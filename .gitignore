@@ -1,0 +1,51 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Generated test, preview, and AI-tool output
+coverage/
+output/
+tmp/
+.codex-temp/
+playwright-report/
+test-results/
+
+# Local deployment metadata
+.vercel/
+.vercelignore
+
+# Internal working files that are not part of the public source release
+progress.md
+tools/
+
+# Keep only the optimized role portraits used by the game. Original artwork
+# remains available locally without making the public repository unnecessarily large.
+/art/*
+!/art/final_roles/
+/art/final_roles/*
+!/art/final_roles/set_20260329_v2/
+/art/final_roles/set_20260329_v2/*
+!/art/final_roles/set_20260329_v2/web/
+!/art/final_roles/set_20260329_v2/web/**
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

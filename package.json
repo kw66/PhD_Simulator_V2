@@ -1,0 +1,35 @@
+{
+  "name": "phd-simulator-v2",
+  "private": true,
+  "version": "0.1.0",
+  "description": "研究生科研与校园生活模拟游戏 2.0",
+  "homepage": "https://kw66.github.io/PhD_Simulator_V2/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kw66/PhD_Simulator_V2.git"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "play": "vite --open",
+    "play:preview": "vite preview --open",
+    "play:local": "vite --host 127.0.0.1 --port 4317",
+    "play:preview:local": "vite preview --host 127.0.0.1 --port 4317 --open",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "playwright": "^1.58.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  }
+}
