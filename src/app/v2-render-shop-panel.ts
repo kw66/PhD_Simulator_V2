@@ -128,7 +128,7 @@ function renderShopTabButtons(activeTab: ShopTabId): string {
 
 function getEconomyLockText(state: GameState): string {
   if (isPreEnrollmentState(state)) {
-    return "正式入学后开放";
+    return "入学后开放";
   }
   if (hasBlockingQueueEvent(state) || state.pendingDecision) {
     return "请先处理待办事件或关键抉择";
@@ -429,13 +429,13 @@ export function renderShopSection(state: GameState, requestedTab?: ShopTabId): s
   const lockText = getEconomyLockText(state);
   const economyLocked = !preEnrollment && lockText.length > 0;
   const content = preEnrollment
-    ? '<div class="section-empty play-module-lock-state">正式入学后开放</div>'
+    ? '<div class="section-empty play-module-lock-state">入学后开放</div>'
     : renderTabContent(state, activeTab, economyLocked);
 
   return `
     <div class="shop-panel" id="shop-panel-col2">
       <div class="shop-header-row">
-        <span class="shop-title">商店</span>
+        <span class="shop-title"><i class="panel-icon">💰</i> 商店</span>
         ${preEnrollment ? "" : `<div class="shop-tab-btns">${renderShopTabButtons(activeTab)}</div>`}
       </div>
       ${!preEnrollment && lockText ? `<div class="shop-state-hint">${escapeHtml(lockText)}</div>` : ""}

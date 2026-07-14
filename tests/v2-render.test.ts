@@ -776,7 +776,10 @@ describe("v2 render lobby shell", () => {
     state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "level5" });
     const html = renderApp(state, createDefaultAccountProfile());
 
-    expect(html.match(/class="section-empty play-module-lock-state">正式入学后开放<\/div>/g)).toHaveLength(3);
+    expect(html.match(/class="section-empty play-module-lock-state">入学后开放<\/div>/g)).toHaveLength(3);
+    expect(html).toContain('<span class="shop-title"><i class="panel-icon">💰</i> 商店</span>');
+    expect(html).toContain('class="paper-switch-btns" id="paper-switch-btns" hidden');
+    expect(html).toContain('class="rel-switch-btns" id="rel-switch-btns" hidden');
     expect(html).not.toContain('class="paper-card paper-card-empty"');
     expect(html).not.toContain("workstation-conference-btn");
     expect(html).not.toContain('data-ui-shop-tab="equipment"');

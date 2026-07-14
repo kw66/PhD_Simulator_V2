@@ -3552,6 +3552,8 @@ button.todo-item:focus-visible {
 }
 
 .workstation-main-actions[hidden],
+.paper-switch-btns[hidden],
+.rel-switch-btns[hidden],
 .conf-info-compact[hidden] {
   display: none;
 }

@@ -1031,7 +1031,7 @@ function renderEmptyWorkstationSlot(state: GameState, slotIndex: number): string
       <div class="paper-card-header">
         <span class="paper-title">论文槽 ${slotIndex + 1}</span>
       </div>
-      <p class="section-empty">${preEnrollment ? "正式入学后开放" : "当前槽位为空，可以开启一篇新论文。"}</p>
+      <p class="section-empty">${preEnrollment ? "入学后开放" : "当前槽位为空，可以开启一篇新论文。"}</p>
       <div class="paper-action-row">
         <button class="paper-action-btn is-primary" type="button" data-action="create-paper" ${preEnrollment ? "disabled" : ""}>开启论文</button>
       </div>
@@ -1197,7 +1197,7 @@ function renderEnhancedWorkstationSection(state: GameState, uiState: PlayRenderU
 
   let mainCardHtml = "";
   if (preEnrollment) {
-    mainCardHtml = '<div class="section-empty play-module-lock-state">正式入学后开放</div>';
+    mainCardHtml = '<div class="section-empty play-module-lock-state">入学后开放</div>';
   } else if (isConferencePanel) {
     mainCardHtml = renderConferenceOverviewPage(state, conferenceMonthOffset);
   } else if (isGraduationPanel) {
@@ -1228,7 +1228,7 @@ function renderEnhancedWorkstationSection(state: GameState, uiState: PlayRenderU
           <span class="btn-effect">SAN+${getShopRestSanGain(state.shopState)}</span>
         </button>
       </div>
-      <div class="paper-switch-btns" id="paper-switch-btns">
+      <div class="paper-switch-btns" id="paper-switch-btns" ${preEnrollment ? "hidden" : ""}>
         ${preEnrollment ? "" : renderEnhancedPaperSwitchButtons(state, activePanelIndex)}
       </div>
       <div class="paper-current-card" id="paper-current-card">
@@ -1542,12 +1542,12 @@ function renderRelationshipSection(state: GameState, uiState: PlayRenderUiState 
         <span><i class="panel-icon">👥</i> 人际关系</span>
         <div class="rel-helper-actions is-empty" id="rel-helper-actions"></div>
       </div>
-      <div class="rel-switch-btns" id="rel-switch-btns">
+      <div class="rel-switch-btns" id="rel-switch-btns" ${preEnrollment ? "hidden" : ""}>
         ${preEnrollment ? "" : renderRelationshipSwitchButtons(cards, activeRelationshipIndex, rel.unlockedSlots)}
       </div>
       <div class="rel-current-card" id="rel-current-card">
         ${preEnrollment
-          ? `<div class="section-empty play-module-lock-state">正式入学后开放</div>`
+          ? `<div class="section-empty play-module-lock-state">入学后开放</div>`
           : renderRelationshipCurrentCard(cards, activeRelationshipIndex, rel.unlockedSlots)}
       </div>
     </div>
