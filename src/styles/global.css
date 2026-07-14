@@ -2945,6 +2945,14 @@ p {
   line-height: 1.58;
 }
 
+.play-module-lock-state {
+  min-height: 132px;
+  display: grid;
+  place-items: center;
+  padding: 28px 16px;
+  text-align: center;
+}
+
 .new-effect-source-box {
   min-height: 0;
   display: grid;

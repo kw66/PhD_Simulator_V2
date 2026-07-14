@@ -770,14 +770,17 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('id="log-nav-next-year" type="button" data-ui-log-nav="last" disabled');
   });
 
-  it("keeps the relationship panel closed before enrollment", () => {
+  it("renders consistent workstation, relationship, and shop locks before enrollment", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
     state = dispatchAction(state, "select-advisor", { advisorId: "level5" });
     state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "level5" });
     const html = renderApp(state, createDefaultAccountProfile());
 
+    expect(html.match(/class="section-empty play-module-lock-state">正式入学后开放<\/div>/g)).toHaveLength(3);
+    expect(html).not.toContain('class="paper-card paper-card-empty"');
+    expect(html).not.toContain("workstation-conference-btn");
+    expect(html).not.toContain('data-ui-shop-tab="equipment"');
     expect(html).toContain('id="relationship-section"');
-    expect(html).toContain("入学后开放");
     expect(html).not.toContain('data-ui-relationship-index="0"');
     expect(html).not.toContain('data-action="advance-advisor-task"');
   });

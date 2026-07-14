@@ -1031,7 +1031,7 @@ function renderEmptyWorkstationSlot(state: GameState, slotIndex: number): string
       <div class="paper-card-header">
         <span class="paper-title">论文槽 ${slotIndex + 1}</span>
       </div>
-      <p class="section-empty">${preEnrollment ? "正式入学后开放。" : "当前槽位为空，可以开启一篇新论文。"}</p>
+      <p class="section-empty">${preEnrollment ? "正式入学后开放" : "当前槽位为空，可以开启一篇新论文。"}</p>
       <div class="paper-action-row">
         <button class="paper-action-btn is-primary" type="button" data-action="create-paper" ${preEnrollment ? "disabled" : ""}>开启论文</button>
       </div>
@@ -1197,14 +1197,7 @@ function renderEnhancedWorkstationSection(state: GameState, uiState: PlayRenderU
 
   let mainCardHtml = "";
   if (preEnrollment) {
-    mainCardHtml = `
-      <div class="paper-card paper-card-empty">
-        <div class="paper-card-header">
-          <span class="paper-title">科研工作站</span>
-        </div>
-        <p class="section-empty">正式入学后开放。</p>
-      </div>
-    `;
+    mainCardHtml = '<div class="section-empty play-module-lock-state">正式入学后开放</div>';
   } else if (isConferencePanel) {
     mainCardHtml = renderConferenceOverviewPage(state, conferenceMonthOffset);
   } else if (isGraduationPanel) {
@@ -1218,7 +1211,7 @@ function renderEnhancedWorkstationSection(state: GameState, uiState: PlayRenderU
       <div class="section-header">
         <span><i class="panel-icon">📄</i> 科研工作站</span>
         <div class="workstation-header-actions">
-          <button class="btn-sm workstation-conference-btn${isConferencePanel ? " active" : ""}" type="button" data-ui-workstation-panel-index="${WORKSTATION_CONFERENCE_PANEL_INDEX}" ${preEnrollment ? "disabled" : ""}>会议信息</button>
+          ${preEnrollment ? "" : `<button class="btn-sm workstation-conference-btn${isConferencePanel ? " active" : ""}" type="button" data-ui-workstation-panel-index="${WORKSTATION_CONFERENCE_PANEL_INDEX}">会议信息</button>`}
         </div>
       </div>
       <div class="workstation-main-actions" id="workstation-main-actions" ${preEnrollment || isConferencePanel ? "hidden" : ""}>
@@ -1554,7 +1547,7 @@ function renderRelationshipSection(state: GameState, uiState: PlayRenderUiState 
       </div>
       <div class="rel-current-card" id="rel-current-card">
         ${preEnrollment
-          ? `<div class="section-empty">入学后开放</div>`
+          ? `<div class="section-empty play-module-lock-state">正式入学后开放</div>`
           : renderRelationshipCurrentCard(cards, activeRelationshipIndex, rel.unlockedSlots)}
       </div>
     </div>
