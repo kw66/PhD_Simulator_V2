@@ -59,8 +59,8 @@ describe("v2 progression", () => {
     for (const advisor of getAdvisorOptions()) {
       expect(getAdvisorSalaryForMonth(advisor.id, "master", 1)).toBe(1);
       expect(getAdvisorSalaryForMonth(advisor.id, "master", 8)).toBe(1);
-      expect(getAdvisorSalaryForMonth(advisor.id, "phd", 1)).toBe(2);
-      expect(getAdvisorSalaryForMonth(advisor.id, "phd", 8)).toBe(2);
+      expect(getAdvisorSalaryForMonth(advisor.id, "phd", 1)).toBe(3);
+      expect(getAdvisorSalaryForMonth(advisor.id, "phd", 8)).toBe(3);
     }
   });
 

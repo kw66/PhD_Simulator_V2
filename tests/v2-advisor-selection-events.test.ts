@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createInitialState } from "../src/core/v2-engine";
+import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { applyFixedEventResolution } from "../src/core/v2-fixed-events";
 import {
   createAdvisorSelectionAct1Event,
@@ -9,6 +9,14 @@ import {
 import type { FixedEventResolution } from "../src/core/v2-types";
 
 describe("v2 advisor selection events", () => {
+  it("always triggers advisor selection when a new game has no advisor", () => {
+    const state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
+
+    expect(state.eventQueue).toHaveLength(1);
+    expect(state.eventQueue[0]?.chainId).toBe("advisor-selection");
+    expect(state.eventQueue[0]?.stage).toBe("act1");
+  });
+
   it("uses four lecturer candidates whose buttons contain names only", () => {
     const act1 = createAdvisorSelectionAct1Event(createInitialState());
     const act2 = act1.choices[0]?.effects.enqueueEvents?.[0];
@@ -61,7 +69,7 @@ describe("v2 advisor selection events", () => {
     });
     expect(result.outcome).toContain("陈明讲师");
     expect(resultEvent?.description).toContain("导师：陈明 | 职称：讲师");
-    expect(resultEvent?.description).toContain("月工资配置：硕士 1 | 博士 2.5");
+    expect(resultEvent?.description).toContain("月工资：硕士 1 | 博士 3");
     expect(resultEvent?.description).toContain("毕业要求：硕士 1 分 | 博士 7 分");
     expect(resultEvent?.description).toContain("下周一上午九点是第一次组会");
     expect(resultEvent?.choices[0]?.label).toBe("确认并入学");

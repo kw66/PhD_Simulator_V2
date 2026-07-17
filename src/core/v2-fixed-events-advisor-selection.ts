@@ -72,7 +72,7 @@ function createAdvisorSelectionResultEvent(
       "报到后，你领了学生卡，也被拉进了课题组群。下周一上午九点是第一次组会。",
       `导师：${advisor.name} | 职称：讲师`,
       `导师信息：科研资源 ${candidate.researchResource} | 亲和度 ${candidate.affinity}`,
-      `月工资配置：硕士 ${ADVISOR_SALARY.master} | 博士 ${ADVISOR_SALARY.phd}`,
+      `月工资：硕士 ${ADVISOR_SALARY.master} | 博士 ${ADVISOR_SALARY.phd}`,
       `毕业要求：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分 | 博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分`,
       `转博要求：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分 | 第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
     ].join("\n\n"),

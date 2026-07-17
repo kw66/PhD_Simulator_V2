@@ -271,7 +271,7 @@ export const ADVISOR_REQUIREMENTS: AdvisorRequirements = {
   phdGrad: 7,
 };
 
-export const ADVISOR_SALARY = { master: 1, phd: 2.5 } as const;
+export const ADVISOR_SALARY = { master: 1, phd: 3 } as const;
 
 export const SCORE_BY_TARGET: Record<PaperTarget, number> = { C: 1, B: 2, A: 4 };
 export const REVIEW_MONTHS_BY_TARGET: Record<PaperTarget, number> = { C: 4, B: 4, A: 4 };
