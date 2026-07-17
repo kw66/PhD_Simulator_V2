@@ -22,7 +22,7 @@ import {
 } from "./v2-engine-relationship-actions";
 import { pushLog } from "./v2-engine-helpers";
 import { createStartedGameState } from "./v2-engine-state-factory";
-import { createAdvisorSelectionAct1Event } from "./v2-fixed-events-advisor-selection";
+import { createSeniorSummerAct1Event } from "./v2-fixed-events-senior-summer";
 import { enqueueEventQueueItem } from "./v2-event-queue";
 import type {
   DispatchPayload,
@@ -71,8 +71,8 @@ export function dispatchSetupAction(
         return startedState;
       }
       return pushLog(
-        enqueueEventQueueItem(startedState, createAdvisorSelectionAct1Event(startedState)) as GameState,
-        "触发事件：保研抉择",
+        enqueueEventQueueItem(startedState, createSeniorSummerAct1Event(startedState)) as GameState,
+        "触发事件：大四暑假",
       );
     }
     case "reset-game":

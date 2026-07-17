@@ -2,7 +2,7 @@ import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-
 import type { CareerType } from "./v2-career-rules";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { clampSan, pushLog } from "./v2-engine-helpers";
-import { createAdvisorSelectionAct1Event } from "./v2-fixed-events-advisor-selection";
+import { createSeniorSummerAct1Event } from "./v2-fixed-events-senior-summer";
 import { createCcigEvent } from "./v2-fixed-events-ccig";
 import { createMidtermMessageEvent } from "./v2-fixed-events-midterm";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
@@ -78,9 +78,9 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
   {
     id: "further-study",
     title: "升学剧情",
-    description: "对齐旧版设置栏里的保研与转博入口。",
+    description: "用于入学前与转博流程的定向测试。",
     buttons: [
-      { id: "advisor-selection", label: "保研抉择" },
+      { id: "senior-summer", label: "大四暑假" },
       { id: "phd-choice", label: "转博抉择" },
     ],
   },
@@ -435,8 +435,8 @@ function buildDebugEvent(state: GameState, eventId: string): { nextState: GameSt
       return { nextState: state, event: createCcigEvent(state) };
     case "mentor-assign":
       return { nextState: state, event: createMentorAssignEvent(state, Math.random) };
-    case "advisor-selection":
-      return { nextState: state, event: createAdvisorSelectionAct1Event(state) };
+    case "senior-summer":
+      return { nextState: state, event: createSeniorSummerAct1Event(state) };
     case "thesis-progress":
       return collectThesisEventForMonth(state);
     case "phd-choice": {

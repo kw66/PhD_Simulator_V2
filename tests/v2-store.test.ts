@@ -123,8 +123,8 @@ describe("v2 store manual saves", () => {
     expect(store.getState().papers).toHaveLength(1);
     expect(store.getState().log[0]?.text).toContain("论文结果");
 
-    store.dispatch("debug-trigger-event", { eventId: "advisor-selection" });
-    expect(store.getState().eventQueue.some((item) => item.chainId === "advisor-selection")).toBe(true);
+    store.dispatch("debug-trigger-event", { eventId: "senior-summer" });
+    expect(store.getState().eventQueue.some((item) => item.chainId === "senior-summer")).toBe(true);
 
     store.dispatch("debug-shift-month", { delta: 12 });
     expect(store.getState().totalMonths).toBe(12);

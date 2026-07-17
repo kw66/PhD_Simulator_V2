@@ -1,4 +1,5 @@
 export type FixedEventResolutionKind =
+  | "advisor-assign"
   | "advisor-select"
   | "advisor-select-tier"
   | "teachers-day-message"
