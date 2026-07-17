@@ -732,14 +732,20 @@ describe("v2 render lobby shell", () => {
 
     expect(todoPreviewBlock).toContain('class="todo-item todo-preview-item todo-preview-current"');
     expect(todoPreviewBlock).toContain(`data-ui-open-event-id="${state.eventQueue[0]?.id}"`);
+    expect(todoPreviewBlock).toContain('class="todo-group todo-group-current"');
     expect(todoPreviewBlock).toContain("保研抉择");
-    expect(todoPreviewBlock).toContain("剧情");
+    expect(todoPreviewBlock).toContain("本月");
     expect(todoPreviewBlock).toContain('class="todo-item todo-preview-item todo-preview-future"');
+    expect(todoPreviewBlock).toContain('class="todo-group todo-group-future"');
+    expect(todoPreviewBlock).toContain('class="todo-group-divider" role="separator"');
     expect(todoPreviewBlock).toContain("论文结果");
     expect(todoPreviewBlock).toContain("2月后");
     expect(todoPreviewBlock).toContain("教师节");
     expect(todoPreviewBlock).toContain("1月后");
-    expect(todoPreviewBlock).toContain("预告");
+    expect(todoPreviewBlock).not.toContain("剧情");
+    expect(todoPreviewBlock).not.toContain("预告");
+    expect(todoPreviewBlock).not.toContain("todo-type-badge");
+    expect(todoPreviewBlock).not.toContain("todo-item-head");
     expect(todoPreviewBlock).not.toContain("选择你的研究生导师");
     expect(todoPreviewBlock).not.toContain("在审论文将在该月返回结果。");
   });
@@ -763,11 +769,14 @@ describe("v2 render lobby shell", () => {
     state = dispatchAction(state, "next-month");
     const html = renderApp(state, createDefaultAccountProfile());
 
+    expect(html).toContain('class="log-header-title-row"');
+    expect(html).toContain('class="log-header-controls-row"');
+    expect(html.indexOf('class="log-header-title-row"')).toBeLessThan(html.indexOf('class="log-header-controls-row"'));
     expect(html).toContain('id="log-time-header">第1年第1月<');
     expect(html).toContain('id="log-nav-prev-year" type="button" data-ui-log-nav="first"');
     expect(html).toContain('id="log-nav-prev-month" type="button" data-ui-log-nav="prev"');
-    expect(html).toContain('id="log-nav-next-month" type="button" data-ui-log-nav="next" disabled');
-    expect(html).toContain('id="log-nav-next-year" type="button" data-ui-log-nav="last" disabled');
+    expect(html).toMatch(/id="log-nav-next-month"[^>]*data-ui-log-nav="next"[^>]*disabled/);
+    expect(html).toMatch(/id="log-nav-next-year"[^>]*data-ui-log-nav="last"[^>]*disabled/);
   });
 
   it("renders consistent workstation, relationship, and shop locks before enrollment", () => {

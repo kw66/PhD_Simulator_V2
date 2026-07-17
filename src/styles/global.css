@@ -1517,6 +1517,8 @@ p {
 }
 
 .play-page {
+  --play-divider-strong: 2px solid var(--setup-divider);
+  --play-divider-thin: 1px solid rgba(39, 68, 58, 0.14);
   position: relative;
   isolation: isolate;
   width: 100%;
@@ -1584,7 +1586,7 @@ p {
   gap: 24px;
   align-items: start;
   padding: 24px 0 18px;
-  border-bottom: 2px solid var(--setup-divider);
+  border-bottom: var(--play-divider-strong);
   box-shadow: inset 0 -1px 0 var(--setup-divider-highlight);
 }
 
@@ -1694,7 +1696,7 @@ p {
   align-content: start;
   gap: 0;
   padding: 18px 20px 0 0;
-  border-right: 2px solid var(--setup-divider);
+  border-right: var(--play-divider-strong);
   box-shadow: 1px 0 0 var(--setup-divider-highlight);
 }
 
@@ -1710,7 +1712,7 @@ p {
   grid-template-rows: auto 1fr;
   gap: 0;
   padding: 18px 0 0 20px;
-  border-left: 2px solid var(--setup-divider);
+  border-left: var(--play-divider-strong);
   box-shadow: inset 1px 0 0 var(--setup-divider-highlight);
 }
 
@@ -1723,7 +1725,7 @@ p {
 .play-left-section.is-effects,
 .play-right-section.is-log {
   padding-top: 16px;
-  border-top: 1px solid rgba(39, 68, 58, 0.14);
+  border-top: var(--play-divider-thin);
 }
 
 .play-section-heading {
@@ -1732,7 +1734,7 @@ p {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(39, 68, 58, 0.14);
+  border-bottom: var(--play-divider-thin);
 }
 
 .play-section-heading h2 {
@@ -1863,7 +1865,7 @@ p {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 0;
-  border-bottom: 2px solid var(--setup-divider);
+  border-bottom: var(--play-divider-strong);
   box-shadow: inset 0 -1px 0 var(--setup-divider-highlight);
 }
 
@@ -1874,7 +1876,7 @@ p {
   min-height: 48px;
   padding: 0 8px;
   border: 0;
-  border-right: 1px solid rgba(39, 68, 58, 0.1);
+  border-right: var(--play-divider-thin);
   background: transparent;
   color: color-mix(in oklab, var(--ink-soft) 88%, var(--paper-strong));
   font-size: 0.8rem;
@@ -1990,7 +1992,7 @@ p {
   display: grid;
   gap: 6px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(39, 68, 58, 0.1);
+  border-bottom: var(--play-divider-thin);
 }
 
 .play-log-item:last-child {
@@ -2365,7 +2367,7 @@ p {
   align-content: start;
   gap: 18px;
   padding: 12px 18px 0 0;
-  border-right: 2px solid var(--setup-divider);
+  border-right: var(--play-divider-strong);
   box-shadow: 1px 0 0 var(--setup-divider-highlight);
 }
 
@@ -2381,7 +2383,7 @@ p {
   align-content: start;
   gap: 18px;
   padding: 12px 0 0 18px;
-  border-left: 2px solid var(--setup-divider);
+  border-left: var(--play-divider-strong);
   box-shadow: inset 1px 0 0 var(--setup-divider-highlight);
 }
 
@@ -2450,8 +2452,7 @@ p {
 .shop-item-head,
 .rel-card-head,
 .research-card-header,
-.talent-item-head,
-.todo-item-head {
+.talent-item-head {
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -2479,7 +2480,6 @@ p {
 .shop-item-value,
 .research-info-item,
 .talent-item-tag,
-.todo-type-badge,
 .todo-deadline,
 .log-entry-month,
 .settings-section-title,
@@ -2697,7 +2697,7 @@ p {
 
 .new-currency-item {
   padding-bottom: 12px;
-  border-bottom: 2px solid rgba(39, 68, 58, 0.22);
+  border-bottom: var(--play-divider-strong);
 }
 
 .new-effect-panel {
@@ -2748,7 +2748,6 @@ p {
 .event-type-badge,
 .event-deadline-badge,
 .event-ddl-badge,
-.todo-type-badge,
 .todo-deadline,
 .center-tab-badge,
 .event-badge {
@@ -2764,7 +2763,6 @@ p {
 
 .section-header,
 .event-header-row,
-.log-header-row,
 .shop-header-row,
 .talent-header-row,
 .settings-header-row,
@@ -2774,7 +2772,7 @@ p {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(39, 68, 58, 0.14);
+  border-bottom: var(--play-divider-thin);
 }
 
 .new-effect-subtitle,
@@ -2800,7 +2798,7 @@ p {
 }
 
 .new-effect-grid .new-effect-section:not(:last-child) {
-  border-bottom: 1px solid rgba(39, 68, 58, 0.1);
+  border-bottom: var(--play-divider-thin);
 }
 
 #new-effect-section-permanent {
@@ -2823,7 +2821,7 @@ p {
   grid-template-columns: 1fr;
   gap: 8px;
   padding-top: 10px;
-  border-top: 1px solid rgba(39, 68, 58, 0.14);
+  border-top: var(--play-divider-thin);
 }
 
 .new-effect-section .new-effect-subtitle {
@@ -2994,7 +2992,7 @@ p {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 0;
-  border-bottom: 2px solid var(--setup-divider);
+  border-bottom: var(--play-divider-strong);
   box-shadow: inset 0 -1px 0 var(--setup-divider-highlight);
 }
 
@@ -3025,7 +3023,7 @@ p {
   min-height: 44px;
   padding: 0 8px;
   border: 0;
-  border-right: 1px solid rgba(39, 68, 58, 0.1);
+  border-right: var(--play-divider-thin);
   background: transparent;
   color: var(--setup-label-color);
   font-size: 0.84rem;
@@ -3842,7 +3840,7 @@ button.todo-item:focus-visible {
 }
 
 .event-content-box {
-  border-top: 1px solid rgba(39, 68, 58, 0.18);
+  border-top: var(--play-divider-thin);
   background: linear-gradient(180deg, rgba(255, 252, 246, 0.84), rgba(240, 233, 220, 0.56));
 }
 
@@ -3852,7 +3850,7 @@ button.todo-item:focus-visible {
   justify-content: space-between;
   gap: 10px;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(39, 68, 58, 0.18);
+  border-bottom: var(--play-divider-thin);
   background: linear-gradient(180deg, rgba(248, 243, 234, 0.96), rgba(238, 230, 217, 0.9));
 }
 
@@ -3931,7 +3929,7 @@ button.todo-item:focus-visible {
   flex-wrap: wrap;
   gap: 8px;
   padding: 8px 10px 10px;
-  border-top: 1px solid rgba(39, 68, 58, 0.16);
+  border-top: var(--play-divider-thin);
   background: linear-gradient(180deg, rgba(244, 238, 228, 0.88), rgba(239, 232, 220, 0.94));
   border-radius: 0 0 16px 16px;
 }
@@ -4018,7 +4016,7 @@ button.todo-item:focus-visible {
   border-radius: 0;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid rgba(39, 68, 58, 0.12);
+  border-bottom: var(--play-divider-thin);
   box-shadow: none;
 }
 
@@ -4030,12 +4028,68 @@ button.todo-item:focus-visible {
   background: rgba(39, 68, 58, 0.04);
 }
 
-.todo-preview-future {
-  opacity: 0.92;
+.new-todo-content {
+  gap: 0;
 }
 
-.todo-preview-future .todo-type-badge {
-  color: color-mix(in oklab, var(--setup-label-color) 88%, white);
+.new-todo-list,
+.todo-group {
+  display: grid;
+  gap: 0;
+}
+
+.new-todo-list .todo-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.new-todo-list .todo-item:not(:last-child) {
+  border-bottom: var(--play-divider-thin);
+}
+
+.new-todo-list .todo-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--ui-font-cjk);
+  font-size: 0.82rem;
+  font-weight: 660;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-todo-list .todo-deadline {
+  min-height: 20px;
+  padding: 0 7px;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.new-todo-list button.todo-item:hover {
+  border-color: transparent;
+  background: rgba(39, 68, 58, 0.045);
+}
+
+.todo-preview-future {
+  opacity: 0.78;
+}
+
+.todo-group-divider {
+  height: 0;
+  margin: 5px 0;
+  border-top: var(--play-divider-strong);
 }
 
 .log-entry .event,
@@ -4065,6 +4119,46 @@ button.todo-item:focus-visible {
   gap: 14px;
 }
 
+.log-header-row {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: var(--play-divider-thin);
+}
+
+.log-header-title-row,
+.log-header-controls-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.log-header-title-row {
+  justify-content: flex-start;
+}
+
+.log-header-controls-row {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.log-title,
+.log-time {
+  white-space: nowrap;
+}
+
+.log-header-controls-row .log-nav-btns {
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.log-header-controls-row .log-nav-btn {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+}
+
 .new-time-row {
   flex-wrap: wrap;
   gap: 10px;
@@ -4086,7 +4180,6 @@ button.todo-item:focus-visible {
 
 .event-type-badge,
 .event-ddl-badge,
-.todo-type-badge,
 .todo-deadline {
   font-size: var(--type-kicker);
   font-weight: 730;

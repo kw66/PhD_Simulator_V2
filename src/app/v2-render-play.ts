@@ -82,14 +82,10 @@ type LogPage = {
 type TodoPreviewItem = {
   key: string;
   title: string;
-  preview: string;
-  badgeText: string;
-  deadlineText: string;
+  timeText: string;
   monthsLater: number;
-  sortGroup: number;
   sortOrder: number;
   eventId: string | null;
-  isFuture: boolean;
 };
 
 function escapeHtml(value: string): string {
@@ -555,7 +551,7 @@ function getDeadlineText(deadlineMonths: number): string {
   return `剩${deadlineMonths}月`;
 }
 
-function getFutureDeadlineText(monthsLater: number): string {
+function getFutureOccurrenceText(monthsLater: number): string {
   return `${Math.max(1, monthsLater)}月后`;
 }
 
@@ -563,14 +559,10 @@ function buildCurrentTodoPreviewItems(state: GameState): TodoPreviewItem[] {
   return getSortedEventQueue(state.eventQueue).map((event, index) => ({
     key: event.id,
     title: event.title,
-    preview: event.preview,
-    badgeText: getEventBadgeLabel(event),
-    deadlineText: getDeadlineText(event.deadlineMonths),
+    timeText: getDeadlineText(event.deadlineMonths),
     monthsLater: Math.max(0, event.deadlineMonths),
-    sortGroup: 0,
     sortOrder: index,
     eventId: event.id,
-    isFuture: false,
   }));
 }
 
@@ -611,14 +603,10 @@ function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[] {
     items.push({
       key: params.key,
       title: params.title,
-      preview: "",
-      badgeText: "预告",
-      deadlineText: getFutureDeadlineText(params.monthsLater),
+      timeText: getFutureOccurrenceText(params.monthsLater),
       monthsLater: params.monthsLater,
-      sortGroup: 1,
       sortOrder,
       eventId: null,
-      isFuture: true,
     });
     sortOrder += 1;
   };
@@ -2263,51 +2251,57 @@ function renderLegacyCenterShell(state: GameState, uiState: PlayRenderUiState = 
   `;
 }
 
-function renderTodoPreviewList(state: GameState): string {
-  const items = [
-    ...buildCurrentTodoPreviewItems(state),
-    ...buildFutureTodoPreviewItems(state),
-  ].sort((left, right) => {
+function sortTodoPreviewItems(items: TodoPreviewItem[]): TodoPreviewItem[] {
+  return [...items].sort((left, right) => {
     if (left.monthsLater !== right.monthsLater) {
       return left.monthsLater - right.monthsLater;
     }
-    if (left.sortGroup !== right.sortGroup) {
-      return left.sortGroup - right.sortGroup;
-    }
     return left.sortOrder - right.sortOrder;
   });
+}
 
-  if (items.length === 0) {
+function renderTodoPreviewRow(item: TodoPreviewItem): string {
+  const content = `
+    <strong class="todo-title">${escapeHtml(item.title)}</strong>
+    <span class="todo-deadline">${escapeHtml(item.timeText)}</span>
+  `;
+
+  if (item.eventId) {
+    return `
+      <button
+        class="todo-item todo-preview-item todo-preview-current"
+        type="button"
+        data-ui-open-event-id="${escapeHtml(item.eventId)}"
+      >${content}</button>
+    `;
+  }
+
+  return `
+    <article class="todo-item todo-preview-item todo-preview-future" data-todo-key="${escapeHtml(item.key)}">
+      ${content}
+    </article>
+  `;
+}
+
+function renderTodoPreviewList(state: GameState): string {
+  const currentItems = sortTodoPreviewItems(buildCurrentTodoPreviewItems(state));
+  const futureItems = sortTodoPreviewItems(buildFutureTodoPreviewItems(state));
+
+  if (currentItems.length === 0 && futureItems.length === 0) {
     return `<div class="todo-empty">暂无待办事件</div>`;
   }
 
   return `
     <div class="new-todo-list">
-      ${items.map((item) => `
-        ${item.eventId
-          ? `
-            <button
-              class="todo-item todo-preview-item todo-preview-current"
-              type="button"
-              data-ui-open-event-id="${escapeHtml(item.eventId)}"
-            >
-              <div class="todo-item-head">
-                <span class="todo-type-badge">${escapeHtml(item.badgeText)}</span>
-                <span class="todo-deadline">${escapeHtml(item.deadlineText)}</span>
-              </div>
-              <strong class="todo-title">${escapeHtml(item.title)}</strong>
-            </button>
-          `
-          : `
-            <article class="todo-item todo-preview-item todo-preview-future">
-              <div class="todo-item-head">
-                <span class="todo-type-badge">${escapeHtml(item.badgeText)}</span>
-                <span class="todo-deadline">${escapeHtml(item.deadlineText)}</span>
-              </div>
-              <strong class="todo-title">${escapeHtml(item.title)}</strong>
-            </article>
-          `}
-      `).join("")}
+      ${currentItems.length > 0
+        ? `<div class="todo-group todo-group-current">${currentItems.map(renderTodoPreviewRow).join("")}</div>`
+        : ""}
+      ${currentItems.length > 0 && futureItems.length > 0
+        ? '<div class="todo-group-divider" role="separator" aria-label="已发生与未发生事件分隔"></div>'
+        : ""}
+      ${futureItems.length > 0
+        ? `<div class="todo-group todo-group-future">${futureItems.map(renderTodoPreviewRow).join("")}</div>`
+        : ""}
     </div>
   `;
 }
@@ -2402,13 +2396,17 @@ function renderLegacyRightRail(state: GameState, uiState: PlayRenderUiState = {}
       <div class="new-right-log-panel" id="new-right-log-panel">
         <div class="log-panel" data-log-page-index="${resolvedLogPageIndex}" data-log-page-count="${logPages.length}">
           <div class="log-header-row">
-            <span class="log-title">游戏日志</span>
-            <span class="log-time" id="log-time-header">${activeLogPage?.label ?? "暂无日志"}</span>
-            <div class="log-nav-btns">
-              <button class="log-nav-btn" id="log-nav-prev-year" type="button" data-ui-log-nav="first" ${atFirstLogPage ? "disabled" : ""}>«</button>
-              <button class="log-nav-btn" id="log-nav-prev-month" type="button" data-ui-log-nav="prev" ${atFirstLogPage ? "disabled" : ""}>‹</button>
-              <button class="log-nav-btn" id="log-nav-next-month" type="button" data-ui-log-nav="next" ${atLastLogPage ? "disabled" : ""}>›</button>
-              <button class="log-nav-btn" id="log-nav-next-year" type="button" data-ui-log-nav="last" ${atLastLogPage ? "disabled" : ""}>»</button>
+            <div class="log-header-title-row">
+              <span class="log-title">游戏日志</span>
+            </div>
+            <div class="log-header-controls-row">
+              <span class="log-time" id="log-time-header">${activeLogPage?.label ?? "暂无日志"}</span>
+              <div class="log-nav-btns">
+                <button class="log-nav-btn" id="log-nav-prev-year" type="button" data-ui-log-nav="first" aria-label="最早日志" ${atFirstLogPage ? "disabled" : ""}>«</button>
+                <button class="log-nav-btn" id="log-nav-prev-month" type="button" data-ui-log-nav="prev" aria-label="上一月日志" ${atFirstLogPage ? "disabled" : ""}>‹</button>
+                <button class="log-nav-btn" id="log-nav-next-month" type="button" data-ui-log-nav="next" aria-label="下一月日志" ${atLastLogPage ? "disabled" : ""}>›</button>
+                <button class="log-nav-btn" id="log-nav-next-year" type="button" data-ui-log-nav="last" aria-label="最新日志" ${atLastLogPage ? "disabled" : ""}>»</button>
+              </div>
             </div>
           </div>
           <div class="log-content" id="log-content">
