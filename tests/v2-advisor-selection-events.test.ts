@@ -22,7 +22,7 @@ describe("v2 advisor selection events", () => {
     const act2 = act1.choices[0]?.effects.enqueueEvents?.[0];
 
     expect(act2?.stage).toBe("act2");
-    expect(act2?.description).toContain("四位讲师");
+    expect(act2?.description).toContain("四位老师的回复陆续到了");
     expect(act2?.choices.map((choice) => choice.label)).toEqual(["陈明", "周岚", "林浩", "赵宁"]);
     expect(act2?.choices).toHaveLength(4);
 
@@ -38,9 +38,13 @@ describe("v2 advisor selection events", () => {
     ]);
 
     const visibleCopy = `${act1.description}\n${act2?.description ?? ""}`;
+    expect(act1.description).toContain("等第一篇论文录用，再把邮件截图发给家里");
+    expect(act1.description).toContain("你已经有点期待开学了");
+    expect(act2?.description).toContain("问了些不方便写在邮件里的问题");
     expect(visibleCopy).not.toContain("真正影响未来三到五年体验");
     expect(visibleCopy).not.toContain("人生的十字路口");
     expect(visibleCopy).not.toContain("未来生活方式");
+    expect(visibleCopy).not.toContain("学院说明四人的培养条件相同");
   });
 
   it("uses the shared lecturer profile after choosing a name", () => {
@@ -71,7 +75,9 @@ describe("v2 advisor selection events", () => {
     expect(resultEvent?.description).toContain("导师：陈明 | 职称：讲师");
     expect(resultEvent?.description).toContain("月工资：硕士 1 | 博士 3");
     expect(resultEvent?.description).toContain("毕业要求：硕士 1 分 | 博士 7 分");
-    expect(resultEvent?.description).toContain("下周一上午九点是第一次组会");
+    expect(resultEvent?.description).toContain("收到，开学见");
+    expect(resultEvent?.description).toContain("争取第一次组会别太狼狈");
+    expect(resultEvent?.description).toContain("终于不再只是想象了");
     expect(resultEvent?.choices[0]?.label).toBe("确认并入学");
     expect(resultEvent?.description).not.toContain("锚定");
     expect(resultEvent?.description).not.toContain("真实现场");
