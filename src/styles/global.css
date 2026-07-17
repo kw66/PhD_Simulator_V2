@@ -2552,6 +2552,14 @@ p {
   letter-spacing: 0.015em;
 }
 
+.event-card .event-title {
+  font-family: var(--ui-font-cjk);
+  font-size: 0.9rem;
+  font-weight: 680;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
 .log-entry-text,
 .settings-summary-row {
   font-family: var(--ui-font-cjk);
