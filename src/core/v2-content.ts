@@ -1,4 +1,4 @@
-import type { AdvisorDefinition, AdvisorTierId, PaperTarget, RoleBaseId, RoleDefinition, RoleId } from "./v2-types";
+import type { AdvisorDefinition, AdvisorRequirements, PaperTarget, RoleBaseId, RoleDefinition, RoleId } from "./v2-types";
 
 export const MASTER_TOTAL_MONTHS = 34;
 export const PHD_TOTAL_MONTHS = 58;
@@ -25,8 +25,6 @@ export const ROLE_ORDER: RoleId[] = [
   "teacher-child-reversed",
   "chosen-reversed",
 ];
-export const ADVISOR_ORDER: AdvisorTierId[] = ["level5", "level4", "level3", "level2", "level1"];
-
 export const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
     id: "normal",
@@ -260,18 +258,25 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
 ];
 
 export const ADVISOR_DEFINITIONS: AdvisorDefinition[] = [
-  { id: "level1", name: "一级教授", title: "院士", color: "#b8860b", salary: { master: 1.75, phd: 3.5 }, requirements: { phdYear2: 4, phdYear3: 6, masterGrad: 3, phdGrad: 15 } },
-  { id: "level2", name: "二级教授", title: "长江 / 千人 / 杰青", color: "#e67e22", salary: { master: 1.5, phd: 3.25 }, requirements: { phdYear2: 3, phdYear3: 5, masterGrad: 3, phdGrad: 13 } },
-  { id: "level3", name: "三级教授", title: "四青", color: "#9b59b6", salary: { master: 1.25, phd: 3.0 }, requirements: { phdYear2: 3, phdYear3: 4, masterGrad: 2, phdGrad: 11 } },
-  { id: "level4", name: "四级教授", title: "教授", color: "#3498db", salary: { master: 1.0, phd: 2.75 }, requirements: { phdYear2: 2, phdYear3: 3, masterGrad: 2, phdGrad: 9 } },
-  { id: "level5", name: "副教授", title: "副教授", color: "#2ecc71", salary: { master: 1.0, phd: 2.5 }, requirements: { phdYear2: 2, phdYear3: 3, masterGrad: 1, phdGrad: 7 } },
+  { id: "chen-ming", name: "陈明", color: "#b8860b" },
+  { id: "zhou-lan", name: "周岚", color: "#e67e22" },
+  { id: "lin-hao", name: "林浩", color: "#3498db" },
+  { id: "zhao-ning", name: "赵宁", color: "#2ecc71" },
 ];
+
+export const ADVISOR_REQUIREMENTS: AdvisorRequirements = {
+  phdYear2: 2,
+  phdYear3: 3,
+  masterGrad: 1,
+  phdGrad: 7,
+};
+
+export const ADVISOR_SALARY = { master: 1, phd: 2.5 } as const;
 
 export const SCORE_BY_TARGET: Record<PaperTarget, number> = { C: 1, B: 2, A: 4 };
 export const REVIEW_MONTHS_BY_TARGET: Record<PaperTarget, number> = { C: 4, B: 4, A: 4 };
 export const ACCEPT_THRESHOLD_BY_TARGET: Record<PaperTarget, number> = { C: 10, B: 18, A: 26 };
 export const SUBMIT_READY_THRESHOLD_BY_TARGET: Record<PaperTarget, number> = { C: 6, B: 12, A: 18 };
-export const ADVISOR_SUPPORT_BY_LEVEL: Record<AdvisorTierId, number> = { level1: 4, level2: 3, level3: 2, level4: 1, level5: 0 };
 export const PAPER_SLOT_RESEARCH_THRESHOLDS = [0, 6, 12, 18] as const;
 export const NATURE_SUBMISSION_THRESHOLD = 150;
 export const NATURE_SUBMISSION_SUB_THRESHOLD = 100;

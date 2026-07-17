@@ -1,13 +1,12 @@
 import {
   ACCEPT_THRESHOLD_BY_TARGET,
-  ADVISOR_SUPPORT_BY_LEVEL,
   PAPER_SLOT_LIMIT,
   PAPER_SLOT_RESEARCH_THRESHOLDS,
   REVIEW_MONTHS_BY_TARGET,
   SCORE_BY_TARGET,
   SUBMIT_READY_THRESHOLD_BY_TARGET,
 } from "./v2-content";
-import type { AdvisorTierId, GameState, Paper, PaperTarget } from "./v2-types";
+import type { GameState, Paper, PaperTarget } from "./v2-types";
 
 export function getSelectedPaper(state: Pick<GameState, "papers" | "selectedPaperId">, paperId?: string): Paper | null {
   const targetId = paperId ?? state.selectedPaperId;
@@ -60,7 +59,6 @@ export function markPaperReviewing(paper: Paper, target: PaperTarget, submittedM
 export function resolvePaperReview(
   paper: Paper,
   playerResearch: number,
-  advisorId: AdvisorTierId | null,
 ): { nextPaper: Paper; scoreGain: number; text: string } {
   if (!paper.target) {
     return { nextPaper: paper, scoreGain: 0, text: `${paper.title} 缺少投稿目标。` };
@@ -69,8 +67,7 @@ export function resolvePaperReview(
   const submittedIdea = paper.submittedIdea ?? paper.idea;
   const submittedExperiment = paper.submittedExperiment ?? paper.experiment;
   const submittedWriting = paper.submittedWriting ?? paper.writing;
-  const advisorSupport = advisorId ? ADVISOR_SUPPORT_BY_LEVEL[advisorId] : 0;
-  const quality = submittedIdea + submittedExperiment + submittedWriting + playerResearch + advisorSupport;
+  const quality = submittedIdea + submittedExperiment + submittedWriting + playerResearch;
   const accepted = quality >= ACCEPT_THRESHOLD_BY_TARGET[paper.target];
 
   if (accepted) {

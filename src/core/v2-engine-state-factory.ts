@@ -26,7 +26,7 @@ import { createLoverState } from "./v2-lover-system";
 import { createLoverProgressState } from "./v2-lover-progression";
 import { createJointTrainingState } from "./v2-joint-training-system";
 import { createResearchCapacityState } from "./v2-research-cap-system";
-import type { AdvisorTierId, GameState, RoleId } from "./v2-types";
+import type { AdvisorId, GameState, RoleId } from "./v2-types";
 
 export function createInitialState(): GameState {
   const calendar = getCalendarForTotalMonths(0);
@@ -89,7 +89,7 @@ export function createInitialState(): GameState {
   };
 }
 
-export function createStartedGameState(roleId: RoleId, advisorId: AdvisorTierId | null = null): GameState {
+export function createStartedGameState(roleId: RoleId, advisorId: AdvisorId | null = null): GameState {
   const role = getRoleDefinition(roleId);
   const advisor = advisorId ? getAdvisorDefinition(advisorId) : null;
   const initialPaperSlots = role.initialPaperSlots ?? getUnlockedPaperSlotCount(role.startingStats.research);
@@ -145,7 +145,7 @@ export function createStartedGameState(roleId: RoleId, advisorId: AdvisorTierId 
     achievementFlags: createAchievementFlags(),
     player: clonePlayer(role.startingStats),
     log: advisor
-      ? [createLogEntry(0, `以 ${role.name} 身份开局，导师档位为 ${advisor.name}。`)]
+      ? [createLogEntry(0, `以 ${role.name} 身份开局，导师为 ${advisor.name} / 讲师。`)]
       : [],
   };
 }

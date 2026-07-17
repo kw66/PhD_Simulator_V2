@@ -30,9 +30,9 @@ describe("v2 progression", () => {
     expect(getRoleDefinition("genius-reversed").name).toBe("愚钝·院士转世");
     expect(getRoleDefinition("social-reversed").name).toBe("嫉妒·社交达人");
     expect(getRoleDefinition("genius-reversed").initialPaperSlots).toBe(4);
-    expect(getAdvisorDefinition("level5").requirements.masterGrad).toBe(1);
+    expect(getAdvisorDefinition("zhao-ning").name).toBe("赵宁");
     expect(getRoleOptions()).toHaveLength(14);
-    expect(getAdvisorOptions()).toHaveLength(5);
+    expect(getAdvisorOptions().map((advisor) => advisor.name)).toEqual(["陈明", "周岚", "林浩", "赵宁"]);
   });
 
   it("统一处理最后一年仅 10 个月的日历口径", () => {
@@ -46,21 +46,22 @@ describe("v2 progression", () => {
   });
 
   it("统一给出毕业线和转博线", () => {
-    expect(getGraduationScoreTarget("master", "level3")).toBe(2);
-    expect(getGraduationScoreTarget("phd", "level3")).toBe(11);
-    expect(getPhdDecisionRequirement("level5", 2)).toBe(2);
-    expect(getPhdDecisionRequirement("level5", 3)).toBe(3);
-    expect(getPhdDecisionRequirement("level5", 4)).toBeNull();
+    for (const advisor of getAdvisorOptions()) {
+      expect(getGraduationScoreTarget("master", advisor.id)).toBe(1);
+      expect(getGraduationScoreTarget("phd", advisor.id)).toBe(7);
+      expect(getPhdDecisionRequirement(advisor.id, 2)).toBe(2);
+      expect(getPhdDecisionRequirement(advisor.id, 3)).toBe(3);
+      expect(getPhdDecisionRequirement(advisor.id, 4)).toBeNull();
+    }
   });
 
-  it("按旧版口径结算导师工资", () => {
-    expect(getAdvisorSalaryForMonth("level2", "master", 1)).toBe(1);
-    expect(getAdvisorSalaryForMonth("level2", "master", 2)).toBe(2);
-    expect(getAdvisorSalaryForMonth("level3", "master", 3)).toBe(1);
-    expect(getAdvisorSalaryForMonth("level3", "master", 4)).toBe(2);
-    expect(getAdvisorSalaryForMonth("level1", "master", 7)).toBe(1);
-    expect(getAdvisorSalaryForMonth("level2", "phd", 8)).toBe(3);
-    expect(getAdvisorSalaryForMonth("level4", "phd", 6)).toBe(2);
+  it("四位讲师都按旧副教授口径结算工资", () => {
+    for (const advisor of getAdvisorOptions()) {
+      expect(getAdvisorSalaryForMonth(advisor.id, "master", 1)).toBe(1);
+      expect(getAdvisorSalaryForMonth(advisor.id, "master", 8)).toBe(1);
+      expect(getAdvisorSalaryForMonth(advisor.id, "phd", 1)).toBe(2);
+      expect(getAdvisorSalaryForMonth(advisor.id, "phd", 8)).toBe(2);
+    }
   });
 
   it("创建转博抉择对象时保持统一结构", () => {

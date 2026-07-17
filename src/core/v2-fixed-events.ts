@@ -25,6 +25,7 @@ export function applyFixedEventResolution(
   getRoll: RandomRollProvider = Math.random,
 ): FixedResolutionResult {
   switch (resolution.kind) {
+    case "advisor-select":
     case "advisor-select-tier":
       return resolveAdvisorSelection(state, resolution);
     case "teachers-day-message":

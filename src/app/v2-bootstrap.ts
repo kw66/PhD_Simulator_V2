@@ -2,7 +2,7 @@ import { createStore } from "../core/v2-store";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
 import { getRoleOptions } from "../core/v2-progression";
 import type {
-  AdvisorTierId,
+  AdvisorId,
   DebugStatId,
   GameActionId,
   GameState,
@@ -557,7 +557,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     store.dispatch(actionId, {
       roleId: isRoleId(button.dataset.roleId) ? button.dataset.roleId : undefined,
-      advisorId: typeof button.dataset.advisorId === "string" ? button.dataset.advisorId as AdvisorTierId : undefined,
+      advisorId: typeof button.dataset.advisorId === "string" ? button.dataset.advisorId as AdvisorId : undefined,
       paperId: typeof button.dataset.paperId === "string" ? button.dataset.paperId : undefined,
       eventId: typeof button.dataset.eventId === "string" ? button.dataset.eventId : undefined,
       eventChoiceId: typeof button.dataset.eventChoiceId === "string" ? button.dataset.eventChoiceId : undefined,

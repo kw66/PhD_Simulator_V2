@@ -71,14 +71,13 @@ describe("v2 paper rules", () => {
     expect(reviewingPaper.conferenceHandled).toBe(false);
     expect(getPaperEffortTotal(reviewingPaper)).toBe(12);
 
-    const accepted = resolvePaperReview({ ...reviewingPaper, idea: 0, experiment: 0, writing: 0 }, 1, "level5");
+    const accepted = resolvePaperReview({ ...reviewingPaper, idea: 0, experiment: 0, writing: 0 }, 1);
     expect(accepted.nextPaper.status).toBe("published");
     expect(accepted.scoreGain).toBe(1);
 
     const rejected = resolvePaperReview(
       markPaperReviewing({ ...reviewingPaper, idea: 1, experiment: 1, writing: 1 }, "A", 8, 1),
       0,
-      "level5",
     );
     expect(rejected.nextPaper.status).toBe("draft");
     expect(rejected.nextPaper.target).toBeNull();

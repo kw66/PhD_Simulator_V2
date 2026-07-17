@@ -84,6 +84,16 @@ describe("manual persistence", () => {
     expect(loadPersistedState()).toBeNull();
   });
 
+  it("读取旧导师档位存档时会迁移为具名讲师", () => {
+    const state = createInitialState();
+    window.localStorage.setItem(
+      "vibe2_v2_autosave",
+      JSON.stringify({ ...state, selectedAdvisorId: "level1" }),
+    );
+
+    expect(loadPersistedState()?.selectedAdvisorId).toBe("chen-ming");
+  });
+
   it("支持保存和读取手动槽", () => {
     const state = createInitialState();
     saveManualState(2, state);

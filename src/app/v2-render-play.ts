@@ -16,7 +16,6 @@ import { applyLoverMonthlyEffect, getBeautifulMonthlyRecovery } from "../core/v2
 import { getAcceptedPaperScore } from "../core/v2-publication-rules";
 import { ADVISOR_TASK_SAN_COST } from "../core/v2-advisor-progress";
 import {
-  formatAdvisorTierLabel,
   getCalendarForTotalMonths,
   getAdvisorDefinitionOrNull,
   getGraduationScoreTarget,
@@ -1305,7 +1304,7 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       type: "advisor",
       buttonLabel: "导师",
       displayType: "导师",
-      displayName: formatAdvisorTierLabel(advisor),
+      displayName: `${advisor.name} / 讲师`,
       detailItems: [
         `科研资源 ${state.advisorProgressState.researchResource}`,
         `亲和度 ${state.advisorProgressState.affinity}`,

@@ -1,5 +1,21 @@
-import { ADVISOR_DEFINITIONS, MASTER_TOTAL_MONTHS, PHD_TOTAL_MONTHS, ROLE_BASE_ORDER, ROLE_DEFINITIONS } from "./v2-content";
-import type { AdvisorDefinition, AdvisorTierId, Degree, PendingDecision, RoleBaseId, RoleDefinition, RoleId, RoleMode } from "./v2-types";
+import {
+  ADVISOR_DEFINITIONS,
+  ADVISOR_REQUIREMENTS,
+  ADVISOR_SALARY,
+  MASTER_TOTAL_MONTHS,
+  PHD_TOTAL_MONTHS,
+  ROLE_BASE_ORDER,
+  ROLE_DEFINITIONS,
+} from "./v2-content";
+import type { AdvisorDefinition, AdvisorId, Degree, PendingDecision, RoleBaseId, RoleDefinition, RoleId, RoleMode } from "./v2-types";
+
+const LEGACY_ADVISOR_ID_MAP: Record<string, AdvisorId> = {
+  level1: "chen-ming",
+  level2: "zhou-lan",
+  level3: "lin-hao",
+  level4: "lin-hao",
+  level5: "zhao-ning",
+};
 
 function getMaxYearsByDegree(degree: Degree): number {
   return degree === "master" ? 3 : 5;
@@ -58,28 +74,23 @@ export function getRoleBaseOrder(): RoleBaseId[] {
   return ROLE_BASE_ORDER;
 }
 
-export function getAdvisorDefinition(advisorId: AdvisorTierId): AdvisorDefinition {
-  const advisor = ADVISOR_DEFINITIONS.find((item) => item.id === advisorId);
+export function normalizeAdvisorId(value: unknown): AdvisorId | null {
+  if (typeof value !== "string") return null;
+  const advisor = ADVISOR_DEFINITIONS.find((item) => item.id === value);
+  return advisor?.id ?? LEGACY_ADVISOR_ID_MAP[value] ?? null;
+}
+
+export function getAdvisorDefinition(advisorId: AdvisorId): AdvisorDefinition {
+  const normalizedAdvisorId = normalizeAdvisorId(advisorId);
+  const advisor = ADVISOR_DEFINITIONS.find((item) => item.id === normalizedAdvisorId);
   if (!advisor) {
     throw new Error(`Unknown advisor: ${advisorId}`);
   }
   return advisor;
 }
 
-export function getAdvisorDefinitionOrNull(advisorId: AdvisorTierId | null): AdvisorDefinition | null {
+export function getAdvisorDefinitionOrNull(advisorId: AdvisorId | null): AdvisorDefinition | null {
   return advisorId ? getAdvisorDefinition(advisorId) : null;
-}
-
-export function isAdvisorGenericTitle(advisor: Pick<AdvisorDefinition, "name" | "title">): boolean {
-  return advisor.title === advisor.name || advisor.title === "教授" || advisor.title === "副教授";
-}
-
-export function getAdvisorHonorText(advisor: Pick<AdvisorDefinition, "name" | "title">): string {
-  return isAdvisorGenericTitle(advisor) ? "无" : advisor.title;
-}
-
-export function formatAdvisorTierLabel(advisor: Pick<AdvisorDefinition, "name" | "title">): string {
-  return isAdvisorGenericTitle(advisor) ? advisor.name : `${advisor.name} / ${advisor.title}`;
 }
 
 export function getRoleOptions(): RoleDefinition[] {
@@ -98,40 +109,29 @@ export function getMonthLimitByDegree(degree: Degree): number {
   return degree === "master" ? MASTER_TOTAL_MONTHS : PHD_TOTAL_MONTHS;
 }
 
-export function getGraduationScoreTarget(degree: Degree, advisorId: AdvisorTierId | null): number | null {
+export function getGraduationScoreTarget(degree: Degree, advisorId: AdvisorId | null): number | null {
   if (!advisorId) return null;
-  const advisor = getAdvisorDefinition(advisorId);
-  return degree === "master" ? advisor.requirements.masterGrad : advisor.requirements.phdGrad;
+  return degree === "master" ? ADVISOR_REQUIREMENTS.masterGrad : ADVISOR_REQUIREMENTS.phdGrad;
 }
 
-export function getAdvisorSalaryForMonth(advisorId: AdvisorTierId | null, degree: Degree, month: number): number {
+export function getAdvisorSalaryForMonth(advisorId: AdvisorId | null, degree: Degree, _month: number): number {
   if (!advisorId) return 0;
-  const advisor = getAdvisorDefinition(advisorId);
-  const baseSalary = advisor.salary[degree];
+  const baseSalary = ADVISOR_SALARY[degree];
 
   if (Number.isInteger(baseSalary)) {
     return baseSalary;
   }
 
-  if (baseSalary === 1.5) {
-    return month % 2 === 0 ? 2 : 1;
-  }
-
-  if (baseSalary === 1.25) {
-    return [4, 8, 12].includes(month) ? 2 : 1;
-  }
-
   return Math.floor(baseSalary);
 }
 
-export function getPhdDecisionRequirement(advisorId: AdvisorTierId | null, year: number): number | null {
+export function getPhdDecisionRequirement(advisorId: AdvisorId | null, year: number): number | null {
   if (year !== 2 && year !== 3) {
     return null;
   }
   if (!advisorId) return null;
 
-  const advisor = getAdvisorDefinition(advisorId);
-  return year === 2 ? advisor.requirements.phdYear2 : advisor.requirements.phdYear3;
+  return year === 2 ? ADVISOR_REQUIREMENTS.phdYear2 : ADVISOR_REQUIREMENTS.phdYear3;
 }
 
 export function createPhdDecision(year: number, requiredScore: number): PendingDecision {

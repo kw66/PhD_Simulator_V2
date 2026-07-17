@@ -140,7 +140,7 @@ export function resolveMonthlyAcademicProgress(params: {
       return { ...paper, reviewMonthsLeft: monthsLeft };
     }
 
-    const resolved = resolvePaperReview({ ...paper, reviewMonthsLeft: 0 }, params.nextPlayer.research, params.state.selectedAdvisorId);
+    const resolved = resolvePaperReview({ ...paper, reviewMonthsLeft: 0 }, params.nextPlayer.research);
     totalResearchScore += resolved.scoreGain;
     reviewLogs.push(resolved.text);
 

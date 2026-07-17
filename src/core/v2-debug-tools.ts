@@ -366,7 +366,6 @@ function triggerReviewResultDebugEvent(state: GameState): GameState {
   const resolved = resolvePaperReview(
     { ...currentPaper, reviewMonthsLeft: 0 },
     workingState.player.research,
-    workingState.selectedAdvisorId,
   );
   let publicationEffects = {
     nextCitationMultipliers: [...workingState.publicationEffects.nextCitationMultipliers],

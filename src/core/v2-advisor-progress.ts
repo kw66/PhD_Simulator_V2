@@ -1,16 +1,11 @@
-import type { AdvisorProgressState, AdvisorTierId } from "./v2-types";
+import type { AdvisorId, AdvisorProgressState } from "./v2-types";
 
 export const MAX_ADVISOR_RESEARCH_RESOURCE = 20;
 const ADVISOR_RELATION_MAX = 40;
 export const ADVISOR_TASK_SAN_COST = 5;
-
-const ADVISOR_PROGRESS_RANGES: Record<AdvisorTierId, { researchResourceRange: [number, number]; affinityRange: [number, number] }> = {
-  level1: { researchResourceRange: [11, 14], affinityRange: [1, 3] },
-  level2: { researchResourceRange: [9, 12], affinityRange: [2, 3] },
-  level3: { researchResourceRange: [7, 10], affinityRange: [2, 4] },
-  level4: { researchResourceRange: [5, 8], affinityRange: [3, 4] },
-  level5: { researchResourceRange: [3, 6], affinityRange: [3, 5] },
-};
+export const LECTURER_RESEARCH_RESOURCE_RANGE: [number, number] = [3, 6];
+export const LECTURER_AFFINITY_RANGE: [number, number] = [3, 5];
+export const LECTURER_TASK_MULTIPLIER_RANGE: [number, number] = [6, 10];
 
 export interface AdvisorTaskAdvanceResult {
   advisorProgressState: AdvisorProgressState;
@@ -57,15 +52,14 @@ export function clampAdvisorResearchResource(value: number): number {
   return Math.max(0, Math.min(MAX_ADVISOR_RESEARCH_RESOURCE, Math.floor(value)));
 }
 
-export function createAdvisorProgressState(advisorId?: AdvisorTierId, getRoll: () => number = Math.random): AdvisorProgressState {
+export function createAdvisorProgressState(advisorId?: AdvisorId, getRoll: () => number = Math.random): AdvisorProgressState {
   if (!advisorId) {
     return createAdvisorProgressSnapshot(0, 0, 8);
   }
 
-  const config = ADVISOR_PROGRESS_RANGES[advisorId];
-  const researchResource = randomIntInRange(config.researchResourceRange, getRoll);
-  const affinity = randomIntInRange(config.affinityRange, getRoll);
-  const taskMultiplier = 6 + Math.floor(getSafeRoll(getRoll) * 5);
+  const researchResource = randomIntInRange(LECTURER_RESEARCH_RESOURCE_RANGE, getRoll);
+  const affinity = randomIntInRange(LECTURER_AFFINITY_RANGE, getRoll);
+  const taskMultiplier = randomIntInRange(LECTURER_TASK_MULTIPLIER_RANGE, getRoll);
   return createAdvisorProgressSnapshot(researchResource, affinity, taskMultiplier);
 }
 

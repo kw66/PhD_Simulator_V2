@@ -12,7 +12,6 @@ import {
   getGraduationScoreTarget,
   getMonthLimitByDegree,
   getPhdDecisionRequirement,
-  getAdvisorDefinitionOrNull,
 } from "./v2-progression";
 import {
   getCurrentEvent,
@@ -206,8 +205,8 @@ export function resolveQueuedEvent(
 
 export function resolvePhdYes(state: GameState): GameState {
   if (!state.pendingDecision) return state;
-  const advisor = getAdvisorDefinitionOrNull(state.selectedAdvisorId);
-  if (!advisor) {
+  const phdGraduationTarget = getGraduationScoreTarget("phd", state.selectedAdvisorId);
+  if (phdGraduationTarget === null) {
     return pushLog(state, "导师尚未确定，当前无法继续转博决策。");
   }
   const nextState = pushLog(
@@ -215,7 +214,7 @@ export function resolvePhdYes(state: GameState): GameState {
       ...state,
       degree: "phd",
       maxMonths: getMonthLimitByDegree("phd"),
-      graduationScoreTarget: advisor.requirements.phdGrad,
+      graduationScoreTarget: phdGraduationTarget,
       pendingDecision: null,
     },
     "你选择继续读博，目标切换为博士毕业线。",

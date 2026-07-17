@@ -1,4 +1,5 @@
 export type FixedEventResolutionKind =
+  | "advisor-select"
   | "advisor-select-tier"
   | "teachers-day-message"
   | "teachers-day-tea"
@@ -29,7 +30,7 @@ export interface FixedEventJuniorCandidate {
 }
 
 export interface FixedEventAdvisorCandidate {
-  advisorId: "level1" | "level2" | "level3" | "level4" | "level5";
+  advisorId: "chen-ming" | "zhou-lan" | "lin-hao" | "zhao-ning";
   researchResource: number;
   affinity: number;
   taskMultiplier: number;

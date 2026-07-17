@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { BASE_RANDOM_EVENT_IDS } from "../src/core/v2-random-event-rules";
-import type { GameState } from "../src/core/v2-types";
+import type { AdvisorId, GameState } from "../src/core/v2-types";
 
 function startPreEnrollmentWith(
   roleId: "normal" | "genius" | "social" | "rich" | "teacher-child",
-  advisorId: "level1" | "level2" | "level3" | "level4" | "level5" = "level5",
+  advisorId: AdvisorId = "zhao-ning",
 ) {
   let state = createInitialState();
   state = dispatchAction(state, "select-role", { roleId });
@@ -16,7 +16,7 @@ function startPreEnrollmentWith(
 
 function startWith(
   roleId: "normal" | "genius" | "social" | "rich" | "teacher-child",
-  advisorId: "level1" | "level2" | "level3" | "level4" | "level5" = "level5",
+  advisorId: AdvisorId = "zhao-ning",
 ): GameState {
   const enrolledState = dispatchAction(startPreEnrollmentWith(roleId, advisorId), "next-month");
   return {
@@ -52,21 +52,21 @@ describe("v2 engine", () => {
   });
 
   it("可以从 setup 进入第 0 月 playing，并带上角色和导师", () => {
-    const state = startPreEnrollmentWith("genius", "level3");
+    const state = startPreEnrollmentWith("genius", "lin-hao");
     expect(state.phase).toBe("playing");
     expect(state.selectedRoleId).toBe("genius");
-    expect(state.selectedAdvisorId).toBe("level3");
+    expect(state.selectedAdvisorId).toBe("lin-hao");
     expect(state.month).toBe(0);
     expect(state.totalMonths).toBe(0);
     expect(state.player).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
     expect(state.paperSlotsUnlocked).toBe(1);
-    expect(state.graduationScoreTarget).toBe(2);
+    expect(state.graduationScoreTarget).toBe(1);
     expect(state.availableRandomEvents).toEqual([...BASE_RANDOM_EVENT_IDS]);
     expect(state.coldWeight).toBe(1);
   });
 
   it("第 0 月点击下一月会作为正式入学进入第 1 月，不跑正常月结算", () => {
-    const state = dispatchAction(startPreEnrollmentWith("normal", "level5"), "next-month");
+    const state = dispatchAction(startPreEnrollmentWith("normal", "zhao-ning"), "next-month");
 
     expect(state.phase).toBe("playing");
     expect(state.year).toBe(1);
@@ -79,7 +79,7 @@ describe("v2 engine", () => {
   });
 
   it("社交达人开局会同步旧版关系槽解锁口径", () => {
-    const state = startPreEnrollmentWith("social", "level5");
+    const state = startPreEnrollmentWith("social", "zhao-ning");
     expect(state.player.social).toBe(1);
     expect(state.relationshipState.unlockedSlots).toBe(2);
   });
@@ -173,7 +173,7 @@ describe("v2 engine", () => {
   });
 
   it("第 2 年 10 月达到门槛会触发转博抉择", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, totalMonths: 21, year: 2, month: 9, totalResearchScore: 2 };
     state = dispatchAction(state, "next-month");
 
@@ -186,7 +186,7 @@ describe("v2 engine", () => {
   });
 
   it("选择读博会切到博士线并清空转博抉择", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 22,
@@ -205,7 +205,7 @@ describe("v2 engine", () => {
   });
 
   it("放弃读博只清空转博抉择并保留硕士线", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 22,
@@ -225,7 +225,7 @@ describe("v2 engine", () => {
   });
 
   it("毕业月放弃读博后会继续按硕士线结算毕业", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 34,
@@ -243,7 +243,7 @@ describe("v2 engine", () => {
   });
 
   it("到达毕业月并满足毕业线时会结算硕士毕业", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, totalMonths: 33, year: 3, month: 9, totalResearchScore: 1 };
     state = dispatchAction(state, "next-month");
 
@@ -256,7 +256,7 @@ describe("v2 engine", () => {
   });
 
   it("5 月寒假事件会按 act1→act2→结果页推进后出队", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 4,
@@ -282,7 +282,7 @@ describe("v2 engine", () => {
   });
 
   it("寒假老同学分支会结算红包、恢复 SAN 并增加社交", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 4,
@@ -308,7 +308,7 @@ describe("v2 engine", () => {
   });
 
   it("寒假带恋人见家长会让红包翻倍，但 SAN 仍只按基础恢复", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 4,
@@ -342,7 +342,7 @@ describe("v2 engine", () => {
   });
 
   it("暑假回家休息会恢复 25% 已损 SAN", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 10,
@@ -365,7 +365,7 @@ describe("v2 engine", () => {
   });
 
   it("暑假留校科研会给下次 idea 额外 1 次并永久 idea +1", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 10,
@@ -390,7 +390,7 @@ describe("v2 engine", () => {
   });
 
   it("暑假外出旅行会花 4 金钱并恢复 50% 已损 SAN", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 10,
@@ -420,7 +420,7 @@ describe("v2 engine", () => {
 
 
   it("学年总结休息调整会给 5 点 SAN", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 10,
@@ -444,7 +444,7 @@ describe("v2 engine", () => {
   });
 
   it("学年总结经营社交在 20 点口径下不会继续增加", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 10,
@@ -470,7 +470,7 @@ describe("v2 engine", () => {
   });
 
   it("学年总结外出实习会按旧版口径给 2~3 金钱", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 10,
@@ -495,7 +495,7 @@ describe("v2 engine", () => {
   });
 
   it("第 2 年 7 月后会触发大论文事件并结算进度", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, totalMonths: 18, year: 2, month: 6 };
     state = dispatchAction(state, "next-month");
 
@@ -508,7 +508,7 @@ describe("v2 engine", () => {
   });
 
   it("硕士第 3 年会按活跃月份触发求职事件并累计最佳 offer", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       year: 2,
@@ -535,7 +535,7 @@ describe("v2 engine", () => {
   });
 
   it("2 月奖学金事件会触发并增加金钱", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, totalMonths: 13, year: 2, month: 1, totalResearchScore: 1 };
     state = dispatchAction(state, "next-month");
     expect(state.eventQueue[0]?.chainId).toBe("scholarship");
@@ -547,14 +547,14 @@ describe("v2 engine", () => {
   });
 
   it("9 月固定事件会触发领域年会", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, totalMonths: 8, year: 1, month: 8 };
     state = dispatchAction(state, "next-month");
     expect(state.eventQueue[0]?.chainId).toBe("ccig-decision");
   });
 
   it("第 4 年 3 月会触发指导新生，并把选中的新生加入关系网", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       degree: "phd",
@@ -591,7 +591,7 @@ describe("v2 engine", () => {
   });
 
   it("指导新生在关系槽位已满时不会强行加入关系网", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       degree: "phd",
@@ -624,7 +624,7 @@ describe("v2 engine", () => {
   });
 
   it("CCIG 导师报销分支会扣 1 点好感并进入会场活动", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 8,
@@ -651,7 +651,7 @@ describe("v2 engine", () => {
   });
 
   it("CCIG 整装待发下自费参会可免费进入会场", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 8,
@@ -679,7 +679,7 @@ describe("v2 engine", () => {
   });
 
   it("CCIG 认真听报告会给下次 idea +4 且永久 idea +1", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 8,
@@ -708,7 +708,7 @@ describe("v2 engine", () => {
   });
 
   it("CCIG 请同学吃饭若现金不足会直接触发穷困结局且不进入结果页", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       totalMonths: 8,
@@ -737,7 +737,7 @@ describe("v2 engine", () => {
   });
 
   it("未来待办会随跨月递减 DDL，并在到期后阻塞流程", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       eventQueue: [createEventQueueItem({
@@ -766,14 +766,14 @@ describe("v2 engine", () => {
   });
 
   it("11 月会同时触发暑假与学年总结", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, totalMonths: 10, year: 1, month: 10 };
     state = dispatchAction(state, "next-month");
     expect(state.eventQueue.map((event) => event.chainId)).toEqual(["summer-vacation", "year-summary"]);
   });
 
   it("教师节高好感祝福分支会给下一次 idea 奖励", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -799,7 +799,7 @@ describe("v2 engine", () => {
   });
 
   it("教师节低好感祝福分支可能触发跑腿扣 SAN", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -822,7 +822,7 @@ describe("v2 engine", () => {
   });
 
   it("教师节连续三年送邮票会解锁吾爱吾师", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -847,14 +847,14 @@ describe("v2 engine", () => {
   });
 
   it("发表 A 类论文后会标记当前槽位具备升级资格", () => {
-    let state = startWith("normal", "level1");
+    let state = startWith("normal", "chen-ming");
     state = dispatchAction(state, "create-paper");
     const paperId = state.selectedPaperId;
     if (!paperId) throw new Error("paper id missing");
     state = {
       ...state,
       papers: state.papers.map((paper) =>
-        paper.id === paperId ? { ...paper, idea: 8, experiment: 8, writing: 8 } : paper,
+        paper.id === paperId ? { ...paper, idea: 9, experiment: 8, writing: 8 } : paper,
       ),
     };
     state = dispatchAction(state, "submit-a", { paperId });
@@ -872,7 +872,7 @@ describe("v2 engine", () => {
     expect(state.slotPublishedA[0]).toBe(true);
   });
   it("year rollover resets random event pool and advances coldWeight", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -918,7 +918,7 @@ describe("v2 engine", () => {
   });
 
   it("action bonuses from queued events affect paper actions", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       eventQueue: [createEventQueueItem({
@@ -947,7 +947,7 @@ describe("v2 engine", () => {
   });
 
   it("blocked paper action keeps temporary effects intact", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = dispatchAction(state, "create-paper");
     const paperId = state.selectedPaperId;
     if (!paperId) throw new Error("paper id missing");
@@ -978,7 +978,7 @@ describe("v2 engine", () => {
   });
 
   it("temporary action effects apply once and only to the matching paper action", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       eventQueue: [createEventQueueItem({
@@ -1021,7 +1021,7 @@ describe("v2 engine", () => {
   });
 
   it("rest action respects sanCap after the cap is reduced", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, san: 16 },
@@ -1033,7 +1033,7 @@ describe("v2 engine", () => {
   });
 
   it("next publication citation multiplier is consumed on acceptance and grows citations next month", () => {
-    let state = startWith("genius", "level5");
+    let state = startWith("genius", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -1080,7 +1080,7 @@ describe("v2 engine", () => {
   });
 
   it("relationship additions respect slot limits and mentorship ticks monthly", () => {
-    let state = startWith("social", "level5");
+    let state = startWith("social", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -1125,7 +1125,7 @@ describe("v2 engine", () => {
   });
 
   it("event effects can clear draft progress and apply a global citation penalty", () => {
-    let state = startWith("genius", "level5");
+    let state = startWith("genius", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -1201,7 +1201,7 @@ describe("v2 engine", () => {
   });
 
   it("granted publications do not occupy paper slots and unlock event 14 on yearly reset", () => {
-    let state = startWith("teacher-child", "level5");
+    let state = startWith("teacher-child", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -1252,7 +1252,7 @@ describe("v2 engine", () => {
   });
 
   it("event support updates and persistent extra actions affect month ticks and experiment actions", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, money: 10, san: 10 },
@@ -1313,7 +1313,7 @@ describe("v2 engine", () => {
 
   it("regular monthly upkeep keeps default advisor salary and base living cost in balance", () => {
     const state = {
-      ...startWith("normal", "level5"),
+      ...startWith("normal", "zhao-ning"),
       availableRandomEvents: [],
       usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
       eventQueue: [],
@@ -1326,7 +1326,7 @@ describe("v2 engine", () => {
   });
 
   it("support items can be bought and sold without consuming actions", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, player: { ...state.player, money: 10 } };
     const beforeActions = state.actionsRemaining;
 
@@ -1342,7 +1342,7 @@ describe("v2 engine", () => {
   });
 
   it("economy actions are blocked by pending blocking events", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, money: 10 },
@@ -1377,7 +1377,7 @@ describe("v2 engine", () => {
   });
 
   it("shop items can be bought and sold, and gpu/chair effects feed the main loop", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, player: { ...state.player, money: 30, san: 10 } };
 
     state = dispatchAction(state, "buy-shop-item", { shopItemId: "gpu_buy" });
@@ -1415,7 +1415,7 @@ describe("v2 engine", () => {
   });
 
   it("keyboard, monitor and down jacket feed read/write and winter month ticks", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = { ...state, player: { ...state.player, money: 30, san: 10, research: 0 } };
 
     state = dispatchAction(state, "buy-shop-item", { shopItemId: "keyboard" });
@@ -1464,7 +1464,7 @@ describe("v2 engine", () => {
   });
 
   it("base bike applies monthly SAN loss and grows sanCap on the confirmed threshold", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, money: 20, san: 10 },
@@ -1502,7 +1502,7 @@ describe("v2 engine", () => {
   });
 
   it("bike upgrades feed sell price and monthly core effects", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, money: 50, san: 10 },
@@ -1537,7 +1537,7 @@ describe("v2 engine", () => {
     expect(soldRoad.shopState.bikeOwned).toBe(false);
     expect(soldRoad.shopState.bikeUpgrade).toBeNull();
 
-    let ebikeState = startWith("normal", "level5");
+    let ebikeState = startWith("normal", "zhao-ning");
     ebikeState = {
       ...ebikeState,
       player: { ...ebikeState.player, money: 50, san: 10 },
@@ -1556,7 +1556,7 @@ describe("v2 engine", () => {
   });
 
   it("bike-related achievements unlock from upgrades, mileage and full gear combo", () => {
-    let roadState = startWith("normal", "level5");
+    let roadState = startWith("normal", "zhao-ning");
     roadState = {
       ...roadState,
       player: { ...roadState.player, money: 80, san: 10 },
@@ -1580,7 +1580,7 @@ describe("v2 engine", () => {
     expect(cyclingMaster.shopState.bikeSanSpent).toBe(31);
     expect(cyclingMaster.achievementFlags.cyclingMaster).toBe(true);
 
-    let fullGearState = startWith("normal", "level5");
+    let fullGearState = startWith("normal", "zhao-ning");
     fullGearState = {
       ...fullGearState,
       player: { ...fullGearState.player, money: 80, san: 10 },
@@ -1597,7 +1597,7 @@ describe("v2 engine", () => {
   });
 
   it("coffee system supports manual coffee and automatic coffee machine month ticks", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, money: 30, san: 10 },
@@ -1633,7 +1633,7 @@ describe("v2 engine", () => {
   });
 
   it("chair upgrades feed rest, monthly SAN and spike recovery", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, money: 40, san: 10 },
@@ -1650,8 +1650,8 @@ describe("v2 engine", () => {
 
     const massageBase = dispatchAction(
       {
-        ...startWith("normal", "level5"),
-        player: { ...startWith("normal", "level5").player, money: 50, san: 10 },
+        ...startWith("normal", "zhao-ning"),
+        player: { ...startWith("normal", "zhao-ning").player, money: 50, san: 10 },
         availableRandomEvents: [],
         usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
         eventQueue: [],
@@ -1670,7 +1670,7 @@ describe("v2 engine", () => {
     }, "next-month");
     expect(afterMonth.player.san).toBeGreaterThan(massageState.player.san);
 
-    let spikeState = startWith("normal", "level5");
+    let spikeState = startWith("normal", "zhao-ning");
     spikeState = {
       ...spikeState,
       player: { ...spikeState.player, money: 40, san: 1 },
@@ -1687,7 +1687,7 @@ describe("v2 engine", () => {
   });
 
   it("monitor upgrades feed read SAN, idea bonus and dual monthly auto reading", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, money: 50, san: 20 },
@@ -1715,7 +1715,7 @@ describe("v2 engine", () => {
     expect(smartRead.temporaryActionEffects.idea.bonus).toBe(2);
     expect(smartRead.readingState.smartMonitorReadCount).toBe(10);
 
-    let fourKState = startWith("normal", "level5");
+    let fourKState = startWith("normal", "zhao-ning");
     fourKState = {
       ...fourKState,
       player: { ...fourKState.player, money: 50 },
@@ -1737,7 +1737,7 @@ describe("v2 engine", () => {
     }, "idea", { paperId: fourKPaperId });
     expect(ideaWith4K.papers[0]?.idea).toBe(3);
 
-    let dualState = startWith("normal", "level5");
+    let dualState = startWith("normal", "zhao-ning");
     dualState = {
       ...dualState,
       player: { ...dualState.player, money: 50, san: 10 },
@@ -1771,7 +1771,7 @@ describe("v2 engine", () => {
   });
 
   it("queued event counter deltas and achievement flags are persisted in state", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       eventQueue: [createEventQueueItem({
@@ -1803,7 +1803,7 @@ describe("v2 engine", () => {
   });
 
   it("resolve-event uses the opened event id instead of always consuming the queue head", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       eventQueue: [
@@ -1859,7 +1859,7 @@ describe("v2 engine", () => {
   });
 
   it("resolve-event can enqueue follow-up queued events for multi-act chains", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       eventQueue: [createEventQueueItem({
@@ -1901,7 +1901,7 @@ describe("v2 engine", () => {
   });
 
   it("stayOnEvent keeps the queued event and sanCap clamps current SAN", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       player: { ...state.player, san: 18 },
@@ -1933,7 +1933,7 @@ describe("v2 engine", () => {
   });
 
   it("joint training reconciles citation-tier cap after publication citations cross a threshold", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
       year: 1,
@@ -1982,7 +1982,7 @@ describe("v2 engine", () => {
   });
 
   it("relationship task actions stay outside monthly action count and can enqueue advisor reward events", () => {
-    let state = startWith("genius", "level5");
+    let state = startWith("genius", "zhao-ning");
     state = {
       ...state,
       actionsRemaining: 0,
@@ -2020,7 +2020,7 @@ describe("v2 engine", () => {
   });
 
   it("lover task actions stay outside monthly action count and can enqueue lover reward events", () => {
-    let state = startWith("genius", "level5");
+    let state = startWith("genius", "zhao-ning");
     state = {
       ...state,
       actionsRemaining: 0,
@@ -2074,7 +2074,7 @@ describe("v2 engine", () => {
 
 
   it("relationship additions create fellow progress profiles for long-term fellow tasks", () => {
-  let state = startWith("social", "level5");
+  let state = startWith("social", "zhao-ning");
   state = {
     ...state,
     relationshipState: {
@@ -2114,7 +2114,7 @@ describe("v2 engine", () => {
   });
 
   it("fellow task actions stay outside monthly action count and can enqueue fellow reward events", () => {
-  let state = startWith("genius", "level5");
+  let state = startWith("genius", "zhao-ning");
   state = {
     ...state,
     actionsRemaining: 0,
@@ -2162,7 +2162,7 @@ describe("v2 engine", () => {
   expect(state.eventQueue.some((event) => event.chainId === "fellow-task-reward")).toBe(true);
 });
   it("lab talent adds team-size bonus to paper actions when active", () => {
-    let state = startWith("normal", "level5");
+    let state = startWith("normal", "zhao-ning");
     state = dispatchAction(state, "create-paper");
     const paperId = state.selectedPaperId;
     if (!paperId) throw new Error("paper id missing");
@@ -2184,7 +2184,7 @@ describe("v2 engine", () => {
   });
 
   it("next-month applies lab talent yearly growth to due fellow relationships", () => {
-    let state = startWith("genius", "level5");
+    let state = startWith("genius", "zhao-ning");
     state = {
       ...state,
       year: 1,

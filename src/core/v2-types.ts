@@ -40,7 +40,7 @@ export type RoleId =
   | "rich-reversed"
   | "teacher-child-reversed"
   | "chosen-reversed";
-export type AdvisorTierId = "level1" | "level2" | "level3" | "level4" | "level5";
+export type AdvisorId = "chen-ming" | "zhou-lan" | "lin-hao" | "zhao-ning";
 export type ManualSlotId = 1 | 2 | 3;
 export type DebugStatId = "san" | "research" | "social" | "favor" | "money";
 export type RoleGrowthStatId = DebugStatId;
@@ -309,15 +309,9 @@ export interface AdvisorRequirements {
 }
 
 export interface AdvisorDefinition {
-  id: AdvisorTierId;
+  id: AdvisorId;
   name: string;
-  title: string;
   color: string;
-  requirements: AdvisorRequirements;
-  salary: {
-    master: number;
-    phd: number;
-  };
 }
 
 export interface Paper {
@@ -445,7 +439,7 @@ export interface ManualSaveSummary {
   totalMonths: number;
   totalResearchScore: number;
   selectedRoleId: RoleId;
-  selectedAdvisorId: AdvisorTierId | null;
+  selectedAdvisorId: AdvisorId | null;
   ending: EndingId;
 }
 
@@ -453,7 +447,7 @@ export interface GameState extends RandomEventState {
   phase: GamePhase;
   selectedRoleId: RoleId;
   setupSelectedRoleId?: RoleId | null;
-  selectedAdvisorId: AdvisorTierId | null;
+  selectedAdvisorId: AdvisorId | null;
   degree: Degree;
   year: number;
   month: number;
@@ -508,7 +502,7 @@ export interface GameState extends RandomEventState {
 
 export interface DispatchPayload {
   roleId?: RoleId | undefined;
-  advisorId?: AdvisorTierId | undefined;
+  advisorId?: AdvisorId | undefined;
   paperId?: string | undefined;
   paperTarget?: PaperTarget | undefined;
   eventId?: string | undefined;

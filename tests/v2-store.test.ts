@@ -77,7 +77,7 @@ describe("v2 store manual saves", () => {
   it("可以保存到手动槽并从手动槽读档", () => {
     const store = createStore();
     store.dispatch("select-role", { roleId: "normal" });
-    store.dispatch("select-advisor", { advisorId: "level3" });
+    store.dispatch("select-advisor", { advisorId: "lin-hao" });
     store.dispatch("start-game");
     store.dispatch("next-month");
     store.dispatch("debug-seed-paper", { paperTarget: "C" });
@@ -92,13 +92,13 @@ describe("v2 store manual saves", () => {
     store.dispatch("load-manual", { manualSlot: 1 });
     expect(store.getState().phase).toBe("playing");
     expect(store.getState().selectedRoleId).toBe("normal");
-    expect(store.getState().selectedAdvisorId).toBe("level3");
+    expect(store.getState().selectedAdvisorId).toBe("lin-hao");
     expect(store.getState().papers.length).toBe(1);
   });
 
   it("可以删除手动槽", () => {
     const store = createStore();
-    store.dispatch("start-game", { roleId: "normal", advisorId: "level5" });
+    store.dispatch("start-game", { roleId: "normal", advisorId: "zhao-ning" });
     store.dispatch("save-manual", { manualSlot: 2 });
     expect(store.getState().manualSaveSummaries.some((item) => item.slot === 2)).toBe(true);
 
@@ -107,7 +107,7 @@ describe("v2 store manual saves", () => {
   });
   it("supports debug tools for faster manual testing", () => {
     const store = createStore();
-    store.dispatch("start-game", { roleId: "normal", advisorId: "level5" });
+    store.dispatch("start-game", { roleId: "normal", advisorId: "zhao-ning" });
 
     store.dispatch("debug-adjust-stat", { debugStatId: "money", delta: 10 });
     expect(store.getState().player.money).toBe(11);
@@ -138,7 +138,7 @@ describe("v2 store manual saves", () => {
     const firstStore = createStore();
     firstStore.dispatch("select-role", { roleId: "genius" });
     expect(firstStore.getAccountProfile().selectedLobbyRoleId).toBe("genius");
-    firstStore.dispatch("start-game", { roleId: "normal", advisorId: "level5" });
+    firstStore.dispatch("start-game", { roleId: "normal", advisorId: "zhao-ning" });
     expect(firstStore.getState().phase).toBe("playing");
 
     installMockWindow("?start=setup", localStorage);
