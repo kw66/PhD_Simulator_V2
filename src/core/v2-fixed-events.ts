@@ -13,9 +13,9 @@ import {
   resolveSeasonalFixedEvent,
 } from "./v2-fixed-events-seasonal";
 import {
-  createSeniorSummerAct1Event,
-  resolveAdvisorAssignment,
-} from "./v2-fixed-events-senior-summer";
+  createBeforeGradSchoolAct1Event,
+  resolveAdvisorConfirmation,
+} from "./v2-fixed-events-before-grad-school";
 import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "./v2-fixed-events-teachers-day";
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
@@ -25,10 +25,11 @@ export function applyFixedEventResolution(
   getRoll: RandomRollProvider = Math.random,
 ): FixedResolutionResult {
   switch (resolution.kind) {
+    case "advisor-confirm":
     case "advisor-assign":
     case "advisor-select":
     case "advisor-select-tier":
-      return resolveAdvisorAssignment(state, resolution);
+      return resolveAdvisorConfirmation(state, resolution);
     case "teachers-day-message":
     case "teachers-day-tea":
     case "teachers-day-flower":
@@ -70,7 +71,7 @@ export function collectFixedEventsForState(
   const events: PendingEvent[] = [];
 
   if (state.totalMonths === 0 && state.selectedAdvisorId === null) {
-    events.push(createSeniorSummerAct1Event(state, getRoll));
+    events.push(createBeforeGradSchoolAct1Event(state, getRoll));
     return events;
   }
 

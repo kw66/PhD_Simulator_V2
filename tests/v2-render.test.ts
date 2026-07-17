@@ -318,7 +318,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('data-action="debug-shift-month"');
     expect(html).toContain('data-action="debug-trigger-event"');
     expect(html).toContain('data-event-id="conference"');
-    expect(html).toContain('data-event-id="senior-summer"');
+    expect(html).toContain('data-event-id="before-grad-school"');
     expect(html).toContain("返回开始页");
     expect(html).not.toContain("主题选择");
     expect(html).not.toContain("本轮概览");
@@ -714,16 +714,16 @@ describe("v2 render lobby shell", () => {
       ...state,
       papers: [reviewingPaper],
       eventQueue: [createEventQueueItem({
-        id: "senior-summer-act1",
-        title: "大四暑假",
-        description: "学院公布了研究生导师分组名单。",
-        preview: "研究生导师分组名单已经发布",
+        id: "before-grad-school-qualification",
+        title: "读研之前",
+        description: "学院公布了保研资格名单。",
+        preview: "保研资格名单已经公示",
         source: "fixed",
         blocking: true,
         deadlineMonths: 0,
-        chainId: "senior-summer",
+        chainId: "before-grad-school",
         stage: "act1",
-        choices: [{ id: "senior-summer-open-assignment", label: "看看分到了哪位老师", outcome: "进入下一步。", effects: {} }],
+        choices: [{ id: "before-grad-school-open-advisor-info", label: "去看看导师信息", outcome: "进入下一步。", effects: {} }],
       }, 1)],
     };
 
@@ -733,7 +733,7 @@ describe("v2 render lobby shell", () => {
     expect(todoPreviewBlock).toContain('class="todo-item todo-preview-item todo-preview-current"');
     expect(todoPreviewBlock).toContain(`data-ui-open-event-id="${state.eventQueue[0]?.id}"`);
     expect(todoPreviewBlock).toContain('class="todo-group todo-group-current"');
-    expect(todoPreviewBlock).toContain("大四暑假");
+    expect(todoPreviewBlock).toContain("读研之前");
     expect(todoPreviewBlock).toContain("本月");
     expect(todoPreviewBlock).toContain('class="todo-item todo-preview-item todo-preview-future"');
     expect(todoPreviewBlock).toContain('class="todo-group todo-group-future"');
@@ -746,7 +746,7 @@ describe("v2 render lobby shell", () => {
     expect(todoPreviewBlock).not.toContain("预告");
     expect(todoPreviewBlock).not.toContain("todo-type-badge");
     expect(todoPreviewBlock).not.toContain("todo-item-head");
-    expect(todoPreviewBlock).not.toContain("研究生导师分组名单已经发布");
+    expect(todoPreviewBlock).not.toContain("保研资格名单已经公示");
     expect(todoPreviewBlock).not.toContain("在审论文将在该月返回结果。");
   });
 

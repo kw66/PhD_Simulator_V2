@@ -1,4 +1,5 @@
 export type FixedEventResolutionKind =
+  | "advisor-confirm"
   | "advisor-assign"
   | "advisor-select"
   | "advisor-select-tier"
