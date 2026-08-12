@@ -58,7 +58,15 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-role-card-mode-band is-reversed"');
     expect(html).toContain('class="lobby-role-card-level-badge">Lv 0</span>');
     expect(html).toContain('class="lobby-role-card-achievement-display"');
-    expect(html).toContain('class="lobby-role-card-achievement-display is-locked" aria-hidden="true"');
+    expect(html).toContain('class="lobby-role-card-achievement-display is-locked" aria-label="角色成就"');
+    expect(html).toContain('class="lobby-role-card-achievement-label">成就</span>');
+    expect(html).toContain('data-achievement-id="normal:first-pot"');
+    expect(html).toContain(">💰</span>");
+    expect(html).toContain(">🔬</span>");
+    expect(html).toContain(">🌟</span>");
+    expect(html).toContain(">🤝</span>");
+    expect(html).toContain(">🏆</span>");
+    expect(html).toContain(">🪑</span>");
     expect(html).toContain('class="lobby-role-card-level-badge is-locked" aria-label="未解锁"');
     expect(html).toContain('data-lucide="lock"');
     expect(html).not.toContain('class="lobby-role-card-lock"');
@@ -145,12 +153,21 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("小有积蓄");
     expect(html).toContain("金币达到30");
     expect(html).toContain("经验+5，解锁富可敌国角色");
-    expect(html).toContain("历史最高 0 / 30");
+    expect(html).toContain("0 / 30");
     expect(html).toContain("全面发展");
-    expect(html).toContain("最佳单局：科研 0/6 · 社交 0/6 · 好感 0/6 · 金币 0/6");
+    expect(html).toContain("科研 0/6 · 社交 0/6 · 好感 0/6 · 金币 0/6");
+    const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
+    expect(html).toContain('class="lobby-profile-achievement-summary"');
+    expect(html).toContain('class="lobby-profile-achievement-icon" aria-hidden="true">💰</span>');
+    expect(html).toContain('data-lucide="chevron-down"');
+    expect(html).not.toContain('<details class="lobby-profile-achievement" open>');
+    expect(achievementList).not.toContain("未达成");
+    expect(achievementList).not.toContain("已达成");
+    expect(html).not.toContain("历史最高 0 / 30");
+    expect(html).not.toContain("最佳单局：科研");
     expect(html).toContain("0 / 6");
     expect(html).toContain("1 / 2");
-    expect(html).not.toContain("渐生惰性");
+    expect(achievementList).not.toContain("渐生惰性");
     expect(html).not.toContain("购买办公椅并升级为人体工学椅");
     expect(html).not.toContain("平稳起步");
     expect(html).not.toContain("金币达到30。");
@@ -178,8 +195,10 @@ describe("v2 render lobby shell", () => {
     account.roleProgress.normal.unlockedAchievementIds = ["normal:first-pot"];
     const html = renderApp(createInitialState(), account);
 
-    expect(html).toContain('class="lobby-role-card-achievement-display" aria-label="已解锁成就"');
-    expect(html).toContain('class="lobby-role-card-achievement-slot" data-achievement-id="normal:first-pot"');
+    expect(html).toContain('class="lobby-role-card-achievement-display" aria-label="角色成就"');
+    expect(html).toContain('class="lobby-role-card-achievement-icon is-unlocked"');
+    expect(html).toContain('data-achievement-id="normal:first-pot"');
+    expect(html).toContain('aria-label="小有积蓄，已达成"');
     expect(html).not.toContain("成就 1/");
     expect(html).not.toContain('class="lobby-role-card-metric is-achievement"');
   });
@@ -238,8 +257,10 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("渐生惰性");
     expect(html).toContain("购买办公椅并升级为人体工学椅");
     expect(html).toContain("经验+5，解锁怠惰·大多数角色");
-    expect(html).toContain("最佳单局：办公椅 0/1 · 工学椅 0/1");
-    expect(html).not.toContain("小有积蓄");
+    expect(html).toContain("办公椅 0/1 · 工学椅 0/1");
+    expect(html).not.toContain("最佳单局：办公椅");
+    const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
+    expect(achievementList).not.toContain("小有积蓄");
   });
 
   it("renders the second page with special tags and the last gender-paired rows", () => {

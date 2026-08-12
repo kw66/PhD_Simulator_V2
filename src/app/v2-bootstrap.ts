@@ -1,4 +1,4 @@
-import { createIcons, Lock } from "lucide";
+import { ChevronDown, createIcons, Lock } from "lucide";
 
 import { createStore } from "../core/v2-store";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
@@ -391,7 +391,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       currentResearchPaperFilter,
       currentResearchPaperIndex,
     });
-    createIcons({ icons: { Lock }, root });
+    createIcons({ icons: { ChevronDown, Lock }, root });
     syncPlayTabUi();
     resetEffectSourceUi();
     scheduleAllFixedStageScales();

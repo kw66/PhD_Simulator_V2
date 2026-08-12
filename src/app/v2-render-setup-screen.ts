@@ -9,6 +9,7 @@ import {
 import { MAX_SAN } from "../core/v2-content";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
 import { BASE_RESEARCH_CAP } from "../core/v2-research-cap-system";
+import { getRoleAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleId } from "../core/v2-types";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 
@@ -94,16 +95,27 @@ function getRoleModeClass(roleId: RoleId): string {
   return getRoleDefinition(roleId).mode === "reversed" ? "is-reversed" : "is-upright";
 }
 
-function renderRoleAchievementDisplay(progress: AccountProfile["roleProgress"][RoleId], owned: boolean): string {
-  if (!owned) {
-    return `<div class="lobby-role-card-achievement-display is-locked" aria-hidden="true"></div>`;
-  }
+function renderRoleAchievementDisplay(
+  roleId: RoleId,
+  progress: AccountProfile["roleProgress"][RoleId],
+  owned: boolean,
+): string {
+  const unlockedAchievementIds = new Set(progress.unlockedAchievementIds);
+  const achievements = getRoleAchievementDefinitions(roleId);
 
   return `
-    <div class="lobby-role-card-achievement-display" aria-label="已解锁成就">
-      ${progress.unlockedAchievementIds.map((achievementId) => `
-        <span class="lobby-role-card-achievement-slot" data-achievement-id="${achievementId}" aria-hidden="true"></span>
+    <div class="lobby-role-card-achievement-display${owned ? "" : " is-locked"}" aria-label="角色成就">
+      <span class="lobby-role-card-achievement-label">成就</span>
+      <span class="lobby-role-card-achievement-icons">
+      ${achievements.map((achievement) => `
+        <span
+          class="lobby-role-card-achievement-icon${unlockedAchievementIds.has(achievement.id) ? " is-unlocked" : ""}"
+          data-achievement-id="${achievement.id}"
+          title="${achievement.title}"
+          aria-label="${achievement.title}${unlockedAchievementIds.has(achievement.id) ? "，已达成" : "，未达成"}"
+        >${achievement.icon}</span>
       `).join("")}
+      </span>
     </div>
   `;
 }
@@ -155,7 +167,7 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
             <div class="lobby-role-card-mode-band ${getRoleModeClass(roleId)}">
               <span>${getRoleModeLabel(roleId)}</span>
             </div>
-            ${renderRoleAchievementDisplay(progress, owned)}
+            ${renderRoleAchievementDisplay(role.id, progress, owned)}
             ${renderRoleCardCornerBadge(progress.level, owned)}
           </div>
         </div>
@@ -203,6 +215,9 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
     achievementPageIndex * ROLE_ACHIEVEMENT_PAGE_SIZE,
     (achievementPageIndex + 1) * ROLE_ACHIEVEMENT_PAGE_SIZE,
   );
+  const formatProgressLine = (line: string) => line
+    .replace(/^历史最高\s*/, "")
+    .replace(/^最佳单局：/, "");
 
   return `
     <section class="lobby-profile-section lobby-profile-achievement-section">
@@ -234,23 +249,24 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
       <div class="lobby-profile-achievement-list">
         ${visibleAchievements.length > 0
           ? visibleAchievements.map((achievement) => `
-          <article class="lobby-profile-achievement${achievement.unlocked ? " is-unlocked" : ""}">
-            <div class="lobby-profile-achievement-head">
+          <details class="lobby-profile-achievement${achievement.unlocked ? " is-unlocked" : ""}">
+            <summary class="lobby-profile-achievement-summary">
+              <span class="lobby-profile-achievement-icon" aria-hidden="true">${achievement.definition.icon}</span>
               <strong>${achievement.definition.title}</strong>
-              <span>${achievement.unlocked ? "已达成" : "未达成"}</span>
-            </div>
-            <div class="lobby-profile-achievement-copy">
-              <p class="lobby-profile-achievement-condition">${achievement.definition.description}</p>
-              ${achievement.definition.rewardText ? `<p class="lobby-profile-achievement-reward">${achievement.definition.rewardText}</p>` : ""}
+              <i class="lobby-profile-achievement-chevron" data-lucide="chevron-down" aria-hidden="true"></i>
+            </summary>
+            <div class="lobby-profile-achievement-details">
+              <p class="lobby-profile-achievement-condition"><span>达成条件</span>${achievement.definition.description}</p>
+              ${achievement.definition.rewardText ? `<p class="lobby-profile-achievement-reward"><span>奖励</span>${achievement.definition.rewardText}</p>` : ""}
               ${achievement.progressLines.length > 0
                 ? `
                 <div class="lobby-profile-achievement-progress">
-                  ${achievement.progressLines.map((line) => `<span>${line}</span>`).join("")}
+                  ${achievement.progressLines.map((line) => `<span>${formatProgressLine(line)}</span>`).join("")}
                 </div>
               `
                 : ""}
             </div>
-          </article>
+          </details>
         `).join("")
           : `<div class="lobby-profile-achievement-empty">暂无成就</div>`}
       </div>

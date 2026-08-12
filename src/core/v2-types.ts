@@ -273,6 +273,7 @@ export type RoleAchievementMetricId =
 
 export interface RoleAchievementDefinition {
   id: string;
+  icon: string;
   title: string;
   description: string;
   rewardText?: string;

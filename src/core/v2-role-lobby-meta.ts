@@ -16,6 +16,7 @@ interface RoleAchievementMetricTemplate {
 
 interface RoleAchievementTemplate {
   idSuffix: string;
+  icon: string;
   title: string;
   description: string;
   rewardText?: string;
@@ -45,6 +46,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
   normal: [
     {
       idSuffix: "first-pot",
+      icon: "💰",
       title: "小有积蓄",
       description: "金币达到30",
       rewardText: "经验+5，解锁富可敌国角色",
@@ -53,6 +55,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "research-start",
+      icon: "🔬",
       title: "初窥门径",
       description: "科研能力达到12",
       rewardText: "经验+5，解锁院士转世角色",
@@ -61,6 +64,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "favorite",
+      icon: "🌟",
       title: "得到器重",
       description: "导师好感达到12",
       rewardText: "经验+5，解锁导师子女角色",
@@ -69,6 +73,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "socialite",
+      icon: "🤝",
       title: "人脉初成",
       description: "社交能力达到12",
       rewardText: "经验+5，解锁社交达人角色",
@@ -77,6 +82,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "all-rounder",
+      icon: "🏆",
       title: "全面发展",
       description: "科研、社交、好感、金币都达到6",
       rewardText: "经验+5，解锁天选之人角色",
@@ -90,6 +96,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "chair-upgrade",
+      icon: "🪑",
       title: "渐生惰性",
       description: "购买办公椅并升级为人体工学椅",
       rewardText: "经验+5，解锁怠惰·大多数角色",
@@ -122,6 +129,7 @@ export function getRoleProfileSummary(roleId: RoleId): string {
 export function getRoleAchievementDefinitions(roleId: RoleId): RoleAchievementDefinition[] {
   return ROLE_ACHIEVEMENT_TEMPLATES[roleId].map((template) => ({
     id: `${roleId}:${template.idSuffix}`,
+    icon: template.icon,
     title: template.title,
     description: template.description,
     rewardText: template.rewardText,
