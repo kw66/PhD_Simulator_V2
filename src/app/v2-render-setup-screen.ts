@@ -172,7 +172,7 @@ function renderRolePager(accountProfile: AccountProfile): string {
         data-delta="-1"
         ${accountProfile.lobbyRolePage <= 0 ? "disabled" : ""}
       >
-        ←
+        <span aria-hidden="true">←</span>
       </button>
       <span class="lobby-page-indicator">${accountProfile.lobbyRolePage + 1} / ${pageCount}</span>
       <button
@@ -183,7 +183,7 @@ function renderRolePager(accountProfile: AccountProfile): string {
         data-delta="1"
         ${accountProfile.lobbyRolePage >= pageCount - 1 ? "disabled" : ""}
       >
-        →
+        <span aria-hidden="true">→</span>
       </button>
     </div>
   `;
@@ -214,7 +214,7 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
             data-action="change-role-achievement-page"
             data-delta="-1"
             ${achievementPageIndex <= 0 ? "disabled" : ""}
-          >←</button>
+          ><span aria-hidden="true">←</span></button>
           <span class="lobby-page-indicator">${achievementPageIndex + 1} / ${achievementPageCount}</span>
           <button
             class="lobby-page-button"
@@ -223,7 +223,7 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
             data-action="change-role-achievement-page"
             data-delta="1"
             ${achievementPageIndex >= achievementPageCount - 1 ? "disabled" : ""}
-          >→</button>
+          ><span aria-hidden="true">→</span></button>
         </div>
       </div>
       <div class="lobby-profile-achievement-list">
@@ -360,8 +360,8 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
       <div class="lobby-profile-info-head">
         <h1 class="lobby-profile-art-name">${viewModel.role.name}</h1>
         ${viewModel.unlockState.owned
-          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${viewModel.role.id}">开始游戏</button>`
-          : `<button class="lobby-start-button is-disabled" type="button" disabled>未解锁</button>`}
+          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${viewModel.role.id}"><span class="lobby-start-button-icon" aria-hidden="true">▶</span><span>开始游戏</span></button>`
+          : `<button class="lobby-start-button is-disabled" type="button" disabled><span class="lobby-start-button-icon" aria-hidden="true">◆</span><span>未解锁</span></button>`}
       </div>
       <p class="lobby-profile-summary">${viewModel.lobby.summary}</p>
       <div class="lobby-profile-stat-columns">

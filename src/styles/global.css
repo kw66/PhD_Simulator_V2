@@ -364,13 +364,13 @@ p {
   gap: 0;
   text-align: left;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
   position: relative;
   overflow: hidden;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.74),
     inset 0 -1px 0 rgba(114, 94, 56, 0.08),
-    0 6px 14px rgba(18, 37, 33, 0.08);
+    0 2px 4px rgba(18, 37, 33, 0.07);
 }
 
 .lobby-role-card.tone-upright {
@@ -401,14 +401,26 @@ p {
 
 .lobby-role-card:hover {
   transform: translateY(-1px);
-  border-color: rgba(39, 68, 58, 0.24);
+  border-color: rgba(39, 68, 58, 0.34);
   background:
     linear-gradient(180deg, rgba(255, 252, 246, 0.86), rgba(241, 235, 223, 0.88)),
     linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent 52%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
     inset 0 -1px 0 rgba(114, 94, 56, 0.1),
-    0 10px 18px rgba(18, 37, 33, 0.12);
+    0 4px 8px rgba(18, 37, 33, 0.11);
+}
+
+.lobby-role-card:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 1px 2px rgba(18, 37, 33, 0.12),
+    0 1px 2px rgba(18, 37, 33, 0.08);
+}
+
+.lobby-role-card:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--role-card-accent) 72%, white 8%);
+  outline-offset: 2px;
 }
 
 .lobby-role-card.is-selected {
@@ -418,8 +430,8 @@ p {
     linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent 52%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.88),
-    inset 0 0 0 1px color-mix(in oklab, var(--role-card-accent) 24%, transparent),
-    0 10px 18px color-mix(in oklab, var(--role-card-accent) 14%, transparent);
+    inset 0 0 0 1px color-mix(in oklab, var(--role-card-accent) 30%, transparent),
+    0 3px 7px color-mix(in oklab, var(--role-card-accent) 16%, transparent);
 }
 
 .lobby-role-card.is-selected::before {
@@ -727,25 +739,55 @@ p {
 .lobby-page-button {
   width: 28px;
   min-width: 28px;
+  height: 28px;
   min-height: 28px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  border: 1px solid rgba(39, 68, 58, 0.24);
   padding: 0;
-  background: linear-gradient(180deg, rgba(255, 252, 246, 0.92), rgba(234, 228, 215, 0.9));
+  background: linear-gradient(180deg, rgba(255, 254, 249, 0.98), rgba(232, 226, 214, 0.96));
   color: var(--ink);
-  font-size: 0.92rem;
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 760;
   line-height: 1;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 2px 3px rgba(18, 37, 33, 0.09);
+  transition: transform 120ms ease, border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.lobby-page-button > span {
+  display: block;
+  transform: translateY(-0.5px);
 }
 
 .lobby-page-button:hover:not(:disabled) {
   transform: translateY(-1px);
+  border-color: rgba(39, 68, 58, 0.46);
+  background: linear-gradient(180deg, #fffef9, #e3dbc9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 3px 5px rgba(18, 37, 33, 0.13);
+}
+
+.lobby-page-button:active:not(:disabled) {
+  transform: translateY(0);
+  background: linear-gradient(180deg, #ded6c5, #f6f1e7);
+  box-shadow: inset 0 1px 2px rgba(18, 37, 33, 0.14);
+}
+
+.lobby-page-button:focus-visible {
+  outline: 2px solid rgba(47, 94, 76, 0.46);
+  outline-offset: 2px;
 }
 
 .lobby-page-button:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.34;
+  box-shadow: none;
 }
 
 .lobby-detail-stage {
@@ -1003,42 +1045,95 @@ p {
   line-height: 1.6;
 }
 
-.lobby-start-button,
-.play-placeholder-button {
+.lobby-start-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid transparent;
+  border: 1px solid #242424;
   cursor: pointer;
-  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+  transition: transform 130ms ease, border-color 130ms ease, background-color 130ms ease, box-shadow 130ms ease, opacity 130ms ease;
 }
 
-.lobby-start-button,
-.play-placeholder-button {
-  min-width: 132px;
+.lobby-start-button {
+  min-width: 142px;
   min-height: 44px;
-  padding: 0 16px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #d6b56d 0%, #b88b3a 100%);
-  color: #fff9ec;
+  padding: 0 15px 0 11px;
+  gap: 10px;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 48%),
+    #343434;
+  color: #f5f3ee;
   font-family: var(--ui-font-cjk);
-  font-size: 0.96rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  box-shadow: 0 12px 20px rgba(132, 94, 30, 0.22);
+  font-size: 0.94rem;
+  font-weight: 760;
+  letter-spacing: 0;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32),
+    0 3px 0 #1f1f1f,
+    0 6px 10px rgba(22, 22, 22, 0.2);
 }
 
-.lobby-start-button:hover:not(:disabled),
-.play-placeholder-button:hover {
+.lobby-start-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1efe9;
+  font-size: 0.65rem;
+  line-height: 1;
+  text-indent: 1px;
+  text-shadow: none;
+}
+
+.lobby-start-button:hover:not(:disabled) {
   transform: translateY(-1px);
+  border-color: #191919;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 52%),
+    #484848;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.28),
+    0 4px 0 #1f1f1f,
+    0 8px 14px rgba(22, 22, 22, 0.24);
+}
+
+.lobby-start-button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.28),
+    0 1px 0 #1f1f1f,
+    0 3px 6px rgba(22, 22, 22, 0.16);
+}
+
+.lobby-start-button:focus-visible {
+  outline: 2px solid rgba(101, 101, 101, 0.72);
+  outline-offset: 3px;
 }
 
 .lobby-start-button.is-disabled,
-.lobby-start-button:disabled,
-.play-placeholder-button:disabled {
+.lobby-start-button:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
-  box-shadow: none;
+  border-color: rgba(66, 66, 66, 0.2);
+  background: linear-gradient(180deg, rgba(231, 228, 219, 0.94), rgba(213, 210, 201, 0.94));
+  color: rgba(62, 62, 62, 0.5);
+  text-shadow: none;
+  opacity: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.54);
+}
+
+.lobby-start-button:disabled .lobby-start-button-icon {
+  border-color: rgba(66, 66, 66, 0.18);
+  background: rgba(66, 66, 66, 0.05);
+  color: rgba(62, 62, 62, 0.38);
 }
 
 .lobby-profile-section {
@@ -1216,17 +1311,21 @@ p {
   min-height: 30px;
   padding: 0 12px;
   border: 1px solid rgba(74, 95, 86, 0.22);
-  border-radius: 999px;
+  border-radius: 0;
   background: linear-gradient(180deg, rgba(255, 253, 247, 0.94), rgba(237, 231, 220, 0.92));
   color: var(--setup-body-color);
   font-size: var(--setup-label-size);
   font-weight: 700;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  letter-spacing: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 1px 2px rgba(18, 37, 33, 0.06);
 }
 
 .lobby-talent-reset-button:disabled {
   cursor: not-allowed;
-  opacity: 0.76;
+  opacity: 0.46;
+  box-shadow: none;
 }
 
 .lobby-talent-allocation-list {
@@ -1282,17 +1381,20 @@ p {
   width: 28px;
   height: 28px;
   border: 1px solid rgba(74, 95, 86, 0.18);
-  border-radius: 10px;
+  border-radius: 0;
   background: linear-gradient(180deg, rgba(255, 253, 247, 0.96), rgba(236, 230, 220, 0.92));
   color: var(--setup-body-color);
   font-size: 0.92rem;
   font-weight: 800;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 1px 2px rgba(18, 37, 33, 0.06);
 }
 
 .lobby-talent-step-button:disabled {
   cursor: not-allowed;
-  opacity: 0.78;
+  opacity: 0.42;
+  box-shadow: none;
 }
 
 .lobby-talent-step-value {
