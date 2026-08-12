@@ -160,11 +160,11 @@ describe("v2 store manual saves", () => {
     expect(store.getState().log[0]?.text).toContain("该角色尚未解锁");
   });
 
-  it("pages role achievements in fixed groups of five and resets the page when switching roles", () => {
+  it("keeps the current six role achievements on one page and resets the page when switching roles", () => {
     const store = createStore();
 
     store.dispatch("change-role-achievement-page", { delta: 1 });
-    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(1);
+    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(0);
 
     store.dispatch("select-role", { roleId: "genius" });
     expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(0);

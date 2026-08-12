@@ -119,7 +119,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('class="lobby-role-card-run-text"');
     expect(html).not.toContain("📢");
     expect(html).not.toContain("角色描述");
-    expect(html).toContain("从小镇一路做题做到这里");
+    expect(html).toContain("家里条件普通，读研也没什么捷径");
     expect(html).not.toContain("天赋加点");
     expect(html).toContain("效果");
     expect(html).toContain("勤能补拙");
@@ -153,22 +153,28 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("小有积蓄");
     expect(html).toContain("金币达到30");
     expect(html).toContain("经验+5，解锁富可敌国角色");
-    expect(html).toContain("0 / 30");
+    expect(html).not.toContain("0 / 30");
     expect(html).toContain("全面发展");
-    expect(html).toContain("科研 0/6 · 社交 0/6 · 好感 0/6 · 金币 0/6");
     const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
     expect(html).toContain('class="lobby-profile-achievement-summary"');
     expect(html).toContain('class="lobby-profile-achievement-icon" aria-hidden="true">💰</span>');
+    expect(html).toContain('class="lobby-profile-achievement-overall-progress"');
+    expect(html).toContain('class="lobby-profile-achievement-progress-label">进度</span>');
+    expect(html).toContain('class="lobby-profile-achievement-progress-count">0/6</strong>');
+    expect(html).toContain('aria-valuemax="6"');
+    expect(html).toContain('aria-valuenow="0"');
     expect(html).toContain('data-lucide="chevron-down"');
     expect(html).not.toContain('<details class="lobby-profile-achievement" open>');
+    expect((html.match(/name="role-achievements"/g) ?? []).length).toBe(6);
     expect(achievementList).not.toContain("未达成");
     expect(achievementList).not.toContain("已达成");
     expect(html).not.toContain("历史最高 0 / 30");
     expect(html).not.toContain("最佳单局：科研");
-    expect(html).toContain("0 / 6");
-    expect(html).toContain("1 / 2");
-    expect(achievementList).not.toContain("渐生惰性");
-    expect(html).not.toContain("购买办公椅并升级为人体工学椅");
+    expect(html).not.toContain('<span class="lobby-meta-count">0 / 6</span>');
+    expect(achievementList).toContain("渐生惰性");
+    expect(html).toContain("购买办公椅并升级为人体工学椅");
+    expect(html).not.toContain('data-action="change-role-achievement-page"');
+    expect(html).not.toContain('class="lobby-profile-achievement-progress"');
     expect(html).not.toContain("平稳起步");
     expect(html).not.toContain("金币达到30。");
     expect(html).not.toContain("奖励经验+5");
@@ -199,6 +205,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-role-card-achievement-icon is-unlocked"');
     expect(html).toContain('data-achievement-id="normal:first-pot"');
     expect(html).toContain('aria-label="小有积蓄，已达成"');
+    expect(html).toContain('aria-valuenow="1"');
+    expect(html).toContain('class="lobby-profile-achievement-progress-count">1/6</strong>');
     expect(html).not.toContain("成就 1/");
     expect(html).not.toContain('class="lobby-role-card-metric is-achievement"');
   });
@@ -248,19 +256,17 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("每月行动次数+1.0（小数累积，满1生效）；满级额外效果：第一个月有10次行动次数");
   });
 
-  it("renders the second achievement page for normal separately from the first five entries", () => {
+  it("clamps stale achievement pages and renders all six normal achievements together", () => {
     const account = createDefaultAccountProfile();
     account.lobbyRoleAchievementPage = 1;
     const html = renderApp(createInitialState(), account);
 
-    expect(html).toContain("2 / 2");
+    expect(html).not.toContain('data-action="change-role-achievement-page"');
+    expect(html).toContain("小有积蓄");
     expect(html).toContain("渐生惰性");
     expect(html).toContain("购买办公椅并升级为人体工学椅");
     expect(html).toContain("经验+5，解锁怠惰·大多数角色");
-    expect(html).toContain("办公椅 0/1 · 工学椅 0/1");
-    expect(html).not.toContain("最佳单局：办公椅");
-    const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
-    expect(achievementList).not.toContain("小有积蓄");
+    expect(html).not.toContain("办公椅 0/1 · 工学椅 0/1");
   });
 
   it("renders the second page with special tags and the last gender-paired rows", () => {

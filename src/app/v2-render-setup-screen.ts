@@ -215,18 +215,17 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
     achievementPageIndex * ROLE_ACHIEVEMENT_PAGE_SIZE,
     (achievementPageIndex + 1) * ROLE_ACHIEVEMENT_PAGE_SIZE,
   );
-  const formatProgressLine = (line: string) => line
-    .replace(/^历史最高\s*/, "")
-    .replace(/^最佳单局：/, "");
+  const achievementProgressPercent = viewModel.roleAchievements.length > 0
+    ? (unlockedCount / viewModel.roleAchievements.length) * 100
+    : 0;
 
   return `
     <section class="lobby-profile-section lobby-profile-achievement-section">
       <div class="lobby-profile-achievement-bar">
         <div class="lobby-profile-achievement-title-block">
           <h2>角色成就</h2>
-          <span class="lobby-meta-count">${unlockedCount} / ${viewModel.roleAchievements.length}</span>
         </div>
-        <div class="lobby-role-pagination is-compact">
+        ${achievementPageCount > 1 ? `<div class="lobby-role-pagination is-compact">
           <button
             class="lobby-page-button"
             type="button"
@@ -244,12 +243,28 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
             data-delta="1"
             ${achievementPageIndex >= achievementPageCount - 1 ? "disabled" : ""}
           ><span aria-hidden="true">→</span></button>
-        </div>
+        </div>` : ""}
       </div>
+      ${viewModel.roleAchievements.length > 0 ? `
+        <div class="lobby-profile-achievement-progress-row">
+          <span class="lobby-profile-achievement-progress-label">进度</span>
+          <div
+            class="lobby-profile-achievement-overall-progress"
+            role="progressbar"
+            aria-label="角色成就完成进度"
+            aria-valuemin="0"
+            aria-valuemax="${viewModel.roleAchievements.length}"
+            aria-valuenow="${unlockedCount}"
+          >
+            <span style="width:${achievementProgressPercent}%;"></span>
+          </div>
+          <strong class="lobby-profile-achievement-progress-count">${unlockedCount}/${viewModel.roleAchievements.length}</strong>
+        </div>
+      ` : ""}
       <div class="lobby-profile-achievement-list">
         ${visibleAchievements.length > 0
           ? visibleAchievements.map((achievement) => `
-          <details class="lobby-profile-achievement${achievement.unlocked ? " is-unlocked" : ""}">
+          <details class="lobby-profile-achievement${achievement.unlocked ? " is-unlocked" : ""}" name="role-achievements">
             <summary class="lobby-profile-achievement-summary">
               <span class="lobby-profile-achievement-icon" aria-hidden="true">${achievement.definition.icon}</span>
               <strong>${achievement.definition.title}</strong>
@@ -258,13 +273,6 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
             <div class="lobby-profile-achievement-details">
               <p class="lobby-profile-achievement-condition"><span>达成条件</span>${achievement.definition.description}</p>
               ${achievement.definition.rewardText ? `<p class="lobby-profile-achievement-reward"><span>奖励</span>${achievement.definition.rewardText}</p>` : ""}
-              ${achievement.progressLines.length > 0
-                ? `
-                <div class="lobby-profile-achievement-progress">
-                  ${achievement.progressLines.map((line) => `<span>${formatProgressLine(line)}</span>`).join("")}
-                </div>
-              `
-                : ""}
             </div>
           </details>
         `).join("")

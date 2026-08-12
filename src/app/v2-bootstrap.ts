@@ -406,6 +406,18 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
   store.subscribe(render);
 
+  root.addEventListener("toggle", (event) => {
+    const openedAchievement = event.target;
+    if (!(openedAchievement instanceof HTMLDetailsElement)) return;
+    if (!openedAchievement.matches(".lobby-profile-achievement[open]")) return;
+
+    root.querySelectorAll<HTMLDetailsElement>(".lobby-profile-achievement[open]").forEach((achievement) => {
+      if (achievement !== openedAchievement) {
+        achievement.open = false;
+      }
+    });
+  }, true);
+
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;

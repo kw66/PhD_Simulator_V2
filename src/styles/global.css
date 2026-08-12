@@ -593,10 +593,10 @@ p {
 
 .lobby-role-card-achievement-display {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   align-content: start;
-  gap: 3px;
+  column-gap: 5px;
   flex: 1;
   width: 100%;
   min-height: 28px;
@@ -619,9 +619,9 @@ p {
 
 .lobby-role-card-achievement-icons {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-start;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -631,7 +631,7 @@ p {
   width: 15px;
   height: 15px;
   flex: 0 0 15px;
-  color: transparent;
+  color: inherit;
   font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
   font-size: 14px;
   line-height: 1;
@@ -1170,13 +1170,17 @@ p {
 }
 
 .lobby-profile-summary {
+  display: -webkit-box;
   max-width: none;
+  overflow: hidden;
   color: var(--setup-body-color);
   font-family: var(--ui-font-cjk);
   font-size: var(--setup-body-size);
   font-weight: 600;
   line-height: 1.84;
   margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .lobby-profile-growth-card {
@@ -1397,7 +1401,7 @@ p {
 
 .lobby-profile-achievement-section {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0;
   min-height: 100%;
   padding: 0;
@@ -1408,9 +1412,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid var(--setup-divider);
-  box-shadow: inset 0 -1px 0 var(--setup-divider-highlight);
+  padding-bottom: 10px;
 }
 
 .lobby-profile-achievement-title-block {
@@ -1453,6 +1455,50 @@ p {
   min-width: 28px;
   min-height: 28px;
   font-size: 0.92rem;
+}
+
+.lobby-profile-achievement-progress-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lobby-profile-achievement-progress-label,
+.lobby-profile-achievement-progress-count {
+  color: var(--setup-label-color);
+  font-family: var(--ui-font-cjk);
+  font-size: var(--setup-label-size);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.lobby-profile-achievement-progress-count {
+  color: var(--setup-title-color);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.lobby-profile-achievement-overall-progress {
+  width: 100%;
+  height: 6px;
+  border: 1px solid rgba(72, 70, 62, 0.16);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1px 2px rgba(55, 53, 47, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+}
+
+.lobby-profile-achievement-overall-progress > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #ac7725, #d7ae57);
+  box-shadow: inset 0 1px 0 rgba(255, 244, 205, 0.48);
+  transition: width 180ms ease;
 }
 
 .lobby-profile-achievement-list {
@@ -1588,24 +1634,6 @@ p {
   color: var(--setup-label-color);
   font-size: 0.72rem;
   font-weight: 720;
-}
-
-.lobby-profile-achievement-progress {
-  display: grid;
-  gap: 2px;
-  padding: 6px 0 0 4.2rem;
-  border-top: 1px dashed rgba(58, 62, 57, 0.12);
-}
-
-.lobby-profile-achievement-progress span {
-  color: var(--setup-label-color);
-  font-size: 0.76rem;
-  font-weight: 700;
-  line-height: 1.5;
-}
-
-.lobby-profile-achievement.is-unlocked .lobby-profile-achievement-progress span {
-  color: color-mix(in oklab, var(--accent-deep) 60%, var(--ink));
 }
 
 .lobby-profile-achievement-empty {
@@ -3683,11 +3711,15 @@ button.todo-item:focus-visible {
   min-height: 30px;
   padding: 0 10px;
   border: 1px solid rgba(39, 68, 58, 0.14);
-  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(236, 229, 216, 0.88));
+  background: #fff;
   color: var(--ink);
   font-size: 0.76rem;
   font-weight: 760;
   white-space: nowrap;
+}
+
+.shop-item-btn:hover:not(:disabled) {
+  background: #fff;
 }
 
 .shop-item-btn.is-secondary {
