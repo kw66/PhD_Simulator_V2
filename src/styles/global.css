@@ -1051,41 +1051,48 @@ p {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  min-width: 116px;
-  min-height: 38px;
-  padding: 0 2px 4px;
-  border: 0;
-  border-bottom: 1px solid rgba(39, 68, 58, 0.48);
+  min-width: 132px;
+  min-height: 40px;
+  padding: 0 15px;
+  border: 1px solid #74342e;
   border-radius: 0;
-  background: transparent;
-  color: var(--ink);
+  background: #98463d;
+  color: #fff9ed;
   font-family: var(--ui-font-cjk);
   letter-spacing: 0;
   cursor: pointer;
-  box-shadow: 0 1px 0 rgba(255, 252, 246, 0.82);
-  transition: border-color 140ms ease, color 140ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 3px 0 #71352f,
+    0 5px 8px rgba(91, 44, 38, 0.15);
+  transition: transform 130ms ease, border-color 130ms ease, background-color 130ms ease, box-shadow 130ms ease;
 }
 
 .lobby-start-button-label {
-  color: var(--ink);
-  font-size: 0.92rem;
-  font-weight: 780;
+  color: #fff9ed;
+  font-size: 0.94rem;
+  font-weight: 800;
   line-height: 1.1;
   white-space: nowrap;
 }
 
 .lobby-start-button-arrow {
   display: inline-block;
-  color: var(--accent-deep);
+  color: rgba(255, 249, 237, 0.86);
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 760;
   line-height: 1;
   transition: transform 140ms ease;
 }
 
 .lobby-start-button:hover:not(:disabled) {
-  border-color: var(--accent-deep);
-  color: color-mix(in oklab, var(--ink) 88%, black);
+  transform: translateY(-1px);
+  border-color: #6c2d28;
+  background: #a44b41;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.17),
+    0 4px 0 #71352f,
+    0 7px 10px rgba(91, 44, 38, 0.18);
 }
 
 .lobby-start-button:hover:not(:disabled) .lobby-start-button-arrow {
@@ -1093,25 +1100,30 @@ p {
 }
 
 .lobby-start-button:active:not(:disabled) {
-  transform: translateY(1px);
-  border-color: rgba(132, 94, 30, 0.72);
+  transform: translateY(2px);
+  border-color: #6c2d28;
+  background: #8e3f37;
+  box-shadow:
+    inset 0 2px 3px rgba(73, 27, 24, 0.2),
+    0 1px 0 #71352f,
+    0 3px 5px rgba(91, 44, 38, 0.12);
 }
 
 .lobby-start-button:focus-visible {
-  outline: 1px solid rgba(39, 68, 58, 0.56);
-  outline-offset: 4px;
+  outline: 2px solid rgba(116, 52, 46, 0.56);
+  outline-offset: 3px;
 }
 
 .lobby-start-button.is-disabled,
 .lobby-start-button:disabled {
   cursor: not-allowed;
-  border-color: rgba(39, 68, 58, 0.14);
-  background: transparent;
-  box-shadow: 0 1px 0 rgba(255, 252, 246, 0.54);
+  border-color: rgba(72, 70, 66, 0.14);
+  background: rgba(218, 213, 204, 0.62);
+  box-shadow: none;
 }
 
 .lobby-start-button:disabled .lobby-start-button-label {
-  color: rgba(32, 49, 46, 0.34);
+  color: rgba(62, 62, 62, 0.34);
 }
 
 .lobby-profile-section {
