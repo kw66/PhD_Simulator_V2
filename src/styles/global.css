@@ -571,8 +571,8 @@ p {
   margin: 0;
   padding: 0 7px;
   border: 0;
-  background: linear-gradient(145deg, rgba(247, 245, 239, 0.96), rgba(220, 216, 207, 0.96));
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.72);
+  background: #e2ded4;
+  box-shadow: none;
   color: color-mix(in oklab, var(--role-card-accent) 72%, black 28%);
   font-family: var(--ui-font-cjk);
   font-size: calc(var(--setup-label-size) - 0.05rem);
