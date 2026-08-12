@@ -571,7 +571,7 @@ p {
   margin: 0;
   padding: 0 7px;
   border: 0;
-  background: #e2ded4;
+  background: #f3efe7;
   box-shadow: none;
   color: color-mix(in oklab, var(--role-card-accent) 72%, black 28%);
   font-family: var(--ui-font-cjk);
