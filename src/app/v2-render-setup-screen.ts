@@ -96,13 +96,7 @@ function getRoleModeClass(roleId: RoleId): string {
 
 function renderRoleAchievementDisplay(progress: AccountProfile["roleProgress"][RoleId], owned: boolean): string {
   if (!owned) {
-    return `
-      <div class="lobby-role-card-achievement-display is-locked" aria-label="未解锁">
-        <span class="lobby-role-card-lock" aria-hidden="true">
-          <i data-lucide="lock"></i>
-        </span>
-      </div>
-    `;
+    return `<div class="lobby-role-card-achievement-display is-locked" aria-hidden="true"></div>`;
   }
 
   return `
@@ -112,6 +106,18 @@ function renderRoleAchievementDisplay(progress: AccountProfile["roleProgress"][R
       `).join("")}
     </div>
   `;
+}
+
+function renderRoleCardCornerBadge(level: number, owned: boolean): string {
+  if (!owned) {
+    return `
+      <span class="lobby-role-card-level-badge is-locked" aria-label="未解锁">
+        <i data-lucide="lock" aria-hidden="true"></i>
+      </span>
+    `;
+  }
+
+  return `<span class="lobby-role-card-level-badge">Lv ${level}</span>`;
 }
 
 function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selectedRoleId: RoleId): string {
@@ -150,7 +156,7 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
               <span>${getRoleModeLabel(roleId)}</span>
             </div>
             ${renderRoleAchievementDisplay(progress, owned)}
-            <span class="lobby-role-card-level-badge">Lv ${progress.level}</span>
+            ${renderRoleCardCornerBadge(progress.level, owned)}
           </div>
         </div>
       </div>

@@ -562,14 +562,12 @@ p {
 .lobby-role-card-mode-band {
   position: absolute;
   z-index: 3;
-  top: 31px;
+  bottom: 0;
   left: 68px;
   right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: auto;
-  height: 18px;
+  height: 22px;
   margin: 0;
   padding: 0 7px;
   border: 0;
@@ -592,6 +590,14 @@ p {
   white-space: nowrap;
 }
 
+.lobby-role-card-mode-band > span {
+  position: absolute;
+  inset: 0 51px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .lobby-role-card-mode-band.is-reversed {
   background: color-mix(in oklab, var(--role-card-accent) 16%, white 84%);
 }
@@ -606,16 +612,16 @@ p {
   align-content: center;
   flex-wrap: wrap;
   gap: 3px;
+  flex: 1;
   width: 100%;
   min-height: 28px;
-  margin-top: 27px;
-  padding: 2px 3px;
+  margin-top: 5px;
+  padding: 2px 3px 24px;
   color: var(--role-card-accent);
 }
 
 .lobby-role-card-achievement-display.is-locked {
-  justify-content: center;
-  color: color-mix(in oklab, var(--role-card-text) 56%, transparent);
+  pointer-events: none;
 }
 
 .lobby-role-card-achievement-slot {
@@ -626,30 +632,9 @@ p {
   background: color-mix(in oklab, var(--role-card-accent) 10%, white 90%);
 }
 
-.lobby-role-card-lock {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(73, 68, 59, 0.2);
-  border-radius: 5px;
-  background: linear-gradient(145deg, rgba(255, 254, 250, 0.96), rgba(218, 212, 201, 0.94));
-  color: rgba(67, 64, 58, 0.78);
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.9),
-    inset -1px -1px 0 rgba(84, 76, 63, 0.08),
-    0 2px 3px rgba(52, 47, 39, 0.14);
-}
-
-.lobby-role-card-lock .lucide {
-  width: 20px;
-  height: 20px;
-  stroke-width: 1.9;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.78));
-}
-
 .lobby-role-card-level-badge {
   position: absolute;
+  z-index: 4;
   right: 0;
   bottom: 0;
   display: flex;
@@ -670,6 +655,18 @@ p {
   line-height: 1;
   letter-spacing: 0.02em;
   white-space: nowrap;
+}
+
+.lobby-role-card-level-badge.is-locked {
+  align-items: flex-end;
+  padding-bottom: 3px;
+}
+
+.lobby-role-card-level-badge.is-locked .lucide {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.9;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.74));
 }
 
 .lobby-badge {

@@ -58,9 +58,11 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-role-card-mode-band is-reversed"');
     expect(html).toContain('class="lobby-role-card-level-badge">Lv 0</span>');
     expect(html).toContain('class="lobby-role-card-achievement-display"');
-    expect(html).toContain('class="lobby-role-card-achievement-display is-locked"');
-    expect(html).toContain('class="lobby-role-card-lock"');
+    expect(html).toContain('class="lobby-role-card-achievement-display is-locked" aria-hidden="true"');
+    expect(html).toContain('class="lobby-role-card-level-badge is-locked" aria-label="未解锁"');
     expect(html).toContain('data-lucide="lock"');
+    expect(html).not.toContain('class="lobby-role-card-lock"');
+    expect(html).not.toMatch(/lobby-role-card-level-badge is-locked[^>]*>\s*Lv/);
     expect(html).not.toContain('class="lobby-role-card-tag');
     expect(html).not.toContain('class="lobby-role-card-metric');
     expect(html).not.toContain("基础属性");
