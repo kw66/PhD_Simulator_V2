@@ -1047,103 +1047,71 @@ p {
 
 .lobby-start-button {
   position: relative;
-  display: grid;
-  grid-template-columns: 4px minmax(0, 1fr) 34px;
+  display: inline-flex;
   align-items: center;
-  min-width: 148px;
-  min-height: 42px;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid rgba(39, 68, 58, 0.36);
+  justify-content: center;
+  gap: 9px;
+  min-width: 116px;
+  min-height: 38px;
+  padding: 0 2px 4px;
+  border: 0;
+  border-bottom: 1px solid rgba(39, 68, 58, 0.48);
   border-radius: 0;
-  background: rgba(255, 252, 246, 0.72);
+  background: transparent;
   color: var(--ink);
   font-family: var(--ui-font-cjk);
   letter-spacing: 0;
   cursor: pointer;
-  transition: transform 130ms ease, border-color 130ms ease, background-color 130ms ease, box-shadow 130ms ease;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.76),
-    2px 2px 0 rgba(39, 68, 58, 0.11);
-}
-
-.lobby-start-button-mark {
-  align-self: stretch;
-  background: var(--accent);
-  box-shadow: inset -1px 0 rgba(132, 94, 30, 0.24);
+  box-shadow: 0 1px 0 rgba(255, 252, 246, 0.82);
+  transition: border-color 140ms ease, color 140ms ease;
 }
 
 .lobby-start-button-label {
-  padding: 0 14px;
   color: var(--ink);
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 780;
-  line-height: 1;
+  line-height: 1.1;
   white-space: nowrap;
 }
 
 .lobby-start-button-arrow {
-  display: grid;
-  place-items: center;
-  align-self: stretch;
-  border-left: 1px solid rgba(39, 68, 58, 0.18);
-  background: rgba(39, 68, 58, 0.035);
-  color: color-mix(in oklab, var(--ink) 82%, var(--paper-strong));
-  font-size: 0.94rem;
-  font-weight: 760;
+  display: inline-block;
+  color: var(--accent-deep);
+  font-size: 1rem;
+  font-weight: 700;
   line-height: 1;
-  transition: color 130ms ease, background-color 130ms ease, transform 130ms ease;
+  transition: transform 140ms ease;
 }
 
 .lobby-start-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(39, 68, 58, 0.62);
-  background: rgba(255, 253, 248, 0.96);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    3px 3px 0 rgba(39, 68, 58, 0.14);
+  border-color: var(--accent-deep);
+  color: color-mix(in oklab, var(--ink) 88%, black);
 }
 
 .lobby-start-button:hover:not(:disabled) .lobby-start-button-arrow {
-  background: rgba(39, 68, 58, 0.075);
-  color: var(--ink);
-  transform: translateX(1px);
+  transform: translateX(3px);
 }
 
 .lobby-start-button:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  background: rgba(239, 233, 221, 0.9);
-  box-shadow:
-    inset 0 1px 2px rgba(39, 68, 58, 0.12),
-    1px 1px 0 rgba(39, 68, 58, 0.14);
+  transform: translateY(1px);
+  border-color: rgba(132, 94, 30, 0.72);
 }
 
 .lobby-start-button:focus-visible {
-  outline: 2px solid rgba(39, 68, 58, 0.52);
-  outline-offset: 3px;
+  outline: 1px solid rgba(39, 68, 58, 0.56);
+  outline-offset: 4px;
 }
 
 .lobby-start-button.is-disabled,
 .lobby-start-button:disabled {
   cursor: not-allowed;
-  border-color: rgba(39, 68, 58, 0.16);
-  background: rgba(235, 230, 220, 0.56);
-  color: rgba(32, 49, 46, 0.4);
-  box-shadow: none;
-}
-
-.lobby-start-button:disabled .lobby-start-button-mark {
-  background: rgba(39, 68, 58, 0.14);
-  box-shadow: none;
+  border-color: rgba(39, 68, 58, 0.14);
+  background: transparent;
+  box-shadow: 0 1px 0 rgba(255, 252, 246, 0.54);
 }
 
 .lobby-start-button:disabled .lobby-start-button-label {
-  color: rgba(32, 49, 46, 0.42);
-}
-
-.lobby-start-button:disabled .lobby-start-button-arrow {
-  background: transparent;
-  color: rgba(32, 49, 46, 0.28);
+  color: rgba(32, 49, 46, 0.34);
 }
 
 .lobby-profile-section {
