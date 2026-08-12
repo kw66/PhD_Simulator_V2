@@ -563,7 +563,7 @@ p {
   position: absolute;
   z-index: 3;
   top: 31px;
-  left: 0;
+  left: 68px;
   right: 0;
   display: flex;
   align-items: center;
@@ -629,10 +629,10 @@ p {
 .lobby-role-card-lock {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border: 1px solid rgba(73, 68, 59, 0.2);
-  border-radius: 4px;
+  border-radius: 5px;
   background: linear-gradient(145deg, rgba(255, 254, 250, 0.96), rgba(218, 212, 201, 0.94));
   color: rgba(67, 64, 58, 0.78);
   box-shadow:
@@ -642,9 +642,9 @@ p {
 }
 
 .lobby-role-card-lock .lucide {
-  width: 16px;
-  height: 16px;
-  stroke-width: 1.8;
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.9;
   filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.78));
 }
 
