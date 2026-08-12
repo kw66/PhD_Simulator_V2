@@ -1,3 +1,5 @@
+import { createIcons, Lock } from "lucide";
+
 import { createStore } from "../core/v2-store";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
 import { getRoleOptions } from "../core/v2-progression";
@@ -389,6 +391,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       currentResearchPaperFilter,
       currentResearchPaperIndex,
     });
+    createIcons({ icons: { Lock }, root });
     syncPlayTabUi();
     resetEffectSourceUi();
     scheduleAllFixedStageScales();

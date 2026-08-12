@@ -60,6 +60,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-role-card-achievement-display"');
     expect(html).toContain('class="lobby-role-card-achievement-display is-locked"');
     expect(html).toContain('class="lobby-role-card-lock"');
+    expect(html).toContain('data-lucide="lock"');
     expect(html).not.toContain('class="lobby-role-card-tag');
     expect(html).not.toContain('class="lobby-role-card-metric');
     expect(html).not.toContain("基础属性");

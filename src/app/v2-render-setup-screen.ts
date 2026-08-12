@@ -98,7 +98,9 @@ function renderRoleAchievementDisplay(progress: AccountProfile["roleProgress"][R
   if (!owned) {
     return `
       <div class="lobby-role-card-achievement-display is-locked" aria-label="未解锁">
-        <span class="lobby-role-card-lock" aria-hidden="true"></span>
+        <span class="lobby-role-card-lock" aria-hidden="true">
+          <i data-lucide="lock"></i>
+        </span>
       </div>
     `;
   }

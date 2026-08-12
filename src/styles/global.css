@@ -385,20 +385,6 @@ p {
   --role-card-accent: var(--special-accent);
 }
 
-.lobby-role-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--role-card-accent) 42%, white 24%),
-    color-mix(in oklab, var(--role-card-accent) 88%, black 6%)
-  );
-  opacity: 0;
-  transition: opacity 140ms ease;
-}
-
 .lobby-role-card:hover {
   transform: translateY(-1px);
   border-color: rgba(39, 68, 58, 0.34);
@@ -432,10 +418,6 @@ p {
     inset 0 1px 0 rgba(255, 255, 255, 0.88),
     inset 0 0 0 1px color-mix(in oklab, var(--role-card-accent) 30%, transparent),
     0 3px 7px color-mix(in oklab, var(--role-card-accent) 16%, transparent);
-}
-
-.lobby-role-card.is-selected::before {
-  opacity: 1;
 }
 
 .lobby-role-card.is-selected .lobby-role-card-portrait-shell {
@@ -578,20 +560,35 @@ p {
 }
 
 .lobby-role-card-mode-band {
+  position: absolute;
+  z-index: 3;
+  top: 31px;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
-  width: 100%;
-  min-height: 17px;
-  margin-top: 5px;
-  padding: 2px 7px;
-  border: 1px solid color-mix(in oklab, var(--role-card-accent) 38%, transparent);
-  background: color-mix(in oklab, var(--role-card-accent) 18%, white 82%);
+  justify-content: center;
+  width: auto;
+  height: 18px;
+  margin: 0;
+  padding: 0 7px;
+  border: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--role-card-accent) 24%, white 76%),
+    color-mix(in oklab, var(--role-card-accent) 15%, white 85%) 50%,
+    color-mix(in oklab, var(--role-card-accent) 24%, white 76%)
+  );
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.38),
+    inset 0 -1px color-mix(in oklab, var(--role-card-accent) 20%, transparent);
   color: color-mix(in oklab, var(--role-card-accent) 72%, black 28%);
   font-family: var(--ui-font-cjk);
   font-size: calc(var(--setup-label-size) - 0.05rem);
   font-weight: 760;
   line-height: 1;
   letter-spacing: 0.08em;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -611,7 +608,7 @@ p {
   gap: 3px;
   width: 100%;
   min-height: 28px;
-  margin-top: 3px;
+  margin-top: 27px;
   padding: 2px 3px;
   color: var(--role-card-accent);
 }
@@ -630,36 +627,25 @@ p {
 }
 
 .lobby-role-card-lock {
-  position: relative;
-  display: block;
-  width: 19px;
-  height: 15px;
-  border: 2px solid currentColor;
-  border-radius: 2px;
-  opacity: 0.76;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(73, 68, 59, 0.2);
+  border-radius: 4px;
+  background: linear-gradient(145deg, rgba(255, 254, 250, 0.96), rgba(218, 212, 201, 0.94));
+  color: rgba(67, 64, 58, 0.78);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.9),
+    inset -1px -1px 0 rgba(84, 76, 63, 0.08),
+    0 2px 3px rgba(52, 47, 39, 0.14);
 }
 
-.lobby-role-card-lock::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  top: -11px;
-  width: 9px;
-  height: 10px;
-  border: 2px solid currentColor;
-  border-bottom: 0;
-  border-radius: 9px 9px 0 0;
-}
-
-.lobby-role-card-lock::after {
-  content: "";
-  position: absolute;
-  left: 7px;
-  top: 4px;
-  width: 3px;
-  height: 5px;
-  border-radius: 2px;
-  background: currentColor;
+.lobby-role-card-lock .lucide {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.8;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.78));
 }
 
 .lobby-role-card-level-badge {
@@ -672,11 +658,12 @@ p {
   width: 51px;
   height: 27px;
   padding: 0 5px 4px 13px;
-  border-top: 1px solid color-mix(in oklab, var(--role-card-accent) 44%, transparent);
-  border-left: 1px solid color-mix(in oklab, var(--role-card-accent) 44%, transparent);
+  border-top: 1px solid rgba(70, 66, 58, 0.22);
+  border-left: 1px solid rgba(70, 66, 58, 0.22);
   border-radius: 999px 0 0 0;
-  background: color-mix(in oklab, var(--role-card-accent) 17%, white 83%);
-  color: color-mix(in oklab, var(--role-card-accent) 78%, black 22%);
+  background: linear-gradient(145deg, rgba(247, 245, 239, 0.96), rgba(220, 216, 207, 0.96));
+  color: rgba(62, 59, 53, 0.84);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.72);
   font-family: var(--ui-font-cjk);
   font-size: 0.68rem;
   font-weight: 800;
