@@ -571,15 +571,8 @@ p {
   margin: 0;
   padding: 0 7px;
   border: 0;
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--role-card-accent) 24%, white 76%),
-    color-mix(in oklab, var(--role-card-accent) 15%, white 85%) 50%,
-    color-mix(in oklab, var(--role-card-accent) 24%, white 76%)
-  );
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.38),
-    inset 0 -1px color-mix(in oklab, var(--role-card-accent) 20%, transparent);
+  background: linear-gradient(145deg, rgba(247, 245, 239, 0.96), rgba(220, 216, 207, 0.96));
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.72);
   color: color-mix(in oklab, var(--role-card-accent) 72%, black 28%);
   font-family: var(--ui-font-cjk);
   font-size: calc(var(--setup-label-size) - 0.05rem);
@@ -596,14 +589,6 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.lobby-role-card-mode-band.is-reversed {
-  background: color-mix(in oklab, var(--role-card-accent) 16%, white 84%);
-}
-
-.lobby-role-card-mode-band.is-special {
-  background: color-mix(in oklab, var(--role-card-accent) 17%, white 83%);
 }
 
 .lobby-role-card-achievement-display {
