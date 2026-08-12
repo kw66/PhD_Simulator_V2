@@ -96,7 +96,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "chair-upgrade",
-      icon: "🪑",
+      icon: "😴",
       title: "渐生惰性",
       description: "购买办公椅并升级为人体工学椅",
       rewardText: "经验+5，解锁怠惰·大多数角色",

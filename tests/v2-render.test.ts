@@ -66,7 +66,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain(">🌟</span>");
     expect(html).toContain(">🤝</span>");
     expect(html).toContain(">🏆</span>");
-    expect(html).toContain(">🪑</span>");
+    expect(html).toContain(">😴</span>");
     expect(html).toContain('class="lobby-role-card-level-badge is-locked" aria-label="未解锁"');
     expect(html).toContain('data-lucide="lock"');
     expect(html).not.toContain('class="lobby-role-card-lock"');
