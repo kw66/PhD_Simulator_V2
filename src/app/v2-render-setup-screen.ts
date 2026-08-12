@@ -360,8 +360,8 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
       <div class="lobby-profile-info-head">
         <h1 class="lobby-profile-art-name">${viewModel.role.name}</h1>
         ${viewModel.unlockState.owned
-          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${viewModel.role.id}"><span class="lobby-start-button-icon" aria-hidden="true">▶</span><span>开始游戏</span></button>`
-          : `<button class="lobby-start-button is-disabled" type="button" disabled><span class="lobby-start-button-icon" aria-hidden="true">◆</span><span>未解锁</span></button>`}
+          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${viewModel.role.id}"><span class="lobby-start-button-icon" aria-hidden="true">▶</span><span class="lobby-start-button-label">开始游戏</span></button>`
+          : `<button class="lobby-start-button is-disabled" type="button" disabled><span class="lobby-start-button-icon" aria-hidden="true">◆</span><span class="lobby-start-button-label">未解锁</span></button>`}
       </div>
       <p class="lobby-profile-summary">${viewModel.lobby.summary}</p>
       <div class="lobby-profile-stat-columns">
