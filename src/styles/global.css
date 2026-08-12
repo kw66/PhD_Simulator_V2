@@ -1094,13 +1094,11 @@ p {
 
 .lobby-start-button-label {
   color: var(--accent-deep);
-  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 56%, #9a742e 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter:
-    drop-shadow(0 1px 0 rgba(255, 252, 244, 0.8))
-    drop-shadow(0 1px 0 rgba(94, 67, 20, 0.12));
+  font-size: 0.94rem;
+  font-weight: 820;
+  text-shadow:
+    0 1px 0 rgba(255, 252, 244, 0.84),
+    0 0 0.01px rgba(80, 55, 16, 0.5);
 }
 
 .lobby-start-button:hover:not(:disabled) {
@@ -1147,9 +1145,7 @@ p {
 
 .lobby-start-button:disabled .lobby-start-button-label {
   color: rgba(62, 62, 62, 0.5);
-  background: none;
-  -webkit-text-fill-color: currentColor;
-  filter: none;
+  text-shadow: none;
 }
 
 .lobby-profile-section {
