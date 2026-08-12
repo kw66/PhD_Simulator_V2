@@ -2,7 +2,6 @@ import {
   buildLobbySelectedRoleViewModel,
   getLobbyRolePageCount,
   getLobbyRolePageRows,
-  getRoleAchievementDisplayTotal,
   getRoleAchievementPageCount,
   isRoleOwned,
   ROLE_ACHIEVEMENT_PAGE_SIZE,
@@ -14,11 +13,6 @@ import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleId } fr
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 
 const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain"]);
-
-type RoleTagDescriptor = {
-  label: string;
-  className: string;
-};
 
 type TalentSourceId = "awakening" | "hidden-awaken";
 
@@ -84,26 +78,36 @@ function getRoleToneClass(roleId: RoleId): string {
   return getRoleDefinition(roleId).mode === "reversed" ? " tone-reversed" : " tone-upright";
 }
 
-function getRoleTagDescriptors(roleId: RoleId, owned: boolean): RoleTagDescriptor[] {
-  const tags: RoleTagDescriptor[] = SPECIAL_ROLE_IDS.has(roleId)
-    ? [{ label: "特殊", className: " is-special" }]
-    : [{
-      label: getRoleDefinition(roleId).mode === "reversed" ? "逆位" : "正位",
-      className: getRoleDefinition(roleId).mode === "reversed" ? " is-reversed" : " is-upright",
-    }];
-
-  if (!owned) {
-    tags.push({ label: "未解锁", className: " is-locked" });
+function getRoleModeLabel(roleId: RoleId): string {
+  if (SPECIAL_ROLE_IDS.has(roleId)) {
+    return "特殊";
   }
 
-  return tags;
+  return getRoleDefinition(roleId).mode === "reversed" ? "逆位" : "正位";
 }
 
-function renderRoleMetricItem(label: string, value: string, className: string): string {
+function getRoleModeClass(roleId: RoleId): string {
+  if (SPECIAL_ROLE_IDS.has(roleId)) {
+    return "is-special";
+  }
+
+  return getRoleDefinition(roleId).mode === "reversed" ? "is-reversed" : "is-upright";
+}
+
+function renderRoleAchievementDisplay(progress: AccountProfile["roleProgress"][RoleId], owned: boolean): string {
+  if (!owned) {
+    return `
+      <div class="lobby-role-card-achievement-display is-locked" aria-label="未解锁">
+        <span class="lobby-role-card-lock" aria-hidden="true"></span>
+      </div>
+    `;
+  }
+
   return `
-    <div class="lobby-role-card-metric ${className}">
-      <span class="lobby-role-card-metric-label">${label}</span>
-      <strong class="lobby-role-card-metric-value">${value}</strong>
+    <div class="lobby-role-card-achievement-display" aria-label="已解锁成就">
+      ${progress.unlockedAchievementIds.map((achievementId) => `
+        <span class="lobby-role-card-achievement-slot" data-achievement-id="${achievementId}" aria-hidden="true"></span>
+      `).join("")}
     </div>
   `;
 }
@@ -115,8 +119,6 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
   const toneClass = getRoleToneClass(roleId);
   const selectedClass = selectedRoleId === roleId ? " is-selected" : "";
   const statusClass = owned ? " is-owned" : " is-locked";
-  const achievementTotal = getRoleAchievementDisplayTotal(roleId);
-  const tagDescriptors = getRoleTagDescriptors(roleId, owned);
 
   return `
     <button
@@ -142,16 +144,11 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
           </div>
           <div class="lobby-role-card-headings">
             <strong class="lobby-role-card-name">${role.name}</strong>
-            <div class="lobby-role-card-tag-line">
-              <span class="lobby-role-card-tags">
-                ${tagDescriptors.map((tag) => `<span class="lobby-role-card-tag${tag.className}">${tag.label}</span>`).join("")}
-              </span>
+            <div class="lobby-role-card-mode-band ${getRoleModeClass(roleId)}">
+              <span>${getRoleModeLabel(roleId)}</span>
             </div>
-            <div class="lobby-role-card-metric-list">
-              ${renderRoleMetricItem("通关", `${progress.completedRuns}`, "is-runs")}
-              ${renderRoleMetricItem("等级", `${progress.level}`, "is-level")}
-              ${renderRoleMetricItem("成就", `${progress.achievementCount}/${achievementTotal}`, "is-achievement")}
-            </div>
+            ${renderRoleAchievementDisplay(progress, owned)}
+            <span class="lobby-role-card-level-badge">Lv ${progress.level}</span>
           </div>
         </div>
       </div>

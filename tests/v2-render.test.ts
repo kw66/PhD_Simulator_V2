@@ -54,14 +54,14 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("怠惰·大多数");
     expect(html).toContain("富可敌国");
     expect(html).toContain("贪求·富可敌国");
-    expect(html).toContain('class="lobby-role-card-metric is-level"');
-    expect(html).toContain('class="lobby-role-card-metric-label">等级</span>');
-    expect(html).toContain('class="lobby-role-card-metric-value">0</strong>');
-    expect(html).toContain('class="lobby-role-card-metric is-runs"');
-    expect(html).toContain('class="lobby-role-card-metric-label">通关</span>');
-    expect(html).toContain('class="lobby-role-card-metric is-achievement"');
-    expect(html).toContain('class="lobby-role-card-metric-label">成就</span>');
-    expect(html).not.toContain('class="lobby-role-card-metric-value-unit"');
+    expect(html).toContain('class="lobby-role-card-mode-band is-upright"');
+    expect(html).toContain('class="lobby-role-card-mode-band is-reversed"');
+    expect(html).toContain('class="lobby-role-card-level-badge">Lv 0</span>');
+    expect(html).toContain('class="lobby-role-card-achievement-display"');
+    expect(html).toContain('class="lobby-role-card-achievement-display is-locked"');
+    expect(html).toContain('class="lobby-role-card-lock"');
+    expect(html).not.toContain('class="lobby-role-card-tag');
+    expect(html).not.toContain('class="lobby-role-card-metric');
     expect(html).not.toContain("基础属性");
     expect(html).not.toContain("角色特征");
     expect(html).not.toContain("已拥有");
@@ -96,10 +96,9 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-role-card-portrait"');
     expect(html).toContain('alt="大多数缩略立绘"');
     expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(5);
-    expect(html).toContain("通关");
     expect(html).toContain("正位");
     expect(html).toContain("逆位");
-    expect(html).toContain("未解锁");
+    expect(html).not.toContain('class="lobby-role-card-tag is-locked"');
     expect(html).not.toContain('class="lobby-role-card-icon"');
     expect(html).not.toContain('class="lobby-role-card-mode"');
     expect(html).not.toContain('class="lobby-role-exp"');
@@ -169,6 +168,17 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('class="lobby-profile-summary-card lobby-profile-section"');
     expect(html).not.toContain('class="lobby-growth-column"');
     expect(html).not.toContain('class="lobby-growth-row"');
+  });
+
+  it("renders unlocked role achievements as expandable display slots", () => {
+    const account = createDefaultAccountProfile();
+    account.roleProgress.normal.unlockedAchievementIds = ["normal:first-pot"];
+    const html = renderApp(createInitialState(), account);
+
+    expect(html).toContain('class="lobby-role-card-achievement-display" aria-label="已解锁成就"');
+    expect(html).toContain('class="lobby-role-card-achievement-slot" data-achievement-id="normal:first-pot"');
+    expect(html).not.toContain("成就 1/");
+    expect(html).not.toContain('class="lobby-role-card-metric is-achievement"');
   });
 
   it("renders locked role details and blocks start on unowned roles", () => {
