@@ -2161,6 +2161,19 @@ function renderSettingsSection(): string {
         <span class="settings-title">设置</span>
       </div>
       <div class="settings-content" id="settings-panel-content">
+        <div class="settings-section settings-control-section">
+          <div class="settings-section-title">游戏控制</div>
+          <div class="settings-action-row">
+            <button class="settings-primary-btn is-restart" type="button" data-action="restart-game">
+              <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+              <span>重开</span>
+            </button>
+            <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
+              <i data-lucide="house" aria-hidden="true"></i>
+              <span>返回开始页</span>
+            </button>
+          </div>
+        </div>
         <div class="settings-section">
           <div class="settings-section-title">属性调整</div>
           <div class="settings-attr-grid">
@@ -2171,12 +2184,6 @@ function renderSettingsSection(): string {
           <div class="settings-section-title">事件触发</div>
           <div class="settings-event-list">
             ${renderSettingsEventGroups()}
-          </div>
-        </div>
-        <div class="settings-section">
-          <div class="settings-section-title">游戏控制</div>
-          <div class="settings-action-row">
-            <button class="settings-primary-btn" type="button" data-action="reset-game">返回开始页</button>
           </div>
         </div>
       </div>

@@ -1,5 +1,3 @@
-import { ACHIEVEMENT_DEFINITIONS } from "./v2-achievements";
-import { getRoleDefinition } from "./v2-progression";
 import type {
   GameState,
   RoleAchievementDefinition,
@@ -190,25 +188,10 @@ export function getRoleAchievementDefinitions(roleId: RoleId): RoleAchievementDe
   }));
 }
 
-function isAchievementVisibleForRole(scope: "any-role" | "upright-role", roleId: RoleId): boolean {
-  return scope === "any-role" || getRoleDefinition(roleId).mode === "upright";
-}
-
 export function getRoleLobbyAchievementDefinitions(roleId: RoleId): RoleAchievementDefinition[] {
   const unlockAchievement = ROLE_UNLOCK_DISPLAY_ACHIEVEMENTS[roleId];
-  const commonAchievements = ACHIEVEMENT_DEFINITIONS
-    .filter((achievement) => isAchievementVisibleForRole(achievement.scope, roleId))
-    .map((achievement) => ({
-      id: `global:${achievement.id}`,
-      icon: achievement.icon,
-      title: achievement.name,
-      description: `${achievement.scope === "upright-role" ? "任意正位角色" : "任意角色"}：${achievement.description}`,
-      rewardText: "通用成就；完成后将在所有适用角色档案中同步展示",
-      scope: achievement.scope,
-      globalAchievementId: achievement.id,
-    }));
-
-  return unlockAchievement ? [unlockAchievement, ...commonAchievements] : commonAchievements;
+  const roleAchievements = getRoleAchievementDefinitions(roleId);
+  return unlockAchievement ? [unlockAchievement, ...roleAchievements] : roleAchievements;
 }
 
 function getRoleAchievementTemplateByDefinitionId(roleId: RoleId, definitionId: string): RoleAchievementTemplate | null {

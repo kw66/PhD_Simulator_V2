@@ -133,6 +133,25 @@ describe("v2 store manual saves", () => {
     expect(store.getState().actionsRemaining).toBe(store.getState().maxActionsPerMonth);
   });
 
+  it("restarts immediately with the current role without settling the abandoned run", () => {
+    const store = createStore();
+    store.dispatch("start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    const startingResearch = store.getState().player.research;
+    store.dispatch("debug-adjust-stat", { debugStatId: "research", delta: 12 });
+    store.dispatch("next-month");
+    const accountBeforeRestart = structuredClone(store.getAccountProfile());
+
+    store.dispatch("restart-game");
+
+    expect(store.getState().phase).toBe("playing");
+    expect(store.getState().selectedRoleId).toBe("normal");
+    expect(store.getState().selectedAdvisorId).toBeNull();
+    expect(store.getState().totalMonths).toBe(0);
+    expect(store.getState().player.research).toBe(startingResearch);
+    expect(store.getState().eventQueue.some((item) => item.chainId === "before-grad-school")).toBe(true);
+    expect(store.getAccountProfile()).toEqual(accountBeforeRestart);
+  });
+
   it("forces the start screen when opened with start=setup", () => {
     const localStorage = installMockWindow();
     const firstStore = createStore();
@@ -160,16 +179,16 @@ describe("v2 store manual saves", () => {
     expect(store.getState().log[0]?.text).toContain("该角色尚未解锁");
   });
 
-  it("pages common role achievements and resets the page when switching roles", () => {
+  it("keeps the six original achievements on one page and resets when switching roles", () => {
     const store = createStore();
 
     store.dispatch("change-role-achievement-page", { delta: 1 });
-    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(1);
+    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(0);
 
     store.dispatch("select-role", { roleId: "genius" });
     expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(0);
 
     store.dispatch("change-role-achievement-page", { delta: 1 });
-    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(1);
+    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(0);
   });
 });

@@ -151,6 +151,14 @@ export function createStore() {
         return;
       }
 
+      if (actionId === "restart-game") {
+        const nextState = dispatchAction(createInitialState(), "start-game", {
+          roleId: state.selectedRoleId,
+        });
+        commit(nextState);
+        return;
+      }
+
       if (actionId === "start-game") {
         const nextRoleId = payload.roleId ?? accountProfile.selectedLobbyRoleId;
         if (!isRoleOwned(accountProfile, nextRoleId)) {

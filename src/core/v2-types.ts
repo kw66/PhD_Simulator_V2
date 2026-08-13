@@ -70,6 +70,7 @@ export type EventSource = "fixed" | "random" | "system" | "review" | "thesis" | 
 export type EventStage = "act1" | "act2" | "act3" | "result";
 export type GameActionId =
   | "start-game"
+  | "restart-game"
   | "reset-game"
   | "select-role"
   | "change-lobby-role-page"
@@ -232,8 +233,6 @@ export interface AchievementMetaState {
   totalCount: number;
 }
 
-export type AchievementScope = "any-role" | "upright-role";
-
 export interface AccountProfile {
   schemaVersion: number;
   ownedRoleIds: RoleId[];
@@ -281,9 +280,7 @@ export interface RoleAchievementDefinition {
   description: string;
   rewardText?: string;
   milestone?: RoleAchievementMilestone;
-  scope?: AchievementScope;
   unlocksRoleId?: RoleId;
-  globalAchievementId?: AchievementFlagId;
 }
 
 export interface RoleAchievementProgressSnapshot {

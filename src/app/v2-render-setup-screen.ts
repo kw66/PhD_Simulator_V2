@@ -10,7 +10,7 @@ import { MAX_SAN } from "../core/v2-content";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
 import { BASE_RESEARCH_CAP } from "../core/v2-research-cap-system";
 import { getRoleLobbyAchievementDefinitions } from "../core/v2-role-lobby-meta";
-import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleId } from "../core/v2-types";
+import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 
 const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain"]);
@@ -95,31 +95,39 @@ function getRoleModeClass(roleId: RoleId): string {
   return getRoleDefinition(roleId).mode === "reversed" ? "is-reversed" : "is-upright";
 }
 
+function isLobbyAchievementUnlocked(
+  accountProfile: AccountProfile,
+  progress: AccountProfile["roleProgress"][RoleId],
+  achievement: RoleAchievementDefinition,
+): boolean {
+  return achievement.unlocksRoleId
+    ? isRoleOwned(accountProfile, achievement.unlocksRoleId)
+    : progress.unlockedAchievementIds.includes(achievement.id);
+}
+
 function renderRoleAchievementDisplay(
   roleId: RoleId,
   progress: AccountProfile["roleProgress"][RoleId],
   owned: boolean,
   accountProfile: AccountProfile,
 ): string {
-  const unlockedAchievementIds = new Set(progress.unlockedAchievementIds);
   const achievements = getRoleLobbyAchievementDefinitions(roleId);
 
   return `
     <div class="lobby-role-card-achievement-display${owned ? "" : " is-locked"}" aria-label="角色成就">
       <span class="lobby-role-card-achievement-label">成就</span>
       <span class="lobby-role-card-achievement-icons">
-      ${achievements.map((achievement) => `
+      ${achievements.map((achievement) => {
+        const achieved = isLobbyAchievementUnlocked(accountProfile, progress, achievement);
+        return `
         <span
-          class="lobby-role-card-achievement-icon${achievement.globalAchievementId
-            ? accountProfile.achievementProgress.flags[achievement.globalAchievementId] ? " is-unlocked" : ""
-            : unlockedAchievementIds.has(achievement.id) ? " is-unlocked" : ""}"
+          class="lobby-role-card-achievement-icon${achieved ? " is-unlocked" : ""}"
           data-achievement-id="${achievement.id}"
           title="${achievement.title}"
-          aria-label="${achievement.title}${achievement.globalAchievementId
-            ? accountProfile.achievementProgress.flags[achievement.globalAchievementId] ? "，已达成" : "，未达成"
-            : unlockedAchievementIds.has(achievement.id) ? "，已达成" : "，未达成"}"
+          aria-label="${achievement.title}${achieved ? "，已达成" : "，未达成"}"
         >${achievement.icon}</span>
-      `).join("")}
+      `;
+      }).join("")}
       </span>
     </div>
   `;
@@ -218,8 +226,8 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
     const roleAchievement = roleAchievementById.get(definition.id);
     return {
       definition,
-      unlocked: definition.globalAchievementId
-        ? accountProfile.achievementProgress.flags[definition.globalAchievementId] === true
+      unlocked: definition.unlocksRoleId
+        ? isRoleOwned(accountProfile, definition.unlocksRoleId)
         : roleAchievement?.unlocked === true,
       progressLines: roleAchievement?.progressLines ?? [],
     };
@@ -310,11 +318,6 @@ function clampNormalEffectLevel(level: number): number {
   return Math.max(0, Math.min(NORMAL_EFFECT_MAX_LEVEL, Math.floor(level)));
 }
 
-function formatNormalBaseEffect(level: number): string {
-  const effectLevel = clampNormalEffectLevel(level);
-  return effectLevel <= 0 ? "无效果" : `天赋点+${effectLevel}`;
-}
-
 function formatNormalAwakeningEffect(level: number): string {
   const effectLevel = clampNormalEffectLevel(level);
   const baseEffectText = `转博时科研能力、社交能力、导师好感+${effectLevel * 10}%（属性小数上取整）`;
@@ -330,15 +333,6 @@ function formatNormalHiddenAwakenEffect(level: number): string {
   return effectLevel >= NORMAL_EFFECT_MAX_LEVEL
     ? `${baseEffectText}；满级额外效果：第一个月有10次行动次数`
     : baseEffectText;
-}
-
-function getRoleBaseEffectText(viewModel: LobbySelectedRoleViewModel): string {
-  switch (viewModel.role.id) {
-    case "normal":
-      return formatNormalBaseEffect(viewModel.progress.level);
-    default:
-      return "无效果";
-  }
 }
 
 function getRoleTalentEffectText(
@@ -395,10 +389,6 @@ function buildTalentPointSummary(
   };
 }
 
-function formatRoleExpGainHint(multiplier: number): string {
-  return `每局经验=科研分*获取倍率，当前倍率为${multiplier.toFixed(1)}（完成成就可提升获取倍率）`;
-}
-
 function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
   return `
     <section class="lobby-profile-info">
@@ -447,16 +437,21 @@ function renderGrowthBoard(viewModel: LobbySelectedRoleViewModel): string {
   const pointSummary = buildTalentPointSummary(viewModel, talents);
   const expTarget = pointSummary.nextExp ?? Math.max(pointSummary.currentExp, 1);
   const expProgressPercent = Math.max(0, Math.min(100, Math.round((pointSummary.currentExp / expTarget) * 100)));
-  const baseEffectText = getRoleBaseEffectText(viewModel);
-  const expGainHint = formatRoleExpGainHint(DEFAULT_ROLE_EXP_GAIN_MULTIPLIER);
 
   return `
     <section class="lobby-profile-growth-card lobby-profile-section">
       <div class="lobby-growth-summary-row">
         <span class="lobby-growth-inline-label">等级</span>
         <strong class="lobby-growth-inline-value">${pointSummary.level}</strong>
-        <span class="lobby-growth-inline-label is-effect">基础效果：</span>
-        <strong class="lobby-growth-inline-value is-effect-copy">${baseEffectText}</strong>
+        <span class="lobby-growth-inline-label is-multiplier">经验倍率</span>
+        <strong class="lobby-growth-inline-value">${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}</strong>
+        <span
+          class="lobby-growth-help"
+          role="img"
+          tabindex="0"
+          aria-label="经验倍率说明"
+          data-tooltip="每局经验=科研分*获取倍率，完成成就可提升获取倍率"
+        ><i data-lucide="circle-help" aria-hidden="true"></i></span>
       </div>
       <div class="lobby-growth-exp-row">
         <span class="lobby-growth-inline-label">经验</span>
@@ -466,7 +461,6 @@ function renderGrowthBoard(viewModel: LobbySelectedRoleViewModel): string {
         <strong class="lobby-growth-exp-value">${pointSummary.currentExp} / ${expTarget}</strong>
       </div>
       <div class="lobby-growth-exp-detail-row">
-        <p class="lobby-growth-exp-note">${expGainHint}</p>
         <div class="lobby-talent-allocation-meta">
           <span>天赋点 ${pointSummary.availablePoints}</span>
           <button class="lobby-talent-reset-button" type="button" disabled>重置</button>

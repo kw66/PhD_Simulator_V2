@@ -61,7 +61,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-role-card-achievement-display"');
     expect(html).toContain('class="lobby-role-card-achievement-display is-locked" aria-label="角色成就"');
     expect(html).toContain('class="lobby-role-card-achievement-label">成就</span>');
-    expect(html).toContain('data-achievement-id="global:sickly"');
+    expect(html).toContain('data-achievement-id="normal:first-pot"');
     expect(html).toContain(">💰</span>");
     expect(html).toContain(">🔬</span>");
     expect(html).toContain(">🌟</span>");
@@ -128,14 +128,19 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("角色描述");
     expect(html).toContain("家里条件普通，读研也没什么捷径");
     expect(html).not.toContain("天赋加点");
-    expect(html).toContain("效果");
     expect(html).toContain("勤能补拙");
-    expect((html.match(/>无效果</g) ?? []).length).toBeGreaterThanOrEqual(1);
+    expect(html).toContain("经验倍率");
+    expect(html).toContain('class="lobby-growth-help"');
+    expect(html).toContain('data-lucide="circle-help"');
+    expect(html).toContain('data-tooltip="每局经验=科研分*获取倍率，完成成就可提升获取倍率"');
+    expect(html).not.toContain("基础效果");
+    expect(html).not.toContain("无效果");
     expect(html).toContain("经验");
     expect(html).toContain("0 / 20");
     expect(html).toContain('class="lobby-growth-exp-bar"');
     expect(html).toContain('class="lobby-growth-exp-detail-row"');
-    expect(html).toContain("每局经验=科研分*获取倍率，当前倍率为1.0（完成成就可提升获取倍率）");
+    expect(html).not.toContain("lobby-growth-exp-note");
+    expect(html).not.toContain("当前倍率为");
     expect(html).toContain("天赋点 0");
     expect(html).toContain(">重置</button>");
     expect(html).toContain('class="lobby-talent-step-button"');
@@ -157,26 +162,29 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("+10次");
     expect(html).not.toContain("特殊能力");
     expect(html).toContain("角色成就");
-    expect(html).toContain("任意角色：感冒3次");
+    expect(html).toContain("小有积蓄");
+    expect(html).toContain("金币达到30");
+    expect(html).toContain("经验+5，解锁富可敌国角色");
+    expect(html).not.toContain('data-achievement-id="global:sickly"');
     expect(html).not.toContain("0 / 30");
-    expect(getRoleLobbyAchievementDefinitions("chosen").some((achievement) => achievement.title === "全面发展")).toBe(true);
+    expect(getRoleLobbyAchievementDefinitions("chosen")[0]?.title).toBe("全面发展");
     const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
     expect(html).toContain('class="lobby-profile-achievement-summary"');
-    expect(html).toContain('class="lobby-profile-achievement-icon" aria-hidden="true">🤧</span>');
+    expect(html).toContain('class="lobby-profile-achievement-icon" aria-hidden="true">💰</span>');
     expect(html).toContain('class="lobby-profile-achievement-overall-progress"');
     expect(html).toContain('class="lobby-profile-achievement-progress-label">进度</span>');
-    expect(html).toContain('class="lobby-profile-achievement-progress-count">0/17</strong>');
-    expect(html).toContain('aria-valuemax="17"');
+    expect(html).toContain('class="lobby-profile-achievement-progress-count">0/6</strong>');
+    expect(html).toContain('aria-valuemax="6"');
     expect(html).toContain('aria-valuenow="0"');
     expect(html).toContain('data-lucide="chevron-down"');
     expect(html).not.toContain('<details class="lobby-profile-achievement" open>');
-    expect((html.match(/name="role-achievements"/g) ?? []).length).toBe(8);
+    expect((html.match(/name="role-achievements"/g) ?? []).length).toBe(6);
     expect(achievementList).not.toContain("未达成");
     expect(achievementList).not.toContain("已达成");
     expect(html).not.toContain("历史最高 0 / 30");
     expect(html).not.toContain("最佳单局：科研");
     expect(html).not.toContain('<span class="lobby-meta-count">0 / 6</span>');
-    expect(html).toContain('data-action="change-role-achievement-page"');
+    expect(html).not.toContain('data-action="change-role-achievement-page"');
     expect(html).not.toContain('class="lobby-profile-achievement-progress"');
     expect(html).not.toContain("平稳起步");
     expect(html).not.toContain("金币达到30。");
@@ -201,15 +209,15 @@ describe("v2 render lobby shell", () => {
 
   it("renders unlocked role achievements as expandable display slots", () => {
     const account = createDefaultAccountProfile();
-    account.achievementProgress.flags.sickly = true;
+    account.roleProgress.normal.unlockedAchievementIds = ["normal:first-pot"];
     const html = renderApp(createInitialState(), account);
 
     expect(html).toContain('class="lobby-role-card-achievement-display" aria-label="角色成就"');
     expect(html).toContain('class="lobby-role-card-achievement-icon is-unlocked"');
-    expect(html).toContain('data-achievement-id="global:sickly"');
-    expect(html).toContain('aria-label="体弱多病，已达成"');
+    expect(html).toContain('data-achievement-id="normal:first-pot"');
+    expect(html).toContain('aria-label="小有积蓄，已达成"');
     expect(html).toContain('aria-valuenow="1"');
-    expect(html).toContain('class="lobby-profile-achievement-progress-count">1/17</strong>');
+    expect(html).toContain('class="lobby-profile-achievement-progress-count">1/6</strong>');
     expect(html).not.toContain("成就 1/");
     expect(html).not.toContain('class="lobby-role-card-metric is-achievement"');
   });
@@ -222,9 +230,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("愚钝·院士转世");
     expect(html).toContain("未解锁");
     expect(html).toContain("逆位");
-    const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
-    expect(achievementList).toContain("体弱多病");
-    expect(achievementList).not.toContain("高分论文");
+    expect(html).toContain("暂无成就");
     expect(html).not.toContain("成就系统待接入：完成院士路线的逆位挑战后解锁");
     expect(html).not.toContain("查看解锁条件");
     expect(html).not.toContain('data-action="start-game" data-role-id="genius-reversed"');
@@ -239,7 +245,7 @@ describe("v2 render lobby shell", () => {
 
     const html = renderApp(createInitialState(), account);
 
-    expect(html).toContain("天赋点+6");
+    expect(html).not.toContain("基础效果");
     expect(html).toContain("转博时科研能力、社交能力、导师好感+50%（属性小数上取整）");
     expect(html).not.toContain("每当属性溢出时上限+1");
     expect(html).toContain("每月行动次数+0.1（小数累积，满1生效）");
@@ -248,19 +254,42 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-talent-allocation-effect"');
   });
 
-  it("exposes scoped lobby achievement definitions without changing role-run definitions", () => {
+  it("keeps the six original achievements and mirrors unlock achievements onto target roles", () => {
     const normalAchievements = getRoleLobbyAchievementDefinitions("normal");
     const reversedAchievements = getRoleLobbyAchievementDefinitions("normal-reversed");
     const richAchievements = getRoleLobbyAchievementDefinitions("rich");
 
-    expect(normalAchievements).toHaveLength(17);
-    expect(normalAchievements.find((achievement) => achievement.id === "global:sickly")?.description)
-      .toBe("任意角色：感冒3次");
-    expect(normalAchievements.find((achievement) => achievement.id === "global:highScorePaper")?.description)
-      .toBe("任意正位角色：论文分数达到125，且未从人脉关系角色获得分数加成");
-    expect(reversedAchievements).toHaveLength(17);
-    expect(reversedAchievements.some((achievement) => achievement.id === "global:highScorePaper")).toBe(false);
+    expect(normalAchievements).toHaveLength(6);
+    expect(normalAchievements.map((achievement) => achievement.id)).toEqual([
+      "normal:first-pot",
+      "normal:research-start",
+      "normal:favorite",
+      "normal:socialite",
+      "normal:all-rounder",
+      "normal:chair-upgrade",
+    ]);
+    expect(reversedAchievements).toHaveLength(1);
+    expect(reversedAchievements[0]).toMatchObject({
+      id: "unlock:normal-reversed",
+      unlocksRoleId: "normal-reversed",
+    });
     expect(richAchievements[0]).toMatchObject({ id: "unlock:rich", unlocksRoleId: "rich" });
+  });
+
+  it("keeps a target role unlock achievement visible after the role is unlocked", () => {
+    const account = createDefaultAccountProfile();
+    account.ownedRoleIds.push("rich");
+    account.roleProgress.rich.unlocked = true;
+    account.selectedLobbyRoleId = "rich";
+
+    const html = renderApp(createInitialState(), account);
+    const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
+
+    expect(html).toContain('data-achievement-id="unlock:rich"');
+    expect(html).toContain('aria-label="小有积蓄，已达成"');
+    expect(achievementList).toContain('class="lobby-profile-achievement is-unlocked"');
+    expect(achievementList).toContain("使用大多数角色，金币达到30");
+    expect(html).toContain('class="lobby-profile-achievement-progress-count">1/1</strong>');
   });
 
   it("renders the max-level extra effect copy for normal talents", () => {
@@ -271,22 +300,20 @@ describe("v2 render lobby shell", () => {
 
     const html = renderApp(createInitialState(), account);
 
-    expect(html).toContain("天赋点+10");
+    expect(html).not.toContain("基础效果");
     expect(html).toContain("转博时科研能力、社交能力、导师好感+100%（属性小数上取整）；满级额外效果：每当属性溢出时上限+1");
     expect(html).toContain("每月行动次数+1.0（小数累积，满1生效）；满级额外效果：第一个月有10次行动次数");
   });
 
-  it("clamps stale achievement pages and renders the second page of common achievements", () => {
+  it("clamps stale achievement pages and renders all six normal achievements together", () => {
     const account = createDefaultAccountProfile();
     account.lobbyRoleAchievementPage = 1;
     const html = renderApp(createInitialState(), account);
 
-    expect(html).toContain('data-action="change-role-achievement-page"');
-    expect(html).toContain("2 / 3");
-    expect(html).toContain("K歌之王");
-    expect(html).toContain("任意角色：在团建中KTV唱歌3次");
-    const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
-    expect(achievementList).not.toContain("体弱多病");
+    expect(html).not.toContain('data-action="change-role-achievement-page"');
+    expect(html).toContain("小有积蓄");
+    expect(html).toContain("渐生惰性");
+    expect(html).toContain("购买办公椅并升级为人体工学椅");
     expect(html).not.toContain("办公椅 0/1 · 工学椅 0/1");
   });
 
@@ -380,7 +407,12 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('data-action="debug-trigger-event"');
     expect(html).toContain('data-event-id="conference"');
     expect(html).toContain('data-event-id="before-grad-school"');
+    expect(html).toContain('data-action="restart-game"');
+    expect(html).toContain('data-lucide="rotate-ccw"');
+    expect(html).toContain('data-lucide="house"');
+    expect(html).toContain("重开");
     expect(html).toContain("返回开始页");
+    expect(html.indexOf("游戏控制")).toBeLessThan(html.indexOf("属性调整"));
     expect(html).not.toContain("主题选择");
     expect(html).not.toContain("本轮概览");
     expect(html).not.toContain("存档占位");

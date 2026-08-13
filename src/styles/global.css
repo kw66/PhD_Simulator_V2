@@ -1213,7 +1213,7 @@ p {
   white-space: nowrap;
 }
 
-.lobby-growth-inline-label.is-effect {
+.lobby-growth-inline-label.is-multiplier {
   margin-left: 10px;
 }
 
@@ -1238,11 +1238,53 @@ p {
   margin-left: auto;
 }
 
-.lobby-growth-inline-value.is-effect-copy {
-  color: color-mix(in srgb, var(--setup-title-color) 82%, var(--setup-body-color) 18%);
-  font-size: calc(var(--setup-label-size) + 0.08rem);
-  font-weight: 620;
-  letter-spacing: 0.01em;
+.lobby-growth-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  margin-left: -4px;
+  color: var(--setup-label-color);
+  cursor: help;
+  flex: 0 0 auto;
+}
+
+.lobby-growth-help::after {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 7px);
+  left: 50%;
+  width: max-content;
+  max-width: 300px;
+  padding: 7px 9px;
+  border: 1px solid rgba(69, 65, 55, 0.2);
+  background: rgba(52, 51, 46, 0.96);
+  color: rgba(255, 252, 242, 0.96);
+  box-shadow: 0 5px 12px rgba(24, 30, 27, 0.18);
+  content: attr(data-tooltip);
+  font-family: var(--ui-font-cjk);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: normal;
+}
+
+.lobby-growth-help:hover::after,
+.lobby-growth-help:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.lobby-growth-help .lucide {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.8;
 }
 
 .lobby-growth-exp-bar {
@@ -1260,16 +1302,6 @@ p {
   border-radius: inherit;
   background: linear-gradient(90deg, rgba(194, 158, 82, 0.9), rgba(228, 198, 125, 0.98));
   box-shadow: inset 0 1px 0 rgba(255, 248, 224, 0.68);
-}
-
-.lobby-growth-exp-note {
-  margin: 0;
-  color: var(--setup-body-color);
-  font-family: var(--ui-font-cjk);
-  font-size: calc(var(--setup-label-size) + 0.02rem);
-  font-weight: 620;
-  line-height: 1.45;
-  letter-spacing: 0.01em;
 }
 
 .lobby-talent-allocation-section {
@@ -3656,6 +3688,52 @@ button.todo-item:focus-visible {
   font-weight: 760;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.settings-control-section {
+  border-color: rgba(184, 139, 58, 0.22);
+  background: linear-gradient(180deg, rgba(255, 250, 239, 0.86), rgba(242, 234, 220, 0.64));
+}
+
+.settings-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.settings-primary-btn .lucide {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.9;
+}
+
+.settings-primary-btn.is-restart {
+  border-color: rgba(184, 139, 58, 0.28);
+  background: linear-gradient(180deg, rgba(255, 248, 231, 0.96), rgba(232, 214, 178, 0.86));
+  color: color-mix(in oklab, var(--accent-deep) 88%, var(--ink));
+}
+
+.settings-primary-btn.is-return {
+  color: var(--setup-label-color);
+}
+
+.settings-primary-btn:hover {
+  border-color: rgba(184, 139, 58, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 3px 8px rgba(77, 60, 36, 0.1);
+}
+
+.settings-primary-btn:focus-visible {
+  outline: 2px solid rgba(184, 139, 58, 0.46);
+  outline-offset: 2px;
 }
 
 .shop-state-hint {
