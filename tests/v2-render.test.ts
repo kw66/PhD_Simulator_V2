@@ -628,6 +628,62 @@ describe("v2 render lobby shell", () => {
     expect(eventButtonsBlock).not.toContain("disabled");
   });
 
+  it("renders resolved event stages as disabled history with navigation", () => {
+    let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
+    state = dispatchAction(state, "start-game", { roleId: "normal" });
+    state = {
+      ...state,
+      eventQueue: [createEventQueueItem({
+        id: "act2-event",
+        title: "Act 2",
+        description: "Current stage.",
+        preview: "act2",
+        source: "fixed",
+        blocking: true,
+        deadlineMonths: 0,
+        chainId: "history-chain",
+        stage: "act2",
+        choices: [{ id: "continue", label: "Continue", outcome: "Continue.", effects: {} }],
+        history: [{
+          eventId: "act1-event",
+          title: "Act 1",
+          description: "Resolved stage.",
+          stage: "act1",
+          choices: [
+            { id: "left", label: "Left", outcome: "Left result." },
+            { id: "right", label: "Right", outcome: "Right result." },
+          ],
+          selectedChoiceId: "right",
+          selectedOutcome: "Right result.",
+        }],
+      }, 1)],
+    };
+
+    const currentHtml = renderApp(state, createDefaultAccountProfile(), {
+      isEventContentOpen: true,
+      activeEventId: "act2-event",
+    });
+    expect(currentHtml).toContain("Act 2");
+    expect(currentHtml).toContain(">2 / 2<");
+    expect(currentHtml).toMatch(/data-ui-event-history-nav="next"[\s\S]*?disabled/);
+    expect(currentHtml).toContain('data-action="resolve-event"');
+
+    const historyHtml = renderApp(state, createDefaultAccountProfile(), {
+      isEventContentOpen: true,
+      activeEventId: "act2-event",
+      activeEventHistoryIndex: 0,
+    });
+    const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    expect(historyHtml).toContain("Act 1");
+    expect(historyHtml).toContain(">1 / 2<");
+    expect(historyHtml).toContain("当时结果");
+    expect(historyHtml).toContain("Right result.");
+    expect(historyButtons.match(/disabled/g)).toHaveLength(2);
+    expect(historyButtons).not.toContain('data-action="resolve-event"');
+    expect(historyButtons).toContain('class="event-choice-btn event-action-btn is-selected"');
+    expect(historyButtons).toContain("已选择");
+  });
+
   it("hides the close button for result-stage events", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
     state = dispatchAction(state, "start-game", { roleId: "normal" });

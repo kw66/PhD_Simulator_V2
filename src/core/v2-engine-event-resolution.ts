@@ -6,7 +6,7 @@ import {
 } from "./v2-event-queue";
 import { enqueueResolvedEventFollowUps } from "./v2-engine-event-resolution-followups";
 import { applyChoiceEffectsToState } from "./v2-engine-event-resolution-state";
-import type { EventQueueItem, GameState } from "./v2-types";
+import type { EventQueueItem, GameState, ResolvedEventStage } from "./v2-types";
 
 interface EventResolutionCallbacks {
   applyChairEmergencyRecoveryToState: (state: GameState) => GameState;
@@ -43,7 +43,25 @@ export function applyQueuedEventEffects(
     ...resolvedState,
     eventQueue: removeEventQueueItem(resolvedState.eventQueue, queuedEvent.id),
   };
-  nextState = enqueueResolvedEventFollowUps(nextState, choice, resolvedEnqueueEvents);
+  const resolvedHistory: ResolvedEventStage[] = [
+    ...(queuedEvent.history ?? []),
+    {
+      eventId: queuedEvent.id,
+      title: queuedEvent.title,
+      description: queuedEvent.description,
+      stage: queuedEvent.stage,
+      choices: queuedEvent.choices.map(({ id, label, outcome }) => ({ id, label, outcome })),
+      selectedChoiceId: choice.id,
+      selectedOutcome: resolvedOutcome,
+    },
+  ];
+  nextState = enqueueResolvedEventFollowUps(
+    nextState,
+    choice,
+    resolvedEnqueueEvents,
+    queuedEvent.chainId,
+    resolvedHistory,
+  );
   nextState = callbacks.evaluateImmediateEndings(
     callbacks.applyChairEmergencyRecoveryToState(
       pushLog(nextState, `${queuedEvent.title}：${resolvedOutcome}`),

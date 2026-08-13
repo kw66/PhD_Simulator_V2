@@ -19,17 +19,22 @@ import { shouldEnqueueLoverDevelopment } from "./v2-lover-system";
 import {
   shouldEnqueueJointTrainingInvite,
 } from "./v2-joint-training-system";
-import type { EventChoice, GameState, PendingEvent } from "./v2-types";
+import type { EventChoice, GameState, PendingEvent, ResolvedEventStage } from "./v2-types";
 
 export function enqueueResolvedEventFollowUps(
   state: GameState,
   choice: EventChoice,
   resolvedEnqueueEvents: PendingEvent[],
+  resolvedChainId: string,
+  resolvedHistory: ResolvedEventStage[],
 ): GameState {
   let nextState = state;
 
   for (const event of [...resolvedEnqueueEvents, ...(choice.effects.enqueueEvents ?? [])]) {
-    nextState = enqueueEventQueueItem(nextState, event);
+    const eventWithHistory = event.chainId === resolvedChainId
+      ? { ...event, history: resolvedHistory }
+      : event;
+    nextState = enqueueEventQueueItem(nextState, eventWithHistory);
   }
 
   if (

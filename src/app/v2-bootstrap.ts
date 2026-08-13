@@ -1,4 +1,4 @@
-import { ChevronDown, CircleHelp, createIcons, House, Lock, RotateCcw } from "lucide";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, createIcons, House, Lock, RotateCcw } from "lucide";
 
 import { createStore } from "../core/v2-store";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
@@ -81,6 +81,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let isEventContentOpen = false;
   let activeEventId: string | null = null;
   let activeEventChainId: string | null = null;
+  let activeEventHistoryIndex: number | null = null;
   let activeLogPage: number | null = null;
   let activeRelationshipIndex = 0;
   let currentResearchPaperFilter: ResearchPaperFilterId = DEFAULT_RESEARCH_PAPER_FILTER;
@@ -223,6 +224,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     isEventContentOpen = false;
     activeEventId = null;
     activeEventChainId = null;
+    activeEventHistoryIndex = null;
   };
 
   const getActiveQueueEvent = (state: GameState): GameState["eventQueue"][number] | null => {
@@ -260,6 +262,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     isEventContentOpen = true;
     activeEventId = nextEvent.id;
     activeEventChainId = nextEvent.chainId;
+    activeEventHistoryIndex = null;
     render();
   };
 
@@ -294,12 +297,19 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const activeQueueEvent = getActiveQueueEvent(state);
     if (activeQueueEvent) {
       activeEventChainId = activeQueueEvent.chainId;
+      if (
+        activeEventHistoryIndex !== null
+        && (activeEventHistoryIndex < 0 || activeEventHistoryIndex >= (activeQueueEvent.history?.length ?? 0))
+      ) {
+        activeEventHistoryIndex = null;
+      }
       return;
     }
 
     const nextChainEvent = getActiveChainEvent(state);
     if (nextChainEvent) {
       activeEventId = nextChainEvent.id;
+      activeEventHistoryIndex = null;
       return;
     }
 
@@ -382,6 +392,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     root.innerHTML = renderApp(state, store.getAccountProfile(), {
       isEventContentOpen,
       activeEventId,
+      activeEventHistoryIndex,
       activeLogPage,
       activeRelationshipIndex,
       activeShopTab,
@@ -391,7 +402,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       currentResearchPaperFilter,
       currentResearchPaperIndex,
     });
-    createIcons({ icons: { ChevronDown, CircleHelp, House, Lock, RotateCcw }, root });
+    createIcons({ icons: { Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, House, Lock, RotateCcw }, root });
     syncPlayTabUi();
     resetEffectSourceUi();
     scheduleAllFixedStageScales();
@@ -420,7 +431,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
   root.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
 
     const playTabButton = target.closest<HTMLButtonElement>("button[data-ui-play-tab]");
     if (playTabButton && !playTabButton.disabled && isPlayTabId(playTabButton.dataset.uiPlayTab)) {
@@ -501,6 +512,23 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const closeEventButton = target.closest<HTMLButtonElement>("button[data-ui-close-event-content]");
     if (closeEventButton && !closeEventButton.disabled) {
       closeEventContent();
+      return;
+    }
+
+    const eventHistoryNavButton = target.closest<HTMLButtonElement>("button[data-ui-event-history-nav]");
+    if (eventHistoryNavButton && !eventHistoryNavButton.disabled) {
+      const activeEvent = getActiveQueueEvent(store.getState()) ?? getActiveChainEvent(store.getState());
+      if (!activeEvent) return;
+
+      const currentPageIndex = activeEvent.history?.length ?? 0;
+      const displayedPageIndex = activeEventHistoryIndex ?? currentPageIndex;
+      if (eventHistoryNavButton.dataset.uiEventHistoryNav === "prev") {
+        activeEventHistoryIndex = Math.max(0, displayedPageIndex - 1);
+      } else if (eventHistoryNavButton.dataset.uiEventHistoryNav === "next") {
+        const nextPageIndex = Math.min(currentPageIndex, displayedPageIndex + 1);
+        activeEventHistoryIndex = nextPageIndex === currentPageIndex ? null : nextPageIndex;
+      }
+      render();
       return;
     }
 

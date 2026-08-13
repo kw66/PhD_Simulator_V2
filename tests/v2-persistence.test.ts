@@ -3,6 +3,7 @@ import { createInitialState } from "../src/core/v2-engine";
 import { createConferenceCareerState } from "../src/core/v2-conference-career";
 import { createConferenceEncounterState } from "../src/core/v2-conference-encounters";
 import { createEventCounters } from "../src/core/v2-event-counters";
+import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createInternshipState } from "../src/core/v2-internship-system";
 import { createLoverProgressState } from "../src/core/v2-lover-progression";
 import { createLoverState } from "../src/core/v2-lover-system";
@@ -134,6 +135,41 @@ describe("manual persistence", () => {
       research: 4,
       affinity: 5,
     });
+  });
+
+  it("会保留事件链的已选择历史", () => {
+    const state = createInitialState();
+    saveManualState(2, {
+      ...state,
+      eventQueue: [createEventQueueItem({
+        id: "current-event",
+        title: "Current",
+        description: "Current stage.",
+        preview: "current",
+        source: "fixed",
+        blocking: true,
+        deadlineMonths: 0,
+        chainId: "saved-chain",
+        stage: "act2",
+        choices: [{ id: "continue", label: "Continue", outcome: "Continue.", effects: {} }],
+        history: [{
+          eventId: "previous-event",
+          title: "Previous",
+          description: "Previous stage.",
+          stage: "act1",
+          choices: [{ id: "chosen", label: "Chosen", outcome: "Chosen result." }],
+          selectedChoiceId: "chosen",
+          selectedOutcome: "Chosen result.",
+        }],
+      }, 1)],
+    });
+
+    const loaded = loadManualState(2);
+    expect(loaded?.eventQueue[0]?.history).toEqual([expect.objectContaining({
+      eventId: "previous-event",
+      selectedChoiceId: "chosen",
+      selectedOutcome: "Chosen result.",
+    })]);
   });
 
   it("会返回手动槽摘要", () => {

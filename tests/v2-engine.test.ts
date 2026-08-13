@@ -1858,7 +1858,7 @@ describe("v2 engine", () => {
     expect(resolved.eventQueue.map((event) => event.id)).toEqual(["head-event"]);
   });
 
-  it("resolve-event can enqueue follow-up queued events for multi-act chains", () => {
+  it("resolve-event carries resolved history through the same multi-act chain", () => {
     let state = startWith("normal", "zhao-ning");
     state = {
       ...state,
@@ -1887,7 +1887,36 @@ describe("v2 engine", () => {
               deadlineMonths: 0,
               chainId: "multi-act",
               stage: "act2",
-              choices: [{ id: "done", label: "Done", outcome: "Done.", effects: {} }],
+              choices: [{
+                id: "done",
+                label: "Done",
+                outcome: "Done.",
+                effects: {
+                  enqueueEvents: [{
+                    id: "act3-event",
+                    title: "Act 3",
+                    description: "Third stage.",
+                    preview: "act3",
+                    source: "fixed",
+                    blocking: true,
+                    deadlineMonths: 0,
+                    chainId: "multi-act",
+                    stage: "act3",
+                    choices: [{ id: "finish", label: "Finish", outcome: "Finished.", effects: {} }],
+                  }],
+                },
+              }],
+            }, {
+              id: "side-event",
+              title: "Side Event",
+              description: "Separate chain.",
+              preview: "side",
+              source: "system",
+              blocking: false,
+              deadlineMonths: 1,
+              chainId: "side-chain",
+              stage: "act1",
+              choices: [{ id: "side", label: "Side", outcome: "Side.", effects: {} }],
             }],
           },
         }],
@@ -1895,9 +1924,24 @@ describe("v2 engine", () => {
     };
 
     const next = dispatchAction(state, "resolve-event", { eventChoiceId: "next" });
-    expect(next.eventQueue).toHaveLength(1);
+    expect(next.eventQueue).toHaveLength(2);
     expect(next.eventQueue[0]?.id).toBe("act2-event");
     expect(next.eventQueue[0]?.stage).toBe("act2");
+    expect(next.eventQueue[0]?.history).toEqual([expect.objectContaining({
+      eventId: "act1-event",
+      title: "Act 1",
+      selectedChoiceId: "next",
+      selectedOutcome: "Go act2.",
+    })]);
+    expect(next.eventQueue[1]?.history).toBeUndefined();
+
+    const act3 = dispatchAction(next, "resolve-event", {
+      eventId: "act2-event",
+      eventChoiceId: "done",
+    });
+    const currentChainEvent = act3.eventQueue.find((event) => event.id === "act3-event");
+    expect(currentChainEvent?.history).toHaveLength(2);
+    expect(currentChainEvent?.history?.map((item) => item.selectedChoiceId)).toEqual(["next", "done"]);
   });
 
   it("stayOnEvent keeps the queued event and sanCap clamps current SAN", () => {
@@ -1924,6 +1968,7 @@ describe("v2 engine", () => {
 
     const stillQueued = dispatchAction(state, "resolve-event", { eventChoiceId: "retry" });
     expect(stillQueued.eventQueue).toHaveLength(1);
+    expect(stillQueued.eventQueue[0]?.history).toBeUndefined();
 
     const resolved = dispatchAction(state, "resolve-event", { eventChoiceId: "hurt" });
     expect(resolved.eventQueue).toHaveLength(0);

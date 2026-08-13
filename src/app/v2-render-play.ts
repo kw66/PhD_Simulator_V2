@@ -764,7 +764,10 @@ function renderEventQueueList(state: GameState, activeEventId: string | null): s
     .join("");
 }
 
-function renderEventContentBox(currentEvent: GameState["eventQueue"][number] | null): string {
+function renderEventContentBox(
+  currentEvent: GameState["eventQueue"][number] | null,
+  activeHistoryIndex: number | null,
+): string {
   if (!currentEvent) {
     return `
       <div class="event-content-box" id="event-content-box" hidden>
@@ -777,28 +780,55 @@ function renderEventContentBox(currentEvent: GameState["eventQueue"][number] | n
   }
 
   const isResultPage = currentEvent.stage === "result";
+  const history = currentEvent.history ?? [];
+  const currentPageIndex = history.length;
+  const displayPageIndex = activeHistoryIndex === null
+    ? currentPageIndex
+    : Math.max(0, Math.min(activeHistoryIndex, currentPageIndex));
+  const historicalPage = displayPageIndex < currentPageIndex ? history[displayPageIndex] : null;
+  const displayEvent = historicalPage ?? currentEvent;
+  const totalPageCount = currentPageIndex + 1;
+  const selectedChoiceId = historicalPage?.selectedChoiceId ?? null;
 
   return `
     <div class="event-content-box" id="event-content-box">
       <div class="event-content-header">
-        <span class="event-content-title" id="event-content-title">${escapeHtml(currentEvent.title)}</span>
+        <span class="event-content-title" id="event-content-title">${escapeHtml(displayEvent.title)}</span>
         <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情"${isResultPage ? " hidden" : ""}>×</button>
       </div>
+      ${totalPageCount > 1 ? `
+        <div class="event-history-nav" aria-label="事件进度">
+          <button
+            class="event-history-nav-btn"
+            type="button"
+            data-ui-event-history-nav="prev"
+            aria-label="查看上一幕"
+            ${displayPageIndex === 0 ? "disabled" : ""}
+          ><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+          <span class="event-history-position">${displayPageIndex + 1} / ${totalPageCount}</span>
+          <button
+            class="event-history-nav-btn"
+            type="button"
+            data-ui-event-history-nav="next"
+            aria-label="查看下一幕"
+            ${displayPageIndex === currentPageIndex ? "disabled" : ""}
+          ><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+        </div>
+      ` : ""}
       <div class="event-content-body" id="event-content-body">
-        ${renderEventDescriptionHtml(currentEvent.description)}
+        ${renderEventDescriptionHtml(displayEvent.description)}
       </div>
       <div class="event-content-buttons" id="event-content-buttons">
-        ${currentEvent.choices.map((choice) => `
+        ${displayEvent.choices.map((choice) => `
           <button
-            class="event-choice-btn event-action-btn"
+            class="event-choice-btn event-action-btn${choice.id === selectedChoiceId ? " is-selected" : ""}"
             type="button"
-            data-action="resolve-event"
-            data-event-id="${escapeHtml(currentEvent.id)}"
-            data-event-choice-id="${escapeHtml(choice.id)}"
+            ${historicalPage ? "disabled" : `data-action="resolve-event" data-event-id="${escapeHtml(currentEvent.id)}" data-event-choice-id="${escapeHtml(choice.id)}"`}
             title="${escapeHtml(choice.outcome)}"
-          ><span>${escapeHtml(choice.label)}</span></button>
+          ><span>${escapeHtml(choice.label)}</span>${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-hidden="true"></i><span class="event-choice-selected-label">已选择</span>' : ""}</button>
         `).join("")}
       </div>
+      ${historicalPage?.selectedOutcome.trim() ? `<div class="event-history-outcome"><span>当时结果</span>${escapeHtml(historicalPage.selectedOutcome)}</div>` : ""}
     </div>
   `;
 }
@@ -2224,7 +2254,7 @@ function renderLegacyCenterShell(state: GameState, uiState: PlayRenderUiState = 
               <div class="event-queue" id="event-queue">
                 ${renderEventQueueList(state, activeEventId)}
               </div>
-              ${renderEventContentBox(openEvent)}
+              ${renderEventContentBox(openEvent, uiState.activeEventHistoryIndex ?? null)}
             </div>
           </section>
 

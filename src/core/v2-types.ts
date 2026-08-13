@@ -411,6 +411,16 @@ export interface EventChoice {
   };
 }
 
+export interface ResolvedEventStage {
+  eventId: string;
+  title: string;
+  description: string;
+  stage: EventStage;
+  choices: Pick<EventChoice, "id" | "label" | "outcome">[];
+  selectedChoiceId: string;
+  selectedOutcome: string;
+}
+
 export interface PendingEvent {
   id: string;
   title: string;
@@ -422,6 +432,7 @@ export interface PendingEvent {
   chainId: string;
   stage: EventStage;
   choices: EventChoice[];
+  history?: ResolvedEventStage[];
 }
 
 export interface EventQueueItem extends PendingEvent {
