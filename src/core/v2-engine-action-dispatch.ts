@@ -72,7 +72,7 @@ export function dispatchSetupAction(
       }
       return pushLog(
         enqueueEventQueueItem(startedState, createBeforeGradSchoolAct1Event(startedState)) as GameState,
-        "触发事件：读研之前",
+        "触发事件：读研之始",
       );
     }
     case "reset-game":

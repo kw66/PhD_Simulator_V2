@@ -418,7 +418,6 @@ export interface ResolvedEventStage {
   stage: EventStage;
   choices: Pick<EventChoice, "id" | "label" | "outcome">[];
   selectedChoiceId: string;
-  selectedOutcome: string;
 }
 
 export interface PendingEvent {

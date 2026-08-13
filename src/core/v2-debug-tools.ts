@@ -80,7 +80,7 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
     title: "升学剧情",
     description: "用于入学前与转博流程的定向测试。",
     buttons: [
-      { id: "before-grad-school", label: "读研之前" },
+      { id: "before-grad-school", label: "读研之始" },
       { id: "phd-choice", label: "转博抉择" },
     ],
   },

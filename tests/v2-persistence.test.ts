@@ -159,7 +159,6 @@ describe("manual persistence", () => {
           stage: "act1",
           choices: [{ id: "chosen", label: "Chosen", outcome: "Chosen result." }],
           selectedChoiceId: "chosen",
-          selectedOutcome: "Chosen result.",
         }],
       }, 1)],
     });
@@ -168,7 +167,6 @@ describe("manual persistence", () => {
     expect(loaded?.eventQueue[0]?.history).toEqual([expect.objectContaining({
       eventId: "previous-event",
       selectedChoiceId: "chosen",
-      selectedOutcome: "Chosen result.",
     })]);
   });
 

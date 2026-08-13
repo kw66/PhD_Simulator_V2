@@ -52,7 +52,6 @@ export function applyQueuedEventEffects(
       stage: queuedEvent.stage,
       choices: queuedEvent.choices.map(({ id, label, outcome }) => ({ id, label, outcome })),
       selectedChoiceId: choice.id,
-      selectedOutcome: resolvedOutcome,
     },
   ];
   nextState = enqueueResolvedEventFollowUps(

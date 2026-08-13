@@ -175,7 +175,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     const sourceBox = root.querySelector<HTMLElement>("#new-effect-source-box");
     if (!sourceBox) return;
-    sourceBox.innerHTML = '<div class="effect-source-text effect-source-text-empty">点击上方效果查看来源</div>';
+    sourceBox.replaceChildren();
   };
 
   const showEffectSource = (chip: HTMLButtonElement): void => {
@@ -192,11 +192,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     } catch {
       sources = [];
     }
-    if (sources.length === 0) {
-      sources = ["暂无来源"];
-    }
-
-    root.querySelectorAll<HTMLElement>(".new-effect-list .effect-chip.is-selected").forEach((node) => {
+    root.querySelectorAll<HTMLElement>(".new-effect-list .effect-chip").forEach((node) => {
       const isActive = node === chip;
       node.classList.toggle("is-selected", isActive);
       node.setAttribute("aria-pressed", isActive ? "true" : "false");

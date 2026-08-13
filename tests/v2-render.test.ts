@@ -342,14 +342,15 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('data-scale-mode="fixed"');
     expect(html).toContain('class="play-stage-scale"');
     expect(html).toContain('class="play-stage"');
-    expect(html).toContain("事件处理");
+    expect(html).toContain('<span>事件</span>');
     expect(html).toContain("科研");
     expect(html).toContain("人际");
     expect(html).toContain("商店");
-    expect(html).toContain("科研成果");
+    expect(html).toContain('data-ui-play-tab="research">成果</button>');
     expect(html).toContain("天赋");
     expect(html).toContain("设置");
     expect(html).toContain("下一月");
+    expect(html).toContain('class="center-tab-badge is-blocking"');
     expect(html).toContain('class="play-workbench"');
     expect(html).toContain("play-left-rail");
     expect(html).toContain("play-center-column");
@@ -370,9 +371,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('id="log-nav-prev-month"');
     expect(html).toContain('id="log-nav-next-month"');
     expect(html).toContain('id="log-nav-next-year"');
-    expect(html).toContain("待办事项");
     expect(html).toContain('class="event-panel"');
-    expect(html).toContain('class="event-header-row"');
+    expect(html).not.toContain('class="event-header-row"');
     expect(html).toContain('class="event-queue"');
     expect(html).toContain('class="event-content-box"');
     expect(html).toContain('class="event-card"');
@@ -422,6 +422,30 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('class="play-workbench-header"');
     expect(html).not.toContain('class="play-workbench-metrics"');
     expect(html).not.toContain("角色图鉴");
+  });
+
+  it("renders green action badges after enrollment when no event blocks progress", () => {
+    let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
+    state = dispatchAction(state, "select-advisor", { advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "next-month");
+    state = {
+      ...state,
+      eventQueue: [],
+      pendingDecision: null,
+      player: { ...state.player, money: 10 },
+    };
+
+    const html = renderApp(state, createDefaultAccountProfile());
+    const getTabHtml = (tabId: string): string => (
+      html.match(new RegExp(`<button[^>]*data-ui-play-tab="${tabId}"[^>]*>([\\s\\S]*?)<\\/button>`))?.[0] ?? ""
+    );
+
+    expect(getTabHtml("events")).not.toContain("is-blocking");
+    expect(getTabHtml("workstation")).toContain(`aria-label="本月剩余 ${state.actionsRemaining} 次行动"`);
+    expect(getTabHtml("workstation")).toContain("center-tab-badge is-available");
+    expect(getTabHtml("relationship")).toContain("center-tab-badge is-available");
+    expect(getTabHtml("shop")).toContain("center-tab-badge is-available");
   });
 
   it("renders actionable shop tabs with buy sell and upgrade entry points", () => {
@@ -654,7 +678,6 @@ describe("v2 render lobby shell", () => {
             { id: "right", label: "Right", outcome: "Right result." },
           ],
           selectedChoiceId: "right",
-          selectedOutcome: "Right result.",
         }],
       }, 1)],
     };
@@ -676,12 +699,52 @@ describe("v2 render lobby shell", () => {
     const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(historyHtml).toContain("Act 1");
     expect(historyHtml).toContain(">1 / 2<");
-    expect(historyHtml).toContain("当时结果");
-    expect(historyHtml).toContain("Right result.");
-    expect(historyButtons.match(/disabled/g)).toHaveLength(2);
+    expect(historyHtml).not.toContain("当时结果");
+    expect(historyButtons.match(/\sdisabled\s/g)).toHaveLength(2);
     expect(historyButtons).not.toContain('data-action="resolve-event"');
     expect(historyButtons).toContain('class="event-choice-btn event-action-btn is-selected"');
-    expect(historyButtons).toContain("已选择");
+    expect(historyButtons).toContain('aria-label="已选择"');
+  });
+
+  it("renders single-choice history as disabled with its selected check", () => {
+    let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
+    state = dispatchAction(state, "start-game", { roleId: "normal" });
+    state = {
+      ...state,
+      eventQueue: [createEventQueueItem({
+        id: "single-current",
+        title: "Current",
+        description: "Current stage.",
+        preview: "current",
+        source: "fixed",
+        blocking: true,
+        deadlineMonths: 0,
+        chainId: "single-chain",
+        stage: "act2",
+        choices: [{ id: "continue", label: "Continue", outcome: "Continue.", effects: {} }],
+        history: [{
+          eventId: "single-previous",
+          title: "Previous",
+          description: "Previous stage.",
+          stage: "act1",
+          choices: [{ id: "next", label: "Next", outcome: "Next." }],
+          selectedChoiceId: "next",
+        }],
+      }, 1)],
+    };
+
+    const html = renderApp(state, createDefaultAccountProfile(), {
+      isEventContentOpen: true,
+      activeEventId: "single-current",
+      activeEventHistoryIndex: 0,
+    });
+    const historyButtons = html.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+
+    expect(historyButtons).toMatch(/\sdisabled\s/);
+    expect(historyButtons).toContain("is-selected");
+    expect(historyButtons).not.toContain('data-action="resolve-event"');
+    expect(historyButtons).toContain('aria-disabled="true"');
+    expect(historyButtons).toContain('aria-label="已选择"');
   });
 
   it("hides the close button for result-stage events", () => {
@@ -864,15 +927,15 @@ describe("v2 render lobby shell", () => {
       papers: [reviewingPaper],
       eventQueue: [createEventQueueItem({
         id: "before-grad-school-qualification",
-        title: "读研之前",
-        description: "学院公布了保研资格名单。",
-        preview: "保研资格名单已经公示",
+        title: "读研之始",
+        description: "学院确认了推免资格。",
+        preview: "推免资格已经确认",
         source: "fixed",
         blocking: true,
         deadlineMonths: 0,
         chainId: "before-grad-school",
         stage: "act1",
-        choices: [{ id: "before-grad-school-open-advisor-info", label: "去看看导师信息", outcome: "进入下一步。", effects: {} }],
+        choices: [{ id: "before-grad-school-open-advisor-info", label: "开始联系导师", outcome: "进入下一步。", effects: {} }],
       }, 1)],
     };
 
@@ -882,7 +945,7 @@ describe("v2 render lobby shell", () => {
     expect(todoPreviewBlock).toContain('class="todo-item todo-preview-item todo-preview-current"');
     expect(todoPreviewBlock).toContain(`data-ui-open-event-id="${state.eventQueue[0]?.id}"`);
     expect(todoPreviewBlock).toContain('class="todo-group todo-group-current"');
-    expect(todoPreviewBlock).toContain("读研之前");
+    expect(todoPreviewBlock).toContain("读研之始");
     expect(todoPreviewBlock).toContain("本月");
     expect(todoPreviewBlock).toContain('class="todo-item todo-preview-item todo-preview-future"');
     expect(todoPreviewBlock).toContain('class="todo-group todo-group-future"');
@@ -895,7 +958,7 @@ describe("v2 render lobby shell", () => {
     expect(todoPreviewBlock).not.toContain("预告");
     expect(todoPreviewBlock).not.toContain("todo-type-badge");
     expect(todoPreviewBlock).not.toContain("todo-item-head");
-    expect(todoPreviewBlock).not.toContain("保研资格名单已经公示");
+    expect(todoPreviewBlock).not.toContain("推免资格已经确认");
     expect(todoPreviewBlock).not.toContain("在审论文将在该月返回结果。");
   });
 
@@ -935,7 +998,7 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(state, createDefaultAccountProfile());
 
     expect(html.match(/class="section-empty play-module-lock-state">入学后开放<\/div>/g)).toHaveLength(3);
-    expect(html).toContain('<span class="shop-title"><i class="panel-icon">💰</i> 商店</span>');
+    expect(html).not.toContain('class="shop-title"');
     expect(html).toContain('class="paper-switch-btns" id="paper-switch-btns" hidden');
     expect(html).toContain('class="rel-switch-btns" id="rel-switch-btns" hidden');
     expect(html).not.toContain('class="paper-card paper-card-empty"');
@@ -1006,7 +1069,7 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(state, createDefaultAccountProfile());
     const relationshipSection = html.match(/id="relationship-section">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
 
-    expect(relationshipSection).toContain('class="rel-helper-actions is-empty"');
+    expect(relationshipSection).not.toContain('class="rel-helper-actions is-empty"');
     expect(relationshipSection).toContain('id="rel-switch-btns"');
     expect(relationshipSection).toContain('id="rel-current-card"');
     expect(relationshipSection).not.toContain('class="rel-helper-chip"');

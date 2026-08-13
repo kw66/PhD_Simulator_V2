@@ -140,6 +140,59 @@ function buildDisabled(primaryDisabled: boolean, economyLocked: boolean): boolea
   return primaryDisabled || economyLocked;
 }
 
+function countShopItemActions(state: GameState, itemId: ShopItemId): number {
+  const shopView = {
+    shopState: state.shopState,
+    eventSupport: state.eventSupport,
+    totalMonths: state.totalMonths,
+  };
+  const item = getShopItemDefinition(itemId);
+  return Number(canSellShopItem(shopView, itemId))
+    + Number(state.player.money >= item.price && canBuyShopItem(shopView, itemId));
+}
+
+function countShopUpgradeActions(
+  state: GameState,
+  itemId: Extract<ShopItemId, "chair" | "monitor" | "bike">,
+): number {
+  return getAvailableShopUpgrades({ shopState: state.shopState }, itemId)
+    .filter((upgrade) => state.player.money >= upgrade.price)
+    .length;
+}
+
+function countSupportItemActions(state: GameState, itemId: SupportItemId): number {
+  if (isSupportItemOwned(state.eventSupport, itemId)) return 1;
+  return Number(state.player.money >= getSupportItemDefinition(itemId).price);
+}
+
+export function getAvailableShopActionCount(state: GameState): number {
+  if (isPreEnrollmentState(state) || getEconomyLockText(state)) return 0;
+
+  const coffeePrice = getCoffeeBuyPrice(state.coffeeState);
+  const coffeeActions = Number(state.player.money >= coffeePrice && canBuyCoffee(state.coffeeState));
+  const machineActions = Number(canSellCoffeeMachine(state.coffeeState))
+    + Number(state.player.money >= COFFEE_MACHINE_PRICE && canBuyCoffeeMachine(state.coffeeState));
+  const coffeeUpgradeActions = getAvailableCoffeeMachineUpgrades(state.coffeeState)
+    .filter((upgrade) => state.player.money >= upgrade.price)
+    .length;
+
+  return countShopItemActions(state, "gpu_buy")
+    + countShopItemActions(state, "chair")
+    + countShopUpgradeActions(state, "chair")
+    + coffeeActions
+    + machineActions
+    + coffeeUpgradeActions
+    + countShopItemActions(state, "keyboard")
+    + countShopItemActions(state, "monitor")
+    + countShopUpgradeActions(state, "monitor")
+    + countShopItemActions(state, "bike")
+    + countShopUpgradeActions(state, "bike")
+    + countShopItemActions(state, "down_jacket")
+    + countSupportItemActions(state, "parasol")
+    + countSupportItemActions(state, "badminton_racket")
+    + countSupportItemActions(state, "game_controller");
+}
+
 function renderGpuRow(state: GameState, economyLocked: boolean): string {
   const shopView = {
     shopState: state.shopState,
@@ -434,10 +487,7 @@ export function renderShopSection(state: GameState, requestedTab?: ShopTabId): s
 
   return `
     <div class="shop-panel" id="shop-panel-col2">
-      <div class="shop-header-row">
-        <span class="shop-title"><i class="panel-icon">💰</i> 商店</span>
-        ${preEnrollment ? "" : `<div class="shop-tab-btns">${renderShopTabButtons(activeTab)}</div>`}
-      </div>
+      ${preEnrollment ? "" : `<div class="shop-header-row"><div class="shop-tab-btns">${renderShopTabButtons(activeTab)}</div></div>`}
       ${!preEnrollment && lockText ? `<div class="shop-state-hint">${escapeHtml(lockText)}</div>` : ""}
       <div class="shop-items-list" id="shop-items-list">
         ${content || '<div class="shop-empty">暂无物品</div>'}

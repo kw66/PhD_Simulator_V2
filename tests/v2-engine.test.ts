@@ -1931,7 +1931,6 @@ describe("v2 engine", () => {
       eventId: "act1-event",
       title: "Act 1",
       selectedChoiceId: "next",
-      selectedOutcome: "Go act2.",
     })]);
     expect(next.eventQueue[1]?.history).toBeUndefined();
 

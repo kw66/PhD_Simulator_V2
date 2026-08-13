@@ -3242,6 +3242,10 @@ p {
 .center-tab-btn {
   min-height: 44px;
   padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 0;
   border-right: var(--play-divider-thin);
   background: transparent;
@@ -3258,6 +3262,28 @@ p {
 .center-tab-btn.active {
   background: linear-gradient(180deg, rgba(255, 251, 243, 0.88), rgba(244, 236, 223, 0.76));
   color: var(--ink);
+}
+
+.center-tab-badge {
+  min-width: 21px;
+  min-height: 21px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 820;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 2px rgba(29, 36, 33, 0.18);
+}
+
+.center-tab-badge.is-blocking {
+  background: #b83b3b;
+}
+
+.center-tab-badge.is-available {
+  background: #2f7d57;
 }
 
 .shop-tab-btn.active,
@@ -3464,6 +3490,19 @@ p {
 
 .center-main-panels {
   min-height: 0;
+}
+
+.event-panel > .event-queue:first-child {
+  border-top: 0;
+}
+
+.workstation-section > .section-header,
+.relationship-section > .section-header,
+.research-section > .section-header,
+.shop-panel > .shop-header-row,
+.talent-panel > .talent-header-row,
+.settings-panel > .settings-header-row {
+  padding-bottom: 8px;
 }
 
 .center-main-panel[hidden] {
@@ -4328,7 +4367,8 @@ button.todo-item:focus-visible {
   box-shadow: none;
 }
 
-.event-content-buttons .event-choice-btn.is-selected:disabled {
+.event-content-buttons .event-choice-btn.is-selected {
+  cursor: default;
   opacity: 1;
   border-color: rgba(146, 105, 37, 0.72);
   background: rgba(233, 215, 169, 0.62);
@@ -4341,29 +4381,6 @@ button.todo-item:focus-visible {
   height: 15px;
   flex: 0 0 15px;
   stroke-width: 2.4;
-}
-
-.event-content-buttons .event-choice-btn .event-choice-selected-label {
-  font-size: 0.72rem;
-  font-weight: 760;
-  white-space: nowrap;
-}
-
-.event-history-outcome {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 9px;
-  padding: 8px 12px 10px;
-  border-top: var(--play-divider-thin);
-  color: rgba(55, 44, 26, 0.82);
-  font-size: 0.78rem;
-  line-height: 1.45;
-  background: rgba(233, 215, 169, 0.28);
-}
-
-.event-history-outcome > span {
-  color: rgba(112, 79, 25, 0.9);
-  font-weight: 760;
 }
 
 .event-badge.is-empty {

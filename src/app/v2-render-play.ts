@@ -3,7 +3,7 @@ import { MAX_SAN, PAPER_SLOT_RESEARCH_THRESHOLDS } from "../core/v2-content";
 import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-catalog";
 import { CAREER_DEFINITIONS, getCareerEventTargetYear, getCareerLevel } from "../core/v2-career-rules";
 import { DEBUG_EVENT_GROUPS, DEBUG_MONTH_DELTAS, DEBUG_STAT_GROUPS } from "../core/v2-debug-tools";
-import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
+import { getCurrentEvent, getSortedEventQueue, hasBlockingQueueEvent } from "../core/v2-event-queue";
 import { clampSan, isTransientUiHintLog } from "../core/v2-engine-helpers";
 import { getJointTrainingCitationCapBonus } from "../core/v2-joint-training-system";
 import { getLabTalentActionBonus, getLabTalentTeamSize, isLabTalentActive } from "../core/v2-lab-talent";
@@ -45,7 +45,7 @@ import {
   WORKSTATION_CONFERENCE_PANEL_INDEX,
   WORKSTATION_GRADUATION_PANEL_INDEX,
 } from "./v2-render";
-import { renderShopSection as renderInteractiveShopSection } from "./v2-render-shop-panel";
+import { getAvailableShopActionCount, renderShopSection as renderInteractiveShopSection } from "./v2-render-shop-panel";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
 const MAX_LOG_RENDER_COUNT = 10;
@@ -237,9 +237,9 @@ function renderAttrItem(
   `;
 }
 
-function renderEffectItems(items: EffectBucketItem[], emptyText = "暂无"): string {
+function renderEffectItems(items: EffectBucketItem[]): string {
   if (items.length === 0) {
-    return `<span class="no-buff">${emptyText}</span>`;
+    return "";
   }
 
   return items
@@ -387,7 +387,7 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
     {
       id: "next-month-san",
       label: `SAN ${sanDelta >= 0 ? "+" : ""}${formatMonthlyValue(sanDelta)}`,
-      sources: sanSources.length > 0 ? sanSources : ["暂无来源"],
+      sources: sanSources,
       isDebuff: sanDelta < 0,
     },
     {
@@ -511,12 +511,12 @@ function renderLegacyLeftRail(state: GameState): string {
           </div>
           <div class="new-effect-section" id="new-effect-section-next-month">
             <div class="new-effect-subtitle">下月初</div>
-            <div class="new-effect-list" id="new-next-month-effect-list">${renderEffectItems(effectBuckets.nextMonth, "SAN+0｜金币+0")}</div>
+            <div class="new-effect-list" id="new-next-month-effect-list">${renderEffectItems(effectBuckets.nextMonth)}</div>
           </div>
         </div>
         <div class="new-effect-section" id="new-effect-section-source">
           <div class="new-effect-subtitle">效果来源</div>
-          <div class="new-effect-source-box" id="new-effect-source-box">点击上方效果查看来源</div>
+          <div class="new-effect-source-box" id="new-effect-source-box"></div>
         </div>
       </div>
     </aside>
@@ -823,12 +823,12 @@ function renderEventContentBox(
           <button
             class="event-choice-btn event-action-btn${choice.id === selectedChoiceId ? " is-selected" : ""}"
             type="button"
-            ${historicalPage ? "disabled" : `data-action="resolve-event" data-event-id="${escapeHtml(currentEvent.id)}" data-event-choice-id="${escapeHtml(choice.id)}"`}
-            title="${escapeHtml(choice.outcome)}"
-          ><span>${escapeHtml(choice.label)}</span>${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-hidden="true"></i><span class="event-choice-selected-label">已选择</span>' : ""}</button>
+            ${historicalPage
+              ? 'disabled aria-disabled="true"'
+              : `data-action="resolve-event" data-event-id="${escapeHtml(currentEvent.id)}" data-event-choice-id="${escapeHtml(choice.id)}" title="${escapeHtml(choice.outcome)}"`}
+          ><span>${escapeHtml(choice.label)}</span>${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
         `).join("")}
       </div>
-      ${historicalPage?.selectedOutcome.trim() ? `<div class="event-history-outcome"><span>当时结果</span>${escapeHtml(historicalPage.selectedOutcome)}</div>` : ""}
     </div>
   `;
 }
@@ -1225,8 +1225,7 @@ function renderEnhancedWorkstationSection(state: GameState, uiState: PlayRenderU
 
   return `
     <div class="right-section workstation-section" id="workstation-section">
-      <div class="section-header">
-        <span><i class="panel-icon">📄</i> 科研工作站</span>
+      <div class="section-header"${preEnrollment ? " hidden" : ""}>
         <div class="workstation-header-actions">
           ${preEnrollment ? "" : `<button class="btn-sm workstation-conference-btn${isConferencePanel ? " active" : ""}" type="button" data-ui-workstation-panel-index="${WORKSTATION_CONFERENCE_PANEL_INDEX}">会议信息</button>`}
         </div>
@@ -1555,10 +1554,6 @@ function renderRelationshipSection(state: GameState, uiState: PlayRenderUiState 
 
   return `
     <div class="right-section relationship-section" id="relationship-section">
-      <div class="section-header rel-section-header">
-        <span><i class="panel-icon">👥</i> 人际关系</span>
-        <div class="rel-helper-actions is-empty" id="rel-helper-actions"></div>
-      </div>
       <div class="rel-switch-btns" id="rel-switch-btns" ${preEnrollment ? "hidden" : ""}>
         ${preEnrollment ? "" : renderRelationshipSwitchButtons(cards, activeRelationshipIndex, rel.unlockedSlots)}
       </div>
@@ -1600,7 +1595,6 @@ function renderResearchSection(state: GameState, uiState: PlayRenderUiState = {}
   return `
     <div class="right-section research-section" id="research-section">
       <div class="section-header">
-        <span><i class="panel-icon">🏆</i> 科研成果</span>
         <div class="research-stats-mini">
           <span class="stat-item">科研分：${state.totalResearchScore}</span>
           <span class="stat-item">总引用：${state.totalCitations}</span>
@@ -2129,7 +2123,6 @@ function renderTalentSection(
   return `
     <div class="talent-panel">
       <div class="talent-header-row">
-        <span class="talent-title">天赋</span>
         <div class="talent-tab-btns">
           ${renderTalentTabButton("character", "角色", tabId === "character")}
           ${renderTalentTabButton("relation", "关系", tabId === "relation")}
@@ -2187,9 +2180,6 @@ function renderSettingsEventGroups(): string {
 function renderSettingsSection(): string {
   return `
     <div class="settings-panel">
-      <div class="settings-header-row">
-        <span class="settings-title">设置</span>
-      </div>
       <div class="settings-content" id="settings-panel-content">
         <div class="settings-section settings-control-section">
           <div class="settings-section-title">游戏控制</div>
@@ -2223,22 +2213,39 @@ function renderSettingsSection(): string {
 
 function renderLegacyCenterShell(state: GameState, uiState: PlayRenderUiState = {}): string {
   const role = getRoleDefinition(state.selectedRoleId);
-  const eventCount = state.eventQueue.length;
+  const blockingEventCount = state.eventQueue.filter((event) => event.blocking && event.deadlineMonths <= 0).length
+    + Number(Boolean(state.pendingDecision));
+  const nonBlockingEventCount = state.eventQueue.filter((event) => !event.blocking || event.deadlineMonths > 0).length;
+  const actionLocked = isPreEnrollmentState(state) || hasBlockingQueueEvent(state) || Boolean(state.pendingDecision);
+  const researchActionCount = actionLocked ? 0 : Math.max(0, state.actionsRemaining);
+  const relationshipActionCount = actionLocked
+    ? 0
+    : buildRelationshipCards(state).reduce((count, card) => (
+      count + Number(Boolean(card && !card.taskDisabled)) + Number(Boolean(card && !card.interactDisabled))
+    ), 0);
+  const shopActionCount = getAvailableShopActionCount(state);
   const activeEventId = uiState.isEventContentOpen ? (uiState.activeEventId ?? null) : null;
   const openEvent = activeEventId ? getCurrentEvent(state.eventQueue, activeEventId) : null;
+
+  const renderTabBadge = (count: number, tone: "blocking" | "available", label: string): string => (
+    count > 0
+      ? `<span class="center-tab-badge is-${tone}" aria-label="${escapeHtml(label)}">${count}</span>`
+      : ""
+  );
 
   return `
     <section class="play-center-column game-main-area">
       <div class="center-shell" id="center-shell">
         <div class="center-main-tabs" id="center-main-tabs">
           <button class="center-tab-btn active" type="button" data-ui-play-tab="events">
-            <span>事件处理</span>
-            ${eventCount > 0 ? `<span class="center-tab-badge" id="center-events-badge">${eventCount}</span>` : ""}
+            <span>事件</span>
+            ${renderTabBadge(blockingEventCount, "blocking", `${blockingEventCount} 个阻塞事件`)}
+            ${renderTabBadge(nonBlockingEventCount, "available", `${nonBlockingEventCount} 个可处理事件`)}
           </button>
-          <button class="center-tab-btn" type="button" data-ui-play-tab="workstation">科研</button>
-          <button class="center-tab-btn" type="button" data-ui-play-tab="relationship">人际</button>
-          <button class="center-tab-btn" type="button" data-ui-play-tab="shop">商店</button>
-          <button class="center-tab-btn" type="button" data-ui-play-tab="research">科研成果</button>
+          <button class="center-tab-btn" type="button" data-ui-play-tab="workstation"><span>科研</span>${renderTabBadge(researchActionCount, "available", `本月剩余 ${researchActionCount} 次行动`)}</button>
+          <button class="center-tab-btn" type="button" data-ui-play-tab="relationship"><span>人际</span>${renderTabBadge(relationshipActionCount, "available", `${relationshipActionCount} 个可用操作`)}</button>
+          <button class="center-tab-btn" type="button" data-ui-play-tab="shop"><span>商店</span>${renderTabBadge(shopActionCount, "available", `${shopActionCount} 个可用操作`)}</button>
+          <button class="center-tab-btn" type="button" data-ui-play-tab="research">成果</button>
           <button class="center-tab-btn" type="button" data-ui-play-tab="talent">天赋</button>
           <button class="center-tab-btn" type="button" data-ui-play-tab="settings">设置</button>
           <button class="center-tab-btn center-tab-btn-next" type="button" data-action="next-month">下一月</button>
@@ -2247,10 +2254,6 @@ function renderLegacyCenterShell(state: GameState, uiState: PlayRenderUiState = 
         <div class="center-main-panels" id="center-main-panels">
           <section class="center-main-panel active" data-tab-panel="events">
             <div class="event-panel${openEvent ? " showing-content" : ""}" id="event-panel">
-              <div class="event-header-row">
-                <span class="event-panel-title">待办事项</span>
-                <span class="event-badge${eventCount > 0 ? "" : " is-empty"}" id="event-badge">${eventCount}</span>
-              </div>
               <div class="event-queue" id="event-queue">
                 ${renderEventQueueList(state, activeEventId)}
               </div>
