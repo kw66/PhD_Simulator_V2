@@ -233,6 +233,7 @@ export interface AchievementMetaState {
 }
 
 export interface AccountProfile {
+  schemaVersion: number;
   ownedRoleIds: RoleId[];
   selectedLobbyRoleId: RoleId;
   lobbyRolePage: number;
@@ -253,9 +254,9 @@ export interface LobbySelectedRoleStatViewModel {
 }
 
 export interface LobbySelectedRoleHistoryStatViewModel {
-  id: "research-score" | "total-citations" | "nature-count" | "representative-citations" | "representative-score";
+  id: "research-score" | "total-citations" | "nature-count" | "representative" | "completed-runs";
   label: string;
-  value: number;
+  value: string;
 }
 
 export interface LobbySelectedRolePassiveViewModel {

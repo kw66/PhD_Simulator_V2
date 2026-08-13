@@ -1,5 +1,6 @@
 import { ACHIEVEMENT_DEFINITIONS, createAchievementFlags, getUnlockedAchievementCount } from "./v2-achievements";
 import { getRoleDefinition, getRoleOptions } from "./v2-progression";
+import { meetsNatureAcceptThreshold } from "./v2-journal-rules";
 import { getAcceptedPaperScore } from "./v2-publication-rules";
 import {
   buildRoleAchievementProgressLines,
@@ -32,6 +33,7 @@ import type {
 } from "./v2-types";
 
 const DEFAULT_EXP_TO_NEXT = 100;
+export const ACCOUNT_PROFILE_SCHEMA_VERSION = 1;
 export const LOBBY_ROLE_PAGE_SIZE = 10;
 export const LOBBY_ROLE_PAGE_ROW_COUNT = Math.max(1, Math.floor(LOBBY_ROLE_PAGE_SIZE / 2));
 export const ROLE_ACHIEVEMENT_PAGE_SIZE = 8;
@@ -255,6 +257,7 @@ export function createDefaultAccountProfile(): AccountProfile {
   ) as Record<RoleId, RoleMetaProgress>;
 
   return {
+    schemaVersion: ACCOUNT_PROFILE_SCHEMA_VERSION,
     ownedRoleIds: ["normal"],
     selectedLobbyRoleId: "normal",
     lobbyRolePage: 0,
@@ -281,7 +284,7 @@ function normalizePlayerStats(value: unknown): PlayerStats {
   };
 }
 
-function normalizeHistoryBest(value: unknown): RoleHistoryBest {
+function normalizeHistoryBest(value: unknown, preserveNatureCount: boolean): RoleHistoryBest {
   if (!isObject(value)) {
     return createZeroHistoryBest();
   }
@@ -289,7 +292,9 @@ function normalizeHistoryBest(value: unknown): RoleHistoryBest {
   return {
     researchScore: typeof value.researchScore === "number" ? Math.max(0, Math.floor(value.researchScore)) : 0,
     totalCitations: typeof value.totalCitations === "number" ? Math.max(0, Math.floor(value.totalCitations)) : 0,
-    natureCount: typeof value.natureCount === "number" ? Math.max(0, Math.floor(value.natureCount)) : 0,
+    natureCount: preserveNatureCount && typeof value.natureCount === "number"
+      ? Math.max(0, Math.floor(value.natureCount))
+      : 0,
     representativeCitations: typeof value.representativeCitations === "number" ? Math.max(0, Math.floor(value.representativeCitations)) : 0,
     representativeScore: typeof value.representativeScore === "number" ? Math.max(0, Math.floor(value.representativeScore)) : 0,
   };
@@ -360,6 +365,8 @@ export function normalizeAccountProfile(value: unknown): AccountProfile | null {
   }
 
   const defaults = createDefaultAccountProfile();
+  const preserveNatureCount = typeof value.schemaVersion === "number"
+    && value.schemaVersion >= ACCOUNT_PROFILE_SCHEMA_VERSION;
   const validRoleIds = new Set<RoleId>(getRoleOptions().map((role) => role.id));
 
   const ownedRoleIds = Array.isArray(value.ownedRoleIds)
@@ -402,7 +409,7 @@ export function normalizeAccountProfile(value: unknown): AccountProfile | null {
           : defaults.roleProgress[role.id].availableStatPoints,
         allocatedStats: normalizePlayerStats(rawProgress.allocatedStats),
         passiveLevels: normalizePassiveLevels(role.id, rawProgress.passiveLevels),
-        historyBest: normalizeHistoryBest(rawProgress.historyBest),
+        historyBest: normalizeHistoryBest(rawProgress.historyBest, preserveNatureCount),
         unlocked: rawProgress.unlocked === true || normalizedOwnedRoleIds.includes(role.id),
         unlockConditionText: typeof rawProgress.unlockConditionText === "string"
           ? rawProgress.unlockConditionText
@@ -445,6 +452,7 @@ export function normalizeAccountProfile(value: unknown): AccountProfile | null {
   }
 
   return {
+    schemaVersion: ACCOUNT_PROFILE_SCHEMA_VERSION,
     ownedRoleIds: Array.from(new Set(normalizedOwnedRoleIds)) as RoleId[],
     selectedLobbyRoleId,
     lobbyRolePage: Math.min(lobbyRolePageRaw, getLobbyRolePageCount() - 1),
@@ -573,11 +581,15 @@ function buildRoleStatsViewModel(roleId: RoleId, progress: RoleMetaProgress): Lo
 
 function buildRoleHistoryStatsViewModel(progress: RoleMetaProgress): LobbySelectedRoleHistoryStatViewModel[] {
   return [
-    { id: "research-score", label: "科研分", value: progress.historyBest.researchScore },
-    { id: "total-citations", label: "总引用", value: progress.historyBest.totalCitations },
-    { id: "nature-count", label: "Nature数量", value: progress.historyBest.natureCount },
-    { id: "representative-citations", label: "代表作引用", value: progress.historyBest.representativeCitations },
-    { id: "representative-score", label: "代表作分数", value: progress.historyBest.representativeScore },
+    { id: "research-score", label: "科研分", value: String(progress.historyBest.researchScore) },
+    { id: "total-citations", label: "引用", value: String(progress.historyBest.totalCitations) },
+    { id: "nature-count", label: "Nature", value: String(progress.historyBest.natureCount) },
+    {
+      id: "representative",
+      label: "代表作",
+      value: `${progress.historyBest.representativeScore}分 | ${progress.historyBest.representativeCitations}引`,
+    },
+    { id: "completed-runs", label: "通关次数", value: String(progress.completedRuns) },
   ];
 }
 
@@ -623,29 +635,46 @@ function buildHistoryBestFromFinishedRun(
   state: Pick<GameState, "totalResearchScore" | "totalCitations" | "papers" | "externalPublications">,
 ): RoleHistoryBest {
   const publishedPapers = getPublishedPapersFromFinishedRun(state);
+  const representativePaper = publishedPapers.reduce<Paper | null>((best, paper) => {
+    if (!best) return paper;
+
+    const paperScore = getAcceptedPaperScore(paper);
+    const bestScore = getAcceptedPaperScore(best);
+    if (paperScore !== bestScore) return paperScore > bestScore ? paper : best;
+
+    const paperCitations = Math.max(0, Math.floor(paper.publication?.citations ?? 0));
+    const bestCitations = Math.max(0, Math.floor(best.publication?.citations ?? 0));
+    return paperCitations > bestCitations ? paper : best;
+  }, null);
 
   return {
     researchScore: Math.max(0, Math.floor(state.totalResearchScore)),
     totalCitations: Math.max(0, Math.floor(state.totalCitations)),
-    natureCount: publishedPapers.filter((paper) => paper.target === "A").length,
-    representativeCitations: publishedPapers.reduce(
-      (best, paper) => Math.max(best, Math.max(0, Math.floor(paper.publication?.citations ?? 0))),
-      0,
-    ),
-    representativeScore: publishedPapers.reduce(
-      (best, paper) => Math.max(best, Math.max(0, Math.floor(getAcceptedPaperScore(paper)))),
-      0,
-    ),
+    natureCount: publishedPapers.filter(
+      (paper) => paper.target === "A" && meetsNatureAcceptThreshold(getAcceptedPaperScore(paper)),
+    ).length,
+    representativeCitations: Math.max(0, Math.floor(representativePaper?.publication?.citations ?? 0)),
+    representativeScore: Math.max(0, Math.floor(representativePaper ? getAcceptedPaperScore(representativePaper) : 0)),
   };
 }
 
 function mergeHistoryBest(current: RoleHistoryBest, next: RoleHistoryBest): RoleHistoryBest {
+  const shouldReplaceRepresentative = next.representativeScore > current.representativeScore
+    || (
+      next.representativeScore === current.representativeScore
+      && next.representativeCitations > current.representativeCitations
+    );
+
   return {
     researchScore: Math.max(current.researchScore, next.researchScore),
     totalCitations: Math.max(current.totalCitations, next.totalCitations),
     natureCount: Math.max(current.natureCount, next.natureCount),
-    representativeCitations: Math.max(current.representativeCitations, next.representativeCitations),
-    representativeScore: Math.max(current.representativeScore, next.representativeScore),
+    representativeCitations: shouldReplaceRepresentative
+      ? next.representativeCitations
+      : current.representativeCitations,
+    representativeScore: shouldReplaceRepresentative
+      ? next.representativeScore
+      : current.representativeScore,
   };
 }
 

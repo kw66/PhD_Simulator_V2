@@ -183,6 +183,34 @@ describe("v2 account profile", () => {
     expect(loaded?.roleProgress.normal.level).toBe(0);
   });
 
+  it("resets legacy Nature totals that counted all A papers", () => {
+    const legacyProfile = createDefaultAccountProfile();
+    const { schemaVersion: _schemaVersion, ...legacyPayload } = legacyProfile;
+    legacyPayload.roleProgress.normal.historyBest = {
+      researchScore: 42,
+      totalCitations: 18,
+      natureCount: 3,
+      representativeCitations: 9,
+      representativeScore: 36,
+    };
+
+    const migrated = normalizeAccountProfile(legacyPayload);
+    const current = normalizeAccountProfile({
+      ...legacyPayload,
+      schemaVersion: legacyProfile.schemaVersion,
+    });
+
+    expect(migrated?.schemaVersion).toBe(legacyProfile.schemaVersion);
+    expect(migrated?.roleProgress.normal.historyBest).toEqual({
+      researchScore: 42,
+      totalCitations: 18,
+      natureCount: 0,
+      representativeCitations: 9,
+      representativeScore: 36,
+    });
+    expect(current?.roleProgress.normal.historyBest.natureCount).toBe(3);
+  });
+
   it("allows normal awakening tracks to normalize up to level 10", () => {
     const loaded = normalizeAccountProfile({
       ownedRoleIds: ["normal"],
@@ -222,10 +250,12 @@ describe("v2 account profile", () => {
 
     const secondFinished = {
       ...firstFinished,
+      ending: "master" as const,
       totalResearchScore: 38,
       totalCitations: 27,
       papers: [
         createPublishedPaper("paper-d", "C", 20, 14),
+        createPublishedPaper("paper-nature", "A", 500, 1),
       ],
       externalPublications: [],
     };
@@ -234,7 +264,7 @@ describe("v2 account profile", () => {
     expect(firstResult.roleProgress.normal.historyBest).toEqual({
       researchScore: 42,
       totalCitations: 18,
-      natureCount: 2,
+      natureCount: 0,
       representativeCitations: 9,
       representativeScore: 36,
     });
@@ -243,10 +273,17 @@ describe("v2 account profile", () => {
     expect(secondResult.roleProgress.normal.historyBest).toEqual({
       researchScore: 42,
       totalCitations: 27,
-      natureCount: 2,
-      representativeCitations: 14,
-      representativeScore: 36,
+      natureCount: 1,
+      representativeCitations: 1,
+      representativeScore: 500,
     });
+    expect(buildLobbySelectedRoleViewModel(secondResult, "normal").historyStats).toEqual([
+      { id: "research-score", label: "科研分", value: "42" },
+      { id: "total-citations", label: "引用", value: "27" },
+      { id: "nature-count", label: "Nature", value: "1" },
+      { id: "representative", label: "代表作", value: "500分 | 1引" },
+      { id: "completed-runs", label: "通关次数", value: "1" },
+    ]);
   });
 
   it("tracks role achievement progress with history-high and best-single-run snapshots", () => {
