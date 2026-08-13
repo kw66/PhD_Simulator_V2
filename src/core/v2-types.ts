@@ -232,6 +232,8 @@ export interface AchievementMetaState {
   totalCount: number;
 }
 
+export type AchievementScope = "any-role" | "upright-role";
+
 export interface AccountProfile {
   schemaVersion: number;
   ownedRoleIds: RoleId[];
@@ -279,6 +281,9 @@ export interface RoleAchievementDefinition {
   description: string;
   rewardText?: string;
   milestone?: RoleAchievementMilestone;
+  scope?: AchievementScope;
+  unlocksRoleId?: RoleId;
+  globalAchievementId?: AchievementFlagId;
 }
 
 export interface RoleAchievementProgressSnapshot {

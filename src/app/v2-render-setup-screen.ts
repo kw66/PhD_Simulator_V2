@@ -9,7 +9,7 @@ import {
 import { MAX_SAN } from "../core/v2-content";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
 import { BASE_RESEARCH_CAP } from "../core/v2-research-cap-system";
-import { getRoleAchievementDefinitions } from "../core/v2-role-lobby-meta";
+import { getRoleLobbyAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleId } from "../core/v2-types";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 
@@ -99,9 +99,10 @@ function renderRoleAchievementDisplay(
   roleId: RoleId,
   progress: AccountProfile["roleProgress"][RoleId],
   owned: boolean,
+  accountProfile: AccountProfile,
 ): string {
   const unlockedAchievementIds = new Set(progress.unlockedAchievementIds);
-  const achievements = getRoleAchievementDefinitions(roleId);
+  const achievements = getRoleLobbyAchievementDefinitions(roleId);
 
   return `
     <div class="lobby-role-card-achievement-display${owned ? "" : " is-locked"}" aria-label="角色成就">
@@ -109,10 +110,14 @@ function renderRoleAchievementDisplay(
       <span class="lobby-role-card-achievement-icons">
       ${achievements.map((achievement) => `
         <span
-          class="lobby-role-card-achievement-icon${unlockedAchievementIds.has(achievement.id) ? " is-unlocked" : ""}"
+          class="lobby-role-card-achievement-icon${achievement.globalAchievementId
+            ? accountProfile.achievementProgress.flags[achievement.globalAchievementId] ? " is-unlocked" : ""
+            : unlockedAchievementIds.has(achievement.id) ? " is-unlocked" : ""}"
           data-achievement-id="${achievement.id}"
           title="${achievement.title}"
-          aria-label="${achievement.title}${unlockedAchievementIds.has(achievement.id) ? "，已达成" : "，未达成"}"
+          aria-label="${achievement.title}${achievement.globalAchievementId
+            ? accountProfile.achievementProgress.flags[achievement.globalAchievementId] ? "，已达成" : "，未达成"
+            : unlockedAchievementIds.has(achievement.id) ? "，已达成" : "，未达成"}"
         >${achievement.icon}</span>
       `).join("")}
       </span>
@@ -167,7 +172,7 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
             <div class="lobby-role-card-mode-band ${getRoleModeClass(roleId)}">
               <span>${getRoleModeLabel(roleId)}</span>
             </div>
-            ${renderRoleAchievementDisplay(role.id, progress, owned)}
+            ${renderRoleAchievementDisplay(role.id, progress, owned, accountProfile)}
             ${renderRoleCardCornerBadge(progress.level, owned)}
           </div>
         </div>
@@ -208,15 +213,26 @@ function renderRolePager(accountProfile: AccountProfile): string {
 
 function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: AccountProfile): string {
   const viewModel = buildLobbySelectedRoleViewModel(accountProfile, selectedRoleId);
-  const unlockedCount = viewModel.roleAchievements.filter((achievement) => achievement.unlocked).length;
+  const roleAchievementById = new Map(viewModel.roleAchievements.map((achievement) => [achievement.definition.id, achievement]));
+  const visibleAchievements = getRoleLobbyAchievementDefinitions(selectedRoleId).map((definition) => {
+    const roleAchievement = roleAchievementById.get(definition.id);
+    return {
+      definition,
+      unlocked: definition.globalAchievementId
+        ? accountProfile.achievementProgress.flags[definition.globalAchievementId] === true
+        : roleAchievement?.unlocked === true,
+      progressLines: roleAchievement?.progressLines ?? [],
+    };
+  });
+  const unlockedCount = visibleAchievements.filter((achievement) => achievement.unlocked).length;
   const achievementPageCount = getRoleAchievementPageCount(selectedRoleId);
   const achievementPageIndex = Math.min(accountProfile.lobbyRoleAchievementPage, achievementPageCount - 1);
-  const visibleAchievements = viewModel.roleAchievements.slice(
+  const pageAchievements = visibleAchievements.slice(
     achievementPageIndex * ROLE_ACHIEVEMENT_PAGE_SIZE,
     (achievementPageIndex + 1) * ROLE_ACHIEVEMENT_PAGE_SIZE,
   );
-  const achievementProgressPercent = viewModel.roleAchievements.length > 0
-    ? (unlockedCount / viewModel.roleAchievements.length) * 100
+  const achievementProgressPercent = visibleAchievements.length > 0
+    ? (unlockedCount / visibleAchievements.length) * 100
     : 0;
 
   return `
@@ -245,7 +261,7 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
           ><span aria-hidden="true">→</span></button>
         </div>` : ""}
       </div>
-      ${viewModel.roleAchievements.length > 0 ? `
+      ${visibleAchievements.length > 0 ? `
         <div class="lobby-profile-achievement-progress-row">
           <span class="lobby-profile-achievement-progress-label">进度</span>
           <div
@@ -253,17 +269,17 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
             role="progressbar"
             aria-label="角色成就完成进度"
             aria-valuemin="0"
-            aria-valuemax="${viewModel.roleAchievements.length}"
+            aria-valuemax="${visibleAchievements.length}"
             aria-valuenow="${unlockedCount}"
           >
             <span style="width:${achievementProgressPercent}%;"></span>
           </div>
-          <strong class="lobby-profile-achievement-progress-count">${unlockedCount}/${viewModel.roleAchievements.length}</strong>
+          <strong class="lobby-profile-achievement-progress-count">${unlockedCount}/${visibleAchievements.length}</strong>
         </div>
       ` : ""}
       <div class="lobby-profile-achievement-list">
-        ${visibleAchievements.length > 0
-          ? visibleAchievements.map((achievement) => `
+        ${pageAchievements.length > 0
+          ? pageAchievements.map((achievement) => `
           <details class="lobby-profile-achievement${achievement.unlocked ? " is-unlocked" : ""}" name="role-achievements">
             <summary class="lobby-profile-achievement-summary">
               <span class="lobby-profile-achievement-icon" aria-hidden="true">${achievement.definition.icon}</span>

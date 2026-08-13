@@ -1,3 +1,5 @@
+import { ACHIEVEMENT_DEFINITIONS } from "./v2-achievements";
+import { getRoleDefinition } from "./v2-progression";
 import type {
   GameState,
   RoleAchievementDefinition,
@@ -24,6 +26,57 @@ interface RoleAchievementTemplate {
   progressMode?: RoleAchievementProgressMode;
   progressMetrics?: readonly RoleAchievementMetricTemplate[];
 }
+
+const ROLE_UNLOCK_DISPLAY_ACHIEVEMENTS: Partial<Record<RoleId, RoleAchievementDefinition>> = {
+  rich: {
+    id: "unlock:rich",
+    icon: "💰",
+    title: "小有积蓄",
+    description: "使用大多数角色，金币达到30",
+    rewardText: "经验+5，解锁富可敌国角色",
+    unlocksRoleId: "rich",
+  },
+  genius: {
+    id: "unlock:genius",
+    icon: "🔬",
+    title: "初窥门径",
+    description: "使用大多数角色，科研能力达到12",
+    rewardText: "经验+5，解锁院士转世角色",
+    unlocksRoleId: "genius",
+  },
+  "teacher-child": {
+    id: "unlock:teacher-child",
+    icon: "🌟",
+    title: "得到器重",
+    description: "使用大多数角色，导师好感达到12",
+    rewardText: "经验+5，解锁导师子女角色",
+    unlocksRoleId: "teacher-child",
+  },
+  social: {
+    id: "unlock:social",
+    icon: "🤝",
+    title: "人脉初成",
+    description: "使用大多数角色，社交能力达到12",
+    rewardText: "经验+5，解锁社交达人角色",
+    unlocksRoleId: "social",
+  },
+  chosen: {
+    id: "unlock:chosen",
+    icon: "🏆",
+    title: "全面发展",
+    description: "使用大多数角色，科研、社交、好感、金币都达到6",
+    rewardText: "经验+5，解锁天选之人角色",
+    unlocksRoleId: "chosen",
+  },
+  "normal-reversed": {
+    id: "unlock:normal-reversed",
+    icon: "😴",
+    title: "渐生惰性",
+    description: "使用大多数角色，购买办公椅并升级为人体工学椅",
+    rewardText: "经验+5，解锁怠惰·大多数角色",
+    unlocksRoleId: "normal-reversed",
+  },
+};
 
 const ROLE_PROFILE_SUMMARIES: Record<RoleId, string> = {
   normal: "家里条件普通，读研也没什么捷径。组会前赶实验，月底算生活费，论文退了就再改一版。你和大多数人一样，只能靠每个月的选择把日子往前推。",
@@ -135,6 +188,27 @@ export function getRoleAchievementDefinitions(roleId: RoleId): RoleAchievementDe
     rewardText: template.rewardText,
     milestone: template.milestone,
   }));
+}
+
+function isAchievementVisibleForRole(scope: "any-role" | "upright-role", roleId: RoleId): boolean {
+  return scope === "any-role" || getRoleDefinition(roleId).mode === "upright";
+}
+
+export function getRoleLobbyAchievementDefinitions(roleId: RoleId): RoleAchievementDefinition[] {
+  const unlockAchievement = ROLE_UNLOCK_DISPLAY_ACHIEVEMENTS[roleId];
+  const commonAchievements = ACHIEVEMENT_DEFINITIONS
+    .filter((achievement) => isAchievementVisibleForRole(achievement.scope, roleId))
+    .map((achievement) => ({
+      id: `global:${achievement.id}`,
+      icon: achievement.icon,
+      title: achievement.name,
+      description: `${achievement.scope === "upright-role" ? "任意正位角色" : "任意角色"}：${achievement.description}`,
+      rewardText: "通用成就；完成后将在所有适用角色档案中同步展示",
+      scope: achievement.scope,
+      globalAchievementId: achievement.id,
+    }));
+
+  return unlockAchievement ? [unlockAchievement, ...commonAchievements] : commonAchievements;
 }
 
 function getRoleAchievementTemplateByDefinitionId(roleId: RoleId, definitionId: string): RoleAchievementTemplate | null {

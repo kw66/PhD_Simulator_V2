@@ -6,6 +6,7 @@ import {
   buildRoleAchievementProgressLines,
   buildRoleAchievementProgressSnapshotFromFinishedRun,
   getRoleAchievementDefinitions,
+  getRoleLobbyAchievementDefinitions,
   getRoleProfileSummary,
   isRoleAchievementUnlockedFromSnapshot,
   isRoleAchievementUnlockedFromFinishedRun,
@@ -502,7 +503,7 @@ export function changeLobbyRolePage(account: AccountProfile, delta: number, page
 }
 
 export function getRoleAchievementPageCount(roleId: RoleId, pageSize = ROLE_ACHIEVEMENT_PAGE_SIZE): number {
-  return Math.max(1, Math.ceil(getRoleAchievementDefinitions(roleId).length / pageSize));
+  return Math.max(1, Math.ceil(getRoleLobbyAchievementDefinitions(roleId).length / pageSize));
 }
 
 export function changeRoleAchievementPage(
@@ -540,7 +541,7 @@ export function buildAchievementMetaState(flags: AccountProfile["achievementProg
 }
 
 export function getRoleAchievementDisplayTotal(roleId: RoleId): number {
-  return getRoleAchievementDefinitions(roleId).length;
+  return getRoleLobbyAchievementDefinitions(roleId).length;
 }
 
 function getStatLabel(statId: RoleGrowthStatId): string {
@@ -601,7 +602,10 @@ function buildRolePassivesViewModel(roleId: RoleId, progress: RoleMetaProgress):
   }));
 }
 
-function buildRoleAchievementsViewModel(roleId: RoleId, progress: RoleMetaProgress): LobbySelectedRoleAchievementViewModel[] {
+function buildRoleAchievementsViewModel(
+  roleId: RoleId,
+  progress: RoleMetaProgress,
+): LobbySelectedRoleAchievementViewModel[] {
   const unlockedIds = new Set(progress.unlockedAchievementIds);
   return getRoleAchievementDefinitions(roleId).map((definition) => ({
     definition,
