@@ -59,18 +59,18 @@ function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile): Pendin
     id: `before-grad-school-advisor-info-${advisor.id}`,
     title: "读研之始",
     description: [
-      `导师主页上的介绍都很完整，真正让你犹豫的却是没写出来的部分：组会多久一次，项目会不会挤占自己的论文，毕业到底按什么算。你给几位方向合适的老师发了邮件，${advisor.name}讲师回信约你聊了聊。`,
-      "通话结束后，你没有立刻答应。你翻导师评价网、实验室主页和组内论文，又托人问在读学生。那些“氛围很好”“老师负责”的套话，终于慢慢变成可以比较的日常。",
+      `学院网站上的导师介绍写得都很正式，看完还是不知道实验室平时是什么样。你挑了几个感兴趣的方向，给对应的老师发了邮件。${advisor.name}讲师回了信，约你线上聊聊。`,
+      "聊完后，你又去导师评价网翻帖子，还找实验室的学生问了问。组会多久一次、平时要不要做项目、毕业要求是什么，这些才是你更想知道的。",
       `导师评价网 · ${advisor.name}讲师\n匿名评价：${profile.anonymousReview}`,
       `游戏数据\n科研资源 ${LECTURER_INITIAL_PROFILE.researchResource}　初始亲和度 ${LECTURER_INITIAL_PROFILE.affinity}\n项目任务倍率 ${LECTURER_INITIAL_PROFILE.taskMultiplier}　上限 ${taskMax}　做项目消耗 SAN ${ADVISOR_TASK_SAN_COST}\n月工资：硕士 ${ADVISOR_SALARY.master}　博士 ${ADVISOR_SALARY.phd}\n毕业线：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分　博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博线：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分　第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
     ].join("\n\n"),
-    preview: `正在了解${advisor.name}讲师与实验室`,
+    preview: `了解${advisor.name}讲师和课题组`,
     chainId: "before-grad-school",
     stage: "act2",
     choices: [
       {
         id: `before-grad-school-confirm-${advisor.id}`,
-        label: "回复邮件，确认入组",
+        label: "确认加入课题组",
         outcome: "",
         effects: {
           fixedEventResolution: {
@@ -94,17 +94,17 @@ function createBeforeGradSchoolResultEvent(
     id: `before-grad-school-summer-${advisor.id}`,
     title: "读研之始",
     description: [
-      `你确认加入${advisor.name}讲师的课题组，很快收到一句：“收到，开学见。”本科答辩结束，班群渐渐安静下来。过去总有人告诉你下一门课是什么，往后却要自己决定该追哪个问题。`,
-      "暑假里，你收藏了几篇组内论文，第一页就读得很慢。你仍会想象自己的工位、第一次组会和第一篇投稿。期待和没底混在一起，被你一并装进行李。",
+      `你给${advisor.name}讲师回了邮件。过了一会儿，对方回复：“收到，开学见。”本科答辩结束后，宿舍里的人陆续收拾行李，你也开始准备开学要带的东西。`,
+      "暑假里，你下载了几篇课题组最近的论文，没看懂多少。你还是忍不住想象开学后的工位、第一次组会，还有以后自己的第一篇投稿。想到这些，你有点紧张，也有点期待。",
     ].join("\n\n"),
-    preview: `暑假结束，准备前往${advisor.name}讲师的实验室`,
+    preview: "开学的日子近了",
     chainId: "before-grad-school",
     stage: "result",
     choices: [
       {
         id: `before-grad-school-finish-${advisor.id}`,
-        label: "出发报到",
-        outcome: "",
+        label: "准备报到",
+        outcome: "你收拾好行李，准备去学校报到。",
         effects: {},
       },
     ],
@@ -120,17 +120,17 @@ export function createBeforeGradSchoolAct1Event(
     id: "before-grad-school-qualification",
     title: "读研之始",
     description: [
-      "大三下，年级群里的话题从绩点变成了夏令营。原本只是成绩单上的几个小数，忽然和明年会在哪座城市连在一起。你准备材料、参加夏令营和预推免，也反复估算排名，直到大四开学仍不敢把话说满。",
-      "学院完成综合排名和资格审核后，公示页里终于出现了你的名字。你随后在推免服务系统填报志愿、参加复试并接受待录取。页面变成“已接受”的那一刻，你松了口气，又意识到：学校定下了，往后几年每天见的人还没有。",
+      "大三下学期，年级群里开始有人问夏令营的事。你把成绩单、排名证明和简历改了好几遍，投出申请后每天都要多刷几次邮箱。夏令营结束，还有预推免和校内排名，哪一步都不敢漏。",
+      "大四开学后，学院公布推免综合排名，你在名单里找到了自己的名字。后来填报志愿、参加复试，再到推免服务系统里接受待录取，几个月忙下来的事情总算有了结果。学校定了，接下来要联系导师。",
     ].join("\n\n"),
-    preview: "推免资格已经确认",
+    preview: "推免结果已经确定",
     chainId: "before-grad-school",
     stage: "act1",
     choices: [
       {
         id: "before-grad-school-open-advisor-info",
-        label: "开始联系导师",
-        outcome: "你开始整理导师名单和联系材料。",
+        label: "联系导师",
+        outcome: "你打开学院网站，开始查看导师信息。",
         effects: {
           enqueueEvents: [createAdvisorInfoEvent(advisorProfile)],
         },
@@ -169,7 +169,7 @@ export function resolveAdvisorConfirmation(
 
   return {
     nextState,
-    outcome: `你和${advisor.name}讲师确认了入组意向。导师和实验室信息已经记下。`,
+    outcome: `你回复了${advisor.name}讲师，确认加入课题组。`,
     enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id)],
   };
 }

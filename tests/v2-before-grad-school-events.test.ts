@@ -39,8 +39,8 @@ describe("v2 before grad school events", () => {
     expect(act1.description).toContain("推免服务系统");
     expect(act1.description).toContain("接受待录取");
     expect(act1.description).not.toContain("公告栏");
-    expect(act1.preview).toBe("推免资格已经确认");
-    expect(act1.choices.map((choice) => choice.label)).toEqual(["开始联系导师"]);
+    expect(act1.preview).toBe("推免结果已经确定");
+    expect(act1.choices.map((choice) => choice.label)).toEqual(["联系导师"]);
   });
 
   it("uses the first and last lecturer at the random roll boundaries", () => {
@@ -48,9 +48,9 @@ describe("v2 before grad school events", () => {
     const lastInfo = getAdvisorInfoEvent(0.999999);
 
     expect(firstInfo.id).toBe("before-grad-school-advisor-info-chen-ming");
-    expect(firstInfo.description).toContain("陈明讲师回信");
+    expect(firstInfo.description).toContain("陈明讲师回了信");
     expect(lastInfo.id).toBe("before-grad-school-advisor-info-zhao-ning");
-    expect(lastInfo.description).toContain("赵宁讲师回信");
+    expect(lastInfo.description).toContain("赵宁讲师回了信");
   });
 
   it("uses active contact instead of assignment and shows one lecturer's game data", () => {
@@ -61,15 +61,15 @@ describe("v2 before grad school events", () => {
 
     expect(advisorInfo.stage).toBe("act2");
     expect(advisorInfo.title).toBe("读研之始");
-    expect(advisorInfo.description).toContain("给几位方向合适的老师发了邮件");
-    expect(advisorInfo.description).toContain("周岚讲师回信");
+    expect(advisorInfo.description).toContain("给对应的老师发了邮件");
+    expect(advisorInfo.description).toContain("周岚讲师回了信");
     expect(advisorInfo.description).toContain("导师评价网");
     expect(advisorInfo.description).toContain("科研资源 4　初始亲和度 4");
     expect(advisorInfo.description).toContain("项目任务倍率 6　上限 44　做项目消耗 SAN 5");
     expect(advisorInfo.description).toContain("月工资：硕士 1　博士 3");
     expect(advisorInfo.description).toContain("毕业线：硕士 1 分　博士 7 分");
     expect(advisorInfo.description).toContain("转博线：第 2 年 2 分　第 3 年 3 分");
-    expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["回复邮件，确认入组"]);
+    expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["确认加入课题组"]);
     expect(resolution).toEqual({
       kind: "advisor-confirm",
       advisorCandidate: {
@@ -106,7 +106,7 @@ describe("v2 before grad school events", () => {
       taskMax: 44,
       relationMax: 40,
     });
-    expect(resolved.outcome).toContain("和陈明讲师确认了入组意向");
+    expect(resolved.outcome).toContain("回复了陈明讲师，确认加入课题组");
     expect(resolved.outcome).not.toContain("分配");
     expect(summerEvent).toMatchObject({
       title: "读研之始",
@@ -117,7 +117,7 @@ describe("v2 before grad school events", () => {
     expect(summerEvent?.description).toContain("暑假");
     expect(summerEvent?.description).toContain("第一次组会");
     expect(summerEvent?.description).toContain("第一篇投稿");
-    expect(summerEvent?.choices[0]?.label).toBe("出发报到");
+    expect(summerEvent?.choices[0]?.label).toBe("准备报到");
   });
 
   it("resolves advisor-assign choices persisted by the previous release", () => {
@@ -137,7 +137,7 @@ describe("v2 before grad school events", () => {
     );
 
     expect(result.nextState.selectedAdvisorId).toBe("lin-hao");
-    expect(result.outcome).toContain("和林浩讲师确认了入组意向");
+    expect(result.outcome).toContain("回复了林浩讲师，确认加入课题组");
   });
 
   it("keeps old tier-based event choices resolvable for legacy saves", () => {
