@@ -1,5 +1,5 @@
 import { createAdvisorProgressStateFromValues } from "./v2-advisor-progress";
-import { ADVISOR_REQUIREMENTS, ADVISOR_SALARY } from "./v2-content";
+import { ADVISOR_REQUIREMENTS, ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
 import {
   createFixedEvent,
   type FixedResolutionResult,
@@ -96,7 +96,7 @@ function createAdvisorInfoEvent(
         `${intel.reporting}｜${intel.projects}｜${intel.internship}`,
         `${intel.guidance}｜${intel.computing}｜${intel.temperament}｜${intel.atmosphere}`,
       ].join("\n"),
-      `工资：硕士 ${ADVISOR_SALARY.master}｜博士 ${ADVISOR_SALARY.phd}\n毕业：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分｜博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分　转博：2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分｜3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
+      `工资：硕士 ${ADVISOR_SALARY.master}｜博士 ${ADVISOR_SALARY.phd}\n科研分：论文录用，C 类 +${SCORE_BY_TARGET.C}｜B 类 +${SCORE_BY_TARGET.B}｜A 类 +${SCORE_BY_TARGET.A}\n毕业：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分｜博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博士：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分｜第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
     ].join("\n\n"),
     preview: `了解${advisorName}讲师和课题组`,
     chainId: "before-grad-school",
