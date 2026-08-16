@@ -4163,21 +4163,28 @@ button.todo-item:focus-visible {
   background: linear-gradient(180deg, rgba(248, 243, 234, 0.96), rgba(238, 230, 217, 0.9));
 }
 
+.event-content-header .event-content-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .event-history-nav {
   display: grid;
-  grid-template-columns: 34px minmax(54px, auto) 34px;
+  grid-template-columns: 30px minmax(42px, auto) 30px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 4px 12px;
-  border-bottom: var(--play-divider-thin);
-  background: rgba(255, 252, 246, 0.42);
+  gap: 4px;
+  min-height: 0;
+  margin-left: auto;
+  padding: 0;
+  flex: 0 0 auto;
 }
 
 .event-history-nav-btn {
-  width: 34px;
-  height: 30px;
+  width: 30px;
+  height: 28px;
   padding: 0;
   display: inline-flex;
   align-items: center;

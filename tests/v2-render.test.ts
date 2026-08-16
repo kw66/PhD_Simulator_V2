@@ -685,6 +685,7 @@ describe("v2 render lobby shell", () => {
     });
     expect(currentHtml).toContain("Act 2");
     expect(currentHtml).toContain(">2 / 2<");
+    expect(currentHtml).toMatch(/<div class="event-content-header">[\s\S]*?<div class="event-history-nav"[\s\S]*?<\/div>[\s\S]*?<\/div>\s*<div class="event-content-body"/);
     expect(currentHtml).toMatch(/data-ui-event-history-nav="next"[\s\S]*?disabled/);
     expect(currentHtml).toContain('data-action="resolve-event"');
 

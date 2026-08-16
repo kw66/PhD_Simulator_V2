@@ -793,27 +793,27 @@ function renderEventContentBox(
     <div class="event-content-box" id="event-content-box">
       <div class="event-content-header">
         <span class="event-content-title" id="event-content-title">${escapeHtml(displayEvent.title)}</span>
+        ${totalPageCount > 1 ? `
+          <div class="event-history-nav" aria-label="事件进度">
+            <button
+              class="event-history-nav-btn"
+              type="button"
+              data-ui-event-history-nav="prev"
+              aria-label="查看上一幕"
+              ${displayPageIndex === 0 ? "disabled" : ""}
+            ><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+            <span class="event-history-position">${displayPageIndex + 1} / ${totalPageCount}</span>
+            <button
+              class="event-history-nav-btn"
+              type="button"
+              data-ui-event-history-nav="next"
+              aria-label="查看下一幕"
+              ${displayPageIndex === currentPageIndex ? "disabled" : ""}
+            ><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+          </div>
+        ` : ""}
         <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情"${isResultPage ? " hidden" : ""}>×</button>
       </div>
-      ${totalPageCount > 1 ? `
-        <div class="event-history-nav" aria-label="事件进度">
-          <button
-            class="event-history-nav-btn"
-            type="button"
-            data-ui-event-history-nav="prev"
-            aria-label="查看上一幕"
-            ${displayPageIndex === 0 ? "disabled" : ""}
-          ><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-          <span class="event-history-position">${displayPageIndex + 1} / ${totalPageCount}</span>
-          <button
-            class="event-history-nav-btn"
-            type="button"
-            data-ui-event-history-nav="next"
-            aria-label="查看下一幕"
-            ${displayPageIndex === currentPageIndex ? "disabled" : ""}
-          ><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-        </div>
-      ` : ""}
       <div class="event-content-body" id="event-content-body">
         ${renderEventDescriptionHtml(displayEvent.description)}
       </div>
