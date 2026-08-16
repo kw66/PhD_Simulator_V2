@@ -58,8 +58,8 @@ describe("v2 before grad school events", () => {
     expect(lastInfo.description).toContain("赵宁讲师回了信");
   });
 
-  it("uses active contact instead of assignment and shows one lecturer's game data", () => {
-    const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => 0.3);
+  it("uses active contact instead of assignment and shows one lecturer's relevant information", () => {
+    const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => 0.6);
     const advisorInfo = act1.choices[0]?.effects.enqueueEvents?.[0] as PendingEvent;
     const resolution = advisorInfo.choices[0]?.effects.fixedEventResolution;
     const visibleCopy = `${act1.description}\n${advisorInfo.description}`;
@@ -67,10 +67,14 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.stage).toBe("act2");
     expect(advisorInfo.title).toBe("读研之始");
     expect(advisorInfo.description).toContain("给对应的老师发了邮件");
-    expect(advisorInfo.description).toContain("周岚讲师回了信");
+    expect(advisorInfo.description).toContain("林浩讲师回了信");
     expect(advisorInfo.description).toContain("导师评价网");
-    expect(advisorInfo.description).toContain("科研资源 4　初始亲和度 4");
-    expect(advisorInfo.description).toContain("项目任务倍率 6　上限 44　做项目消耗 SAN 5");
+    expect(advisorInfo.description).toContain("即使暂时没结果，也要把卡在哪里讲清楚");
+    expect(advisorInfo.description).toContain("赶项目节点时会忙一阵");
+    expect(advisorInfo.description).not.toContain("游戏数据");
+    expect(advisorInfo.description).not.toContain("科研资源");
+    expect(advisorInfo.description).not.toContain("项目任务倍率");
+    expect(advisorInfo.description).not.toContain("做项目消耗 SAN");
     expect(advisorInfo.description).toContain("月工资：硕士 1　博士 3");
     expect(advisorInfo.description).toContain("毕业线：硕士 1 分　博士 7 分");
     expect(advisorInfo.description).toContain("转博线：第 2 年 2 分　第 3 年 3 分");
@@ -78,7 +82,7 @@ describe("v2 before grad school events", () => {
     expect(resolution).toEqual({
       kind: "advisor-confirm",
       advisorCandidate: {
-        advisorId: "zhou-lan",
+        advisorId: "lin-hao",
         researchResource: 4,
         affinity: 4,
         taskMultiplier: 6,

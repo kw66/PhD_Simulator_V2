@@ -1,4 +1,4 @@
-import { createAdvisorProgressStateFromValues, ADVISOR_TASK_SAN_COST } from "./v2-advisor-progress";
+import { createAdvisorProgressStateFromValues } from "./v2-advisor-progress";
 import { ADVISOR_REQUIREMENTS, ADVISOR_SALARY } from "./v2-content";
 import {
   createFixedEvent,
@@ -34,7 +34,7 @@ const BEFORE_GRAD_SCHOOL_ADVISORS: BeforeGradSchoolAdvisorProfile[] = [
   },
   {
     advisorId: "lin-hao",
-    anonymousReview: "每周一次组会，实验没跑通也照样要讲。组里设备够用，项目节点比较紧。",
+    anonymousReview: "每周开一次组会，轮到汇报时即使暂时没结果，也要把卡在哪里讲清楚。服务器基本够用，赶项目节点时会忙一阵。",
   },
   {
     advisorId: "zhao-ning",
@@ -53,7 +53,6 @@ function getRandomAdvisorProfile(getRoll: RandomRollProvider): BeforeGradSchoolA
 
 function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile): PendingEvent {
   const advisor = getAdvisorDefinition(profile.advisorId);
-  const taskMax = LECTURER_INITIAL_PROFILE.researchResource * LECTURER_INITIAL_PROFILE.taskMultiplier + 20;
 
   return createFixedEvent({
     id: `before-grad-school-advisor-info-${advisor.id}`,
@@ -62,7 +61,7 @@ function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile): Pendin
       `学院网站上的导师介绍写得都很正式，看完还是不知道实验室平时是什么样。你挑了几个感兴趣的方向，给对应的老师发了邮件。${advisor.name}讲师回了信，约你线上聊聊。`,
       "聊完后，你又去导师评价网翻帖子，还找实验室的学生问了问。组会多久一次、平时要不要做项目、毕业要求是什么，这些才是你更想知道的。",
       `导师评价网 · ${advisor.name}讲师\n匿名评价：${profile.anonymousReview}`,
-      `游戏数据\n科研资源 ${LECTURER_INITIAL_PROFILE.researchResource}　初始亲和度 ${LECTURER_INITIAL_PROFILE.affinity}\n项目任务倍率 ${LECTURER_INITIAL_PROFILE.taskMultiplier}　上限 ${taskMax}　做项目消耗 SAN ${ADVISOR_TASK_SAN_COST}\n月工资：硕士 ${ADVISOR_SALARY.master}　博士 ${ADVISOR_SALARY.phd}\n毕业线：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分　博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博线：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分　第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
+      `月工资：硕士 ${ADVISOR_SALARY.master}　博士 ${ADVISOR_SALARY.phd}\n毕业线：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分　博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博线：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分　第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
     ].join("\n\n"),
     preview: `了解${advisor.name}讲师和课题组`,
     chainId: "before-grad-school",
