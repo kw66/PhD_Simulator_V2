@@ -149,7 +149,8 @@ describe("v2 before grad school events", () => {
       chainId: "before-grad-school",
       stage: "result",
     });
-    expect(summerEvent?.description).toContain("收到，开学见");
+    expect(summerEvent?.description).toContain("老师把你拉进了实验室群");
+    expect(summerEvent?.description).not.toContain("收到，开学见");
     expect(summerEvent?.description).toContain("推免资格名单");
     expect(summerEvent?.description).toContain("九月，推免系统正式开放");
     expect(summerEvent?.description).not.toContain("九推系统");
