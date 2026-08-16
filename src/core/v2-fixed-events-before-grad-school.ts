@@ -70,7 +70,7 @@ function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile): Pendin
     choices: [
       {
         id: `before-grad-school-confirm-${advisor.id}`,
-        label: "确认加入课题组",
+        label: "回复导师",
         outcome: "",
         effects: {
           fixedEventResolution: {
@@ -94,8 +94,9 @@ function createBeforeGradSchoolResultEvent(
     id: `before-grad-school-summer-${advisor.id}`,
     title: "读研之始",
     description: [
-      `你给${advisor.name}讲师回了邮件。过了一会儿，对方回复：“收到，开学见。”本科答辩结束后，宿舍里的人陆续收拾行李，你也开始准备开学要带的东西。`,
-      "暑假里，你下载了几篇课题组最近的论文，没看懂多少。你还是忍不住想象开学后的工位、第一次组会，还有以后自己的第一篇投稿。想到这些，你有点紧张，也有点期待。",
+      `你给${advisor.name}讲师回了邮件，表示想加入课题组。老师让你先等本校资格和九推结果。`,
+      "大四开学后，学院公布推免资格名单，你在里面找到了自己的名字。九推系统开放后，你填报了之前拿到预录取的学校，并在系统里接受待录取。你把结果告诉老师，很快收到回复：“收到，开学见。”",
+      "本科毕业后的暑假，宿舍里的人陆续收拾行李。你下载了几篇课题组最近的论文，没看懂多少。你还是忍不住想象开学后的工位、第一次组会，还有以后自己的第一篇投稿。想到这些，你有点紧张，也有点期待。",
     ].join("\n\n"),
     preview: "开学的日子近了",
     chainId: "before-grad-school",
@@ -120,10 +121,10 @@ export function createBeforeGradSchoolAct1Event(
     id: "before-grad-school-qualification",
     title: "读研之始",
     description: [
-      "大三下学期，年级群里开始有人问夏令营的事。你把成绩单、排名证明和简历改了好几遍，投出申请后每天都要多刷几次邮箱。夏令营结束，还有预推免和校内排名，哪一步都不敢漏。",
-      "大四开学后，学院公布推免综合排名，你在名单里找到了自己的名字。后来填报志愿、参加复试，再到推免服务系统里接受待录取，几个月忙下来的事情总算有了结果。学校定了，接下来要联系导师。",
+      "大三下学期，年级群里开始有人问夏令营的事。你把成绩单、排名证明和简历改了好几遍，投出申请后每天都要多刷几次邮箱。",
+      "暑假里，你先参加夏令营，之后又报了预推免。表格填了一份又一份，线上面试也做了几场，最后拿到一个比较满意的预录取结果。正式手续还没开始，你先去联系导师。",
     ].join("\n\n"),
-    preview: "推免结果已经确定",
+    preview: "拿到预录取，准备联系导师",
     chainId: "before-grad-school",
     stage: "act1",
     choices: [
@@ -169,7 +170,7 @@ export function resolveAdvisorConfirmation(
 
   return {
     nextState,
-    outcome: `你回复了${advisor.name}讲师，确认加入课题组。`,
+    outcome: `你回复了${advisor.name}讲师，表示希望加入课题组。`,
     enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id)],
   };
 }
