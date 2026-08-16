@@ -10,8 +10,7 @@ function startPreEnrollmentWith(
 ) {
   let state = createInitialState();
   state = dispatchAction(state, "select-role", { roleId });
-  state = dispatchAction(state, "select-advisor", { advisorId });
-  return dispatchAction(state, "start-game", { roleId, advisorId });
+  return dispatchAction(state, "start-game", { roleId, advisorId, advisorName: "测试导师" });
 }
 
 function startWith(
@@ -56,6 +55,7 @@ describe("v2 engine", () => {
     expect(state.phase).toBe("playing");
     expect(state.selectedRoleId).toBe("genius");
     expect(state.selectedAdvisorId).toBe("lin-hao");
+    expect(state.selectedAdvisorName).toBe("测试导师");
     expect(state.month).toBe(0);
     expect(state.totalMonths).toBe(0);
     expect(state.player).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });

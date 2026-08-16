@@ -35,6 +35,7 @@ export function createInitialState(): GameState {
     selectedRoleId: "normal",
     setupSelectedRoleId: null,
     selectedAdvisorId: null,
+    selectedAdvisorName: null,
     degree: "master",
     year: calendar.year,
     month: calendar.month,
@@ -89,7 +90,11 @@ export function createInitialState(): GameState {
   };
 }
 
-export function createStartedGameState(roleId: RoleId, advisorId: AdvisorId | null = null): GameState {
+export function createStartedGameState(
+  roleId: RoleId,
+  advisorId: AdvisorId | null = null,
+  advisorName: string | null = null,
+): GameState {
   const role = getRoleDefinition(roleId);
   const advisor = advisorId ? getAdvisorDefinition(advisorId) : null;
   const initialPaperSlots = role.initialPaperSlots ?? getUnlockedPaperSlotCount(role.startingStats.research);
@@ -105,6 +110,7 @@ export function createStartedGameState(roleId: RoleId, advisorId: AdvisorId | nu
     selectedRoleId: role.id,
     setupSelectedRoleId: role.id,
     selectedAdvisorId: advisor?.id ?? null,
+    selectedAdvisorName: advisor ? advisorName : null,
     degree: "master",
     year: 1,
     month: 0,
@@ -145,7 +151,7 @@ export function createStartedGameState(roleId: RoleId, advisorId: AdvisorId | nu
     achievementFlags: createAchievementFlags(),
     player: clonePlayer(role.startingStats),
     log: advisor
-      ? [createLogEntry(0, `以 ${role.name} 身份开局，导师为 ${advisor.name} / 讲师。`)]
+      ? [createLogEntry(0, `以 ${role.name} 身份开局，导师为 ${advisorName ?? "导师"} / 讲师。`)]
       : [],
   };
 }

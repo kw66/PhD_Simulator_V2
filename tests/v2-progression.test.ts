@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   createPhdDecision,
   getAdvisorDefinition,
-  getAdvisorOptions,
   getAdvisorSalaryForMonth,
   getCalendarForTotalMonths,
   getGraduationScoreTarget,
@@ -13,8 +12,10 @@ import {
   getRoleOptions,
 } from "../src/core/v2-progression";
 
+const ADVISOR_PROFILE_IDS = ["chen-ming", "zhou-lan", "lin-hao", "zhao-ning"] as const;
+
 describe("v2 progression", () => {
-  it("提供稳定的角色和导师定义访问", () => {
+  it("提供稳定的角色和导师内部配置访问", () => {
     expect(getRoleDefinition("normal").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
     expect(getRoleDefinition("genius").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
     expect(getRoleDefinition("social").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
@@ -30,9 +31,8 @@ describe("v2 progression", () => {
     expect(getRoleDefinition("genius-reversed").name).toBe("愚钝·院士转世");
     expect(getRoleDefinition("social-reversed").name).toBe("嫉妒·社交达人");
     expect(getRoleDefinition("genius-reversed").initialPaperSlots).toBe(4);
-    expect(getAdvisorDefinition("zhao-ning").name).toBe("赵宁");
+    expect(getAdvisorDefinition("zhao-ning").id).toBe("zhao-ning");
     expect(getRoleOptions()).toHaveLength(14);
-    expect(getAdvisorOptions().map((advisor) => advisor.name)).toEqual(["陈明", "周岚", "林浩", "赵宁"]);
   });
 
   it("统一处理最后一年仅 10 个月的日历口径", () => {
@@ -46,21 +46,21 @@ describe("v2 progression", () => {
   });
 
   it("统一给出毕业线和转博线", () => {
-    for (const advisor of getAdvisorOptions()) {
-      expect(getGraduationScoreTarget("master", advisor.id)).toBe(1);
-      expect(getGraduationScoreTarget("phd", advisor.id)).toBe(7);
-      expect(getPhdDecisionRequirement(advisor.id, 2)).toBe(2);
-      expect(getPhdDecisionRequirement(advisor.id, 3)).toBe(3);
-      expect(getPhdDecisionRequirement(advisor.id, 4)).toBeNull();
+    for (const advisorId of ADVISOR_PROFILE_IDS) {
+      expect(getGraduationScoreTarget("master", advisorId)).toBe(1);
+      expect(getGraduationScoreTarget("phd", advisorId)).toBe(7);
+      expect(getPhdDecisionRequirement(advisorId, 2)).toBe(2);
+      expect(getPhdDecisionRequirement(advisorId, 3)).toBe(3);
+      expect(getPhdDecisionRequirement(advisorId, 4)).toBeNull();
     }
   });
 
   it("四位讲师都按旧副教授口径结算工资", () => {
-    for (const advisor of getAdvisorOptions()) {
-      expect(getAdvisorSalaryForMonth(advisor.id, "master", 1)).toBe(1);
-      expect(getAdvisorSalaryForMonth(advisor.id, "master", 8)).toBe(1);
-      expect(getAdvisorSalaryForMonth(advisor.id, "phd", 1)).toBe(3);
-      expect(getAdvisorSalaryForMonth(advisor.id, "phd", 8)).toBe(3);
+    for (const advisorId of ADVISOR_PROFILE_IDS) {
+      expect(getAdvisorSalaryForMonth(advisorId, "master", 1)).toBe(1);
+      expect(getAdvisorSalaryForMonth(advisorId, "master", 8)).toBe(1);
+      expect(getAdvisorSalaryForMonth(advisorId, "phd", 1)).toBe(3);
+      expect(getAdvisorSalaryForMonth(advisorId, "phd", 8)).toBe(3);
     }
   });
 

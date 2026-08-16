@@ -97,6 +97,7 @@ export function buildNormalizedHydratedState(
   GameState,
   | "sanCap"
   | "selectedAdvisorId"
+  | "selectedAdvisorName"
   | "totalCitations"
   | "externalPublications"
   | "availableRandomEvents"
@@ -140,6 +141,7 @@ export function buildNormalizedHydratedState(
 
   return {
     selectedAdvisorId: normalizeAdvisorId(value.selectedAdvisorId),
+    selectedAdvisorName: typeof value.selectedAdvisorName === "string" ? value.selectedAdvisorName : null,
     sanCap: typeof value.sanCap === "number" ? value.sanCap : 20,
     totalCitations: typeof value.totalCitations === "number" ? value.totalCitations : 0,
     externalPublications: Array.isArray(value.externalPublications) ? value.externalPublications as GameState["externalPublications"] : [],

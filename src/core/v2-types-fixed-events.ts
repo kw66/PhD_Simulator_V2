@@ -1,8 +1,5 @@
 export type FixedEventResolutionKind =
   | "advisor-confirm"
-  | "advisor-assign"
-  | "advisor-select"
-  | "advisor-select-tier"
   | "teachers-day-message"
   | "teachers-day-tea"
   | "teachers-day-flower"
@@ -33,6 +30,7 @@ export interface FixedEventJuniorCandidate {
 
 export interface FixedEventAdvisorCandidate {
   advisorId: "chen-ming" | "zhou-lan" | "lin-hao" | "zhao-ning";
+  advisorName: string;
   researchResource: number;
   affinity: number;
   taskMultiplier: number;

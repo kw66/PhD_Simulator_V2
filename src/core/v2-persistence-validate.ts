@@ -35,6 +35,7 @@ export function hasGameStateBaseShape(value: unknown): value is Record<string, u
     typeof value.phase === "string" &&
     typeof value.selectedRoleId === "string" &&
     (typeof value.selectedAdvisorId === "string" || value.selectedAdvisorId === null) &&
+    (typeof value.selectedAdvisorName === "string" || value.selectedAdvisorName === null) &&
     typeof value.degree === "string" &&
     typeof value.year === "number" &&
     typeof value.month === "number" &&

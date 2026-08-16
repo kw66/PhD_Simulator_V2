@@ -258,10 +258,10 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
 ];
 
 export const ADVISOR_DEFINITIONS: AdvisorDefinition[] = [
-  { id: "chen-ming", name: "陈明", color: "#b8860b" },
-  { id: "zhou-lan", name: "周岚", color: "#e67e22" },
-  { id: "lin-hao", name: "林浩", color: "#3498db" },
-  { id: "zhao-ning", name: "赵宁", color: "#2ecc71" },
+  { id: "chen-ming", color: "#b8860b" },
+  { id: "zhou-lan", color: "#e67e22" },
+  { id: "lin-hao", color: "#3498db" },
+  { id: "zhao-ning", color: "#2ecc71" },
 ];
 
 export const ADVISOR_REQUIREMENTS: AdvisorRequirements = {

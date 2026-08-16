@@ -41,7 +41,6 @@ import {
   hasBlockingQueueEvent,
 } from "./v2-event-queue";
 import {
-  getAdvisorOptions,
   getRoleOptions,
   isPreEnrollmentState,
 } from "./v2-progression";
@@ -49,7 +48,6 @@ import {
   getShopRestSanGain,
 } from "./v2-shop-items";
 import type {
-  AdvisorDefinition,
   DispatchPayload,
   GameActionId,
   GameState,
@@ -158,8 +156,4 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
 
 export function getCurrentRoleOptions(): RoleDefinition[] {
   return getRoleOptions();
-}
-
-export function getCurrentAdvisorOptions(): AdvisorDefinition[] {
-  return getAdvisorOptions();
 }

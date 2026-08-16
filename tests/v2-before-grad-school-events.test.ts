@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
-import { applyFixedEventResolution } from "../src/core/v2-fixed-events";
 import {
   createBeforeGradSchoolAct1Event,
   resolveAdvisorConfirmation,
 } from "../src/core/v2-fixed-events-before-grad-school";
-import type { FixedEventResolution, PendingEvent } from "../src/core/v2-types";
+import type { PendingEvent } from "../src/core/v2-types";
 
 function getAdvisorInfoEvent(roll: number): PendingEvent {
   const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => roll);
@@ -48,14 +47,14 @@ describe("v2 before grad school events", () => {
     expect(act1.choices.map((choice) => choice.label)).toEqual(["联系导师"]);
   });
 
-  it("uses the first and last lecturer at the random roll boundaries", () => {
+  it("combines random lecturer names at the roll boundaries", () => {
     const firstInfo = getAdvisorInfoEvent(0);
     const lastInfo = getAdvisorInfoEvent(0.999999);
 
     expect(firstInfo.id).toBe("before-grad-school-advisor-info-chen-ming");
-    expect(firstInfo.description).toContain("陈明讲师回了信");
+    expect(firstInfo.description).toContain("李旭旭讲师回了信");
     expect(lastInfo.id).toBe("before-grad-school-advisor-info-zhao-ning");
-    expect(lastInfo.description).toContain("赵宁讲师回了信");
+    expect(lastInfo.description).toContain("章名讲师回了信");
   });
 
   it("uses active contact instead of assignment and shows one lecturer's relevant information", () => {
@@ -67,7 +66,7 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.stage).toBe("act2");
     expect(advisorInfo.title).toBe("读研之始");
     expect(advisorInfo.description).toContain("给对应的老师发了邮件");
-    expect(advisorInfo.description).toContain("林浩讲师回了信");
+    expect(advisorInfo.description).toContain("辛英英讲师回了信");
     expect(advisorInfo.description).toContain("导师评价网");
     expect(advisorInfo.description).toContain("即使暂时没结果，也要把卡在哪里讲清楚");
     expect(advisorInfo.description).toContain("赶项目节点时会忙一阵");
@@ -83,6 +82,7 @@ describe("v2 before grad school events", () => {
       kind: "advisor-confirm",
       advisorCandidate: {
         advisorId: "lin-hao",
+        advisorName: "辛英英",
         researchResource: 4,
         affinity: 4,
         taskMultiplier: 6,
@@ -106,6 +106,7 @@ describe("v2 before grad school events", () => {
     const summerEvent = resolved.enqueueEvents?.[0];
 
     expect(resolved.nextState.selectedAdvisorId).toBe("chen-ming");
+    expect(resolved.nextState.selectedAdvisorName).toBe("李旭旭");
     expect(resolved.nextState.graduationScoreTarget).toBe(1);
     expect(resolved.nextState.relationshipState.advisorCount).toBe(1);
     expect(resolved.nextState.advisorProgressState).toMatchObject({
@@ -115,7 +116,7 @@ describe("v2 before grad school events", () => {
       taskMax: 44,
       relationMax: 40,
     });
-    expect(resolved.outcome).toContain("回复了陈明讲师，表示希望加入课题组");
+    expect(resolved.outcome).toContain("回复了李旭旭讲师，表示希望加入课题组");
     expect(resolved.outcome).not.toContain("分配");
     expect(summerEvent).toMatchObject({
       title: "读研之始",
@@ -138,43 +139,4 @@ describe("v2 before grad school events", () => {
     expect(summerEvent?.choices[0]?.label).toBe("准备报到");
   });
 
-  it("resolves advisor-assign choices persisted by the previous release", () => {
-    const previousResolution: FixedEventResolution = {
-      kind: "advisor-assign",
-      advisorCandidate: {
-        advisorId: "lin-hao",
-        researchResource: 4,
-        affinity: 4,
-        taskMultiplier: 6,
-      },
-    };
-
-    const result = applyFixedEventResolution(
-      { ...createInitialState(), phase: "playing" },
-      previousResolution,
-    );
-
-    expect(result.nextState.selectedAdvisorId).toBe("lin-hao");
-    expect(result.outcome).toContain("回复了林浩讲师，表示希望加入课题组");
-  });
-
-  it("keeps old tier-based event choices resolvable for legacy saves", () => {
-    const legacyResolution = {
-      kind: "advisor-select-tier",
-      advisorCandidate: {
-        advisorId: "level5",
-        researchResource: 4,
-        affinity: 4,
-        taskMultiplier: 6,
-      },
-    } as unknown as FixedEventResolution;
-
-    const result = applyFixedEventResolution(
-      { ...createInitialState(), phase: "playing" },
-      legacyResolution,
-    );
-
-    expect(result.nextState.selectedAdvisorId).toBe("zhao-ning");
-    expect(result.outcome).toContain("赵宁讲师");
-  });
 });

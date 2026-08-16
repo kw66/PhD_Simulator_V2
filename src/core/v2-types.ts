@@ -75,7 +75,6 @@ export type GameActionId =
   | "select-role"
   | "change-lobby-role-page"
   | "change-role-achievement-page"
-  | "select-advisor"
   | "create-paper"
   | "select-paper"
   | "read"
@@ -314,7 +313,6 @@ export interface AdvisorRequirements {
 
 export interface AdvisorDefinition {
   id: AdvisorId;
-  name: string;
   color: string;
 }
 
@@ -462,6 +460,7 @@ export interface GameState extends RandomEventState {
   selectedRoleId: RoleId;
   setupSelectedRoleId?: RoleId | null;
   selectedAdvisorId: AdvisorId | null;
+  selectedAdvisorName: string | null;
   degree: Degree;
   year: number;
   month: number;
@@ -517,6 +516,7 @@ export interface GameState extends RandomEventState {
 export interface DispatchPayload {
   roleId?: RoleId | undefined;
   advisorId?: AdvisorId | undefined;
+  advisorName?: string | undefined;
   paperId?: string | undefined;
   paperTarget?: PaperTarget | undefined;
   eventId?: string | undefined;

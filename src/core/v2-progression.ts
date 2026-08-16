@@ -9,14 +9,6 @@ import {
 } from "./v2-content";
 import type { AdvisorDefinition, AdvisorId, Degree, PendingDecision, RoleBaseId, RoleDefinition, RoleId, RoleMode } from "./v2-types";
 
-const LEGACY_ADVISOR_ID_MAP: Record<string, AdvisorId> = {
-  level1: "chen-ming",
-  level2: "zhou-lan",
-  level3: "lin-hao",
-  level4: "lin-hao",
-  level5: "zhao-ning",
-};
-
 function getMaxYearsByDegree(degree: Degree): number {
   return degree === "master" ? 3 : 5;
 }
@@ -77,7 +69,7 @@ export function getRoleBaseOrder(): RoleBaseId[] {
 export function normalizeAdvisorId(value: unknown): AdvisorId | null {
   if (typeof value !== "string") return null;
   const advisor = ADVISOR_DEFINITIONS.find((item) => item.id === value);
-  return advisor?.id ?? LEGACY_ADVISOR_ID_MAP[value] ?? null;
+  return advisor?.id ?? null;
 }
 
 export function getAdvisorDefinition(advisorId: AdvisorId): AdvisorDefinition {
@@ -89,16 +81,8 @@ export function getAdvisorDefinition(advisorId: AdvisorId): AdvisorDefinition {
   return advisor;
 }
 
-export function getAdvisorDefinitionOrNull(advisorId: AdvisorId | null): AdvisorDefinition | null {
-  return advisorId ? getAdvisorDefinition(advisorId) : null;
-}
-
 export function getRoleOptions(): RoleDefinition[] {
   return ROLE_DEFINITIONS;
-}
-
-export function getAdvisorOptions(): AdvisorDefinition[] {
-  return ADVISOR_DEFINITIONS;
 }
 
 export function getCalendarForTotalMonths(totalMonths: number, degree: Degree = "master"): { year: number; month: number } {

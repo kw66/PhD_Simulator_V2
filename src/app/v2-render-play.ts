@@ -17,7 +17,6 @@ import { getAcceptedPaperScore } from "../core/v2-publication-rules";
 import { ADVISOR_TASK_SAN_COST } from "../core/v2-advisor-progress";
 import {
   getCalendarForTotalMonths,
-  getAdvisorDefinitionOrNull,
   getGraduationScoreTarget,
   getAdvisorSalaryForMonth,
   getPhdDecisionRequirement,
@@ -1324,16 +1323,15 @@ function getRenderedLoverName(type: LoverTypeId | null): string {
 
 function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard | null> {
   const preEnrollment = isPreEnrollmentState(state);
-  const advisor = getAdvisorDefinitionOrNull(state.selectedAdvisorId);
   const cards: Array<RelationshipRenderCard | null> = Array.from({ length: 5 }, () => null);
 
-  if (advisor && state.relationshipState.advisorCount > 0) {
+  if (state.selectedAdvisorId && state.relationshipState.advisorCount > 0) {
     cards[0] = {
       slotIndex: 0,
       type: "advisor",
       buttonLabel: "导师",
       displayType: "导师",
-      displayName: `${advisor.name} / 讲师`,
+      displayName: `${state.selectedAdvisorName ?? "导师"} / 讲师`,
       detailItems: [
         `科研资源 ${state.advisorProgressState.researchResource}`,
         `亲和度 ${state.advisorProgressState.affinity}`,

@@ -85,14 +85,16 @@ describe("manual persistence", () => {
     expect(loadPersistedState()).toBeNull();
   });
 
-  it("读取旧导师档位存档时会迁移为具名讲师", () => {
+  it("保留本局随机生成的导师姓名", () => {
     const state = createInitialState();
-    window.localStorage.setItem(
-      "vibe2_v2_autosave",
-      JSON.stringify({ ...state, selectedAdvisorId: "level1" }),
-    );
+    savePersistedState({
+      ...state,
+      selectedAdvisorId: "chen-ming",
+      selectedAdvisorName: "李旭霖",
+    });
 
     expect(loadPersistedState()?.selectedAdvisorId).toBe("chen-ming");
+    expect(loadPersistedState()?.selectedAdvisorName).toBe("李旭霖");
   });
 
   it("支持保存和读取手动槽", () => {

@@ -26,9 +26,6 @@ export function applyFixedEventResolution(
 ): FixedResolutionResult {
   switch (resolution.kind) {
     case "advisor-confirm":
-    case "advisor-assign":
-    case "advisor-select":
-    case "advisor-select-tier":
       return resolveAdvisorConfirmation(state, resolution);
     case "teachers-day-message":
     case "teachers-day-tea":

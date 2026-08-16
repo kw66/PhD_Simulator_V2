@@ -77,8 +77,7 @@ describe("v2 store manual saves", () => {
   it("可以保存到手动槽并从手动槽读档", () => {
     const store = createStore();
     store.dispatch("select-role", { roleId: "normal" });
-    store.dispatch("select-advisor", { advisorId: "lin-hao" });
-    store.dispatch("start-game");
+    store.dispatch("start-game", { roleId: "normal", advisorId: "lin-hao", advisorName: "李旭霖" });
     store.dispatch("next-month");
     store.dispatch("debug-seed-paper", { paperTarget: "C" });
     store.dispatch("save-manual", { manualSlot: 1 });
@@ -93,6 +92,7 @@ describe("v2 store manual saves", () => {
     expect(store.getState().phase).toBe("playing");
     expect(store.getState().selectedRoleId).toBe("normal");
     expect(store.getState().selectedAdvisorId).toBe("lin-hao");
+    expect(store.getState().selectedAdvisorName).toBe("李旭霖");
     expect(store.getState().papers.length).toBe(1);
   });
 

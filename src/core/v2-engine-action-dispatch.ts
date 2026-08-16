@@ -58,15 +58,14 @@ export function dispatchSetupAction(
             setupSelectedRoleId: payload.roleId,
           }
         : state;
-    case "select-advisor":
-      return payload.advisorId ? { ...state, selectedAdvisorId: payload.advisorId } : state;
     case "start-game": {
       const roleId = payload.roleId ?? state.setupSelectedRoleId ?? (state.phase === "setup" ? null : state.selectedRoleId);
       const advisorId = payload.advisorId ?? state.selectedAdvisorId;
+      const advisorName = payload.advisorName ?? state.selectedAdvisorName;
       if (!roleId) {
         return pushLog(state, "请先选择角色。");
       }
-      const startedState = createStartedGameState(roleId, advisorId);
+      const startedState = createStartedGameState(roleId, advisorId, advisorName);
       if (advisorId) {
         return startedState;
       }

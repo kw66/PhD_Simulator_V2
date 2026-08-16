@@ -9,6 +9,7 @@ import {
   getAdvisorDefinition,
   getGraduationScoreTarget,
 } from "./v2-progression";
+import { generateRandomChineseName } from "./v2-random-name";
 import { tryAddRelationship } from "./v2-relationship-rules";
 import type { AdvisorId, FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
@@ -51,19 +52,19 @@ function getRandomAdvisorProfile(getRoll: RandomRollProvider): BeforeGradSchoolA
     ?? BEFORE_GRAD_SCHOOL_ADVISORS[0];
 }
 
-function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile): PendingEvent {
+function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile, advisorName: string): PendingEvent {
   const advisor = getAdvisorDefinition(profile.advisorId);
 
   return createFixedEvent({
     id: `before-grad-school-advisor-info-${advisor.id}`,
     title: "读研之始",
     description: [
-      `学院网站上的导师介绍写得都很正式，看完还是不知道实验室平时是什么样。你挑了几个感兴趣的方向，给对应的老师发了邮件。${advisor.name}讲师回了信，约你线上聊聊。`,
+      `学院网站上的导师介绍写得都很正式，看完还是不知道实验室平时是什么样。你挑了几个感兴趣的方向，给对应的老师发了邮件。${advisorName}讲师回了信，约你线上聊聊。`,
       "聊完后，你又去导师评价网翻帖子，还找实验室的学生问了问。组会多久一次、平时要不要做项目、毕业要求是什么，这些才是你更想知道的。",
-      `导师评价网 · ${advisor.name}讲师\n匿名评价：${profile.anonymousReview}`,
+      `导师评价网 · ${advisorName}讲师\n匿名评价：${profile.anonymousReview}`,
       `月工资：硕士 ${ADVISOR_SALARY.master}　博士 ${ADVISOR_SALARY.phd}\n毕业线：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分　博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博线：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分　第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
     ].join("\n\n"),
-    preview: `了解${advisor.name}讲师和课题组`,
+    preview: `了解${advisorName}讲师和课题组`,
     chainId: "before-grad-school",
     stage: "act2",
     choices: [
@@ -76,6 +77,7 @@ function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile): Pendin
             kind: "advisor-confirm",
             advisorCandidate: {
               advisorId: profile.advisorId,
+              advisorName,
               ...LECTURER_INITIAL_PROFILE,
             },
           },
@@ -87,13 +89,14 @@ function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile): Pendin
 
 function createBeforeGradSchoolResultEvent(
   advisorId: AdvisorId,
+  advisorName: string,
 ): PendingEvent {
   const advisor = getAdvisorDefinition(advisorId);
   return createFixedEvent({
     id: `before-grad-school-summer-${advisor.id}`,
     title: "读研之始",
     description: [
-      `你给${advisor.name}讲师回了邮件，表示想加入课题组。老师让你先等本校资格和九推结果。`,
+      `你给${advisorName}讲师回了邮件，表示想加入课题组。老师让你先等本校资格和九推结果。`,
       "大四开学后，学院公布推免资格名单，你在里面找到了自己的名字。九推系统开放后，你填报了之前拿到预录取的学校，并在系统里接受待录取。你把结果告诉老师，很快收到回复：“收到，开学见。”",
       "本科毕业后的暑假，宿舍里的人陆续收拾行李。你下载了几篇课题组最近的论文，没看懂多少。你还是忍不住想象开学后的工位、第一次组会，还有以后自己的第一篇投稿。想到这些，你有点紧张，也有点期待。",
     ].join("\n\n"),
@@ -116,6 +119,7 @@ export function createBeforeGradSchoolAct1Event(
   getRoll: RandomRollProvider = Math.random,
 ): PendingEvent {
   const advisorProfile = getRandomAdvisorProfile(getRoll);
+  const advisorName = generateRandomChineseName(getRoll);
   return createFixedEvent({
     id: "before-grad-school-qualification",
     title: "读研之始",
@@ -132,7 +136,7 @@ export function createBeforeGradSchoolAct1Event(
         label: "联系导师",
         outcome: "你打开学院网站，开始查看导师信息。",
         effects: {
-          enqueueEvents: [createAdvisorInfoEvent(advisorProfile)],
+          enqueueEvents: [createAdvisorInfoEvent(advisorProfile, advisorName)],
         },
       },
     ],
@@ -158,6 +162,7 @@ export function resolveAdvisorConfirmation(
   const nextState: GameState = {
     ...state,
     selectedAdvisorId: advisor.id,
+    selectedAdvisorName: candidate.advisorName,
     graduationScoreTarget: getGraduationScoreTarget("master", advisor.id),
     relationshipState,
     advisorProgressState: createAdvisorProgressStateFromValues(
@@ -169,7 +174,7 @@ export function resolveAdvisorConfirmation(
 
   return {
     nextState,
-    outcome: `你回复了${advisor.name}讲师，表示希望加入课题组。`,
-    enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id)],
+    outcome: `你回复了${candidate.advisorName}讲师，表示希望加入课题组。`,
+    enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id, candidate.advisorName)],
   };
 }
