@@ -34,11 +34,12 @@ describe("v2 before grad school events", () => {
     expect(act1.description).toContain("大三下");
     expect(act1.description).toContain("计算机类专业");
     expect(act1.description).toContain("人工智能项目");
-    expect(act1.description).toContain("人工智能是当下最热门的方向之一");
-    expect(act1.description).toContain("挤在这条路上的人也多");
-    expect(act1.description).toContain("迷茫");
-    expect(act1.description).toContain("求职越来越卷");
-    expect(act1.description).toContain("选择读研的人也越来越多");
+    expect(act1.description).toContain("人工智能正热");
+    expect(act1.description).toContain("学这个方向的人也越来越多");
+    expect(act1.description).toContain("本科生能选择的岗位并不多");
+    expect(act1.description).toContain("硕士优先");
+    expect(act1.description).toContain("还没想清楚自己是否喜欢科研");
+    expect(act1.description).toContain("本科学历不好找工作");
     expect(act1.description).toContain("随大流");
     expect(act1.description).toContain("个人陈述");
     expect(act1.description).toContain("夏令营");
@@ -75,23 +76,18 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.title).toBe("读研之始");
     expect(advisorInfo.description).toContain("给对应的老师发了邮件");
     expect(advisorInfo.description).toContain("辛英英讲师回了信");
-    expect(advisorInfo.description).toContain("搜集信息\n辛英英讲师");
-    expect(advisorInfo.description).toContain("汇报：每周组会，平时自由安排");
-    expect(advisorInfo.description).toContain("项目：偶尔会有");
-    expect(advisorInfo.description).toContain("实习：提前沟通即可");
-    expect(advisorInfo.description).toContain("指导：会给方向，细节需要自己摸索");
-    expect(advisorInfo.description).toContain("计算资源：基本够用");
-    expect(advisorInfo.description).toContain("导师：好沟通");
-    expect(advisorInfo.description).toContain("氛围：同门相处融洽");
+    expect(advisorInfo.description).toContain("搜集信息 · 辛英英讲师");
+    expect(advisorInfo.description).toContain("每周组会｜偶有项目｜提前沟通");
+    expect(advisorInfo.description).toContain("给方向｜资源够用｜老师好沟通｜同门融洽");
     expect(advisorInfo.description).not.toContain("评价网");
     expect(advisorInfo.description).not.toContain("匿名评价");
     expect(advisorInfo.description).not.toContain("游戏数据");
     expect(advisorInfo.description).not.toContain("科研资源");
     expect(advisorInfo.description).not.toContain("项目任务倍率");
     expect(advisorInfo.description).not.toContain("做项目消耗 SAN");
-    expect(advisorInfo.description).toContain("月工资：硕士 1　博士 3");
-    expect(advisorInfo.description).toContain("毕业线：硕士 1 分　博士 7 分");
-    expect(advisorInfo.description).toContain("转博线：第 2 年 2 分　第 3 年 3 分");
+    expect(advisorInfo.description).toContain("工资：硕士 1｜博士 3");
+    expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分");
+    expect(advisorInfo.description).toContain("转博：2 年 2 分｜3 年 3 分");
     expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["回复导师"]);
     expect(resolution).toEqual({
       kind: "advisor-confirm",
@@ -113,14 +109,9 @@ describe("v2 before grad school events", () => {
     const firstCandidate = firstInfo.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
     const lastCandidate = lastInfo.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
 
-    expect(firstInfo.description).toContain("汇报：每周周报 + 组会");
-    expect(firstInfo.description).toContain("项目：不多");
-    expect(firstInfo.description).toContain("实习：放实习");
-    expect(firstInfo.description).toContain("指导：较少");
-    expect(firstInfo.description).toContain("计算资源：不多");
-    expect(firstInfo.description).toContain("导师：比较宽和");
-    expect(firstInfo.description).toContain("氛围：实验室氛围好");
-    expect(lastInfo.description).toContain("汇报：隔周组会，进展随时沟通");
+    expect(firstInfo.description).toContain("周报 + 组会｜项目少｜可实习");
+    expect(firstInfo.description).toContain("指导少｜资源较少｜老师宽和｜氛围好");
+    expect(lastInfo.description).toContain("隔周组会｜科研为主｜支持实习");
     expect(firstCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
     expect(lastCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
   });
