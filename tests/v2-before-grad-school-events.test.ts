@@ -33,14 +33,15 @@ describe("v2 before grad school events", () => {
 
     expect(act1.description).toContain("大三下");
     expect(act1.description).toContain("计算机类专业");
-    expect(act1.description).toContain("人工智能项目");
     expect(act1.description).toContain("人工智能正热");
     expect(act1.description).toContain("学这个方向的人也越来越多");
-    expect(act1.description).toContain("本科生能选择的岗位并不多");
-    expect(act1.description).toContain("硕士优先");
     expect(act1.description).toContain("还没想清楚自己是否喜欢科研");
-    expect(act1.description).toContain("本科学历不好找工作");
+    expect(act1.description).toContain("准备继续读研");
     expect(act1.description).toContain("随大流");
+    expect(act1.description).not.toContain("机器学习和深度学习");
+    expect(act1.description).not.toContain("招聘信息");
+    expect(act1.description).not.toContain("本科学历不好找工作");
+    expect(act1.description).not.toContain("准备继续读书");
     expect(act1.description).toContain("个人陈述");
     expect(act1.description).toContain("夏令营");
     expect(act1.description).toContain("预推免");
