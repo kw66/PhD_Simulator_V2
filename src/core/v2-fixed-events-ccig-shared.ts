@@ -1,3 +1,4 @@
+import { getAcademicCalendarYear } from "./v2-calendar";
 import type { GameState } from "./v2-types";
 
 const CCIG_LOCATIONS = ["合肥", "成都", "苏州", "西安", "重庆"] as const;
@@ -10,7 +11,7 @@ export function getCcigLocation(year: number): string {
 }
 
 export function getCcigRealYear(gameYear: number, gameMonth: number): number {
-  return 2029 + Number(gameYear || 0) + (Number(gameMonth || 0) >= 5 ? 1 : 0);
+  return getAcademicCalendarYear(gameYear, gameMonth);
 }
 
 export function hasCcigFullGear(state: GameState): boolean {

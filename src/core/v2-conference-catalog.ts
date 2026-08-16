@@ -1,3 +1,4 @@
+import { getAcademicCalendarYear } from "./v2-calendar";
 import type { PaperTarget } from "./v2-types";
 import {
   CONFERENCES,
@@ -24,7 +25,7 @@ function getDeterministicLocation(locations: ConferenceLocation[], gameMonth: nu
 }
 
 export function getRealConferenceYear(gameYear: number, gameMonth: number): number {
-  return 2029 + Number(gameYear || 0) + (Number(gameMonth || 0) >= 5 ? 1 : 0);
+  return getAcademicCalendarYear(gameYear, gameMonth);
 }
 
 export function getConferenceInfo(gameMonth: number, target: PaperTarget, gameYear: number): ConferenceInfo {

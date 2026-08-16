@@ -13,9 +13,14 @@ import { generateRandomChineseName } from "./v2-random-name";
 import { tryAddRelationship } from "./v2-relationship-rules";
 import type { AdvisorId, FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
-interface BeforeGradSchoolAdvisorProfile {
-  advisorId: AdvisorId;
-  anonymousReview: string;
+interface BeforeGradSchoolAdvisorIntel {
+  reporting: string;
+  projects: string;
+  internship: string;
+  guidance: string;
+  computing: string;
+  temperament: string;
+  atmosphere: string;
 }
 
 const LECTURER_INITIAL_PROFILE = {
@@ -24,44 +29,79 @@ const LECTURER_INITIAL_PROFILE = {
   taskMultiplier: 6,
 } as const;
 
-const BEFORE_GRAD_SCHOOL_ADVISORS: BeforeGradSchoolAdvisorProfile[] = [
-  {
-    advisorId: "chen-ming",
-    anonymousReview: "每周一次组会，老师回消息挺快。改稿时批注很多，连图里的字号都会管。",
-  },
-  {
-    advisorId: "zhou-lan",
-    anonymousReview: "隔周组会，平时在群里同步。老师会给大方向，具体怎么做得自己先拿方案。",
-  },
-  {
-    advisorId: "lin-hao",
-    anonymousReview: "每周开一次组会，轮到汇报时即使暂时没结果，也要把卡在哪里讲清楚。服务器基本够用，赶项目节点时会忙一阵。",
-  },
-  {
-    advisorId: "zhao-ning",
-    anonymousReview: "隔周组会，时间安排比较自由。想出去开会要提前准备，老师会认真看投稿稿件。",
-  },
+const BEFORE_GRAD_SCHOOL_ADVISOR_IDS: AdvisorId[] = [
+  "chen-ming",
+  "zhou-lan",
+  "lin-hao",
+  "zhao-ning",
 ];
 
-function getRandomAdvisorProfile(getRoll: RandomRollProvider): BeforeGradSchoolAdvisorProfile {
+const ADVISOR_INTEL_OPTIONS = {
+  reporting: ["每周周报 + 组会", "每周组会，平时自由安排", "隔周组会，进展随时沟通"],
+  projects: ["不多", "偶尔会有", "以科研为主"],
+  internship: ["放实习", "提前沟通即可", "比较支持"],
+  guidance: ["较少", "会给方向，细节需要自己摸索", "有问题时可以单独约"],
+  computing: ["不多", "基本够用", "比较充足"],
+  temperament: ["比较宽和", "好沟通", "对学生比较耐心"],
+  atmosphere: ["实验室氛围好", "同门相处融洽", "整体比较轻松"],
+} as const;
+
+function pickRandomText(
+  options: readonly string[],
+  getRoll: RandomRollProvider,
+): string {
   const rawRoll = getRoll();
   const normalizedRoll = Number.isFinite(rawRoll)
     ? Math.min(0.999999, Math.max(0, rawRoll))
     : 0;
-  return BEFORE_GRAD_SCHOOL_ADVISORS[Math.floor(normalizedRoll * BEFORE_GRAD_SCHOOL_ADVISORS.length)]
-    ?? BEFORE_GRAD_SCHOOL_ADVISORS[0];
+  return options[Math.floor(normalizedRoll * options.length)] ?? options[0] ?? "";
 }
 
-function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile, advisorName: string): PendingEvent {
-  const advisor = getAdvisorDefinition(profile.advisorId);
+function getRandomAdvisorId(getRoll: RandomRollProvider): AdvisorId {
+  const rawRoll = getRoll();
+  const normalizedRoll = Number.isFinite(rawRoll)
+    ? Math.min(0.999999, Math.max(0, rawRoll))
+    : 0;
+  return BEFORE_GRAD_SCHOOL_ADVISOR_IDS[Math.floor(normalizedRoll * BEFORE_GRAD_SCHOOL_ADVISOR_IDS.length)]
+    ?? BEFORE_GRAD_SCHOOL_ADVISOR_IDS[0];
+}
+
+function createRandomAdvisorIntel(getRoll: RandomRollProvider): BeforeGradSchoolAdvisorIntel {
+  return {
+    reporting: pickRandomText(ADVISOR_INTEL_OPTIONS.reporting, getRoll),
+    projects: pickRandomText(ADVISOR_INTEL_OPTIONS.projects, getRoll),
+    internship: pickRandomText(ADVISOR_INTEL_OPTIONS.internship, getRoll),
+    guidance: pickRandomText(ADVISOR_INTEL_OPTIONS.guidance, getRoll),
+    computing: pickRandomText(ADVISOR_INTEL_OPTIONS.computing, getRoll),
+    temperament: pickRandomText(ADVISOR_INTEL_OPTIONS.temperament, getRoll),
+    atmosphere: pickRandomText(ADVISOR_INTEL_OPTIONS.atmosphere, getRoll),
+  };
+}
+
+function createAdvisorInfoEvent(
+  advisorId: AdvisorId,
+  advisorName: string,
+  intel: BeforeGradSchoolAdvisorIntel,
+): PendingEvent {
+  const advisor = getAdvisorDefinition(advisorId);
 
   return createFixedEvent({
     id: `before-grad-school-advisor-info-${advisor.id}`,
     title: "读研之始",
     description: [
       `学院网站上的导师介绍写得都很正式，看完还是不知道实验室平时是什么样。你挑了几个感兴趣的方向，给对应的老师发了邮件。${advisorName}讲师回了信，约你线上聊聊。`,
-      "聊完后，你又去导师评价网翻帖子，还找实验室的学生问了问。组会多久一次、平时要不要做项目、毕业要求是什么，这些才是你更想知道的。",
-      `导师评价网 · ${advisorName}讲师\n匿名评价：${profile.anonymousReview}`,
+      "聊完后，你又找实验室的学生打听课题组平时怎么安排。零零散散问了几个人，总算拼出了一个大概。",
+      [
+        "搜集信息",
+        `${advisorName}讲师`,
+        `汇报：${intel.reporting}`,
+        `项目：${intel.projects}`,
+        `实习：${intel.internship}`,
+        `指导：${intel.guidance}`,
+        `计算资源：${intel.computing}`,
+        `导师：${intel.temperament}`,
+        `氛围：${intel.atmosphere}`,
+      ].join("\n"),
       `月工资：硕士 ${ADVISOR_SALARY.master}　博士 ${ADVISOR_SALARY.phd}\n毕业线：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分　博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博线：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分　第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
     ].join("\n\n"),
     preview: `了解${advisorName}讲师和课题组`,
@@ -76,7 +116,7 @@ function createAdvisorInfoEvent(profile: BeforeGradSchoolAdvisorProfile, advisor
           fixedEventResolution: {
             kind: "advisor-confirm",
             advisorCandidate: {
-              advisorId: profile.advisorId,
+              advisorId,
               advisorName,
               ...LECTURER_INITIAL_PROFILE,
             },
@@ -118,13 +158,14 @@ export function createBeforeGradSchoolAct1Event(
   _state: GameState,
   getRoll: RandomRollProvider = Math.random,
 ): PendingEvent {
-  const advisorProfile = getRandomAdvisorProfile(getRoll);
+  const advisorId = getRandomAdvisorId(getRoll);
   const advisorName = generateRandomChineseName(getRoll);
+  const advisorIntel = createRandomAdvisorIntel(getRoll);
   return createFixedEvent({
     id: "before-grad-school-qualification",
     title: "读研之始",
     description: [
-      "大三下学期，你对毕业后的去向还有些迷茫。求职越来越卷，选择读研的人也越来越多。你说不清读研是不是最适合自己，只觉得保研机会不能先放掉。抱着“先争取到再说”的想法，你也有些随大流地开始准备了。",
+      "你读的是计算机类专业，本科几年里修过机器学习、深度学习之类的课，也跟着做过几个人工智能项目。人工智能是当下最热门的方向之一，机会多，挤在这条路上的人也多。到了大三下学期，你对毕业后的去向还是有些迷茫。求职越来越卷，选择读研的人也越来越多。你说不清读研是不是最适合自己，只觉得保研机会不能先放掉。抱着“先争取到再说”的想法，你也有些随大流地开始准备了。",
       "你把想去的学校和研究方向列成表格，一项项核对报名要求。成绩单、排名证明、简历和个人陈述准备齐后，你又针对不同学校改了很多遍。每投出一份申请，你都会反复检查邮箱，生怕错过补交材料或面试的消息。",
       "暑假里，你参加了夏令营，结束后又继续报预推免。为了笔试和面试，你重新复习专业课，也把做过的项目一遍遍讲给自己听。忙了几个月，最后很幸运，你拿到了心仪学校的预录取，保上了最想去的学校。正式手续还没开始，你先去联系导师。",
     ].join("\n\n"),
@@ -137,7 +178,7 @@ export function createBeforeGradSchoolAct1Event(
         label: "联系导师",
         outcome: "你打开学院网站，开始查看导师信息。",
         effects: {
-          enqueueEvents: [createAdvisorInfoEvent(advisorProfile, advisorName)],
+          enqueueEvents: [createAdvisorInfoEvent(advisorId, advisorName, advisorIntel)],
         },
       },
     ],

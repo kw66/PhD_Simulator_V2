@@ -32,6 +32,10 @@ describe("v2 before grad school events", () => {
     const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => 0);
 
     expect(act1.description).toContain("大三下");
+    expect(act1.description).toContain("计算机类专业");
+    expect(act1.description).toContain("人工智能项目");
+    expect(act1.description).toContain("人工智能是当下最热门的方向之一");
+    expect(act1.description).toContain("挤在这条路上的人也多");
     expect(act1.description).toContain("迷茫");
     expect(act1.description).toContain("求职越来越卷");
     expect(act1.description).toContain("选择读研的人也越来越多");
@@ -71,9 +75,16 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.title).toBe("读研之始");
     expect(advisorInfo.description).toContain("给对应的老师发了邮件");
     expect(advisorInfo.description).toContain("辛英英讲师回了信");
-    expect(advisorInfo.description).toContain("导师评价网");
-    expect(advisorInfo.description).toContain("即使暂时没结果，也要把卡在哪里讲清楚");
-    expect(advisorInfo.description).toContain("赶项目节点时会忙一阵");
+    expect(advisorInfo.description).toContain("搜集信息\n辛英英讲师");
+    expect(advisorInfo.description).toContain("汇报：每周组会，平时自由安排");
+    expect(advisorInfo.description).toContain("项目：偶尔会有");
+    expect(advisorInfo.description).toContain("实习：提前沟通即可");
+    expect(advisorInfo.description).toContain("指导：会给方向，细节需要自己摸索");
+    expect(advisorInfo.description).toContain("计算资源：基本够用");
+    expect(advisorInfo.description).toContain("导师：好沟通");
+    expect(advisorInfo.description).toContain("氛围：同门相处融洽");
+    expect(advisorInfo.description).not.toContain("评价网");
+    expect(advisorInfo.description).not.toContain("匿名评价");
     expect(advisorInfo.description).not.toContain("游戏数据");
     expect(advisorInfo.description).not.toContain("科研资源");
     expect(advisorInfo.description).not.toContain("项目任务倍率");
@@ -94,6 +105,24 @@ describe("v2 before grad school events", () => {
     });
     expect(visibleCopy).not.toContain("分配");
     expect(visibleCopy).not.toContain("分组名单");
+  });
+
+  it("keeps collected lecturer information separate from gameplay values", () => {
+    const firstInfo = getAdvisorInfoEvent(0);
+    const lastInfo = getAdvisorInfoEvent(0.999999);
+    const firstCandidate = firstInfo.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
+    const lastCandidate = lastInfo.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
+
+    expect(firstInfo.description).toContain("汇报：每周周报 + 组会");
+    expect(firstInfo.description).toContain("项目：不多");
+    expect(firstInfo.description).toContain("实习：放实习");
+    expect(firstInfo.description).toContain("指导：较少");
+    expect(firstInfo.description).toContain("计算资源：不多");
+    expect(firstInfo.description).toContain("导师：比较宽和");
+    expect(firstInfo.description).toContain("氛围：实验室氛围好");
+    expect(lastInfo.description).toContain("汇报：隔周组会，进展随时沟通");
+    expect(firstCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
+    expect(lastCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
   });
 
   it("uses the third act for the summer before enrollment", () => {
