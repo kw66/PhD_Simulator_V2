@@ -33,15 +33,18 @@ describe("v2 before grad school events", () => {
     const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => 0);
 
     expect(act1.description).toContain("大三下");
+    expect(act1.description).toContain("个人陈述");
     expect(act1.description).toContain("夏令营");
     expect(act1.description).toContain("预推免");
-    expect(act1.description).toContain("预录取结果");
+    expect(act1.description).toContain("心仪学校的预录取");
+    expect(act1.description).toContain("保上了最想去的学校");
     expect(act1.description.indexOf("夏令营")).toBeLessThan(act1.description.lastIndexOf("预推免"));
+    expect(act1.description).not.toContain("年级群");
     expect(act1.description).not.toContain("推免资格名单");
     expect(act1.description).not.toContain("九推系统");
     expect(act1.description).not.toContain("接受待录取");
     expect(act1.description).not.toContain("公告栏");
-    expect(act1.preview).toBe("拿到预录取，准备联系导师");
+    expect(act1.preview).toBe("拿到梦校预录取，准备联系导师");
     expect(act1.choices.map((choice) => choice.label)).toEqual(["联系导师"]);
   });
 

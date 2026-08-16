@@ -929,7 +929,7 @@ describe("v2 render lobby shell", () => {
         id: "before-grad-school-qualification",
         title: "读研之始",
         description: "学院确认了推免资格。",
-        preview: "拿到预录取，准备联系导师",
+        preview: "拿到梦校预录取，准备联系导师",
         source: "fixed",
         blocking: true,
         deadlineMonths: 0,
@@ -958,7 +958,7 @@ describe("v2 render lobby shell", () => {
     expect(todoPreviewBlock).not.toContain("预告");
     expect(todoPreviewBlock).not.toContain("todo-type-badge");
     expect(todoPreviewBlock).not.toContain("todo-item-head");
-    expect(todoPreviewBlock).not.toContain("拿到预录取，准备联系导师");
+    expect(todoPreviewBlock).not.toContain("拿到梦校预录取，准备联系导师");
     expect(todoPreviewBlock).not.toContain("在审论文将在该月返回结果。");
   });
 
