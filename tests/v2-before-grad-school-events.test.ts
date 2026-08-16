@@ -32,6 +32,10 @@ describe("v2 before grad school events", () => {
     const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => 0);
 
     expect(act1.description).toContain("大三下");
+    expect(act1.description).toContain("迷茫");
+    expect(act1.description).toContain("求职越来越卷");
+    expect(act1.description).toContain("选择读研的人也越来越多");
+    expect(act1.description).toContain("随大流");
     expect(act1.description).toContain("个人陈述");
     expect(act1.description).toContain("夏令营");
     expect(act1.description).toContain("预推免");
@@ -40,7 +44,7 @@ describe("v2 before grad school events", () => {
     expect(act1.description.indexOf("夏令营")).toBeLessThan(act1.description.lastIndexOf("预推免"));
     expect(act1.description).not.toContain("年级群");
     expect(act1.description).not.toContain("推免资格名单");
-    expect(act1.description).not.toContain("九推系统");
+    expect(act1.description).not.toContain("推免系统");
     expect(act1.description).not.toContain("接受待录取");
     expect(act1.description).not.toContain("公告栏");
     expect(act1.preview).toBe("拿到梦校预录取，准备联系导师");
@@ -125,12 +129,13 @@ describe("v2 before grad school events", () => {
     });
     expect(summerEvent?.description).toContain("收到，开学见");
     expect(summerEvent?.description).toContain("推免资格名单");
-    expect(summerEvent?.description).toContain("九推系统");
+    expect(summerEvent?.description).toContain("九月，推免系统正式开放");
+    expect(summerEvent?.description).not.toContain("九推系统");
     expect(summerEvent?.description).toContain("接受待录取");
     expect(summerEvent?.description.indexOf("推免资格名单") ?? -1).toBeLessThan(
-      summerEvent?.description.indexOf("九推系统") ?? -1,
+      summerEvent?.description.indexOf("推免系统正式开放") ?? -1,
     );
-    expect(summerEvent?.description.indexOf("九推系统") ?? -1).toBeLessThan(
+    expect(summerEvent?.description.indexOf("推免系统正式开放") ?? -1).toBeLessThan(
       summerEvent?.description.indexOf("接受待录取") ?? -1,
     );
     expect(summerEvent?.description).toContain("暑假");
