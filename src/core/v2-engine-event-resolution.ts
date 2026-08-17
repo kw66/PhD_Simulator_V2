@@ -32,9 +32,12 @@ export function applyQueuedEventEffects(
   } = applyChoiceEffectsToState(state, choice);
 
   if (choice.effects.stayOnEvent === true) {
+    const stateWithLog = resolvedOutcome.trim().length > 0
+      ? pushLog(resolvedState, `${queuedEvent.title}：${resolvedOutcome}`)
+      : resolvedState;
     return callbacks.evaluateImmediateEndings(
       callbacks.applyChairEmergencyRecoveryToState(
-        pushLog(resolvedState, `${queuedEvent.title}?${resolvedOutcome}`),
+        stateWithLog,
       ),
     );
   }

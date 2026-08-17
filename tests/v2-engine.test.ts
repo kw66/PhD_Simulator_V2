@@ -1986,6 +1986,8 @@ describe("v2 engine", () => {
     const stillQueued = dispatchAction(state, "resolve-event", { eventChoiceId: "retry" });
     expect(stillQueued.eventQueue).toHaveLength(1);
     expect(stillQueued.eventQueue[0]?.history).toBeUndefined();
+    expect(stillQueued.log[0]?.text).toBe("Cold Event：Need more money.");
+    expect(stillQueued.log[0]?.text).not.toContain("?");
 
     const resolved = dispatchAction(state, "resolve-event", { eventChoiceId: "hurt" });
     expect(resolved.eventQueue).toHaveLength(0);

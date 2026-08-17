@@ -163,6 +163,7 @@ describe("v2 before grad school events", () => {
       const originalRelationshipState = structuredClone(state.relationshipState);
       const originalHistory = structuredClone(originalEvent.history);
       const originalEventHistory = structuredClone(state.eventHistory);
+      const originalLog = structuredClone(state.log);
 
       state = dispatchAction(state, "resolve-event", {
         eventId: originalEvent.id,
@@ -175,6 +176,7 @@ describe("v2 before grad school events", () => {
       expect(refreshedEvent?.queueOrder).toBe(originalEvent.queueOrder);
       expect(refreshedEvent?.history).toEqual(originalHistory);
       expect(state.eventHistory).toEqual(originalEventHistory);
+      expect(state.log).toEqual(originalLog);
       expect(refreshedEvent?.description).not.toBe(originalEvent.description);
       expect(refreshedCandidate?.advisorName).not.toBe(originalCandidate?.advisorName);
       expect(refreshedCandidate?.advisorId).toBe(originalCandidate?.advisorId);

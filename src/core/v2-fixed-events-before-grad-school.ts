@@ -290,6 +290,6 @@ export function resolveAdvisorReroll(
           }
         : event),
     },
-    outcome: `改为联系${advisorName}讲师。`,
+    outcome: "",
   };
 }
