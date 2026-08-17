@@ -40,6 +40,18 @@ function getMentorAssignHintText(candidate: { research: number; affinity: number
   return "中规中矩，适合稳扎稳打慢慢培养";
 }
 
+function getMentorAssignLevelText(research: number): string {
+  if (research >= 5) return "科研起点较高，后续可能更快上手";
+  if (research <= 2) return "科研基础偏弱，前期需要你更多投入";
+  return "科研基础中等，适合稳步培养";
+}
+
+function getMentorAssignRelationText(affinity: number): string {
+  if (affinity >= 5) return "相处起来比较顺畅，沟通阻力较小";
+  if (affinity <= 2) return "性格略生硬，磨合期可能会更长";
+  return "亲和力中等，属于正常协作节奏";
+}
+
 function createMentorAssignCandidates(getRoll: RandomRollProvider): NonNullable<FixedEventResolution["juniorCandidate"]>[] {
   return pickUniqueItems(MENTOR_ASSIGN_NAMES, 4, getRoll).map((name) => ({
     name,
@@ -55,7 +67,11 @@ function createMentorAssignChoiceEvent(
   return createFixedEvent({
     id: `mentor-assign-choice-y${state.year}-m${state.month}`,
     title: "指导新生 ➜ 如何抉择",
-    description: "带人比自己做更费心。四位新生各有长短，选一位。",
+    description: [
+      "“这不是一次随手分配，而是在选未来几个月的协作搭档。”",
+      "“选得合适，你会得到可培养的执行位；选得失衡，后续就是持续救火。”",
+      "“既然决定权在我，就要对这条培养链路负责到底。”你会同时评估科研潜力与亲和程度，而不是只看某一项高分。",
+    ].join("\n\n"),
     preview: "看看 4 位候选新生，再决定带谁",
     chainId: "mentor-assign",
     stage: "act2",
@@ -81,7 +97,15 @@ function createMentorAssignResultEvent(
   return createFixedEvent({
     id: `mentor-assign-result-${candidate.name}-y${state.year}-m${state.month}`,
     title: "指导新生 ➜ 如何抉择 ➜ 指派完成",
-    description: `你最后选了${candidate.name}。${getMentorAssignHintText(candidate)}。${added ? `加入关系网（科研 ${candidate.research}，亲和 ${candidate.affinity}）。` : "关系槽位已满，未加入关系网。"}`,
+    description: [
+      `你最终选择了${candidate.name}。`,
+      "导师点头：“行，这位以后就跟你走流程、做训练。”",
+      "你和对方简单打了招呼，一段新的师门协作关系开始了。",
+      "机制结算",
+      getMentorAssignLevelText(candidate.research),
+      getMentorAssignRelationText(candidate.affinity),
+      `${added ? "已加入关系网" : "本次未加入关系网"}：${candidate.name}（科研 ${candidate.research}，亲和 ${candidate.affinity}）`,
+    ].join("\n\n"),
     preview: added ? `${candidate.name} 已加入你的关系网` : `${candidate.name} 本次未加入关系网`,
     chainId: "mentor-assign",
     stage: "result",
@@ -103,7 +127,12 @@ export function createMentorAssignEvent(state: GameState, getRoll: RandomRollPro
   return createFixedEvent({
     id: "mentor-assign-junior",
     title: "指导新生",
-    description: "导师让你带一位新生入门。你也到了要教别人做科研的时候。",
+    description: [
+      "导师把你叫到办公室，说新生需要你带一位入门。",
+      "这不仅是额外工作，也是导师对你独立带人的考验。",
+      "候选人背景不一，选得好会形成正向循环，选得差就可能持续补位。",
+      "你需要挑一个最适合当前阶段的人选，因为这次选择会直接决定你之后几个月的协作质量。",
+    ].join("\n\n"),
     preview: "导师让你带一位新入学同学",
     chainId: "mentor-assign",
     choices: [

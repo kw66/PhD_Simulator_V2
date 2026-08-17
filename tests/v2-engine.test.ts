@@ -174,8 +174,10 @@ describe("v2 engine", () => {
     state = { ...state, totalMonths: 21, year: 2, month: 9, totalResearchScore: 2 };
     state = dispatchAction(state, "next-month");
 
-    if (state.eventQueue.length > 0) {
+    let guard = 0;
+    while (!state.pendingDecision && state.eventQueue.length > 0 && guard < 20) {
       state = resolveFirstQueuedEvent(state);
+      guard += 1;
     }
 
     expect(state.pendingDecision).not.toBeNull();
@@ -271,7 +273,7 @@ describe("v2 engine", () => {
     expect(state.eventQueue[0]?.stage).toBe("act2");
 
     state = resolveFirstQueuedEvent(state);
-    expect(state.eventQueue[0]?.title).toBe("寒假 ➜ 假期结束");
+    expect(state.eventQueue[0]?.title).toBe("寒假 ➜ 假期计划 ➜ 假期结束");
     expect(state.eventQueue[0]?.stage).toBe("result");
 
     state = resolveFirstQueuedEvent(state);
@@ -377,7 +379,7 @@ describe("v2 engine", () => {
     state = resolveFirstQueuedEvent(state);
     const researchChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("summer-vacation-research"))?.id;
     state = dispatchAction(state, "resolve-event", { eventChoiceId: researchChoiceId });
-    expect(state.eventQueue[0]?.title).toBe("暑假 ➜ 学术进步");
+    expect(state.eventQueue[0]?.title).toBe("暑假 ➜ 暑假计划 ➜ 学术进步");
 
     state = resolveFirstQueuedEvent(state);
 
@@ -406,7 +408,7 @@ describe("v2 engine", () => {
     state = resolveFirstQueuedEvent(state);
     const travelChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("summer-vacation-travel"))?.id;
     state = dispatchAction(state, "resolve-event", { eventChoiceId: travelChoiceId });
-    expect(state.eventQueue[0]?.title).toBe("暑假 ➜ 难忘旅程");
+    expect(state.eventQueue[0]?.title).toBe("暑假 ➜ 暑假计划 ➜ 难忘旅程");
 
     state = resolveFirstQueuedEvent(state);
 
@@ -500,8 +502,17 @@ describe("v2 engine", () => {
     expect(state.eventQueue.some((event) => event.source === "thesis")).toBe(true);
 
     const beforeProgress = state.thesis.progress;
+    while (state.eventQueue[0]?.source !== "thesis") {
+      state = resolveFirstQueuedEvent(state);
+    }
+    state = resolveFirstQueuedEvent(state);
     state = dispatchAction(state, "resolve-event", { eventChoiceId: "normal" });
     expect(state.thesis.progress).toBeGreaterThan(beforeProgress);
+    expect(state.eventQueue[0]).toMatchObject({ chainId: "thesis-progress", stage: "result" });
+
+    state = resolveFirstQueuedEvent(state);
+    const completedThesisEvent = state.eventHistory.find((event) => event.chainId === "thesis-progress");
+    expect(completedThesisEvent?.stages.map((eventStage) => eventStage.stage)).toEqual(["act1", "act2", "result"]);
   });
 
   it("硕士第 3 年会按活跃月份触发求职事件并累计最佳 offer", () => {
@@ -525,6 +536,11 @@ describe("v2 engine", () => {
       state = resolveFirstQueuedEvent(state);
     }
 
+    const careerChainId = state.eventQueue[0]?.chainId;
+    state = resolveFirstQueuedEvent(state);
+    while (state.eventQueue[0]?.chainId !== careerChainId || state.eventQueue[0]?.stage !== "act2") {
+      state = resolveFirstQueuedEvent(state);
+    }
     state = dispatchAction(state, "resolve-event", { eventChoiceId: "normal" });
     const progressTotal = state.careerProgress.stateOwned + state.careerProgress.civilService + state.careerProgress.internet + state.careerProgress.academic;
     expect(progressTotal).toBeGreaterThan(0);
@@ -793,6 +809,17 @@ describe("v2 engine", () => {
     expect(state.temporaryActionEffects.idea.bonus).toBe(3);
     expect(state.eventCounters.consecutiveStampGiftCount).toBe(0);
     expect(state.log.some((entry) => entry.text.includes("你发去节日祝福，导师顺势分享了一个想法，下次想 idea +3。"))).toBe(true);
+    expect(state.eventQueue[0]).toMatchObject({
+      chainId: "teachers-day",
+      stage: "result",
+      title: "教师节 ➜ 你的选择 ➜ 导师来电",
+    });
+    expect(state.eventQueue[0]?.history).toHaveLength(2);
+
+    state = resolveFirstQueuedEvent(state);
+    const completedTeachersDay = state.eventHistory.find((event) => event.chainId === "teachers-day");
+    expect(completedTeachersDay?.stages).toHaveLength(3);
+    expect(completedTeachersDay?.stages.map((stage) => stage.stage)).toEqual(["act1", "act2", "result"]);
   });
 
   it("教师节低好感祝福分支可能触发跑腿扣 SAN", () => {

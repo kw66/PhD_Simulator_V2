@@ -113,7 +113,7 @@ function createAdvisorInfoEvent(
 ): PendingEvent {
   return createFixedEvent({
     id: "before-grad-school-advisor-info",
-    title: "读研之始",
+    title: "读研之始 ➜ 导师信息",
     description: [
       "你给感兴趣的老师发了邮件，又找组里的学生问了问。",
       [
@@ -146,7 +146,7 @@ function createAdvisorInfoEvent(
       },
       {
         id: "before-grad-school-confirm",
-        label: "回复导师",
+        label: "确认导师",
         outcome: "",
         effects: {
           fixedEventResolution: {
@@ -165,8 +165,8 @@ function createAdvisorInfoEvent(
 function createBeforeGradSchoolResultEvent(): PendingEvent {
   return createFixedEvent({
     id: "before-grad-school-admission",
-    title: "读研之始",
-    description: "录取通知书寄到了。你拍张照片晒到朋友圈，读研这件事终于有了实感。",
+    title: "读研之始 ➜ 导师信息 ➜ 正式录取",
+    description: "录取通知书寄到了，你拍张照片晒到朋友圈。九月越来越近，读研这件事终于有了实感。",
     preview: "收到录取通知书",
     chainId: "before-grad-school",
     stage: "result",

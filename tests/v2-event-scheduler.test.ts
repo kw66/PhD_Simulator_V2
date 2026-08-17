@@ -10,6 +10,7 @@ import {
   type RandomRollProvider,
 } from "../src/core/v2-event-scheduler";
 import { createInitialState } from "../src/core/v2-engine";
+import type { EventChoice, PendingEvent } from "../src/core/v2-types";
 
 function fromRolls(rolls: number[]): RandomRollProvider {
   let index = 0;
@@ -18,6 +19,17 @@ function fromRolls(rolls: number[]): RandomRollProvider {
     index += 1;
     return roll;
   };
+}
+
+function getDecisionChoices(event: PendingEvent | undefined): EventChoice[] {
+  expect(event?.stage).toBe("act1");
+  const decisionEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
+  expect(decisionEvent?.stage).toBe("act2");
+  for (const choice of decisionEvent?.choices ?? []) {
+    const enqueuedEvents = choice.effects.enqueueEvents ?? [];
+    expect(enqueuedEvents[enqueuedEvents.length - 1]?.stage).toBe("result");
+  }
+  return decisionEvent?.choices ?? [];
 }
 
 describe("v2 event scheduler", () => {
@@ -98,11 +110,11 @@ describe("v2 event scheduler", () => {
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.source).toBe("random");
     expect(result.events[0]?.title).toBe("疾病来袭");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["硬撑工作", "先买药", "去医院", "休息一天"]);
-    expect(result.events[0]?.choices[0]?.effects.sanCapDelta).toBe(-4);
-    expect(result.events[0]?.choices[1]?.effects.stayOnEvent).toBe(true);
-    expect(result.events[0]?.choices[2]?.effects.stayOnEvent).toBe(true);
-    expect(result.events[0]?.choices[3]?.effects.san).toBe(-7);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["硬撑工作", "先买药", "去医院", "休息一天"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.sanCapDelta).toBe(-4);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.stayOnEvent).toBe(true);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.stayOnEvent).toBe(true);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-7);
     expect(result.nextState.availableRandomEvents).toEqual([]);
     expect(result.nextState.usedRandomEvents).toEqual([3]);
     expect(result.nextState.coldWeight).toBe(1);
@@ -126,7 +138,7 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("不断学习");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["基础知识", "最新技术", "代码知识", "深奥理论"]);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["基础知识", "最新技术", "代码知识", "深奥理论"]);
   });
 
   it("builds the real event 1 choices with junior and rejection hooks", () => {
@@ -146,13 +158,13 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("毕设辅导");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["委婉拒绝", "亲自指导", "转给师弟"]);
-    expect(result.events[0]?.choices[0]?.effects.favor).toBe(-1);
-    expect(result.events[0]?.choices[0]?.effects.counterDeltas).toEqual({ rejectedMentoringCount: 1 });
-    expect(result.events[0]?.choices[1]?.effects.san).toBe(-3);
-    expect(result.events[0]?.choices[1]?.effects.research).toBe(1);
-    expect(result.events[0]?.choices[1]?.effects.relationshipAdditions).toEqual(["junior"]);
-    expect(result.events[0]?.choices[2]?.effects.social).toBe(-1);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["委婉拒绝", "亲自指导", "转给师弟"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.favor).toBe(-1);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.counterDeltas).toEqual({ rejectedMentoringCount: 1 });
+    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-3);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(1);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.relationshipAdditions).toEqual(["junior"]);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(-1);
   });
 
   it("builds the real event 2 choices with inspiration and social threshold", () => {
@@ -172,12 +184,12 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("帮忙审稿");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["婉言推辞", "认真审稿", "交给师弟"]);
-    expect(result.events[0]?.choices[0]?.effects.favor).toBe(-1);
-    expect(result.events[0]?.choices[0]?.effects.counterDeltas).toEqual({ rejectedReviewCount: 1 });
-    expect(result.events[0]?.choices[1]?.effects.san).toBe(-2);
-    expect(result.events[0]?.choices[1]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(4);
-    expect(result.events[0]?.choices[2]?.effects.social).toBe(-1);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["婉言推辞", "认真审稿", "交给师弟"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.favor).toBe(-1);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.counterDeltas).toEqual({ rejectedReviewCount: 1 });
+    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(4);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(-1);
   });
 
   it("builds the real event 4 choices with project king and learn-to-say-no hooks", () => {
@@ -202,15 +214,15 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("导师项目");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["接横向项目", "接纵向项目", "婉言拒绝", "让师弟分担"]);
-    expect(result.events[0]?.choices[0]?.effects.counterDeltas).toEqual({ projectCompletedCount: 1 });
-    expect(result.events[0]?.choices[0]?.effects.achievementFlags).toEqual(["projectKing"]);
-    expect(result.events[0]?.choices[1]?.effects.research).toBe(1);
-    expect(result.events[0]?.choices[2]?.effects.counterDeltas).toEqual({ rejectedProjectCount: 1 });
-    expect(result.events[0]?.choices[2]?.effects.achievementFlags).toEqual(["learnToSayNo"]);
-    expect(result.events[0]?.choices[2]?.effects.favor).toBe(-2);
-    expect(result.events[0]?.choices[3]?.effects.san).toBe(-2);
-    expect(result.events[0]?.choices[3]?.effects.social).toBe(-1);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["接横向项目", "接纵向项目", "婉言拒绝", "让师弟分担"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.counterDeltas).toEqual({ projectCompletedCount: 1 });
+    expect(getDecisionChoices(result.events[0])[0]?.effects.achievementFlags).toEqual(["projectKing"]);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(1);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.counterDeltas).toEqual({ rejectedProjectCount: 1 });
+    expect(getDecisionChoices(result.events[0])[2]?.effects.achievementFlags).toEqual(["learnToSayNo"]);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.favor).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.social).toBe(-1);
   });
 
   it("applies spring season SAN relief to advisor project branches", () => {
@@ -227,9 +239,9 @@ describe("v2 event scheduler", () => {
     };
 
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0]));
-    expect(result.events[0]?.choices[0]?.effects.san).toBe(-6);
-    expect(result.events[0]?.choices[1]?.effects.san).toBe(-4);
-    expect(result.events[0]?.choices[3]?.effects.san).toBe(-1);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-6);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-4);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-1);
   });
 
   it("builds the real event 5 choices with research and favor thresholds", () => {
@@ -249,12 +261,12 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("导师约谈");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["认真汇报", "请教推进方法", "提出去实习"]);
-    expect(result.events[0]?.choices[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(5);
-    expect(result.events[0]?.choices[1]?.effects.research).toBe(1);
-    expect(result.events[0]?.choices[2]?.effects.money).toBe(5);
-    expect(result.events[0]?.choices[2]?.effects.san).toBe(-6);
-    expect(result.events[0]?.choices[2]?.effects.temporaryActionEffectUpdates?.experiment?.bonus).toBe(5);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["认真汇报", "请教推进方法", "提出去实习"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(5);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(1);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.money).toBe(5);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-6);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.temporaryActionEffectUpdates?.experiment?.bonus).toBe(5);
   });
 
   it("builds the real event 6 choices with research threshold and meeting attendance rolls", () => {
@@ -274,11 +286,11 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("组会汇报");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["讲深奥论文", "讲系列论文", "随便水一下"]);
-    expect(result.events[0]?.choices[0]?.effects.favor).toBe(-1);
-    expect(result.events[0]?.choices[1]?.effects.san).toBe(-3);
-    expect(result.events[0]?.choices[1]?.effects.favor).toBe(2);
-    expect(result.events[0]?.choices[2]?.effects.favor).toBe(-1);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["讲深奥论文", "讲系列论文", "随便水一下"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.favor).toBe(-1);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-3);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.favor).toBe(2);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.favor).toBe(-1);
   });
 
   it("builds the real event 7 choices with sports, poker, ktv and dinner effects", () => {
@@ -304,23 +316,23 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0.1, 0.1, 0.1, 0.9]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("实验室团建");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["打羽毛球", "打德州扑克", "KTV唱歌", "聚餐"]);
-    expect(result.events[0]?.choices[0]?.effects.san).toBe(2);
-    expect(result.events[0]?.choices[0]?.effects.social).toBe(1);
-    expect(result.events[0]?.choices[0]?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
-    expect(result.events[0]?.choices[0]?.effects.eventSupportUpdates).toEqual({ hasStrongBodyTalent: true });
-    expect(result.events[0]?.choices[0]?.effects.achievementFlags).toEqual(["badmintonChampion"]);
-    expect(result.events[0]?.choices[0]?.effects.setBadmintonYearToCurrent).toBe(true);
-    expect(result.events[0]?.choices[1]?.effects.money).toBe(6);
-    expect(result.events[0]?.choices[1]?.effects.counterDeltas).toEqual({ pokerWinCount: 1, pokerTotalEarnings: 6 });
-    expect(result.events[0]?.choices[1]?.effects.eventSupportUpdates).toEqual({ hasFinanceTalent: true });
-    expect(result.events[0]?.choices[1]?.effects.achievementFlags).toEqual(["pokerGod"]);
-    expect(result.events[0]?.choices[2]?.effects.social).toBe(1);
-    expect(result.events[0]?.choices[2]?.effects.counterDeltas).toEqual({ ktvCount: 1 });
-    expect(result.events[0]?.choices[2]?.effects.achievementFlags).toEqual(["ktvKing"]);
-    expect(result.events[0]?.choices[3]?.effects.san).toBe(5);
-    expect(result.events[0]?.choices[3]?.effects.favor).toBe(1);
-    expect(result.events[0]?.choices[3]?.effects.counterDeltas).toEqual({ dinnerCount: 1 });
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["打羽毛球", "打德州扑克", "KTV唱歌", "聚餐"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(2);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.social).toBe(1);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
+    expect(getDecisionChoices(result.events[0])[0]?.effects.eventSupportUpdates).toEqual({ hasStrongBodyTalent: true });
+    expect(getDecisionChoices(result.events[0])[0]?.effects.achievementFlags).toEqual(["badmintonChampion"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.setBadmintonYearToCurrent).toBe(true);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.money).toBe(6);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.counterDeltas).toEqual({ pokerWinCount: 1, pokerTotalEarnings: 6 });
+    expect(getDecisionChoices(result.events[0])[1]?.effects.eventSupportUpdates).toEqual({ hasFinanceTalent: true });
+    expect(getDecisionChoices(result.events[0])[1]?.effects.achievementFlags).toEqual(["pokerGod"]);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(1);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.counterDeltas).toEqual({ ktvCount: 1 });
+    expect(getDecisionChoices(result.events[0])[2]?.effects.achievementFlags).toEqual(["ktvKing"]);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(5);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.favor).toBe(1);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.counterDeltas).toEqual({ dinnerCount: 1 });
   });
 
   it("builds the real event 8 choices with gpu, salary and renovate routes", () => {
@@ -340,12 +352,12 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("导师经费");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["买GPU服务器", "多发劳务费", "装修工位"]);
-    expect(result.events[0]?.choices[0]?.effects.experimentBonus).toBe(3);
-    expect(result.events[0]?.choices[0]?.effects.persistentExtraActionDeltas).toEqual({ experiment: 3 });
-    expect(result.events[0]?.choices[1]?.effects.money).toBe(6);
-    expect(result.events[0]?.choices[2]?.effects.ideaBonus).toBe(1);
-    expect(result.events[0]?.choices[2]?.effects.writingBonus).toBe(1);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["买GPU服务器", "多发劳务费", "装修工位"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.experimentBonus).toBe(3);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.persistentExtraActionDeltas).toEqual({ experiment: 3 });
+    expect(getDecisionChoices(result.events[0])[1]?.effects.money).toBe(6);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.ideaBonus).toBe(1);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.writingBonus).toBe(1);
   });
 
   it("builds the real event 10 choices with publication and one-shot effects", () => {
@@ -365,13 +377,13 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("\u540c\u95e8\u5408\u4f5c");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["\u5b66\u672f\u4ea4\u6d41", "\u4e92\u6302\u8bba\u6587", "\u5a49\u62d2\u5408\u4f5c", "\u5168\u9762\u5408\u4f5c"]);
-    expect(result.events[0]?.choices[0]?.effects.temporaryActionEffectUpdates?.idea).toEqual({ bonus: 5, multiplier: 0.5 });
-    expect(result.events[0]?.choices[1]?.effects.nextPublicationCitationMultiplier).toBe(2);
-    expect(result.events[0]?.choices[1]?.effects.san).toBe(-2);
-    expect(result.events[0]?.choices[3]?.effects.temporaryActionEffectUpdates?.idea?.extraActions).toBe(1);
-    expect(result.events[0]?.choices[3]?.effects.temporaryActionEffectUpdates?.writing?.extraActions).toBe(1);
-    expect(result.events[0]?.choices[3]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["\u5b66\u672f\u4ea4\u6d41", "\u4e92\u6302\u8bba\u6587", "\u5a49\u62d2\u5408\u4f5c", "\u5168\u9762\u5408\u4f5c"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea).toEqual({ bonus: 5, multiplier: 0.5 });
+    expect(getDecisionChoices(result.events[0])[1]?.effects.nextPublicationCitationMultiplier).toBe(2);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.temporaryActionEffectUpdates?.idea?.extraActions).toBe(1);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.temporaryActionEffectUpdates?.writing?.extraActions).toBe(1);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-2);
   });
 
   it("builds the real event 11 choices with one-shot action effects", () => {
@@ -389,11 +401,11 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("\u5e08\u5144\u6307\u5bfc");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["\u5148\u89c2\u671b", "\u6d45\u6d45\u5408\u4f5c", "\u6df1\u5165\u5408\u4f5c", "\u62dc\u5165\u95e8\u4e0b"]);
-    expect(result.events[0]?.choices[1]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(10);
-    expect(result.events[0]?.choices[2]?.effects.research).toBe(1);
-    expect(result.events[0]?.choices[3]?.effects.writingBonus).toBe(5);
-    expect(result.events[0]?.choices[1]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["\u5148\u89c2\u671b", "\u6d45\u6d45\u5408\u4f5c", "\u6df1\u5165\u5408\u4f5c", "\u62dc\u5165\u95e8\u4e0b"]);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(10);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.research).toBe(1);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.writingBonus).toBe(5);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-2);
   });
 
   it("builds the real event 12 choices with favor and teacher-child branching", () => {
@@ -414,14 +426,14 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("署名风波");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["向导师诉苦", "转移到别人", "据理力争", "极端施压"]);
-    expect(result.events[0]?.choices[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(-5);
-    expect(result.events[0]?.choices[1]?.effects.social).toBe(-2);
-    expect(result.events[0]?.choices[1]?.effects.score).toBe(1);
-    expect(result.events[0]?.choices[1]?.effects.grantedPublication).toEqual({ target: "C", acceptedScore: 15 });
-    expect(result.events[0]?.choices[2]?.effects.san).toBe(-2);
-    expect(result.events[0]?.choices[3]?.effects.money).toBe(2);
-    expect(result.events[0]?.choices[3]?.effects.favor).toBe(-2);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["向导师诉苦", "转移到别人", "据理力争", "极端施压"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(-5);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.social).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.score).toBe(1);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.grantedPublication).toEqual({ target: "C", acceptedScore: 15 });
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBe(2);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.favor).toBe(-2);
   });
 
   it("applies summer season SAN penalty to advisor talk, meeting and authorship branches", () => {
@@ -439,7 +451,7 @@ describe("v2 event scheduler", () => {
       totalRandomEventCount: 0,
     };
     const talkResult = collectRandomEventsForMonth(talkState, 0, fromRolls([0.7, 0]));
-    expect(talkResult.events[0]?.choices[2]?.effects.san).toBe(-7);
+    expect(getDecisionChoices(talkResult.events[0])[2]?.effects.san).toBe(-7);
 
     const meetingState = {
       ...initial,
@@ -453,7 +465,7 @@ describe("v2 event scheduler", () => {
       totalRandomEventCount: 0,
     };
     const meetingResult = collectRandomEventsForMonth(meetingState, 0, fromRolls([0.7, 0, 0, 0]));
-    expect(meetingResult.events[0]?.choices[1]?.effects.san).toBe(-4);
+    expect(getDecisionChoices(meetingResult.events[0])[1]?.effects.san).toBe(-4);
 
     const authorshipState = {
       ...initial,
@@ -468,7 +480,7 @@ describe("v2 event scheduler", () => {
       totalRandomEventCount: 0,
     };
     const authorshipResult = collectRandomEventsForMonth(authorshipState, 0, fromRolls([0.7, 0]));
-    expect(authorshipResult.events[0]?.choices[2]?.effects.san).toBe(-3);
+    expect(getDecisionChoices(authorshipResult.events[0])[2]?.effects.san).toBe(-3);
   });
 
   it("builds the real event 13 choices with persistent and temporary experiment effects", () => {
@@ -486,14 +498,14 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0.8, 0.8]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("服务器宕机");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["催导师修", "举报挖矿", "自己重装", "淘宝找人"]);
-    expect(result.events[0]?.choices[0]?.effects.experimentBonus).toBe(-2);
-    expect(result.events[0]?.choices[1]?.effects.social).toBe(-2);
-    expect(result.events[0]?.choices[2]?.effects.san).toBe(-3);
-    expect(result.events[0]?.choices[2]?.effects.social).toBe(-1);
-    expect(result.events[0]?.choices[2]?.effects.temporaryActionEffectUpdates?.experiment?.multiplier).toBe(0.5);
-    expect(result.events[0]?.choices[3]?.effects.money).toBe(-4);
-    expect(result.events[0]?.choices[3]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["催导师修", "举报挖矿", "自己重装", "淘宝找人"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.experimentBonus).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.social).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-3);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(-1);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.temporaryActionEffectUpdates?.experiment?.multiplier).toBe(0.5);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBe(-4);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-2);
   });
 
   it("builds the real event 14 choices with mentorship hooks", () => {
@@ -511,12 +523,12 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("\u6307\u5bfc\u5e08\u5f1f");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["\u7cbe\u529b\u6709\u9650\uff0c\u5a49\u62d2\u62d2\u7edd", "\u77ed\u671f\u5408\u4f5c\uff0c\u5206\u4eabidea", "\u957f\u671f\u5408\u4f5c\uff0c\u5171\u540c\u6210\u957f"]);
-    expect(result.events[0]?.choices[1]?.effects.social).toBe(1);
-    expect(result.events[0]?.choices[1]?.effects.relationshipAdditions).toEqual(["junior"]);
-    expect(result.events[0]?.choices[1]?.effects.san).toBe(-5);
-    expect(result.events[0]?.choices[2]?.effects.mentorshipStacks).toBe(1);
-    expect(result.events[0]?.choices[2]?.effects.relationshipAdditions).toEqual(["junior"]);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["精力有限，委婉拒绝", "短期合作，分享idea", "长期合作，共同成长"]);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.social).toBe(1);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.relationshipAdditions).toEqual(["junior"]);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-5);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.mentorshipStacks).toBe(1);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.relationshipAdditions).toEqual(["junior"]);
   });
 
   it("builds the real event 15 choices with seasonal SAN modifiers", () => {
@@ -535,11 +547,11 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("游戏放松");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["玩泰拉瑞亚", "玩魔塔50层", "玩研究生模拟器", "打王者荣耀"]);
-    expect(result.events[0]?.choices[0]?.effects.san).toBe(-3);
-    expect(result.events[0]?.choices[1]?.effects.san).toBe(-5);
-    expect(result.events[0]?.choices[2]?.effects.san).toBe(2);
-    expect(result.events[0]?.choices[3]?.effects.san).toBe(-4);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["玩泰拉瑞亚", "玩魔塔50层", "玩研究生模拟器", "打王者荣耀"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-3);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-5);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(2);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-4);
   });
 
   it("builds the real event 16 choices when there is in-progress draft work", () => {
@@ -574,11 +586,11 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("数据丢失");
-    expect(result.events[0]?.choices.map((choice) => choice.label)).toEqual(["熬夜补数据", "从头再来", "花钱恢复", "伪造数据"]);
-    expect(result.events[0]?.choices[0]?.effects.san).toBe(-6);
-    expect(result.events[0]?.choices[1]?.effects.clearDraftProgress).toBe(true);
-    expect(result.events[0]?.choices[2]?.effects.money).toBe(-6);
-    expect(result.events[0]?.choices[3]?.effects.publicationPenaltyMultiplier).toBe(0.5);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["熬夜补数据", "从头再来", "花钱恢复", "伪造数据"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-6);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.clearDraftProgress).toBe(true);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.money).toBe(-6);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.publicationPenaltyMultiplier).toBe(0.5);
   });
 
   it("skips event 16 when there is no recoverable draft progress but still consumes the draw", () => {
@@ -636,7 +648,7 @@ describe("v2 event scheduler", () => {
 
     const result = collectRandomEventsForMonth(baseState, 0, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
-    expect(result.events[0]?.title).toBe("💪 抵抗感冒");
+    expect(result.events[0]?.title).toBe("疾病来袭 ➜ 你的选择 ➜ 抵抗感冒");
     expect(result.nextState.availableRandomEvents).toEqual([]);
     expect(result.nextState.usedRandomEvents).toEqual([3]);
     expect(result.nextState.coldWeight).toBe(2);

@@ -21,12 +21,26 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
   const nextRejectCount = context.rejectedInternshipCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
   const description = permanentlyBlocked
-    ? `你再次拒绝实习，企业线关闭（${nextRejectCount}/2）。`
-    : `你还是想先把论文做完（${nextRejectCount}/2）。以后还有一次机会。`;
+    ? [
+        "你最终决定把重心留在当前课题上，先不接受这次实习邀请。",
+        "你把回复写得很克制：感谢认可、说明阶段目标、保留未来合作可能。",
+        "短期看你保住了可控节奏，但你也明白，这等于主动放弃了一次提前进入产业线的窗口。",
+        "机制结算",
+        `实习拒绝计数 +1（当前 ${nextRejectCount}/2）`,
+        "达到 2 次后，实习机会永久关闭。",
+      ].join("\n\n")
+    : [
+        "你最终决定把重心留在当前课题上，先不接受这次实习邀请。",
+        "你把回复写得很克制：感谢认可、说明阶段目标、保留未来合作可能。",
+        "短期看你保住了可控节奏，但你也明白，这等于主动放弃了一次提前进入产业线的窗口。",
+        "机制结算",
+        `实习拒绝计数 +1（当前 ${nextRejectCount}/2）`,
+        "下次企业交流还有一次机会。",
+      ].join("\n\n");
 
   return {
     id: `internship-invite-result-decline-${nextRejectCount}`,
-    title: "实习邀请 ➜ 暂不实习",
+    title: "实习邀请 ➜ 实习抉择 ➜ 暂不实习",
     description,
     preview: "实习邀请",
     source: "fixed",
@@ -46,8 +60,17 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
 function createInternshipAcceptResult(context: InternshipInviteContext): PendingEvent {
   return {
     id: `internship-invite-result-accept-${context.totalMonths}`,
-    title: "实习邀请 ➜ 实习已确认",
-    description: `你接下 6 个月远程实习。实验 ×1.25，每月金钱 +${context.currentMonthlyIncome}、SAN -2；收入随 A 类论文与引用变化。`,
+    title: "实习邀请 ➜ 实习抉择 ➜ 实习已确认",
+    description: [
+      "你签下了远程实习，接下来几个月会进入“白天课题、晚上交付”的并行状态。",
+      "这不是一次短期尝鲜，而是对时间管理、执行稳定性和抗压能力的持续考验。",
+      "你知道自己会更累，但也清楚这条线能给你带来真实的行业经验和资源回流。",
+      "机制结算",
+      "实习周期：6 个月",
+      "实习期间：做实验分数 ×1.25",
+      `每月收益：金币 +${context.currentMonthlyIncome}`,
+      "每月压力：SAN -2",
+    ].join("\n\n"),
     preview: "实习邀请",
     source: "fixed",
     blocking: true,
@@ -73,7 +96,13 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
   return {
     id: `internship-invite-act2-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择",
-    description: `实习能补贴生活，也会挤占科研时间。${warningText}`,
+    description: [
+      "你把邀请邮件又读了一遍：项目方向很硬，周期明确，回报也不低，但每一行都在暗示同一件事——你接下来几个月会更累。",
+      "接下实习，意味着你能更早摸到工业研发的真实节奏，也能缓解一点经济压力；可实验、组会、论文和交付并行后，任何一个环节失控都会连锁反应。",
+      "不接则能把重心稳稳压在学术线上，节奏更可控、容错更高，但你也明白，很多机会从来不是“错过一次，下次还有”。",
+      "你不是在选“好坏”，而是在选“哪一种忙碌更值得”。",
+      warningText,
+    ].join("\n\n"),
     preview: "实习邀请",
     source: "fixed",
     blocking: true,
@@ -110,7 +139,12 @@ export function createInternshipInviteAct1(context: InternshipInviteContext): Pe
   return {
     id: `internship-invite-act1-${context.totalMonths}`,
     title: "实习邀请",
-    description: "会后，一家相关企业发来远程实习邀请。你有些心动，也担心时间不够用。",
+    description: [
+      "会后你收到一封远程实习邀请，对方给出的方向和你现在的研究并不冲突，甚至有一定互补。",
+      "邮件里的项目节奏写得很清楚：回报真实、要求也真实，意味着你很难再用“有空再说”来拖延决定。",
+      "这份机会能让你提前接触工业研发流程，也会实打实压缩你在学术线上的缓冲时间。",
+      "你需要在“长期学术节奏”和“短期机会窗口”之间，尽快给出一个明确答案。",
+    ].join("\n\n"),
     preview: "实习邀请",
     source: "fixed",
     blocking: true,

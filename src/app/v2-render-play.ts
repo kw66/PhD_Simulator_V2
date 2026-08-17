@@ -36,7 +36,7 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getThesisStage } from "../core/v2-thesis-rules";
-import type { EventStage, FellowProgressProfile, GameLogEntry, GameState, LoverTypeId, Paper, RoleDefinition } from "../core/v2-types";
+import type { FellowProgressProfile, GameLogEntry, GameState, LoverTypeId, Paper, RoleDefinition } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type ResearchPaperFilterId,
@@ -778,13 +778,7 @@ function renderEventQueueList(
   `;
 }
 
-function getEventSceneLabel(chainId: string, stage: EventStage, title: string): string {
-  if (chainId === "before-grad-school") {
-    if (stage === "act1") return "保研资格";
-    if (stage === "act2") return "导师信息";
-    if (stage === "result") return "正式录取";
-  }
-
+function getEventSceneLabel(title: string): string {
   const titleParts = title.split("➜").map((part) => part.trim()).filter(Boolean);
   if (titleParts.length > 1) {
     return titleParts[titleParts.length - 1] ?? title;
@@ -821,20 +815,19 @@ function renderEventContentBox(
   const displayEvent = historicalPage ?? currentEvent;
   if (!displayEvent) return "";
   const selectedChoiceId = historicalPage?.selectedChoiceId ?? null;
-  const chainId = completedEvent?.chainId ?? currentEvent?.chainId ?? "";
   const sceneTabs = isCompleted
     ? completedStages.map((page, index) => ({
       index,
-      label: getEventSceneLabel(chainId, page.stage, page.title),
+      label: getEventSceneLabel(page.title),
     }))
     : [
       ...history.map((page, index) => ({
         index,
-        label: getEventSceneLabel(chainId, page.stage, page.title),
+        label: getEventSceneLabel(page.title),
       })),
       {
         index: currentPageIndex,
-        label: getEventSceneLabel(chainId, currentEvent!.stage, currentEvent!.title),
+        label: getEventSceneLabel(currentEvent!.title),
       },
     ];
 

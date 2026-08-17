@@ -43,7 +43,7 @@ export function buildAdvisorTaskRewardEvent(input: {
   return {
     id: `advisor-task-reward-${input.totalMonths}-${input.completedProjectCount}`,
     title: "导师项目奖励",
-    description: `可把导师项目奖励分配给一篇草稿，论文 idea / 实验 / 写作各 +${input.paperBonus}。`,
+    description: `导师项目顺利收尾，你争取到一份可以反哺论文的资源。选一篇草稿分配奖励，idea / 实验 / 写作各 +${input.paperBonus}。`,
     preview: "选择奖励论文",
     source: "system",
     blocking: true,
@@ -89,7 +89,7 @@ export function buildFellowTaskRewardEvent(input: {
   return {
     id: `fellow-task-reward-${input.totalMonths}-${input.profile.id}-${input.profile.completedTaskCount}`,
     title: "同门任务奖励",
-    description: `可把这次同门任务奖励分配给一篇草稿，${fieldLabel} +${input.profile.research}。`,
+    description: `你和同门一起完成了这项任务，也把其中一部分经验带回自己的研究。选一篇草稿分配奖励，${fieldLabel} +${input.profile.research}。`,
     preview: "选择奖励论文",
     source: "system",
     blocking: true,
@@ -135,7 +135,7 @@ export function buildLoverTaskRewardEvent(input: {
   return {
     id: `lover-task-reward-${input.totalMonths}-${input.completedTaskCount}`,
     title: "恋人任务奖励",
-    description: `可把恋人的补短板奖励分配给一篇草稿，总加成 ${input.paperBonusTotal}，会优先补最低项。`,
+    description: `恋人帮你重新梳理了手头的工作，最薄弱的部分终于有了头绪。选一篇草稿分配总计 ${input.paperBonusTotal} 点加成，系统会优先补最低项。`,
     preview: "选择奖励论文",
     source: "system",
     blocking: true,

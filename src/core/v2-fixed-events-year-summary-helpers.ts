@@ -21,10 +21,15 @@ export function createYearSummaryResultEvent(params: {
   outcome: string;
   effects: PendingEvent["choices"][number]["effects"];
 }): PendingEvent {
+  const yearLabel = getYearSummaryLabel(params.year);
   return createFixedEvent({
     id: `year-summary-${params.idSuffix}-result-y${params.year}-m${params.month}`,
     title: "学年总结 ➜ 年度总结 ➜ 辞旧迎新",
-    description: params.description,
+    description: [
+      `${yearLabel}复盘已完成，你把这一年的得失从“感受”整理成了“可执行判断”。`,
+      params.description,
+      "这不是一份漂亮总结，而是一份下一学年可直接执行的路线说明。",
+    ].join("\n\n"),
     preview: "你把这一年的得失整理成了下一学年的出发点",
     chainId: "year-summary",
     stage: "result",
@@ -53,7 +58,10 @@ export function resolveYearSummaryChoice(
           idSuffix: "sleep",
           year: state.year,
           month: state.month,
-          description: "先休息。为新学年留足状态。",
+          description: [
+            "你把“可持续”放在第一位，没有让自己长期透支。",
+            "科研进度也许不算最快，但你把状态守住了。",
+          ].join("\n\n"),
           outcome: "SAN +5。",
           effects: { san: 5 },
         })],
@@ -67,7 +75,10 @@ export function resolveYearSummaryChoice(
           idSuffix: "social",
           year: state.year,
           month: state.month,
-          description: "认识了更多人。协作圈扩大了。",
+          description: [
+            "你把更多时间放在人和人之间，慢慢把自己的协作圈拓开了。",
+            "这些关系未必立刻见效，但会在关键节点托你一把。",
+          ].join("\n\n"),
           outcome: socialGain > 0 ? `社交 +${socialGain}。` : "社交已达上限。",
           effects: socialGain > 0 ? { social: socialGain } : {},
         })],
@@ -82,7 +93,10 @@ export function resolveYearSummaryChoice(
           idSuffix: "favor",
           year: state.year,
           month: state.month,
-          description: "多接了些导师的事。信任更稳了。",
+          description: [
+            "你主动接住了不少导师事务，沟通方式也更成熟了。",
+            "信任是慢慢累积的，很多机会开始优先流到你手里。",
+          ].join("\n\n"),
           outcome: favorGain > 0 ? `导师好感 +${favorGain}。` : "导师好感已达上限。",
           effects: favorGain > 0 ? { favor: favorGain } : {},
         })],
@@ -97,7 +111,10 @@ export function resolveYearSummaryChoice(
           idSuffix: "intern",
           year: state.year,
           month: state.month,
-          description: "抽时间做了实习。攒下一笔钱。",
+          description: [
+            "你在课题缝隙里挤出时间做实习，把“生存焦虑”往下压了一截。",
+            "账户余额增加不只是数字变化，也让你后续选择更从容。",
+          ].join("\n\n"),
           outcome: `金钱 +${moneyGain}。`,
           effects: { money: moneyGain },
         })],

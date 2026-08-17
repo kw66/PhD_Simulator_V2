@@ -48,11 +48,36 @@ function getScholarshipGradeLabel(year: number): string {
 }
 
 function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): PendingEvent {
+  const gradeLabel = getScholarshipGradeLabel(context.year);
   if (context.success) {
+    const diff = context.score - context.requirement;
+    const story = diff >= 3
+      ? [
+          "📱 手机震动，学院通知跳了出来。",
+          "你点开看到“恭喜获得本年度学业奖学金”，心里第一反应是：稳了。",
+          "这一年堆起来的实验记录和论文修改，终于变成了实打实的结果。",
+        ]
+      : diff >= 1
+        ? [
+            "📱 手机一震，你几乎是屏住呼吸点开通知。",
+            "“恭喜获得本年度学业奖学金。”",
+            "你长出一口气，虽然不是断层领先，但关键节点没有掉队。",
+          ]
+        : [
+            "📱 手机震动，你反复确认了两遍推送内容。",
+            "“恭喜获得本年度学业奖学金。”",
+            "几乎卡线通过的感觉又惊又险，你忽然觉得这学年总算有了句号。",
+          ];
     return createFixedEvent({
       id: `scholarship-result-y${context.year}-m${context.month}`,
-      title: "国奖评选 ➜ 结果公布",
-      description: `名单公布。科研分 ${context.score}，分数线 ${context.requirement}。你拿到了，奖金 +${context.reward}。`,
+      title: "国奖评选 ➜ 查看积分 ➜ 获得奖学金",
+      description: [
+        ...story,
+        "评选结果",
+        `${gradeLabel}年级分数线：${context.requirement} 分`,
+        `你的科研积分：${context.score} 分`,
+        `评定结果：${context.score} ≥ ${context.requirement}，获奖`,
+      ].join("\n\n"),
       preview: "奖学金结果已公布",
       chainId: "scholarship",
       stage: "result",
@@ -69,10 +94,35 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
     });
   }
 
+  const diff = context.requirement - context.score;
+  const story = diff === 1
+    ? [
+        "📱 通知弹窗亮起，你几乎立刻点开。",
+        `分数线是 ${context.requirement} 分，而你是 ${context.score} 分。`,
+        "只差 1 分的落差最刺痛，你开始在脑海里倒放这学年的每个选择。",
+      ]
+    : diff <= 3
+      ? [
+          `📱 你点开通知，结果并不意外：分数线 ${context.requirement}，你是 ${context.score}。`,
+          "情绪有些下沉，但你也清楚问题出在产出密度不够，而不是运气。",
+        ]
+      : [
+          `📱 你扫了一眼通知：分数线 ${context.requirement}，你是 ${context.score}。`,
+          "差距比较明显，这次更像一次清晰的体检报告。",
+          "你把页面关掉，心里冒出一句：明年要提前布局，不再临线挣扎。",
+        ];
+
   return createFixedEvent({
     id: `scholarship-result-y${context.year}-m${context.month}`,
-    title: "国奖评选 ➜ 结果公布",
-    description: `名单公布。科研分 ${context.score}，分数线 ${context.requirement}。你没有入选。`,
+    title: "国奖评选 ➜ 查看积分 ➜ 遗憾落选",
+    description: [
+      ...story,
+      "评选结果",
+      `${gradeLabel}年级分数线：${context.requirement} 分`,
+      `你的科研积分：${context.score} 分`,
+      `评定结果：${context.score} < ${context.requirement}，落选`,
+      `分差：-${diff}`,
+    ].join("\n\n"),
     preview: "奖学金结果已公布",
     chainId: "scholarship",
     stage: "result",
@@ -90,24 +140,50 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
 function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "success">): PendingEvent {
   const diff = context.score - context.requirement;
   const success = diff >= 0;
-  let descriptionTail = "分数明显过线。";
+  let innerThoughts = [
+    `“${context.score} 分，按体感应该在前排。”`,
+    "“只要今年线别离谱，机会很大。”",
+  ];
+  let mood = "心态：比较稳";
   let label = "等待结果";
 
-  if (diff === 0) {
-    descriptionTail = "你刚好压线。";
+  if (diff >= 1 && diff < 3) {
+    innerThoughts = [
+      `“${context.score} 分，还算有竞争力。”`,
+      "“能不能中要看别人今年的产出。”",
+    ];
+    mood = "心态：期待里带点紧张";
+  } else if (diff === 0) {
+    innerThoughts = [
+      `“${context.score} 分，刚好卡在分界附近。”`,
+      "“按当前计分规则是压线通过，但已经没有任何容错空间。”",
+    ];
+    mood = "心态：卡线过关但不敢松懈";
     label = "继续等待";
   } else if (diff < 0 && diff >= -2) {
-    descriptionTail = "还差一点。";
+    innerThoughts = [
+      `“${context.score} 分，稍微有点危险。”`,
+      "“如果今年大家都很卷，可能就差一口气。”",
+    ];
+    mood = "心态：偏悲观";
     label = "继续等待";
   } else if (diff < -2) {
-    descriptionTail = "与分数线差距明显。";
-    label = "接受结果";
+    innerThoughts = [
+      `“${context.score} 分，基本无缘今年奖学金了。”`,
+      "“这次就当复盘，明年提早布局。”",
+    ];
+    mood = "心态：接受现实";
+    label = "继续等待";
   }
 
   return createFixedEvent({
     id: `scholarship-score-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 查看积分",
-    description: `科研分 ${context.score}，评选线 ${context.requirement}。${descriptionTail}`,
+    description: [
+      `你打开系统，看到自己本年度科研积分为 ${context.score} 分。`,
+      ...innerThoughts,
+      `${mood}。你知道分差越小，越容易在“名单公布那一刻”被情绪放大；现在能做的，是先稳住心态，等正式结果落地。`,
+    ].join("\n\n"),
     preview: "查看当前积分与评选线",
     chainId: "scholarship",
     stage: "act2",
@@ -139,7 +215,12 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
   return createFixedEvent({
     id: `scholarship-y${state.year}-m${state.month}`,
     title: "国奖评选",
-    description: `学院启动国奖评选，${gradeLabel}按本年度科研分排序。`,
+    description: [
+      "晚上十点，学院系统推送了“国奖评选启动”通知。",
+      `${gradeLabel}年级本轮只有 5 个名额，按本年度科研积分排序。`,
+      "分数线不会提前公布，真正的压力在于你不知道别人今年到底有多猛。",
+      "你先点开积分页面，想给自己一个“今晚能不能睡着”的答案。",
+    ].join("\n\n"),
     preview: "奖学金评选通知，查看评选结果",
     chainId: "scholarship",
     choices: [

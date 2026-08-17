@@ -79,7 +79,7 @@ describe("v2 before grad school events", () => {
     const visibleCopy = `${act1.description}\n${advisorInfo.description}`;
 
     expect(advisorInfo.stage).toBe("act2");
-    expect(advisorInfo.title).toBe("读研之始");
+    expect(advisorInfo.title).toBe("读研之始 ➜ 导师信息");
     expect(advisorInfo.description).toContain("你给感兴趣的老师发了邮件，又找组里的学生问了问。");
     expect(advisorInfo.description).toContain("梁哲哲 · 讲师");
     expect(advisorInfo.description).not.toContain("讲师回信后");
@@ -97,7 +97,7 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.description).toContain("科研分：论文录用，C 类 +1｜B 类 +2｜A 类 +4");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分\n转博士：第 2 年 2 分｜第 3 年 3 分");
-    expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["换个导师", "回复导师"]);
+    expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["换个导师", "确认导师"]);
     expect(resolution).toEqual({
       kind: "advisor-confirm",
       advisorCandidate: {
@@ -197,7 +197,7 @@ describe("v2 before grad school events", () => {
       expect(state.relationshipState).toEqual(originalRelationshipState);
       expect(state.selectedAdvisorName).toBeNull();
 
-      const confirmChoice = refreshedEvent?.choices.find((choice) => choice.label === "回复导师");
+      const confirmChoice = refreshedEvent?.choices.find((choice) => choice.label === "确认导师");
       if (!refreshedEvent || !confirmChoice || !refreshedCandidate) {
         throw new Error("refreshed advisor confirmation missing");
       }
@@ -242,7 +242,7 @@ describe("v2 before grad school events", () => {
     expect(resolved.outcome).not.toContain("分配");
     expect(admissionEvent).toMatchObject({
       id: "before-grad-school-admission",
-      title: "读研之始",
+      title: "读研之始 ➜ 导师信息 ➜ 正式录取",
       chainId: "before-grad-school",
       stage: "result",
       preview: "收到录取通知书",

@@ -5,6 +5,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-account";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
+import { createTeachersDayEvent } from "../src/core/v2-fixed-events-teachers-day";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import { createDraftPaper, markPaperReviewing } from "../src/core/v2-paper-rules";
 import { getRoleLobbyAchievementDefinitions } from "../src/core/v2-role-lobby-meta";
@@ -730,10 +731,51 @@ describe("v2 render lobby shell", () => {
       activeEventId: state.eventQueue[0]?.id ?? null,
     });
 
-    expect(html).toContain(">保研资格</button>");
+    expect(html).toContain(">读研之始</button>");
     expect(html).toContain(">导师信息</button>");
     expect(html).toContain(">正式录取</button>");
     expect(html).not.toContain("data-ui-event-history-nav");
+  });
+
+  it("renders all three Teacher's Day scenes in current and historical views", () => {
+    let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
+    state = dispatchAction(state, "start-game", { roleId: "normal" });
+    state = {
+      ...state,
+      eventQueue: [createEventQueueItem(createTeachersDayEvent(state), 1)],
+      eventHistory: [],
+    };
+
+    state = dispatchAction(state, "resolve-event", {
+      eventId: state.eventQueue[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+    });
+    state = dispatchAction(state, "resolve-event", {
+      eventId: state.eventQueue[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices.find((choice) => choice.id.includes("teachers-day-tea"))?.id,
+    });
+
+    const currentHtml = renderApp(state, createDefaultAccountProfile(), {
+      isEventContentOpen: true,
+      activeEventId: state.eventQueue[0]?.id ?? null,
+    });
+    expect(currentHtml).toContain(">教师节</button>");
+    expect(currentHtml).toContain(">你的选择</button>");
+    expect(currentHtml).toContain(">礼物送达</button>");
+
+    state = dispatchAction(state, "resolve-event", {
+      eventId: state.eventQueue[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+    });
+    const completedEvent = state.eventHistory.find((event) => event.chainId === "teachers-day");
+    const historyHtml = renderApp(state, createDefaultAccountProfile(), {
+      isEventContentOpen: true,
+      activeEventHistoryId: completedEvent?.id ?? null,
+    });
+    expect(completedEvent?.stages).toHaveLength(3);
+    expect(historyHtml).toContain(">教师节</button>");
+    expect(historyHtml).toContain(">你的选择</button>");
+    expect(historyHtml).toContain(">礼物送达</button>");
   });
 
   it("renders single-choice history as disabled with its selected check", () => {
@@ -840,7 +882,7 @@ describe("v2 render lobby shell", () => {
       activeEventHistoryId: completedEvent?.id ?? null,
     });
     const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
-    expect(historyHtml).toContain(">保研资格</button>");
+    expect(historyHtml).toContain(">读研之始</button>");
     expect(historyHtml).toContain(">导师信息</button>");
     expect(historyHtml).toContain(">正式录取</button>");
     expect(historyButtons).toContain('disabled aria-disabled="true"');
