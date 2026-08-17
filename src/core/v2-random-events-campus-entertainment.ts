@@ -12,7 +12,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState): PendingE
   return {
     id: `random-15-y${state.year}-m${state.month}-n${serial}`,
     title: "游戏放松",
-    description: "忙完一天，你想打会儿游戏放松一下。玩什么？",
+    description: "实验跑不动了，你只想打会儿游戏。玩什么？",
     preview: "学了一天，想放松一下...",
     source: "random",
     blocking: true,

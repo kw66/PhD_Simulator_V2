@@ -12,7 +12,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   return {
     id: `random-6-y${state.year}-m${state.month}-n${serial}`,
     title: "组会汇报",
-    description: "这次周组会轮到你汇报。你可以搏高上限、走稳妥路线，或者选择临时应付。",
+    description: "周组会轮到你汇报，PPT 还空着一半。怎么准备？",
     preview: "轮到你汇报了",
     source: "random",
     blocking: true,

@@ -21,7 +21,7 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
     event: {
       id: `random-16-y${state.year}-m${state.month}-n${serial}`,
       title: "数据丢失",
-      description: "服务器日志提示数据损坏。你得在保进度、花成本和承担长期学术风险之间做选择。",
+      description: "服务器提示数据损坏。几周的进度可能白费，怎么补救？",
       preview: "服务器崩溃了……",
       source: "random",
       blocking: true,
@@ -76,7 +76,7 @@ export function createLearningRandomEvent(state: GameState): PendingEvent {
   return {
     id: `random-9-y${state.year}-m${state.month}-n${serial}`,
     title: "不断学习",
-    description: "你想补一轮知识，但时间只够学一个方向。",
+    description: "总觉得哪里都欠一点。时间只够学一个方向，学什么？",
     preview: "想学点新东西",
     source: "random",
     blocking: true,

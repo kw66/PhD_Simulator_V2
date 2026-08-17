@@ -14,7 +14,7 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `teachers-day-choice-y${state.year}-m${state.month}`,
     title: "教师节 ➜ 你的选择",
-    description: `你和导师关系${relationText}，当前好感 ${state.player.favor}。发消息不花钱，送礼则可能更有分量。`,
+    description: `导师关系${relationText}，好感 ${state.player.favor}。怎么表示？`,
     preview: "在祝福与送礼之间做选择",
     chainId: "teachers-day",
     stage: "act2",
@@ -22,7 +22,7 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
       {
         id: `teachers-day-message-y${state.year}-m${state.month}`,
         label: "发祝福",
-        outcome: "你选择先发一条节日祝福。",
+        outcome: "发一条节日祝福。",
         effects: {
           fixedEventResolution: { kind: "teachers-day-message" },
         },
@@ -30,7 +30,7 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
       {
         id: `teachers-day-tea-y${state.year}-m${state.month}`,
         label: "送茶叶",
-        outcome: "你准备送一盒茶叶表示心意。",
+        outcome: "送一盒茶叶。",
         effects: {
           fixedEventResolution: { kind: "teachers-day-tea" },
         },
@@ -38,7 +38,7 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
       {
         id: `teachers-day-flower-y${state.year}-m${state.month}`,
         label: "送鲜花",
-        outcome: "你准备送一束鲜花表示敬意。",
+        outcome: "送一束鲜花。",
         effects: {
           fixedEventResolution: { kind: "teachers-day-flower" },
         },
@@ -46,7 +46,7 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
       {
         id: `teachers-day-stamp-y${state.year}-m${state.month}`,
         label: "送邮票",
-        outcome: "你准备送一套邮票让导师记住你。",
+        outcome: "送一套邮票。",
         effects: {
           fixedEventResolution: { kind: "teachers-day-stamp" },
         },
@@ -59,14 +59,14 @@ export function createTeachersDayEvent(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `teachers-day-y${state.year}-m${state.month}`,
     title: "教师节",
-    description: "教师节到了，实验室群里陆续有人发祝福。你也得想想该怎么表示。",
+    description: "教师节到了，实验室群里陆续有人发祝福。你要表示一下吗？",
     preview: "教师节到了，要给导师送礼物吗？",
     chainId: "teachers-day",
     choices: [
       {
         id: `teachers-day-continue-y${state.year}-m${state.month}`,
         label: "继续",
-        outcome: "你开始认真权衡这次教师节该怎么处理。",
+        outcome: "想想怎么表示。",
         effects: {
           enqueueEvents: [createTeachersDayChoiceEvent(state)],
         },

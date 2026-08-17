@@ -55,14 +55,14 @@ function createMentorAssignChoiceEvent(
   return createFixedEvent({
     id: `mentor-assign-choice-y${state.year}-m${state.month}`,
     title: "指导新生 ➜ 如何抉择",
-    description: "四位新生各有长短。你准备结合科研潜力和亲和程度选一位。",
+    description: "带人比自己做更费心。四位新生各有长短，选一位。",
     preview: "看看 4 位候选新生，再决定带谁",
     chainId: "mentor-assign",
     stage: "act2",
     choices: candidates.map((candidate, index) => ({
       id: `mentor-assign-candidate-${index}-y${state.year}-m${state.month}`,
       label: `选择${candidate.name}：${getMentorAssignHintText(candidate)}`,
-      outcome: `你决定把 ${candidate.name} 作为这次带教对象。`,
+      outcome: `选择${candidate.name}。`,
       effects: {
         fixedEventResolution: {
           kind: "mentor-assign-candidate",
@@ -78,21 +78,10 @@ function createMentorAssignResultEvent(
   candidate: NonNullable<FixedEventResolution["juniorCandidate"]>,
   added: boolean,
 ): PendingEvent {
-  const levelText = candidate.research >= 5
-    ? "科研起点较高，后续可能更快上手"
-    : candidate.research <= 2
-      ? "科研基础偏弱，前期需要你更多投入"
-      : "科研基础中等，适合稳步培养";
-  const relationText = candidate.affinity >= 5
-    ? "相处起来比较顺畅，沟通阻力较小"
-    : candidate.affinity <= 2
-      ? "性格略生硬，磨合期可能会更长"
-      : "亲和力中等，属于正常协作节奏";
-
   return createFixedEvent({
     id: `mentor-assign-result-${candidate.name}-y${state.year}-m${state.month}`,
     title: "指导新生 ➜ 如何抉择 ➜ 指派完成",
-    description: `你选择了${candidate.name}。${levelText}；${relationText}。${added ? `已加入关系网（科研 ${candidate.research}，亲和 ${candidate.affinity}）。` : "关系槽位已满，本次未加入关系网。"}`,
+    description: `你最后选了${candidate.name}。${getMentorAssignHintText(candidate)}。${added ? `加入关系网（科研 ${candidate.research}，亲和 ${candidate.affinity}）。` : "关系槽位已满，未加入关系网。"}`,
     preview: added ? `${candidate.name} 已加入你的关系网` : `${candidate.name} 本次未加入关系网`,
     chainId: "mentor-assign",
     stage: "result",
@@ -114,14 +103,14 @@ export function createMentorAssignEvent(state: GameState, getRoll: RandomRollPro
   return createFixedEvent({
     id: "mentor-assign-junior",
     title: "指导新生",
-    description: "导师让你从四位新生中选一位带入门。",
+    description: "导师让你带一位新生入门。你也到了要教别人做科研的时候。",
     preview: "导师让你带一位新入学同学",
     chainId: "mentor-assign",
     choices: [
       {
         id: `mentor-assign-open-y${state.year}-m${state.month}`,
         label: "看看候选人",
-        outcome: "你准备认真比较这批候选人的科研潜力与相处成本。",
+        outcome: "查看四位新生。",
         effects: {
           enqueueEvents: [createMentorAssignChoiceEvent(state, candidates)],
         },
@@ -138,7 +127,7 @@ export function resolveMentorAssignCandidate(
   if (!candidate) {
     return {
       nextState: state,
-      outcome: "这次没有成功确认要指导的新生对象。",
+      outcome: "未确认指导对象。",
     };
   }
 
@@ -167,7 +156,7 @@ export function resolveMentorAssignCandidate(
     nextState,
     outcome: relationshipResult.added
       ? `${candidate.name} 已加入你的关系网（科研 ${candidate.research}，亲和 ${candidate.affinity}）。`
-      : `当前关系槽位已满，${candidate.name} 这次没有加入关系网。`,
+      : `关系槽位已满，${candidate.name} 未加入关系网。`,
     enqueueEvents: [createMentorAssignResultEvent(state, candidate, relationshipResult.added)],
   };
 }

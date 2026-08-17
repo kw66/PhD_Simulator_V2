@@ -68,7 +68,7 @@ export function buildAdvisorTaskRewardEvent(input: {
       {
         id: "skip",
         label: "跳过",
-        outcome: "你决定先不分配这次论文奖励。",
+        outcome: "本次不分配。",
         effects: {},
       },
     ],
@@ -114,7 +114,7 @@ export function buildFellowTaskRewardEvent(input: {
       {
         id: "skip",
         label: "跳过",
-        outcome: "你决定先不分配这次论文奖励。",
+        outcome: "本次不分配。",
         effects: {},
       },
     ],
@@ -163,7 +163,7 @@ export function buildLoverTaskRewardEvent(input: {
       {
         id: "skip",
         label: "跳过",
-        outcome: "你决定先不分配这次论文奖励。",
+        outcome: "本次不分配。",
         effects: {},
       },
     ],

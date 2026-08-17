@@ -14,7 +14,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   return {
     id: `random-4-y${state.year}-m${state.month}-n${serial}`,
     title: "导师项目",
-    description: "导师把一个项目交给你主导。你要在现金流、科研成长与关系成本之间作出取舍。",
+    description: "导师把一个项目交给你主导。能换资源，也会占掉论文时间。接吗？",
     preview: "导师有项目要交给你",
     source: "random",
     blocking: true,

@@ -10,7 +10,7 @@ export function createAdvisorTalkRandomEvent(state: GameState): PendingEvent {
   return {
     id: `random-5-y${state.year}-m${state.month}-n${serial}`,
     title: "导师约谈",
-    description: "导师找你谈话。你可以选择如实汇报、请教方法，或者争取一段实习经历。",
+    description: "导师突然叫你去办公室。一路上，你都在猜是好事还是坏事。",
     preview: "导师找你谈话",
     source: "random",
     blocking: true,

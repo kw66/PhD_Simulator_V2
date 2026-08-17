@@ -10,7 +10,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
   return {
     id: `random-1-y${state.year}-m${state.month}-n${serial}`,
     title: "毕设辅导",
-    description: "导师把一名本科生交给你带。你得在时间消耗、导师评价和组内关系之间做权衡。",
+    description: "自己的论文还没做完，导师又让你指导本科生毕设。怎么带？",
     preview: "导师让你指导本科生毕设",
     source: "random",
     blocking: true,
@@ -60,7 +60,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
   return {
     id: `random-2-y${state.year}-m${state.month}-n${serial}`,
     title: "帮忙审稿",
-    description: "导师把一篇审稿任务转给了你。你要在时间消耗、职业信用和人情成本之间做选择。",
+    description: "自己的稿子还在改，导师又转来一篇审稿。接吗？",
     preview: "导师让你帮忙审稿",
     source: "random",
     blocking: true,
@@ -112,7 +112,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   return {
     id: `random-14-y${state.year}-m${state.month}-n${serial}`,
     title: eventTitle,
-    description: `新入组${roleText}来请教代码和实验流程。要投入多少时间？`,
+    description: `新入组${roleText}来请教。你想起自己刚入门的时候，怎么指导？`,
     preview: "你已经初窥科研门道了...",
     source: "random",
     blocking: true,

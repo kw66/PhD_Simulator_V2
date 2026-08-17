@@ -12,7 +12,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   return {
     id: `random-10-y${state.year}-m${state.month}-n${serial}`,
     title: "\u540c\u95e8\u5408\u4f5c",
-    description: "同门邀请你合作论文。你准备合作到什么程度？",
+    description: "同门邀请你合作论文。多个人能分担，也可能多些麻烦。怎么合作？",
     preview: "\u540c\u95e8\u627e\u4f60\u5408\u4f5c",
     source: "random",
     blocking: true,
@@ -76,7 +76,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   return {
     id: `random-11-y${state.year}-m${state.month}-n${serial}`,
     title: eventTitle,
-    description: `临近毕业的${roleText}邀请你合作项目。你准备投入多少？`,
+    description: `${roleText}邀请你合作项目。机会不错，但你的时间也不宽裕。怎么合作？`,
     preview: `${roleText}\u627e\u4f60\u5408\u4f5c`,
     source: "random",
     blocking: true,

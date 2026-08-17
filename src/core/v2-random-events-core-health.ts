@@ -68,7 +68,7 @@ export function createIllnessRandomEvent(
     event: {
       id: `random-3-y${state.year}-m${state.month}-n${serial}`,
       title: "疾病来袭",
-      description: "你发烧到 38.5°C，偏偏这周还有组会和实验节点。",
+      description: "发烧 38.5°C，脑子发沉，这周却还有组会和实验。",
       preview: "身体不舒服，需要休息",
       source: "random",
       blocking: true,
@@ -107,7 +107,7 @@ export function createImmuneColdEvent(state: GameState): PendingEvent {
   return {
     id: `random-immune-cold-y${state.year}-m${state.month}-n${serial}`,
     title: "💪 抵抗感冒",
-    description: "本来你要感冒了，但今年打过羽毛球强化了身体，成功把这次疾病来袭扛了过去。",
+    description: "身体不错，扛过了这次感冒。",
     preview: "今年打过羽毛球，身体倍儿棒！",
     source: "random",
     blocking: true,

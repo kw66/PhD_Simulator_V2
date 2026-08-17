@@ -57,7 +57,7 @@ function createConferenceDecisionAct3(
   return {
     id: `${context.id}-act3-${decision.mode}`,
     title: "论文参会 ➜ 参会确认",
-    description: `${modeText}已确定；本次地点为 ${getRegionName(context.region)} · ${context.city}。结算：${costText}。`,
+    description: `${modeText}，${getRegionName(context.region)} · ${context.city}。${costText}。`,
     preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
@@ -68,7 +68,7 @@ function createConferenceDecisionAct3(
       ? [{
           id: "enter-venue",
           label: "进入会场活动",
-          outcome: "已进入会场活动。",
+          outcome: "进入会场。",
           effects: {
             counterDeltas: { meetingCount: 1 },
             paperUpdates: createPaperHandledUpdates(context),
@@ -78,7 +78,7 @@ function createConferenceDecisionAct3(
       : [{
           id: "proxy-finish",
           label: "结束本次流程",
-          outcome: "同学代参会，本次不进入会场活动。",
+          outcome: "由同学代参会。",
           effects: {
             paperUpdates: createPaperHandledUpdates(context),
           },
@@ -106,7 +106,9 @@ function createConferenceDecisionAct2(
   const createChoice = (mode: ConferenceDecisionMode, decision: ReturnType<typeof resolveConferenceDecisionCost>) => ({
     id: mode,
     label: mode === "self" ? "自费参会" : mode === "advisor" ? "导师报销" : "请同学代参会",
-    outcome: mode === "proxy" ? "参会方式已委托同学处理。" : "参会方式已确认。",
+    outcome: mode === "proxy"
+      ? "委托同学代参会。"
+      : `${decision.resource === "favor" ? "导师好感" : "金钱"} -${decision.actualCost}。`,
     effects: {
       ...(decision.resource === "money" && decision.actualCost > 0 ? { money: -decision.actualCost } : {}),
       ...(decision.resource === "favor" && decision.actualCost > 0 ? { favor: -decision.actualCost } : {}),
@@ -117,7 +119,7 @@ function createConferenceDecisionAct2(
   return {
     id: `${context.id}-act2`,
     title: "论文参会 ➜ 开会方式抉择",
-    description: `${context.conferenceName} ${context.conferenceYear} @ ${context.city}（${getRegionName(context.region)}）。${getPaperScaleText(context.paperCount)}`,
+    description: `论文录用了，但参会也要花资源。${context.conferenceName} @ ${context.city}（${getRegionName(context.region)}）。${getPaperScaleText(context.paperCount)}怎么去？`,
     preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
@@ -140,7 +142,7 @@ export function createConferenceDecisionAct1(
   return {
     id: `${context.id}-act1`,
     title: "论文参会",
-    description: `${context.conferenceName} ${context.conferenceYear} @ ${context.city}, ${context.country}。${getPaperScaleText(context.paperCount)}`,
+    description: `收到 ${context.conferenceName} 录用通知。会址 ${context.city}, ${context.country}。${getPaperScaleText(context.paperCount)}`,
     preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
@@ -150,7 +152,7 @@ export function createConferenceDecisionAct1(
     choices: [{
       id: "continue",
       label: "继续",
-      outcome: "进入参会方式抉择。",
+      outcome: "选择参会方式。",
       effects: {
         enqueueEvents: [createConferenceDecisionAct2(context, state, getRoll)],
       },

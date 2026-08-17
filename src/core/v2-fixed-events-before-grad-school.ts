@@ -89,7 +89,7 @@ function createAdvisorInfoEvent(
     id: `before-grad-school-advisor-info-${advisor.id}`,
     title: "读研之始",
     description: [
-      `学院网站看不出实验室的日常。你给对应的老师发了邮件，${advisorName}讲师回了信。随后，你又向组里的学生打听情况。`,
+      `你给感兴趣的老师发了邮件。${advisorName}讲师回信后，你又找组里的学生问了问。`,
       [
         `搜集信息 · ${advisorName}讲师`,
         `${intel.reporting}｜${intel.projects}｜${intel.internship}`,
@@ -129,8 +129,8 @@ function createBeforeGradSchoolResultEvent(
     id: `before-grad-school-summer-${advisor.id}`,
     title: "读研之始",
     description: [
-      `你回复${advisorName}讲师，希望加入课题组。大四开学后，你进入推免资格名单。九月，推免系统正式开放，你填报学校、接受待录取，老师把你拉进了实验室群。`,
-      "毕业后的暑假，你开始想象开学后的工位、第一次组会和第一篇投稿。紧张之外，也有些期待。",
+      `你回复${advisorName}讲师，希望加入课题组。大四开学，你进入推免资格名单。九月推免系统开放，你接受待录取，老师把你拉进实验室群。`,
+      "毕业后的暑假，你开始期待工位、第一次组会和第一篇投稿。",
     ].join("\n\n"),
     preview: "开学的日子近了",
     chainId: "before-grad-school",
@@ -139,7 +139,7 @@ function createBeforeGradSchoolResultEvent(
       {
         id: `before-grad-school-finish-${advisor.id}`,
         label: "准备报到",
-        outcome: "你收拾好行李，准备去学校报到。",
+        outcome: "准备入学。",
         effects: {},
       },
     ],
@@ -157,8 +157,8 @@ export function createBeforeGradSchoolAct1Event(
     id: "before-grad-school-qualification",
     title: "读研之始",
     description: [
-      "你读的是计算机类专业。人工智能正热，学这个方向的人也越来越多。到了大三下学期，你还没想清楚自己是否喜欢科研，却还是随大流准备继续读研。",
-      "你备好个人陈述，投了夏令营和预推免，也梳理项目准备面试。几个月后，你拿到心仪学校的预录取，保上了最想去的学校。接下来，该联系导师了。",
+      "你是计算机类专业。大三下，还没想清楚是否喜欢科研，准备随大流继续读研。",
+      "你备好个人陈述，投了夏令营和预推免，也梳理项目准备面试。几个月后，拿到心仪学校的预录取。接下来，该联系导师了。",
     ].join("\n\n"),
     preview: "拿到梦校预录取，准备联系导师",
     chainId: "before-grad-school",
@@ -167,7 +167,7 @@ export function createBeforeGradSchoolAct1Event(
       {
         id: "before-grad-school-open-advisor-info",
         label: "联系导师",
-        outcome: "你打开学院网站，开始查看导师信息。",
+        outcome: "查看导师信息。",
         effects: {
           enqueueEvents: [createAdvisorInfoEvent(advisorId, advisorName, advisorIntel)],
         },
@@ -184,7 +184,7 @@ export function resolveAdvisorConfirmation(
   if (!candidate) {
     return {
       nextState: state,
-      outcome: "这次没有成功确认导师联系信息。",
+      outcome: "未确认导师信息。",
     };
   }
 
@@ -207,7 +207,7 @@ export function resolveAdvisorConfirmation(
 
   return {
     nextState,
-    outcome: `你回复了${candidate.advisorName}讲师，表示希望加入课题组。`,
+    outcome: `加入${candidate.advisorName}讲师的课题组。`,
     enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id, candidate.advisorName)],
   };
 }

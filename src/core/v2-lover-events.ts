@@ -27,20 +27,20 @@ function getTypeName(type: LoverTypeId): string {
 
 function getIntroText(type: LoverTypeId): string {
   return type === "beautiful"
-    ? "最近几次会议结束后，你和那位活泼的学者总会顺路聊上一会儿。"
-    : "你和那位聪慧学者在讨论里越来越默契，常常一句话就能接上对方思路。";
+    ? "几次会议下来，你和那位活泼学者总会在散场后多聊一会儿。"
+    : "几次讨论下来，你和那位聪慧学者越来越默契。";
 }
 
 function getSceneText(type: LoverTypeId): string {
   return type === "beautiful"
-    ? "从会场到地铁口的路并不长，但每次都觉得很快就走完了。"
-    : "从论文细节聊到未来规划，你发现这份理解比想象中更珍贵。";
+    ? "相处很轻松，你开始期待下一次见面。"
+    : "话题从论文聊到生活，你开始期待下一次见面。";
 }
 
 function getThoughtText(type: LoverTypeId): string {
   return type === "beautiful"
-    ? "和她在一起会轻松很多，但也意味着我要把生活节奏和她绑得更紧。"
-    : "如果在一起，也许能一起走得更远，但我也要承担这份长期承诺。";
+    ? "你有些心动，也担心忙碌的生活容不下另一份关系。"
+    : "你喜欢这种被理解的感觉，也担心科研和关系搅在一起。";
 }
 
 function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEvent {
@@ -51,8 +51,8 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
     id: `lover-development-result-decline-${context.type}-${nextRejectCount}`,
     title: "发展关系 ➜ 暂缓关系",
     description: permanentlyBlocked
-      ? `你再次选择保持距离，这段关系已结束（${nextRejectCount}/2）。`
-      : `你选择保持距离（${nextRejectCount}/2），以后或许还有一次机会。`,
+      ? `你再次选择保持距离，这段关系到此为止（${nextRejectCount}/2）。`
+      : `你没有往前一步（${nextRejectCount}/2），以后还有一次机会。`,
     preview: "发展关系",
     source: "fixed",
     blocking: true,
@@ -62,7 +62,7 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
     choices: [{
       id: "close",
       label: "继续",
-      outcome: "你先把节奏留在当前主线上。",
+      outcome: "继续当前生活。",
       effects: {},
     }],
   };
@@ -77,7 +77,7 @@ function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent
   return {
     id: `lover-development-result-accept-${context.type}-${context.totalMonths}`,
     title: "发展关系 ➜ 关系确认",
-    description: `你们确认了关系。${typeLabel}：${effectText}`,
+    description: `你们决定试试看。${typeLabel}：${effectText}`,
     preview: "发展关系",
     source: "fixed",
     blocking: true,
@@ -87,7 +87,7 @@ function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent
     choices: [{
       id: "close",
       label: "继续",
-      outcome: "你们开始进入稳定关系。",
+      outcome: "关系开始。",
       effects: {},
     }],
   };
@@ -97,8 +97,8 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
   const nextRejectCount = context.rejectCount + 1;
   const typeName = getTypeName(context.type);
   const warningText = context.rejectCount === 0
-    ? "若这次仍只停在原地，未来见面的频率可能会慢慢降下来。"
-    : `这已经是你和这位${typeName}学者最后一次站在同一条分岔口。`;
+    ? "拒绝后还有一次机会。"
+    : `再次拒绝将结束与这位${typeName}学者的关系。`;
 
   return {
     id: `lover-development-act2-${context.type}-${context.totalMonths}`,
@@ -114,7 +114,7 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
       {
         id: "decline",
         label: "先保持距离",
-        outcome: "你决定先把关系停在现在这个距离。",
+        outcome: nextRejectCount >= 2 ? "这段关系结束。" : "以后还有一次机会。",
         effects: {
           conferenceEncounterUpdates: context.type === "beautiful"
             ? {
@@ -131,7 +131,7 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
       {
         id: "accept",
         label: "尝试在一起",
-        outcome: "你决定认真回应这段关系。",
+        outcome: "确认关系。",
         effects: {
           loverStateUpdates: activateLover(context.type, context.totalMonths),
           activateLoverProgress: context.type,
@@ -166,7 +166,7 @@ export function createLoverDevelopmentAct1(context: LoverDevelopmentContext): Pe
     choices: [{
       id: "continue",
       label: "继续",
-      outcome: "进入关系抉择。",
+      outcome: "确认彼此心意。",
       effects: {
         enqueueEvents: [createLoverDevelopmentAct2(context)],
       },

@@ -20,8 +20,8 @@ export function createAdvancedConferenceActivityOptions(
     options.push({
       id: "big-bull-coop",
       label: "🎓 找大牛合作（借联培继续深挖）",
-      outcome: "借联培继续深挖合作，社交 +1，下次写论文分数 +8，科研上限 +1。",
-      resultDescription: "你借联培继续推进合作：社交 +1，下次写论文 +8，科研上限 +1。",
+      outcome: "社交 +1，下次写论文 +8，科研上限 +1。",
+      resultDescription: "有了联培基础，合作聊得更具体。社交 +1，写论文 +8，科研上限 +1。",
       effects: {
         social: 1,
         temporaryActionEffectUpdates: {
@@ -39,8 +39,8 @@ export function createAdvancedConferenceActivityOptions(
     options.push({
       id: "big-bull-coop",
       label: "🎓 找大牛合作（主动争取一次机会）",
-      outcome: "主动围住大牛聊研究，社交 +1，下次写论文分数 +8。",
-      resultDescription: "你顶着会场人流把话题推进到具体合作点，成功换来一次更高质量的写作反馈窗口：下次写论文分数 +8，社交 +1。",
+      outcome: "社交 +1，下次写论文 +8。",
+      resultDescription: "你主动聊到合作，对方愿意继续跟进。社交 +1，写论文 +8。",
       effects: {
         social: 1,
         temporaryActionEffectUpdates: {
@@ -58,8 +58,8 @@ export function createAdvancedConferenceActivityOptions(
     options.push({
       id: "beautiful-scholar",
       label: "💕 和活泼学者交流",
-      outcome: "轻松的聊天让你状态回升，SAN +5，社交 +1。",
-      resultDescription: "你和那位活泼学者一路从报告聊到城市小吃，紧绷感一下松了下来，SAN +5，社交 +1。",
+      outcome: "SAN +5，社交 +1。",
+      resultDescription: "你们从报告聊到吃饭，意外地投缘。SAN +5，社交 +1。",
       effects: {
         san: 5,
         social: 1,
@@ -75,8 +75,8 @@ export function createAdvancedConferenceActivityOptions(
     options.push({
       id: "smart-scholar",
       label: "🧠 和聪慧学者交流（深聊研究）",
-      outcome: "交流研究细节，SAN +1，社交 +1，下次想 idea 多想 2 次。",
-      resultDescription: "你们深入聊了研究：SAN +1、社交 +1，下次想 idea 多 2 次。",
+      outcome: "SAN +1，社交 +1，下次想 idea 多 2 次。",
+      resultDescription: "你们对着论文聊了很久，想到几个新方向。SAN +1，社交 +1，想 idea 多 2 次。",
       effects: {
         san: 1,
         social: 1,
@@ -102,11 +102,11 @@ export function createAdvancedConferenceActivityOptions(
       id: "big-bull-joint-training",
       label: "🌟 和上次那位大牛深入合作",
       outcome: nextDeepCount >= 2
-        ? "合作默契进一步成形，下次写论文分数 +8，并触发联合培养邀请。"
-        : "继续打磨合作细节，下次写论文分数 +8。",
+        ? "下次写论文 +8，收到联合培养邀请。"
+        : "下次写论文 +8。",
       resultDescription: nextDeepCount >= 2
-        ? "你们把合作讨论推进到了更实质的层面，这次交流既会反映到下一轮写作推进，也终于把联合培养邀约推到了台前。"
-        : "你们继续围绕合作细节来回拆解，下一轮写作会直接吃到这次深聊留下的增益：下次写论文分数 +8。",
+        ? "几次交流后，对方发来联合培养邀请。下次写论文 +8。"
+        : "这次终于聊到具体分工。下次写论文 +8。",
       effects: {
         temporaryActionEffectUpdates: {
           writing: { bonus: 8 },
@@ -125,11 +125,11 @@ export function createAdvancedConferenceActivityOptions(
       id: "beautiful-lover-development",
       label: "💕 和上次那位活泼学者继续交流",
       outcome: nextBeautifulCount >= 2
-        ? "关系明显更近一步，SAN +8，SAN 上限 +3，并触发发展关系。"
-        : "相处更自然了，SAN +8，SAN 上限 +3。",
+        ? "SAN +8，SAN 上限 +3，触发关系事件。"
+        : "SAN +8，SAN 上限 +3。",
       resultDescription: nextBeautifulCount >= 2
-        ? "你们聊到散场：SAN +8、SAN 上限 +3，并触发关系事件。"
-        : "你们相处得更自然：SAN +8、SAN 上限 +3。",
+        ? "聊到散场，你发现自己开始期待下次见面。SAN +8，SAN 上限 +3。"
+        : "你们相处得更自然了。SAN +8，SAN 上限 +3。",
       effects: {
         san: 8,
         sanCapDelta: 3,
@@ -147,11 +147,11 @@ export function createAdvancedConferenceActivityOptions(
       id: "smart-lover-development",
       label: "🧠 和上次那位聪慧学者继续交流",
       outcome: nextSmartCount >= 2
-        ? "关系更进一步，SAN +1，科研 +1，并触发发展关系。"
-        : "讨论更投机了，SAN +1，科研 +1。",
+        ? "SAN +1，科研 +1，触发关系事件。"
+        : "SAN +1，科研 +1。",
       resultDescription: nextSmartCount >= 2
-        ? "你们聊到彼此未来的计划：SAN +1、科研 +1，并触发关系事件。"
-        : "这次讨论十分投机：SAN +1、科研 +1。",
+        ? "话题从论文聊到未来，你有些在意对方的回答。SAN +1，科研 +1。"
+        : "你们的思路很合拍。SAN +1，科研 +1。",
       effects: {
         san: 1,
         research: 1,

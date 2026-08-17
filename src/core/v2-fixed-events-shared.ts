@@ -61,7 +61,7 @@ export function createPlaceholderFixedEvent(params: {
       {
         id: `${params.chainId}-continue-y${params.year}-m${params.month}`,
         label: "继续",
-        outcome: "当前只保留旧版事件身份占位，具体链路将在后续轮次继续迁移。",
+        outcome: "你停下来想了片刻，继续往前走。",
         effects: {},
       },
     ],

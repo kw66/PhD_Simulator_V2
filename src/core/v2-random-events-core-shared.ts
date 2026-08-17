@@ -13,7 +13,7 @@ export function createRandomEventChoice(serial: number): EventChoice[] {
     {
       id: `random-continue-${serial}`,
       label: "继续",
-      outcome: "你先把这个节点处理完，再回到当前主线节奏。",
+      outcome: "事情处理完了，回到原来的安排。",
       effects: {},
     },
   ];
@@ -23,9 +23,9 @@ export function createRandomEventSkeleton(eventId: number, state: GameState): Pe
   const serial = state.totalRandomEventCount;
   return {
     id: `random-${eventId}-y${state.year}-m${state.month}-n${serial}`,
-    title: `随机事件 ${eventId}（待校对）`,
-    description: `这个随机事件骨架已占位，但文案尚未完成校对。当前事件编号 ${eventId}，后续需要回旧版核对真实描述与选项。`,
-    preview: `随机事件 ${eventId} 待校对`,
+    title: "临时事务",
+    description: "一件计划外的事打断了安排。先处理，再继续这个月。",
+    preview: "有件临时事务需要处理",
     source: "random",
     blocking: true,
     deadlineMonths: 0,

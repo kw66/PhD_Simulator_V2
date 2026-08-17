@@ -22,8 +22,8 @@ function createJointTrainingDeclineResult(context: JointTrainingContext): Pendin
     id: `joint-training-result-decline-${nextRejectCount}`,
     title: "联合培养 ➜ 暂不接受",
     description: permanentlyBlocked
-      ? `你再次拒绝联培，这条合作线已关闭（${nextRejectCount}/2）。`
-      : `你暂时拒绝联培（${nextRejectCount}/2），以后仍可能再收到一次邀请。`,
+      ? `你再次拒绝联培，合作线关闭（${nextRejectCount}/2）。`
+      : `你决定先做完手头课题（${nextRejectCount}/2）。以后还有一次机会。`,
     preview: "联合培养",
     source: "fixed",
     blocking: true,
@@ -33,7 +33,7 @@ function createJointTrainingDeclineResult(context: JointTrainingContext): Pendin
     choices: [{
       id: "close",
       label: "继续",
-      outcome: "你先把节奏留在当前主线上。",
+      outcome: "继续当前课题。",
       effects: {},
     }],
   };
@@ -43,7 +43,7 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
   return {
     id: "joint-training-result-accept",
     title: "联合培养 ➜ 已确认",
-    description: `你接受联合培养：科研上限 +${context.pendingCitationCapBonus}、导师资源 +2、永久想 idea +5、做实验 +5。`,
+    description: `你接受联合培养。科研上限 +${context.pendingCitationCapBonus}，导师资源 +2，永久想 idea +5、做实验 +5。`,
     preview: "联合培养",
     source: "fixed",
     blocking: true,
@@ -53,7 +53,7 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
     choices: [{
       id: "close",
       label: "继续",
-      outcome: "你正式进入联培合作阶段。",
+      outcome: "联合培养开始。",
       effects: {},
     }],
   };
@@ -66,7 +66,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
   return {
     id: "joint-training-act2",
     title: "联合培养 ➜ 联培抉择",
-    description: "联合培养能带来更多资源，也会增加长期任务。接受吗？",
+    description: "换一个环境，会有更多资源，也会多出不少任务。接受吗？",
     preview: "联合培养",
     source: "fixed",
     blocking: true,
@@ -77,7 +77,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
       {
         id: "decline",
         label: "暂不接受",
-        outcome: "你决定先把节奏留在当前课题上。",
+        outcome: permanentlyBlocked ? "合作线关闭。" : "以后还会收到一次邀请。",
         effects: {
           conferenceEncounterUpdates: {
             rejectedBigBullCoopCount: nextRejectCount,
@@ -89,7 +89,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
       {
         id: "accept",
         label: "接受联培",
-        outcome: "你决定接下这次联合培养。",
+        outcome: "接受联合培养。",
         effects: {
           conferenceEncounterUpdates: {
             bigBullCooperation: true,
@@ -116,7 +116,7 @@ export function createJointTrainingAct1(context: JointTrainingContext): PendingE
   return {
     id: "joint-training-act1",
     title: "联合培养邀约",
-    description: "几次会后交流之后，对方正式邀请你参加联合培养。",
+    description: "合作导师发来联合培养邀请。你有些期待，也担心打乱现有课题。",
     preview: "联合培养",
     source: "fixed",
     blocking: true,
@@ -126,7 +126,7 @@ export function createJointTrainingAct1(context: JointTrainingContext): PendingE
     choices: [{
       id: "continue",
       label: "继续",
-      outcome: "进入联培抉择。",
+      outcome: "查看联培条件。",
       effects: {
         enqueueEvents: [createJointTrainingAct2(context)],
       },

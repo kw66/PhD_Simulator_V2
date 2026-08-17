@@ -10,7 +10,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState): PendingEve
   return {
     id: `random-12-y${state.year}-m${state.month}-n${serial}`,
     title: "署名风波",
-    description: "合作论文的署名安排让你陷入被动。你得决定是忍耐、转移矛盾，还是直接正面施压。",
+    description: "活干了不少，署名却和预想不同。怎么办？",
     preview: "导师抢一作了",
     source: "random",
     blocking: true,

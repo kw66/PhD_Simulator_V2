@@ -31,7 +31,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
   return {
     id: `random-7-y${state.year}-m${state.month}-n${serial}`,
     title: "实验室团建",
-    description: "导师组织了团建。你可以把这次聚会当成修状态、搏手气，或稳关系的一次窗口。",
+    description: "导师组织团建，难得不用只聊论文。参加什么活动？",
     preview: "实验室组织团建活动",
     source: "random",
     blocking: true,
@@ -111,7 +111,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
   return {
     id: `random-8-y${state.year}-m${state.month}-n${serial}`,
     title: "导师经费",
-    description: "项目经费到账，导师让大家提资源使用建议。你要在短期现金流和长期效率之间做判断。",
+    description: "项目经费到账，组里都盯着这笔钱。怎么花？",
     preview: "导师有经费要花",
     source: "random",
     blocking: true,

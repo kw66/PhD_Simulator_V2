@@ -33,10 +33,9 @@ describe("v2 before grad school events", () => {
 
     expect(act1.description).toContain("大三下");
     expect(act1.description).toContain("计算机类专业");
-    expect(act1.description).toContain("人工智能正热");
-    expect(act1.description).toContain("学这个方向的人也越来越多");
-    expect(act1.description).toContain("还没想清楚自己是否喜欢科研");
-    expect(act1.description).toContain("准备继续读研");
+    expect(act1.description).toContain("你是计算机类专业");
+    expect(act1.description).toContain("还没想清楚是否喜欢科研");
+    expect(act1.description).toContain("准备随大流继续读研");
     expect(act1.description).toContain("随大流");
     expect(act1.description).not.toContain("机器学习和深度学习");
     expect(act1.description).not.toContain("招聘信息");
@@ -46,7 +45,7 @@ describe("v2 before grad school events", () => {
     expect(act1.description).toContain("夏令营");
     expect(act1.description).toContain("预推免");
     expect(act1.description).toContain("心仪学校的预录取");
-    expect(act1.description).toContain("保上了最想去的学校");
+    expect(act1.description).toContain("接下来，该联系导师了");
     expect(act1.description.indexOf("夏令营")).toBeLessThan(act1.description.lastIndexOf("预推免"));
     expect(act1.description).not.toContain("年级群");
     expect(act1.description).not.toContain("推免资格名单");
@@ -62,9 +61,9 @@ describe("v2 before grad school events", () => {
     const lastInfo = getAdvisorInfoEvent(0.999999);
 
     expect(firstInfo.id).toBe("before-grad-school-advisor-info-chen-ming");
-    expect(firstInfo.description).toContain("李旭旭讲师回了信");
+    expect(firstInfo.description).toContain("李旭旭讲师回信");
     expect(lastInfo.id).toBe("before-grad-school-advisor-info-zhao-ning");
-    expect(lastInfo.description).toContain("章名讲师回了信");
+    expect(lastInfo.description).toContain("章名讲师回信");
   });
 
   it("uses active contact instead of assignment and shows one lecturer's relevant information", () => {
@@ -75,8 +74,8 @@ describe("v2 before grad school events", () => {
 
     expect(advisorInfo.stage).toBe("act2");
     expect(advisorInfo.title).toBe("读研之始");
-    expect(advisorInfo.description).toContain("给对应的老师发了邮件");
-    expect(advisorInfo.description).toContain("辛英英讲师回了信");
+    expect(advisorInfo.description).toContain("给感兴趣的老师发了邮件");
+    expect(advisorInfo.description).toContain("辛英英讲师回信");
     expect(advisorInfo.description).toContain("搜集信息 · 辛英英讲师");
     expect(advisorInfo.description).toContain("每周组会｜偶有项目｜提前沟通");
     expect(advisorInfo.description).toContain("给方向｜资源够用｜老师好沟通｜同门融洽");
@@ -142,23 +141,23 @@ describe("v2 before grad school events", () => {
       taskMax: 44,
       relationMax: 40,
     });
-    expect(resolved.outcome).toContain("回复了李旭旭讲师，表示希望加入课题组");
+    expect(resolved.outcome).toContain("加入李旭旭讲师的课题组");
     expect(resolved.outcome).not.toContain("分配");
     expect(summerEvent).toMatchObject({
       title: "读研之始",
       chainId: "before-grad-school",
       stage: "result",
     });
-    expect(summerEvent?.description).toContain("老师把你拉进了实验室群");
+    expect(summerEvent?.description).toContain("老师把你拉进实验室群");
     expect(summerEvent?.description).not.toContain("收到，开学见");
     expect(summerEvent?.description).toContain("推免资格名单");
-    expect(summerEvent?.description).toContain("九月，推免系统正式开放");
+    expect(summerEvent?.description).toContain("九月推免系统开放");
     expect(summerEvent?.description).not.toContain("九推系统");
     expect(summerEvent?.description).toContain("接受待录取");
     expect(summerEvent?.description.indexOf("推免资格名单") ?? -1).toBeLessThan(
-      summerEvent?.description.indexOf("推免系统正式开放") ?? -1,
+      summerEvent?.description.indexOf("推免系统开放") ?? -1,
     );
-    expect(summerEvent?.description.indexOf("推免系统正式开放") ?? -1).toBeLessThan(
+    expect(summerEvent?.description.indexOf("推免系统开放") ?? -1).toBeLessThan(
       summerEvent?.description.indexOf("接受待录取") ?? -1,
     );
     expect(summerEvent?.description).toContain("暑假");

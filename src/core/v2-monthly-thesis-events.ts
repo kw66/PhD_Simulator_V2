@@ -30,7 +30,7 @@ function createThesisChoices(state: GameState): { nextState: GameState; choices:
   choices.push({
     id: "abandon-thesis",
     label: "放弃大论文",
-    outcome: "你决定暂时停止推进大论文。",
+    outcome: "停止推进大论文。",
     effects: {
       abandonThesis: true,
     },
@@ -58,7 +58,7 @@ function createThesisEvent(state: GameState): { nextState: GameState; event: Pen
     event: {
       id: `thesis-progress-y${state.year}-m${state.month}`,
       title: "毕业论文推进",
-      description: `大论文处于${stage.name}阶段，当前进度 ${nextState.thesis.progress}%。`,
+      description: `毕业论文又催了一次。${stage.name}阶段，当前进度 ${nextState.thesis.progress}%。`,
       preview: `大论文 ${stage.name}，当前 ${nextState.thesis.progress}%`,
       source: "thesis",
       blocking: true,

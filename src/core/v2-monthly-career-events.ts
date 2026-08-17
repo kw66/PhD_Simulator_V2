@@ -39,7 +39,7 @@ function createCareerChoices(state: GameState, careerType: CareerType): EventCho
   choices.push({
     id: `abandon-${careerType}`,
     label: `放弃${definition.name}`,
-    outcome: `你决定停止推进 ${definition.name} 路线，后续将不再收到这条路线的求职事件。`,
+    outcome: `放弃${definition.name}，以后不再收到这条线的求职事件。`,
     effects: {
       careerType,
       abandonCareer: true,
@@ -56,7 +56,7 @@ function createCareerEvent(state: GameState, careerType: CareerType): PendingEve
   return {
     id: `career-${careerType}-y${state.year}-m${state.month}`,
     title: `${definition.name}求职推进`,
-    description: `${definition.name}路线：${level.name}，进度 ${progress}。继续投入可冲击更好的 offer。`,
+    description: `毕业越来越近，你开始考虑${definition.name}。当前：${level.name}，进度 ${progress}。`,
     preview: `${definition.name} · ${level.name} · 进度 ${progress}`,
     source: "career",
     blocking: true,

@@ -39,7 +39,7 @@ function createConferenceActivityAct2(
   return {
     id: `${context.id}-activity-act2`,
     title: "论文参会会场活动 ➜ 会场决策",
-    description: "报告、海报和交流同时进行。你得选出今天的主线。",
+    description: "会场议程排得很满，不可能全顾上。选一个重点。",
     preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
@@ -71,7 +71,7 @@ export function createConferenceActivityAct1(
   return {
     id: `${context.id}-activity-act1`,
     title: "论文参会会场活动",
-    description: `你抵达${context.city}，进入 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）会场。${getPaperScaleText(context.paperCount)}先安排今天的重点。`,
+    description: `论文录用后，终于到了开会这一步。${context.conferenceName}（${getConferenceGradeLabel(context.grade)}），${context.city}。${getPaperScaleText(context.paperCount)}`,
     preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,

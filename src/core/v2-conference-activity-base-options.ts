@@ -13,8 +13,8 @@ export function createBaseConferenceActivityOptions(
     {
       id: "tour-local",
       label: "🏖️ 顺便在当地走走",
-      outcome: `在 ${context.city} 顺便走走，SAN +6。`,
-      resultDescription: `你把碎片时间留给了 ${context.city} 的街道与风景，紧绷许久的神经终于缓下来，SAN +6。`,
+      outcome: `逛了逛 ${context.city}，SAN +6。`,
+      resultDescription: `你在 ${context.city} 走了一下午，脑子终于空下来。SAN +6。`,
       effects: {
         san: 6,
         counterDeltas: { tourCount: 1 },
@@ -23,8 +23,8 @@ export function createBaseConferenceActivityOptions(
     {
       id: "tea-break",
       label: "☕ 茶歇与晚宴交流",
-      outcome: "在茶歇与晚宴间维持交流，SAN +1，社交 +1。",
-      resultDescription: "你把主要精力放在茶歇与晚宴交流上，既缓冲了状态，也顺手拓宽了社交触角，SAN +1，社交 +1。",
+      outcome: "SAN +1，社交 +1。",
+      resultDescription: "几轮茶歇下来，你认识了几位同行。SAN +1，社交 +1。",
       effects: {
         san: 1,
         social: 1,
@@ -34,8 +34,8 @@ export function createBaseConferenceActivityOptions(
     {
       id: "experiment-discussion",
       label: "🔬 和同行深聊实验思路",
-      outcome: "从同行那里摸到新的实验展开方式；下次做实验多做 3 次。",
-      resultDescription: "你围着实验设计和同行反复拆解细节，把会场交流沉淀成一次确定性的实验推进优势：下次做实验多做 3 次。",
+      outcome: "下次做实验多 3 次。",
+      resultDescription: "和同行聊完，你找到一个能试的改法。下次做实验多 3 次。",
       effects: {
         temporaryActionEffectUpdates: {
           experiment: { extraActions: 3 },
@@ -45,8 +45,8 @@ export function createBaseConferenceActivityOptions(
     {
       id: "idea-networking",
       label: "💡 广泛交流找灵感",
-      outcome: "从密集交流里攒出新灵感；下次想 idea 多想 3 次。",
-      resultDescription: "你把注意力分散到更广的交流面上，让零散火花逐渐聚成方向感：下次想 idea 多想 3 次。",
+      outcome: "下次想 idea 多 3 次。",
+      resultDescription: "几场交流后，零散想法连了起来。下次想 idea 多 3 次。",
       effects: {
         temporaryActionEffectUpdates: {
           idea: { extraActions: 3 },
@@ -56,8 +56,8 @@ export function createBaseConferenceActivityOptions(
     {
       id: "peer-collaboration",
       label: "🤝 和同学约一次后续合作",
-      outcome: "提前约好后续合作；下次做实验分数 +5。",
-      resultDescription: "你把会场里最靠谱的一段对话落成了后续合作，下一轮实验会更快进入有效推进：下次做实验分数 +5。",
+      outcome: "下次做实验 +5。",
+      resultDescription: "聊到最后，你们约好会后合作。下次做实验 +5。",
       effects: {
         temporaryActionEffectUpdates: {
           experiment: { bonus: 5 },
@@ -67,8 +67,8 @@ export function createBaseConferenceActivityOptions(
     {
       id: "famous-scholar",
       label: "🌟 主动请教著名学者",
-      outcome: "从高质量请教中收束方向；下次想 idea ×1.25。",
-      resultDescription: "你抓住机会向著名学者请教，把原本模糊的判断压缩成更高质量的方向筛选：下次想 idea ×1.25。",
+      outcome: "下次想 idea ×1.25。",
+      resultDescription: "对方点出一个关键问题，方向清楚了些。下次想 idea ×1.25。",
       effects: {
         temporaryActionEffectUpdates: {
           idea: { multiplier: 1.25 },
@@ -81,8 +81,8 @@ export function createBaseConferenceActivityOptions(
     {
       id: "enterprise-networking",
       label: "🏢 与企业代表深入交流",
-      outcome: "产业线的信息交换让实验更接地气；下次做实验分数 ×1.25。",
-      resultDescription: "你把对话推进到具体的产业需求和工程约束上，这种信息回流会直接改变你下一轮实验的组织方式：下次做实验分数 ×1.25。",
+      outcome: "下次做实验 ×1.25。",
+      resultDescription: "你听到不少真实需求，下一轮实验更有针对性。下次做实验 ×1.25。",
       effects: {
         temporaryActionEffectUpdates: {
           experiment: { multiplier: 1.25 },

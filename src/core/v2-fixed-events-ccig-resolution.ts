@@ -20,13 +20,13 @@ export function resolveCcigFixedEvent(
     case "ccig-open":
       return {
         nextState: state,
-        outcome: "你开始认真权衡这次年会到底值不值得去。",
+        outcome: "选择是否参会。",
         enqueueEvents: [createCcigDecisionEvent(state)],
       };
     case "ccig-skip":
       return {
         nextState: state,
-        outcome: "你决定先把资源留在手里，接受这次机会成本。",
+        outcome: "本次不参会。",
         enqueueEvents: [createCcigSkipResultEvent(state)],
       };
     case "ccig-advisor": {
@@ -34,12 +34,12 @@ export function resolveCcigFixedEvent(
       if (nextState.player.favor < 0) {
         return {
           nextState,
-          outcome: "你试图让导师报销，但这次关系成本已经把你压到了底线之外。",
+          outcome: "导师好感 -1，关系跌破下限。",
         };
       }
       return {
         nextState,
-        outcome: "导师同意了报销，你把这次线下窗口争取了下来。",
+        outcome: "导师好感 -1，报销通过。",
         enqueueEvents: [createCcigAttendResultEvent(state, "advisor", 0)],
       };
     }
@@ -49,14 +49,14 @@ export function resolveCcigFixedEvent(
       if (nextState.player.money < 0) {
         return {
           nextState,
-          outcome: `你硬着头皮自费参会，但实际支出 ${actualCost} 金钱已经超过了你当前现金承受范围。`,
+          outcome: `金钱 -${actualCost}，余额跌破下限。`,
         };
       }
       return {
         nextState,
         outcome: actualCost === 0
-          ? "整装待发替你吃掉了这次出行成本，你几乎零成本拿到了参会资格。"
-          : `你决定自己承担 ${actualCost} 金钱的参会成本。`,
+          ? "装备减免生效，参会免费。"
+          : `金钱 -${actualCost}。`,
         enqueueEvents: [createCcigAttendResultEvent(state, "self", actualCost)],
       };
     }
@@ -64,12 +64,12 @@ export function resolveCcigFixedEvent(
       const tempBonus = drawWeightedTriplet(4, 6, getRoll);
       return {
         nextState: state,
-        outcome: `你把今天主要押在报告与交流上；下次想 idea +${tempBonus}，以后每次想 idea +1。`,
+        outcome: `下次想 idea +${tempBonus}，永久 idea +1。`,
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "listen",
           title: "领域年会 ➜ 会场入场 ➜ 满载而归",
-          description: "你听完报告，又在茶歇请教了几位同行。回程时，下一轮实验已有了思路。",
+          description: "听完报告，又请教了几位同行。下一轮实验有了思路。",
           preview: "会场交流沉淀成了明确的课题收益",
           outcome: `下次想 idea +${tempBonus}，以后每次想 idea +1。`,
           effects: {
@@ -82,12 +82,12 @@ export function resolveCcigFixedEvent(
     case "ccig-activity-travel":
       return {
         nextState: state,
-        outcome: "你给自己留出了一段从学术高压里抽离的时间；SAN +5。",
+        outcome: "SAN +5。",
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "travel",
           title: "领域年会 ➜ 会场入场 ➜ 旅途愉快",
-          description: "你只听了核心场次，其余时间逛了逛城市。学术收获不多，心情却轻松了。",
+          description: "只听核心场次，其余时间逛了城市。心情轻松不少。",
           preview: "把一部分参会时间换成状态修复",
           outcome: "SAN +5。",
           effects: { san: 5 },
@@ -98,19 +98,19 @@ export function resolveCcigFixedEvent(
       if (nextState.player.money < 0) {
         return {
           nextState,
-          outcome: "你想请同学吃饭，但这 2 金钱的预算已经把现金线彻底压穿了。",
+          outcome: "金钱 -2，余额跌破下限。",
         };
       }
       return {
         nextState,
-        outcome: "你把会场里更松弛的一圈关系攒到了一张饭桌上。",
+        outcome: "金钱 -2。",
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "food",
           title: "领域年会 ➜ 会场入场 ➜ 大快朵颐",
-          description: "你请几位同学吃了当地菜。饭桌上的交流比会场轻松，关系也近了一些。",
+          description: "请几位同学吃了当地菜。关系近了一些。",
           preview: "用一顿饭换回更顺的合作氛围",
-          outcome: "金钱已在上一幕结算；本次再获得 SAN +2、社交 +1。",
+          outcome: "SAN +2，社交 +1。",
           effects: { san: 2, social: 1 },
         })],
       };

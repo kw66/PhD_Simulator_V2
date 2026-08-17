@@ -48,12 +48,12 @@ export function resolveYearSummaryChoice(
     case "year-summary-sleep":
       return {
         nextState: state,
-        outcome: "你把可持续性放在第一位，这份续航会带到明年。",
+        outcome: "你先停下来喘口气。SAN +5。",
         enqueueEvents: [createYearSummaryResultEvent({
           idSuffix: "sleep",
           year: state.year,
           month: state.month,
-          description: "你决定先休息，给新学年留足状态。",
+          description: "先休息。为新学年留足状态。",
           outcome: "SAN +5。",
           effects: { san: 5 },
         })],
@@ -62,13 +62,13 @@ export function resolveYearSummaryChoice(
       const socialGain = Math.max(0, Math.min(3, 20 - state.player.social));
       return {
         nextState: state,
-        outcome: socialGain > 0 ? `你决定继续拓展协作圈；社交 +${socialGain}。` : "你这条线已经没什么实际增量空间了。",
+        outcome: socialGain > 0 ? `认识了更多人，社交 +${socialGain}。` : "认识的人已经够多了，社交不变。",
         enqueueEvents: [createYearSummaryResultEvent({
           idSuffix: "social",
           year: state.year,
           month: state.month,
-          description: "你主动认识了更多人，协作圈也扩大了。",
-          outcome: socialGain > 0 ? `社交 +${socialGain}。` : "社交已达到这条线的旧版封顶口径。",
+          description: "认识了更多人。协作圈扩大了。",
+          outcome: socialGain > 0 ? `社交 +${socialGain}。` : "社交已达上限。",
           effects: socialGain > 0 ? { social: socialGain } : {},
         })],
       };
@@ -77,13 +77,13 @@ export function resolveYearSummaryChoice(
       const favorGain = Math.max(0, Math.min(3, 20 - state.player.favor));
       return {
         nextState: state,
-        outcome: favorGain > 0 ? `你继续投入到导师这条线上；好感 +${favorGain}。` : "导师信任已经足够高，这次没有新的实际增量。",
+        outcome: favorGain > 0 ? `导师更信任你了，好感 +${favorGain}。` : "导师已经很信任你，好感不变。",
         enqueueEvents: [createYearSummaryResultEvent({
           idSuffix: "favor",
           year: state.year,
           month: state.month,
-          description: "你多接了些导师交办的事，彼此的信任更稳了。",
-          outcome: favorGain > 0 ? `导师好感 +${favorGain}。` : "导师好感已达到这条线的旧版封顶口径。",
+          description: "多接了些导师的事。信任更稳了。",
+          outcome: favorGain > 0 ? `导师好感 +${favorGain}。` : "导师好感已达上限。",
           effects: favorGain > 0 ? { favor: favorGain } : {},
         })],
       };
@@ -92,12 +92,12 @@ export function resolveYearSummaryChoice(
       const moneyGain = drawInclusiveInt(2, 3, getRoll);
       return {
         nextState: state,
-        outcome: `你给自己补了一点现金缓冲；金钱 +${moneyGain}。`,
+        outcome: `实习攒下一笔钱，金钱 +${moneyGain}。`,
         enqueueEvents: [createYearSummaryResultEvent({
           idSuffix: "intern",
           year: state.year,
           month: state.month,
-          description: "你抽时间做了实习，为新学年攒下一笔钱。",
+          description: "抽时间做了实习。攒下一笔钱。",
           outcome: `金钱 +${moneyGain}。`,
           effects: { money: moneyGain },
         })],

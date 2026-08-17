@@ -12,7 +12,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
   return {
     id: `random-13-y${state.year}-m${state.month}-n${serial}`,
     title: "服务器宕机",
-    description: "实验跑到一半时服务器突然报错中断。你得判断是先止血、追责，还是自己承担修复风险。",
+    description: "实验跑到一半，服务器又报错了。怎么处理？",
     preview: "服务器又出问题了",
     source: "random",
     blocking: true,

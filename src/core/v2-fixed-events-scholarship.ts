@@ -52,7 +52,7 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
     return createFixedEvent({
       id: `scholarship-result-y${context.year}-m${context.month}`,
       title: "国奖评选 ➜ 结果公布",
-      description: `名单公布：科研分 ${context.score}，分数线 ${context.requirement}。你成功获奖，奖金 +${context.reward}。`,
+      description: `名单公布。科研分 ${context.score}，分数线 ${context.requirement}。你拿到了，奖金 +${context.reward}。`,
       preview: "奖学金结果已公布",
       chainId: "scholarship",
       stage: "result",
@@ -60,7 +60,7 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
         {
           id: `scholarship-claim-y${context.year}-m${context.month}`,
           label: "收下奖金",
-          outcome: `你成功拿到本年度奖学金，金钱 +${context.reward}。`,
+          outcome: `拿到奖学金，金钱 +${context.reward}。`,
           effects: {
             money: context.reward,
           },
@@ -72,7 +72,7 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
   return createFixedEvent({
     id: `scholarship-result-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 结果公布",
-    description: `名单公布：科研分 ${context.score}，分数线 ${context.requirement}。你遗憾落选。`,
+    description: `名单公布。科研分 ${context.score}，分数线 ${context.requirement}。你没有入选。`,
     preview: "奖学金结果已公布",
     chainId: "scholarship",
     stage: "result",
@@ -80,7 +80,7 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
       {
         id: `scholarship-fail-y${context.year}-m${context.month}`,
         label: "明年再战",
-        outcome: "这次没有拿到奖学金，只能把经验留到下一年。",
+        outcome: "没有获奖，明年再来。",
         effects: {},
       },
     ],
@@ -115,7 +115,7 @@ function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "su
       {
         id: `scholarship-wait-y${context.year}-m${context.month}`,
         label,
-        outcome: success ? "你的分数达到或超过评选线，进入结果公布。" : "你的分数低于评选线，进入结果公布。",
+        outcome: success ? "分数过线，等待名单。" : "分数未过线，等待名单。",
         effects: {
           enqueueEvents: [buildScholarshipResultEvent({ ...context, success })],
         },
@@ -146,7 +146,7 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
       {
         id: `scholarship-view-score-y${state.year}-m${state.month}`,
         label: "查看积分",
-        outcome: "查看你本年度的科研积分与这一轮评选线。",
+        outcome: "查看科研分和评选线。",
         effects: {
           enqueueEvents: [buildScholarshipScoreEvent(context)],
         },

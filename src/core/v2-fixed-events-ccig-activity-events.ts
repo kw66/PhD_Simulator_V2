@@ -13,14 +13,14 @@ export function createCcigActivityAct1Event(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `ccig-activity-act1-y${state.year}-m${state.month}`,
     title: "领域年会会场活动",
-    description: `你进入 CCIG ${realYear} 主会场。分会同时进行，你得先安排今天的行程。`,
+    description: `进入 CCIG ${realYear} 主会场。分会很多，时间不够全听。`,
     preview: `CCIG ${realYear} · ${location} 会场安排`,
     chainId: "ccig-activity",
     choices: [
       {
         id: `ccig-activity-open-y${state.year}-m${state.month}`,
         label: "规划当天行程",
-        outcome: "你准备先定下今天的主线。",
+        outcome: "选择会场安排。",
         effects: {
           enqueueEvents: [createCcigActivityDecisionEvent(state)],
         },
@@ -46,7 +46,7 @@ function createCcigActivityDecisionEvent(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `ccig-activity-act2-y${state.year}-m${state.month}`,
     title: "领域年会 ➜ 会场入场 ➜ 参会活动",
-    description: `${arrivalText}日程很满：听报告、逛城市，还是请同学吃饭？`,
+    description: `${arrivalText}难得出来一趟，听报告、逛城市，还是请同学吃饭？`,
     preview: `CCIG ${realYear} · ${location}，会场主线抉择`,
     chainId: "ccig-activity",
     stage: "act2",
@@ -54,7 +54,7 @@ function createCcigActivityDecisionEvent(state: GameState): PendingEvent {
       {
         id: `ccig-activity-listen-y${state.year}-m${state.month}`,
         label: "认真听报告",
-        outcome: "你决定把今天主要押在学术积累上。",
+        outcome: "认真听报告。",
         effects: {
           fixedEventResolution: { kind: "ccig-activity-listen" },
         },
@@ -62,7 +62,7 @@ function createCcigActivityDecisionEvent(state: GameState): PendingEvent {
       {
         id: `ccig-activity-travel-y${state.year}-m${state.month}`,
         label: "趁机旅游",
-        outcome: "你决定把一部分时间留给这座城市本身。",
+        outcome: "抽空逛城市。",
         effects: {
           fixedEventResolution: { kind: "ccig-activity-travel" },
         },
@@ -70,7 +70,7 @@ function createCcigActivityDecisionEvent(state: GameState): PendingEvent {
       {
         id: `ccig-activity-food-y${state.year}-m${state.month}`,
         label: "请同学吃饭",
-        outcome: "你准备花点预算去经营这一圈更松弛的关系。",
+        outcome: "请同学吃饭。",
         effects: {
           fixedEventResolution: { kind: "ccig-activity-food" },
         },
