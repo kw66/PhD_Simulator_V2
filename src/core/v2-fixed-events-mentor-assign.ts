@@ -55,7 +55,7 @@ function createMentorAssignChoiceEvent(
   return createFixedEvent({
     id: `mentor-assign-choice-y${state.year}-m${state.month}`,
     title: "指导新生 ➜ 如何抉择",
-    description: "“这不是一次随手分配，而是在选未来几个月的协作搭档。”你会同时评估科研潜力与亲和程度，而不是只看某一项高分。选得合适，会形成正向循环；选得失衡，后续就会变成持续补位。",
+    description: "四位新生各有长短。你准备结合科研潜力和亲和程度选一位。",
     preview: "看看 4 位候选新生，再决定带谁",
     chainId: "mentor-assign",
     stage: "act2",
@@ -92,7 +92,7 @@ function createMentorAssignResultEvent(
   return createFixedEvent({
     id: `mentor-assign-result-${candidate.name}-y${state.year}-m${state.month}`,
     title: "指导新生 ➜ 如何抉择 ➜ 指派完成",
-    description: `你最终选择了 ${candidate.name}。导师点头：“行，这位以后就跟你走流程、做训练。”你和对方简单打了招呼，一段新的师门协作关系从这里开始。${levelText}；${relationText}。${added ? `已加入关系网：${candidate.name}（科研 ${candidate.research}，亲和 ${candidate.affinity}）。` : `但当前关系槽位已满，这次没有把 ${candidate.name} 正式纳入关系网。`}`,
+    description: `你选择了${candidate.name}。${levelText}；${relationText}。${added ? `已加入关系网（科研 ${candidate.research}，亲和 ${candidate.affinity}）。` : "关系槽位已满，本次未加入关系网。"}`,
     preview: added ? `${candidate.name} 已加入你的关系网` : `${candidate.name} 本次未加入关系网`,
     chainId: "mentor-assign",
     stage: "result",
@@ -114,7 +114,7 @@ export function createMentorAssignEvent(state: GameState, getRoll: RandomRollPro
   return createFixedEvent({
     id: "mentor-assign-junior",
     title: "指导新生",
-    description: "导师把你叫到办公室，说新生需要你带一位入门。这不仅是额外工作，也是导师对你独立带人的考验。候选人背景不一，选得好会形成正向循环，选得差就可能持续补位。",
+    description: "导师让你从四位新生中选一位带入门。",
     preview: "导师让你带一位新入学同学",
     chainId: "mentor-assign",
     choices: [

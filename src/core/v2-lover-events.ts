@@ -46,14 +46,13 @@ function getThoughtText(type: LoverTypeId): string {
 function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEvent {
   const nextRejectCount = context.rejectCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
-  const typeName = getTypeName(context.type);
 
   return {
     id: `lover-development-result-decline-${context.type}-${nextRejectCount}`,
     title: "发展关系 ➜ 暂缓关系",
     description: permanentlyBlocked
-      ? `你再次停下了这段关系线。与这位${typeName}学者的关系拒绝计数来到 ${nextRejectCount} / 2，按旧版真实口径，这条关系线会被永久关闭。`
-      : `你决定先把关系停在现在这个距离。与这位${typeName}学者的关系拒绝计数 +1，当前为 ${nextRejectCount} / 2；若后续再次走到这个节点，仍可能还有一次机会。`,
+      ? `你再次选择保持距离，这段关系已结束（${nextRejectCount}/2）。`
+      : `你选择保持距离（${nextRejectCount}/2），以后或许还有一次机会。`,
     preview: "发展关系",
     source: "fixed",
     blocking: true,
@@ -78,7 +77,7 @@ function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent
   return {
     id: `lover-development-result-accept-${context.type}-${context.totalMonths}`,
     title: "发展关系 ➜ 关系确认",
-    description: `你们互相确认了心意，这段关系正式从会场偶遇变成了日常牵挂。当前迁入口径（${typeLabel}）：${effectText}`,
+    description: `你们确认了关系。${typeLabel}：${effectText}`,
     preview: "发展关系",
     source: "fixed",
     blocking: true,

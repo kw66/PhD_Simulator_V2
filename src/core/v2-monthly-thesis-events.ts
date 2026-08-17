@@ -58,7 +58,7 @@ function createThesisEvent(state: GameState): { nextState: GameState; event: Pen
     event: {
       id: `thesis-progress-y${state.year}-m${state.month}`,
       title: "毕业论文推进",
-      description: `你当前处于${stage.name}阶段，大论文进度为 ${nextState.thesis.progress}%。这个月要决定继续怎么推进。`,
+      description: `大论文处于${stage.name}阶段，当前进度 ${nextState.thesis.progress}%。`,
       preview: `大论文 ${stage.name}，当前 ${nextState.thesis.progress}%`,
       source: "thesis",
       blocking: true,

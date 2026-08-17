@@ -14,7 +14,7 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `teachers-day-choice-y${state.year}-m${state.month}`,
     title: "教师节 ➜ 你的选择",
-    description: `你和导师当前关系${relationText}（当前好感 ${state.player.favor}）。发祝福最省成本，送茶叶更稳妥，鲜花更有仪式感，邮票最容易让导师记住你。关键不在“贵不贵”，而在你想传达哪种关系信号。`,
+    description: `你和导师关系${relationText}，当前好感 ${state.player.favor}。发消息不花钱，送礼则可能更有分量。`,
     preview: "在祝福与送礼之间做选择",
     chainId: "teachers-day",
     stage: "act2",
@@ -59,7 +59,7 @@ export function createTeachersDayEvent(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `teachers-day-y${state.year}-m${state.month}`,
     title: "教师节",
-    description: "9 月 10 日一早，实验室群里开始刷“教师节快乐”。有人觉得发条消息就够，也有人觉得最好准备点心意，气氛微妙地卷了起来。这件事不只是礼物本身，更像一次“分寸感”测试：既不能太轻飘，也不能越过边界。",
+    description: "教师节到了，实验室群里陆续有人发祝福。你也得想想该怎么表示。",
     preview: "教师节到了，要给导师送礼物吗？",
     chainId: "teachers-day",
     choices: [

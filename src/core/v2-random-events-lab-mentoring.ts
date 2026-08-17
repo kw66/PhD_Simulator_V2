@@ -112,7 +112,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   return {
     id: `random-14-y${state.year}-m${state.month}-n${serial}`,
     title: eventTitle,
-    description: `一位新入组${roleText}来请教代码与实验流程。带人会分走你的时间，但也可能积累团队资源和长期协作回报。`,
+    description: `新入组${roleText}来请教代码和实验流程。要投入多少时间？`,
     preview: "你已经初窥科研门道了...",
     source: "random",
     blocking: true,

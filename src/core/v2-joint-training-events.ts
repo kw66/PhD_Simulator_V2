@@ -22,8 +22,8 @@ function createJointTrainingDeclineResult(context: JointTrainingContext): Pendin
     id: `joint-training-result-decline-${nextRejectCount}`,
     title: "联合培养 ➜ 暂不接受",
     description: permanentlyBlocked
-      ? `你再次婉拒了这次联培机会。拒绝计数来到 ${nextRejectCount} / 2，旧版真实口径下这条联培线会被永久关闭。`
-      : `你决定暂时不接这次联培。拒绝计数 +1，当前为 ${nextRejectCount} / 2；后续若再次把合作推进到位，仍可能再收到一次邀约。`,
+      ? `你再次拒绝联培，这条合作线已关闭（${nextRejectCount}/2）。`
+      : `你暂时拒绝联培（${nextRejectCount}/2），以后仍可能再收到一次邀请。`,
     preview: "联合培养",
     source: "fixed",
     blocking: true,
@@ -43,7 +43,7 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
   return {
     id: "joint-training-result-accept",
     title: "联合培养 ➜ 已确认",
-    description: `你接受了这次联合培养。按旧版真实口径，本次会立刻带来：科研上限 +${context.pendingCitationCapBonus}（按当前总引用计算）、导师科研资源 +2、永久想 idea +5、永久做实验 +5。`,
+    description: `你接受联合培养：科研上限 +${context.pendingCitationCapBonus}、导师资源 +2、永久想 idea +5、做实验 +5。`,
     preview: "联合培养",
     source: "fixed",
     blocking: true,
@@ -66,7 +66,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
   return {
     id: "joint-training-act2",
     title: "联合培养 ➜ 联培抉择",
-    description: "对方把合作推进到了更正式的层级：你可以借这条线拿到更强的学术回流，但也要接受它带来的持续绑定和额外负担。",
+    description: "联合培养能带来更多资源，也会增加长期任务。接受吗？",
     preview: "联合培养",
     source: "fixed",
     blocking: true,
@@ -116,7 +116,7 @@ export function createJointTrainingAct1(context: JointTrainingContext): PendingE
   return {
     id: "joint-training-act1",
     title: "联合培养邀约",
-    description: "大牛把你们前几次会后的交流正式推进成了一次联合培养邀约。它不是一次轻量合作，而是会持续改写你后续学术节奏的深绑定选项。",
+    description: "几次会后交流之后，对方正式邀请你参加联合培养。",
     preview: "联合培养",
     source: "fixed",
     blocking: true,

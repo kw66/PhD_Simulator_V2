@@ -76,7 +76,7 @@ export function createLearningRandomEvent(state: GameState): PendingEvent {
   return {
     id: `random-9-y${state.year}-m${state.month}-n${serial}`,
     title: "不断学习",
-    description: "你决定系统补一轮知识储备。收藏夹里从基础到前沿全都有，但时间只够选一条主线；你得判断补哪一块最能拉高后续产出。",
+    description: "你想补一轮知识，但时间只够学一个方向。",
     preview: "想学点新东西",
     source: "random",
     blocking: true,

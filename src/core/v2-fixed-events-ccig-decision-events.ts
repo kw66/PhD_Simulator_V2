@@ -12,20 +12,14 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
   const location = getCcigLocation(state.year);
   const realYear = getCcigRealYear(state.year, state.month);
   const { hasFullGear, discount, actualCost } = getCcigSelfPayCost(state);
-  const advisorHint = state.player.favor >= 6
-    ? "“和导师关系不错，让他报销应该没问题吧……”"
-    : "“让导师报销的话……他会不会不太高兴？毕竟最近好像没什么成果……”";
-  const selfPayHint = state.player.favor >= 6
-    ? "“自己掏钱的话有点肉疼，但也不用欠人情……”"
-    : "“自己掏钱比较省心，不用看导师脸色……”";
   const fullGearHint = hasFullGear
-    ? `整装待发生效：自费路径本次减免 ${discount} 金钱，实际只需 ${actualCost} 金钱。`
-    : "当前没有触发整装待发减免。";
+    ? `整装待发减免 ${discount}，自费需 ${actualCost} 金钱。`
+    : "";
 
   return createFixedEvent({
     id: `ccig-decision-act2-y${state.year}-m${state.month}`,
     title: "领域年会 ➜ 参会决定",
-    description: `导师把 CCIG ${realYear} 的通知转进群里，会址是 ${location}。你把参会方案拆开来看，发现本质上是三种代价模型：不去最省资源，但会直接错过线下窗口；导师报销现金压力最低，却要消耗关系资本；自费最干净，也最直接地消耗预算。${advisorHint}${selfPayHint}${fullGearHint}`,
+    description: `CCIG ${realYear} 在${location}举办。你可以不去、请导师报销，或自费参加。${fullGearHint}`,
     preview: `CCIG ${realYear} · ${location}，决定是否参加`,
     chainId: "ccig-decision",
     stage: "act2",
@@ -77,7 +71,7 @@ export function createCcigAttendResultEvent(
   return createFixedEvent({
     id: `ccig-attend-result-y${state.year}-m${state.month}-${mode}`,
     title: "领域年会 ➜ 参会决定 ➜ 参会确认",
-    description: `你最终决定参加 CCIG ${realYear}，按计划抵达 ${location}。路上你反复翻看议程，把和课题最相关的报告、海报和交流时段都提前标记出来。签到后胸牌、手册、会场地图一起塞满背包，你能感到“出发决策”已经完成，而“收益决策”才刚开始。${costText}`,
+    description: `你抵达${location}，准备参加 CCIG ${realYear}。${costText}`,
     preview: `CCIG ${realYear} · ${location}，准备进入会场`,
     chainId: "ccig-decision",
     stage: "act3",
@@ -100,7 +94,7 @@ export function createCcigSkipResultEvent(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `ccig-skip-result-y${state.year}-m${state.month}`,
     title: "领域年会 ➜ 参会决定 ➜ 暂不参会",
-    description: `你最终决定不去 ${location} 的 CCIG ${realYear}，把这次窗口主动让给了更可控的本地节奏。原本用于出行的时间被你切回实验、文献与代码整理，计划先把手头课题做到更扎实。这个决定更稳，但你也明确接受了它的机会成本。`,
+    description: `你没有参加${location}的 CCIG ${realYear}，把时间留给了手头的课题。`,
     preview: `CCIG ${realYear} · ${location}，本次不参会`,
     chainId: "ccig-decision",
     stage: "act3",
@@ -121,7 +115,7 @@ export function createCcigEvent(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `ccig-y${state.year}-m${state.month}`,
     title: "领域年会",
-    description: `导师把 CCIG ${realYear} 的通知转进群里，会址是 ${location}。消息一出来，组里立刻热闹起来，有人开始订票，有人已经在翻分论坛名单。这类会议的价值从来不止一场报告：主旨演讲、企业展台、同行交流、临时约谈，很多关键机会都藏在议程之外。`,
+    description: `导师转来 CCIG ${realYear} 的通知，会址是${location}。要去参加吗？`,
     preview: `CCIG ${realYear} · ${location}，是否参加？`,
     chainId: "ccig-decision",
     choices: [

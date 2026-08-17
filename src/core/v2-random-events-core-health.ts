@@ -68,7 +68,7 @@ export function createIllnessRandomEvent(
     event: {
       id: `random-3-y${state.year}-m${state.month}-n${serial}`,
       title: "疾病来袭",
-      description: "早上闹钟响了三次你才爬起来，喉咙发紧、四肢发沉，体温已经到 38.5°C。偏偏这周排着组会和实验节点，你得立刻在“保进度”和“保身体”之间做决定。",
+      description: "你发烧到 38.5°C，偏偏这周还有组会和实验节点。",
       preview: "身体不舒服，需要休息",
       source: "random",
       blocking: true,

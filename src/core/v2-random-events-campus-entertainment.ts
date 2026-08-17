@@ -12,7 +12,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState): PendingE
   return {
     id: `random-15-y${state.year}-m${state.month}-n${serial}`,
     title: "游戏放松",
-    description: "一天高强度学习和科研结束后，你决定留一点时间给娱乐。不同游戏会把你带向不同后果：有的更像社交补给，有的能练脑子，有的恢复快，也有的能换点零花钱。",
+    description: "忙完一天，你想打会儿游戏放松一下。玩什么？",
     preview: "学了一天，想放松一下...",
     source: "random",
     blocking: true,

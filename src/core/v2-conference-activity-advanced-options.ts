@@ -21,7 +21,7 @@ export function createAdvancedConferenceActivityOptions(
       id: "big-bull-coop",
       label: "🎓 找大牛合作（借联培继续深挖）",
       outcome: "借联培继续深挖合作，社交 +1，下次写论文分数 +8，科研上限 +1。",
-      resultDescription: "联培已经把合作通道打开，你这次继续把对话往更细处推进。按旧版真实口径，这会立刻带来社交 +1、下次写论文分数 +8，以及科研上限 +1。",
+      resultDescription: "你借联培继续推进合作：社交 +1，下次写论文 +8，科研上限 +1。",
       effects: {
         social: 1,
         temporaryActionEffectUpdates: {
@@ -76,7 +76,7 @@ export function createAdvancedConferenceActivityOptions(
       id: "smart-scholar",
       label: "🧠 和聪慧学者交流（深聊研究）",
       outcome: "交流研究细节，SAN +1，社交 +1，下次想 idea 多想 2 次。",
-      resultDescription: "你们围着研究细节越聊越深，既提振了一点状态，也为下一次想 idea 留下了更宽的展开空间：SAN +1，社交 +1，下次想 idea 多想 2 次。",
+      resultDescription: "你们深入聊了研究：SAN +1、社交 +1，下次想 idea 多 2 次。",
       effects: {
         san: 1,
         social: 1,
@@ -128,8 +128,8 @@ export function createAdvancedConferenceActivityOptions(
         ? "关系明显更近一步，SAN +8，SAN 上限 +3，并触发发展关系。"
         : "相处更自然了，SAN +8，SAN 上限 +3。",
       resultDescription: nextBeautifulCount >= 2
-        ? "你们从会场一路聊到散场，熟悉感已经不止是偶遇式的轻松。按旧版真实口径，这次推进会立刻带来 SAN +8、SAN 上限 +3，并触发后续的发展关系事件。"
-        : "你们这次相处比上回更自然，也更能让人卸下紧绷。按旧版真实口径，这次推进会立刻带来 SAN +8、SAN 上限 +3。",
+        ? "你们聊到散场：SAN +8、SAN 上限 +3，并触发关系事件。"
+        : "你们相处得更自然：SAN +8、SAN 上限 +3。",
       effects: {
         san: 8,
         sanCapDelta: 3,
@@ -150,8 +150,8 @@ export function createAdvancedConferenceActivityOptions(
         ? "关系更进一步，SAN +1，科研 +1，并触发发展关系。"
         : "讨论更投机了，SAN +1，科研 +1。",
       resultDescription: nextSmartCount >= 2
-        ? "你们把这次讨论一路推到彼此未来想做的事上。按旧版真实口径，这次推进会立刻带来 SAN +1、科研 +1，并触发后续的发展关系事件。"
-        : "这次交流让你们的讨论更像共同推进而不是简单寒暄。按旧版真实口径，这次推进会立刻带来 SAN +1、科研 +1。",
+        ? "你们聊到彼此未来的计划：SAN +1、科研 +1，并触发关系事件。"
+        : "这次讨论十分投机：SAN +1、科研 +1。",
       effects: {
         san: 1,
         research: 1,

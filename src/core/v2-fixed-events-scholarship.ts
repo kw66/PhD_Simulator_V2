@@ -52,7 +52,7 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
     return createFixedEvent({
       id: `scholarship-result-y${context.year}-m${context.month}`,
       title: "国奖评选 ➜ 结果公布",
-      description: `名单终于公布。你的科研积分为 ${context.score} 分，本轮分数线为 ${context.requirement} 分，成功获奖。按已核定旧版口径，本年奖学金奖励为金钱 +${context.reward}。`,
+      description: `名单公布：科研分 ${context.score}，分数线 ${context.requirement}。你成功获奖，奖金 +${context.reward}。`,
       preview: "奖学金结果已公布",
       chainId: "scholarship",
       stage: "result",
@@ -72,7 +72,7 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
   return createFixedEvent({
     id: `scholarship-result-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 结果公布",
-    description: `名单终于公布。你的科研积分为 ${context.score} 分，本轮分数线为 ${context.requirement} 分，遗憾落选。`,
+    description: `名单公布：科研分 ${context.score}，分数线 ${context.requirement}。你遗憾落选。`,
     preview: "奖学金结果已公布",
     chainId: "scholarship",
     stage: "result",
@@ -90,24 +90,24 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
 function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "success">): PendingEvent {
   const diff = context.score - context.requirement;
   const success = diff >= 0;
-  let descriptionTail = "你的分数已经明显压过本轮线，心里大致有底。";
+  let descriptionTail = "分数明显过线。";
   let label = "等待结果";
 
   if (diff === 0) {
-    descriptionTail = "你刚好卡在分界附近，结果出来前很难彻底放心。";
+    descriptionTail = "你刚好压线。";
     label = "继续等待";
   } else if (diff < 0 && diff >= -2) {
-    descriptionTail = "你的分数略显危险，结果很可能只差一口气。";
+    descriptionTail = "还差一点。";
     label = "继续等待";
   } else if (diff < -2) {
-    descriptionTail = "你的分数和今年线有明显差距，这次更像一次年度体检。";
+    descriptionTail = "与分数线差距明显。";
     label = "接受结果";
   }
 
   return createFixedEvent({
     id: `scholarship-score-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 查看积分",
-    description: `你打开系统，看到自己本年度科研积分为 ${context.score} 分；当前年级的评选线为 ${context.requirement} 分。${descriptionTail}`,
+    description: `科研分 ${context.score}，评选线 ${context.requirement}。${descriptionTail}`,
     preview: "查看当前积分与评选线",
     chainId: "scholarship",
     stage: "act2",
@@ -139,7 +139,7 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
   return createFixedEvent({
     id: `scholarship-y${state.year}-m${state.month}`,
     title: "国奖评选",
-    description: `晚上十点，学院系统推送了“国奖评选启动”通知。${gradeLabel}年级本轮按本年度科研积分排序，你准备先点开积分页面，判断自己离分数线还有多远。`,
+    description: `学院启动国奖评选，${gradeLabel}按本年度科研分排序。`,
     preview: "奖学金评选通知，查看评选结果",
     chainId: "scholarship",
     choices: [

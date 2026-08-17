@@ -21,8 +21,8 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
   const nextRejectCount = context.rejectedInternshipCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
   const description = permanentlyBlocked
-    ? `你最终还是把这次机会放回了邮箱深处。实习拒绝计数来到 ${nextRejectCount} / 2，这条企业线按旧版真实口径已永久关闭。`
-    : `你决定先把节奏稳在学术线上。实习拒绝计数 +1，当前为 ${nextRejectCount} / 2；后续若再次通过企业交流接触产业线，仍可能再收到一次邀请。`;
+    ? `你再次拒绝实习邀请，这条企业线已关闭（${nextRejectCount}/2）。`
+    : `你暂时拒绝实习邀请（${nextRejectCount}/2），以后仍可能再收到一次。`;
 
   return {
     id: `internship-invite-result-decline-${nextRejectCount}`,
@@ -47,7 +47,7 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
   return {
     id: `internship-invite-result-accept-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习已确认",
-    description: `你接受了这份远程实习。已确认口径：实习周期 6 个月；实习激活后做实验分数 ×1.25；按当前状态估算，月收益为金钱 +${context.currentMonthlyIncome}；旧版真实运行口径为每月 SAN -2，收益会随 A 类发表数与总引用实时变化。`,
+    description: `你接受了 6 个月远程实习：实验分 ×1.25，每月金钱 +${context.currentMonthlyIncome}、SAN -2。收益会随 A 类论文与引用变化。`,
     preview: "实习邀请",
     source: "fixed",
     blocking: true,
@@ -73,7 +73,7 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
   return {
     id: `internship-invite-act2-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择",
-    description: `你又把邀请邮件完整读了一遍：工业研发流程、交付压力和短期资源回流都写得很清楚。${warningText}`,
+    description: `远程实习能带来收入和产业经验，也会持续消耗时间与精力。${warningText}`,
     preview: "实习邀请",
     source: "fixed",
     blocking: true,
@@ -110,7 +110,7 @@ export function createInternshipInviteAct1(context: InternshipInviteContext): Pe
   return {
     id: `internship-invite-act1-${context.totalMonths}`,
     title: "实习邀请",
-    description: "会后你收到一封远程实习邀请。对方给出的方向和你现在的研究并不冲突，甚至有一定互补；真正的问题在于，你必须立刻决定是否把接下来几个月的缓冲时间压缩掉。",
+    description: "会后，你收到一份与研究方向相关的远程实习邀请。",
     preview: "实习邀请",
     source: "fixed",
     blocking: true,

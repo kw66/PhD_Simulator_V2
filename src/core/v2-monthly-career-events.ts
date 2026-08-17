@@ -56,7 +56,7 @@ function createCareerEvent(state: GameState, careerType: CareerType): PendingEve
   return {
     id: `career-${careerType}-y${state.year}-m${state.month}`,
     title: `${definition.name}求职推进`,
-    description: `你正在持续推进${definition.name}路线。当前处于${level.name}阶段，累计进度 ${progress}；继续投入可以尝试把最好 offer 再往上推。`,
+    description: `${definition.name}路线：${level.name}，进度 ${progress}。继续投入可冲击更好的 offer。`,
     preview: `${definition.name} · ${level.name} · 进度 ${progress}`,
     source: "career",
     blocking: true,

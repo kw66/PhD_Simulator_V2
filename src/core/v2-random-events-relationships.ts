@@ -12,7 +12,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   return {
     id: `random-10-y${state.year}-m${state.month}-n${serial}`,
     title: "\u540c\u95e8\u5408\u4f5c",
-    description: "\u540c\u95e8\u9080\u4f60\u4e00\u8d77\u5408\u4f5c\u8bba\u6587\u3002\u4f60\u5f97\u5728\u5b66\u672f\u4ea4\u6d41\u3001\u4e92\u6302\u8bba\u6587\u3001\u5168\u9762\u5408\u4f5c\u548c\u5a49\u62d2\u5408\u4f5c\u4e4b\u95f4\u505a\u51fa\u9009\u62e9\u3002",
+    description: "同门邀请你合作论文。你准备合作到什么程度？",
     preview: "\u540c\u95e8\u627e\u4f60\u5408\u4f5c",
     source: "random",
     blocking: true,
@@ -76,7 +76,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   return {
     id: `random-11-y${state.year}-m${state.month}-n${serial}`,
     title: eventTitle,
-    description: `\u4e34\u8fd1\u6bd5\u4e1a\u7684${roleText}\u9080\u4f60\u4e00\u8d77\u505a\u9879\u76ee\u3002\u4f60\u77e5\u9053\u8fd9\u7c7b\u5408\u4f5c\u5e38\u5e38\u51b3\u5b9a\u4e00\u4e2a\u65b0\u4eba\u540e\u7eed\u4e24\u4e09\u5b66\u671f\u7684\u6210\u957f\u8def\u5f84\uff0c\u8fd9\u6b21\u5f97\u5224\u65ad\u81ea\u5df1\u8be5\u6295\u5165\u5230\u4ec0\u4e48\u6df1\u5ea6\u3002`,
+    description: `临近毕业的${roleText}邀请你合作项目。你准备投入多少？`,
     preview: `${roleText}\u627e\u4f60\u5408\u4f5c`,
     source: "random",
     blocking: true,
