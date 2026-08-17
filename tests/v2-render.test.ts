@@ -427,7 +427,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders green action badges after enrollment when no event blocks progress", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     state = dispatchAction(state, "next-month");
     state = {
       ...state,
@@ -450,7 +450,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders actionable shop tabs with buy sell and upgrade entry points", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     state = dispatchAction(state, "next-month");
     state = {
       ...state,
@@ -503,7 +503,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders workstation conference page, slot cards and graduation page from local ui state", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     state = dispatchAction(state, "next-month");
 
     const firstPaper = {
@@ -850,7 +850,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders character talents by default with switch buttons", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
 
     const html = renderApp(state, createDefaultAccountProfile());
 
@@ -866,7 +866,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders relation and equip talent tabs from play ui state", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     state = dispatchAction(state, "next-month");
 
     const junior = createCustomFellowProgressProfile({
@@ -1036,7 +1036,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders next-month gold sources with legacy income expense breakdown", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     const html = renderApp(state, createDefaultAccountProfile());
 
     expect(html).toContain('data-effect-id="next-month-gold"');
@@ -1047,7 +1047,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders log pagination with the latest month page by default", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     state = dispatchAction(state, "next-month");
     const html = renderApp(state, createDefaultAccountProfile());
 
@@ -1063,7 +1063,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders consistent workstation, relationship, and shop locks before enrollment", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     const html = renderApp(state, createDefaultAccountProfile());
 
     expect(html.match(/class="section-empty play-module-lock-state">入学后开放<\/div>/g)).toHaveLength(3);
@@ -1080,7 +1080,7 @@ describe("v2 render lobby shell", () => {
 
   it("renders legacy-style relationship slots and per-card actions after enrollment", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     state = dispatchAction(state, "next-month");
 
     const junior = createCustomFellowProgressProfile({
@@ -1131,7 +1131,7 @@ describe("v2 render lobby shell", () => {
 
   it("keeps the relationship header aligned to the legacy single-card layout", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     state = dispatchAction(state, "next-month");
 
     const html = renderApp(state, createDefaultAccountProfile());
@@ -1146,7 +1146,7 @@ describe("v2 render lobby shell", () => {
 
   it("filters transient blocked hints out of the game log panel", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
-    state = dispatchAction(state, "start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    state = dispatchAction(state, "start-game", { roleId: "normal", advisorName: "测试导师" });
     state = dispatchAction(state, "next-month");
     state = {
       ...state,

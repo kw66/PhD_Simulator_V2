@@ -313,7 +313,7 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
   if (state.eventSupport.hasFinanceTalent) {
     addGold("理财能手", Math.ceil(Math.max(0, state.player.money) * 0.03));
   }
-  addGold("导师工资", getAdvisorSalaryForMonth(state.selectedAdvisorId, state.degree, calendarMonth));
+  addGold("导师工资", getAdvisorSalaryForMonth(state.selectedAdvisorName, state.degree, calendarMonth));
 
   addSan("基础休息", 1);
   addGold("基础开销", -BASE_MONTHLY_LIVING_COST);
@@ -571,7 +571,7 @@ function shouldPreviewPhdDecision(state: GameState, targetYear: number, targetMo
   if (targetMonth !== 10 || (targetYear !== 2 && targetYear !== 3)) {
     return false;
   }
-  return getPhdDecisionRequirement(state.selectedAdvisorId, targetYear) !== null;
+  return getPhdDecisionRequirement(state.selectedAdvisorName, targetYear) !== null;
 }
 
 function shouldPreviewAdvisorRetention(state: GameState, targetYear: number, targetMonth: number): boolean {
@@ -585,7 +585,7 @@ function shouldPreviewAdvisorRetention(state: GameState, targetYear: number, tar
     return false;
   }
 
-  const phdGradRequirement = getGraduationScoreTarget("phd", state.selectedAdvisorId);
+  const phdGradRequirement = getGraduationScoreTarget("phd", state.selectedAdvisorName);
   return phdGradRequirement !== null && state.totalResearchScore >= phdGradRequirement;
 }
 
@@ -1368,7 +1368,7 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
   const preEnrollment = isPreEnrollmentState(state);
   const cards: Array<RelationshipRenderCard | null> = Array.from({ length: 5 }, () => null);
 
-  if (state.selectedAdvisorId && state.relationshipState.advisorCount > 0) {
+  if (state.selectedAdvisorName && state.relationshipState.advisorCount > 0) {
     cards[0] = {
       slotIndex: 0,
       type: "advisor",

@@ -3,27 +3,23 @@ import { createAdvisorProgressState, resolveAdvisorTaskAdvance, tickAdvisorProgr
 
 describe("v2 advisor progress", () => {
   it("uses the former associate-professor ranges for every lecturer", () => {
-    const advisorIds = ["chen-ming", "zhou-lan", "lin-hao", "zhao-ning"] as const;
-
-    for (const advisorId of advisorIds) {
-      expect(createAdvisorProgressState(advisorId, () => 0)).toMatchObject({
-        researchResource: 3,
-        affinity: 3,
-        taskMultiplier: 6,
-        taskMax: 38,
-      });
-      expect(createAdvisorProgressState(advisorId, () => 0.999999)).toMatchObject({
-        researchResource: 6,
-        affinity: 5,
-        taskMultiplier: 10,
-        taskMax: 80,
-      });
-    }
+    expect(createAdvisorProgressState(true, () => 0)).toMatchObject({
+      researchResource: 3,
+      affinity: 3,
+      taskMultiplier: 6,
+      taskMax: 38,
+    });
+    expect(createAdvisorProgressState(true, () => 0.999999)).toMatchObject({
+      researchResource: 6,
+      affinity: 5,
+      taskMultiplier: 10,
+      taskMax: 80,
+    });
   });
 
   it("unlocks interaction with overflow during monthly relation growth", () => {
     const state = {
-      ...createAdvisorProgressState("zhao-ning", () => 0),
+      ...createAdvisorProgressState(true, () => 0),
       affinity: 4,
       relationProgress: 38,
       taskUsedThisMonth: true,
@@ -38,7 +34,7 @@ describe("v2 advisor progress", () => {
 
   it("cycles completion rewards and recalculates taskMax", () => {
     const base = {
-      ...createAdvisorProgressState("zhao-ning", () => 0),
+      ...createAdvisorProgressState(true, () => 0),
       researchResource: 3,
       affinity: 4,
       taskMultiplier: 6,

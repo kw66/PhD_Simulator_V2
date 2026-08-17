@@ -1,4 +1,4 @@
-import type { AdvisorDefinition, AdvisorRequirements, PaperTarget, RoleBaseId, RoleDefinition, RoleId } from "./v2-types";
+import type { AdvisorRequirements, PaperTarget, RoleBaseId, RoleDefinition, RoleId } from "./v2-types";
 
 export const MASTER_TOTAL_MONTHS = 34;
 export const PHD_TOTAL_MONTHS = 58;
@@ -255,13 +255,6 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
     awakenDesc: "每月:科研/社交/好感/SAN/金全部随机交换，可突破属性上限",
     startingStats: { san: 20, research: 1, social: 1, favor: 1, money: 1 },
   },
-];
-
-export const ADVISOR_DEFINITIONS: AdvisorDefinition[] = [
-  { id: "chen-ming", color: "#b8860b" },
-  { id: "zhou-lan", color: "#e67e22" },
-  { id: "lin-hao", color: "#3498db" },
-  { id: "zhao-ning", color: "#2ecc71" },
 ];
 
 export const ADVISOR_REQUIREMENTS: AdvisorRequirements = {

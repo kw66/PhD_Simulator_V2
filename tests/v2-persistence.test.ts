@@ -89,11 +89,9 @@ describe("manual persistence", () => {
     const state = createInitialState();
     savePersistedState({
       ...state,
-      selectedAdvisorId: "chen-ming",
       selectedAdvisorName: "李旭霖",
     });
 
-    expect(loadPersistedState()?.selectedAdvisorId).toBe("chen-ming");
     expect(loadPersistedState()?.selectedAdvisorName).toBe("李旭霖");
   });
 

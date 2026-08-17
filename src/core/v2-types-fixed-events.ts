@@ -30,7 +30,6 @@ export interface FixedEventJuniorCandidate {
 }
 
 export interface FixedEventAdvisorCandidate {
-  advisorId: "chen-ming" | "zhou-lan" | "lin-hao" | "zhao-ning";
   advisorName: string;
   researchResource: number;
   affinity: number;

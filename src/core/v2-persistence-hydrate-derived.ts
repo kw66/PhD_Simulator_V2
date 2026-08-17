@@ -28,7 +28,6 @@ import {
   normalizeResearchCapacityState,
 } from "./v2-persistence-normalize-life";
 import { isObject } from "./v2-persistence-validate";
-import { normalizeAdvisorId } from "./v2-progression";
 import type { GameState } from "./v2-types";
 
 export function normalizeThesisState(value: Record<string, unknown>): GameState["thesis"] {
@@ -96,7 +95,6 @@ export function buildNormalizedHydratedState(
 ): Pick<
   GameState,
   | "sanCap"
-  | "selectedAdvisorId"
   | "selectedAdvisorName"
   | "totalCitations"
   | "externalPublications"
@@ -141,7 +139,6 @@ export function buildNormalizedHydratedState(
   const eventSupport = normalizeEventSupportState(value);
 
   return {
-    selectedAdvisorId: normalizeAdvisorId(value.selectedAdvisorId),
     selectedAdvisorName: typeof value.selectedAdvisorName === "string" ? value.selectedAdvisorName : null,
     sanCap: typeof value.sanCap === "number" ? value.sanCap : 20,
     totalCitations: typeof value.totalCitations === "number" ? value.totalCitations : 0,

@@ -88,7 +88,7 @@ function maybeOpenPhdDecision(state: GameState): GameState {
   if (state.degree !== "master") return state;
   if (state.month !== 10 || (state.year !== 2 && state.year !== 3)) return state;
 
-  const requiredScore = getPhdDecisionRequirement(state.selectedAdvisorId, state.year);
+  const requiredScore = getPhdDecisionRequirement(state.selectedAdvisorName, state.year);
   if (requiredScore === null) return state;
   if (state.totalResearchScore < requiredScore) {
     return pushLog(state, `第 ${state.year} 年 10 月转博线为 ${requiredScore} 分，你当前只有 ${state.totalResearchScore} 分。`);
@@ -101,7 +101,7 @@ function maybeOpenPhdDecision(state: GameState): GameState {
 }
 
 export function currentGraduationTarget(state: GameState): number {
-  return getGraduationScoreTarget(state.degree, state.selectedAdvisorId) ?? state.graduationScoreTarget ?? 0;
+  return getGraduationScoreTarget(state.degree, state.selectedAdvisorName) ?? state.graduationScoreTarget ?? 0;
 }
 
 export function currentMonthLimit(state: GameState): number {
@@ -205,7 +205,7 @@ export function resolveQueuedEvent(
 
 export function resolvePhdYes(state: GameState): GameState {
   if (!state.pendingDecision) return state;
-  const phdGraduationTarget = getGraduationScoreTarget("phd", state.selectedAdvisorId);
+  const phdGraduationTarget = getGraduationScoreTarget("phd", state.selectedAdvisorName);
   if (phdGraduationTarget === null) {
     return pushLog(state, "导师尚未确定，当前无法继续转博决策。");
   }

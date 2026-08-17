@@ -77,7 +77,7 @@ describe("v2 store manual saves", () => {
   it("可以保存到手动槽并从手动槽读档", () => {
     const store = createStore();
     store.dispatch("select-role", { roleId: "normal" });
-    store.dispatch("start-game", { roleId: "normal", advisorId: "lin-hao", advisorName: "李旭霖" });
+    store.dispatch("start-game", { roleId: "normal", advisorName: "李旭霖" });
     store.dispatch("next-month");
     store.dispatch("debug-seed-paper", { paperTarget: "C" });
     store.dispatch("save-manual", { manualSlot: 1 });
@@ -91,14 +91,13 @@ describe("v2 store manual saves", () => {
     store.dispatch("load-manual", { manualSlot: 1 });
     expect(store.getState().phase).toBe("playing");
     expect(store.getState().selectedRoleId).toBe("normal");
-    expect(store.getState().selectedAdvisorId).toBe("lin-hao");
     expect(store.getState().selectedAdvisorName).toBe("李旭霖");
     expect(store.getState().papers.length).toBe(1);
   });
 
   it("可以删除手动槽", () => {
     const store = createStore();
-    store.dispatch("start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    store.dispatch("start-game", { roleId: "normal", advisorName: "测试导师" });
     store.dispatch("save-manual", { manualSlot: 2 });
     expect(store.getState().manualSaveSummaries.some((item) => item.slot === 2)).toBe(true);
 
@@ -107,7 +106,7 @@ describe("v2 store manual saves", () => {
   });
   it("supports debug tools for faster manual testing", () => {
     const store = createStore();
-    store.dispatch("start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    store.dispatch("start-game", { roleId: "normal", advisorName: "测试导师" });
 
     store.dispatch("debug-adjust-stat", { debugStatId: "money", delta: 10 });
     expect(store.getState().player.money).toBe(11);
@@ -135,7 +134,7 @@ describe("v2 store manual saves", () => {
 
   it("restarts immediately with the current role without settling the abandoned run", () => {
     const store = createStore();
-    store.dispatch("start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    store.dispatch("start-game", { roleId: "normal", advisorName: "测试导师" });
     const startingResearch = store.getState().player.research;
     store.dispatch("debug-adjust-stat", { debugStatId: "research", delta: 12 });
     store.dispatch("next-month");
@@ -145,7 +144,7 @@ describe("v2 store manual saves", () => {
 
     expect(store.getState().phase).toBe("playing");
     expect(store.getState().selectedRoleId).toBe("normal");
-    expect(store.getState().selectedAdvisorId).toBeNull();
+    expect(store.getState().selectedAdvisorName).toBeNull();
     expect(store.getState().totalMonths).toBe(0);
     expect(store.getState().player.research).toBe(startingResearch);
     expect(store.getState().eventQueue.some((item) => item.chainId === "before-grad-school")).toBe(true);
@@ -157,7 +156,7 @@ describe("v2 store manual saves", () => {
     const firstStore = createStore();
     firstStore.dispatch("select-role", { roleId: "genius" });
     expect(firstStore.getAccountProfile().selectedLobbyRoleId).toBe("genius");
-    firstStore.dispatch("start-game", { roleId: "normal", advisorId: "zhao-ning" });
+    firstStore.dispatch("start-game", { roleId: "normal", advisorName: "测试导师" });
     expect(firstStore.getState().phase).toBe("playing");
 
     installMockWindow("?start=setup", localStorage);

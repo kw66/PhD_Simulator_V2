@@ -70,7 +70,7 @@ export function collectFixedEventsForState(
 ): PendingEvent[] {
   const events: PendingEvent[] = [];
 
-  if (state.totalMonths === 0 && state.selectedAdvisorId === null) {
+  if (state.totalMonths === 0 && state.selectedAdvisorName === null) {
     events.push(createBeforeGradSchoolAct1Event(state, getRoll));
     return events;
   }

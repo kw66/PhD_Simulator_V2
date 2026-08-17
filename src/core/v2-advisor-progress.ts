@@ -1,4 +1,4 @@
-import type { AdvisorId, AdvisorProgressState } from "./v2-types";
+import type { AdvisorProgressState } from "./v2-types";
 
 export const MAX_ADVISOR_RESEARCH_RESOURCE = 20;
 const ADVISOR_RELATION_MAX = 40;
@@ -52,8 +52,8 @@ export function clampAdvisorResearchResource(value: number): number {
   return Math.max(0, Math.min(MAX_ADVISOR_RESEARCH_RESOURCE, Math.floor(value)));
 }
 
-export function createAdvisorProgressState(advisorId?: AdvisorId, getRoll: () => number = Math.random): AdvisorProgressState {
-  if (!advisorId) {
+export function createAdvisorProgressState(hasAdvisor = false, getRoll: () => number = Math.random): AdvisorProgressState {
+  if (!hasAdvisor) {
     return createAdvisorProgressSnapshot(0, 0, 8);
   }
 

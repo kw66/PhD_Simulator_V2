@@ -62,14 +62,14 @@ describe("v2 before grad school events", () => {
     expect(act1.choices.map((choice) => choice.label)).toEqual(["联系导师"]);
   });
 
-  it("combines random lecturer names at the roll boundaries", () => {
+  it("draws lecturer names from the curated pool at the roll boundaries", () => {
     const firstInfo = getAdvisorInfoEvent(0);
     const lastInfo = getAdvisorInfoEvent(0.999999);
 
-    expect(firstInfo.id).toBe("before-grad-school-advisor-info-chen-ming");
+    expect(firstInfo.id).toBe("before-grad-school-advisor-info");
     expect(firstInfo.description).toContain("李旭旭 · 讲师");
-    expect(lastInfo.id).toBe("before-grad-school-advisor-info-zhao-ning");
-    expect(lastInfo.description).toContain("章名 · 讲师");
+    expect(lastInfo.id).toBe("before-grad-school-advisor-info");
+    expect(lastInfo.description).toContain("王江 · 讲师");
   });
 
   it("uses active contact instead of assignment and shows one lecturer's relevant information", () => {
@@ -81,7 +81,7 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.stage).toBe("act2");
     expect(advisorInfo.title).toBe("读研之始");
     expect(advisorInfo.description).toContain("你给感兴趣的老师发了邮件，又找组里的学生问了问。");
-    expect(advisorInfo.description).toContain("辛英英 · 讲师");
+    expect(advisorInfo.description).toContain("梁哲哲 · 讲师");
     expect(advisorInfo.description).not.toContain("讲师回信后");
     expect(advisorInfo.description).not.toContain("搜集信息");
     expect(advisorInfo.description).toContain("每月组会｜横向较少｜研二可实习");
@@ -101,8 +101,7 @@ describe("v2 before grad school events", () => {
     expect(resolution).toEqual({
       kind: "advisor-confirm",
       advisorCandidate: {
-        advisorId: "lin-hao",
-        advisorName: "辛英英",
+        advisorName: "梁哲哲",
         researchResource: 4,
         affinity: 4,
         taskMultiplier: 6,
@@ -188,7 +187,6 @@ describe("v2 before grad school events", () => {
       expect(state.log).toEqual(originalLog);
       expect(refreshedEvent?.description).not.toBe(originalEvent.description);
       expect(refreshedCandidate?.advisorName).not.toBe(originalCandidate?.advisorName);
-      expect(refreshedCandidate?.advisorId).toBe(originalCandidate?.advisorId);
       expect(refreshedCandidate).toMatchObject({
         researchResource: 4,
         affinity: 4,
@@ -197,7 +195,7 @@ describe("v2 before grad school events", () => {
       expect(state.player).toEqual(originalPlayer);
       expect(state.advisorProgressState).toEqual(originalAdvisorProgress);
       expect(state.relationshipState).toEqual(originalRelationshipState);
-      expect(state.selectedAdvisorId).toBeNull();
+      expect(state.selectedAdvisorName).toBeNull();
 
       const confirmChoice = refreshedEvent?.choices.find((choice) => choice.label === "回复导师");
       if (!refreshedEvent || !confirmChoice || !refreshedCandidate) {
@@ -208,7 +206,6 @@ describe("v2 before grad school events", () => {
         eventChoiceId: confirmChoice.id,
       });
 
-      expect(state.selectedAdvisorId).toBe(refreshedCandidate.advisorId);
       expect(state.selectedAdvisorName).toBe(refreshedCandidate.advisorName);
       expect(state.eventQueue[0]?.stage).toBe("result");
       expect(state.eventQueue[0]?.choices.map((choice) => choice.label)).toEqual(["准备报到"]);
@@ -230,7 +227,6 @@ describe("v2 before grad school events", () => {
     );
     const admissionEvent = resolved.enqueueEvents?.[0];
 
-    expect(resolved.nextState.selectedAdvisorId).toBe("chen-ming");
     expect(resolved.nextState.selectedAdvisorName).toBe("李旭旭");
     expect(resolved.nextState.graduationScoreTarget).toBe(1);
     expect(resolved.nextState.relationshipState.advisorCount).toBe(1);
@@ -245,7 +241,7 @@ describe("v2 before grad school events", () => {
     expect(resolved.outcome).toContain("进了实验室群");
     expect(resolved.outcome).not.toContain("分配");
     expect(admissionEvent).toMatchObject({
-      id: "before-grad-school-admission-chen-ming",
+      id: "before-grad-school-admission",
       title: "读研之始",
       chainId: "before-grad-school",
       stage: "result",

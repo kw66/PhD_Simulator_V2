@@ -444,7 +444,7 @@ function buildDebugEvent(state: GameState, eventId: string): { nextState: GameSt
         return { nextState: state, event: null };
       }
       const year = state.year >= 3 ? 3 : 2;
-      const requiredScore = getPhdDecisionRequirement(state.selectedAdvisorId, year) ?? Math.max(1, state.totalResearchScore);
+      const requiredScore = getPhdDecisionRequirement(state.selectedAdvisorName, year) ?? Math.max(1, state.totalResearchScore);
       return {
         nextState: {
           ...state,

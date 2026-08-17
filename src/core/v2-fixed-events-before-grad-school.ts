@@ -6,13 +6,15 @@ import {
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
 import {
-  getAdvisorDefinition,
   getGraduationScoreTarget,
 } from "./v2-progression";
-import { generateRandomChineseName } from "./v2-random-name";
+import {
+  pickRandomAdvisorName,
+  RANDOM_ADVISOR_GIVEN_CHARS,
+  RANDOM_ADVISOR_SURNAMES,
+} from "./v2-random-name";
 import { tryAddRelationship } from "./v2-relationship-rules";
 import type {
-  AdvisorId,
   FixedEventAdvisorIntel,
   FixedEventResolution,
   GameState,
@@ -24,13 +26,6 @@ const LECTURER_INITIAL_PROFILE = {
   affinity: 4,
   taskMultiplier: 6,
 } as const;
-
-const BEFORE_GRAD_SCHOOL_ADVISOR_IDS: AdvisorId[] = [
-  "chen-ming",
-  "zhou-lan",
-  "lin-hao",
-  "zhao-ning",
-];
 
 const ADVISOR_INTEL_OPTIONS = {
   reporting: ["周报 + 组会", "每周组会", "隔周组会", "每月组会", "按需组会", "周报为主"],
@@ -55,15 +50,6 @@ function pickRandomText(
   return options[Math.floor(normalizedRoll * options.length)] ?? options[0] ?? "";
 }
 
-function getRandomAdvisorId(getRoll: RandomRollProvider): AdvisorId {
-  const rawRoll = getRoll();
-  const normalizedRoll = Number.isFinite(rawRoll)
-    ? Math.min(0.999999, Math.max(0, rawRoll))
-    : 0;
-  return BEFORE_GRAD_SCHOOL_ADVISOR_IDS[Math.floor(normalizedRoll * BEFORE_GRAD_SCHOOL_ADVISOR_IDS.length)]
-    ?? BEFORE_GRAD_SCHOOL_ADVISOR_IDS[0];
-}
-
 function createRandomAdvisorIntel(getRoll: RandomRollProvider): FixedEventAdvisorIntel {
   return {
     reporting: pickRandomText(ADVISOR_INTEL_OPTIONS.reporting, getRoll),
@@ -83,11 +69,20 @@ function createDifferentAdvisorName(
   getRoll: RandomRollProvider,
 ): string {
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const nextName = generateRandomChineseName(getRoll);
+    const nextName = pickRandomAdvisorName(getRoll);
     if (nextName !== currentName) return nextName;
   }
 
-  return currentName === "李旭" ? "王晨" : "李旭";
+  for (const surname of RANDOM_ADVISOR_SURNAMES) {
+    for (const first of RANDOM_ADVISOR_GIVEN_CHARS) {
+      for (const second of RANDOM_ADVISOR_GIVEN_CHARS) {
+        const nextName = surname + first + second;
+        if (nextName !== currentName) return nextName;
+      }
+    }
+  }
+
+  return currentName;
 }
 
 function createDifferentAdvisorIntel(
@@ -113,14 +108,11 @@ function createDifferentAdvisorIntel(
 }
 
 function createAdvisorInfoEvent(
-  advisorId: AdvisorId,
   advisorName: string,
   intel: FixedEventAdvisorIntel,
 ): PendingEvent {
-  const advisor = getAdvisorDefinition(advisorId);
-
   return createFixedEvent({
-    id: `before-grad-school-advisor-info-${advisor.id}`,
+    id: "before-grad-school-advisor-info",
     title: "读研之始",
     description: [
       "你给感兴趣的老师发了邮件，又找组里的学生问了问。",
@@ -137,7 +129,7 @@ function createAdvisorInfoEvent(
     stage: "act2",
     choices: [
       {
-        id: `before-grad-school-reroll-${advisor.id}`,
+        id: "before-grad-school-reroll",
         label: "换个导师",
         outcome: "",
         effects: {
@@ -145,7 +137,6 @@ function createAdvisorInfoEvent(
           fixedEventResolution: {
             kind: "advisor-reroll",
             advisorCandidate: {
-              advisorId,
               advisorName,
               ...LECTURER_INITIAL_PROFILE,
             },
@@ -154,14 +145,13 @@ function createAdvisorInfoEvent(
         },
       },
       {
-        id: `before-grad-school-confirm-${advisor.id}`,
+        id: "before-grad-school-confirm",
         label: "回复导师",
         outcome: "",
         effects: {
           fixedEventResolution: {
             kind: "advisor-confirm",
             advisorCandidate: {
-              advisorId,
               advisorName,
               ...LECTURER_INITIAL_PROFILE,
             },
@@ -172,12 +162,9 @@ function createAdvisorInfoEvent(
   });
 }
 
-function createBeforeGradSchoolResultEvent(
-  advisorId: AdvisorId,
-): PendingEvent {
-  const advisor = getAdvisorDefinition(advisorId);
+function createBeforeGradSchoolResultEvent(): PendingEvent {
   return createFixedEvent({
-    id: `before-grad-school-admission-${advisor.id}`,
+    id: "before-grad-school-admission",
     title: "读研之始",
     description: "录取通知书寄到了。你拍张照片晒到朋友圈，读研这件事终于有了实感。",
     preview: "收到录取通知书",
@@ -185,7 +172,7 @@ function createBeforeGradSchoolResultEvent(
     stage: "result",
     choices: [
       {
-        id: `before-grad-school-finish-${advisor.id}`,
+        id: "before-grad-school-finish",
         label: "准备报到",
         outcome: "准备入学。",
         effects: {},
@@ -198,8 +185,7 @@ export function createBeforeGradSchoolAct1Event(
   _state: GameState,
   getRoll: RandomRollProvider = Math.random,
 ): PendingEvent {
-  const advisorId = getRandomAdvisorId(getRoll);
-  const advisorName = generateRandomChineseName(getRoll);
+  const advisorName = pickRandomAdvisorName(getRoll);
   const advisorIntel = createRandomAdvisorIntel(getRoll);
   return createFixedEvent({
     id: "before-grad-school-qualification",
@@ -217,7 +203,7 @@ export function createBeforeGradSchoolAct1Event(
         label: "联系导师",
         outcome: "查看导师信息。",
         effects: {
-          enqueueEvents: [createAdvisorInfoEvent(advisorId, advisorName, advisorIntel)],
+          enqueueEvents: [createAdvisorInfoEvent(advisorName, advisorIntel)],
         },
       },
     ],
@@ -236,15 +222,13 @@ export function resolveAdvisorConfirmation(
     };
   }
 
-  const advisor = getAdvisorDefinition(candidate.advisorId);
   const relationshipState = state.relationshipState.advisorCount > 0
     ? { ...state.relationshipState }
     : tryAddRelationship(state.relationshipState, "advisor").nextState;
   const nextState: GameState = {
     ...state,
-    selectedAdvisorId: advisor.id,
     selectedAdvisorName: candidate.advisorName,
-    graduationScoreTarget: getGraduationScoreTarget("master", advisor.id),
+    graduationScoreTarget: getGraduationScoreTarget("master", candidate.advisorName),
     relationshipState,
     advisorProgressState: createAdvisorProgressStateFromValues(
       candidate.researchResource,
@@ -256,7 +240,7 @@ export function resolveAdvisorConfirmation(
   return {
     nextState,
     outcome: `加入${candidate.advisorName}讲师的课题组，也进了实验室群。`,
-    enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id)],
+    enqueueEvents: [createBeforeGradSchoolResultEvent()],
   };
 }
 
@@ -276,8 +260,8 @@ export function resolveAdvisorReroll(
 
   const advisorName = createDifferentAdvisorName(candidate.advisorName, getRoll);
   const advisorIntel = createDifferentAdvisorIntel(currentIntel, getRoll);
-  const refreshedEvent = createAdvisorInfoEvent(candidate.advisorId, advisorName, advisorIntel);
-  const eventId = `before-grad-school-advisor-info-${candidate.advisorId}`;
+  const refreshedEvent = createAdvisorInfoEvent(advisorName, advisorIntel);
+  const eventId = "before-grad-school-advisor-info";
 
   return {
     nextState: {

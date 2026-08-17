@@ -32,7 +32,6 @@ function buildSummary(slot: ManualSlotId, savedAt: string, state: GameState): Ma
     totalMonths: state.totalMonths,
     totalResearchScore: state.totalResearchScore,
     selectedRoleId: state.selectedRoleId,
-    selectedAdvisorId: state.selectedAdvisorId,
     ending: state.ending,
   };
 }

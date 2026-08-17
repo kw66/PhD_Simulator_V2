@@ -66,7 +66,7 @@ export function applyMonthlyUpkeep(
   if (state.eventSupport.hasFinanceTalent) {
     nextPlayer.money += Math.ceil(Math.max(0, state.player.money) * 0.03);
   }
-  nextPlayer.money += getAdvisorSalaryForMonth(state.selectedAdvisorId, state.degree, calendarMonth);
+  nextPlayer.money += getAdvisorSalaryForMonth(state.selectedAdvisorName, state.degree, calendarMonth);
   nextPlayer.san = clampSan(nextPlayer.san + 1, state.sanCap);
   nextPlayer.money -= BASE_MONTHLY_LIVING_COST;
 

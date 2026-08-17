@@ -12,7 +12,6 @@ import { createInitialRandomEventState } from "./v2-random-event-rules";
 import { getUnlockedPaperSlotCount } from "./v2-paper-rules";
 import {
   getGraduationScoreTarget,
-  getAdvisorDefinition,
   getCalendarForTotalMonths,
   getMonthLimitByDegree,
   getRoleDefinition,
@@ -26,7 +25,7 @@ import { createLoverState } from "./v2-lover-system";
 import { createLoverProgressState } from "./v2-lover-progression";
 import { createJointTrainingState } from "./v2-joint-training-system";
 import { createResearchCapacityState } from "./v2-research-cap-system";
-import type { AdvisorId, GameState, RoleId } from "./v2-types";
+import type { GameState, RoleId } from "./v2-types";
 
 export function createInitialState(): GameState {
   const calendar = getCalendarForTotalMonths(0);
@@ -34,7 +33,6 @@ export function createInitialState(): GameState {
     phase: "setup",
     selectedRoleId: "normal",
     setupSelectedRoleId: null,
-    selectedAdvisorId: null,
     selectedAdvisorName: null,
     degree: "master",
     year: calendar.year,
@@ -93,15 +91,14 @@ export function createInitialState(): GameState {
 
 export function createStartedGameState(
   roleId: RoleId,
-  advisorId: AdvisorId | null = null,
   advisorName: string | null = null,
 ): GameState {
   const role = getRoleDefinition(roleId);
-  const advisor = advisorId ? getAdvisorDefinition(advisorId) : null;
+  const hasAdvisor = Boolean(advisorName);
   const initialPaperSlots = role.initialPaperSlots ?? getUnlockedPaperSlotCount(role.startingStats.research);
   const baseState = createInitialState();
   const baseRelationshipState = syncRelationshipState(createRelationshipState(), role.startingStats.social);
-  const relationshipState = advisor
+  const relationshipState = hasAdvisor
     ? tryAddRelationship(baseRelationshipState, "advisor").nextState
     : baseRelationshipState;
 
@@ -110,8 +107,7 @@ export function createStartedGameState(
     phase: "playing",
     selectedRoleId: role.id,
     setupSelectedRoleId: role.id,
-    selectedAdvisorId: advisor?.id ?? null,
-    selectedAdvisorName: advisor ? advisorName : null,
+    selectedAdvisorName: advisorName,
     degree: "master",
     year: 1,
     month: 0,
@@ -121,7 +117,7 @@ export function createStartedGameState(
     maxActionsPerMonth: MAX_ACTIONS_PER_MONTH,
     sanCap: MAX_SAN,
     paperSlotsUnlocked: initialPaperSlots,
-    graduationScoreTarget: getGraduationScoreTarget("master", advisor?.id ?? null),
+    graduationScoreTarget: getGraduationScoreTarget("master", advisorName),
     slotPublishedA: [false, false, false, false],
     upgradedSlots: [false, false, false, false],
     thesis: createInitialThesisState(),
@@ -145,13 +141,13 @@ export function createStartedGameState(
     relationshipState,
     fellowProgressState: [],
     researchCapacityState: createResearchCapacityState(),
-    advisorProgressState: createAdvisorProgressState(advisor?.id),
+    advisorProgressState: createAdvisorProgressState(hasAdvisor),
     jointTrainingState: createJointTrainingState(),
     eventSupport: { hasGameController: false, hasParasol: false, hasDownJacket: false, hasBadmintonRacket: false, hasStrongBodyTalent: false, hasFinanceTalent: false },
     eventCounters: createEventCounters(),
     achievementFlags: createAchievementFlags(),
     player: clonePlayer(role.startingStats),
-    log: advisor
+    log: hasAdvisor
       ? [createLogEntry(0, `以 ${role.name} 身份开局，导师为 ${advisorName ?? "导师"} / 讲师。`)]
       : [],
   };

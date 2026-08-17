@@ -1,5 +1,4 @@
 import {
-  ADVISOR_DEFINITIONS,
   ADVISOR_REQUIREMENTS,
   ADVISOR_SALARY,
   MASTER_TOTAL_MONTHS,
@@ -7,7 +6,7 @@ import {
   ROLE_BASE_ORDER,
   ROLE_DEFINITIONS,
 } from "./v2-content";
-import type { AdvisorDefinition, AdvisorId, Degree, PendingDecision, RoleBaseId, RoleDefinition, RoleId, RoleMode } from "./v2-types";
+import type { Degree, PendingDecision, RoleBaseId, RoleDefinition, RoleId, RoleMode } from "./v2-types";
 
 function getMaxYearsByDegree(degree: Degree): number {
   return degree === "master" ? 3 : 5;
@@ -66,21 +65,6 @@ export function getRoleBaseOrder(): RoleBaseId[] {
   return ROLE_BASE_ORDER;
 }
 
-export function normalizeAdvisorId(value: unknown): AdvisorId | null {
-  if (typeof value !== "string") return null;
-  const advisor = ADVISOR_DEFINITIONS.find((item) => item.id === value);
-  return advisor?.id ?? null;
-}
-
-export function getAdvisorDefinition(advisorId: AdvisorId): AdvisorDefinition {
-  const normalizedAdvisorId = normalizeAdvisorId(advisorId);
-  const advisor = ADVISOR_DEFINITIONS.find((item) => item.id === normalizedAdvisorId);
-  if (!advisor) {
-    throw new Error(`Unknown advisor: ${advisorId}`);
-  }
-  return advisor;
-}
-
 export function getRoleOptions(): RoleDefinition[] {
   return ROLE_DEFINITIONS;
 }
@@ -93,13 +77,13 @@ export function getMonthLimitByDegree(degree: Degree): number {
   return degree === "master" ? MASTER_TOTAL_MONTHS : PHD_TOTAL_MONTHS;
 }
 
-export function getGraduationScoreTarget(degree: Degree, advisorId: AdvisorId | null): number | null {
-  if (!advisorId) return null;
+export function getGraduationScoreTarget(degree: Degree, advisorName: string | null): number | null {
+  if (!advisorName) return null;
   return degree === "master" ? ADVISOR_REQUIREMENTS.masterGrad : ADVISOR_REQUIREMENTS.phdGrad;
 }
 
-export function getAdvisorSalaryForMonth(advisorId: AdvisorId | null, degree: Degree, _month: number): number {
-  if (!advisorId) return 0;
+export function getAdvisorSalaryForMonth(advisorName: string | null, degree: Degree, _month: number): number {
+  if (!advisorName) return 0;
   const baseSalary = ADVISOR_SALARY[degree];
 
   if (Number.isInteger(baseSalary)) {
@@ -109,11 +93,11 @@ export function getAdvisorSalaryForMonth(advisorId: AdvisorId | null, degree: De
   return Math.floor(baseSalary);
 }
 
-export function getPhdDecisionRequirement(advisorId: AdvisorId | null, year: number): number | null {
+export function getPhdDecisionRequirement(advisorName: string | null, year: number): number | null {
   if (year !== 2 && year !== 3) {
     return null;
   }
-  if (!advisorId) return null;
+  if (!advisorName) return null;
 
   return year === 2 ? ADVISOR_REQUIREMENTS.phdYear2 : ADVISOR_REQUIREMENTS.phdYear3;
 }
