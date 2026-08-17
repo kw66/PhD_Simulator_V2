@@ -77,8 +77,9 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.description).toContain("给感兴趣的老师发了邮件");
     expect(advisorInfo.description).toContain("辛英英讲师回信");
     expect(advisorInfo.description).toContain("搜集信息 · 辛英英讲师");
-    expect(advisorInfo.description).toContain("每周组会｜偶有项目｜提前沟通");
-    expect(advisorInfo.description).toContain("给方向｜资源够用｜老师好沟通｜同门融洽");
+    expect(advisorInfo.description).toContain("每月组会｜横向较少｜研二可实习");
+    expect(advisorInfo.description).toContain("定期反馈｜显卡需排队｜回复及时");
+    expect(advisorInfo.description).toContain("合作较多｜选题较自由｜作息规律");
     expect(advisorInfo.description).not.toContain("评价网");
     expect(advisorInfo.description).not.toContain("匿名评价");
     expect(advisorInfo.description).not.toContain("游戏数据");
@@ -111,10 +112,36 @@ describe("v2 before grad school events", () => {
     const lastCandidate = lastInfo.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
 
     expect(firstInfo.description).toContain("周报 + 组会｜项目少｜可实习");
-    expect(firstInfo.description).toContain("指导少｜资源较少｜老师宽和｜氛围好");
-    expect(lastInfo.description).toContain("隔周组会｜科研为主｜支持实习");
+    expect(firstInfo.description).toContain("指导少｜资源较少｜老师宽和");
+    expect(firstInfo.description).toContain("氛围好｜偏算法研究｜节奏平稳");
+    expect(lastInfo.description).toContain("周报为主｜项目可选｜不限制实习");
+    expect(lastInfo.description).toContain("同门带得多｜可借校内算力｜比较随和");
+    expect(lastInfo.description).toContain("组内常交流｜方向较稳定｜平时较松");
     expect(firstCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
     expect(lastCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
+  });
+
+  it("provides six variants across every lecturer information category", () => {
+    const intelSamples = [0, 0.2, 0.4, 0.6, 0.8, 0.999999].map((roll) => {
+      const event = getAdvisorInfoEvent(roll);
+      return event.choices.find((choice) => choice.label === "换个导师")
+        ?.effects.fixedEventResolution?.advisorIntel;
+    });
+
+    const intelKeys = [
+      "reporting",
+      "projects",
+      "internship",
+      "guidance",
+      "computing",
+      "temperament",
+      "atmosphere",
+      "focus",
+      "pace",
+    ] as const;
+    for (const key of intelKeys) {
+      expect(new Set(intelSamples.map((intel) => intel?.[key])).size).toBe(6);
+    }
   });
 
   it("rerolls only the lecturer name and description until the lecturer is confirmed", () => {

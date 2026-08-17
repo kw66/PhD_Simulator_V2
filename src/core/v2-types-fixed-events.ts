@@ -45,6 +45,8 @@ export interface FixedEventAdvisorIntel {
   computing: string;
   temperament: string;
   atmosphere: string;
+  focus: string;
+  pace: string;
 }
 
 export interface FixedEventResolution {

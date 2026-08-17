@@ -33,13 +33,15 @@ const BEFORE_GRAD_SCHOOL_ADVISOR_IDS: AdvisorId[] = [
 ];
 
 const ADVISOR_INTEL_OPTIONS = {
-  reporting: ["周报 + 组会", "每周组会", "隔周组会"],
-  projects: ["项目少", "偶有项目", "科研为主"],
-  internship: ["可实习", "提前沟通", "支持实习"],
-  guidance: ["指导少", "给方向", "可单独约"],
-  computing: ["资源较少", "资源够用", "资源充足"],
-  temperament: ["老师宽和", "老师好沟通", "老师耐心"],
-  atmosphere: ["氛围好", "同门融洽", "氛围轻松"],
+  reporting: ["周报 + 组会", "每周组会", "隔周组会", "每月组会", "按需组会", "周报为主"],
+  projects: ["项目少", "偶有项目", "科研为主", "横向较少", "节点集中", "项目可选"],
+  internship: ["可实习", "提前沟通", "支持实习", "研二可实习", "有成果可实习", "不限制实习"],
+  guidance: ["指导少", "给方向", "可单独约", "定期反馈", "亲自改稿", "同门带得多"],
+  computing: ["资源较少", "资源够用", "资源充足", "显卡需排队", "有组内服务器", "可借校内算力"],
+  temperament: ["老师宽和", "老师好沟通", "老师耐心", "回复及时", "要求直接", "比较随和"],
+  atmosphere: ["氛围好", "同门融洽", "氛围轻松", "合作较多", "各做各的", "组内常交流"],
+  focus: ["偏算法研究", "偏工程落地", "偏论文导向", "选题较自由", "交叉方向多", "方向较稳定"],
+  pace: ["节奏平稳", "节点前忙", "时间自由", "作息规律", "进度抓得紧", "平时较松"],
 } as const;
 
 function pickRandomText(
@@ -71,6 +73,8 @@ function createRandomAdvisorIntel(getRoll: RandomRollProvider): FixedEventAdviso
     computing: pickRandomText(ADVISOR_INTEL_OPTIONS.computing, getRoll),
     temperament: pickRandomText(ADVISOR_INTEL_OPTIONS.temperament, getRoll),
     atmosphere: pickRandomText(ADVISOR_INTEL_OPTIONS.atmosphere, getRoll),
+    focus: pickRandomText(ADVISOR_INTEL_OPTIONS.focus, getRoll),
+    pace: pickRandomText(ADVISOR_INTEL_OPTIONS.pace, getRoll),
   };
 }
 
@@ -123,7 +127,8 @@ function createAdvisorInfoEvent(
       [
         `搜集信息 · ${advisorName}讲师`,
         `${intel.reporting}｜${intel.projects}｜${intel.internship}`,
-        `${intel.guidance}｜${intel.computing}｜${intel.temperament}｜${intel.atmosphere}`,
+        `${intel.guidance}｜${intel.computing}｜${intel.temperament}`,
+        `${intel.atmosphere}｜${intel.focus}｜${intel.pace}`,
       ].join("\n"),
       `工资：硕士 ${ADVISOR_SALARY.master}｜博士 ${ADVISOR_SALARY.phd}\n科研分：论文录用，C 类 +${SCORE_BY_TARGET.C}｜B 类 +${SCORE_BY_TARGET.B}｜A 类 +${SCORE_BY_TARGET.A}\n毕业：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分｜博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博士：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分｜第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
     ].join("\n\n"),
