@@ -12,6 +12,7 @@ export const WORKSTATION_GRADUATION_PANEL_INDEX = 4;
 export interface PlayRenderUiState {
   isEventContentOpen?: boolean;
   activeEventId?: string | null;
+  activeEventHistoryId?: string | null;
   activeEventHistoryIndex?: number | null;
   activeLogPage?: number | null;
   activeRelationshipIndex?: number | null;

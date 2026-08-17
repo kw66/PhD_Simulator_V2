@@ -418,6 +418,16 @@ export interface ResolvedEventStage {
   selectedChoiceId: string;
 }
 
+export interface ResolvedEventRecord {
+  id: string;
+  chainId: string;
+  source: EventSource;
+  completedAtTotalMonths: number;
+  completedAtYear: number;
+  completedAtMonth: number;
+  stages: ResolvedEventStage[];
+}
+
 export interface PendingEvent {
   id: string;
   title: string;
@@ -509,6 +519,7 @@ export interface GameState extends RandomEventState {
   log: GameLogEntry[];
   ending: EndingId;
   eventQueue: EventQueueItem[];
+  eventHistory: ResolvedEventRecord[];
   pendingDecision: PendingDecision | null;
   manualSaveSummaries: ManualSaveSummary[];
 }

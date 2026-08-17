@@ -85,6 +85,7 @@ export function createInitialState(): GameState {
     log: [createLogEntry(0, "等待选择角色。")],
     ending: null,
     eventQueue: [],
+    eventHistory: [],
     pendingDecision: null,
     manualSaveSummaries: [],
   };

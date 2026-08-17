@@ -3539,6 +3539,28 @@ p {
   gap: 10px;
 }
 
+.event-list-group {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.event-list-divider {
+  height: 0;
+  margin: 2px 0;
+  border-top: var(--play-divider-strong);
+}
+
+.event-history-card {
+  background: rgba(242, 236, 225, 0.42);
+}
+
+.event-history-card .event-type-badge,
+.event-history-card .event-title,
+.event-history-card .event-ddl-badge {
+  opacity: 0.76;
+}
+
 .event-card,
 .paper-card,
 .shop-item-row,

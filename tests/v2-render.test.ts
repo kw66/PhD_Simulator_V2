@@ -774,7 +774,7 @@ describe("v2 render lobby shell", () => {
     expect(historyButtons).toContain('aria-label="已选择"');
   });
 
-  it("hides the close button for result-stage events", () => {
+  it("keeps the close button available for result-stage events", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
     state = dispatchAction(state, "start-game", { roleId: "normal" });
     state = {
@@ -798,7 +798,45 @@ describe("v2 render lobby shell", () => {
       activeEventId: "result-event",
     });
 
-    expect(html).toContain('data-ui-close-event-content aria-label="关闭事件详情" hidden');
+    expect(html).toContain('data-ui-close-event-content aria-label="关闭事件详情">×</button>');
+    expect(html).not.toContain('data-ui-close-event-content aria-label="关闭事件详情" hidden');
+  });
+
+  it("separates completed events and renders their scenes as read-only history", () => {
+    let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
+    state = dispatchAction(state, "start-game", { roleId: "normal" });
+    state = dispatchAction(state, "resolve-event", {
+      eventId: state.eventQueue[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+    });
+    state = dispatchAction(state, "resolve-event", {
+      eventId: state.eventQueue[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+    });
+    state = dispatchAction(state, "resolve-event", {
+      eventId: state.eventQueue[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+    });
+
+    const completedEvent = state.eventHistory[0];
+    expect(completedEvent?.stages).toHaveLength(3);
+
+    const listHtml = renderApp(state, createDefaultAccountProfile());
+    expect(listHtml).toContain('class="event-list-divider" role="separator"');
+    expect(listHtml).toContain(`data-ui-open-event-history-id="${completedEvent?.id}"`);
+    expect(listHtml).toContain('<span class="event-ddl-badge">入学前</span>');
+
+    const historyHtml = renderApp(state, createDefaultAccountProfile(), {
+      isEventContentOpen: true,
+      activeEventHistoryId: completedEvent?.id ?? null,
+    });
+    const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    expect(historyHtml).toContain(">保研资格</button>");
+    expect(historyHtml).toContain(">导师信息</button>");
+    expect(historyHtml).toContain(">暑假憧憬</button>");
+    expect(historyButtons).toContain('disabled aria-disabled="true"');
+    expect(historyButtons).not.toContain('data-action="resolve-event"');
+    expect(historyButtons).toContain('aria-label="已选择"');
   });
 
   it("renders character talents by default with switch buttons", () => {

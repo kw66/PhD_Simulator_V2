@@ -79,6 +79,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let conferenceMonthOffset = 0;
   let isEventContentOpen = false;
   let activeEventId: string | null = null;
+  let activeEventHistoryId: string | null = null;
   let activeEventChainId: string | null = null;
   let activeEventHistoryIndex: number | null = null;
   let activeLogPage: number | null = null;
@@ -218,6 +219,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const resetEventContentUiState = (): void => {
     isEventContentOpen = false;
     activeEventId = null;
+    activeEventHistoryId = null;
     activeEventChainId = null;
     activeEventHistoryIndex = null;
   };
@@ -238,6 +240,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
     return getSortedEventQueue(state.eventQueue).find((event) => event.chainId === activeEventChainId) ?? null;
   };
 
+  const getActiveHistoryEvent = (state: GameState): GameState["eventHistory"][number] | null => {
+    if (!activeEventHistoryId) {
+      return null;
+    }
+
+    return state.eventHistory.find((event) => event.id === activeEventHistoryId) ?? null;
+  };
+
   const openEventContent = (eventId: string): void => {
     if (isEventContentOpen) {
       return;
@@ -256,18 +266,33 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activePlayTab = "events";
     isEventContentOpen = true;
     activeEventId = nextEvent.id;
+    activeEventHistoryId = null;
     activeEventChainId = nextEvent.chainId;
     activeEventHistoryIndex = null;
     render();
   };
 
-  const closeEventContent = (): void => {
-    const state = store.getState();
-    const openEvent = getActiveQueueEvent(state) ?? getActiveChainEvent(state);
-    if (openEvent?.stage === "result") {
+  const openEventHistoryContent = (eventHistoryId: string): void => {
+    if (isEventContentOpen) {
       return;
     }
 
+    const state = store.getState();
+    const historyEvent = state.eventHistory.find((event) => event.id === eventHistoryId);
+    if (state.phase !== "playing" || !historyEvent) {
+      return;
+    }
+
+    activePlayTab = "events";
+    isEventContentOpen = true;
+    activeEventId = null;
+    activeEventHistoryId = historyEvent.id;
+    activeEventChainId = null;
+    activeEventHistoryIndex = null;
+    render();
+  };
+
+  const closeEventContent = (): void => {
     resetEventContentUiState();
     render();
   };
@@ -285,6 +310,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
       }
       if (activeEventChainId && !state.eventQueue.some((event) => event.chainId === activeEventChainId)) {
         activeEventChainId = null;
+      }
+      if (activeEventHistoryId && !state.eventHistory.some((event) => event.id === activeEventHistoryId)) {
+        activeEventHistoryId = null;
       }
       return;
     }
@@ -306,6 +334,29 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeEventId = nextChainEvent.id;
       activeEventHistoryIndex = null;
       return;
+    }
+
+    const activeHistoryEvent = getActiveHistoryEvent(state);
+    if (activeHistoryEvent) {
+      const lastSceneIndex = Math.max(0, activeHistoryEvent.stages.length - 1);
+      if (
+        activeEventHistoryIndex !== null
+        && (activeEventHistoryIndex < 0 || activeEventHistoryIndex > lastSceneIndex)
+      ) {
+        activeEventHistoryIndex = null;
+      }
+      return;
+    }
+
+    if (activeEventChainId) {
+      const completedEvent = [...state.eventHistory].reverse().find((event) => event.chainId === activeEventChainId);
+      if (completedEvent) {
+        activeEventId = null;
+        activeEventHistoryId = completedEvent.id;
+        activeEventChainId = null;
+        activeEventHistoryIndex = null;
+        return;
+      }
     }
 
     resetEventContentUiState();
@@ -387,6 +438,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     root.innerHTML = renderApp(state, store.getAccountProfile(), {
       isEventContentOpen,
       activeEventId,
+      activeEventHistoryId,
       activeEventHistoryIndex,
       activeLogPage,
       activeRelationshipIndex,
@@ -504,6 +556,15 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
+    const openEventHistoryButton = target.closest<HTMLButtonElement>("button[data-ui-open-event-history-id]");
+    if (openEventHistoryButton && !openEventHistoryButton.disabled) {
+      const eventHistoryId = openEventHistoryButton.dataset.uiOpenEventHistoryId?.trim();
+      if (eventHistoryId) {
+        openEventHistoryContent(eventHistoryId);
+      }
+      return;
+    }
+
     const closeEventButton = target.closest<HTMLButtonElement>("button[data-ui-close-event-content]");
     if (closeEventButton && !closeEventButton.disabled) {
       closeEventContent();
@@ -512,10 +573,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     const eventSceneTab = target.closest<HTMLButtonElement>("button[data-ui-event-scene-index]");
     if (eventSceneTab && !eventSceneTab.disabled) {
-      const activeEvent = getActiveQueueEvent(store.getState()) ?? getActiveChainEvent(store.getState());
-      if (!activeEvent) return;
-
-      const currentPageIndex = activeEvent.history?.length ?? 0;
+      const state = store.getState();
+      const activeEvent = getActiveQueueEvent(state) ?? getActiveChainEvent(state);
+      const activeHistoryEvent = getActiveHistoryEvent(state);
+      const currentPageIndex = activeEvent
+        ? (activeEvent.history?.length ?? 0)
+        : Math.max(0, (activeHistoryEvent?.stages.length ?? 1) - 1);
+      if (!activeEvent && !activeHistoryEvent) return;
       const selectedPageIndex = Number(eventSceneTab.dataset.uiEventSceneIndex ?? "");
       if (Number.isFinite(selectedPageIndex) && selectedPageIndex >= 0 && selectedPageIndex <= currentPageIndex) {
         activeEventHistoryIndex = selectedPageIndex === currentPageIndex ? null : Math.floor(selectedPageIndex);

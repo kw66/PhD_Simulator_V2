@@ -172,6 +172,36 @@ describe("manual persistence", () => {
     })]);
   });
 
+  it("会保留已经完成的历史事件", () => {
+    const state = createInitialState();
+    saveManualState(2, {
+      ...state,
+      eventHistory: [{
+        id: "completed-event@0@0",
+        chainId: "completed-chain",
+        source: "fixed",
+        completedAtTotalMonths: 0,
+        completedAtYear: 1,
+        completedAtMonth: 0,
+        stages: [{
+          eventId: "completed-event",
+          title: "Completed",
+          description: "Completed event.",
+          stage: "result",
+          choices: [{ id: "confirm", label: "Confirm", outcome: "Done." }],
+          selectedChoiceId: "confirm",
+        }],
+      }],
+    });
+
+    const loaded = loadManualState(2);
+    expect(loaded?.eventHistory).toEqual([expect.objectContaining({
+      id: "completed-event@0@0",
+      completedAtTotalMonths: 0,
+      stages: [expect.objectContaining({ selectedChoiceId: "confirm" })],
+    })]);
+  });
+
   it("会返回手动槽摘要", () => {
     const state = createInitialState();
     saveManualState(1, { ...state, totalMonths: 7, year: 1, month: 7, totalResearchScore: 2 });

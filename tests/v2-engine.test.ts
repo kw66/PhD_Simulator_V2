@@ -1941,6 +1941,24 @@ describe("v2 engine", () => {
     const currentChainEvent = act3.eventQueue.find((event) => event.id === "act3-event");
     expect(currentChainEvent?.history).toHaveLength(2);
     expect(currentChainEvent?.history?.map((item) => item.selectedChoiceId)).toEqual(["next", "done"]);
+
+    const completed = dispatchAction(act3, "resolve-event", {
+      eventId: "act3-event",
+      eventChoiceId: "finish",
+    });
+    expect(completed.eventQueue.find((event) => event.chainId === "multi-act")).toBeUndefined();
+    expect(completed.eventHistory).toHaveLength(1);
+    expect(completed.eventHistory[0]).toMatchObject({
+      chainId: "multi-act",
+      completedAtTotalMonths: state.totalMonths,
+      completedAtYear: state.year,
+      completedAtMonth: state.month,
+    });
+    expect(completed.eventHistory[0]?.stages.map((item) => item.selectedChoiceId)).toEqual([
+      "next",
+      "done",
+      "finish",
+    ]);
   });
 
   it("stayOnEvent keeps the queued event and sanCap clamps current SAN", () => {
@@ -1971,6 +1989,11 @@ describe("v2 engine", () => {
 
     const resolved = dispatchAction(state, "resolve-event", { eventChoiceId: "hurt" });
     expect(resolved.eventQueue).toHaveLength(0);
+    expect(resolved.eventHistory).toHaveLength(1);
+    expect(resolved.eventHistory[0]?.stages).toEqual([expect.objectContaining({
+      eventId: "cold-event",
+      selectedChoiceId: "hurt",
+    })]);
     expect(resolved.sanCap).toBe(16);
     expect(resolved.player.san).toBe(16);
     expect(resolved.achievementFlags.nearDeath).toBe(true);

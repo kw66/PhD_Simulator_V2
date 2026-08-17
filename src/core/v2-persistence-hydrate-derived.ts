@@ -131,6 +131,7 @@ export function buildNormalizedHydratedState(
   | "eventSupport"
   | "eventCounters"
   | "achievementFlags"
+  | "eventHistory"
   | "internshipCount"
   | "willTransferPhDYear3"
   | "isNatureExtensionYear"
@@ -175,6 +176,7 @@ export function buildNormalizedHydratedState(
       normalizeAchievementFlags(value),
       getAchievementSyncInput(value, shopState, coffeeState, eventSupport),
     ),
+    eventHistory: Array.isArray(value.eventHistory) ? value.eventHistory as GameState["eventHistory"] : [],
     internshipCount: typeof value.internshipCount === "number" ? value.internshipCount : 0,
     willTransferPhDYear3: value.willTransferPhDYear3 === true,
     isNatureExtensionYear: value.isNatureExtensionYear === true,

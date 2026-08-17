@@ -522,7 +522,7 @@ function renderLegacyLeftRail(state: GameState): string {
   `;
 }
 
-function getEventBadgeLabel(event: GameState["eventQueue"][number]): string {
+function getEventBadgeLabel(event: Pick<GameState["eventQueue"][number], "source" | "chainId">): string {
   if (event.source === "random") return "随机";
   if (event.source === "review") return "审稿";
   if (event.source === "thesis") return "论文";
@@ -719,10 +719,25 @@ function renderEventDescriptionHtml(description: string): string {
     .join("");
 }
 
-function renderEventQueueList(state: GameState, activeEventId: string | null): string {
-  const queue = getSortedEventQueue(state.eventQueue);
+function getEventHistoryTitle(event: GameState["eventHistory"][number]): string {
+  const firstTitle = event.stages[0]?.title ?? "历史事件";
+  return firstTitle.split("➜")[0]?.trim() || firstTitle;
+}
 
-  if (queue.length === 0) {
+function getEventHistoryTimeText(event: GameState["eventHistory"][number]): string {
+  if (event.completedAtTotalMonths <= 0) return "入学前";
+  return `第${event.completedAtYear}年${event.completedAtMonth}月`;
+}
+
+function renderEventQueueList(
+  state: GameState,
+  activeEventId: string | null,
+  activeEventHistoryId: string | null,
+): string {
+  const queue = getSortedEventQueue(state.eventQueue);
+  const history = [...state.eventHistory].reverse();
+
+  const renderEmptyGuide = (): string => {
     const hasAnyPaper = state.papers.some((paper) => Boolean(paper));
     let guideText = "本月待办已处理完成。你可以直接进入下一月，或先做一轮准备。";
     if (!hasAnyPaper) {
@@ -744,9 +759,14 @@ function renderEventQueueList(state: GameState, activeEventId: string | null): s
         </div>
       </div>
     `;
+  };
+
+  if (queue.length === 0 && history.length === 0) {
+    return renderEmptyGuide();
   }
 
-  return queue
+  const currentHtml = queue.length > 0
+    ? queue
     .map((event) => `
       <button
         class="event-card${activeEventId === event.id ? " is-active" : ""}"
@@ -760,7 +780,31 @@ function renderEventQueueList(state: GameState, activeEventId: string | null): s
         </div>
       </button>
     `)
+    .join("")
+    : renderEmptyGuide();
+  const historyHtml = history
+    .map((event) => `
+      <button
+        class="event-card event-history-card${activeEventHistoryId === event.id ? " is-active" : ""}"
+        type="button"
+        data-ui-open-event-history-id="${escapeHtml(event.id)}"
+      >
+        <div class="event-card-header">
+          <span class="event-type-badge">${getEventBadgeLabel(event)}</span>
+          <span class="event-title">${escapeHtml(getEventHistoryTitle(event))}</span>
+          <span class="event-ddl-badge">${getEventHistoryTimeText(event)}</span>
+        </div>
+      </button>
+    `)
     .join("");
+
+  return `
+    <div class="event-list-group event-list-current">${currentHtml}</div>
+    ${historyHtml
+      ? '<div class="event-list-divider" role="separator" aria-label="当前事件与历史事件分隔"></div>'
+      : ""}
+    ${historyHtml ? `<div class="event-list-group event-list-history">${historyHtml}</div>` : ""}
+  `;
 }
 
 function getEventSceneLabel(chainId: string, stage: EventStage, title: string): string {
@@ -779,9 +823,10 @@ function getEventSceneLabel(chainId: string, stage: EventStage, title: string): 
 
 function renderEventContentBox(
   currentEvent: GameState["eventQueue"][number] | null,
+  completedEvent: GameState["eventHistory"][number] | null,
   activeHistoryIndex: number | null,
 ): string {
-  if (!currentEvent) {
+  if (!currentEvent && !completedEvent) {
     return `
       <div class="event-content-box" id="event-content-box" hidden>
         <div class="event-content-header">
@@ -792,30 +837,40 @@ function renderEventContentBox(
     `;
   }
 
-  const isResultPage = currentEvent.stage === "result";
-  const history = currentEvent.history ?? [];
-  const currentPageIndex = history.length;
+  const isCompleted = completedEvent !== null;
+  const completedStages = completedEvent?.stages ?? [];
+  const history = currentEvent?.history ?? [];
+  const currentPageIndex = isCompleted ? Math.max(0, completedStages.length - 1) : history.length;
   const displayPageIndex = activeHistoryIndex === null
     ? currentPageIndex
     : Math.max(0, Math.min(activeHistoryIndex, currentPageIndex));
-  const historicalPage = displayPageIndex < currentPageIndex ? history[displayPageIndex] : null;
+  const historicalPage = isCompleted
+    ? (completedStages[displayPageIndex] ?? completedStages[completedStages.length - 1] ?? null)
+    : (displayPageIndex < currentPageIndex ? history[displayPageIndex] : null);
   const displayEvent = historicalPage ?? currentEvent;
+  if (!displayEvent) return "";
   const selectedChoiceId = historicalPage?.selectedChoiceId ?? null;
-  const sceneTabs = [
-    ...history.map((page, index) => ({
+  const chainId = completedEvent?.chainId ?? currentEvent?.chainId ?? "";
+  const sceneTabs = isCompleted
+    ? completedStages.map((page, index) => ({
       index,
-      label: getEventSceneLabel(currentEvent.chainId, page.stage, page.title),
-    })),
-    {
-      index: currentPageIndex,
-      label: getEventSceneLabel(currentEvent.chainId, currentEvent.stage, currentEvent.title),
-    },
-  ];
+      label: getEventSceneLabel(chainId, page.stage, page.title),
+    }))
+    : [
+      ...history.map((page, index) => ({
+        index,
+        label: getEventSceneLabel(chainId, page.stage, page.title),
+      })),
+      {
+        index: currentPageIndex,
+        label: getEventSceneLabel(chainId, currentEvent!.stage, currentEvent!.title),
+      },
+    ];
 
   return `
     <div class="event-content-box" id="event-content-box">
       <div class="event-content-header">
-        <div class="event-scene-tabs" aria-label="${escapeHtml(currentEvent.title)}事件幕次">
+        <div class="event-scene-tabs" aria-label="${escapeHtml(displayEvent.title)}事件幕次">
           ${sceneTabs.map((scene, index) => `
             <button
               class="event-scene-tab${scene.index === displayPageIndex ? " is-active" : ""}"
@@ -829,7 +884,7 @@ function renderEventContentBox(
               : ""}
           `).join("")}
         </div>
-        <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情"${isResultPage ? " hidden" : ""}>×</button>
+        <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情">×</button>
       </div>
       <div class="event-content-body" id="event-content-body">
         ${renderEventDescriptionHtml(displayEvent.description)}
@@ -841,7 +896,7 @@ function renderEventContentBox(
             type="button"
             ${historicalPage
               ? 'disabled aria-disabled="true"'
-              : `data-action="resolve-event" data-event-id="${escapeHtml(currentEvent.id)}" data-event-choice-id="${escapeHtml(choice.id)}" title="${escapeHtml(choice.outcome)}"`}
+              : `data-action="resolve-event" data-event-id="${escapeHtml(currentEvent!.id)}" data-event-choice-id="${escapeHtml(choice.id)}" title="${escapeHtml(choice.outcome)}"`}
           ><span>${escapeHtml(choice.label)}</span>${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
         `).join("")}
       </div>
@@ -2240,7 +2295,11 @@ function renderLegacyCenterShell(state: GameState, uiState: PlayRenderUiState = 
     ), 0);
   const shopActionCount = getAvailableShopActionCount(state);
   const activeEventId = uiState.isEventContentOpen ? (uiState.activeEventId ?? null) : null;
+  const activeEventHistoryId = uiState.isEventContentOpen ? (uiState.activeEventHistoryId ?? null) : null;
   const openEvent = activeEventId ? getCurrentEvent(state.eventQueue, activeEventId) : null;
+  const openHistoryEvent = activeEventHistoryId
+    ? state.eventHistory.find((event) => event.id === activeEventHistoryId) ?? null
+    : null;
 
   const renderTabBadge = (count: number, tone: "blocking" | "available", label: string): string => (
     count > 0
@@ -2268,11 +2327,11 @@ function renderLegacyCenterShell(state: GameState, uiState: PlayRenderUiState = 
 
         <div class="center-main-panels" id="center-main-panels">
           <section class="center-main-panel active" data-tab-panel="events">
-            <div class="event-panel${openEvent ? " showing-content" : ""}" id="event-panel">
+            <div class="event-panel${openEvent || openHistoryEvent ? " showing-content" : ""}" id="event-panel">
               <div class="event-queue" id="event-queue">
-                ${renderEventQueueList(state, activeEventId)}
+                ${renderEventQueueList(state, activeEventId, activeEventHistoryId)}
               </div>
-              ${renderEventContentBox(openEvent, uiState.activeEventHistoryIndex ?? null)}
+              ${renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null)}
             </div>
           </section>
 

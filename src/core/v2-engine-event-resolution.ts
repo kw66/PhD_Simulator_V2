@@ -61,6 +61,24 @@ export function applyQueuedEventEffects(
     queuedEvent.chainId,
     resolvedHistory,
   );
+  const hasFollowUpStage = nextState.eventQueue.some((event) => event.history === resolvedHistory);
+  if (!hasFollowUpStage) {
+    nextState = {
+      ...nextState,
+      eventHistory: [
+        ...nextState.eventHistory,
+        {
+          id: `${queuedEvent.id}@${state.totalMonths}@${nextState.eventHistory.length}`,
+          chainId: queuedEvent.chainId,
+          source: queuedEvent.source,
+          completedAtTotalMonths: state.totalMonths,
+          completedAtYear: state.year,
+          completedAtMonth: state.month,
+          stages: resolvedHistory,
+        },
+      ],
+    };
+  }
   nextState = callbacks.evaluateImmediateEndings(
     callbacks.applyChairEmergencyRecoveryToState(
       pushLog(nextState, `${queuedEvent.title}：${resolvedOutcome}`),
