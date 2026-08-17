@@ -1,5 +1,6 @@
 export type FixedEventResolutionKind =
   | "advisor-confirm"
+  | "advisor-reroll"
   | "teachers-day-message"
   | "teachers-day-tea"
   | "teachers-day-flower"
@@ -36,8 +37,19 @@ export interface FixedEventAdvisorCandidate {
   taskMultiplier: number;
 }
 
+export interface FixedEventAdvisorIntel {
+  reporting: string;
+  projects: string;
+  internship: string;
+  guidance: string;
+  computing: string;
+  temperament: string;
+  atmosphere: string;
+}
+
 export interface FixedEventResolution {
   kind: FixedEventResolutionKind;
   juniorCandidate?: FixedEventJuniorCandidate;
   advisorCandidate?: FixedEventAdvisorCandidate;
+  advisorIntel?: FixedEventAdvisorIntel;
 }

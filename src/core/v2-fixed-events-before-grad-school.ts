@@ -11,17 +11,13 @@ import {
 } from "./v2-progression";
 import { generateRandomChineseName } from "./v2-random-name";
 import { tryAddRelationship } from "./v2-relationship-rules";
-import type { AdvisorId, FixedEventResolution, GameState, PendingEvent } from "./v2-types";
-
-interface BeforeGradSchoolAdvisorIntel {
-  reporting: string;
-  projects: string;
-  internship: string;
-  guidance: string;
-  computing: string;
-  temperament: string;
-  atmosphere: string;
-}
+import type {
+  AdvisorId,
+  FixedEventAdvisorIntel,
+  FixedEventResolution,
+  GameState,
+  PendingEvent,
+} from "./v2-types";
 
 const LECTURER_INITIAL_PROFILE = {
   researchResource: 4,
@@ -66,7 +62,7 @@ function getRandomAdvisorId(getRoll: RandomRollProvider): AdvisorId {
     ?? BEFORE_GRAD_SCHOOL_ADVISOR_IDS[0];
 }
 
-function createRandomAdvisorIntel(getRoll: RandomRollProvider): BeforeGradSchoolAdvisorIntel {
+function createRandomAdvisorIntel(getRoll: RandomRollProvider): FixedEventAdvisorIntel {
   return {
     reporting: pickRandomText(ADVISOR_INTEL_OPTIONS.reporting, getRoll),
     projects: pickRandomText(ADVISOR_INTEL_OPTIONS.projects, getRoll),
@@ -78,10 +74,44 @@ function createRandomAdvisorIntel(getRoll: RandomRollProvider): BeforeGradSchool
   };
 }
 
+function createDifferentAdvisorName(
+  currentName: string,
+  getRoll: RandomRollProvider,
+): string {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const nextName = generateRandomChineseName(getRoll);
+    if (nextName !== currentName) return nextName;
+  }
+
+  return currentName === "李旭" ? "王晨" : "李旭";
+}
+
+function createDifferentAdvisorIntel(
+  currentIntel: FixedEventAdvisorIntel,
+  getRoll: RandomRollProvider,
+): FixedEventAdvisorIntel {
+  const nextIntel = createRandomAdvisorIntel(getRoll);
+  if (Object.keys(currentIntel).some((key) => {
+    const typedKey = key as keyof FixedEventAdvisorIntel;
+    return currentIntel[typedKey] !== nextIntel[typedKey];
+  })) {
+    return nextIntel;
+  }
+
+  const currentIndex = ADVISOR_INTEL_OPTIONS.reporting.indexOf(
+    currentIntel.reporting as typeof ADVISOR_INTEL_OPTIONS.reporting[number],
+  );
+  return {
+    ...nextIntel,
+    reporting: ADVISOR_INTEL_OPTIONS.reporting[(currentIndex + 1) % ADVISOR_INTEL_OPTIONS.reporting.length]
+      ?? ADVISOR_INTEL_OPTIONS.reporting[0],
+  };
+}
+
 function createAdvisorInfoEvent(
   advisorId: AdvisorId,
   advisorName: string,
-  intel: BeforeGradSchoolAdvisorIntel,
+  intel: FixedEventAdvisorIntel,
 ): PendingEvent {
   const advisor = getAdvisorDefinition(advisorId);
 
@@ -113,6 +143,23 @@ function createAdvisorInfoEvent(
               advisorName,
               ...LECTURER_INITIAL_PROFILE,
             },
+          },
+        },
+      },
+      {
+        id: `before-grad-school-reroll-${advisor.id}`,
+        label: "换个导师",
+        outcome: "",
+        effects: {
+          stayOnEvent: true,
+          fixedEventResolution: {
+            kind: "advisor-reroll",
+            advisorCandidate: {
+              advisorId,
+              advisorName,
+              ...LECTURER_INITIAL_PROFILE,
+            },
+            advisorIntel: intel,
           },
         },
       },
@@ -209,5 +256,39 @@ export function resolveAdvisorConfirmation(
     nextState,
     outcome: `加入${candidate.advisorName}讲师的课题组。`,
     enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id, candidate.advisorName)],
+  };
+}
+
+export function resolveAdvisorReroll(
+  state: GameState,
+  resolution: FixedEventResolution,
+  getRoll: RandomRollProvider = Math.random,
+): FixedResolutionResult {
+  const candidate = resolution.advisorCandidate;
+  const currentIntel = resolution.advisorIntel;
+  if (!candidate || !currentIntel) {
+    return {
+      nextState: state,
+      outcome: "未找到可更换的导师信息。",
+    };
+  }
+
+  const advisorName = createDifferentAdvisorName(candidate.advisorName, getRoll);
+  const advisorIntel = createDifferentAdvisorIntel(currentIntel, getRoll);
+  const refreshedEvent = createAdvisorInfoEvent(candidate.advisorId, advisorName, advisorIntel);
+  const eventId = `before-grad-school-advisor-info-${candidate.advisorId}`;
+
+  return {
+    nextState: {
+      ...state,
+      eventQueue: state.eventQueue.map((event) => event.id === eventId
+        ? {
+            ...refreshedEvent,
+            queueOrder: event.queueOrder,
+            history: event.history,
+          }
+        : event),
+    },
+    outcome: `改为联系${advisorName}讲师。`,
   };
 }

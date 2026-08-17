@@ -15,6 +15,7 @@ import {
 import {
   createBeforeGradSchoolAct1Event,
   resolveAdvisorConfirmation,
+  resolveAdvisorReroll,
 } from "./v2-fixed-events-before-grad-school";
 import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "./v2-fixed-events-teachers-day";
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
@@ -27,6 +28,8 @@ export function applyFixedEventResolution(
   switch (resolution.kind) {
     case "advisor-confirm":
       return resolveAdvisorConfirmation(state, resolution);
+    case "advisor-reroll":
+      return resolveAdvisorReroll(state, resolution, getRoll);
     case "teachers-day-message":
     case "teachers-day-tea":
     case "teachers-day-flower":

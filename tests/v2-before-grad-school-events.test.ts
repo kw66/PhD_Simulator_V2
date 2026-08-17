@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import {
@@ -89,7 +89,7 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.description).toContain("科研分：论文录用，C 类 +1｜B 类 +2｜A 类 +4");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分\n转博士：第 2 年 2 分｜第 3 年 3 分");
-    expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["回复导师"]);
+    expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["回复导师", "换个导师"]);
     expect(resolution).toEqual({
       kind: "advisor-confirm",
       advisorCandidate: {
@@ -115,6 +115,68 @@ describe("v2 before grad school events", () => {
     expect(lastInfo.description).toContain("隔周组会｜科研为主｜支持实习");
     expect(firstCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
     expect(lastCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
+  });
+
+  it("rerolls only the lecturer name and description until the lecturer is confirmed", () => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+
+    try {
+      let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
+      state = dispatchAction(state, "resolve-event", {
+        eventChoiceId: "before-grad-school-open-advisor-info",
+      });
+
+      const originalEvent = state.eventQueue[0];
+      const rerollChoice = originalEvent?.choices.find((choice) => choice.label === "换个导师");
+      if (!originalEvent || !rerollChoice) throw new Error("advisor reroll choice missing");
+
+      const originalCandidate = originalEvent.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
+      const originalPlayer = structuredClone(state.player);
+      const originalAdvisorProgress = structuredClone(state.advisorProgressState);
+      const originalRelationshipState = structuredClone(state.relationshipState);
+      const originalHistory = structuredClone(originalEvent.history);
+      const originalEventHistory = structuredClone(state.eventHistory);
+
+      state = dispatchAction(state, "resolve-event", {
+        eventId: originalEvent.id,
+        eventChoiceId: rerollChoice.id,
+      });
+
+      const refreshedEvent = state.eventQueue[0];
+      const refreshedCandidate = refreshedEvent?.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
+      expect(refreshedEvent?.id).toBe(originalEvent.id);
+      expect(refreshedEvent?.queueOrder).toBe(originalEvent.queueOrder);
+      expect(refreshedEvent?.history).toEqual(originalHistory);
+      expect(state.eventHistory).toEqual(originalEventHistory);
+      expect(refreshedEvent?.description).not.toBe(originalEvent.description);
+      expect(refreshedCandidate?.advisorName).not.toBe(originalCandidate?.advisorName);
+      expect(refreshedCandidate?.advisorId).toBe(originalCandidate?.advisorId);
+      expect(refreshedCandidate).toMatchObject({
+        researchResource: 4,
+        affinity: 4,
+        taskMultiplier: 6,
+      });
+      expect(state.player).toEqual(originalPlayer);
+      expect(state.advisorProgressState).toEqual(originalAdvisorProgress);
+      expect(state.relationshipState).toEqual(originalRelationshipState);
+      expect(state.selectedAdvisorId).toBeNull();
+
+      const confirmChoice = refreshedEvent?.choices.find((choice) => choice.label === "回复导师");
+      if (!refreshedEvent || !confirmChoice || !refreshedCandidate) {
+        throw new Error("refreshed advisor confirmation missing");
+      }
+      state = dispatchAction(state, "resolve-event", {
+        eventId: refreshedEvent.id,
+        eventChoiceId: confirmChoice.id,
+      });
+
+      expect(state.selectedAdvisorId).toBe(refreshedCandidate.advisorId);
+      expect(state.selectedAdvisorName).toBe(refreshedCandidate.advisorName);
+      expect(state.eventQueue[0]?.stage).toBe("result");
+      expect(state.eventQueue[0]?.choices.map((choice) => choice.label)).toEqual(["准备报到"]);
+    } finally {
+      random.mockRestore();
+    }
   });
 
   it("uses the third act for the summer before enrollment", () => {
