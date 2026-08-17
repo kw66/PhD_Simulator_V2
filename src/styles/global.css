@@ -4128,6 +4128,16 @@ button.todo-item:focus-visible {
   gap: 6px;
 }
 
+.event-empty-status {
+  padding: 16px 18px;
+  border: 1px dashed rgba(39, 68, 58, 0.28);
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.5), rgba(240, 233, 220, 0.34));
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 760;
+  text-align: center;
+}
+
 .event-content-box {
   border-top: var(--play-divider-thin);
   background: linear-gradient(180deg, rgba(255, 252, 246, 0.84), rgba(240, 233, 220, 0.56));

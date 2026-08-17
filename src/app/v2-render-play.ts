@@ -737,12 +737,8 @@ function renderEventQueueList(
   const queue = getSortedEventQueue(state.eventQueue);
   const history = [...state.eventHistory].reverse();
 
-  if (queue.length === 0 && history.length === 0) {
-    return "";
-  }
-
-  const currentHtml = queue
-    .map((event) => `
+  const currentHtml = queue.length > 0
+    ? queue.map((event) => `
       <button
         class="event-card${activeEventId === event.id ? " is-active" : ""}"
         type="button"
@@ -755,7 +751,8 @@ function renderEventQueueList(
         </div>
       </button>
     `)
-    .join("");
+      .join("")
+    : '<div class="event-empty-status">本月待办已清空</div>';
   const historyHtml = history
     .map((event) => `
       <button
