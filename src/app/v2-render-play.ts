@@ -26,7 +26,7 @@ import {
 import { getMonthlyRelationshipEffects } from "../core/v2-relationship-rules";
 import { applyDualMonitorMonthlyRead } from "../core/v2-reading-system";
 import { getResearchCap } from "../core/v2-research-cap-system";
-import { getMonthlySeasonSanModifier, getSeasonByMonth } from "../core/v2-sanity-rules";
+import { getMonthlySeasonSanModifier, getSeasonByMonth, getTierResistChance } from "../core/v2-sanity-rules";
 import {
   applyShopMonthlyModifier,
   getChairFlatMonthlySanBonus,
@@ -191,6 +191,11 @@ function getAttrTierName(kind: AttrTierId, value: number): string {
   return ["陌生", "认可", "信任", "心腹"][tier];
 }
 
+function getAttrTierTooltip(value: number): string {
+  const currentChance = Math.round(getTierResistChance(value) * 100);
+  return `全局抵抗：当前档位抵抗率 ${currentChance}%。属性变化时，每 1 点独立判定是否被抵抗。档位抵抗率：0-5 为 0%，6-11 为 25%，12-17 为 50%，18 以上为 75%。`;
+}
+
 function getAttrFillStateClass(value: number, cap: number, lowThreshold: number, dangerThreshold: number): string {
   const ratio = cap > 0 ? value / cap : 0;
   if (ratio >= 1) return " full-glow";
@@ -227,7 +232,12 @@ function renderAttrItem(
         <span class="new-attr-icon">${icon}</span>
         <span class="new-attr-name">${name}</span>
         <span class="new-attr-value">${value}/${cap}</span>
-        <span class="new-attr-level attr-level-${tierKind}">${getAttrTierName(tierKind, value)}</span>
+        <span
+          class="new-attr-level attr-level-${tierKind}"
+          tabindex="0"
+          aria-label="${escapeHtml(`${getAttrTierName(tierKind, value)}，${getAttrTierTooltip(value)}`)}"
+          data-tooltip="${escapeHtml(getAttrTierTooltip(value))}"
+        >${getAttrTierName(tierKind, value)}</span>
       </div>
       <div class="new-attr-bar-row">
         ${renderProgressBar(progressClassName, safePercent)}

@@ -31,8 +31,7 @@ export function applyFixedEventResolution(
     case "advisor-reroll":
       return resolveAdvisorReroll(state, resolution, getRoll);
     case "teachers-day-message":
-    case "teachers-day-tea":
-    case "teachers-day-flower":
+    case "teachers-day-gift":
     case "teachers-day-stamp":
       return resolveTeachersDayFixedEvent(state, resolution, getRoll);
     case "winter-vacation-rest":
@@ -76,7 +75,7 @@ export function collectFixedEventsForState(
   }
 
   if (state.month === 1) {
-    events.push(createTeachersDayEvent(state));
+    events.push(createTeachersDayEvent(state, getRoll));
   }
   if (state.month === 2 && state.year >= 2 && !state.isNatureExtensionYear) {
     events.push(createScholarshipEvent(state, getRoll));

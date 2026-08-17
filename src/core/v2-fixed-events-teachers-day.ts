@@ -6,7 +6,79 @@ import {
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
-import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
+import type {
+  FixedEventResolution,
+  GameState,
+  PendingEvent,
+  TeachersDayGiftId,
+} from "./v2-types";
+
+interface TeachersDayGiftDefinition {
+  id: TeachersDayGiftId;
+  name: string;
+  choiceLabel: string;
+  amountText: string;
+  highFavorHint: string;
+  lowFavorHint: string;
+  resultDescription: string[];
+}
+
+const TEACHERS_DAY_GIFTS: readonly TeachersDayGiftDefinition[] = [
+  {
+    id: "tea",
+    name: "茶叶",
+    choiceLabel: "送茶叶",
+    amountText: "一盒茶叶",
+    highFavorHint: "“送盒茶叶表示一下心意，1 金币不算贵，导师平时也爱喝茶。”",
+    lowFavorHint: "“送盒茶叶比较稳妥，1 金币就能让导师记住我的好。”",
+    resultDescription: [
+      "你决定送一盒茶叶。",
+      "下午，你拎着精心挑选的茶叶来到导师办公室。敲门进去，导师正在批改论文。",
+      "“老师，教师节快乐！”你递上茶叶，“这是给您的小礼物，知道您爱喝茶。”",
+      "导师接过茶叶，笑着说：“哎呀，还破费了。”他打开包装看了看：“嗯，这茶不错啊，正好最近喝完了。”",
+      "他拍了拍你的肩膀：“谢谢你的心意！”",
+    ],
+  },
+  {
+    id: "mooncake",
+    name: "月饼",
+    choiceLabel: "送月饼",
+    amountText: "一盒月饼",
+    highFavorHint: "“中秋也快到了，送盒月饼正合适，1 金币就当提前祝个节。”",
+    lowFavorHint: "“送盒月饼比较稳妥，1 金币不算太贵，也不会显得空手。”",
+    resultDescription: [
+      "你决定送一盒月饼。",
+      "下午，你拎着月饼来到导师办公室。敲门进去，导师正在回复邮件。",
+      "“老师，教师节快乐！中秋也快到了，这盒月饼给您尝尝。”",
+      "导师接过盒子看了看：“谢谢，正好晚上带回去和家里人一起吃。”",
+      "你们又聊了几句最近的进度，气氛比平时轻松不少。",
+    ],
+  },
+  {
+    id: "flower",
+    name: "鲜花",
+    choiceLabel: "送鲜花",
+    amountText: "一束鲜花",
+    highFavorHint: "“送束鲜花也不错，1 金币，简单体面，也有点节日气氛。”",
+    lowFavorHint: "“送束鲜花比较得体，1 金币不算太贵，至少不会显得敷衍。”",
+    resultDescription: [
+      "你决定送一束鲜花。",
+      "下午，你捧着一束康乃馨来到导师办公室。敲门进去，导师正在批改学生的作业。",
+      "“老师，教师节快乐！”你递上鲜花，“这是给您的小心意。”",
+      "导师接过花束，笑着说：“还特意买了花，谢谢你。”",
+      "他找来一个花瓶把花插好，放在办公桌一角。",
+    ],
+  },
+] as const;
+
+function getTeachersDayGift(giftId: TeachersDayGiftId | undefined): TeachersDayGiftDefinition | null {
+  return TEACHERS_DAY_GIFTS.find((gift) => gift.id === giftId) ?? null;
+}
+
+function drawTeachersDayGift(getRoll: RandomRollProvider): TeachersDayGiftDefinition {
+  return TEACHERS_DAY_GIFTS[drawInclusiveInt(0, TEACHERS_DAY_GIFTS.length - 1, getRoll)]
+    ?? TEACHERS_DAY_GIFTS[0];
+}
 
 function createTeachersDayResultEvent(params: {
   state: GameState;
@@ -34,16 +106,14 @@ function createTeachersDayResultEvent(params: {
   });
 }
 
-function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
+function createTeachersDayChoiceEvent(
+  state: GameState,
+  gift: TeachersDayGiftDefinition,
+): PendingEvent {
   const noGiftHint = state.player.favor >= 6
     ? "“和导师关系还行，应该不会计较这些形式上的东西吧……说不定还能趁机聊聊学术？”"
     : "“什么都不送的话……万一导师正好有事找我帮忙，那就尴尬了……”";
-  const teaHint = state.player.favor >= 6
-    ? "“送盒茶叶表示一下心意，1 金币不算贵，导师平时也爱喝茶。”"
-    : "“送盒茶叶比较稳妥，1 金币就能让导师记住我的好。”";
-  const flowerHint = state.player.favor >= 6
-    ? "“送束鲜花也不错，2 金币，既体面又不会太贵重。”"
-    : "“送束鲜花比较得体，2 金币也不算太贵，应该能给导师留个好印象。”";
+  const giftHint = state.player.favor >= 6 ? gift.highFavorHint : gift.lowFavorHint;
   const stampHint = state.player.favor >= 6
     ? "“导师喜欢集邮，送套邮票肯定能让他高兴。不过 3 金币有点肉疼……”"
     : "“送套邮票的话，导师肯定印象深刻。就是 3 金币有点贵……”";
@@ -53,10 +123,8 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
     title: "教师节 ➜ 你的选择",
     description: [
       noGiftHint,
-      teaHint,
-      flowerHint,
+      giftHint,
       stampHint,
-      "你在心里反复衡量：发祝福最省成本、送茶叶更稳妥、鲜花更有仪式感、邮票最容易拉开记忆点。",
     ].join("\n\n"),
     preview: "在祝福与送礼之间做选择",
     chainId: "teachers-day",
@@ -71,19 +139,14 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
         },
       },
       {
-        id: `teachers-day-tea-y${state.year}-m${state.month}`,
-        label: "送茶叶",
-        outcome: "你准备送一盒茶叶表示心意。",
+        id: `teachers-day-gift-${gift.id}-y${state.year}-m${state.month}`,
+        label: gift.choiceLabel,
+        outcome: `你准备送${gift.amountText}表示心意。`,
         effects: {
-          fixedEventResolution: { kind: "teachers-day-tea" },
-        },
-      },
-      {
-        id: `teachers-day-flower-y${state.year}-m${state.month}`,
-        label: "送鲜花",
-        outcome: "你准备送一束鲜花表示敬意。",
-        effects: {
-          fixedEventResolution: { kind: "teachers-day-flower" },
+          fixedEventResolution: {
+            kind: "teachers-day-gift",
+            teachersDayGift: gift.id,
+          },
         },
       },
       {
@@ -98,8 +161,12 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
   });
 }
 
-export function createTeachersDayEvent(state: GameState): PendingEvent {
+export function createTeachersDayEvent(
+  state: GameState,
+  getRoll: RandomRollProvider = Math.random,
+): PendingEvent {
   const relationText = state.player.favor >= 6 ? "还不错" : "一般";
+  const gift = drawTeachersDayGift(getRoll);
   return createFixedEvent({
     id: `teachers-day-y${state.year}-m${state.month}`,
     title: "教师节",
@@ -117,7 +184,7 @@ export function createTeachersDayEvent(state: GameState): PendingEvent {
         label: "继续",
         outcome: "你开始认真权衡这次教师节该怎么处理。",
         effects: {
-          enqueueEvents: [createTeachersDayChoiceEvent(state)],
+          enqueueEvents: [createTeachersDayChoiceEvent(state, gift)],
         },
       },
     ],
@@ -222,7 +289,14 @@ export function resolveTeachersDayFixedEvent(
           outcome: "无事发生。",
         })],
       };
-    case "teachers-day-tea": {
+    case "teachers-day-gift": {
+      const gift = getTeachersDayGift(resolution.teachersDayGift);
+      if (!gift) {
+        return {
+          nextState: state,
+          outcome: "教师节礼物信息无效。",
+        };
+      }
       const favorChange = applyTierResist(1, state.player.favor, getRoll).effectiveChange;
       return {
         nextState: applyStateMutation(state, {
@@ -231,55 +305,20 @@ export function resolveTeachersDayFixedEvent(
           consecutiveStampGiftCount: 0,
         }),
         outcome: favorChange > 0
-          ? `你送出茶叶，金钱 -1，导师好感 +${favorChange}。`
-          : "你送出茶叶，金钱 -1，但这次没有额外拉近关系。",
+          ? `你送出${gift.name}，金钱 -1，导师好感 +${favorChange}。`
+          : `你送出${gift.name}，金钱 -1，但这次没有额外拉近关系。`,
         enqueueEvents: [createTeachersDayResultEvent({
           state,
-          resultId: "tea",
+          resultId: `gift-${gift.id}`,
           resultTitle: "礼物送达",
           description: [
-            "你决定送一盒茶叶。",
-            "下午，你拎着精心挑选的茶叶来到导师办公室。敲门进去，导师正在批改论文。",
-            "“老师，教师节快乐！”你递上茶叶，“这是给您的小礼物，知道您爱喝茶。”",
-            "导师接过茶叶，笑着说：“哎呀，还破费了。”他打开包装看了看：“嗯，这茶不错啊，正好最近喝完了。”",
-            "他拍了拍你的肩膀：“谢谢你的心意！”",
+            ...gift.resultDescription,
             `机制结算\n金币 -1\n导师好感度 ${favorChange > 0 ? "+" : ""}${favorChange}`,
           ].join("\n\n"),
           buttonLabel: "继续",
           outcome: favorChange > 0
             ? `金币 -1，导师好感 +${favorChange}。`
             : "金币 -1，导师好感没有变化。",
-        })],
-      };
-    }
-    case "teachers-day-flower": {
-      const rawFavor = drawInclusiveInt(1, 2, getRoll);
-      const favorChange = applyTierResist(rawFavor, state.player.favor, getRoll).effectiveChange;
-      return {
-        nextState: applyStateMutation(state, {
-          favor: favorChange,
-          money: -2,
-          consecutiveStampGiftCount: 0,
-        }),
-        outcome: favorChange > 0
-          ? `你送出鲜花，金钱 -2，导师好感 +${favorChange}。`
-          : "你送出鲜花，金钱 -2，但这次没有额外拉近关系。",
-        enqueueEvents: [createTeachersDayResultEvent({
-          state,
-          resultId: "flower",
-          resultTitle: "礼物送达",
-          description: [
-            "你决定送一束鲜花。",
-            "下午，你捧着精心挑选的康乃馨来到导师办公室。敲门进去，导师正在批改学生的作业。",
-            "“老师，教师节快乐！”你递上鲜花，“这是给您的小心意。”",
-            "导师接过花束，脸上露出惊喜的笑容：“哎呀，真漂亮！”他闻了闻花香，“谢谢你，有心了。”",
-            "他找来一个花瓶，小心地把花插好，放在办公桌上：“这下办公室都亮堂了不少。”",
-            `机制结算\n金币 -2\n导师好感度 ${favorChange > 0 ? "+" : ""}${favorChange}`,
-          ].join("\n\n"),
-          buttonLabel: "继续",
-          outcome: favorChange > 0
-            ? `金币 -2，导师好感 +${favorChange}。`
-            : "金币 -2，导师好感没有变化。",
         })],
       };
     }

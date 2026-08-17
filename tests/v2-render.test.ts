@@ -358,6 +358,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("play-center-column");
     expect(html).toContain("play-right-rail");
     expect(html).toContain('class="new-attr-panel"');
+    expect((html.match(/data-tooltip="全局抵抗：当前档位抵抗率/g) ?? []).length).toBe(4);
+    expect(html).toContain("属性变化时，每 1 点独立判定是否被抵抗");
     expect(html).toContain("SAN值");
     expect(html).toContain("永久效果");
     expect(html).toContain("本月效果");
@@ -752,7 +754,7 @@ describe("v2 render lobby shell", () => {
     });
     state = dispatchAction(state, "resolve-event", {
       eventId: state.eventQueue[0]?.id,
-      eventChoiceId: state.eventQueue[0]?.choices.find((choice) => choice.id.includes("teachers-day-tea"))?.id,
+      eventChoiceId: state.eventQueue[0]?.choices.find((choice) => choice.id.includes("teachers-day-gift"))?.id,
     });
 
     const currentHtml = renderApp(state, createDefaultAccountProfile(), {

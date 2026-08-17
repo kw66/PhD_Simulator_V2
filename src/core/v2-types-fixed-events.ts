@@ -2,8 +2,7 @@ export type FixedEventResolutionKind =
   | "advisor-confirm"
   | "advisor-reroll"
   | "teachers-day-message"
-  | "teachers-day-tea"
-  | "teachers-day-flower"
+  | "teachers-day-gift"
   | "teachers-day-stamp"
   | "winter-vacation-rest"
   | "summer-vacation-home"
@@ -22,6 +21,8 @@ export type FixedEventResolutionKind =
   | "ccig-activity-travel"
   | "ccig-activity-food"
   | "mentor-assign-candidate";
+
+export type TeachersDayGiftId = "tea" | "mooncake" | "flower";
 
 export interface FixedEventJuniorCandidate {
   name: string;
@@ -50,6 +51,7 @@ export interface FixedEventAdvisorIntel {
 
 export interface FixedEventResolution {
   kind: FixedEventResolutionKind;
+  teachersDayGift?: TeachersDayGiftId;
   juniorCandidate?: FixedEventJuniorCandidate;
   advisorCandidate?: FixedEventAdvisorCandidate;
   advisorIntel?: FixedEventAdvisorIntel;

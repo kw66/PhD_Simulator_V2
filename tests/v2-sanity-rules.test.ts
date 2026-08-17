@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applySanCostModifiers, applyTierResist, getActualSanChange, getMonthlySeasonSanModifier, getSeasonByMonth, getSeasonSanModifier } from "../src/core/v2-sanity-rules";
+import { applySanCostModifiers, applyTierResist, getActualSanChange, getMonthlySeasonSanModifier, getSeasonByMonth, getSeasonSanModifier, getTierResistChance } from "../src/core/v2-sanity-rules";
 
 describe("v2 sanity rules", () => {
   it("maps game months to the confirmed legacy seasons", () => {
@@ -30,6 +30,7 @@ describe("v2 sanity rules", () => {
   });
 
   it("applies tier resist point by point using the confirmed thresholds", () => {
+    expect([0, 6, 12, 18].map(getTierResistChance)).toEqual([0, 0.25, 0.5, 0.75]);
     expect(applyTierResist(-4, 18, () => 0)).toEqual({ effectiveChange: 0, resistedCount: 4 });
     expect(applyTierResist(-4, 18, () => 0.99)).toEqual({ effectiveChange: -4, resistedCount: 0 });
   });

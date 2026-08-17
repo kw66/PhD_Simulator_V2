@@ -10,6 +10,7 @@ import {
   type RandomRollProvider,
 } from "../src/core/v2-event-scheduler";
 import { createInitialState } from "../src/core/v2-engine";
+import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "../src/core/v2-fixed-events-teachers-day";
 import type { EventChoice, PendingEvent } from "../src/core/v2-types";
 
 function fromRolls(rolls: number[]): RandomRollProvider {
@@ -33,6 +34,37 @@ function getDecisionChoices(event: PendingEvent | undefined): EventChoice[] {
 }
 
 describe("v2 event scheduler", () => {
+  it("randomizes one unified Teacher's Day gift without restoring the fourth choice", () => {
+    const state = {
+      ...createInitialState(),
+      phase: "playing" as const,
+      year: 1,
+      month: 1,
+      totalMonths: 1,
+      player: { ...createInitialState().player, favor: 1, money: 10 },
+    };
+    const cases = [
+      { roll: 0, giftId: "tea" as const, label: "送茶叶", name: "茶叶" },
+      { roll: 0.4, giftId: "mooncake" as const, label: "送月饼", name: "月饼" },
+      { roll: 0.99, giftId: "flower" as const, label: "送鲜花", name: "鲜花" },
+    ];
+
+    for (const item of cases) {
+      const event = createTeachersDayEvent(state, () => item.roll);
+      const choiceEvent = event.choices[0]?.effects.enqueueEvents?.[0];
+      expect(choiceEvent?.choices).toHaveLength(3);
+      expect(choiceEvent?.choices.map((choice) => choice.label)).toEqual(["发祝福", item.label, "送邮票"]);
+      const giftResolution = choiceEvent?.choices[1]?.effects.fixedEventResolution;
+      expect(giftResolution).toEqual({ kind: "teachers-day-gift", teachersDayGift: item.giftId });
+
+      const result = resolveTeachersDayFixedEvent(state, giftResolution!, () => 0.99);
+      expect(result.nextState.player.money).toBe(9);
+      expect(result.nextState.player.favor).toBe(2);
+      expect(result.outcome).toContain(`送出${item.name}`);
+      expect(result.enqueueEvents?.[0]?.description).toContain(item.name);
+    }
+  });
+
   it("collects fixed events by month", () => {
     const initial = createInitialState();
 
@@ -666,7 +698,7 @@ describe("v2 event scheduler", () => {
       usedRandomEvents: [],
     };
 
-    const result = enqueueMonthlyEventsForMonth(baseState, fromRolls([0.7, 0]));
+    const result = enqueueMonthlyEventsForMonth(baseState, fromRolls([0, 0.7, 0]));
     expect(result.queuedEvents.map((event) => event.source)).toEqual(["fixed", "random"]);
     expect(result.queuedEvents[0]?.chainId).toBe("teachers-day");
     expect(result.queuedEvents[1]?.title).toBe("毕设辅导");

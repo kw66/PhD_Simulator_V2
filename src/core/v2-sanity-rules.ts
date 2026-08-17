@@ -59,9 +59,7 @@ export function applyTierResist(
     return { effectiveChange: 0, resistedCount: 0 };
   }
 
-  const resistChanceByTier = [0, 0.25, 0.5, 0.75] as const;
-  const tier = getAttributeTier(currentValue);
-  const resistChance = resistChanceByTier[tier];
+  const resistChance = getTierResistChance(currentValue);
   if (resistChance === 0) {
     return { effectiveChange: rawChange, resistedCount: 0 };
   }
@@ -79,4 +77,9 @@ export function applyTierResist(
     effectiveChange: effectiveCount === 0 ? 0 : effectiveCount * sign,
     resistedCount: absChange - effectiveCount,
   };
+}
+
+export function getTierResistChance(currentValue: number): number {
+  const resistChanceByTier = [0, 0.25, 0.5, 0.75] as const;
+  return resistChanceByTier[getAttributeTier(currentValue)];
 }

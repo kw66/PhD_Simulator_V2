@@ -2790,6 +2790,7 @@ p {
 }
 
 .new-attr-level {
+  position: relative;
   flex: 0 0 auto;
   min-width: 0;
   min-height: 19px;
@@ -2809,6 +2810,43 @@ p {
   text-align: center;
   white-space: nowrap;
   margin-left: 3px;
+  cursor: help;
+}
+
+.new-attr-level::after {
+  position: absolute;
+  z-index: 40;
+  right: 0;
+  top: calc(100% + 7px);
+  bottom: auto;
+  width: 252px;
+  padding: 8px 10px;
+  border: 1px solid rgba(69, 65, 55, 0.2);
+  background: rgba(52, 51, 46, 0.97);
+  color: rgba(255, 252, 242, 0.97);
+  box-shadow: 0 5px 12px rgba(24, 30, 27, 0.18);
+  content: attr(data-tooltip);
+  font-family: var(--ui-font-cjk);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.55;
+  letter-spacing: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: normal;
+}
+
+.new-attr-level:hover::after,
+.new-attr-level:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.new-attr-level:focus-visible {
+  outline: 2px solid rgba(184, 139, 58, 0.42);
+  outline-offset: 2px;
 }
 
 .new-attr-level.attr-level-san {
