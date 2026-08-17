@@ -349,7 +349,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('data-ui-play-tab="research">成果</button>');
     expect(html).toContain("天赋");
     expect(html).toContain("设置");
-    expect(html).toContain("下一月");
+    expect(html).toContain('<span class="center-tab-next-label">下一月</span>');
+    expect(html).toContain('<span class="center-tab-next-arrow" aria-hidden="true">→</span>');
     expect(html).toContain('class="center-tab-badge is-blocking"');
     expect(html).toContain('class="play-workbench"');
     expect(html).toContain("play-left-rail");

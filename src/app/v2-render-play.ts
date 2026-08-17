@@ -2293,7 +2293,10 @@ function renderLegacyCenterShell(state: GameState, uiState: PlayRenderUiState = 
           <button class="center-tab-btn" type="button" data-ui-play-tab="research">成果</button>
           <button class="center-tab-btn" type="button" data-ui-play-tab="talent">天赋</button>
           <button class="center-tab-btn" type="button" data-ui-play-tab="settings">设置</button>
-          <button class="center-tab-btn center-tab-btn-next" type="button" data-action="next-month">下一月</button>
+          <button class="center-tab-btn center-tab-btn-next" type="button" data-action="next-month">
+            <span class="center-tab-next-label">下一月</span>
+            <span class="center-tab-next-arrow" aria-hidden="true">→</span>
+          </button>
         </div>
 
         <div class="center-main-panels" id="center-main-panels">

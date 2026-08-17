@@ -3251,7 +3251,7 @@ p {
   color: var(--setup-label-color);
   font-size: 0.84rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .center-tab-btn:last-child {
@@ -3259,8 +3259,12 @@ p {
 }
 
 .center-tab-btn.active {
-  background: linear-gradient(180deg, rgba(255, 251, 243, 0.88), rgba(244, 236, 223, 0.76));
+  background: linear-gradient(180deg, rgba(255, 251, 243, 0.96), rgba(239, 228, 207, 0.84));
   color: var(--ink);
+  font-weight: 800;
+  box-shadow:
+    inset 0 -3px 0 #b08a45,
+    inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
 .center-tab-badge {
@@ -3482,9 +3486,64 @@ p {
   color: color-mix(in oklab, #9a2c54 74%, var(--ink));
 }
 
-.center-tab-btn-next {
-  background: linear-gradient(180deg, rgba(214, 181, 109, 0.22), rgba(184, 139, 58, 0.14));
-  color: color-mix(in oklab, var(--accent-deep) 82%, var(--ink));
+.center-tab-btn.center-tab-btn-next {
+  position: relative;
+  z-index: 1;
+  gap: 7px;
+  border: 1px solid #9a7b3e;
+  background: #ddc98f;
+  color: #493a20;
+  font-family: var(--ui-font-cjk);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.58),
+    0 3px 0 #a18343,
+    0 5px 8px rgba(92, 70, 30, 0.13);
+  transition: transform 130ms ease, border-color 130ms ease, background-color 130ms ease, box-shadow 130ms ease;
+}
+
+.center-tab-next-label {
+  color: #493a20;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.center-tab-next-arrow {
+  display: inline-block;
+  color: #705521;
+  font-size: 0.96rem;
+  font-weight: 760;
+  line-height: 1;
+  transition: transform 140ms ease;
+}
+
+.center-tab-btn.center-tab-btn-next:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #886a31;
+  background: #e5d19a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.68),
+    0 4px 0 #a18343,
+    0 7px 10px rgba(92, 70, 30, 0.16);
+}
+
+.center-tab-btn.center-tab-btn-next:hover:not(:disabled) .center-tab-next-arrow {
+  transform: translateX(3px);
+}
+
+.center-tab-btn.center-tab-btn-next:active:not(:disabled) {
+  transform: translateY(2px);
+  border-color: #886a31;
+  background: #ccb675;
+  box-shadow:
+    inset 0 2px 3px rgba(83, 61, 22, 0.15),
+    0 1px 0 #a18343,
+    0 3px 5px rgba(92, 70, 30, 0.1);
+}
+
+.center-tab-btn.center-tab-btn-next:focus-visible {
+  outline: 2px solid rgba(136, 106, 49, 0.56);
+  outline-offset: 3px;
 }
 
 .center-main-panels {
