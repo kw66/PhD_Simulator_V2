@@ -737,36 +737,11 @@ function renderEventQueueList(
   const queue = getSortedEventQueue(state.eventQueue);
   const history = [...state.eventHistory].reverse();
 
-  const renderEmptyGuide = (): string => {
-    const hasAnyPaper = state.papers.some((paper) => Boolean(paper));
-    let guideText = "本月待办已处理完成。你可以直接进入下一月，或先做一轮准备。";
-    if (!hasAnyPaper) {
-      guideText = "本月待办已处理完成。建议先去科研工作站开启论文，避免后续推进断档。";
-    } else if (state.player.san > 0 && state.player.san <= 4) {
-      guideText = "本月待办已处理完成。当前 SAN 偏低，建议先在科研中休息补状态，再进入下一月。";
-    }
-
-    return `
-      <div class="event-column-empty">
-        <div class="event-empty-guide">
-          <div class="event-empty-guide-title">本月待办已清空</div>
-          <div class="event-empty-guide-desc">${guideText}</div>
-          <div class="event-empty-guide-actions">
-            <button class="event-empty-guide-btn" type="button" data-ui-play-tab="workstation">前往科研</button>
-            <button class="event-empty-guide-btn" type="button" data-ui-play-tab="relationship">前往人际</button>
-            <button class="event-empty-guide-btn is-primary" type="button" data-action="next-month">进入下一月</button>
-          </div>
-        </div>
-      </div>
-    `;
-  };
-
   if (queue.length === 0 && history.length === 0) {
-    return renderEmptyGuide();
+    return "";
   }
 
-  const currentHtml = queue.length > 0
-    ? queue
+  const currentHtml = queue
     .map((event) => `
       <button
         class="event-card${activeEventId === event.id ? " is-active" : ""}"
@@ -780,8 +755,7 @@ function renderEventQueueList(
         </div>
       </button>
     `)
-    .join("")
-    : renderEmptyGuide();
+    .join("");
   const historyHtml = history
     .map((event) => `
       <button

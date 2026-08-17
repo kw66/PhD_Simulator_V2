@@ -351,10 +351,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (activeEventChainId) {
       const completedEvent = [...state.eventHistory].reverse().find((event) => event.chainId === activeEventChainId);
       if (completedEvent) {
-        activeEventId = null;
-        activeEventHistoryId = completedEvent.id;
-        activeEventChainId = null;
-        activeEventHistoryIndex = null;
+        resetEventContentUiState();
         return;
       }
     }

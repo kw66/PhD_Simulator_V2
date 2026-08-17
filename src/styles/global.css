@@ -3224,7 +3224,6 @@ p {
 .rel-switch-btn,
 .paper-action-btn,
 .event-choice-btn,
-.event-empty-guide-btn,
 .event-content-close,
 .event-card,
 .settings-tool-btn,
@@ -4127,47 +4126,6 @@ button.todo-item:focus-visible {
 .event-list-column {
   display: grid;
   gap: 6px;
-}
-
-.event-column-empty {
-  display: grid;
-}
-
-.event-empty-guide {
-  display: grid;
-  gap: 10px;
-  padding: 16px 18px;
-  border: 1px dashed rgba(39, 68, 58, 0.28);
-  background: linear-gradient(180deg, rgba(255, 252, 246, 0.5), rgba(240, 233, 220, 0.34));
-  text-align: center;
-}
-
-.event-empty-guide-title {
-  color: var(--ink);
-  font-size: 0.88rem;
-  font-weight: 760;
-}
-
-.event-empty-guide-desc {
-  color: var(--setup-label-color);
-  font-size: 0.8rem;
-  line-height: 1.55;
-}
-
-.event-empty-guide-actions {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.event-empty-guide-btn {
-  min-height: 34px;
-  padding: 0 14px;
-}
-
-.event-empty-guide-btn.is-primary {
-  color: color-mix(in oklab, var(--accent-deep) 82%, var(--ink));
 }
 
 .event-content-box {

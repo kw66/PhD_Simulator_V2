@@ -829,6 +829,10 @@ describe("v2 render lobby shell", () => {
     expect(listHtml).toContain('class="event-list-divider" role="separator"');
     expect(listHtml).toContain(`data-ui-open-event-history-id="${completedEvent?.id}"`);
     expect(listHtml).toContain('<span class="event-ddl-badge">入学前</span>');
+    expect(listHtml).not.toContain("本月待办已清空");
+    expect(listHtml).not.toContain("前往科研");
+    expect(listHtml).not.toContain("前往人际");
+    expect(listHtml).not.toContain("进入下一月");
 
     const historyHtml = renderApp(state, createDefaultAccountProfile(), {
       isEventContentOpen: true,
