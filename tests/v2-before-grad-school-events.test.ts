@@ -179,7 +179,7 @@ describe("v2 before grad school events", () => {
     }
   });
 
-  it("uses the third act for the summer before enrollment", () => {
+  it("uses the third act for formal admission", () => {
     const advisorInfo = getAdvisorInfoEvent(0);
     const resolution = advisorInfo.choices[0]?.effects.fixedEventResolution;
 
@@ -190,7 +190,7 @@ describe("v2 before grad school events", () => {
       { ...createInitialState(), phase: "playing" },
       resolution,
     );
-    const summerEvent = resolved.enqueueEvents?.[0];
+    const admissionEvent = resolved.enqueueEvents?.[0];
 
     expect(resolved.nextState.selectedAdvisorId).toBe("chen-ming");
     expect(resolved.nextState.selectedAdvisorName).toBe("李旭旭");
@@ -204,28 +204,21 @@ describe("v2 before grad school events", () => {
       relationMax: 40,
     });
     expect(resolved.outcome).toContain("加入李旭旭讲师的课题组");
+    expect(resolved.outcome).toContain("进了实验室群");
     expect(resolved.outcome).not.toContain("分配");
-    expect(summerEvent).toMatchObject({
+    expect(admissionEvent).toMatchObject({
+      id: "before-grad-school-admission-chen-ming",
       title: "读研之始",
       chainId: "before-grad-school",
       stage: "result",
+      preview: "收到录取通知书",
     });
-    expect(summerEvent?.description).toContain("老师把你拉进实验室群");
-    expect(summerEvent?.description).not.toContain("收到，开学见");
-    expect(summerEvent?.description).toContain("推免资格名单");
-    expect(summerEvent?.description).toContain("九月推免系统开放");
-    expect(summerEvent?.description).not.toContain("九推系统");
-    expect(summerEvent?.description).toContain("接受待录取");
-    expect(summerEvent?.description.indexOf("推免资格名单") ?? -1).toBeLessThan(
-      summerEvent?.description.indexOf("推免系统开放") ?? -1,
-    );
-    expect(summerEvent?.description.indexOf("推免系统开放") ?? -1).toBeLessThan(
-      summerEvent?.description.indexOf("接受待录取") ?? -1,
-    );
-    expect(summerEvent?.description).toContain("暑假");
-    expect(summerEvent?.description).toContain("第一次组会");
-    expect(summerEvent?.description).toContain("第一篇投稿");
-    expect(summerEvent?.choices[0]?.label).toBe("准备报到");
+    expect(admissionEvent?.description).toContain("录取通知书");
+    expect(admissionEvent?.description).toContain("晒到朋友圈");
+    expect(admissionEvent?.description).not.toContain("暑假");
+    expect(admissionEvent?.description).not.toContain("第一次组会");
+    expect(admissionEvent?.description).not.toContain("第一篇投稿");
+    expect(admissionEvent?.choices[0]?.label).toBe("准备报到");
   });
 
 });

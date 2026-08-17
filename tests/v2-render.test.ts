@@ -729,7 +729,7 @@ describe("v2 render lobby shell", () => {
 
     expect(html).toContain(">保研资格</button>");
     expect(html).toContain(">导师信息</button>");
-    expect(html).toContain(">暑假憧憬</button>");
+    expect(html).toContain(">正式录取</button>");
     expect(html).not.toContain("data-ui-event-history-nav");
   });
 
@@ -833,7 +833,7 @@ describe("v2 render lobby shell", () => {
     const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(historyHtml).toContain(">保研资格</button>");
     expect(historyHtml).toContain(">导师信息</button>");
-    expect(historyHtml).toContain(">暑假憧憬</button>");
+    expect(historyHtml).toContain(">正式录取</button>");
     expect(historyButtons).toContain('disabled aria-disabled="true"');
     expect(historyButtons).not.toContain('data-action="resolve-event"');
     expect(historyButtons).toContain('aria-label="已选择"');

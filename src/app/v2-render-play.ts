@@ -811,7 +811,7 @@ function getEventSceneLabel(chainId: string, stage: EventStage, title: string): 
   if (chainId === "before-grad-school") {
     if (stage === "act1") return "保研资格";
     if (stage === "act2") return "导师信息";
-    if (stage === "result") return "暑假憧憬";
+    if (stage === "result") return "正式录取";
   }
 
   const titleParts = title.split("➜").map((part) => part.trim()).filter(Boolean);

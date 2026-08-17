@@ -169,17 +169,13 @@ function createAdvisorInfoEvent(
 
 function createBeforeGradSchoolResultEvent(
   advisorId: AdvisorId,
-  advisorName: string,
 ): PendingEvent {
   const advisor = getAdvisorDefinition(advisorId);
   return createFixedEvent({
-    id: `before-grad-school-summer-${advisor.id}`,
+    id: `before-grad-school-admission-${advisor.id}`,
     title: "读研之始",
-    description: [
-      `你回复${advisorName}讲师，希望加入课题组。大四开学，你进入推免资格名单。九月推免系统开放，你接受待录取，老师把你拉进实验室群。`,
-      "毕业后的暑假，你开始期待工位、第一次组会和第一篇投稿。",
-    ].join("\n\n"),
-    preview: "开学的日子近了",
+    description: "录取通知书寄到了。你拍张照片晒到朋友圈，读研这件事终于有了实感。",
+    preview: "收到录取通知书",
     chainId: "before-grad-school",
     stage: "result",
     choices: [
@@ -254,8 +250,8 @@ export function resolveAdvisorConfirmation(
 
   return {
     nextState,
-    outcome: `加入${candidate.advisorName}讲师的课题组。`,
-    enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id, candidate.advisorName)],
+    outcome: `加入${candidate.advisorName}讲师的课题组，也进了实验室群。`,
+    enqueueEvents: [createBeforeGradSchoolResultEvent(advisor.id)],
   };
 }
 
