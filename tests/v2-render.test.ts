@@ -719,7 +719,9 @@ describe("v2 render lobby shell", () => {
     });
     state = dispatchAction(state, "resolve-event", {
       eventId: state.eventQueue[0]?.id,
-      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices.find((choice) => (
+        choice.effects.fixedEventResolution?.kind === "advisor-confirm"
+      ))?.id,
     });
 
     const html = renderApp(state, createDefaultAccountProfile(), {
@@ -811,7 +813,9 @@ describe("v2 render lobby shell", () => {
     });
     state = dispatchAction(state, "resolve-event", {
       eventId: state.eventQueue[0]?.id,
-      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices.find((choice) => (
+        choice.effects.fixedEventResolution?.kind === "advisor-confirm"
+      ))?.id,
     });
     state = dispatchAction(state, "resolve-event", {
       eventId: state.eventQueue[0]?.id,

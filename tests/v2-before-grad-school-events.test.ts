@@ -14,6 +14,12 @@ function getAdvisorInfoEvent(roll: number): PendingEvent {
   return advisorInfo as PendingEvent;
 }
 
+function getAdvisorConfirmationResolution(event: PendingEvent) {
+  return event.choices.find((choice) => (
+    choice.effects.fixedEventResolution?.kind === "advisor-confirm"
+  ))?.effects.fixedEventResolution;
+}
+
 describe("v2 before grad school events", () => {
   it("always starts one before-grad-school event when a new game has no advisor", () => {
     const state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
@@ -69,7 +75,7 @@ describe("v2 before grad school events", () => {
   it("uses active contact instead of assignment and shows one lecturer's relevant information", () => {
     const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => 0.6);
     const advisorInfo = act1.choices[0]?.effects.enqueueEvents?.[0] as PendingEvent;
-    const resolution = advisorInfo.choices[0]?.effects.fixedEventResolution;
+    const resolution = getAdvisorConfirmationResolution(advisorInfo);
     const visibleCopy = `${act1.description}\n${advisorInfo.description}`;
 
     expect(advisorInfo.stage).toBe("act2");
@@ -90,7 +96,7 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.description).toContain("科研分：论文录用，C 类 +1｜B 类 +2｜A 类 +4");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分\n转博士：第 2 年 2 分｜第 3 年 3 分");
-    expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["回复导师", "换个导师"]);
+    expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["换个导师", "回复导师"]);
     expect(resolution).toEqual({
       kind: "advisor-confirm",
       advisorCandidate: {
@@ -108,8 +114,8 @@ describe("v2 before grad school events", () => {
   it("keeps collected lecturer information separate from gameplay values", () => {
     const firstInfo = getAdvisorInfoEvent(0);
     const lastInfo = getAdvisorInfoEvent(0.999999);
-    const firstCandidate = firstInfo.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
-    const lastCandidate = lastInfo.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
+    const firstCandidate = getAdvisorConfirmationResolution(firstInfo)?.advisorCandidate;
+    const lastCandidate = getAdvisorConfirmationResolution(lastInfo)?.advisorCandidate;
 
     expect(firstInfo.description).toContain("周报 + 组会｜项目少｜可实习");
     expect(firstInfo.description).toContain("指导少｜资源较少｜老师宽和");
@@ -157,7 +163,7 @@ describe("v2 before grad school events", () => {
       const rerollChoice = originalEvent?.choices.find((choice) => choice.label === "换个导师");
       if (!originalEvent || !rerollChoice) throw new Error("advisor reroll choice missing");
 
-      const originalCandidate = originalEvent.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
+      const originalCandidate = getAdvisorConfirmationResolution(originalEvent)?.advisorCandidate;
       const originalPlayer = structuredClone(state.player);
       const originalAdvisorProgress = structuredClone(state.advisorProgressState);
       const originalRelationshipState = structuredClone(state.relationshipState);
@@ -171,7 +177,9 @@ describe("v2 before grad school events", () => {
       });
 
       const refreshedEvent = state.eventQueue[0];
-      const refreshedCandidate = refreshedEvent?.choices[0]?.effects.fixedEventResolution?.advisorCandidate;
+      const refreshedCandidate = refreshedEvent
+        ? getAdvisorConfirmationResolution(refreshedEvent)?.advisorCandidate
+        : undefined;
       expect(refreshedEvent?.id).toBe(originalEvent.id);
       expect(refreshedEvent?.queueOrder).toBe(originalEvent.queueOrder);
       expect(refreshedEvent?.history).toEqual(originalHistory);
@@ -210,7 +218,7 @@ describe("v2 before grad school events", () => {
 
   it("uses the third act for formal admission", () => {
     const advisorInfo = getAdvisorInfoEvent(0);
-    const resolution = advisorInfo.choices[0]?.effects.fixedEventResolution;
+    const resolution = getAdvisorConfirmationResolution(advisorInfo);
 
     expect(resolution).toBeDefined();
     if (!resolution) return;

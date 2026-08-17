@@ -137,21 +137,6 @@ function createAdvisorInfoEvent(
     stage: "act2",
     choices: [
       {
-        id: `before-grad-school-confirm-${advisor.id}`,
-        label: "回复导师",
-        outcome: "",
-        effects: {
-          fixedEventResolution: {
-            kind: "advisor-confirm",
-            advisorCandidate: {
-              advisorId,
-              advisorName,
-              ...LECTURER_INITIAL_PROFILE,
-            },
-          },
-        },
-      },
-      {
         id: `before-grad-school-reroll-${advisor.id}`,
         label: "换个导师",
         outcome: "",
@@ -165,6 +150,21 @@ function createAdvisorInfoEvent(
               ...LECTURER_INITIAL_PROFILE,
             },
             advisorIntel: intel,
+          },
+        },
+      },
+      {
+        id: `before-grad-school-confirm-${advisor.id}`,
+        label: "回复导师",
+        outcome: "",
+        effects: {
+          fixedEventResolution: {
+            kind: "advisor-confirm",
+            advisorCandidate: {
+              advisorId,
+              advisorName,
+              ...LECTURER_INITIAL_PROFILE,
+            },
           },
         },
       },
