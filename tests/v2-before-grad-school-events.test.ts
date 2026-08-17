@@ -67,9 +67,9 @@ describe("v2 before grad school events", () => {
     const lastInfo = getAdvisorInfoEvent(0.999999);
 
     expect(firstInfo.id).toBe("before-grad-school-advisor-info-chen-ming");
-    expect(firstInfo.description).toContain("李旭旭讲师回信");
+    expect(firstInfo.description).toContain("李旭旭 · 讲师");
     expect(lastInfo.id).toBe("before-grad-school-advisor-info-zhao-ning");
-    expect(lastInfo.description).toContain("章名讲师回信");
+    expect(lastInfo.description).toContain("章名 · 讲师");
   });
 
   it("uses active contact instead of assignment and shows one lecturer's relevant information", () => {
@@ -80,9 +80,10 @@ describe("v2 before grad school events", () => {
 
     expect(advisorInfo.stage).toBe("act2");
     expect(advisorInfo.title).toBe("读研之始");
-    expect(advisorInfo.description).toContain("给感兴趣的老师发了邮件");
-    expect(advisorInfo.description).toContain("辛英英讲师回信");
-    expect(advisorInfo.description).toContain("搜集信息 · 辛英英讲师");
+    expect(advisorInfo.description).toContain("你给感兴趣的老师发了邮件，又找组里的学生问了问。");
+    expect(advisorInfo.description).toContain("辛英英 · 讲师");
+    expect(advisorInfo.description).not.toContain("讲师回信后");
+    expect(advisorInfo.description).not.toContain("搜集信息");
     expect(advisorInfo.description).toContain("每月组会｜横向较少｜研二可实习");
     expect(advisorInfo.description).toContain("定期反馈｜显卡需排队｜回复及时");
     expect(advisorInfo.description).toContain("合作较多｜选题较自由｜作息规律");
@@ -92,7 +93,7 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.description).not.toContain("科研资源");
     expect(advisorInfo.description).not.toContain("项目任务倍率");
     expect(advisorInfo.description).not.toContain("做项目消耗 SAN");
-    expect(advisorInfo.description).toContain("工资：硕士 1｜博士 3");
+    expect(advisorInfo.description).toContain("工资：硕士 1 金币｜博士 3 金币");
     expect(advisorInfo.description).toContain("科研分：论文录用，C 类 +1｜B 类 +2｜A 类 +4");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分\n转博士：第 2 年 2 分｜第 3 年 3 分");

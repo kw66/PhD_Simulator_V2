@@ -123,14 +123,14 @@ function createAdvisorInfoEvent(
     id: `before-grad-school-advisor-info-${advisor.id}`,
     title: "读研之始",
     description: [
-      `你给感兴趣的老师发了邮件。${advisorName}讲师回信后，你又找组里的学生问了问。`,
+      "你给感兴趣的老师发了邮件，又找组里的学生问了问。",
       [
-        `搜集信息 · ${advisorName}讲师`,
+        `${advisorName} · 讲师`,
         `${intel.reporting}｜${intel.projects}｜${intel.internship}`,
         `${intel.guidance}｜${intel.computing}｜${intel.temperament}`,
         `${intel.atmosphere}｜${intel.focus}｜${intel.pace}`,
       ].join("\n"),
-      `工资：硕士 ${ADVISOR_SALARY.master}｜博士 ${ADVISOR_SALARY.phd}\n科研分：论文录用，C 类 +${SCORE_BY_TARGET.C}｜B 类 +${SCORE_BY_TARGET.B}｜A 类 +${SCORE_BY_TARGET.A}\n毕业：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分｜博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博士：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分｜第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
+      `工资：硕士 ${ADVISOR_SALARY.master} 金币｜博士 ${ADVISOR_SALARY.phd} 金币\n科研分：论文录用，C 类 +${SCORE_BY_TARGET.C}｜B 类 +${SCORE_BY_TARGET.B}｜A 类 +${SCORE_BY_TARGET.A}\n毕业：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分｜博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博士：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分｜第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
     ].join("\n\n"),
     preview: `了解${advisorName}讲师和课题组`,
     chainId: "before-grad-school",
