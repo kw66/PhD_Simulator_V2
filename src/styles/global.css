@@ -4170,55 +4170,48 @@ button.todo-item:focus-visible {
   white-space: nowrap;
 }
 
-.event-history-nav {
-  display: grid;
-  grid-template-columns: 30px minmax(42px, auto) 30px;
+.event-scene-tabs {
+  display: flex;
   align-items: center;
-  justify-content: center;
   gap: 4px;
-  min-height: 0;
-  margin-left: auto;
-  padding: 0;
-  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  flex: 1 1 auto;
 }
 
-.event-history-nav-btn {
-  width: 30px;
-  height: 28px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(57, 68, 103, 0.62);
-  border-radius: 4px;
-  background: rgba(255, 253, 248, 0.9);
-  color: rgba(48, 59, 88, 0.95);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-}
-
-.event-history-nav-btn svg {
-  width: 17px;
-  height: 17px;
-  stroke-width: 2.2;
-}
-
-.event-history-nav-btn:hover:not(:disabled) {
-  border-color: rgba(57, 68, 103, 0.9);
-  background: #fffdf8;
-}
-
-.event-history-nav-btn:disabled {
-  cursor: default;
-  opacity: 0.3;
-  box-shadow: none;
-}
-
-.event-history-position {
-  color: rgba(55, 44, 26, 0.78);
+.event-scene-tab {
+  min-width: 0;
+  max-width: 130px;
+  padding: 0 7px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: rgba(55, 44, 26, 0.56);
   font-size: 0.76rem;
-  font-weight: 760;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  line-height: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-scene-tab:hover {
+  color: rgba(55, 44, 26, 0.84);
+}
+
+.event-scene-tab.is-active {
+  border-bottom-color: rgba(57, 68, 103, 0.82);
+  color: rgba(55, 44, 26, 0.78);
+  font-weight: 820;
+}
+
+.event-scene-separator {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  color: rgba(55, 44, 26, 0.34);
+  stroke-width: 2;
 }
 
 .event-content-body {

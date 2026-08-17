@@ -510,20 +510,17 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
-    const eventHistoryNavButton = target.closest<HTMLButtonElement>("button[data-ui-event-history-nav]");
-    if (eventHistoryNavButton && !eventHistoryNavButton.disabled) {
+    const eventSceneTab = target.closest<HTMLButtonElement>("button[data-ui-event-scene-index]");
+    if (eventSceneTab && !eventSceneTab.disabled) {
       const activeEvent = getActiveQueueEvent(store.getState()) ?? getActiveChainEvent(store.getState());
       if (!activeEvent) return;
 
       const currentPageIndex = activeEvent.history?.length ?? 0;
-      const displayedPageIndex = activeEventHistoryIndex ?? currentPageIndex;
-      if (eventHistoryNavButton.dataset.uiEventHistoryNav === "prev") {
-        activeEventHistoryIndex = Math.max(0, displayedPageIndex - 1);
-      } else if (eventHistoryNavButton.dataset.uiEventHistoryNav === "next") {
-        const nextPageIndex = Math.min(currentPageIndex, displayedPageIndex + 1);
-        activeEventHistoryIndex = nextPageIndex === currentPageIndex ? null : nextPageIndex;
+      const selectedPageIndex = Number(eventSceneTab.dataset.uiEventSceneIndex ?? "");
+      if (Number.isFinite(selectedPageIndex) && selectedPageIndex >= 0 && selectedPageIndex <= currentPageIndex) {
+        activeEventHistoryIndex = selectedPageIndex === currentPageIndex ? null : Math.floor(selectedPageIndex);
+        render();
       }
-      render();
       return;
     }
 

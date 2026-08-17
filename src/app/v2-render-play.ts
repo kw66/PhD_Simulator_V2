@@ -36,7 +36,7 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getThesisStage } from "../core/v2-thesis-rules";
-import type { FellowProgressProfile, GameLogEntry, GameState, LoverTypeId, Paper, RoleDefinition } from "../core/v2-types";
+import type { EventStage, FellowProgressProfile, GameLogEntry, GameState, LoverTypeId, Paper, RoleDefinition } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type ResearchPaperFilterId,
@@ -763,6 +763,20 @@ function renderEventQueueList(state: GameState, activeEventId: string | null): s
     .join("");
 }
 
+function getEventSceneLabel(chainId: string, stage: EventStage, title: string): string {
+  if (chainId === "before-grad-school") {
+    if (stage === "act1") return "保研资格";
+    if (stage === "act2") return "导师信息";
+    if (stage === "result") return "暑假憧憬";
+  }
+
+  const titleParts = title.split("➜").map((part) => part.trim()).filter(Boolean);
+  if (titleParts.length > 1) {
+    return titleParts[titleParts.length - 1] ?? title;
+  }
+  return title;
+}
+
 function renderEventContentBox(
   currentEvent: GameState["eventQueue"][number] | null,
   activeHistoryIndex: number | null,
@@ -786,32 +800,35 @@ function renderEventContentBox(
     : Math.max(0, Math.min(activeHistoryIndex, currentPageIndex));
   const historicalPage = displayPageIndex < currentPageIndex ? history[displayPageIndex] : null;
   const displayEvent = historicalPage ?? currentEvent;
-  const totalPageCount = currentPageIndex + 1;
   const selectedChoiceId = historicalPage?.selectedChoiceId ?? null;
+  const sceneTabs = [
+    ...history.map((page, index) => ({
+      index,
+      label: getEventSceneLabel(currentEvent.chainId, page.stage, page.title),
+    })),
+    {
+      index: currentPageIndex,
+      label: getEventSceneLabel(currentEvent.chainId, currentEvent.stage, currentEvent.title),
+    },
+  ];
 
   return `
     <div class="event-content-box" id="event-content-box">
       <div class="event-content-header">
-        <span class="event-content-title" id="event-content-title">${escapeHtml(displayEvent.title)}</span>
-        ${totalPageCount > 1 ? `
-          <div class="event-history-nav" aria-label="事件进度">
+        <div class="event-scene-tabs" aria-label="${escapeHtml(currentEvent.title)}事件幕次">
+          ${sceneTabs.map((scene, index) => `
             <button
-              class="event-history-nav-btn"
+              class="event-scene-tab${scene.index === displayPageIndex ? " is-active" : ""}"
               type="button"
-              data-ui-event-history-nav="prev"
-              aria-label="查看上一幕"
-              ${displayPageIndex === 0 ? "disabled" : ""}
-            ><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-            <span class="event-history-position">${displayPageIndex + 1} / ${totalPageCount}</span>
-            <button
-              class="event-history-nav-btn"
-              type="button"
-              data-ui-event-history-nav="next"
-              aria-label="查看下一幕"
-              ${displayPageIndex === currentPageIndex ? "disabled" : ""}
-            ><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-          </div>
-        ` : ""}
+              data-ui-event-scene-index="${scene.index}"
+              aria-current="${scene.index === displayPageIndex ? "step" : "false"}"
+              title="${escapeHtml(scene.label)}"
+            >${escapeHtml(scene.label)}</button>
+            ${index < sceneTabs.length - 1
+              ? '<i class="event-scene-separator" data-lucide="chevron-right" aria-hidden="true"></i>'
+              : ""}
+          `).join("")}
+        </div>
         <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情"${isResultPage ? " hidden" : ""}>×</button>
       </div>
       <div class="event-content-body" id="event-content-body">

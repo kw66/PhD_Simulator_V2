@@ -642,6 +642,9 @@ describe("v2 render lobby shell", () => {
     const eventButtonsBlock = html.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
 
     expect(html).toContain('class="event-content-close"');
+    expect(html).toContain('class="event-scene-tabs"');
+    expect(html).toContain('class="event-scene-tab is-active"');
+    expect(html).toContain('data-ui-event-scene-index="0"');
     expect(eventButtonsBlock).toContain('class="event-choice-btn event-action-btn"');
     expect(eventButtonsBlock).toContain('data-action="resolve-event"');
     expect(eventButtonsBlock).toMatch(/data-event-id="[^"]+"/);
@@ -649,7 +652,7 @@ describe("v2 render lobby shell", () => {
     expect(eventButtonsBlock).not.toContain("disabled");
   });
 
-  it("renders resolved event stages as disabled history with navigation", () => {
+  it("renders resolved event stages as clickable scene tabs", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
     state = dispatchAction(state, "start-game", { roleId: "normal" });
     state = {
@@ -684,9 +687,12 @@ describe("v2 render lobby shell", () => {
       activeEventId: "act2-event",
     });
     expect(currentHtml).toContain("Act 2");
-    expect(currentHtml).toContain(">2 / 2<");
-    expect(currentHtml).toMatch(/<div class="event-content-header">[\s\S]*?<div class="event-history-nav"[\s\S]*?<\/div>[\s\S]*?<\/div>\s*<div class="event-content-body"/);
-    expect(currentHtml).toMatch(/data-ui-event-history-nav="next"[\s\S]*?disabled/);
+    expect(currentHtml).toContain('class="event-scene-tabs"');
+    expect(currentHtml).toContain('data-ui-event-scene-index="0"');
+    expect(currentHtml).toContain('data-ui-event-scene-index="1"');
+    expect(currentHtml).toContain('aria-current="step"');
+    expect(currentHtml).toContain('data-lucide="chevron-right"');
+    expect(currentHtml).not.toContain("data-ui-event-history-nav");
     expect(currentHtml).toContain('data-action="resolve-event"');
 
     const historyHtml = renderApp(state, createDefaultAccountProfile(), {
@@ -696,12 +702,35 @@ describe("v2 render lobby shell", () => {
     });
     const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(historyHtml).toContain("Act 1");
-    expect(historyHtml).toContain(">1 / 2<");
+    expect(historyHtml).toContain('class="event-scene-tab is-active"');
     expect(historyHtml).not.toContain("当时结果");
     expect(historyButtons.match(/\sdisabled\s/g)).toHaveLength(2);
     expect(historyButtons).not.toContain('data-action="resolve-event"');
     expect(historyButtons).toContain('class="event-choice-btn event-action-btn is-selected"');
     expect(historyButtons).toContain('aria-label="已选择"');
+  });
+
+  it("names the three pre-enrollment scenes consistently", () => {
+    let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
+    state = dispatchAction(state, "start-game", { roleId: "normal" });
+    state = dispatchAction(state, "resolve-event", {
+      eventId: state.eventQueue[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+    });
+    state = dispatchAction(state, "resolve-event", {
+      eventId: state.eventQueue[0]?.id,
+      eventChoiceId: state.eventQueue[0]?.choices[0]?.id,
+    });
+
+    const html = renderApp(state, createDefaultAccountProfile(), {
+      isEventContentOpen: true,
+      activeEventId: state.eventQueue[0]?.id ?? null,
+    });
+
+    expect(html).toContain(">保研资格</button>");
+    expect(html).toContain(">导师信息</button>");
+    expect(html).toContain(">暑假憧憬</button>");
+    expect(html).not.toContain("data-ui-event-history-nav");
   });
 
   it("renders single-choice history as disabled with its selected check", () => {
