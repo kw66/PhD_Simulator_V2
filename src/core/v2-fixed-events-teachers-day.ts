@@ -56,7 +56,7 @@ function createTeachersDayChoiceEvent(state: GameState): PendingEvent {
       teaHint,
       flowerHint,
       stampHint,
-      "你在心里反复衡量：发祝福最省成本、送茶叶更稳妥、鲜花更有仪式感、邮票最容易拉开记忆点。关键不在“贵不贵”，而在你想传达哪种关系信号。",
+      "你在心里反复衡量：发祝福最省成本、送茶叶更稳妥、鲜花更有仪式感、邮票最容易拉开记忆点。",
     ].join("\n\n"),
     preview: "在祝福与送礼之间做选择",
     chainId: "teachers-day",

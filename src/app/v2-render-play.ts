@@ -1260,11 +1260,11 @@ function renderEnhancedWorkstationSection(state: GameState, uiState: PlayRenderU
 
   return `
     <div class="right-section workstation-section" id="workstation-section">
-      <div class="section-header"${preEnrollment ? " hidden" : ""}>
+      ${preEnrollment ? "" : `<div class="section-header">
         <div class="workstation-header-actions">
-          ${preEnrollment ? "" : `<button class="btn-sm workstation-conference-btn${isConferencePanel ? " active" : ""}" type="button" data-ui-workstation-panel-index="${WORKSTATION_CONFERENCE_PANEL_INDEX}">会议信息</button>`}
+          <button class="btn-sm workstation-conference-btn${isConferencePanel ? " active" : ""}" type="button" data-ui-workstation-panel-index="${WORKSTATION_CONFERENCE_PANEL_INDEX}">会议信息</button>
         </div>
-      </div>
+      </div>`}
       <div class="workstation-main-actions" id="workstation-main-actions" ${preEnrollment || isConferencePanel ? "hidden" : ""}>
         <button class="compact-action-btn" type="button" data-action="read" ${preEnrollment ? "disabled" : ""}>
           <span class="btn-desc">看论文</span>

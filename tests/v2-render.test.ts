@@ -1112,6 +1112,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('class="shop-title"');
     expect(html).toContain('class="paper-switch-btns" id="paper-switch-btns" hidden');
     expect(html).toContain('class="rel-switch-btns" id="rel-switch-btns" hidden');
+    expect(html).not.toContain('<div class="section-header" hidden>');
     expect(html).not.toContain('class="paper-card paper-card-empty"');
     expect(html).not.toContain("workstation-conference-btn");
     expect(html).not.toContain('data-ui-shop-tab="equipment"');
