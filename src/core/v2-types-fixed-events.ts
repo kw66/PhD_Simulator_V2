@@ -12,23 +12,17 @@ export type FixedEventResolutionKind =
   | "year-summary-sleep"
   | "year-summary-social"
   | "year-summary-favor"
-  | "year-summary-intern"
+  | "year-summary-part-time"
   | "ccig-open"
   | "ccig-skip"
   | "ccig-advisor"
   | "ccig-self"
   | "ccig-activity-listen"
+  | "ccig-activity-poster"
   | "ccig-activity-travel"
-  | "ccig-activity-food"
-  | "mentor-assign-candidate";
+  | "ccig-activity-food";
 
 export type TeachersDayGiftId = "tea" | "mooncake" | "flower";
-
-export interface FixedEventJuniorCandidate {
-  name: string;
-  research: number;
-  affinity: number;
-}
 
 export interface FixedEventAdvisorCandidate {
   advisorName: string;
@@ -51,8 +45,9 @@ export interface FixedEventAdvisorIntel {
 
 export interface FixedEventResolution {
   kind: FixedEventResolutionKind;
+  ccigAttendanceSummary?: string;
+  ccigPaperId?: string;
   teachersDayGift?: TeachersDayGiftId;
-  juniorCandidate?: FixedEventJuniorCandidate;
   advisorCandidate?: FixedEventAdvisorCandidate;
   advisorIntel?: FixedEventAdvisorIntel;
 }

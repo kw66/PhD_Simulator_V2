@@ -1,39 +1,41 @@
 import { createFixedEvent } from "./v2-fixed-events-shared";
 import {
+  getCcigChainId,
   getCcigLocation,
   getCcigRealYear,
   getCcigSelfPayCost,
   type CcigParticipationMode,
 } from "./v2-fixed-events-ccig-shared";
-import { createCcigActivityAct1Event } from "./v2-fixed-events-ccig-activity-events";
+import { createCcigActivityEvent } from "./v2-fixed-events-ccig-activity-events";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function createCcigDecisionEvent(state: GameState): PendingEvent {
-  const location = getCcigLocation(state.year);
-  const realYear = getCcigRealYear(state.year, state.month);
-  const { hasFullGear, discount, actualCost } = getCcigSelfPayCost(state);
-  const fullGearHint = hasFullGear
-    ? `整装待发生效：自费路径可减免 ${discount} 金币。`
+  const { hasMeetingExperience, discount, actualCost } = getCcigSelfPayCost(state);
+  const meetingExperienceHint = hasMeetingExperience
+      ? `会务经验生效：自费参会可减免 ${discount} 金币。`
     : "";
   const advisorHint = state.player.favor >= 6
     ? "“和导师关系不错，让他报销应该没问题吧……”"
     : "“让导师报销的话……他会不会不太高兴？毕竟最近好像没什么成果……”";
   const selfPayHint = state.player.favor >= 6
-    ? "“自己掏钱的话有点肉疼，但也不用欠人情……”"
-    : "“自己掏钱比较省心，不用看导师脸色……”";
+    ? actualCost === 0
+      ? "“会务经验已经帮我省下一笔，这次自费不用花金币，也不用欠人情……”"
+      : `“自己掏钱的话有点肉疼，要花 ${actualCost} 金币，但也不用欠人情……”`
+    : actualCost === 0
+      ? "“会务经验帮我省下了费用，这次自费不用花金币，至少不用看导师脸色……”"
+      : `“自己掏钱比较省心，需要 ${actualCost} 金币，不用看导师脸色……”`;
 
   return createFixedEvent({
     id: `ccig-decision-act2-y${state.year}-m${state.month}`,
-    title: "领域年会 ➜ 参会决定",
+    title: "年会 ➜ 参会决定",
     description: [
-      "你把参会方案拆开来看，发现本质上是三种代价模型：不去最省资源，但会直接错过线下窗口；导师报销现金压力最低，却要消耗关系资本；自费最干净，也最直接地消耗预算。",
+      "报告名单里有几场正好和你的方向相关，错过有点可惜。",
       advisorHint,
       selfPayHint,
-      "你意识到这一步没有绝对最优解，只有“当前阶段更能承受哪种压力”。",
-      ...(fullGearHint ? [fullGearHint] : []),
+      ...(meetingExperienceHint ? [meetingExperienceHint] : []),
+      "你把日程和预算对了几遍，还是得决定这趟值不值得去。",
     ].join("\n\n"),
-    preview: `CCIG ${realYear} · ${location}，决定是否参加`,
-    chainId: "ccig-decision",
+    chainId: getCcigChainId(state),
     stage: "act2",
     choices: [
       {
@@ -54,8 +56,8 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
       },
       {
         id: actualCost === 0 ? `ccig-self-free-y${state.year}-m${state.month}` : `ccig-self-y${state.year}-m${state.month}`,
-        label: actualCost === 0 ? "自费参会（本次免费）" : `自费参会（${actualCost} 金钱）`,
-        outcome: actualCost === 0 ? "装备减免生效，本次免费。" : `金钱 -${actualCost}。`,
+        label: "自费参会",
+        outcome: actualCost === 0 ? "装备减免生效，本次免费。" : `金币 -${actualCost}。`,
         effects: {
           fixedEventResolution: { kind: "ccig-self" },
         },
@@ -67,40 +69,43 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
 export function createCcigAttendResultEvent(
   state: GameState,
   mode: Exclude<CcigParticipationMode, "skip">,
-  actualCost: number,
+  settlementItems: string[],
+  narrative = "",
+  deferredEffects: PendingEvent["choices"][number]["effects"] = {},
 ): PendingEvent {
   const location = getCcigLocation(state.year);
   const realYear = getCcigRealYear(state.year, state.month);
-  const { hasFullGear } = getCcigSelfPayCost(state);
-  const costText = mode === "advisor"
-    ? "关系成本已结算：导师好感 -1。"
-    : hasFullGear
-      ? actualCost === 0
-        ? "出行花费：免费（整装待发减免生效）。"
-        : `出行花费：金钱 -${actualCost}（整装待发减免生效）。`
-      : `出行花费：金钱 -${actualCost}。`;
+  const { hasMeetingExperience, actualCost } = getCcigSelfPayCost(state);
+  const gearNarrative = mode === "self" && hasMeetingExperience
+    ? actualCost === 0
+      ? "会务经验帮你免掉了这次参会费用。"
+      : "会务经验替你分担了一部分参会费用。"
+    : "";
 
   return createFixedEvent({
     id: `ccig-attend-result-y${state.year}-m${state.month}-${mode}`,
-    title: "领域年会 ➜ 参会决定 ➜ 参会确认",
+    title: "年会 ➜ 参会决定 ➜ 参会确认",
     description: [
-      `你最终决定参加 CCIG ${realYear}，按计划抵达${location}。`,
-      "路上你反复翻看议程，把和课题最相关的报告、海报和交流时段都提前标记出来。",
-      "签到后胸牌、手册、会场地图一起塞满背包，你能感到“出发决策”已经完成，而“收益决策”才刚开始。",
-      "接下来你在会场里的每一次选择，都会决定这趟行程是“热闹一场”还是“真正回本”。",
+      `参会方式定下来后，你订好前往${location}参加 CCIG ${realYear} 的车票和住宿。`,
+      "群里几位同行约你到了以后碰面，你也把电脑、充电器和换洗衣物塞进行李箱。",
+      ...(narrative ? [narrative] : []),
+      ...(gearNarrative ? [gearNarrative] : []),
+      "出发前的事情都准备好了，接下来就等会期开始。",
       "机制结算",
-      costText,
+      ...settlementItems,
     ].join("\n\n"),
-    preview: `CCIG ${realYear} · ${location}，准备进入会场`,
-    chainId: "ccig-decision",
+    chainId: getCcigChainId(state),
     stage: "act3",
+    completionLog: `${settlementItems.join("，")}；年会参会已确认`,
     choices: [
       {
         id: `ccig-enter-venue-y${state.year}-m${state.month}-${mode}`,
-        label: "进入会场安排",
-        outcome: "进入会场。",
+        label: "安排行程",
+        outcome: "进入行程安排。",
         effects: {
-          enqueueEvents: [createCcigActivityAct1Event(state, mode, actualCost)],
+          ...deferredEffects,
+          counterDeltas: { ...(deferredEffects.counterDeltas ?? {}), meetingCount: 1 },
+          enqueueEvents: [createCcigActivityEvent(state, mode, settlementItems)],
         },
       },
     ],
@@ -112,21 +117,20 @@ export function createCcigSkipResultEvent(state: GameState): PendingEvent {
   const realYear = getCcigRealYear(state.year, state.month);
   return createFixedEvent({
     id: `ccig-skip-result-y${state.year}-m${state.month}`,
-    title: "领域年会 ➜ 参会决定 ➜ 暂不参会",
+    title: "年会 ➜ 参会决定 ➜ 暂不参会",
     description: [
-      `你最终决定不去 ${location} 的 CCIG ${realYear}，把这次窗口主动让给了更可控的本地节奏。`,
-      "原本用于出行的时间被你切回实验、文献与代码整理，计划先把手头课题做到更扎实。",
-      "你省下了路费和奔波，也明确接受了这次机会成本：线下交流与偶发机会不会在本月落到你身上。",
-      "这个决定更稳，但也更考验你能否把“留在原地”转化成真正的产出。",
+      `你最终决定不去${location}参加 CCIG ${realYear}。`,
+      "省下来的时间继续做实验、看文献和整理代码。",
+      "路费和来回奔波都省了，现场报告和交流也只能错过。",
     ].join("\n\n"),
-    preview: `CCIG ${realYear} · ${location}，本次不参会`,
-    chainId: "ccig-decision",
+    chainId: getCcigChainId(state),
     stage: "act3",
+    completionLog: "本次未参会，继续原来的安排",
     choices: [
       {
         id: `ccig-skip-finish-y${state.year}-m${state.month}`,
         label: "继续本月安排",
-        outcome: "本次无直接数值变化。",
+        outcome: "继续原来的安排。",
         effects: {},
       },
     ],
@@ -138,15 +142,14 @@ export function createCcigEvent(state: GameState): PendingEvent {
   const realYear = getCcigRealYear(state.year, state.month);
   return createFixedEvent({
     id: `ccig-y${state.year}-m${state.month}`,
-    title: "领域年会",
+    title: "年会",
     description: [
       `导师把 CCIG ${realYear} 的通知转进群里，会址是${location}。消息一出来，组里立刻热闹起来，有人开始订票，有人已经在翻分论坛名单。`,
-      "这类会议的价值从来不止一场报告。主旨演讲、企业展台、同行交流、临时约谈，很多关键机会都藏在议程之外。",
-      "但你也很清楚，参会会消耗时间、金钱和关系额度；不参会则能把资源留在手里，却要接受“错过窗口”的代价。",
+      "除了报告和海报，现场还能见到不少同行，也有人准备顺便逛企业展台。",
+      "去一趟要花时间和钱，请导师报销的话也得开口。",
       "你准备先做第一个决定：去，还是不去。",
     ].join("\n\n"),
-    preview: `CCIG ${realYear} · ${location}，是否参加？`,
-    chainId: "ccig-decision",
+    chainId: getCcigChainId(state),
     choices: [
       {
         id: `ccig-open-y${state.year}-m${state.month}`,

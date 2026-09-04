@@ -1,9 +1,11 @@
 import {
+  appendMechanismSettlement,
   createFixedEvent,
   drawInclusiveInt,
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
+import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function getYearSummaryLabel(year: number): string {
@@ -14,23 +16,23 @@ export function getYearSummaryLabel(year: number): string {
 }
 
 export function createYearSummaryResultEvent(params: {
-  idSuffix: "sleep" | "social" | "favor" | "intern";
+  idSuffix: "sleep" | "social" | "favor" | "part-time";
   year: number;
   month: number;
   description: string;
   outcome: string;
+  settlement: string;
   effects: PendingEvent["choices"][number]["effects"];
 }): PendingEvent {
   const yearLabel = getYearSummaryLabel(params.year);
   return createFixedEvent({
     id: `year-summary-${params.idSuffix}-result-y${params.year}-m${params.month}`,
     title: "学年总结 ➜ 年度总结 ➜ 辞旧迎新",
-    description: [
-      `${yearLabel}复盘已完成，你把这一年的得失从“感受”整理成了“可执行判断”。`,
+    description: appendMechanismSettlement([
+      `${yearLabel}就这样结束了。`,
       params.description,
-      "这不是一份漂亮总结，而是一份下一学年可直接执行的路线说明。",
-    ].join("\n\n"),
-    preview: "你把这一年的得失整理成了下一学年的出发点",
+      "你把下一学年最想做的事记在了日历上。",
+    ].join("\n\n"), params.settlement),
     chainId: "year-summary",
     stage: "result",
     choices: [
@@ -46,7 +48,7 @@ export function createYearSummaryResultEvent(params: {
 
 export function resolveYearSummaryChoice(
   state: GameState,
-  kind: "year-summary-sleep" | "year-summary-social" | "year-summary-favor" | "year-summary-intern",
+  kind: "year-summary-sleep" | "year-summary-social" | "year-summary-favor" | "year-summary-part-time",
   getRoll: RandomRollProvider,
 ): FixedResolutionResult {
   switch (kind) {
@@ -59,63 +61,73 @@ export function resolveYearSummaryChoice(
           year: state.year,
           month: state.month,
           description: [
-            "你把“可持续”放在第一位，没有让自己长期透支。",
-            "科研进度也许不算最快，但你把状态守住了。",
+            "你决定先少安排一些任务，把欠下的觉补回来。",
+            "科研进度慢了一点，精神总算恢复了不少。",
           ].join("\n\n"),
           outcome: "SAN +5。",
+          settlement: "SAN +5",
           effects: { san: 5 },
         })],
       };
     case "year-summary-social": {
-      const socialGain = Math.max(0, Math.min(3, 20 - state.player.social));
+      const socialResult = applyTierResist(1, state.player.social, getRoll);
+      const socialGain = socialResult.effectiveChange;
+      const socialNarrative = getTierResistedNarrative("社交", 1, socialResult);
       return {
         nextState: state,
-        outcome: socialGain > 0 ? `认识了更多人，社交 +${socialGain}。` : "认识的人已经够多了，社交不变。",
+        outcome: formatTierResistedOutcome("社交", 1, socialResult),
         enqueueEvents: [createYearSummaryResultEvent({
           idSuffix: "social",
           year: state.year,
           month: state.month,
           description: [
-            "你把更多时间放在人和人之间，慢慢把自己的协作圈拓开了。",
-            "这些关系未必立刻见效，但会在关键节点托你一把。",
+            "你参加了几次活动，也主动认识了其他课题组的同学。",
+            "实验室之外，能聊研究和互相帮忙的人多了起来。",
+            ...(socialNarrative ? [socialNarrative] : []),
           ].join("\n\n"),
-          outcome: socialGain > 0 ? `社交 +${socialGain}。` : "社交已达上限。",
+          outcome: formatTierResistedOutcome("社交", 1, socialResult),
+          settlement: formatTierResistedOutcome("社交", 1, socialResult),
           effects: socialGain > 0 ? { social: socialGain } : {},
         })],
       };
     }
     case "year-summary-favor": {
-      const favorGain = Math.max(0, Math.min(3, 20 - state.player.favor));
+      const favorResult = applyTierResist(1, state.player.favor, getRoll);
+      const favorGain = favorResult.effectiveChange;
+      const favorNarrative = getTierResistedNarrative("导师好感", 1, favorResult);
       return {
         nextState: state,
-        outcome: favorGain > 0 ? `导师更信任你了，好感 +${favorGain}。` : "导师已经很信任你，好感不变。",
+        outcome: formatTierResistedOutcome("导师好感", 1, favorResult),
         enqueueEvents: [createYearSummaryResultEvent({
           idSuffix: "favor",
           year: state.year,
           month: state.month,
           description: [
-            "你主动接住了不少导师事务，沟通方式也更成熟了。",
-            "信任是慢慢累积的，很多机会开始优先流到你手里。",
+            "你主动接了几件组里的事，汇报也比以前及时。",
+            "导师渐渐更愿意把重要任务交给你。",
+            ...(favorNarrative ? [favorNarrative] : []),
           ].join("\n\n"),
-          outcome: favorGain > 0 ? `导师好感 +${favorGain}。` : "导师好感已达上限。",
+          outcome: formatTierResistedOutcome("导师好感", 1, favorResult),
+          settlement: formatTierResistedOutcome("导师好感", 1, favorResult),
           effects: favorGain > 0 ? { favor: favorGain } : {},
         })],
       };
     }
-    case "year-summary-intern": {
+    case "year-summary-part-time": {
       const moneyGain = drawInclusiveInt(2, 3, getRoll);
       return {
         nextState: state,
-        outcome: `实习攒下一笔钱，金钱 +${moneyGain}。`,
+        outcome: `兼职攒下一笔钱，金币 +${moneyGain}。`,
         enqueueEvents: [createYearSummaryResultEvent({
-          idSuffix: "intern",
+          idSuffix: "part-time",
           year: state.year,
           month: state.month,
           description: [
-            "你在课题缝隙里挤出时间做实习，把“生存焦虑”往下压了一截。",
-            "账户余额增加不只是数字变化，也让你后续选择更从容。",
+            "你在课题空档接了一份兼职，白天干活，晚上还得处理实验。",
+            "过程很累，不过账户里总算多了一笔钱。",
           ].join("\n\n"),
-          outcome: `金钱 +${moneyGain}。`,
+          outcome: `金币 +${moneyGain}。`,
+          settlement: `金币 +${moneyGain}`,
           effects: { money: moneyGain },
         })],
       };

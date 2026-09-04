@@ -6,31 +6,22 @@ export interface ShopItemDefinition {
   description: string;
   price: number;
   sellPrice: number;
-  repeatable: boolean;
 }
 
 export interface ShopItemStateView {
   shopState: ShopState;
   eventSupport: Pick<EventSupportState, "hasDownJacket">;
-  totalMonths: number;
+}
+
+export interface GpuTierDefinition {
+  level: number;
+  name: string;
 }
 
 export interface ShopActionModifier {
   bonus: number;
   extraActions: number;
   sanDiscount: number;
-}
-
-export interface ShopMonthlyModifier {
-  shopState: ShopState;
-  sanDelta: number;
-  sanCapDelta: number;
-  logs: string[];
-}
-
-export interface ChairEmergencyRecoveryResult {
-  san: number;
-  triggered: boolean;
 }
 
 export interface ShopUpgradeDefinition {
@@ -45,38 +36,79 @@ export interface ShopUpgradeStateView {
   shopState: ShopState;
 }
 
+export const GPU_UPGRADE_PRICES = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const;
+
+export function getNextGpuPrice(currentLevel: number): number | null {
+  return GPU_UPGRADE_PRICES[Math.max(0, Math.floor(currentLevel))] ?? null;
+}
+
 export const SHOP_ITEM_DEFINITIONS: ShopItemDefinition[] = [
-  { id: "gpu_buy", name: "显卡", description: "做实验 +1 次，+1 分。库存上限等于当前总月数。", price: 10, sellPrice: 6, repeatable: true },
-  { id: "chair", name: "办公椅", description: "每月 SAN +1。", price: 10, sellPrice: 5, repeatable: false },
-  { id: "keyboard", name: "机械键盘", description: "写作 SAN -1，写作 +1 分。", price: 8, sellPrice: 4, repeatable: false },
-  { id: "monitor", name: "2K 显示器", description: "看论文 SAN -1。", price: 8, sellPrice: 4, repeatable: false },
-  { id: "bike", name: "自行车", description: "每月 SAN -1；累计骑行消耗每满 6 点，SAN 上限 +1（最多 +6）。", price: 10, sellPrice: 5, repeatable: false },
-  { id: "down_jacket", name: "羽绒服", description: "使冬季每月 SAN -1 无效。", price: 8, sellPrice: 4, repeatable: false },
+  { id: "gpu_buy", name: "显卡", description: "做实验：+1次，+1分", price: GPU_UPGRADE_PRICES[0], sellPrice: 3 },
+  { id: "chair", name: "办公椅", description: "每月 SAN +1", price: 10, sellPrice: 5 },
+  { id: "keyboard", name: "机械键盘", description: "写论文：SAN -1", price: 7, sellPrice: 3 },
+  { id: "monitor", name: "2K 显示器", description: "看论文：SAN -1", price: 8, sellPrice: 4 },
+  { id: "bike", name: "自行车", description: "每月 SAN -1；每累计消耗 6 点 SAN，SAN 上限 +1（最多 +3）", price: 6, sellPrice: 3 },
+  { id: "ebike", name: "小电驴", description: "春季、秋季每月 SAN +1", price: 12, sellPrice: 6 },
+  { id: "down_jacket", name: "羽绒服", description: "使冬季每月 SAN -1 无效", price: 5, sellPrice: 2 },
 ];
 
+export const GPU_TIER_DEFINITIONS: readonly GpuTierDefinition[] = [
+  { level: 1, name: "GTX 1080 Ti 显卡" },
+  { level: 2, name: "RTX 2080 Ti 显卡" },
+  { level: 3, name: "RTX 3090 显卡" },
+  { level: 4, name: "RTX 4090 显卡" },
+  { level: 5, name: "RTX A6000 显卡" },
+  { level: 6, name: "A800 显卡" },
+  { level: 7, name: "A100 显卡" },
+  { level: 8, name: "H20 显卡" },
+  { level: 9, name: "H200 显卡" },
+  { level: 10, name: "B300 显卡" },
+];
+
+export function getGpuTierDefinition(level: number): GpuTierDefinition | null {
+  const normalizedLevel = Math.floor(level);
+  return GPU_TIER_DEFINITIONS.find((tier) => tier.level === normalizedLevel) ?? null;
+}
+
+export function getNextGpuTierDefinition(level: number): GpuTierDefinition | null {
+  return getGpuTierDefinition(Math.max(0, Math.floor(level)) + 1);
+}
+
 export const SHOP_UPGRADE_DEFINITIONS: ShopUpgradeDefinition[] = [
-  { id: "bike-road", itemId: "bike", name: "公路车", description: "每月 SAN -2；累计骑行消耗每满 5 点，SAN 上限 +1（最多 +12）。", price: 20 },
-  { id: "bike-ebike", itemId: "bike", name: "小电驴", description: "春季和秋季每月 SAN +1。", price: 12 },
-  { id: "monitor-4k", itemId: "monitor", name: "4K 显示器", description: "手动看论文 SAN 变为 0；想 idea 时每 10 次阅读额外 +1。", price: 15 },
-  { id: "monitor-smart", itemId: "monitor", name: "智能显示器", description: "手动看论文 SAN 变为 2；持有期间每 10 次阅读使本次阅读给的 idea buff 额外 +1。", price: 15 },
-  { id: "monitor-dual", itemId: "monitor", name: "双屏显示器", description: "手动看论文 SAN 变为 2；每月自动阅读一次（SAN -2）。", price: 15 },
-  { id: "chair-advanced", itemId: "chair", name: "人体工学椅", description: "每月 SAN +2。", price: 18 },
-  { id: "chair-massage", itemId: "chair", name: "电动按摩椅", description: "每月恢复 10% 已损失 SAN（上取整）。", price: 20 },
-  { id: "chair-torture", itemId: "chair", name: "沙发", description: "每月恢复当前 SAN 的 20%（上取整）。", price: 20 },
-  { id: "chair-spike", itemId: "chair", name: "锥刺股椅", description: "SAN 小于等于 0 时恢复到 2。", price: 18 },
-  { id: "chair-hammock", itemId: "chair", name: "吊床", description: "休息动作改为 SAN +5。", price: 16 },
+  { id: "chair-advanced", itemId: "chair", name: "人体工学椅", description: "每月 SAN +2", price: 18 },
+  { id: "chair-massage", itemId: "chair", name: "电动按摩椅", description: "每月恢复 20% 已损失 SAN（下取整）", price: 20 },
+  { id: "chair-torture", itemId: "chair", name: "沙发", description: "每月恢复当前 SAN 的 20%（下取整）", price: 20 },
+  { id: "chair-spike", itemId: "chair", name: "锥刺股椅", description: "SAN 小于等于 0 时恢复到 3", price: 16 },
+  { id: "chair-hammock", itemId: "chair", name: "吊床", description: "休息动作改为 SAN +5", price: 15 },
 ];
 
 export function createShopState(): ShopState {
   return {
-    gpuServersBought: 0,
+    gpuLevel: 0,
+    investments: {
+      gpu: 0,
+    chair: 0,
+    keyboard: 0,
+    monitor: 0,
+    bike: 0,
+    },
+    entitlements: {
+      gpuTransaction: 0,
+      keyboardPurchase: 0,
+      monitorPurchase: 0,
+      chairPurchase: 0,
+      chairUpgrade: 0,
+      coffeeMachinePurchase: 0,
+      coffeeMachineUpgrade: 0,
+    },
     chairOwned: false,
     chairUpgrade: null,
+    chairSanRecovered: 0,
     keyboardOwned: false,
     monitorOwned: false,
-    monitorUpgrade: null,
     bikeOwned: false,
-    bikeUpgrade: null,
+    bikeLevel: 0,
+    ebikeOwned: false,
     bikeSanSpent: 0,
     bikeSanCapGains: 0,
   };

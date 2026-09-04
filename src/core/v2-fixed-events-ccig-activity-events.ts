@@ -1,67 +1,69 @@
 import { createFixedEvent } from "./v2-fixed-events-shared";
 import {
+  getCcigActivityChainId,
   getCcigLocation,
+  getCcigPosterPaper,
   getCcigRealYear,
-  getCcigSelfPayCost,
   type CcigActivityMode,
   type CcigParticipationMode,
 } from "./v2-fixed-events-ccig-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
-export function createCcigActivityAct1Event(
+export function createCcigActivityEvent(
   state: GameState,
   participationMode: Exclude<CcigParticipationMode, "skip">,
-  actualCost: number,
+  attendanceSettlementItems: string[],
 ): PendingEvent {
+  const activityChainId = getCcigActivityChainId(state);
   const location = getCcigLocation(state.year);
   const realYear = getCcigRealYear(state.year, state.month);
+  const posterPaper = getCcigPosterPaper(state);
+  const arrivalText = participationMode === "advisor"
+    ? `报销手续办妥后，你按计划来到${location}参加 CCIG ${realYear}。`
+    : `车票和住宿付好后，你按计划来到${location}参加 CCIG ${realYear}。`;
   return createFixedEvent({
-    id: `ccig-activity-act1-y${state.year}-m${state.month}`,
-    title: "领域年会会场活动",
+    id: `${activityChainId}-act1`,
+    title: "年会活动",
     description: [
-      `你进入 CCIG ${realYear} 主会场，签到区和海报区都很拥挤，信息量几乎在第一分钟就把人淹没。`,
-      `${location}的会场节奏很快，同一时间有多条分会并行进行，任何一个时段的选择都意味着对其他机会的主动放弃。`,
-      "你不可能把所有内容都吃下，只能围绕自己当前课题与近期目标做取舍。",
-      "今天真正要定下来的，是你的资源分配策略。",
+      arrivalText,
+      `前一幕参会确认：${attendanceSettlementItems.join("，")}`,
+      "签到区排着长队，胸牌、手册和会场图领了一整套。",
+      "这是一次不要求展示论文的普通年会，主旨报告、分论坛、海报和企业展台同时开放。",
+      `你已经完成参会报到，接下来可以安排听报告、游览城市或和同行交流。${posterPaper ? `如果愿意，也可以把 A 类论文《${posterPaper.title}》带来做一次额外的海报展示。` : ""}`,
     ].join("\n\n"),
-    preview: `CCIG ${realYear} · ${location} 会场安排`,
-    chainId: "ccig-activity",
-    choices: [
-      {
-        id: `ccig-activity-open-y${state.year}-m${state.month}`,
-        label: "规划当天行程",
-        outcome: "选择会场安排。",
-        effects: {
-          enqueueEvents: [createCcigActivityDecisionEvent(state, participationMode, actualCost)],
-        },
+    chainId: activityChainId,
+    stage: "act1",
+    choices: [{
+      id: `ccig-activity-open-y${state.year}-m${state.month}`,
+      label: "继续",
+      outcome: "查看年会活动安排。",
+      effects: {
+        enqueueEvents: [createCcigActivityDecisionEvent(state, participationMode, attendanceSettlementItems)],
       },
-    ],
+    }],
   });
 }
 
-function createCcigActivityDecisionEvent(
+export function createCcigActivityDecisionEvent(
   state: GameState,
-  participationMode: Exclude<CcigParticipationMode, "skip">,
-  paidCost: number,
+  _participationMode: Exclude<CcigParticipationMode, "skip">,
+  attendanceSettlementItems: string[],
 ): PendingEvent {
+  const activityChainId = getCcigActivityChainId(state);
   const location = getCcigLocation(state.year);
   const realYear = getCcigRealYear(state.year, state.month);
-  const { hasFullGear } = getCcigSelfPayCost(state);
-  const arrivalText = participationMode === "advisor"
-    ? `导师同意了报销，你顺利来到了${location}。`
-    : `你自掏腰包买了车票，独自来到了${location}。${hasFullGear && paidCost === 0 ? "整装待发让本次出行免费。" : ""}`;
-
+  const posterPaper = getCcigPosterPaper(state);
+  const attendanceSummary = attendanceSettlementItems.join("，");
   return createFixedEvent({
-    id: `ccig-activity-act2-y${state.year}-m${state.month}`,
-    title: "领域年会会场活动 ➜ 参会选择",
+    id: `${activityChainId}-act2`,
+    title: "年会活动 ➜ 选择安排",
     description: [
-      arrivalText,
-      "会场日程被塞得很满，你不可能全都参加，只能抓最关键的一段收益。",
-      "认真听报告更偏向学术积累，短期会更疲惫，但后续课题收益通常更高；趁机旅游更偏向状态恢复，能快速回血，但学术收益相对有限；请同学吃饭属于关系经营，需要预算投入，通常换来更稳的协作氛围。",
-      "你盯着手里的议程表，明白今天不是“把每件事都做一点”，而是“选一条主线做深”。",
-    ].join("\n\n"),
-    preview: `CCIG ${realYear} · ${location}，会场主线抉择`,
-    chainId: "ccig-activity",
+      `到达${location}后，你有一整段时间安排 CCIG ${realYear} 的会场活动。`,
+      `前一幕参会确认：${attendanceSummary}`,
+      "认真听报告能带回些新思路；趁空逛逛城市，可以让脑子歇一会儿；也可以约同学吃饭聊聊近况。",
+      posterPaper ? `此外，A 类论文《${posterPaper.title}》可以选择做一次额外的海报展示。` : "",
+    ].filter(Boolean).join("\n\n"),
+    chainId: activityChainId,
     stage: "act2",
     choices: [
       {
@@ -69,15 +71,27 @@ function createCcigActivityDecisionEvent(
         label: "认真听报告",
         outcome: "认真听报告。",
         effects: {
-          fixedEventResolution: { kind: "ccig-activity-listen" },
+          fixedEventResolution: { kind: "ccig-activity-listen", ccigAttendanceSummary: attendanceSummary },
         },
       },
+      ...(posterPaper ? [{
+        id: `ccig-activity-poster-y${state.year}-m${state.month}`,
+        label: "海报展示",
+        outcome: `展示《${posterPaper.title}》。`,
+        effects: {
+          fixedEventResolution: {
+            kind: "ccig-activity-poster" as const,
+            ccigAttendanceSummary: attendanceSummary,
+            ccigPaperId: posterPaper.id,
+          },
+        },
+      }] : []),
       {
         id: `ccig-activity-travel-y${state.year}-m${state.month}`,
         label: "趁机旅游",
         outcome: "抽空逛城市。",
         effects: {
-          fixedEventResolution: { kind: "ccig-activity-travel" },
+          fixedEventResolution: { kind: "ccig-activity-travel", ccigAttendanceSummary: attendanceSummary },
         },
       },
       {
@@ -85,7 +99,7 @@ function createCcigActivityDecisionEvent(
         label: "请同学吃饭",
         outcome: "请同学吃饭。",
         effects: {
-          fixedEventResolution: { kind: "ccig-activity-food" },
+          fixedEventResolution: { kind: "ccig-activity-food", ccigAttendanceSummary: attendanceSummary },
         },
       },
     ],
@@ -97,17 +111,17 @@ export function createCcigActivityResultEvent(params: {
   mode: CcigActivityMode;
   title: string;
   description: string;
-  preview: string;
   outcome: string;
+  completionLog: string;
   effects: PendingEvent["choices"][number]["effects"];
 }): PendingEvent {
   return createFixedEvent({
     id: `ccig-activity-result-y${params.state.year}-m${params.state.month}-${params.mode}`,
-    title: params.title,
-    description: params.description,
-    preview: params.preview,
-    chainId: "ccig-activity",
-    stage: "act3",
+    title: params.title.includes("➜") ? params.title : `年会活动 ➜ 选择安排 ➜ ${params.title}`,
+    description: [params.description, "机制结算", params.outcome].join("\n\n"),
+    chainId: getCcigActivityChainId(params.state),
+    stage: "result",
+    completionLog: params.completionLog,
     choices: [
       {
         id: `ccig-activity-finish-y${params.state.year}-m${params.state.month}-${params.mode}`,

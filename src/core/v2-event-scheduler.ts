@@ -1,17 +1,28 @@
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { hasBlockingQueueEvent } from "./v2-event-queue";
 import { collectFixedEventsForState } from "./v2-fixed-events";
-import { collectCareerEventsForMonth } from "./v2-monthly-career-events";
-import { collectThesisEventForMonth } from "./v2-monthly-thesis-events";
 import { createRandomEventById } from "./v2-random-event-router";
 import {
   calculateRandomEventCount,
   drawRandomEvent,
 } from "./v2-random-event-rules";
-import { createImmuneColdEvent } from "./v2-random-events-core";
+import { createIllnessRandomEvent } from "./v2-random-events-core-health";
+import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
+import { getPublishedPaperCount } from "./v2-monthly-event-shared";
+import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
-export type RandomRollProvider = () => number;
+export type { RandomRollProvider } from "./v2-random-events-core-shared";
+
+export function collectIllnessEventForMonth(
+  state: GameState,
+  getRoll: RandomRollProvider = Math.random,
+): PendingEvent[] {
+  if (state.phase !== "playing" || state.illnessProbability <= 0 || getRoll() >= state.illnessProbability / 100) {
+    return [];
+  }
+  return [createIllnessRandomEvent(state, getRoll)];
+}
 
 export function collectFixedEventsForMonth(
   state: GameState,
@@ -20,18 +31,15 @@ export function collectFixedEventsForMonth(
   return collectFixedEventsForState(state, getRoll);
 }
 
-export { collectThesisEventForMonth, collectCareerEventsForMonth };
-
 export function collectRandomEventsForMonth(
   state: GameState,
-  fixedEventCount: number,
   getRoll: RandomRollProvider = Math.random,
 ): { nextState: GameState; events: PendingEvent[] } {
   if (state.phase !== "playing") {
     return { nextState: state, events: [] };
   }
 
-  const randomEventCount = calculateRandomEventCount(getRoll(), fixedEventCount);
+  const randomEventCount = calculateRandomEventCount(getRoll());
   if (randomEventCount <= 0) {
     return { nextState: state, events: [] };
   }
@@ -44,13 +52,12 @@ export function collectRandomEventsForMonth(
       {
         availableRandomEvents: nextState.availableRandomEvents,
         usedRandomEvents: nextState.usedRandomEvents,
-        coldWeight: nextState.coldWeight,
-        badmintonYear: nextState.badmintonYear,
+        illnessProbability: nextState.illnessProbability,
         totalRandomEventCount: nextState.totalRandomEventCount,
         social: nextState.player.social,
-        san: nextState.player.san,
-        year: nextState.year,
-        month: nextState.month,
+        research: nextState.player.research,
+        publishedPaperCount: getPublishedPaperCount(nextState),
+        hasRecoverableDraftPaper: hasRecoverableDraftPaper(nextState),
       },
       getRoll(),
     );
@@ -64,22 +71,24 @@ export function collectRandomEventsForMonth(
       break;
     }
 
-    if (drawResult.outcome === "immune-cold") {
-      nextState = {
-        ...nextState,
-        achievementFlags: {
-          ...nextState.achievementFlags,
-          badmintonAvoidedCold: true,
-        },
-      };
-      events.push(createImmuneColdEvent(nextState));
-      continue;
-    }
-
-    const builtEvent = createRandomEventById(drawResult.eventId, nextState, getRoll);
+    const randomRolls: number[] = [];
+    const recordRoll = (): number => {
+      const roll = getRoll();
+      randomRolls.push(roll);
+      return roll;
+    };
+    const serial = nextState.totalRandomEventCount;
+    const builtEvent = createRandomEventById(drawResult.eventId, nextState, recordRoll);
     nextState = builtEvent.nextState;
     if (builtEvent.event) {
-      events.push(builtEvent.event);
+      events.push({
+        ...builtEvent.event,
+        randomReplay: {
+          eventId: drawResult.eventId,
+          serial,
+          rolls: randomRolls,
+        },
+      });
     }
   }
 
@@ -94,24 +103,16 @@ export function enqueueFixedEventsForMonth(
     return { nextState: state, queuedEvents: [] };
   }
 
-  if (hasBlockingQueueEvent(state) || state.pendingDecision) {
+  if (hasBlockingQueueEvent(state)) {
     return { nextState: state, queuedEvents: [] };
   }
 
   const fixedEvents = collectFixedEventsForMonth(state, getRoll);
-  const thesisCollection = collectThesisEventForMonth(state);
-  const careerEvents = collectCareerEventsForMonth(thesisCollection.nextState);
-  const allEvents = [
-    ...fixedEvents,
-    ...(thesisCollection.event ? [thesisCollection.event] : []),
-    ...careerEvents,
-  ];
-
-  if (allEvents.length === 0) {
-    return { nextState: thesisCollection.nextState, queuedEvents: [] };
+  if (fixedEvents.length === 0) {
+    return { nextState: state, queuedEvents: [] };
   }
 
-  return enqueuePendingEvents(thesisCollection.nextState, allEvents);
+  return enqueuePendingEvents(state, fixedEvents);
 }
 
 export function enqueueMonthlyEventsForMonth(
@@ -122,14 +123,14 @@ export function enqueueMonthlyEventsForMonth(
     return { nextState: state, queuedEvents: [] };
   }
 
-  if (hasBlockingQueueEvent(state) || state.pendingDecision) {
-    return { nextState: state, queuedEvents: [] };
-  }
-
-  const fixedCollection = enqueueFixedEventsForMonth(state, getRoll);
+  const illnessEvents = collectIllnessEventForMonth(state, getRoll);
+  const illnessCollection = enqueuePendingEvents(state, illnessEvents);
+  const fixedCollection = enqueuePendingEvents(
+    illnessCollection.nextState,
+    collectFixedEventsForMonth(illnessCollection.nextState, getRoll),
+  );
   const randomCollection = collectRandomEventsForMonth(
     fixedCollection.nextState,
-    fixedCollection.queuedEvents.length,
     getRoll,
   );
   const randomEnqueueCollection = enqueuePendingEvents(
@@ -139,6 +140,6 @@ export function enqueueMonthlyEventsForMonth(
 
   return {
     nextState: randomEnqueueCollection.nextState,
-    queuedEvents: [...fixedCollection.queuedEvents, ...randomEnqueueCollection.queuedEvents],
+    queuedEvents: [...illnessCollection.queuedEvents, ...fixedCollection.queuedEvents, ...randomEnqueueCollection.queuedEvents],
   };
 }

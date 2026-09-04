@@ -1,71 +1,163 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, createIcons, House, Lock, RotateCcw } from "lucide";
+import {
+  Award,
+  Bell,
+  ChartNoAxesColumn,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  CircleHelp,
+  createIcons,
+  FlaskConical,
+  Gamepad2,
+  GitFork,
+  House,
+  Lock,
+  MessageSquare,
+  MessagesSquare,
+  Microchip,
+  RotateCcw,
+  Send,
+  Settings,
+  Sprout,
+  Store,
+  Users,
+  UserRound,
+  X,
+} from "lucide";
 
+import { DEBUG_STAT_IDS, GAME_ACTION_IDS } from "../core/v2-action-ids";
 import { createStore } from "../core/v2-store";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
-import { getRoleOptions } from "../core/v2-progression";
+import { getRoleOptions, isPreEnrollmentState } from "../core/v2-progression";
+import { getAttributeTier } from "../core/v2-random-event-rules";
+import { getAvailablePaperSlotCount } from "../core/v2-paper-rules";
 import type {
   DebugStatId,
+  DateDisplayMode,
   GameActionId,
   GameState,
-  ManualSlotId,
+  PlayerStats,
+  PaperActionType,
+  PaperTarget,
+  JournalTarget,
+  PaperPromotionId,
   RoleId,
+  AiSlotId,
+  CoffeeMachineUpgradeId,
   ShopItemId,
   ShopUpgradeId,
   SupportItemId,
 } from "../core/v2-types";
 import {
   renderApp,
-  type TalentPanelTabId,
-  WORKSTATION_CONFERENCE_PANEL_INDEX,
-  WORKSTATION_GRADUATION_PANEL_INDEX,
-  type ResearchPaperFilterId,
 } from "./v2-render";
 import { normalizeShopTab, type ShopTabId } from "./v2-render-shop-panel";
+import {
+  type LobbyInfoSectionId,
+  type LobbyViewId,
+  type PlayTabId,
+  type TalentPanelTabId,
+} from "./v2-render-types";
 import { warmRoleDetailPortraits } from "./v2-role-portrait-assets";
 
-const ROLE_IDS = new Set<RoleId>(getRoleOptions().map((role) => role.id));
+const ROLE_IDS: ReadonlySet<string> = new Set(getRoleOptions().map((role) => role.id));
 const ROLE_IDS_IN_DISPLAY_ORDER = getRoleOptions().map((role) => role.id);
-const PLAY_TAB_IDS = new Set(["events", "workstation", "relationship", "shop", "research", "talent", "settings"] as const);
-const SHOP_TAB_IDS = new Set(["ai", "rest", "coffee", "display", "outdoor", "misc"] as const);
-const TALENT_PANEL_TAB_IDS = new Set(["character", "relation", "equip"] as const);
-const RESEARCH_PAPER_FILTER_IDS = new Set(["S", "A", "B", "C"] as const);
-const DEFAULT_RESEARCH_PAPER_FILTER: ResearchPaperFilterId = "C";
+const PLAY_TAB_IDS: ReadonlySet<string> = new Set(["events", "workstation", "relationship", "shop", "research", "talent", "settings"]);
+const LOBBY_VIEW_IDS: ReadonlySet<string> = new Set(["roles", "info", "messages"]);
+const LOBBY_INFO_SECTION_IDS: ReadonlySet<string> = new Set(["overview", "mechanics", "values", "guide", "events", "systems", "endings", "updates"]);
+const SHOP_TAB_IDS: ReadonlySet<string> = new Set(["ai", "rest", "coffee", "display", "outdoor"]);
+const TALENT_PANEL_TAB_IDS: ReadonlySet<string> = new Set(["character", "relation", "equip", "growth"]);
+const DATE_DISPLAY_MODES: ReadonlySet<string> = new Set(["academic", "calendar"]);
+const GAME_ACTION_ID_SET: ReadonlySet<string> = new Set(GAME_ACTION_IDS);
+const DEBUG_STAT_ID_SET: ReadonlySet<string> = new Set(DEBUG_STAT_IDS);
+const PAPER_ACTION_TYPE_SET: ReadonlySet<string> = new Set(["idea", "experiment", "writing"]);
+const PAPER_TARGET_SET: ReadonlySet<string> = new Set(["A", "B", "C"]);
+const JOURNAL_TARGET_SET: ReadonlySet<string> = new Set(["nature", "nmi", "pami"]);
+const PAPER_PROMOTION_SET: ReadonlySet<string> = new Set(["arxiv", "github", "xiaohongshu"]);
+const DEBUG_PAPER_AUTHORSHIP_SET: ReadonlySet<string> = new Set(["first", "coauthor"]);
+const CHAIR_UPGRADE_ID_SET: ReadonlySet<string> = new Set([
+  "chair-advanced",
+  "chair-massage",
+  "chair-torture",
+  "chair-spike",
+  "chair-hammock",
+]);
+const COFFEE_UPGRADE_ID_SET: ReadonlySet<string> = new Set(["manual", "automatic", "advanced", "unlimited"]);
 const SETUP_STAGE_WIDTH = 1460;
 const PLAY_STAGE_WIDTH = 1540;
+const PLAY_DEBUG_STAGE_WIDTH = 1800;
+const ANIMATED_ATTRIBUTE_IDS = ["san", "research", "social", "favor"] as const;
 
-function isRoleId(value: string | undefined): value is RoleId {
-  return Boolean(value) && ROLE_IDS.has(value as RoleId);
+function getAttributeFillPercent(value: number, cap: number): number {
+  if (cap <= 0) return 0;
+  const percent = ((value + (value > 0 ? 1 : 0)) / (cap + 1)) * 100;
+  return Math.max(0, Math.min(100, percent));
 }
 
-type PlayTabId = "events" | "workstation" | "relationship" | "shop" | "research" | "talent" | "settings";
+function isRoleId(value: string | undefined): value is RoleId {
+  return value !== undefined && ROLE_IDS.has(value);
+}
 
 function isPlayTabId(value: string | undefined): value is PlayTabId {
-  return Boolean(value) && PLAY_TAB_IDS.has(value as PlayTabId);
+  return value !== undefined && PLAY_TAB_IDS.has(value);
+}
+
+function isChairUpgradeId(value: string | undefined): value is ShopUpgradeId {
+  return value !== undefined && CHAIR_UPGRADE_ID_SET.has(value);
+}
+
+
+function isCoffeeUpgradeId(value: string | undefined): value is Exclude<CoffeeMachineUpgradeId, null> {
+  return value !== undefined && COFFEE_UPGRADE_ID_SET.has(value);
+}
+
+function isLobbyViewId(value: string | undefined): value is LobbyViewId {
+  return value !== undefined && LOBBY_VIEW_IDS.has(value);
+}
+
+function isLobbyInfoSectionId(value: string | undefined): value is LobbyInfoSectionId {
+  return value !== undefined && LOBBY_INFO_SECTION_IDS.has(value);
 }
 
 function isShopTabId(value: string | undefined): value is ShopTabId {
-  return Boolean(value) && SHOP_TAB_IDS.has(value as ShopTabId);
+  return value !== undefined && SHOP_TAB_IDS.has(value);
 }
 
 function isTalentPanelTabId(value: string | undefined): value is TalentPanelTabId {
-  return Boolean(value) && TALENT_PANEL_TAB_IDS.has(value as TalentPanelTabId);
+  return value !== undefined && TALENT_PANEL_TAB_IDS.has(value);
 }
 
-function isResearchPaperFilterId(value: string | undefined): value is ResearchPaperFilterId {
-  return Boolean(value) && RESEARCH_PAPER_FILTER_IDS.has(value as ResearchPaperFilterId);
+function isDateDisplayMode(value: string | undefined): value is DateDisplayMode {
+  return value !== undefined && DATE_DISPLAY_MODES.has(value);
 }
 
-function getResearchPaperFilter(paper: Pick<GameState["papers"][number], "target">): ResearchPaperFilterId {
-  return paper.target ?? "S";
+function isGameActionId(value: string | undefined): value is GameActionId {
+  return value !== undefined && GAME_ACTION_ID_SET.has(value);
 }
 
-function getFilteredResearchPapers(
-  state: Pick<GameState, "papers" | "externalPublications">,
-  filter: ResearchPaperFilterId,
-): GameState["papers"] {
-  return [...state.papers, ...state.externalPublications].filter(
-    (paper) => paper.status === "published" && getResearchPaperFilter(paper) === filter,
-  );
+function isDebugStatId(value: string | undefined): value is DebugStatId {
+  return value !== undefined && DEBUG_STAT_ID_SET.has(value);
+}
+
+function isPaperActionType(value: string | undefined): value is PaperActionType {
+  return value !== undefined && PAPER_ACTION_TYPE_SET.has(value);
+}
+
+function isPaperTarget(value: string | undefined): value is PaperTarget {
+  return value !== undefined && PAPER_TARGET_SET.has(value);
+}
+
+function isJournalTarget(value: string | undefined): value is JournalTarget {
+  return value !== undefined && JOURNAL_TARGET_SET.has(value);
+}
+
+function isPaperPromotionId(value: string | undefined): value is PaperPromotionId {
+  return value !== undefined && PAPER_PROMOTION_SET.has(value);
+}
+
+function isDebugPaperAuthorship(value: string | undefined): value is "first" | "coauthor" {
+  return value !== undefined && DEBUG_PAPER_AUTHORSHIP_SET.has(value);
 }
 
 export function bootstrapApp(root: HTMLDivElement): void {
@@ -73,21 +165,136 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let queuedSetupPortraitWarmup = false;
   let fixedStageScaleFrame = 0;
   let activePlayTab: PlayTabId = "events";
+  let activeLobbyView: LobbyViewId = "roles";
+  let activeLobbyInfoSection: LobbyInfoSectionId = "overview";
+  let isFeedbackOpen = false;
   let activeShopTab: ShopTabId = "ai";
+  let selectedChairUpgradeId: ShopUpgradeId | null = null;
+  let selectedCoffeeUpgradeId: Exclude<CoffeeMachineUpgradeId, null> | null = null;
   let activeTalentTab: TalentPanelTabId = "character";
-  let activeWorkstationPanelIndex = WORKSTATION_CONFERENCE_PANEL_INDEX;
-  let conferenceMonthOffset = 0;
   let isEventContentOpen = false;
   let activeEventId: string | null = null;
   let activeEventHistoryId: string | null = null;
   let activeEventChainId: string | null = null;
   let activeEventHistoryIndex: number | null = null;
   let activeLogPage: number | null = null;
+  let activePendingPage = 0;
   let activeRelationshipIndex = 0;
-  let currentResearchPaperFilter: ResearchPaperFilterId = DEFAULT_RESEARCH_PAPER_FILTER;
   let currentResearchPaperIndex = 0;
   let lastLogSignature = "";
   let lastPhase = store.getState().phase;
+  let lastRenderedPlayer: PlayerStats | null = null;
+  let lastRenderedPaperScores = new Map<string, [number, number, number]>();
+  let lastRenderedPaperSlotCount: number | null = null;
+  let animateEventPanelAfterNextMonth = false;
+  let skipNextPlayerAnimation = false;
+
+  const animatePlayerStatChanges = (previous: PlayerStats, current: PlayerStats): void => {
+    const animateValue = (statId: keyof PlayerStats, delta: number): void => {
+      const item = root.querySelector<HTMLElement>(`[data-player-stat="${statId}"]`);
+      if (!item || delta === 0) return;
+
+      const direction = delta > 0 ? "increase" : "decrease";
+      const value = item.querySelector<HTMLElement>(statId === "money" ? ".new-currency-value" : ".new-attr-value");
+      const floatingChange = document.createElement("span");
+      floatingChange.className = `stat-floating-change is-${direction}`;
+      floatingChange.textContent = delta > 0 ? `+${delta}` : String(delta);
+      value?.appendChild(floatingChange);
+      value?.classList.add(`is-value-${direction}`);
+      item.classList.add(`is-stat-${direction}`);
+
+      if (statId !== "money") {
+        const cap = Number(item.dataset.statCap ?? "0");
+        const fill = item.querySelector<HTMLElement>(".progress-fill");
+        if (fill && Number.isFinite(cap) && cap > 0) {
+          const targetWidth = fill.style.width;
+          fill.style.transition = "none";
+          fill.style.width = `${getAttributeFillPercent(previous[statId], cap).toFixed(1)}%`;
+          void fill.offsetWidth;
+          fill.style.removeProperty("transition");
+          fill.style.width = targetWidth;
+          fill.classList.add(`is-stat-${direction}`);
+        }
+
+        const previousTier = getAttributeTier(previous[statId]);
+        const currentTier = getAttributeTier(current[statId]);
+        if (previousTier !== currentTier) {
+          const tierLabel = item.querySelector<HTMLElement>(".new-attr-level");
+          if (tierLabel) {
+            const tierChange = document.createElement("span");
+            const tierDirection = currentTier > previousTier ? "up" : "down";
+            tierChange.className = `tier-floating-change is-${tierDirection}`;
+            tierChange.textContent = `${tierDirection === "up" ? "升至" : "降至"}${tierLabel.textContent?.trim() ?? "新档位"}`;
+            tierLabel.classList.add(`is-tier-${tierDirection}`);
+            tierLabel.appendChild(tierChange);
+          }
+        }
+      }
+
+      window.setTimeout(() => {
+        value?.classList.remove("is-value-increase", "is-value-decrease");
+        item.classList.remove("is-stat-increase", "is-stat-decrease");
+        item.querySelector<HTMLElement>(".progress-fill")?.classList.remove("is-stat-increase", "is-stat-decrease");
+        item.querySelector<HTMLElement>(".new-attr-level")?.classList.remove("is-tier-up", "is-tier-down");
+        floatingChange.remove();
+        item.querySelector<HTMLElement>(".tier-floating-change")?.remove();
+      }, 1000);
+    };
+
+    for (const statId of ANIMATED_ATTRIBUTE_IDS) {
+      animateValue(statId, current[statId] - previous[statId]);
+    }
+    animateValue("money", current.money - previous.money);
+  };
+
+  const animatePaperScoreChanges = (previous: Map<string, [number, number, number]>, current: GameState["papers"]): void => {
+    current.forEach((paper) => {
+      const before = previous.get(paper.id);
+      if (!before) return;
+      const after: [number, number, number] = [paper.idea, paper.experiment, paper.writing];
+      const deltas = after.map((value, index) => value - before[index]);
+      if (deltas.every((delta) => delta === 0)) return;
+      const scoreDeltas = [deltas.reduce((sum, delta) => sum + delta, 0), ...deltas];
+
+      const card = root.querySelector<HTMLElement>(`[data-paper-id="${CSS.escape(paper.id)}"]`);
+      const scoreStrip = card?.querySelector<HTMLElement>(".paper-score-strip");
+      if (!card || !scoreStrip) return;
+      card.classList.add("is-score-changing");
+      scoreStrip.classList.add("is-score-changing");
+
+      scoreDeltas.forEach((delta, index) => {
+        if (delta === 0) return;
+        const scoreCell = scoreStrip.children[index];
+        if (!(scoreCell instanceof HTMLElement)) return;
+        const change = document.createElement("span");
+        change.className = `paper-score-change is-${delta > 0 ? "positive" : "negative"}`;
+        change.textContent = delta > 0 ? `+${delta}` : String(delta);
+        scoreCell.appendChild(change);
+      });
+
+      window.setTimeout(() => {
+        card.classList.remove("is-score-changing");
+        scoreStrip.classList.remove("is-score-changing");
+        scoreStrip.querySelectorAll(".paper-score-change").forEach((item) => item.remove());
+      }, 760);
+    });
+  };
+
+  const showNewPaperSlotUnlocks = (state: GameState): void => {
+    const currentCount = getAvailablePaperSlotCount(state);
+    const previousCount = lastRenderedPaperSlotCount;
+    lastRenderedPaperSlotCount = currentCount;
+    if (previousCount === null || currentCount <= previousCount || isPreEnrollmentState(state)) return;
+
+    for (let slotIndex = previousCount; slotIndex < currentCount; slotIndex += 1) {
+      const card = root.querySelector<HTMLElement>(`[data-paper-slot-index="${slotIndex}"]`);
+      if (!card) continue;
+      card.classList.add("is-newly-unlocked");
+      window.setTimeout(() => {
+        card.classList.remove("is-newly-unlocked");
+      }, 1800);
+    }
+  };
 
   const syncFixedStageScale = (
     shellSelector: string,
@@ -109,6 +316,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
+    if (window.matchMedia("(max-width: 1180px)").matches) {
+      root.style.setProperty(scaleVarName, "1");
+      root.style.setProperty(contentHeightVarName, `${stage.scrollHeight}px`);
+      return;
+    }
+
     const scale = Math.min(1, shellWidth / stageWidth);
     root.style.setProperty(scaleVarName, scale.toFixed(4));
     root.style.setProperty(contentHeightVarName, `${stage.scrollHeight}px`);
@@ -127,7 +340,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
       '.play-page[data-scale-mode="fixed"] .play-stage',
       "--play-stage-scale",
       "--play-stage-content-height",
-      PLAY_STAGE_WIDTH,
+      root.querySelector<HTMLElement>('.play-page.has-debug-bar')
+        && !window.matchMedia("(max-width: 1600px)").matches
+        ? PLAY_DEBUG_STAGE_WIDTH
+        : PLAY_STAGE_WIDTH,
     );
   };
 
@@ -148,24 +364,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
   resizeObserver.observe(root);
   window.addEventListener("resize", scheduleAllFixedStageScales);
   window.visualViewport?.addEventListener("resize", scheduleAllFixedStageScales);
-
-  const syncPlayTabUi = (): void => {
-    if (store.getState().phase !== "playing") {
-      return;
-    }
-
-    root.querySelectorAll<HTMLButtonElement>("button[data-ui-play-tab]").forEach((button) => {
-      const isActive = button.dataset.uiPlayTab === activePlayTab;
-      button.classList.toggle("active", isActive);
-      button.setAttribute("aria-pressed", isActive ? "true" : "false");
-    });
-
-    root.querySelectorAll<HTMLElement>("[data-tab-panel]").forEach((panel) => {
-      const isActive = panel.dataset.tabPanel === activePlayTab;
-      panel.classList.toggle("active", isActive);
-      panel.hidden = !isActive;
-    });
-  };
 
   const resetEffectSourceUi = (): void => {
     root.querySelectorAll<HTMLElement>(".new-effect-list .effect-chip.is-selected").forEach((chip) => {
@@ -249,10 +447,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
   };
 
   const openEventContent = (eventId: string): void => {
-    if (isEventContentOpen) {
-      return;
-    }
-
     const state = store.getState();
     if (state.phase !== "playing") {
       return;
@@ -273,10 +467,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
   };
 
   const openEventHistoryContent = (eventHistoryId: string): void => {
-    if (isEventContentOpen) {
-      return;
-    }
-
     const state = store.getState();
     const historyEvent = state.eventHistory.find((event) => event.id === eventHistoryId);
     if (state.phase !== "playing" || !historyEvent) {
@@ -371,20 +561,20 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const syncResearchUiState = (): void => {
     const state = store.getState();
     if (state.phase !== "playing") {
-      currentResearchPaperFilter = DEFAULT_RESEARCH_PAPER_FILTER;
       currentResearchPaperIndex = 0;
       return;
     }
 
-    const filteredPapers = getFilteredResearchPapers(state, currentResearchPaperFilter);
-    if (filteredPapers.length === 0) {
+    const publishedPaperCount = [...state.papers, ...state.externalPublications]
+      .filter((paper) => paper.status === "published").length;
+    if (publishedPaperCount === 0) {
       currentResearchPaperIndex = 0;
       return;
     }
 
     currentResearchPaperIndex = Math.min(
       Math.max(currentResearchPaperIndex, 0),
-      filteredPapers.length - 1,
+      publishedPaperCount - 1,
     );
   };
 
@@ -400,28 +590,37 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
   const render = (): void => {
     const state = store.getState();
+    const previousRenderedPlayer = lastRenderedPlayer;
+    const shouldAnimatePlayer = !skipNextPlayerAnimation && lastPhase === "playing" && state.phase === "playing";
+    skipNextPlayerAnimation = false;
     if (state.phase !== lastPhase) {
       if (state.phase === "playing") {
+        activeLobbyView = "roles";
+        activeLobbyInfoSection = "overview";
+        isFeedbackOpen = false;
         activePlayTab = "events";
         activeShopTab = "ai";
+        selectedChairUpgradeId = null;
+        selectedCoffeeUpgradeId = null;
         activeTalentTab = "character";
-        activeWorkstationPanelIndex = WORKSTATION_CONFERENCE_PANEL_INDEX;
-        conferenceMonthOffset = 0;
         resetEventContentUiState();
         activeLogPage = null;
+        activePendingPage = 0;
         activeRelationshipIndex = 0;
-        currentResearchPaperFilter = DEFAULT_RESEARCH_PAPER_FILTER;
         currentResearchPaperIndex = 0;
       } else if (state.phase === "setup") {
+        activeLobbyView = "roles";
+        activeLobbyInfoSection = "overview";
+        isFeedbackOpen = false;
         activePlayTab = "events";
         activeShopTab = "ai";
+        selectedChairUpgradeId = null;
+        selectedCoffeeUpgradeId = null;
         activeTalentTab = "character";
-        activeWorkstationPanelIndex = WORKSTATION_CONFERENCE_PANEL_INDEX;
-        conferenceMonthOffset = 0;
         resetEventContentUiState();
         activeLogPage = null;
+        activePendingPage = 0;
         activeRelationshipIndex = 0;
-        currentResearchPaperFilter = DEFAULT_RESEARCH_PAPER_FILTER;
         currentResearchPaperIndex = 0;
       }
       lastPhase = state.phase;
@@ -432,24 +631,72 @@ export function bootstrapApp(root: HTMLDivElement): void {
     syncResearchUiState();
     syncRelationshipUiState();
     root.dataset.phase = state.phase;
-    root.innerHTML = renderApp(state, store.getAccountProfile(), {
+    root.innerHTML = renderApp(state, store.getLobbyState(), {
+      activePlayTab,
+      activeLobbyView,
+      activeLobbyInfoSection,
+      isFeedbackOpen,
       isEventContentOpen,
       activeEventId,
       activeEventHistoryId,
       activeEventHistoryIndex,
       activeLogPage,
+      activePendingPage,
       activeRelationshipIndex,
       activeShopTab,
+      selectedChairUpgradeId,
+      selectedCoffeeUpgradeId,
       activeTalentTab,
-      activeWorkstationPanelIndex,
-      conferenceMonthOffset,
-      currentResearchPaperFilter,
       currentResearchPaperIndex,
     });
-    createIcons({ icons: { Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, House, Lock, RotateCcw }, root });
-    syncPlayTabUi();
+    if (animateEventPanelAfterNextMonth) {
+      animateEventPanelAfterNextMonth = false;
+      if (state.phase === "playing" && activePlayTab === "events") {
+        const eventPanel = root.querySelector<HTMLElement>('[data-tab-panel="events"] .event-panel');
+        eventPanel?.classList.add("is-month-entering");
+      }
+    }
+    createIcons({
+      icons: {
+        Award,
+        Bell,
+        ChartNoAxesColumn,
+        Check,
+        ChevronDown,
+        ChevronRight,
+        ChevronLeft,
+        CircleHelp,
+        FlaskConical,
+        Gamepad2,
+        GitFork,
+        House,
+        Lock,
+        MessageSquare,
+        MessagesSquare,
+        Microchip,
+        RotateCcw,
+        Send,
+        Settings,
+        Sprout,
+        Store,
+        Users,
+        UserRound,
+        X,
+      },
+      root,
+    });
+    animatePaperScoreChanges(lastRenderedPaperScores, state.papers);
+    showNewPaperSlotUnlocks(state);
+    lastRenderedPaperScores = new Map(state.papers.map((paper) => [
+      paper.id,
+      [paper.idea, paper.experiment, paper.writing],
+    ]));
     resetEffectSourceUi();
     scheduleAllFixedStageScales();
+    if (shouldAnimatePlayer && previousRenderedPlayer) {
+      animatePlayerStatChanges(previousRenderedPlayer, state.player);
+    }
+    lastRenderedPlayer = { ...state.player };
 
     if (!queuedSetupPortraitWarmup && state.phase === "setup") {
       queuedSetupPortraitWarmup = true;
@@ -477,16 +724,84 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    const lobbyViewButton = target.closest<HTMLButtonElement>("button[data-ui-lobby-view]");
+    if (lobbyViewButton && !lobbyViewButton.disabled && isLobbyViewId(lobbyViewButton.dataset.uiLobbyView)) {
+      activeLobbyView = lobbyViewButton.dataset.uiLobbyView;
+      render();
+      return;
+    }
+
+    const lobbyInfoSectionButton = target.closest<HTMLButtonElement>("button[data-ui-lobby-info-section]");
+    if (
+      lobbyInfoSectionButton
+      && !lobbyInfoSectionButton.disabled
+      && isLobbyInfoSectionId(lobbyInfoSectionButton.dataset.uiLobbyInfoSection)
+    ) {
+      activeLobbyInfoSection = lobbyInfoSectionButton.dataset.uiLobbyInfoSection;
+      render();
+      return;
+    }
+
+    const openFeedbackButton = target.closest<HTMLButtonElement>("button[data-ui-open-feedback]");
+    if (openFeedbackButton && !openFeedbackButton.disabled) {
+      isFeedbackOpen = true;
+      render();
+      return;
+    }
+
+    const closeFeedbackButton = target.closest<HTMLButtonElement>("button[data-ui-close-feedback]");
+    if (closeFeedbackButton && !closeFeedbackButton.disabled) {
+      isFeedbackOpen = false;
+      render();
+      return;
+    }
+
     const playTabButton = target.closest<HTMLButtonElement>("button[data-ui-play-tab]");
     if (playTabButton && !playTabButton.disabled && isPlayTabId(playTabButton.dataset.uiPlayTab)) {
       activePlayTab = playTabButton.dataset.uiPlayTab;
-      syncPlayTabUi();
+      if (activePlayTab !== "shop") {
+        selectedChairUpgradeId = null;
+        selectedCoffeeUpgradeId = null;
+      }
+      render();
+      return;
+    }
+
+    const paperSelectionCard = target.closest<HTMLElement>("[data-ui-select-workstation-paper]");
+    if (
+      paperSelectionCard
+      && !target.closest("button[data-action]")
+      && !target.closest("button[data-ui-select-workstation-paper]")
+    ) {
+      const paperId = paperSelectionCard.dataset.uiSelectWorkstationPaper?.trim();
+      if (paperId) {
+        store.dispatch("select-paper", { paperId });
+      }
       return;
     }
 
     const shopTabButton = target.closest<HTMLButtonElement>("button[data-ui-shop-tab]");
     if (shopTabButton && !shopTabButton.disabled && isShopTabId(shopTabButton.dataset.uiShopTab)) {
       activeShopTab = normalizeShopTab(shopTabButton.dataset.uiShopTab);
+      selectedChairUpgradeId = null;
+      selectedCoffeeUpgradeId = null;
+      render();
+      return;
+    }
+
+    const chairUpgradeOption = target.closest<HTMLButtonElement>("button[data-ui-select-chair-upgrade]");
+    if (chairUpgradeOption && !chairUpgradeOption.disabled && isChairUpgradeId(chairUpgradeOption.dataset.uiSelectChairUpgrade)) {
+      const upgradeId = chairUpgradeOption.dataset.uiSelectChairUpgrade;
+      selectedChairUpgradeId = selectedChairUpgradeId === upgradeId ? null : upgradeId;
+      render();
+      return;
+    }
+
+
+    const coffeeUpgradeOption = target.closest<HTMLButtonElement>("button[data-ui-select-coffee-upgrade]");
+    if (coffeeUpgradeOption && !coffeeUpgradeOption.disabled && isCoffeeUpgradeId(coffeeUpgradeOption.dataset.uiSelectCoffeeUpgrade)) {
+      const upgradeId = coffeeUpgradeOption.dataset.uiSelectCoffeeUpgrade;
+      selectedCoffeeUpgradeId = selectedCoffeeUpgradeId === upgradeId ? null : upgradeId;
       render();
       return;
     }
@@ -495,21 +810,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (talentTabButton && !talentTabButton.disabled && isTalentPanelTabId(talentTabButton.dataset.uiTalentTab)) {
       activeTalentTab = talentTabButton.dataset.uiTalentTab;
       render();
-      return;
-    }
-
-    const researchFilterButton = target.closest<HTMLButtonElement>("button[data-ui-research-filter]");
-    if (
-      researchFilterButton
-      && !researchFilterButton.disabled
-      && isResearchPaperFilterId(researchFilterButton.dataset.uiResearchFilter)
-    ) {
-      const nextFilter = researchFilterButton.dataset.uiResearchFilter;
-      if (currentResearchPaperFilter !== nextFilter) {
-        currentResearchPaperFilter = nextFilter;
-        currentResearchPaperIndex = 0;
-        render();
-      }
       return;
     }
 
@@ -608,39 +908,17 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
-    const workstationPanelButton = target.closest<HTMLButtonElement>("button[data-ui-workstation-panel-index]");
-    if (workstationPanelButton && !workstationPanelButton.disabled) {
-      const nextPanelIndex = Number(workstationPanelButton.dataset.uiWorkstationPanelIndex ?? "");
-      if (!Number.isInteger(nextPanelIndex)) {
-        return;
-      }
+    const pendingNavButton = target.closest<HTMLButtonElement>("button[data-ui-pending-nav]");
+    if (pendingNavButton && !pendingNavButton.disabled) {
+      const pendingPanel = root.querySelector<HTMLElement>(".new-pending-event-section[data-pending-page-index][data-pending-page-count]");
+      const pageIndex = Number(pendingPanel?.dataset.pendingPageIndex ?? "0");
+      const pageCount = Number(pendingPanel?.dataset.pendingPageCount ?? "1");
+      const lastPageIndex = Math.max(0, pageCount - 1);
+      const currentPageIndex = Number.isFinite(pageIndex) ? Math.max(0, Math.min(pageIndex, lastPageIndex)) : 0;
 
-      activeWorkstationPanelIndex = nextPanelIndex;
-
-      if (nextPanelIndex === WORKSTATION_CONFERENCE_PANEL_INDEX || nextPanelIndex === WORKSTATION_GRADUATION_PANEL_INDEX) {
-        render();
-        return;
-      }
-
-      const state = store.getState();
-      const paper = state.papers[nextPanelIndex] ?? null;
-      if (paper) {
-        store.dispatch("select-paper", { paperId: paper.id });
-        return;
-      }
-
-      render();
-      return;
-    }
-
-    const conferenceOffsetButton = target.closest<HTMLButtonElement>("button[data-ui-conference-offset]");
-    if (conferenceOffsetButton && !conferenceOffsetButton.disabled) {
-      const delta = Number(conferenceOffsetButton.dataset.uiConferenceOffset ?? "");
-      if (!Number.isFinite(delta) || delta === 0) {
-        return;
-      }
-
-      conferenceMonthOffset = Math.max(0, Math.min(11, conferenceMonthOffset + Math.trunc(delta)));
+      activePendingPage = pendingNavButton.dataset.uiPendingNav === "next"
+        ? Math.min(lastPageIndex, currentPageIndex + 1)
+        : Math.max(0, currentPageIndex - 1);
       render();
       return;
     }
@@ -648,21 +926,55 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const button = target.closest<HTMLButtonElement>("button[data-action]");
     if (!button || button.disabled) return;
 
-    const actionId = button.dataset.action as GameActionId | undefined;
-    if (!actionId) return;
+    const actionId = button.dataset.action;
+    if (!isGameActionId(actionId)) return;
+
+    if (actionId === "next-month" || actionId === "force-next-month") {
+      animateEventPanelAfterNextMonth = activePlayTab === "events";
+    }
+    if (actionId === "restart-game") {
+      skipNextPlayerAnimation = true;
+    }
+    if (actionId === "upgrade-shop-item" && button.dataset.shopUpgradeId?.startsWith("chair-")) {
+      selectedChairUpgradeId = null;
+    }
+    if (actionId === "upgrade-coffee-machine") {
+      selectedCoffeeUpgradeId = null;
+    }
+    if (actionId === "sell-shop-item" && button.dataset.shopItemId === "chair") {
+      selectedChairUpgradeId = null;
+    }
+    if (actionId === "sell-coffee-machine") {
+      selectedCoffeeUpgradeId = null;
+    }
 
     store.dispatch(actionId, {
       roleId: isRoleId(button.dataset.roleId) ? button.dataset.roleId : undefined,
       paperId: typeof button.dataset.paperId === "string" ? button.dataset.paperId : undefined,
+      paperSlotIndex: typeof button.dataset.paperSlotIndex === "string" ? Number(button.dataset.paperSlotIndex) : undefined,
+      paperActionType: isPaperActionType(button.dataset.paperActionType) ? button.dataset.paperActionType : undefined,
+      paperTarget: isPaperTarget(button.dataset.paperTarget) ? button.dataset.paperTarget : undefined,
+      journalTarget: isJournalTarget(button.dataset.journalTarget) ? button.dataset.journalTarget : undefined,
+      promotionId: isPaperPromotionId(button.dataset.promotionId) ? button.dataset.promotionId : undefined,
       eventId: typeof button.dataset.eventId === "string" ? button.dataset.eventId : undefined,
       eventChoiceId: typeof button.dataset.eventChoiceId === "string" ? button.dataset.eventChoiceId : undefined,
-      manualSlot: typeof button.dataset.manualSlot === "string" ? Number(button.dataset.manualSlot) as ManualSlotId : undefined,
-      relationshipId: typeof button.dataset.relationshipId === "string" ? button.dataset.relationshipId : undefined,
-      shopItemId: typeof button.dataset.shopItemId === "string" ? button.dataset.shopItemId as ShopItemId : undefined,
-      shopUpgradeId: typeof button.dataset.shopUpgradeId === "string" ? button.dataset.shopUpgradeId as ShopUpgradeId : undefined,
-      supportItemId: typeof button.dataset.supportItemId === "string" ? button.dataset.supportItemId as SupportItemId : undefined,
-      debugStatId: typeof button.dataset.debugStatId === "string" ? button.dataset.debugStatId as DebugStatId : undefined,
+      debugStatId: isDebugStatId(button.dataset.debugStatId) ? button.dataset.debugStatId : undefined,
+      debugPaperTarget: isPaperTarget(button.dataset.debugPaperTarget) ? button.dataset.debugPaperTarget : undefined,
+      debugPaperAuthorship: isDebugPaperAuthorship(button.dataset.debugPaperAuthorship) ? button.dataset.debugPaperAuthorship : undefined,
       delta: typeof button.dataset.delta === "string" ? Number(button.dataset.delta) : undefined,
+      dateDisplayMode: isDateDisplayMode(button.dataset.dateDisplayMode) ? button.dataset.dateDisplayMode : undefined,
+      shopItemId: typeof button.dataset.shopItemId === "string" ? button.dataset.shopItemId as ShopItemId : undefined,
+      shopUpgradeId: typeof button.dataset.shopUpgradeId === "string"
+        ? button.dataset.shopUpgradeId as ShopUpgradeId | Exclude<CoffeeMachineUpgradeId, null>
+        : undefined,
+      aiSlotId: typeof button.dataset.aiSlotId === "string" ? button.dataset.aiSlotId as AiSlotId : undefined,
+      supportItemId: typeof button.dataset.supportItemId === "string" ? button.dataset.supportItemId as SupportItemId : undefined,
     });
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !isFeedbackOpen) return;
+    isFeedbackOpen = false;
+    render();
   });
 }

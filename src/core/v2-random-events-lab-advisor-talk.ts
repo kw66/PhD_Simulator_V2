@@ -1,18 +1,41 @@
-import { getActualSanChange } from "./v2-sanity-rules";
-import { createThreeStageRandomEvent } from "./v2-random-events-core-shared";
+﻿import {
+  applyTierResist,
+  formatResearchMiscSanChange,
+  formatTierResistedOutcome,
+  getActualResearchMiscSanChange,
+  getResearchMiscSanNarrative,
+  getTierResistedNarrative,
+} from "./v2-sanity-rules";
+import { getResearchCap } from "./v2-research-cap-system";
+import { createThreeStageRandomEvent, drawInclusiveInt, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
-export function createAdvisorTalkRandomEvent(state: GameState): PendingEvent {
+export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
   const isHighResearch = state.player.research >= 6;
   const isHighFavor = state.player.favor >= 6;
-  const internshipSanChange = getActualSanChange(-6, state.month, state.eventSupport);
+  const internshipSanChange = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport);
+  const internshipSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport);
+  const internshipSanNarrative = getResearchMiscSanNarrative(-5, state.player.research);
+  const ideaBonus = drawInclusiveInt(4, 6, getRoll);
+  const experimentBonus = drawInclusiveInt(4, 6, getRoll);
+  const reportFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const reportFavorChange = reportFavorResult.effectiveChange;
+  const reportFavorNarrative = getTierResistedNarrative("导师好感", -1, reportFavorResult);
+  const askFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const askFavorChange = askFavorResult.effectiveChange;
+  const askFavorNarrative = getTierResistedNarrative("导师好感", -1, askFavorResult);
+  const askResearchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
+  const askResearchChange = askResearchResult.effectiveChange;
+  const askResearchNarrative = getTierResistedNarrative("科研", 1, askResearchResult);
+  const internFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const internFavorChange = internFavorResult.effectiveChange;
+  const internFavorNarrative = getTierResistedNarrative("导师好感", -1, internFavorResult);
 
   const event: PendingEvent = {
     id: `random-5-y${state.year}-m${state.month}-n${serial}`,
     title: "导师约谈",
     description: "导师突然发来一句“来我办公室一趟”，没说是什么事。一路上，你把最近的进度和失误都想了一遍。",
-    preview: "导师找你谈话",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -22,103 +45,109 @@ export function createAdvisorTalkRandomEvent(state: GameState): PendingEvent {
       {
         id: `random-5-report-${serial}`,
         label: "认真汇报",
-        outcome: isHighResearch ? "下次想 idea +5。" : "导师好感 -1。",
+        outcome: isHighResearch
+          ? `科研 ≥ 6｜下次想 idea +${ideaBonus}。`
+          : `科研 < 6｜${formatTierResistedOutcome("导师好感", -1, reportFavorResult)}`,
         effects: isHighResearch
           ? {
             temporaryActionEffectUpdates: {
-              idea: { bonus: 5 },
+              idea: { bonus: ideaBonus },
             },
           }
-          : {
-            favor: -1,
-          },
+          : reportFavorChange < 0 ? { favor: reportFavorChange } : {},
       },
       {
         id: `random-5-ask-${serial}`,
         label: "请教推进方法",
-        outcome: isHighFavor ? "科研 +1。" : "导师好感 -1。",
-        effects: isHighFavor ? { research: 1 } : { favor: -1 },
+        outcome: isHighFavor
+          ? `导师好感 ≥ 6｜${formatTierResistedOutcome("科研", 1, askResearchResult)}`
+          : `导师好感 < 6｜${formatTierResistedOutcome("导师好感", -1, askFavorResult)}`,
+        effects: isHighFavor
+          ? askResearchChange > 0 ? { research: askResearchChange } : {}
+          : askFavorChange < 0 ? { favor: askFavorChange } : {},
       },
       {
         id: `random-5-intern-${serial}`,
-        label: "提出去实习",
-        outcome: isHighFavor ? `SAN ${internshipSanChange}，金钱 +5，下次实验 +5。` : "导师好感 -1。",
+        label: "提出远程实习",
+        outcome: isHighFavor
+          ? `导师好感 ≥ 6｜${internshipSanSummary}｜金币 +3｜下次实验 +${experimentBonus}。`
+          : `导师好感 < 6｜${formatTierResistedOutcome("导师好感", -1, internFavorResult)}`,
         effects: isHighFavor
           ? {
             san: internshipSanChange,
-            money: 5,
+            money: 3,
             temporaryActionEffectUpdates: {
-              experiment: { bonus: 5 },
+              experiment: { bonus: experimentBonus },
             },
           }
-          : {
-            favor: -1,
-          },
+          : internFavorChange < 0 ? { favor: internFavorChange } : {},
       },
     ],
   };
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "导师叫你去办公室单独谈话。",
-      "你不确定是例行沟通，还是要问责近期进度。",
-      "走到门口时，你已经在脑内把最近几周的实验和论文节点快速过了一遍。",
-      "这次对话可能影响后续资源和信任，甚至决定你接下来能不能拿到关键支持。",
+      "导师发来一句“来办公室聊聊”，没有多说什么。",
+      "你把最近的实验结果、没解决的问题和下周计划整理到同一页 PPT 上。",
+      "走到门口时，你又看了一遍这页内容，免得谈到一半才想起漏了什么。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "“如实汇报最体面，但也意味着把短板和拖延都摊在桌面上。”",
-      "“请教方法像一次试探：关系到位是点拨，关系不到位是碰壁。”",
-      "“提实习是在争取个人路径，也是在挑战导师对你当前优先级的判断。”你要决定今天是优先保关系、保成长，还是主动争取个人节奏。",
+      "如实汇报最稳，不过没做完的部分也藏不住。",
+      "卡住的问题拖了几周，你也想听听导师的意见。",
+      "至于远程实习，现在提出来可能正好，也可能让谈话突然变得严肃。",
     ].join("\n\n"),
     results: {
       [`random-5-report-${serial}`]: {
         title: "汇报进展",
         description: isHighResearch
           ? [
-              "你打开PPT，详细汇报了最近的研究进展。",
-              "导师听得很认真，不时点头，还提出了几个很有价值的建议。",
-              "“不错，思路很清晰。”导师说，“顺着这个方向继续深入，应该能出成果。”",
-              "你感觉收获很大，对下一步的研究方向更加明确了。",
+              "你打开 PPT，把已经完成的实验、失败的尝试和下一步计划依次讲清楚。",
+              "导师在其中一页停下来，帮你排除了两个不必再做的对照，又圈出一条值得继续验证的路线。",
+              "离开办公室前，你把接下来的实验顺序重新记了一遍。这次谈话至少让下一步清楚了。",
             ].join("\n\n")
           : [
-              "你支支吾吾地汇报了一下最近的“进展”。",
-              "导师越听眉头皱得越紧：“就这些？你这段时间都在干什么？”",
-              "你被问得哑口无言，只能低头认错。",
-              "“回去好好反思一下。”导师叹了口气。",
+              "你把最近的结果投到屏幕上，能讲清楚的只有两组还没跑完的实验。",
+              "导师追问了几次变量设置，你翻了半天记录也没找到完整答案。",
+              "谈话结束前，导师让你先把实验记录补齐，下次再带着可复现的结果来汇报。",
+              ...(reportFavorNarrative ? [reportFavorNarrative] : []),
             ].join("\n\n"),
       },
       [`random-5-ask-${serial}`]: {
         title: "当面请教",
         description: isHighFavor
           ? [
-              "“导师，我最近在研究方法上遇到了一些困惑，想请教您。”",
-              "导师放下手中的工作，认真地听你描述问题，然后耐心地给你讲解。",
-              "“做科研要有自己的方法论，不能只是埋头苦干……”导师传授了不少经验。",
-              "你感觉茅塞顿开，科研能力有了明显提升。",
+              "你把卡住的问题画在白板上，也列出已经试过的几种方法。",
+              "导师顺着你的推导问了几个问题，很快指出其中一个假设并不成立。",
+              "你们把方案改到能继续验证的程度。回到工位后，你马上补上了新的实验清单。",
+              ...(askResearchNarrative ? [askResearchNarrative] : []),
             ].join("\n\n")
           : [
-              "“导师，我想请教一下科研方法……”",
-              "导师抬头看了你一眼：“这些基础的东西自己去看文献，我很忙。”",
-              "你讪讪地退出办公室，感觉导师对你有些不耐烦。",
+              "你刚说自己不知道下一步该怎么做，导师先问：“相关论文看了哪些？已经试过什么？”",
+              "你一时答不上来。导师让你先把问题和已有尝试整理具体，再约时间讨论。",
+              "回到工位后，你重新翻开文献和实验记录，先把缺的准备补上。",
+              ...(askFavorNarrative ? [askFavorNarrative] : []),
             ].join("\n\n"),
       },
       [`random-5-intern-${serial}`]: {
         title: isHighFavor ? "安排实习" : "谈话结束",
         description: isHighFavor
           ? [
-              "“导师，我想利用假期去企业实习一段时间，积累一些实践经验。”",
-              "导师想了想：“可以，但是科研不能落下，实习期间也要保持进度。”",
-              "你连忙点头答应。虽然会很累，但能赚点钱还能学到东西，值了！",
-              "实习期间你白天上班，晚上还要抽空做实验，累得够呛，但收获也不少。",
+              "“导师，我想接一段远程实习，时间尽量安排在课题之外。”",
+              "导师想了想：“可以，但组里的实验节点不能耽误。”",
+              "你和公司确认了远程安排，白天处理实习任务，空档继续跑实验。",
+              "两边来回切换有些累，不过收入和工程经验都实实在在。",
+              ...(internshipSanNarrative ? [internshipSanNarrative] : []),
             ].join("\n\n")
           : [
-              "“导师，我想去企业实习一段时间……”",
-              "话还没说完，导师就打断了你：“实习？你论文写完了吗？实验做完了吗？”",
-              "你被问得哑口无言。",
-              "“先把手头的事情做好再说别的。”导师的语气明显不悦。",
+              "“导师，我想接一段远程实习……”",
+              "导师先问了论文和实验的进度。你报出的几个节点都还没有收尾。",
+              "“先把手头这些做完吧。”导师没有同意，谈话也很快回到当前课题。",
+              "你只好暂时放下实习计划，回去继续赶实验。",
+              ...(internFavorNarrative ? [internFavorNarrative] : []),
             ].join("\n\n"),
       },
     },
   });
 }
+

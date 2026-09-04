@@ -1,193 +1,80 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+
+import { renderApp } from "../src/app/v2-render";
 import { createStore } from "../src/core/v2-store";
 
-class MemoryStorage {
-  private readonly map = new Map<string, string>();
-
-  getItem(key: string): string | null {
-    return this.map.has(key) ? this.map.get(key) ?? null : null;
-  }
-
-  setItem(key: string, value: string): void {
-    this.map.set(key, value);
-  }
-
-  removeItem(key: string): void {
-    this.map.delete(key);
-  }
-
-  clear(): void {
-    this.map.clear();
-  }
-}
-
-type MockWindowState = {
-  localStorage: MemoryStorage;
-  location: {
-    search: string;
-    pathname: string;
-    hash: string;
-  };
-  history: {
-    state: null;
-    replaceState: (state: null, title: string, url?: string | URL | null) => void;
-  };
-};
-
-function installMockWindow(search = "", localStorage = new MemoryStorage()): MemoryStorage {
-  const windowState: MockWindowState = {
-    localStorage,
-    location: {
-      search,
-      pathname: "/",
-      hash: "",
-    },
-    history: {
-      state: null,
-      replaceState: (_state, _title, url) => {
-        const nextUrl = typeof url === "string" ? url : (url?.toString() ?? "/");
-        const queryIndex = nextUrl.indexOf("?");
-        const hashIndex = nextUrl.indexOf("#");
-
-        windowState.location.search = queryIndex >= 0
-          ? nextUrl.slice(queryIndex, hashIndex >= 0 ? hashIndex : undefined)
-          : "";
-        windowState.location.hash = hashIndex >= 0 ? nextUrl.slice(hashIndex) : "";
-      },
-    },
-  };
-
-  (globalThis as unknown as { window?: MockWindowState }).window = {
-    localStorage: windowState.localStorage,
-    location: windowState.location,
-    history: windowState.history,
-  };
-  return localStorage;
-}
-
-describe("v2 store manual saves", () => {
-  beforeEach(() => {
-    installMockWindow();
-  });
-
-  afterEach(() => {
-    delete (globalThis as { window?: unknown }).window;
-  });
-
-  it("可以保存到手动槽并从手动槽读档", () => {
+describe("session store", () => {
+  it("starts at the lobby with only the base role playable", () => {
     const store = createStore();
-    store.dispatch("select-role", { roleId: "normal" });
-    store.dispatch("start-game", { roleId: "normal", advisorName: "李旭霖" });
-    store.dispatch("next-month");
-    store.dispatch("debug-seed-paper", { paperTarget: "C" });
-    store.dispatch("save-manual", { manualSlot: 1 });
 
-    expect(store.getState().manualSaveSummaries).toHaveLength(1);
-    expect(store.getState().manualSaveSummaries[0]?.slot).toBe(1);
+    expect(store.getState().phase).toBe("setup");
+    expect(store.getLobbyState().roleProgress.normal.unlocked).toBe(true);
+    expect(
+      Object.entries(store.getLobbyState().roleProgress)
+        .filter(([, progress]) => progress.unlocked)
+        .map(([roleId]) => roleId),
+    ).toEqual(["normal"]);
 
-    store.dispatch("reset-game");
+    store.dispatch("select-role", { roleId: "genius" });
+    expect(store.getLobbyState().selectedLobbyRoleId).toBe("genius");
+
+    store.dispatch("start-game", { roleId: "genius" });
     expect(store.getState().phase).toBe("setup");
 
-    store.dispatch("load-manual", { manualSlot: 1 });
+    store.dispatch("start-game", { roleId: "normal" });
     expect(store.getState().phase).toBe("playing");
     expect(store.getState().selectedRoleId).toBe("normal");
-    expect(store.getState().selectedAdvisorName).toBe("李旭霖");
-    expect(store.getState().papers.length).toBe(1);
   });
 
-  it("可以删除手动槽", () => {
+  it("keeps display settings only for the current store session", () => {
     const store = createStore();
-    store.dispatch("start-game", { roleId: "normal", advisorName: "测试导师" });
-    store.dispatch("save-manual", { manualSlot: 2 });
-    expect(store.getState().manualSaveSummaries.some((item) => item.slot === 2)).toBe(true);
+    expect(store.getLobbyState().dateDisplayMode).toBe("calendar");
+    store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
 
-    store.dispatch("delete-manual", { manualSlot: 2 });
-    expect(store.getState().manualSaveSummaries.some((item) => item.slot === 2)).toBe(false);
+    expect(store.getLobbyState().dateDisplayMode).toBe("academic");
+    expect(createStore().getLobbyState().dateDisplayMode).toBe("calendar");
   });
-  it("supports debug tools for faster manual testing", () => {
-    const store = createStore();
-    store.dispatch("start-game", { roleId: "normal", advisorName: "测试导师" });
 
+  it("can restart a run and return to the lobby without persistence", () => {
+    const store = createStore();
+    store.dispatch("start-game", { roleId: "normal" });
     store.dispatch("debug-adjust-stat", { debugStatId: "money", delta: 10 });
     expect(store.getState().player.money).toBe(11);
 
-    store.dispatch("debug-seed-paper", { paperTarget: "C" });
-    expect(store.getState().papers).toHaveLength(1);
-    expect(store.getState().selectedPaperId).toBe(store.getState().papers[0]?.id);
-
-    store.dispatch("debug-trigger-event", { eventId: "teachers-day" });
-    expect(store.getState().eventQueue.some((item) => item.chainId === "teachers-day")).toBe(true);
-
-    store.dispatch("debug-trigger-event", { eventId: "review-result" });
-    expect(store.getState().papers).toHaveLength(1);
-    expect(store.getState().log[0]?.text).toContain("论文结果");
-
-    store.dispatch("debug-trigger-event", { eventId: "before-grad-school" });
-    expect(store.getState().eventQueue.some((item) => item.chainId === "before-grad-school")).toBe(true);
-
-    store.dispatch("debug-shift-month", { delta: 12 });
-    expect(store.getState().totalMonths).toBe(12);
-    expect(store.getState().year).toBe(1);
-    expect(store.getState().month).toBe(12);
-    expect(store.getState().actionsRemaining).toBe(store.getState().maxActionsPerMonth);
-  });
-
-  it("restarts immediately with the current role without settling the abandoned run", () => {
-    const store = createStore();
-    store.dispatch("start-game", { roleId: "normal", advisorName: "测试导师" });
-    const startingResearch = store.getState().player.research;
-    store.dispatch("debug-adjust-stat", { debugStatId: "research", delta: 12 });
-    store.dispatch("next-month");
-    const accountBeforeRestart = structuredClone(store.getAccountProfile());
-
     store.dispatch("restart-game");
-
     expect(store.getState().phase).toBe("playing");
-    expect(store.getState().selectedRoleId).toBe("normal");
-    expect(store.getState().selectedAdvisorName).toBeNull();
-    expect(store.getState().totalMonths).toBe(0);
-    expect(store.getState().player.research).toBe(startingResearch);
-    expect(store.getState().eventQueue.some((item) => item.chainId === "before-grad-school")).toBe(true);
-    expect(store.getAccountProfile()).toEqual(accountBeforeRestart);
-  });
+    expect(store.getState().player.money).toBe(1);
 
-  it("forces the start screen when opened with start=setup", () => {
-    const localStorage = installMockWindow();
-    const firstStore = createStore();
-    firstStore.dispatch("select-role", { roleId: "genius" });
-    expect(firstStore.getAccountProfile().selectedLobbyRoleId).toBe("genius");
-    firstStore.dispatch("start-game", { roleId: "normal", advisorName: "测试导师" });
-    expect(firstStore.getState().phase).toBe("playing");
-
-    installMockWindow("?start=setup", localStorage);
-    const secondStore = createStore();
-
-    expect(secondStore.getState().phase).toBe("setup");
-    expect(secondStore.getState().setupSelectedRoleId).toBe("genius");
-    expect(secondStore.getAccountProfile().selectedLobbyRoleId).toBe("genius");
-    expect((globalThis as unknown as { window?: MockWindowState }).window?.location.search).toBe("");
-  });
-
-  it("does not allow starting a locked role from the lobby", () => {
-    const store = createStore();
-    store.dispatch("select-role", { roleId: "genius" });
-
-    store.dispatch("start-game", { roleId: "genius" });
-
+    store.dispatch("reset-game");
     expect(store.getState().phase).toBe("setup");
-    expect(store.getState().log[0]?.text).toContain("该角色尚未解锁");
   });
 
-  it("keeps the six original achievements on one page and resets when switching roles", () => {
+  it("notifies the UI immediately when final event confirmation adds a Buff", () => {
     const store = createStore();
+    let latestHtml = "";
+    store.subscribe((state) => {
+      latestHtml = renderApp(state, store.getLobbyState());
+    });
+    store.dispatch("start-game", { roleId: "normal" });
+    store.dispatch("debug-trigger-event", { eventId: "random-9" });
 
-    store.dispatch("change-role-achievement-page", { delta: 1 });
-    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(0);
+    const intro = store.getState().eventQueue.find((event) => event.chainId === "random-9");
+    expect(intro).toBeDefined();
+    store.dispatch("resolve-event", { eventId: intro?.id, eventChoiceId: intro?.choices[0]?.id });
 
-    store.dispatch("select-role", { roleId: "genius" });
-    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(0);
+    const decision = store.getState().eventQueue.find((event) => event.chainId === "random-9");
+    const technologyChoice = decision?.choices.find((choice) => choice.label === "最新技术");
+    expect(technologyChoice).toBeDefined();
+    store.dispatch("resolve-event", { eventId: decision?.id, eventChoiceId: technologyChoice?.id });
+    expect(latestHtml).not.toContain("每次想 idea +1分");
 
-    store.dispatch("change-role-achievement-page", { delta: 1 });
-    expect(store.getAccountProfile().lobbyRoleAchievementPage).toBe(0);
+    const result = store.getState().eventQueue.find((event) => event.chainId === "random-9");
+    expect(result?.stage).toBe("result");
+    store.dispatch("resolve-event", { eventId: result?.id, eventChoiceId: result?.choices[0]?.id });
+
+    expect(store.getState().buffs.map((buff) => buff.name)).toContain("每次想 idea +1分");
+    expect(latestHtml).toContain("idea +1分");
+    expect(latestHtml).not.toContain("每次 idea +1分");
+    expect(latestHtml).toContain("不断学习 · 永久");
   });
 });

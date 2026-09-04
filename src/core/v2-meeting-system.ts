@@ -1,25 +1,12 @@
-import type { EventCounters, EventSupportState, ShopState } from "./v2-types";
+import type { EventSupportState, ShopState } from "./v2-types";
+import { getMeetingExperienceDiscount } from "./v2-growth-system";
 
 export function hasFullGear(shopState: ShopState, eventSupport: EventSupportState): boolean {
-  return shopState.bikeUpgrade === "ebike"
+  return shopState.ebikeOwned
     && eventSupport.hasParasol
     && eventSupport.hasDownJacket;
 }
 
-export function getFullGearMeetingDiscount(
-  meetingCount: number,
-  shopState: ShopState,
-  eventSupport: EventSupportState,
-): number {
-  if (!hasFullGear(shopState, eventSupport)) {
-    return 0;
-  }
-  return Math.min(2 + Math.floor(Math.max(0, meetingCount) / 4), 6);
-}
-
-export function incrementMeetingCount(eventCounters: EventCounters): EventCounters {
-  return {
-    ...eventCounters,
-    meetingCount: eventCounters.meetingCount + 1,
-  };
+export function getMeetingSelfPayDiscount(meetingCount: number, selfPayCost: number): number {
+  return getMeetingExperienceDiscount(meetingCount, selfPayCost);
 }

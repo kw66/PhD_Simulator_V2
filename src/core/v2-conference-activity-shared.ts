@@ -4,9 +4,17 @@ import type {
   EventChoice,
   InternshipState,
   LoverState,
+  PaperAcceptType,
   PaperTarget,
   RelationshipState,
 } from "./v2-types";
+
+export interface ConferencePaperPresentation {
+  id: string;
+  title: string;
+  acceptType: PaperAcceptType;
+  citationPromotionMultiplier: number;
+}
 
 export interface ConferenceActivityContext {
   id: string;
@@ -16,6 +24,20 @@ export interface ConferenceActivityContext {
   country: string;
   paperCount: number;
   grade: PaperTarget;
+  paperIds?: string[];
+  paperPresentations?: ConferencePaperPresentation[];
+}
+
+export function getConferencePaperPresentationResults(context: ConferenceActivityContext): string[] {
+  return (context.paperPresentations ?? []).map((paper) => {
+    const increase = Math.round((paper.citationPromotionMultiplier - 1) * 100);
+    const increaseText = increase > 0 ? `（+${increase}%）` : "";
+    return `《${paper.title}》：${paper.acceptType} 展示，会后引用倍率 ×${paper.citationPromotionMultiplier.toFixed(2)}${increaseText}`;
+  });
+}
+
+export function getConferenceActivityChainId(context: Pick<ConferenceActivityContext, "id">): string {
+  return `${context.id}-activity`;
 }
 
 export interface ConferenceActivityBuildState {
@@ -40,10 +62,6 @@ export function getConferenceGradeLabel(grade: PaperTarget): string {
   if (grade === "A") return "A 类";
   if (grade === "B") return "B 类";
   return "C 类";
-}
-
-export function getPaperScaleText(paperCount: number): string {
-  return paperCount >= 2 ? `这次同会共有 ${paperCount} 篇论文需要处理。` : "这次只涉及 1 篇论文展示。";
 }
 
 export function pickDistinctRandomOptions<T>(options: T[], count: number, getRoll: () => number): T[] {

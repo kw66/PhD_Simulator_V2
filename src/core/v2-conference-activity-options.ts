@@ -14,8 +14,7 @@ export function selectConferenceActivityOptions(
 ): ConferenceActivityOptionDefinition[] {
   const baseOptions = createBaseConferenceActivityOptions(context, state);
   const advancedOptions = createAdvancedConferenceActivityOptions(state);
-  const followUpOptions: ConferenceActivityOptionDefinition[] = [];
-  const allOptions = [...baseOptions, ...advancedOptions, ...followUpOptions];
+  const allOptions = [...baseOptions, ...advancedOptions];
 
   if (context.grade === "C") {
     return pickDistinctRandomOptions(baseOptions, 3, getRoll);
@@ -25,8 +24,7 @@ export function selectConferenceActivityOptions(
     return pickDistinctRandomOptions(allOptions, 4, getRoll);
   }
 
-  const highPriorityOptions = [...advancedOptions, ...followUpOptions];
-  const selected = pickDistinctRandomOptions(highPriorityOptions, 2, getRoll);
+  const selected = pickDistinctRandomOptions(advancedOptions, 2, getRoll);
   if (selected.length === 0) {
     return pickDistinctRandomOptions(baseOptions, 4, getRoll);
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createConferenceActivityAct1, selectConferenceActivityOptions } from "../src/core/v2-conference-activity";
+import { createConferenceActivityDecisionEvent, selectConferenceActivityOptions } from "../src/core/v2-conference-activity";
 import { createConferenceCareerState } from "../src/core/v2-conference-career";
 import { createConferenceEncounterState } from "../src/core/v2-conference-encounters";
 import { activateInternship, createInternshipState } from "../src/core/v2-internship-system";
@@ -38,6 +38,23 @@ describe("v2 conference activity", () => {
     ]);
   });
 
+  it("keeps local travel in the story and only SAN in the settlement", () => {
+    const activity = createConferenceActivityDecisionEvent(
+      baseContext,
+      createBuildState(),
+      "自费参会，金币 -2",
+      () => 0,
+    );
+    const travelChoice = activity.choices.find((choice) => choice.id === "tour-local");
+    const result = travelChoice?.effects.enqueueEvents?.at(-1);
+
+    expect(travelChoice?.outcome).toBe("SAN +6。");
+    expect(result?.description).toContain("测试城");
+    expect(result?.description).toContain("街道");
+    expect(result?.description).toContain("机制结算");
+    expect(result?.description).toContain("SAN +6");
+  });
+
   it("falls back to four base options for A-grade before follow-up lines are migrated", () => {
     const options = selectConferenceActivityOptions({ ...baseContext, grade: "A" }, createBuildState(), () => 0);
     expect(options.map((option) => option.id)).toEqual([
@@ -65,43 +82,51 @@ describe("v2 conference activity", () => {
 
   it("builds famous scholar as pure idea multiplier and marks the encounter", () => {
     const rolls = [0.8, 0.7, 0.7];
-    const act1 = createConferenceActivityAct1(baseContext, createBuildState(), () => rolls.shift() ?? 0);
-    const act2 = act1.choices[0]?.effects.enqueueEvents?.[0];
-    expect(act2?.choices.map((choice) => choice.id)).toEqual([
+    const activity = createConferenceActivityDecisionEvent(
+      baseContext,
+      createBuildState(),
+      "自费参会，金币 -2",
+      () => rolls.shift() ?? 0,
+    );
+    expect(activity.choices.map((choice) => choice.id)).toEqual([
       "famous-scholar",
       "peer-collaboration",
       "idea-networking",
     ]);
 
-    const famousScholarChoice = act2?.choices[0];
-    expect(famousScholarChoice?.effects.temporaryActionEffectUpdates).toEqual({
+    const famousScholarChoice = activity.choices.find((choice) => choice.id === "famous-scholar");
+    const famousResultChoice = famousScholarChoice?.effects.enqueueEvents?.[0]?.choices[0];
+    expect(famousResultChoice?.effects.temporaryActionEffectUpdates).toEqual({
       idea: { multiplier: 1.25 },
     });
-    expect(famousScholarChoice?.effects.conferenceEncounterUpdates).toEqual({
-      metBigBull: true,
-    });
-    expect(famousScholarChoice?.effects.enqueueEvents?.[0]?.chainId).toBe("conference-activity");
+    expect(famousResultChoice?.effects.conferenceEncounterUpdates).toBeUndefined();
+    expect(famousScholarChoice?.effects.enqueueEvents?.[0]?.chainId).toBe(`${baseContext.id}-activity`);
   });
 
   it("tracks enterprise networking as a low-coupling conference career counter", () => {
     const rolls = [0.99, 0.99, 0.99];
-    const act1 = createConferenceActivityAct1(baseContext, createBuildState(), () => rolls.shift() ?? 0.99);
-    const act2 = act1.choices[0]?.effects.enqueueEvents?.[0];
-    const enterpriseChoice = act2?.choices.find((choice) => choice.id === "enterprise-networking");
+    const activity = createConferenceActivityDecisionEvent(
+      baseContext,
+      createBuildState(),
+      "导师报销，导师好感 -1",
+      () => rolls.shift() ?? 0.99,
+    );
+    const enterpriseChoice = activity.choices.find((choice) => choice.id === "enterprise-networking");
 
-    expect(enterpriseChoice?.effects.temporaryActionEffectUpdates).toEqual({
+    const enterpriseResultChoice = enterpriseChoice?.effects.enqueueEvents?.[0]?.choices[0];
+    expect(enterpriseResultChoice?.effects.temporaryActionEffectUpdates).toEqual({
       experiment: { multiplier: 1.25 },
     });
-    expect(enterpriseChoice?.effects.conferenceCareerUpdates).toEqual({
+    expect(enterpriseResultChoice?.effects.conferenceCareerUpdates).toEqual({
       enterpriseCount: 1,
     });
-    expect(enterpriseChoice?.effects.triggerInternshipInvite).toBe(true);
+    expect(enterpriseResultChoice?.effects.triggerInternshipInvite).toBe(true);
   });
 
   it("grows active internship multiplier when enterprise networking happens during internship", () => {
     const options = selectConferenceActivityOptions(
       { ...baseContext, grade: "B" },
-      createBuildState({ social: 6, internshipState: activateInternship(12) }),
+      createBuildState({ social: 6, internshipState: activateInternship() }),
       () => 0.99,
     );
     const enterpriseChoice = options.find((option) => option.id === "enterprise-networking");
@@ -109,7 +134,6 @@ describe("v2 conference activity", () => {
     expect(enterpriseChoice?.effects.internshipStateUpdates).toEqual({
       active: true,
       remainingMonths: 6,
-      startTotalMonths: 12,
       experimentMultiplier: 1.3,
     });
   });

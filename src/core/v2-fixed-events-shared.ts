@@ -1,4 +1,5 @@
-import { applyTemporaryActionEffectUpdates } from "./v2-temporary-action-rules";
+import { addOrReplaceBuffs } from "./v2-buffs";
+import { syncRelationshipState } from "./v2-relationship-rules";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type RandomRollProvider = () => number;
@@ -9,8 +10,6 @@ export interface FixedStateMutation {
   social?: number;
   money?: number;
   temporaryIdeaBonus?: number;
-  consecutiveStampGiftCount?: number;
-  unlockLoveMyTeacher?: boolean;
 }
 
 export interface FixedResolutionResult {
@@ -19,64 +18,41 @@ export interface FixedResolutionResult {
   enqueueEvents?: PendingEvent[];
 }
 
+/** Add the shared settlement marker used by the event result renderer. */
+export function appendMechanismSettlement(description: string, settlement: string): string {
+  if (/(?:^|\n)机制结算(?:\n|$)/u.test(description)) return description;
+  const normalizedSettlement = settlement.trim().replace(/[。.]+$/u, "");
+  return normalizedSettlement
+    ? `${description}\n\n机制结算\n${normalizedSettlement}`
+    : description;
+}
+
 export function createFixedEvent(params: {
   id: string;
   title: string;
   description: string;
-  preview: string;
   chainId: string;
   stage?: PendingEvent["stage"];
+  deadlineMonths?: number;
+  completionLog?: string;
   choices: EventChoice[];
 }): PendingEvent {
   return {
     id: params.id,
     title: params.title,
     description: params.description,
-    preview: params.preview,
     source: "fixed",
     blocking: true,
-    deadlineMonths: 0,
+    deadlineMonths: params.deadlineMonths ?? 0,
     chainId: params.chainId,
     stage: params.stage ?? "act1",
+    completionLog: params.completionLog,
     choices: params.choices,
   };
 }
 
-export function createPlaceholderFixedEvent(params: {
-  id: string;
-  title: string;
-  description: string;
-  preview: string;
-  chainId: string;
-  year: number;
-  month: number;
-}): PendingEvent {
-  return createFixedEvent({
-    id: params.id,
-    title: params.title,
-    description: params.description,
-    preview: params.preview,
-    chainId: params.chainId,
-    choices: [
-      {
-        id: `${params.chainId}-continue-y${params.year}-m${params.month}`,
-        label: "继续",
-        outcome: "你停下来想了片刻，继续往前走。",
-        effects: {},
-      },
-    ],
-  });
-}
-
 export function clamp(min: number, value: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-export function drawWeightedTriplet(low: number, high: number, getRoll: RandomRollProvider): number {
-  const normalized = clamp(0, getRoll(), 0.999999999999);
-  if (normalized < 0.25) return low;
-  if (normalized < 0.75) return low + 1;
-  return high;
 }
 
 export function drawInclusiveInt(min: number, max: number, getRoll: RandomRollProvider): number {
@@ -84,36 +60,39 @@ export function drawInclusiveInt(min: number, max: number, getRoll: RandomRollPr
   return min + Math.floor(normalized * (max - min + 1));
 }
 
-export function applyStateMutation(state: GameState, mutation: FixedStateMutation): GameState {
+export function applyStateMutation(
+  state: GameState,
+  mutation: FixedStateMutation,
+  buffSource = "事件",
+): GameState {
   const nextPlayer = { ...state.player };
   if (mutation.san !== undefined) {
-    nextPlayer.san = clamp(0, nextPlayer.san + mutation.san, state.sanCap);
+    nextPlayer.san = Math.min(state.sanCap, nextPlayer.san + mutation.san);
   }
   if (mutation.favor !== undefined) {
-    nextPlayer.favor += mutation.favor;
+    nextPlayer.favor = Math.min(20, nextPlayer.favor + mutation.favor);
   }
   if (mutation.social !== undefined) {
-    nextPlayer.social += mutation.social;
+    nextPlayer.social = Math.min(20, nextPlayer.social + mutation.social);
   }
   if (mutation.money !== undefined) {
     nextPlayer.money += mutation.money;
   }
 
-  const nextTemporaryActionEffects = mutation.temporaryIdeaBonus !== undefined
-    ? applyTemporaryActionEffectUpdates(state.temporaryActionEffects, { idea: { bonus: mutation.temporaryIdeaBonus } })
-    : state.temporaryActionEffects;
-  const nextEventCounters = mutation.consecutiveStampGiftCount !== undefined
-    ? { ...state.eventCounters, consecutiveStampGiftCount: mutation.consecutiveStampGiftCount }
-    : state.eventCounters;
-  const nextAchievementFlags = mutation.unlockLoveMyTeacher === true
-    ? { ...state.achievementFlags, loveMyTeacher: true }
-    : state.achievementFlags;
-
+  const buffs = mutation.temporaryIdeaBonus !== undefined
+    ? addOrReplaceBuffs(state.buffs, [{
+      id: `fixed-next-idea-${state.totalMonths}-${state.buffs.length}`,
+      name: `下次想 idea +${mutation.temporaryIdeaBonus}分`,
+      source: buffSource,
+      timing: "next-action",
+      remainingMonths: null,
+      actionEffects: { idea: { bonus: mutation.temporaryIdeaBonus } },
+    }])
+    : state.buffs;
   return {
     ...state,
     player: nextPlayer,
-    temporaryActionEffects: nextTemporaryActionEffects,
-    eventCounters: nextEventCounters,
-    achievementFlags: nextAchievementFlags,
+    relationshipState: syncRelationshipState(state.relationshipState, nextPlayer.social),
+    buffs,
   };
 }

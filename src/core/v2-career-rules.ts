@@ -13,7 +13,6 @@ export interface CareerDefinition {
     research: number;
     social: number;
     papers: number;
-    internship: number;
   };
 }
 
@@ -31,14 +30,6 @@ export interface CareerProgressInput {
   internshipCount: number;
 }
 
-export interface BestCareerOffer {
-  type: CareerType;
-  typeName: string;
-  level: string;
-  threshold: number;
-  progress: number;
-}
-
 export const CAREER_DEFINITIONS: Record<CareerType, CareerDefinition> = {
   internet: {
     name: "互联网",
@@ -50,7 +41,7 @@ export const CAREER_DEFINITIONS: Record<CareerType, CareerDefinition> = {
       { threshold: 300, name: "大厂" },
       { threshold: 500, name: "人才计划" },
     ],
-    weights: { research: 0.3, social: 0.2, papers: 0.3, internship: 0.5 },
+    weights: { research: 0.3, social: 0.2, papers: 0.3 },
   },
   stateOwned: {
     name: "央国企",
@@ -62,7 +53,7 @@ export const CAREER_DEFINITIONS: Record<CareerType, CareerDefinition> = {
       { threshold: 300, name: "头部央企" },
       { threshold: 500, name: "顶级央企" },
     ],
-    weights: { research: 0.2, social: 0.4, papers: 0.2, internship: 0.1 },
+    weights: { research: 0.2, social: 0.4, papers: 0.2 },
   },
   civilService: {
     name: "公务员",
@@ -74,7 +65,7 @@ export const CAREER_DEFINITIONS: Record<CareerType, CareerDefinition> = {
       { threshold: 300, name: "市级" },
       { threshold: 500, name: "省部级" },
     ],
-    weights: { research: 0.1, social: 0.3, papers: 0.1, internship: 0 },
+    weights: { research: 0.1, social: 0.3, papers: 0.1 },
   },
   academic: {
     name: "教职",
@@ -87,7 +78,7 @@ export const CAREER_DEFINITIONS: Record<CareerType, CareerDefinition> = {
       { threshold: 300, name: "985" },
       { threshold: 500, name: "顶尖高校" },
     ],
-    weights: { research: 0.5, social: 0.1, papers: 0.6, internship: 0 },
+    weights: { research: 0.5, social: 0.1, papers: 0.6 },
   },
 };
 
@@ -100,28 +91,12 @@ export const CAREER_OPTIONS: CareerOptionDefinition[] = [
 
 export function getCareerEventTargetYear(
   degree: "master" | "phd",
-  willTransferPhDYear3: boolean,
-  isNatureExtensionYear: boolean,
 ): number | null {
   if (degree === "master") {
-    return willTransferPhDYear3 ? null : 3;
+    return 3;
   }
 
-  return isNatureExtensionYear ? 6 : 5;
-}
-
-export function canTriggerCareerEventsThisMonth(
-  year: number,
-  degree: "master" | "phd",
-  willTransferPhDYear3: boolean,
-  isNatureExtensionYear: boolean,
-): boolean {
-  const targetYear = getCareerEventTargetYear(degree, willTransferPhDYear3, isNatureExtensionYear);
-  return targetYear !== null && year === targetYear;
-}
-
-export function getActiveCareerTypes(month: number): CareerType[] {
-  return (Object.keys(CAREER_DEFINITIONS) as CareerType[]).filter((careerType) => CAREER_DEFINITIONS[careerType].activeMonths.includes(month));
+  return 5;
 }
 
 export function getCareerLevel(careerType: CareerType, progress: number): CareerLevelDefinition {
@@ -152,25 +127,4 @@ export function calculateCareerProgress(
   const internshipBonus = input.internshipCount * (careerType === "internet" ? 15 : careerType === "stateOwned" ? 5 : 0);
 
   return Math.round(option.baseProgress + researchBonus + socialBonus + papersBonus + internshipBonus);
-}
-
-export function updateBestCareerOffer(
-  currentOffer: BestCareerOffer | null,
-  careerType: CareerType,
-  progress: number,
-): BestCareerOffer {
-  const careerDefinition = CAREER_DEFINITIONS[careerType];
-  const level = getCareerLevel(careerType, progress);
-
-  if (!currentOffer || level.threshold > currentOffer.threshold) {
-    return {
-      type: careerType,
-      typeName: careerDefinition.name,
-      level: level.name,
-      threshold: level.threshold,
-      progress,
-    };
-  }
-
-  return currentOffer;
 }

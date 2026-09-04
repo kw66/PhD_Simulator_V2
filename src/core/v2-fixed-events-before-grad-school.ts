@@ -1,5 +1,6 @@
 import { createAdvisorProgressStateFromValues } from "./v2-advisor-progress";
 import { ADVISOR_REQUIREMENTS, ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
+import { ENROLLMENT_CALENDAR_YEAR } from "./v2-calendar";
 import {
   createFixedEvent,
   type FixedResolutionResult,
@@ -115,16 +116,23 @@ function createAdvisorInfoEvent(
     id: "before-grad-school-advisor-info",
     title: "读研之始 ➜ 导师信息",
     description: [
-      "你给感兴趣的老师发了邮件，又找组里的学生问了问。",
       [
         `${advisorName} · 讲师`,
-        `${intel.reporting}｜${intel.projects}｜${intel.internship}`,
-        `${intel.guidance}｜${intel.computing}｜${intel.temperament}`,
-        `${intel.atmosphere}｜${intel.focus}｜${intel.pace}`,
+        [
+          intel.reporting,
+          intel.projects,
+          intel.internship,
+          intel.guidance,
+          intel.computing,
+          intel.temperament,
+          intel.atmosphere,
+          intel.focus,
+          intel.pace,
+        ].join("；"),
       ].join("\n"),
       `工资：硕士 ${ADVISOR_SALARY.master} 金币｜博士 ${ADVISOR_SALARY.phd} 金币\n科研分：论文录用，C 类 +${SCORE_BY_TARGET.C}｜B 类 +${SCORE_BY_TARGET.B}｜A 类 +${SCORE_BY_TARGET.A}\n毕业：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分｜博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博士：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分｜第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
+      "小提示：换导师只会刷新姓名和介绍，对游戏数值没有影响。",
     ].join("\n\n"),
-    preview: `了解${advisorName}讲师和课题组`,
     chainId: "before-grad-school",
     stage: "act2",
     choices: [
@@ -162,14 +170,23 @@ function createAdvisorInfoEvent(
   });
 }
 
-function createBeforeGradSchoolResultEvent(): PendingEvent {
+function createBeforeGradSchoolResultEvent(advisorName: string): PendingEvent {
   return createFixedEvent({
     id: "before-grad-school-admission",
     title: "读研之始 ➜ 导师信息 ➜ 正式录取",
-    description: "录取通知书寄到了，你拍张照片晒到朋友圈。九月越来越近，读研这件事终于有了实感。",
-    preview: "收到录取通知书",
+    description: [
+      `${ENROLLMENT_CALENDAR_YEAR}年夏天，录取通知书寄到了。你拍下照片晒到朋友圈，终于可以认真期待九月以后的生活。`,
+      "你想做点有趣的研究，多发几篇论文，也参加几次学术会议。想到这些，你对未来充满了期待。",
+    ].join("\n\n"),
     chainId: "before-grad-school",
     stage: "result",
+    completionLog: [
+      `加入${advisorName}讲师课题组和实验室群`,
+      `待遇 硕士${ADVISOR_SALARY.master}/博士${ADVISOR_SALARY.phd}金币/月`,
+      `科研分 C+${SCORE_BY_TARGET.C}/B+${SCORE_BY_TARGET.B}/A+${SCORE_BY_TARGET.A}`,
+      `毕业 硕士${ADVISOR_REQUIREMENTS.masterGrad}/博士${ADVISOR_REQUIREMENTS.phdGrad}分`,
+      `转博 第2年${ADVISOR_REQUIREMENTS.phdYear2}/第3年${ADVISOR_REQUIREMENTS.phdYear3}分`,
+    ].join("｜"),
     choices: [
       {
         id: "before-grad-school-finish",
@@ -192,9 +209,9 @@ export function createBeforeGradSchoolAct1Event(
     title: "读研之始",
     description: [
       "你是计算机类专业。大三下，还没想清楚是否喜欢科研，准备随大流继续读研。",
-      "你备好个人陈述，投了夏令营和预推免，也梳理项目准备面试。几个月后，拿到心仪学校的预录取。接下来，该联系导师了。",
+      "你备好个人陈述，投了夏令营和预推免，也梳理项目准备面试。几个月后，拿到心仪学校的预录取。",
+      "接下来，该联系导师了。你给感兴趣的老师发了邮件，又找组里的学生问了问。",
     ].join("\n\n"),
-    preview: "拿到梦校预录取，准备联系导师",
     chainId: "before-grad-school",
     stage: "act1",
     choices: [
@@ -240,7 +257,7 @@ export function resolveAdvisorConfirmation(
   return {
     nextState,
     outcome: `加入${candidate.advisorName}讲师的课题组，也进了实验室群。`,
-    enqueueEvents: [createBeforeGradSchoolResultEvent()],
+    enqueueEvents: [createBeforeGradSchoolResultEvent(candidate.advisorName)],
   };
 }
 

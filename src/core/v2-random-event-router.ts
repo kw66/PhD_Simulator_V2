@@ -5,9 +5,8 @@ import {
 } from "./v2-random-events-core";
 import { createLabRandomEventById } from "./v2-random-events-lab";
 import { createRelationshipRandomEventById } from "./v2-random-events-relationships";
+import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
-
-type RandomRollProvider = () => number;
 
 export function createRandomEventById(
   eventId: number,

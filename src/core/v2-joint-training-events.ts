@@ -1,8 +1,10 @@
+import { getJointTrainingCitationCapBonus } from "./v2-joint-training-system";
 import type { ConferenceEncounterState, GameState, PendingEvent } from "./v2-types";
 
 export interface JointTrainingContext {
   rejectedBigBullCoopCount: number;
   pendingCitationCapBonus: number;
+  origin?: string;
 }
 
 export function buildJointTrainingContext(
@@ -10,7 +12,7 @@ export function buildJointTrainingContext(
 ): JointTrainingContext {
   return {
     rejectedBigBullCoopCount: state.conferenceEncounterState.rejectedBigBullCoopCount,
-    pendingCitationCapBonus: Math.min(Math.floor(state.totalCitations / 500) * 2, 10),
+    pendingCitationCapBonus: getJointTrainingCitationCapBonus(state.totalCitations),
   };
 }
 
@@ -24,26 +26,28 @@ function createJointTrainingDeclineResult(context: JointTrainingContext): Pendin
     description: permanentlyBlocked
       ? [
           "你和导师反复沟通后，决定暂时不加入联合培养，先把当前主线做扎实。",
-          "这个决定让你的节奏保持可控，也意味着你主动放过了一个更高上限的加速通道。",
-          "你没有把门彻底关死，但也清楚，下一次再出现同等窗口的概率不会太高。",
+          "眼前的课题和安排都不用改变，不过这次合作也就错过了。",
+          "这是你第二次拒绝，以后不会再收到联培邀请。",
           "机制结算",
           `联培拒绝计数 +1（当前 ${nextRejectCount}/2）`,
           "达到 2 次后，联培机会永久关闭。",
         ].join("\n\n")
       : [
           "你和导师反复沟通后，决定暂时不加入联合培养，先把当前主线做扎实。",
-          "这个决定让你的节奏保持可控，也意味着你主动放过了一个更高上限的加速通道。",
-          "你没有把门彻底关死，但也清楚，下一次再出现同等窗口的概率不会太高。",
+          "眼前的课题和安排都不用改变，不过这次合作也就错过了。",
+          "如果以后再次收到邀请，你还可以重新考虑。",
           "机制结算",
           `联培拒绝计数 +1（当前 ${nextRejectCount}/2）`,
           "继续深入合作还有一次机会。",
         ].join("\n\n"),
-    preview: "联合培养",
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,
     chainId: "joint-training",
     stage: "result",
+    completionLog: permanentlyBlocked
+      ? "你拒绝了联合培养，联培机会永久关闭。"
+      : "你暂不接受联合培养，以后还有一次机会。",
     choices: [{
       id: "close",
       label: "继续",
@@ -58,20 +62,20 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
     id: "joint-training-result-accept",
     title: "联合培养 ➜ 联培抉择 ➜ 已确认",
     description: [
-      "你正式加入联合培养，课题、会议和协作对象的密度一下子上了一个台阶。",
-      "资源确实更多了，但每一份资源背后都附带更高的交付预期和更低的容错空间。",
-      "从这一刻起，你不再只是“按部就班完成学业”，而是在主动押注更高上限的科研路径。",
+      "你正式加入联合培养，之后要同时参加两边的组会，也会接触新的课题和合作者。",
+      "能用的资源更多了，对方对进度和成果的要求也更高。",
+      "接下来一段时间，你的日程会排得更满。",
       "机制结算",
       `科研上限 +${context.pendingCitationCapBonus}`,
       "导师科研资源 +2",
       "永久：想 idea +5 分、做实验 +5 分",
     ].join("\n\n"),
-    preview: "联合培养",
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,
     chainId: "joint-training",
     stage: "result",
+    completionLog: `你接受了联合培养，科研上限 +${context.pendingCitationCapBonus}，导师科研资源 +2。`,
     choices: [{
       id: "close",
       label: "继续",
@@ -89,15 +93,13 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
     id: "joint-training-act2",
     title: "联合培养 ➜ 联培抉择",
     description: [
-      "导师把联培方案推到你面前时，你第一眼看到的是资源，第二眼看到的却是责任。",
-      "接下这条线，你会被放进更高强度的协作网络，接触到更稀缺的课题和人脉，同时也会被放在更亮的灯下，容错空间比现在小得多。",
-      "不接则能维持当前节奏，路径更稳、压力更可预测，但你心里清楚，有些“上限窗口”一旦错过，很难再原样出现。",
-      "你要决定的不是“是否努力”，而是“是否愿意把未来几年交给更陡的斜坡”。",
+      "导师把联培方案发给你：课题和资源都不错，但两边都要汇报进度。",
+      "接受以后会认识更多合作者，也会多出不少会议和任务。",
+      "不接受的话，继续按现在的安排做自己的课题。",
       context.rejectedBigBullCoopCount === 0
         ? "若这次暂不接受，以后还有一次机会。"
         : "这已经是最后一次联培机会。",
     ].join("\n\n"),
-    preview: "联合培养",
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,
@@ -124,9 +126,6 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
           conferenceEncounterUpdates: {
             bigBullCooperation: true,
           } satisfies Partial<ConferenceEncounterState>,
-          jointTrainingStateUpdates: {
-            citationBonusApplied: context.pendingCitationCapBonus,
-          },
           researchCapacityStateDeltas: {
             jointTrainingCitationCapBonus: context.pendingCitationCapBonus,
           },
@@ -147,12 +146,10 @@ export function createJointTrainingAct1(context: JointTrainingContext): PendingE
     id: "joint-training-act1",
     title: "联合培养",
     description: [
-      "会后，一位领域大牛向你和导师提出联合培养，语气不重，却把整个课题组的注意力都拉了过去。",
-      "这意味着你可能进入更高层级的合作网络，拿到平时接触不到的资源和议题，但同时也要接受更密集的目标与评估。",
-      "你能感到导师对这件事很重视，而你自己也明白，这不是“多一个机会”，而是“换一条更陡的轨道”。",
-      "这会是一次典型的“上限与稳定”抉择。",
+      `${context.origin ? `离开${context.origin}后` : "会后"}，一位领域大牛向你和导师提出联合培养，语气不重，却把整个课题组的注意力都拉了过去。`,
+      "对方愿意开放设备和课题资源，也要求你定期参加两边的组会。",
+      "导师很重视这件事，让你先仔细看看联培条件。",
     ].join("\n\n"),
-    preview: "联合培养",
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SUPPORT_ITEM_DEFINITIONS, applySupportItemOwnership, getSupportItemDefinition, getSupportItemSellPrice, isSupportItemOwned } from "../src/core/v2-support-items";
+import { SUPPORT_ITEM_DEFINITIONS, getSupportItemDefinition, getSupportItemSellPrice, isSupportItemOwned } from "../src/core/v2-support-items";
 
 describe("v2 support items", () => {
   it("exposes the audited support item prices", () => {
@@ -13,14 +13,9 @@ describe("v2 support items", () => {
     expect(getSupportItemSellPrice("parasol")).toBe(5);
   });
 
-  it("toggles ownership through eventSupport flags", () => {
-    const base = { hasGameController: false, hasParasol: false, hasDownJacket: false, hasBadmintonRacket: false, hasStrongBodyTalent: false, hasFinanceTalent: false };
-    const owned = applySupportItemOwnership(base, "badminton_racket", true);
-
-    expect(isSupportItemOwned(owned, "badminton_racket")).toBe(true);
-    expect(isSupportItemOwned(owned, "parasol")).toBe(false);
-
-    const sold = applySupportItemOwnership(owned, "badminton_racket", false);
-    expect(isSupportItemOwned(sold, "badminton_racket")).toBe(false);
+  it("reads ownership from event-support flags", () => {
+    const state = { hasGameController: false, hasParasol: false, hasDownJacket: false, hasBadmintonRacket: true, hasStrongBodyTalent: false };
+    expect(isSupportItemOwned(state, "badminton_racket")).toBe(true);
+    expect(isSupportItemOwned(state, "parasol")).toBe(false);
   });
 });

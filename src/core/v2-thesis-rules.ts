@@ -97,8 +97,9 @@ export function applyThesisOption(
   publishedPaperCount: number,
   research: number,
 ): { nextThesis: ThesisState; progressGain: number; sanCost: number } {
-  const progressGain = calculateThesisProgressGain(option.baseProgress, publishedPaperCount, research);
-  const nextProgress = Math.min(100, thesis.progress + progressGain);
+  const requestedProgressGain = calculateThesisProgressGain(option.baseProgress, publishedPaperCount, research);
+  const nextProgress = Math.min(100, thesis.progress + requestedProgressGain);
+  const progressGain = nextProgress - thesis.progress;
 
   return {
     nextThesis: {
@@ -109,12 +110,5 @@ export function applyThesisOption(
     },
     progressGain,
     sanCost: option.sanCost,
-  };
-}
-
-export function abandonThesis(thesis: ThesisState): ThesisState {
-  return {
-    ...thesis,
-    abandoned: true,
   };
 }

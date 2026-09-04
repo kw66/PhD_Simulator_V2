@@ -2,15 +2,17 @@ export interface CandidateEventContext {
   availableRandomEvents: number[];
   usedRandomEvents: number[];
   social: number;
-  year: number;
-  month: number;
+  research?: number;
+  publishedPaperCount?: number;
+  hasRecoverableDraftPaper?: boolean;
 }
 
 export interface CandidateEventBuildResult {
   candidateEventIds: number[];
-  isFirstSemester: boolean;
-  isCooperationMonth: boolean;
 }
+
+const DISEASE_EVENT_ID = 3;
+const MENTORING_EVENT_ID = 14;
 
 function uniqueEventIds(eventIds: number[]): number[] {
   const seen = new Set<number>();
@@ -31,55 +33,40 @@ function uniqueEventIds(eventIds: number[]): number[] {
 export function buildCandidateEventIds(params: {
   context: CandidateEventContext;
   socialUnlockEventId: number;
-  cooperationEventIdSet: Set<number>;
-  negativeEventIdSet: Set<number>;
 }): CandidateEventBuildResult {
-  const { context, socialUnlockEventId, cooperationEventIdSet, negativeEventIdSet } = params;
-  let candidateEventIds = [...context.availableRandomEvents];
+  const { context, socialUnlockEventId } = params;
+  let candidateEventIds = context.availableRandomEvents.filter((eventId) => (
+    eventId !== DISEASE_EVENT_ID
+    && (eventId !== 16 || context.hasRecoverableDraftPaper === true)
+  ));
 
-  if (context.social >= 6 && !candidateEventIds.includes(socialUnlockEventId) && !context.usedRandomEvents.includes(socialUnlockEventId)) {
-    candidateEventIds.push(socialUnlockEventId);
+  if ((context.research ?? 0) >= 6 || context.social >= 6) {
+    if (!candidateEventIds.includes(socialUnlockEventId) && !context.usedRandomEvents.includes(socialUnlockEventId)) {
+      candidateEventIds.push(socialUnlockEventId);
+    }
   }
 
-  const isCooperationMonth = context.month === 7;
-  if (isCooperationMonth) {
-    candidateEventIds = candidateEventIds.filter((eventId) => cooperationEventIdSet.has(eventId));
+  if ((context.publishedPaperCount ?? 0) > 0 && !candidateEventIds.includes(MENTORING_EVENT_ID) && !context.usedRandomEvents.includes(MENTORING_EVENT_ID)) {
+    candidateEventIds.push(MENTORING_EVENT_ID);
   }
 
-  const isFirstSemester = context.year === 1 && context.month >= 1 && context.month <= 6;
-  if (isFirstSemester) {
-    candidateEventIds = candidateEventIds.filter((eventId) => !negativeEventIdSet.has(eventId));
+  if (context.hasRecoverableDraftPaper === true && !candidateEventIds.includes(16) && !context.usedRandomEvents.includes(16)) {
+    candidateEventIds.push(16);
   }
 
   return {
     candidateEventIds: uniqueEventIds(candidateEventIds),
-    isFirstSemester,
-    isCooperationMonth,
   };
 }
 
 export function buildWeightedPool(params: {
   candidateEventIds: number[];
-  coldEventId: number;
-  coldActualWeight: number;
   baseWeightRepeat: number;
 }): number[] {
-  const { candidateEventIds, coldEventId, coldActualWeight, baseWeightRepeat } = params;
+  const { candidateEventIds, baseWeightRepeat } = params;
   const weightedPool: number[] = [];
 
   for (const eventId of candidateEventIds) {
-    if (eventId === coldEventId) {
-      if (coldActualWeight <= 0) {
-        continue;
-      }
-
-      const repeatCount = Math.round(coldActualWeight * baseWeightRepeat);
-      for (let index = 0; index < repeatCount; index += 1) {
-        weightedPool.push(eventId);
-      }
-      continue;
-    }
-
     for (let index = 0; index < baseWeightRepeat; index += 1) {
       weightedPool.push(eventId);
     }

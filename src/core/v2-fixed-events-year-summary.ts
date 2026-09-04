@@ -10,40 +10,39 @@ import {
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
-  const yearLabel = getYearSummaryLabel(state.year);
   const socialCapped = state.player.social >= 20;
   const favorCapped = state.player.favor >= 20;
-  const sleepHint = state.player.san < 40
+  const sleepHint = state.player.san < 6
     ? "“最近真的累坏了，再不休息感觉要撑不住了……”"
-    : state.player.san < 70
+    : state.player.san < 12
       ? "“有点疲惫，好好休息一下也不错”"
       : "“虽然精神还行，但躺平也挺舒服的……”";
   const socialHint = socialCapped
-    ? "“朋友已经够多了，再认识也记不住名字……”"
+    ? "“已经认识不少人了，先把现在的关系维护好。”"
     : state.player.social < 6
-      ? "“确实应该多认识些人，太孤僻了不好……”"
-      : "“多交些朋友总没坏处，人脉嘛”";
+      ? "“除了组里几位同门，我几乎没认识什么人。”"
+      : "“下学年可以多参加几次活动，认识些不同方向的同学。”";
   const favorHint = favorCapped
-    ? "“导师对我已经很满意了，不用再刻意讨好”"
-    : state.player.favor < 0
-      ? "“得赶紧修复和导师的关系，不然毕业堪忧……”"
-      : "“帮导师多干点活，毕业的时候好说话”";
-  const internHint = state.player.money < 3
+    ? "“和导师的沟通已经很顺畅，保持现在这样就好。”"
+    : state.player.favor < 6
+      ? "“和导师最近有些生疏，下学年得把沟通补回来。”"
+      : "“组里的事多承担一点，沟通也许会更顺。”";
+  const partTimeHint = state.player.money < 3
     ? "“手头有点紧，得想办法赚点钱……”"
-    : "“偷偷实习攒点私房钱，以后用得上”";
+    : "“找份兼职攒点钱，以后用得上”";
 
   return createFixedEvent({
     id: `year-summary-choice-y${state.year}-m${state.month}`,
     title: "学年总结 ➜ 年度总结",
     description: [
-      "“如果把这一年重来一次，我最该把精力放在哪？”",
+      "你把这一年的月历、论文记录和账单都翻了出来。",
+      "有些问题只是偶尔碰到，有些却几乎每个月都在重复。下学年能多分出来的时间有限，最好先改最影响自己的那一项。",
       sleepHint,
       socialHint,
       favorHint,
-      internHint,
-      "你明白这一步不是“选最舒服”，而是“选最适合下一学年的主线”：修复续航、扩展协作、加深导师信任，或换取更现实的现金缓冲。",
+      partTimeHint,
+      "你拿起笔，在四个方向里圈下一个。",
     ].join("\n\n"),
-    preview: `${yearLabel}学年即将结束，选一个来年侧重点`,
     chainId: "year-summary",
     stage: "act2",
     choices: [
@@ -57,7 +56,7 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
       },
       {
         id: `year-summary-social-y${state.year}-m${state.month}`,
-        label: socialCapped ? "经营社交（已封顶）" : "经营社交",
+        label: "经营社交",
         outcome: "多认识些人，也多做些合作。",
         effects: {
           fixedEventResolution: { kind: "year-summary-social" },
@@ -65,18 +64,18 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
       },
       {
         id: `year-summary-favor-y${state.year}-m${state.month}`,
-        label: favorCapped ? "服务导师（已封顶）" : "服务导师",
+        label: "服务导师",
         outcome: "多承担些组里的事。",
         effects: {
           fixedEventResolution: { kind: "year-summary-favor" },
         },
       },
       {
-        id: `year-summary-intern-y${state.year}-m${state.month}`,
-        label: "外出实习",
-        outcome: "出去实习，顺便攒点钱。",
+        id: `year-summary-part-time-y${state.year}-m${state.month}`,
+        label: "兼职打工",
+        outcome: "做份兼职，顺便攒点钱。",
         effects: {
-          fixedEventResolution: { kind: "year-summary-intern" },
+          fixedEventResolution: { kind: "year-summary-part-time" },
         },
       },
     ],
@@ -90,11 +89,9 @@ export function createYearSummaryEvent(state: GameState): PendingEvent {
     title: "学年总结",
     description: [
       `${yearLabel}接近尾声，你在月历上划掉了最后几项节点。`,
-      "不知不觉，这一学年就要结束了。",
-      "这一年有推进，也有卡壳；有被肯定，也有深夜怀疑自己。",
-      "很多当时觉得“卡死”的节点，如今回头看都成了经验样本。你决定停下来做一次正式复盘，给下一年一个更清楚的起点。",
+      "这一年里，有些实验顺利跑完，有些问题拖到现在也没有答案；组会、投稿和临时任务也填满了不少晚上。",
+      "趁新学年还没开始，你准备回头看一遍：接下来最该先调整什么？",
     ].join("\n\n"),
-    preview: `${yearLabel}学年即将结束，回顾这一年`,
     chainId: "year-summary",
     choices: [
       {
@@ -129,8 +126,8 @@ export function resolveYearSummaryFixedEvent(
     case "year-summary-favor": {
       return resolveYearSummaryChoice(state, "year-summary-favor", getRoll);
     }
-    case "year-summary-intern": {
-      return resolveYearSummaryChoice(state, "year-summary-intern", getRoll);
+    case "year-summary-part-time": {
+      return resolveYearSummaryChoice(state, "year-summary-part-time", getRoll);
     }
     default:
       return null;

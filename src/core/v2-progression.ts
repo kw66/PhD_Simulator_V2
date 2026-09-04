@@ -1,15 +1,13 @@
 import {
   ADVISOR_REQUIREMENTS,
-  ADVISOR_SALARY,
   MASTER_TOTAL_MONTHS,
   PHD_TOTAL_MONTHS,
-  ROLE_BASE_ORDER,
   ROLE_DEFINITIONS,
 } from "./v2-content";
-import type { Degree, PendingDecision, RoleBaseId, RoleDefinition, RoleId, RoleMode } from "./v2-types";
+import type { Degree, RoleDefinition, RoleId } from "./v2-types";
 
-function getMaxYearsByDegree(degree: Degree): number {
-  return degree === "master" ? 3 : 5;
+function getMaxYearsByDegree(_degree: Degree): number {
+  return 6;
 }
 
 export function isPreEnrollmentState(state: Pick<{ month: number; totalMonths: number }, "month" | "totalMonths">): boolean {
@@ -32,7 +30,7 @@ function getCalendarForMaxYears(totalMonths: number, maxYears: number): { year: 
 
   return {
     year: maxYears,
-    month: Math.min(Math.max(remainingMonths, 1), 10),
+    month: Math.min(Math.max(remainingMonths, 1), 8),
   };
 }
 
@@ -42,27 +40,6 @@ export function getRoleDefinition(roleId: RoleId): RoleDefinition {
     throw new Error(`Unknown role: ${roleId}`);
   }
   return role;
-}
-
-export function getRoleBaseId(roleId: RoleId): RoleBaseId {
-  return getRoleDefinition(roleId).baseId;
-}
-
-export function getRoleMode(roleId: RoleId): RoleMode {
-  return getRoleDefinition(roleId).mode;
-}
-
-export function isReversedRole(roleId: RoleId): boolean {
-  return getRoleMode(roleId) === "reversed";
-}
-
-export function getRoleVariant(baseId: RoleBaseId, mode: RoleMode): RoleDefinition {
-  const targetId = mode === "upright" ? baseId : (`${baseId}-reversed` as RoleId);
-  return getRoleDefinition(targetId);
-}
-
-export function getRoleBaseOrder(): RoleBaseId[] {
-  return ROLE_BASE_ORDER;
 }
 
 export function getRoleOptions(): RoleDefinition[] {
@@ -80,32 +57,4 @@ export function getMonthLimitByDegree(degree: Degree): number {
 export function getGraduationScoreTarget(degree: Degree, advisorName: string | null): number | null {
   if (!advisorName) return null;
   return degree === "master" ? ADVISOR_REQUIREMENTS.masterGrad : ADVISOR_REQUIREMENTS.phdGrad;
-}
-
-export function getAdvisorSalaryForMonth(advisorName: string | null, degree: Degree, _month: number): number {
-  if (!advisorName) return 0;
-  const baseSalary = ADVISOR_SALARY[degree];
-
-  if (Number.isInteger(baseSalary)) {
-    return baseSalary;
-  }
-
-  return Math.floor(baseSalary);
-}
-
-export function getPhdDecisionRequirement(advisorName: string | null, year: number): number | null {
-  if (year !== 2 && year !== 3) {
-    return null;
-  }
-  if (!advisorName) return null;
-
-  return year === 2 ? ADVISOR_REQUIREMENTS.phdYear2 : ADVISOR_REQUIREMENTS.phdYear3;
-}
-
-export function createPhdDecision(year: number, requiredScore: number): PendingDecision {
-  return {
-    kind: "phd-transfer",
-    requiredScore,
-    year,
-  };
 }

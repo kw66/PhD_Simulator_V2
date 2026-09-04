@@ -1,199 +1,206 @@
-import { applyTierResist, getActualSanChange } from "./v2-sanity-rules";
-import {
-  createRandomEventChoice,
-  createThreeStageRandomEvent,
-  type RandomRollProvider,
-} from "./v2-random-events-core-shared";
+import { getActualSanChange } from "./v2-sanity-rules";
+import { createThreeStageRandomEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
+
+export type IllnessType = "stomach" | "flu" | "fever";
+
+const ILLNESS_INDEX: IllnessType[] = ["stomach", "flu", "fever"];
+const ILLNESS_COPY: Record<IllnessType, {
+  title: string;
+  intro: string[];
+  decision: string[];
+  results: Record<"hard" | "medicine" | "hospital" | "rest", string[]>;
+}> = {
+  stomach: {
+    title: "肚子虚弱",
+    intro: [
+      "早上起来，你的肚子就一阵阵不舒服，早餐只吃了两口。",
+      "刚坐到电脑前，你又急着往洗手间跑。",
+      "组会和实验还排在日程里，可你现在连坐稳都费劲。",
+    ],
+    decision: [
+      "你打开药店页面看了看，蒙脱石散要 1 金币；去医院挂号检查，至少要 3 金币。",
+      "这点钱不是拿不出来，只是这个月本来就没剩多少，你还惦记着下午没跑完的实验。",
+      "肚子又疼了一阵，你只好先决定今天怎么过。",
+    ],
+    results: {
+      hard: [
+        "你还是去了实验室，想着先把最急的实验跑完。",
+        "中午开始，你隔一会儿就得往洗手间跑，同门看你脸色不对，劝了好几次。",
+        "当天的进度勉强保住了，这场病却拖了下去，你最后还是连休了几天。",
+      ],
+      medicine: [
+        "你下楼买了一盒蒙脱石散，回宿舍就着温水服下。",
+        "下午的实验只好托同门帮忙看着，你躺到傍晚，肚子总算安静了一点。",
+        "人还没完全恢复，至少不用再一直往洗手间跑了。",
+      ],
+      hospital: [
+        "你去了校医院，挂号后做了检查。",
+        "医生让你补液、清淡饮食，还把这几天该注意的事交代了一遍。",
+        "折腾了大半天，回去时肚子终于没那么难受了。",
+      ],
+      rest: [
+        "你给导师请了假，把手机调成静音。",
+        "这一天除了喝水和睡觉，你什么也没干。",
+        "第二天起床时舒服了一些，落下的任务只能再慢慢补。",
+      ],
+    },
+  },
+  flu: {
+    title: "流感来袭",
+    intro: [
+      "早上醒来，你的嗓子发紧，鼻子也堵得厉害。",
+      "洗漱时喷嚏一个接一个，浑身酸痛，咳嗽也停不下来。",
+      "今天原本排了组会和实验，你却头昏乏力，连收拾东西都嫌累。",
+    ],
+    decision: [
+      "宿舍抽屉里没有现成的药，临时去买磷酸奥司他韦要 2 金币，去医院则要 4 金币。",
+      "你担心请假会打乱本周进度，又怕硬撑一天把流感拖得更久。",
+      "群里的消息还在往上跳，你得先把今天安排明白。",
+    ],
+    results: {
+      hard: [
+        "你戴上口罩去了实验室，想着把必须做的事处理完就走。",
+        "撑到下午时，你咳得停不下来，浑身酸痛，盯着屏幕半天也看不进去。",
+        "回宿舍后，鼻塞和咳嗽一直没好，你只好连休了几天，原来的安排还是全停了。",
+      ],
+      medicine: [
+        "你去药店买了磷酸奥司他韦，按说明服下第一剂。",
+        "鼻塞没有立刻缓解，不过咳嗽、酸痛和乏力慢慢轻了一些。",
+        "你在宿舍休息了几天，才把作息重新拉回来。",
+      ],
+      hospital: [
+        "你去医院做了检查，确认是流感后按医生的安排治疗。",
+        "治疗后，咳嗽和浑身酸痛逐渐缓了下来，同门也替你把实验关好。",
+        "回去再睡一晚，你总算不用担心病情继续加重。",
+      ],
+      rest: [
+        "你在群里请了假，把电脑也合上了。",
+        "一整天里，你醒了就喝水，困了又继续睡。",
+        "晚上鼻塞和咳嗽轻了一些，只是落下的组会和实验还得之后补上。",
+      ],
+    },
+  },
+  fever: {
+    title: "高烧不退",
+    intro: [
+      "早上醒来，你浑身发烫，连下床都觉得腿软。",
+      "体温计连续几次停在 39.5°C 左右，高烧一直没有退。",
+      "室友看了眼温度，又看了眼你，催你别再硬扛。",
+    ],
+    decision: [
+      "布洛芬要 3 金币，去医院检查和治疗则要 5 金币。",
+      "你盯着下午的实验安排看了半天，脑子却昏沉得连消息都回不利索。",
+      "室友已经准备帮你叫车，你得马上决定怎么办。",
+    ],
+    results: {
+      hard: [
+        "你还是去了实验室，想把关键步骤做完再回来。",
+        "没撑多久，你就开始发抖，同门只好停下手里的事把你送回宿舍。",
+        "这场高烧让你连休了几天，原本想保住的进度也没能保住。",
+      ],
+      medicine: [
+        "你先买了布洛芬，回宿舍服下后躺下。",
+        "体温降得很慢，到了晚上仍然反复，你连饭都没怎么吃。",
+        "第二天勉强能下床时，手头的安排已经乱成一团。",
+      ],
+      hospital: [
+        "室友陪你赶到医院，医生很快安排了检查和输液。",
+        "观察了一阵后，体温终于慢慢降了下来。",
+        "虽然花了更多钱，这一晚至少睡得安稳了。",
+      ],
+      rest: [
+        "你直接请假留在宿舍，把手机放到够不着的地方。",
+        "一天过去，高烧还没完全退，你只能继续躺着补水休息。",
+        "实验和消息堆了不少，但眼下也只能等身体慢慢恢复。",
+      ],
+    },
+  },
+};
+
+function drawIllnessType(getRoll: RandomRollProvider): IllnessType {
+  const index = Math.floor(Math.max(0, Math.min(0.999999999999, getRoll())) * ILLNESS_INDEX.length);
+  return ILLNESS_INDEX[index] ?? "stomach";
+}
 
 export function createIllnessRandomEvent(
   state: GameState,
   getRoll: RandomRollProvider,
-): { nextState: GameState; event: PendingEvent } {
-  const nextColdCount = state.eventCounters.coldCount + 1;
-  const nextState: GameState = {
-    ...state,
-    eventCounters: {
-      ...state.eventCounters,
-      coldCount: nextColdCount,
-    },
-    achievementFlags: {
-      ...state.achievementFlags,
-      sickly: state.achievementFlags.sickly || nextColdCount >= 3,
-    },
-  };
-
-  const hardWorkResist = applyTierResist(-4, state.player.san, getRoll);
-  const hardWorkNextCap = Math.max(0, state.sanCap + hardWorkResist.effectiveChange);
-  const medicineResist = applyTierResist(-4, state.player.san, getRoll);
-  const restResist = applyTierResist(-8, state.player.san, getRoll);
+  illnessType: IllnessType = drawIllnessType(getRoll),
+): PendingEvent {
   const serial = state.totalRandomEventCount;
-
-  const medicineChoice: EventChoice = state.player.money < 2
-    ? {
-      id: `random-3-medicine-${serial}`,
-      label: "先买药",
-      outcome: "金钱不足 2，暂时买不起药，只能重新考虑其他方案。",
-      effects: {
-        stayOnEvent: true,
-      },
-    }
-    : {
-      id: `random-3-medicine-${serial}`,
-      label: "先买药",
-      outcome: `金钱 -2，SAN ${getActualSanChange(medicineResist.effectiveChange, state.month, state.eventSupport)}。`,
-      effects: {
-        money: -2,
-        san: getActualSanChange(medicineResist.effectiveChange, state.month, state.eventSupport),
-      },
-    };
-
-  const hospitalChoice: EventChoice = state.player.money < 4
-    ? {
-      id: `random-3-hospital-${serial}`,
-      label: "去医院",
-      outcome: "金钱不足 4，挂号和检查费用不够，只能改选其他方案。",
-      effects: {
-        stayOnEvent: true,
-      },
-    }
-    : {
-      id: `random-3-hospital-${serial}`,
-      label: "去医院",
-      outcome: "金钱 -4，SAN +2。",
-      effects: {
-        money: -4,
-        san: 2,
-      },
-    };
+  const copy = ILLNESS_COPY[illnessType];
+  const severity = illnessType === "stomach" ? 0 : illnessType === "flu" ? 1 : 2;
+  const hardCapDelta = -(2 + severity);
+  const medicineMoney = -(1 + severity);
+  const medicineSan = getActualSanChange(-severity, state.month, state.eventSupport);
+  const hospitalMoney = -(3 + severity);
+  const restSan = getActualSanChange(-(6 + severity * 2), state.month, state.eventSupport);
+  const activeOperationSanMultiplier = illnessType === "stomach" ? 1.5 : illnessType === "flu" ? 2 : 2.5;
+  const pendingBuffId = `illness-work-penalty-${illnessType}-${state.totalMonths}-${serial}`;
 
   const event: PendingEvent = {
-    id: `random-3-y${state.year}-m${state.month}-n${serial}`,
-    title: "疾病来袭",
-    description: "一觉醒来烧到 38.5°C，脑子沉得连消息都不想回。这周偏偏还有组会和实验，你得决定怎么撑过去。",
-    preview: "身体不舒服，需要休息",
+    id: `illness-${illnessType}-y${state.year}-m${state.month}-n${serial}`,
+    title: copy.title,
+    description: copy.intro.join("\n\n"),
     source: "random",
     blocking: true,
     deadlineMonths: 0,
-    chainId: "random-3",
+    chainId: `illness-${illnessType}`,
     stage: "act1",
+    pendingBuffs: [{
+      id: pendingBuffId,
+      name: `主动操作 SAN ×${activeOperationSanMultiplier}`,
+      source: copy.title,
+      timing: "monthly",
+      remainingMonths: null,
+      activeOperationSanMultiplier,
+      description: "处理该疾病事件后消失；作用于看论文、想 idea、写论文、做实验和人际主动操作",
+    }],
+    removeBuffIdsOnCompletion: [pendingBuffId],
     choices: [
       {
-        id: `random-3-strong-${serial}`,
+        id: `illness-${illnessType}-hard-${serial}`,
         label: "硬撑工作",
-        outcome: hardWorkResist.effectiveChange < 0
-          ? `SAN 上限 ${hardWorkResist.effectiveChange}；这次感冒拖得很久，后续恢复明显变差。`
-          : "这次居然扛住了，SAN 上限没有继续下降。",
-        effects: {
-          sanCapDelta: hardWorkResist.effectiveChange,
-          achievementFlags: hardWorkResist.effectiveChange < 0 && hardWorkNextCap <= 10 ? ["nearDeath"] : [],
-        },
+        outcome: `SAN 上限 ${hardCapDelta}｜生病概率 ×0.5`,
+        effects: { sanCapDelta: hardCapDelta, illnessProbabilityMultiplier: 0.5 },
       },
-      medicineChoice,
-      hospitalChoice,
       {
-        id: `random-3-rest-${serial}`,
+        id: `illness-${illnessType}-medicine-${serial}`,
+        label: "先买药",
+        outcome: `金币 ${medicineMoney}｜SAN ${medicineSan}｜SAN 上限 -${severity}｜生病概率 ×0.25`,
+        effects: { money: medicineMoney, san: medicineSan, sanCapDelta: -severity, illnessProbabilityMultiplier: 0.25 },
+      },
+      {
+        id: `illness-${illnessType}-hospital-${serial}`,
+        label: "去医院",
+        outcome: `金币 ${hospitalMoney}｜生病概率 ×0`,
+        effects: { money: hospitalMoney, illnessProbabilityMultiplier: 0 },
+      },
+      {
+        id: `illness-${illnessType}-rest-${serial}`,
         label: "休息一天",
-        outcome: `SAN ${getActualSanChange(restResist.effectiveChange, state.month, state.eventSupport)}。`,
-        effects: {
-          san: getActualSanChange(restResist.effectiveChange, state.month, state.eventSupport),
-        },
+        outcome: `SAN ${restSan}｜生病概率 ×0.5`,
+        effects: { san: restSan, illnessProbabilityMultiplier: 0.5 },
       },
     ],
   };
 
-  return {
-    nextState,
-    event: createThreeStageRandomEvent(event, {
-      introDescription: [
-        "早上闹钟响了三次你才爬起来，喉咙发紧、四肢发沉，体温已经到 38.5°C。",
-        "偏偏这周排着组会和实验节点，任何掉速都会把后面的计划连锁打乱。",
-        "你得在“保进度”和“保身体”之间，立刻做一个不舒服的决定。",
-      ].join("\n\n"),
-      decisionTitle: "你的选择",
-      decisionDescription: [
-        "“硬撑：今天进度不掉，但身体账可能变成长债。”",
-        "“买药：成本低一些，能换来可控恢复。”",
-        "“去医院：最稳的修复方案，但金币支出最大。”",
-        "“休息：短期最安全，后续补进度会更焦虑。”你这次不是在选轻松，而是在选哪种后果最可持续。",
-      ].join("\n\n"),
-      results: {
-        [`random-3-strong-${serial}`]: {
-          title: "硬扛",
-          description: hardWorkResist.effectiveChange < 0
-            ? [
-                "你还是去了实验室，靠咖啡和止痛药硬把当天安排顶完。",
-                "同门劝你回去休息，你嘴上说“没事”，手却一直在发抖。",
-                "这次感冒拖得很久，后面几周你明显感觉恢复力变差了。",
-                `判定口径：SAN 上限基础 -4，按当前 SAN 执行概率抵消后，实际 ${hardWorkResist.effectiveChange}。`,
-              ].join("\n\n")
-            : [
-                "你把当天关键步骤咬牙做完，晚上才回寝室倒头就睡。",
-                "这次虽然冒险，但你意外地扛住了，几天后状态逐步回正。",
-                "你心里清楚：这次是侥幸，不该当常规方案。",
-                "判定口径：SAN 上限基础 -4，本次被概率抵消。",
-              ].join("\n\n"),
-        },
-        [`random-3-medicine-${serial}`]: {
-          title: "吃药",
-          description: medicineResist.effectiveChange < 0
-            ? [
-                "你先去药店配了药，把高热先压下去，再按时休息补水。",
-                "白天效率确实掉了，但至少没有把病拖成更大事故。",
-                "几天后症状缓解，你把延误控制在可接受范围内。",
-                `判定口径：SAN 基础 -4，按当前 SAN 执行概率抵消后，实际 ${medicineResist.effectiveChange}。`,
-              ].join("\n\n")
-            : [
-                "你迅速买药处理，休息节奏也跟上了。",
-                "恢复速度比预想更快，基本没被这次感冒拖垮。",
-                "判定口径：SAN 基础 -4，本次被概率抵消。",
-              ].join("\n\n"),
-        },
-        [`random-3-hospital-${serial}`]: {
-          title: "去医院",
-          description: [
-            "你去校医院挂号、验血、输液，流程虽然慢，但处理很扎实。",
-            "医生让你强制休息两天，别再拿身体硬拼进度。",
-            "花钱买来了确定性恢复，后续计划基本没有大幅偏航。",
-          ].join("\n\n"),
-        },
-        [`random-3-rest-${serial}`]: {
-          title: "休息",
-          description: restResist.effectiveChange < 0
-            ? [
-                "你给导师发消息请假，把手机调成静音，整天只做喝水和睡觉两件事。",
-                "病是慢慢压下去了，但想到堆积的任务，心理负担并没有立刻消失。",
-                "恢复后你还要补回进度，整体精神消耗仍然很大。",
-                `判定口径：SAN 基础 -8，按当前 SAN 执行概率抵消后，实际 ${restResist.effectiveChange}。`,
-              ].join("\n\n")
-            : [
-                "你果断停工休息，把恢复放在第一优先级。",
-                "这一觉睡得很实，第二天状态回升得比预期更快。",
-                "你意识到：及时止损本身也是一种效率。",
-                "判定口径：SAN 基础 -8，本次被概率抵消。",
-              ].join("\n\n"),
-        },
-      },
-    }),
+  const resultDescription = (choice: EventChoice): string => {
+    const resultKey = choice.id.includes("hard")
+      ? "hard"
+      : choice.id.includes("medicine")
+        ? "medicine"
+        : choice.id.includes("hospital")
+          ? "hospital"
+          : "rest";
+    return copy.results[resultKey].join("\n\n");
   };
-}
 
-export function createImmuneColdEvent(state: GameState): PendingEvent {
-  const serial = state.totalRandomEventCount;
-  return {
-    id: `random-immune-cold-y${state.year}-m${state.month}-n${serial}`,
-    title: "疾病来袭 ➜ 你的选择 ➜ 抵抗感冒",
-    description: "本来你要感冒了……\n\n但是今年打过羽毛球强化了身体，成功抵抗了感冒！",
-    preview: "今年打过羽毛球，身体倍儿棒！",
-    source: "random",
-    blocking: true,
-    deadlineMonths: 0,
-    chainId: "random-3",
-    stage: "result",
-    choices: createRandomEventChoice(serial).map((choice) => ({
-      ...choice,
-      label: "身体倍儿棒！",
-      outcome: "今年打过羽毛球，成功抵抗感冒！",
-    })),
-  };
+  return createThreeStageRandomEvent(event, {
+    introDescription: copy.intro.join("\n\n"),
+    decisionTitle: "你的选择",
+    decisionDescription: copy.decision.join("\n\n"),
+    results: Object.fromEntries(event.choices.map((choice) => [choice.id, { title: choice.label, description: resultDescription(choice) }])),
+  });
 }

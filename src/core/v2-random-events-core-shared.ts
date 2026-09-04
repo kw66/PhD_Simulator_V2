@@ -2,6 +2,18 @@ import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type RandomRollProvider = () => number;
 
+export function formatProbabilityCondition(label: string, probability: number): string {
+  const normalizedProbability = Number.isFinite(probability)
+    ? Math.max(0, Math.min(1, probability))
+    : 0;
+  return `${label}（${Math.round(normalizedProbability * 100)}%）`;
+}
+
+export function drawInclusiveInt(min: number, max: number, getRoll: RandomRollProvider): number {
+  const normalized = Math.max(0, Math.min(0.999999999999, getRoll()));
+  return min + Math.floor(normalized * (max - min + 1));
+}
+
 export interface RandomEventResultCopy {
   title: string;
   description: string;
@@ -25,6 +37,7 @@ export function createThreeStageEvent(
     title: `${event.title} ➜ ${copy.decisionTitle}`,
     description: copy.decisionDescription,
     stage: "act2",
+    deadlineMonths: 0,
     choices: event.choices.map((choice) => {
       const resultCopy = copy.results[choice.id];
       if (!resultCopy) return choice;
@@ -33,12 +46,13 @@ export function createThreeStageEvent(
         id: `${event.id}-result-${choice.id}`,
         title: `${event.title} ➜ ${copy.decisionTitle} ➜ ${resultCopy.title}`,
         description: `${resultCopy.description}\n\n机制结算\n${choice.outcome}`,
-        preview: resultCopy.title,
         source: event.source,
         blocking: event.blocking,
-        deadlineMonths: event.deadlineMonths,
+        deadlineMonths: 0,
         chainId: event.chainId,
         stage: "result",
+        removeBuffIdsOnCompletion: event.removeBuffIdsOnCompletion,
+        completionLog: `${choice.label}：${choice.outcome}`,
         choices: [
           {
             id: `${choice.id}-finish`,
@@ -106,7 +120,6 @@ export function createRandomEventSkeleton(eventId: number, state: GameState): Pe
     id: `random-${eventId}-y${state.year}-m${state.month}-n${serial}`,
     title: "临时事务",
     description: "一件计划外的事突然打断了这个月的安排。先把眼前的问题处理掉，原来的进度只能稍后再接上。",
-    preview: "有件临时事务需要处理",
     source: "random",
     blocking: true,
     deadlineMonths: 0,

@@ -5,3 +5,8 @@ export function getAcademicCalendarYear(gameYear: number, gameMonth: number): nu
     + Number(gameYear || 0)
     + (Number(gameMonth || 0) >= 5 ? 1 : 0);
 }
+
+export function getAcademicCalendarMonth(gameMonth: number): number {
+  if (gameMonth <= 0) return 0;
+  return ((Math.trunc(gameMonth) + 7) % 12) + 1;
+}

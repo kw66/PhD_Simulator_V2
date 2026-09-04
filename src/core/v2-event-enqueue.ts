@@ -1,3 +1,4 @@
+import { addOrReplaceBuffs } from "./v2-buffs";
 import { enqueueEventQueueItem } from "./v2-event-queue";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -14,6 +15,7 @@ export function enqueuePendingEvents(state: GameState, events: PendingEvent[]): 
     nextState = {
       ...nextState,
       eventQueue: nextEventQueue,
+      buffs: addOrReplaceBuffs(nextState.buffs, event.pendingBuffs ?? []),
     };
     queuedEvents.push(event);
   }

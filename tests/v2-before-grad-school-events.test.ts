@@ -31,7 +31,7 @@ describe("v2 before grad school events", () => {
       chainId: "before-grad-school",
       stage: "act1",
     });
-    expect(state.log[0]?.text).toContain("触发事件：读研之始");
+    expect(state.log).toEqual([]);
   });
 
   it("puts summer camp and pre-admission before contacting a lecturer", () => {
@@ -52,13 +52,13 @@ describe("v2 before grad school events", () => {
     expect(act1.description).toContain("预推免");
     expect(act1.description).toContain("心仪学校的预录取");
     expect(act1.description).toContain("接下来，该联系导师了");
+    expect(act1.description).toContain("你给感兴趣的老师发了邮件，又找组里的学生问了问。");
     expect(act1.description.indexOf("夏令营")).toBeLessThan(act1.description.lastIndexOf("预推免"));
     expect(act1.description).not.toContain("年级群");
     expect(act1.description).not.toContain("推免资格名单");
     expect(act1.description).not.toContain("推免系统");
     expect(act1.description).not.toContain("接受待录取");
     expect(act1.description).not.toContain("公告栏");
-    expect(act1.preview).toBe("拿到梦校预录取，准备联系导师");
     expect(act1.choices.map((choice) => choice.label)).toEqual(["联系导师"]);
   });
 
@@ -80,13 +80,13 @@ describe("v2 before grad school events", () => {
 
     expect(advisorInfo.stage).toBe("act2");
     expect(advisorInfo.title).toBe("读研之始 ➜ 导师信息");
-    expect(advisorInfo.description).toContain("你给感兴趣的老师发了邮件，又找组里的学生问了问。");
+    expect(advisorInfo.description).not.toContain("你给感兴趣的老师发了邮件，又找组里的学生问了问。");
     expect(advisorInfo.description).toContain("梁哲哲 · 讲师");
     expect(advisorInfo.description).not.toContain("讲师回信后");
     expect(advisorInfo.description).not.toContain("搜集信息");
-    expect(advisorInfo.description).toContain("每月组会｜横向较少｜研二可实习");
-    expect(advisorInfo.description).toContain("定期反馈｜显卡需排队｜回复及时");
-    expect(advisorInfo.description).toContain("合作较多｜选题较自由｜作息规律");
+    expect(advisorInfo.description).toContain(
+      "每月组会；横向较少；研二可实习；定期反馈；显卡需排队；回复及时；合作较多；选题较自由；作息规律",
+    );
     expect(advisorInfo.description).not.toContain("评价网");
     expect(advisorInfo.description).not.toContain("匿名评价");
     expect(advisorInfo.description).not.toContain("游戏数据");
@@ -97,6 +97,7 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.description).toContain("科研分：论文录用，C 类 +1｜B 类 +2｜A 类 +4");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分\n转博士：第 2 年 2 分｜第 3 年 3 分");
+    expect(advisorInfo.description).toContain("小提示：换导师只会刷新姓名和介绍，对游戏数值没有影响。");
     expect(advisorInfo.choices.map((choice) => choice.label)).toEqual(["换个导师", "确认导师"]);
     expect(resolution).toEqual({
       kind: "advisor-confirm",
@@ -117,12 +118,12 @@ describe("v2 before grad school events", () => {
     const firstCandidate = getAdvisorConfirmationResolution(firstInfo)?.advisorCandidate;
     const lastCandidate = getAdvisorConfirmationResolution(lastInfo)?.advisorCandidate;
 
-    expect(firstInfo.description).toContain("周报 + 组会｜项目少｜可实习");
-    expect(firstInfo.description).toContain("指导少｜资源较少｜老师宽和");
-    expect(firstInfo.description).toContain("氛围好｜偏算法研究｜节奏平稳");
-    expect(lastInfo.description).toContain("周报为主｜项目可选｜不限制实习");
-    expect(lastInfo.description).toContain("同门带得多｜可借校内算力｜比较随和");
-    expect(lastInfo.description).toContain("组内常交流｜方向较稳定｜平时较松");
+    expect(firstInfo.description).toContain(
+      "周报 + 组会；项目少；可实习；指导少；资源较少；老师宽和；氛围好；偏算法研究；节奏平稳",
+    );
+    expect(lastInfo.description).toContain(
+      "周报为主；项目可选；不限制实习；同门带得多；可借校内算力；比较随和；组内常交流；方向较稳定；平时较松",
+    );
     expect(firstCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
     expect(lastCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
   });
@@ -206,9 +207,15 @@ describe("v2 before grad school events", () => {
         eventChoiceId: confirmChoice.id,
       });
 
-      expect(state.selectedAdvisorName).toBe(refreshedCandidate.advisorName);
+      expect(state.selectedAdvisorName).toBeNull();
       expect(state.eventQueue[0]?.stage).toBe("result");
       expect(state.eventQueue[0]?.choices.map((choice) => choice.label)).toEqual(["准备报到"]);
+      const admissionEvent = state.eventQueue[0];
+      state = dispatchAction(state, "resolve-event", {
+        eventId: admissionEvent?.id,
+        eventChoiceId: admissionEvent?.choices[0]?.id,
+      });
+      expect(state.selectedAdvisorName).toBe(refreshedCandidate.advisorName);
     } finally {
       random.mockRestore();
     }
@@ -233,7 +240,6 @@ describe("v2 before grad school events", () => {
     expect(resolved.nextState.advisorProgressState).toMatchObject({
       researchResource: 4,
       affinity: 4,
-      taskMultiplier: 6,
       taskMax: 44,
       relationMax: 40,
     });
@@ -245,14 +251,47 @@ describe("v2 before grad school events", () => {
       title: "读研之始 ➜ 导师信息 ➜ 正式录取",
       chainId: "before-grad-school",
       stage: "result",
-      preview: "收到录取通知书",
     });
     expect(admissionEvent?.description).toContain("录取通知书");
+    expect(admissionEvent?.description).toContain("2023年夏天");
     expect(admissionEvent?.description).toContain("晒到朋友圈");
+    expect(admissionEvent?.description).toContain("做点有趣的研究");
+    expect(admissionEvent?.description).toContain("多发几篇论文");
+    expect(admissionEvent?.description).toContain("参加几次学术会议");
+    expect(admissionEvent?.description).toContain("对未来充满了期待");
+    expect(admissionEvent?.description).not.toContain("先把一个方向踏踏实实做下去");
+    expect(admissionEvent?.description).not.toContain("看看同行都在研究什么");
     expect(admissionEvent?.description).not.toContain("暑假");
+    expect(admissionEvent?.description).not.toContain("报到、住宿");
     expect(admissionEvent?.description).not.toContain("第一次组会");
     expect(admissionEvent?.description).not.toContain("第一篇投稿");
+    expect(admissionEvent?.completionLog).toBe(
+      "加入李旭旭讲师课题组和实验室群｜待遇 硕士1/博士3金币/月｜科研分 C+1/B+2/A+4｜毕业 硕士1/博士7分｜转博 第2年2/第3年3分",
+    );
     expect(admissionEvent?.choices[0]?.label).toBe("准备报到");
+  });
+
+  it("records all enrollment requirements in one completion log", () => {
+    let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
+    state = dispatchAction(state, "resolve-event", {
+      eventChoiceId: "before-grad-school-open-advisor-info",
+    });
+    const advisorName = state.eventQueue[0]?.choices.find((choice) => (
+      choice.effects.fixedEventResolution?.kind === "advisor-confirm"
+    ))?.effects.fixedEventResolution?.advisorCandidate?.advisorName;
+    state = dispatchAction(state, "resolve-event", {
+      eventChoiceId: "before-grad-school-confirm",
+    });
+
+    expect(state.log).toEqual([]);
+    state = dispatchAction(state, "resolve-event", {
+      eventChoiceId: "before-grad-school-finish",
+    });
+
+    expect(state.log).toHaveLength(1);
+    expect(state.log[0]?.text).toBe(
+      `读研之始：加入${advisorName}讲师课题组和实验室群｜待遇 硕士1/博士3金币/月｜科研分 C+1/B+2/A+4｜毕业 硕士1/博士7分｜转博 第2年2/第3年3分`,
+    );
   });
 
 });

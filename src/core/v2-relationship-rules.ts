@@ -59,20 +59,3 @@ export function tryAddRelationship(state: RelationshipState, kind: RelationshipK
   };
 }
 
-export function addMentorshipStacks(state: RelationshipState, stackDelta: number): RelationshipState {
-  if (!Number.isFinite(stackDelta) || stackDelta === 0) {
-    return { ...state };
-  }
-
-  return {
-    ...state,
-    mentorshipStacks: Math.max(0, state.mentorshipStacks + stackDelta),
-  };
-}
-
-export function getMonthlyRelationshipEffects(state: RelationshipState): { sanDelta: number; citationDelta: number } {
-  return {
-    sanDelta: -state.mentorshipStacks,
-    citationDelta: state.juniorCount * 3 * state.mentorshipStacks,
-  };
-}

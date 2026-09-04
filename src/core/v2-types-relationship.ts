@@ -1,6 +1,7 @@
 import type {
   FellowTaskType,
   FellowTypeId,
+  Gender,
   LoverTypeId,
 } from "./v2-types";
 
@@ -16,7 +17,6 @@ export interface RelationshipState {
 }
 
 export interface ConferenceEncounterState {
-  metBigBull: boolean;
   metBigBullCoop: boolean;
   bigBullCooperation: boolean;
   bigBullCoopCount: number;
@@ -42,13 +42,13 @@ export interface ConferenceCareerState {
 export interface InternshipState {
   active: boolean;
   remainingMonths: number;
-  startTotalMonths: number | null;
   experimentMultiplier: number;
 }
 
 export interface LoverState {
   active: boolean;
   type: LoverTypeId | null;
+  gender: Gender | null;
   startTotalMonths: number | null;
   beautifulExtraRecoveryRate: number;
 }
@@ -64,13 +64,10 @@ export interface AdvisorProgressState {
   affinity: number;
   taskProgress: number;
   taskMax: number;
-  taskMultiplier: number;
   relationProgress: number;
   relationMax: number;
   canInteract: boolean;
   taskUsedThisMonth: boolean;
-  completedProjectCount: number;
-  interactCount: number;
 }
 
 export interface LoverProgressState {
@@ -84,13 +81,13 @@ export interface LoverProgressState {
   canInteract: boolean;
   taskUsedThisMonth: boolean;
   completedTaskCount: number;
-  interactCount: number;
 }
 
 export interface FellowProgressProfile {
   id: string;
   name?: string;
   type: FellowTypeId;
+  gender: Gender;
   research: number;
   affinity: number;
   taskType: FellowTaskType;
@@ -100,13 +97,16 @@ export interface FellowProgressProfile {
   relationMax: number;
   canInteract: boolean;
   taskUsedThisMonth: boolean;
-  completedTaskCount: number;
-  interactCount: number;
   startTotalMonths: number;
 }
 
-export interface JointTrainingState {
-  citationBonusApplied: number;
+export interface FellowProfileAddition {
+  type: FellowTypeId;
+  gender: Gender;
+  research: number;
+  affinity: number;
+  name?: string;
+  taskType?: FellowTaskType;
 }
 
 export interface EventSupportState {
@@ -115,5 +115,5 @@ export interface EventSupportState {
   hasDownJacket: boolean;
   hasBadmintonRacket: boolean;
   hasStrongBodyTalent: boolean;
-  hasFinanceTalent: boolean;
+  aiCostsCoveredUntilTotalMonths?: number | null;
 }

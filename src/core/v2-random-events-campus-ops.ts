@@ -1,7 +1,10 @@
-import { getActualSanChange } from "./v2-sanity-rules";
-import { createThreeStageRandomEvent } from "./v2-random-events-core-shared";
+﻿import { applyTierResist, formatTierResistedOutcome, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import {
+  createThreeStageRandomEvent,
+  formatProbabilityCondition,
+  type RandomRollProvider,
+} from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
-import type { RandomRollProvider } from "./v2-random-events-campus-shared";
 
 export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
@@ -9,12 +12,17 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
   const taobaoFailureSanChange = getActualSanChange(-2, state.month, state.eventSupport);
   const reinstallSuccess = getRoll() < 0.5;
   const taobaoSuccess = getRoll() < 0.5;
+  const reportSocialResult = applyTierResist(-2, state.player.social, getRoll);
+  const reportSocialChange = reportSocialResult.effectiveChange;
+  const reportSocialNarrative = getTierResistedNarrative("社交", -2, reportSocialResult);
+  const reinstallSocialResult = applyTierResist(-1, state.player.social, getRoll);
+  const reinstallSocialChange = reinstallSocialResult.effectiveChange;
+  const reinstallSocialNarrative = getTierResistedNarrative("社交", -1, reinstallSocialResult);
 
   const event: PendingEvent = {
     id: `random-13-y${state.year}-m${state.month}-n${serial}`,
-    title: "服务器宕机",
-    description: "实验跑到一半，服务器突然失联，排队的任务全停在原地。群里没人能说清原因，这次得由你来处理。",
-    preview: "服务器又出问题了",
+    title: "显卡故障",
+    description: "实验室服务器突然离线，几张显卡接连报错，排队的任务全停在原地。机器暂时不能用了，这次得由你来处理。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -32,24 +40,22 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
       {
         id: `random-13-report-${serial}`,
         label: "举报挖矿",
-        outcome: "社交 -2。",
-        effects: {
-          social: -2,
-        },
+        outcome: formatTierResistedOutcome("社交", -2, reportSocialResult),
+        effects: reportSocialChange < 0 ? { social: reportSocialChange } : {},
       },
       {
         id: `random-13-reinstall-${serial}`,
         label: "自己重装",
         outcome: reinstallSuccess
-          ? `SAN ${reinstallSanChange}。`
-          : `SAN ${reinstallSanChange}，社交 -1，下次实验 x0.5。`,
+          ? `${formatProbabilityCondition("重装成功", 0.5)}｜SAN ${reinstallSanChange}。`
+          : `${formatProbabilityCondition("重装失败", 0.5)}｜SAN ${reinstallSanChange}｜${formatTierResistedOutcome("社交", -1, reinstallSocialResult)}｜下次实验 ×0.25`,
         effects: reinstallSuccess
           ? { san: reinstallSanChange }
           : {
             san: reinstallSanChange,
-            social: -1,
+            ...(reinstallSocialChange < 0 ? { social: reinstallSocialChange } : {}),
             temporaryActionEffectUpdates: {
-              experiment: { multiplier: 0.5 },
+              experiment: { multiplier: 0.25 },
             },
           },
       },
@@ -57,8 +63,8 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
         id: `random-13-taobao-${serial}`,
         label: "淘宝找人",
         outcome: taobaoSuccess
-          ? "金钱 -2。"
-          : `金钱 -4，SAN ${taobaoFailureSanChange}。`,
+          ? `${formatProbabilityCondition("维修成功", 0.5)}｜金币 -2。`
+          : `${formatProbabilityCondition("维修翻车", 0.5)}｜金币 -4｜SAN ${taobaoFailureSanChange}。`,
         effects: taobaoSuccess
           ? { money: -2 }
           : { money: -4, san: taobaoFailureSanChange },
@@ -68,63 +74,65 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "凌晨跑到一半的实验突然中断，终端只剩一行刺眼的报错。",
-      "这台服务器已经不是第一次出问题，组里每个人都被它坑过。",
-      "你翻了眼最近备份记录，发现真正可回滚的版本并不理想。",
-      "你现在要决定：先把本轮任务救回来，还是趁机把隐患处理掉。",
+      "凌晨跑到一半的实验突然中断，实验室服务器彻底连不上了。",
+      "到机房一看，有张显卡持续报错，整台机器已经无法正常跑实验。",
+      "组里排队的任务全部停住，谁也说不准是驱动故障，还是显卡真的坏了。",
+      "这次是先找人检查，还是自己动手排查？",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "“找导师：响应快，但大概率只是临时重启。”",
-      "“举报挖矿：可能治本，但会触发人际后坐力。”",
-      "“自己重装：一把梭哈，成功和翻车大概五五开。”",
-      "“淘宝找人：花钱换时间，质量同样看运气。”你要选的是“短期止血”还是“长期稳定”，以及你愿意承担的失败成本。",
+      "找导师最稳，但坏掉的显卡未必能马上换新。",
+      "举报有人挖矿可能查清显卡为什么出故障，也会得罪同门。",
+      "自己重装驱动或淘宝找人都有一半机会翻车；淘宝维修成功花 2 金币，翻车则会扣 4 金币。",
     ].join("\n\n"),
     results: {
       [`random-13-advisor-${serial}`]: {
         title: "找导师",
         description: [
-          "你把故障日志发给导师，导师安排同门远程重启了机器。",
-          "服务器很快恢复，但你看得出来这只是“把今天撑过去”。",
-          "底层问题没解决，后面每次开新实验都得留一手应急方案。",
+          "你把显卡报错发给导师，导师安排同门到机房逐张排查。",
+          "坏卡被停用后，服务器总算重新上线，但可用算力少了一截。",
+          "以后跑实验只能排更久的队。",
         ].join("\n\n"),
       },
       [`random-13-report-${serial}`]: {
         title: "举报挖矿",
         description: [
-          "你把后台异常和日志证据整理后直接上报，导师当场排查。",
-          "问题源头被揪出来，服务器状态确实稳定了下来。",
-          "但“是谁先捅出来的”也很快传开，你在人际面上背了成本。",
+          "你把后台的异常占用和显卡报错整理后直接上报，导师当场排查。",
+          "有人长期占着显卡挖矿的事情被查了出来，故障显卡也被送去检修。",
+          "但很快有人知道是你举报的，实验室里的气氛有些尴尬。",
+          ...(reportSocialNarrative ? [reportSocialNarrative] : []),
         ].join("\n\n"),
       },
       [`random-13-reinstall-${serial}`]: {
         title: "自己重装",
         description: reinstallSuccess
           ? [
-              "你决定自己扛下重装：备份、装系统、补驱动、恢复环境，一路排雷到深夜。",
-              "最终系统干净重启，性能甚至比之前更顺。",
-              "这次是高压下的硬胜利，但体力和精神都被榨得很干。",
+              "你关掉服务器，重新插拔显卡，又把驱动和 CUDA 环境从头装了一遍。",
+              "折腾到深夜后，系统终于重新识别出所有显卡，实验也能正常启动了。",
+              "服务器修好了，你也累得只想回去睡觉。",
             ].join("\n\n")
           : [
-              "你选择自己重装，但中途才发现关键目录备份不完整。",
-              "不仅你自己的进度受损，同门也被波及，现场气氛瞬间降到冰点。",
-              "你意识到“自己上”并不总是勇敢，有时只是高风险赌局。",
+              "你重装了驱动和 CUDA 环境，显卡却依然反复掉线。",
+              "公共环境还被你改乱了，同门的任务一时也跑不起来，现场气氛瞬间降到冰点。",
+              "早知道会这样，你宁愿一开始就找专业人员来修。",
+              ...(reinstallSocialNarrative ? [reinstallSocialNarrative] : []),
             ].join("\n\n"),
       },
       [`random-13-taobao-${serial}`]: {
         title: taobaoSuccess ? "淘宝维修" : "淘宝翻车",
         description: taobaoSuccess
           ? [
-              "你在淘宝筛到一个口碑不错的工程师，远程接入后很快定位故障。",
-              "对方把环境清理、权限和服务重启一口气做完，机器恢复正常。",
-              "这次你花钱买到了真正的“省时省心”。",
+              "你在淘宝找到一名口碑不错的维修工程师，对方到机房逐项检查。",
+              "重新插拔显卡并处理供电故障后，服务器终于恢复正常。",
+              "钱花得不冤，机器当天就重新上线了。",
             ].join("\n\n")
           : [
-              "你找的远程维修看着便宜，实际全程低效反复试错。",
-              "拖了几天才勉强恢复，还被追加了额外费用。",
-              "你省下的预算没省下风险，反而把焦虑拉满了。",
+              "你找的维修看着便宜，实际只是反复拆装显卡和试错。",
+              "折腾几天后显卡还是不能用，对方还追加了额外费用。",
+              "钱没少花，服务器也继续趴了好几天。",
             ].join("\n\n"),
       },
     },
   });
 }
+

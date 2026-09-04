@@ -6,53 +6,41 @@ import {
 export interface RandomEventState {
   availableRandomEvents: number[];
   usedRandomEvents: number[];
-  coldWeight: number;
-  badmintonYear: number;
+  illnessProbability: number;
   totalRandomEventCount: number;
 }
 
 export interface RandomEventPoolContext extends RandomEventState {
   social: number;
-  san: number;
-  year: number;
-  month: number;
+  research?: number;
+  publishedPaperCount?: number;
+  hasRecoverableDraftPaper?: boolean;
 }
 
 export interface RandomEventPoolSnapshot {
   candidateEventIds: number[];
   weightedPool: number[];
-  coldActualWeight: number;
-  isFirstSemester: boolean;
-  isCooperationMonth: boolean;
 }
 
 export interface RandomEventDrawResult {
   eventId: number | null;
-  outcome: "none" | "event" | "immune-cold";
-  snapshot: RandomEventPoolSnapshot;
+  outcome: "none" | "event";
   nextState: RandomEventState;
 }
 
-export const BASE_RANDOM_EVENT_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15, 16] as const;
-export const NEGATIVE_RANDOM_EVENT_IDS = [3, 12, 13, 16] as const;
-export const COOPERATION_RANDOM_EVENT_IDS = [1, 10, 11, 14] as const;
+export const BASE_RANDOM_EVENT_IDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15] as const;
 
-const COLD_EVENT_ID = 3;
 const SOCIAL_UNLOCK_EVENT_ID = 11;
 const MENTORING_EVENT_ID = 14;
 const BASE_WEIGHT_REPEAT = 10;
-const DEFAULT_COLD_WEIGHT = 1;
-const MAX_COLD_WEIGHT = 8;
-const COLD_TIER_MULTIPLIERS = [4, 2, 0.5, 0] as const;
-const NEGATIVE_RANDOM_EVENT_ID_SET = new Set<number>(NEGATIVE_RANDOM_EVENT_IDS);
-const COOPERATION_RANDOM_EVENT_ID_SET = new Set<number>(COOPERATION_RANDOM_EVENT_IDS);
 
 function cloneRandomEventState(state: RandomEventState): RandomEventState {
   return {
     availableRandomEvents: [...state.availableRandomEvents],
     usedRandomEvents: [...state.usedRandomEvents],
-    coldWeight: Number.isFinite(state.coldWeight) && state.coldWeight > 0 ? state.coldWeight : DEFAULT_COLD_WEIGHT,
-    badmintonYear: Number.isFinite(state.badmintonYear) ? state.badmintonYear : -1,
+    illnessProbability: typeof state.illnessProbability === "number" && Number.isFinite(state.illnessProbability)
+      ? Math.max(0, Math.min(100, Math.floor(state.illnessProbability)))
+      : 4,
     totalRandomEventCount: Number.isFinite(state.totalRandomEventCount)
       ? Math.max(0, Math.floor(state.totalRandomEventCount))
       : 0,
@@ -66,7 +54,7 @@ export function getAttributeTier(value: number): 0 | 1 | 2 | 3 {
   return 0;
 }
 
-export function calculateRandomEventCount(roll: number, _fixedEventCount = 0): number {
+export function calculateRandomEventCount(roll: number): number {
   const normalizedRoll = Math.max(0, Math.min(0.999999999999, roll));
   if (normalizedRoll < 0.70) return 0;
   if (normalizedRoll < 0.85) return 1;
@@ -74,10 +62,13 @@ export function calculateRandomEventCount(roll: number, _fixedEventCount = 0): n
   return 3;
 }
 
-export function createRandomEventPool(publishedPaperCount: number): number[] {
+export function createRandomEventPool(publishedPaperCount: number, hasRecoverableDraftPaper = false): number[] {
   const nextPool: number[] = [...BASE_RANDOM_EVENT_IDS];
   if (publishedPaperCount > 0) {
     nextPool.push(MENTORING_EVENT_ID);
+  }
+  if (hasRecoverableDraftPaper) {
+    nextPool.push(16);
   }
   return nextPool;
 }
@@ -86,61 +77,36 @@ export function createInitialRandomEventState(publishedPaperCount = 0): RandomEv
   return {
     availableRandomEvents: createRandomEventPool(publishedPaperCount),
     usedRandomEvents: [],
-    coldWeight: DEFAULT_COLD_WEIGHT,
-    badmintonYear: -1,
+    illnessProbability: 4,
     totalRandomEventCount: 0,
   };
 }
 
-export function yearlyResetRandomEventState(state: RandomEventState, publishedPaperCount: number): RandomEventState {
+export function yearlyResetRandomEventState(
+  state: RandomEventState,
+  publishedPaperCount: number,
+  hasRecoverableDraftPaper = false,
+): RandomEventState {
   const nextState = cloneRandomEventState(state);
-  nextState.availableRandomEvents = createRandomEventPool(publishedPaperCount);
+  nextState.availableRandomEvents = createRandomEventPool(publishedPaperCount, hasRecoverableDraftPaper);
   nextState.usedRandomEvents = [];
   return nextState;
 }
 
-export function unlockMentoringRandomEvent(state: RandomEventState): RandomEventState {
-  if (state.availableRandomEvents.includes(MENTORING_EVENT_ID) || state.usedRandomEvents.includes(MENTORING_EVENT_ID)) {
-    return state;
-  }
-
-  return {
-    ...cloneRandomEventState(state),
-    availableRandomEvents: [...state.availableRandomEvents, MENTORING_EVENT_ID],
-  };
-}
-
-export function advanceColdWeight(coldWeight: number): number {
-  const normalizedWeight = Number.isFinite(coldWeight) && coldWeight > 0 ? coldWeight : DEFAULT_COLD_WEIGHT;
-  return Math.min(MAX_COLD_WEIGHT, normalizedWeight * 1.2);
-}
-
 export function buildWeightedRandomEventPool(context: RandomEventPoolContext): RandomEventPoolSnapshot {
-  const { candidateEventIds, isFirstSemester, isCooperationMonth } = buildCandidateEventIdsFromContext({
+  const { candidateEventIds } = buildCandidateEventIdsFromContext({
     context,
     socialUnlockEventId: SOCIAL_UNLOCK_EVENT_ID,
-    cooperationEventIdSet: COOPERATION_RANDOM_EVENT_ID_SET,
-    negativeEventIdSet: NEGATIVE_RANDOM_EVENT_ID_SET,
   });
-  let coldActualWeight = 0;
-
-  if (!isFirstSemester && candidateEventIds.includes(COLD_EVENT_ID)) {
-    coldActualWeight = cloneRandomEventState(context).coldWeight * COLD_TIER_MULTIPLIERS[getAttributeTier(context.san)];
-  }
 
   const weightedPool = buildWeightedPool({
     candidateEventIds,
-    coldEventId: COLD_EVENT_ID,
-    coldActualWeight,
     baseWeightRepeat: BASE_WEIGHT_REPEAT,
   });
 
   return {
     candidateEventIds,
     weightedPool,
-    coldActualWeight,
-    isFirstSemester,
-    isCooperationMonth,
   };
 }
 
@@ -160,7 +126,6 @@ export function drawRandomEvent(context: RandomEventPoolContext, roll: number): 
     return {
       eventId: null,
       outcome: "none",
-      snapshot,
       nextState: cloneRandomEventState(context),
     };
   }
@@ -171,7 +136,6 @@ export function drawRandomEvent(context: RandomEventPoolContext, roll: number): 
     return {
       eventId: null,
       outcome: "none",
-      snapshot,
       nextState: cloneRandomEventState(context),
     };
   }
@@ -182,28 +146,11 @@ export function drawRandomEvent(context: RandomEventPoolContext, roll: number): 
     totalRandomEventCount: currentState.totalRandomEventCount + 1,
   };
 
-  if (eventId === COLD_EVENT_ID && context.badmintonYear === context.year) {
-    nextState = consumeRandomEvent(nextState, eventId);
-    return {
-      eventId,
-      outcome: "immune-cold",
-      snapshot,
-      nextState,
-    };
-  }
-
   nextState = consumeRandomEvent(nextState, eventId);
-  if (eventId === COLD_EVENT_ID) {
-    nextState = {
-      ...nextState,
-      coldWeight: DEFAULT_COLD_WEIGHT,
-    };
-  }
 
   return {
     eventId,
     outcome: "event",
-    snapshot,
     nextState,
   };
 }

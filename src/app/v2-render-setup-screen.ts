@@ -5,13 +5,15 @@ import {
   getRoleAchievementPageCount,
   isRoleOwned,
   ROLE_ACHIEVEMENT_PAGE_SIZE,
-} from "../core/v2-account";
+} from "../core/v2-lobby";
 import { MAX_SAN } from "../core/v2-content";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
 import { BASE_RESEARCH_CAP } from "../core/v2-research-cap-system";
 import { getRoleLobbyAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
+import { renderLobbyInfoView, renderLobbyMasthead, renderLobbyMessageView } from "./v2-render-community";
+import type { LobbyInfoSectionId, LobbyViewId } from "./v2-render-types";
 
 const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain"]);
 
@@ -49,6 +51,15 @@ const LOBBY_STARTING_STAT_CAPS: Partial<Record<keyof typeof DOSSIER_STAT_LABELS,
 const ROLE_LEVEL_EXP_REQUIREMENTS = [20, 40, 80, 140, 220, 320, 440, 580, 640, 820] as const;
 const NORMAL_EFFECT_MAX_LEVEL = 10;
 const DEFAULT_ROLE_EXP_GAIN_MULTIPLIER = 1;
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
 
 function buildTalentPreviewDefinitions(...sourceIds: TalentSourceId[]): TalentSourceId[] {
   return [...sourceIds];
@@ -122,10 +133,10 @@ function renderRoleAchievementDisplay(
         return `
         <span
           class="lobby-role-card-achievement-icon${achieved ? " is-unlocked" : ""}"
-          data-achievement-id="${achievement.id}"
-          title="${achievement.title}"
-          aria-label="${achievement.title}${achieved ? "，已达成" : "，未达成"}"
-        >${achievement.icon}</span>
+          data-achievement-id="${escapeHtml(achievement.id)}"
+          title="${escapeHtml(achievement.title)}"
+          aria-label="${escapeHtml(`${achievement.title}${achieved ? "，已达成" : "，未达成"}`)}"
+        >${escapeHtml(achievement.icon)}</span>
       `;
       }).join("")}
       </span>
@@ -158,7 +169,7 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
       class="lobby-role-card${toneClass}${selectedClass}${statusClass}"
       type="button"
       data-action="select-role"
-      data-role-id="${role.id}"
+      data-role-id="${escapeHtml(role.id)}"
       aria-pressed="${selectedRoleId === roleId ? "true" : "false"}"
     >
       <div class="lobby-role-card-top">
@@ -166,17 +177,17 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
           <div class="lobby-role-card-portrait-shell">
             <img
               class="lobby-role-card-portrait"
-              src="${getRoleCardPortraitUrl(role.id)}"
+              src="${escapeHtml(getRoleCardPortraitUrl(role.id))}"
               width="144"
               height="258"
               loading="lazy"
               decoding="async"
               fetchpriority="low"
-              alt="${role.name}缩略立绘"
+              alt="${escapeHtml(`${role.name}缩略立绘`)}"
             />
           </div>
           <div class="lobby-role-card-headings">
-            <strong class="lobby-role-card-name">${role.name}</strong>
+            <strong class="lobby-role-card-name">${escapeHtml(role.name)}</strong>
             <div class="lobby-role-card-mode-band ${getRoleModeClass(roleId)}">
               <span>${getRoleModeLabel(roleId)}</span>
             </div>
@@ -204,7 +215,7 @@ function renderRolePager(accountProfile: AccountProfile): string {
       >
         <span aria-hidden="true">←</span>
       </button>
-      <span class="lobby-page-indicator">${accountProfile.lobbyRolePage + 1} / ${pageCount}</span>
+      ${renderLobbyPageDots(pageCount, accountProfile.lobbyRolePage, "change-lobby-role-page")}
       <button
         class="lobby-page-button"
         type="button"
@@ -219,6 +230,23 @@ function renderRolePager(accountProfile: AccountProfile): string {
   `;
 }
 
+function renderLobbyPageDots(pageCount: number, currentPage: number, action: string): string {
+  return `
+    <div class="lobby-page-dots" role="group" aria-label="分页">
+      ${Array.from({ length: pageCount }, (_, pageIndex) => `
+        <button
+          class="lobby-page-dot${pageIndex === currentPage ? " is-active" : ""}"
+          type="button"
+          aria-label="第${pageIndex + 1}页"
+          ${pageIndex === currentPage ? 'aria-current="page" disabled' : ""}
+          data-action="${action}"
+          data-delta="${pageIndex - currentPage}"
+        ></button>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: AccountProfile): string {
   const viewModel = buildLobbySelectedRoleViewModel(accountProfile, selectedRoleId);
   const roleAchievementById = new Map(viewModel.roleAchievements.map((achievement) => [achievement.definition.id, achievement]));
@@ -229,7 +257,6 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
       unlocked: definition.unlocksRoleId
         ? isRoleOwned(accountProfile, definition.unlocksRoleId)
         : roleAchievement?.unlocked === true,
-      progressLines: roleAchievement?.progressLines ?? [],
     };
   });
   const unlockedCount = visibleAchievements.filter((achievement) => achievement.unlocked).length;
@@ -258,7 +285,7 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
             data-delta="-1"
             ${achievementPageIndex <= 0 ? "disabled" : ""}
           ><span aria-hidden="true">←</span></button>
-          <span class="lobby-page-indicator">${achievementPageIndex + 1} / ${achievementPageCount}</span>
+          ${renderLobbyPageDots(achievementPageCount, achievementPageIndex, "change-role-achievement-page")}
           <button
             class="lobby-page-button"
             type="button"
@@ -290,13 +317,13 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
           ? pageAchievements.map((achievement) => `
           <details class="lobby-profile-achievement${achievement.unlocked ? " is-unlocked" : ""}" name="role-achievements">
             <summary class="lobby-profile-achievement-summary">
-              <span class="lobby-profile-achievement-icon" aria-hidden="true">${achievement.definition.icon}</span>
-              <strong>${achievement.definition.title}</strong>
+              <span class="lobby-profile-achievement-icon" aria-hidden="true">${escapeHtml(achievement.definition.icon)}</span>
+              <strong>${escapeHtml(achievement.definition.title)}</strong>
               <i class="lobby-profile-achievement-chevron" data-lucide="chevron-down" aria-hidden="true"></i>
             </summary>
             <div class="lobby-profile-achievement-details">
-              <p class="lobby-profile-achievement-condition"><span>达成条件</span>${achievement.definition.description}</p>
-              ${achievement.definition.rewardText ? `<p class="lobby-profile-achievement-reward"><span>奖励</span>${achievement.definition.rewardText}</p>` : ""}
+              <p class="lobby-profile-achievement-condition"><span>达成条件</span>${escapeHtml(achievement.definition.description)}</p>
+              ${achievement.definition.rewardText ? `<p class="lobby-profile-achievement-reward"><span>奖励</span>${escapeHtml(achievement.definition.rewardText)}</p>` : ""}
             </div>
           </details>
         `).join("")
@@ -393,20 +420,20 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
   return `
     <section class="lobby-profile-info">
       <div class="lobby-profile-info-head">
-        <h1 class="lobby-profile-art-name">${viewModel.role.name}</h1>
+        <h1 class="lobby-profile-art-name">${escapeHtml(viewModel.role.name)}</h1>
         ${viewModel.unlockState.owned
-          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${viewModel.role.id}"><span class="lobby-start-button-label">开始游戏</span><span class="lobby-start-button-arrow" aria-hidden="true">→</span></button>`
-          : `<button class="lobby-start-button is-disabled" type="button" disabled><span class="lobby-start-button-label">未解锁</span></button>`}
+          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"><span class="lobby-start-button-label">开始游戏</span><span class="lobby-start-button-arrow" aria-hidden="true">→</span></button>`
+          : `<button class="lobby-start-button is-disabled" type="button" disabled aria-label="角色尚未解锁"><i data-lucide="lock" aria-hidden="true"></i></button>`}
       </div>
-      <p class="lobby-profile-summary">${viewModel.lobby.summary}</p>
+      <p class="lobby-profile-summary">${escapeHtml(viewModel.lobby.summary)}</p>
       <div class="lobby-profile-stat-columns">
         <section class="lobby-profile-stat-column">
           <h2 class="lobby-profile-stat-column-title">开局属性</h2>
           <div class="lobby-profile-stat-stack">
             ${viewModel.stats.map((stat) => `
               <div class="lobby-profile-stat-row">
-                <span>${getDossierStatLabel(stat.id, stat.label)}</span>
-                <strong>${formatLobbyStartingStatValue(stat.id, stat.total)}</strong>
+                <span>${escapeHtml(getDossierStatLabel(stat.id, stat.label))}</span>
+                <strong>${escapeHtml(formatLobbyStartingStatValue(stat.id, stat.total))}</strong>
               </div>
             `).join("")}
           </div>
@@ -416,8 +443,8 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
           <div class="lobby-profile-stat-stack lobby-profile-history-stack">
             ${viewModel.historyStats.map((stat) => `
               <div class="lobby-profile-stat-row">
-                <span>${stat.label}</span>
-                <strong>${stat.value}</strong>
+                <span>${escapeHtml(stat.label)}</span>
+                <strong>${escapeHtml(stat.value)}</strong>
               </div>
             `).join("")}
           </div>
@@ -463,7 +490,7 @@ function renderGrowthBoard(viewModel: LobbySelectedRoleViewModel): string {
       <div class="lobby-growth-exp-detail-row">
         <div class="lobby-talent-allocation-meta">
           <span>天赋点 ${pointSummary.availablePoints}</span>
-          <button class="lobby-talent-reset-button" type="button" disabled>重置</button>
+          <button class="lobby-talent-reset-button" type="button" disabled><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span></button>
         </div>
       </div>
       <div class="lobby-talent-allocation-section">
@@ -471,13 +498,13 @@ function renderGrowthBoard(viewModel: LobbySelectedRoleViewModel): string {
         ${talents.map((talent) => `
           <article class="lobby-talent-allocation-row">
             <div class="lobby-talent-allocation-copy">
-              <strong>${talent.name}</strong>
-              ${talent.effectText ? `<span class="lobby-talent-allocation-effect">${talent.effectText}</span>` : ""}
+              <strong>${escapeHtml(talent.name)}</strong>
+              ${talent.effectText ? `<span class="lobby-talent-allocation-effect">${escapeHtml(talent.effectText)}</span>` : ""}
             </div>
             <div class="lobby-talent-stepper">
-              <button class="lobby-talent-step-button" type="button" disabled aria-label="减少${talent.name}点数">−</button>
+              <button class="lobby-talent-step-button" type="button" disabled aria-label="${escapeHtml(`减少${talent.name}点数`)}">−</button>
               <strong class="lobby-talent-step-value">${talent.allocatedPoints}</strong>
-              <button class="lobby-talent-step-button" type="button" disabled aria-label="增加${talent.name}点数">+</button>
+              <button class="lobby-talent-step-button" type="button" disabled aria-label="${escapeHtml(`增加${talent.name}点数`)}">+</button>
             </div>
           </article>
         `).join("")}
@@ -498,13 +525,13 @@ function renderSelectedRoleDetail(accountProfile: AccountProfile, selectedRoleId
             <div class="lobby-profile-art">
               <img
                 class="lobby-profile-portrait"
-                src="${getRoleDetailPortraitUrl(viewModel.role.id)}"
+                src="${escapeHtml(getRoleDetailPortraitUrl(viewModel.role.id))}"
                 width="432"
                 height="774"
                 loading="eager"
                 decoding="async"
                 fetchpriority="high"
-                alt="${viewModel.role.name}立绘"
+                alt="${escapeHtml(`${viewModel.role.name}立绘`)}"
               />
             </div>
             ${renderProfileInfoPanel(viewModel)}
@@ -519,7 +546,12 @@ function renderSelectedRoleDetail(accountProfile: AccountProfile, selectedRoleId
   `;
 }
 
-export function renderSetupScreen(_state: GameState, accountProfile: AccountProfile): string {
+export function renderSetupScreen(
+  _state: GameState,
+  accountProfile: AccountProfile,
+  activeView: LobbyViewId = "roles",
+  activeInfoSection: LobbyInfoSectionId = "overview",
+): string {
   const selectedRoleId = accountProfile.selectedLobbyRoleId;
   const ownedCount = getRoleOptions().filter((role) => isRoleOwned(accountProfile, role.id)).length;
   const rolePageRows = getLobbyRolePageRows(accountProfile);
@@ -529,7 +561,8 @@ export function renderSetupScreen(_state: GameState, accountProfile: AccountProf
       <section class="lobby-stage-shell">
         <div class="lobby-stage-scale">
           <section class="lobby-stage">
-            <section class="lobby-grid">
+            ${renderLobbyMasthead(activeView)}
+            ${activeView === "roles" ? `<section class="lobby-grid">
               <aside class="lobby-role-rail">
                 <div class="lobby-panel lobby-role-panel">
                   <div class="lobby-panel-header">
@@ -552,7 +585,7 @@ export function renderSetupScreen(_state: GameState, accountProfile: AccountProf
               </aside>
 
               ${renderSelectedRoleDetail(accountProfile, selectedRoleId)}
-            </section>
+            </section>` : activeView === "info" ? renderLobbyInfoView(activeInfoSection) : renderLobbyMessageView()}
           </section>
         </div>
       </section>

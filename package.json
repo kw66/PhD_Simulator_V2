@@ -14,7 +14,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "vite build",
     "play": "vite --open",
     "play:preview": "vite preview --open",
     "play:local": "vite --host 127.0.0.1 --port 4317",
@@ -23,6 +23,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "audit:reviews": "node scripts/audit-event-review-snapshots.mjs",
+    "sync:reviews": "node scripts/sync-event-review-snapshots.mjs",
     "verify": "npm run typecheck && npm run test && npm run build"
   },
   "devDependencies": {

@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   THESIS_OPTIONS,
   THESIS_STAGES,
-  abandonThesis,
   applyThesisOption,
   calculateThesisProgressGain,
   createInitialThesisState,
@@ -40,14 +39,10 @@ describe("v2 thesis rules", () => {
     expect(getThesisStage(firstStep.nextThesis.progress).name).toBe("未开始");
 
     const finalStep = applyThesisOption({ ...firstStep.nextThesis, progress: 90 }, THESIS_OPTIONS[3], 4, 20);
+    expect(finalStep.progressGain).toBe(10);
     expect(finalStep.nextThesis.progress).toBe(100);
     expect(finalStep.nextThesis.completed).toBe(true);
     expect(getThesisStage(finalStep.nextThesis.progress).name).toBe("答辩准备");
   });
 
-  it("支持放弃后停止后续触发", () => {
-    const abandoned = abandonThesis(startThesisIfAvailable(2, 7, createInitialThesisState()));
-    expect(abandoned.abandoned).toBe(true);
-    expect(shouldTriggerThesisEvent(3, 1, abandoned)).toBe(false);
-  });
 });

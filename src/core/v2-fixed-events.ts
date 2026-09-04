@@ -3,8 +3,8 @@ import {
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
 import { createCcigEvent, resolveCcigFixedEvent } from "./v2-fixed-events-ccig";
-import { createMidtermMessageEvent } from "./v2-fixed-events-midterm";
-import { createMentorAssignEvent, resolveMentorAssignCandidate } from "./v2-fixed-events-mentor-assign";
+import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
+import { createPhdDecisionEvent } from "./v2-phd-decision-event";
 import { createScholarshipEvent } from "./v2-fixed-events-scholarship";
 import {
   createSummerVacationEvent,
@@ -42,18 +42,17 @@ export function applyFixedEventResolution(
     case "year-summary-sleep":
     case "year-summary-social":
     case "year-summary-favor":
-    case "year-summary-intern":
+    case "year-summary-part-time":
       return resolveSeasonalFixedEvent(state, resolution, getRoll);
     case "ccig-open":
     case "ccig-skip":
     case "ccig-advisor":
     case "ccig-self":
     case "ccig-activity-listen":
+    case "ccig-activity-poster":
     case "ccig-activity-travel":
     case "ccig-activity-food":
       return resolveCcigFixedEvent(state, resolution, getRoll);
-    case "mentor-assign-candidate":
-      return resolveMentorAssignCandidate(state, resolution);
     default: {
       return {
         nextState: state,
@@ -77,20 +76,20 @@ export function collectFixedEventsForState(
   if (state.month === 1) {
     events.push(createTeachersDayEvent(state, getRoll));
   }
-  if (state.month === 2 && state.year >= 2 && !state.isNatureExtensionYear) {
+  if (state.month === 2 && state.year >= 2) {
     events.push(createScholarshipEvent(state, getRoll));
   }
-  if (state.month === 3 && state.year === 3) {
-    events.push(createMidtermMessageEvent(state));
-  }
-  if (state.month === 3 && state.year === 4) {
-    events.push(createMentorAssignEvent(state, getRoll));
+  if (state.degree === "phd" && state.phdStartYear === state.year && state.month === 1) {
+    events.push(createMentorAssignEvent(state));
   }
   if (state.month === 5) {
     events.push(createWinterVacationEvent(state));
   }
   if (state.month === 9) {
     events.push(createCcigEvent(state));
+  }
+  if (state.degree === "master" && state.month === 10 && (state.year === 2 || state.year === 3)) {
+    events.push(createPhdDecisionEvent(state, state.year));
   }
   if (state.month === 11) {
     events.push(createSummerVacationEvent(state));

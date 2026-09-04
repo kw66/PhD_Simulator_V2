@@ -1,15 +1,14 @@
-import { applyStateMutation, drawWeightedTriplet, type FixedResolutionResult, type RandomRollProvider } from "./v2-fixed-events-shared";
+import { drawInclusiveInt, type FixedResolutionResult, type RandomRollProvider } from "./v2-fixed-events-shared";
 import {
   createCcigActivityResultEvent,
   createCcigAttendResultEvent,
   createCcigDecisionEvent,
-  createCcigEvent,
   createCcigSkipResultEvent,
 } from "./v2-fixed-events-ccig-events";
 import { getCcigLocation, getCcigSelfPayCost } from "./v2-fixed-events-ccig-shared";
+import { combineEffectMultipliers } from "./v2-numeric-modifiers";
+import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState } from "./v2-types";
-
-export { createCcigEvent };
 
 export function resolveCcigFixedEvent(
   state: GameState,
@@ -30,55 +29,95 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigSkipResultEvent(state)],
       };
     case "ccig-advisor": {
-      const nextState = applyStateMutation(state, { favor: -1 });
-      if (nextState.player.favor < 0) {
-        return {
-          nextState,
-          outcome: "导师好感 -1，关系跌破下限。",
-        };
-      }
+      const favorResult = applyTierResist(-1, state.player.favor, getRoll);
+      const favorChange = favorResult.effectiveChange;
+      const favorNarrative = getTierResistedNarrative("导师好感", -1, favorResult);
+      const nextState = state;
+      const settlement = formatTierResistedOutcome("导师好感", -1, favorResult);
       return {
         nextState,
-        outcome: "导师好感 -1，报销通过。",
-        enqueueEvents: [createCcigAttendResultEvent(state, "advisor", 0)],
+        outcome: `${settlement}，报销通过。`,
+        enqueueEvents: [createCcigAttendResultEvent(state, "advisor", ["导师报销", settlement], favorNarrative, favorChange < 0 ? { favor: favorChange } : {})],
       };
     }
     case "ccig-self": {
       const { actualCost } = getCcigSelfPayCost(state);
-      const nextState = actualCost === 0 ? state : applyStateMutation(state, { money: -actualCost });
-      if (nextState.player.money < 0) {
-        return {
-          nextState,
-          outcome: `金钱 -${actualCost}，余额跌破下限。`,
-        };
-      }
+      const nextState = state;
+      const costText = actualCost === 0 ? "参会费用 0" : `金币 -${actualCost}`;
       return {
         nextState,
-        outcome: actualCost === 0
-          ? "装备减免生效，参会免费。"
-          : `金钱 -${actualCost}。`,
-        enqueueEvents: [createCcigAttendResultEvent(state, "self", actualCost)],
+        outcome: `${costText}。`,
+        enqueueEvents: [createCcigAttendResultEvent(state, "self", ["自费参会", costText], "", actualCost > 0 ? { money: -actualCost } : {})],
       };
     }
     case "ccig-activity-listen": {
-      const tempBonus = drawWeightedTriplet(4, 6, getRoll);
+      const tempBonus = drawInclusiveInt(4, 6, getRoll);
+      const activityOutcome = `下次想 idea +${tempBonus}，永久 idea +1`;
+      const completionLog = [resolution.ccigAttendanceSummary, activityOutcome].filter(Boolean).join("；");
       return {
         nextState: state,
         outcome: `下次想 idea +${tempBonus}，永久 idea +1。`,
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "listen",
-          title: "领域年会会场活动 ➜ 参会选择 ➜ 满载而归",
+          title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
-            "你把一天几乎都放在报告厅，从 keynote 听到分论坛，笔记写了好几页。",
+            "你把一天几乎都放在报告厅，从院士的主旨报告听到分论坛，笔记写了好几页。",
             "茶歇时你主动和几位学者交流，把自己课题里的瓶颈直接拿出来请教。",
             "回程路上，你已经列好下一轮要验证的三个想法，脑子里久违地很清晰。",
           ].join("\n\n"),
-          preview: "会场交流沉淀成了明确的课题收益",
-          outcome: `下次想 idea +${tempBonus}，以后每次想 idea +1。`,
+          outcome: `${activityOutcome}。`,
+          completionLog,
           effects: {
             temporaryActionEffectUpdates: { idea: { bonus: tempBonus } },
             ideaBonus: 1,
+          },
+        })],
+      };
+    }
+    case "ccig-activity-poster": {
+      const paper = [...state.papers, ...state.externalPublications].find((entry) => (
+        entry.id === resolution.ccigPaperId
+        && entry.status === "published"
+        && entry.target === "A"
+        && entry.nonFirstAuthor !== true
+        && entry.publication
+      ));
+      if (!paper?.publication) {
+        return {
+          nextState: state,
+          outcome: "没有找到可展示的 A 类论文。",
+        };
+      }
+      const promotionMultiplier = combineEffectMultipliers([
+        paper.publication.promotionMultiplier ?? 1,
+        1.5,
+      ]);
+      const activityOutcome = `SAN -2；《${paper.title}》宣传倍率 +50%`;
+      const completionLog = [resolution.ccigAttendanceSummary, "海报展示", activityOutcome].filter(Boolean).join("；");
+      return {
+        nextState: state,
+        outcome: `展示《${paper.title}》。`,
+        enqueueEvents: [createCcigActivityResultEvent({
+          state,
+          mode: "poster",
+          title: "年会活动 ➜ 选择安排 ➜ 活动结果",
+          description: [
+            `你把《${paper.title}》的海报贴上展板，留在旁边向过来的同行介绍工作。`,
+            "有人追问实验细节，也有人拍下海报，约你会后继续交流。",
+            "一天下来讲得口干舌燥，这篇论文倒是让更多人记住了。",
+          ].join("\n\n"),
+          outcome: `${activityOutcome}。`,
+          completionLog,
+          effects: {
+            san: -2,
+            paperUpdates: [{
+              id: paper.id,
+              publication: {
+                ...paper.publication,
+                promotionMultiplier,
+              },
+            }],
           },
         })],
       };
@@ -92,20 +131,22 @@ export function resolveCcigFixedEvent(
         西安: "参观了兵马俑和大雁塔，感受千年古都的魅力",
         重庆: "坐轻轨穿过山城，又在洪崖洞看了夜景",
       } as Record<string, string>)[location] ?? "在当地的著名景点游玩";
+      const activityOutcome = "SAN +5";
+      const completionLog = [resolution.ccigAttendanceSummary, activityOutcome].filter(Boolean).join("；");
       return {
         nextState: state,
         outcome: "SAN +5。",
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "travel",
-          title: "领域年会会场活动 ➜ 参会选择 ➜ 旅途愉快",
+          title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             "你只听了核心场次，其余时间留给了城市本身。",
-            `你${attraction}，让大脑从连续几个月的高压节奏里短暂抽离。`,
-            "这天没有带来明显学术进展，但你明显感觉焦虑阈值被拉低了。",
+            `你${attraction}，一整天都没再想实验和论文。`,
+            "晚上回到酒店时，你已经轻松了不少。",
           ].join("\n\n"),
-          preview: "把一部分参会时间换成状态修复",
-          outcome: "SAN +5。",
+          outcome: `${activityOutcome}。`,
+          completionLog,
           effects: { san: 5 },
         })],
       };
@@ -119,28 +160,30 @@ export function resolveCcigFixedEvent(
         西安: "肉夹馍、羊肉泡馍、凉皮",
         重庆: "重庆火锅、小面、酸辣粉",
       } as Record<string, string>)[location] ?? "当地特色美食";
-      const nextState = applyStateMutation(state, { money: -2 });
-      if (nextState.player.money < 0) {
-        return {
-          nextState,
-          outcome: "金钱 -2，余额跌破下限。",
-        };
-      }
+      // The activity result is its own confirmation stage; defer the meal cost
+      // until that final click just like the other activity effects.
+      const nextState = state;
+      const socialResult = applyTierResist(1, state.player.social, getRoll);
+      const socialGain = socialResult.effectiveChange;
+      const socialNarrative = getTierResistedNarrative("社交", 1, socialResult);
+      const activityOutcome = `金币 -2，SAN +2，${formatTierResistedOutcome("社交", 1, socialResult)}`;
+      const completionLog = [resolution.ccigAttendanceSummary, activityOutcome].filter(Boolean).join("；");
       return {
         nextState,
-        outcome: "金钱 -2。",
+        outcome: "金币 -2。",
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "food",
-          title: "领域年会会场活动 ➜ 参会选择 ➜ 大快朵颐",
+          title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你约了几位同学去吃${location}当地菜：${food}。`,
             "饭桌上从“最近在做什么”聊到“你这个方向怎么落地”，气氛比会场里松很多。",
-            "这顿饭花了钱，但你换回了更顺的合作关系和更轻的心理负担。",
+            "一顿饭下来，大家熟了不少，还约好以后互相交流代码和数据。",
+            ...(socialNarrative ? [socialNarrative] : []),
           ].join("\n\n"),
-          preview: "用一顿饭换回更顺的合作氛围",
-          outcome: "SAN +2，社交 +1。",
-          effects: { san: 2, social: 1 },
+          outcome: `${activityOutcome}。`,
+          completionLog,
+          effects: socialGain > 0 ? { money: -2, san: 2, social: socialGain } : { money: -2, san: 2 },
         })],
       };
     }

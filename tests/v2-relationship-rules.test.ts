@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  addMentorshipStacks,
   createRelationshipState,
-  getMonthlyRelationshipEffects,
   getUnlockedRelationshipSlotCount,
   syncRelationshipState,
   tryAddRelationship,
@@ -34,14 +32,5 @@ describe("v2 relationship rules", () => {
     expect(state.seniorCount).toBe(1);
     expect(blocked.added).toBe(false);
     expect(blocked.nextState.occupiedSlots).toBe(2);
-  });
-
-  it("mentorship stacks convert into monthly SAN cost and citation gain", () => {
-    let state = createRelationshipState();
-    state = syncRelationshipState(state, 6);
-    ({ nextState: state } = tryAddRelationship(state, "junior"));
-    state = addMentorshipStacks(state, 2);
-
-    expect(getMonthlyRelationshipEffects(state)).toEqual({ sanDelta: -2, citationDelta: 6 });
   });
 });

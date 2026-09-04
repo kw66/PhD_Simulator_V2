@@ -14,9 +14,9 @@ const SUPPORT_ITEM_STATE_KEYS: Record<SupportItemId, keyof EventSupportState> = 
 };
 
 export const SUPPORT_ITEM_DEFINITIONS: SupportItemDefinition[] = [
-  { id: "badminton_racket", name: "羽毛球拍", description: "羽毛球比赛 2 次尝试机会。", price: 4 },
-  { id: "game_controller", name: "游戏手柄", description: "玩游戏时 SAN 消耗 -2。", price: 4 },
-  { id: "parasol", name: "遮阳伞", description: "使夏季 SAN debuff 无效。", price: 10 },
+  { id: "badminton_racket", name: "羽毛球拍", description: "羽毛球获胜概率 +30%", price: 4 },
+  { id: "game_controller", name: "游戏手柄", description: "玩游戏时 SAN 消耗 -2", price: 4 },
+  { id: "parasol", name: "遮阳伞", description: "使夏季主动操作 SAN +1 无效", price: 10 },
 ];
 
 export function getSupportItemDefinition(itemId: SupportItemId): SupportItemDefinition {
@@ -29,17 +29,6 @@ export function getSupportItemDefinition(itemId: SupportItemId): SupportItemDefi
 
 export function isSupportItemOwned(eventSupport: EventSupportState, itemId: SupportItemId): boolean {
   return eventSupport[SUPPORT_ITEM_STATE_KEYS[itemId]] === true;
-}
-
-export function applySupportItemOwnership(
-  eventSupport: EventSupportState,
-  itemId: SupportItemId,
-  owned: boolean,
-): EventSupportState {
-  return {
-    ...eventSupport,
-    [SUPPORT_ITEM_STATE_KEYS[itemId]]: owned,
-  };
 }
 
 export function getSupportItemSellPrice(itemId: SupportItemId): number {

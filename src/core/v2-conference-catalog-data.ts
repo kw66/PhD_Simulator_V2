@@ -6,7 +6,13 @@ export interface ConferenceInfo {
   fullName: string;
   field: string;
   year: number;
-  month: number;
+  influence: number;
+  referenceScore: number;
+}
+
+export interface ConferenceProfile {
+  /** Fixed venue visibility baseline; values are rough gameplay estimates. */
+  influence: number;
 }
 
 export interface ConferenceLocation {
@@ -65,7 +71,7 @@ export const CONFERENCES: Record<number, Record<PaperTarget, ConferenceDefinitio
         even: { name: "ECCV", fullName: "European Conference on Computer Vision" },
       },
     },
-    B: { name: "ISCA", fullName: "Annual Conference of ISCA", field: "语音" },
+    B: { name: "Interspeech", fullName: "Annual Conference of the International Speech Communication Association", field: "语音" },
     C: { name: "IROS", fullName: "IEEE/RSJ International Conference on Intelligent Robots and Systems", field: "机器人" },
   },
   8: {
@@ -93,6 +99,51 @@ export const CONFERENCES: Record<number, Record<PaperTarget, ConferenceDefinitio
     B: { name: "ICMR", fullName: "ACM International Conference on Multimedia Retrieval", field: "多媒体检索" },
     C: { name: "3DV", fullName: "International Conference on 3D Vision", field: "三维视觉" },
   },
+};
+
+/** Conference-level influence estimates used by the review and citation systems. */
+export const CONFERENCE_PROFILES: Record<string, ConferenceProfile> = {
+  ICLR: { influence: 1.40 },
+  ICRA: { influence: 0.70 },
+  WACV: { influence: 0.35 },
+  WWW: { influence: 1.15 },
+  NAACL: { influence: 0.65 },
+  MMAsia: { influence: 0.25 },
+  CVPR: { influence: 1.40 },
+  CIKM: { influence: 0.65 },
+  ICDAR: { influence: 0.30 },
+  ACL: { influence: 1.25 },
+  ICONIP: { influence: 0.55 },
+  ICPR: { influence: 0.30 },
+  IJCAI: { influence: 0.95 },
+  ICME: { influence: 0.60 },
+  ICIP: { influence: 0.25 },
+  ICML: { influence: 1.35 },
+  COLT: { influence: 0.75 },
+  IJCNN: { influence: 0.25 },
+  ICCV: { influence: 1.30 },
+  ECCV: { influence: 1.30 },
+  Interspeech: { influence: 0.70 },
+  IROS: { influence: 0.35 },
+  "ACM MM": { influence: 0.90 },
+  EACL: { influence: 0.65 },
+  IJCB: { influence: 0.25 },
+  NeurIPS: { influence: 1.40 },
+  ECAI: { influence: 0.65 },
+  BMVC: { influence: 0.40 },
+  EMNLP: { influence: 1.20 },
+  CoNLL: { influence: 0.60 },
+  PRCV: { influence: 0.30 },
+  COLING: { influence: 1.10 },
+  RSS: { influence: 0.75 },
+  ACCV: { influence: 0.30 },
+  AAAI: { influence: 1.00 },
+  ICMR: { influence: 0.55 },
+  "3DV": { influence: 0.30 },
+};
+
+export const DEFAULT_CONFERENCE_PROFILE: ConferenceProfile = {
+  influence: 1,
 };
 
 export const CONFERENCE_LOCATIONS: ConferenceLocation[] = [

@@ -2,7 +2,6 @@ import type { ConferenceEncounterState } from "./v2-types";
 
 export function createConferenceEncounterState(): ConferenceEncounterState {
   return {
-    metBigBull: false,
     metBigBullCoop: false,
     bigBullCooperation: false,
     bigBullCoopCount: 0,

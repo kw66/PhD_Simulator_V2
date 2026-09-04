@@ -17,7 +17,6 @@ function createEvent(id: string, deadlineMonths: number, blocking = true): Pendi
     id,
     title: `事件 ${id}`,
     description: `描述 ${id}`,
-    preview: `预览 ${id}`,
     source: "fixed",
     blocking,
     deadlineMonths,
@@ -28,10 +27,9 @@ function createEvent(id: string, deadlineMonths: number, blocking = true): Pendi
 }
 
 describe("v2 event queue", () => {
-  it("入队时会补齐排序字段并保持预览文本", () => {
+  it("入队时会补齐排序字段", () => {
     const queueItem = createEventQueueItem(createEvent("a", 0), 3);
     expect(queueItem.queueOrder).toBe(3);
-    expect(queueItem.preview).toBe("预览 a");
   });
 
   it("按期限优先、再按入队顺序排序", () => {

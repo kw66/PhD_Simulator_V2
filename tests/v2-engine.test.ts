@@ -1,2364 +1,822 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+
+import { DEBUG_EVENT_GROUPS } from "../src/core/v2-debug-tools";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
-import { BASE_RANDOM_EVENT_IDS } from "../src/core/v2-random-event-rules";
-import type { GameState } from "../src/core/v2-types";
+import { collectRandomEventsForMonth } from "../src/core/v2-event-scheduler";
+import { collectFixedEventsForState } from "../src/core/v2-fixed-events";
+import { createDraftPaper } from "../src/core/v2-paper-rules";
+import { attachPaperPublication } from "../src/core/v2-publication-rules";
+import { createPhdDecisionEvent } from "../src/core/v2-phd-decision-event";
+import { pushLog, pushNoOpLog } from "../src/core/v2-engine-helpers";
 
-function startPreEnrollmentWith(
-  roleId: "normal" | "genius" | "social" | "rich" | "teacher-child",
-) {
-  let state = createInitialState();
-  state = dispatchAction(state, "select-role", { roleId });
-  return dispatchAction(state, "start-game", { roleId, advisorName: "测试导师" });
+function startGame() {
+  return dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
 }
 
-function startWith(
-  roleId: "normal" | "genius" | "social" | "rich" | "teacher-child",
-): GameState {
-  const enrolledState = dispatchAction(startPreEnrollmentWith(roleId), "next-month");
-  return {
-    ...enrolledState,
-    eventQueue: [] as GameState["eventQueue"],
-  };
+function resolveCurrent(state: ReturnType<typeof startGame>) {
+  const event = state.eventQueue[0];
+  const choice = event?.choices[0];
+  if (!event || !choice) throw new Error("current event is missing");
+  return dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: choice.id });
 }
 
-function resolveFirstQueuedEvent(state: GameState): GameState {
-  const firstChoiceId = state.eventQueue[0]?.choices[0]?.id;
-  if (!firstChoiceId) {
-    throw new Error("missing queued choice");
-  }
-  return dispatchAction(state, "resolve-event", { eventChoiceId: firstChoiceId });
-}
+describe("minimal game engine", () => {
+  it("keeps no-op and empty messages out of the timeline", () => {
+    const initial = startGame();
+    const withMessage = pushNoOpLog(initial, "重复操作：当前状态没有变化");
+    const duplicate = pushNoOpLog(withMessage, "重复操作：当前状态没有变化");
 
-describe("v2 engine", () => {
-  beforeEach(() => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    expect(withMessage.log).toHaveLength(initial.log.length + 1);
+    expect(duplicate.log).toEqual(withMessage.log);
+    expect(pushNoOpLog(duplicate, "   ").log).toEqual(duplicate.log);
+    expect(pushLog(duplicate, "重复操作：当前状态没有变化").log).toHaveLength(duplicate.log.length + 1);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("setup 空态下不能直接 start-game", () => {
-    const initialState = createInitialState();
-    const state = dispatchAction(initialState, "start-game");
-
-    expect(state.phase).toBe("setup");
-    expect(state.setupSelectedRoleId).toBeNull();
-    expect(state.log[0]?.text).toContain("请先选择角色");
-  });
-
-  it("可以从 setup 进入第 0 月 playing，并带上角色和导师", () => {
-    const state = startPreEnrollmentWith("genius");
+  it("starts with the pre-enrollment event and preserves its multi-scene chain", () => {
+    let state = startGame();
     expect(state.phase).toBe("playing");
-    expect(state.selectedRoleId).toBe("genius");
-    expect(state.selectedAdvisorName).toBe("测试导师");
     expect(state.month).toBe(0);
-    expect(state.totalMonths).toBe(0);
-    expect(state.player).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
-    expect(state.paperSlotsUnlocked).toBe(1);
-    expect(state.graduationScoreTarget).toBe(1);
-    expect(state.availableRandomEvents).toEqual([...BASE_RANDOM_EVENT_IDS]);
-    expect(state.coldWeight).toBe(1);
-  });
+    expect(state.eventQueue[0]?.chainId).toBe("before-grad-school");
 
-  it("第 0 月点击下一月会作为正式入学进入第 1 月，不跑正常月结算", () => {
-    const state = dispatchAction(startPreEnrollmentWith("normal"), "next-month");
-
-    expect(state.phase).toBe("playing");
-    expect(state.year).toBe(1);
-    expect(state.month).toBe(1);
-    expect(state.totalMonths).toBe(1);
-    expect(state.actionsRemaining).toBe(state.maxActionsPerMonth);
-    expect(state.eventQueue).toHaveLength(1);
-    expect(state.eventQueue[0]?.chainId).toBe("teachers-day");
-    expect(state.log.some((entry) => entry.text.includes("正式入学"))).toBe(true);
-  });
-
-  it("社交达人开局会同步旧版关系槽解锁口径", () => {
-    const state = startPreEnrollmentWith("social");
-    expect(state.player.social).toBe(1);
-    expect(state.relationshipState.unlockedSlots).toBe(2);
-  });
-
-  it("idea 行动会消耗 SAN 并提升选中论文", () => {
-    let state = startWith("normal");
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    const beforeSan = state.player.san;
-    state = dispatchAction(state, "idea", { paperId: paperId ?? undefined });
-    expect(state.actionsRemaining).toBe(state.maxActionsPerMonth - 2);
-    expect(state.player.san).toBe(beforeSan - 1);
-    expect(state.papers[0]?.idea).toBe(2);
-  });
-
-  it("院士转世开局会直接带着第二个基础论文槽", () => {
-    let state = startWith("genius");
-    expect(state.paperSlotsUnlocked).toBe(1);
-
-    state = {
-      ...state,
-      readingState: { ...state.readingState, readCount: 10 },
-    };
-    state = dispatchAction(state, "read");
-
-    expect(state.player.research).toBe(2);
-    expect(state.temporaryActionEffects.idea.bonus).toBe(2);
-    expect(state.paperSlotsUnlocked).toBe(1);
-  });
-
-  it("普通会议审稿满 4 个月后才会结算科研分", () => {
-    let state = startWith("genius");
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-    state = {
-      ...state,
-      papers: state.papers.map((paper) => (paper.id === paperId ? { ...paper, idea: 4, experiment: 4, writing: 4 } : paper)),
-    };
-    state = dispatchAction(state, "submit-c", { paperId });
-
-    for (let step = 0; step < 12; step += 1) {
-      if (state.eventQueue.length > 0) {
-        state = resolveFirstQueuedEvent(state);
-      } else {
-        state = dispatchAction(state, "next-month");
-      }
-
-      if (state.papers[0]?.status === "published") break;
-    }
-
-    expect(state.totalResearchScore).toBe(1);
-    expect(state.papers[0]?.status).toBe("published");
-  });
-
-  it("论文被接收后会同月入队 conference-decision act1", () => {
-    let state = startWith("genius");
-    state = {
-      ...state,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-    state = {
-      ...state,
-      papers: state.papers.map((paper) => (paper.id === paperId ? { ...paper, idea: 4, experiment: 4, writing: 4 } : paper)),
-    };
-    state = dispatchAction(state, "submit-c", { paperId });
-
-    for (let step = 0; step < 12; step += 1) {
-      const conferenceEvent = state.eventQueue.find((event) => event.chainId === "conference-decision" && event.stage === "act1");
-      if (conferenceEvent) break;
-
-      if (state.eventQueue.length > 0) {
-        state = resolveFirstQueuedEvent(state);
-      } else {
-        state = dispatchAction(state, "next-month");
-      }
-    }
-
-    const conferenceEvent = state.eventQueue.find((event) => event.chainId === "conference-decision" && event.stage === "act1");
-    expect(state.papers[0]?.status).toBe("published");
-    expect(state.papers[0]?.submittedMonth).toBe(1);
-    expect(state.papers[0]?.submittedYear).toBe(1);
-    expect(state.papers[0]?.conferenceHandled).toBe(false);
-    expect(conferenceEvent?.title).toBe("论文参会");
-  });
-
-  it("第 2 年 10 月达到门槛会触发转博抉择", () => {
-    let state = startWith("normal");
-    state = { ...state, totalMonths: 21, year: 2, month: 9, totalResearchScore: 2 };
-    state = dispatchAction(state, "next-month");
-
-    let guard = 0;
-    while (!state.pendingDecision && state.eventQueue.length > 0 && guard < 20) {
-      state = resolveFirstQueuedEvent(state);
-      guard += 1;
-    }
-
-    expect(state.pendingDecision).not.toBeNull();
-    expect(state.pendingDecision?.requiredScore).toBe(2);
-  });
-
-  it("选择读博会切到博士线并清空转博抉择", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 22,
-      year: 2,
-      month: 10,
-      pendingDecision: { kind: "phd-transfer", year: 2, requiredScore: 2 },
-    };
-
-    state = dispatchAction(state, "resolve-phd-yes");
-
-    expect(state.degree).toBe("phd");
-    expect(state.maxMonths).toBe(58);
-    expect(state.graduationScoreTarget).toBe(7);
-    expect(state.pendingDecision).toBeNull();
-    expect(state.phase).toBe("playing");
-  });
-
-  it("放弃读博只清空转博抉择并保留硕士线", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 22,
-      year: 2,
-      month: 10,
-      totalResearchScore: 2,
-      pendingDecision: { kind: "phd-transfer", year: 2, requiredScore: 2 },
-    };
-
-    state = dispatchAction(state, "resolve-phd-no");
-
-    expect(state.degree).toBe("master");
-    expect(state.maxMonths).toBe(34);
-    expect(state.graduationScoreTarget).toBe(1);
-    expect(state.pendingDecision).toBeNull();
-    expect(state.phase).toBe("playing");
-  });
-
-  it("毕业月放弃读博后会继续按硕士线结算毕业", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 34,
-      year: 3,
-      month: 10,
-      totalResearchScore: 3,
-      pendingDecision: { kind: "phd-transfer", year: 3, requiredScore: 3 },
-    };
-
-    state = dispatchAction(state, "resolve-phd-no");
-
-    expect(state.pendingDecision).toBeNull();
-    expect(state.phase).toBe("finished");
-    expect(state.ending).toBe("master");
-  });
-
-  it("到达毕业月并满足毕业线时会结算硕士毕业", () => {
-    let state = startWith("normal");
-    state = { ...state, totalMonths: 33, year: 3, month: 9, totalResearchScore: 1 };
-    state = dispatchAction(state, "next-month");
-
-    while (state.eventQueue.length > 0) {
-      state = resolveFirstQueuedEvent(state);
-    }
-
-    expect(state.phase).toBe("finished");
-    expect(state.ending).toBe("master");
-  });
-
-  it("5 月寒假事件会按 act1→act2→结果页推进后出队", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 4,
-      year: 1,
-      month: 4,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-    state = dispatchAction(state, "next-month");
-    expect(state.eventQueue.map((event) => event.chainId)).toEqual(["winter-vacation"]);
-    expect(state.eventQueue[0]?.stage).toBe("act1");
-
-    state = resolveFirstQueuedEvent(state);
-    expect(state.eventQueue[0]?.title).toBe("寒假 ➜ 假期计划");
+    state = resolveCurrent(state);
     expect(state.eventQueue[0]?.stage).toBe("act2");
-
-    state = resolveFirstQueuedEvent(state);
-    expect(state.eventQueue[0]?.title).toBe("寒假 ➜ 假期计划 ➜ 假期结束");
-    expect(state.eventQueue[0]?.stage).toBe("result");
-
-    state = resolveFirstQueuedEvent(state);
-    expect(state.eventQueue).toHaveLength(0);
+    expect(state.eventQueue[0]?.history).toHaveLength(1);
   });
 
-  it("寒假老同学分支会结算红包、恢复 SAN 并增加社交", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 4,
+  it("blocks calendar advancement until blocking events are resolved", () => {
+    const state = startGame();
+    const next = dispatchAction(state, "next-month");
+    expect(next.totalMonths).toBe(0);
+    expect(next.log).toEqual(state.log);
+  });
+
+  it("delays the conference event by three months after a confirmed publication", () => {
+    const base = startGame();
+    const paper = attachPaperPublication({
+      ...createDraftPaper(1, 0, () => 0),
+      status: "published" as const,
+      target: "A" as const,
+      idea: 24,
+      experiment: 23,
+      writing: 23,
+      submittedIdea: 24,
+      submittedExperiment: 23,
+      submittedWriting: 23,
+      submittedMonth: 1,
+      submittedYear: 1,
+      conferenceHandled: false,
+      conferenceAvailableAtTotalMonths: 4,
+    }, 1, "Poster", 1);
+    let state: ReturnType<typeof startGame> = {
+      ...base,
       year: 1,
-      month: 4,
-      player: { ...state.player, san: 10, social: 0 },
+      month: 1,
+      totalMonths: 1,
+      eventQueue: [],
       availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    const beforeSan = state.player.san;
-    const beforeMoney = state.player.money;
-    const beforeSocial = state.player.social;
-
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-
-    expect(state.player.money).toBe(beforeMoney + 1);
-    expect(state.player.san).toBe(beforeSan + Math.ceil((state.sanCap - beforeSan) * 0.1));
-    expect(state.player.social).toBe(beforeSocial + 1);
-  });
-
-  it("寒假带恋人见家长会让红包翻倍，但 SAN 仍只按基础恢复", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 4,
-      year: 1,
-      month: 4,
-      player: { ...state.player, san: 10, money: 10 },
-      loverState: {
-        ...state.loverState,
-        active: true,
-        type: "smart",
-        startTotalMonths: 1,
-      },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    const beforeSan = state.player.san;
-    const beforeMoney = state.player.money;
-
-    state = resolveFirstQueuedEvent(state);
-    vi.spyOn(Math, "random")
-      .mockImplementationOnce(() => 0)
-      .mockImplementationOnce(() => 0.5)
-      .mockImplementation(() => 0);
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-
-    expect(state.player.money).toBe(beforeMoney + 2);
-    expect(state.player.san).toBe(beforeSan + Math.ceil((state.sanCap - beforeSan) * 0.1));
-  });
-
-  it("暑假回家休息会恢复 25% 已损 SAN", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 10,
-      year: 1,
-      month: 10,
-      player: { ...state.player, san: 8 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = { ...state, eventQueue: state.eventQueue.filter((event) => event.chainId === "summer-vacation") };
-    const beforeSan = state.player.san;
-
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-    expect(state.player.san).toBe(beforeSan + Math.ceil((state.sanCap - beforeSan) * 0.25));
-    expect(state.eventQueue).toHaveLength(0);
-  });
-
-  it("暑假留校科研会给下次 idea 额外 1 次并永久 idea +1", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 10,
-      year: 1,
-      month: 10,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = { ...state, eventQueue: state.eventQueue.filter((event) => event.chainId === "summer-vacation") };
-    state = resolveFirstQueuedEvent(state);
-    const researchChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("summer-vacation-research"))?.id;
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: researchChoiceId });
-    expect(state.eventQueue[0]?.title).toBe("暑假 ➜ 暑假计划 ➜ 学术进步");
-
-    state = resolveFirstQueuedEvent(state);
-
-    expect(state.temporaryActionEffects.idea.extraActions).toBe(1);
-    expect(state.actionBonuses.idea).toBe(1);
-    expect(state.eventQueue).toHaveLength(0);
-  });
-
-  it("暑假外出旅行会花 4 金钱并恢复 50% 已损 SAN", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 10,
-      year: 1,
-      month: 10,
-      player: { ...state.player, san: 8, money: 10 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = { ...state, eventQueue: state.eventQueue.filter((event) => event.chainId === "summer-vacation") };
-    const beforeSan = state.player.san;
-    const beforeMoney = state.player.money;
-
-    state = resolveFirstQueuedEvent(state);
-    const travelChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("summer-vacation-travel"))?.id;
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: travelChoiceId });
-    expect(state.eventQueue[0]?.title).toBe("暑假 ➜ 暑假计划 ➜ 难忘旅程");
-
-    state = resolveFirstQueuedEvent(state);
-
-    expect(state.player.money).toBe(beforeMoney - 4);
-    expect(state.player.san).toBe(beforeSan + Math.ceil((state.sanCap - beforeSan) * 0.5));
-    expect(state.eventQueue).toHaveLength(0);
-  });
-
-
-  it("学年总结休息调整会给 5 点 SAN", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 10,
-      year: 1,
-      month: 10,
-      player: { ...state.player, san: 12 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = { ...state, eventQueue: state.eventQueue.filter((event) => event.chainId === "year-summary") };
-    const beforeSan = state.player.san;
-
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-
-    expect(state.player.san).toBe(beforeSan + 5);
-    expect(state.eventQueue).toHaveLength(0);
-  });
-
-  it("学年总结经营社交在 20 点口径下不会继续增加", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 10,
-      year: 1,
-      month: 10,
-      player: { ...state.player, social: 20 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = { ...state, eventQueue: state.eventQueue.filter((event) => event.chainId === "year-summary") };
-    const beforeSocial = state.player.social;
-
-    state = resolveFirstQueuedEvent(state);
-    const socialChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("year-summary-social"))?.id;
-    if (!socialChoiceId) throw new Error("year summary social choice missing");
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: socialChoiceId });
-    state = resolveFirstQueuedEvent(state);
-
-    expect(state.player.social).toBe(beforeSocial);
-    expect(state.eventQueue).toHaveLength(0);
-  });
-
-  it("学年总结外出实习会按旧版口径给 2~3 金钱", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 10,
-      year: 1,
-      month: 10,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = { ...state, eventQueue: state.eventQueue.filter((event) => event.chainId === "year-summary") };
-    const beforeMoney = state.player.money;
-
-    state = resolveFirstQueuedEvent(state);
-    const internChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("year-summary-intern"))?.id;
-    if (!internChoiceId) throw new Error("year summary intern choice missing");
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: internChoiceId });
-    state = resolveFirstQueuedEvent(state);
-
-    expect(state.player.money).toBe(beforeMoney + 2);
-    expect(state.eventQueue).toHaveLength(0);
-  });
-
-  it("第 2 年 7 月后会触发大论文事件并结算进度", () => {
-    let state = startWith("normal");
-    state = { ...state, totalMonths: 18, year: 2, month: 6 };
-    state = dispatchAction(state, "next-month");
-
-    expect(state.thesis.started).toBe(true);
-    expect(state.eventQueue.some((event) => event.source === "thesis")).toBe(true);
-
-    const beforeProgress = state.thesis.progress;
-    while (state.eventQueue[0]?.source !== "thesis") {
-      state = resolveFirstQueuedEvent(state);
-    }
-    state = resolveFirstQueuedEvent(state);
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "normal" });
-    expect(state.thesis.progress).toBeGreaterThan(beforeProgress);
-    expect(state.eventQueue[0]).toMatchObject({ chainId: "thesis-progress", stage: "result" });
-
-    state = resolveFirstQueuedEvent(state);
-    const completedThesisEvent = state.eventHistory.find((event) => event.chainId === "thesis-progress");
-    expect(completedThesisEvent?.stages.map((eventStage) => eventStage.stage)).toEqual(["act1", "act2", "result"]);
-  });
-
-  it("硕士第 3 年会按活跃月份触发求职事件并累计最佳 offer", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      year: 2,
-      month: 12,
-      totalMonths: 24,
-      thesis: { ...state.thesis, abandoned: true },
-      player: { ...state.player, research: 10, social: 8 },
-    };
-    state = dispatchAction(state, "next-month");
-
-    expect(state.eventQueue.some((event) => event.source === "career")).toBe(true);
-
-    const careerEvent = state.eventQueue.find((event) => event.source === "career");
-    if (!careerEvent) throw new Error("career event missing");
-
-    while (state.eventQueue[0]?.source !== "career") {
-      state = resolveFirstQueuedEvent(state);
-    }
-
-    const careerChainId = state.eventQueue[0]?.chainId;
-    state = resolveFirstQueuedEvent(state);
-    while (state.eventQueue[0]?.chainId !== careerChainId || state.eventQueue[0]?.stage !== "act2") {
-      state = resolveFirstQueuedEvent(state);
-    }
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "normal" });
-    const progressTotal = state.careerProgress.stateOwned + state.careerProgress.civilService + state.careerProgress.internet + state.careerProgress.academic;
-    expect(progressTotal).toBeGreaterThan(0);
-    expect(state.bestCareerOffer).not.toBeNull();
-  });
-
-  it("2 月奖学金事件会触发并增加金钱", () => {
-    let state = startWith("normal");
-    state = { ...state, totalMonths: 13, year: 2, month: 1, totalResearchScore: 1 };
-    state = dispatchAction(state, "next-month");
-    expect(state.eventQueue[0]?.chainId).toBe("scholarship");
-    const beforeMoney = state.player.money;
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-    expect(state.player.money).toBe(beforeMoney + 5);
-  });
-
-  it("9 月固定事件会触发领域年会", () => {
-    let state = startWith("normal");
-    state = { ...state, totalMonths: 8, year: 1, month: 8 };
-    state = dispatchAction(state, "next-month");
-    expect(state.eventQueue[0]?.chainId).toBe("ccig-decision");
-  });
-
-  it("第 4 年 3 月会触发指导新生，并把选中的新生加入关系网", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      degree: "phd",
-      totalMonths: 38,
-      maxMonths: 60,
-      year: 4,
-      month: 2,
-      thesis: { ...state.thesis, abandoned: true },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = { ...state, eventQueue: state.eventQueue.filter((event) => event.chainId === "mentor-assign") };
-    expect(state.eventQueue[0]?.chainId).toBe("mentor-assign");
-
-    state = resolveFirstQueuedEvent(state);
-    const candidateChoiceId = state.eventQueue[0]?.choices[0]?.id;
-    if (!candidateChoiceId) throw new Error("mentor assign candidate choice missing");
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: candidateChoiceId });
-
-    expect(state.relationshipState.juniorCount).toBe(1);
-    expect(state.relationshipState.occupiedSlots).toBe(2);
-    expect(state.fellowProgressState).toHaveLength(1);
-    expect(state.fellowProgressState[0]).toMatchObject({
-      name: "小明",
-      type: "junior",
-      research: 1,
-      affinity: 1,
-      taskType: "idea",
-    });
-    expect(state.eventQueue[0]?.title).toBe("指导新生 ➜ 如何抉择 ➜ 指派完成");
-  });
-
-  it("指导新生在关系槽位已满时不会强行加入关系网", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      degree: "phd",
-      totalMonths: 38,
-      maxMonths: 60,
-      year: 4,
-      month: 2,
-      thesis: { ...state.thesis, abandoned: true },
-      relationshipState: {
-        ...state.relationshipState,
-        unlockedSlots: 2,
-        occupiedSlots: 2,
-      },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = { ...state, eventQueue: state.eventQueue.filter((event) => event.chainId === "mentor-assign") };
-    state = resolveFirstQueuedEvent(state);
-    const candidateChoiceId = state.eventQueue[0]?.choices[0]?.id;
-    if (!candidateChoiceId) throw new Error("mentor assign candidate choice missing");
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: candidateChoiceId });
-
-    expect(state.relationshipState.juniorCount).toBe(0);
-    expect(state.relationshipState.occupiedSlots).toBe(2);
-    expect(state.fellowProgressState).toHaveLength(0);
-    expect(state.eventQueue[0]?.preview).toContain("本次未加入关系网");
-  });
-
-  it("CCIG 导师报销分支会扣 1 点好感并进入会场活动", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 8,
-      year: 1,
-      month: 8,
-      player: { ...state.player, favor: 3 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = resolveFirstQueuedEvent(state);
-    const advisorChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("ccig-advisor"))?.id;
-    if (!advisorChoiceId) throw new Error("ccig advisor choice missing");
-
-    const beforeFavor = state.player.favor;
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: advisorChoiceId });
-    expect(state.player.favor).toBe(beforeFavor - 1);
-    expect(state.eventQueue[0]?.title).toBe("领域年会 ➜ 参会决定 ➜ 参会确认");
-
-    state = resolveFirstQueuedEvent(state);
-    expect(state.eventQueue[0]?.chainId).toBe("ccig-activity");
-    expect(state.eventQueue[0]?.stage).toBe("act1");
-  });
-
-  it("CCIG 整装待发下自费参会可免费进入会场", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 8,
-      year: 1,
-      month: 8,
-      player: { ...state.player, money: 0 },
-      shopState: { ...state.shopState, bikeOwned: true, bikeUpgrade: "ebike" },
-      eventSupport: { ...state.eventSupport, hasParasol: true, hasDownJacket: true },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = resolveFirstQueuedEvent(state);
-    const selfChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("ccig-self"))?.id;
-    if (!selfChoiceId) throw new Error("ccig self choice missing");
-
-    const beforeMoney = state.player.money;
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: selfChoiceId });
-    expect(state.player.money).toBe(beforeMoney);
-    expect(state.eventQueue[0]?.title).toBe("领域年会 ➜ 参会决定 ➜ 参会确认");
-
-    state = resolveFirstQueuedEvent(state);
-    expect(state.eventQueue[0]?.chainId).toBe("ccig-activity");
-  });
-
-  it("CCIG 认真听报告会给下次 idea +4 且永久 idea +1", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 8,
-      year: 1,
-      month: 8,
-      player: { ...state.player, favor: 3 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = resolveFirstQueuedEvent(state);
-    const advisorChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("ccig-advisor"))?.id;
-    if (!advisorChoiceId) throw new Error("ccig advisor choice missing");
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: advisorChoiceId });
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-
-    const listenChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("ccig-activity-listen"))?.id;
-    if (!listenChoiceId) throw new Error("ccig listen choice missing");
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: listenChoiceId });
-    state = resolveFirstQueuedEvent(state);
-
-    expect(state.temporaryActionEffects.idea.bonus).toBe(4);
-    expect(state.actionBonuses.idea).toBe(1);
-  });
-
-  it("CCIG 请同学吃饭若现金不足会直接触发穷困结局且不进入结果页", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      totalMonths: 8,
-      year: 1,
-      month: 8,
-      player: { ...state.player, favor: 3, money: 0 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = resolveFirstQueuedEvent(state);
-    const advisorChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("ccig-advisor"))?.id;
-    if (!advisorChoiceId) throw new Error("ccig advisor choice missing");
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: advisorChoiceId });
-    state = resolveFirstQueuedEvent(state);
-    state = resolveFirstQueuedEvent(state);
-
-    const foodChoiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("ccig-activity-food"))?.id;
-    if (!foodChoiceId) throw new Error("ccig food choice missing");
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: foodChoiceId });
-
-    expect(state.phase).toBe("finished");
-    expect(state.ending).toBe("poor");
-    expect(state.eventQueue).toHaveLength(0);
-  });
-
-  it("未来待办会随跨月递减 DDL，并在到期后阻塞流程", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      eventQueue: [createEventQueueItem({
-        id: "future-event",
-        title: "未来事件",
-        description: "这是一个延后触发的待办。",
-        preview: "稍后会到期。",
-        source: "system",
-        blocking: true,
-        deadlineMonths: 1,
-        chainId: "future-event",
-        stage: "act1",
-        choices: [{ id: "ok", label: "处理", outcome: "已处理。", effects: {} }],
-      }, 1)],
+      usedRandomEvents: [],
+      externalPublications: [paper],
     };
 
     state = dispatchAction(state, "next-month");
     expect(state.totalMonths).toBe(2);
-    expect(state.eventQueue[0]?.deadlineMonths).toBe(0);
-
-    const blockedLogLength = state.log.length;
-    const stillBlocked = dispatchAction(state, "next-month");
-    expect(stillBlocked.totalMonths).toBe(2);
-    expect(stillBlocked.log).toHaveLength(blockedLogLength);
-    expect(stillBlocked.log.some((entry) => entry.text.includes("必须先处理待办事件。"))).toBe(false);
-  });
-
-  it("11 月会同时触发暑假与学年总结", () => {
-    let state = startWith("normal");
-    state = { ...state, totalMonths: 10, year: 1, month: 10 };
+    expect(state.eventQueue.some((event) => event.title === "论文参会")).toBe(false);
+    state = { ...state, eventQueue: [] };
     state = dispatchAction(state, "next-month");
-    expect(state.eventQueue.map((event) => event.chainId)).toEqual(["summer-vacation", "year-summary"]);
-  });
-
-  it("教师节高好感祝福分支会给下一次 idea 奖励", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      year: 1,
-      month: 12,
-      totalMonths: 12,
-      player: { ...state.player, favor: 6 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
+    expect(state.totalMonths).toBe(3);
+    expect(state.eventQueue.some((event) => event.title === "论文参会")).toBe(false);
+    state = { ...state, eventQueue: [] };
     state = dispatchAction(state, "next-month");
-    expect(state.eventQueue[0]?.chainId).toBe("teachers-day");
-
-    state = resolveFirstQueuedEvent(state);
-    const choiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("teachers-day-message"))?.id;
-    if (!choiceId) throw new Error("teachers-day message choice missing");
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: choiceId });
-
-    expect(state.temporaryActionEffects.idea.bonus).toBe(3);
-    expect(state.eventCounters.consecutiveStampGiftCount).toBe(0);
-    expect(state.log.some((entry) => entry.text.includes("你发去节日祝福，导师顺势分享了一个想法，下次想 idea +3。"))).toBe(true);
-    expect(state.eventQueue[0]).toMatchObject({
-      chainId: "teachers-day",
-      stage: "result",
-      title: "教师节 ➜ 你的选择 ➜ 导师来电",
-    });
-    expect(state.eventQueue[0]?.history).toHaveLength(2);
-
-    state = resolveFirstQueuedEvent(state);
-    const completedTeachersDay = state.eventHistory.find((event) => event.chainId === "teachers-day");
-    expect(completedTeachersDay?.stages).toHaveLength(3);
-    expect(completedTeachersDay?.stages.map((stage) => stage.stage)).toEqual(["act1", "act2", "result"]);
+    expect(state.totalMonths).toBe(4);
+    expect(state.eventQueue.some((event) => event.title === "论文参会")).toBe(true);
   });
 
-  it("教师节低好感祝福分支可能触发跑腿扣 SAN", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      year: 1,
-      month: 12,
-      totalMonths: 12,
-      player: { ...state.player, favor: 5, san: 10 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = resolveFirstQueuedEvent(state);
-    const choiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("teachers-day-message"))?.id;
-    if (!choiceId) throw new Error("teachers-day message choice missing");
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: choiceId });
-
-    expect(state.player.san).toBe(9);
-    expect(state.eventCounters.consecutiveStampGiftCount).toBe(0);
-  });
-
-  it("教师节连续三年送邮票会解锁吾爱吾师", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      year: 1,
-      month: 12,
-      totalMonths: 12,
-      eventCounters: { ...state.eventCounters, consecutiveStampGiftCount: 2 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-    };
-
-    state = dispatchAction(state, "next-month");
-    state = resolveFirstQueuedEvent(state);
-    const choiceId = state.eventQueue[0]?.choices.find((choice) => choice.id.includes("teachers-day-stamp"))?.id;
-    if (!choiceId) throw new Error("teachers-day stamp choice missing");
-
-    const beforeMoney = state.player.money;
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: choiceId });
-
-    expect(state.player.money).toBe(beforeMoney - 3);
-    expect(state.eventCounters.consecutiveStampGiftCount).toBe(3);
-    expect(state.achievementFlags.loveMyTeacher).toBe(true);
-  });
-
-  it("发表 A 类论文后会标记当前槽位具备升级资格", () => {
-    let state = startWith("normal");
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-    state = {
-      ...state,
-      papers: state.papers.map((paper) =>
-        paper.id === paperId ? { ...paper, idea: 9, experiment: 8, writing: 8 } : paper,
-      ),
-    };
-    state = dispatchAction(state, "submit-a", { paperId });
-
-    for (let step = 0; step < 12; step += 1) {
-      if (state.eventQueue.length > 0) {
-        state = resolveFirstQueuedEvent(state);
-      } else {
-        state = dispatchAction(state, "next-month");
-      }
-      if (state.slotPublishedA[0]) break;
-    }
-
-    expect(state.paperSlotsUnlocked).toBe(1);
-    expect(state.slotPublishedA[0]).toBe(true);
-  });
-  it("year rollover resets random event pool and advances coldWeight", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      year: 1,
-      month: 12,
-      totalMonths: 12,
-      availableRandomEvents: [2, 5],
-      usedRandomEvents: [1, 3],
-      coldWeight: 1,
-    };
-
-    state = dispatchAction(state, "next-month");
-
-    expect(state.year).toBe(2);
-    expect(state.month).toBe(1);
-    expect(state.availableRandomEvents).toEqual([...BASE_RANDOM_EVENT_IDS]);
-    expect(state.usedRandomEvents).toEqual([]);
-    expect(state.coldWeight).toBeCloseTo(1.2);
-  });
-
-  it("first published paper unlocks random event 14 immediately", () => {
-    let state = startWith("genius");
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-    state = {
-      ...state,
-      papers: state.papers.map((paper) => (paper.id === paperId ? { ...paper, idea: 4, experiment: 4, writing: 4 } : paper)),
-    };
-    state = dispatchAction(state, "submit-c", { paperId });
-
-    for (let step = 0; step < 12; step += 1) {
-      if (state.eventQueue.length > 0) {
-        state = resolveFirstQueuedEvent(state);
-      } else {
-        state = dispatchAction(state, "next-month");
-      }
-
-      if (state.papers[0]?.status === "published") break;
-    }
-
-    expect(state.papers[0]?.status).toBe("published");
-    expect(state.availableRandomEvents).toContain(14);
-  });
-
-  it("action bonuses from queued events affect paper actions", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      eventQueue: [createEventQueueItem({
-        id: "bonus-event",
-        title: "Bonus Event",
-        description: "Grants an idea bonus.",
-        preview: "Idea bonus",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "bonus-event",
-        stage: "act1",
-        choices: [{ id: "take", label: "Take", outcome: "Idea bonus +1.", effects: { ideaBonus: 1 } }],
-      }, 1)],
-    };
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "take" });
-    expect(state.actionBonuses.idea).toBe(1);
-
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-
-    state = dispatchAction(state, "idea", { paperId });
-    expect(state.papers[0]?.idea).toBe(3);
-  });
-
-  it("blocked paper action keeps temporary effects intact", () => {
-    let state = startWith("normal");
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-
-    state = {
-      ...state,
-      eventQueue: [createEventQueueItem({
-        id: "blocking-event",
-        title: "Blocking Event",
-        description: "Must be resolved first.",
-        preview: "blocking",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "blocking-event",
-        stage: "act1",
-        choices: [{ id: "ok", label: "OK", outcome: "Done.", effects: {} }],
-      }, 1)],
-      temporaryActionEffects: {
-        ...state.temporaryActionEffects,
-        idea: { bonus: 10, multiplier: 1, extraActions: 0 },
-      },
-    };
-
-    const nextState = dispatchAction(state, "idea", { paperId });
-    expect(nextState.temporaryActionEffects.idea).toEqual({ bonus: 10, multiplier: 1, extraActions: 0 });
-    expect(nextState.papers[0]?.idea).toBe(0);
-  });
-
-  it("temporary action effects apply once and only to the matching paper action", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      eventQueue: [createEventQueueItem({
-        id: "temp-bonus-event",
-        title: "Temp Bonus Event",
-        description: "Grants a one-shot idea effect.",
-        preview: "temp idea",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "temp-bonus-event",
-        stage: "act1",
-        choices: [{
-          id: "take",
-          label: "Take",
-          outcome: "Next idea gains +10 and one extra action.",
-          effects: {
-            temporaryActionEffectUpdates: {
-              idea: { bonus: 10, extraActions: 1 },
-            },
-          },
-        }],
-      }, 1)],
-    };
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "take" });
-    expect(state.temporaryActionEffects.idea).toEqual({ bonus: 10, multiplier: 1, extraActions: 1 });
-
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-
-    state = dispatchAction(state, "idea", { paperId });
-    expect(state.papers[0]?.idea).toBe(14);
-    expect(state.temporaryActionEffects.idea).toEqual({ bonus: 0, multiplier: 1, extraActions: 0 });
-
-    state = { ...state, actionsRemaining: 1 };
-    state = dispatchAction(state, "idea", { paperId });
-    expect(state.papers[0]?.idea).toBe(16);
-  });
-
-  it("rest action respects sanCap after the cap is reduced", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, san: 16 },
-      sanCap: 16,
-    };
-
-    state = dispatchAction(state, "rest");
-    expect(state.player.san).toBe(16);
-  });
-
-  it("next publication citation multiplier is consumed on acceptance and grows citations next month", () => {
-    let state = startWith("genius");
-    state = {
-      ...state,
-      year: 1,
-      month: 4,
-      totalMonths: 4,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      publicationEffects: { nextCitationMultipliers: [2], citationPenaltyMultiplier: 1 },
-    };
-
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-
-    state = {
-      ...state,
-      papers: state.papers.map((paper) => paper.id === paperId ? {
-        ...paper,
-        status: "reviewing",
-        target: "C",
-        reviewMonthsLeft: 1,
-        idea: 4,
-        experiment: 4,
-        writing: 4,
-        submittedIdea: 4,
-        submittedExperiment: 4,
-        submittedWriting: 4,
-      } : paper),
-    };
-
-    state = dispatchAction(state, "next-month");
-    expect(state.papers[0]?.status).toBe("published");
-    expect(state.papers[0]?.publication?.citationMultiplier).toBe(2);
-    expect(state.publicationEffects.nextCitationMultipliers).toEqual([]);
-    expect(state.totalCitations).toBe(0);
-
-    while (state.eventQueue.length > 0) {
-      state = resolveFirstQueuedEvent(state);
-    }
-
-    state = dispatchAction(state, "next-month");
-    expect(state.papers[0]?.publication?.citations).toBeGreaterThan(0);
-    expect(state.totalCitations).toBeGreaterThan(0);
-  });
-
-  it("relationship additions respect slot limits and mentorship ticks monthly", () => {
-    let state = startWith("social");
-    state = {
-      ...state,
-      year: 1,
-      month: 4,
-      totalMonths: 4,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      relationshipState: {
-        ...state.relationshipState,
-        unlockedSlots: 3,
-      },
-      eventQueue: [createEventQueueItem({
-        id: "mentorship-event",
-        title: "Mentorship Event",
-        description: "Adds one junior and one mentorship stack.",
-        preview: "mentorship",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "mentorship-event",
-        stage: "act1",
-        choices: [{
-          id: "take",
-          label: "Take",
-          outcome: "Applied.",
-          effects: {
-            relationshipAdditions: ["junior"],
-            mentorshipStacks: 1,
-          },
-        }],
-      }, 1)],
-    };
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "take" });
-    expect(state.relationshipState.juniorCount).toBe(1);
-    expect(state.relationshipState.occupiedSlots).toBe(2);
-    expect(state.relationshipState.mentorshipStacks).toBe(1);
-
-    state = dispatchAction(state, "next-month");
-    expect(state.totalCitations).toBe(3);
-    expect(state.relationshipState.juniorCount).toBe(1);
-  });
-
-  it("event effects can clear draft progress and apply a global citation penalty", () => {
-    let state = startWith("genius");
-    state = {
-      ...state,
-      year: 1,
-      month: 4,
-      totalMonths: 4,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      papers: [
-        {
-          id: "draft-paper",
-          title: "Draft Paper",
-          idea: 5,
-          experiment: 6,
-          writing: 7,
-          status: "draft",
-          target: null,
-          reviewMonthsLeft: 0,
-          submittedIdea: null,
-          submittedExperiment: null,
-          submittedWriting: null,
-          publication: null,
-        },
-        {
-          id: "published-paper",
-          title: "Published Paper",
-          idea: 10,
-          experiment: 15,
-          writing: 15,
-          status: "published",
-          target: "C",
-          reviewMonthsLeft: 0,
-          submittedIdea: 10,
-          submittedExperiment: 15,
-          submittedWriting: 15,
-          publication: {
-            citations: 0,
-            monthsSincePublication: 0,
-            pendingCitationFraction: 0,
-            effectiveScore: 40,
-            citationMultiplier: 1,
-          },
-        },
-      ],
-      eventQueue: [createEventQueueItem({
-        id: "data-loss-event",
-        title: "数据丢失",
-        description: "Applies the restart / fake-data effects.",
-        preview: "data-loss",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "data-loss-event",
-        stage: "act1",
-        choices: [{
-          id: "fake",
-          label: "Fake",
-          outcome: "Applied.",
-          effects: {
-            clearDraftProgress: true,
-            publicationPenaltyMultiplier: 0.5,
-          },
-        }],
-      }, 1)],
-    };
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "fake" });
-    expect(state.papers[0]).toMatchObject({ idea: 0, experiment: 0, writing: 0, status: "draft" });
-    expect(state.publicationEffects.citationPenaltyMultiplier).toBe(0.5);
-
-    state = dispatchAction(state, "next-month");
-    expect(state.papers[1]?.publication?.citations).toBe(1);
-    expect(state.totalCitations).toBe(1);
-  });
-
-  it("granted publications do not occupy paper slots and unlock event 14 on yearly reset", () => {
-    let state = startWith("teacher-child");
-    state = {
-      ...state,
-      year: 1,
-      month: 12,
-      totalMonths: 12,
-      player: { ...state.player, social: 3 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [createEventQueueItem({
-        id: "authorship-event",
-        title: "署名风波",
-        description: "Grants one external publication.",
-        preview: "authorship",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "authorship-event",
-        stage: "act1",
-        choices: [{
-          id: "transfer",
-          label: "Transfer",
-          outcome: "Applied.",
-          effects: {
-            social: -2,
-            score: 1,
-            grantedPublication: {
-              target: "C",
-              acceptedScore: 15,
-            },
-          },
-        }],
-      }, 1)],
-    };
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "transfer" });
-    expect(state.externalPublications).toHaveLength(1);
-    expect(state.papers).toHaveLength(0);
-    expect(state.totalResearchScore).toBe(1);
-    expect(state.availableRandomEvents).not.toContain(14);
-
-    state = dispatchAction(state, "create-paper");
-    expect(state.papers).toHaveLength(1);
-
-    state = dispatchAction(state, "next-month");
-    expect(state.year).toBe(2);
-    expect(state.month).toBe(1);
-    expect(state.availableRandomEvents).toContain(14);
-  });
-
-  it("event support updates and persistent extra actions affect month ticks and experiment actions", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, money: 10, san: 10 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [createEventQueueItem({
-        id: "support-event",
-        title: "Support Event",
-        description: "Unlocks talents and permanent experiment times.",
-        preview: "support",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "support-event",
-        stage: "act1",
-        choices: [{
-          id: "take",
-          label: "Take",
-          outcome: "Applied.",
-          effects: {
-            eventSupportUpdates: { hasFinanceTalent: true, hasStrongBodyTalent: true },
-            persistentExtraActionDeltas: { experiment: 2 },
-          },
-        }],
-      }, 1)],
-    };
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "take" });
-    expect(state.eventSupport.hasFinanceTalent).toBe(true);
-    expect(state.eventSupport.hasStrongBodyTalent).toBe(true);
-    expect(state.persistentExtraActions.experiment).toBe(2);
-
-    const monthlyBaseWithTalents = {
-      ...state,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-      actionsRemaining: state.maxActionsPerMonth,
-    };
-    const monthlyBaseWithoutTalents = {
-      ...monthlyBaseWithTalents,
-      eventSupport: { ...monthlyBaseWithTalents.eventSupport, hasFinanceTalent: false, hasStrongBodyTalent: false },
-    };
-
-    const nextWithTalents = dispatchAction(monthlyBaseWithTalents, "next-month");
-    const nextWithoutTalents = dispatchAction(monthlyBaseWithoutTalents, "next-month");
-
-    expect(nextWithTalents.player.money - nextWithoutTalents.player.money).toBe(1);
-    expect(nextWithTalents.player.san - nextWithoutTalents.player.san).toBe(1);
-
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-    state = dispatchAction(state, "experiment", { paperId });
-    expect(state.papers[0]?.experiment).toBe(6);
-  });
-
-  it("regular monthly upkeep keeps default advisor salary and base living cost in balance", () => {
+  it("force advances through real month settlement after deleting only current blockers", () => {
+    const makeEvent = (id: string, blocking: boolean, deadlineMonths: number, queueOrder: number) => createEventQueueItem({
+      id,
+      title: id,
+      description: "测试事件",
+      source: "random" as const,
+      blocking,
+      deadlineMonths,
+      chainId: id,
+      stage: "act1" as const,
+      choices: [{
+        id: "confirm",
+        label: "确认",
+        outcome: "测试",
+        effects: {},
+      }],
+    }, queueOrder);
     const state = {
-      ...startWith("normal"),
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-
-    const nextMonth = dispatchAction(state, "next-month");
-
-    expect(nextMonth.player.money).toBe(state.player.money);
-  });
-
-  it("support items can be bought and sold without consuming actions", () => {
-    let state = startWith("normal");
-    state = { ...state, player: { ...state.player, money: 10 } };
-    const beforeActions = state.actionsRemaining;
-
-    state = dispatchAction(state, "buy-support-item", { supportItemId: "badminton_racket" });
-    expect(state.eventSupport.hasBadmintonRacket).toBe(true);
-    expect(state.player.money).toBe(6);
-    expect(state.actionsRemaining).toBe(beforeActions);
-
-    state = dispatchAction(state, "sell-support-item", { supportItemId: "badminton_racket" });
-    expect(state.eventSupport.hasBadmintonRacket).toBe(false);
-    expect(state.player.money).toBe(8);
-    expect(state.actionsRemaining).toBe(beforeActions);
-  });
-
-  it("economy actions are blocked by pending blocking events", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, money: 10 },
-      eventQueue: [createEventQueueItem({
-        id: "economy-blocker",
-        title: "Economy Blocker",
-        description: "Blocks economy actions.",
-        preview: "blocker",
-        source: "system",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "economy-blocker",
-        stage: "act1",
-        choices: [{
-          id: "ok",
-          label: "OK",
-          outcome: "ok",
-          effects: {},
-        }],
-      }, 1)],
-    };
-
-    const beforeActions = state.actionsRemaining;
-    const beforeLogLength = state.log.length;
-    state = dispatchAction(state, "buy-support-item", { supportItemId: "badminton_racket" });
-
-    expect(state.eventSupport.hasBadmintonRacket).toBe(false);
-    expect(state.player.money).toBe(10);
-    expect(state.actionsRemaining).toBe(beforeActions);
-    expect(state.log).toHaveLength(beforeLogLength);
-    expect(state.log.some((entry) => entry.text.includes("当前必须先处理待办事件或关键抉择。"))).toBe(false);
-  });
-
-  it("shop items can be bought and sold, and gpu/chair effects feed the main loop", () => {
-    let state = startWith("normal");
-    state = { ...state, player: { ...state.player, money: 30, san: 10 } };
-
-    state = dispatchAction(state, "buy-shop-item", { shopItemId: "gpu_buy" });
-    state = dispatchAction(state, "buy-shop-item", { shopItemId: "chair" });
-    expect(state.shopState.gpuServersBought).toBe(1);
-    expect(state.shopState.chairOwned).toBe(true);
-    expect(state.player.money).toBe(10);
-
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-    state = dispatchAction(state, "experiment", { paperId });
-    expect(state.papers[0]?.experiment).toBe(5);
-
-    const nextMonth = dispatchAction({
-      ...state,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    }, "next-month");
-    expect(nextMonth.player.san).toBeGreaterThan(state.player.san);
-
-    const sold = dispatchAction(
-      {
-        ...nextMonth,
-        eventQueue: [],
-        pendingDecision: null,
-      },
-      "sell-shop-item",
-      { shopItemId: "gpu_buy" },
-    );
-    expect(sold.shopState.gpuServersBought).toBe(0);
-    expect(sold.player.money).toBe(nextMonth.player.money + 6);
-  });
-
-  it("keyboard, monitor and down jacket feed read/write and winter month ticks", () => {
-    let state = startWith("normal");
-    state = { ...state, player: { ...state.player, money: 30, san: 10, research: 0 } };
-
-    state = dispatchAction(state, "buy-shop-item", { shopItemId: "keyboard" });
-    state = dispatchAction(state, "buy-shop-item", { shopItemId: "monitor" });
-    state = dispatchAction(state, "buy-shop-item", { shopItemId: "down_jacket" });
-    expect(state.shopState.keyboardOwned).toBe(true);
-    expect(state.shopState.monitorOwned).toBe(true);
-    expect(state.eventSupport.hasDownJacket).toBe(true);
-
-    const afterRead = dispatchAction(state, "read");
-    expect(afterRead.player.research).toBe(state.player.research);
-    expect(afterRead.player.san).toBe(state.player.san - 1);
-    expect(afterRead.temporaryActionEffects.idea.bonus).toBe(1);
-
-    let paperState = dispatchAction({
-      ...afterRead,
-      actionsRemaining: afterRead.maxActionsPerMonth,
-    }, "create-paper");
-    const paperId = paperState.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-    const sanBeforeWrite = paperState.player.san;
-    paperState = dispatchAction(paperState, "write", { paperId });
-    expect(paperState.papers[0]?.writing).toBe(3);
-    expect(paperState.player.san).toBe(sanBeforeWrite);
-
-    const winterBase = {
-      ...paperState,
+      ...startGame(),
       year: 1,
-      month: 3,
-      totalMonths: 3,
+      month: 1,
+      totalMonths: 1,
+      selectedAdvisorName: "测试导师",
+      illnessProbability: 0,
       availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-    const nextWithJacket = dispatchAction(winterBase, "next-month");
-    const nextWithoutJacket = dispatchAction(
-      {
-        ...winterBase,
-        eventSupport: { ...winterBase.eventSupport, hasDownJacket: false },
-      },
-      "next-month",
-    );
-
-    expect(nextWithJacket.player.san - nextWithoutJacket.player.san).toBe(1);
-  });
-
-  it("base bike applies monthly SAN loss and grows sanCap on the confirmed threshold", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, money: 20, san: 10 },
-      year: 1,
-      month: 9,
-      totalMonths: 9,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-
-    const bought = dispatchAction(state, "buy-shop-item", { shopItemId: "bike" });
-    expect(bought.shopState.bikeOwned).toBe(true);
-    expect(bought.player.money).toBe(10);
-
-    const nextWithBike = dispatchAction(bought, "next-month");
-    const nextWithoutBike = dispatchAction({
-      ...bought,
-      shopState: { ...bought.shopState, bikeOwned: false },
-    }, "next-month");
-
-    expect(nextWithBike.player.san - nextWithoutBike.player.san).toBe(-1);
-    expect(nextWithBike.shopState.bikeSanSpent).toBe(1);
-
-    const thresholdReady = {
-      ...bought,
-      shopState: { ...bought.shopState, bikeOwned: true, bikeSanSpent: 5, bikeSanCapGains: 0 },
-      sanCap: 20,
-    };
-    const crossedThreshold = dispatchAction(thresholdReady, "next-month");
-    expect(crossedThreshold.sanCap).toBe(21);
-    expect(crossedThreshold.shopState.bikeSanSpent).toBe(6);
-    expect(crossedThreshold.shopState.bikeSanCapGains).toBe(1);
-  });
-
-  it("bike upgrades feed sell price and monthly core effects", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, money: 50, san: 10 },
-      year: 1,
-      month: 9,
-      totalMonths: 9,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-
-    state = dispatchAction(state, "buy-shop-item", { shopItemId: "bike" });
-    state = dispatchAction(state, "upgrade-shop-item", { shopUpgradeId: "bike-road" });
-    expect(state.shopState.bikeUpgrade).toBe("road");
-
-    const roadNext = dispatchAction({
-      ...state,
-      shopState: { ...state.shopState, bikeUpgrade: "road", bikeOwned: true, bikeSanSpent: 4, bikeSanCapGains: 0 },
-      sanCap: 20,
-    }, "next-month");
-    expect(roadNext.shopState.bikeSanSpent).toBe(6);
-    expect(roadNext.shopState.bikeSanCapGains).toBe(1);
-    expect(roadNext.sanCap).toBe(21);
-
-    const soldRoad = dispatchAction({
-      ...roadNext,
-      eventQueue: [],
-      pendingDecision: null,
-    }, "sell-shop-item", { shopItemId: "bike" });
-    expect(soldRoad.player.money).toBe(roadNext.player.money + 15);
-    expect(soldRoad.shopState.bikeOwned).toBe(false);
-    expect(soldRoad.shopState.bikeUpgrade).toBeNull();
-
-    let ebikeState = startWith("normal");
-    ebikeState = {
-      ...ebikeState,
-      player: { ...ebikeState.player, money: 50, san: 10 },
-      year: 1,
-      month: 7,
-      totalMonths: 7,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-    ebikeState = dispatchAction(ebikeState, "buy-shop-item", { shopItemId: "bike" });
-    ebikeState = dispatchAction(ebikeState, "upgrade-shop-item", { shopUpgradeId: "bike-ebike" });
-    const ebikeNext = dispatchAction(ebikeState, "next-month");
-    expect(ebikeNext.player.san - ebikeState.player.san).toBe(2);
-  });
-
-  it("bike-related achievements unlock from upgrades, mileage and full gear combo", () => {
-    let roadState = startWith("normal");
-    roadState = {
-      ...roadState,
-      player: { ...roadState.player, money: 80, san: 10 },
-      year: 1,
-      month: 9,
-      totalMonths: 9,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-    roadState = dispatchAction(roadState, "buy-shop-item", { shopItemId: "bike" });
-    roadState = dispatchAction(roadState, "upgrade-shop-item", { shopUpgradeId: "bike-road" });
-    expect(roadState.achievementFlags.advancedEquipment).toBe(true);
-
-    const cyclingMaster = dispatchAction({
-      ...roadState,
-      shopState: { ...roadState.shopState, bikeOwned: true, bikeUpgrade: "road", bikeSanSpent: 29, bikeSanCapGains: 0 },
-      sanCap: 20,
-    }, "next-month");
-    expect(cyclingMaster.shopState.bikeSanSpent).toBe(31);
-    expect(cyclingMaster.achievementFlags.cyclingMaster).toBe(true);
-
-    let fullGearState = startWith("normal");
-    fullGearState = {
-      ...fullGearState,
-      player: { ...fullGearState.player, money: 80, san: 10 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-    fullGearState = dispatchAction(fullGearState, "buy-shop-item", { shopItemId: "bike" });
-    fullGearState = dispatchAction(fullGearState, "buy-support-item", { supportItemId: "parasol" });
-    fullGearState = dispatchAction(fullGearState, "buy-shop-item", { shopItemId: "down_jacket" });
-    fullGearState = dispatchAction(fullGearState, "upgrade-shop-item", { shopUpgradeId: "bike-ebike" });
-    expect(fullGearState.achievementFlags.fullGear).toBe(true);
-  });
-
-  it("coffee system supports manual coffee and automatic coffee machine month ticks", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, money: 30, san: 10 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-
-    state = dispatchAction(state, "buy-coffee-machine");
-    expect(state.coffeeState.machineOwned).toBe(true);
-    expect(state.player.money).toBe(25);
-
-    state = dispatchAction(state, "buy-coffee");
-    expect(state.player.money).toBe(23);
-    expect(state.player.san).toBe(13);
-    expect(state.coffeeState.manualCoffeeBoughtThisMonth).toBe(1);
-    expect(state.coffeeState.machineTrackedCoffeeCount).toBe(1);
-
-    state = dispatchAction(state, "upgrade-coffee-machine", { eventId: "automatic" });
-    expect(state.coffeeState.machineUpgrade).toBe("automatic");
-
-    const nextMonth = dispatchAction({
-      ...state,
-      year: 1,
-      month: 9,
-      totalMonths: 9,
-    }, "next-month");
-    expect(nextMonth.player.money).toBe(state.player.money - 2);
-    expect(nextMonth.player.san).toBeGreaterThan(state.player.san);
-    expect(nextMonth.coffeeState.manualCoffeeBoughtThisMonth).toBe(0);
-    expect(nextMonth.coffeeState.totalCoffeeBought).toBe(state.coffeeState.totalCoffeeBought + 1);
-  });
-
-  it("chair upgrades feed rest, monthly SAN and spike recovery", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, money: 40, san: 10 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-
-    state = dispatchAction(state, "buy-shop-item", { shopItemId: "chair" });
-    state = dispatchAction(state, "upgrade-shop-item", { shopUpgradeId: "chair-hammock" });
-    const afterRest = dispatchAction(state, "rest");
-    expect(afterRest.player.san - state.player.san).toBe(5);
-
-    const massageBase = dispatchAction(
-      {
-        ...startWith("normal"),
-        player: { ...startWith("normal").player, money: 50, san: 10 },
-        availableRandomEvents: [],
-        usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-        eventQueue: [],
-        pendingDecision: null,
-      },
-      "buy-shop-item",
-      { shopItemId: "chair" },
-    );
-    const massageState = dispatchAction(massageBase, "upgrade-shop-item", { shopUpgradeId: "chair-massage" });
-    const afterMonth = dispatchAction({
-      ...massageState,
-      year: 1,
-      month: 9,
-      totalMonths: 9,
-      sanCap: 20,
-    }, "next-month");
-    expect(afterMonth.player.san).toBeGreaterThan(massageState.player.san);
-
-    let spikeState = startWith("normal");
-    spikeState = {
-      ...spikeState,
-      player: { ...spikeState.player, money: 40, san: 1 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-    spikeState = dispatchAction(spikeState, "buy-shop-item", { shopItemId: "chair" });
-    spikeState = dispatchAction(spikeState, "upgrade-shop-item", { shopUpgradeId: "chair-spike" });
-    const recovered = dispatchAction(spikeState, "work");
-    expect(recovered.player.san).toBe(2);
-    expect(recovered.phase).toBe("playing");
-  });
-
-  it("monitor upgrades feed read SAN, idea bonus and dual monthly auto reading", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, money: 50, san: 20 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-
-    const plainRead = dispatchAction(state, "read");
-    expect(plainRead.player.research).toBe(state.player.research);
-    expect(plainRead.player.san).toBe(state.player.san - 2);
-    expect(plainRead.temporaryActionEffects.idea.bonus).toBe(1);
-
-    state = dispatchAction(state, "buy-shop-item", { shopItemId: "monitor" });
-    state = dispatchAction(state, "upgrade-shop-item", { shopUpgradeId: "monitor-smart" });
-    state = {
-      ...state,
-      readingState: { ...state.readingState, readCount: 9, smartMonitorReadCount: 9 },
-      player: { ...state.player, san: 20 },
-    };
-    const smartRead = dispatchAction(state, "read");
-    expect(smartRead.player.research).toBe(state.player.research);
-    expect(smartRead.player.san).toBe(18);
-    expect(smartRead.temporaryActionEffects.idea.bonus).toBe(2);
-    expect(smartRead.readingState.smartMonitorReadCount).toBe(10);
-
-    let fourKState = startWith("normal");
-    fourKState = {
-      ...fourKState,
-      player: { ...fourKState.player, money: 50 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-    fourKState = dispatchAction(fourKState, "buy-shop-item", { shopItemId: "monitor" });
-    fourKState = dispatchAction(fourKState, "upgrade-shop-item", { shopUpgradeId: "monitor-4k" });
-    fourKState = dispatchAction(fourKState, "create-paper");
-    const fourKPaperId = fourKState.selectedPaperId;
-    if (!fourKPaperId) throw new Error("paper id missing");
-    const ideaWith4K = dispatchAction({
-      ...fourKState,
-      actionsRemaining: fourKState.maxActionsPerMonth,
-      readingState: { ...fourKState.readingState, readCount: 10 },
-      temporaryActionEffects: { ...fourKState.temporaryActionEffects, idea: { bonus: 0, multiplier: 1, extraActions: 0 } },
-    }, "idea", { paperId: fourKPaperId });
-    expect(ideaWith4K.papers[0]?.idea).toBe(3);
-
-    let dualState = startWith("normal");
-    dualState = {
-      ...dualState,
-      player: { ...dualState.player, money: 50, san: 10 },
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-    };
-    dualState = dispatchAction(dualState, "buy-shop-item", { shopItemId: "monitor" });
-    dualState = dispatchAction(dualState, "upgrade-shop-item", { shopUpgradeId: "monitor-dual" });
-    const dualNext = dispatchAction({
-      ...dualState,
-      year: 1,
-      month: 9,
-      totalMonths: 9,
-    }, "next-month");
-    expect(dualNext.player.san - dualState.player.san).toBe(-1);
-    expect(dualNext.readingState.readCount).toBe(1);
-    expect(dualNext.readingState.dualMonitorIdeaBonus).toBe(1);
-
-    const dualMilestoneNext = dispatchAction({
-      ...dualState,
-      readingState: { ...dualState.readingState, readCount: 10 },
-      year: 1,
-      month: 9,
-      totalMonths: 9,
-    }, "next-month");
-    expect(dualMilestoneNext.player.research).toBe(dualState.player.research + 1);
-    expect(dualMilestoneNext.readingState.readCount).toBe(11);
-    expect(dualMilestoneNext.readingState.dualMonitorIdeaBonus).toBe(2);
-  });
-
-  it("queued event counter deltas and achievement flags are persisted in state", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      eventQueue: [createEventQueueItem({
-        id: "meta-event",
-        title: "Meta Event",
-        description: "Updates counters and achievements.",
-        preview: "meta",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "meta-event",
-        stage: "act1",
-        choices: [{
-          id: "take",
-          label: "Take",
-          outcome: "Applied.",
-          effects: {
-            counterDeltas: { gamePlayCount: 1, terrariaCount: 1 },
-            achievementFlags: ["terraria300"],
-          },
-        }],
-      }, 1)],
-    };
-
-    state = dispatchAction(state, "resolve-event", { eventChoiceId: "take" });
-    expect(state.eventCounters.gamePlayCount).toBe(1);
-    expect(state.eventCounters.terrariaCount).toBe(1);
-    expect(state.achievementFlags.terraria300).toBe(true);
-  });
-
-  it("resolve-event uses the opened event id instead of always consuming the queue head", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
+      usedRandomEvents: [],
       eventQueue: [
-        createEventQueueItem({
-          id: "head-event",
-          title: "Head Event",
-          description: "Should stay queued.",
-          preview: "head",
-          source: "random",
-          blocking: true,
-          deadlineMonths: 0,
-          chainId: "head-event",
-          stage: "act1",
-          choices: [{
-            id: "head-choice",
-            label: "Head",
-            outcome: "Head resolved.",
-            effects: {
-              social: 1,
-            },
-          }],
-        }, 1),
-        createEventQueueItem({
-          id: "opened-event",
-          title: "Opened Event",
-          description: "Should resolve by explicit event id.",
-          preview: "opened",
-          source: "fixed",
-          blocking: true,
-          deadlineMonths: 0,
-          chainId: "opened-event",
-          stage: "act1",
-          choices: [{
-            id: "opened-choice",
-            label: "Opened",
-            outcome: "Opened resolved.",
-            effects: {
-              research: 2,
-            },
-          }],
-        }, 2),
+        makeEvent("due-blocker-a", true, 0, 1),
+        makeEvent("due-blocker-b", true, 0, 2),
+        makeEvent("future-blocker", true, 2, 3),
+        makeEvent("deferrable", false, 1, 4),
       ],
+      buffs: [{
+        id: "force-next-month-settlement",
+        name: "月度测试",
+        source: "测试",
+        timing: "monthly" as const,
+        remainingMonths: 1,
+        monthlyStats: { money: 2 },
+      }],
     };
 
-    const resolved = dispatchAction(state, "resolve-event", {
-      eventId: "opened-event",
-      eventChoiceId: "opened-choice",
+    const ordinaryBlocked = dispatchAction(state, "next-month");
+    expect(ordinaryBlocked.totalMonths).toBe(1);
+    expect(ordinaryBlocked.eventQueue).toHaveLength(4);
+
+    const manuallyCleared = {
+      ...state,
+      eventQueue: state.eventQueue.filter((event) => event.id !== "due-blocker-a" && event.id !== "due-blocker-b"),
+    };
+    const expected = dispatchAction(manuallyCleared, "next-month");
+    const forced = dispatchAction(state, "force-next-month");
+    const withoutLogIds = (value: typeof forced) => ({
+      ...value,
+      log: value.log.map(({ id: _id, ...entry }) => entry),
     });
 
-    expect(resolved.player.research).toBe(state.player.research + 2);
-    expect(resolved.player.social).toBe(state.player.social);
-    expect(resolved.eventQueue.map((event) => event.id)).toEqual(["head-event"]);
+    expect(withoutLogIds(forced)).toEqual(withoutLogIds(expected));
+    expect(forced.totalMonths).toBe(2);
+    expect(forced.player.money).toBe(state.player.money + 3);
+    expect(forced.eventQueue.some((event) => event.id === "due-blocker-a" || event.id === "due-blocker-b")).toBe(false);
+    expect(forced.eventQueue.find((event) => event.id === "future-blocker")?.deadlineMonths).toBe(1);
+    expect(forced.eventQueue.find((event) => event.id === "deferrable")?.deadlineMonths).toBe(0);
+
+    const debugShifted = dispatchAction(state, "debug-shift-month", { delta: 1 });
+    expect(debugShifted.totalMonths).toBe(2);
+    expect(debugShifted.player.money).toBe(state.player.money);
+    expect(debugShifted.buffs).toEqual(state.buffs);
+    expect(debugShifted.eventQueue).toEqual(state.eventQueue);
   });
 
-  it("resolve-event carries resolved history through the same multi-act chain", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
+  it("cleans event-only state without applying discarded event outcomes", () => {
+    const base = dispatchAction(startGame(), "create-paper", { paperSlotIndex: 0 });
+    const paperId = base.papers[0].id;
+    const state = {
+      ...base,
+      year: 1,
+      month: 1,
+      totalMonths: 1,
+      selectedAdvisorName: "测试导师",
+      illnessProbability: 0,
+      availableRandomEvents: [],
+      usedRandomEvents: [],
+      player: { ...base.player, san: 10 },
+      papers: base.papers.map((paper) => paper.id === paperId
+        ? { ...paper, conferenceHandled: false }
+        : paper),
+      buffs: [{
+        id: "pending-event-penalty",
+        name: "待处理事件惩罚",
+        source: "测试事件",
+        timing: "monthly" as const,
+        remainingMonths: null,
+        activeOperationSanMultiplier: 2,
+      }],
       eventQueue: [createEventQueueItem({
-        id: "act1-event",
-        title: "Act 1",
-        description: "First stage.",
-        preview: "act1",
-        source: "fixed",
+        id: "discard-cleanup",
+        title: "待删除事件",
+        description: "测试事件",
+        source: "random" as const,
         blocking: true,
         deadlineMonths: 0,
-        chainId: "multi-act",
-        stage: "act1",
+        chainId: "discard-cleanup",
+        stage: "act1" as const,
+        removeBuffIdsOnCompletion: ["pending-event-penalty"],
+        discardPaperUpdates: [{ id: paperId, conferenceHandled: true }],
         choices: [{
-          id: "next",
-          label: "Next",
-          outcome: "Go act2.",
+          id: "costly-choice",
+          label: "付出代价",
+          outcome: "SAN -5｜金币 -5",
+          effects: { san: -5, money: -5 },
+        }],
+      }, 1)],
+    };
+
+    const forced = dispatchAction(state, "force-next-month");
+
+    expect(forced.buffs.some((buff) => buff.id === "pending-event-penalty")).toBe(false);
+    expect(forced.papers.find((paper) => paper.id === paperId)?.conferenceHandled).toBe(true);
+    expect(forced.player.san).toBe(state.player.san + 2);
+    expect(forced.player.money).toBe(state.player.money + 1);
+  });
+
+  it("runs the workstation reading action once per monthly action point", () => {
+    const state = { ...startGame(), eventQueue: [], month: 1, totalMonths: 1 };
+    const firstRead = dispatchAction(state, "read-paper");
+    expect(firstRead.readingState.readCount).toBe(1);
+    expect(firstRead.actionState).toEqual({ used: 1, limit: 1, aiResearchBonusUsed: false });
+    expect(firstRead.log[0]?.text).toContain("看论文 1 次");
+
+    const secondRead = dispatchAction(firstRead, "read-paper");
+    expect(secondRead).toEqual(firstRead);
+  });
+
+  it("runs tiered part-time work through the shared action and SAN settlement", () => {
+    const state = { ...startGame(), eventQueue: [], month: 1, totalMonths: 1 };
+    const firstWork = dispatchAction(state, "part-time-work");
+
+    expect(firstWork.partTimeWorkCount).toBe(1);
+    expect(firstWork.player.san).toBe(15);
+    expect(firstWork.player.money).toBe(3);
+    expect(firstWork.actionState).toEqual({ used: 1, limit: 1, aiResearchBonusUsed: false });
+    expect(firstWork.log[0]?.text).toContain("第 1 次兼职，SAN -5｜金币 +2");
+    expect(dispatchAction(firstWork, "part-time-work")).toEqual(firstWork);
+
+    const ninthWork = dispatchAction({
+      ...state,
+      partTimeWorkCount: 8,
+    }, "part-time-work");
+    expect(ninthWork.partTimeWorkCount).toBe(9);
+    expect(ninthWork.player.san).toBe(14);
+    expect(ninthWork.player.money).toBe(4);
+
+    const modifiedWork = dispatchAction({
+      ...state,
+      month: 8,
+      buffs: [{
+        id: "work-cost-multiplier",
+        name: "主动操作 SAN ×2",
+        source: "测试",
+        timing: "monthly" as const,
+        remainingMonths: 1,
+        activeOperationSanMultiplier: 2,
+      }],
+    }, "part-time-work");
+    expect(modifiedWork.player.san).toBe(11);
+  });
+
+  it("advances only the calendar, buffs, event deadlines, events and logs", () => {
+    const state = {
+      ...startGame(),
+      selectedAdvisorName: "测试导师",
+      eventQueue: [],
+      illnessProbability: 0,
+      availableRandomEvents: [],
+      usedRandomEvents: [],
+      buffs: [{
+        id: "monthly-money",
+        name: "每月补贴",
+        source: "测试",
+        timing: "monthly" as const,
+        remainingMonths: 1,
+        monthlyStats: { money: 2 },
+      }],
+    };
+
+    const enrolled = dispatchAction(state, "next-month");
+    expect(enrolled.totalMonths).toBe(1);
+    expect(enrolled.player.money).toBe(state.player.money);
+
+    const unblocked = {
+      ...enrolled,
+      player: { ...enrolled.player, san: 12 },
+      eventQueue: [],
+    };
+    const advanced = dispatchAction(unblocked, "next-month");
+    expect(advanced.totalMonths).toBe(2);
+    expect(advanced.player.money).toBe(state.player.money + 3);
+    expect(advanced.player.san).toBe(14);
+    expect(advanced.buffs).toEqual([]);
+    expect(advanced.log[0]?.text).toBe([
+      "进入第 1 年 2 月。",
+      "月初结算：自动恢复 SAN +1｜导师工资 金币 +1｜秋季 SAN +1｜每月补贴 金币 +2",
+    ].join("\n"));
+  });
+
+  it("applies state changes directly and converts only future modifiers to Buffs", () => {
+    const state = {
+      ...startGame(),
+      eventQueue: [createEventQueueItem({
+        id: "core-effect",
+        title: "核心效果",
+        description: "测试当前事件边界。",
+        source: "random" as const,
+        blocking: true,
+        deadlineMonths: 0,
+        chainId: "core-effect",
+        stage: "act1" as const,
+        choices: [{
+          id: "apply",
+          label: "确认",
+          outcome: "科研 +2，下次灵感 +3。",
           effects: {
-            enqueueEvents: [{
-              id: "act2-event",
-              title: "Act 2",
-              description: "Second stage.",
-              preview: "act2",
-              source: "fixed",
-              blocking: true,
-              deadlineMonths: 0,
-              chainId: "multi-act",
-              stage: "act2",
-              choices: [{
-                id: "done",
-                label: "Done",
-                outcome: "Done.",
-                effects: {
-                  enqueueEvents: [{
-                    id: "act3-event",
-                    title: "Act 3",
-                    description: "Third stage.",
-                    preview: "act3",
-                    source: "fixed",
-                    blocking: true,
-                    deadlineMonths: 0,
-                    chainId: "multi-act",
-                    stage: "act3",
-                    choices: [{ id: "finish", label: "Finish", outcome: "Finished.", effects: {} }],
-                  }],
-                },
-              }],
-            }, {
-              id: "side-event",
-              title: "Side Event",
-              description: "Separate chain.",
-              preview: "side",
-              source: "system",
-              blocking: false,
-              deadlineMonths: 1,
-              chainId: "side-chain",
-              stage: "act1",
-              choices: [{ id: "side", label: "Side", outcome: "Side.", effects: {} }],
-            }],
+            research: 2,
+            score: 3,
+            temporaryActionEffectUpdates: { idea: { bonus: 3 } },
+            thesisProgress: 50,
+            relationshipAdditions: ["junior"],
           },
         }],
       }, 1)],
     };
 
-    const next = dispatchAction(state, "resolve-event", { eventChoiceId: "next" });
-    expect(next.eventQueue).toHaveLength(2);
-    expect(next.eventQueue[0]?.id).toBe("act2-event");
-    expect(next.eventQueue[0]?.stage).toBe("act2");
-    expect(next.eventQueue[0]?.history).toEqual([expect.objectContaining({
-      eventId: "act1-event",
-      title: "Act 1",
-      selectedChoiceId: "next",
-    })]);
-    expect(next.eventQueue[1]?.history).toBeUndefined();
-
-    const act3 = dispatchAction(next, "resolve-event", {
-      eventId: "act2-event",
-      eventChoiceId: "done",
-    });
-    const currentChainEvent = act3.eventQueue.find((event) => event.id === "act3-event");
-    expect(currentChainEvent?.history).toHaveLength(2);
-    expect(currentChainEvent?.history?.map((item) => item.selectedChoiceId)).toEqual(["next", "done"]);
-
-    const completed = dispatchAction(act3, "resolve-event", {
-      eventId: "act3-event",
-      eventChoiceId: "finish",
-    });
-    expect(completed.eventQueue.find((event) => event.chainId === "multi-act")).toBeUndefined();
-    expect(completed.eventHistory).toHaveLength(1);
-    expect(completed.eventHistory[0]).toMatchObject({
-      chainId: "multi-act",
-      completedAtTotalMonths: state.totalMonths,
-      completedAtYear: state.year,
-      completedAtMonth: state.month,
-    });
-    expect(completed.eventHistory[0]?.stages.map((item) => item.selectedChoiceId)).toEqual([
-      "next",
-      "done",
-      "finish",
-    ]);
-  });
-
-  it("stayOnEvent keeps the queued event and sanCap clamps current SAN", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      player: { ...state.player, san: 18 },
-      eventQueue: [createEventQueueItem({
-        id: "cold-event",
-        title: "Cold Event",
-        description: "Tests san cap and retry behavior.",
-        preview: "cold",
-        source: "random",
-        blocking: true,
-        deadlineMonths: 0,
-        chainId: "cold-event",
-        stage: "act1",
-        choices: [
-          { id: "retry", label: "Retry", outcome: "Need more money.", effects: { stayOnEvent: true } },
-          { id: "hurt", label: "Hurt", outcome: "Cap down.", effects: { sanCapDelta: -4, achievementFlags: ["nearDeath"] } },
-        ],
-      }, 1)],
-    };
-
-    const stillQueued = dispatchAction(state, "resolve-event", { eventChoiceId: "retry" });
-    expect(stillQueued.eventQueue).toHaveLength(1);
-    expect(stillQueued.eventQueue[0]?.history).toBeUndefined();
-    expect(stillQueued.log[0]?.text).toBe("Cold Event：Need more money.");
-    expect(stillQueued.log[0]?.text).not.toContain("?");
-
-    const resolved = dispatchAction(state, "resolve-event", { eventChoiceId: "hurt" });
-    expect(resolved.eventQueue).toHaveLength(0);
+    const resolved = dispatchAction(state, "resolve-event", { eventId: "core-effect", eventChoiceId: "apply" });
+    expect(resolved.player.research).toBe(state.player.research + 2);
+    expect(resolved.totalResearchScore).toBe(state.totalResearchScore + 3);
+    expect(resolved.thesis).toMatchObject({ progress: 50, started: true, completed: false });
+    expect(resolved.relationshipState.juniorCount).toBe(state.relationshipState.juniorCount + 1);
+    expect(resolved.buffs.map((buff) => buff.name)).toEqual(["下次想 idea +3分"]);
     expect(resolved.eventHistory).toHaveLength(1);
-    expect(resolved.eventHistory[0]?.stages).toEqual([expect.objectContaining({
-      eventId: "cold-event",
-      selectedChoiceId: "hurt",
-    })]);
-    expect(resolved.sanCap).toBe(16);
-    expect(resolved.player.san).toBe(16);
-    expect(resolved.achievementFlags.nearDeath).toBe(true);
+    expect(resolved.log[0]?.text).toBe("核心效果：科研 +2，下次灵感 +3。");
   });
 
-  it("joint training reconciles citation-tier cap after publication citations cross a threshold", () => {
-    let state = startWith("normal");
-    state = {
-      ...state,
-      year: 1,
-      month: 9,
-      totalMonths: 9,
-      totalCitations: 499,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
-      eventQueue: [],
-      pendingDecision: null,
-      conferenceEncounterState: {
-        ...state.conferenceEncounterState,
-        bigBullCooperation: true,
-      },
-      jointTrainingState: {
-        citationBonusApplied: 0,
-      },
-      papers: [{
-        id: "published-paper",
-        title: "Published Paper",
-        idea: 7,
-        experiment: 7,
-        writing: 7,
+  it("completes the three-stage PhD decision and applies the degree change", () => {
+    let state: ReturnType<typeof startGame> = {
+      ...startGame(),
+      selectedAdvisorName: "测试导师",
+      year: 2,
+      month: 1,
+      totalMonths: 13,
+      totalResearchScore: 2,
+      papers: [],
+      externalPublications: [{
+        id: "published-b",
+        title: "测试论文",
+        topicId: "test",
+        topicLabel: "测试方向",
+        heatMultiplier: 1,
+        prepublicationDecayRate: 0.1,
+        idea: 0,
+        experiment: 0,
+        writing: 0,
         status: "published",
-        target: "A",
+        target: "B",
         reviewMonthsLeft: 0,
-        submittedIdea: 7,
-        submittedExperiment: 7,
-        submittedWriting: 7,
-        publication: {
-          citations: 499,
-          monthsSincePublication: 0,
-          pendingCitationFraction: 0,
-          effectiveScore: 21,
-          citationMultiplier: 1,
-        },
+        submittedIdea: 0,
+        submittedExperiment: 0,
+        submittedWriting: 0,
+        publication: null,
       }],
+      eventQueue: [],
     };
-
-    state = dispatchAction(state, "next-month");
-
-    expect(state.totalCitations).toBe(500);
-    expect(state.jointTrainingState.citationBonusApplied).toBe(2);
-    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(2);
-    expect(state.log.some((entry) => entry.text.includes("联培加成：引用达到 500，科研上限 +2（联培累计 +2）。"))).toBe(true);
-  });
-
-  it("relationship task actions stay outside monthly action count and can enqueue advisor reward events", () => {
-    let state = startWith("genius");
     state = {
       ...state,
-      actionsRemaining: 0,
-      player: { ...state.player, research: 6 },
-      papers: [{
-        id: "draft-paper",
-        title: "Draft Paper",
-        idea: 0,
-        experiment: 0,
-        writing: 0,
-        status: "draft",
-        target: null,
-        reviewMonthsLeft: 0,
-        submittedIdea: null,
-        submittedExperiment: null,
-        submittedWriting: null,
-      }],
-      advisorProgressState: {
-        ...state.advisorProgressState,
-        researchResource: 3,
-        affinity: 4,
-        taskMultiplier: 6,
-        taskMax: 38,
-        taskProgress: 36,
-        taskUsedThisMonth: false,
-        completedProjectCount: 0,
-      },
+      eventQueue: [createEventQueueItem(createPhdDecisionEvent(state, 2), 1)],
     };
 
-    state = dispatchAction(state, "advance-advisor-task");
+    state = resolveCurrent(state);
+    expect(state.eventQueue[0]?.stage).toBe("act2");
+    expect(state.eventQueue[0]?.description).toContain("已经发表 1 篇论文（B 类 1 篇），科研分是 2");
+    expect(state.eventQueue[0]?.description).toContain("今年转博需要达到 2 分");
+    expect(state.eventQueue[0]?.description).toContain("同届同门");
+    expect(state.eventQueue[0]?.description).toContain("读博压力");
 
-    expect(state.actionsRemaining).toBe(0);
-    expect(state.advisorProgressState.completedProjectCount).toBe(1);
-    expect(state.eventQueue.some((event) => event.chainId === "advisor-task-reward")).toBe(true);
-  });
-
-  it("lover task actions stay outside monthly action count and can enqueue lover reward events", () => {
-    let state = startWith("genius");
-    state = {
-      ...state,
-      actionsRemaining: 0,
-      player: { ...state.player, money: 10, san: 20, research: 8 },
-      papers: [{
-        id: "draft-paper",
-        title: "Draft Paper",
-        idea: 0,
-        experiment: 0,
-        writing: 0,
-        status: "draft",
-        target: null,
-        reviewMonthsLeft: 0,
-        submittedIdea: null,
-        submittedExperiment: null,
-        submittedWriting: null,
-      }],
-      loverState: {
-        ...state.loverState,
-        active: true,
-        type: "smart",
-        startTotalMonths: 1,
-      },
-      loverProgressState: {
-        ...state.loverProgressState,
-        active: true,
-        research: 9,
-        intimacy: 10,
-        taskProgress: 55,
-        taskMax: 60,
-        relationProgress: 0,
-        relationMax: 40,
-        canInteract: false,
-        taskUsedThisMonth: false,
-        completedTaskCount: 0,
-        interactCount: 0,
-      },
-    };
-
-    state = dispatchAction(state, "advance-lover-task");
-
-    expect(state.actionsRemaining).toBe(0);
-    expect(state.player.money).toBe(8);
-    expect(state.loverProgressState).toMatchObject({
-      completedTaskCount: 1,
-      intimacy: 11,
-      taskProgress: 0,
+    const decision = state.eventQueue[0];
+    expect(decision?.choices.map((choice) => choice.id)).toContain("transfer-phd");
+    expect(decision?.choices.find((choice) => choice.id === "transfer-phd")?.outcome).toContain("读博压力");
+    state = dispatchAction(state, "resolve-event", {
+      eventId: decision?.id,
+      eventChoiceId: "transfer-phd",
     });
-    expect(state.eventQueue.some((event) => event.chainId === "lover-task-reward")).toBe(true);
+    expect(state.degree).toBe("master");
+    expect(state.eventQueue[0]?.stage).toBe("result");
+    expect(state.eventQueue[0]?.description).toContain("基础的每月 SAN +1 仍会生效");
+
+    state = resolveCurrent(state);
+    expect(state.degree).toBe("phd");
+    expect(state.phdStartYear).toBe(3);
+    expect(state.maxMonths).toBe(68);
+    expect(state.graduationScoreTarget).toBe(7);
+    expect(state.eventQueue).toHaveLength(0);
+    expect(state.eventHistory.at(-1)?.stages).toHaveLength(3);
+    expect(state.log[0]?.text).toContain("转博抉择");
+    expect(state.log[0]?.text).toContain("读博压力");
+    expect(state.buffs.find((buff) => buff.id === "phd-pressure")).toMatchObject({
+      name: "读博压力",
+      source: "转博",
+      timing: "permanent",
+      remainingMonths: null,
+      monthlyStats: { san: -1 },
+      description: "博士阶段的长期压力使每月 SAN -1",
+    });
+
+    const nextMonth = dispatchAction({
+      ...state,
+      player: { ...state.player, san: 10 },
+      eventQueue: [],
+    }, "next-month");
+    expect(nextMonth.player.san).toBe(11);
+    expect(nextMonth.log[0]?.text).toContain("自动恢复 SAN +1");
+    expect(nextMonth.log[0]?.text).toContain("读博压力 SAN -1");
+    expect(nextMonth.log[0]?.text).toContain("秋季 SAN +1");
   });
 
+  it("defers settlement effects and ending checks until the result is confirmed", () => {
+    const resultEvent = {
+      id: "deferred-ending-result",
+      title: "礼物送达",
+      description: "礼物已经送到。\n\n机制结算\n金币 -2",
+      source: "fixed" as const,
+      blocking: true,
+      deadlineMonths: 0,
+      chainId: "deferred-ending",
+      stage: "result" as const,
+      choices: [{ id: "confirm", label: "确定", outcome: "结算完成。", effects: {} }],
+    };
+    const decisionEvent = createEventQueueItem({
+      id: "deferred-ending-decision",
+      title: "选择礼物",
+      description: "你决定买下礼物。",
+      source: "fixed",
+      blocking: true,
+      deadlineMonths: 0,
+      chainId: "deferred-ending",
+      stage: "act2",
+      choices: [{
+        id: "buy",
+        label: "购买",
+        outcome: "买下礼物。",
+        effects: { money: -2, enqueueEvents: [resultEvent] },
+      }],
+    }, 1);
+    let state = {
+      ...startGame(),
+      player: { ...startGame().player, money: 1 },
+      eventQueue: [decisionEvent],
+    };
 
-  it("relationship additions create fellow progress profiles for long-term fellow tasks", () => {
-  let state = startWith("social");
-  state = {
-    ...state,
-    relationshipState: {
-      ...state.relationshipState,
-      unlockedSlots: 4,
-    },
-    eventQueue: [createEventQueueItem({
-      id: "fellow-additions",
-      title: "Fellow Additions",
-      description: "Adds three fellow relationships.",
-      preview: "fellow additions",
+    state = dispatchAction(state, "resolve-event", {
+      eventId: decisionEvent.id,
+      eventChoiceId: "buy",
+    });
+    expect(state.player.money).toBe(1);
+    expect(state.phase).toBe("playing");
+    expect(state.eventQueue[0]).toMatchObject({ id: resultEvent.id, stage: "result" });
+
+    state = dispatchAction(state, "debug-adjust-stat", { debugStatId: "research", delta: 5 });
+    const debuggedResearch = state.player.research;
+
+    state = dispatchAction(state, "resolve-event", {
+      eventId: resultEvent.id,
+      eventChoiceId: "confirm",
+    });
+    expect(state.player.money).toBe(-1);
+    expect(state.player.research).toBe(debuggedResearch);
+    expect(state.phase).toBe("finished");
+    expect(state.ending).toBe("poor");
+  });
+
+  it("adds tier changes to the completed event log after confirmation", () => {
+    const resultEvent = {
+      id: "tier-change-result",
+      title: "学习结果",
+      description: "你摸到了新的门槛。\n\n机制结算\n科研 +1",
+      source: "fixed" as const,
+      blocking: true,
+      deadlineMonths: 0,
+      chainId: "tier-change",
+      stage: "result" as const,
+      completionLog: "科研 +1。",
+      choices: [{ id: "confirm", label: "确定", outcome: "结算完成。", effects: {} }],
+    };
+    const decisionEvent = createEventQueueItem({
+      id: "tier-change-decision",
+      title: "学习选择",
+      description: "你决定继续钻研。",
+      source: "fixed",
+      blocking: true,
+      deadlineMonths: 0,
+      chainId: "tier-change",
+      stage: "act2",
+      choices: [{
+        id: "learn",
+        label: "学习",
+        outcome: "科研 +1。",
+        effects: { research: 1, enqueueEvents: [resultEvent] },
+      }],
+    }, 1);
+    let state = {
+      ...startGame(),
+      player: { ...startGame().player, research: 5 },
+      eventQueue: [decisionEvent],
+    };
+
+    state = dispatchAction(state, "resolve-event", {
+      eventId: decisionEvent.id,
+      eventChoiceId: "learn",
+    });
+    expect(state.player.research).toBe(5);
+    expect(state.log).toHaveLength(0);
+
+    state = dispatchAction(state, "resolve-event", {
+      eventId: resultEvent.id,
+      eventChoiceId: "confirm",
+    });
+    expect(state.player.research).toBe(6);
+    expect(state.log[0]?.text).toContain("学习选择：科研 +1。");
+    expect(state.log[0]?.text).not.toContain("档位变化");
+  });
+
+  it("queues the PhD decision in months 22 and 34 for master's students", () => {
+    const secondYear = {
+      ...startGame(),
+      selectedAdvisorName: "测试导师",
+      year: 2,
+      month: 10,
+      totalMonths: 22,
+      eventQueue: [],
+    };
+    const thirdYear = { ...secondYear, year: 3, totalMonths: 34 };
+
+    expect(collectFixedEventsForState(secondYear, () => 0.5).map((event) => event.chainId)).toContain("phd-decision");
+    expect(collectFixedEventsForState(thirdYear, () => 0.5).map((event) => event.chainId)).toContain("phd-decision");
+    expect(collectFixedEventsForState({ ...thirdYear, degree: "phd" }, () => 0.5).map((event) => event.chainId)).not.toContain("phd-decision");
+  });
+
+  it("finishes at the training limit with graduation or delay", () => {
+    const readyState = {
+      ...startGame(),
+      selectedAdvisorName: "测试导师",
+      graduationScoreTarget: 1,
+      year: 3,
+      month: 10,
+      totalMonths: 34,
+      maxMonths: 34,
+      eventQueue: [],
+    };
+
+    const graduated = dispatchAction({ ...readyState, totalResearchScore: 1 }, "next-month");
+    expect(graduated.phase).toBe("finished");
+    expect(graduated.ending).toBe("master");
+    expect(graduated.log[0]?.text).toBe("硕士毕业：科研分 1/1。");
+
+    const delayed = dispatchAction({ ...readyState, totalResearchScore: 0 }, "next-month");
+    expect(delayed.phase).toBe("finished");
+    expect(delayed.ending).toBe("delay");
+    expect(delayed.log[0]?.text).toBe("延期毕业：科研分 0/1。");
+  });
+
+  it("allows core attributes to cross zero and trigger endings", () => {
+    const event = createEventQueueItem({
+      id: "san-ending",
+      title: "压力测试",
+      description: "测试负值结局。",
       source: "system",
       blocking: true,
       deadlineMonths: 0,
-      chainId: "fellow-additions",
+      chainId: "san-ending",
       stage: "act1",
-      choices: [{
-        id: "take",
-        label: "Take",
-        outcome: "Applied.",
-        effects: {
-          relationshipAdditions: ["senior", "peer", "junior"],
-        },
-      }],
-    }, 1)],
-  };
+      choices: [{ id: "apply", label: "确认", outcome: "SAN -1。", effects: { san: -1 } }],
+    }, 1);
+    const state = { ...startGame(), player: { ...startGame().player, san: 0 }, eventQueue: [event] };
+    const resolved = dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: "apply" });
 
-  state = dispatchAction(state, "resolve-event", { eventChoiceId: "take" });
-
-  expect(state.relationshipState.seniorCount).toBe(1);
-  expect(state.relationshipState.peerCount).toBe(1);
-  expect(state.relationshipState.juniorCount).toBe(1);
-  expect(state.relationshipState.occupiedSlots).toBe(4);
-  expect(state.fellowProgressState).toHaveLength(3);
-  expect(state.fellowProgressState.map((profile) => profile.type)).toEqual(["senior", "peer", "junior"]);
-  expect(state.fellowProgressState.map((profile) => profile.taskType)).toEqual(["writing", "experiment", "idea"]);
+    expect(resolved.player.san).toBe(-1);
+    expect(resolved.phase).toBe("finished");
+    expect(resolved.ending).toBe("burnout");
   });
 
-  it("fellow task actions stay outside monthly action count and can enqueue fellow reward events", () => {
-  let state = startWith("genius");
-  state = {
-    ...state,
-    actionsRemaining: 0,
-    player: { ...state.player, research: 6 },
-    papers: [{
-      id: "draft-paper",
-      title: "Draft Paper",
-      idea: 0,
-      experiment: 0,
-      writing: 0,
-      status: "draft",
-      target: null,
-      reviewMonthsLeft: 0,
-      submittedIdea: null,
-      submittedExperiment: null,
-      submittedWriting: null,
-    }],
-    fellowProgressState: [{
-      id: "junior-1",
-      type: "junior",
-      research: 6,
-      affinity: 4,
-      taskType: "idea",
-      taskProgress: 58,
-      taskMax: 60,
-      relationProgress: 0,
-      relationMax: 40,
-      canInteract: false,
-      taskUsedThisMonth: false,
-      completedTaskCount: 0,
-      interactCount: 0,
-      startTotalMonths: 1,
-    }],
-  };
+  it("makes every debug event button observable with one click", () => {
+    const eventIds = DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons.map((button) => button.id));
 
-  state = dispatchAction(state, "advance-fellow-task", { relationshipId: "junior-1" });
-
-  expect(state.actionsRemaining).toBe(0);
-  expect(state.player.san).toBe(18);
-  expect(state.fellowProgressState[0]).toMatchObject({
-    completedTaskCount: 1,
-    affinity: 5,
-    taskProgress: 1,
-  });
-  expect(state.eventQueue.some((event) => event.chainId === "fellow-task-reward")).toBe(true);
-});
-  it("lab talent adds team-size bonus to paper actions when active", () => {
-    let state = startWith("normal");
-    state = dispatchAction(state, "create-paper");
-    const paperId = state.selectedPaperId;
-    if (!paperId) throw new Error("paper id missing");
-
-    state = {
-      ...state,
-      relationshipState: {
-        ...state.relationshipState,
-        occupiedSlots: 4,
-        advisorCount: 1,
-        seniorCount: 1,
-        juniorCount: 1,
-        peerCount: 1,
-      },
-    };
-
-    state = dispatchAction(state, "idea", { paperId });
-    expect(state.papers[0]?.idea).toBe(6);
+    for (const eventId of eventIds) {
+      const state = { ...startGame(), eventQueue: [] };
+      const next = dispatchAction(state, "debug-trigger-event", { eventId });
+      expect(next, eventId).not.toEqual(state);
+      expect(next.log[0]?.text ?? "", eventId).not.toMatch(/失败|无法生成/u);
+      expect(next.eventQueue.length, eventId).toBeGreaterThan(0);
+    }
   });
 
-  it("next-month applies lab talent yearly growth to due fellow relationships", () => {
-    let state = startWith("genius");
-    state = {
-      ...state,
-      year: 1,
-      month: 12,
-      totalMonths: 12,
-      availableRandomEvents: [],
-      usedRandomEvents: [...BASE_RANDOM_EVENT_IDS],
+  it("routes the three disease debug buttons to three independent illness events", () => {
+    const cases = [
+      ["illness-stomach", "肚子虚弱", "illness-stomach"],
+      ["illness-flu", "流感来袭", "illness-flu"],
+      ["illness-fever", "高烧不退", "illness-fever"],
+    ] as const;
+
+    for (const [eventId, title, chainId] of cases) {
+      const state = { ...startGame(), eventQueue: [] };
+      const next = dispatchAction(state, "debug-trigger-event", { eventId });
+      expect(next.eventQueue).toHaveLength(1);
+      expect(next.eventQueue[0]?.title).toBe(title);
+      expect(next.eventQueue[0]?.chainId).toBe(chainId);
+      expect(next.eventQueue[0]?.description).not.toContain("一件计划外的事突然打断");
+      expect(next.eventQueue[0]?.title).not.toBe("临时事务");
+      expect(next.buffs).toContainEqual(expect.objectContaining({
+        source: title,
+        activeOperationSanMultiplier: eventId === "illness-stomach" ? 1.5 : eventId === "illness-flu" ? 2 : 2.5,
+      }));
+    }
+  });
+
+  it("gives only the selected non-urgent events one month before they become blocking", () => {
+    const base = {
+      ...startGame(),
       eventQueue: [],
-      pendingDecision: null,
-      player: { ...state.player, research: 8, social: 0 },
-      relationshipState: {
-        ...state.relationshipState,
-        unlockedSlots: 4,
-        occupiedSlots: 4,
-        advisorCount: 1,
-        seniorCount: 1,
-        juniorCount: 1,
-        peerCount: 1,
-      },
-      advisorProgressState: {
-        ...state.advisorProgressState,
-        researchResource: 7,
-      },
-      fellowProgressState: [
-        {
-          id: "senior-1",
-          type: "senior",
-          research: 2,
-          affinity: 2,
-          taskType: "writing",
-          taskProgress: 0,
-          taskMax: 60,
-          relationProgress: 0,
-          relationMax: 40,
-          canInteract: false,
-          taskUsedThisMonth: false,
-          completedTaskCount: 0,
-          interactCount: 0,
-          startTotalMonths: 1,
-        },
-        {
-          id: "peer-1",
-          type: "peer",
-          research: 4,
-          affinity: 3,
-          taskType: "experiment",
-          taskProgress: 0,
-          taskMax: 60,
-          relationProgress: 0,
-          relationMax: 40,
-          canInteract: false,
-          taskUsedThisMonth: false,
-          completedTaskCount: 0,
-          interactCount: 0,
-          startTotalMonths: 1,
-        },
-        {
-          id: "junior-1",
-          type: "junior",
-          research: 5,
-          affinity: 3,
-          taskType: "idea",
-          taskProgress: 0,
-          taskMax: 60,
-          relationProgress: 0,
-          relationMax: 40,
-          canInteract: false,
-          taskUsedThisMonth: false,
-          completedTaskCount: 0,
-          interactCount: 0,
-          startTotalMonths: 2,
-        },
-      ],
+      month: 6,
+      totalMonths: 6,
+      player: { ...startGame().player, research: 6, social: 6 },
     };
+    const deferableEventIds = [
+      "random-1",
+      "random-2",
+      "random-4",
+      "random-8",
+      "random-9",
+      "random-10",
+      "random-11",
+      "random-12",
+      "random-14",
+      "random-15",
+    ];
+    const urgentEventIds = [
+      "random-5",
+      "random-6",
+      "random-7",
+      "random-13",
+      "random-16",
+      "illness-stomach",
+      "illness-flu",
+      "illness-fever",
+      "mentor-assign",
+    ];
 
-    state = dispatchAction(state, "next-month");
-
-    expect(state.fellowProgressState[0]?.research).toBe(4);
-    expect(state.fellowProgressState[1]?.research).toBe(5);
-    expect(state.fellowProgressState[2]?.research).toBe(5);
-    expect(state.log.some((entry) => entry.text.includes("实验室互帮互助：师兄师姐 1 科研 +2（组内 4 人高于 TA）。"))).toBe(true);
+    for (const eventId of deferableEventIds) {
+      const next = dispatchAction(base, "debug-trigger-event", { eventId });
+      expect(next.eventQueue[0]?.deadlineMonths, eventId).toBe(1);
+    }
+    for (const eventId of urgentEventIds) {
+      const next = dispatchAction(base, "debug-trigger-event", { eventId });
+      expect(next.eventQueue[0]?.deadlineMonths, eventId).toBe(0);
+    }
   });
 
+  it("makes a deferred event due after one month while still scheduling the new month's events", () => {
+    let state: ReturnType<typeof startGame> = {
+      ...startGame(),
+      selectedAdvisorName: "测试导师",
+      eventQueue: [],
+      year: 2,
+      month: 1,
+      totalMonths: 13,
+      illnessProbability: 0,
+    };
+    state = dispatchAction(state, "debug-trigger-event", { eventId: "random-2" });
+    expect(state.eventQueue[0]?.deadlineMonths).toBe(1);
+
+    const nextMonth = dispatchAction(state, "next-month");
+    expect(nextMonth.totalMonths).toBe(14);
+    expect(nextMonth.eventQueue.find((event) => event.chainId === "random-2")?.deadlineMonths).toBe(0);
+    expect(nextMonth.eventQueue.some((event) => event.chainId === "scholarship")).toBe(true);
+
+    const blocked = dispatchAction(nextMonth, "next-month");
+    expect(blocked.totalMonths).toBe(14);
+  });
+
+  it("turns a deferred event into a current-month task once the player starts it", () => {
+    let state: ReturnType<typeof startGame> = {
+      ...startGame(),
+      eventQueue: [],
+      month: 6,
+      totalMonths: 6,
+    };
+    state = dispatchAction(state, "debug-trigger-event", { eventId: "random-2" });
+    expect(state.eventQueue[0]?.deadlineMonths).toBe(1);
+
+    state = resolveCurrent(state);
+    expect(state.eventQueue[0]?.stage).toBe("act2");
+    expect(state.eventQueue[0]?.deadlineMonths).toBe(0);
+  });
+
+  it("opens and resolves the game-relaxation choice scene", () => {
+    let state: ReturnType<typeof startGame> = {
+      ...startGame(),
+      eventQueue: [],
+      month: 6,
+      totalMonths: 6,
+    };
+    state = dispatchAction(state, "debug-trigger-event", { eventId: "random-15" });
+    const intro = state.eventQueue[0];
+    const continueChoice = intro?.choices[0];
+    if (!intro || !continueChoice) throw new Error("game-relaxation intro is missing");
+
+    state = dispatchAction(state, "resolve-event", {
+      eventId: intro.id,
+      eventChoiceId: continueChoice.id,
+    });
+    const decision = state.eventQueue[0];
+    expect(decision?.stage).toBe("act2");
+    expect(decision?.choices.map((choice) => choice.label)).toEqual([
+      "玩泰拉瑞亚",
+      "玩魔塔50层",
+      "玩研究生模拟器",
+      "打王者荣耀",
+    ]);
+
+    const gradSimChoice = decision?.choices.find((choice) => choice.label === "玩研究生模拟器");
+    if (!decision || !gradSimChoice) throw new Error("game-relaxation choice is missing");
+    state = dispatchAction(state, "resolve-event", {
+      eventId: decision.id,
+      eventChoiceId: gradSimChoice.id,
+    });
+    expect(state.eventQueue[0]?.stage).toBe("result");
+    state = resolveCurrent(state);
+    expect(state.eventQueue).toHaveLength(0);
+  });
+
+  it("resolves a naturally scheduled game-relaxation event after it is deferred", () => {
+    const base: ReturnType<typeof startGame> = {
+      ...startGame(),
+      eventQueue: [],
+      player: { ...startGame().player, san: 10 },
+      month: 6,
+      totalMonths: 6,
+      availableRandomEvents: [15],
+      usedRandomEvents: [],
+      totalRandomEventCount: 0,
+    };
+    const rolls = [0.7, 0];
+    const collection = collectRandomEventsForMonth(base, () => rolls.shift() ?? 0);
+    const scheduled = collection.events[0];
+    if (!scheduled) throw new Error("scheduled game-relaxation event is missing");
+    let state = {
+      ...collection.nextState,
+      month: 7,
+      totalMonths: 7,
+      eventQueue: [{ ...createEventQueueItem(scheduled, 1), deadlineMonths: 0 }],
+    };
+
+    state = dispatchAction(state, "resolve-event", {
+      eventId: scheduled.id,
+      eventChoiceId: scheduled.choices[0]?.id,
+    });
+    expect(state.eventQueue[0]?.stage).toBe("act2");
+    expect(state.log[0]?.text ?? "").not.toContain("当前事件选择无效");
+
+    const decision = state.eventQueue[0];
+    const gradSimChoice = decision?.choices.find((choice) => choice.label === "玩研究生模拟器");
+    if (!decision || !gradSimChoice) throw new Error("deferred game-relaxation choice is missing");
+    state = dispatchAction(state, "resolve-event", {
+      eventId: decision.id,
+      eventChoiceId: gradSimChoice.id,
+    });
+    expect(state.eventQueue[0]?.stage).toBe("result");
+    expect(state.player.san).toBe(10);
+
+    state = resolveCurrent(state);
+    expect(state.player.san).toBe(12);
+    expect(state.eventQueue).toHaveLength(0);
+  });
+
+  it("keeps the illness Buff through all scenes and removes it only after final confirmation", () => {
+    let state: ReturnType<typeof startGame> = { ...startGame(), eventQueue: [], month: 1, totalMonths: 1 };
+    state = dispatchAction(state, "debug-trigger-event", { eventId: "illness-flu" });
+    const illnessBuffId = state.buffs.find((buff) => buff.source === "流感来袭")?.id;
+    expect(illnessBuffId).toBeTruthy();
+
+    state = resolveCurrent(state);
+    expect(state.buffs.some((buff) => buff.id === illnessBuffId)).toBe(true);
+    const decision = state.eventQueue[0];
+    const hospital = decision?.choices.find((choice) => choice.label === "去医院");
+    if (!decision || !hospital) throw new Error("illness decision is missing");
+    state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: hospital.id });
+    expect(state.buffs.some((buff) => buff.id === illnessBuffId)).toBe(true);
+
+    state = resolveCurrent(state);
+    expect(state.buffs.some((buff) => buff.id === illnessBuffId)).toBe(false);
+  });
+
+  it("applies the independent review cost and reading count only on final confirmation", () => {
+    let state: ReturnType<typeof startGame> = {
+      ...startGame(),
+      eventQueue: [],
+      month: 1,
+      totalMonths: 1,
+      actionState: { used: 1, limit: 1, aiResearchBonusUsed: false },
+      readingState: { ...startGame().readingState, readCount: 9 },
+    };
+    state = dispatchAction(state, "debug-trigger-event", { eventId: "random-2" });
+    state = resolveCurrent(state);
+    const decision = state.eventQueue[0];
+    const selfReview = decision?.choices.find((choice) => choice.label === "认真审稿");
+    if (!decision || !selfReview) throw new Error("review decision is missing");
+    state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: selfReview.id });
+    expect(state.readingState.readCount).toBe(9);
+
+    state = resolveCurrent(state);
+    expect(state.readingState.readCount).toBe(11);
+    expect(state.player.research).toBe(2);
+    expect(state.player.san).toBe(16);
+    expect(state.actionState).toEqual({ used: 1, limit: 1, aiResearchBonusUsed: false });
+    expect(state.log[0]?.text).toContain("额外看论文 +2 次");
+    expect(state.log[0]?.text).toContain("阅读累计 +2");
+    expect(state.buffs.some((buff) => buff.id.startsWith("read-paper-idea-"))).toBe(true);
+    expect(state.log.filter((entry) => entry.text.startsWith("看论文："))).toHaveLength(0);
+  });
 });

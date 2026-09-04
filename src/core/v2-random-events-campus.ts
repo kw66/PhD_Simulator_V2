@@ -4,8 +4,8 @@ import {
   createFundingCampusRandomEvent,
   createSocialCampusRandomEvent,
 } from "./v2-random-events-campus-social";
+import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
-import type { RandomRollProvider } from "./v2-random-events-campus-shared";
 
 export function createCampusRandomEventById(
   eventId: number,
@@ -22,7 +22,7 @@ export function createCampusRandomEventById(
     return createOpsCampusRandomEvent(state, getRoll);
   }
   if (eventId === 15) {
-    return createEntertainmentCampusRandomEvent(state);
+    return createEntertainmentCampusRandomEvent(state, getRoll);
   }
   return null;
 }

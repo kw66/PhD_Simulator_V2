@@ -1,75 +1,65 @@
 import { createLoverState } from "./v2-lover-system";
 import type { PendingEvent } from "./v2-types";
 import {
+  getConferenceActivityChainId,
   getConferenceGradeLabel,
+  getConferencePaperPresentationResults,
   type ConferenceActivityBuildState,
   type ConferenceActivityContext,
   type ConferenceActivityOptionDefinition,
 } from "./v2-conference-activity-shared";
 import { selectConferenceActivityOptions } from "./v2-conference-activity-options";
 
-function createConferenceActivityResult(
+function trimOutcome(value: string): string {
+  return value.trim().replace(/[。.]+$/u, "");
+}
+
+function createDiscardPaperUpdates(context: ConferenceActivityContext) {
+  return (context.paperIds ?? []).map((id) => ({ id, conferenceHandled: true }));
+}
+
+export function createConferenceActivityResult(
   context: ConferenceActivityContext,
   option: ConferenceActivityOptionDefinition,
+  attendanceSummary: string,
 ): PendingEvent {
+  const activitySummary = trimOutcome(option.outcome);
+  const activityChainId = getConferenceActivityChainId(context);
   return {
-    id: `${context.id}-activity-result-${option.id}`,
-    title: "论文参会会场活动 ➜ 会场决策 ➜ 行程收获",
+    id: `${activityChainId}-result-${option.id}`,
+    title: "会场活动 ➜ 选择安排 ➜ 活动结果",
     description: [
-      `你在会场选择了：${option.label}。`,
       option.resultDescription,
-      "执行完这一轮安排后，你能明显感觉到今天的“收益形状”已经定型：有的回报立刻可见，有的会在后续几个月慢慢兑现。",
-      "会场里的每一个决策都像提前埋下的分支，这次你已经把其中一条走到底。",
+      "散场广播响起时，当天的报告和交流也告一段落。",
+      "你收好胸牌和会议手册，这趟行程也到了尾声。",
+      "机制结算",
+      activitySummary,
+      ...getConferencePaperPresentationResults(context),
     ].join("\n\n"),
-    preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,
-    chainId: "conference-activity",
+    chainId: activityChainId,
     stage: "result",
+    discardPaperUpdates: createDiscardPaperUpdates(context),
+    completionLog: [attendanceSummary, activitySummary].filter(Boolean).join("；"),
     choices: [{
       id: "close",
       label: "结束",
       outcome: "本次会场活动结束。",
-      effects: {},
+      effects: {
+        ...option.effects,
+        followUpContext: `${context.conferenceName} ${context.conferenceYear} 会场交流`,
+        paperUpdates: createDiscardPaperUpdates(context),
+      },
     }],
   };
 }
 
-function createConferenceActivityAct2(
-  context: ConferenceActivityContext,
-  selectedOptions: ConferenceActivityOptionDefinition[],
-): PendingEvent {
-  return {
-    id: `${context.id}-activity-act2`,
-    title: "论文参会会场活动 ➜ 会场决策",
-    description: [
-      "会场的时间被切得很碎，报告、茶歇、海报、晚宴和临时交流挤在同一天里，你不可能把每条线都做到位。",
-      "你翻着日程，脑中自动分成三类收益：立刻能落到课题上的学术收益、能缓冲长期压力的状态收益、以及可能在未来回本的人脉收益。",
-      "每个选择都在提醒你同一件事：今天的“放弃项”与“投入项”一样重要。",
-      "你决定不再贪多，而是选一条最符合当前阶段的主线，把有限精力砸出最大确定性。",
-    ].join("\n\n"),
-    preview: `${context.conferenceName} @ ${context.city}`,
-    source: "fixed",
-    blocking: true,
-    deadlineMonths: 0,
-    chainId: "conference-activity",
-    stage: "act2",
-    choices: selectedOptions.map((option) => ({
-      id: option.id,
-      label: option.label,
-      outcome: option.outcome,
-      effects: {
-        ...option.effects,
-        enqueueEvents: [...(option.effects.enqueueEvents ?? []), createConferenceActivityResult(context, option)],
-      },
-    })),
-  };
-}
-
-export function createConferenceActivityAct1(
+export function createConferenceActivityDecisionEvent(
   context: ConferenceActivityContext,
   state: ConferenceActivityBuildState,
+  attendanceSummary: string,
   getRoll: () => number = Math.random,
 ): PendingEvent {
   const selectedOptions = selectConferenceActivityOptions(
@@ -77,28 +67,68 @@ export function createConferenceActivityAct1(
     { ...state, loverState: state.loverState ?? createLoverState() },
     getRoll,
   );
+  const activityChainId = getConferenceActivityChainId(context);
   return {
-    id: `${context.id}-activity-act1`,
-    title: "论文参会会场活动",
+    id: `${activityChainId}-act2`,
+    title: "会场活动 ➜ 选择安排",
     description: [
-      `你抵达${context.city}，正式进入 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）会场，胸牌和议程一拿到手，时间就被切成了很多互相竞争的片段。`,
+      "论文已经按会议安排完成展示，接下来的时间可以自己安排。",
+      `你抵达${context.city}，在 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）签到处领到胸牌和议程。`,
       context.paperCount >= 2
-        ? `这次你有 ${context.paperCount} 篇论文展示任务，意味着你不仅要“出现”，还要反复切换表达策略和交流对象。`
-        : "这次你有 1 篇论文展示任务，看似简单，但每一次沟通的质量都会被直接放大。",
-      "会场流程很密，报告、海报、茶歇和临时交流几乎无缝衔接，你必须提前决定今天的主攻方向。",
+        ? `这次有 ${context.paperCount} 篇论文已经完成展示，你终于可以把注意力放到会场活动上。`
+        : "这次的论文展示已经完成。",
+      ...getConferencePaperPresentationResults(context),
+      "报告、海报、茶歇和临时交流有不少撞在同一时段，你只能挑一项最想参加的安排。",
     ].join("\n\n"),
-    preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,
-    chainId: "conference-activity",
+    chainId: activityChainId,
+    stage: "act2",
+    discardPaperUpdates: createDiscardPaperUpdates(context),
+    choices: selectedOptions.map((option) => ({
+      id: option.id,
+      label: option.label,
+      outcome: option.outcome,
+      effects: {
+        enqueueEvents: [createConferenceActivityResult(context, option, attendanceSummary)],
+      },
+    })),
+  };
+}
+
+export function createConferenceActivityEvent(
+  context: ConferenceActivityContext,
+  state: ConferenceActivityBuildState,
+  attendanceSettlementItems: string[],
+  getRoll: () => number = Math.random,
+): PendingEvent {
+  const activityChainId = getConferenceActivityChainId(context);
+  const attendanceSummary = attendanceSettlementItems.join("，");
+  return {
+    id: `${activityChainId}-act1`,
+    title: "会场活动",
+    description: [
+      `会议当天，你带着论文来到${context.city}，展示已经按 ${context.conferenceName} 的安排完成。`,
+      `前一幕参会确认：${attendanceSummary}`,
+      context.paperCount >= 2
+        ? `同会的 ${context.paperCount} 篇论文都展示完了，剩下的时间由你安排。`
+        : "论文展示顺利结束，剩下的时间由你安排。",
+      ...getConferencePaperPresentationResults(context),
+      "主旨报告、分论坛、茶歇和城市活动同时开放，挑一项最想参加的吧。",
+    ].join("\n\n"),
+    source: "fixed",
+    blocking: true,
+    deadlineMonths: 0,
+    chainId: activityChainId,
     stage: "act1",
+    discardPaperUpdates: createDiscardPaperUpdates(context),
     choices: [{
       id: "continue",
       label: "继续",
-      outcome: "进入会场活动决策。",
+      outcome: "查看会场活动安排。",
       effects: {
-        enqueueEvents: [createConferenceActivityAct2(context, selectedOptions)],
+        enqueueEvents: [createConferenceActivityDecisionEvent(context, state, attendanceSummary, getRoll)],
       },
     }],
   };

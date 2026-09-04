@@ -1,16 +1,17 @@
-import type { ShopItemId, ShopUpgradeId } from "./v2-types";
+import type { ShopItemId } from "./v2-types";
 import {
+  GPU_TIER_DEFINITIONS,
   SHOP_UPGRADE_DEFINITIONS,
-  getShopUpgradeDefinition,
   type ShopItemStateView,
   type ShopUpgradeDefinition,
   type ShopUpgradeStateView,
 } from "./v2-shop-items-shared";
+import { BIKE_TIER_DEFINITIONS } from "./v2-bike-system";
 
 export function isShopItemOwned(view: ShopItemStateView, itemId: ShopItemId): boolean {
   switch (itemId) {
     case "gpu_buy":
-      return view.shopState.gpuServersBought > 0;
+      return view.shopState.gpuLevel > 0;
     case "chair":
       return view.shopState.chairOwned === true;
     case "keyboard":
@@ -19,6 +20,8 @@ export function isShopItemOwned(view: ShopItemStateView, itemId: ShopItemId): bo
       return view.shopState.monitorOwned === true;
     case "bike":
       return view.shopState.bikeOwned === true;
+    case "ebike":
+      return view.shopState.ebikeOwned === true;
     case "down_jacket":
       return view.eventSupport.hasDownJacket === true;
     default:
@@ -29,7 +32,7 @@ export function isShopItemOwned(view: ShopItemStateView, itemId: ShopItemId): bo
 export function canBuyShopItem(view: ShopItemStateView, itemId: ShopItemId): boolean {
   switch (itemId) {
     case "gpu_buy":
-      return view.shopState.gpuServersBought < Math.max(1, view.totalMonths);
+      return view.shopState.gpuLevel < GPU_TIER_DEFINITIONS.length;
     case "chair":
       return view.shopState.chairOwned !== true;
     case "keyboard":
@@ -37,7 +40,9 @@ export function canBuyShopItem(view: ShopItemStateView, itemId: ShopItemId): boo
     case "monitor":
       return view.shopState.monitorOwned !== true;
     case "bike":
-      return view.shopState.bikeOwned !== true;
+      return view.shopState.bikeOwned !== true || view.shopState.bikeLevel < BIKE_TIER_DEFINITIONS.length;
+    case "ebike":
+      return view.shopState.ebikeOwned !== true;
     case "down_jacket":
       return view.eventSupport.hasDownJacket !== true;
     default:
@@ -49,16 +54,9 @@ export function canSellShopItem(view: ShopItemStateView, itemId: ShopItemId): bo
   return isShopItemOwned(view, itemId);
 }
 
-function getUpgradeableItemId(upgradeId: ShopUpgradeId): ShopItemId {
-  return getShopUpgradeDefinition(upgradeId).itemId;
-}
-
 function canUpgradeOwnedItem(view: ShopUpgradeStateView, itemId: ShopItemId): boolean {
+  // Bicycle routes are no longer offered by the UI; legacy callers are handled in transactions.
   switch (itemId) {
-    case "monitor":
-      return view.shopState.monitorOwned && view.shopState.monitorUpgrade === null;
-    case "bike":
-      return view.shopState.bikeOwned && view.shopState.bikeUpgrade === null;
     case "chair":
       return view.shopState.chairOwned && view.shopState.chairUpgrade === null;
     default:
@@ -71,8 +69,4 @@ export function getAvailableShopUpgrades(view: ShopUpgradeStateView, itemId: Sho
     return [];
   }
   return SHOP_UPGRADE_DEFINITIONS.filter((upgrade) => upgrade.itemId === itemId);
-}
-
-export function canUpgradeShopItem(view: ShopUpgradeStateView, upgradeId: ShopUpgradeId): boolean {
-  return canUpgradeOwnedItem(view, getUpgradeableItemId(upgradeId));
 }

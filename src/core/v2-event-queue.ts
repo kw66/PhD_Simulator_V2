@@ -1,23 +1,13 @@
+import { removeBuffs } from "./v2-buffs";
 import type { EventQueueItem, GameState, PendingEvent } from "./v2-types";
 
 function clampDeadlineMonths(value: number): number {
   return Math.max(0, Math.floor(value));
 }
 
-function normalizePreview(event: PendingEvent): string {
-  const preview = event.preview.trim();
-  if (preview.length > 0) {
-    return preview;
-  }
-
-  const compactDescription = event.description.replace(/\s+/g, " ").trim();
-  return compactDescription.length > 0 ? compactDescription : "点击查看详情";
-}
-
 export function createEventQueueItem(event: PendingEvent, queueOrder: number): EventQueueItem {
   return {
     ...event,
-    preview: normalizePreview(event),
     blocking: event.blocking === true,
     deadlineMonths: clampDeadlineMonths(event.deadlineMonths),
     queueOrder,
@@ -49,6 +39,32 @@ export function getCurrentEvent(eventQueue: EventQueueItem[], eventId?: string):
 
 export function hasBlockingEventQueueItems(eventQueue: EventQueueItem[]): boolean {
   return eventQueue.some((event) => event.blocking && event.deadlineMonths <= 0);
+}
+
+export function removeBlockingEventQueueItems(eventQueue: EventQueueItem[]): EventQueueItem[] {
+  return eventQueue.filter((event) => !event.blocking || event.deadlineMonths > 0);
+}
+
+export function discardBlockingQueueEvents(state: GameState): GameState {
+  const discardedEvents = state.eventQueue.filter((event) => event.blocking && event.deadlineMonths <= 0);
+  if (discardedEvents.length === 0) return state;
+
+  const removedBuffIds = discardedEvents.flatMap((event) => event.removeBuffIdsOnCompletion ?? []);
+  const paperUpdates = new Map(
+    discardedEvents.flatMap((event) => event.discardPaperUpdates ?? []).map((update) => [update.id, update]),
+  );
+  const applyPaperUpdates = (papers: GameState["papers"]): GameState["papers"] => papers.map((paper) => {
+    const update = paperUpdates.get(paper.id);
+    return update ? { ...paper, ...update } : paper;
+  });
+
+  return {
+    ...state,
+    eventQueue: removeBlockingEventQueueItems(state.eventQueue),
+    buffs: removeBuffs(state.buffs, removedBuffIds),
+    papers: applyPaperUpdates(state.papers),
+    externalPublications: applyPaperUpdates(state.externalPublications),
+  };
 }
 
 export function enqueueEventQueueItem(eventQueue: EventQueueItem[], event: PendingEvent): EventQueueItem[];
@@ -85,18 +101,6 @@ export function decrementEventQueueDeadlines(eventQueue: EventQueueItem[]): Even
         }
       : event,
   );
-}
-
-export function dequeueCurrentQueueEvent(state: GameState): GameState {
-  const currentEvent = getCurrentEvent(state.eventQueue);
-  if (!currentEvent) {
-    return state;
-  }
-
-  return {
-    ...state,
-    eventQueue: removeEventQueueItem(state.eventQueue, currentEvent.id),
-  };
 }
 
 export function getCurrentQueueEvent(state: Pick<GameState, "eventQueue">): EventQueueItem | null {

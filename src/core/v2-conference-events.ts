@@ -1,6 +1,8 @@
-import { createConferenceActivityAct1, type ConferenceActivityBuildState, type ConferenceActivityContext } from "./v2-conference-activity";
+import { createConferenceActivityEvent, type ConferenceActivityBuildState, type ConferenceActivityContext } from "./v2-conference-activity";
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
-import type { EventCounters, EventSupportState, PendingEvent, PaperTarget, ShopState } from "./v2-types";
+import { getPaperConferencePromotionMultiplier } from "./v2-publication-system";
+import { getConferencePaperPresentationResults } from "./v2-conference-activity-shared";
+import type { EventCounters, EventSupportState, PaperAcceptType, PendingEvent, PaperTarget, ShopState } from "./v2-types";
 import type { ConferenceDecisionMode, ConferenceRegionId } from "./v2-conference-system";
 import { resolveConferenceDecisionCost } from "./v2-conference-system";
 
@@ -9,15 +11,19 @@ export interface ConferenceAcceptedPaperCandidate {
   target: PaperTarget;
   submittedMonth: number;
   submittedYear: number;
+  title?: string;
+  acceptType?: PaperAcceptType;
 }
 
 export interface ConferenceEventContext extends ConferenceActivityContext {
   region: ConferenceRegionId;
+  locationSeed?: number | null;
   paperIds: string[];
 }
 
 export interface ConferenceEventBuilderState extends ConferenceActivityBuildState {
   favor: number;
+  conferenceLocationSeed?: number | null;
   shopState: ShopState;
   eventSupport: EventSupportState;
   eventCounters: EventCounters;
@@ -46,35 +52,50 @@ function createConferenceDecisionAct3(
   getRoll: () => number,
 ): PendingEvent {
   const modeText = decision.mode === "self" ? "自费参会" : decision.mode === "advisor" ? "导师报销" : "同学代参会";
-  const costText = decision.resource === "favor"
-    ? `好感 -${decision.actualCost}`
-    : `金钱 -${decision.actualCost}`;
+  const costText = decision.actualCost > 0
+    ? decision.resource === "favor"
+      ? `导师好感 -${decision.actualCost}`
+      : `金币 -${decision.actualCost}`
+    : decision.mode === "advisor"
+      ? "导师好感未变化"
+      : decision.mode === "proxy"
+        ? "代参会费用 0"
+        : "参会费用 0";
+  const settlementItems = [modeText, costText];
+  const settlementSummary = settlementItems.join("，");
+  const presentationResults = getConferencePaperPresentationResults(context);
 
   return {
     id: `${context.id}-act3-${decision.mode}`,
-    title: "论文参会 ➜ 开会方式抉择 ➜ 参会确认",
+    title: "论文参会 ➜ 参会方式 ➜ 参会确认",
     description: [
-      "你已经敲定了本次参会方式，预算、人情和行程也随之落定。",
-      "这一刻开始，你不再纠结“去不去、怎么去”，而是进入下一层问题：到会场后，把有限精力投向哪里。",
-      "真正决定产出的，往往不是抵达本身，而是抵达后的每一次取舍。",
+      "参会方式已经选好，预算和行程也排上了。",
+      "论文展示就在会议日程里，报告、海报和交流活动都挤在同一天。",
+      "你把会场地图存进手机，准备确认这次安排。",
+      ...(decision.resistanceNarrative ? [decision.resistanceNarrative] : []),
       "机制结算",
-      `${modeText}，目的地是${getRegionName(context.region)}的${context.city}，${costText}。`,
+      ...settlementItems,
+      ...presentationResults,
     ].join("\n\n"),
-    preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,
-    chainId: "conference-decision",
+    chainId: context.id,
     stage: "act3",
+    discardPaperUpdates: createPaperHandledUpdates(context),
+    completionLog: decision.countsAsMeeting
+      ? [settlementSummary, ...presentationResults, "论文展示已完成"].join("；")
+      : [settlementSummary, ...presentationResults, "论文参会已处理"].join("；"),
     choices: decision.countsAsMeeting
       ? [{
           id: "enter-venue",
-          label: "进入会场活动",
-          outcome: "进入会场。",
+          label: "进入会场安排",
+          outcome: "进入会场安排。",
           effects: {
+            ...(decision.resource === "money" && decision.actualCost > 0 ? { money: -decision.actualCost } : {}),
+            ...(decision.resource === "favor" && decision.actualCost > 0 ? { favor: -decision.actualCost } : {}),
             counterDeltas: { meetingCount: 1 },
-            paperUpdates: createPaperHandledUpdates(context),
-            enqueueEvents: [createConferenceActivityAct1(context, state, getRoll)],
+            enqueueEvents: [createConferenceActivityEvent(context, state, settlementItems, getRoll)],
           },
         }]
       : [{
@@ -104,43 +125,48 @@ function createConferenceDecisionAct2(
   const selfDecision = resolveConferenceDecisionCost({ ...baseInput, mode: "self" }, getRoll);
   const advisorDecision = resolveConferenceDecisionCost({ ...baseInput, mode: "advisor" }, getRoll);
   const proxyDecision = resolveConferenceDecisionCost({ ...baseInput, mode: "proxy" }, getRoll);
-  const hasFullGear = selfDecision.fullGearDiscount > 0;
-  const discount = selfDecision.fullGearDiscount;
+  const hasMeetingExperience = selfDecision.meetingDiscount > 0;
+  const discount = selfDecision.meetingDiscount;
   const regionName = getRegionName(context.region);
+  const selfCostHint = selfDecision.actualCost === 0
+    ? "自费参会本次免费。"
+    : `自费参会需要 ${selfDecision.actualCost} 金币。`;
+  const proxyCostHint = proxyDecision.actualCost === 0
+    ? "请同学代参会不需要花金币。"
+    : `请同学代参会需要 ${proxyDecision.actualCost} 金币。`;
 
   const createChoice = (mode: ConferenceDecisionMode, decision: ReturnType<typeof resolveConferenceDecisionCost>) => ({
     id: mode,
     label: mode === "self" ? "自费参会" : mode === "advisor" ? "导师报销" : "请同学代参会",
     outcome: mode === "proxy"
       ? "委托同学代参会。"
-      : `${decision.resource === "favor" ? "导师好感" : "金钱"} -${decision.actualCost}。`,
-    effects: {
-      ...(decision.resource === "money" && decision.actualCost > 0 ? { money: -decision.actualCost } : {}),
-      ...(decision.resource === "favor" && decision.actualCost > 0 ? { favor: -decision.actualCost } : {}),
+      : `${decision.resource === "favor" ? "导师好感" : "金币"} -${decision.actualCost}。`,
+      effects: {
       enqueueEvents: [createConferenceDecisionAct3(context, state, decision, getRoll)],
     },
   });
 
   return {
     id: `${context.id}-act2`,
-    title: "论文参会 ➜ 开会方式抉择",
+    title: "论文参会 ➜ 参会方式",
     description: [
-      `你站在行程确认页前，把这次参会当成一次“资源调度题”来算：地点在${regionName}，成本和后续收益都会被地域放大。`,
+      `你查了去${context.city}的行程，这次会议在${regionName}，路费和时间都不算少。`,
       context.paperCount >= 2
-        ? `这次同会有 ${context.paperCount} 篇论文需要你处理，现场投入越深，通常回报也越高，但任何失误都会被成倍放大。`
-        : "这次只有 1 篇展示任务，整体投入可控，但也更考验你是否愿意为单点机会付出成本。",
-      hasFullGear
-        ? `你现在有整装待发加成，自费路径可减免 ${discount}，相当于给了你一次“硬扛成本”的缓冲。`
-        : "你这次没有整装待发减免，任何自费支出都会实打实落到账上。",
-      "自费最直接，现金压力也最明确；导师报销最省钱，但会消耗关系资本；请同学代参会最省精力，却常常意味着你把现场机会让给了别人。",
-      "你并不是在选“哪个按钮”，而是在选“哪一种代价最符合你当前阶段”。",
+        ? `同会有 ${context.paperCount} 篇论文需要展示，现场会比平时更忙。`
+        : "这次只有 1 篇论文需要展示，安排起来相对简单。",
+      hasMeetingExperience
+        ? `会务经验可以减免 ${discount} 金币，自费会便宜一些。`
+        : "这次自费没有减免，花费要全部自己承担。",
+      selfCostHint,
+      proxyCostHint,
+      "自费最直接，导师报销要开口；请同学代参会，则不用亲自到场。",
     ].join("\n\n"),
-    preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,
-    chainId: "conference-decision",
+    chainId: context.id,
     stage: "act2",
+    discardPaperUpdates: createPaperHandledUpdates(context),
     choices: [
       createChoice("self", selfDecision),
       createChoice("advisor", advisorDecision),
@@ -158,19 +184,21 @@ export function createConferenceDecisionAct1(
     id: `${context.id}-act1`,
     title: "论文参会",
     description: [
-      "你的论文收到了会议录用通知，邮箱里的那封确认信让你兴奋了几秒，也立刻带来了现实问题：这次到底怎么参会。",
-      `会议是 ${context.conferenceName} ${context.conferenceYear}，地点在 ${context.city}, ${context.country}。行程、预算和关系成本都会在这一步一起结算。`,
+      "录用通知已经收到，会议也快到了。高兴过后，注册、行程和参会方式都要定下来。",
+      `这次是 ${context.conferenceName} ${context.conferenceYear}，地点在 ${context.city}，${context.country}。要不要亲自去，还得一起算路费和时间。`,
       context.paperCount >= 2
-        ? `更关键的是，本次同会有 ${context.paperCount} 篇论文需要展示。你投入方式的不同，会直接影响这几篇工作的曝光质量和后续连锁机会。`
-        : "这是一次单篇展示，看似负担更轻，但每一次露面质量都更容易被放大解读。",
-      "你准备先把参会方式定下来，再决定进入会场后把精力押在哪一条线。",
+        ? `本次同会有 ${context.paperCount} 篇论文需要展示，行程会排得很满。`
+        : "这次只有一篇论文需要展示。",
+      ...getConferencePaperPresentationResults(context),
+      "完成会议展示后，对应的宣传倍率才会开始计入引用。",
+      "先把参会方式定下来。",
     ].join("\n\n"),
-    preview: `${context.conferenceName} @ ${context.city}`,
     source: "fixed",
     blocking: true,
     deadlineMonths: 0,
-    chainId: "conference-decision",
+    chainId: context.id,
     stage: "act1",
+    discardPaperUpdates: createPaperHandledUpdates(context),
     choices: [{
       id: "continue",
       label: "继续",
@@ -191,12 +219,23 @@ export function buildConferenceDecisionEventsForAcceptedPapers(
 
   for (const paper of papers) {
     const conferenceInfo = getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear);
-    const conferenceLocation = getConferenceLocation(paper.submittedMonth, paper.target, paper.submittedYear);
+    const conferenceLocation = getConferenceLocation(
+      paper.submittedMonth,
+      paper.target,
+      paper.submittedYear,
+      state.conferenceLocationSeed,
+    );
     const key = `${conferenceInfo.name}_${conferenceInfo.year}_${conferenceLocation.city}`;
     const existing = groupedContexts.get(key);
     if (existing) {
       existing.paperCount += 1;
       existing.paperIds.push(paper.id);
+      existing.paperPresentations?.push({
+        id: paper.id,
+        title: paper.title ?? "论文",
+        acceptType: paper.acceptType ?? "Poster",
+        citationPromotionMultiplier: getPaperConferencePromotionMultiplier(paper.acceptType),
+      });
       if (getPaperTargetPriority(paper.target) > getPaperTargetPriority(existing.grade)) {
         existing.grade = paper.target;
       }
@@ -210,9 +249,16 @@ export function buildConferenceDecisionEventsForAcceptedPapers(
       city: conferenceLocation.city,
       country: conferenceLocation.country,
       region: conferenceLocation.region,
+      locationSeed: state.conferenceLocationSeed,
       grade: paper.target,
       paperCount: 1,
       paperIds: [paper.id],
+      paperPresentations: [{
+        id: paper.id,
+        title: paper.title ?? "论文",
+        acceptType: paper.acceptType ?? "Poster",
+        citationPromotionMultiplier: getPaperConferencePromotionMultiplier(paper.acceptType),
+      }],
     });
   }
 

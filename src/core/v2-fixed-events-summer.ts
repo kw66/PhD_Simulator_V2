@@ -1,4 +1,5 @@
 import {
+  appendMechanismSettlement,
   createFixedEvent,
   type FixedResolutionResult,
   type RandomRollProvider,
@@ -11,15 +12,14 @@ function createSummerVacationResultEvent(params: {
   month: number;
   title: string;
   description: string;
-  preview: string;
   outcome: string;
+  settlement: string;
   effects: PendingEvent["choices"][number]["effects"];
 }): PendingEvent {
   return createFixedEvent({
     id: `summer-vacation-${params.idSuffix}-result-y${params.year}-m${params.month}`,
     title: params.title,
-    description: params.description,
-    preview: params.preview,
+    description: appendMechanismSettlement(params.description, params.settlement),
     chainId: "summer-vacation",
     stage: "result",
     choices: [
@@ -38,12 +38,10 @@ function createSummerVacationPlanEvent(state: GameState): PendingEvent {
     id: `summer-vacation-plan-y${state.year}-m${state.month}`,
     title: "暑假 ➜ 暑假计划",
     description: [
-      "“回家休整最稳，适合把神经从紧绷状态慢慢放下来。”",
-      "“留校冲科研像押注长期回报，短期不轻松，但后劲更足。”",
-      "“旅行是快速切换场景的方案，恢复明显，但也有现实开销。”",
-      "你不是在“混不混假期”，而是在给下一学期选一种初始状态：稳态恢复、能力加速，或者情绪复位。",
+      "回家可以补觉，也能陪陪家里人。",
+      "留校的话，暑期没有课程，正好集中做一段时间科研。",
+      "也可以和朋友出去走走，需要 4 金币。",
     ].join("\n\n"),
-    preview: "在休整、科研和旅行之间选一个假期策略",
     chainId: "summer-vacation",
     stage: "act2",
     choices: [
@@ -65,7 +63,7 @@ function createSummerVacationPlanEvent(state: GameState): PendingEvent {
       },
       {
         id: `summer-vacation-travel-y${state.year}-m${state.month}`,
-        label: "外出旅行（花钱）",
+        label: "外出旅行",
         outcome: "外出旅行。",
         effects: {
           fixedEventResolution: { kind: "summer-vacation-travel" },
@@ -82,10 +80,8 @@ export function createSummerVacationEvent(state: GameState): PendingEvent {
     description: [
       "期末结束，校园一下子安静下来，楼道里只剩零星脚步声。",
       "导师说实验室暑期照常开放，朋友喊你出门散心，家里也催你回去吃顿饭。",
-      "你站在空荡的教学楼口，意识到这次暑假安排会直接决定下学期的开局手感。",
-      "是修复状态、冲刺科研，还是彻底放松一次，这次不是“假期选择题”，而是“新学期起跑姿态”的预设。",
+      "一个多月的假期不算短，你得想好怎么过。",
     ].join("\n\n"),
-    preview: "暑假到了，准备选一种过假方式",
     chainId: "summer-vacation",
     choices: [
       {
@@ -119,12 +115,12 @@ export function resolveSummerVacationFixedEvent(
           title: "暑假 ➜ 暑假计划 ➜ 新学期将至",
           description: [
             "你回到家后，先把欠下的睡眠一点点补齐。",
-            "白天帮家里处理些琐事，晚上散步、看书，不再被 deadline 追着跑。",
-            "偶尔也会翻翻研究笔记，但这次你更在意把心态修到可持续状态。",
-            "临开学前，你发现自己看问题不再急躁，节奏重新稳了下来。",
+            "白天帮家里处理些琐事，晚上散步、看书，不再被截止日期追着跑。",
+            "偶尔也会翻翻研究笔记，不过大部分时间都在好好休息。",
+            "临开学前，你终于觉得没那么累了。",
           ].join("\n\n"),
-          preview: "远离实验楼一阵子，把状态休息回来",
           outcome: `SAN +${sanRecovery}。`,
+          settlement: `SAN +${sanRecovery}`,
           effects: sanRecovery === 0 ? {} : { san: sanRecovery },
         })],
       };
@@ -143,10 +139,10 @@ export function resolveSummerVacationFixedEvent(
             "少了课程和杂事，你把时间切成“读文献-复现实验-记疑问”三段循环。",
             "几次卡住后，你在白板上重画问题结构，反而把核心难点看清了。",
             "导师路过时看了你的记录本，只说了一句：“这个方向可以继续深挖。”",
-            "这个暑假没有轻松，但你给下一轮选题攒下了确定性。",
+            "开学前，你已经记下了几个可以继续尝试的想法。",
           ].join("\n\n"),
-          preview: "把假期投给科研，换取下一轮 idea 优势",
-          outcome: "下次想 idea 多 1 次，后续每次 idea 永久 +1 分。",
+          outcome: "下次想 idea 多 1 次，永久 idea +1 分。",
+          settlement: "下次想 idea +1 次｜永久 idea +1",
           effects: {
             temporaryActionEffectUpdates: { idea: { extraActions: 1 } },
             ideaBonus: 1,
@@ -158,7 +154,7 @@ export function resolveSummerVacationFixedEvent(
       const sanRecovery = Math.ceil(missingSan * 0.5);
       return {
         nextState: state,
-        outcome: `金钱 -4，SAN +${sanRecovery}。`,
+        outcome: `金币 -4，SAN +${sanRecovery}。`,
         enqueueEvents: [createSummerVacationResultEvent({
           idSuffix: "travel",
           year: state.year,
@@ -167,11 +163,11 @@ export function resolveSummerVacationFixedEvent(
           description: [
             "你和朋友把行程排得很松：白天走景点，晚上找小馆子慢慢吃。",
             "在陌生城市里，你们暂时不再讨论投稿和审稿，只讨论天气、路线和下一站。",
-            "几天后再看手机里的待办清单，你没有先前那种“喘不过气”的感觉了。",
-            "这趟旅行花了钱，也换回了难得的情绪空间和专注力。",
+            "几天后再看手机里的待办清单，你已经没那么烦躁了。",
+            "旅行花了不少钱，不过这几天确实玩得开心。",
           ].join("\n\n"),
-          preview: "花一笔钱，快速把状态从高压里拉出来",
-          outcome: `花了 4 金钱，SAN +${sanRecovery}。`,
+          outcome: `花了 4 金币，SAN +${sanRecovery}。`,
+          settlement: `金币 -4｜SAN +${sanRecovery}`,
           effects: {
             money: -4,
             ...(sanRecovery === 0 ? {} : { san: sanRecovery }),

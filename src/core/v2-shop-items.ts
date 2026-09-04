@@ -1,35 +1,43 @@
 export type {
-  ChairEmergencyRecoveryResult,
   ShopActionModifier,
   ShopItemDefinition,
   ShopItemStateView,
-  ShopMonthlyModifier,
   ShopUpgradeDefinition,
   ShopUpgradeStateView,
+  GpuTierDefinition,
 } from "./v2-shop-items-shared";
 export {
   createShopState,
+  getGpuTierDefinition,
+  getNextGpuTierDefinition,
   getShopItemDefinition,
   getShopUpgradeDefinition,
+  GPU_TIER_DEFINITIONS,
+  GPU_UPGRADE_PRICES,
+  getNextGpuPrice,
   SHOP_ITEM_DEFINITIONS,
   SHOP_UPGRADE_DEFINITIONS,
 } from "./v2-shop-items-shared";
 export {
-  applyShopItemOwnership,
-  applyShopItemUpgrade,
+  BIKE_TIER_DEFINITIONS,
+  getBikeMonthlySanCost,
+  getBikeSanCapLimit,
+  getBikeSellPrice,
+  getBikeTierDefinition,
+  getBikeTierLevel,
+  getNextBikeTierDefinition,
+} from "./v2-bike-system";
+export {
   canBuyShopItem,
   canSellShopItem,
-  canUpgradeShopItem,
   getAvailableShopUpgrades,
   getShopItemOwnedText,
   getShopItemSellPrice,
   isShopItemOwned,
 } from "./v2-shop-items-ownership";
 export {
-  applyChairEmergencyRecovery,
-  applyShopMonthlyModifier,
-  getChairFlatMonthlySanBonus,
   getChairMonthlyRecovery,
+  getShopEmergencySan,
   getShopPaperActionModifier,
   getShopReadSanDiscount,
   getShopRestSanGain,

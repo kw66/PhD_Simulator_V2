@@ -5,6 +5,6 @@ export {
   createCcigSkipResultEvent,
 } from "./v2-fixed-events-ccig-decision-events";
 export {
-  createCcigActivityAct1Event,
+  createCcigActivityEvent,
   createCcigActivityResultEvent,
 } from "./v2-fixed-events-ccig-activity-events";
