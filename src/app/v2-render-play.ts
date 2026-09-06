@@ -1,6 +1,6 @@
 import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { getActiveOperationAllowance, getAiCollaborationStatus } from "../core/v2-ai-shop";
-import { PAPER_SLOT_RESEARCH_THRESHOLDS } from "../core/v2-content";
+import { PAPER_SLOT_RESEARCH_THRESHOLDS, SCORE_BY_TARGET } from "../core/v2-content";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getCitationStats } from "../core/v2-citation-stats";
 import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-catalog";
@@ -13,7 +13,8 @@ import { getLabTalentActionBonus, getLabTalentTeamSize, isLabTalentActive } from
 import { getMeetingSelfPayDiscount, hasFullGear } from "../core/v2-meeting-system";
 import {
   ACTIVITY_WIN_RATE_CAP,
-  getBadmintonWinRate,
+  BADMINTON_VICTORY_THRESHOLD,
+  getBadmintonStrength,
   getPokerWinRate,
 } from "../core/v2-growth-system";
 import { getBikeSanCapLimit, getBikeTierDefinition } from "../core/v2-bike-system";
@@ -28,12 +29,8 @@ import {
   getPaperPromotionCost,
   getPaperPromotionMultiplierBonus,
 } from "../core/v2-publication-rules";
-import {
-  CITATION_SETTLEMENT_INTERVAL_MONTHS,
-  PUBLISHED_SCORE_DECAY_INTERVAL_MONTHS,
-  PUBLISHED_SCORE_DECAY_RATE,
-  getPaperCitationMultiplier,
-} from "../core/v2-publication-system";
+import { getPaperCitationMultiplier, getPaperConferencePromotionMultiplier } from "../core/v2-publication-system";
+import { getPublicationTalentChecklist } from "../core/v2-publication-talent";
 import { getAvailablePaperSlotCount, getPaperSubmissionFailure, getWorkstationPaperSlotMap } from "../core/v2-paper-rules";
 import { getPaperHeatTier } from "../core/v2-paper-topics";
 import { ADVISOR_TASK_SAN_COST } from "../core/v2-advisor-progress";
@@ -50,7 +47,16 @@ import {
 } from "../core/v2-reading-system";
 import { previewResearchOperation, RESEARCH_OPERATION_SAN_COST } from "../core/v2-research-operation";
 import { getJournalDefinition, getJournalRevisionScore, getJournalSubmissionFailure } from "../core/v2-journal-system";
-import { getSeasonByMonth, getTierResistChance } from "../core/v2-sanity-rules";
+import {
+  RANDOM_ADVISOR_GIVEN_CHARS,
+  RANDOM_ADVISOR_NAMES,
+  RANDOM_ADVISOR_SURNAMES,
+} from "../core/v2-random-name";
+import {
+  DISEASE_MONTH_END_CHANGE_BY_SAN_TIER,
+  getSeasonByMonth,
+  getTierResistChance,
+} from "../core/v2-sanity-rules";
 import {
   getChairMonthlyRecovery,
   getShopPaperActionModifier,
@@ -58,27 +64,35 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
-import type { DateDisplayMode, DebugStatId, FellowProgressProfile, GameLogEntry, GameState, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, RoleDefinition } from "../core/v2-types";
+import type { DateDisplayMode, DebugStatId, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, RoleDefinition } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type PlayTabId,
+  type ResearchSortMode,
   type TalentPanelTabId,
 } from "./v2-render-types";
 import { renderShopSection as renderInteractiveShopSection } from "./v2-render-shop-panel";
 import { buildBuffDisplayBuckets } from "./v2-render-buffs";
 import { renderGameFeedbackOverlay } from "./v2-render-community";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "../core/v2-development-flags";
+import { getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
-const DISEASE_MONTH_END_CHANGE_PERCENT = [2, 1, 0, -1] as const;
 const RESEARCH_CHORE_SAN_DISCOUNT = [0, 1, 2, 3] as const;
 const FUTURE_MONTH_LOOKAHEAD = 6;
 const PENDING_PAGE_SIZE = 5;
+const RESEARCH_PAGE_SIZE = 5;
 const RELATIONSHIP_SLOT_UNLOCK_THRESHOLDS = [0, 0, 6, 12, 18] as const;
 const DEFERRED_GAMEPLAY_ACTION_ATTRIBUTES = 'disabled aria-disabled="true" data-gameplay-status="deferred"';
 
 function isGameplayModuleLocked(state: GameState): boolean {
   return isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT;
+}
+
+function getDeferredGameplayActionAttributes(state: GameState): string {
+  return isPreEnrollmentState(state) && SHOW_ALL_MODULES_DURING_DEVELOPMENT
+    ? "data-gameplay-status=\"deferred\""
+    : DEFERRED_GAMEPLAY_ACTION_ATTRIBUTES;
 }
 
 type AttrTierId = "san" | "research" | "social" | "favor";
@@ -95,10 +109,13 @@ type TalentPanelItem = {
   icon: string;
   name: string;
   active: boolean;
+  tagLabel?: string;
   description: string;
   detail?: string;
   requirement?: string;
   metrics?: Array<{ label: string; value: string }>;
+  rewardTable?: { label: string; columns: string[]; rows: string[][] };
+  rewardRules?: string[];
   progress?: { label: string; value: number; max: number; valueLabel: string };
 };
 
@@ -126,6 +143,8 @@ function escapeHtml(value: string): string {
 
 function renderEventInlineHtml(value: string): string {
   return escapeHtml(normalizeGameDisplayText(value))
+    .replace(/(^|\n)([^，。\n]+?)(?= · 讲师(?:\n|$))/gu, "$1<mark class=\"event-name-highlight\">$2</mark>")
+    .replace(/(^|\n)(你叫)([^，。\n]+)(?=，)/gu, "$1$2<mark class=\"event-name-highlight\">$3</mark>")
     .replace(/\*\*([^*\n]+)\*\*/gu, "<strong>$1</strong>")
     .replace(/\n/g, "<br>");
 }
@@ -262,11 +281,11 @@ function getAttrTierName(kind: AttrTierId, value: number): string {
   return ["陌生", "认可", "信任", "心腹"][tier];
 }
 
-function getAttrTierTooltip(kind: AttrTierId, value: number, illnessProbability = 4): string {
+function getAttrTierTooltip(kind: AttrTierId, value: number, illnessProbability = 0): string {
   const tier = getAttrTier(value);
   const currentChance = Math.round(getTierResistChance(value) * 100);
   if (kind === "san") {
-    const monthEndChange = DISEASE_MONTH_END_CHANGE_PERCENT[tier];
+    const monthEndChange = DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[tier];
     const signedChange = monthEndChange >= 0 ? `+${monthEndChange}` : String(monthEndChange);
     return `当前疾病概率 ${illnessProbability}%｜月末结算 ${signedChange}%`;
   }
@@ -300,7 +319,7 @@ function renderAttrItem(
   cap: number,
   tierKind: AttrTierId,
   fillClassName: string,
-  illnessProbability = 4,
+  illnessProbability = 0,
 ): string {
   const fillStateClass = tierKind === "san"
     ? getAttrFillStateClass(value, cap, 5, 2)
@@ -364,12 +383,23 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
 
   return (Object.keys(labels) as Array<keyof typeof labels>).flatMap((statId) => {
     const sources = resolution.items.flatMap((item) => {
-      const value = item.appliedStats[statId] ?? 0;
+      const value = item.stats[statId] ?? 0;
       if (!Object.hasOwn(item.stats, statId)) return [];
       const note = item.note ? `（${normalizeGameDisplayText(item.note)}）` : "";
-      return [`${normalizeGameDisplayText(item.source)}：${normalizeGameDisplayText(item.name)} ${formatSignedNumber(value)}${note}`];
+      const displaySource = item.id === "base-san-recovery" || item.id === "debug-buff-base-recovery"
+        ? "自然回复"
+        : item.id === "advisor-salary" || item.id === "debug-buff-advisor-salary"
+          ? `${state.degree === "phd" ? "博士" : "硕士"}工资`
+          : normalizeGameDisplayText(item.source);
+      const displayName = item.id === "base-san-recovery"
+        || item.id === "debug-buff-base-recovery"
+        || item.id === "advisor-salary"
+        || item.id === "debug-buff-advisor-salary"
+        ? "每月"
+        : normalizeGameDisplayText(item.name);
+      return [`${displaySource}：${displayName} ${formatSignedNumber(value)}${note}`];
     });
-    const value = resolution.totals[statId];
+    const value = resolution.items.reduce((total, item) => total + (item.stats[statId] ?? 0), 0);
     const alwaysShow = statId === "san" || statId === "money";
     if (!alwaysShow && (sources.length === 0 || value === 0)) return [];
     return [{
@@ -481,6 +511,9 @@ function buildEffectBuckets(state: GameState): {
 function renderLeftRail(state: GameState): string {
   const researchCap = getResearchCap(state.researchCapacityState);
   const effectBuckets = buildEffectBuckets(state);
+  const role = getRoleDefinition(state.selectedRoleId);
+  const playerName = state.playerName?.trim() || getPendingStudentName(state);
+  const displayName = playerName ? `${role.name}：${playerName}` : role.name;
 
   return `
     <aside class="play-left-rail new-left-container">
@@ -489,10 +522,10 @@ function renderLeftRail(state: GameState): string {
         ${renderAttrItem("💡", "科研能力", state.player.research, Math.max(researchCap, 20), "research", "research")}
         ${renderAttrItem("🤝", "社交能力", state.player.social, 20, "social", "social")}
         ${renderAttrItem("👨‍🏫", "导师好感", state.player.favor, 20, "favor", "favor")}
-        <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${state.player.money}" aria-label="金币">
-          <div class="new-attr-header">
-            <span class="new-attr-icon">💰</span>
-            <span class="new-currency-value">${state.player.money}</span>
+        <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${state.player.money}" aria-label="${escapeHtml(`${displayName}，金币 ${state.player.money}`)}">
+          <div class="new-attr-header new-identity-money-header">
+            <span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span>
+            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${state.player.money}</span>
           </div>
         </div>
       </div>
@@ -666,6 +699,25 @@ function isEventSettlementCondition(value: string): boolean {
   return /^(?:达到科研分门槛|获胜|落败|无本金|押注|导师请客|AA 聚餐|重装成功|重装失败|维修成功|维修翻车|导师到场|导师缺席|有熟悉的|暂无熟悉的|获得审稿灵感|未获得审稿灵感|对方选择留组|对方毕业离组|互挂成功|互挂未成|没有后续波澜|转而专注自身研究)/u.test(value);
 }
 
+function splitEventSettlementItems(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === "（" || character === "(") depth += 1;
+    if (character === "）" || character === ")") depth = Math.max(0, depth - 1);
+    const separatesEffect = character === "，"
+      && /^(?:SAN|金币|导师好感|好感|科研|社交|生病概率|下次|永久|新增|休息|每月|每年|未来引用|论文进度|所有未投稿)/u.test(text.slice(index + 1).trimStart());
+    if (depth === 0 && (character === "｜" || character === "；" || separatesEffect)) {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts.map((part) => part.trim().replace(/[。.]+$/u, "")).filter(Boolean);
+}
+
 function splitEventSettlementRows(items: string[]): { conditions: string[]; results: string[] } {
   const conditions: string[] = [];
   const results: string[] = [];
@@ -677,20 +729,20 @@ function splitEventSettlementRows(items: string[]): { conditions: string[]; resu
     const normalized = item.trim();
     if (!normalized) continue;
     if (normalized.startsWith("条件：")) {
-      conditions.push(...normalized.slice(3).split(/[｜，；]/u).map((part) => part.trim()).filter(Boolean));
+      conditions.push(...splitEventSettlementItems(normalized.slice(3)));
       continue;
     }
     if (normalized.startsWith("结果：")) {
-      addResults(normalized.slice(3).split(/[｜，；]/u).map((part) => part.trim()).filter(Boolean));
+      addResults(splitEventSettlementItems(normalized.slice(3)));
       continue;
     }
 
-    const parts = normalized.split(/[｜，；]/u).map((part) => part.trim()).filter(Boolean);
-    if (parts.length > 1 && parts[0] && isEventSettlementCondition(parts[0])) {
-      conditions.push(parts[0]);
-      addResults(parts.slice(1));
-    } else {
-      addResults(parts);
+    for (const part of splitEventSettlementItems(normalized)) {
+      if (isEventSettlementCondition(part)) {
+        conditions.push(part);
+      } else {
+        addResults([part]);
+      }
     }
   }
 
@@ -699,7 +751,7 @@ function splitEventSettlementRows(items: string[]): { conditions: string[]; resu
 
 function renderEventSettlementValues(values: string[]): string {
   return values
-    .map((value) => `<span class="event-settlement-item">${escapeHtml(normalizeGameDisplayText(value))}</span>`)
+    .map((value) => `<span class="event-settlement-item">${escapeHtml(normalizeGameDisplayText(value).replace(/[。.]+$/u, ""))}</span>`)
     .join('<span class="event-settlement-divider" aria-hidden="true">|</span>');
 }
 
@@ -1004,7 +1056,7 @@ function formatPaperDecayRate(rate: number): string {
   return `${(rate * 100).toFixed(1).replace(/\.0$/, "")}%`;
 }
 
-function renderPaperTopicMeta(state: GameState, paper: Paper): string {
+function renderPaperTopicMeta(paper: Paper): string {
   const heatTier = getPaperHeatTier(paper.heatMultiplier);
   const decayText = paper.status === "journal-reviewing"
     ? "送审后不衰减"
@@ -1014,18 +1066,18 @@ function renderPaperTopicMeta(state: GameState, paper: Paper): string {
       <span class="paper-topic-tag">${escapeHtml(paper.topicLabel)}</span>
       <span
         class="paper-heat-badge is-${heatTier}"
-        title="${escapeHtml(`${decayText} · 引用倍率 ×${getPaperCitationMultiplier(state, paper).toFixed(2)}`)}"
+        title="${escapeHtml(`${decayText} · 引用倍率 ×${paper.heatMultiplier.toFixed(2)}`)}"
       >热度 ×${paper.heatMultiplier.toFixed(2)}</span>
     </span>
   `;
 }
 
-function renderPaperTitleWithMeta(state: GameState, paper: Paper, trailingAction = ""): string {
+function renderPaperTitleWithMeta(paper: Paper, trailingAction = ""): string {
   return `
     <div class="paper-title-meta-row${trailingAction ? " has-trailing-action" : ""}">
       <div class="paper-title-meta-content">
         <strong class="paper-title">${escapeHtml(paper.title)}</strong>
-        ${renderPaperTopicMeta(state, paper)}
+        ${renderPaperTopicMeta(paper)}
       </div>
       ${trailingAction}
     </div>
@@ -1267,73 +1319,17 @@ function formatConferenceLocationText(location: { city: string; region: Conferen
   return `${city} · ${currentRegion}`;
 }
 
-const RESEARCH_PROMOTION_IDS: readonly PaperPromotionId[] = ["arxiv", "github", "xiaohongshu"];
-
-function renderResearchPromotionActions(state: GameState, paper: Paper): string {
-  if (paper.status !== "published" || !paper.publication || paper.nonFirstAuthor === true) return "";
-  const promotions = paper.publication.promotions ?? {
-    arxiv: false,
-    github: false,
-    xiaohongshu: false,
-  };
-  const labels: Record<PaperPromotionId, string> = {
-    arxiv: "arXiv",
-    github: "GitHub",
-    xiaohongshu: "小红书",
-  };
-  return `
-    <div class="research-promotion-block">
-      <div class="research-promotion-heading">论文推广</div>
-      <div class="research-promotion-actions">
-        ${RESEARCH_PROMOTION_IDS.map((promotionId) => {
-          const used = promotions[promotionId];
-          const cost = getPaperPromotionCost(promotionId);
-          const canAfford = state.player.san >= cost;
-          const bonus = getPaperPromotionMultiplierBonus(promotionId);
-          const arxivIsUseful = promotionId !== "arxiv" || (
-            paper.target !== null
-            && paper.conferenceHandled !== true
-            && (paper.publication?.monthsSincePublish ?? 0) < 3
-          );
-          const disabled = used || !canAfford || !arxivIsUseful;
-          const effect = promotionId === "arxiv"
-            ? "提前公开"
-            : promotionId === "github"
-              ? "当前分 +25%"
-              : `引用倍率 +${Math.round(bonus * 100)}%`;
-          return `
-            <button
-              class="research-promotion-btn${used ? " is-used" : ""}"
-              type="button"
-              ${disabled
-                ? `disabled aria-disabled="true"${!used && !canAfford
-                  ? ` title="SAN不足，需要 ${cost}"`
-                  : !used && !arxivIsUseful
-                    ? ' title="论文已经公开，arXiv 不再带来提前曝光"'
-                    : ""}`
-                : `data-action="promote-paper" data-paper-id="${escapeHtml(paper.id)}" data-promotion-id="${promotionId}"`}
-            >
-              <span>${used ? "✓ " : ""}${labels[promotionId]}</span>
-              <small>${used ? "已完成" : `SAN -${cost} · ${effect}`}</small>
-            </button>
-          `;
-        }).join("")}
-      </div>
-    </div>
-  `;
-}
-
 function renderLockedWorkstationSlot(slotIndex: number): string {
   const threshold = PAPER_SLOT_RESEARCH_THRESHOLDS[slotIndex] ?? 0;
   const tierName = getAttrTierName("research", threshold);
   return `
     <article class="paper-card paper-slot-card paper-card-empty paper-card-locked paper-slot-compact" data-paper-slot-index="${slotIndex}">
+      <div class="paper-card-header paper-empty-card-header" aria-hidden="true"></div>
       <div class="paper-empty-body paper-locked-body">
         <div class="paper-card-lock-message">
           <strong>科研能力达到${threshold}<span class="new-attr-level attr-level-research paper-lock-tier">${tierName}</span>解锁</strong>
         </div>
       </div>
-      ${renderPaperStatsValues(0, 0, 0)}
     </article>
   `;
 }
@@ -1343,6 +1339,7 @@ function renderEmptyWorkstationSlot(state: GameState, slotIndex: number): string
   const canCreate = !preEnrollment && getWorkstationPaperByPanelIndex(state, slotIndex) === null;
   return `
     <article class="paper-card paper-slot-card paper-card-empty paper-slot-compact" data-paper-slot-index="${slotIndex}">
+      <div class="paper-card-header paper-empty-card-header" aria-hidden="true"></div>
       <div class="paper-empty-body">
         <button
           class="paper-action-btn is-primary paper-empty-create-btn"
@@ -1352,7 +1349,6 @@ function renderEmptyWorkstationSlot(state: GameState, slotIndex: number): string
             : `disabled aria-disabled="true"`}
         ><span aria-hidden="true">＋</span> 新建论文</button>
       </div>
-      ${renderPaperStatsValues(0, 0, 0)}
     </article>
   `;
 }
@@ -1388,7 +1384,7 @@ function renderWorkstationPaperCard(state: GameState, panelIndex: number): strin
           </div>
           ${renderPaperDraftActions(selectedPaper, canReroll)}
         </div>
-        ${renderPaperTitleWithMeta(state, selectedPaper)}
+        ${renderPaperTitleWithMeta(selectedPaper)}
         ${renderPaperStats(selectedPaper)}
       </article>
     `;
@@ -1399,7 +1395,7 @@ function renderWorkstationPaperCard(state: GameState, panelIndex: number): strin
     return `
       <article class="paper-card paper-slot-card paper-card-filled paper-card-selectable is-journal-reviewing${selected ? " is-selected" : ""}" data-paper-id="${escapeHtml(selectedPaper.id)}" data-paper-slot-index="${panelIndex}" data-ui-select-workstation-paper="${escapeHtml(selectedPaper.id)}">
         ${renderPaperJournalHeader(state, selectedPaper, selected)}
-        ${renderPaperTitleWithMeta(state, selectedPaper)}
+        ${renderPaperTitleWithMeta(selectedPaper)}
       </article>
     `;
   }
@@ -1409,7 +1405,7 @@ function renderWorkstationPaperCard(state: GameState, panelIndex: number): strin
       ${selectedPaper.status === "reviewing"
         ? renderPaperReviewHeader(selectedPaper)
         : `<div class="paper-card-header"><span class="paper-card-header-tail"><span class="paper-card-status is-${selectedPaper.status}">${getPaperStatusBadgeText(selectedPaper)}</span></span></div>`}
-      ${renderPaperTitleWithMeta(state, selectedPaper)}
+      ${renderPaperTitleWithMeta(selectedPaper)}
       ${renderPaperStats(selectedPaper)}
       ${renderPaperPublishedSummary(selectedPaper)}
     </article>
@@ -1449,8 +1445,42 @@ function renderEnhancedWorkstationSection(state: GameState): string {
       : 'data-action="rest"';
   const remainingActions = Math.max(0, state.actionState.limit - state.actionState.used);
 
-  return `
+  const html = `
     <div class="right-section workstation-section" id="workstation-section">
+      ${preEnrollment ? "" : `
+        <div class="workstation-notes">
+          <details class="workstation-tip-note workstation-formula-note panel-tip-note">
+            <summary>💡 小提示：想 idea、做实验、写论文会重新计算对应分数，至少+1；展开查看公式与 Buff 顺序</summary>
+            <ol class="workstation-formula-list">
+              <li>
+                <strong>科研分 = 四舍五入(基础分 × 总倍率 + 固定分)</strong>
+                <span>基础分 = 科研能力 × 随机倍率（0.5～1.5）+ 随机加分（0～5）。</span>
+              </li>
+              <li>
+                <strong>Buff 顺序：先合并倍率，再加固定分</strong>
+                <span>倍率从 ×1 开始，只相加增减幅：×1.5 算 +0.5，×0.8 算 −0.2；两个 ×1.5 合并为 ×2。固定分来自当前生效的 Buff（包括 AI）和显卡。</span>
+              </li>
+              <li>
+                <strong>最后保底：结果 ≤ 当前分时，取当前分+1</strong>
+                <span>例：科研4、随机倍率1.2、随机加分2、总倍率×1.5、固定分+1，结果为四舍五入((4×1.2+2)×1.5+1)=11；若当前分≥11，则取当前分+1。</span>
+              </li>
+              <li>
+                <strong>执行次数 = max(1, 1 + 向下取整(Buff额外次数 + 装备额外次数))</strong>
+                <span>有额外次数时依次重新抽取并计算，上一遍结果作为下一遍的当前分数；不再额外扣行动点或 SAN。“仅下次”Buff 的加分与倍率只用于第一遍，持续 Buff 与装备效果每遍均生效</span>
+              </li>
+            </ol>
+          </details>
+          <details class="workstation-review-note panel-tip-note" data-workstation-note="review">
+            <summary>💡 小提示：会议投稿后审稿 3 个月，由 3 位审稿人共同决定接收；期刊达到送审线后可持续修改，达标后自动接收。点击展开看细则</summary>
+            <div class="workstation-review-note-body">
+              <span>会议总评 ≥+2 接收，≤−2 拒稿，介于两者之间按边缘录用概率判定；接收后再根据投稿总分和会议影响力抽取 Poster、Spotlight、Oral 或 Best Paper 等类型。</span>
+              <span>会议拒稿会退回草稿，并保留审稿人的修改建议；接收奖励会随同级或更高等级的一作成果增加而递减。</span>
+              <span>期刊送审线/达标线：PAMI 75/125 分、NMI 100/250 分、Nature 150/500 分；送审后新增分数直接累加。</span>
+              <span>每月衰减：发表前各项分数按论文热度分别衰减，最低保留 1 分；原本为 0 的仍为 0，期刊送审后不衰减。</span>
+            </div>
+          </details>
+        </div>
+      `}
       <div class="workstation-action-toolbar" ${preEnrollment ? "hidden" : ""}>
       <div class="workstation-main-row">
           <div class="workstation-main-actions" id="workstation-main-actions">
@@ -1478,12 +1508,11 @@ function renderEnhancedWorkstationSection(state: GameState): string {
             ${renderWorkstationPaperResearchActions(state, selectedPaper)}
           </div>
           <div class="workstation-action-points" aria-label="行动点 ${remainingActions}/${state.actionState.limit}">
-            <span>行动点</span>
+            <span><span class="workstation-action-points-icon" aria-hidden="true">👣</span>行动点</span>
             <strong>${remainingActions}/${state.actionState.limit}</strong>
           </div>
         </div>
       </div>
-      ${preEnrollment ? "" : '<p class="workstation-tip-note panel-tip-note">💡 小提示：想 idea、做实验、写论文会重掷对应分数，取新分数与当前分数 +1 中的较大值；每月按热度标注的比例衰减（期刊送审后除外），最低保留 1 分。</p>'}
       <div class="workstation-paper-grid" id="workstation-paper-grid">
         ${preEnrollment
           ? '<div class="section-empty play-module-lock-state">入学后开放</div>'
@@ -1492,6 +1521,7 @@ function renderEnhancedWorkstationSection(state: GameState): string {
       ${preEnrollment ? "" : renderWorkstationPaperActions(state, selectedPaper)}
     </div>
   `;
+  return html;
 }
 
 type RelationshipRenderCard = {
@@ -1523,7 +1553,7 @@ function getRelationshipEmptyText(slotIndex: number): string {
 
 function getRelationshipLockedText(slotIndex: number): string {
   const threshold = RELATIONSHIP_SLOT_UNLOCK_THRESHOLDS[slotIndex] ?? 18;
-  return `需要社交达到 ${threshold} 解锁该槽位。`;
+  return `社交达到${threshold}${getAttrTierName("social", threshold)}解锁`;
 }
 
 function getRelationshipSortValue(startTotalMonths: number | null | undefined, fallback: number): number {
@@ -1553,7 +1583,7 @@ function getRenderedLoverName(type: LoverTypeId | null): string {
 }
 
 function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard | null> {
-  const cards: Array<RelationshipRenderCard | null> = Array.from({ length: 5 }, () => null);
+  const cards: Array<RelationshipRenderCard | null> = Array.from({ length: 6 }, () => null);
 
   if (state.selectedAdvisorName && state.relationshipState.advisorCount > 0) {
     cards[0] = {
@@ -1615,32 +1645,6 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       } satisfies RelationshipRenderCard,
     });
     }),
-    ...((state.loverState.active && state.loverProgressState.active && state.loverState.type)
-      ? [{
-        sortValue: getRelationshipSortValue(state.loverState.startTotalMonths, state.fellowProgressState.length),
-        card: {
-          type: "lover" as const,
-          buttonLabel: "恋人",
-          displayType: "恋人",
-          displayName: getRenderedLoverName(state.loverState.type),
-          detailItems: [
-            `科研 ${state.loverProgressState.research}`,
-            `亲密度 ${state.loverProgressState.intimacy}`,
-            `认识时间 ${Math.max(0, state.totalMonths - (state.loverState.startTotalMonths ?? state.totalMonths))}月`,
-          ],
-          taskProgress: state.loverProgressState.taskProgress,
-          taskMax: state.loverProgressState.taskMax,
-          relationProgress: state.loverProgressState.relationProgress,
-          relationMax: state.loverProgressState.relationMax,
-          relationGrowthPerMonth: Math.max(0, state.loverProgressState.intimacy),
-          taskRewardText: "亲密度 +1、特殊效果",
-          taskLabel: "约会",
-          taskCostLabel: `金币-${LOVER_DATE_MONEY_COST}`,
-          taskUsedThisMonth: state.loverProgressState.taskUsedThisMonth,
-          canInteract: state.loverProgressState.canInteract,
-        } satisfies RelationshipRenderCard,
-      }]
-      : []),
   ]
     .sort((left, right) => left.sortValue - right.sortValue)
     .map((item) => item.card)
@@ -1649,6 +1653,30 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
   otherCards.forEach((card, index) => {
     cards[index + 1] = card;
   });
+
+  if (state.loverState.active && state.loverProgressState.active && state.loverState.type) {
+    cards[5] = {
+      type: "lover",
+      buttonLabel: "恋人",
+      displayType: "恋人",
+      displayName: getRenderedLoverName(state.loverState.type),
+      detailItems: [
+        `科研 ${state.loverProgressState.research}`,
+        `亲密度 ${state.loverProgressState.intimacy}`,
+        `认识时间 ${Math.max(0, state.totalMonths - (state.loverState.startTotalMonths ?? state.totalMonths))}月`,
+      ],
+      taskProgress: state.loverProgressState.taskProgress,
+      taskMax: state.loverProgressState.taskMax,
+      relationProgress: state.loverProgressState.relationProgress,
+      relationMax: state.loverProgressState.relationMax,
+      relationGrowthPerMonth: Math.max(0, state.loverProgressState.intimacy),
+      taskRewardText: "亲密度 +1、特殊效果",
+      taskLabel: "约会",
+      taskCostLabel: `金币-${LOVER_DATE_MONEY_COST}`,
+      taskUsedThisMonth: state.loverProgressState.taskUsedThisMonth,
+      canInteract: state.loverProgressState.canInteract,
+    };
+  }
 
   return cards;
 }
@@ -1689,6 +1717,7 @@ function renderRelationshipSwitchButtons(
 }
 
 function renderRelationshipCurrentCard(
+  state: GameState,
   cards: Array<RelationshipRenderCard | null>,
   activeRelationshipIndex: number,
   unlockedSlots: number,
@@ -1736,12 +1765,12 @@ function renderRelationshipCurrentCard(
         <button
           class="btn-sm rel-action-btn"
           type="button"
-          ${DEFERRED_GAMEPLAY_ACTION_ATTRIBUTES}
+          ${getDeferredGameplayActionAttributes(state)}
         >${escapeHtml(card.taskUsedThisMonth ? "✓ 本月已用" : `${card.taskLabel}（${card.taskCostLabel}）`)}</button>
         <button
           class="btn-sm rel-action-btn is-chat"
           type="button"
-          ${DEFERRED_GAMEPLAY_ACTION_ATTRIBUTES}
+          ${getDeferredGameplayActionAttributes(state)}
         >交流</button>
       </div>
     </div>
@@ -1749,6 +1778,7 @@ function renderRelationshipCurrentCard(
 }
 
 function renderRelationshipSection(state: GameState, uiState: PlayRenderUiState = {}): string {
+  return renderRelationshipGridSection(state);
   const rel = state.relationshipState;
   const activeRelationshipIndex = getSafeRelationshipSlotIndex(uiState.activeRelationshipIndex);
   const cards = buildRelationshipCards(state);
@@ -1762,7 +1792,95 @@ function renderRelationshipSection(state: GameState, uiState: PlayRenderUiState 
       <div class="rel-current-card" id="rel-current-card">
         ${preEnrollment
           ? `<div class="section-empty play-module-lock-state">入学后开放</div>`
-          : renderRelationshipCurrentCard(cards, activeRelationshipIndex, rel.unlockedSlots)}
+          : renderRelationshipCurrentCard(state, cards, activeRelationshipIndex, rel.unlockedSlots)}
+      </div>
+    </div>
+  `;
+}
+
+function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCard): string {
+  return `
+    <article class="rel-card filled">
+      <div class="rel-card-head rel-card-header">
+        <span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
+        <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
+        ${card.canInteract ? '<span class="rel-card-alert" aria-label="\u6709\u53ef\u7528\u64cd\u4f5c">!</span>' : ""}
+      </div>
+      <div class="rel-detail-row">
+        ${card.detailItems.map((item) => `<span class="rel-detail-item">${escapeHtml(item)}</span>`).join("")}
+      </div>
+      <div class="rel-progress-section">
+        <div class="rel-progress-item">
+          <div class="rel-progress-header">
+            <span class="rel-progress-label">\u4efb\u52a1\u8fdb\u5ea6\uff08\u6ee1\u540e\uff1a${escapeHtml(card.taskRewardText)}\uff09</span>
+            <span class="rel-progress-val">${card.taskProgress}/${card.taskMax}</span>
+          </div>
+          <div class="rel-progress-bar">
+            <div class="rel-progress-fill task" style="width:${clampPercent(card.taskProgress / Math.max(1, card.taskMax) * 100)}%"></div>
+          </div>
+        </div>
+        <div class="rel-progress-item">
+          <div class="rel-progress-header">
+            <span class="rel-progress-label">\u5173\u7cfb\u79ef\u7d2f\uff08+${card.relationGrowthPerMonth}/\u6708\uff0c\u6ee1\u540e\u89e3\u9501\u4ea4\u6d41\uff09</span>
+            <span class="rel-progress-val">${card.relationProgress}/${card.relationMax}</span>
+          </div>
+          <div class="rel-progress-bar">
+            <div class="rel-progress-fill relation" style="width:${clampPercent(card.relationProgress / Math.max(1, card.relationMax) * 100)}%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="rel-actions">
+        <button class="btn-sm rel-action-btn" type="button" ${getDeferredGameplayActionAttributes(state)}>
+          ${escapeHtml(card.taskUsedThisMonth ? "\u2713 \u672c\u6708\u5df2\u7528" : `${card.taskLabel}\uff08${card.taskCostLabel}\uff09`)}
+        </button>
+        <button class="btn-sm rel-action-btn is-chat" type="button" ${getDeferredGameplayActionAttributes(state)}>\u4ea4\u6d41</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderRelationshipGridSlot(
+  state: GameState,
+  card: RelationshipRenderCard | null,
+  slotIndex: number,
+  unlockedSlots: number,
+): string {
+  if (slotIndex === 5) {
+    if (card) return renderRelationshipGridCard(state, card);
+    return `
+      <article class="rel-card locked rel-card-lover-locked">
+        <div class="rel-lover-lock-icon" aria-hidden="true">💕</div>
+        <span class="rel-lover-lock-text">恋爱后解锁</span>
+      </article>
+    `;
+  }
+  if (slotIndex >= unlockedSlots) {
+    const threshold = RELATIONSHIP_SLOT_UNLOCK_THRESHOLDS[slotIndex] ?? 18;
+    const tierName = getAttrTierName("social", threshold);
+    return `
+      <article class="rel-card locked">
+        <div class="paper-card-lock-message relationship-card-lock-message">
+          <strong>社交达到${threshold}<span class="new-attr-level attr-level-social relationship-lock-tier">${tierName}</span>解锁</strong>
+        </div>
+      </article>
+    `;
+  }
+  if (!card) {
+    return `<article class="rel-card empty"><div class="section-empty">${getRelationshipEmptyText(slotIndex)}</div></article>`;
+  }
+  return renderRelationshipGridCard(state, card);
+}
+
+function renderRelationshipGridSection(state: GameState): string {
+  const rel = state.relationshipState;
+  const cards = buildRelationshipCards(state);
+  const preEnrollment = isGameplayModuleLocked(state);
+  return `
+    <div class="right-section relationship-section" id="relationship-section">
+      <div class="rel-card-grid" id="rel-card-grid">
+        ${preEnrollment
+          ? '<div class="section-empty play-module-lock-state">\u5165\u5b66\u540e\u5f00\u653e</div>'
+          : cards.map((card, slotIndex) => renderRelationshipGridSlot(state, card, slotIndex, rel.unlockedSlots)).join("")}
       </div>
     </div>
   `;
@@ -1772,8 +1890,243 @@ function getPublishedPapers(state: GameState): Paper[] {
   return [...state.papers, ...state.externalPublications].filter((paper) => paper.status === "published");
 }
 
-function getResearchAuthorshipLabel(paper: Paper): string {
-  return paper.nonFirstAuthor === true ? "合作" : "一作";
+const NAME_PINYIN: Readonly<Record<string, string>> = {
+  李: "Li", 旭: "Xu", 霖: "Lin", 阳: "Yang", 沁: "Qin", 宏: "Hong", 佳: "Jia", 择: "Ze",
+  庄: "Zhuang", 婉: "Wan", 仪: "Yi", 赵: "Zhao", 志: "Zhi", 伟: "Wei", 陆: "Lu", 岩: "Yan",
+  刘: "Liu", 斌: "Bin", 储: "Chu", 琪: "Qi", 张: "Zhang", 雅: "Ya", 俞: "Yu", 能: "Neng", 海: "Hai",
+  余: "Yu", 涵: "Han", 蕾: "Lei", 徐: "Xu", 寅: "Yin", 虎: "Hu", 罗: "Luo", 子: "Zi", 祥: "Xiang",
+  郑: "Zheng", 啟: "Qi", 嘉: "Jia", 马: "Ma", 泽: "Ze", 坤: "Kun", 梦: "Meng", 欣: "Xin", 可: "Ke",
+  心: "Xin", 嫣: "Yan", 梁: "Liang", 哲: "Zhe", 铭: "Ming", 明: "Ming", 聪: "Cong", 临: "Lin", 风: "Feng",
+  方: "Fang", 婷: "Ting", 长: "Chang", 雷: "Lei", 王: "Wang", 卓: "Zhuo", 丰: "Feng", 魏: "Wei", 叶: "Ye",
+  林: "Lin", 谭: "Tan", 杰: "Jie", 森: "Sen", 姚: "Yao", 骏: "Jun", 晨: "Chen", 禹: "Yu", 博: "Bo",
+  谢: "Xie", 天: "Tian", 江: "Jiang", 小: "Xiao", 红: "Hong", 丽: "Li", 芳: "Fang", 燕: "Yan", 雪: "Xue",
+  刚: "Gang", 强: "Qiang", 龙: "Long",
+};
+
+function getNamePinyin(name: string): string {
+  if (name === "你") return "Ni";
+  if (name === "导师") return "Advisor";
+  if (name === "合作者") return "Collaborator";
+  const chars = [...name].map((char) => NAME_PINYIN[char] ?? char);
+  if (chars.length <= 1) return chars.join("");
+  const initials = chars.slice(1)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+  return `${chars[0]} ${initials}`;
+}
+
+function getStableNameSeed(value: string): number {
+  let hash = 2166136261;
+  for (const char of value) {
+    hash ^= char.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function getPendingStudentName(state: GameState): string | null {
+  for (const event of state.eventQueue) {
+    for (const choice of event.choices) {
+      const resolution = choice.effects.fixedEventResolution;
+      if (resolution?.kind === "student-name-confirm") {
+        const name = resolution.studentName?.trim();
+        if (name) return name;
+      }
+    }
+  }
+  return null;
+}
+
+function getPendingAdvisorName(state: GameState): string | null {
+  const queuedEvents = state.eventQueue.flatMap((event) => [
+    event,
+    ...event.choices.flatMap((choice) => choice.effects.enqueueEvents ?? []),
+  ]);
+  for (const event of queuedEvents) {
+    for (const choice of event.choices) {
+      const resolution = choice.effects.fixedEventResolution;
+      if (resolution?.kind === "advisor-confirm" || resolution?.kind === "advisor-reroll") {
+        const name = resolution.advisorCandidate?.advisorName?.trim();
+        if (name) return name;
+      }
+    }
+  }
+  return null;
+}
+
+function generatePaperAuthorName(seed: string, excludedNames: ReadonlySet<string>): string {
+  const surnames = [...new Set(RANDOM_ADVISOR_SURNAMES)];
+  const givenChars = [...new Set(RANDOM_ADVISOR_GIVEN_CHARS)];
+  const seedValue = getStableNameSeed(seed);
+  const isAvailable = (name: string): boolean => (
+    !excludedNames.has(name)
+    && !RANDOM_ADVISOR_NAMES.some((knownName) => knownName === name)
+  );
+
+  for (let attempt = 0; attempt < 256; attempt += 1) {
+    const mixed = (seedValue + Math.imul(attempt, 0x9e3779b9)) >>> 0;
+    const surname = surnames[mixed % Math.max(1, surnames.length)] ?? "李";
+    const first = givenChars[(mixed >>> 8) % Math.max(1, givenChars.length)] ?? "明";
+    const second = givenChars[(mixed >>> 16) % Math.max(1, givenChars.length)] ?? "远";
+    const candidate = `${surname}${first}${second}`;
+    if (isAvailable(candidate)) return candidate;
+  }
+
+  for (const surname of surnames) {
+    for (const first of givenChars) {
+      for (const second of givenChars) {
+        const candidate = `${surname}${first}${second}`;
+        if (isAvailable(candidate)) return candidate;
+      }
+    }
+  }
+
+  return "李明远";
+}
+
+type ResearchAuthor = { name: string; isPlayer: boolean };
+
+function getPaperAuthors(state: GameState, paper: Paper): ResearchAuthor[] {
+  const pendingStudentName = getPendingStudentName(state);
+  const pendingAdvisorName = getPendingAdvisorName(state);
+  const enrollmentIdentitySeed = `${state.selectedRoleId}:${state.totalMonths}:enrollment`;
+  const reservedNames = new Set<string>();
+  const playerName = state.playerName?.trim()
+    || pendingStudentName
+    || generatePaperAuthorName(`${enrollmentIdentitySeed}:player`, reservedNames);
+  reservedNames.add(playerName);
+  const advisorName = state.selectedAdvisorName?.trim()
+    || pendingAdvisorName
+    || generatePaperAuthorName(`${enrollmentIdentitySeed}:advisor`, reservedNames);
+  reservedNames.add(advisorName);
+  const fellows = state.fellowProgressState
+    .map((profile) => profile.name?.trim() || "")
+    .filter((name, index, names) => name && names.indexOf(name) === index)
+    .sort((left, right) => getStableNameSeed(`${paper.id}:${left}`) - getStableNameSeed(`${paper.id}:${right}`));
+
+  if (paper.nonFirstAuthor !== true) {
+    const visibleFellows = fellows
+      .filter((name) => getStableNameSeed(`${paper.id}:show:${name}`) % 3 !== 0)
+      .slice(0, 3)
+      .map((name) => ({ name, isPlayer: false }));
+    return [
+      { name: playerName, isPlayer: true },
+      ...visibleFellows,
+      { name: advisorName, isPlayer: false },
+    ];
+  }
+
+  const relationLead = paper.leadAuthorName?.trim();
+  const relationNames = new Set(fellows);
+  const fallbackLead = generatePaperAuthorName(`${paper.id}:lead`, new Set([
+    ...reservedNames,
+    ...fellows,
+  ]));
+  const leadName = relationLead && relationNames.has(relationLead) ? relationLead : fallbackLead;
+  const middleFellows = fellows
+    .filter((name) => name !== leadName && getStableNameSeed(`${paper.id}:middle:${name}`) % 2 === 0)
+    .slice(0, 2);
+  const authorsBeforePlayer = middleFellows
+    .map((name) => ({ name, isPlayer: false }));
+  return [
+    { name: leadName, isPlayer: false },
+    ...authorsBeforePlayer,
+    { name: playerName, isPlayer: true },
+    { name: advisorName, isPlayer: false },
+  ];
+}
+
+const JOURNAL_FULL_NAMES: Readonly<Record<JournalTarget, string>> = {
+  nature: "Nature",
+  nmi: "Nature Machine Intelligence",
+  pami: "IEEE Transactions on Pattern Analysis and Machine Intelligence",
+};
+
+function getPaperVenue(state: GameState, paper: Paper): { marker: string; short: string; full: string; year: number; influence: number; journal: boolean } {
+  if (paper.journalTarget) {
+    const journal = getJournalDefinition(paper.journalTarget);
+    return {
+      marker: "J",
+      short: journal.name.replace(/^(?:子刊|顶刊)/u, ""),
+      full: JOURNAL_FULL_NAMES[paper.journalTarget],
+      year: typeof paper.submittedYear === "number" && typeof paper.submittedMonth === "number"
+        ? getAcademicCalendarYear(paper.submittedYear, paper.submittedMonth)
+        : getAcademicCalendarYear(state.year, state.month),
+      influence: paper.publication?.influence ?? journal.citationInfluence,
+      journal: true,
+    };
+  }
+
+  const target = paper.target ?? "C";
+  const conference = paper.submittedMonth && paper.submittedYear
+    ? getConferenceInfo(paper.submittedMonth, target, paper.submittedYear)
+    : null;
+  return {
+    marker: target,
+    short: conference?.name ?? "会议",
+    full: conference?.fullName ?? "学术会议",
+    year: conference?.year ?? getAcademicCalendarYear(state.year, state.month),
+    influence: paper.publication?.influence ?? conference?.influence ?? 0,
+    journal: false,
+  };
+}
+
+const RESEARCH_PROMOTION_IDS: readonly PaperPromotionId[] = ["arxiv", "github", "xiaohongshu"];
+
+function renderResearchPromotionActions(state: GameState, paper: Paper): string {
+  if (paper.status !== "published" || !paper.publication || paper.nonFirstAuthor === true) return "";
+
+  const promotions = paper.publication.promotions ?? {
+    arxiv: false,
+    github: false,
+    xiaohongshu: false,
+  };
+  const visiblePromotionIds = RESEARCH_PROMOTION_IDS.filter((promotionId) => {
+    if (promotionId !== "arxiv") return true;
+    return promotions.arxiv === true
+      || (paper.target !== null
+      && paper.conferenceHandled !== true
+      && (paper.publication?.monthsSincePublish ?? 0) < 3);
+  });
+  if (visiblePromotionIds.length === 0) return "";
+  const promotionLabels: Record<PaperPromotionId, string> = {
+    arxiv: "arXiv",
+    github: "GitHub",
+    xiaohongshu: "小红书",
+  };
+  const promotionEffects: Record<PaperPromotionId, string> = {
+    arxiv: "提前公开",
+    github: "当前分 +25%",
+    xiaohongshu: `引用倍率 +${Math.round(getPaperPromotionMultiplierBonus("xiaohongshu") * 100)}%`,
+  };
+
+  return `
+    <div class="research-promotion-block">
+      <div class="research-promotion-actions">
+        ${visiblePromotionIds.map((promotionId) => {
+          const cost = getPaperPromotionCost(promotionId);
+          const used = promotions[promotionId] === true;
+          const affordable = state.player.san >= cost;
+          return `
+            <button
+              class="research-promotion-btn${used ? " is-used" : ""}"
+              type="button"
+              ${used ? "disabled aria-disabled='true'" : ""}
+              ${affordable
+                ? `data-action="promote-paper" data-paper-id="${escapeHtml(paper.id)}" data-promotion-id="${promotionId}"`
+                : `disabled aria-disabled="true" title="SAN 不足，需要 ${cost}"`}
+            >
+              <span class="research-promotion-topline">
+                <span>${escapeHtml(promotionLabels[promotionId])}${used ? " ✓" : ""}</span>
+                ${used ? "" : `<small>SAN -${cost}</small>`}
+              </span>
+              ${used ? "" : `<small class="research-promotion-effect">${promotionEffects[promotionId]}</small>`}
+            </button>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function getCitationAxisMax(maxCitations: number): number {
@@ -1802,7 +2155,6 @@ function renderCitationProfile(state: GameState, publishedPapers: Paper[]): stri
   const chartLabel = stats.annualCitations
     .map((item) => `${item.year} 年 ${item.citations} 次`)
     .join("，");
-
   return `
     <section class="citation-profile-panel" aria-labelledby="citation-profile-title">
       <div class="citation-chart-wrap">
@@ -1850,6 +2202,154 @@ function renderCitationProfile(state: GameState, publishedPapers: Paper[]): stri
   `;
 }
 
+function renderResearchGlobalSummary(state: GameState, publishedPapers: Paper[]): string {
+  const items = [
+    ["科研分", state.totalResearchScore, null],
+    ["A", publishedPapers.filter((paper) => paper.target === "A").length, SCORE_BY_TARGET.A],
+    ["B", publishedPapers.filter((paper) => paper.target === "B").length, SCORE_BY_TARGET.B],
+    ["C", publishedPapers.filter((paper) => paper.target === "C").length, SCORE_BY_TARGET.C],
+    ["Nature", publishedPapers.filter((paper) => paper.journalTarget === "nature").length, getJournalDefinition("nature").researchScore],
+    ["NMI", publishedPapers.filter((paper) => paper.journalTarget === "nmi").length, getJournalDefinition("nmi").researchScore],
+    ["PAMI", publishedPapers.filter((paper) => paper.journalTarget === "pami").length, getJournalDefinition("pami").researchScore],
+  ] as const;
+
+  return `
+    <div class="citation-venue-grid research-global-summary" aria-label="科研分与发表 venue 统计">
+      ${items.slice(0, 4).map(([label, count, score]) => `
+        <span class="citation-venue-cell">
+          <strong>${count}</strong>
+          <small>${label}${score === null ? "" : `（${score}分）`}</small>
+        </span>
+      `).join("")}
+      <details class="research-mechanism-note research-citation-mechanism-note" data-research-note="citation">
+        <summary>💡 小提示：引用按月结算；会议开会或挂 arXiv 后开始被引，期刊接收后直接开始；引用受热度、影响力和录用类型倍率影响。点击展开看细则</summary>
+        <div class="research-mechanism-note-body">
+          <span>会议论文接收后，开会才开始被引；开会前挂 arXiv 也可以提前开启被引。期刊接收后直接开始按月结算。</span>
+          <span>每月引用增长 = 当前分 × 0.05 × 总引用倍率；小数部分保留到下月，累计到整数后才增加引用。当前分每 4 个月衰减 10%。</span>
+          <span>总引用倍率 = 热度 × 影响力 × 录用/推广倍率 × 其他引用倍率。Poster/Spotlight ×1、Oral ×1.5、Best Paper ×5；期刊 ×1；小红书使引用倍率 +25%。arXiv 只负责提前开启被引，GitHub 只提升当前分。</span>
+        </div>
+      </details>
+      ${items.slice(4).map(([label, count, score]) => `
+        <span class="citation-venue-cell">
+          <strong>${count}</strong>
+          <small>${label}${score === null ? "" : `（${score}分）`}</small>
+        </span>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderResearchPaperRow(
+  state: GameState,
+  paper: Paper,
+  index: number,
+  selected: boolean,
+): string {
+  const venue = getPaperVenue(state, paper);
+  const authors = getPaperAuthors(state, paper)
+    .map((author) => author.isPlayer
+      ? `<strong class="research-paper-author is-player">${escapeHtml(getNamePinyin(author.name))}</strong>`
+      : `<span class="research-paper-author">${escapeHtml(getNamePinyin(author.name))}</span>`)
+    .join('<span class="research-paper-author-separator">, </span>');
+  const citations = paper.publication?.citations ?? 0;
+  return `
+    <button
+      class="research-paper-row${selected ? " active" : ""}"
+      type="button"
+      data-ui-research-index="${index}"
+      data-research-grade="${venue.marker}"
+      aria-pressed="${selected ? "true" : "false"}"
+      aria-label="查看第 ${index + 1} 篇论文 ${escapeHtml(paper.title)}"
+    >
+      <span class="research-paper-row-main">
+        <strong class="research-paper-title" title="${escapeHtml(paper.title)}">${escapeHtml(paper.title)}</strong>${paper.publication?.highlyCited === true ? '<span class="research-paper-achievement">🏆ESI高被引</span>' : ""}
+        <span class="research-paper-authors">${authors}</span>
+        <span class="research-paper-venue" title="${escapeHtml(`${venue.full} (${venue.short})`)}">${escapeHtml(venue.full)} <span>(${escapeHtml(venue.short)})</span></span>
+      </span>
+      <span class="research-paper-row-meta">
+        <span class="research-paper-row-stat" aria-label="引用 ${citations}"><strong>${citations}</strong><small>引用</small></span>
+        <span class="research-paper-row-stat" aria-label="年份 ${venue.year}"><strong>${venue.year}</strong><small>年份</small></span>
+      </span>
+    </button>
+  `;
+}
+
+function renderResearchPaperAuthors(state: GameState, paper: Paper): string {
+  return getPaperAuthors(state, paper)
+    .map((author) => author.isPlayer
+      ? `<strong class="research-paper-author is-player">${escapeHtml(getNamePinyin(author.name))}</strong>`
+      : `<span class="research-paper-author">${escapeHtml(getNamePinyin(author.name))}</span>`)
+    .join('<span class="research-paper-author-separator">, </span>');
+}
+
+function renderSelectedResearchPaper(state: GameState, paper: Paper | null): string {
+  if (!paper) {
+    return '<div class="research-detail-empty">选择一篇论文查看详情</div>';
+  }
+
+  const venue = getPaperVenue(state, paper);
+  const acceptedScore = getAcceptedPaperScore(paper);
+  const currentScore = paper.publication?.effectiveScore ?? acceptedScore;
+  const citations = paper.publication?.citations ?? 0;
+  const citationMultiplier = getPaperCitationMultiplier(state, paper);
+  const citationExposurePending = paper.target !== null
+    && paper.conferenceHandled !== true
+    && paper.publication?.preprintExposed !== true;
+  const displayedCitationMultiplier = citationExposurePending ? 0 : citationMultiplier;
+  const publicationLabel = venue.journal
+    ? "\u671f\u520a"
+    : paper.conferenceHandled !== true
+      ? paper.publication?.preprintExposed === true ? "arXiv" : "\u672a\u5f00\u4f1a"
+      : paper.publication?.acceptType ?? "Poster";
+  const publicationMultiplier = venue.journal
+    ? 1
+    : paper.conferenceHandled !== true
+      ? paper.publication?.preprintExposed === true ? 1 : 0
+      : getPaperConferencePromotionMultiplier(paper.publication?.acceptType);
+  const durationMonths = paper.publication?.monthsSincePublish ?? 0;
+  return `
+    <section class="research-current-card" aria-labelledby="research-current-title">
+      <div class="research-card">
+        <div class="research-card-header">
+          <div class="research-detail-heading">
+            <h3 class="research-title" id="research-current-title">${escapeHtml(paper.title)}</h3>
+          </div>
+        </div>
+        <div class="research-paper-authors">${renderResearchPaperAuthors(state, paper)}</div>
+        <div class="research-paper-conference">
+          <span>${escapeHtml(venue.full)}</span>
+          <strong>(${escapeHtml(`${venue.short} ${venue.year}`)})</strong>
+        </div>
+        <div class="research-paper-lifecycle">
+          <span>${venue.year} 年</span>
+          <span>${citations} 引用</span>
+          <span>热度 ×${paper.heatMultiplier.toFixed(2)}</span>
+        </div>
+        <div class="research-metric-grid research-metric-grid-legacy">
+          <div class="research-metric-item"><span>录用分</span><strong>${acceptedScore}</strong></div>
+          <div class="research-metric-item"><span>当前分</span><strong>${currentScore}</strong></div>
+          <div class="research-metric-item"><span>引用倍率</span><strong>×${citationMultiplier.toFixed(2)}</strong></div>
+        </div>
+        <div class="research-metric-grid research-metric-grid-expanded">
+          <div class="research-metric-item"><span>\u5f15\u7528</span><strong>${citations}</strong></div>
+          <div class="research-metric-item"><span>\u5f55\u7528\u5206</span><strong>${acceptedScore}</strong></div>
+          <div class="research-metric-item"><span>\u5f53\u524d\u5206</span><strong>${currentScore}</strong></div>
+          <div class="research-metric-item"><span>\u5386\u65f6</span><strong>${durationMonths}\u4e2a\u6708</strong></div>
+          <div class="research-metric-item research-metric-item-publication-type">
+            <span class="research-publication-label">${publicationLabel === "Best Paper Candidate"
+              ? '<span>Best Paper</span><span>Candidate</span>'
+              : escapeHtml(publicationLabel)}</span><strong>\u00d7${venue.journal ? publicationMultiplier.toFixed(1) : publicationMultiplier}</strong>
+          </div>
+          <div class="research-metric-item"><span>\u70ed\u5ea6</span><strong>\u00d7${paper.heatMultiplier.toFixed(2)}</strong></div>
+          <div class="research-metric-item"><span>\u5f71\u54cd\u529b</span><strong>\u00d7${venue.influence.toFixed(2)}</strong></div>
+          <div class="research-metric-item"><span>\u603b\u5f15\u7528\u500d\u7387</span><strong>${displayedCitationMultiplier === 0 ? "0" : `\u00d7${displayedCitationMultiplier.toFixed(2)}`}</strong></div>
+        </div>
+        ${renderResearchPromotionActions(state, paper)}
+      </div>
+    </section>
+  `;
+}
+
 function renderResearchSection(state: GameState, uiState: PlayRenderUiState = {}): string {
   const preEnrollment = isGameplayModuleLocked(state);
   if (preEnrollment) {
@@ -1861,128 +2361,61 @@ function renderResearchSection(state: GameState, uiState: PlayRenderUiState = {}
   }
 
   const publishedPapers = getPublishedPapers(state);
-  const firstAuthorCount = publishedPapers.filter((paper) => paper.nonFirstAuthor !== true).length;
-  const coauthorCount = publishedPapers.length - firstAuthorCount;
-  const currentPaperIndex = publishedPapers.length === 0
+  const authorshipFilter = uiState.researchAuthorshipFilter === "first" || uiState.researchAuthorshipFilter === "coauthor"
+    ? uiState.researchAuthorshipFilter
+    : "all";
+  const filteredPapers = publishedPapers.filter((paper) => authorshipFilter === "all"
+    || (authorshipFilter === "first" ? paper.nonFirstAuthor !== true : paper.nonFirstAuthor === true));
+  const sortMode: ResearchSortMode = uiState.researchSortMode === "citations" ? "citations" : "year";
+  const sortedPapers = [...filteredPapers].sort((left, right) => {
+    const leftVenue = getPaperVenue(state, left);
+    const rightVenue = getPaperVenue(state, right);
+    if (sortMode === "citations") {
+      return (right.publication?.citations ?? 0) - (left.publication?.citations ?? 0)
+        || rightVenue.year - leftVenue.year;
+    }
+    return rightVenue.year - leftVenue.year
+      || (right.publication?.citations ?? 0) - (left.publication?.citations ?? 0);
+  });
+  const currentPaperIndex = sortedPapers.length === 0
     ? 0
-    : Math.min(Math.max(uiState.currentResearchPaperIndex ?? 0, 0), publishedPapers.length - 1);
-  const currentPaper = publishedPapers[currentPaperIndex] ?? null;
-  const currentPaperConference = currentPaper?.target && currentPaper.submittedMonth && currentPaper.submittedYear
-    ? getConferenceInfo(currentPaper.submittedMonth, currentPaper.target, currentPaper.submittedYear)
-    : null;
-  const currentPaperJournal = currentPaper?.publication?.journalTarget
-    ? getJournalDefinition(currentPaper.publication.journalTarget)
-    : null;
-  const currentPaperInfluence = currentPaper?.publication?.influence
-    ?? currentPaperConference?.influence
-    ?? currentPaperJournal?.citationInfluence
-    ?? null;
-  const currentPaperAge = Math.max(0, Math.floor(currentPaper?.publication?.monthsSincePublish ?? 0));
-  const monthsUntilCitationSettlement = CITATION_SETTLEMENT_INTERVAL_MONTHS;
-  const monthsUntilScoreDecay = PUBLISHED_SCORE_DECAY_INTERVAL_MONTHS - currentPaperAge % PUBLISHED_SCORE_DECAY_INTERVAL_MONTHS;
-  const currentPaperAgeText = currentPaperAge === 0 ? "刚发表" : `发表后 ${currentPaperAge} 月`;
-  const conferencePending = currentPaper !== null
-    && currentPaper.target !== null
-    && currentPaper.conferenceHandled !== true;
-  const preprintExposed = currentPaper?.publication?.preprintExposed === true;
-  const conferenceStatusText = conferencePending && preprintExposed
-    ? "已提前公开"
-    : !conferencePending
-      ? "已公开"
-      : currentPaper?.conferenceAvailableAtTotalMonths !== undefined
-      && currentPaper.conferenceAvailableAtTotalMonths > state.totalMonths
-      ? `${currentPaper.conferenceAvailableAtTotalMonths - state.totalMonths} 月后参会`
-      : "待参会";
+    : Math.min(Math.max(uiState.currentResearchPaperIndex ?? 0, 0), sortedPapers.length - 1);
+  const researchPageCount = Math.max(1, Math.ceil(sortedPapers.length / RESEARCH_PAGE_SIZE));
+  const researchPageIndex = sortedPapers.length === 0
+    ? 0
+    : Math.min(Math.floor(currentPaperIndex / RESEARCH_PAGE_SIZE), researchPageCount - 1);
+  const researchPageStart = researchPageIndex * RESEARCH_PAGE_SIZE;
+  const visiblePapers = sortedPapers.slice(researchPageStart, researchPageStart + RESEARCH_PAGE_SIZE);
+  const selectedPaper = sortedPapers[currentPaperIndex] ?? null;
 
   return `
     <div class="right-section research-section" id="research-section">
+      ${renderResearchGlobalSummary(state, publishedPapers)}
       <div class="research-compact-layout">
         <section class="research-library" aria-labelledby="research-library-title">
           <div class="research-library-header">
-            <h3 id="research-library-title">论文 ${publishedPapers.length}</h3>
-            <div class="research-library-totals">
-              <span>${firstAuthorCount} 一作</span>
-              <span>${coauthorCount} 合作</span>
+            <div class="research-library-heading" aria-hidden="true"></div>
+            ${researchPageCount > 1 ? `
+              <div class="research-pagination" role="group" aria-label="论文分页">
+                <button type="button" data-ui-research-page="${Math.max(0, researchPageStart - RESEARCH_PAGE_SIZE)}"${researchPageIndex === 0 ? " disabled" : ""} aria-label="上一页"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+                <span><strong>${researchPageIndex + 1}</strong> / ${researchPageCount}</span>
+                <button type="button" data-ui-research-page="${Math.min((researchPageCount - 1) * RESEARCH_PAGE_SIZE, researchPageStart + RESEARCH_PAGE_SIZE)}"${researchPageIndex >= researchPageCount - 1 ? " disabled" : ""} aria-label="下一页"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+              </div>
+            ` : ""}
+            <div class="research-sort-controls" role="group" aria-label="论文排序">
+              <button class="research-sort-btn${sortMode === "citations" ? " active" : ""}" type="button" data-ui-research-sort="citations" aria-pressed="${sortMode === "citations" ? "true" : "false"}">引用</button>
+              <button class="research-sort-btn${sortMode === "year" ? " active" : ""}" type="button" data-ui-research-sort="year" aria-pressed="${sortMode === "year" ? "true" : "false"}">年份</button>
             </div>
           </div>
-
           <div class="research-switch-btns research-paper-list" id="research-switch-btns">
-            ${publishedPapers.length > 0
-              ? publishedPapers.map((paper, index) => `
-              <button
-                class="research-switch-btn research-paper-row${index === currentPaperIndex ? " active" : ""}"
-                type="button"
-                data-ui-research-index="${index}"
-                data-research-grade="${paper.target ?? "none"}"
-                aria-pressed="${index === currentPaperIndex ? "true" : "false"}"
-                aria-label="查看第 ${index + 1} 篇论文"
-              >
-                <span class="research-paper-grade grade-${paper.target ?? "none"}">${paper.target ?? "-"}</span>
-                <span class="research-paper-row-main">
-                  <strong title="${escapeHtml(paper.title)}">${escapeHtml(paper.title)}</strong>
-                  <small>${getResearchAuthorshipLabel(paper)}${paper.publication?.acceptType ? ` · ${paper.publication.acceptType}` : ""}</small>
-                </span>
-                <span class="research-paper-row-metrics">
-                  <span aria-label="引用 ${paper.publication?.citations ?? 0}"><strong>${paper.publication?.citations ?? 0}</strong><small>引用</small></span>
-                  <span aria-label="中稿分 ${getAcceptedPaperScore(paper)}"><strong>${getAcceptedPaperScore(paper)}</strong><small>中稿</small></span>
-                </span>
-              </button>
-            `).join("")
+            ${sortedPapers.length > 0
+              ? visiblePapers.map((paper, index) => renderResearchPaperRow(state, paper, researchPageStart + index, researchPageStart + index === currentPaperIndex)).join("")
               : '<div class="no-papers">暂无已发表论文</div>'}
           </div>
         </section>
-
-        <aside class="research-results-side">
+        <aside class="research-results-primary">
           ${renderCitationProfile(state, publishedPapers)}
-          <section class="research-current-card" id="research-current-card" aria-label="当前论文详情">
-            ${currentPaper
-              ? `
-                <article class="research-card">
-                  <div class="research-card-header">
-                    <strong class="research-title">${escapeHtml(currentPaper.title)}</strong>
-                  <div class="research-paper-tags">
-                      <span class="research-paper-tag is-grade">${currentPaperJournal?.name ?? (currentPaper.target ? `${currentPaper.target} 类` : "未分类")}</span>
-                      <span class="research-paper-tag is-authorship">${getResearchAuthorshipLabel(currentPaper)}</span>
-                      ${currentPaper.publication?.acceptType ? `<span class="research-paper-tag is-accept">${currentPaper.publication.acceptType}</span>` : ""}
-                    </div>
-                  </div>
-                  ${currentPaperConference ? `
-                    <div class="research-paper-conference">
-                      <strong title="${escapeHtml(currentPaperConference.fullName)}">${escapeHtml(currentPaperConference.name)}</strong>
-                      <span>${currentPaperConference.year}</span>
-                    </div>
-                  ` : ""}
-                  ${currentPaperJournal ? `
-                    <div class="research-paper-conference">
-                      <strong>${escapeHtml(currentPaperJournal.name)}</strong>
-                      <span>期刊论文</span>
-                    </div>
-                  ` : ""}
-                  <div class="research-paper-lifecycle">
-                    <span>方向 ${escapeHtml(currentPaper.topicLabel)}</span>
-                    <span>${conferenceStatusText}</span>
-                    <span>${currentPaperAgeText}</span>
-                    <span>${monthsUntilCitationSettlement} 月后结算</span>
-                    <span>每月结算引用；当前分每 ${PUBLISHED_SCORE_DECAY_INTERVAL_MONTHS} 月 -${Math.round(PUBLISHED_SCORE_DECAY_RATE * 100)}%（${monthsUntilScoreDecay} 月后）</span>
-                  </div>
-                  <div class="research-metric-grid">
-                    <div class="research-metric-item"><span>中稿分</span><strong>${getAcceptedPaperScore(currentPaper)}</strong></div>
-                    <div class="research-metric-item"><span>当前分</span><strong>${currentPaper.publication?.effectiveScore ?? getAcceptedPaperScore(currentPaper)}</strong></div>
-                    <div class="research-metric-item"><span>引用</span><strong>${currentPaper.publication?.citations ?? 0}</strong></div>
-                    <div class="research-metric-item"><span>热度</span><strong>×${currentPaper.heatMultiplier.toFixed(2)}</strong></div>
-                    <div class="research-metric-item"><span>影响力</span><strong>${currentPaperInfluence === null ? "-" : currentPaperInfluence.toFixed(2)}</strong></div>
-                    <div class="research-metric-item"><span>引用倍率</span><strong>×${getPaperCitationMultiplier(state, currentPaper).toFixed(2)}</strong></div>
-                  </div>
-                  ${renderPaperReviewSummary(currentPaper)}
-                  ${renderResearchPromotionActions(state, currentPaper)}
-                </article>
-              `
-              : `
-                <div class="research-detail-empty">
-                  <span>${publishedPapers.length === 0 ? "发表论文后显示详情" : "选择一篇论文"}</span>
-                </div>
-              `}
-          </section>
+          ${sortedPapers.length > 0 ? renderSelectedResearchPaper(state, selectedPaper) : ""}
         </aside>
       </div>
     </div>
@@ -1990,17 +2423,17 @@ function renderResearchSection(state: GameState, uiState: PlayRenderUiState = {}
 }
 
 function normalizeTalentPanelTab(tabId: TalentPanelTabId | undefined): TalentPanelTabId {
-  return tabId === "relation" || tabId === "equip" || tabId === "growth" ? tabId : "character";
+  return tabId === "relation" || tabId === "equip" || tabId === "growth" || tabId === "publication" ? tabId : "character";
 }
 
-function renderTalentTabButton(tabId: TalentPanelTabId, label: string, active: boolean): string {
+function renderTalentTabButton(tabId: TalentPanelTabId, icon: string, label: string, active: boolean): string {
   return `
     <button
-      class="panel-switch-btn${active ? " active" : ""}"
+    class="panel-switch-btn shop-tab-btn${active ? " active" : ""}"
       type="button"
       data-ui-talent-tab="${tabId}"
       aria-pressed="${active ? "true" : "false"}"
-    >${label}</button>
+    ><span class="talent-tab-icon" aria-hidden="true">${icon}</span><span>${label}</span></button>
   `;
 }
 
@@ -2019,7 +2452,7 @@ function renderTalentPanelItem(item: TalentPanelItem): string {
         <div class="talent-item-heading">
           <strong class="talent-item-title">${escapeHtml(item.name)}</strong>
         </div>
-        <span class="talent-item-tag${item.active ? " is-active" : " is-inactive"}">${item.active ? "已激活" : "未激活"}</span>
+        <span class="talent-item-tag${item.active ? " is-active" : " is-inactive"}">${escapeHtml(item.tagLabel ?? (item.active ? "已激活" : "未激活"))}</span>
       </div>
       ${item.metrics ? `
         <div class="talent-item-metrics">
@@ -2031,18 +2464,33 @@ function renderTalentPanelItem(item: TalentPanelItem): string {
           `).join("")}
         </div>
       ` : ""}
+      ${item.rewardTable ? `
+        <table class="talent-item-rewards" aria-label="${escapeHtml(item.rewardTable.label)}">
+          <thead><tr>${item.rewardTable.columns.map((column) => `<th scope="col">${escapeHtml(column)}</th>`).join("")}</tr></thead>
+          <tbody>${item.rewardTable.rows.map((row) => `
+            <tr>${row.map((value, index) => index === 0
+              ? `<th scope="row">${escapeHtml(value)}</th>`
+              : `<td>${escapeHtml(value)}</td>`).join("")}</tr>
+          `).join("")}</tbody>
+        </table>
+      ` : ""}
       ${progress ? `
         <div class="talent-item-progress">
           <div class="talent-item-progress-head">
-            <span>${escapeHtml(progress.label)}</span>
+            <div class="talent-item-progress-track" role="progressbar" aria-label="${escapeHtml(`${progress.label} ${progress.valueLabel}`)}" aria-valuemin="0" aria-valuemax="${progress.max}" aria-valuenow="${progress.value}" aria-valuetext="${escapeHtml(progress.valueLabel)}">
+              <span style="width:${progressPercent.toFixed(1)}%"></span>
+            </div>
             <strong>${escapeHtml(progress.valueLabel)}</strong>
-          </div>
-          <div class="talent-item-progress-track" role="progressbar" aria-label="${escapeHtml(progress.label)}" aria-valuemin="0" aria-valuemax="${progress.max}" aria-valuenow="${progress.value}">
-            <span style="width:${progressPercent.toFixed(1)}%"></span>
           </div>
         </div>
       ` : ""}
       <p class="talent-item-desc">${escapeHtml(item.description)}</p>
+      ${item.rewardRules ? `
+        <details class="talent-item-reward-rules">
+          <summary>奖励规则</summary>
+          <ul>${item.rewardRules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join("")}</ul>
+        </details>
+      ` : ""}
       ${item.detail ? `<p class="talent-item-note">${escapeHtml(item.detail)}</p>` : ""}
       ${!item.active && item.requirement ? `<p class="talent-item-note is-requirement">${escapeHtml(item.requirement)}</p>` : ""}
     </article>
@@ -2093,17 +2541,6 @@ function buildCharacterTalentItems(state: GameState, role: RoleDefinition): Tale
       requirement: "条件：达成隐藏触发条件。",
     });
   }
-
-  items.push(
-    {
-      id: "strong-body",
-      icon: "💪",
-      name: "强身健体",
-      active: state.eventSupport.hasStrongBodyTalent,
-      description: "效果：每月 SAN +1。",
-      requirement: "条件：在羽毛球比赛中获得冠军。",
-    },
-  );
 
   return items;
 }
@@ -2302,7 +2739,7 @@ function getChairTalentItem(state: GameState): TalentPanelItem | null {
       icon: "🪑",
       name: "吊床",
       active: true,
-      description: "效果：休息动作改为 SAN +5。",
+      description: "效果：休息动作从 SAN +2 提升为 SAN +5。",
       metrics: recoveryMetrics("休息 +5"),
     };
   }
@@ -2332,7 +2769,7 @@ function getBikeTalentItem(state: GameState): TalentPanelItem | null {
     description: tier
       ? capReached
         ? "效果：SAN 上限已满，后续每月不再消耗 SAN。"
-        : `效果：每月 SAN -${tier.monthlySanCost}；每累计消耗 6 点 SAN，SAN 上限 +1（最多 +${capLimit}）。`
+        : `效果：每月 SAN -${tier.monthlySanCost}；每 -6 SAN，上限 +1（最多 +${capLimit}）。`
       : "效果：购入后逐级提升骑行消耗与 SAN 上限成长。",
     metrics: tier
       ? [
@@ -2351,6 +2788,28 @@ function getBikeTalentItem(state: GameState): TalentPanelItem | null {
   };
 }
 
+function formatPublicationTalentReward(reward: ReturnType<typeof getPublicationTalentChecklist>[number]["reward"]): string {
+  return [
+    `SAN+${reward.san}`,
+    `好感+${reward.favor}`,
+    `社交+${reward.social}`,
+    `科研+${reward.research}`,
+    `科研上限+${reward.researchCap}`,
+  ].join(" ｜ ");
+}
+
+function buildPublicationTalentItems(state: GameState): TalentPanelItem[] {
+  return getPublicationTalentChecklist(state).map((item) => ({
+    id: `publication-talent-${item.id}`,
+    icon: item.completed ? "✅" : "⬜",
+    name: item.name,
+    active: item.completed,
+    tagLabel: item.completed ? "已完成" : "未完成",
+    description: `奖励：${formatPublicationTalentReward(item.reward)}`,
+    detail: item.description,
+  }));
+}
+
 function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
   const readCount = Math.max(0, Math.floor(state.readingState.readCount));
   const workCount = Math.max(0, Math.floor(state.partTimeWorkCount));
@@ -2360,7 +2819,9 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
   const nextReadingIdeaBonus = getReadingIdeaBonus(readCount + 1);
   const badmintonCount = Math.max(0, Math.floor(state.eventCounters.badmintonCount));
   const pokerCount = Math.max(0, Math.floor(state.eventCounters.pokerCount));
-  const badmintonRate = getBadmintonWinRate(
+  const pokerProfit = state.eventCounters.pokerProfit ?? 0;
+  const badmintonStrength = getBadmintonStrength(
+    state.player.san,
     badmintonCount,
     state.eventSupport.hasBadmintonRacket,
   );
@@ -2425,16 +2886,16 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
       icon: "🏸",
       name: "羽毛球水平",
       active: true,
-      description: "首次胜率 40%，每参加一次提高 10%，球拍额外 +30%，最高 90%",
+      description: `获胜：SAN×（参加次数 + 3）+ 球拍 40达${BADMINTON_VICTORY_THRESHOLD}`,
       metrics: [
-        { label: "当前胜率", value: `${badmintonRate}%` },
+        { label: "获胜后每月 SAN +1", value: state.eventSupport.hasStrongBodyTalent ? "✅" : "—" },
         { label: "已参加", value: `${badmintonCount} 次` },
       ],
       progress: {
         label: "水平进度",
-        value: badmintonRate,
-        max: ACTIVITY_WIN_RATE_CAP,
-        valueLabel: `${badmintonRate}%`,
+        value: Math.min(badmintonStrength, BADMINTON_VICTORY_THRESHOLD),
+        max: BADMINTON_VICTORY_THRESHOLD,
+        valueLabel: `${badmintonStrength}/${BADMINTON_VICTORY_THRESHOLD}`,
       },
     },
     {
@@ -2442,9 +2903,9 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
       icon: "🃏",
       name: "牌局策略",
       active: true,
-      description: "首次胜率 40%，每参加一次提高 10%，最高 90%",
+      description: "胜率 = 40 + 参加次数 × 10%",
       metrics: [
-        { label: "当前胜率", value: `${pokerRate}%` },
+        { label: "累计赚取金币", value: `${pokerProfit >= 0 ? "+ " : "- "}${Math.abs(pokerProfit)}` },
         { label: "已参加", value: `${pokerCount} 次` },
       ],
       progress: {
@@ -2466,20 +2927,25 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
       icon: "🎒",
       name: "整装待发",
       active: fullGearActive,
-      description: fullGearActive
-        ? "效果：小电驴四季每月 SAN +1。"
-        : "效果：小电驴、遮阳伞和羽绒服组成完整出行装备。",
-      detail: fullGearActive ? "春、夏、秋、冬每月 SAN +1。" : undefined,
-      requirement: "条件：小电驴 + 遮阳伞 + 羽绒服。",
+      description: "激活后夏冬 SAN +1",
+      detail: undefined,
+      metrics: [
+        { label: "小电驴", value: state.shopState.ebikeOwned ? "✅" : "—" },
+        { label: "遮阳伞", value: state.eventSupport.hasParasol ? "✅" : "—" },
+        { label: "羽绒服", value: state.eventSupport.hasDownJacket ? "✅" : "—" },
+      ],
     },
     {
       id: "ai-collaboration",
       icon: "🤖",
       name: "AI 协作",
       active: aiCollaboration.active,
-      description: "效果：行动点耗尽后，可额外进行 1 次科研操作；不消耗行动点，但 SAN +2。",
-      detail: `当前已启用 ${aiCollaboration.activeAiCount}/3 个 AI 模型；GPT/Claude ${aiCollaboration.hasCoreModel ? "已启用" : "未启用"}。`,
-      requirement: "条件：本月启用至少 3 个 AI 模型，且其中包含 GPT 或 Claude。",
+      description: "激活后可额外进行 1 次科研操作；不消耗行动点，但 SAN 消耗 +2",
+      metrics: [
+        { label: "GPT/Claude", value: aiCollaboration.hasCoreModel ? "✅" : "—" },
+        { label: "AI2", value: aiCollaboration.activeAiCount >= 2 ? "✅" : "—" },
+        { label: "AI3", value: aiCollaboration.activeAiCount >= 3 ? "✅" : "—" },
+      ],
     },
   ];
 
@@ -2551,16 +3017,6 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
     });
   }
 
-  if (state.eventSupport.hasGameController) {
-    items.push({
-      id: "game-controller",
-      icon: "🎮",
-      name: "游戏手柄",
-      active: true,
-      description: "效果：玩游戏时 SAN 消耗 -2。",
-    });
-  }
-
   return items;
 }
 
@@ -2574,6 +3030,8 @@ function renderTalentSection(
     ? buildRelationTalentItems(state)
     : tabId === "equip"
       ? buildEquipTalentItems(state)
+      : tabId === "publication"
+        ? buildPublicationTalentItems(state)
       : tabId === "growth"
         ? buildGrowthTalentItems(state)
         : buildCharacterTalentItems(state, role);
@@ -2581,11 +3039,12 @@ function renderTalentSection(
   return `
     <div class="talent-panel">
       <div class="talent-header-row">
-        <div class="panel-switch-btns">
-          ${renderTalentTabButton("character", "角色", tabId === "character")}
-          ${renderTalentTabButton("relation", "关系", tabId === "relation")}
-          ${renderTalentTabButton("equip", "装备", tabId === "equip")}
-          ${renderTalentTabButton("growth", "成长", tabId === "growth")}
+        <div class="panel-switch-btns shop-tab-btns talent-tab-switches">
+          ${renderTalentTabButton("character", "👤", "角色", tabId === "character")}
+          ${renderTalentTabButton("relation", "🤝", "关系", tabId === "relation")}
+          ${renderTalentTabButton("equip", "🎒", "装备", tabId === "equip")}
+          ${renderTalentTabButton("growth", "🌱", "成长", tabId === "growth")}
+          ${renderTalentTabButton("publication", "📜", "发表", tabId === "publication")}
         </div>
       </div>
       <div class="talent-items-list" id="talent-items-list" data-talent-panel-tab="${tabId}">
@@ -2636,7 +3095,7 @@ function renderDebugMonthButtons(): string {
 }
 
 function renderDebugPaperButtons(): string {
-  return ([
+  const paperButtons = ([
     ...(["A", "B", "C"] as const).map((target) => ({ target, authorship: "first" as const, label: `${target}一作` })),
     ...(["A", "B", "C"] as const).map((target) => ({ target, authorship: "coauthor" as const, label: `${target}合作` })),
   ]).map((button) => `
@@ -2645,6 +3104,28 @@ function renderDebugPaperButtons(): string {
       type="button"
       data-action="debug-add-paper"
       data-debug-paper-target="${button.target}"
+      data-debug-paper-authorship="${button.authorship}"
+    >${button.label}</button>
+  `).join("");
+  return `${paperButtons}
+    <button class="debug-tool-btn debug-buff-btn" type="button" data-action="debug-add-all-buffs">全部buff</button>
+  `;
+}
+
+function renderDebugJournalButtons(): string {
+  return ([
+    { journalTarget: "nature" as const, authorship: "first" as const, label: "Nature一作" },
+    { journalTarget: "nature" as const, authorship: "coauthor" as const, label: "Nature合作" },
+    { journalTarget: "nmi" as const, authorship: "first" as const, label: "NMI一作" },
+    { journalTarget: "nmi" as const, authorship: "coauthor" as const, label: "NMI合作" },
+    { journalTarget: "pami" as const, authorship: "first" as const, label: "PAMI一作" },
+    { journalTarget: "pami" as const, authorship: "coauthor" as const, label: "PAMI合作" },
+  ]).map((button) => `
+    <button
+      class="debug-tool-btn"
+      type="button"
+      data-action="debug-add-paper"
+      data-debug-journal-target="${button.journalTarget}"
       data-debug-paper-authorship="${button.authorship}"
     >${button.label}</button>
   `).join("");
@@ -2714,7 +3195,9 @@ function renderDebugBottomBar(): string {
             </div>
           </div>
           <div class="debug-bottom-group">
-            <button class="debug-tool-btn debug-buff-btn" type="button" data-action="debug-add-all-buffs">全部buff</button>
+            <div class="debug-bottom-paper-grid debug-bottom-journal-grid">
+              ${renderDebugJournalButtons()}
+            </div>
           </div>
         </div>
         <div class="debug-bottom-actions">
@@ -2732,9 +3215,43 @@ function renderDebugBottomBar(): string {
   `;
 }
 
-function renderSettingsSection(): string {
+function renderSettingsSection(showDebugEventRail = true, showDebugBottomBar = true): string {
   return `
     <div class="settings-panel">
+      <section class="settings-layout-controls" aria-labelledby="settings-layout-title">
+        <div class="settings-layout-heading">
+          <h3 id="settings-layout-title">界面栏位</h3>
+          <span>开发栏可按需收起</span>
+        </div>
+        <div class="settings-layout-toggle-list">
+          <label class="settings-layout-toggle">
+            <span class="settings-layout-toggle-copy">
+              <strong>最右侧栏</strong>
+              <small>开发事件快捷栏</small>
+            </span>
+            <input
+              type="checkbox"
+              data-ui-layout-toggle="debug-event-rail"
+              aria-label="显示最右侧栏"
+              ${showDebugEventRail ? "checked" : ""}
+            />
+            <span class="settings-layout-switch" aria-hidden="true"><span></span></span>
+          </label>
+          <label class="settings-layout-toggle">
+            <span class="settings-layout-toggle-copy">
+              <strong>底部栏</strong>
+              <small>开发测试工具栏</small>
+            </span>
+            <input
+              type="checkbox"
+              data-ui-layout-toggle="debug-bottom-bar"
+              aria-label="显示底部栏"
+              ${showDebugBottomBar ? "checked" : ""}
+            />
+            <span class="settings-layout-switch" aria-hidden="true"><span></span></span>
+          </label>
+        </div>
+      </section>
       <div class="settings-quick-actions" id="settings-panel-content">
         <button class="settings-primary-btn is-restart" type="button" data-action="restart-game">
           <i data-lucide="rotate-ccw" aria-hidden="true"></i>
@@ -2811,7 +3328,6 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
     ? `AI行动可用 ${aiResearchActionCount} 次`
     : `本月看论文可用 ${regularResearchActionCount} 次`;
   const relationshipActionCount = 0;
-  const shopActionCount = 0;
   const activeEventId = uiState.isEventContentOpen ? (uiState.activeEventId ?? null) : null;
   const activeEventHistoryId = uiState.isEventContentOpen ? (uiState.activeEventHistoryId ?? null) : null;
   const dateDisplayMode = getDateDisplayMode(uiState);
@@ -2819,14 +3335,19 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
   const openHistoryEvent = activeEventHistoryId
     ? state.eventHistory.find((event) => event.id === activeEventHistoryId) ?? null
     : null;
-  const logPages = buildLogPages(state.log, state.degree, dateDisplayMode);
+  const logPages = buildLogPages(state.log, state.degree, dateDisplayMode, state.totalMonths);
   const latestLogPageIndex = Math.max(0, logPages.length - 1);
+  const currentLogPageIndex = logPages.findIndex((logPage) => logPage.monthKey === state.totalMonths);
+  const hasFutureLogEntriesAtInitialMonth = state.totalMonths === 0 && logPages.some((logPage) => (
+    logPage.monthKey > state.totalMonths && logPage.entries.length > 0
+  ));
+  const defaultLogPageIndex = hasFutureLogEntriesAtInitialMonth
+    ? latestLogPageIndex
+    : currentLogPageIndex >= 0 ? currentLogPageIndex : latestLogPageIndex;
   const resolvedLogPageIndex = logPages.length === 0
     ? 0
-    : Math.min(Math.max(uiState.activeLogPage ?? latestLogPageIndex, 0), latestLogPageIndex);
+    : Math.min(Math.max(uiState.activeLogPage ?? defaultLogPageIndex, 0), latestLogPageIndex);
   const activeLogPage = logPages[resolvedLogPageIndex] ?? null;
-  const atFirstLogPage = resolvedLogPageIndex <= 0;
-  const atLastLogPage = resolvedLogPageIndex >= latestLogPageIndex;
   const activePlayTab = uiState.activePlayTab ?? "events";
   const getTabActiveClass = (tabId: PlayTabId): string => activePlayTab === tabId ? " active" : "";
   const getTabAriaPressed = (tabId: PlayTabId): string => activePlayTab === tabId ? "true" : "false";
@@ -2837,6 +3358,9 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
       ? `<span class="center-tab-badge is-${tone}" aria-label="${escapeHtml(label)}">${count}</span>`
       : ""
   );
+  const shopUpgradeBadge = uiState.showShopUpgradeNotice
+    ? '<span class="center-tab-badge is-available shop-upgrade-badge" aria-label="商店内有提升">↑</span>'
+    : "";
   return `
     <section class="play-center-column game-main-area">
       <div class="center-shell" id="center-shell">
@@ -2847,7 +3371,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </button>
           <button class="center-tab-btn${getTabActiveClass("workstation")}" type="button" aria-pressed="${getTabAriaPressed("workstation")}" data-ui-play-tab="workstation"><span class="center-tab-icon" aria-hidden="true">🔬</span><span>科研</span>${renderTabBadge(researchActionCount, "available", researchActionLabel)}</button>
           <button class="center-tab-btn${getTabActiveClass("relationship")}" type="button" aria-pressed="${getTabAriaPressed("relationship")}" data-ui-play-tab="relationship"><span class="center-tab-icon" aria-hidden="true">🤝</span><span>人际</span>${renderTabBadge(relationshipActionCount, "available", `${relationshipActionCount} 个可用操作`)}</button>
-          <button class="center-tab-btn${getTabActiveClass("shop")}" type="button" aria-pressed="${getTabAriaPressed("shop")}" data-ui-play-tab="shop"><span class="center-tab-icon" aria-hidden="true">🛒</span><span>商店</span>${renderTabBadge(shopActionCount, "available", `${shopActionCount} 个可用操作`)}</button>
+          <button class="center-tab-btn${getTabActiveClass("shop")}" type="button" aria-pressed="${getTabAriaPressed("shop")}" data-ui-play-tab="shop"><span class="center-tab-icon" aria-hidden="true">🛒</span><span>商店</span>${shopUpgradeBadge}</button>
           <button class="center-tab-btn${getTabActiveClass("research")}" type="button" aria-pressed="${getTabAriaPressed("research")}" data-ui-play-tab="research"><span class="center-tab-icon" aria-hidden="true">🏆</span><span>成果</span></button>
           <button class="center-tab-btn${getTabActiveClass("talent")}" type="button" aria-pressed="${getTabAriaPressed("talent")}" data-ui-play-tab="talent"><span class="center-tab-icon" aria-hidden="true">🌱</span><span>天赋</span></button>
           <button class="center-tab-btn${getTabActiveClass("settings")}" type="button" aria-pressed="${getTabAriaPressed("settings")}" data-ui-play-tab="settings"><span class="center-tab-icon" aria-hidden="true">⚙️</span><span>设置</span></button>
@@ -2868,10 +3392,8 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
               ${renderEventLogSection(
                 activeLogPage,
                 resolvedLogPageIndex,
-                logPages.length,
-                atFirstLogPage,
-                atLastLogPage,
                 state.eventHistory,
+                logPages,
                 openEvent || openHistoryEvent
                   ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null)
                   : "",
@@ -2893,6 +3415,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
               uiState.activeShopTab,
               uiState.selectedChairUpgradeId,
               uiState.selectedCoffeeUpgradeId,
+              uiState.shopUpgradeNoticeTabs,
             )}
           </section>
 
@@ -2905,7 +3428,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("settings")}" data-tab-panel="settings"${getTabPanelHidden("settings")}>
-            ${renderSettingsSection()}
+            ${renderSettingsSection(uiState.showDebugEventRail !== false, uiState.showDebugBottomBar !== false)}
           </section>
         </div>
       </div>
@@ -2990,16 +3513,22 @@ function getLogPageLabel(
   return formatGameDate(calendar.year, calendar.month, dateDisplayMode);
 }
 
+const MONTH_ADVANCE_LOG_TITLE_PATTERN = /^\u8FDB\u5165\u7B2C\s*\d+\s*\u5E74\s*\d+\s*\u6708[\u3002.]?$/u;
+
+function isEmptyMonthAdvanceLog(text: string): boolean {
+  const parsed = splitLogEntryText(text);
+  return MONTH_ADVANCE_LOG_TITLE_PATTERN.test(parsed.title) && parsed.result.length === 0;
+}
+
 function buildLogPages(
   logEntries: GameLogEntry[],
   degree: GameState["degree"],
   dateDisplayMode: DateDisplayMode,
+  currentTotalMonths = 0,
 ): LogPage[] {
-  const visibleEntries = logEntries.filter((entry) => !isTransientUiHintLog(entry.text));
-
-  if (visibleEntries.length === 0) {
-    return [];
-  }
+  const visibleEntries = logEntries.filter((entry) => (
+    !isTransientUiHintLog(entry.text) && !isEmptyMonthAdvanceLog(entry.text)
+  ));
 
   const pageMap = new Map<number, LogPage>();
   for (const entry of [...visibleEntries].reverse()) {
@@ -3016,7 +3545,19 @@ function buildLogPages(
     }
   }
 
-  return [...pageMap.values()];
+  const highestLoggedMonth = [...pageMap.keys()].reduce((highest, monthKey) => Math.max(highest, monthKey), 0);
+  const highestMonth = Math.max(0, currentTotalMonths, highestLoggedMonth);
+  for (let monthKey = 0; monthKey <= highestMonth; monthKey += 1) {
+    if (!pageMap.has(monthKey)) {
+      pageMap.set(monthKey, {
+        monthKey,
+        label: getLogPageLabel(monthKey, degree, dateDisplayMode),
+        entries: [],
+      });
+    }
+  }
+
+  return [...pageMap.values()].sort((left, right) => left.monthKey - right.monthKey);
 }
 
 function getLogEntryClassName(text: string): string {
@@ -3093,9 +3634,15 @@ function getEventLogPresentation(
   eventHistory: readonly GameState["eventHistory"][number][],
 ): { title: string; result: string } {
   const parsed = splitLogEntryText(entry.text);
-  if (!entry.eventHistoryId) return parsed;
+  const monthAdvancePresentation = MONTH_ADVANCE_LOG_TITLE_PATTERN.test(parsed.title)
+    ? {
+      title: parsed.result ? "\u6708\u521D\u7ED3\u7B97" : parsed.title,
+      result: parsed.result,
+    }
+    : parsed;
+  if (!entry.eventHistoryId) return monthAdvancePresentation;
   const record = eventHistory.find((event) => event.id === entry.eventHistoryId);
-  if (!record) return parsed;
+  if (!record) return monthAdvancePresentation;
 
   const selectedChoices = record.stages.flatMap((stage) => {
     const selected = stage.choices.find((choice) => choice.id === stage.selectedChoiceId);
@@ -3107,7 +3654,7 @@ function getEventLogPresentation(
     : selectedChoices.filter((choice) => !GENERIC_EVENT_CHOICE_LABELS.has(choice.label)))
     .map((choice) => choice.label)
     .filter((label, index, labels) => labels.indexOf(label) === index);
-  let result = parsed.result;
+  let result = monthAdvancePresentation.result;
   for (const choice of [...visibleChoices].reverse()) {
     const prefix = `${choice}：`;
     if (result.startsWith(prefix)) {
@@ -3116,7 +3663,9 @@ function getEventLogPresentation(
     }
   }
   return {
-    title: visibleChoices.length > 0 ? `${parsed.title} - ${visibleChoices.join(" · ")}` : parsed.title,
+    title: visibleChoices.length > 0
+      ? `${monthAdvancePresentation.title} - ${visibleChoices.join(" · ")}`
+      : monthAdvancePresentation.title,
     result,
   };
 }
@@ -3151,24 +3700,31 @@ function renderLogList(
 function renderEventLogSection(
   page: LogPage | null,
   pageIndex: number,
-  pageCount: number,
-  atFirstLogPage: boolean,
-  atLastLogPage: boolean,
   eventHistory: readonly GameState["eventHistory"][number][],
+  logPages: readonly LogPage[],
   eventContentHtml = "",
 ): string {
   return `
-    <div class="event-log-panel log-panel" id="event-log-panel" data-log-page-index="${pageIndex}" data-log-page-count="${pageCount}">
-      <div class="log-header-row event-log-header-row">
-        <div class="log-header-controls-row">
-          <div class="log-nav-btns log-page-selector" aria-label="日志分页">
-            <button class="log-nav-btn" id="log-nav-prev-year" type="button" data-ui-log-nav="first" aria-label="最早日志" ${atFirstLogPage ? "disabled" : ""}>«</button>
-            <button class="log-nav-btn" id="log-nav-prev-month" type="button" data-ui-log-nav="prev" aria-label="上一月日志" ${atFirstLogPage ? "disabled" : ""}>‹</button>
-            <span class="log-time" id="log-time-header">${escapeHtml(page?.label ?? "暂无日志")}</span>
-            <button class="log-nav-btn" id="log-nav-next-month" type="button" data-ui-log-nav="next" aria-label="下一月日志" ${atLastLogPage ? "disabled" : ""}>›</button>
-            <button class="log-nav-btn" id="log-nav-next-year" type="button" data-ui-log-nav="last" aria-label="最新日志" ${atLastLogPage ? "disabled" : ""}>»</button>
-          </div>
-        </div>
+    <div class="event-log-panel log-panel" id="event-log-panel" data-log-page-index="${pageIndex}" data-log-page-count="${logPages.length}">
+      <div class="event-timeline-track" role="list" aria-label="日志月份时间轴">
+        ${(logPages.length > 0 ? logPages : [{ monthKey: 0, label: page?.label ?? "暂无日志", entries: [] } satisfies LogPage]).map((timelinePage, index) => {
+          const isCurrent = index === pageIndex;
+          const firstEntry = timelinePage.entries[0];
+          const markerTitle = firstEntry ? getEventLogPresentation(firstEntry, eventHistory).title : "暂无记录";
+          return `
+            <button
+              class="event-timeline-marker${isCurrent ? " is-current" : ""}"
+              type="button"
+              role="listitem"
+              data-ui-log-page-index="${index}"
+              aria-label="${escapeHtml(`${timelinePage.label}：${markerTitle}`)}"
+              aria-pressed="${isCurrent ? "true" : "false"}"
+              >
+                <span class="event-timeline-node" aria-hidden="true"></span>
+                <span class="event-timeline-marker-label">${escapeHtml(timelinePage.label)}</span>
+              </button>
+          `;
+        }).join("")}
       </div>
       ${eventContentHtml}
       <div class="log-content event-log-content" id="log-content">
@@ -3188,15 +3744,17 @@ function renderDebugEventRail(): string {
   `;
 }
 
+
 function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): string {
   const dateDisplayMode = getDateDisplayMode(uiState);
   const preEnrollment = isPreEnrollmentState(state);
-  const seasonLabel = getSeasonLabel(state);
   const pendingEvents = getSortedEventQueue(state.eventQueue);
   const pendingBlockingCount = pendingEvents.filter((event) => event.blocking && event.deadlineMonths <= 0).length;
   const pendingPage = buildPendingAgendaPage(state, uiState.activePendingPage ?? 0);
   const atFirstPendingPage = pendingPage.pageIndex <= 0;
   const atLastPendingPage = pendingPage.pageIndex >= pendingPage.pageCount - 1;
+  const seasonLabel = getSeasonLabel(state);
+  const role = getRoleDefinition(state.selectedRoleId);
 
   return `
     <aside class="play-right-rail new-right-container" id="new-right-container">
@@ -3242,13 +3800,34 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
           </div>
         </div>
       </div>
+      <section class="out-of-game-role-panel" aria-label="当前人物立绘">
+        <img
+          class="out-of-game-role-portrait"
+          src="${escapeHtml(getRoleDetailPortraitUrl(role.id))}"
+          width="432"
+          height="774"
+          loading="eager"
+          decoding="async"
+          alt="${escapeHtml(`${role.name}立绘`)}"
+        />
+      </section>
     </aside>
   `;
 }
 
 export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = {}): string {
+  const isPlaying = state.phase === "playing";
+  const showDebugEventRail = SHOW_ALL_MODULES_DURING_DEVELOPMENT
+    && isPlaying
+    && uiState.showDebugEventRail !== false;
+  const showDebugBottomBar = SHOW_ALL_MODULES_DURING_DEVELOPMENT
+    && isPlaying
+    && uiState.showDebugBottomBar !== false;
+  const debugLayoutClass = showDebugEventRail ? " has-debug-bar" : "";
+  const debugBottomClass = showDebugBottomBar ? " has-debug-bottom-bar" : "";
+
   return `
-    <main class="play-page${SHOW_ALL_MODULES_DURING_DEVELOPMENT && state.phase === "playing" ? " has-debug-bar" : ""}" data-phase="${state.phase}" data-scale-mode="fixed">
+    <main class="play-page${debugLayoutClass}${debugBottomClass}" data-phase="${state.phase}" data-scale-mode="fixed">
       <section class="play-stage-shell">
         <div class="play-stage-scale">
           <section class="play-stage">
@@ -3257,13 +3836,13 @@ export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = 
                 ${renderLeftRail(state)}
                 ${renderCenterShell(state, uiState)}
                 ${renderRightRail(state, uiState)}
-                ${SHOW_ALL_MODULES_DURING_DEVELOPMENT && state.phase === "playing" ? renderDebugEventRail() : ""}
+                ${showDebugEventRail ? renderDebugEventRail() : ""}
               </div>
             </section>
           </section>
         </div>
       </section>
-      ${SHOW_ALL_MODULES_DURING_DEVELOPMENT && state.phase === "playing" ? renderDebugBottomBar() : ""}
+      ${showDebugBottomBar ? renderDebugBottomBar() : ""}
       ${uiState.isFeedbackOpen ? renderGameFeedbackOverlay() : ""}
     </main>
   `;

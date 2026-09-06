@@ -62,7 +62,7 @@ export type PaperReviewDecision = "Accept" | "Borderline" | "Reject";
 export type PaperReviewerType = "novelty" | "experiment" | "normal" | "gpt" | "expert" | "kind" | "strict" | "hostile";
 export type PaperReviewerFocus = "balanced" | "idea" | "experiment" | "weakness";
 export type PaperAcceptType = "Poster" | "Spotlight" | "Oral" | "Best Paper Candidate" | "Best Paper";
-export type SupportItemId = "badminton_racket" | "game_controller" | "parasol";
+export type SupportItemId = "badminton_racket" | "parasol";
 export type ChairUpgradeId = "advanced" | "massage" | "torture" | "spike" | "hammock" | null;
 export type ShopItemId = "gpu_buy" | "chair" | "keyboard" | "monitor" | "bike" | "ebike" | "down_jacket";
 export type ShopUpgradeId =
@@ -116,6 +116,10 @@ export interface PaperPublicationState {
   acceptType?: PaperAcceptType;
   /** Number of elapsed game months since publication. */
   monthsSincePublish?: number;
+  /** Citation threshold frozen from the paper heat at publication time. */
+  highlyCitedThreshold?: number;
+  /** Permanently awarded after reaching the first-year highly cited threshold. */
+  highlyCited?: boolean;
   /** Fractional citation growth carried into the next settlement. */
   pendingCitationFraction?: number;
   /** arXiv makes the paper visible before the conference attendance flow ends. */
@@ -304,6 +308,10 @@ export interface ScholarshipState {
   claimedPaperIds: string[];
 }
 
+export interface PublicationTalentState {
+  claimedIds: string[];
+}
+
 export interface AccountProfile {
   dateDisplayMode: DateDisplayMode;
   selectedLobbyRoleId: RoleId;
@@ -390,6 +398,8 @@ export interface Paper {
   citationDebuffMultiplierOnPublish?: number;
   lastReview?: PaperReviewResult | null;
   nonFirstAuthor?: boolean;
+  /** Optional relationship author used for non-first-author publications. */
+  leadAuthorName?: string;
 }
 
 export interface GameLogEntry {
@@ -406,6 +416,7 @@ export interface GrantedPublicationEffect {
   acceptedScore: number;
   citationDebuffMultiplier?: number;
   nonFirstAuthor?: boolean;
+  leadAuthorName?: string;
 }
 
 export type PaperEffectUpdate = { id: string } & Partial<Omit<Paper, "id">>;
@@ -472,6 +483,8 @@ export interface EventChoice {
     paperUpdates?: PaperEffectUpdate[];
     /** Execute shared reading actions without consuming this month's action points. */
     readPaperActions?: number;
+    /** Execute one normal rest action, including its SAN gain and action-point cost. */
+    restAction?: boolean;
     readingCount?: number;
     paperReviewSettlement?: PaperReviewSettlement;
     addBuffs?: Buff[];
@@ -531,6 +544,8 @@ export interface GameState extends RandomEventState {
   phase: GamePhase;
   selectedRoleId: RoleId;
   setupSelectedRoleId?: RoleId | null;
+  /** Name confirmed during the opening scene and used in publication author lists. */
+  playerName: string | null;
   selectedAdvisorName: string | null;
   degree: Degree;
   phdStartYear: number | null;
@@ -571,6 +586,7 @@ export interface GameState extends RandomEventState {
   eventSupport: EventSupportState;
   eventCounters: EventCounters;
   scholarshipState: ScholarshipState;
+  publicationTalentState?: PublicationTalentState;
   buffs: Buff[];
   player: PlayerStats;
   log: GameLogEntry[];
@@ -599,6 +615,7 @@ export interface DispatchPayload {
   eventChoiceId?: string | undefined;
   debugStatId?: DebugStatId | undefined;
   debugPaperTarget?: PaperTarget | undefined;
+  debugJournalTarget?: JournalTarget | undefined;
   debugPaperAuthorship?: "first" | "coauthor" | undefined;
   delta?: number | undefined;
   dateDisplayMode?: DateDisplayMode | undefined;

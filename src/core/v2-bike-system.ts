@@ -10,10 +10,10 @@ export interface BikeTierDefinition {
 
 /** Bicycle upgrades use one continuous chain, like the GPU upgrades. */
 export const BIKE_TIER_DEFINITIONS: readonly BikeTierDefinition[] = [
-  { level: 1, name: "自行车", monthlySanCost: 1, sanCapLimit: 3, price: 6 },
-  { level: 2, name: "轻量自行车", monthlySanCost: 1, sanCapLimit: 6, price: 6 },
-  { level: 3, name: "公路车", monthlySanCost: 2, sanCapLimit: 9, price: 6 },
-  { level: 4, name: "竞速公路车", monthlySanCost: 2, sanCapLimit: 12, price: 6 },
+  { level: 1, name: "通勤自行车", monthlySanCost: 1, sanCapLimit: 3, price: 6 },
+  { level: 2, name: "入门公路车", monthlySanCost: 1, sanCapLimit: 6, price: 6 },
+  { level: 3, name: "轻量公路车", monthlySanCost: 2, sanCapLimit: 9, price: 6 },
+  { level: 4, name: "竞赛级公路车", monthlySanCost: 2, sanCapLimit: 12, price: 6 },
 ];
 
 export function getBikeTierDefinition(level: number): BikeTierDefinition | null {

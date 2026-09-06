@@ -347,7 +347,7 @@ function clampNormalEffectLevel(level: number): number {
 
 function formatNormalAwakeningEffect(level: number): string {
   const effectLevel = clampNormalEffectLevel(level);
-  const baseEffectText = `转博时科研能力、社交能力、导师好感+${effectLevel * 10}%（属性小数上取整）`;
+  const baseEffectText = `转博时科研能力、社交能力、导师好感+${effectLevel * 10}%（属性结果向上取整）`;
   return effectLevel >= NORMAL_EFFECT_MAX_LEVEL
     ? `${baseEffectText}；满级额外效果：每当属性溢出时上限+1`
     : baseEffectText;
@@ -358,7 +358,7 @@ function formatNormalHiddenAwakenEffect(level: number): string {
   const actionBonusText = effectLevel <= 0 ? "0" : (effectLevel / 10).toFixed(1);
   const baseEffectText = `每月行动次数+${actionBonusText}（小数累积，满1生效）`;
   return effectLevel >= NORMAL_EFFECT_MAX_LEVEL
-    ? `${baseEffectText}；满级额外效果：第一个月有10次行动次数`
+    ? `${baseEffectText}；满级额外效果：第一个月有10次行动机会`
     : baseEffectText;
 }
 
@@ -477,7 +477,7 @@ function renderGrowthBoard(viewModel: LobbySelectedRoleViewModel): string {
           role="img"
           tabindex="0"
           aria-label="经验倍率说明"
-          data-tooltip="每局经验=科研分*获取倍率，完成成就可提升获取倍率"
+          data-tooltip="角色成长仅供预览，经验结算、成就奖励和天赋分配尚未接入"
         ><i data-lucide="circle-help" aria-hidden="true"></i></span>
       </div>
       <div class="lobby-growth-exp-row">

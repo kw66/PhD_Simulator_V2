@@ -38,7 +38,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
   const event: PendingEvent = {
     id: `random-1-y${state.year}-m${state.month}-n${serial}`,
     title: "毕设辅导",
-    description: "本科生拿着还没成形的毕设选题来找你，导师让你顺手带一带。自己的论文也没做完，你得决定把多少时间分给对方。",
+    description: "一名本科生拿着毕设草稿来找你，导师希望你帮忙把关。自己的研究也没忙完，你得决定把多少时间分给对方。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -77,14 +77,12 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "本科毕设季到了，导师把一名本科生交给你带。",
-      `你看了眼${mentorshipJuniorPronoun}的开题材料，基础薄弱，短期内要投入不少精力。`,
-      "你自己的实验还卡着，论文也等着改，很难再挤出完整时间。",
-      "直接推掉，导师多半不高兴；转给同门，也得看对方愿不愿意。",
+      `导师让你帮一名本科生检查毕设。你翻了翻${mentorshipJuniorPronoun}的草稿：实验缺对照，结论也没解释清楚。`,
+      "说是帮忙看看，真要改好恐怕得花不少时间。自己的研究还没忙完，你先看了一眼手头的安排。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "亲自带，接下来几周会很忙，但事情至少能做稳。",
+      "亲自带，要花时间补实验、改草稿，也可能多认识一位留组的后辈。",
       "拒绝最省时间，导师可能会不太高兴。",
       "转给师弟师妹能少做一些，也可能惹来抱怨。",
     ].join("\n\n"),
@@ -94,7 +92,9 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
         description: [
           "你向导师说明最近科研任务太重，实在抽不出时间。",
           "导师听完，只回了句“知道了”，便让你先回去。",
-          "接下来的几天，导师对你不再像之前那么热情，组会上也少问了你几句。",
+          refuseFavorChange < 0
+            ? "这次推辞让导师有些不满。你空出了时间，也得想想下次怎么把安排提前说清楚。"
+            : "你把眼前的时间留给了自己的研究，没有再接下这件事。",
           ...(refuseFavorNarrative ? [refuseFavorNarrative] : []),
         ].join("\n\n"),
       },
@@ -102,15 +102,13 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
         title: "亲自指导",
         description: becomesJunior
           ? [
-              `接下来几周，你陪${mentorshipJuniorName}重新拆选题、查数据，又把论文里说不清楚的地方逐段改了一遍。`,
-              `${mentorshipJuniorPronoun}赶在答辩前跑出了一组能用的结果，你也从其中整理出一个值得继续试的实验思路。`,
-              `答辩结束后，${mentorshipJuniorName}告诉你已经决定留组读研：“谢谢${playerHonorific}，开学以后还得继续请教你。”新学期开学时，组里会多一位你的${mentorshipJuniorLabel}。`,
+              `你陪${mentorshipJuniorName}补了必要的实验，又把草稿里说不清楚的地方逐段改好。自己的事只能挤在空档里做。`,
+              `${mentorshipJuniorPronoun}决定留组读研，眼下就开始跟你熟悉课题：“谢谢${playerHonorific}，以后还得多请教。”你多了一位常来讨论的${mentorshipJuniorLabel}。`,
               ...(mentoringSanNarrative ? [mentoringSanNarrative] : []),
             ].join("\n\n")
           : [
-              `接下来几周，你陪${mentorshipJuniorName}重新拆选题、查数据，又把论文里说不清楚的地方逐段改了一遍。`,
-              `直到答辩前一晚，${mentorshipJuniorPronoun}还在追问表格里的 P 值该怎么解释。你只好再开一次语音，把最后几页过完。`,
-              `答辩总算通过，${mentorshipJuniorName}也按计划毕业离组。你回宿舍关掉闹钟，准备把欠下的觉补回来。`,
+              `你陪${mentorshipJuniorName}补实验、改草稿，连答辩前一晚都还在解释表格里的结果。自己的进度只能抽空赶。`,
+              `答辩顺利通过，${mentorshipJuniorPronoun}按原计划毕业离组。你收到一条认真的道谢，也终于能把晚上的时间留给自己。`,
               ...(mentoringSanNarrative ? [mentoringSanNarrative] : []),
             ].join("\n\n"),
       },
@@ -120,14 +118,13 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
             ? delegateSocialChange < 0
               ? [
                 `你找到了${familiarJuniorName}，对方当面答应得很爽快。`,
-                "事情做完后，对方半开玩笑地说下次得请杯咖啡。你应了下来。",
-                "这次人情算是用掉了。",
+                "可自己的任务也被耽搁了，对方交接时忍不住说：“下次别这么突然，我也有事要做。”",
+                "你道了谢，也记住了这次勉强。",
                 ...(delegateSocialNarrative ? [delegateSocialNarrative] : []),
               ].join("\n\n")
             : [
-                `你找到一位有点交情的${familiarJuniorLabel}${familiarJuniorName === familiarJuniorLabel ? "" : ` ${familiarJuniorName}`}：“这个任务就交给你了，正好熟悉下实验流程。”`,
-                `“好嘞，${playerHonorific}放心，包在我身上！”`,
-                "对方干劲十足地接过了任务。你顺利腾出了一块时间，也记下了这次人情。",
+                `你和${familiarJuniorName}商量，请对方接手这次辅导。${familiarJuniorLabel}看过材料，答应帮忙。`,
+                "你把已有资料交接清楚，总算腾出时间处理自己的研究。这次帮忙，你也记在了心里。",
                 ...(delegateSocialNarrative ? [delegateSocialNarrative] : []),
               ].join("\n\n")
           : delegateSocialChange < 0
@@ -169,9 +166,8 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
     allowSanOverdraw: true,
   });
   const reviewOutcome = [
-    `额外看论文 +${reviewReadPreview.appliedCount} 次`,
+    `看论文 ${reviewReadPreview.appliedCount} 次`,
     `SAN -${reviewReadPreview.totalSanCost}`,
-    `阅读累计 +${reviewReadPreview.appliedCount}`,
     `下次想 idea +${reviewReadPreview.totalIdeaBonus}分`,
     reviewReadPreview.researchGain > 0 ? `科研 +${reviewReadPreview.researchGain}` : "",
   ].filter(Boolean).join("｜");
@@ -211,16 +207,13 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "导师把一篇审稿任务转给了你，希望你抽空给些意见。",
-      "这是一篇深度学习论文，理论公式很多，不过有些地方的解释比较牵强。",
-      "你本来准备今晚改自己的论文，现在得重新排一下时间。",
+      "导师转来一篇深度学习论文，请你协助审稿。你粗看了一遍，公式不少，但几处推导与实验结论还对不上。",
+      "要判断是自己没读懂，还是文章确实有问题，得坐下来仔细核对。原定今晚的研究安排，又得往后挪一挪。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "自己认真审，得把公式、实验和结论逐项过一遍，今晚基本就得花在这上面。",
-      "直接推辞能省下时间，但导师可能觉得你不太愿意帮忙。",
-      "交给师弟师妹最快，不过也得消耗一次人情。",
-      "认真审能学到些东西，推掉或转交则轻松一些。",
+      "认真审稿得核对公式、实验和相关工作，耗神，也能积累阅读经验。",
+      "推辞能保住自己的时间，导师却未必高兴；请师弟师妹代劳，也得看对方是否忙得过来。",
     ].join("\n\n"),
     results: {
       [`random-2-refuse-${serial}`]: {
@@ -228,16 +221,17 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
         description: [
           "你把这周的实验排期发给导师，说明自己确实抽不出一个完整晚上。",
           "导师回了句“好，我再问问其他同学”，没有继续勉强你。",
-          "之后几次讨论里，导师对你的回复不再那么热情了。",
+          refuseFavorChange < 0
+            ? "语气虽然平静，导师还是对这次推辞有些不满。你只能先把手头的事做好。"
+            : "你把时间留给原来的实验，先不再为审稿分心。",
           ...(refuseFavorNarrative ? [refuseFavorNarrative] : []),
         ].join("\n\n"),
       },
       [`random-2-self-${serial}`]: {
         title: "自己审稿",
         description: [
-          "你花了一个晚上把论文从头读完，对着公式和实验表来回核了几遍。",
-          "写审稿意见时，你又把两篇相关工作快速过了一遍，顺手记下了几条能用的对照。",
-          "意见发给导师后，今晚的阅读也一起记进了积累，接下来的想法可以直接从笔记里接着做。",
+          "你把这篇稿件和一篇关键参考文献仔细读完，对着公式和实验表反复核对。哪里证据充分、哪里还需补充，都记进了意见。",
+          "发给导师后，你又把值得借鉴的实验设计抄进笔记。一个晚上过去，自己的课题没动，倒是多了些阅读积累。",
         ].join("\n\n"),
       },
       [`random-2-delegate-${serial}`]: {
@@ -253,7 +247,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
             : [
                 `你找到一位有点交情的${familiarJuniorLabel}${familiarJuniorName === familiarJuniorLabel ? "" : ` ${familiarJuniorName}`}：“帮我看看这篇论文，正好和你的方向相关。”`,
                 "“没问题，包在我身上。”对方爽快地答应了。",
-                "审稿意见很快发了回来。你稍微改了格式便交了出去，也记下了这次人情。",
+                "审稿意见很快发了回来。你核对过论据和结论，再整理交给导师，也记下了这次人情。",
                 ...(delegateSocialNarrative ? [delegateSocialNarrative] : []),
               ].join("\n\n")
           : delegateSocialChange < 0
@@ -291,7 +285,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   const event: PendingEvent = {
     id: `random-14-y${state.year}-m${state.month}-n${serial}`,
     title: eventTitle,
-    description: `新入组${roleText}拿着实验结果来请教，问题和你刚入门时遇到的很像。你想起当年四处摸索的日子，准备怎么指导？`,
+    description: `新入组的${roleText}拿着实验结果来请教，问题和你刚入门时遇到的很像。你想起四处摸索的日子，准备帮到什么程度？`,
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -343,21 +337,20 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   const pronounText = getFellowPronoun(juniorGender);
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      `一位新入组${roleText}来请教代码与实验流程。`,
-      `你看着${pronounText}手里凌乱的笔记，想起自己刚入组时同样迷茫。`,
+      `一位新入组的${roleText}来请教代码与实验流程。看着${pronounText}手里凌乱的笔记，你想起自己刚入组时同样迷茫。`,
       "你手头也有自己的任务，只能决定帮到什么程度。",
     ].join("\n\n"),
     decisionTitle: "如何抉择",
     decisionDescription: [
       "最近实在忙不过来，可以直接说明情况。",
       `也可以先帮${pronounText}把眼前的问题跑通，之后让${pronounText}自己做。`,
-      "如果愿意长期带，每个月都要留出固定时间。",
+      "长期带教要每月持续投入，也能一起积累合作成果；你得先确认自己还有精力维持这段合作。",
     ].join("\n\n"),
     results: {
       [`random-14-decline-${serial}`]: {
         title: "婉拒指导",
         description: [
-          "你沉默了几秒，还是把“最近课题太满”这句话说出了口。",
+          "你犹豫片刻，还是说明最近的实验已经排满，没法再接下指导。",
           `${roleText}点头说理解，但你能听出${pronounText}语气里的失落。`,
           "你回到工位继续自己的实验，暂时没有再接下这件事。",
         ].join("\n\n"),
@@ -367,7 +360,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
         description: [
           "你把白板拉到身边，从问题背景到实验路线完整讲了一遍。",
           `${roleText}一边记笔记一边追问细节，配环境和调参的坑也在你的带领下逐步绕开。`,
-          `几天后，${pronounText}已经能独立跑通小规模实验，你终于可以把时间收回来。`,
+          `几天后，${pronounText}已经能独立跑通小规模实验，你也能回头处理自己的任务了。`,
           ...(shortTermSocialNarrative ? [shortTermSocialNarrative] : []),
           ...(shortTermSanNarrative ? [shortTermSanNarrative] : []),
         ].join("\n\n"),
@@ -379,9 +372,8 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
           `${pronounText}开始参与实验、读文献，也会主动整理问题来找你。`,
           "你每个月都要额外花时间指导，不过有人一起做实验后，组里的工作也推进得更顺了。",
         ].join("\n\n") : [
-          "你愿意长期带教，但人际栏已经没有空位。",
-          "导师把这位新生交给了其他同学，你只在遇到具体问题时偶尔帮忙。",
-          "这次没有新增关系，也不会产生长期带教效果。",
+          "你想了想，眼下维持的合作已经够多，实在排不出固定的指导时间。",
+          "你如实说明情况，建议对方再问问其他同门。这次没有接下长期带教，也就不用勉强作出做不到的承诺。",
         ].join("\n\n"),
       },
     },

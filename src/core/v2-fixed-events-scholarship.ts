@@ -58,10 +58,10 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
   if (context.success) {
     const diff = context.score - context.requirement;
     const reaction = diff >= 3
-      ? "你稳稳进入名单，这一年的成果终于有了回报。"
+      ? "你稳稳进入名单，忍不住把通知又看了一遍。攒下来的成果，这回总算能帮钱包缓口气。"
       : diff >= 1
-        ? "看到名单里自己的名字，你松了一口气。"
-        : "你踩线入选，确认了两遍才放下心来。";
+        ? "你在名单里找到自己的名字，先松了一口气，又把获奖通知存好。这阵子反复核材料，总算没有白忙。"
+        : "你刚好踩线入选，把名字和分数来回核了两遍才敢相信。刚才还悬着的心，总算落回了肚子里。";
     return createFixedEvent({
       id: `scholarship-result-y${context.year}-m${context.month}`,
       title: "国奖评选 ➜ 自己估分 ➜ 获得奖学金",
@@ -92,10 +92,10 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
 
   const diff = context.requirement - context.score;
   const reaction = diff === 1
-    ? "你盯着结果看了几秒，还是有些不甘。"
+    ? "你盯着那一点差距看了好一会儿，心里难免不甘。没获奖的成果仍能继续累计，这次不用从头攒起。"
     : diff <= 3
-      ? "差距不算远，明年还有机会。"
-      : "你关掉通知，决定下学年早点准备成果。";
+      ? "你把通知和自己的材料对照了一遍，确认不是漏算了成果。虽然没能入选，已有的积累还在。"
+      : "你关掉通知，把申报材料归档。差距摆在眼前，难免泄气；好在没获奖的成果还能继续累计。";
 
   return createFixedEvent({
     id: `scholarship-result-y${context.year}-m${context.month}`,
@@ -126,37 +126,32 @@ function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "su
     : `按往年情况，分数线大约在 ${context.estimateMin}～${context.estimateMax} 分`;
   let innerThoughts = [
     `你把这次能计入的成果算了一遍，共 ${context.score} 分。${estimateText}。`,
-    "今年申报的人不少，真正的分数线还得等名单公布。",
   ];
-  let finalThought = "你把材料又检查了一遍，剩下的只能等结果。";
+  let finalThought = "提交回执已存好。你心里有些期待，但还是等正式名单出来再说。";
   let label = "等待结果";
 
   if (diff >= 1 && diff < 3) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分，按往年情况算是有竞争力。`,
-      "不过今年申报的人不少，谁也不敢提前把话说满。",
+      `这次能计入 ${context.score} 分。${estimateText}，你又核了一遍，确认没有重复申报。`,
     ];
-    finalThought = "你把申报表又检查了一遍，开始等学院公布名单。";
+    finalThought = "你保存好提交回执，暂时关掉申报页面，等学院公布名单。";
   } else if (diff === 0) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分，正好压在往年的范围边缘。`,
-      "只要今年分数线稍微抬高一点，结果就会完全不同。",
+      `这次能计入 ${context.score} 分。${estimateText}，你在估分表上圈出自己的分数。`,
     ];
-    finalThought = "你盯着提交成功的页面看了一会儿，还是不敢先庆祝。";
+    finalThought = "你盯着提交成功的页面看了一会儿，仍拿不准今年会不会更难入选。";
     label = "继续等待";
   } else if (diff < 0 && diff >= -2) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分，离往年的范围还有一点距离。`,
-      "如果今年竞争更激烈，这些成果可能还不够。",
+      `这次能计入 ${context.score} 分。${estimateText}，你有些忐忑，又检查了一遍材料。`,
     ];
     finalThought = "材料已经交了，你仍想等到正式名单出来再下结论。";
     label = "继续等待";
   } else if (diff < -2) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分，和往年的分数线差得比较远。`,
-      "这次大概很难入选，没用上的成果以后还可以继续累计。",
+      `这次能计入 ${context.score} 分。${estimateText}，光凭往年的范围还猜不出结果。`,
     ];
-    finalThought = "你关掉估分表，准备等正式结果出来后继续做下一篇。";
+    finalThought = "你保存好提交回执。即使这次没选上，未用于获奖的成果也能继续累计。";
     label = "继续等待";
   }
 
@@ -164,7 +159,7 @@ function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "su
     id: `scholarship-score-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 自己估分",
     description: [
-      "你对照学院公布的评分规则，把论文、专利和其他能计入的成果逐项核了一遍。",
+      "你核过已发表论文和往次获奖记录，把申报材料逐项对齐。",
       ...innerThoughts,
       finalThought,
     ].join("\n\n"),
@@ -174,7 +169,7 @@ function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "su
       {
         id: `scholarship-wait-y${context.year}-m${context.month}`,
         label,
-        outcome: success ? "分数过线，等待名单。" : "分数未过线，等待名单。",
+        outcome: success ? "估分结果已记下，等待正式名单。" : "材料已提交，等待正式名单。",
         effects: {
           enqueueEvents: [buildScholarshipResultEvent({ ...context, success })],
         },
@@ -209,10 +204,9 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
     id: `scholarship-y${state.year}-m${state.month}`,
     title: "国奖评选",
     description: [
-      "晚上十点，学院系统推送了“国奖评选启动”通知。",
-      `本轮评选中，${getScholarshipGradeLabel(state)}共有 5 个名额，按科研积分排名。`,
+      `晚上十点，你收到学院系统推送的“国奖评选启动”通知。本轮评选中，${getScholarshipGradeLabel(state)}共有 5 个名额，按科研积分排名。`,
       `${estimateText}，具体门槛要等名单公布才知道。已经用于获奖的论文不能再次计入。`,
-      "你可以现在准备材料申报，也可以先把成果攒到下一年。",
+      "你可以准备材料申报，也可以暂不参加，保留目前的积累。",
     ].join("\n\n"),
     chainId: "scholarship",
     choices: [

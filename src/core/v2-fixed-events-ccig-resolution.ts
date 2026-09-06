@@ -62,9 +62,8 @@ export function resolveCcigFixedEvent(
           mode: "listen",
           title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
-            "你把一天几乎都放在报告厅，从院士的主旨报告听到分论坛，笔记写了好几页。",
-            "茶歇时你主动和几位学者交流，把自己课题里的瓶颈直接拿出来请教。",
-            "回程路上，你已经列好下一轮要验证的三个想法，脑子里久违地很清晰。",
+            "你挑了几场贴近课题的报告，边听边记。遇到没跟上的地方，先把图和关键词抄下来，留着回去查。",
+            "茶歇时，你拿着笔记请教了一处实验设计，才发现自己一直把问题想窄了。回程再翻笔记，几处想法渐渐接上了，连以后该怎么提问也有了点头绪。",
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
@@ -104,8 +103,8 @@ export function resolveCcigFixedEvent(
           title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你把《${paper.title}》的海报贴上展板，留在旁边向过来的同行介绍工作。`,
-            "有人追问实验细节，也有人拍下海报，约你会后继续交流。",
-            "一天下来讲得口干舌燥，这篇论文倒是让更多人记住了。",
+            "有人追问基线和实验设置，你指着图解释了几轮，也把对方的疑问记在空白处。",
+            "收海报时嗓子已经有些哑了，好在路过的同行不只是看了个标题，多少记住了你在做什么。",
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
@@ -125,12 +124,12 @@ export function resolveCcigFixedEvent(
     case "ccig-activity-travel": {
       const location = getCcigLocation(state.year);
       const attraction = ({
-        合肥: "沿着包河散步，又去看了三河古镇",
-        成都: "去了宽窄巷子和锦里，还看了大熊猫",
-        苏州: "逛了平江路和园林，在河边慢慢走了一下午",
-        西安: "参观了兵马俑和大雁塔，感受千年古都的魅力",
+        合肥: "沿着包河慢慢散步，在树荫下坐了一会儿",
+        成都: "在宽窄巷子走走停停，找了家茶馆歇脚",
+        苏州: "逛了平江路，在河边慢慢走了一下午",
+        西安: "在大雁塔附近闲逛，坐在广场边歇了会儿",
         重庆: "坐轻轨穿过山城，又在洪崖洞看了夜景",
-      } as Record<string, string>)[location] ?? "在当地的著名景点游玩";
+      } as Record<string, string>)[location] ?? "在附近的街巷随意走走";
       const activityOutcome = "SAN +5";
       const completionLog = [resolution.ccigAttendanceSummary, activityOutcome].filter(Boolean).join("；");
       return {
@@ -141,9 +140,9 @@ export function resolveCcigFixedEvent(
           mode: "travel",
           title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
-            "你只听了核心场次，其余时间留给了城市本身。",
-            `你${attraction}，一整天都没再想实验和论文。`,
-            "晚上回到酒店时，你已经轻松了不少。",
+            "你把会务袋放回酒店，留了些空当出门走走。今天不用给每段时间都排上正事。",
+            `你${attraction}，路上没再反复琢磨那几个实验。`,
+            "回酒店时腿有点酸，脑子倒是松快了不少。",
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
@@ -177,8 +176,7 @@ export function resolveCcigFixedEvent(
           title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你约了几位同学去吃${location}当地菜：${food}。`,
-            "饭桌上从“最近在做什么”聊到“你这个方向怎么落地”，气氛比会场里松很多。",
-            "一顿饭下来，大家熟了不少，还约好以后互相交流代码和数据。",
+            "饭桌上聊起刚听的报告，也吐槽各自没跑通的实验，话题比会场里随意得多。结账时你主动买了单，这顿饭花了钱，好歹也吃得舒坦。",
             ...(socialNarrative ? [socialNarrative] : []),
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,

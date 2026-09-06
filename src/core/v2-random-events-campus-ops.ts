@@ -22,7 +22,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
   const event: PendingEvent = {
     id: `random-13-y${state.year}-m${state.month}-n${serial}`,
     title: "显卡故障",
-    description: "实验室服务器突然离线，几张显卡接连报错，排队的任务全停在原地。机器暂时不能用了，这次得由你来处理。",
+    description: "实验室服务器突然离线，几张显卡接连报错，排队的任务全停在原地。机器暂时用不了，这次得由你来处理。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -74,16 +74,14 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "凌晨跑到一半的实验突然中断，实验室服务器彻底连不上了。",
-      "到机房一看，有张显卡持续报错，整台机器已经无法正常跑实验。",
-      "组里排队的任务全部停住，谁也说不准是驱动故障，还是显卡真的坏了。",
-      "这次是先找人检查，还是自己动手排查？",
+      "凌晨跑到一半的实验突然中断。你查了服务器日志，显卡反复报错，组里排队的任务全被卡住了。",
+      "是驱动出了问题，还是硬件故障？后台还有几项说不清来路的占用。大家都等着恢复实验，这次得有人出面处理。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
       "找导师最稳，但坏掉的显卡未必能马上换新。",
-      "举报有人挖矿可能查清显卡为什么出故障，也会得罪同门。",
-      "自己重装驱动或淘宝找人都有一半机会翻车；淘宝维修成功花 2 金币，翻车则会扣 4 金币。",
+      "上报异常占用可以查清有没有人在挖矿，但也可能得罪同门。",
+      "自己重装要花精力，淘宝找人则要花钱。两种办法都可能没修好，反而添了新的麻烦。",
     ].join("\n\n"),
     results: {
       [`random-13-advisor-${serial}`]: {
@@ -97,7 +95,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
       [`random-13-report-${serial}`]: {
         title: "举报挖矿",
         description: [
-          "你把后台的异常占用和显卡报错整理后直接上报，导师当场排查。",
+          "你把后台的异常占用和显卡报错整理后直接上报，导师当即安排人排查。",
           "有人长期占着显卡挖矿的事情被查了出来，故障显卡也被送去检修。",
           "但很快有人知道是你举报的，实验室里的气氛有些尴尬。",
           ...(reportSocialNarrative ? [reportSocialNarrative] : []),
@@ -127,9 +125,8 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
               "钱花得不冤，机器当天就重新上线了。",
             ].join("\n\n")
           : [
-              "你找的维修看着便宜，实际只是反复拆装显卡和试错。",
-              "折腾几天后显卡还是不能用，对方还追加了额外费用。",
-              "钱没少花，服务器也继续趴了好几天。",
+              "你找来的维修报价很低，实际却只是反复拆装、试错。折腾几天仍没找准故障，对方还追加了费用。",
+              "最后只好请组里重新安排检修。你为这次失败的维修花了冤枉钱，也没少操心。",
             ].join("\n\n"),
       },
     },

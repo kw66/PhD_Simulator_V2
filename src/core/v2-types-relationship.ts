@@ -110,7 +110,6 @@ export interface FellowProfileAddition {
 }
 
 export interface EventSupportState {
-  hasGameController: boolean;
   hasParasol: boolean;
   hasDownJacket: boolean;
   hasBadmintonRacket: boolean;

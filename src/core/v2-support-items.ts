@@ -9,14 +9,12 @@ export interface SupportItemDefinition {
 
 const SUPPORT_ITEM_STATE_KEYS: Record<SupportItemId, keyof EventSupportState> = {
   badminton_racket: "hasBadmintonRacket",
-  game_controller: "hasGameController",
   parasol: "hasParasol",
 };
 
 export const SUPPORT_ITEM_DEFINITIONS: SupportItemDefinition[] = [
-  { id: "badminton_racket", name: "羽毛球拍", description: "羽毛球获胜概率 +30%", price: 4 },
-  { id: "game_controller", name: "游戏手柄", description: "玩游戏时 SAN 消耗 -2", price: 4 },
-  { id: "parasol", name: "遮阳伞", description: "使夏季主动操作 SAN +1 无效", price: 10 },
+  { id: "badminton_racket", name: "羽毛球拍", description: "羽毛球实力 +40", price: 6 },
+  { id: "parasol", name: "遮阳伞", description: "免除夏季主动操作的额外消耗：SAN +1", price: 10 },
 ];
 
 export function getSupportItemDefinition(itemId: SupportItemId): SupportItemDefinition {

@@ -21,6 +21,14 @@ tmp/
 playwright-report/
 test-results/
 
+# Local screenshots and visual review captures
+/artifacts/
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/history-card-gallery.html
+
 # Local deployment metadata
 .vercel/
 .vercelignore

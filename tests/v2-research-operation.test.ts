@@ -192,4 +192,33 @@ describe("v2 research operations", () => {
     );
     expect(coauthor.totalResearchScore).toBe(firstAuthor.totalResearchScore);
   });
+
+  it("adds journal first-author and coauthor papers through the debug bar contract", () => {
+    const state = admittedState();
+    const firstAuthor = dispatchAction(state, "debug-add-paper", {
+      debugJournalTarget: "nmi",
+      debugPaperAuthorship: "first",
+    });
+    const coauthor = dispatchAction(firstAuthor, "debug-add-paper", {
+      debugJournalTarget: "pami",
+      debugPaperAuthorship: "coauthor",
+    });
+
+    expect(firstAuthor.externalPublications[0]).toMatchObject({
+      target: null,
+      journalTarget: "nmi",
+      nonFirstAuthor: false,
+      publication: { journalTarget: "nmi", influence: 0.5 },
+    });
+    expect(firstAuthor.externalPublications[0]?.publication?.effectiveScore).toBeGreaterThanOrEqual(250);
+    expect(firstAuthor.totalResearchScore).toBe(state.totalResearchScore + 10);
+    expect(coauthor.externalPublications[1]).toMatchObject({
+      target: null,
+      journalTarget: "pami",
+      nonFirstAuthor: true,
+      publication: { journalTarget: "pami", influence: 0.5 },
+    });
+    expect(coauthor.externalPublications[1]?.publication?.effectiveScore).toBeGreaterThanOrEqual(125);
+    expect(coauthor.totalResearchScore).toBe(firstAuthor.totalResearchScore);
+  });
 });

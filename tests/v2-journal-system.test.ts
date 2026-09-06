@@ -89,13 +89,19 @@ describe("v2 journal system", () => {
     });
 
     expect(submitted.papers).toHaveLength(0);
+    expect(submitted.totalResearchScore).toBe(state.totalResearchScore + 5);
     expect(submitted.externalPublications[0]).toMatchObject({ status: "published", journalTarget: "pami" });
+    expect(submitted.externalPublications[0]?.conferenceHandled).toBe(true);
     expect(submitted.externalPublications[0]?.publication).toMatchObject({
       journalTarget: "pami",
       influence: 0.5,
       citationDebuffMultiplier: 1,
       effectiveScore: 126,
     });
+    const html = renderApp(submitted, createDefaultAccountProfile());
+    expect(html).not.toMatch(/data-promotion-id=.*arxiv/);
+    expect(html).toMatch(/data-promotion-id=.*github/);
+    expect(html).toMatch(/data-promotion-id=.*xiaohongshu/);
   });
 
   it("treats post-submission journal work as additive revision score", () => {

@@ -254,9 +254,7 @@ function buyCoffee(state: GameState): GameState {
     ...coffeeState,
     coffeePurchaseCountThisMonth: coffeeState.coffeePurchaseCountThisMonth + 1,
     coffeeProducedCountThisMonth: coffeeState.coffeeProducedCountThisMonth + 1,
-    machineTrackedCoffeeCount: coffeeState.machineUpgrade === "advanced"
-      ? coffeeState.machineTrackedCoffeeCount + 1
-      : coffeeState.machineTrackedCoffeeCount,
+    machineTrackedCoffeeCount: coffeeState.machineTrackedCoffeeCount + 1,
   };
   return pushLog({
     ...updateMoney(state, state.player.money - coffeePrice),
@@ -345,7 +343,6 @@ function buySupportItem(state: GameState, itemId: SupportItemId): GameState {
   if (state.player.money < item.price) return fail(state, `金币不足，购买${item.name}需要 ${item.price} 金币。`);
   const eventSupport = { ...state.eventSupport };
   if (itemId === "badminton_racket") eventSupport.hasBadmintonRacket = true;
-  if (itemId === "game_controller") eventSupport.hasGameController = true;
   if (itemId === "parasol") eventSupport.hasParasol = true;
   return pushLog({
     ...updateMoney(state, state.player.money - item.price),
@@ -358,7 +355,6 @@ function sellSupportItem(state: GameState, itemId: SupportItemId): GameState {
   if (!isSupportItemOwned(state.eventSupport, itemId)) return fail(state, `你没有可出售的${item.name}。`);
   const eventSupport = { ...state.eventSupport };
   if (itemId === "badminton_racket") eventSupport.hasBadmintonRacket = false;
-  if (itemId === "game_controller") eventSupport.hasGameController = false;
   if (itemId === "parasol") eventSupport.hasParasol = false;
   return pushLog({
     ...updateMoney(state, state.player.money + getSupportItemSellPrice(itemId)),

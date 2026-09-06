@@ -72,5 +72,6 @@ export interface CoffeeState {
   coffeePurchaseCountThisMonth: number;
   /** All cups produced this month, including automatic-machine output. */
   coffeeProducedCountThisMonth: number;
+  /** All successfully produced cups across the run; preserved through upgrades and resale. */
   machineTrackedCoffeeCount: number;
 }

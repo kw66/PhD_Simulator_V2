@@ -4,7 +4,7 @@ import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { createRandomEventById } from "../src/core/v2-random-event-router";
-import { getBadmintonWinRate, getPokerWinRate } from "../src/core/v2-growth-system";
+import { getBadmintonStrength, getPokerWinRate } from "../src/core/v2-growth-system";
 import type { GameState, PendingEvent } from "../src/core/v2-types";
 
 const RANDOM_EVENT_IDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] as const;
@@ -66,25 +66,51 @@ function hasInvalidChoiceLog(state: GameState): boolean {
 }
 
 describe("random event replay", () => {
-  it("keeps activity win-rate inputs bounded and deterministic", () => {
-    expect(getBadmintonWinRate(-2, false)).toBe(40);
-    expect(getBadmintonWinRate(1.9, false)).toBe(50);
-    expect(getBadmintonWinRate(4, true)).toBe(90);
-    expect(getPokerWinRate(-1)).toBe(40);
-    expect(getPokerWinRate(3.8)).toBe(70);
-    expect(getPokerWinRate(99)).toBe(90);
+  it("normalizes badminton strength inputs without capping strength", () => {
+    expect(getBadmintonStrength(-2, 0, false)).toBe(0);
+    expect(getBadmintonStrength(20, -2, false)).toBe(60);
+    expect(getBadmintonStrength(20, 1.9, false)).toBe(80);
+    expect(getBadmintonStrength(20, 0, true)).toBe(100);
+    expect(getBadmintonStrength(18, 4, true)).toBe(166);
   });
 
-  it("uses a 40% initial win rate for badminton and poker", () => {
+  it("normalizes poker participation counts and caps the win rate at 100%", () => {
+    expect(getPokerWinRate(-1)).toBe(40);
+    expect(getPokerWinRate(0)).toBe(40);
+    expect(getPokerWinRate(3.8)).toBe(70);
+    expect(getPokerWinRate(5)).toBe(90);
+    expect(getPokerWinRate(6)).toBe(100);
+    expect(getPokerWinRate(7)).toBe(100);
+    expect(getPokerWinRate(99)).toBe(100);
+  });
+
+  it.each([
+    { participations: 5, roll: 0.899, winRate: 90, money: 5 },
+    { participations: 5, roll: 0.9, winRate: 90, money: -5 },
+    { participations: 6, roll: 0.999, winRate: 100, money: 5 },
+    { participations: 99, roll: 0.999, winRate: 100, money: 5 },
+  ])("preserves poker effects at $participations participations with roll $roll", ({ participations, roll, winRate, money }) => {
+    const state = createReplayReadyState();
+    state.eventCounters = { ...state.eventCounters, pokerCount: participations };
+    const event = createRandomEventById(7, state, () => roll).event;
+    const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
+    const poker = choiceEvent?.choices.find((choice) => choice.label === "打德州扑克");
+
+    expect(poker?.outcome).toContain(`${money > 0 ? "获胜" : "落败"}（胜率 ${winRate}%）`);
+    expect(poker?.effects.money).toBe(money);
+    expect(poker?.effects.counterDeltas).toEqual({ pokerCount: 1, pokerProfit: money });
+  });
+
+  it("uses SAN-based badminton strength and poker win rate", () => {
     const state = createReplayReadyState();
     state.player = { ...state.player, san: 20 };
     state.eventCounters = { ...state.eventCounters, badmintonCount: 0, pokerCount: 0 };
     const event = createRandomEventById(7, state, () => 0.5).event;
     const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
-    const badminton = choiceEvent?.choices.find((choice) => choice.label === "打羽毛球");
+    const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
     const poker = choiceEvent?.choices.find((choice) => choice.label === "打德州扑克");
 
-    expect(badminton?.outcome).toContain("胜率 40%");
+    expect(badminton?.outcome).toContain("实力 60/100");
     expect(poker?.outcome).toContain("胜率 40%");
   });
 
@@ -101,7 +127,7 @@ describe("random event replay", () => {
     expect(getChoices(1).find((choice) => choice.label === "亲自指导")?.outcome).toContain("对方毕业离组（50%）");
   });
 
-  it("adds participation and racket bonuses to badminton and caps at 90%", () => {
+  it("adds SAN multiplier and racket bonuses to badminton strength", () => {
     const cases = [5, 6, 12, 18] as const;
 
     for (const san of cases) {
@@ -110,16 +136,17 @@ describe("random event replay", () => {
       state.eventCounters = { ...state.eventCounters, badmintonCount: 0 };
       const event = createRandomEventById(7, state, () => 0.99).event;
       const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
-      expect(choiceEvent?.choices.find((choice) => choice.label === "打羽毛球")?.outcome)
-        .toContain("胜率 40%");
+      expect(choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"))?.outcome)
+        .toContain(`实力 ${san * 3}/100`);
     }
 
     const experienced = createReplayReadyState();
+    experienced.player = { ...experienced.player, san: 20 };
     experienced.eventCounters = { ...experienced.eventCounters, badmintonCount: 2 };
     const experiencedEvent = createRandomEventById(7, experienced, () => 0.99).event;
     const experiencedChoiceEvent = experiencedEvent?.choices[0]?.effects.enqueueEvents?.[0];
-    expect(experiencedChoiceEvent?.choices.find((choice) => choice.label === "打羽毛球")?.outcome)
-      .toContain("胜率 60%");
+    expect(experiencedChoiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"))?.outcome)
+      .toContain("实力 100/100");
 
     const boosted = createReplayReadyState();
     boosted.player = { ...boosted.player, san: 18 };
@@ -127,25 +154,58 @@ describe("random event replay", () => {
     boosted.eventSupport = { ...boosted.eventSupport, hasBadmintonRacket: true };
     const boostedEvent = createRandomEventById(7, boosted, () => 0.99).event;
     const boostedChoiceEvent = boostedEvent?.choices[0]?.effects.enqueueEvents?.[0];
-    expect(boostedChoiceEvent?.choices.find((choice) => choice.label === "打羽毛球")?.outcome)
-      .toContain("胜率 90%");
+    expect(boostedChoiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"))?.outcome)
+      .toContain("实力 166/100");
   });
 
-  it("does not grant or announce strong body again after the first badminton win", () => {
+  it.each([
+    { san: 33, participations: 0, strength: 99, wins: false },
+    { san: 20, participations: 2, strength: 100, wins: true },
+    { san: 34, participations: 0, strength: 102, wins: true },
+  ])("preserves badminton effects at strength $strength regardless of random roll", ({ san, participations, strength, wins }) => {
+    for (const roll of [0, 0.999]) {
+      const state = createReplayReadyState();
+      state.player = { ...state.player, san };
+      state.eventCounters = { ...state.eventCounters, badmintonCount: participations };
+      const event = createRandomEventById(7, state, () => roll).event;
+      const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
+      const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
+
+      expect(badminton?.outcome).toContain(`${wins ? "获胜" : "落败"}（实力 ${strength}/100）`);
+      expect(badminton?.outcome.includes("解锁每月 SAN +1")).toBe(wins);
+      expect(badminton?.effects.illnessProbabilityDelta).toBe(-10);
+      expect(badminton?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
+      expect(badminton?.effects.eventSupportUpdates).toEqual(wins ? { hasStrongBodyTalent: true } : {});
+    }
+  });
+
+  it("unlocks monthly SAN recovery on the first badminton win", () => {
     const state = createReplayReadyState();
-    state.eventSupport = { ...state.eventSupport, hasStrongBodyTalent: true };
+    state.player = { ...state.player, san: 20 };
+    state.eventCounters = { ...state.eventCounters, badmintonCount: 0 };
+    state.eventSupport = { ...state.eventSupport, hasBadmintonRacket: true };
     const event = createRandomEventById(7, state, () => 0).event;
     const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
     const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
-    const firstWinEvent = createRandomEventById(7, {
-      ...state,
-      eventSupport: { ...state.eventSupport, hasStrongBodyTalent: false },
-    }, () => 0).event;
-    const firstWinChoiceEvent = firstWinEvent?.choices[0]?.effects.enqueueEvents?.[0];
-    const firstWin = firstWinChoiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
 
-    expect(badminton?.outcome).toBeDefined();
-    expect(badminton?.outcome).not.toBe(firstWin?.outcome);
+    expect(badminton?.outcome).toContain("获胜（实力 100/100）");
+    expect(badminton?.outcome).toContain("解锁每月 SAN +1");
+    expect(badminton?.effects.eventSupportUpdates).toEqual({ hasStrongBodyTalent: true });
+  });
+
+  it("does not unlock or announce monthly SAN recovery again after a badminton win", () => {
+    const state = createReplayReadyState();
+    state.player = { ...state.player, san: 20 };
+    state.eventCounters = { ...state.eventCounters, badmintonCount: 2 };
+    state.eventSupport = { ...state.eventSupport, hasStrongBodyTalent: true };
+    const event = createRandomEventById(7, state, () => 0.999).event;
+    const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
+    const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
+
+    expect(badminton?.outcome).toContain("获胜（实力 100/100）");
+    expect(badminton?.outcome).not.toContain("解锁每月 SAN +1");
+    expect(badminton?.effects.illnessProbabilityDelta).toBe(-10);
+    expect(badminton?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
     expect(badminton?.effects.eventSupportUpdates).toEqual({});
   });
 

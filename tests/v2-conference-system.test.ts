@@ -18,7 +18,6 @@ describe("v2 conference system", () => {
       social: 12,
       shopState: { ...createShopState(), ebikeOwned: true },
       eventSupport: {
-        hasGameController: false,
         hasParasol: true,
         hasDownJacket: true,
         hasBadmintonRacket: false,
@@ -42,7 +41,6 @@ describe("v2 conference system", () => {
       social: 12,
       shopState: createShopState(),
       eventSupport: {
-        hasGameController: false,
         hasParasol: false,
         hasDownJacket: false,
         hasBadmintonRacket: false,
@@ -71,7 +69,6 @@ describe("v2 conference system", () => {
       social: 0,
       shopState: createShopState(),
       eventSupport: {
-        hasGameController: false,
         hasParasol: false,
         hasDownJacket: false,
         hasBadmintonRacket: false,

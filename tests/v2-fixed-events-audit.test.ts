@@ -203,8 +203,8 @@ describe("audited fixed-event rules", () => {
     expect(confirmation.description).toContain("车票和住宿");
     expect(confirmation.description).not.toContain("签到区");
     expect(confirmation.description).not.toContain("分论坛");
-    expect(activity.description).toContain("签到区");
-    expect(activity.description).toContain("分论坛");
+    expect(activity.description).toContain("签到处");
+    expect(activity.description).toContain("海报区");
     expect(activity.title).toBe("年会活动");
     const activityDecision = activity.choices[0]?.effects.enqueueEvents?.[0];
     expect(activityDecision?.description).toContain("导师报销");
@@ -233,6 +233,9 @@ describe("audited fixed-event rules", () => {
       ...playingState(),
       player: { ...createInitialState().player, san: 10 },
       externalPublications: [weakerPaper, strongerPaper, coauthorPaper],
+      publicationTalentState: {
+        claimedIds: ["first-paper", "first-a-or-journal", "first-coauthor-paper", "first-coauthor-a"],
+      },
     };
     const activity = createCcigActivityEvent(state, "advisor", ["导师报销"]);
     const activityDecision = activity.choices[0]?.effects.enqueueEvents?.[0];

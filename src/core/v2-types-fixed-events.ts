@@ -1,4 +1,6 @@
 export type FixedEventResolutionKind =
+  | "student-name-confirm"
+  | "student-name-reroll"
   | "advisor-confirm"
   | "advisor-reroll"
   | "teachers-day-message"
@@ -45,6 +47,7 @@ export interface FixedEventAdvisorIntel {
 
 export interface FixedEventResolution {
   kind: FixedEventResolutionKind;
+  studentName?: string;
   ccigAttendanceSummary?: string;
   ccigPaperId?: string;
   teachersDayGift?: TeachersDayGiftId;

@@ -14,6 +14,8 @@ import {
 } from "./v2-fixed-events-seasonal";
 import {
   createBeforeGradSchoolAct1Event,
+  resolveStudentNameConfirmation,
+  resolveStudentNameReroll,
   resolveAdvisorConfirmation,
   resolveAdvisorReroll,
 } from "./v2-fixed-events-before-grad-school";
@@ -26,6 +28,10 @@ export function applyFixedEventResolution(
   getRoll: RandomRollProvider = Math.random,
 ): FixedResolutionResult {
   switch (resolution.kind) {
+    case "student-name-confirm":
+      return resolveStudentNameConfirmation(state, resolution);
+    case "student-name-reroll":
+      return resolveStudentNameReroll(state, resolution, getRoll);
     case "advisor-confirm":
       return resolveAdvisorConfirmation(state, resolution);
     case "advisor-reroll":

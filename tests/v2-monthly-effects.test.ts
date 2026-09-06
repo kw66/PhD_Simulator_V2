@@ -116,10 +116,10 @@ describe("monthly effects", () => {
     expect(resolution.items.find((item) => item.id === "automatic-coffee-machine")?.appliedStats).toEqual({ san: 3, money: -2 });
     expect(nextState.player.money).toBe(0);
     expect(nextState.player.san).toBe(14);
-    expect(nextState.coffeeState.machineTrackedCoffeeCount).toBe(0);
+    expect(nextState.coffeeState.machineTrackedCoffeeCount).toBe(1);
   });
 
-  it("keeps the old automatic-machine rule of charging at full SAN", () => {
+  it("skips automatic production and payment at full SAN", () => {
     const state = createPlayingMonth(8, 8, 20);
     state.player = { ...state.player, money: 2 };
     state.coffeeState = {
@@ -129,11 +129,36 @@ describe("monthly effects", () => {
     };
 
     const { nextState, resolution } = applyMonthlyEffects(state);
-    expect(resolution.items.find((item) => item.id === "automatic-coffee-machine")?.appliedStats).toEqual({
-      san: 0,
-      money: -2,
+    expect(resolution.items.find((item) => item.id === "automatic-coffee-machine-skipped")).toMatchObject({
+      note: "SAN 已满，本月未冲泡",
+      appliedStats: {
+        san: 0,
+        money: 0,
+      },
     });
-    expect(nextState.player).toMatchObject({ san: 20, money: 0 });
+    expect(resolution.items.some((item) => item.id === "automatic-coffee-machine")).toBe(false);
+    expect(nextState.player).toMatchObject({ san: 20, money: 2 });
+    expect(nextState.coffeeState.coffeeProducedCountThisMonth).toBe(0);
+  });
+
+  it("previews no automatic production or payment when next month starts at full SAN", () => {
+    const state = createPlayingMonth(8, 8, 20);
+    state.player = { ...state.player, money: 2 };
+    state.coffeeState = {
+      ...state.coffeeState,
+      machineOwned: true,
+      machineUpgrade: "automatic",
+    };
+
+    const resolution = previewNextMonthEffects(state);
+    expect(resolution.items.find((item) => item.id === "automatic-coffee-machine-skipped")).toMatchObject({
+      note: "SAN 已满，本月未冲泡",
+      appliedStats: {
+        san: 0,
+        money: 0,
+      },
+    });
+    expect(resolution.player).toMatchObject({ san: 20, money: 2 });
   });
 
   it("lets the automatic machine add one cup alongside the regular monthly cup", () => {
@@ -153,6 +178,7 @@ describe("monthly effects", () => {
     expect(nextState.player.san).toBe(17);
     expect(nextState.coffeeState.coffeePurchaseCountThisMonth).toBe(1);
     expect(nextState.coffeeState.coffeeProducedCountThisMonth).toBe(2);
+    expect(nextState.coffeeState.machineTrackedCoffeeCount).toBe(2);
   });
 
   it("settles and expires a six-month remote internship", () => {

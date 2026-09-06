@@ -21,6 +21,7 @@ import { createCareerEventForType } from "./v2-monthly-career-events";
 import { collectThesisEventForMonth } from "./v2-monthly-thesis-events";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
 import { createDraftPaper, REVIEW_STABLE_SCORE_BY_TARGET } from "./v2-paper-rules";
+import { getJournalDefinition } from "./v2-journal-system";
 import { getCalendarForTotalMonths, getRoleDefinition } from "./v2-progression";
 import { attachPaperPublication, createGrantedPublishedPaper } from "./v2-publication-rules";
 import { resolveDuePaperReviews } from "./v2-publication-system";
@@ -36,6 +37,7 @@ import type {
   GameActionId,
   GameState,
   PaperAcceptType,
+  JournalTarget,
   PaperTarget,
   PendingEvent,
 } from "./v2-types";
@@ -47,14 +49,6 @@ export function createDebugBuffs(): Buff[] {
       id: "debug-buff-base-recovery",
       name: "自动恢复",
       source: "基础规则",
-      timing: "permanent",
-      remainingMonths: null,
-      monthlyStats: { san: 1 },
-    },
-    {
-      id: "debug-buff-strong-body",
-      name: "强身健体",
-      source: "羽毛球冠军",
       timing: "permanent",
       remainingMonths: null,
       monthlyStats: { san: 1 },
@@ -105,8 +99,8 @@ export function createDebugBuffs(): Buff[] {
     },
     {
       id: "ai-debug-gpt",
-      name: "GPT-5.6-sol",
-      source: "商店 GPT-5.6-sol",
+      name: "GPT-6-Astra",
+      source: "商店 GPT-6-Astra",
       timing: "monthly",
       remainingMonths: 1,
       actionEffects: {
@@ -723,13 +717,14 @@ function addDebugPublishedPaper(
   }, 1, acceptType, conference.influence);
   const publication = paper.publication ? {
     ...paper.publication,
-    citations: Math.floor(Math.random() * 21),
+    citations: 0,
     effectiveScore: acceptedScore,
     monthsSincePublish: 0,
   } : null;
   const randomizedPaper = { ...paper, publication };
   const scoreGain = nonFirstAuthor ? 0 : SCORE_BY_TARGET[target];
   const citationGain = publication?.citations ?? 0;
+
   const citationHistoryByYear = { ...state.citationHistoryByYear };
   const citationYear = getAcademicCalendarYear(submittedYear, submittedMonth);
   if (citationGain > 0) citationHistoryByYear[citationYear] = (citationHistoryByYear[citationYear] ?? 0) + citationGain;
@@ -740,6 +735,65 @@ function addDebugPublishedPaper(
     totalCitations: state.totalCitations + citationGain,
     citationHistoryByYear,
   }, `测试论文：${randomizedPaper.title}｜${conference.name} ${conference.year}｜${target} 类 ${acceptType}${scoreGain > 0 ? `｜科研分 +${scoreGain}` : ""}`);
+}
+
+function addDebugPublishedJournalPaper(
+  state: GameState,
+  journalTarget: JournalTarget,
+  authorship: "first" | "coauthor",
+): GameState {
+  const nonFirstAuthor = authorship === "coauthor";
+  const publicationIndex = state.externalPublications.length;
+  const submittedMonth = Math.floor(Math.random() * 12) + 1;
+  const submittedYear = Math.max(1, state.year);
+  const calendarYear = getAcademicCalendarYear(submittedYear, submittedMonth);
+  const topic = createDraftPaper(state.totalMonths, publicationIndex, Math.random, calendarYear);
+  const journal = getJournalDefinition(journalTarget);
+  const acceptedScore = journal.acceptanceScore + 30 + Math.floor(Math.random() * 36);
+  const baseScore = Math.floor(acceptedScore / 3);
+  const remainder = acceptedScore - baseScore * 3;
+  const idea = baseScore + (remainder > 0 ? 1 : 0);
+  const experiment = baseScore + (remainder > 1 ? 1 : 0);
+  const writing = baseScore;
+  const paper = attachPaperPublication({
+    ...topic,
+    id: `debug-journal-${state.totalMonths}-${publicationIndex + 1}`,
+    idea,
+    experiment,
+    writing,
+    status: "published",
+    target: null,
+    journalTarget,
+    reviewMonthsLeft: 0,
+    submittedIdea: idea,
+    submittedExperiment: experiment,
+    submittedWriting: writing,
+    submittedMonth,
+    submittedYear,
+    conferenceHandled: true,
+    lastReview: null,
+    nonFirstAuthor,
+  }, 1, undefined, journal.citationInfluence);
+  const publication = paper.publication ? {
+    ...paper.publication,
+    journalTarget,
+    citations: 0,
+    monthsSincePublish: 0,
+  } : null;
+  const randomizedPaper = { ...paper, publication };
+  const citationGain = publication?.citations ?? 0;
+  const researchScoreGain = nonFirstAuthor ? 0 : journal.researchScore;
+  const citationHistoryByYear = { ...state.citationHistoryByYear };
+  const citationYear = getAcademicCalendarYear(submittedYear, submittedMonth);
+  if (citationGain > 0) citationHistoryByYear[citationYear] = (citationHistoryByYear[citationYear] ?? 0) + citationGain;
+  const authorshipLabel = nonFirstAuthor ? "合作" : "一作";
+  return pushLog({
+    ...state,
+    externalPublications: [...state.externalPublications, randomizedPaper],
+    totalResearchScore: state.totalResearchScore + researchScoreGain,
+    totalCitations: state.totalCitations + citationGain,
+    citationHistoryByYear,
+  }, `测试论文：${randomizedPaper.title}｜${journal.name}｜${authorshipLabel}`);
 }
 
 function addAllDebugBuffs(state: GameState): GameState {
@@ -777,6 +831,9 @@ export function dispatchDebugAction(
       }
       return applyDebugStatChange(state, payload.debugStatId, payload.delta);
     case "debug-add-paper":
+      if (payload.debugPaperAuthorship && payload.debugJournalTarget) {
+        return addDebugPublishedJournalPaper(state, payload.debugJournalTarget, payload.debugPaperAuthorship);
+      }
       return payload.debugPaperTarget && payload.debugPaperAuthorship
         ? addDebugPublishedPaper(state, payload.debugPaperTarget, payload.debugPaperAuthorship)
         : state;

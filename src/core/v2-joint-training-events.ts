@@ -25,17 +25,15 @@ function createJointTrainingDeclineResult(context: JointTrainingContext): Pendin
     title: "联合培养 ➜ 联培抉择 ➜ 暂不接受",
     description: permanentlyBlocked
       ? [
-          "你和导师反复沟通后，决定暂时不加入联合培养，先把当前主线做扎实。",
-          "眼前的课题和安排都不用改变，不过这次合作也就错过了。",
-          "这是你第二次拒绝，以后不会再收到联培邀请。",
+          "你又和导师确认了一遍，还是决定不参加联培。给对方回信时，你把原因讲清楚，也说明以后不再考虑这类安排。",
+          "发完邮件，你回到自己的工位。没多出新的合作资源，手头的课题也不用为联培另做调整，多少松了口气。",
           "机制结算",
           `联培拒绝计数 +1（当前 ${nextRejectCount}/2）`,
           "达到 2 次后，联培机会永久关闭。",
         ].join("\n\n")
       : [
-          "你和导师反复沟通后，决定暂时不加入联合培养，先把当前主线做扎实。",
-          "眼前的课题和安排都不用改变，不过这次合作也就错过了。",
-          "如果以后再次收到邀请，你还可以重新考虑。",
+          "你和导师商量后，决定这次先不参加联培。邀请确实让人动心，只是你还想先把手头的课题做明白，不急着改安排。",
+          "你在回复里谢过对方，把暂不接受的原因说清楚。这次合作先放下，以后若再有邀请，你仍可以重新考虑。",
           "机制结算",
           `联培拒绝计数 +1（当前 ${nextRejectCount}/2）`,
           "继续深入合作还有一次机会。",
@@ -62,9 +60,8 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
     id: "joint-training-result-accept",
     title: "联合培养 ➜ 联培抉择 ➜ 已确认",
     description: [
-      "你正式加入联合培养，之后要同时参加两边的组会，也会接触新的课题和合作者。",
-      "能用的资源更多了，对方对进度和成果的要求也更高。",
-      "接下来一段时间，你的日程会排得更满。",
+      "你回信确认了联培安排，也抄送给导师。原先要自己摸索的实验设置，现在有了可供参考的资料和讨论对象。",
+      "你把合作笔记放进课题文件夹，准备先核清后续实验的设置。新的条件总算落实了，实验该重跑的还是得重跑。",
       "机制结算",
       `科研上限 +${context.pendingCitationCapBonus}`,
       "导师科研资源 +2",
@@ -93,9 +90,8 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
     id: "joint-training-act2",
     title: "联合培养 ➜ 联培抉择",
     description: [
-      "导师把联培方案发给你：课题和资源都不错，但两边都要汇报进度。",
-      "接受以后会认识更多合作者，也会多出不少会议和任务。",
-      "不接受的话，继续按现在的安排做自己的课题。",
+      "你把方案拿去和导师商量：能用上对方的资源，也要让两边都清楚你在做什么。",
+      "接受就按合作安排继续做；不接受，仍留在原组完成课题。",
       context.rejectedBigBullCoopCount === 0
         ? "若这次暂不接受，以后还有一次机会。"
         : "这已经是最后一次联培机会。",
@@ -146,9 +142,8 @@ export function createJointTrainingAct1(context: JointTrainingContext): PendingE
     id: "joint-training-act1",
     title: "联合培养",
     description: [
-      `${context.origin ? `离开${context.origin}后` : "会后"}，一位领域大牛向你和导师提出联合培养，语气不重，却把整个课题组的注意力都拉了过去。`,
-      "对方愿意开放设备和课题资源，也要求你定期参加两边的组会。",
-      "导师很重视这件事，让你先仔细看看联培条件。",
+      `${context.origin ? `${context.origin}结束后` : "会后"}，之前一起讨论课题的那位学者发来联培邀请，也把方案抄送给了你的导师。`,
+      "你点开附件，里面列了可共享的设备和课题资料。原先只是会后继续交流，现在对方想把合作长期做下去。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

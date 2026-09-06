@@ -226,6 +226,21 @@ describe("minimal game engine", () => {
     expect(secondRead).toEqual(firstRead);
   });
 
+  it("keeps paper topic and discard actions available in the pre-enrollment preview", () => {
+    const created = dispatchAction(startGame(), "create-paper", { paperSlotIndex: 0 });
+    const paper = created.papers[0];
+    if (!paper) throw new Error("preview paper is missing");
+
+    const rerolled = dispatchAction(created, "reroll-paper-topic", { paperId: paper.id });
+    expect(rerolled.papers[0]?.topicLabel).not.toBe(paper.topicLabel);
+
+    const discarded = dispatchAction(rerolled, "discard-paper", { paperId: paper.id });
+    expect(discarded.papers.some((entry) => entry.id === paper.id)).toBe(false);
+
+    const rested = dispatchAction(startGame(), "rest");
+    expect(rested.actionState.used).toBe(1);
+  });
+
   it("runs tiered part-time work through the shared action and SAN settlement", () => {
     const state = { ...startGame(), eventQueue: [], month: 1, totalMonths: 1 };
     const firstWork = dispatchAction(state, "part-time-work");
@@ -792,6 +807,54 @@ describe("minimal game engine", () => {
     expect(state.buffs.some((buff) => buff.id === illnessBuffId)).toBe(false);
   });
 
+  it("combines illness rest SAN loss with one ordinary rest action", () => {
+    let state: ReturnType<typeof startGame> = {
+      ...startGame(),
+      eventQueue: [],
+      month: 1,
+      totalMonths: 1,
+      player: { ...startGame().player, san: 10 },
+      actionState: { used: 0, limit: 1, aiResearchBonusUsed: false },
+      illnessProbability: 0,
+    };
+    state = dispatchAction(state, "debug-trigger-event", { eventId: "illness-flu" });
+    state = resolveCurrent(state);
+    const decision = state.eventQueue[0];
+    const rest = decision?.choices.find((choice) => choice.label === "休息");
+    if (!decision || !rest) throw new Error("illness rest choice is missing");
+    expect(rest.outcome).toContain("休息（SAN+2｜行动点-1）");
+    expect(rest.outcome).not.toContain("普通休息");
+    state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: rest.id });
+    expect(state.player.san).toBe(10);
+    expect(state.actionState.used).toBe(0);
+
+    state = resolveCurrent(state);
+    expect(state.player.san).toBe(6);
+    expect(state.actionState.used).toBe(1);
+    expect(state.buffs).toHaveLength(0);
+  });
+
+  it("keeps the hard-work illness penalty until the next month", () => {
+    let state: ReturnType<typeof startGame> = {
+      ...startGame(),
+      eventQueue: [],
+      month: 1,
+      totalMonths: 1,
+      illnessProbability: 0,
+    };
+    state = dispatchAction(state, "debug-trigger-event", { eventId: "illness-stomach" });
+    state = resolveCurrent(state);
+    const decision = state.eventQueue[0];
+    const hard = decision?.choices.find((choice) => choice.label === "硬撑工作");
+    if (!decision || !hard) throw new Error("illness hard-work choice is missing");
+    state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: hard.id });
+    state = resolveCurrent(state);
+    expect(state.buffs.some((buff) => buff.source === "肚子虚弱")).toBe(true);
+
+    state = dispatchAction(state, "next-month");
+    expect(state.buffs.some((buff) => buff.source === "肚子虚弱")).toBe(false);
+  });
+
   it("applies the independent review cost and reading count only on final confirmation", () => {
     let state: ReturnType<typeof startGame> = {
       ...startGame(),
@@ -814,8 +877,8 @@ describe("minimal game engine", () => {
     expect(state.player.research).toBe(2);
     expect(state.player.san).toBe(16);
     expect(state.actionState).toEqual({ used: 1, limit: 1, aiResearchBonusUsed: false });
-    expect(state.log[0]?.text).toContain("额外看论文 +2 次");
-    expect(state.log[0]?.text).toContain("阅读累计 +2");
+    expect(state.log[0]?.text).toContain("看论文 2 次");
+    expect(state.log[0]?.text).not.toContain("阅读累计");
     expect(state.buffs.some((buff) => buff.id.startsWith("read-paper-idea-"))).toBe(true);
     expect(state.log.filter((entry) => entry.text.startsWith("看论文："))).toHaveLength(0);
   });

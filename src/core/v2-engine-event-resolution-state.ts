@@ -11,6 +11,7 @@ import { syncRelationshipState, tryAddRelationship } from "./v2-relationship-rul
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
+import { getShopRestSanGain } from "./v2-shop-items-effects";
 import type { Buff, EventChoice, GameState, PaperActionType, PendingEvent } from "./v2-types";
 
 export interface ResolvedEventChoiceState {
@@ -174,6 +175,17 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     const typedKey = key as keyof typeof shopState.entitlements;
     shopState.entitlements[typedKey] = Math.max(0, shopState.entitlements[typedKey] + (value ?? 0));
   }
+  let actionState = state.actionState;
+  if (effects.restAction && state.actionState.used < state.actionState.limit) {
+    const restSanGain = getShopRestSanGain(state.shopState);
+    const restedSan = Math.min(sanCap, player.san + restSanGain);
+    const appliedRestGain = restedSan - player.san;
+    player.san = restedSan;
+    actionState = { ...state.actionState, used: state.actionState.used + 1 };
+    if (state.shopState.chairUpgrade === "hammock" && appliedRestGain > 0) {
+      shopState.chairSanRecovered = Math.max(0, shopState.chairSanRecovered ?? 0) + appliedRestGain;
+    }
+  }
   const illnessProbability = Math.max(0, Math.min(100, applyMultipliersThenAdditions(
     state.illnessProbability,
     effects.illnessProbabilityMultiplier === undefined ? [] : [effects.illnessProbabilityMultiplier],
@@ -308,6 +320,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   const directlyResolvedState: GameState = {
     ...state,
     player,
+    actionState,
     sanCap,
     degree,
     phdStartYear: transferToPhd ? state.year + 1 : state.phdStartYear,
@@ -355,6 +368,7 @@ function mergeFixedCoreState(base: GameState, resolved: GameState): GameState {
   return {
     ...base,
     player: { ...resolved.player },
+    playerName: resolved.playerName,
     sanCap: resolved.sanCap,
     selectedAdvisorName: resolved.selectedAdvisorName,
     phdStartYear: resolved.phdStartYear,

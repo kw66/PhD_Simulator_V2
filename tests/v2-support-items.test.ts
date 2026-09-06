@@ -5,8 +5,7 @@ import { SUPPORT_ITEM_DEFINITIONS, getSupportItemDefinition, getSupportItemSellP
 describe("v2 support items", () => {
   it("exposes the audited support item prices", () => {
     expect(SUPPORT_ITEM_DEFINITIONS.map((item) => [item.id, item.price])).toEqual([
-      ["badminton_racket", 4],
-      ["game_controller", 4],
+      ["badminton_racket", 6],
       ["parasol", 10],
     ]);
     expect(getSupportItemDefinition("parasol").name).toBe("遮阳伞");
@@ -14,7 +13,7 @@ describe("v2 support items", () => {
   });
 
   it("reads ownership from event-support flags", () => {
-    const state = { hasGameController: false, hasParasol: false, hasDownJacket: false, hasBadmintonRacket: true, hasStrongBodyTalent: false };
+    const state = { hasParasol: false, hasDownJacket: false, hasBadmintonRacket: true, hasStrongBodyTalent: false };
     expect(isSupportItemOwned(state, "badminton_racket")).toBe(true);
     expect(isSupportItemOwned(state, "parasol")).toBe(false);
   });

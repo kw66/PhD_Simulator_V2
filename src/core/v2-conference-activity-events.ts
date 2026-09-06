@@ -30,8 +30,7 @@ export function createConferenceActivityResult(
     title: "会场活动 ➜ 选择安排 ➜ 活动结果",
     description: [
       option.resultDescription,
-      "散场广播响起时，当天的报告和交流也告一段落。",
-      "你收好胸牌和会议手册，这趟行程也到了尾声。",
+      "收拾东西时，你把胸牌和会议手册放在一起。今天的安排告一段落，回去再慢慢整理。",
       "机制结算",
       activitySummary,
       ...getConferencePaperPresentationResults(context),
@@ -72,13 +71,11 @@ export function createConferenceActivityDecisionEvent(
     id: `${activityChainId}-act2`,
     title: "会场活动 ➜ 选择安排",
     description: [
-      "论文已经按会议安排完成展示，接下来的时间可以自己安排。",
-      `你抵达${context.city}，在 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）签到处领到胸牌和议程。`,
+      `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，一边看时间，一边盘算先去哪里。`,
       context.paperCount >= 2
-        ? `这次有 ${context.paperCount} 篇论文已经完成展示，你终于可以把注意力放到会场活动上。`
-        : "这次的论文展示已经完成。",
+        ? `忙完 ${context.paperCount} 篇论文的展示，你不想再来回赶场，准备挑一项好好参加。`
+        : "你不想再把空当塞满。接下来想留在会场交流，还是出去透口气？",
       ...getConferencePaperPresentationResults(context),
-      "报告、海报、茶歇和临时交流有不少撞在同一时段，你只能挑一项最想参加的安排。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -109,13 +106,12 @@ export function createConferenceActivityEvent(
     id: `${activityChainId}-act1`,
     title: "会场活动",
     description: [
-      `会议当天，你带着论文来到${context.city}，展示已经按 ${context.conferenceName} 的安排完成。`,
-      `前一幕参会确认：${attendanceSummary}`,
+      `在${context.city}的会场，你按 ${context.conferenceName} 的安排完成了论文展示。走出展示区时，肩膀才慢慢松下来。`,
+      `参会安排：${attendanceSummary}`,
       context.paperCount >= 2
-        ? `同会的 ${context.paperCount} 篇论文都展示完了，剩下的时间由你安排。`
-        : "论文展示顺利结束，剩下的时间由你安排。",
+        ? `同会的 ${context.paperCount} 篇论文让你忙得够呛，记下的问题也攒了几页。你把材料收好，终于有空听听周围的人在聊什么。`
+        : "你把记着问题的纸收好。茶歇区飘来咖啡味，邻近海报前还围着几个人，你终于有心思看看周围。",
       ...getConferencePaperPresentationResults(context),
-      "主旨报告、分论坛、茶歇和城市活动同时开放，挑一项最想参加的吧。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

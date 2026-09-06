@@ -98,14 +98,13 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "同级同门来找你合作一个想法。",
+      `同级同门${peerName}来找你，想把一个新想法一起做成论文。`,
       "方向看起来有潜力，不过谁做实验、谁写论文、最后怎么署名，都得提前说清楚。",
-      "你们平时关系不错，真一起做项目后未必还这么顺。",
+      "平时聊得来，真一起做事却是另一回事。你得先想好，这次愿意投入多少。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "只交流想法最省时间，但说出去的内容未必收得回来。",
-      "互挂论文或全面合作收益更大，也更依赖彼此靠谱。",
+      "可以只交流思路，也可以互补实验、共同署名；若想全面合作，就得把后续安排一起商量好。",
       "如果手头已经够忙，婉拒也很正常。",
     ].join("\n\n"),
     results: {
@@ -114,9 +113,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         description: isLowSocial
           ? [
               "你们找了间空会议室，把各自正在做的问题摊开来聊。",
-              `${peerName}对你刚说的实验设想追问了很久，还拍下了白板上的关键步骤。`,
-              `过了一阵，你发现${peerPronoun}的新稿里出现了几乎相同的思路，署名和致谢里却都没有你。`,
-              "你把聊天记录翻出来看了几遍，决定以后再聊未完成的想法时得留个心眼。",
+              `${peerName}追问了不少细节，你却不太擅长把想法说清楚，几处误会来回解释了很久。`,
+              "聊得有些累，好在白板上还是留下了几条新思路。你拍照记下，准备回去试试。",
             ].join("\n\n")
           : [
               "你们找了间空会议室，把各自正在做的问题摊开来聊。",
@@ -128,14 +126,12 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         title: "互补合作",
         description: mutualSuccess
           ? [
-              "你们各自补了一部分实验，并约好论文录用后互相挂名。",
-              `没过多久，${peerName}的论文中了。${peerPronoun}把最终版本发给你确认，作者列表里也有你的名字。`,
-              "这篇论文不是你主导的成果，不计科研分，但后续引用仍会记入你的统计。",
+              "你们互相补做实验，投稿前确认了各自贡献和署名。这次由对方主导，你负责其中一部分。",
+              `${peerName}的论文传来录用消息，作者列表里也有你的名字。虽不是一作，从修改稿到录用通知，你也跟着高兴了一回。`,
             ].join("\n\n")
           : [
-              "你们各自补了一部分实验，并约好论文录用后互相挂名。",
-              `结果等了好久，${peerName}的论文一直没中。不是被拒就是大修，来来回回折腾了好几轮。`,
-              `论文迟迟没有结果，你们只能先把这次合作放下。`,
+              "你们商量了互补实验和共同署名的方案，但真正排时间时，才发现彼此都抽不出手。",
+              `${peerName}也没能继续推进。这次合作暂时搁下，还没有形成可以计入成果的论文。`,
             ].join("\n\n"),
       },
       [`random-10-reject-${serial}`]: {
@@ -143,7 +139,9 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         description: [
           "你把自己的排期给对方看了看，说明这几个月确实接不下新项目。",
           `${peerName}表示理解，只说以后有合适的题目再聊。`,
-          "你们照常交换了几句近况，合作没有谈成，关系也没有因此变僵。",
+          rejectSuccess
+            ? "你们又聊了几句近况，各自回去忙手头的事。合作没谈成，也没有因此变得尴尬。"
+            : "腾出时间后，你重新梳理自己的选题和草稿，补上了几处卡住的思路。下次动手时，可以直接从这里继续。",
         ].join("\n\n"),
       },
       [`random-10-full-${serial}`]: {
@@ -152,13 +150,15 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
           ? [
               "你们很快开了共享文档，却一直没有把分工和更新时间说清楚。",
               "同一组实验被重复跑了两遍，真正缺的数据反而没人补，临近节点时只能一起返工。",
-              "项目最后勉强交付。你们都没再提下一次合作，至少先把这段忙乱缓过去。",
+              "这轮合作磕磕绊绊，好在两人分担后，还是多整理了一些思路和草稿。接下来你想先把自己的部分做好。",
               ...(fullSanNarrative ? [fullSanNarrative] : []),
             ].join("\n\n")
           : [
               "正式开工前，你们先把实验、写作和每周节点写进共享文档。",
               `你负责 idea 和写作，${peerName}负责实验和数据，遇到问题就在固定时间一起处理。`,
-              "第一轮结果出来时，进度和预想差不多。你们顺手约好了下一次讨论。",
+              canAddPeer
+                ? "第一轮讨论就理清了不少思路，草稿也分好了工。你们约定定期碰面，把合作继续做下去。"
+                : "这次讨论和分工都很顺利，思路与草稿也有了着落。不过手头的长期合作已经排满，你们暂时只完成这次任务。",
               ...(fullSanNarrative ? [fullSanNarrative] : []),
             ].join("\n\n"),
       },
@@ -259,7 +259,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
         description: [
           "你答应先负责其中一组实验，不把整条项目线都接下来。",
           `${roleText}把之前踩过的坑和关键论文整理给你，还帮你改了两次实验设置。`,
-          "任务结束时，你手里已经多了一套可以迁回自己课题的思路。",
+          "任务结束时，你已经记下几种可以用在自己课题上的做法，准备下次构思方案时试一试。",
         ].join("\n\n"),
       },
       [`random-11-deep-${serial}`]: {
@@ -267,7 +267,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
         description: [
           `你和${roleText}说，自己愿意从头跟完这个项目。`,
           `${roleText}把完整排期发给你：“那就一起做，过程可能会比较累。”`,
-          "从选题、实验到写作，你第一次完整跟完了整条流程。下一次再拆类似问题时，心里已经有了章法。",
+          "你跟着梳理选题、实验和写作，补上了自己不熟悉的环节。再面对类似问题时，心里多了些章法。",
           ...(deepResearchNarrative ? [deepResearchNarrative] : []),
           ...(deepSanNarrative ? [deepSanNarrative] : []),
         ].join("\n\n"),
@@ -275,9 +275,11 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
       [`random-11-mentor-${serial}`]: {
         title: "拜入门下",
         description: [
-          `你问${roleText}，以后能不能定期帮你看论文。`,
-          `${roleText}笑着答应：“可以，但你得自己先改到改不动了再来找我。”`,
-          "此后每次交稿，你都会先收到一页密密麻麻的批注。改得辛苦，写作习惯也一点点被纠正过来。",
+          `你拿着草稿请${roleText}仔细指点。对方从论证顺序到图表说明逐处标注，密密麻麻写了一整页。`,
+          "你照着批注改了几轮，才发现自己总在同样的地方说不清楚。改稿很累，这些写作习惯却终于有了纠正的机会。",
+          canAddSenior
+            ? `${roleText}答应以后继续帮你看稿：“不过你得先自己认真改过，再拿来一起讨论。”`
+            : "你记下这次的建议，先不再约固定讨论。已有的合作已经占满时间，之后要靠自己继续练习。",
           ...(mentorSanNarrative ? [mentorSanNarrative] : []),
         ].join("\n\n"),
       },

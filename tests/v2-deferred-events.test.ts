@@ -235,7 +235,6 @@ describe("deferred-system event content", () => {
       internshipState: createInternshipState(),
       shopState: createShopState(),
       eventSupport: {
-        hasGameController: false,
         hasParasol: false,
         hasDownJacket: false,
         hasBadmintonRacket: false,
@@ -316,6 +315,7 @@ describe("deferred-system event content", () => {
       phase: "playing",
       player: { ...initial.player, san: 10, money: 10 },
       papers: [conferencePaper],
+      publicationTalentState: { claimedIds: ["first-paper"] },
       eventQueue: [createEventQueueItem(root, 1)],
     };
 

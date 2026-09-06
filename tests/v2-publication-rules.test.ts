@@ -18,6 +18,7 @@ describe("v2 publication rules", () => {
       effectiveScore: 12,
       citationDebuffMultiplier: 2,
       promotionMultiplier: 1,
+      highlyCitedThreshold: Math.ceil(published.heatMultiplier * 200),
     });
   });
 

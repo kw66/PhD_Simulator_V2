@@ -7,7 +7,7 @@ function getBikeOwnedText(view: ShopItemStateView): string {
   if (!view.shopState.bikeOwned) return "未拥有";
   const tier = getBikeTierDefinition(view.shopState.bikeLevel);
   const limit = getBikeSanCapLimit(view.shopState);
-  return `已拥有（${tier?.name ?? "自行车"}，上限 +${view.shopState.bikeSanCapGains}/${limit}）`;
+  return `已拥有（${tier?.name ?? "自行车"}，SAN 上限 +${view.shopState.bikeSanCapGains}/${limit}）`;
 }
 
 function getMonitorOwnedText(view: ShopItemStateView): string {

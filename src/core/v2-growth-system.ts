@@ -1,5 +1,10 @@
 export const MEETING_EXPERIENCE_INTERVAL = 4;
-export const ACTIVITY_WIN_RATE_CAP = 90;
+export const ACTIVITY_WIN_RATE_CAP = 100;
+export const BADMINTON_VICTORY_THRESHOLD = 100;
+
+export function getBadmintonStrength(san: number, participationCount: number, hasRacket: boolean): number {
+  return Math.max(0, san) * (Math.max(0, Math.floor(participationCount)) + 3) + (hasRacket ? 40 : 0);
+}
 
 export function getBadmintonWinRate(participationCount: number, hasRacket: boolean): number {
   return Math.min(

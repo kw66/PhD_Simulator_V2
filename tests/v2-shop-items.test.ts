@@ -39,15 +39,15 @@ describe("v2 shop items", () => {
     ]);
     expect(SHOP_UPGRADE_DEFINITIONS).toHaveLength(5);
     expect(getShopItemDefinition("monitor").price).toBe(8);
-    expect(getShopItemDefinition("monitor").description).toBe("看论文：SAN -1");
-    expect(getShopItemDefinition("keyboard")).toMatchObject({ price: 7, description: "写论文：SAN -1" });
+    expect(getShopItemDefinition("monitor").description).toBe("看论文消耗减少：SAN -1");
+    expect(getShopItemDefinition("keyboard")).toMatchObject({ price: 7, description: "写论文消耗减少：SAN -1" });
     expect(SHOP_ITEM_DEFINITIONS.find((item) => item.id === "bike")).toMatchObject({ price: 6 });
     expect(SHOP_ITEM_DEFINITIONS.find((item) => item.id === "ebike")).toMatchObject({ price: 12 });
     expect(BIKE_TIER_DEFINITIONS.map((tier) => [tier.name, tier.monthlySanCost, tier.sanCapLimit, tier.price])).toEqual([
-      ["自行车", 1, 3, 6],
-      ["轻量自行车", 1, 6, 6],
-      ["公路车", 2, 9, 6],
-      ["竞速公路车", 2, 12, 6],
+      ["通勤自行车", 1, 3, 6],
+      ["入门公路车", 1, 6, 6],
+      ["轻量公路车", 2, 9, 6],
+      ["竞赛级公路车", 2, 12, 6],
     ]);
     expect(GPU_UPGRADE_PRICES).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     expect(getNextGpuPrice(0)).toBe(6);
@@ -72,7 +72,7 @@ describe("v2 shop items", () => {
 
   it("uses the active bicycle tier for SAN cost and cap growth", () => {
     const base = createShopState();
-    expect(getBikeTierDefinition(3)?.name).toBe("公路车");
+    expect(getBikeTierDefinition(3)?.name).toBe("轻量公路车");
     expect(getBikeSanCapLimit({ ...base, bikeLevel: 4 })).toBe(12);
     expect(getBikeMonthlySanCost({ ...base, bikeOwned: true, bikeLevel: 3, bikeSanCapGains: 2 })).toBe(2);
     expect(getBikeMonthlySanCost({ ...base, bikeOwned: true, bikeLevel: 3, bikeSanCapGains: 9 })).toBe(0);

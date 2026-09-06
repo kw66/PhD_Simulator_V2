@@ -69,9 +69,8 @@ function createConferenceDecisionAct3(
     id: `${context.id}-act3-${decision.mode}`,
     title: "论文参会 ➜ 参会方式 ➜ 参会确认",
     description: [
-      "参会方式已经选好，预算和行程也排上了。",
-      "论文展示就在会议日程里，报告、海报和交流活动都挤在同一天。",
-      "你把会场地图存进手机，准备确认这次安排。",
+      "参会方式定下来了。你重新核对展示时间和材料要求，把论文、图表和说明放进同一个文件夹，免得临时找漏。",
+      "原以为收到录用就能松口气，结果还得逐封翻会务邮件。现在安排总算清楚，你把需要联系的人和待办事项记好。",
       ...(decision.resistanceNarrative ? [decision.resistanceNarrative] : []),
       "机制结算",
       ...settlementItems,
@@ -150,16 +149,15 @@ function createConferenceDecisionAct2(
     id: `${context.id}-act2`,
     title: "论文参会 ➜ 参会方式",
     description: [
-      `你查了去${context.city}的行程，这次会议在${regionName}，路费和时间都不算少。`,
+      `你对照去${context.city}的行程查预算，这次会议在${regionName}。自己承担费用、找导师商量报销，还是请同学帮忙？`,
       context.paperCount >= 2
-        ? `同会有 ${context.paperCount} 篇论文需要展示，现场会比平时更忙。`
-        : "这次只有 1 篇论文需要展示，安排起来相对简单。",
+        ? `同会的 ${context.paperCount} 篇论文得一起安排，展示材料也要逐份核对。`
+        : "这次只有 1 篇论文要展示，但材料也得提前准备，不能临到会场再找文件。",
       hasMeetingExperience
         ? `会务经验可以减免 ${discount} 金币，自费会便宜一些。`
         : "这次自费没有减免，花费要全部自己承担。",
       selfCostHint,
       proxyCostHint,
-      "自费最直接，导师报销要开口；请同学代参会，则不用亲自到场。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -184,14 +182,11 @@ export function createConferenceDecisionAct1(
     id: `${context.id}-act1`,
     title: "论文参会",
     description: [
-      "录用通知已经收到，会议也快到了。高兴过后，注册、行程和参会方式都要定下来。",
-      `这次是 ${context.conferenceName} ${context.conferenceYear}，地点在 ${context.city}，${context.country}。要不要亲自去，还得一起算路费和时间。`,
+      `会议临近，会务邮件催你确认展示安排。这次是 ${context.conferenceName} ${context.conferenceYear}，地点在 ${context.city}，${context.country}。`,
       context.paperCount >= 2
-        ? `本次同会有 ${context.paperCount} 篇论文需要展示，行程会排得很满。`
-        : "这次只有一篇论文需要展示。",
+        ? `同一场会议有 ${context.paperCount} 篇论文要展示，你在日历上挨个标好。去不去现场、材料由谁带，都得尽早定下来。`
+        : "这次只有一篇论文要展示，你把会务要求重新读了一遍。去不去现场、材料由谁带，都得尽早定下来。",
       ...getConferencePaperPresentationResults(context),
-      "完成会议展示后，对应的宣传倍率才会开始计入引用。",
-      "先把参会方式定下来。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

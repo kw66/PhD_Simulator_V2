@@ -19,17 +19,16 @@ export function createCcigActivityEvent(
   const realYear = getCcigRealYear(state.year, state.month);
   const posterPaper = getCcigPosterPaper(state);
   const arrivalText = participationMode === "advisor"
-    ? `报销手续办妥后，你按计划来到${location}参加 CCIG ${realYear}。`
-    : `车票和住宿付好后，你按计划来到${location}参加 CCIG ${realYear}。`;
+    ? `报销手续办妥后，你来到${location}参加 CCIG ${realYear}，在签到处领了胸牌和手册。`
+    : `行程安排妥当后，你来到${location}参加 CCIG ${realYear}，在签到处领了胸牌和手册。`;
   return createFixedEvent({
     id: `${activityChainId}-act1`,
     title: "年会活动",
     description: [
       arrivalText,
-      `前一幕参会确认：${attendanceSettlementItems.join("，")}`,
-      "签到区排着长队，胸牌、手册和会场图领了一整套。",
-      "这是一次不要求展示论文的普通年会，主旨报告、分论坛、海报和企业展台同时开放。",
-      `你已经完成参会报到，接下来可以安排听报告、游览城市或和同行交流。${posterPaper ? `如果愿意，也可以把 A 类论文《${posterPaper.title}》带来做一次额外的海报展示。` : ""}`,
+      `你在手册上圈出想听的报告，又看了看海报区的位置。${posterPaper ? `手头那篇 A 类论文《${posterPaper.title}》也能做成海报，趁这次和同行聊聊。` : ""}`,
+      "机制结算",
+      `参会确认：${attendanceSettlementItems.join("，")}`,
     ].join("\n\n"),
     chainId: activityChainId,
     stage: "act1",
@@ -58,10 +57,11 @@ export function createCcigActivityDecisionEvent(
     id: `${activityChainId}-act2`,
     title: "年会活动 ➜ 选择安排",
     description: [
-      `到达${location}后，你有一整段时间安排 CCIG ${realYear} 的会场活动。`,
-      `前一幕参会确认：${attendanceSummary}`,
-      "认真听报告能带回些新思路；趁空逛逛城市，可以让脑子歇一会儿；也可以约同学吃饭聊聊近况。",
-      posterPaper ? `此外，A 类论文《${posterPaper.title}》可以选择做一次额外的海报展示。` : "",
+      `你在${location}的 CCIG ${realYear} 会场翻着日程，几项安排撞在一起，总得有所取舍。`,
+      "坐下听报告、出去走走，或是请同学吃顿饭，你想先挑一件。",
+      posterPaper ? `你也可以留在海报区，介绍 A 类论文《${posterPaper.title}》。` : "",
+      "机制结算",
+      `参会确认：${attendanceSummary}`,
     ].filter(Boolean).join("\n\n"),
     chainId: activityChainId,
     stage: "act2",

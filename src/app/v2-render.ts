@@ -9,6 +9,8 @@ export type {
   LobbyViewId,
   PlayRenderUiState,
   PlayTabId,
+  ResearchAuthorshipFilter,
+  ResearchSortMode,
   TalentPanelTabId,
 } from "./v2-render-types";
 export function renderApp(

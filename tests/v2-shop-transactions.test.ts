@@ -42,7 +42,7 @@ describe("v2 shop transactions", () => {
     expect(getAiModelForTotalMonths(1, "gpt").name).toBe("GPT-3.5");
     expect(getAiModelForTotalMonths(13, "gpt").name).toBe("GPT-4o");
     expect(getAiModelForTotalMonths(25, "gpt").name).toBe("GPT-5");
-    expect(getAiModelForTotalMonths(37, "gpt").name).toBe("GPT-5.6-sol");
+    expect(getAiModelForTotalMonths(37, "gpt").name).toBe("GPT-6-Astra");
     expect(getAiModelForTotalMonths(1, "claude").name).toBe("Claude 2");
     expect(getAiModelForTotalMonths(25, "gemini").name).toBe("Gemini 2.5");
     expect(getAiModelForTotalMonths(25, "gemini").price).toBe(1);
@@ -173,6 +173,7 @@ describe("v2 shop transactions", () => {
     expect(coffee.actionState).toEqual(equipped.actionState);
     expect(coffee.coffeeState.coffeePurchaseCountThisMonth).toBe(1);
     expect(coffee.coffeeState.coffeeProducedCountThisMonth).toBe(1);
+    expect(coffee.coffeeState.machineTrackedCoffeeCount).toBe(1);
 
     const nextMonth = dispatchAction(coffee, "next-month");
     expect(nextMonth.coffeeState.coffeePurchaseCountThisMonth).toBe(0);
@@ -340,7 +341,7 @@ describe("v2 shop transactions", () => {
     const preview = previewNextMonthEffects(state);
     const advanced = dispatchAction(state, "next-month");
     expect(advanced.player.money).toBe(preview.player.money);
-    expect(advanced.coffeeState.machineTrackedCoffeeCount).toBe(0);
+    expect(advanced.coffeeState.machineTrackedCoffeeCount).toBe(1);
     expect(advanced.coffeeState.coffeePurchaseCountThisMonth).toBe(1);
     expect(advanced.coffeeState.coffeeProducedCountThisMonth).toBe(1);
     expect(advanced.aiShopState.subscriptions.gpt.active).toBe(true);

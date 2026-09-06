@@ -27,3 +27,24 @@ export function pickRandomAdvisorName(getRoll: () => number = Math.random): stri
   const second = pickRandom(RANDOM_ADVISOR_GIVEN_CHARS, getRoll);
   return surname + first + second;
 }
+
+export function pickDifferentRandomName(
+  currentName: string,
+  getRoll: () => number = Math.random,
+): string {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const nextName = pickRandomAdvisorName(getRoll);
+    if (nextName !== currentName) return nextName;
+  }
+
+  for (const surname of RANDOM_ADVISOR_SURNAMES) {
+    for (const first of RANDOM_ADVISOR_GIVEN_CHARS) {
+      for (const second of RANDOM_ADVISOR_GIVEN_CHARS) {
+        const nextName = surname + first + second;
+        if (nextName !== currentName) return nextName;
+      }
+    }
+  }
+
+  return currentName;
+}

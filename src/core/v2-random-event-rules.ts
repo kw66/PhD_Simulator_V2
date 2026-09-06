@@ -40,7 +40,7 @@ function cloneRandomEventState(state: RandomEventState): RandomEventState {
     usedRandomEvents: [...state.usedRandomEvents],
     illnessProbability: typeof state.illnessProbability === "number" && Number.isFinite(state.illnessProbability)
       ? Math.max(0, Math.min(100, Math.floor(state.illnessProbability)))
-      : 4,
+      : 0,
     totalRandomEventCount: Number.isFinite(state.totalRandomEventCount)
       ? Math.max(0, Math.floor(state.totalRandomEventCount))
       : 0,
@@ -77,7 +77,7 @@ export function createInitialRandomEventState(publishedPaperCount = 0): RandomEv
   return {
     availableRandomEvents: createRandomEventPool(publishedPaperCount),
     usedRandomEvents: [],
-    illnessProbability: 4,
+    illnessProbability: 0,
     totalRandomEventCount: 0,
   };
 }

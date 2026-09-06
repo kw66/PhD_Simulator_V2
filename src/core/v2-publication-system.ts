@@ -6,11 +6,12 @@ import {
   getPublicationBuffEffect,
 } from "./v2-buffs";
 import { getReviewStrictnessMultiplier, resolvePaperReview } from "./v2-paper-rules";
-import { attachPaperPublication } from "./v2-publication-rules";
+import { attachPaperPublication, getHighlyCitedThreshold } from "./v2-publication-rules";
 import { enqueueEventQueueItem } from "./v2-event-queue";
 import type { GameState, Paper, PaperAcceptType, PaperReviewSettlement, PaperTarget, PendingEvent } from "./v2-types";
 import { applyTierResist } from "./v2-sanity-rules";
 import { getJournalDefinition } from "./v2-journal-system";
+import { applyPublicationTalentRewards } from "./v2-publication-talent";
 
 const DEFAULT_TARGET_INFLUENCE: Record<PaperTarget, number> = { A: 1.1, B: 0.6, C: 0.3 };
 export const CITATION_SETTLEMENT_INTERVAL_MONTHS = 1;
@@ -82,6 +83,23 @@ function countRewardReduction(state: GameState, target: PaperTarget, acceptType:
       && paper.nonFirstAuthor !== true
       && getPublicationRank(paper) >= currentRank
   )).length;
+}
+
+export function getConferencePublicationRewardPreview(
+  state: GameState,
+  target: PaperTarget,
+  acceptType: PaperAcceptType,
+  additionalHigherOrEqualCount = 0,
+) {
+  const reward = PUBLICATION_REWARDS[target][acceptType];
+  const rewardReductionCount = countRewardReduction(state, target, acceptType) + additionalHigherOrEqualCount;
+  return {
+    baseSanReward: reward.san,
+    baseFavorReward: reward.favor,
+    rewardReductionCount,
+    sanReward: Math.max(1, reward.san - rewardReductionCount),
+    favorReward: Math.max(0, reward.favor - Math.floor(rewardReductionCount / 2)),
+  };
 }
 
 function getReviewResultText(settlement: PaperReviewSettlement): string {
@@ -363,7 +381,7 @@ export function applyPaperReviewSettlement(state: GameState, settlement: PaperRe
       favor: Math.min(20, state.player.favor + settlement.favorReward),
     },
   });
-  return nextState;
+  return applyPublicationTalentRewards(nextState);
 }
 
 export function resolveDuePaperReviews(
@@ -389,21 +407,22 @@ export function resolveDuePaperReviews(
     const accepted = resolved.nextPaper.status === "published";
     const acceptType = resolved.acceptType ?? "Poster";
     if (accepted) acceptedPaperIds.push(paper.id);
-    const reward = accepted && paper.target ? PUBLICATION_REWARDS[paper.target][acceptType] : { san: 0, favor: 0 };
     const resultRank = paper.target ? getResultRank(paper.target, acceptType) : 0;
-    const rewardReductionCount = accepted && paper.target
-      ? countRewardReduction(state, paper.target, acceptType)
-        + pendingAcceptedRanks.filter((rank) => rank >= resultRank).length
-      : 0;
+    const reward = accepted && paper.target
+      ? getConferencePublicationRewardPreview(
+        state,
+        paper.target,
+        acceptType,
+        pendingAcceptedRanks.filter((rank) => rank >= resultRank).length,
+      )
+      : null;
     if (accepted) pendingAcceptedRanks.push(resultRank);
-    const reducedSanReward = accepted ? Math.max(1, reward.san - rewardReductionCount) : 0;
-    const reducedFavorReward = accepted ? Math.max(0, reward.favor - Math.floor(rewardReductionCount / 2)) : 0;
     // Keep the reward as an additive effect until confirmation.  Clamping it
     // before combining reviewer SAN changes would incorrectly discard a
     // positive reward whenever a hostile reviewer also applies SAN damage.
-    const sanReward = accepted ? reducedSanReward : 0;
+    const sanReward = reward?.sanReward ?? 0;
     const favorResult = accepted
-      ? applyTierResist(reducedFavorReward, state.player.favor, random)
+      ? applyTierResist(reward?.favorReward ?? 0, state.player.favor, random)
       : { effectiveChange: 0 };
     const reviewerSanChange = resolved.nextPaper.lastReview?.reports
       .reduce((total, report) => total + (report.sanChange ?? 0), 0) ?? 0;
@@ -418,9 +437,9 @@ export function resolveDuePaperReviews(
       venueInfluence: getPaperVenueInfluence(paper),
       reviewStrictnessMultiplier: getReviewStrictnessMultiplier(paper.target!, getPaperVenueInfluence(paper)),
       scoreGain: accepted ? resolved.scoreGain : 0,
-      baseSanReward: accepted ? reward.san : 0,
-      baseFavorReward: accepted ? reward.favor : 0,
-      rewardReductionCount,
+      baseSanReward: reward?.baseSanReward ?? 0,
+      baseFavorReward: reward?.baseFavorReward ?? 0,
+      rewardReductionCount: reward?.rewardReductionCount ?? 0,
       sanReward,
       favorReward: favorResult.effectiveChange,
       reviewerSanChange,
@@ -546,6 +565,11 @@ export function settlePublishedPaperCitations(
     const accumulated = growth + (publication.pendingCitationFraction ?? 0);
     const amount = Math.max(0, Math.floor(accumulated));
     const pendingCitationFraction = accumulated - amount;
+    const nextCitations = publication.citations + amount;
+    const highlyCitedThreshold = publication.highlyCitedThreshold
+      ?? getHighlyCitedThreshold(paper.heatMultiplier);
+    const highlyCited = publication.highlyCited === true
+      || (monthsSincePublish >= 12 && nextCitations >= highlyCitedThreshold);
     if (amount > 0) {
       totalCitations += amount;
       const year = getAcademicCalendarYear(state.year, state.month);
@@ -556,16 +580,19 @@ export function settlePublishedPaperCitations(
       ...paper,
       publication: {
         ...publication,
-        citations: publication.citations + amount,
+        citations: nextCitations,
         effectiveScore,
         monthsSincePublish,
         pendingCitationFraction,
+        highlyCitedThreshold,
+        highlyCited,
       },
     };
   };
 
+  const settledState = { ...state, papers: papers.map(settle), externalPublications: external.map(settle), totalCitations, citationHistoryByYear };
   return {
-    state: { ...state, papers: papers.map(settle), externalPublications: external.map(settle), totalCitations, citationHistoryByYear },
+    state: applyPublicationTalentRewards(settledState),
     changes,
   };
 }

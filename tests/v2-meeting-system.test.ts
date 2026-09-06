@@ -8,7 +8,6 @@ describe("v2 meeting system", () => {
     expect(hasFullGear(
       { ...createShopState(), ebikeOwned: true },
       {
-        hasGameController: false,
         hasParasol: true,
         hasDownJacket: true,
         hasBadmintonRacket: false,

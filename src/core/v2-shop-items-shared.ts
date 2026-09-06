@@ -45,9 +45,9 @@ export function getNextGpuPrice(currentLevel: number): number | null {
 export const SHOP_ITEM_DEFINITIONS: ShopItemDefinition[] = [
   { id: "gpu_buy", name: "显卡", description: "做实验：+1次，+1分", price: GPU_UPGRADE_PRICES[0], sellPrice: 3 },
   { id: "chair", name: "办公椅", description: "每月 SAN +1", price: 10, sellPrice: 5 },
-  { id: "keyboard", name: "机械键盘", description: "写论文：SAN -1", price: 7, sellPrice: 3 },
-  { id: "monitor", name: "2K 显示器", description: "看论文：SAN -1", price: 8, sellPrice: 4 },
-  { id: "bike", name: "自行车", description: "每月 SAN -1；每累计消耗 6 点 SAN，SAN 上限 +1（最多 +3）", price: 6, sellPrice: 3 },
+  { id: "keyboard", name: "机械键盘", description: "写论文消耗减少：SAN -1", price: 7, sellPrice: 3 },
+  { id: "monitor", name: "2K 显示器", description: "看论文消耗减少：SAN -1", price: 8, sellPrice: 4 },
+  { id: "bike", name: "自行车", description: "骑行每月 SAN -1；每 -6 SAN，SAN 上限 +1（最多 +3）；达到本档上限后不再扣 SAN", price: 6, sellPrice: 3 },
   { id: "ebike", name: "小电驴", description: "春季、秋季每月 SAN +1", price: 12, sellPrice: 6 },
   { id: "down_jacket", name: "羽绒服", description: "使冬季每月 SAN -1 无效", price: 5, sellPrice: 2 },
 ];
@@ -79,7 +79,7 @@ export const SHOP_UPGRADE_DEFINITIONS: ShopUpgradeDefinition[] = [
   { id: "chair-massage", itemId: "chair", name: "电动按摩椅", description: "每月恢复 20% 已损失 SAN（下取整）", price: 20 },
   { id: "chair-torture", itemId: "chair", name: "沙发", description: "每月恢复当前 SAN 的 20%（下取整）", price: 20 },
   { id: "chair-spike", itemId: "chair", name: "锥刺股椅", description: "SAN 小于等于 0 时恢复到 3", price: 16 },
-  { id: "chair-hammock", itemId: "chair", name: "吊床", description: "休息动作改为 SAN +5", price: 15 },
+  { id: "chair-hammock", itemId: "chair", name: "吊床", description: "休息动作从 SAN +2 提升为 SAN +5", price: 15 },
 ];
 
 export function createShopState(): ShopState {

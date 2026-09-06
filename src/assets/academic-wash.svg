@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d7bd8e" stop-opacity="0.08" />
+      <stop offset="1" stop-color="#b6925a" stop-opacity="0.16" />
+    </linearGradient>
+    <linearGradient id="middle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b59867" stop-opacity="0.10" />
+      <stop offset="1" stop-color="#887047" stop-opacity="0.20" />
+    </linearGradient>
+    <linearGradient id="near" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a38657" stop-opacity="0.14" />
+      <stop offset="1" stop-color="#695438" stop-opacity="0.26" />
+    </linearGradient>
+  </defs>
+
+  <path d="M0 558 C160 488 270 507 412 455 C560 401 706 446 843 391 C990 333 1129 391 1256 348 C1378 307 1490 332 1600 296 L1600 1000 L0 1000 Z" fill="url(#far)" />
+  <path d="M0 655 C160 590 298 612 442 564 C595 514 733 566 881 516 C1035 464 1165 502 1310 458 C1430 422 1524 430 1600 410 L1600 1000 L0 1000 Z" fill="url(#middle)" />
+  <path d="M0 748 C160 690 302 710 450 762 C592 812 720 824 855 781 C1001 735 1110 756 1260 701 C1398 651 1504 670 1600 715 L1600 1000 L0 1000 Z" fill="url(#near)" />
+
+</svg>

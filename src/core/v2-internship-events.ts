@@ -23,17 +23,15 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
   const permanentlyBlocked = nextRejectCount >= 2;
   const description = permanentlyBlocked
     ? [
-        "你最终决定把重心留在当前课题上，先不接受这次实习邀请。",
-        "你把回复写得很克制：感谢认可、说明阶段目标、保留未来合作可能。",
-        "邮件发出去后，这次实习机会也就放下了。",
+        "你再次婉拒了实习邀请，说明目前还是顾不过来。回复写到最后，你删掉了‘下次一定’，免得又给对方一个含糊的答复。",
+        "这回你也把话说清楚了，之后不再考虑这类实习。关掉邮件时有点可惜，不过桌上没整理完的实验记录还等着你。",
         "机制结算",
         `实习拒绝计数 +1（当前 ${nextRejectCount}/2）`,
         "达到 2 次后，实习机会永久关闭。",
       ].join("\n\n")
     : [
-        "你最终决定把重心留在当前课题上，先不接受这次实习邀请。",
-        "你把回复写得很克制：感谢认可、说明阶段目标、保留未来合作可能。",
-        "邮件发出去后，这次实习机会也就放下了。",
+        "你回复说，手头的课题暂时腾不出空来，这次先不接受实习。写到‘以后有机会再聊’时，你还是停了一下，毕竟这份邀请确实合适。",
+        "邮件发出后，你关掉附件，回去整理实验记录。眼下不必兼顾项目交付，但这份实习收入也只能先放下。",
         "机制结算",
         `实习拒绝计数 +1（当前 ${nextRejectCount}/2）`,
         "下次企业交流还有一次机会。",
@@ -49,8 +47,8 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
     chainId: "internship-invite",
     stage: "result",
     completionLog: permanentlyBlocked
-      ? "你拒绝了实习，企业线永久关闭。"
-      : "你暂不实习，以后还会收到一次邀请。",
+      ? "你再次拒绝了实习，之后不再收到实习邀请。"
+      : "你暂不实习，之后仍有一次接受邀请的机会。",
     choices: [{
       id: "close",
       label: "继续",
@@ -65,9 +63,8 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
     id: `internship-invite-result-accept-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择 ➜ 实习已确认",
     description: [
-      "你签下了远程实习，接下来几个月要同时做课题和项目交付。",
-      "白天开会写代码，晚上还得顾着实验和论文，肯定会比现在更累。",
-      "不过这份实习能带来行业经验，也能多一笔收入。",
+      "你确认了远程实习安排，把每周交付记进日历。报酬会随论文和引用情况调整，你又核对了一遍邮件里按目前情况列出的金额。",
+      "课题还得继续，项目也要交差。你把两边的待办放到一起，才发现最难安排的不是工作地点，而是晚上几点能合上电脑。",
       "机制结算",
       "实习周期：6 个月",
       "实习期间：做实验分数 ×1.25",
@@ -91,8 +88,8 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
 
 function createInternshipInviteAct2(context: InternshipInviteContext): PendingEvent {
   const warningText = context.rejectedInternshipCount === 0
-    ? "拒绝后还有一次机会。"
-    : "再次拒绝将关闭企业线。";
+    ? "这次不接，以后仍有一次机会。"
+    : "若再次婉拒，之后就不再考虑实习了。";
   const nextRejectCount = context.rejectedInternshipCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
 
@@ -100,9 +97,8 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
     id: `internship-invite-act2-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择",
     description: [
-      "你把邀请邮件又读了一遍：项目方向合适，周期和报酬也写得很清楚。",
-      "接下以后，实验、组会、论文和实习交付都得同时做。",
-      "不接可以继续专心科研，不过企业给你的机会次数有限。",
+      "你对照实验计划核了一遍实习安排，项目交付和组会都不能落下，接了就得挤出时间。",
+      "远程不用搬家，但也不是挂着聊天软件就能领钱。你得想清楚，眼下有没有余力兼顾。",
       warningText,
     ].join("\n\n"),
     source: "fixed",
@@ -141,9 +137,8 @@ export function createInternshipInviteAct1(context: InternshipInviteContext): Pe
     id: `internship-invite-act1-${context.totalMonths}`,
     title: "实习邀请",
     description: [
-      `${context.origin ? `离开${context.origin}后` : "会后"}，你收到一封远程实习邀请，对方给出的方向和你现在的研究并不冲突，甚至有一定互补。`,
-      "对方希望你尽快回复，入职后每周都有固定的项目任务。",
-      "这份机会能让你提前接触工业研发，也会挤掉不少做科研的时间。",
+      `${context.origin ? `${context.origin}结束后` : "会后"}，你收到企业代表发来的远程实习邀请。附件里列着项目任务，正好用得上你现在做课题的方法。`,
+      "你往下翻，报酬和工作安排都写得挺具体。对方希望你尽快答复，你先保存了附件，准备看看能不能和手头的课题兼顾。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

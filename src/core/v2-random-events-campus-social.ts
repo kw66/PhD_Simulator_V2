@@ -1,5 +1,5 @@
 import { getAttributeTier } from "./v2-random-event-rules";
-import { getBadmintonWinRate, getPokerWinRate } from "./v2-growth-system";
+import { BADMINTON_VICTORY_THRESHOLD, getBadmintonStrength, getPokerWinRate } from "./v2-growth-system";
 import {
   createThreeStageRandomEvent,
   formatProbabilityCondition,
@@ -10,11 +10,12 @@ import type { GameState, PendingEvent } from "./v2-types";
 
 export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
-  const winRate = getBadmintonWinRate(
+  const badmintonStrength = getBadmintonStrength(
+    state.player.san,
     state.eventCounters.badmintonCount,
     state.eventSupport.hasBadmintonRacket,
-  ) / 100;
-  const badmintonChampion = getRoll() < winRate;
+  );
+  const badmintonChampion = badmintonStrength >= BADMINTON_VICTORY_THRESHOLD;
 
   const pokerStake = Math.max(0, Math.min(state.player.money, 5));
   const pokerWinRate = getPokerWinRate(state.eventCounters.pokerCount) / 100;
@@ -34,7 +35,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
   const event: PendingEvent = {
     id: `random-7-y${state.year}-m${state.month}-n${serial}`,
     title: "组内团建",
-    description: "导师难得组织了一次团建，群里终于不只是在催论文和项目。活动有好几种，你准备跟大家去做什么？",
+    description: "导师难得组织了一次团建，群里终于不只是在催论文和项目。活动有好几种，你准备和大家一起做什么？",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -45,8 +46,8 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         id: `random-7-badminton-${serial}`,
         label: "打羽毛球",
         outcome: badmintonChampion
-          ? `获胜（胜率 ${Math.round(winRate * 100)}%）｜生病概率 -10%｜羽毛球参加次数 +1${state.eventSupport.hasStrongBodyTalent ? "" : "｜首次获胜获得强身健体"}`
-          : `落败（胜率 ${Math.round(winRate * 100)}%）｜生病概率 -10%｜羽毛球参加次数 +1`,
+          ? `获胜（实力 ${badmintonStrength}/${BADMINTON_VICTORY_THRESHOLD}）｜生病概率 -10%｜羽毛球参加次数 +1${state.eventSupport.hasStrongBodyTalent ? "" : "｜解锁每月 SAN +1"}`
+          : `落败（实力 ${badmintonStrength}/${BADMINTON_VICTORY_THRESHOLD}）｜生病概率 -10%｜羽毛球参加次数 +1`,
         effects: {
           illnessProbabilityDelta: -10,
           counterDeltas: { badmintonCount: 1 },
@@ -62,11 +63,11 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         effects: pokerWin
           ? {
             ...(pokerStake > 0 ? { money: pokerStake } : {}),
-            counterDeltas: { pokerCount: 1 },
+            counterDeltas: { pokerCount: 1, pokerProfit: pokerStake },
           }
           : {
             ...(pokerStake > 0 ? { money: -pokerStake } : {}),
-            counterDeltas: { pokerCount: 1 },
+            counterDeltas: { pokerCount: 1, pokerProfit: -pokerStake },
           },
       },
       {
@@ -97,22 +98,20 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
   };
 
   const badmintonDescription = badmintonChampion
-    ? "前几拍你还在找手感，打到后半场以后，脚步和落点都顺了起来。最后一球压在线内，你赢下了这场比赛。出了一身汗再走出球馆，久坐后的肩背也松了不少。"
-    : "前几拍你还在找手感，对方已经连续把球压到后场。你追了几轮，最后还是没能把比分追回来。输球有点可惜，不过出了一身汗再走出球馆，久坐后的肩背也松了不少。";
+    ? "前几拍你还在找手感，打到后半场，脚步和落点渐渐顺了起来。最后一球压在线内，你赢下了比赛。出了一身汗走出球馆，久坐后的肩背也松快了不少。"
+    : "前几拍你还在找手感，对方却接连把球压到后场。你追了几轮，还是没能把比分追回来。实力还差一点，输球有些可惜，不过出了一身汗走出球馆，久坐后的肩背也松快了不少。";
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "导师组织了实验室团建，大家难得一起出来玩。",
-      "周末集合时，同门状态都很放松，气氛明显和组会不一样。",
-      "没有人谈截止日期，你也想好好放松半天。",
+      "导师在群里发起团建，大家提了打球、打牌、唱歌和聚餐几种方案。这次不用带 PPT，也没人要求汇报进度。",
+      "难得有半天能放下实验，你准备投一票，选一项和大家一起去。",
     ].join("\n\n"),
     decisionTitle: "活动选择",
     decisionDescription: [
       pokerStake === 0
-        ? "球场已经订好了，牌桌也凑齐了人；德州扑克没有本金也能参加，输赢都不扣金币。"
-        : `球场已经订好了，牌桌也凑齐了人；德州扑克本次押注 ${pokerStake} 金币，输了会扣掉这笔本金。`,
-      "另一拨同门在约唱歌，气氛会轻松一些。",
-      "晚上还有聚餐，导师可能请客，也可能每人各出 2 金币。",
+        ? "打球能活动筋骨，打牌则考验耐心。你没有本金，也能参加纯游戏牌局，输赢都不影响金币。"
+        : `打球能活动筋骨，打牌则考验耐心。这次德州扑克押注 ${pokerStake} 金币，输了就要扣掉这笔本金。`,
+      "也可以选唱歌或聚餐。聚餐可能由导师请客，也可能每人各出 2 金币。",
     ].join("\n\n"),
     results: {
       [`random-7-badminton-${serial}`]: {
@@ -123,23 +122,25 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         title: "德州扑克",
         description: pokerWin
           ? [
-              "你坐到牌桌前，和几个师兄师姐开始了德州扑克。",
-              "前几局你打得很保守，慢慢摸清了大家的牌风。",
-              "关键一局，你拿到一手不错的牌，跟到最后顺利赢下底池。",
-              "大家笑着说你今晚手气不错，你也把筹码收了回来。",
+              "你坐到牌桌前，起初打得很保守，慢慢摸清了几位同门的牌风。关键一局拿到好牌，你跟到最后，赢下了底池。",
+              pokerStake === 0
+                ? "大家笑着说你手气不错。筹码只是记分用的，没赢到钱，也不妨碍你高兴一会儿。"
+                : "大家笑着说你手气不错。清点筹码时，你发现这趟不光玩得开心，还多赚了一点生活费。",
             ].join("\n\n")
           : [
-              "你坐到牌桌前，和几个师兄师姐开始了德州扑克。",
+              "你坐到牌桌前，和几个师兄师姐玩起了德州扑克。",
               "前几局你还小赢了几手，后来一次跟注太深，桌上的筹码很快见了底。",
-              "最后摊牌时，对方刚好大你一级。大家重新洗牌，你笑着把位置让给了下一位。",
+              pokerStake === 0
+                ? "最后摊牌，对方的牌更大一些。好在只是记分牌局，你没损失金币，笑着让出了位置。"
+                : "最后摊牌，对方的牌更大一些。这次押下的金币输了出去，你笑着让出位置，提醒自己下次别跟得太急。",
             ].join("\n\n"),
       },
       [`random-7-ktv-${serial}`]: {
         title: "KTV 唱歌",
         description: [
-          "包厢里刚开始还有些拘谨，唱过两轮以后，跑调的人反而抢起了麦克风。",
+          "包厢里刚开始还有些拘谨，唱过两轮以后，最跑调的人反而先抢起了麦克风。",
           "轮到你时，你点了一首大家都听过的动画片主题曲。副歌还没唱完，整间包厢已经跟着合唱。",
-          "回去路上，群里还在互相发刚才的录像。以后再见到这些同门，聊天也多了几个不用谈科研的话题。",
+          "回去路上，群里还在互相转发刚才的录像。以后再见到这些同门，聊天也多了几个不用谈科研的话题。",
           ...(ktvSocialNarrative ? [ktvSocialNarrative] : []),
         ].join("\n\n"),
       },
@@ -147,15 +148,14 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         title: "聚餐",
         description: dinnerAdvisorTreat
           ? [
-              "大家在学校附近找了家餐厅，坐下以后才发现聊天比点菜还慢。",
-              "结账时，导师摆摆手：“今天我请吧，大家难得一起出来。”原本准备 AA 的同门立刻把手机收了回去。",
-              "饭桌上从最近的实验聊到假期安排，导师也没有追问进度。散场时，你们之间的距离比组会上近了一点。",
+              "大家在学校附近找了家餐厅，聊起假期安排和最近的趣事。导师没有追问实验，饭桌比组会轻松得多。",
+              "结账时，导师摆摆手：“今天我请，大家难得一起出来。”几部刚拿出来的手机又默默收了回去。",
               ...(dinnerFavorNarrative ? [dinnerFavorNarrative] : []),
             ].join("\n\n")
           : [
-              "大家在学校附近找了家餐厅，菜单传了一圈，很快点满一桌平时食堂吃不到的菜。",
+              "大家在学校附近找了家餐厅，菜单传了一圈，很快点满一桌平时在食堂吃不到的菜。",
               "饭桌上没人催实验，最近的糗事反而被翻出来讲了个遍。你也跟着笑了很久。",
-              "最后照例 AA，每人付了 2 金币。钱包少了一点，这顿饭倒确实让人放松。",
+              "最后照例 AA，每人付了 2 金币。钱包薄了一点，这顿饭倒确实让人放松。",
             ].join("\n\n"),
       },
     },
@@ -170,7 +170,7 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
   const event: PendingEvent = {
     id: `random-8-y${state.year}-m${state.month}-n${serial}`,
     title: "导师经费",
-    description: "导师负责的项目快结项了，账上还有一笔经费没用完。结项前得尽快确定用途，实验室只能优先补上一项。",
+    description: "导师负责的项目快结项了，账上还剩一笔经费。结项前得尽快确定用途，实验室暂时只能优先补上一项。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -221,30 +221,20 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "导师负责的一个项目快结项了，账上还有一笔经费没用完。",
-      "结项前得尽快把用途定下来，导师便在组会上让大家想想，实验室还有什么值得添置。",
-      "有人想添 **💻 GPU 服务器**，有人希望多发点 **💰 劳务费**，也有人提议置办 **🪑 工位设备**、报销常用的 **🤖 AI 工具**。",
-      "---",
-      "导师把几种提议记在白板上，又看向你：“你更支持哪一种？”",
+      "一个项目快结项了，导师在组会上征求剩余经费的使用意见。显卡不够用，工位该改善，劳务费和 AI 费用也有人惦记。",
+      "几种提议写满了白板，预算却不能样样照顾。导师看向你：“这次你觉得该先花在哪儿？”",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "服务器能让实验少排队，劳务费能让这个月宽裕一些。",
-      "工位改善和 AI 报销也都用得上，组里一时谁也说服不了谁。",
-      "💻 **买显卡**：以后跑实验不用总排队",
-      "💰 **发劳务费**：这个月手头宽裕一点",
-      "🪑 **装修工位**：添置桌椅、外设和咖啡机",
-      "🤖 **报销 AI 费用**：本月商店里的 AI 费用由组里承担",
-      "---",
-      "导师把最后的决定交给了你，但这笔经费只能先顾一头。",
+      "显卡预算可以留到下次购买或升级时使用；劳务费则直接到账，先缓解眼下的开销。",
+      "也可以选工位设备的购买、升级报销，或让组里承担本月商店里的 AI 费用。这次只能选一项。",
     ].join("\n\n"),
     results: {
       [`random-8-gpu-${serial}`]: {
         title: "显卡采购",
         description: [
-          "“显卡确实该添了。”导师同意从项目经费里出一笔设备预算，具体型号由你按需要选择。",
-          "财务把额度记进了你的采购清单。下次在商店购买或升级显卡时，这笔费用会直接由项目经费承担。",
-          "你重新看了看实验安排，决定先不急着下单，等需要更强算力时再把这次机会用掉。",
+          "“显卡确实该添了。”导师同意留一笔设备预算，下次购买或升级显卡的费用由项目承担，型号按你的需要选。",
+          "你把这次报销机会记好，打算先看看实验需求再下单。这回挑显卡，终于不用只盯着价格了。",
         ].join("\n\n"),
       },
       [`random-8-salary-${serial}`]: {
@@ -253,35 +243,32 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
           ? [
               "“劳务费啊……”导师翻了翻账本，“最近开销比较大，先发一点吧。”",
               `到账提醒很快弹出来，这次一共多发了 ${salaryGain} 金币。`,
-              "数目不算多，至少这个月的日常开销能松一点。",
+              "数目不算多，至少这个月手头能宽裕一点。",
             ].join("\n\n")
           : salaryGain === 5
             ? [
                 "“劳务费？没问题。”导师爽快地答应了。",
                 `很快，${salaryGain} 金币打进账户，比平时的补贴宽裕不少。`,
-                "你顺手把拖了几天的购物清单也结了账。",
+                "你重新打开搁置几天的购物清单，开始盘算这笔钱怎么花。",
               ].join("\n\n")
             : [
                 "“劳务费？”导师笑了笑，“你最近表现不错，多发点。”",
                 `到账提醒显示多了 ${salaryGain} 金币，比你预想的数目高出不少。`,
-                "这下不只日常开销有了着落，还能留下一些备用。",
+                "这下日常开销有了着落，还能留下一些备用。",
               ].join("\n\n"),
       },
       [`random-8-renovate-${serial}`]: {
         title: "布置工位",
         description: [
-          "“工位确实该收拾一下了。”导师给每个人留了一笔设备预算，让大家按自己的习惯添置。",
-          "你的机械键盘、2K 显示器、办公椅和咖啡机都可以各报销一次，办公椅与咖啡机之后再升级也能走这笔经费。",
-          "预算不会立刻过期，你打算去商店慢慢挑，缺哪件就先换哪件。",
+          "“工位确实该改善一下。”导师同意报销机械键盘、2K 显示器、办公椅和咖啡机，各一次；办公椅和咖啡机的下次升级也能报销。",
+          "你把清单记好，打算按需要慢慢挑。天天坐在这里，能舒服一点也是件正经事。",
         ].join("\n\n"),
       },
       [`random-8-ai-${serial}`]: {
         title: "报销 AI 费用",
         description: [
-          "你提议把一部分经费用来报销本月的 AI 订阅：“查资料、改代码和整理实验都用得上。”",
-          "导师点了点头：“这类工具确实能省下不少时间，本月的费用先从项目经费里走。”",
-          "手续办好后，你打开商店看了一眼，所有 AI 模型都显示为 0 金币。",
-          "这个月再需要订阅模型时，你不用先盯着余额计算了。",
+          "你提议报销本月的 AI 费用：“查资料、改代码，平时都用得上。”导师点头，同意这笔钱从项目经费里出。",
+          "手续办好后，商店里的 AI 费用都变成了 0 金币。至少这个月，用哪个工具可以先看需要，不必先看余额。",
         ].join("\n\n"),
       },
     },

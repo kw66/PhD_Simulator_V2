@@ -37,21 +37,21 @@ function getTypeName(type: LoverTypeId): string {
 
 function getIntroText(type: LoverTypeId): string {
   return type === "beautiful"
-    ? "最近几次会议结束后，你和那位活泼的学者总会顺路聊上一会儿。"
-    : "你和那位聪慧学者在讨论里越来越默契，常常一句话就能接上对方思路。";
+    ? "你和那位开朗的同行又聊了很久。起初还在说今天的报告，后来连赶材料时吃什么都聊到了。"
+    : "你和那位思路清楚的同行又讨论起论文。意见不同的时候，你们会把问题拆开慢慢说，谁也不急着结束话题。";
 }
 
 function getSceneText(type: LoverTypeId): string {
   return type === "beautiful"
-    ? "从会场到地铁口的路并不长，但每次都觉得很快就走完了。"
-    : "从论文细节聊到未来规划，你发现这份理解比想象中更珍贵。";
+    ? "分别以后，你还想起刚才没说完的笑话，拿起手机补发了一句。对方很快回了消息，你也发现自己一直在等。"
+    : "讨论结束后，你们又聊了些研究之外的琐事。消息提示亮起来时，你先看了发信人，才想起自己刚才还在改文档。";
 }
 
 function getThoughtText(context: LoverDevelopmentContext): string {
   const pronoun = context.loverGender === "male" ? "他" : "她";
   return context.type === "beautiful"
     ? `“我好像真的有点喜欢${pronoun}。只是读研已经够忙了，谈恋爱以后还得留出时间陪${pronoun}。”`
-    : "“我们很聊得来。如果真的在一起，科研之外也会多出很多共同安排。”";
+    : "“不聊论文的时候，我们也有话说。我想和对方再靠近一些，又怕只是自己想多了。”";
 }
 
 function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEvent {
@@ -63,17 +63,15 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
     title: "发展关系 ➜ 你的心意 ➜ 暂缓关系",
     description: permanentlyBlocked
       ? [
-          "你决定把关系停在现在这个距离，礼貌、克制，也尽量不让对方难堪。",
-          "之后你们仍会在会场和走廊里打招呼，偶尔聊几句论文，只是不再单独约着散步。",
-          "时间久了，那点暧昧也慢慢淡了。",
+          "你把自己的意思说清楚了：不再往恋人的方向发展，也不想让对方继续等一个含糊的答复。这话不太好开口，却比一直回避更合适。",
+          "对方表示理解，没有再追问。你们仍可以像普通同行那样交流，只是这次不再为下次见面留下别的暗示。",
           "机制结算",
           `关系线拒绝计数 +1（当前 ${nextRejectCount}/2）`,
-          "该关系线永久关闭。",
+          "今后不会再与对方发展恋人关系。",
         ].join("\n\n")
       : [
-          "你决定把关系停在现在这个距离，礼貌、克制，也尽量不让对方难堪。",
-          "之后你们仍会在会场和走廊里打招呼，偶尔聊几句论文，只是不再单独约着散步。",
-          "你们暂时都没有再提这件事。",
+          "你说自己还没想好，暂时想保持现在的距离。说完以后有一点尴尬，好在对方没有催你回答，也没有把话题彻底停住。",
+          "你们又聊了几句近况，随后各自去忙。联系还在，只是你没有作出交往的承诺，也不想让这份犹豫变成对方的负担。",
           "机制结算",
           `关系线拒绝计数 +1（当前 ${nextRejectCount}/2）`,
           "以后还有一次机会。",
@@ -84,8 +82,8 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
     chainId: "lover-development",
     stage: "result",
     completionLog: permanentlyBlocked
-      ? `你拒绝了这段关系，与这位${getTypeName(context.type)}学者的关系线永久关闭。`
-      : "你选择保持距离，以后还有一次机会。",
+      ? `你明确了自己的心意，今后不再与这位${getTypeName(context.type)}学者发展恋人关系。`
+      : "你暂时保持距离，还没有作出交往的承诺。",
     choices: [{
       id: "close",
       label: "继续",
@@ -105,9 +103,8 @@ function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent
     id: `lover-development-result-accept-${context.type}-${context.totalMonths}`,
     title: "发展关系 ➜ 你的心意 ➜ 关系确认",
     description: [
-      "你们互相确认了心意，正式开始交往。",
-      "以后除了在会场见面，也会一起吃饭、散步，讨论各自的生活。",
-      "读研的日程里，从此多了一个需要认真留时间的人。",
+      "你把心意说了出来，也得到了明确的回应。确定开始交往以后，你们反倒有点不好意思，刚才想好的话一时都忘了。",
+      "你们约好找时间一起吃顿饭，再慢慢商量往后的相处。课题和日常安排仍要继续，只是现在除了赶进度，你也想认真留些时间给对方。",
       "机制结算",
       `${typeLabel}：${effectText}`,
     ].join("\n\n"),
@@ -130,16 +127,15 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
   const nextRejectCount = context.rejectCount + 1;
   const typeName = getTypeName(context.type);
   const warningText = context.rejectCount === 0
-    ? "拒绝后还有一次机会。"
-    : `再次拒绝将结束与这位${typeName}学者的关系。`;
+    ? "你还可以先缓一缓，等更确定时再回应这份心意。"
+    : `这已不是你第一次犹豫，再拒绝一次，就只和这位${typeName}学者做普通同行了。`;
 
   return {
     id: `lover-development-act2-${context.type}-${context.totalMonths}`,
     title: "发展关系 ➜ 你的心意",
     description: [
       getThoughtText(context),
-      "会后的人流慢慢散开，你们并肩走在场馆外，聊着论文、课题组和下次见面的时间。",
-      "你几次想把话说得更明白，又担心以后见面会尴尬。",
+      "聊到下次见面时，对方问起了你的想法。你几次想把话说得更明白，又担心以后见面会尴尬。",
       warningText,
     ].join("\n\n"),
     source: "fixed",
@@ -194,11 +190,9 @@ export function createLoverDevelopmentAct1(context: LoverDevelopmentContext): Pe
     id: `lover-development-act1-${context.type}-${context.totalMonths}`,
     title: "发展关系",
     description: [
-      ...(context.origin ? [`从${context.origin}分别后，你们的联系没有停在会场。`] : []),
+      ...(context.origin ? [`在${context.origin}见面后，你们一直保持着联系。`] : []),
       getIntroText(context.type),
       getSceneText(context.type),
-      "你们从今天的报告聊到下个月的计划，又约好下次会议一起吃饭。",
-      "你开始期待这些会后的聊天，也隐约觉得对方有同样的心思。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

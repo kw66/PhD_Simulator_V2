@@ -3,6 +3,7 @@ import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { attachPaperPublication } from "./v2-publication-rules";
 import { getInitialJournalScore, getJournalRevisionScore } from "./v2-journal-score";
 import type { GameState, JournalTarget, Paper } from "./v2-types";
+import { applyPublicationTalentRewards } from "./v2-publication-talent";
 
 export { getJournalRevisionScore } from "./v2-journal-score";
 
@@ -11,6 +12,7 @@ export interface JournalDefinition {
   name: string;
   submissionScore: number;
   acceptanceScore: number;
+  researchScore: number;
   /** Fixed factor used in the venue-influence zone. */
   citationInfluence: number;
 }
@@ -21,6 +23,7 @@ export const JOURNAL_DEFINITIONS: Readonly<Record<JournalTarget, JournalDefiniti
     name: "Nature",
     submissionScore: 150,
     acceptanceScore: 500,
+    researchScore: 20,
     citationInfluence: 0.5,
   },
   nmi: {
@@ -28,6 +31,7 @@ export const JOURNAL_DEFINITIONS: Readonly<Record<JournalTarget, JournalDefiniti
     name: "子刊NMI",
     submissionScore: 100,
     acceptanceScore: 250,
+    researchScore: 10,
     citationInfluence: 0.5,
   },
   pami: {
@@ -35,6 +39,7 @@ export const JOURNAL_DEFINITIONS: Readonly<Record<JournalTarget, JournalDefiniti
     name: "顶刊PAMI",
     submissionScore: 75,
     acceptanceScore: 125,
+    researchScore: 5,
     citationInfluence: 0.5,
   },
 };
@@ -95,7 +100,7 @@ export function submitJournalPaper(
     submittedWriting: paper.writing,
     submittedMonth: state.month,
     submittedYear: state.year,
-    conferenceHandled: false,
+    conferenceHandled: true,
     publication: null,
     lastReview: null,
   };
@@ -151,13 +156,14 @@ export function resolveReadyJournalPapers(state: GameState): JournalResolution {
       journal.citationInfluence,
       promotionMultiplier,
     );
+    const researchScoreGain = paper.nonFirstAuthor === true ? 0 : journal.researchScore;
     if (publishedPaper.publication) {
       publishedPaper.publication.journalTarget = journal.id;
     }
     publishedPapers.push(publishedPaper);
-    nextState = consumeNextPublicationBuffs(nextState);
+    nextState = consumeNextPublicationBuffs({ ...nextState, totalResearchScore: nextState.totalResearchScore + researchScoreGain });
     acceptedPaperIds.push(paper.id);
-    logs.push(`${paper.title} 已达到${journal.name}达标分 ${journal.acceptanceScore}，正式发表`);
+    logs.push(`${paper.title} 已达到${journal.name}达标分 ${journal.acceptanceScore}，正式发表${researchScoreGain > 0 ? `；科研分 +${researchScoreGain}` : ""}`);
   }
 
   const resolvedState = {
@@ -168,5 +174,5 @@ export function resolveReadyJournalPapers(state: GameState): JournalResolution {
   };
   let loggedState = resolvedState;
   for (const log of logs) loggedState = pushLog(loggedState, `期刊结果：${log}`);
-  return { state: loggedState, logs, acceptedPaperIds };
+  return { state: applyPublicationTalentRewards(loggedState), logs, acceptedPaperIds };
 }

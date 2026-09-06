@@ -33,6 +33,7 @@ import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyShopAction } from "./v2-shop-transactions";
 import { getShopEmergencySan, getShopRestSanGain } from "./v2-shop-items-effects";
+import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER } from "./v2-sanity-rules";
 import type { DispatchPayload, GameActionId, GameState, PlayerStats } from "./v2-types";
 
 const MONTHLY_LOG_STAT_LABELS: Record<keyof PlayerStats, string> = {
@@ -95,7 +96,7 @@ function evaluateCoreEndings(state: GameState): GameState {
 }
 
 function takeRest(state: GameState): GameState {
-  if (state.phase !== "playing" || isPreEnrollmentState(state)) return state;
+  if (state.phase !== "playing" || (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)) return state;
   const sanGain = getShopRestSanGain(state.shopState);
   if (state.actionState.used >= state.actionState.limit) return pushNoOpLog(state, "本月行动次数已用尽。");
   const nextSan = Math.min(state.sanCap, state.player.san + sanGain);
@@ -157,7 +158,7 @@ function createAdvancedCalendarState(state: GameState): GameState {
     randomState.usedRandomEvents = [...new Set([...randomState.usedRandomEvents, ...queuedRandomIds])];
   }
   const monthEndIllnessDelta = state.totalMonths > 0
-    ? state.player.san < 6 ? 2 : state.player.san < 12 ? 1 : state.player.san < 18 ? 0 : -1
+    ? DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[state.player.san < 6 ? 0 : state.player.san < 12 ? 1 : state.player.san < 18 ? 2 : 3]
     : 0;
   const calendarState: GameState = {
     ...state,
@@ -277,10 +278,10 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
         ? createResearchPaper(state, payload.paperSlotIndex)
         : state;
     case "reroll-paper-topic":
-      if (isPreEnrollmentState(state)) return state;
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return payload.paperId ? rerollPaperTopic(state, payload.paperId) : state;
     case "discard-paper":
-      if (isPreEnrollmentState(state)) return state;
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return payload.paperId ? discardDraftPaper(state, payload.paperId) : state;
     case "research-paper":
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
@@ -290,30 +291,30 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
         ).state)
         : state;
     case "submit-paper":
-      if (isPreEnrollmentState(state)) return state;
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return payload.paperId && payload.paperTarget
         ? submitPaper(state, payload.paperId, payload.paperTarget)
         : state;
     case "submit-journal-paper":
-      if (isPreEnrollmentState(state)) return state;
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return payload.paperId && payload.journalTarget
         ? submitJournalPaper(state, payload.paperId, payload.journalTarget)
         : state;
     case "withdraw-paper":
-      if (isPreEnrollmentState(state)) return state;
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return payload.paperId ? withdrawPaper(state, payload.paperId) : state;
     case "promote-paper":
       if (!payload.paperId || !payload.promotionId) return state;
       return applyPaperPromotion(state, payload.paperId, payload.promotionId);
     case "read-paper":
-      if (isPreEnrollmentState(state)) return state;
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return evaluateCoreEndings(applyReadPaperActions(state, getManualReadPaperCount(state), {
         consumeMonthlyAction: true,
         consumeMonthlyActionOnce: true,
         allowSanOverdraw: false,
       }).nextState);
     case "part-time-work":
-      if (isPreEnrollmentState(state)) return state;
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return evaluateCoreEndings(applyPartTimeWork(state));
     case "rest":
       return takeRest(state);

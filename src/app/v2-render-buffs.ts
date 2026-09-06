@@ -53,7 +53,7 @@ function formatSignedNumber(value: number): string {
 
 function getDurationText(buff: Buff): string {
   if (buff.timing === "permanent") return "永久";
-  if (buff.timing === "next-action") return "使用后消失";
+  if (buff.timing === "next-action") return "对应效果触发后消耗";
   return buff.remainingMonths === null ? "持续生效" : `剩余 ${buff.remainingMonths} 月`;
 }
 

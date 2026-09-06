@@ -84,8 +84,8 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
   if (state.eventSupport.hasStrongBodyTalent) {
     effects.push({
       id: "strong-body-san-recovery",
-      name: "强身健体",
-      source: "羽毛球冠军",
+      name: "羽毛球",
+      source: "羽毛球获胜",
       stats: { san: 1 },
     });
   }
@@ -284,6 +284,17 @@ function applyAutomaticCoffeeMachineEffect(
     return state;
   }
 
+  if (resolution.player.san >= state.sanCap) {
+    appendMonthlyEffect(state, resolution, {
+      id: "automatic-coffee-machine-skipped",
+      name: "自动咖啡机",
+      source: "商店装备",
+      stats: { money: 0, san: 0 },
+      note: "SAN 已满，本月未冲泡",
+    });
+    return { ...state, player: { ...resolution.player } };
+  }
+
   if (resolution.player.money < BASE_COFFEE_PRICE) {
     appendMonthlyEffect(state, resolution, {
       id: "automatic-coffee-machine-paused",
@@ -307,6 +318,7 @@ function applyAutomaticCoffeeMachineEffect(
     coffeeState: {
       ...state.coffeeState,
       coffeeProducedCountThisMonth: state.coffeeState.coffeeProducedCountThisMonth + 1,
+      machineTrackedCoffeeCount: state.coffeeState.machineTrackedCoffeeCount + 1,
     },
   };
 }
@@ -369,8 +381,7 @@ export function applyMonthStartSubscriptions(
             subscriptionPaused: false,
             coffeePurchaseCountThisMonth: nextState.coffeeState.coffeePurchaseCountThisMonth + 1,
             coffeeProducedCountThisMonth: nextState.coffeeState.coffeeProducedCountThisMonth + 1,
-            machineTrackedCoffeeCount: nextState.coffeeState.machineTrackedCoffeeCount
-              + (nextState.coffeeState.machineUpgrade === "advanced" ? 1 : 0),
+            machineTrackedCoffeeCount: nextState.coffeeState.machineTrackedCoffeeCount + 1,
           },
         };
       } else {

@@ -223,7 +223,7 @@ describe("v2 event scheduler", () => {
       [0.34, "流感来袭", "磷酸奥司他韦"],
       [0.99, "高烧不退", "布洛芬"],
     ] as const;
-    for (const [typeRoll, title, medicineName] of illnessCases) {
+    for (const [typeRoll, title] of illnessCases) {
       const illness = collectIllnessEventForMonth(baseState, fromRolls([0, typeRoll]));
       expect(illness).toHaveLength(1);
       expect(illness[0]?.title).toBe(title);
@@ -234,13 +234,20 @@ describe("v2 event scheduler", () => {
       const hardResult = hardChoice?.effects.enqueueEvents?.at(-1);
       const medicineChoice = decision?.choices.find((choice) => choice.label === "先买药");
       const medicineResult = medicineChoice?.effects.enqueueEvents?.at(-1);
-      expect(decision?.description).toContain(medicineName);
-      expect(hardChoice?.outcome).toMatch(/^SAN 上限 -[234]｜生病概率 ×0\.5$/u);
+      expect(decision?.description).toContain("买药要");
+      expect(hardChoice?.outcome).toMatch(/^SAN 上限 -[123]｜生病概率 ×0\.5$/u);
       expect(hardChoice?.outcome).not.toContain("大病一场");
-      expect(hardResult?.description.split("机制结算")[0]).toContain("连休了几天");
+      expect(hardResult?.description.split("机制结算")[0]).toContain("去了实验室");
       expect(hardResult?.description.split("机制结算")[1]).not.toContain("连休");
-      expect(medicineResult?.description).toContain(medicineName);
+      expect(medicineResult?.description).toContain("买了药");
     }
+    const exhausted = collectIllnessEventForMonth({
+      ...baseState,
+      actionState: { used: 1, limit: 1, aiResearchBonusUsed: false },
+    }, fromRolls([0, 0]));
+    const exhaustedDecision = exhausted[0]?.choices[0]?.effects.enqueueEvents?.[0];
+    const exhaustedRest = exhaustedDecision?.choices.find((choice) => choice.label === "休息");
+    expect(exhaustedRest?.disabledReason).toBe("本月行动点已用尽，无法休息");
     const ordinary = collectRandomEventsForMonth({ ...baseState, availableRandomEvents: [3] }, fromRolls([0.7, 0]));
     expect(ordinary.events).toHaveLength(0);
   });
@@ -346,8 +353,8 @@ describe("v2 event scheduler", () => {
       readPaperActions: 2,
     });
     expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBeUndefined();
-    expect(getDecisionChoices(result.events[0])[1]?.outcome).toContain("额外看论文 +2 次");
-    expect(getDecisionChoices(result.events[0])[1]?.outcome).toContain("阅读累计 +2");
+    expect(getDecisionChoices(result.events[0])[1]?.outcome).toContain("看论文 2 次");
+    expect(getDecisionChoices(result.events[0])[1]?.outcome).not.toContain("阅读累计");
     expect(getDecisionChoices(result.events[0])[1]?.outcome).toContain("下次想 idea +2分");
     expect(getDecisionChoices(result.events[0])[1]?.outcome).not.toContain("审稿灵感");
     expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(-2);
@@ -393,11 +400,11 @@ describe("v2 event scheduler", () => {
     const decision = result.events[0]?.choices[0]?.effects.enqueueEvents?.[0]?.description ?? "";
 
     expect(`${intro}\n${decision}`).toContain("深度学习论文");
-    expect(intro).toContain("理论公式很多");
-    expect(intro).toContain("解释比较牵强");
+    expect(intro).toContain("公式不少");
+    expect(intro).toContain("推导与实验结论还对不上");
     expect(decision).not.toContain("篇幅长、信息密");
     expect(intro).not.toContain("认真审能学到些东西");
-    expect(decision).toContain("认真审，得把公式、实验和结论逐项过一遍");
+    expect(decision).toContain("认真审稿得核对公式、实验和相关工作");
   });
 
   it("separates familiar and unfamiliar junior delegation in mentoring", () => {
@@ -638,7 +645,7 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBeUndefined();
     expect(getDecisionChoices(result.events[0])[0]?.effects.social).toBeUndefined();
     expect(getDecisionChoices(result.events[0])[0]?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
-    expect(getDecisionChoices(result.events[0])[0]?.effects.eventSupportUpdates).toEqual({ hasStrongBodyTalent: true });
+    expect(getDecisionChoices(result.events[0])[0]?.effects.eventSupportUpdates).toEqual({});
     expect(getDecisionChoices(result.events[0])[1]?.effects.money).toBe(5);
     expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(1);
     expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(5);
@@ -694,8 +701,8 @@ describe("v2 event scheduler", () => {
     expect(choices[3]?.effects.eventSupportUpdates).toEqual({ aiCostsCoveredUntilTotalMonths: 17 });
     const aiResult = choices[3]?.effects.enqueueEvents?.at(-1);
     expect(aiResult?.title).toContain("报销 AI 费用");
-    expect(aiResult?.description).toContain("你提议把一部分经费用来报销本月的 AI 订阅");
-    expect(aiResult?.description).toContain("所有 AI 模型都显示为 0 金币");
+    expect(aiResult?.description).toContain("你提议报销本月的 AI 费用");
+    expect(aiResult?.description).toContain("商店里的 AI 费用都变成了 0 金币");
   });
 
   it("maps all four advisor-favor tiers to the new funding salary values", () => {
@@ -940,7 +947,7 @@ describe("v2 event scheduler", () => {
       availableRandomEvents: [15],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
-      eventSupport: { hasGameController: false, hasParasol: false, hasDownJacket: false, hasBadmintonRacket: false, hasStrongBodyTalent: false },
+      eventSupport: { hasParasol: false, hasDownJacket: false, hasBadmintonRacket: false, hasStrongBodyTalent: false },
     };
 
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0]));

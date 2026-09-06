@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import {
   createBeforeGradSchoolAct1Event,
+  resolveStudentNameConfirmation,
+  resolveStudentNameReroll,
   resolveAdvisorConfirmation,
 } from "../src/core/v2-fixed-events-before-grad-school";
 import type { PendingEvent } from "../src/core/v2-types";
@@ -39,7 +41,7 @@ describe("v2 before grad school events", () => {
 
     expect(act1.description).toContain("大三下");
     expect(act1.description).toContain("计算机类专业");
-    expect(act1.description).toContain("你是计算机类专业");
+    expect(act1.description).toContain("是计算机类专业");
     expect(act1.description).toContain("还没想清楚是否喜欢科研");
     expect(act1.description).toContain("准备随大流继续读研");
     expect(act1.description).toContain("随大流");
@@ -59,7 +61,47 @@ describe("v2 before grad school events", () => {
     expect(act1.description).not.toContain("推免系统");
     expect(act1.description).not.toContain("接受待录取");
     expect(act1.description).not.toContain("公告栏");
-    expect(act1.choices.map((choice) => choice.label)).toEqual(["联系导师"]);
+    expect(act1.choices.map((choice) => choice.label)).toEqual(["联系导师", "换个姓名"]);
+    expect(act1.description).toContain("叫李旭旭");
+  });
+
+  it("keeps the selected student name after confirmation and changes it on reroll", () => {
+    const state = createInitialState();
+    const act1 = createBeforeGradSchoolAct1Event(state, () => 0);
+    const candidateName = act1.choices[0]?.effects.fixedEventResolution?.studentName;
+    const rerollResolution = act1.choices[1]?.effects.fixedEventResolution;
+
+    expect(candidateName).toBe("李旭旭");
+    expect(rerollResolution?.kind).toBe("student-name-reroll");
+
+    const confirmed = resolveStudentNameConfirmation(state, {
+      kind: "student-name-confirm",
+      studentName: candidateName,
+    });
+    expect(confirmed.nextState.playerName).toBe(candidateName);
+
+    const rerolled = resolveStudentNameReroll(
+      { ...state, eventQueue: [{ ...act1, queueOrder: 0 }] },
+      rerollResolution!,
+      () => 0,
+    );
+    const refreshed = rerolled.nextState.eventQueue[0];
+    expect(refreshed?.description).toContain("叫李旭霖");
+    expect(refreshed?.description).not.toContain(`叫${candidateName}`);
+  });
+
+  it("persists the confirmed name through the real event dispatch path", () => {
+    let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
+    const act1 = state.eventQueue[0];
+    const candidateName = act1?.choices[0]?.effects.fixedEventResolution?.studentName;
+    if (!act1 || !candidateName) throw new Error("student name choice missing");
+
+    state = dispatchAction(state, "resolve-event", {
+      eventId: act1.id,
+      eventChoiceId: "before-grad-school-open-advisor-info",
+    });
+
+    expect(state.playerName).toBe(candidateName);
   });
 
   it("draws lecturer names from the curated pool at the roll boundaries", () => {
@@ -110,6 +152,12 @@ describe("v2 before grad school events", () => {
     });
     expect(visibleCopy).not.toContain("分配");
     expect(visibleCopy).not.toContain("分组名单");
+  });
+
+  it("explains that rerolling the student name does not change gameplay values", () => {
+    const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => 0.6);
+
+    expect(act1.description).toContain("小提示：换个姓名只会刷新称呼，对游戏数值没有影响。");
   });
 
   it("keeps collected lecturer information separate from gameplay values", () => {

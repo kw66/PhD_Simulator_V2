@@ -16,7 +16,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
   const event: PendingEvent = {
     id: `random-12-y${state.year}-m${state.month}-n${serial}`,
     title: "署名风波",
-    description: "论文还在组内修改，署名顺序却和原先说好的不一样。核心实验、写作和返修大多是你完成的，这件事必须在投稿前谈清楚。",
+    description: "论文还在组内修改，署名顺序却和原先说好的不一样。核心实验、写作和修改大多是你完成的，你想在投稿前把这件事谈清楚。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -61,16 +61,13 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "论文还在组内修改，离正式投稿还有一段时间，导师先把署名方案拿出来讨论。",
-      "你发现原先说好的一作安排变了，核心实验、写作和返修明明大多是你完成的。",
-      "现在就把话挑明，可能影响后续合作；先缓一缓，也许能等到更合适的时机。",
-      "一作对你很重要，你得想好这次该怎么处理。",
+      "导师发来组内一篇合作稿的署名方案，你发现原先说好的一作安排变了。核心实验和写作明明大多由你完成。",
+      "稿件还没投稿，现在谈还有调整的余地。但以后还要一起做研究，你得想好怎么开口。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "先和导师把贡献和署名规则谈清楚，留出商量余地。",
-      "把一作转给别的同门，自己先避开冲突，但也会欠下一份人情。",
-      "拿贡献清单和署名规范据理力争，态度最明确，场面也最难收。",
+      "可以先诉说难处，也可以拿出贡献记录据理力争。建议把另一位同门往后排，能保住自己，却把矛盾推给了别人。",
+      "若以停止后续工作施压，还可以要求结清劳务费，只是之后的沟通恐怕会更难。",
     ].join("\n\n"),
     results: {
       [`random-12-complain-${serial}`]: {
@@ -84,7 +81,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
           : [
               "你尽量压住情绪，把自己完成的工作和原先约定逐项说了一遍。",
               "导师同意把一作改回来，只提醒你以后更早确认署名。",
-              "稿件里的顺序恢复了，之后几次讨论里，导师的回复也比以前简短。",
+              "顺序虽然改回来了，你却还在反复琢磨这场谈话。再坐下来想新方案时，思路总被打断。",
             ].join("\n\n"),
       },
       [`random-12-transfer-${serial}`]: {
@@ -115,7 +112,9 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
         description: [
           "你明确表示，如果署名不按贡献调整，自己将不再继续承担后续返修。",
           "谈话僵了很久，导师最后同意保留你的一作，也把之前没结算的 2 金币劳务费一并补发。",
-          "稿件改回来了，但这次把话说得太重，之后的沟通不会像以前那么轻松。",
+          pressureFavorChange < 0
+            ? "稿件改回来了，劳务费也结清了，但谈话不欢而散。之后再开口，你们都比以前谨慎。"
+            : "稿件改回来了，劳务费也结清了。你收好记录，没有再把争执继续下去。",
           ...(pressureFavorNarrative ? [pressureFavorNarrative] : []),
         ].join("\n\n"),
       },

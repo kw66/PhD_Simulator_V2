@@ -143,8 +143,10 @@ describe("v2 publication loop", () => {
       "decision",
     ]);
     expect(confirmed.totalResearchScore).toBe(1);
-    expect(confirmed.player.san).toBe(12);
-    expect(confirmed.log.at(-1)?.text).toContain("C类会议接收");
+    expect(confirmed.player.san).toBe(14);
+    expect(confirmed.publicationTalentState?.claimedIds).toEqual(["first-paper"]);
+    expect(confirmed.log.some((entry) => entry.text.includes("C类会议接收"))).toBe(true);
+    expect(confirmed.log.at(-1)?.text).toBe("发表天赋完成：首发论文；SAN+2、好感+1、科研+1");
   });
 
   it("releases a review-result chain back to a draft when force-advancing", () => {
@@ -309,6 +311,7 @@ describe("v2 publication loop", () => {
       eventQueue: [],
       papers: [paper],
       externalPublications: [prior],
+      publicationTalentState: { claimedIds: ["first-paper"] },
       selectedPaperId: paper.id,
       player: { ...createStartedGameState("normal").player, san: 10 },
     };
@@ -561,6 +564,38 @@ describe("v2 publication loop", () => {
     const fourthMonth = settlePublishedPaperCitations(thirdMonth).state;
     expect(fourthMonth.papers[0]?.publication).toMatchObject({ effectiveScore: 95, citations: 21, monthsSincePublish: 4 });
     expect(fourthMonth.papers[1]?.publication).toMatchObject({ effectiveScore: 95, citations: 42, monthsSincePublish: 4 });
+  });
+
+  it("awards highly cited status after twelve months using the frozen publication heat threshold", () => {
+    const paper = attachPaperPublication({
+      ...createDraftPaper(1, 0),
+      heatMultiplier: 0.7,
+      idea: 0,
+      experiment: 0,
+      writing: 0,
+      status: "published" as const,
+      target: "C" as const,
+      submittedIdea: 0,
+      submittedExperiment: 0,
+      submittedWriting: 0,
+      conferenceHandled: true,
+    });
+    paper.publication!.citations = 140;
+    paper.publication!.monthsSincePublish = 11;
+    paper.heatMultiplier = 1.5;
+
+    const settled = settlePublishedPaperCitations({
+      ...createStartedGameState("normal"),
+      eventQueue: [],
+      papers: [paper],
+      selectedPaperId: paper.id,
+    }).state;
+
+    expect(settled.papers[0]?.publication).toMatchObject({
+      highlyCitedThreshold: 140,
+      highlyCited: true,
+      monthsSincePublish: 12,
+    });
   });
 
   it("supports arXiv while a conference paper is awaiting exposure", () => {
@@ -823,6 +858,7 @@ describe("v2 publication loop", () => {
       ...createStartedGameState("normal"),
       eventQueue: [],
       papers: [paper],
+      publicationTalentState: { claimedIds: ["first-paper", "first-a-or-journal"] },
       selectedPaperId: paper.id,
       player: { ...createStartedGameState("normal").player, san: 10 },
     };

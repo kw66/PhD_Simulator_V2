@@ -17,28 +17,28 @@ const CAREER_COPY: Record<CareerType, {
   followup: string;
 }> = {
   internet: {
-    intro: "校招群里的岗位表每天都在更新，提前批、笔试和面试通知挤在一起。",
-    currentWork: "改简历、刷题、投递和准备面试都要占时间。",
-    result: "你改完一版项目经历，又处理了几份投递和面试准备。",
-    followup: "邮箱里开始多出测评和面试通知，下一轮还得继续跟进。",
+    intro: "你打开校招群的岗位表，岗位名称看着相近，点进去才发现要求差得不少。",
+    currentWork: "你得先理清项目经历，再看简历里哪些内容值得留下，不能只把技术名词排满一页。",
+    result: "你理了理项目经历，把简历里空泛的描述换成具体做法，又对照岗位要求列出需要补的内容。",
+    followup: "看着这些修改，你总算更清楚面试时该讲什么；至于岗位会不会给回复，还得另说。",
   },
   stateOwned: {
-    intro: "央国企的宣讲和网申陆续开始，岗位地点、业务方向和招聘批次各不相同。",
-    currentWork: "筛岗位、填网申、做测评和准备面试都要占时间。",
-    result: "你筛完一批岗位，补齐网申材料，也完成了几场测评和沟通。",
-    followup: "部分岗位开始通知后续环节，剩下的还在等待筛选。",
+    intro: "你翻开央国企的招聘公告，同样是招应届生，岗位地点、专业要求和网申材料却各有一套。",
+    currentWork: "你得逐项核对条件，连专业名称都不敢想当然。单位名字熟悉，也省不了填表的功夫。",
+    result: "你对着岗位要求检查申请材料，把专业名称、学历和联系方式重新核了一遍，几处拿不准的地方单独标了出来。",
+    followup: "材料比之前齐整了一些，但符合条件不等于录用，后续要求还得继续留意。",
   },
   civilService: {
-    intro: "报名时间临近，职位表、招录人数和专业限制摆在同一张表里。",
-    currentWork: "选岗、报名和准备行测申论都要占时间。",
-    result: "你核对了选岗条件，也按计划完成了这一阶段的行测和申论练习。",
-    followup: "报名或备考只是刚往前走了一段，后面还有不少内容要补。",
+    intro: "你打开公务员招录的职位表，专业、学历和招录人数挤在几列里，筛完才知道能报哪些岗位。",
+    currentWork: "职位表要仔细核对，行测和申论也得准备；光收藏几份资料，显然不算已经学过。",
+    result: "你核对了报考条件，也整理了行测和申论的备考笔记。几处容易混淆的要求，这次总算没有只看个大概。",
+    followup: "正式考试还得靠自己答。你把没弄懂的地方留在笔记上，免得合上书就当会了。",
   },
   academic: {
-    intro: "高校陆续发布招聘信息，论文、项目、研究方向和学历要求列得很细。",
-    currentWork: "整理学术简历、研究计划和试讲材料都要占时间。",
-    result: "你更新了学术简历和研究计划，也继续准备试讲与岗位沟通。",
-    followup: "有些岗位开始回复，更多材料还要按学校要求继续调整。",
+    intro: "你打开高校招聘页面，同样是教职，研究方向和学历要求差得不少，附件还得逐个下载来看。",
+    currentWork: "你得按岗位整理研究经历和后续计划，不能只把论文目录复制进简历就交差。",
+    result: "你整理了学术简历，把研究方向、已有工作和后续设想重新核了一遍，删掉几句连自己也讲不清的表述。",
+    followup: "材料比之前清楚了一些，能否拿到岗位仍要看招聘要求；简历写得顺，并不等于事情已经定了。",
   },
 };
 
@@ -68,13 +68,13 @@ function createCareerChoices(state: GameState, careerType: CareerType): {
       description: progressGain > 0
         ? [
             copy.result,
-            `这次准备让「${definition.name}」进度从 ${oldProgress} 提升到 ${newProgress}，当前阶段为「${getCareerLevel(careerType, newProgress).name}」。`,
+            `「${definition.name}」准备进度从 ${oldProgress} 提升到 ${newProgress}，当前求职评估为「${getCareerLevel(careerType, newProgress).name}」。`,
             copy.followup,
           ].join("\n\n")
         : [
-            `这个月你没有继续投入「${definition.name}」方向。`,
-            `进度仍为 ${oldProgress}，当前阶段保持在「${getCareerLevel(careerType, oldProgress).name}」。`,
-            "相关通知还在更新，之后想继续时仍可以回来准备。",
+            `这次你把「${definition.name}」的求职准备先放到一边，没有给自己再添一项任务。`,
+            `进度仍为 ${oldProgress}，求职评估保持为「${getCareerLevel(careerType, oldProgress).name}」。`,
+            "招聘信息先留着，眼下不用急着删掉。你合上页面，免得盯着它太久，就误以为自己已经准备过了。",
           ].join("\n\n"),
     };
 
@@ -104,9 +104,8 @@ function createCareerChoices(state: GameState, careerType: CareerType): {
   results[`abandon-${careerType}`] = {
     title: "放弃方向",
     description: [
-      `你把「${definition.name}」相关的招聘提醒关掉了。`,
-      "已经整理的材料先留在电脑里，这段时间不再继续投递。",
-      "空出来的精力，你准备放到其他方向上。",
+      `你关掉「${definition.name}」的招聘页面，把这个方向从眼下的求职计划里划掉。`,
+      "已经整理的材料还在电脑里，先留着。关页面比改材料利索得多，但接下来做什么，你还得自己想清楚。",
     ].join("\n\n"),
   };
 
@@ -134,14 +133,13 @@ function createCareerEvent(state: GameState, careerType: CareerType): PendingEve
   return createThreeStageEvent(event, {
     introDescription: [
       copy.intro,
-      `你当前处于「${level.name}」阶段（进度 ${progress}）。${copy.currentWork}`,
-      "你把这个月的日历翻了一遍，得决定在求职上投入多少精力。",
+      copy.currentWork,
+      `求职评估：「${level.name}」（进度 ${progress}）。`,
     ].join("\n\n"),
     decisionTitle: "本月安排",
     decisionDescription: [
-      "按部就班准备，不会太影响实验和作息，不过推进得慢一些。",
-      "集中冲一段时间能多完成几轮准备，最近也得少睡一点。",
-      "你看了看这个月的实验安排，得给求职留出一个合适的分量。",
+      "只留意消息，还是腾出整段时间认真准备？投入得越多，材料能看得越细，人也会更累。",
+      "你把实验安排放在旁边，提醒自己别把每天都排成满格。这次也可以先不投入，或者不再考虑这个方向。",
     ].join("\n\n"),
     results,
   });

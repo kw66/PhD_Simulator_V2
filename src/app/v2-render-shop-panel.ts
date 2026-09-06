@@ -4,14 +4,13 @@ import {
   getAvailableCoffeeMachineUpgrades,
   getCoffeeBuyPrice,
   getCoffeeMachineSellPrice,
-  getCurrentCoffeeBonus,
 } from "../core/v2-coffee-system";
 import { getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { isPreEnrollmentState } from "../core/v2-progression";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "../core/v2-development-flags";
 import anthropicIcon from "../assets/ai/anthropic.svg?raw";
 import deepseekIcon from "../assets/ai/deepseek.svg?raw";
-import doubaoIcon from "../assets/ai/doubao.svg?raw";
+import doubaoAvatarUrl from "../assets/ai/doubao-avatar.jpeg";
 import geminiIcon from "../assets/ai/gemini.svg?raw";
 import kimiIcon from "../assets/ai/kimi.svg?raw";
 import openAiIcon from "../assets/ai/openai.svg?raw";
@@ -20,13 +19,12 @@ import {
   getGpuTierDefinition,
   getNextGpuTierDefinition,
   getShopItemDefinition,
-  getShopItemOwnedText,
   getShopItemSellPrice,
   getShopUpgradeDefinition,
   GPU_TIER_DEFINITIONS,
   isShopItemOwned,
 } from "../core/v2-shop-items";
-import { BIKE_TIER_DEFINITIONS, getBikeTierDefinition, getNextBikeTierDefinition } from "../core/v2-bike-system";
+import { getBikeTierDefinition, getNextBikeTierDefinition } from "../core/v2-bike-system";
 import { getSupportItemDefinition, getSupportItemSellPrice, isSupportItemOwned } from "../core/v2-support-items";
 import { getShopActionPrice } from "../core/v2-shop-transactions";
 import type {
@@ -38,7 +36,7 @@ import type {
   SupportItemId,
 } from "../core/v2-types";
 
-export type ShopTabId = "ai" | "rest" | "coffee" | "display" | "outdoor";
+export type ShopTabId = "ai" | "rest" | "coffee" | "gear";
 
 type ShopTabDefinition = {
   id: ShopTabId;
@@ -115,17 +113,15 @@ type UpgradeRouteOption = {
 const SHOP_TABS: ShopTabDefinition[] = [
   { id: "ai", icon: "🤖", label: "AI" },
   { id: "coffee", icon: "☕", label: "咖啡" },
-  { id: "display", icon: "🖥️", label: "设备" },
+  { id: "gear", icon: "🎒", label: "装备" },
   { id: "rest", icon: "🪑", label: "休息" },
-  { id: "outdoor", icon: "🚲", label: "生活" },
 ];
 
-const AI_ICON_SVGS: Record<AiSlotId, string> = {
+const AI_ICON_SVGS: Partial<Record<AiSlotId, string>> = {
   gpt: openAiIcon,
   claude: anthropicIcon,
   gemini: geminiIcon,
   deepseek: deepseekIcon,
-  doubao: doubaoIcon,
   kimi: kimiIcon,
 };
 
@@ -155,7 +151,11 @@ const CHAIR_UPGRADE_ICONS: Record<typeof CHAIR_UPGRADE_IDS[number], string> = {
 };
 
 function renderAiIcon(slot: AiSlotId): string {
-  return AI_ICON_SVGS[slot]
+  if (slot === "doubao") {
+    return `<img class="shop-item-icon-image is-avatar" src="${escapeHtml(doubaoAvatarUrl)}" alt="">`;
+  }
+
+  return AI_ICON_SVGS[slot]!
     .replaceAll("currentColor", AI_ICON_COLORS[slot])
     .replace("<svg ", '<svg class="shop-item-icon-image" aria-hidden="true" ');
 }
@@ -174,6 +174,7 @@ function normalizeShopDescription(value: string): string {
 }
 
 export function normalizeShopTab(value: string | undefined | null): ShopTabId {
+  if (value === "display" || value === "outdoor") return "gear";
   return SHOP_TABS.some((tab) => tab.id === value) ? (value as ShopTabId) : "ai";
 }
 
@@ -236,7 +237,7 @@ function renderShopEffectHtml(effectText: string): string {
         ${value ? `<strong>${escapeHtml(value)}</strong>` : ""}
       </span>
     `;
-  }).join("");
+  }).join("\n");
 }
 
 function renderAiSubscriptionToggle(slot: AiSlotId, enabled: boolean, paused: boolean): string {
@@ -397,7 +398,10 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
     ? getChairUpgradeIcon(`chair-${currentUpgrade}` as ShopUpgradeId)
     : icon;
   const currentName = currentDefinition?.name ?? item.name;
-  const currentEffect = currentDefinition?.description ?? item.description;
+  const currentEffect = [
+    currentDefinition?.description ?? `${item.description}，升级路线5选一`,
+    ...(owned ? [`累计 +${Math.max(0, state.shopState.chairSanRecovered)} SAN`] : []),
+  ].join("\n");
   const purchasePrice = getShopActionPrice(state, "buy-shop-item", { shopItemId: "chair" }) ?? item.price;
   const options = CHAIR_UPGRADE_IDS.map((upgradeId): UpgradeRouteOption => {
     const definition = getShopUpgradeDefinition(upgradeId);
@@ -425,8 +429,8 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
   const currentCard = renderShopRow({
     icon: currentIcon,
     name: currentName,
-    status: "",
-    statusTone: "owned",
+    status: currentUpgrade ? "已升级" : "可升级",
+    statusTone: owned ? "owned" : "neutral",
     description: "",
     effectText: currentEffect,
     actions: owned
@@ -464,9 +468,13 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
   return [currentCard, ...options.map((option) => renderSelectableUpgradeOption(option, selectedChairUpgradeId ?? null, "chair"))].join("");
 }
 
-function renderShopTabButtons(activeTab: ShopTabId): string {
+function renderShopTabButtons(activeTab: ShopTabId, upgradeNoticeTabs: readonly ShopTabId[] = []): string {
+  const noticeTabSet = new Set(upgradeNoticeTabs);
   return SHOP_TABS.map((tab) => {
     const activeClass = tab.id === activeTab ? " active" : "";
+    const upgradeBadge = noticeTabSet.has(tab.id)
+      ? `<span class="center-tab-badge is-available shop-upgrade-badge" aria-label="${escapeHtml(`${tab.label}有提升`)}">↑</span>`
+      : "";
     return `
       <button
         class="shop-tab-btn${activeClass}"
@@ -476,6 +484,7 @@ function renderShopTabButtons(activeTab: ShopTabId): string {
       >
         <span class="shop-tab-icon" aria-hidden="true">${tab.icon}</span>
         <span>${tab.label}</span>
+        ${upgradeBadge}
       </button>
     `;
   }).join("");
@@ -492,9 +501,6 @@ function renderGpuRow(state: GameState): string {
   const firstTier = GPU_TIER_DEFINITIONS[0]!;
   const canSell = canSellShopItem(shopView, "gpu_buy");
   const nextPrice = getShopActionPrice(state, "buy-shop-item", { shopItemId: "gpu_buy" });
-  const tierText = currentTier
-    ? nextTier ? `下一档：${nextTier.name}` : "已升级到最高型号"
-    : `起步型号，共 ${GPU_TIER_DEFINITIONS.length} 档`;
   const experimentText = currentTier
     ? `做实验：+${currentLevel}次，+${currentLevel}分`
     : "做实验：+1次，+1分";
@@ -503,10 +509,10 @@ function renderGpuRow(state: GameState): string {
     icon: "",
     iconHtml: '<i class="shop-device-icon" data-lucide="microchip" aria-hidden="true"></i>',
     name: currentTier?.name ?? firstTier.name,
-    status: currentTier ? `第 ${currentLevel}/${GPU_TIER_DEFINITIONS.length} 档` : "未拥有",
+    status: nextTier ? "可升级" : "已满级",
     statusTone: currentTier ? "owned" : "neutral",
     description: "",
-    effectText: `${tierText}\n${experimentText}`,
+    effectText: experimentText,
     actions: [
       canSell
         ? renderActionButton({
@@ -548,7 +554,7 @@ function renderShopItemRow(
   return renderShopRow({
     icon,
     name: item.name,
-    status: owned ? "" : getShopItemOwnedText(shopView, itemId),
+    status: "",
     statusTone: owned ? "owned" : "neutral",
     description: "",
     effectText: item.description,
@@ -586,18 +592,18 @@ function renderBikeRow(state: GameState): string {
   const capReached = Boolean(tier && state.shopState.bikeSanCapGains >= capLimit);
   const currentDescription = displayedTier
     ? capReached
-      ? `SAN 上限已满，后续每月不再消耗 SAN`
-      : `每月 SAN -${displayedTier.monthlySanCost}；每累计消耗 6 点 SAN，SAN 上限 +1（最多 +${displayedTier.sanCapLimit}）`
+      ? `当前车型已无法继续提高 SAN 上限，暂不再消耗 SAN`
+      : `每月 SAN -${displayedTier.monthlySanCost}；每 -6 SAN，上限 +1（最多 +${displayedTier.sanCapLimit}）`
     : "已达到最高等级";
   const detail = tier
-    ? `累计 ${state.shopState.bikeSanSpent}｜当前上限 +${state.shopState.bikeSanCapGains}/${capLimit}`
+    ? `累计消耗 ${state.shopState.bikeSanSpent} SAN｜当前上限 +${state.shopState.bikeSanCapGains}/${capLimit}`
     : "";
   const nextPrice = getShopActionPrice(state, "buy-shop-item", { shopItemId: "bike" });
   return renderShopRow({
     icon: "🚲",
     className: "is-bike",
     name: tier?.name ?? nextTier?.name ?? "自行车",
-    status: owned ? `第 ${state.shopState.bikeLevel}/${BIKE_TIER_DEFINITIONS.length} 档` : "未拥有",
+    status: nextTier ? "可升级" : "已满级",
     statusTone: owned ? "owned" : "neutral",
     description: "",
     effectText: [currentDescription, detail].filter(Boolean).join("\n"),
@@ -625,11 +631,7 @@ function renderCoffeeRows(
   selectedCoffeeUpgradeId?: Exclude<CoffeeMachineUpgradeId, null> | null,
 ): string {
   const coffeePrice = getCoffeeBuyPrice(state.coffeeState);
-  const coffeeBonus = getCurrentCoffeeBonus(state.coffeeState);
-  const coffeeSanGain = 3 + coffeeBonus;
-  const coffeeDescription = state.coffeeState.machineOwned
-    ? `SAN +${coffeeSanGain}｜本月已生产 ${state.coffeeState.coffeeProducedCountThisMonth} 杯`
-    : "需先购买咖啡机";
+  const coffeeDescription = "基础 SAN +3";
   const coffeeMachineSellPrice = getCoffeeMachineSellPrice(state.coffeeState);
   const coffeeMachinePurchasePrice = getShopActionPrice(state, "buy-coffee-machine", {}) ?? COFFEE_MACHINE_PRICE;
   const machineUpgrades = getAvailableCoffeeMachineUpgrades(state.coffeeState);
@@ -637,14 +639,9 @@ function renderCoffeeRows(
   const currentDefinition = currentUpgrade
     ? COFFEE_MACHINE_UPGRADE_DEFINITIONS.find((upgrade) => upgrade.id === currentUpgrade) ?? null
     : null;
-  const advancedProgressText = coffeeBonus >= 5
-    ? "已满级"
-    : `再生产 ${10 - (state.coffeeState.machineTrackedCoffeeCount % 10)} 杯提升`;
   const machineDescription = !state.coffeeState.machineOwned
     ? "购入后可生产冰美式并选择一条升级路线"
-    : currentUpgrade === "advanced"
-      ? `已生产 ${state.coffeeState.machineTrackedCoffeeCount} 杯｜冰美式额外 SAN +${coffeeBonus}｜${advancedProgressText}`
-      : currentDefinition?.description ?? "可生产冰美式，每月 1 杯";
+    : currentDefinition?.description ?? "可生产冰美式，每月 1 杯";
 
   const availableUpgradeIds = new Set(machineUpgrades.map((upgrade) => upgrade.id));
   const upgradeOptions = COFFEE_MACHINE_UPGRADE_DEFINITIONS.map((upgrade): UpgradeRouteOption => {
@@ -704,8 +701,8 @@ function renderCoffeeRows(
     renderShopRow({
       icon: "☕",
       name: currentDefinition?.name ?? "咖啡机",
-      status: "",
-      statusTone: "owned",
+      status: currentUpgrade ? "已升级" : "可升级",
+      statusTone: state.coffeeState.machineOwned ? "owned" : "neutral",
       description: "",
       effectText: machineDescription,
       actions: state.coffeeState.machineOwned
@@ -760,7 +757,7 @@ function renderSupportItemRow(
   return renderShopRow({
     icon,
     name: item.name,
-    status: owned ? "" : "未拥有",
+    status: "",
     statusTone: owned ? "owned" : "neutral",
     description: "",
     effectText: item.description,
@@ -823,7 +820,7 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>):
     const polishText = polishGroups
       .map((group) => `${group.labels.join("、")} ${group.bonus > 0 ? "+" : ""}${group.bonus}分`)
       .join("；");
-    return polishText ? `自动科研，提升未提交论文或送审期刊的分数：\n${polishText}` : "暂无效果";
+    return polishText ? `订购或续费时，自动提升可修改论文的分数：\n${polishText}` : "暂无效果";
   }
 
   const groupedEffects: Array<{
@@ -857,7 +854,7 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>):
     .join("\n");
   const hasRelationshipDiscount = Boolean(model.relationshipOperationSanDelta);
   const extraText = hasRelationshipDiscount
-    ? [`人际栏操作：SAN -${Math.abs(model.relationshipOperationSanDelta ?? 0)}`]
+    ? [`人际操作消耗修正（暂未开放）：SAN -${Math.abs(model.relationshipOperationSanDelta ?? 0)}`]
     : [];
 
   return [...(researchText ? [researchText] : []), ...extraText].join("\n") || "暂无效果";
@@ -913,15 +910,11 @@ function renderTabContent(
       ].join("");
     case "coffee":
       return renderCoffeeRows(state, selectedCoffeeUpgradeId);
-    case "display":
+    case "gear":
       return [
         renderGpuRow(state),
         renderShopItemRow(state, "keyboard", "⌨️"),
         renderShopItemRow(state, "monitor", "🖥️"),
-        renderSupportItemRow(state, "game_controller", "🎮"),
-      ].join("");
-    case "outdoor":
-      return [
         renderBikeRow(state),
         renderShopItemRow(state, "ebike", "🛵"),
         renderShopItemRow(state, "down_jacket", "🧥"),
@@ -936,15 +929,13 @@ function renderTabContent(
 function getShopTabNote(activeTab: ShopTabId): string | null {
   switch (activeTab) {
     case "ai":
-      return "单次订购仅生效一个月；AI 模型每年迭代更新，效果与价格随之变化，模型更新后自动续费会关闭";
+      return "订购仅在当月生效；游戏内 AI 模型按学年更新，效果和价格随之变化，更新后你需要重新开启自动续费";
     case "coffee":
-      return "冰美式可手动购买或开启月初自动续费；自动续费需要咖啡机，金币不足时本月暂停";
-    case "display":
-      return "显卡每次升级都会提高做实验的次数和分数，升级价格按型号逐档增加";
+      return "手动购买冰美式和月初自动续费均需咖啡机；自动续费在金币不足或 SAN 已满时跳过";
+    case "gear":
+      return "显卡和自行车可以逐档升级，提升效果；夏季（公历 6–8 月）主动操作的 SAN 消耗 +1，遮阳伞可免除；冬季（公历 12–2 月）每月 SAN -1，羽绒服可免除";
     case "rest":
-      return "办公椅购入后只能选一次升级，之后不能更换";
-    case "outdoor":
-      return "自行车按显卡方式逐档升级；小电驴是独立商品";
+      return "办公椅的升级路线选定后不能直接更换；出售并重新购买后可重新选择";
     default:
       return null;
   }
@@ -955,6 +946,7 @@ export function renderShopSection(
   requestedTab?: ShopTabId,
   selectedChairUpgradeId?: ShopUpgradeId | null,
   selectedCoffeeUpgradeId?: Exclude<CoffeeMachineUpgradeId, null> | null,
+  upgradeNoticeTabs: readonly ShopTabId[] = [],
 ): string {
   const activeTab = normalizeShopTab(requestedTab);
   const preEnrollment = isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT;
@@ -967,11 +959,11 @@ export function renderShopSection(
       selectedCoffeeUpgradeId,
     );
 
-  return `
+  const html = `
     <div class="shop-panel" id="shop-panel-col2" data-shop-tab="${activeTab}">
       ${preEnrollment ? "" : `
         <nav class="shop-tab-btns" aria-label="商店分类">
-          ${renderShopTabButtons(activeTab)}
+          ${renderShopTabButtons(activeTab, upgradeNoticeTabs)}
         </nav>
         ${getShopTabNote(activeTab)
           ? `<p class="${activeTab === "ai" ? "shop-ai-note" : "shop-tab-note"} panel-tip-note">💡 小提示：${escapeHtml(getShopTabNote(activeTab)!)}</p>`
@@ -979,9 +971,13 @@ export function renderShopSection(
       `}
       ${preEnrollment
         ? '<div class="section-empty play-module-lock-state">入学后开放</div>'
-        : `<div class="shop-items-list" id="shop-items-list">
-            ${content || '<div class="shop-empty">暂无物品</div>'}
-          </div>`}
+      : `<div class="shop-items-list" id="shop-items-list">
+          ${content || '<div class="shop-empty">暂无物品</div>'}
+        </div>`}
     </div>
   `;
+  if (!isPreEnrollmentState(state) || !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return html;
+  return html
+    .replaceAll(" disabled", "")
+    .replaceAll(' aria-disabled="true"', "");
 }

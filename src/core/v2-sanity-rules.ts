@@ -3,6 +3,8 @@ import type { EventSupportState } from "./v2-types";
 
 export type SeasonId = "spring" | "summer" | "autumn" | "winter";
 
+export const DISEASE_MONTH_END_CHANGE_BY_SAN_TIER = [4, 2, 0, -2] as const;
+
 export function getSeasonByMonth(month: number): SeasonId {
   if (month >= 7 && month <= 9) return "spring";
   if (month >= 10 && month <= 12) return "summer";
@@ -90,7 +92,7 @@ export function formatResearchMiscSanChange(
 export function getResearchMiscSanNarrative(baseDelta: number, research: number): string {
   const tierDiscount = getResearchMiscTierDiscount(baseDelta, research);
   return tierDiscount > 0
-    ? `你已经是“${RESEARCH_MISC_TIER_NAMES[getAttributeTier(research)]}”档，处理这类杂活少费些力气，SAN 少耗 ${tierDiscount} 点`
+    ? `有了“${RESEARCH_MISC_TIER_NAMES[getAttributeTier(research)]}”档的经验，这类事务处理起来省力了一些。`
     : "";
 }
 
@@ -177,7 +179,9 @@ export function getTierResistedNarrative(
   result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount" | "cappedCount">,
 ): string {
   if (result.cappedCount && rawChange > 0) {
-    return `${label}已经到达上限，这次积累没有再转成新的数值。`;
+    return result.effectiveChange > 0
+      ? `${label}提升后已达到上限，剩余的积累暂时无法带来增长。`
+      : `${label}已达到当前上限，这次积累暂时无法带来增长。`;
   }
   if (result.resistedCount === 0) return "";
   if (label === "导师好感") {
@@ -188,14 +192,24 @@ export function getTierResistedNarrative(
     }
     return result.effectiveChange === 0
       ? "导师对你的态度已经比较稳定，想再进一步也没那么容易。"
-      : "导师认可了你的心意，不过关系只拉近了一点。";
+      : "导师对你多了些认可，关系也拉近了一点。";
   }
   if (label === "社交") {
-    return rawChange < 0
-      ? "你在组里已经有自己的熟人，这点摩擦没有影响现有关系。"
-      : "认识的人已经不少，再扩展人脉没有那么容易。";
+    if (rawChange < 0) {
+      return result.effectiveChange === 0
+        ? "好在平时积累的交情还在，这点摩擦没有让关系继续变僵。"
+        : "平时积累的交情缓和了些不满，但这次摩擦还是让相处生疏了一点。";
+    }
+    return result.effectiveChange === 0
+      ? "你已经积累了不少交往经验，这次相处没有带来明显的提升。"
+      : "这次相处仍有收获，只是已有经验较多，提升没有那么明显。";
   }
-  return rawChange < 0
-    ? "原本稳住的基础没有被这次波动打破。"
-    : "基础已经比较扎实，这次积累没有立刻转成新的数值。";
+  if (rawChange < 0) {
+    return result.effectiveChange === 0
+      ? "以往积累的基础还在，这次波折没有造成进一步的退步。"
+      : "以往的积累抵消了一部分影响，但还是受到了一些打击。";
+  }
+  return result.effectiveChange === 0
+    ? "已有的基础比较扎实，这次学习没有带来明显的提升。"
+    : "这次仍学到了一些东西，只是基础已经比较扎实，提升没有那么明显。";
 }

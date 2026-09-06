@@ -35,7 +35,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
   const event: PendingEvent = {
     id: `random-5-y${state.year}-m${state.month}-n${serial}`,
     title: "导师约谈",
-    description: "导师突然发来一句“来我办公室一趟”，没说是什么事。一路上，你把最近的进度和失误都想了一遍。",
+    description: "导师突然发来一句“来我办公室一趟”，没说是什么事。一路上，你把最近的进度和可能的失误都想了一遍。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -89,13 +89,13 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
     introDescription: [
       "导师发来一句“来办公室聊聊”，没有多说什么。",
       "你把最近的实验结果、没解决的问题和下周计划整理到同一页 PPT 上。",
-      "走到门口时，你又看了一遍这页内容，免得谈到一半才想起漏了什么。",
+      "走到门口时，你又看了一遍这页内容，免得谈到一半才想起遗漏。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
       "如实汇报最稳，不过没做完的部分也藏不住。",
-      "卡住的问题拖了几周，你也想听听导师的意见。",
-      "至于远程实习，现在提出来可能正好，也可能让谈话突然变得严肃。",
+      "卡住的问题已经拖了几周，你也想听听导师的意见。",
+      "至于远程实习，现在提出来可能正合适，也可能让谈话突然变得严肃。",
     ].join("\n\n"),
     results: {
       [`random-5-report-${serial}`]: {
@@ -103,8 +103,8 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
         description: isHighResearch
           ? [
               "你打开 PPT，把已经完成的实验、失败的尝试和下一步计划依次讲清楚。",
-              "导师在其中一页停下来，帮你排除了两个不必再做的对照，又圈出一条值得继续验证的路线。",
-              "离开办公室前，你把接下来的实验顺序重新记了一遍。这次谈话至少让下一步清楚了。",
+              "导师在其中一页停下来，帮你排除了两个没必要再做的对照，又圈出一条值得继续验证的路线。",
+              "离开办公室前，你重新记下接下来的实验顺序。一直拿不准的方向，终于有了值得试的思路。",
             ].join("\n\n")
           : [
               "你把最近的结果投到屏幕上，能讲清楚的只有两组还没跑完的实验。",
@@ -124,7 +124,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
             ].join("\n\n")
           : [
               "你刚说自己不知道下一步该怎么做，导师先问：“相关论文看了哪些？已经试过什么？”",
-              "你一时答不上来。导师让你先把问题和已有尝试整理具体，再约时间讨论。",
+              "你一时答不上来。导师让你先把问题和已有尝试整理清楚，再约时间讨论。",
               "回到工位后，你重新翻开文献和实验记录，先把缺的准备补上。",
               ...(askFavorNarrative ? [askFavorNarrative] : []),
             ].join("\n\n"),
@@ -133,14 +133,14 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
         title: isHighFavor ? "安排实习" : "谈话结束",
         description: isHighFavor
           ? [
-              "“导师，我想接一段远程实习，时间尽量安排在课题之外。”",
+              "“老师，我想做一段远程实习，会把课题这边的时间安排好。”",
               "导师想了想：“可以，但组里的实验节点不能耽误。”",
-              "你和公司确认了远程安排，白天处理实习任务，空档继续跑实验。",
-              "两边来回切换有些累，不过收入和工程经验都实实在在。",
+              "你和公司确认了远程安排，白天处理实习任务，空档时间继续跑实验。",
+              "两边来回切换有些累，好在拿到了实习报酬，也学到几种能用于下轮实验的工程做法。",
               ...(internshipSanNarrative ? [internshipSanNarrative] : []),
             ].join("\n\n")
           : [
-              "“导师，我想接一段远程实习……”",
+              "“老师，我想做一段远程实习……”",
               "导师先问了论文和实验的进度。你报出的几个节点都还没有收尾。",
               "“先把手头这些做完吧。”导师没有同意，谈话也很快回到当前课题。",
               "你只好暂时放下实习计划，回去继续赶实验。",

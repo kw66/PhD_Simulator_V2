@@ -21,6 +21,12 @@ describe("v2 coffee system", () => {
       ["advanced", 18],
       ["unlimited", 16],
     ]);
+    expect(COFFEE_MACHINE_UPGRADE_DEFINITIONS.map((item) => item.description)).toEqual([
+      "冰美式价格降低 1 金币",
+      "每月初额外生产一杯冰美式，金币 -2，SAN +3",
+      "每累计生产 10 杯冰美式，效果提升 1（最多 +5）",
+      "每月可无限生产冰美式，价格按 2/3/4... 递增",
+    ]);
   });
 
   it("exposes current coffee availability and display queries", () => {

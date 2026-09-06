@@ -11,6 +11,7 @@ import {
 } from "./v2-progression";
 import {
   pickRandomAdvisorName,
+  pickDifferentRandomName,
   RANDOM_ADVISOR_GIVEN_CHARS,
   RANDOM_ADVISOR_SURNAMES,
 } from "./v2-random-name";
@@ -175,8 +176,8 @@ function createBeforeGradSchoolResultEvent(advisorName: string): PendingEvent {
     id: "before-grad-school-admission",
     title: "读研之始 ➜ 导师信息 ➜ 正式录取",
     description: [
-      `${ENROLLMENT_CALENDAR_YEAR}年夏天，录取通知书寄到了。你拍下照片晒到朋友圈，终于可以认真期待九月以后的生活。`,
-      "你想做点有趣的研究，多发几篇论文，也参加几次学术会议。想到这些，你对未来充满了期待。",
+      `到了${ENROLLMENT_CALENDAR_YEAR}年夏天，录取通知书寄到了。你拍下照片晒到朋友圈，又在${advisorName}老师的课题组群里报了个喜，九月入学这件事终于有了实感。`,
+      "你想做点有趣的研究，多发几篇论文，也参加几次学术会议。眼下连实验室的门朝哪开都还不知道，你却已经对未来充满了期待。",
     ].join("\n\n"),
     chainId: "before-grad-school",
     stage: "result",
@@ -201,16 +202,21 @@ function createBeforeGradSchoolResultEvent(advisorName: string): PendingEvent {
 export function createBeforeGradSchoolAct1Event(
   _state: GameState,
   getRoll: RandomRollProvider = Math.random,
+  studentName?: string,
+  advisorNameOverride?: string,
+  advisorIntelOverride?: FixedEventAdvisorIntel,
 ): PendingEvent {
-  const advisorName = pickRandomAdvisorName(getRoll);
-  const advisorIntel = createRandomAdvisorIntel(getRoll);
+  const advisorName = advisorNameOverride ?? pickRandomAdvisorName(getRoll);
+  const advisorIntel = advisorIntelOverride ?? createRandomAdvisorIntel(getRoll);
+  const candidateName = studentName ?? pickRandomAdvisorName(getRoll);
   return createFixedEvent({
     id: "before-grad-school-qualification",
     title: "读研之始",
     description: [
-      "你是计算机类专业。大三下，还没想清楚是否喜欢科研，准备随大流继续读研。",
-      "你备好个人陈述，投了夏令营和预推免，也梳理项目准备面试。几个月后，拿到心仪学校的预录取。",
+      `你叫${candidateName}，是计算机类专业学生。大三下，你还没想清楚是否喜欢科研，准备随大流继续读研。`,
+      "你备好个人陈述，梳理项目准备面试，先后申请夏令营和预推免。到了大四上，你拿到心仪学校的预录取。",
       "接下来，该联系导师了。你给感兴趣的老师发了邮件，又找组里的学生问了问。",
+      `小提示：换个姓名只会刷新称呼，对游戏数值没有影响。`,
     ].join("\n\n"),
     chainId: "before-grad-school",
     stage: "act1",
@@ -218,13 +224,81 @@ export function createBeforeGradSchoolAct1Event(
       {
         id: "before-grad-school-open-advisor-info",
         label: "联系导师",
-        outcome: "查看导师信息。",
+        outcome: "确认姓名并查看导师信息。",
         effects: {
+          fixedEventResolution: {
+            kind: "student-name-confirm",
+            studentName: candidateName,
+          },
           enqueueEvents: [createAdvisorInfoEvent(advisorName, advisorIntel)],
+        },
+      },
+      {
+        id: "before-grad-school-reroll-name",
+        label: "换个姓名",
+        outcome: "重新想一个名字。",
+        effects: {
+          stayOnEvent: true,
+          fixedEventResolution: {
+            kind: "student-name-reroll",
+            studentName: candidateName,
+            advisorCandidate: {
+              advisorName,
+              ...LECTURER_INITIAL_PROFILE,
+            },
+            advisorIntel,
+          },
         },
       },
     ],
   });
+}
+
+export function resolveStudentNameConfirmation(
+  state: GameState,
+  resolution: FixedEventResolution,
+): FixedResolutionResult {
+  const studentName = resolution.studentName?.trim();
+  if (!studentName) return { nextState: state, outcome: "未确认姓名。" };
+  return {
+    nextState: { ...state, playerName: studentName },
+    outcome: "",
+  };
+}
+
+export function resolveStudentNameReroll(
+  state: GameState,
+  resolution: FixedEventResolution,
+  getRoll: RandomRollProvider = Math.random,
+): FixedResolutionResult {
+  const currentName = resolution.studentName?.trim();
+  const advisorCandidate = resolution.advisorCandidate;
+  const advisorIntel = resolution.advisorIntel;
+  if (!currentName || !advisorCandidate || !advisorIntel) {
+    return { nextState: state, outcome: "未找到可更换的姓名。" };
+  }
+
+  const refreshedEvent = createBeforeGradSchoolAct1Event(
+    state,
+    getRoll,
+    pickDifferentRandomName(currentName, getRoll),
+    advisorCandidate.advisorName,
+    advisorIntel,
+  );
+  const eventId = "before-grad-school-qualification";
+  return {
+    nextState: {
+      ...state,
+      eventQueue: state.eventQueue.map((event) => event.id === eventId
+        ? {
+            ...refreshedEvent,
+            queueOrder: event.queueOrder,
+            history: event.history,
+          }
+        : event),
+    },
+    outcome: "",
+  };
 }
 
 export function resolveAdvisorConfirmation(

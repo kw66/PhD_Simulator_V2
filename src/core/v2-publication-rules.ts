@@ -1,6 +1,12 @@
 import type { GrantedPublicationEffect, JournalTarget, Paper, PaperPublicationState, PaperPromotionState } from "./v2-types";
 import { getJournalRevisionScore } from "./v2-journal-score";
 
+export const HIGHLY_CITED_CITATION_FACTOR = 200;
+
+export function getHighlyCitedThreshold(heatMultiplier: number): number {
+  return Math.ceil(Math.max(0, heatMultiplier) * HIGHLY_CITED_CITATION_FACTOR);
+}
+
 export function getAcceptedPaperScore(paper: Pick<Paper, "idea" | "experiment" | "writing" | "submittedIdea" | "submittedExperiment" | "submittedWriting"> & { journalTarget?: JournalTarget | null }): number {
   if (paper.journalTarget) {
     return getJournalRevisionScore(paper);
@@ -16,12 +22,14 @@ function createPaperPublicationState(
   citationPenaltyMultiplier = 1,
   influence?: number,
   promotionMultiplier = 1,
+  heatMultiplier = 1,
 ): PaperPublicationState {
   return {
     citations: 0,
     effectiveScore: Math.max(0, acceptedScore),
     citationDebuffMultiplier: Number.isFinite(citationPenaltyMultiplier) && citationPenaltyMultiplier >= 0 ? citationPenaltyMultiplier : 1,
     promotionMultiplier: Number.isFinite(promotionMultiplier) && promotionMultiplier >= 0 ? promotionMultiplier : 1,
+    highlyCitedThreshold: getHighlyCitedThreshold(heatMultiplier),
     ...(Number.isFinite(influence) && (influence ?? 0) >= 0 ? { influence } : {}),
   };
 }
@@ -36,7 +44,7 @@ export function attachPaperPublication(
   return {
     ...paper,
     publication: {
-      ...createPaperPublicationState(getAcceptedPaperScore(paper), citationPenaltyMultiplier, influence, promotionMultiplier),
+      ...createPaperPublicationState(getAcceptedPaperScore(paper), citationPenaltyMultiplier, influence, promotionMultiplier, paper.heatMultiplier),
       ...(paper.journalTarget ? { journalTarget: paper.journalTarget } : {}),
       ...(acceptType ? { acceptType } : {}),
     },
@@ -84,6 +92,7 @@ export function createGrantedPublishedPaper(
     submittedWriting: writing,
     publication: createPaperPublicationState(acceptedScore, grant.citationDebuffMultiplier),
     nonFirstAuthor: grant.nonFirstAuthor === true,
+    ...(grant.leadAuthorName?.trim() ? { leadAuthorName: grant.leadAuthorName.trim() } : {}),
   };
 }
 
