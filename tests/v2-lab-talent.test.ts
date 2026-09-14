@@ -10,7 +10,7 @@ describe("v2 lab talent", () => {
   it("activates only when advisor, senior and junior are all present", () => {
     const inactiveState = {
       unlockedSlots: 4,
-      occupiedSlots: 3,
+      occupiedSlots: 2,
       advisorCount: 1,
       seniorCount: 1,
       juniorCount: 0,

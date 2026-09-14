@@ -8,6 +8,7 @@ import { getConferenceInfo } from "./v2-conference-catalog";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getJournalDefinition } from "./v2-journal-system";
 import { generatePaperTopic } from "./v2-paper-topics";
+import { setPaperTotalScores } from "./v2-paper-collaboration";
 import {
   getBorderlineAcceptChance,
   getReviewerWeights,
@@ -121,6 +122,9 @@ export function createDraftPaper(
     idea: 0,
     experiment: 0,
     writing: 0,
+    collaborationScores: { idea: 0, experiment: 0, writing: 0 },
+    collaborators: [],
+    submittedCollaborationScores: null,
     status: "draft",
     target: null,
     reviewMonthsLeft: 0,
@@ -193,7 +197,7 @@ export function applyPrepublicationPaperDecay(state: GameState): GameState {
       ...(nextWriting < paper.writing ? [`写作 -${paper.writing - nextWriting}`] : []),
     ];
     if (paperChanges.length > 0) changes.push(`${paper.title}：${paperChanges.join("、")}`);
-    return { ...paper, idea: nextIdea, experiment: nextExperiment, writing: nextWriting };
+    return setPaperTotalScores(paper, { idea: nextIdea, experiment: nextExperiment, writing: nextWriting });
   });
   const nextState = { ...state, papers };
   return changes.length > 0
@@ -234,6 +238,7 @@ export function submitPaper(
     submittedIdea: paper.idea,
     submittedExperiment: paper.experiment,
     submittedWriting: paper.writing,
+    ...(paper.collaborationScores ? { submittedCollaborationScores: { ...paper.collaborationScores } } : {}),
     submittedMonth: state.month,
     submittedYear: state.year,
     conferenceHandled: false,
@@ -265,6 +270,7 @@ export function withdrawPaper(state: GameState, paperId: string): GameState {
       idea: paper.submittedIdea ?? paper.idea,
       experiment: paper.submittedExperiment ?? paper.experiment,
       writing: paper.submittedWriting ?? paper.writing,
+      ...(paper.collaborationScores ? { collaborationScores: { ...(paper.submittedCollaborationScores ?? {}) } } : {}),
       status: "draft",
       target: null,
       journalTarget: null,
@@ -272,6 +278,7 @@ export function withdrawPaper(state: GameState, paperId: string): GameState {
       submittedIdea: null,
       submittedExperiment: null,
       submittedWriting: null,
+      submittedCollaborationScores: null,
       submittedMonth: null,
       submittedYear: null,
       conferenceHandled: false,
@@ -297,6 +304,7 @@ export function withdrawPaper(state: GameState, paperId: string): GameState {
     submittedIdea: null,
     submittedExperiment: null,
     submittedWriting: null,
+    submittedCollaborationScores: null,
     submittedMonth: null,
     submittedYear: null,
     conferenceHandled: false,
@@ -548,6 +556,7 @@ export function resolvePaperReview(
       submittedIdea: null,
       submittedExperiment: null,
       submittedWriting: null,
+      submittedCollaborationScores: null,
       submittedMonth: null,
       submittedYear: null,
       conferenceHandled: false,

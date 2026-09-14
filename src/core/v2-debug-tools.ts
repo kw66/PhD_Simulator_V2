@@ -29,9 +29,16 @@ import { createRandomEventById } from "./v2-random-event-router";
 import { createIllnessRandomEvent } from "./v2-random-events-core-health";
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { clampResearchToCap } from "./v2-research-cap-system";
-import { syncRelationshipState } from "./v2-relationship-rules";
+import { canAddRelationship, syncRelationshipState } from "./v2-relationship-rules";
+import { DEBUG_RELATIONSHIP_TYPES } from "./v2-action-ids";
+import { createCustomFellowProgressProfile, createGeneratedFellowProfileAddition, getFellowRoleLabel } from "./v2-fellow-progression";
+import { createLoverProgressState } from "./v2-lover-progression";
+import { activateLover } from "./v2-lover-system";
+import { isPaperCompetitionEventId } from "./v2-paper-competition";
+import { activatePendingPaperCompetitionEvents, rememberPendingPaperCompetitionEvent } from "./v2-paper-competition-waiting";
 import type {
   Buff,
+  DebugRelationshipType,
   DebugStatId,
   DispatchPayload,
   GameActionId,
@@ -284,6 +291,8 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
       { id: "random-14", label: "指导师弟/师妹" },
       { id: "random-15", label: "游戏放松" },
       { id: "random-16", label: "数据丢失" },
+      { id: "random-17", label: "被抢发idea" },
+      { id: "random-18", label: "新SOTA" },
     ],
   },
   {
@@ -605,7 +614,7 @@ function buildDebugEvent(state: GameState, eventId: string): { nextState: GameSt
           totalMonths: state.totalMonths,
           type,
           playerGender: getRoleDefinition(state.selectedRoleId).gender,
-          canAddRelationship: state.relationshipState.occupiedSlots < state.relationshipState.unlockedSlots,
+          canAddRelationship: canAddRelationship(state.relationshipState, "lover"),
         })),
       };
     }
@@ -644,6 +653,15 @@ function buildDebugEvent(state: GameState, eventId: string): { nextState: GameSt
 }
 
 function triggerDebugEvent(state: GameState, eventId: string): GameState {
+  const randomMatch = /^random-(\d+)$/u.exec(eventId);
+  const randomId = randomMatch ? Number(randomMatch[1]) : NaN;
+  if (isPaperCompetitionEventId(randomId)) {
+    const pendingState = rememberPendingPaperCompetitionEvent(state, randomId, state.totalRandomEventCount + 1);
+    return activatePendingPaperCompetitionEvents(pendingState === state ? state : {
+      ...pendingState,
+      totalRandomEventCount: state.totalRandomEventCount + 1,
+    });
+  }
   if (eventId === "conference") {
     return triggerConferenceDebugEvent(state);
   }
@@ -806,6 +824,40 @@ function addAllDebugBuffs(state: GameState): GameState {
   );
 }
 
+function addDebugRelationship(state: GameState, type: DebugRelationshipType): GameState {
+  if (type === "lover") {
+    if (state.loverState.active || state.loverProgressState.active || state.relationshipState.loverCount > 0) {
+      return pushLog(state, "测试：已有恋人，未重复添加");
+    }
+    return pushLog({
+      ...state,
+      relationshipState: { ...state.relationshipState, loverCount: 1 },
+      loverState: activateLover("smart", state.totalMonths, getRoleDefinition(state.selectedRoleId).gender),
+      loverProgressState: { ...createLoverProgressState(), active: true },
+    }, "测试：已新增恋人，不触发恋爱奖励");
+  }
+
+  if (state.fellowProgressState.length >= 4) {
+    return pushLog(state, "测试：已有 4 位同学，未继续添加");
+  }
+  const seed = state.totalMonths + state.fellowProgressState.length;
+  const profile = createCustomFellowProgressProfile({
+    ...createGeneratedFellowProfileAddition(type, seed),
+    startTotalMonths: state.totalMonths,
+  });
+  const countKey = ({ senior: "seniorCount", junior: "juniorCount", peer: "peerCount" } as const)[type];
+  return pushLog({
+    ...state,
+    fellowProgressState: [...state.fellowProgressState, profile],
+    relationshipState: {
+      ...state.relationshipState,
+      [countKey]: state.relationshipState[countKey] + 1,
+      occupiedSlots: state.relationshipState.occupiedSlots + 1,
+      unlockedSlots: Math.max(state.relationshipState.unlockedSlots, state.fellowProgressState.length + 2),
+    },
+  }, `测试：已新增${getFellowRoleLabel(type, profile.gender)}${profile.name ?? ""}`);
+}
+
 export function dispatchDebugAction(
   state: GameState,
   actionId: GameActionId,
@@ -815,6 +867,7 @@ export function dispatchDebugAction(
     switch (actionId) {
       case "debug-adjust-stat":
       case "debug-add-paper":
+      case "debug-add-relationship":
       case "debug-shift-month":
       case "debug-trigger-event":
       case "debug-add-all-buffs":
@@ -842,6 +895,10 @@ export function dispatchDebugAction(
         return state;
       }
       return shiftDebugMonth(state, payload.delta);
+    case "debug-add-relationship":
+      return payload.debugRelationshipType && DEBUG_RELATIONSHIP_TYPES.includes(payload.debugRelationshipType)
+        ? addDebugRelationship(state, payload.debugRelationshipType)
+        : state;
     case "debug-trigger-event":
       return payload.eventId ? triggerDebugEvent(state, payload.eventId) : state;
     case "debug-add-all-buffs":

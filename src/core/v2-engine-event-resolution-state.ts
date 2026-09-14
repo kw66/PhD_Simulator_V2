@@ -4,14 +4,16 @@ import { applyFixedEventResolution } from "./v2-fixed-events";
 import { getGraduationScoreTarget, getMonthLimitByDegree, getRoleDefinition } from "./v2-progression";
 import { createGrantedPublishedPaper } from "./v2-publication-rules";
 import { applyPaperReviewSettlement } from "./v2-publication-system";
+import { applyPaperCompetitionResolution } from "./v2-paper-competition";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { clampResearchToCap } from "./v2-research-cap-system";
 import { applyReadPaperActions, applyReadingCountProgress } from "./v2-reading-system";
-import { syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
+import { canAddRelationship, syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
+import { addPaperCollaboration, applyPaperEffectUpdates, setPaperTotalScores } from "./v2-paper-collaboration";
 import type { Buff, EventChoice, GameState, PaperActionType, PendingEvent } from "./v2-types";
 
 export interface ResolvedEventChoiceState {
@@ -54,7 +56,7 @@ function createTriggeredFollowUpEvents(state: GameState, choice: EventChoice): P
         totalMonths: state.totalMonths,
         type: effects.triggerLoverDevelopment,
         playerGender: getRoleDefinition(state.selectedRoleId).gender,
-        canAddRelationship: state.relationshipState.occupiedSlots < state.relationshipState.unlockedSlots,
+        canAddRelationship: canAddRelationship(state.relationshipState, "lover"),
         ...(effects.followUpContext ? { origin: effects.followUpContext } : {}),
       })));
     }
@@ -280,18 +282,18 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       });
   const clearedPapers = effects.clearDraftProgress
     ? scopedPapers.map((paper) => paper.status === "draft"
-      ? { ...paper, idea: 0, experiment: 0, writing: 0 }
+      ? setPaperTotalScores(paper, { idea: 0, experiment: 0, writing: 0 })
       : paper)
     : scopedPapers;
-  const paperUpdates = new Map((effects.paperUpdates ?? []).map((update) => [update.id, update]));
+  const paperUpdates = effects.paperUpdates ?? [];
   const papers = clearedPapers.map((paper) => {
-    const update = paperUpdates.get(paper.id);
-    return update ? { ...paper, ...update } : paper;
+    let nextPaper = applyPaperEffectUpdates(paper, paperUpdates);
+    for (const collaboration of effects.paperCollaborations ?? []) {
+      nextPaper = addPaperCollaboration(nextPaper, collaboration);
+    }
+    return nextPaper;
   });
-  const updatedExternalPublications = state.externalPublications.map((paper) => {
-    const update = paperUpdates.get(paper.id);
-    return update ? { ...paper, ...update } : paper;
-  });
+  const updatedExternalPublications = state.externalPublications.map((paper) => applyPaperEffectUpdates(paper, paperUpdates));
   const externalPublications = effects.grantedPublication
     ? [
         ...updatedExternalPublications,
@@ -314,7 +316,16 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     ...(effects.loverProgressStateUpdates ?? {}),
   };
 
-  const additions = [...(effects.addBuffs ?? []), ...createBuffsFromEventEffects(choice, state, buffSource)];
+  const addedFellowIds = fellowProgressState.length > state.fellowProgressState.length
+    ? fellowProgressState.slice(state.fellowProgressState.length).map((profile) => profile.id)
+    : [];
+  const relationshipId = effects.activateLoverProgress
+    ? "lover"
+    : addedFellowIds.length === 1 ? addedFellowIds[0] : undefined;
+  const additions = [
+    ...(effects.addBuffs ?? []).map((buff) => relationshipId ? { ...buff, relationshipId } : buff),
+    ...createBuffsFromEventEffects(choice, state, buffSource).map((buff) => relationshipId ? { ...buff, relationshipId } : buff),
+  ];
   const buffs = removeBuffs(addOrReplaceBuffs(state.buffs, additions), effects.removeBuffIds ?? []);
 
   const directlyResolvedState: GameState = {
@@ -408,6 +419,12 @@ export function applyChoiceEffectsToState(
   choice: EventChoice,
   buffSource = "事件",
 ): ResolvedEventChoiceState {
+  if (choice.effects.paperCompetitionResolution) {
+    return {
+      ...applyPaperCompetitionResolution(state, choice.effects.paperCompetitionResolution),
+      resolvedEnqueueEvents: [],
+    };
+  }
   let nextState = applyDirectCoreEffects(state, choice, buffSource);
   if (choice.effects.paperReviewSettlement) {
     nextState = applyPaperReviewSettlement(nextState, choice.effects.paperReviewSettlement);

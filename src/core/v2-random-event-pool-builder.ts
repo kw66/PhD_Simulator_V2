@@ -1,3 +1,5 @@
+import type { PendingPaperCompetitionEvent } from "./v2-paper-competition";
+
 export interface CandidateEventContext {
   availableRandomEvents: number[];
   usedRandomEvents: number[];
@@ -5,6 +7,7 @@ export interface CandidateEventContext {
   research?: number;
   publishedPaperCount?: number;
   hasRecoverableDraftPaper?: boolean;
+  pendingPaperCompetitionEvents?: PendingPaperCompetitionEvent[];
 }
 
 export interface CandidateEventBuildResult {
@@ -35,8 +38,10 @@ export function buildCandidateEventIds(params: {
   socialUnlockEventId: number;
 }): CandidateEventBuildResult {
   const { context, socialUnlockEventId } = params;
+  const pendingIds = new Set<number>((context.pendingPaperCompetitionEvents ?? []).map((event) => event.eventId));
   let candidateEventIds = context.availableRandomEvents.filter((eventId) => (
     eventId !== DISEASE_EVENT_ID
+    && !pendingIds.has(eventId)
     && (eventId !== 16 || context.hasRecoverableDraftPaper === true)
   ));
 

@@ -1,6 +1,7 @@
 ﻿import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
 import { createGeneratedFellowProfileAddition, getFellowRoleLabel, getFellowPronoun, getPlayerHonorific } from "./v2-fellow-progression";
 import { getRoleDefinition } from "./v2-progression";
+import { canAddRelationship } from "./v2-relationship-rules";
 import { previewReadPaperActions } from "./v2-reading-system";
 import {
   createThreeStageRandomEvent,
@@ -17,7 +18,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
   const mentorshipJuniorPronoun = getFellowPronoun(mentorshipJunior.gender);
   const familiarJunior = state.fellowProgressState.find((profile) => profile.type === "junior");
   const hasJunior = familiarJunior !== undefined;
-  const canAddJunior = state.relationshipState.occupiedSlots < state.relationshipState.unlockedSlots;
+  const canAddJunior = canAddRelationship(state.relationshipState, "junior");
   const familiarJuniorLabel = familiarJunior ? getFellowRoleLabel(familiarJunior.type, familiarJunior.gender) : "";
   const familiarJuniorName = familiarJunior?.name?.trim() || familiarJuniorLabel;
   const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 101);
@@ -280,7 +281,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   const shortTermSocialResult = applyTierResist(1, state.player.social, getRoll);
   const shortTermSocialGain = shortTermSocialResult.effectiveChange;
   const shortTermSocialNarrative = getTierResistedNarrative("社交", 1, shortTermSocialResult);
-  const canAddJunior = state.relationshipState.occupiedSlots < state.relationshipState.unlockedSlots;
+  const canAddJunior = canAddRelationship(state.relationshipState, "junior");
 
   const event: PendingEvent = {
     id: `random-14-y${state.year}-m${state.month}-n${serial}`,
@@ -342,6 +343,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
     ].join("\n\n"),
     decisionTitle: "如何抉择",
     decisionDescription: [
+      ...(!canAddJunior ? ["普通关系栏已满，继续合作不会新增师弟师妹；你可以现在选择退出。"] : []),
       "最近实在忙不过来，可以直接说明情况。",
       `也可以先帮${pronounText}把眼前的问题跑通，之后让${pronounText}自己做。`,
       "长期带教要每月持续投入，也能一起积累合作成果；你得先确认自己还有精力维持这段合作。",

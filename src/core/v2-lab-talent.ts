@@ -7,7 +7,7 @@ export function isLabTalentActive(relationshipState: RelationshipState): boolean
 }
 
 export function getLabTalentTeamSize(relationshipState: RelationshipState): number {
-  return relationshipState.occupiedSlots;
+  return relationshipState.occupiedSlots + relationshipState.advisorCount;
 }
 
 export function getLabTalentActionBonus(relationshipState: RelationshipState): number {

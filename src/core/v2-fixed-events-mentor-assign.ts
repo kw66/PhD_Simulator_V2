@@ -2,10 +2,11 @@ import { createGeneratedFellowProfileAddition } from "./v2-fellow-progression";
 import { createFixedEvent } from "./v2-fixed-events-shared";
 import { createThreeStageEvent } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
+import { canAddRelationship } from "./v2-relationship-rules";
 
 export function createMentorAssignEvent(state: GameState): PendingEvent {
   const assignedJunior = createGeneratedFellowProfileAddition("junior", state.totalMonths + state.year + state.month);
-  const canAddJunior = state.relationshipState.occupiedSlots < state.relationshipState.unlockedSlots;
+  const canAddJunior = canAddRelationship(state.relationshipState, "junior");
   const event: PendingEvent = createFixedEvent({
     id: "mentor-assign-junior",
     title: "指导新生",
@@ -35,6 +36,7 @@ export function createMentorAssignEvent(state: GameState): PendingEvent {
     ].join("\n\n"),
     decisionTitle: "如何处理",
     decisionDescription: [
+      ...(!canAddJunior ? ["普通关系栏已满，接受安排也不会新增师弟师妹；你可以现在选择拒绝。"] : []),
       "你先问清带教内容：从环境配置、实验记录，到组会前怎样整理问题，都需要有人领个头。",
       "老师在等你答复。你可以接受安排，也可以说明暂时顾不过来，请老师另找同学。",
     ].join("\n\n"),

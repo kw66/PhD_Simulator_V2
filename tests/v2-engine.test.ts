@@ -596,11 +596,12 @@ describe("minimal game engine", () => {
     expect(resolved.ending).toBe("burnout");
   });
 
-  it("makes every debug event button observable with one click", () => {
+  it("makes every debug event button observable when paper prerequisites are met", () => {
     const eventIds = DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons.map((button) => button.id));
 
     for (const eventId of eventIds) {
-      const state = { ...startGame(), eventQueue: [] };
+      const paper = { ...createDraftPaper(0, 0, () => 0), idea: 4, experiment: 4, writing: 4 };
+      const state = { ...startGame(), eventQueue: [], papers: [paper] };
       const next = dispatchAction(state, "debug-trigger-event", { eventId });
       expect(next, eventId).not.toEqual(state);
       expect(next.log[0]?.text ?? "", eventId).not.toMatch(/失败|无法生成/u);

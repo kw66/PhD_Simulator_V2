@@ -8,6 +8,7 @@
   getTierResistedNarrative,
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
+import { canAddRelationship } from "./v2-relationship-rules";
 import { createGeneratedFellowProfileAddition, getFellowPronoun, getFellowRoleLabel } from "./v2-fellow-progression";
 import {
   createThreeStageRandomEvent,
@@ -24,7 +25,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   const peerName = peerAddition.name ?? "同门";
   const peerPronoun = getFellowPronoun(peerGender);
   const isLowSocial = state.player.social < 6;
-  const canAddPeer = state.relationshipState.occupiedSlots < state.relationshipState.unlockedSlots;
+  const canAddPeer = canAddRelationship(state.relationshipState, "peer");
   const exchangeSanChange = getActualSanChange(-2, state.month, state.eventSupport);
   const fullSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport);
   const fullSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport);
@@ -104,6 +105,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
+      ...(!isLowSocial && !canAddPeer ? ["普通关系栏已满，全面合作仍可获得本次合作收益，但不会新增同门；你可以现在选择退出。"] : []),
       "可以只交流思路，也可以互补实验、共同署名；若想全面合作，就得把后续安排一起商量好。",
       "如果手头已经够忙，婉拒也很正常。",
     ].join("\n\n"),
@@ -182,7 +184,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   const deepResearchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
   const deepResearchChange = deepResearchResult.effectiveChange;
   const deepResearchNarrative = getTierResistedNarrative("科研", 1, deepResearchResult);
-  const canAddSenior = state.relationshipState.occupiedSlots < state.relationshipState.unlockedSlots;
+  const canAddSenior = canAddRelationship(state.relationshipState, "senior");
 
   const event: PendingEvent = {
     id: `random-11-y${state.year}-m${state.month}-n${serial}`,
@@ -241,6 +243,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
+      ...(!canAddSenior ? ["普通关系栏已满，深度合作仍可结算本次收益，但不会新增师兄或师姐；你可以现在选择退出。"] : []),
       "先观望最省事，对方可能很快就会找别人。",
       "浅合作只负责一部分，深合作则要从头跟到尾。",
       `如果想长期跟着${roleText}学，也可以直接开口。`,

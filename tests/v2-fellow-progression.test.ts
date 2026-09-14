@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createCustomFellowProgressProfile,
+  createGeneratedFellowProfileAddition,
+  getFellowName,
   getFellowTaskSanCost,
+  getStableGeneratedFellowName,
 } from "../src/core/v2-fellow-progression";
+import { pickStableRandomName } from "../src/core/v2-random-name";
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("v2 fellow progression", () => {
   it("creates custom preview profiles with stable task defaults", () => {
@@ -41,5 +47,54 @@ describe("v2 fellow progression", () => {
       startTotalMonths: 12,
     });
     expect(["idea", "experiment", "writing"].map((type) => getFellowTaskSanCost(type as "idea" | "experiment" | "writing"))).toEqual([2, 3, 4]);
+  });
+
+  it.each(["male", "female"] as const)("generates %s fellows with the shared seeded full-name rules", (gender) => {
+    const random = vi.spyOn(Math, "random");
+    for (const seed of [0, 1, 7, 23, 100, -4.2]) {
+      const expectedName = pickStableRandomName(`fellow:${Math.abs(Math.floor(seed))}:${gender}`);
+      for (const type of ["senior", "junior", "peer"] as const) {
+        const profile = createGeneratedFellowProfileAddition(type, seed, gender);
+        expect(profile).toMatchObject({ type, gender, name: expectedName });
+        expect(profile.name).toMatch(/^[\p{Script=Han}]{2,3}$/u);
+        expect(profile.name).not.toMatch(/^小/);
+        expect(getStableGeneratedFellowName(seed, gender)).toBe(expectedName);
+      }
+    }
+    expect(random).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", " \t\n "])("stores a generated name for a custom profile with blank input %j", (name) => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.123456);
+    const profile = createCustomFellowProgressProfile({
+      type: "junior", gender: "female", startTotalMonths: 12, research: 4, affinity: 2, name,
+    });
+
+    expect(profile.name).toBe(pickStableRandomName(`fellow:${profile.id}`));
+    expect(getFellowName(profile)).toBe(profile.name);
+    expect(profile.name).toMatch(/^[\p{Script=Han}]{2,3}$/u);
+    expect(random).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves explicitly supplied names after trimming", () => {
+    const profile = createCustomFellowProgressProfile({
+      type: "senior", gender: "male", startTotalMonths: 12, research: 4, affinity: 2, name: "  小明  ",
+    });
+
+    expect(profile.name).toBe("小明");
+    expect(getFellowName(profile)).toBe("小明");
+    expect(getFellowName({ id: "custom-id", name: "  林知远  " })).toBe("林知远");
+  });
+
+  it("keeps missing-name fallbacks stable by profile id without changing profiles or global randomness", () => {
+    const random = vi.spyOn(Math, "random");
+    const profiles = [{ id: "junior-12-a" }, { id: "senior-12-b", name: "   " }];
+    const before = structuredClone(profiles);
+    const names = profiles.map(getFellowName);
+
+    expect(names).toEqual(profiles.map((profile) => pickStableRandomName(`fellow:${profile.id}`)));
+    expect(profiles.map(getFellowName)).toEqual(names);
+    expect(profiles).toEqual(before);
+    expect(random).not.toHaveBeenCalled();
   });
 });

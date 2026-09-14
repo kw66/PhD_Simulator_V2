@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { renderApp } from "../src/app/v2-render";
 import { buildBuffDisplayBuckets } from "../src/app/v2-render-buffs";
 import { buildFutureTodoPreviewItems } from "../src/app/v2-render-play";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { getAiModelForTotalMonths } from "../src/core/v2-ai-shop";
-import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
+import { createCustomFellowProgressProfile, getFellowName } from "../src/core/v2-fellow-progression";
+import { activateLover, getLoverName } from "../src/core/v2-lover-system";
+import { pickStableRandomName } from "../src/core/v2-random-name";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { getConferenceInfo, getConferenceLocation } from "../src/core/v2-conference-catalog";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
@@ -14,6 +16,7 @@ import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { getRoleLobbyAchievementDefinitions } from "../src/core/v2-role-lobby-meta";
 import { createDebugBuffs } from "../src/core/v2-debug-tools";
+import type { GameState, RelationshipKind } from "../src/core/v2-types";
 
 function createPublishedPaper(
   index: number,
@@ -86,6 +89,79 @@ function getTalentCardHtml(html: string, talentId: string): string {
   const cardStart = html.lastIndexOf("<article", markerIndex);
   const cardEnd = html.indexOf("</article>", markerIndex);
   return cardStart >= 0 && cardEnd >= 0 ? html.slice(cardStart, cardEnd + "</article>".length) : "";
+}
+
+function getRelationshipCardHtml(html: string, type: RelationshipKind): string {
+  const markerIndex = html.indexOf(`data-relationship-type="${type}"`);
+  if (markerIndex < 0) return "";
+  const cardStart = html.lastIndexOf("<article", markerIndex);
+  const cardEnd = html.indexOf("</article>", markerIndex);
+  return cardStart >= 0 && cardEnd >= 0 ? html.slice(cardStart, cardEnd + "</article>".length) : "";
+}
+
+function createRelationshipCardTestState(taskUsedThisMonth = false): GameState {
+  const state = dispatchAction(createAdmittedTestState(), "next-month");
+  return {
+    ...state,
+    totalMonths: 12,
+    selectedAdvisorName: "李旭霖",
+    player: { ...state.player, social: 6, favor: 3 },
+    relationshipState: {
+      ...state.relationshipState,
+      unlockedSlots: 5,
+      occupiedSlots: 4,
+      advisorCount: 1,
+      seniorCount: 1,
+      juniorCount: 1,
+      peerCount: 1,
+      loverCount: 1,
+    },
+    advisorProgressState: {
+      ...state.advisorProgressState,
+      researchResource: 7,
+      affinity: 4,
+      taskProgress: 11,
+      taskMax: 44,
+      relationProgress: 14,
+      relationMax: 40,
+      canInteract: true,
+      taskUsedThisMonth,
+    },
+    fellowProgressState: (["senior", "junior", "peer"] as const).map((type) => ({
+      ...createCustomFellowProgressProfile({
+        type,
+        gender: "female",
+        name: { senior: "小明", junior: "小李", peer: "小刚" }[type],
+        startTotalMonths: 4,
+        research: 7,
+        affinity: 4,
+      }),
+      taskProgress: 15,
+      relationProgress: 14,
+      canInteract: true,
+      taskUsedThisMonth,
+    })),
+    loverState: {
+      ...state.loverState,
+      active: true,
+      name: "林知远",
+      type: "smart",
+      gender: "female",
+      startTotalMonths: 4,
+    },
+    loverProgressState: {
+      ...state.loverProgressState,
+      active: true,
+      research: 7,
+      intimacy: 4,
+      taskProgress: 25,
+      taskMax: 100,
+      relationProgress: 14,
+      relationMax: 40,
+      canInteract: true,
+      taskUsedThisMonth,
+    },
+  };
 }
 
 describe("v2 render lobby shell", () => {
@@ -320,10 +396,21 @@ describe("v2 render lobby shell", () => {
     expect(rolesHtml).toContain('data-lucide="user-round"');
     expect(rolesHtml).toContain('data-lucide="git-fork"');
     expect(rolesHtml).toContain('data-lucide="gamepad-2"');
-    expect(rolesHtml).toContain('data-community-stat="today-visitors"');
-    expect(rolesHtml).toContain('data-community-stat="today-games"');
-    expect(rolesHtml).toContain('data-community-stat="total-visitors"');
-    expect(rolesHtml).toContain('data-community-stat="total-games"');
+    for (const html of [rolesHtml, infoHtml, valuesHtml, guideHtml, messagesHtml]) {
+      const metricGroups = html.match(/<div class="(?:lobby-live-metrics|lobby-stat-strip)"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+      expect(metricGroups).toHaveLength(html === infoHtml ? 2 : 1);
+      for (const metrics of metricGroups) {
+        expect(metrics.match(/data-community-stat=/g)).toHaveLength(2);
+        expect(metrics).toContain('<strong data-community-stat="visitors">--（--）</strong>');
+        expect(metrics).toContain('<strong data-community-stat="views">--（--）</strong>');
+        expect(metrics).toContain('title="访客：同一浏览器去重计数；总数（今日，北京时间）"');
+        expect(metrics).toContain('title="访问：每次打开或刷新页面计一次；总数（今日，北京时间）"');
+        expect(metrics).toContain('<i aria-hidden="true">👥</i>访客');
+        expect(metrics).toContain('<i aria-hidden="true">👁️</i>访问');
+      }
+      expect(html).not.toMatch(/data-community-stat="(?:today-visitors|today-games|total-visitors|total-games)"/);
+      expect(html).not.toMatch(/今日访客|今日游玩|总访客|总游玩|统计服务待接入/);
+    }
     expect(rolesHtml).not.toContain('data-community-stat="current-online"');
     expect(rolesHtml).not.toContain("当前在线");
     expect(rolesHtml).toContain('class="lobby-grid"');
@@ -332,6 +419,7 @@ describe("v2 render lobby shell", () => {
 
     expect(infoHtml).toMatch(/class="lobby-community-view lobby-info-view"/);
     expect(infoHtml).toContain("研究生模拟器 v2.0");
+    expect(infoHtml).toContain('<small>总数（今日）</small>');
     expect(infoHtml).toContain("68 个月");
     expect(infoHtml).toContain('data-ui-lobby-info-section="overview"');
     expect(infoHtml).toContain('data-ui-lobby-info-section="guide"');
@@ -1335,7 +1423,7 @@ describe("v2 render lobby shell", () => {
     expect((slotHtml.match(/data-action="submit-paper"/g) ?? [])).toHaveLength(3);
     expect(slotHtml).not.toContain('data-action="idea"');
     expect(slotHtml).toContain('class="paper-score-strip"');
-    expect(slotHtml).toContain("💡 小提示：想 idea、做实验、写论文会重新计算对应分数");
+    expect(slotHtml).toContain("💡 小提示：idea/实验/写作上行是包含协作的合计分，下行是自身分；科研只更新自身，同学帮助持续累加。点击展开看细则");
     expect(slotHtml.indexOf('id="workstation-paper-grid"')).toBeLessThan(slotHtml.indexOf('class="workstation-paper-toolbar"'));
     expect(slotHtml).not.toContain('class="paper-score-track"');
     expect(slotHtml).not.toContain("通常消耗 1 个行动");
@@ -1577,6 +1665,130 @@ describe("v2 render lobby shell", () => {
     expect(publishedHtml).not.toContain("已发表，推广与引用统计请在成果页查看");
   });
 
+  it.each(["draft", "reviewing", "journal-reviewing", "published"] as const)("shows total and own scores with saved collaborator avatars on %s workstation cards", (status) => {
+    const base = { ...createAdmittedTestState(), playerName: "王知行" };
+    const paper = {
+      ...createDraftPaper(1, 0),
+      status,
+      idea: 30,
+      experiment: 40,
+      writing: 50,
+      journalTarget: status === "journal-reviewing" ? "nmi" as const : null,
+      collaborationScores: { idea: 3, experiment: 40, writing: 7 },
+      collaborators: [
+        { id: "former-peer", name: "张雅琪" },
+        { id: "another-peer", name: "张雅琪" },
+        { id: "former-senior", name: "Alice Wang" },
+        { id: "former-lover", name: '<img src="x">&\'姓名' },
+        { id: "blank-name", name: "   " },
+      ],
+    };
+    const html = renderApp({ ...base, papers: [paper], fellowProgressState: [] }, createDefaultAccountProfile());
+    const card = getPaperSlotCardHtml(html, 0);
+    const totals = card.match(/<div class="paper-score-strip"[\s\S]*?<\/div>/)?.[0] ?? "";
+    const ownScores = card.match(/<div class="paper-own-score-strip"[\s\S]*?<\/div>/)?.[0] ?? "";
+    const collaborators = card.match(/<div class="paper-collaborators"[^>]*>[\s\S]*?<\/div>\s*<\/div>/)?.[0] ?? "";
+    const [playerAvatar, ...avatars] = collaborators.match(/<span class="paper-collaborator-avatar"[^>]*>[\s\S]*?<\/span>/g) ?? [];
+    if (!playerAvatar) throw new Error("player avatar is missing");
+
+    expect(totals).toContain('aria-label="idea 30，实验 40，写作 50，总分 120"');
+    expect(totals).toContain('<small>总分</small><strong>120</strong>');
+    expect(totals).toContain('title="自身27+协作3分"');
+    expect(totals).toContain('title="自身0+协作40分"');
+    expect(totals).toContain('title="自身43+协作7分"');
+    expect(totals).toContain('title="自身70+协作50分"');
+    expect(ownScores).toContain('aria-label="自身分：idea 27，实验 0，写作 43"');
+    expect(ownScores).toContain('<span><small>自身</small><strong>27</strong></span>');
+    expect(ownScores).toContain('<span><small>自身</small><strong>0</strong></span>');
+    expect(ownScores).toContain('<span><small>自身</small><strong>43</strong></span>');
+    expect((ownScores.match(/<strong>/g) ?? [])).toHaveLength(3);
+    expect(ownScores).not.toMatch(/总分|\+|—/);
+    expect(card.indexOf(totals)).toBeLessThan(card.indexOf(ownScores));
+    expect(card).not.toContain('paper-collaboration-strip');
+    expect(collaborators).toContain('aria-label="论文参与者"');
+    expect(playerAvatar).toContain('data-player-avatar="true"');
+    expect(playerAvatar).toContain('title="王知行（你）"');
+    expect(playerAvatar).toMatch(/>王<\/span>$/);
+    expect(collaborators).not.toContain('<small>协作者</small>');
+    expect(card.indexOf(collaborators)).toBeLessThan(card.indexOf('class="paper-title-meta-row"'));
+    expect(card.match(/class="paper-collaborators"/g)).toHaveLength(1);
+    expect(collaborators).toContain('class="paper-collaborator-list"');
+    expect(avatars).toHaveLength(4);
+    for (const avatar of avatars.slice(0, 2)) {
+      expect(avatar).toContain('title="张雅琪"');
+      expect(avatar).toContain('aria-label="张雅琪"');
+      expect(avatar).toMatch(/>张<\/span>$/);
+    }
+    expect(avatars[2]).toContain('title="Alice Wang"');
+    expect(avatars[2]).toContain('aria-label="Alice Wang"');
+    expect(avatars[2]).toMatch(/>A<\/span>$/);
+    expect(avatars[3]).toContain('title="&lt;img src=&quot;x&quot;&gt;&amp;&#39;姓名"');
+    expect(avatars[3]).toContain('aria-label="&lt;img src=&quot;x&quot;&gt;&amp;&#39;姓名"');
+    expect(avatars[3]).toMatch(/>&lt;<\/span>$/);
+    for (const avatar of avatars) {
+      expect(avatar).toMatch(/style="--collaborator-color:hsl\(\d+ 62% 42%\)"/i);
+    }
+    expect(new Set([playerAvatar, ...avatars].map((avatar) => avatar.match(/--collaborator-color:([^\"]+)/)?.[1])).size).toBe(5);
+    const reorderedCard = getPaperSlotCardHtml(renderApp({
+      ...base,
+      papers: [{ ...paper, collaborators: [...paper.collaborators].reverse() }],
+      fellowProgressState: [],
+    }, createDefaultAccountProfile()), 0);
+    expect(reorderedCard.match(/<span class="paper-collaborator-avatar"[^>]*>[\s\S]*?<\/span>/g)).toEqual([playerAvatar, ...[...avatars].reverse()]);
+    expect(collaborators).not.toContain('<img');
+    expect(collaborators).not.toMatch(/<strong>|\+\d|data-ui-select-workstation-paper|paper-collaborator-empty/);
+    expect(card).not.toMatch(/<details class="paper-collaborators"|<summary>协作者/);
+    expect(card.match(/<article\b[^>]*>/)?.[0]).not.toContain('data-ui-select-workstation-paper');
+    if (status === "draft" || status === "journal-reviewing") {
+      expect(card).toContain(`class="paper-card-selection-content" data-ui-select-workstation-paper="${paper.id}"`);
+    }
+  });
+
+  it.each(["draft", "reviewing", "journal-reviewing", "published"] as const)("shows own scores including zero without collaborator placeholders on %s cards without collaboration", (status) => {
+    const base = createAdmittedTestState();
+    for (const { total, ...paperData } of [
+      { idea: 4, experiment: 5, writing: 6, total: 15, collaborationScores: { idea: 0, experiment: 0, writing: 0 }, collaborators: [] },
+      { idea: 4, experiment: 5, writing: 6, total: 15, collaborationScores: undefined, collaborators: undefined },
+      { idea: 0, experiment: 0, writing: 0, total: 0, collaborationScores: { idea: 0, experiment: 0, writing: 0 }, collaborators: [] },
+      { idea: 0, experiment: 0, writing: 0, total: 0, collaborationScores: { idea: 0, experiment: 0, writing: 0 }, collaborators: [{ id: "blank-name", name: "   " }] },
+    ]) {
+      const paper = {
+        ...createDraftPaper(1, 0),
+        ...paperData,
+        status,
+        journalTarget: status === "journal-reviewing" ? "nmi" as const : null,
+      };
+      const card = getPaperSlotCardHtml(renderApp({ ...base, papers: [paper] }, createDefaultAccountProfile()), 0);
+      const ownScores = card.match(/<div class="paper-own-score-strip"[\s\S]*?<\/div>/)?.[0] ?? "";
+      const collaborators = card.match(/<div class="paper-collaborators"[^>]*>[\s\S]*?<\/div>\s*<\/div>/)?.[0] ?? "";
+
+      expect(card).toContain(`aria-label="idea ${paper.idea}，实验 ${paper.experiment}，写作 ${paper.writing}，总分 ${total}"`);
+      expect(card).toContain(`title="自身${total}+协作0分"`);
+      expect(ownScores).toContain(`aria-label="自身分：idea ${paper.idea}，实验 ${paper.experiment}，写作 ${paper.writing}"`);
+      expect((ownScores.match(/<strong>(\d+)<\/strong>/g) ?? [])).toEqual([
+        `<strong>${paper.idea}</strong>`,
+        `<strong>${paper.experiment}</strong>`,
+        `<strong>${paper.writing}</strong>`,
+      ]);
+      expect(ownScores).not.toMatch(/总分|\+|—/);
+      expect(collaborators.match(/class="paper-collaborator-avatar"/g)).toHaveLength(1);
+      expect(collaborators).toContain('data-player-avatar="true"');
+      expect(card).not.toContain('paper-collaborator-empty');
+      expect(card).not.toContain('<details class="paper-collaborators"');
+    }
+  });
+
+  it("keeps empty and locked paper slots free of score rows and collaborator lists", () => {
+    const state = createAdmittedTestState();
+    const html = renderApp({ ...state, papers: [], paperSlotsUnlocked: 1, player: { ...state.player, research: 0 } }, createDefaultAccountProfile());
+
+    for (const slotIndex of [0, 1, 2, 3]) {
+      const card = getPaperSlotCardHtml(html, slotIndex);
+      expect(card).toContain('paper-card-empty');
+      expect(card).not.toMatch(/paper-score-strip|paper-own-score-strip|paper-collaboration-strip|paper-collaborators|paper-collaborator-avatar/);
+    }
+  });
+
   it("renders compact research results and the selected paper", () => {
     let state = createAdmittedTestState();
     state = dispatchAction(state, "next-month");
@@ -1738,7 +1950,7 @@ describe("v2 render lobby shell", () => {
       ...createAdmittedTestState(),
       playerName: "李旭旭",
       selectedAdvisorName: "李旭霖",
-      papers: [createPublishedPaper(0, "合作论文测试", "B", 20, 4, 20, true)],
+      papers: [{ ...createPublishedPaper(0, "合作论文测试", "B", 20, 4, 20, true), collaborators: undefined }],
       externalPublications: [],
     };
     const html = renderApp(state, createDefaultAccountProfile());
@@ -1751,6 +1963,96 @@ describe("v2 render lobby shell", () => {
     expect(authors).not.toContain("Collaborator");
     expect(authors).not.toContain("Advisor");
     expect(authors).not.toContain(">Ni<");
+  });
+
+  it("uses saved collaborators for published authors after relationships end", () => {
+    const base = createRelationshipCardTestState();
+    const paper = {
+      ...createPublishedPaper(0, "真实作者论文", "A", 30, 4),
+      collaborators: [
+        { id: "former-peer", name: "张雅琪" },
+        { id: "former-lover", name: "刘斌" },
+        { id: "former-senior", name: "庄婉仪" },
+        { id: "former-junior", name: "赵志伟" },
+      ],
+    };
+    const renderAuthors = (state: GameState) => {
+      const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "research" });
+      const row = html.match(/<button\s+class="research-paper-row[\s\S]*?真实作者论文[\s\S]*?<\/button>/)?.[0] ?? "";
+      return row.match(/<span class="research-paper-authors">([\s\S]*?)<span class="research-paper-venue"/)?.[1] ?? "";
+    };
+    const state = { ...base, playerName: "李旭旭", selectedAdvisorName: "李旭霖", papers: [], externalPublications: [paper] };
+    const authors = renderAuthors(state);
+    const afterEndingRelationships = renderAuthors({
+      ...state,
+      fellowProgressState: [],
+      loverState: { ...state.loverState, active: false },
+      loverProgressState: { ...state.loverProgressState, active: false },
+    });
+
+    expect(authors).toMatch(/^<strong class="research-paper-author is-player">Li XX<\/strong>/);
+    expect(authors.match(/class="research-paper-author(?: is-player)?"/g)).toHaveLength(6);
+    expect(authors).toContain('<span class="research-paper-author">Zhang YQ</span>');
+    expect(authors).toContain('<span class="research-paper-author">Liu B</span>');
+    expect(authors).toContain('<span class="research-paper-author">Zhuang WY</span>');
+    expect(authors).toContain('<span class="research-paper-author">Zhao ZW</span>');
+    expect(authors).toContain('<span class="research-paper-author">Li XL</span></span>');
+    expect(afterEndingRelationships).toBe(authors);
+  });
+
+  it("does not invent authors for a first-author paper with an explicit empty collaborator list", () => {
+    const base = createRelationshipCardTestState();
+    const paper = { ...createPublishedPaper(0, "空名单论文", "B", 20, 4), collaborators: [] };
+    const html = renderApp({ ...base, playerName: "李旭旭", selectedAdvisorName: "李旭霖", papers: [paper], externalPublications: [] }, createDefaultAccountProfile());
+    const row = html.match(/<button\s+class="research-paper-row[\s\S]*?空名单论文[\s\S]*?<\/button>/)?.[0] ?? "";
+    const authors = row.match(/<span class="research-paper-authors">([\s\S]*?)<span class="research-paper-venue"/)?.[1] ?? "";
+
+    expect(authors).toContain('<strong class="research-paper-author is-player">Li XX</strong>');
+    expect(authors).toContain('<span class="research-paper-author">Li XL</span>');
+    expect(authors.match(/class="research-paper-author(?: is-player)?"/g)).toHaveLength(2);
+  });
+
+  it.each([{ debugPaperTarget: "B" as const }, { debugJournalTarget: "nmi" as const }])("gives a new debug coauthor paper a stable distinct lead author for %j", (target) => {
+    const base = createRelationshipCardTestState();
+    const state = dispatchAction({
+      ...base,
+      playerName: "李旭旭",
+      selectedAdvisorName: "李旭霖",
+      papers: [],
+      externalPublications: [],
+    }, "debug-add-paper", { ...target, debugPaperAuthorship: "coauthor" });
+    const renderAuthorNames = (renderState: GameState) => {
+      const html = renderApp(renderState, createDefaultAccountProfile(), { activePlayTab: "research" });
+      const row = html.match(/<button\s+class="research-paper-row[\s\S]*?<\/button>/)?.[0] ?? "";
+      const authors = row.match(/<span class="research-paper-authors">([\s\S]*?)<span class="research-paper-venue"/)?.[1] ?? "";
+      expect(authors).toMatch(/^<span class="research-paper-author">[^<]+<\/span>/);
+      expect(authors).toContain('<strong class="research-paper-author is-player">Li XX</strong>');
+      return [...authors.matchAll(/class="research-paper-author(?: is-player)?">([^<]+)</g)].map((match) => match[1]);
+    };
+    const authorNames = renderAuthorNames(state);
+
+    expect(authorNames).toHaveLength(3);
+    expect(authorNames.slice(1)).toEqual(["Li XX", "Li XL"]);
+    expect(new Set(authorNames).size).toBe(3);
+    expect(renderAuthorNames({ ...state, totalMonths: state.totalMonths + 1, fellowProgressState: [] })).toEqual(authorNames);
+  });
+
+  it.each([undefined, [], [{ id: "former-lead", name: "张雅琪" }, { id: "former-peer", name: "刘斌" }]])("preserves a saved lead author without an active relationship for collaborators %j", (collaborators) => {
+    const paper = {
+      ...createPublishedPaper(0, "保留一作论文", "B", 20, 4, 20, true),
+      leadAuthorName: "张雅琪",
+      collaborators,
+    };
+    const state = { ...createAdmittedTestState(), playerName: "李旭旭", selectedAdvisorName: "李旭霖", fellowProgressState: [], papers: [paper], externalPublications: [] };
+    const html = renderApp(state, createDefaultAccountProfile());
+    const row = html.match(/<button\s+class="research-paper-row[\s\S]*?保留一作论文[\s\S]*?<\/button>/)?.[0] ?? "";
+    const authors = row.match(/<span class="research-paper-authors">([\s\S]*?)<span class="research-paper-venue"/)?.[1] ?? "";
+
+    expect(authors).toMatch(/^<span class="research-paper-author">Zhang YQ<\/span>/);
+    expect(authors.match(/>Zhang YQ<\/span>/g)).toHaveLength(1);
+    expect(authors).toContain('<strong class="research-paper-author is-player">Li XX</strong>');
+    expect(authors).toContain('<span class="research-paper-author">Li XL</span></span>');
+    if (collaborators?.length) expect(authors).toContain('<span class="research-paper-author">Liu B</span>');
   });
 
   it("renders the compact research empty state without filter controls", () => {
@@ -3054,20 +3356,196 @@ describe("v2 render lobby shell", () => {
     expect(advisorHtml).toContain("💕");
     expect(advisorHtml).toContain("恋爱后解锁");
     expect(advisorHtml).not.toContain('class="rel-switch-badge is-task"');
-    expect(advisorHtml).toContain("做项目（SAN-5）");
+    expect(advisorHtml).toContain('class="rel-action-label">做项目</span>');
+    expect(advisorHtml).toContain('class="rel-action-cost">SAN-5</span>');
     expect(advisorHtml).toContain(">交流</button>");
     expect(advisorHtml).not.toContain('data-action="advance-advisor-task"');
     expect(advisorHtml).toContain("李旭霖 / 讲师");
     expect(advisorHtml).not.toContain("副教授");
-    expect(advisorHtml).toContain("任务进度（满后：亲和度 +1、科研资源 +1、项目奖励）");
+    expect(advisorHtml).toContain('class="rel-progress-label">任务进度</span>');
+    expect(advisorHtml).toContain('class="rel-progress-note">完成：亲和度 +1、科研资源 +1、项目奖励</div>');
 
     const fellowHtml = renderApp(state, createDefaultAccountProfile(), { activeRelationshipIndex: 1 });
     expect(fellowHtml).toContain("师弟/师妹");
     expect(fellowHtml).toContain("小李");
-    expect(fellowHtml).not.toContain('data-relationship-id=');
+    expect(fellowHtml).toContain('data-relationship-id=');
     expect(fellowHtml).not.toContain('data-action="advance-fellow-task"');
-    expect(fellowHtml).toContain("任务进度（满后：亲和度 +1、idea +4）");
-    expect(fellowHtml).toContain("关系积累（+");
+    expect(fellowHtml).toContain('class="rel-progress-note">完成：亲和度 +1、idea +4</div>');
+    expect(fellowHtml).toContain('class="rel-progress-label">关系积累</span>');
+    expect(getRelationshipCardHtml(fellowHtml, "junior")).toContain(`每月+${state.player.social + 3} · 满后解锁交流`);
+  });
+
+  it.each([
+    { type: "advisor", name: "李旭霖 / 讲师", role: "导师", months: 12, fraction: "11/44", growth: 7, reward: "亲和度 +1、科研资源 +1、项目奖励", action: "做项目", cost: "SAN-5" },
+    { type: "senior", name: "小明", role: "师姐", months: 8, fraction: "15/60", growth: 10, reward: "亲和度 +1、写作 +7", action: "帮写论文", cost: "SAN-4" },
+    { type: "junior", name: "小李", role: "师妹", months: 8, fraction: "15/60", growth: 10, reward: "亲和度 +1、idea +7", action: "帮想idea", cost: "SAN-2" },
+    { type: "peer", name: "小刚", role: "同门", months: 8, fraction: "15/60", growth: 10, reward: "亲和度 +1、实验 +7", action: "帮做实验", cost: "SAN-3" },
+    { type: "lover", name: "林知远", role: "聪慧恋人", months: 8, fraction: "25/100", growth: 4, reward: "亲密度 +1、特殊效果", action: "约会", cost: "金币-2" },
+  ] as const)("separates identity, attributes, progress notes and action costs for $type", (expected) => {
+    const state = createRelationshipCardTestState();
+    const stateBeforeRender = structuredClone(state);
+    const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "relationship" });
+    const card = getRelationshipCardHtml(html, expected.type);
+    const meta = card.match(/<div class="rel-card-meta">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const attributes = card.match(/<div class="rel-detail-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const attributePairs = attributes.match(/<span class="rel-detail-item">[\s\S]*?<\/strong>\s*<\/span>/g) ?? [];
+    const headers = card.match(/<div class="rel-progress-header">[\s\S]*?<\/div>/g) ?? [];
+    const notes = card.match(/<div class="rel-progress-note">[^<]*<\/div>/g) ?? [];
+    const buttons = card.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [];
+    const resourceLabel = expected.type === "advisor" ? "科研资源" : "科研";
+    const affinityLabel = expected.type === "lover" ? "亲密度" : "亲和度";
+
+    expect(html.match(/class="rel-card /g) ?? []).toHaveLength(6);
+    expect(html.match(/class="rel-card filled"/g) ?? []).toHaveLength(5);
+    expect(card).toContain(`<article class="rel-card filled" data-relationship-type="${expected.type}">`);
+    expect(card).toMatch(/<div class="rel-card-identity">\s*<div class="rel-card-head rel-card-header">/);
+    expect(card).toContain(`data-rel-type-pill="${expected.type}">${expected.role}</span>`);
+    expect(card).toContain(`<strong class="rel-name">${expected.name}</strong>`);
+    expect(meta).toContain(`<span class="rel-known-time">认识时间${expected.months}月</span>`);
+    expect(meta).toContain('class="rel-card-alert" aria-label="有可用操作">!</span>');
+    expect(card.indexOf('class="rel-card-meta"')).toBeLessThan(card.indexOf('class="rel-detail-row"'));
+    expect(card.match(/class="rel-known-time"/g) ?? []).toHaveLength(1);
+    expect(attributes).not.toContain("认识时间");
+    expect(attributePairs).toHaveLength(2);
+    expect(attributePairs[0]).toMatch(new RegExp(`^<span class="rel-detail-item">\\s*<span class="rel-detail-label">${resourceLabel}</span>\\s*<strong class="rel-detail-value">7</strong>\\s*</span>$`));
+    expect(attributePairs[1]).toMatch(new RegExp(`^<span class="rel-detail-item">\\s*<span class="rel-detail-label">${affinityLabel}</span>\\s*<strong class="rel-detail-value">4</strong>\\s*</span>$`));
+    expect(attributes.match(/class="rel-detail-label"/g) ?? []).toHaveLength(2);
+    expect(attributes.match(/class="rel-detail-value"/g) ?? []).toHaveLength(2);
+
+    expect(headers).toHaveLength(2);
+    expect(headers[0]).toMatch(new RegExp(`^<div class="rel-progress-header">\\s*<span class="rel-progress-label">任务进度</span>\\s*<span class="rel-progress-val">${expected.fraction}</span>\\s*</div>$`));
+    expect(headers[1]).toMatch(/^<div class="rel-progress-header">\s*<span class="rel-progress-label">关系积累<\/span>\s*<span class="rel-progress-val">14\/40<\/span>\s*<\/div>$/);
+    expect(notes).toEqual([
+      `<div class="rel-progress-note">完成：${expected.reward}</div>`,
+      `<div class="rel-progress-note">每月+${expected.growth} · 满后解锁交流</div>`,
+    ]);
+    expect(card).toMatch(/<div class="rel-progress-bar">\s*<div class="rel-progress-fill task" style="width:25%"><\/div>\s*<\/div>\s*<div class="rel-progress-note">/);
+    expect(card).toMatch(/<div class="rel-progress-bar">\s*<div class="rel-progress-fill relation" style="width:35%"><\/div>\s*<\/div>\s*<div class="rel-progress-note">/);
+    expect(card.indexOf('class="rel-progress-label">任务进度')).toBeLessThan(card.indexOf('class="rel-progress-note">完成：'));
+    expect(card.indexOf('class="rel-progress-note">完成：')).toBeLessThan(card.indexOf('class="rel-progress-label">关系积累'));
+    expect(card.indexOf('class="rel-progress-label">关系积累')).toBeLessThan(card.indexOf('class="rel-progress-note">每月+'));
+    expect(card.indexOf('class="rel-progress-note">每月+')).toBeLessThan(card.indexOf('class="rel-actions"'));
+
+    expect(buttons).toHaveLength(expected.type === "advisor" ? 2 : 3);
+    expect(buttons[0]).toMatch(new RegExp(`<span class="rel-action-label">${expected.action}</span>\\s*<span class="rel-action-cost">${expected.cost}</span>`));
+    expect(buttons[0]).not.toMatch(/[（）]|本月已用/);
+    expect(buttons[1]).toContain('class="btn-sm rel-action-btn is-chat"');
+    expect(buttons[1]).toContain(">交流</button>");
+    expect(buttons[1]).not.toContain("rel-action-cost");
+    buttons.slice(0, 2).forEach((button) => {
+      expect(button).toContain('type="button" disabled aria-disabled="true" data-gameplay-status="deferred"');
+      expect(button).not.toContain("data-action=");
+    });
+    if (expected.type !== "advisor") {
+      expect(buttons[2]).toContain('data-action="end-relationship"');
+      expect(buttons[2]).toContain('data-relationship-id=');
+    }
+    expect(state).toEqual(stateBeforeRender);
+  });
+
+  it.each(["advisor", "senior", "junior", "peer", "lover"] as const)("removes only the task cost after the monthly %s action is used", (type) => {
+    const state = createRelationshipCardTestState(true);
+    const unusedHtml = renderApp(createRelationshipCardTestState(), createDefaultAccountProfile());
+    const html = renderApp(state, createDefaultAccountProfile());
+    const card = getRelationshipCardHtml(html, type);
+    const unusedCard = getRelationshipCardHtml(unusedHtml, type);
+    const taskButton = card.match(/<button class="btn-sm rel-action-btn"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+
+    expect(taskButton).toMatch(/<span class="rel-action-label">✓ 本月已用<\/span>\s*<\/button>$/);
+    expect(taskButton).toContain('disabled aria-disabled="true" data-gameplay-status="deferred"');
+    expect(taskButton).not.toMatch(/rel-action-cost|SAN-|金币-/);
+    expect(card).toContain(">交流</button>");
+    expect(card.match(/<div class="rel-progress-note">[^<]*<\/div>/g)).toEqual(unusedCard.match(/<div class="rel-progress-note">[^<]*<\/div>/g));
+    expect(card.match(/<span class="rel-progress-val">[^<]*<\/span>/g)).toEqual(unusedCard.match(/<span class="rel-progress-val">[^<]*<\/span>/g));
+  });
+
+  it("keeps zero-month relationships in header metadata without an unavailable-action alert", () => {
+    const state = createRelationshipCardTestState();
+    state.totalMonths = 0;
+    state.advisorProgressState.canInteract = false;
+    state.fellowProgressState = state.fellowProgressState.map((profile) => ({ ...profile, startTotalMonths: 0, canInteract: false }));
+    state.loverState.startTotalMonths = 0;
+    state.loverProgressState.canInteract = false;
+    const html = renderApp(state, createDefaultAccountProfile());
+
+    (["advisor", "senior", "junior", "peer", "lover"] as const).forEach((type) => {
+      const card = getRelationshipCardHtml(html, type);
+      const meta = card.match(/<div class="rel-card-meta">([\s\S]*?)<\/div>/)?.[1] ?? "";
+      const attributes = card.match(/<div class="rel-detail-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
+      expect(meta).toContain('class="rel-known-time">认识时间0月</span>');
+      expect(attributes).not.toContain("认识时间");
+      expect(card).not.toContain("rel-card-alert");
+    });
+  });
+
+  it("escapes custom advisor, fellow and lover names inside the redesigned identity header", () => {
+    const state = createRelationshipCardTestState();
+    const name = '<img src=x onerror="alert(1)"> & 学友';
+    const escapedName = '&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; 学友';
+    state.selectedAdvisorName = name;
+    state.fellowProgressState = state.fellowProgressState.map((profile) => ({ ...profile, name }));
+    state.loverState.name = name;
+    const html = renderApp(state, createDefaultAccountProfile());
+
+    (["advisor", "senior", "junior", "peer", "lover"] as const).forEach((type) => {
+      const card = getRelationshipCardHtml(html, type);
+      const suffix = type === "advisor" ? " / 讲师" : "";
+      expect(card).toContain(`<strong class="rel-name">${escapedName}${suffix}</strong>`);
+      expect(card).not.toContain("<img");
+      expect(card).not.toContain(name);
+      expect(card.match(/class="rel-card-meta"/g) ?? []).toHaveLength(1);
+    });
+  });
+
+  it.each(["beautiful", "smart"] as const)("shows the %s lover type in its badge and a persistent real name in the heading", (type) => {
+    const state = createRelationshipCardTestState();
+    state.loverState = activateLover(type, 4, "male");
+    const expectedName = state.loverState.name;
+    const badge = type === "beautiful" ? "活泼恋人" : "聪慧恋人";
+    const before = structuredClone(state);
+    const account = createDefaultAccountProfile();
+    const random = vi.spyOn(Math, "random");
+
+    try {
+      for (let repaint = 0; repaint < 3; repaint += 1) {
+        const card = getRelationshipCardHtml(renderApp(state, account, { activePlayTab: "relationship" }), "lover");
+        expect(card).toContain(`data-rel-type-pill="lover">${badge}</span>`);
+        expect(card).toContain(`<strong class="rel-name">${expectedName}</strong>`);
+        expect(card).not.toContain(`<strong class="rel-name">${badge}</strong>`);
+        expect(card).not.toContain('data-rel-type-pill="lover">恋人</span>');
+      }
+      expect(state).toEqual(before);
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it.each([undefined, "   "])("renders stable full-name fallbacks for unnamed fellows and lovers with input %j", (name) => {
+    const state = createRelationshipCardTestState();
+    state.fellowProgressState = state.fellowProgressState.map((profile) => ({ ...profile, name }));
+    state.loverState.name = name;
+    const before = structuredClone(state);
+    const account = createDefaultAccountProfile();
+    const random = vi.spyOn(Math, "random");
+
+    try {
+      for (let repaint = 0; repaint < 3; repaint += 1) {
+        const html = renderApp(state, account, { activePlayTab: "relationship" });
+        for (const profile of state.fellowProgressState) {
+          const expectedName = pickStableRandomName(`fellow:${profile.id}`);
+          expect(getFellowName(profile)).toBe(expectedName);
+          expect(getRelationshipCardHtml(html, profile.type)).toContain(`<strong class="rel-name">${expectedName}</strong>`);
+        }
+        const loverCard = getRelationshipCardHtml(html, "lover");
+        expect(loverCard).toContain(`<strong class="rel-name">${getLoverName(state.loverState)}</strong>`);
+        expect(loverCard).toContain('data-rel-type-pill="lover">聪慧恋人</span>');
+      }
+      expect(state).toEqual(before);
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+    }
   });
 
   it("keeps the relationship header aligned to the single-card layout", () => {
@@ -3082,6 +3560,78 @@ describe("v2 render lobby shell", () => {
     expect((relationshipSection.match(/class="rel-card /g) ?? [])).toHaveLength(6);
     expect(relationshipSection).not.toContain('class="rel-helper-chip"');
     expect(relationshipSection).not.toContain("data-rel-helper-action=");
+  });
+
+  it.each([false, true])("renders four relationship debug buttons in two bottom-bar rows (pre-enrollment: %s)", (preEnrollment) => {
+    const state = preEnrollment
+      ? dispatchAction(createInitialState(), "start-game", { roleId: "normal" })
+      : dispatchAction(createAdmittedTestState(), "next-month");
+    const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "relationship" });
+    const debugBar = html.match(/<aside class="debug-bottom-bar"[^>]*>[\s\S]*?<\/aside>/)?.[0] ?? "";
+    const buttons = debugBar.match(/<button\b[^>]*data-action="debug-add-relationship"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+    const columnStart = debugBar.indexOf('<div class="debug-bottom-column debug-bottom-relationship-column"');
+    const actionsStart = debugBar.indexOf('<div class="debug-bottom-actions">');
+    const relationshipColumn = debugBar.slice(columnStart, actionsStart);
+    const rows = relationshipColumn.match(/<div class="debug-bottom-group">[\s\S]*?<\/div>/g) ?? [];
+
+    expect(columnStart).toBeGreaterThan(debugBar.indexOf('class="debug-bottom-column debug-bottom-paper-column"'));
+    expect(actionsStart).toBeGreaterThan(columnStart);
+    expect(relationshipColumn).toContain('role="group" aria-label="新增人际关系"');
+    expect(rows).toHaveLength(2);
+    rows.forEach((row) => {
+      expect(row.match(/data-action="debug-add-relationship"/g) ?? []).toHaveLength(2);
+    });
+    expect(buttons).toHaveLength(4);
+    expect(html.match(/data-action="debug-add-relationship"/g) ?? []).toHaveLength(4);
+    const expected = [
+      ["senior", "新增师兄/师姐"],
+      ["junior", "新增师弟/师妹"],
+      ["peer", "新增同门"],
+      ["lover", "新增恋人"],
+    ];
+    expected.forEach(([type, label], index) => {
+      expect(buttons[index]).toContain('class="debug-tool-btn"');
+      expect(buttons[index]).toContain('type="button"');
+      expect(buttons[index]).toContain(`data-debug-relationship-type="${type}"`);
+      expect(buttons[index]).toContain(label);
+      expect(buttons[index]).not.toMatch(/\b(?:disabled|aria-disabled|data-gameplay-status)\b/);
+      expect(rows[Math.floor(index / 2)]).toContain(`data-debug-relationship-type="${type}"`);
+    });
+
+    const relationshipSection = html.match(/id="relationship-section"[^>]*>([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
+    expect(relationshipSection).toContain('id="rel-card-grid"');
+    expect(relationshipSection).not.toContain('data-action="debug-add-relationship"');
+    expect(relationshipSection).not.toContain("data-debug-relationship-type=");
+    expect(html).not.toContain("rel-add-actions");
+    expect(html).not.toContain("data-relationship-add-type=");
+
+    const hidden = renderApp(state, createDefaultAccountProfile(), {
+      activePlayTab: "relationship",
+      showDebugBottomBar: false,
+    });
+    expect(hidden).not.toContain('id="debug-bottom-bar"');
+    expect(hidden).not.toContain('data-action="debug-add-relationship"');
+    expect(hidden).not.toContain("data-debug-relationship-type=");
+    expected.forEach(([, label]) => {
+      expect(hidden).not.toContain(label);
+    });
+  });
+
+  it("keeps both workstation tips as native bulb-first disclosure controls", () => {
+    const state = dispatchAction(createAdmittedTestState(), "next-month");
+    const html = renderApp(state, createDefaultAccountProfile());
+    const notes = html.match(/<div class="workstation-notes">([\s\S]*?)<div class="workstation-action-toolbar"/)?.[1] ?? "";
+    const details = notes.match(/<details\b[^>]*>[\s\S]*?<\/details>/g) ?? [];
+
+    expect(details).toHaveLength(2);
+    expect(details[0]).toContain("workstation-formula-note");
+    expect(details[1]).toContain('data-workstation-note="review"');
+    details.forEach((detail) => {
+      const summary = detail.match(/<summary\b[^>]*>[\s\S]*?<\/summary>/)?.[0] ?? "";
+      expect(summary).toMatch(/^<summary>💡 小提示：/);
+      expect(summary).not.toMatch(/aria-hidden=|tabindex=|disabled/);
+      expect(detail).not.toMatch(/<details[^>]*\b(?:hidden|inert)\b/);
+    });
   });
 
   it("filters transient blocked hints out of the game log panel", () => {

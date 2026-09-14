@@ -58,7 +58,7 @@ describe("v2 random event rules", () => {
       social: 6,
     });
 
-    expect(snapshot.candidateEventIds).toEqual([1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15, 11]);
+    expect(snapshot.candidateEventIds).toEqual([1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15, 17, 18, 11]);
     expect(snapshot.candidateEventIds).not.toContain(3);
     expect(snapshot.weightedPool.filter((eventId) => eventId === 3)).toHaveLength(0);
   });

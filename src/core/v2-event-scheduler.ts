@@ -8,6 +8,8 @@ import {
 } from "./v2-random-event-rules";
 import { createIllnessRandomEvent } from "./v2-random-events-core-health";
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
+import { isPaperCompetitionEventId } from "./v2-paper-competition";
+import { rememberPendingPaperCompetitionEvent } from "./v2-paper-competition-waiting";
 import { getPublishedPaperCount } from "./v2-monthly-event-shared";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -54,6 +56,7 @@ export function collectRandomEventsForMonth(
         usedRandomEvents: nextState.usedRandomEvents,
         illnessProbability: nextState.illnessProbability,
         totalRandomEventCount: nextState.totalRandomEventCount,
+        pendingPaperCompetitionEvents: nextState.pendingPaperCompetitionEvents,
         social: nextState.player.social,
         research: nextState.player.research,
         publishedPaperCount: getPublishedPaperCount(nextState),
@@ -80,6 +83,9 @@ export function collectRandomEventsForMonth(
     const serial = nextState.totalRandomEventCount;
     const builtEvent = createRandomEventById(drawResult.eventId, nextState, recordRoll);
     nextState = builtEvent.nextState;
+    if (!builtEvent.event && isPaperCompetitionEventId(drawResult.eventId)) {
+      nextState = rememberPendingPaperCompetitionEvent(nextState, drawResult.eventId, serial);
+    }
     if (builtEvent.event) {
       events.push({
         ...builtEvent.event,

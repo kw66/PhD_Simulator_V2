@@ -59,6 +59,13 @@ function renderMessageComposer(mode: "board" | "feedback"): string {
   `;
 }
 
+function renderVisitMetrics(): string {
+  return `
+    <span title="访客：同一浏览器去重计数；总数（今日，北京时间）"><i aria-hidden="true">👥</i>访客 <strong data-community-stat="visitors">--（--）</strong></span>
+    <span title="访问：每次打开或刷新页面计一次；总数（今日，北京时间）"><i aria-hidden="true">👁️</i>访问 <strong data-community-stat="views">--（--）</strong></span>
+  `;
+}
+
 export function renderLobbyMasthead(activeView: LobbyViewId): string {
   return `
     <header class="lobby-masthead">
@@ -79,10 +86,7 @@ export function renderLobbyMasthead(activeView: LobbyViewId): string {
         `).join("")}
       </nav>
       <div class="lobby-live-metrics" aria-label="游戏公开数据">
-        <span><i aria-hidden="true">👤</i>今日访客 <strong data-community-stat="today-visitors">--</strong></span>
-        <span><i aria-hidden="true">🎯</i>今日游玩 <strong data-community-stat="today-games">--</strong></span>
-        <span><i aria-hidden="true">👥</i>总访客 <strong data-community-stat="total-visitors">--</strong></span>
-        <span><i aria-hidden="true">🎮</i>总游玩 <strong data-community-stat="total-games">--</strong></span>
+        ${renderVisitMetrics()}
       </div>
       <div class="lobby-project-links" aria-label="项目链接">
         <a href="https://xhslink.com/m/A2DFslJF4mb" target="_blank" rel="noreferrer"><i data-lucide="user-round" aria-hidden="true"></i><span>作者</span></a>
@@ -151,12 +155,9 @@ function renderLobbyInfoArticle(section: LobbyInfoSectionId): string {
           <div><strong>04</strong><span>走到终点</span><small>查看本轮毕业或提前结束的结果</small></div>
         </div>
         <section class="lobby-info-subsection">
-          <div class="lobby-info-subsection-heading"><span>公开数据</span><strong>V2 游戏数据</strong><small>统计服务待接入</small></div>
-          <div class="lobby-stat-strip">
-            <span>今日访客 <strong data-community-stat="today-visitors">--</strong></span>
-            <span>今日游玩 <strong data-community-stat="today-games">--</strong></span>
-            <span>总访客 <strong data-community-stat="total-visitors">--</strong></span>
-            <span>总游玩 <strong data-community-stat="total-games">--</strong></span>
+          <div class="lobby-info-subsection-heading"><span>公开数据</span><strong>V2 游戏数据</strong><small>总数（今日）</small></div>
+          <div class="lobby-stat-strip" aria-label="游戏公开数据">
+            ${renderVisitMetrics()}
           </div>
         </section>
       `;

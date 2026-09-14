@@ -1,6 +1,9 @@
 export const DEBUG_STAT_IDS = ["san", "research", "social", "favor", "money"] as const;
 export type DebugStatId = typeof DEBUG_STAT_IDS[number];
 
+export const DEBUG_RELATIONSHIP_TYPES = ["senior", "junior", "peer", "lover"] as const;
+export type DebugRelationshipType = typeof DEBUG_RELATIONSHIP_TYPES[number];
+
 export const GAME_ACTION_IDS = [
   "start-game",
   "restart-game",
@@ -22,8 +25,10 @@ export const GAME_ACTION_IDS = [
   "part-time-work",
   "rest",
   "resolve-event",
+  "end-relationship",
   "debug-adjust-stat",
   "debug-add-paper",
+  "debug-add-relationship",
   "debug-shift-month",
   "debug-trigger-event",
   "debug-add-all-buffs",

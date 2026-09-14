@@ -1,4 +1,5 @@
 import type { Gender, LoverState, LoverTypeId } from "./v2-types";
+import { pickStableRandomName } from "./v2-random-name";
 
 const BASE_BEAUTIFUL_RECOVERY_RATE = 0.1;
 
@@ -17,13 +18,19 @@ export function getOppositeGender(gender: Gender): Gender {
 }
 
 export function activateLover(type: LoverTypeId, totalMonths: number, playerGender: Gender): LoverState {
+  const gender = getOppositeGender(playerGender);
   return {
     active: true,
+    name: getLoverName({ type, gender, startTotalMonths: totalMonths }),
     type,
-    gender: getOppositeGender(playerGender),
+    gender,
     startTotalMonths: totalMonths,
     beautifulExtraRecoveryRate: 0,
   };
+}
+
+export function getLoverName(lover: Pick<LoverState, "name" | "type" | "gender" | "startTotalMonths">): string {
+  return lover.name?.trim() || pickStableRandomName(`lover:${lover.type}:${lover.startTotalMonths}:${lover.gender}`);
 }
 
 export function getBeautifulMonthlyRecovery(loverState: LoverState, san: number, sanCap: number): number {

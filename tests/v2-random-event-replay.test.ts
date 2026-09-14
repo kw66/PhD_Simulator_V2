@@ -7,7 +7,7 @@ import { createRandomEventById } from "../src/core/v2-random-event-router";
 import { getBadmintonStrength, getPokerWinRate } from "../src/core/v2-growth-system";
 import type { GameState, PendingEvent } from "../src/core/v2-types";
 
-const RANDOM_EVENT_IDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] as const;
+const RANDOM_EVENT_IDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] as const;
 
 function createReplayReadyState(): GameState {
   const started = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });

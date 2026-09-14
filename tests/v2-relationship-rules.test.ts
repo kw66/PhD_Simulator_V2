@@ -22,7 +22,7 @@ describe("v2 relationship rules", () => {
   });
 
   it("adds relationships only when slots are available", () => {
-    let state = createRelationshipState();
+    let state = { ...createRelationshipState(), unlockedSlots: 3 };
     ({ nextState: state } = tryAddRelationship(state, "junior"));
     ({ nextState: state } = tryAddRelationship(state, "senior"));
     const blocked = tryAddRelationship(state, "peer");

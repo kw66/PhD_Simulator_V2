@@ -179,7 +179,12 @@ describe("v2 journal system", () => {
     expect(html).toContain(`data-action="withdraw-paper" data-paper-id="${paper.id}"`);
     expect(html).not.toContain(`data-action="discard-paper" data-paper-id="${paper.id}"`);
     const journalCard = html.match(/<article class="paper-card[^>]*is-journal-reviewing[\s\S]*?<\/article>/u)?.[0] ?? "";
-    expect(journalCard).not.toContain('class="paper-score-strip"');
+    expect(journalCard).toContain('class="paper-score-strip"');
+    expect(journalCard).toContain('aria-label="idea 40，实验 40，写作 40，总分 120"');
+    expect(journalCard).toContain('class="paper-own-score-strip" aria-label="自身分：idea 40，实验 40，写作 40"');
+    expect(journalCard).toContain('<span><small>自身</small><strong>40</strong></span>');
+    expect(journalCard).toContain('data-player-avatar="true"');
+    expect(journalCard).not.toContain('class="paper-collaboration-strip"');
     expect(journalCard).not.toContain("当前期刊分");
     expect(html).toContain(`data-action="research-paper" data-paper-id="${paper.id}" data-paper-action-type="idea"`);
   });

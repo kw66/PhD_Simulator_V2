@@ -47,6 +47,7 @@ export interface InternshipState {
 
 export interface LoverState {
   active: boolean;
+  name?: string;
   type: LoverTypeId | null;
   gender: Gender | null;
   startTotalMonths: number | null;

@@ -15,6 +15,8 @@ import {
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { yearlyResetRandomEventState } from "./v2-random-event-rules";
+import { activatePendingPaperCompetitionEvents } from "./v2-paper-competition-waiting";
+import { refreshPaperCompetitionEvents } from "./v2-paper-competition-preview";
 import { applyMonthlyEffects, applyMonthStartSubscriptions } from "./v2-monthly-effects";
 import { applyReadPaperActions, getManualReadPaperCount } from "./v2-reading-system";
 import { applyResearchOperation, createResearchPaper } from "./v2-research-operation";
@@ -34,6 +36,7 @@ import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyShopAction } from "./v2-shop-transactions";
 import { getShopEmergencySan, getShopRestSanGain } from "./v2-shop-items-effects";
 import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER } from "./v2-sanity-rules";
+import { endRelationship } from "./v2-relationship-actions";
 import type { DispatchPayload, GameActionId, GameState, PlayerStats } from "./v2-types";
 
 const MONTHLY_LOG_STAT_LABELS: Record<keyof PlayerStats, string> = {
@@ -254,6 +257,10 @@ export function createInitialState(): GameState {
 }
 
 export function dispatchAction(state: GameState, actionId: GameActionId, payload: DispatchPayload = {}): GameState {
+  return refreshPaperCompetitionEvents(activatePendingPaperCompetitionEvents(dispatchGameAction(state, actionId, payload)));
+}
+
+function dispatchGameAction(state: GameState, actionId: GameActionId, payload: DispatchPayload): GameState {
   const setupState = dispatchSetupAction(state, actionId, payload, createInitialState);
   if (setupState !== null) return setupState;
 
@@ -320,6 +327,10 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
       return takeRest(state);
     case "resolve-event":
       return resolveQueuedEvent(state, payload.eventId, payload.eventChoiceId);
+    case "end-relationship":
+      return payload.relationshipId && !hasBlockingQueueEvent(state)
+        ? endRelationship(state, payload.relationshipId)
+        : state;
     case "buy-shop-item":
     case "sell-shop-item":
     case "upgrade-shop-item":

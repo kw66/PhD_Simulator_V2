@@ -20,6 +20,12 @@ export function getUnlockedRelationshipSlotCount(social: number): number {
   return 2;
 }
 
+export function canAddRelationship(state: RelationshipState, kind: RelationshipKind): boolean {
+  if (kind === "advisor") return state.advisorCount === 0;
+  if (kind === "lover") return state.loverCount === 0;
+  return state.occupiedSlots < Math.max(0, state.unlockedSlots - 1);
+}
+
 export function syncRelationshipState(state: RelationshipState, social: number): RelationshipState {
   return {
     ...state,
@@ -45,15 +51,16 @@ function incrementRelationshipKindCount(state: RelationshipState, kind: Relation
 }
 
 export function tryAddRelationship(state: RelationshipState, kind: RelationshipKind): { nextState: RelationshipState; added: boolean } {
-  if (state.occupiedSlots >= state.unlockedSlots) {
+  if (!canAddRelationship(state, kind)) {
     return { nextState: { ...state }, added: false };
   }
 
   const withKind = incrementRelationshipKindCount(state, kind);
+  const occupiesFellowSlot = kind !== "advisor" && kind !== "lover";
   return {
     nextState: {
       ...withKind,
-      occupiedSlots: withKind.occupiedSlots + 1,
+      occupiedSlots: withKind.occupiedSlots + (occupiesFellowSlot ? 1 : 0),
     },
     added: true,
   };

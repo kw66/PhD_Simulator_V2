@@ -5,6 +5,8 @@ import {
 } from "./v2-random-events-core";
 import { createLabRandomEventById } from "./v2-random-events-lab";
 import { createRelationshipRandomEventById } from "./v2-random-events-relationships";
+import { isPaperCompetitionEventId } from "./v2-paper-competition";
+import { createPaperCompetitionRandomEvent } from "./v2-random-events-paper-competition";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -13,6 +15,10 @@ export function createRandomEventById(
   state: GameState,
   getRoll: RandomRollProvider,
 ): { nextState: GameState; event: PendingEvent | null } {
+  if (isPaperCompetitionEventId(eventId)) {
+    return { nextState: state, event: createPaperCompetitionRandomEvent(eventId, state, getRoll) };
+  }
+
   const labEvent = createLabRandomEventById(eventId, state, getRoll);
   if (labEvent) {
     return { nextState: state, event: labEvent };

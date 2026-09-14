@@ -1,11 +1,8 @@
 import type { FellowProfileAddition, FellowProgressProfile, FellowTaskType, FellowTypeId, Gender } from "./v2-types";
+import { pickStableRandomName } from "./v2-random-name";
 
 const FELLOW_TASK_MAX = 60;
 const FELLOW_RELATION_MAX = 40;
-const GENERATED_FELLOW_NAMES: Record<Gender, readonly string[]> = {
-  male: ["小明", "小华", "小刚", "小强", "小伟", "小杰", "小龙"],
-  female: ["小红", "小丽", "小芳", "小燕", "小雪"],
-};
 
 const FELLOW_CONFIG: Record<FellowTypeId, {
   taskType: FellowTaskType;
@@ -53,8 +50,11 @@ export function getStableGeneratedGender(seed: number): Gender {
 }
 
 export function getStableGeneratedFellowName(seed: number, gender: Gender): string {
-  const names = GENERATED_FELLOW_NAMES[gender];
-  return names[Math.abs(Math.floor(seed)) % names.length] ?? (gender === "male" ? "小明" : "小红");
+  return pickStableRandomName(`fellow:${Math.abs(Math.floor(seed))}:${gender}`);
+}
+
+export function getFellowName(profile: Pick<FellowProgressProfile, "id" | "name">): string {
+  return profile.name?.trim() || pickStableRandomName(`fellow:${profile.id}`);
 }
 
 export function createGeneratedFellowProfileAddition(
@@ -86,9 +86,10 @@ export function createCustomFellowProgressProfile(input: {
   taskType?: FellowTaskType;
 }): FellowProgressProfile {
   const config = FELLOW_CONFIG[input.type];
+  const id = createFellowProgressProfileId(input.type, input.startTotalMonths);
   return {
-    id: createFellowProgressProfileId(input.type, input.startTotalMonths),
-    ...(input.name ? { name: input.name } : {}),
+    id,
+    name: getFellowName({ id, name: input.name }),
     type: input.type,
     gender: input.gender,
     research: Math.max(0, Math.floor(input.research)),

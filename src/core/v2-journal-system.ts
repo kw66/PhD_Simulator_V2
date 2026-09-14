@@ -98,6 +98,7 @@ export function submitJournalPaper(
     submittedIdea: paper.idea,
     submittedExperiment: paper.experiment,
     submittedWriting: paper.writing,
+    ...(paper.collaborationScores ? { submittedCollaborationScores: { ...paper.collaborationScores } } : {}),
     submittedMonth: state.month,
     submittedYear: state.year,
     conferenceHandled: true,

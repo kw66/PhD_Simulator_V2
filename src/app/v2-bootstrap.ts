@@ -26,15 +26,17 @@ import {
   X,
 } from "lucide";
 
-import { DEBUG_STAT_IDS, GAME_ACTION_IDS } from "../core/v2-action-ids";
+import { DEBUG_RELATIONSHIP_TYPES, DEBUG_STAT_IDS, GAME_ACTION_IDS } from "../core/v2-action-ids";
 import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
+import { createVisitStats } from "./v2-visit-stats";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
 import { getRoleOptions, isPreEnrollmentState } from "../core/v2-progression";
 import { getAttributeTier } from "../core/v2-random-event-rules";
 import { getAvailablePaperSlotCount } from "../core/v2-paper-rules";
 import type {
+  DebugRelationshipType,
   DebugStatId,
   DateDisplayMode,
   GameActionId,
@@ -81,6 +83,7 @@ const PAPER_TARGET_SET: ReadonlySet<string> = new Set(["A", "B", "C"]);
 const JOURNAL_TARGET_SET: ReadonlySet<string> = new Set(["nature", "nmi", "pami"]);
 const PAPER_PROMOTION_SET: ReadonlySet<string> = new Set(["arxiv", "github", "xiaohongshu"]);
 const DEBUG_PAPER_AUTHORSHIP_SET: ReadonlySet<string> = new Set(["first", "coauthor"]);
+const DEBUG_RELATIONSHIP_TYPE_SET: ReadonlySet<string> = new Set(DEBUG_RELATIONSHIP_TYPES);
 const CHAIR_UPGRADE_ID_SET: ReadonlySet<string> = new Set([
   "chair-advanced",
   "chair-massage",
@@ -174,8 +177,13 @@ function isDebugPaperAuthorship(value: string | undefined): value is "first" | "
   return value !== undefined && DEBUG_PAPER_AUTHORSHIP_SET.has(value);
 }
 
+function isDebugRelationshipType(value: string | undefined): value is DebugRelationshipType {
+  return value !== undefined && DEBUG_RELATIONSHIP_TYPE_SET.has(value);
+}
+
 export function bootstrapApp(root: HTMLDivElement): void {
   const store = createStore();
+  const visitStats = createVisitStats({ recordVisit: import.meta.env.PROD && window.location.protocol === "https:" });
   let queuedSetupPortraitWarmup = false;
   let fixedStageScaleFrame = 0;
   let activePlayTab: PlayTabId = "events";
@@ -328,7 +336,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const after: [number, number, number] = [paper.idea, paper.experiment, paper.writing];
       const deltas = after.map((value, index) => value - before[index]);
       if (deltas.every((delta) => delta === 0)) return;
-      const scoreDeltas = [deltas.reduce((sum, delta) => sum + delta, 0), ...deltas];
+      const scoreDeltas = [...deltas, deltas.reduce((sum, delta) => sum + delta, 0)];
 
       const card = root.querySelector<HTMLElement>(`[data-paper-id="${CSS.escape(paper.id)}"]`);
       const scoreStrip = card?.querySelector<HTMLElement>(".paper-score-strip");
@@ -390,7 +398,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
-    if (window.matchMedia("(max-width: 1180px)").matches) {
+    if (window.getComputedStyle(stage).position !== "absolute") {
       root.style.setProperty(scaleVarName, "1");
       root.style.setProperty(contentHeightVarName, `${stage.scrollHeight}px`);
       return;
@@ -738,6 +746,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       researchSortMode,
       researchAuthorshipFilter,
     });
+    visitStats.render(root);
     if (animateEventPanelAfterNextMonth) {
       animateEventPanelAfterNextMonth = false;
       if (state.phase === "playing" && activePlayTab === "events") {
@@ -808,6 +817,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
   };
 
   store.subscribe(render);
+  void visitStats.load().then(() => {
+    visitStats.render(root);
+    scheduleAllFixedStageScales();
+  });
 
   root.addEventListener("toggle", (event) => {
     const openedAchievement = event.target;
@@ -1133,10 +1146,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
       promotionId: isPaperPromotionId(button.dataset.promotionId) ? button.dataset.promotionId : undefined,
       eventId: typeof button.dataset.eventId === "string" ? button.dataset.eventId : undefined,
       eventChoiceId: typeof button.dataset.eventChoiceId === "string" ? button.dataset.eventChoiceId : undefined,
+      relationshipId: typeof button.dataset.relationshipId === "string" ? button.dataset.relationshipId : undefined,
       debugStatId: isDebugStatId(button.dataset.debugStatId) ? button.dataset.debugStatId : undefined,
       debugPaperTarget: isPaperTarget(button.dataset.debugPaperTarget) ? button.dataset.debugPaperTarget : undefined,
       debugJournalTarget: isJournalTarget(button.dataset.debugJournalTarget) ? button.dataset.debugJournalTarget : undefined,
       debugPaperAuthorship: isDebugPaperAuthorship(button.dataset.debugPaperAuthorship) ? button.dataset.debugPaperAuthorship : undefined,
+      debugRelationshipType: isDebugRelationshipType(button.dataset.debugRelationshipType) ? button.dataset.debugRelationshipType : undefined,
       delta: typeof button.dataset.delta === "string" ? Number(button.dataset.delta) : undefined,
       dateDisplayMode: isDateDisplayMode(button.dataset.dateDisplayMode) ? button.dataset.dateDisplayMode : undefined,
       shopItemId: typeof button.dataset.shopItemId === "string" ? button.dataset.shopItemId as ShopItemId : undefined,

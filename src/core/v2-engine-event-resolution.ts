@@ -10,8 +10,10 @@ import { enqueueResolvedEventFollowUps } from "./v2-engine-event-resolution-foll
 import { applyChoiceEffectsToState } from "./v2-engine-event-resolution-state";
 import { clampResearchToCap } from "./v2-research-cap-system";
 import { createRandomEventById } from "./v2-random-event-router";
+import { refreshPaperCompetitionEvent } from "./v2-paper-competition-preview";
 import type {
   DeferredEventStatePatch,
+  EventChoice,
   EventQueueItem,
   GameState,
   ResolvedEventStage,
@@ -137,13 +139,13 @@ function rebaseDeferredValue(currentValue: unknown, previousValue: unknown, inte
   return stateValuesMatch(currentValue, previousValue) ? structuredClone(intendedValue) : currentValue;
 }
 
-const RELATIONSHIP_COUNT_KEYS = ["advisorCount", "seniorCount", "juniorCount", "peerCount", "loverCount"] as const;
+const RELATIONSHIP_COUNT_KEYS = ["seniorCount", "juniorCount", "peerCount"] as const;
 
 function enforceDeferredRelationshipCapacity(
   nextState: GameState,
   patch: DeferredEventStatePatch,
 ): void {
-  const overflow = nextState.relationshipState.occupiedSlots - nextState.relationshipState.unlockedSlots;
+  const overflow = nextState.relationshipState.occupiedSlots - Math.max(0, nextState.relationshipState.unlockedSlots - 1);
   if (overflow <= 0) return;
 
   let remaining = overflow;
@@ -165,7 +167,7 @@ function enforceDeferredRelationshipCapacity(
   if (remaining > 0) {
     nextState.relationshipState = {
       ...nextState.relationshipState,
-      occupiedSlots: nextState.relationshipState.unlockedSlots,
+      occupiedSlots: Math.max(0, nextState.relationshipState.unlockedSlots - 1),
     };
   }
 
@@ -256,7 +258,13 @@ function rebuildRandomEventFromCurrentState(
   };
   const rebuilt = createRandomEventById(
     replay.eventId,
-    { ...state, totalRandomEventCount: replay.serial },
+    {
+      ...state,
+      totalRandomEventCount: replay.serial,
+      ...(queuedEvent.paperCompetitionTargetId ? {
+        papers: state.papers.filter((paper) => paper.id === queuedEvent.paperCompetitionTargetId),
+      } : {}),
+    },
     getReplayRoll,
   ).event;
   if (!rebuilt) {
@@ -280,14 +288,16 @@ export function applyQueuedEventEffects(
   choiceId: string | undefined,
   callbacks: EventResolutionCallbacks,
 ): GameState {
-  const resolvedEvent = rebuildRandomEventFromCurrentState(state, queuedEvent);
-  const choice = resolvedEvent.choices.find((item) => item.id === choiceId);
+  const resolvedEvent = refreshPaperCompetitionEvent(state, rebuildRandomEventFromCurrentState(state, queuedEvent));
+  let choice = resolvedEvent.choices.find((item) => item.id === choiceId);
   if (!choice) {
     return pushNoOpLog(state, "当前事件选择无效。");
   }
   if (choice.disabledReason) {
     return state;
   }
+
+  choice = deferPaperChoiceEffects(resolvedEvent, choice);
 
   const stateWithDeferredResolution = applyDeferredStatePatch(state, resolvedEvent.deferredStatePatch);
   const {
@@ -363,4 +373,32 @@ export function applyQueuedEventEffects(
   nextState = callbacks.evaluateImmediateEndings(nextState);
   if (nextState.phase !== "playing") return nextState;
   return callbacks.runPostQueuePipeline(nextState);
+}
+
+function deferPaperChoiceEffects(event: EventQueueItem, choice: EventChoice): EventChoice {
+  if (event.stage === "result") return choice;
+  const { clearDraftProgress, paperCollaborations, paperUpdates, ...otherEffects } = choice.effects;
+  if (!clearDraftProgress && !paperCollaborations?.length && !paperUpdates?.length) return choice;
+  const followUps = choice.effects.enqueueEvents ?? [];
+  const resultIndex = followUps.findIndex((followUp) => followUp.chainId === event.chainId
+    && (followUp.stage === "result" || followUp.description.includes("机制结算")));
+  if (resultIndex < 0) return choice;
+  return {
+    ...choice,
+    effects: {
+      ...otherEffects,
+      enqueueEvents: followUps.map((followUp, index) => index !== resultIndex ? followUp : {
+        ...followUp,
+        choices: followUp.choices.map((resultChoice) => ({
+          ...resultChoice,
+          effects: {
+            ...resultChoice.effects,
+            clearDraftProgress: clearDraftProgress || resultChoice.effects.clearDraftProgress,
+            paperUpdates: [...(paperUpdates ?? []), ...(resultChoice.effects.paperUpdates ?? [])],
+            paperCollaborations: [...(paperCollaborations ?? []), ...(resultChoice.effects.paperCollaborations ?? [])],
+          },
+        })),
+      }),
+    },
+  };
 }

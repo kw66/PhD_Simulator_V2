@@ -2,8 +2,10 @@ import { consumeNextActionBuffs, getActionEffect, getActiveOperationSanCostForSt
 import { getActiveOperationAllowance } from "./v2-ai-shop";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
+import { getQueuedPaperTargetIds } from "./v2-event-queue";
 import { createDraftPaper, getAvailablePaperSlotCount, getWorkstationPaperSlotMap } from "./v2-paper-rules";
 import { getShopPaperActionModifier } from "./v2-shop-items-effects";
+import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
 import type { GameState, PaperActionType } from "./v2-types";
 
 export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
@@ -86,7 +88,10 @@ export function createResearchPaper(state: GameState, slotIndex: number): GameSt
     return state;
   }
 
-  const existingPaperIds = new Set([...state.papers, ...state.externalPublications].map((paper) => paper.id));
+  const existingPaperIds = new Set([
+    ...[...state.papers, ...state.externalPublications].map((paper) => paper.id),
+    ...getQueuedPaperTargetIds(state.eventQueue),
+  ]);
   let sequence = 1;
   while (existingPaperIds.has(`paper-${state.totalMonths}-${sequence}`)) sequence += 1;
   const paper = {
@@ -158,7 +163,7 @@ export function applyResearchOperation(
   const paper = state.papers[eligibility.paperIndex]!;
   const equipmentEffect = getShopPaperActionModifier(state.shopState, actionType);
   const executionCount = Math.max(1, 1 + Math.floor(preview.extraActions));
-  let score = paper[actionType];
+  let score = getPaperScoreBreakdown(paper, actionType).own;
 
   for (let index = 0; index < executionCount; index += 1) {
     const buffEffect = getActionEffect(state, actionType, { includeNextAction: index === 0 });
@@ -172,7 +177,7 @@ export function applyResearchOperation(
   }
 
   const actionState = applyResearchOperationActionState(state, actionType);
-  const updatedPaper = { ...paper, [actionType]: score };
+  const updatedPaper = setPaperOwnScore(paper, actionType, score);
   const nextState = consumeNextActionBuffs({
     ...state,
     ...actionState,
@@ -183,6 +188,6 @@ export function applyResearchOperation(
   const operationCountText = executionCount > 1 ? `，共 ${executionCount} 次` : "";
   return pushLog(
     nextState,
-    `${RESEARCH_OPERATION_LABEL[actionType]}：${paper.title}，${actionType} ${paper[actionType]} → ${score}${operationCountText}；SAN -${preview.sanCost}`,
+    `${RESEARCH_OPERATION_LABEL[actionType]}：${paper.title}，${actionType} ${paper[actionType]} → ${updatedPaper[actionType]}${operationCountText}；SAN -${preview.sanCost}`,
   );
 }

@@ -1,5 +1,6 @@
 import type { CareerType } from "./v2-career-rules";
-import type { DebugStatId } from "./v2-action-ids";
+import type { DebugRelationshipType, DebugStatId } from "./v2-action-ids";
+import type { PaperCompetitionResolution } from "./v2-paper-competition";
 import type { RandomEventState } from "./v2-random-event-rules";
 import type { ThesisState } from "./v2-thesis-rules";
 import type { EventCounters } from "./v2-event-state";
@@ -31,7 +32,7 @@ export * from "./v2-event-state";
 export * from "./v2-types-economy";
 export * from "./v2-types-fixed-events";
 export * from "./v2-types-relationship";
-export type { DebugStatId, GameActionId } from "./v2-action-ids";
+export type { DebugRelationshipType, DebugStatId, GameActionId } from "./v2-action-ids";
 
 export type RoleMode = "upright" | "reversed";
 export type Gender = "male" | "female";
@@ -238,6 +239,7 @@ export interface ReadingEffect {
 
 export interface Buff {
   id: string;
+  relationshipId?: string;
   name: string;
   source: string;
   timing: BuffTiming;
@@ -381,6 +383,9 @@ export interface Paper {
   idea: number;
   experiment: number;
   writing: number;
+  collaborationScores?: Partial<Record<PaperActionType, number>>;
+  collaborators?: PaperCollaborator[];
+  submittedCollaborationScores?: Partial<Record<PaperActionType, number>> | null;
   status: PaperStatus;
   target: PaperTarget | null;
   journalTarget?: JournalTarget | null;
@@ -420,6 +425,17 @@ export interface GrantedPublicationEffect {
 }
 
 export type PaperEffectUpdate = { id: string } & Partial<Omit<Paper, "id">>;
+
+export interface PaperCollaborator {
+  id: string;
+  name: string;
+}
+
+export interface PaperCollaborationEffect {
+  paperId: string;
+  collaborator: PaperCollaborator;
+  scores: Partial<Record<PaperActionType, number>>;
+}
 
 export interface EventChoice {
   id: string;
@@ -481,6 +497,8 @@ export interface EventChoice {
     fixedEventResolution?: FixedEventResolution;
     enqueueEvents?: PendingEvent[];
     paperUpdates?: PaperEffectUpdate[];
+    paperCollaborations?: PaperCollaborationEffect[];
+    paperCompetitionResolution?: PaperCompetitionResolution;
     /** Execute shared reading actions without consuming this month's action points. */
     readPaperActions?: number;
     /** Execute one normal rest action, including its SAN gain and action-point cost. */
@@ -529,6 +547,8 @@ export interface PendingEvent {
     serial: number;
     rolls: number[];
   };
+  paperCompetitionTargetId?: string;
+  paperCompetitionResult?: { description: string; choiceLabel: string; paperTitle: string };
   /** Buffs that exist only while this event chain remains unresolved. */
   pendingBuffs?: Buff[];
   removeBuffIdsOnCompletion?: string[];
@@ -613,10 +633,12 @@ export interface DispatchPayload {
   promotionId?: PaperPromotionId | undefined;
   eventId?: string | undefined;
   eventChoiceId?: string | undefined;
+  relationshipId?: string | undefined;
   debugStatId?: DebugStatId | undefined;
   debugPaperTarget?: PaperTarget | undefined;
   debugJournalTarget?: JournalTarget | undefined;
   debugPaperAuthorship?: "first" | "coauthor" | undefined;
+  debugRelationshipType?: DebugRelationshipType | undefined;
   delta?: number | undefined;
   dateDisplayMode?: DateDisplayMode | undefined;
   shopItemId?: ShopItemId | undefined;

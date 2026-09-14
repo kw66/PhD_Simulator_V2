@@ -1,4 +1,5 @@
 import { removeBuffs } from "./v2-buffs";
+import { applyPaperEffectUpdates } from "./v2-paper-collaboration";
 import type { EventQueueItem, GameState, PendingEvent } from "./v2-types";
 
 function clampDeadlineMonths(value: number): number {
@@ -50,13 +51,8 @@ export function discardBlockingQueueEvents(state: GameState): GameState {
   if (discardedEvents.length === 0) return state;
 
   const removedBuffIds = discardedEvents.flatMap((event) => event.removeBuffIdsOnCompletion ?? []);
-  const paperUpdates = new Map(
-    discardedEvents.flatMap((event) => event.discardPaperUpdates ?? []).map((update) => [update.id, update]),
-  );
-  const applyPaperUpdates = (papers: GameState["papers"]): GameState["papers"] => papers.map((paper) => {
-    const update = paperUpdates.get(paper.id);
-    return update ? { ...paper, ...update } : paper;
-  });
+  const paperUpdates = discardedEvents.flatMap((event) => event.discardPaperUpdates ?? []);
+  const applyPaperUpdates = (papers: GameState["papers"]): GameState["papers"] => papers.map((paper) => applyPaperEffectUpdates(paper, paperUpdates));
 
   return {
     ...state,
@@ -90,6 +86,31 @@ export function enqueueEventQueueItem(input: EventQueueItem[] | GameState, event
 
 export function removeEventQueueItem(eventQueue: EventQueueItem[], eventId: string): EventQueueItem[] {
   return eventQueue.filter((event) => event.id !== eventId);
+}
+
+export function getQueuedPaperTargetIds(events: PendingEvent[]): string[] {
+  const paperIds = new Set<string>();
+  const visitEvent = (event: PendingEvent): void => {
+    if (event.paperCompetitionTargetId) paperIds.add(event.paperCompetitionTargetId);
+    for (const change of event.deferredStatePatch ?? []) {
+      if (change.path[0] !== "papers") continue;
+      for (const value of [change.previousValue, change.value]) {
+        if (!Array.isArray(value)) continue;
+        for (const paper of value) {
+          if (paper && typeof paper.id === "string") paperIds.add(paper.id);
+        }
+      }
+    }
+    for (const update of event.discardPaperUpdates ?? []) paperIds.add(update.id);
+    for (const choice of event.choices) {
+      for (const effect of choice.effects.paperCollaborations ?? []) paperIds.add(effect.paperId);
+      for (const update of choice.effects.paperUpdates ?? []) paperIds.add(update.id);
+      if (choice.effects.paperCompetitionResolution) paperIds.add(choice.effects.paperCompetitionResolution.paperId);
+      for (const followUp of choice.effects.enqueueEvents ?? []) visitEvent(followUp);
+    }
+  };
+  events.forEach(visitEvent);
+  return [...paperIds];
 }
 
 export function decrementEventQueueDeadlines(eventQueue: EventQueueItem[]): EventQueueItem[] {

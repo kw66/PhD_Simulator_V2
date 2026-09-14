@@ -19,11 +19,11 @@ import {
 } from "../core/v2-growth-system";
 import { getBikeSanCapLimit, getBikeTierDefinition } from "../core/v2-bike-system";
 import { previewNextMonthEffects } from "../core/v2-monthly-effects";
-import { getFellowRoleLabel, getFellowTaskSanCost } from "../core/v2-fellow-progression";
+import { getFellowName, getFellowRoleLabel, getFellowTaskSanCost } from "../core/v2-fellow-progression";
 import { getInternshipMonthlyIncome, getPublishedAPaperCount } from "../core/v2-internship-system";
 import { LOVER_DATE_MONEY_COST } from "../core/v2-lover-progression";
 import { previewPartTimeWork } from "../core/v2-part-time-work";
-import { getBeautifulMonthlyRecovery } from "../core/v2-lover-system";
+import { getBeautifulMonthlyRecovery, getLoverName } from "../core/v2-lover-system";
 import {
   getAcceptedPaperScore,
   getPaperPromotionCost,
@@ -32,6 +32,7 @@ import {
 import { getPaperCitationMultiplier, getPaperConferencePromotionMultiplier } from "../core/v2-publication-system";
 import { getPublicationTalentChecklist } from "../core/v2-publication-talent";
 import { getAvailablePaperSlotCount, getPaperSubmissionFailure, getWorkstationPaperSlotMap } from "../core/v2-paper-rules";
+import { getPaperScoreBreakdown } from "../core/v2-paper-collaboration";
 import { getPaperHeatTier } from "../core/v2-paper-topics";
 import { ADVISOR_TASK_SAN_COST } from "../core/v2-advisor-progress";
 import {
@@ -1007,7 +1008,7 @@ function getPaperReviewConference(paper: Paper) {
     : null;
 }
 
-function renderPaperReviewHeader(paper: Paper): string {
+function renderPaperReviewHeader(state: GameState, paper: Paper): string {
   if (paper.status !== "reviewing") return "";
   const conference = getPaperReviewConference(paper);
   const conferenceText = conference && paper.target
@@ -1018,6 +1019,7 @@ function renderPaperReviewHeader(paper: Paper): string {
       <div class="paper-card-header-main">
         <span class="paper-card-status is-reviewing">${escapeHtml(conferenceText)}</span>
         <span class="paper-review-remaining">剩余 ${paper.reviewMonthsLeft} 月</span>
+        ${renderPaperParticipants(state, paper)}
       </div>
       <div class="paper-card-header-actions">${renderPaperReviewAction(paper)}</div>
     </div>
@@ -1042,6 +1044,7 @@ function renderPaperJournalHeader(state: GameState, paper: Paper, selected: bool
         ${renderPaperSelectionToggle(paper, selected, "期刊论文")}
         <span class="paper-card-status is-journal-reviewing">${escapeHtml(journal.name)} 修改中</span>
         <span class="paper-review-remaining">已修改 ${revisedMonths} 月 · <span class="paper-journal-score" aria-label="期刊修改分数 ${score}/${journal.acceptanceScore}">${score}/${journal.acceptanceScore}</span></span>
+        ${renderPaperParticipants(state, paper)}
       </div>
       <div class="paper-card-header-actions">${renderPaperReviewAction(paper)}</div>
     </div>
@@ -1128,24 +1131,41 @@ function renderPaperReviewSummary(paper: Paper): string {
 }
 
 function renderPaperStats(paper: Paper): string {
-  return renderPaperStatsValues(paper.idea, paper.experiment, paper.writing, getPaperTotalScore(paper), renderPaperReviewSummary(paper));
+  const idea = getPaperScoreBreakdown(paper, "idea");
+  const experiment = getPaperScoreBreakdown(paper, "experiment");
+  const writing = getPaperScoreBreakdown(paper, "writing");
+  const total = idea.total + experiment.total + writing.total;
+  const ownScores = [idea.own, experiment.own, writing.own];
+  return `
+    <div class="paper-score-breakdown">
+      <div class="paper-score-strip" aria-label="idea ${idea.total}，实验 ${experiment.total}，写作 ${writing.total}，总分 ${total}">
+        <span title="自身${idea.own}+协作${idea.collaboration}分"><small>idea</small><strong>${idea.total}</strong></span>
+        <span title="自身${experiment.own}+协作${experiment.collaboration}分"><small>实验</small><strong>${experiment.total}</strong></span>
+        <span title="自身${writing.own}+协作${writing.collaboration}分"><small>写作</small><strong>${writing.total}</strong></span>
+        <span class="paper-score-total" title="自身${idea.own + experiment.own + writing.own}+协作${idea.collaboration + experiment.collaboration + writing.collaboration}分"><small>总分</small><strong>${total}</strong></span>
+      </div>
+      <div class="paper-own-score-strip" aria-label="自身分：idea ${idea.own}，实验 ${experiment.own}，写作 ${writing.own}">
+        ${ownScores.map((score) => `<span><small>自身</small><strong>${score}</strong></span>`).join("")}
+      </div>
+    </div>
+    ${renderPaperReviewSummary(paper)}
+  `;
 }
 
-function renderPaperStatsValues(
-  idea: number,
-  experiment: number,
-  writing: number,
-  total = idea + experiment + writing,
-  reviewSummary = "",
-): string {
+function renderPaperParticipants(state: GameState, paper: Paper): string {
+  const collaborators = (paper.collaborators ?? []).filter((collaborator) => collaborator.name.trim());
+  const participants = [{ id: "player", name: state.playerName?.trim() || getPendingStudentName(state) || "你" }, ...collaborators];
+  const avatars = participants.map((participant, index) => {
+    const name = participant.name.trim();
+    const initial = [...name][0]!.toUpperCase();
+    const color = `hsl(${getStableNameSeed(participant.id) % 360} 62% 42%)`;
+    const label = index === 0 && name !== "你" ? `${name}（你）` : name;
+    return `<span class="paper-collaborator-avatar"${index === 0 ? ' data-player-avatar="true"' : ""} style="--collaborator-color:${color}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(initial)}</span>`;
+  }).join("");
   return `
-    <div class="paper-score-strip" aria-label="idea ${idea}，实验 ${experiment}，写作 ${writing}，总分 ${total}">
-      <span><small>idea</small><strong>${idea}</strong></span>
-      <span><small>实验</small><strong>${experiment}</strong></span>
-      <span><small>写作</small><strong>${writing}</strong></span>
-      <span class="paper-score-total"><small>总分</small><strong>${total}</strong></span>
+    <div class="paper-collaborators" aria-label="论文参与者">
+      <div class="paper-collaborator-list">${avatars}</div>
     </div>
-    ${reviewSummary}
   `;
 }
 
@@ -1375,17 +1395,19 @@ function renderWorkstationPaperCard(state: GameState, panelIndex: number): strin
         class="paper-card paper-slot-card paper-card-filled paper-card-selectable is-draft${selected ? " is-selected" : ""}${getPaperDisplayStatus(selectedPaper) === "ready" ? " is-ready" : ""}"
         data-paper-slot-index="${panelIndex}"
         data-paper-id="${escapeHtml(selectedPaper.id)}"
-        data-ui-select-workstation-paper="${escapeHtml(selectedPaper.id)}"
       >
-        <div class="paper-card-header">
-          <div class="paper-card-header-main">
-            ${renderPaperSelectionToggle(selectedPaper, selected, "论文")}
-            <span class="paper-card-status is-${getPaperDisplayStatus(selectedPaper)}">${getPaperStatusBadgeText(selectedPaper)}</span>
+        <div class="paper-card-selection-content" data-ui-select-workstation-paper="${escapeHtml(selectedPaper.id)}">
+          <div class="paper-card-header">
+            <div class="paper-card-header-main">
+              ${renderPaperSelectionToggle(selectedPaper, selected, "论文")}
+              <span class="paper-card-status is-${getPaperDisplayStatus(selectedPaper)}">${getPaperStatusBadgeText(selectedPaper)}</span>
+              ${renderPaperParticipants(state, selectedPaper)}
+            </div>
+            ${renderPaperDraftActions(selectedPaper, canReroll)}
           </div>
-          ${renderPaperDraftActions(selectedPaper, canReroll)}
+          ${renderPaperTitleWithMeta(selectedPaper)}
+          ${renderPaperStats(selectedPaper)}
         </div>
-        ${renderPaperTitleWithMeta(selectedPaper)}
-        ${renderPaperStats(selectedPaper)}
       </article>
     `;
   }
@@ -1393,9 +1415,12 @@ function renderWorkstationPaperCard(state: GameState, panelIndex: number): strin
   if (selectedPaper.status === "journal-reviewing") {
     const selected = selectedPaper.id === getSelectedWorkstationPaper(state)?.id;
     return `
-      <article class="paper-card paper-slot-card paper-card-filled paper-card-selectable is-journal-reviewing${selected ? " is-selected" : ""}" data-paper-id="${escapeHtml(selectedPaper.id)}" data-paper-slot-index="${panelIndex}" data-ui-select-workstation-paper="${escapeHtml(selectedPaper.id)}">
-        ${renderPaperJournalHeader(state, selectedPaper, selected)}
-        ${renderPaperTitleWithMeta(selectedPaper)}
+      <article class="paper-card paper-slot-card paper-card-filled paper-card-selectable is-journal-reviewing${selected ? " is-selected" : ""}" data-paper-id="${escapeHtml(selectedPaper.id)}" data-paper-slot-index="${panelIndex}">
+        <div class="paper-card-selection-content" data-ui-select-workstation-paper="${escapeHtml(selectedPaper.id)}">
+          ${renderPaperJournalHeader(state, selectedPaper, selected)}
+          ${renderPaperTitleWithMeta(selectedPaper)}
+          ${renderPaperStats(selectedPaper)}
+        </div>
       </article>
     `;
   }
@@ -1403,8 +1428,8 @@ function renderWorkstationPaperCard(state: GameState, panelIndex: number): strin
   return `
     <article class="paper-card paper-slot-card paper-card-filled is-${selectedPaper.status}" data-paper-id="${escapeHtml(selectedPaper.id)}" data-paper-slot-index="${panelIndex}">
       ${selectedPaper.status === "reviewing"
-        ? renderPaperReviewHeader(selectedPaper)
-        : `<div class="paper-card-header"><span class="paper-card-header-tail"><span class="paper-card-status is-${selectedPaper.status}">${getPaperStatusBadgeText(selectedPaper)}</span></span></div>`}
+        ? renderPaperReviewHeader(state, selectedPaper)
+        : `<div class="paper-card-header"><div class="paper-card-header-main"><span class="paper-card-status is-${selectedPaper.status}">${getPaperStatusBadgeText(selectedPaper)}</span>${renderPaperParticipants(state, selectedPaper)}</div></div>`}
       ${renderPaperTitleWithMeta(selectedPaper)}
       ${renderPaperStats(selectedPaper)}
       ${renderPaperPublishedSummary(selectedPaper)}
@@ -1450,10 +1475,10 @@ function renderEnhancedWorkstationSection(state: GameState): string {
       ${preEnrollment ? "" : `
         <div class="workstation-notes">
           <details class="workstation-tip-note workstation-formula-note panel-tip-note">
-            <summary>💡 小提示：想 idea、做实验、写论文会重新计算对应分数，至少+1；展开查看公式与 Buff 顺序</summary>
+            <summary>💡 小提示：idea/实验/写作上行是包含协作的合计分，下行是自身分；科研只更新自身，同学帮助持续累加。点击展开看细则</summary>
             <ol class="workstation-formula-list">
               <li>
-                <strong>科研分 = 四舍五入(基础分 × 总倍率 + 固定分)</strong>
+                <strong>本次分 = 四舍五入(基础分 × 总倍率 + 固定分)</strong>
                 <span>基础分 = 科研能力 × 随机倍率（0.5～1.5）+ 随机加分（0～5）。</span>
               </li>
               <li>
@@ -1461,22 +1486,23 @@ function renderEnhancedWorkstationSection(state: GameState): string {
                 <span>倍率从 ×1 开始，只相加增减幅：×1.5 算 +0.5，×0.8 算 −0.2；两个 ×1.5 合并为 ×2。固定分来自当前生效的 Buff（包括 AI）和显卡。</span>
               </li>
               <li>
-                <strong>最后保底：结果 ≤ 当前分时，取当前分+1</strong>
-                <span>例：科研4、随机倍率1.2、随机加分2、总倍率×1.5、固定分+1，结果为四舍五入((4×1.2+2)×1.5+1)=11；若当前分≥11，则取当前分+1。</span>
+                <strong>新自身 = max(原自身+1,本次)</strong>
+                <span>协作分不会被科研覆盖，同一人反复帮助、多人帮助都持续累加。例：某项自身20+协作10，本次25→新自身25+协作10=合计35。最右总分为三项合计。</span>
               </li>
               <li>
                 <strong>执行次数 = max(1, 1 + 向下取整(Buff额外次数 + 装备额外次数))</strong>
-                <span>有额外次数时依次重新抽取并计算，上一遍结果作为下一遍的当前分数；不再额外扣行动点或 SAN。“仅下次”Buff 的加分与倍率只用于第一遍，持续 Buff 与装备效果每遍均生效</span>
+                <span>额外次数逐次重新抽取，沿用上一遍自身分，不额外扣行动点或SAN。“仅下次”Buff 的加分与倍率只用于第一遍，持续Buff与装备每遍生效。</span>
               </li>
             </ol>
           </details>
           <details class="workstation-review-note panel-tip-note" data-workstation-note="review">
-            <summary>💡 小提示：会议投稿后审稿 3 个月，由 3 位审稿人共同决定接收；期刊达到送审线后可持续修改，达标后自动接收。点击展开看细则</summary>
+            <summary>💡 小提示：会议按投稿时合计分审稿3个月；期刊送审后不衰减，可持续修改，达标接收。点击展开看细则</summary>
             <div class="workstation-review-note-body">
               <span>会议总评 ≥+2 接收，≤−2 拒稿，介于两者之间按边缘录用概率判定；接收后再根据投稿总分和会议影响力抽取 Poster、Spotlight、Oral 或 Best Paper 等类型。</span>
-              <span>会议拒稿会退回草稿，并保留审稿人的修改建议；接收奖励会随同级或更高等级的一作成果增加而递减。</span>
-              <span>期刊送审线/达标线：PAMI 75/125 分、NMI 100/250 分、Nature 150/500 分；送审后新增分数直接累加。</span>
-              <span>每月衰减：发表前各项分数按论文热度分别衰减，最低保留 1 分；原本为 0 的仍为 0，期刊送审后不衰减。</span>
+              <span>会议投稿冻结三项合计分快照，3位审稿人据此评分；审稿期间当前分数仍衰减，快照不变。退稿回到草稿，保留衰减后的分数，再将审稿反馈加到自身分，协作分不变。</span>
+              <span>每月衰减：草稿和会议审稿期，各项扣分=向下取整(合计×热度×10%)，至少扣1分、合计最低1分；原本0或1不扣。先算合计扣分，再按自身/协作比例分摊。</span>
+              <span>期刊初始分=向下取整(3×三项合计的几何均值)；修改分=初始分+各项较送审时合计的净新增（逐项最低0），自身与协作新增均计入。</span>
+              <span>期刊送审线/达标线：PAMI 75/125 分、NMI 100/250 分、Nature 150/500 分；送审后不衰减，修改分达标后自动接收。</span>
             </div>
           </details>
         </div>
@@ -1525,11 +1551,13 @@ function renderEnhancedWorkstationSection(state: GameState): string {
 }
 
 type RelationshipRenderCard = {
+  relationshipId: string;
   type: "advisor" | "senior" | "peer" | "junior" | "lover";
   buttonLabel: string;
   displayType: string;
   displayName: string;
-  detailItems: string[];
+  detailItems: Array<{ label: string; value: number }>;
+  knownMonths: number;
   taskProgress: number;
   taskMax: number;
   relationProgress: number;
@@ -1576,7 +1604,7 @@ function getRenderedFellowTaskRewardText(taskType: FellowProgressProfile["taskTy
   return `亲和度 +1、idea +${research}`;
 }
 
-function getRenderedLoverName(type: LoverTypeId | null): string {
+function getRenderedLoverType(type: LoverTypeId | null): string {
   if (type === "beautiful") return "活泼恋人";
   if (type === "smart") return "聪慧恋人";
   return "恋人";
@@ -1587,15 +1615,16 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
 
   if (state.selectedAdvisorName && state.relationshipState.advisorCount > 0) {
     cards[0] = {
+      relationshipId: "advisor",
       type: "advisor",
       buttonLabel: "导师",
       displayType: "导师",
       displayName: `${state.selectedAdvisorName ?? "导师"} / 讲师`,
       detailItems: [
-        `科研资源 ${state.advisorProgressState.researchResource}`,
-        `亲和度 ${state.advisorProgressState.affinity}`,
-        `认识时间 ${Math.max(0, state.totalMonths)}月`,
+        { label: "科研资源", value: state.advisorProgressState.researchResource },
+        { label: "亲和度", value: state.advisorProgressState.affinity },
       ],
+      knownMonths: Math.max(0, state.totalMonths),
       taskProgress: state.advisorProgressState.taskProgress,
       taskMax: state.advisorProgressState.taskMax,
       relationProgress: state.advisorProgressState.relationProgress,
@@ -1609,29 +1638,22 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
     };
   }
 
-  const fellowFallbackCounts: Record<FellowProgressProfile["type"], number> = {
-    senior: 0,
-    peer: 0,
-    junior: 0,
-  };
-
   const otherCards = [
     ...state.fellowProgressState.map((profile, index) => {
-      fellowFallbackCounts[profile.type] += 1;
       const fellowLabel = getRenderedFellowTypeLabel(profile);
-      const fallbackName = `${fellowLabel} ${fellowFallbackCounts[profile.type]}`;
       return ({
       sortValue: getRelationshipSortValue(profile.startTotalMonths, index),
       card: {
+        relationshipId: profile.id,
         type: profile.type,
         buttonLabel: fellowLabel,
         displayType: fellowLabel,
-        displayName: profile.name?.trim() || fallbackName,
+        displayName: getFellowName(profile),
         detailItems: [
-          `科研 ${profile.research}`,
-          `亲和度 ${profile.affinity}`,
-          `认识时间 ${Math.max(0, state.totalMonths - profile.startTotalMonths)}月`,
+          { label: "科研", value: profile.research },
+          { label: "亲和度", value: profile.affinity },
         ],
+        knownMonths: Math.max(0, state.totalMonths - profile.startTotalMonths),
         taskProgress: profile.taskProgress,
         taskMax: profile.taskMax,
         relationProgress: profile.relationProgress,
@@ -1656,15 +1678,16 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
 
   if (state.loverState.active && state.loverProgressState.active && state.loverState.type) {
     cards[5] = {
+      relationshipId: "lover",
       type: "lover",
       buttonLabel: "恋人",
-      displayType: "恋人",
-      displayName: getRenderedLoverName(state.loverState.type),
+      displayType: getRenderedLoverType(state.loverState.type),
+      displayName: getLoverName(state.loverState),
       detailItems: [
-        `科研 ${state.loverProgressState.research}`,
-        `亲密度 ${state.loverProgressState.intimacy}`,
-        `认识时间 ${Math.max(0, state.totalMonths - (state.loverState.startTotalMonths ?? state.totalMonths))}月`,
+        { label: "科研", value: state.loverProgressState.research },
+        { label: "亲密度", value: state.loverProgressState.intimacy },
       ],
+      knownMonths: Math.max(0, state.totalMonths - (state.loverState.startTotalMonths ?? state.totalMonths)),
       taskProgress: state.loverProgressState.taskProgress,
       taskMax: state.loverProgressState.taskMax,
       relationProgress: state.loverProgressState.relationProgress,
@@ -1739,7 +1762,7 @@ function renderRelationshipCurrentCard(
         <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
       </div>
       <div class="rel-detail-row">
-        ${card.detailItems.map((item) => `<span class="rel-detail-item">${escapeHtml(item)}</span>`).join("")}
+        ${card.detailItems.map((item) => `<span class="rel-detail-item">${escapeHtml(item.label)} ${item.value}</span>`).join("")}
       </div>
       <div class="rel-progress-section">
         <div class="rel-progress-item">
@@ -1799,41 +1822,54 @@ function renderRelationshipSection(state: GameState, uiState: PlayRenderUiState 
 }
 
 function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCard): string {
+  const canEndRelationship = card.type !== "advisor";
+  const endRelationshipLabel = card.type === "lover" ? "分手" : "停止合作";
   return `
-    <article class="rel-card filled">
-      <div class="rel-card-head rel-card-header">
-        <span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
-        <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
-        ${card.canInteract ? '<span class="rel-card-alert" aria-label="\u6709\u53ef\u7528\u64cd\u4f5c">!</span>' : ""}
-      </div>
-      <div class="rel-detail-row">
-        ${card.detailItems.map((item) => `<span class="rel-detail-item">${escapeHtml(item)}</span>`).join("")}
+    <article class="rel-card filled" data-relationship-type="${card.type}">
+      <div class="rel-card-identity">
+        <div class="rel-card-head rel-card-header">
+          <span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
+          <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
+          <div class="rel-card-meta">
+            <span class="rel-known-time">认识时间${card.knownMonths}月</span>
+            ${card.canInteract ? '<span class="rel-card-alert" aria-label="有可用操作">!</span>' : ""}
+          </div>
+        </div>
+        <div class="rel-detail-row">
+          ${card.detailItems.map((item) => `
+            <span class="rel-detail-item"><span class="rel-detail-label">${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${item.value}</strong></span>
+          `).join("")}
+        </div>
       </div>
       <div class="rel-progress-section">
         <div class="rel-progress-item">
           <div class="rel-progress-header">
-            <span class="rel-progress-label">\u4efb\u52a1\u8fdb\u5ea6\uff08\u6ee1\u540e\uff1a${escapeHtml(card.taskRewardText)}\uff09</span>
+            <span class="rel-progress-label">任务进度</span>
             <span class="rel-progress-val">${card.taskProgress}/${card.taskMax}</span>
           </div>
           <div class="rel-progress-bar">
             <div class="rel-progress-fill task" style="width:${clampPercent(card.taskProgress / Math.max(1, card.taskMax) * 100)}%"></div>
           </div>
+          <div class="rel-progress-note">完成：${escapeHtml(card.taskRewardText)}</div>
         </div>
         <div class="rel-progress-item">
           <div class="rel-progress-header">
-            <span class="rel-progress-label">\u5173\u7cfb\u79ef\u7d2f\uff08+${card.relationGrowthPerMonth}/\u6708\uff0c\u6ee1\u540e\u89e3\u9501\u4ea4\u6d41\uff09</span>
+            <span class="rel-progress-label">关系积累</span>
             <span class="rel-progress-val">${card.relationProgress}/${card.relationMax}</span>
           </div>
           <div class="rel-progress-bar">
             <div class="rel-progress-fill relation" style="width:${clampPercent(card.relationProgress / Math.max(1, card.relationMax) * 100)}%"></div>
           </div>
+          <div class="rel-progress-note">每月+${card.relationGrowthPerMonth} · 满后解锁交流</div>
         </div>
       </div>
       <div class="rel-actions">
         <button class="btn-sm rel-action-btn" type="button" ${getDeferredGameplayActionAttributes(state)}>
-          ${escapeHtml(card.taskUsedThisMonth ? "\u2713 \u672c\u6708\u5df2\u7528" : `${card.taskLabel}\uff08${card.taskCostLabel}\uff09`)}
+          <span class="rel-action-label">${escapeHtml(card.taskUsedThisMonth ? "✓ 本月已用" : card.taskLabel)}</span>
+          ${card.taskUsedThisMonth ? "" : `<span class="rel-action-cost">${escapeHtml(card.taskCostLabel)}</span>`}
         </button>
-        <button class="btn-sm rel-action-btn is-chat" type="button" ${getDeferredGameplayActionAttributes(state)}>\u4ea4\u6d41</button>
+        <button class="btn-sm rel-action-btn is-chat" type="button" ${getDeferredGameplayActionAttributes(state)}>交流</button>
+        ${canEndRelationship ? `<button class="btn-sm rel-action-btn rel-end-btn" type="button" data-action="end-relationship" data-relationship-id="${escapeHtml(card.relationshipId)}">${endRelationshipLabel}</button>` : ""}
       </div>
     </article>
   `;
@@ -1999,8 +2035,30 @@ function getPaperAuthors(state: GameState, paper: Paper): ResearchAuthor[] {
     || pendingAdvisorName
     || generatePaperAuthorName(`${enrollmentIdentitySeed}:advisor`, reservedNames);
   reservedNames.add(advisorName);
+  if (paper.collaborators !== undefined) {
+    const collaboratorNames = [...new Set(paper.collaborators.map((collaborator) => collaborator.name.trim()))]
+      .filter((name) => name && !reservedNames.has(name));
+    const leadName = paper.nonFirstAuthor === true
+      ? paper.leadAuthorName?.trim() || collaboratorNames[0] || generatePaperAuthorName(`${paper.id}:lead`, reservedNames)
+      : undefined;
+    const collaborators = collaboratorNames
+      .filter((name) => name !== leadName)
+      .map((name) => ({ name, isPlayer: false }));
+    return paper.nonFirstAuthor === true
+      ? [
+        ...(leadName ? [{ name: leadName, isPlayer: false }] : []),
+        ...collaborators,
+        { name: playerName, isPlayer: true },
+        { name: advisorName, isPlayer: false },
+      ]
+      : [
+        { name: playerName, isPlayer: true },
+        ...collaborators,
+        { name: advisorName, isPlayer: false },
+      ];
+  }
   const fellows = state.fellowProgressState
-    .map((profile) => profile.name?.trim() || "")
+    .map(getFellowName)
     .filter((name, index, names) => name && names.indexOf(name) === index)
     .sort((left, right) => getStableNameSeed(`${paper.id}:${left}`) - getStableNameSeed(`${paper.id}:${right}`));
 
@@ -2017,12 +2075,11 @@ function getPaperAuthors(state: GameState, paper: Paper): ResearchAuthor[] {
   }
 
   const relationLead = paper.leadAuthorName?.trim();
-  const relationNames = new Set(fellows);
   const fallbackLead = generatePaperAuthorName(`${paper.id}:lead`, new Set([
     ...reservedNames,
     ...fellows,
   ]));
-  const leadName = relationLead && relationNames.has(relationLead) ? relationLead : fallbackLead;
+  const leadName = relationLead || fallbackLead;
   const middleFellows = fellows
     .filter((name) => name !== leadName && getStableNameSeed(`${paper.id}:middle:${name}`) % 2 === 0)
     .slice(0, 2);
@@ -2588,7 +2645,7 @@ function buildRelationTalentItems(state: GameState): TalentPanelItem[] {
     ...fellows.map((profile) => ({
       id: `fellow-${profile.id}`,
       icon: profile.type === "senior" ? "🧑‍🏫" : profile.type === "peer" ? "🤝" : "🧑‍🎓",
-      name: `${getTalentFellowTypeLabel(profile)}·${profile.name ?? getTalentFellowTypeLabel(profile)}`,
+      name: `${getTalentFellowTypeLabel(profile)}·${getFellowName(profile)}`,
       active: true,
       description: `效果：帮忙${getTalentFellowTaskLabel(profile.taskType)} +${profile.research}。`,
       detail: `当前亲和 ${profile.affinity}，任务进度 ${profile.taskProgress}/${profile.taskMax}。`,
@@ -3198,6 +3255,20 @@ function renderDebugBottomBar(): string {
             <div class="debug-bottom-paper-grid debug-bottom-journal-grid">
               ${renderDebugJournalButtons()}
             </div>
+          </div>
+        </div>
+        <div class="debug-bottom-column debug-bottom-relationship-column" role="group" aria-label="新增人际关系">
+          <div class="debug-bottom-group">
+            <button class="debug-tool-btn" type="button"
+              data-action="debug-add-relationship" data-debug-relationship-type="senior">新增师兄/师姐</button>
+            <button class="debug-tool-btn" type="button"
+              data-action="debug-add-relationship" data-debug-relationship-type="junior">新增师弟/师妹</button>
+          </div>
+          <div class="debug-bottom-group">
+            <button class="debug-tool-btn" type="button"
+              data-action="debug-add-relationship" data-debug-relationship-type="peer">新增同门</button>
+            <button class="debug-tool-btn" type="button"
+              data-action="debug-add-relationship" data-debug-relationship-type="lover">新增恋人</button>
           </div>
         </div>
         <div class="debug-bottom-actions">
