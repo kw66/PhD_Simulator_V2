@@ -878,8 +878,8 @@ describe("minimal game engine", () => {
     expect(state.player.research).toBe(2);
     expect(state.player.san).toBe(16);
     expect(state.actionState).toEqual({ used: 1, limit: 1, aiResearchBonusUsed: false });
-    expect(state.log[0]?.text).toContain("看论文 2 次");
-    expect(state.log[0]?.text).not.toContain("阅读累计");
+    expect(state.log.some((entry) => entry.text.includes("看论文 2 次"))).toBe(true);
+    expect(state.eventHistory.some((entry) => entry.stages.some((stage) => stage.talentTrigger?.name === "阅读积累"))).toBe(true);
     expect(state.buffs.some((buff) => buff.id.startsWith("read-paper-idea-"))).toBe(true);
     expect(state.log.filter((entry) => entry.text.startsWith("看论文："))).toHaveLength(0);
   });

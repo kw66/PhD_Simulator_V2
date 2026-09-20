@@ -28,9 +28,6 @@ export type TeachersDayGiftId = "tea" | "mooncake" | "flower";
 
 export interface FixedEventAdvisorCandidate {
   advisorName: string;
-  researchResource: number;
-  affinity: number;
-  taskMultiplier: number;
 }
 
 export interface FixedEventAdvisorIntel {

@@ -96,8 +96,8 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
 function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent {
   const typeLabel = context.type === "beautiful" ? "活泼恋人" : "聪慧恋人";
   const effectText = context.type === "beautiful"
-    ? "SAN 回满、SAN 上限 +4、每月额外回复 10% 已损 SAN、每月金币 -2。"
-    : "科研 +2、永久获得想 idea / 做实验 / 写论文各 +1 次、每月金币 -2。";
+    ? "科研3～6、亲密9～12；每月自动推进玩耍，学习获得一半进度。"
+    : "科研9～12、亲密3～6；每月自动推进学习，玩耍获得一半进度。";
 
   return {
     id: `lover-development-result-accept-${context.type}-${context.totalMonths}`,
@@ -169,15 +169,6 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
           loverStateUpdates: activateLover(context.type, context.totalMonths, context.playerGender),
           activateLoverProgress: context.type,
           relationshipAdditions: ["lover"],
-          ...(context.type === "beautiful"
-            ? {
-                restoreSanToCap: true,
-                sanCapDelta: 4,
-              }
-            : {
-                research: 2,
-                persistentExtraActionDeltas: { idea: 1, experiment: 1, writing: 1 },
-              }),
           enqueueEvents: [createLoverAcceptResult(context)],
         },
       },

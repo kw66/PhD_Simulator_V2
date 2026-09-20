@@ -137,6 +137,7 @@ describe("v2 paper rules", () => {
     const rerolled = rerollPaperTopic(state, paper.id, fromRolls([0.999, 0, 0, 0, 0]));
     expect(rerolled.papers[0]).toMatchObject({ id: paper.id, heatMultiplier: 1.5 });
     expect(rerolled.papers[0]?.title).not.toBe(paper.title);
+    expect(rerolled.log).toBe(state.log);
 
     const progressed = { ...rerolled.papers[0]!, idea: 1 };
     const progressedState = { ...rerolled, papers: [progressed] };
@@ -145,7 +146,7 @@ describe("v2 paper rules", () => {
     const discarded = discardDraftPaper(progressedState, progressed.id);
     expect(discarded.papers).toEqual([]);
     expect(discarded.selectedPaperId).toBeNull();
-    expect(discarded.log[0]?.text).toContain("丢弃论文");
+    expect(discarded.log).toBe(progressedState.log);
   });
 
   it("草稿和审稿中的 idea、实验、写作每月按各自热度衰减", () => {
@@ -179,7 +180,7 @@ describe("v2 paper rules", () => {
     expect(decayed.papers[0]).toMatchObject({ idea: 18, experiment: 8, writing: 6 });
     expect(decayed.papers[1]).toMatchObject({ idea: 8, experiment: 1, writing: 5 });
     expect(decayed.papers[1]).toMatchObject({ submittedIdea: 10, submittedExperiment: 2, submittedWriting: 6 });
-    expect(decayed.log[0]?.text).toContain("论文时效");
+    expect(decayed.log).toBe(state.log);
   });
 
   it("审稿期间可以随时撤稿并完整保留三项分数", () => {

@@ -3,6 +3,7 @@ import { createConferenceActivityEvent, createConferenceActivityResult } from ".
 import { createConferenceCareerState } from "../src/core/v2-conference-career";
 import { createConferenceEncounterState } from "../src/core/v2-conference-encounters";
 import { createInternshipState } from "../src/core/v2-internship-system";
+import { createJointTrainingAct1 } from "../src/core/v2-joint-training-events";
 import { createLoverState } from "../src/core/v2-lover-system";
 import { createRelationshipState } from "../src/core/v2-relationship-rules";
 import { createPaperReviewResultEvent } from "../src/core/v2-publication-system";
@@ -14,6 +15,29 @@ import { renderApp } from "../src/app/v2-render";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("new multi-stage event shape", () => {
+  it("keeps joint training rewards without changing advisor progress", () => {
+    const first = createJointTrainingAct1({ rejectedBigBullCoopCount: 0, pendingCitationCapBonus: 3 });
+    const second = first.choices[0]?.effects.enqueueEvents?.[0];
+    const accept = second?.choices.find((choice) => choice.id === "accept");
+    const result = accept?.effects.enqueueEvents?.[0];
+
+    expect(first.stage).toBe("act1");
+    expect(second?.stage).toBe("act2");
+    expect(result?.stage).toBe("result");
+    expect(accept?.effects).toEqual({
+      conferenceEncounterUpdates: { bigBullCooperation: true },
+      researchCapacityStateDeltas: { jointTrainingCitationCapBonus: 3 },
+      ideaBonus: 5,
+      experimentBonus: 5,
+      enqueueEvents: [result],
+    });
+    expect(result?.description).toContain("科研上限 +3");
+    expect(result?.description).toContain("永久：想 idea +5 分、做实验 +5 分");
+    expect(result?.description).not.toContain("导师科研资源");
+    expect(result?.completionLog).toBe("你接受了联合培养，科研上限 +3。");
+    expect(result?.choices[0]?.effects).toEqual({});
+  });
+
   it("keeps conference activity effects in its result stage", () => {
     const context = { id: "conference-test", conferenceName: "CVPR", conferenceYear: 2026, city: "杭州", country: "中国", paperCount: 1, grade: "B" as const, paperIds: ["p1"] };
     const state = { research: 0, social: 6, relationshipState: createRelationshipState(), conferenceEncounterState: createConferenceEncounterState(), conferenceCareerState: createConferenceCareerState(), internshipState: createInternshipState(), loverState: createLoverState() };
@@ -31,7 +55,7 @@ describe("new multi-stage event shape", () => {
 
   it("exposes review, reviewers, and PC as one chain", () => {
     const paper = { id: "p1", title: "Test", topicId: "t", topicLabel: "T", heatMultiplier: 1, prepublicationDecayRate: 0.1, idea: 1, experiment: 1, writing: 1, status: "reviewing" as const, target: "C" as const, reviewMonthsLeft: 0, submittedIdea: 1, submittedExperiment: 1, submittedWriting: 1 };
-    const settlement = { paperId: "p1", target: "C" as const, accepted: false, acceptType: null, submittedScore: 3, totalReviewScore: -2, borderlineChance: null, venueInfluence: 0.3, reviewStrictnessMultiplier: 1, scoreGain: 0, baseSanReward: 0, baseFavorReward: 0, rewardReductionCount: 0, sanReward: 0, favorReward: 0, reviewerSanChange: 0, reports: ["普通审稿人", "严格审稿人", "LLM审稿人"].map((reviewer) => ({ reviewer, focus: "balanced" as PaperReviewerFocus, reviewScore: -1 as const, decision: "Reject" as const, effectiveScore: 1 })) };
+    const settlement = { paperId: "p1", target: "C" as const, accepted: false, acceptType: null, submittedScore: 3, totalReviewScore: -2, borderlineChance: null, venueInfluence: 0.3, reviewStrictnessMultiplier: 1, scoreGain: 0, reviewerSanChange: 0, reports: ["普通审稿人", "严格审稿人", "LLM审稿人"].map((reviewer) => ({ reviewer, focus: "balanced" as PaperReviewerFocus, reviewScore: -1 as const, decision: "Reject" as const, effectiveScore: 1 })) };
     const first = createPaperReviewResultEvent(paper, settlement);
     const second = first.choices[0]?.effects.enqueueEvents?.[0];
     const third = second?.choices[0]?.effects.enqueueEvents?.[0];

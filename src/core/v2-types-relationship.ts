@@ -1,3 +1,4 @@
+import type { FixedPaperTopic } from "./v2-paper-topics";
 import type {
   FellowTaskType,
   FellowTypeId,
@@ -60,15 +61,35 @@ export interface ResearchCapacityState {
   otherCapBonus: number;
 }
 
+export type AdvisorGrantId = "youth" | "general" | "excellent" | "distinguished" | "academician";
+
+export interface AdvisorGrantAward {
+  id: AdvisorGrantId;
+  awardedYear: number;
+  startYear: number | null;
+  endYear: number | null;
+}
+
+export interface AdvisorGrantApplication {
+  id: AdvisorGrantId;
+  calendarYear: number;
+  researchSnapshot: number;
+}
+
 export interface AdvisorProgressState {
-  researchResource: number;
-  affinity: number;
-  taskProgress: number;
-  taskMax: number;
-  relationProgress: number;
-  relationMax: number;
-  canInteract: boolean;
-  taskUsedThisMonth: boolean;
+  researchAccumulation: number;
+  funding: number;
+  awards: AdvisorGrantAward[];
+  pendingApplication: AdvisorGrantApplication | null;
+  countedPaperIds: string[];
+  lastSettledTotalMonths: number | null;
+  lastHorizontalTotalMonths?: number | null;
+  salaryRemainder?: number;
+  monthlyResearchGrowth?: {
+    totalMonths: number;
+    funding: number | null;
+    papers: number;
+  };
 }
 
 export interface LoverProgressState {
@@ -82,11 +103,18 @@ export interface LoverProgressState {
   canInteract: boolean;
   taskUsedThisMonth: boolean;
   completedTaskCount: number;
+  routes?: Record<"play" | "study" | "shopping", { progress: number; completed: number }>;
+  giftCoupons?: number;
+  pendingPaperHelp?: { amount: number; collaboratorId: string; name: string } | null;
+  lastDateTotalMonths?: number;
+  lastAdvancedTotalMonths?: number;
+  sanDiscountMonths?: number[];
 }
 
 export interface FellowProgressProfile {
   id: string;
   name?: string;
+  researchTopic?: FixedPaperTopic;
   type: FellowTypeId;
   gender: Gender;
   research: number;
@@ -94,11 +122,13 @@ export interface FellowProgressProfile {
   taskType: FellowTaskType;
   taskProgress: number;
   taskMax: number;
-  relationProgress: number;
-  relationMax: number;
-  canInteract: boolean;
   taskUsedThisMonth: boolean;
   startTotalMonths: number;
+  pendingHelpToPlayer?: number | null;
+  pendingHelpToFellow?: number | null;
+  lastAdvancedTotalMonths?: number;
+  lastAnnualGrowthTotalMonths?: number;
+  affinityRewardedPaperIds?: string[];
 }
 
 export interface FellowProfileAddition {

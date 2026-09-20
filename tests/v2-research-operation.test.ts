@@ -22,6 +22,7 @@ describe("v2 research operations", () => {
   it("creates a draft for an unlocked slot without spending an action", () => {
     const state = admittedState();
     const created = dispatchAction(state, "create-paper", { paperSlotIndex: 0 });
+    expect(created.log).toBe(state.log);
 
     expect(created.papers).toHaveLength(1);
     expect(created.papers[0]).toMatchObject({ idea: 0, experiment: 0, writing: 0, status: "draft" });

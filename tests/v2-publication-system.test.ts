@@ -65,6 +65,7 @@ describe("v2 publication loop", () => {
       idea: 6,
       experiment: 5,
       writing: 4,
+      rejectionCount: 2,
     };
     const state = {
       ...createStartedGameState("normal"),
@@ -86,6 +87,7 @@ describe("v2 publication loop", () => {
       writing: 4,
     });
     expect(withdrawn.log[0]?.text).toContain("撤稿");
+    expect(withdrawn.papers[0]?.rejectionCount).toBe(2);
   });
 
   it("resolves a due review and awards the target research score", () => {
@@ -143,10 +145,11 @@ describe("v2 publication loop", () => {
       "decision",
     ]);
     expect(confirmed.totalResearchScore).toBe(1);
-    expect(confirmed.player.san).toBe(14);
+    expect(confirmed.player.san).toBe(12);
     expect(confirmed.publicationTalentState?.claimedIds).toEqual(["first-paper"]);
     expect(confirmed.log.some((entry) => entry.text.includes("C类会议接收"))).toBe(true);
-    expect(confirmed.log.at(-1)?.text).toBe("发表天赋完成：首发论文；SAN+2、好感+1、科研+1");
+    expect(confirmed.eventHistory.flatMap((entry) => entry.stages).find((stage) => stage.talentTrigger?.name === "研究之始")?.talentTrigger)
+      .toMatchObject({ recipient: "你", effects: ["SAN+2（10→12）", "好感+1（1→2）", "科研+1（1→2）"] });
   });
 
   it("releases a review-result chain back to a draft when force-advancing", () => {
@@ -188,6 +191,28 @@ describe("v2 publication loop", () => {
       lastReview: null,
     });
     expect(forced.eventQueue.some((event) => event.id.startsWith("paper-review-result-"))).toBe(false);
+  });
+
+  it("counts each confirmed rejection once and preserves the count when accepted", () => {
+    let state: GameState = {
+      ...createStartedGameState("normal"), eventQueue: [],
+      papers: [{ ...createDraftPaper(1, 0), idea: 1, experiment: 1, writing: 1 }],
+    };
+    for (const expectedCount of [1, 2, 3]) {
+      state = dispatchAction(state, "submit-paper", { paperId: state.papers[0]!.id, paperTarget: "A" });
+      state = { ...state, papers: state.papers.map((paper) => ({ ...paper, reviewMonthsLeft: 0 })) };
+      const reviewed = resolveDuePaperReviews(state, () => 0.99).state;
+      expect(reviewed.papers[0]?.rejectionCount ?? 0).toBe(expectedCount - 1);
+      state = confirmReview(reviewed);
+      expect(state.papers[0]?.rejectionCount).toBe(expectedCount);
+      expect(state.papers[0]?.status).toBe("draft");
+    }
+    state = { ...state, papers: state.papers.map((paper) => ({ ...paper, idea: 1000, experiment: 1000, writing: 1000 })) };
+    state = dispatchAction(state, "submit-paper", { paperId: state.papers[0]!.id, paperTarget: "A" });
+    state = { ...state, papers: state.papers.map((paper) => ({ ...paper, reviewMonthsLeft: 0 })) };
+    state = confirmReview(resolveDuePaperReviews(state, () => 0).state);
+    expect(state.externalPublications[0]?.status).toBe("published");
+    expect(state.externalPublications[0]?.rejectionCount).toBe(3);
   });
 
   it("does not apply a second decay when an already-decayed paper is rejected", () => {
@@ -278,7 +303,7 @@ describe("v2 publication loop", () => {
     expect(confirmed.papers[0]).toMatchObject({ status: "draft", idea: 4, experiment: 4, writing: 10 });
   });
 
-  it("reduces SAN reward after publishing a same-level paper", () => {
+  it("grants no extra SAN or favor for repeat publications and shows no reward reduction", () => {
     const prior = attachPaperPublication({
       ...createDraftPaper(1, 0, () => 0),
       status: "published" as const,
@@ -318,8 +343,11 @@ describe("v2 publication loop", () => {
     const result = resolveDuePaperReviews(state, () => 0);
     const advanced = advanceReviewToPc(result.state);
     const confirmed = confirmReview(result.state);
-    expect(advanced.finalEvent.description).toContain("同级或更高等级");
-    expect(confirmed.player.san).toBe(11);
+    expect(advanced.finalEvent.description).not.toContain("同级或更高等级");
+    expect(advanced.finalEvent.description).toContain("科研分+1");
+    expect(advanced.finalEvent.description).not.toMatch(/SAN\s*\+|好感\s*\+|奖励递减/);
+    expect(confirmed.player.san).toBe(10);
+    expect(confirmed.player.favor).toBe(state.player.favor);
   });
 
   it("applies reviewer pressure on rejection confirmation", () => {

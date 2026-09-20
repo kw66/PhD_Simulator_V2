@@ -1,6 +1,9 @@
 import { dispatchDebugAction } from "./v2-debug-tools";
+import { recordTalentTransitions } from "./v2-talent-transitions";
 import { dispatchSetupAction } from "./v2-engine-action-dispatch";
+import { evaluateCoreEndings, finishTrainingIfReady, quitGame } from "./v2-ending-system";
 import { applyQueuedEventEffects } from "./v2-engine-event-resolution";
+import { hasManualBlockingEvents, settleLinearEvents } from "./v2-event-auto-resolution";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "./v2-development-flags";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { createInitialState as buildInitialState } from "./v2-engine-state-factory";
@@ -17,7 +20,7 @@ import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { yearlyResetRandomEventState } from "./v2-random-event-rules";
 import { activatePendingPaperCompetitionEvents } from "./v2-paper-competition-waiting";
 import { refreshPaperCompetitionEvents } from "./v2-paper-competition-preview";
-import { applyMonthlyEffects, applyMonthStartSubscriptions } from "./v2-monthly-effects";
+import { applyMonthlyEffects, applyMonthStartSubscriptions, resolveMonthlyEffects } from "./v2-monthly-effects";
 import { applyReadPaperActions, getManualReadPaperCount } from "./v2-reading-system";
 import { applyResearchOperation, createResearchPaper } from "./v2-research-operation";
 import { applyPartTimeWork } from "./v2-part-time-work";
@@ -34,9 +37,14 @@ import { resolveReadyJournalPapers, submitJournalPaper } from "./v2-journal-syst
 import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyShopAction } from "./v2-shop-transactions";
-import { getShopEmergencySan, getShopRestSanGain } from "./v2-shop-items-effects";
+import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER } from "./v2-sanity-rules";
 import { endRelationship } from "./v2-relationship-actions";
+import { advanceFellowTask } from "./v2-fellow-actions";
+import { settlePendingFellowHelp } from "./v2-fellow-cooperation";
+import { advanceFellowResearch, attendFellowConferences, ensureFellowPapers } from "./v2-fellow-research";
+import { advanceAdvisorHorizontal, settleAdvisorMonth, syncAdvisorResearchAccumulation } from "./v2-advisor-progress";
+import { advanceLoverDate, advanceLoverMonth, settlePendingLoverHelp } from "./v2-lover-progression";
 import type { DispatchPayload, GameActionId, GameState, PlayerStats } from "./v2-types";
 
 const MONTHLY_LOG_STAT_LABELS: Record<keyof PlayerStats, string> = {
@@ -76,28 +84,6 @@ function buildMonthAdvanceLog(
   return `进入第 ${year} 年 ${month} 月。${buildMonthStartSettlementLog(resolution)}`;
 }
 
-function evaluateCoreEndings(state: GameState): GameState {
-  if (state.phase !== "playing") return state;
-  const protectedSan = getShopEmergencySan(state.shopState, state.player.san);
-  const chairSanRecovered = protectedSan > state.player.san && state.shopState.chairUpgrade === "spike"
-    ? Math.max(0, state.shopState.chairSanRecovered ?? 0) + protectedSan - state.player.san
-    : state.shopState.chairSanRecovered;
-  const protectedState = protectedSan === state.player.san
-    ? state
-    : {
-        ...state,
-        player: { ...state.player, san: protectedSan },
-        shopState: chairSanRecovered === state.shopState.chairSanRecovered
-          ? state.shopState
-          : { ...state.shopState, chairSanRecovered },
-      };
-  if (protectedState.player.san < 0) return pushLog({ ...protectedState, phase: "finished", ending: "burnout" }, "SAN 已跌破 0，本轮提前结束。");
-  if (protectedState.player.money < 0) return pushLog({ ...protectedState, phase: "finished", ending: "poor" }, "金币已跌破 0，本轮提前结束。");
-  if (protectedState.player.favor < 0) return pushLog({ ...protectedState, phase: "finished", ending: "expelled" }, "导师好感已跌破 0，本轮提前结束。");
-  if (protectedState.player.social < 0) return pushLog({ ...protectedState, phase: "finished", ending: "isolated" }, "社交能力已跌破 0，本轮提前结束。");
-  return protectedState;
-}
-
 function takeRest(state: GameState): GameState {
   if (state.phase !== "playing" || (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)) return state;
   const sanGain = getShopRestSanGain(state.shopState);
@@ -118,30 +104,12 @@ function takeRest(state: GameState): GameState {
   return appliedGain === 0 ? nextState : pushLog(nextState, `休息：你放下手头的事休息了一会儿，SAN +${appliedGain}。`);
 }
 
-function finishTrainingIfReady(state: GameState): GameState {
-  if (state.phase !== "playing" || state.totalMonths < state.maxMonths || state.eventQueue.length > 0) {
-    return state;
-  }
-
-  const target = state.graduationScoreTarget;
-  const graduated = target !== null && state.totalResearchScore >= target;
-  const ending = graduated ? state.degree : "delay";
-  const label = graduated
-    ? state.degree === "phd" ? "博士毕业" : "硕士毕业"
-    : "延期毕业";
-  const scoreSummary = target === null
-    ? `科研分 ${state.totalResearchScore}，毕业要求尚未确定`
-    : `科研分 ${state.totalResearchScore}/${target}`;
-
-  return pushLog({ ...state, phase: "finished", ending }, `${label}：${scoreSummary}。`);
-}
-
 function resolveQueuedEvent(state: GameState, eventId: string | undefined, choiceId: string | undefined): GameState {
   const event = eventId ? getCurrentEvent(state.eventQueue, eventId) : getCurrentQueueEvent(state);
   if (!event) return state;
   return applyQueuedEventEffects(state, event, choiceId, {
     evaluateImmediateEndings: evaluateCoreEndings,
-    runPostQueuePipeline: (nextState) => finishTrainingIfReady(evaluateCoreEndings(resolveReadyJournalPapers(nextState).state)),
+    runPostQueuePipeline: (nextState) => nextState,
   });
 }
 
@@ -177,16 +145,34 @@ function createAdvancedCalendarState(state: GameState): GameState {
   const reviewProgressState = advancePaperReviewDeadlines(decayedPaperState);
   const reviewResolution = resolveDuePaperReviews(reviewProgressState);
   const journalResolution = resolveReadyJournalPapers(reviewResolution.state);
+  const monthlyResolution = resolveMonthlyEffects(journalResolution.state);
+  if ([monthlyResolution.player.san, monthlyResolution.player.money, monthlyResolution.player.favor, monthlyResolution.player.social]
+    .some((value) => value < 0)) {
+    const emergencyRecovery = monthlyResolution.items.find((item) => item.id === "chair-emergency")?.appliedStats.san ?? 0;
+    return evaluateCoreEndings(pushLog({
+      ...journalResolution.state,
+      player: monthlyResolution.player,
+      shopState: {
+        ...journalResolution.state.shopState,
+        chairSanRecovered: (journalResolution.state.shopState.chairSanRecovered ?? 0) + emergencyRecovery,
+      },
+    }, buildMonthAdvanceLog(calendar.year, calendar.month, monthlyResolution)));
+  }
   const monthlyEffects = applyMonthlyEffects(journalResolution.state);
-  const settledJournalState = resolveReadyJournalPapers(monthlyEffects.nextState).state;
   const monthLog = buildMonthAdvanceLog(calendar.year, calendar.month, monthlyEffects.resolution);
-  return pushLog(settledJournalState, monthLog);
+  const monthlyState = evaluateCoreEndings(pushLog(monthlyEffects.nextState, monthLog));
+  if (monthlyState.phase !== "playing") return monthlyState;
+  const fellowResearchState = advanceFellowResearch(resolveReadyJournalPapers(monthlyState).state);
+  const settledJournalState = attendFellowConferences(resolveReadyJournalPapers(fellowResearchState).state);
+  return settleAdvisorMonth(resolveReadyJournalPapers(advanceLoverMonth(settledJournalState)).state);
 }
 
 function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
+  if (state.phase !== "playing") return state;
   const candidates = [...state.papers, ...state.externalPublications]
     .filter((paper): paper is typeof paper & { target: NonNullable<typeof paper.target>; submittedMonth: number; submittedYear: number } => (
       paper.status === "published"
+      && !paper.leadAuthorId
       && paper.conferenceHandled !== true
       && (paper.conferenceAvailableAtTotalMonths === undefined || paper.conferenceAvailableAtTotalMonths <= state.totalMonths)
       && paper.target !== null
@@ -221,6 +207,9 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
 
 function advanceMonth(state: GameState): GameState {
   if (state.phase !== "playing") return state;
+  if (hasManualBlockingEvents(state)) return pushNoOpLog(state, "必须先处理待办事件。");
+  state = settleLinearEvents(state, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
+  if (state.phase !== "playing") return state;
   if (hasBlockingQueueEvent(state)) return pushNoOpLog(state, "必须先处理待办事件。");
 
   if (isPreEnrollmentState(state)) {
@@ -236,20 +225,22 @@ function advanceMonth(state: GameState): GameState {
       },
       actionState: { ...state.actionState, used: 0, aiResearchBonusUsed: false },
     };
-    const subscriptionSettlement = applyMonthStartSubscriptions(enrolledState);
-    const settledState = pushLog(
+    const subscriptionSettlement = applyMonthStartSubscriptions(advanceFellowResearch(enrolledState));
+    const settledState = evaluateCoreEndings(pushLog(
       subscriptionSettlement.nextState,
       `正式入学，研究生生涯开始了。${buildMonthStartSettlementLog(subscriptionSettlement.resolution)}`,
-    );
+    ));
+    if (settledState.phase !== "playing") return settledState;
     const queued = enqueueMonthlyEventsForMonth(settledState);
-    return queued.nextState;
+    return settleLinearEvents(queued.nextState, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
   }
 
-  if (state.totalMonths >= state.maxMonths) return finishTrainingIfReady(state);
+  if (state.totalMonths >= state.maxMonths) return state;
 
   const nextState = evaluateCoreEndings(enqueueAcceptedPaperConferenceEvents(createAdvancedCalendarState(state)));
   if (nextState.phase !== "playing") return nextState;
-  return finishTrainingIfReady(enqueueMonthlyEventsForMonth(nextState).nextState);
+  const queuedState = enqueueMonthlyEventsForMonth(nextState).nextState;
+  return settleLinearEvents(queuedState, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
 }
 
 export function createInitialState(): GameState {
@@ -257,17 +248,45 @@ export function createInitialState(): GameState {
 }
 
 export function dispatchAction(state: GameState, actionId: GameActionId, payload: DispatchPayload = {}): GameState {
-  return refreshPaperCompetitionEvents(activatePendingPaperCompetitionEvents(dispatchGameAction(state, actionId, payload)));
+  if (actionId === "restart-game") {
+    return dispatchAction({ ...createInitialState(), blockLinearEvents: state.blockLinearEvents }, "start-game", {
+      roleId: state.selectedRoleId,
+    });
+  }
+  const setupState = dispatchSetupAction(state, actionId, payload, createInitialState);
+  if (setupState !== null) return setupState;
+  if (state.phase === "finished") return state;
+  if (actionId === "set-linear-event-blocking" && state.phase !== "playing") return dispatchGameAction(state, actionId, payload);
+  if (state.phase !== "playing") return dispatchDebugAction(state, actionId, payload) ?? state;
+  if (actionId === "quit-game") return quitGame(state);
+  const debugAction = actionId.startsWith("debug-");
+  if (!debugAction) {
+    const checkedState = evaluateCoreEndings(state);
+    if (checkedState.phase !== "playing") return checkedState;
+    state = checkedState;
+  }
+  const nextState = dispatchGameAction(ensureFellowPapers(state), actionId, payload);
+  if (nextState.phase !== "playing") return nextState;
+  const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
+  if (checkedState.phase !== "playing") return checkedState;
+  const helpedState = settlePendingLoverHelp(settlePendingFellowHelp(ensureFellowPapers(checkedState)));
+  const settledState = actionId === "resolve-event"
+    || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
+    ? resolveReadyJournalPapers(helpedState).state : helpedState;
+  const refreshed = refreshPaperCompetitionEvents(activatePendingPaperCompetitionEvents(syncAdvisorResearchAccumulation(settledState)));
+  if (debugAction) return refreshed;
+  const evaluated = evaluateCoreEndings(refreshed);
+  if (evaluated.phase !== "playing") return evaluated;
+  return finishTrainingIfReady(recordTalentTransitions(state, evaluated));
 }
 
 function dispatchGameAction(state: GameState, actionId: GameActionId, payload: DispatchPayload): GameState {
-  const setupState = dispatchSetupAction(state, actionId, payload, createInitialState);
-  if (setupState !== null) return setupState;
-
   const debugState = dispatchDebugAction(state, actionId, payload);
   if (debugState !== null) return debugState;
 
   switch (actionId) {
+    case "set-linear-event-blocking":
+      return typeof payload.blockLinearEvents === "boolean" ? { ...state, blockLinearEvents: payload.blockLinearEvents } : state;
     case "select-paper": {
       const paper = payload.paperId
         ? state.papers.find((entry) => entry.id === payload.paperId)
@@ -293,9 +312,9 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
     case "research-paper":
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return payload.paperId && payload.paperActionType
-        ? evaluateCoreEndings(resolveReadyJournalPapers(
+        ? resolveReadyJournalPapers(
           applyResearchOperation(state, payload.paperId, payload.paperActionType),
-        ).state)
+        ).state
         : state;
     case "submit-paper":
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
@@ -315,22 +334,34 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
       return applyPaperPromotion(state, payload.paperId, payload.promotionId);
     case "read-paper":
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
-      return evaluateCoreEndings(applyReadPaperActions(state, getManualReadPaperCount(state), {
+      return applyReadPaperActions(state, getManualReadPaperCount(state), {
         consumeMonthlyAction: true,
         consumeMonthlyActionOnce: true,
         allowSanOverdraw: false,
-      }).nextState);
+      }).nextState;
     case "part-time-work":
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
-      return evaluateCoreEndings(applyPartTimeWork(state));
+      return applyPartTimeWork(state);
     case "rest":
       return takeRest(state);
     case "resolve-event":
       return resolveQueuedEvent(state, payload.eventId, payload.eventChoiceId);
     case "end-relationship":
-      return payload.relationshipId && !hasBlockingQueueEvent(state)
+      return payload.relationshipId && state.phase === "playing"
         ? endRelationship(state, payload.relationshipId)
         : state;
+    case "relationship-task":
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
+      return payload.relationshipId ? resolveReadyJournalPapers(advanceFellowTask(state, payload.relationshipId)).state : state;
+    case "advisor-horizontal":
+      if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
+      return advanceAdvisorHorizontal(state);
+    case "lover-play":
+      return advanceLoverDate(state, "play");
+    case "lover-study":
+      return advanceLoverDate(state, "study");
+    case "lover-shopping":
+      return advanceLoverDate(state, "shopping");
     case "buy-shop-item":
     case "sell-shop-item":
     case "upgrade-shop-item":

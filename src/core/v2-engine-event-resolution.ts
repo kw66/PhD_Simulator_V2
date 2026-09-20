@@ -282,13 +282,17 @@ function rebuildRandomEventFromCurrentState(
   };
 }
 
+export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
+  return refreshPaperCompetitionEvent(state, rebuildRandomEventFromCurrentState(state, queuedEvent));
+}
+
 export function applyQueuedEventEffects(
   state: GameState,
   queuedEvent: EventQueueItem,
   choiceId: string | undefined,
   callbacks: EventResolutionCallbacks,
 ): GameState {
-  const resolvedEvent = refreshPaperCompetitionEvent(state, rebuildRandomEventFromCurrentState(state, queuedEvent));
+  const resolvedEvent = getResolvableQueuedEvent(state, queuedEvent);
   let choice = resolvedEvent.choices.find((item) => item.id === choiceId);
   if (!choice) {
     return pushNoOpLog(state, "当前事件选择无效。");

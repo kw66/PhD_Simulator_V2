@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createInitialState } from "../src/core/v2-engine";
+import { createInitialState, dispatchAction } from "../src/core/v2-engine";
+import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createMentorAssignEvent } from "../src/core/v2-fixed-events-mentor-assign";
 import { endRelationship } from "../src/core/v2-relationship-actions";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
@@ -100,6 +101,24 @@ describe("v2 relationship capacity", () => {
     expect(next.relationshipState).toMatchObject({ juniorCount: 0, occupiedSlots: 3 });
     expect(next.buffs).toHaveLength(0);
     expect(next.log[0]?.text).toContain("停止合作");
+  });
+
+  it("lets the player free a fellow slot while an event is waiting without discarding the event", () => {
+    const profile = createCustomFellowProgressProfile({ type: "junior", gender: "male", startTotalMonths: 1, research: 4, affinity: 3 });
+    const initial = createFullFellowState();
+    const state: GameState = {
+      ...initial, month: 1, totalMonths: 1,
+      fellowProgressState: [profile],
+      relationshipState: { ...initial.relationshipState, juniorCount: 1 },
+      eventQueue: [createEventQueueItem(createMentorAssignEvent(initial), 1)],
+    };
+    const next = dispatchAction(state, "end-relationship", { relationshipId: profile.id });
+    expect(next.fellowProgressState).toHaveLength(0);
+    expect(next.relationshipState.occupiedSlots).toBe(3);
+    expect(next.eventQueue).toEqual(state.eventQueue);
+    expect(next.player).toEqual(state.player);
+    const finished = { ...state, phase: "finished" as const };
+    expect(dispatchAction(finished, "end-relationship", { relationshipId: profile.id })).toEqual(finished);
   });
 
   it("ends a relationship independently from ordinary fellow capacity", () => {

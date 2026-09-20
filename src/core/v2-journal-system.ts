@@ -1,6 +1,6 @@
 import { consumeNextPublicationBuffs, getPublicationBuffEffect } from "./v2-buffs";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
-import { attachPaperPublication } from "./v2-publication-rules";
+import { attachPaperPublication, recordPaperAcceptances } from "./v2-publication-rules";
 import { getInitialJournalScore, getJournalRevisionScore } from "./v2-journal-score";
 import type { GameState, JournalTarget, Paper } from "./v2-types";
 import { applyPublicationTalentRewards } from "./v2-publication-talent";
@@ -58,6 +58,7 @@ export function getJournalSubmissionFailure(
 ): string | null {
   if (!paper) return "请先新建一篇论文";
   if (paper.status !== "draft") return paper.status === "journal-reviewing" ? "论文正在期刊修改中" : "这篇论文当前不能投稿";
+  if (paper.idea <= 0 || paper.experiment <= 0 || paper.writing <= 0) return "先完成idea、实验和写作，再投稿期刊";
   const journal = getJournalDefinition(journalTarget);
   const score = getJournalScore(paper);
   return score >= journal.submissionScore ? null : `期刊分不足，需要 ${journal.submissionScore}`;
@@ -82,12 +83,11 @@ export function submitJournalPaper(
   const paper = paperIndex >= 0 ? state.papers[paperIndex] : null;
   if (!paper) return pushNoOpLog(state, "投稿期刊：没有找到这篇论文");
   if (paper.status !== "draft") return pushNoOpLog(state, "投稿期刊：这篇论文当前不能投稿");
+  const failure = getJournalSubmissionFailure(paper, journalTarget);
+  if (failure) return pushNoOpLog(state, `投稿期刊：${failure}`);
 
   const journal = getJournalDefinition(journalTarget);
   const score = getJournalScore(paper);
-  if (score < journal.submissionScore) {
-    return pushNoOpLog(state, `投稿期刊：${journal.name}需要期刊分达到 ${journal.submissionScore}，当前 ${score}`);
-  }
 
   const submittedPaper: Paper = {
     ...paper,
@@ -167,10 +167,14 @@ export function resolveReadyJournalPapers(state: GameState): JournalResolution {
     logs.push(`${paper.title} 已达到${journal.name}达标分 ${journal.acceptanceScore}，正式发表${researchScoreGain > 0 ? `；科研分 +${researchScoreGain}` : ""}`);
   }
 
+  const recordedPapers = new Map(recordPaperAcceptances(
+    publishedPapers.filter((paper) => acceptedPaperIds.includes(paper.id)), state.totalMonths,
+    [...state.papers, ...state.externalPublications, ...(state.fellowPapers ?? [])],
+  ).map((paper) => [paper.id, paper]));
   const resolvedState = {
     ...nextState,
     papers: activePapers,
-    externalPublications: publishedPapers,
+    externalPublications: publishedPapers.map((paper) => recordedPapers.get(paper.id) ?? paper),
     selectedPaperId: selectNextEditablePaper(state, activePapers),
   };
   let loggedState = resolvedState;

@@ -26,6 +26,7 @@ interface AccumulatedEffect {
   sources: string[];
   showWhenZero?: boolean;
   isDebuffWhenAboveOne?: boolean;
+  isCost?: boolean;
   renderLabel: (value: number) => string;
 }
 
@@ -111,6 +112,7 @@ function addEffect(
     sources: [config.source],
     showWhenZero: config.showWhenZero,
     isDebuffWhenAboveOne: config.isDebuffWhenAboveOne,
+    isCost: config.isCost,
     renderLabel: config.renderLabel,
   });
 }
@@ -159,6 +161,7 @@ function addActionEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): 
         operation: "sum",
         value: actionEffect.sanDelta,
         source,
+        isCost: true,
         showWhenZero: true,
         renderLabel: (value) => `${actionLabel} SAN ${formatSignedNumber(value)}`,
       });
@@ -193,6 +196,7 @@ function addReadingEffects(effects: Map<string, AccumulatedEffect>, buff: Buff):
       operation: "sum",
       value: reading.sanDelta,
       source,
+      isCost: true,
       showWhenZero: true,
       renderLabel: (value) => `看论文 SAN ${formatSignedNumber(value)}`,
     });
@@ -281,6 +285,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       operation: "sum",
       value: buff.relationshipOperationSanDelta,
       source: getSourceText(buff),
+      isCost: true,
       showWhenZero: true,
       renderLabel: (value) => `人际操作 SAN ${formatSignedNumber(value)}`,
     });
@@ -307,7 +312,7 @@ export function buildBuffDisplayBuckets(buffs: readonly Buff[]): BuffDisplayBuck
       sources: effect.sources,
       isDebuff: effect.operation === "multiplier"
         ? effect.isDebuffWhenAboveOne ? effect.value > 1 : effect.value < 1
-        : effect.value < 0,
+        : effect.isCost ? effect.value > 0 : effect.value < 0,
     };
     if (effect.timing === "permanent") buckets.permanent.push(item);
     else if (effect.timing === "monthly") buckets.monthly.push(item);

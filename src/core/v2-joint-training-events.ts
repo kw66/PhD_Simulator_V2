@@ -64,7 +64,6 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
       "你把合作笔记放进课题文件夹，准备先核清后续实验的设置。新的条件总算落实了，实验该重跑的还是得重跑。",
       "机制结算",
       `科研上限 +${context.pendingCitationCapBonus}`,
-      "导师科研资源 +2",
       "永久：想 idea +5 分、做实验 +5 分",
     ].join("\n\n"),
     source: "fixed",
@@ -72,7 +71,7 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
     deadlineMonths: 0,
     chainId: "joint-training",
     stage: "result",
-    completionLog: `你接受了联合培养，科研上限 +${context.pendingCitationCapBonus}，导师科研资源 +2。`,
+    completionLog: `你接受了联合培养，科研上限 +${context.pendingCitationCapBonus}。`,
     choices: [{
       id: "close",
       label: "继续",
@@ -124,9 +123,6 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
           } satisfies Partial<ConferenceEncounterState>,
           researchCapacityStateDeltas: {
             jointTrainingCitationCapBonus: context.pendingCitationCapBonus,
-          },
-          advisorProgressStateDeltas: {
-            researchResource: 2,
           },
           ideaBonus: 5,
           experimentBonus: 5,

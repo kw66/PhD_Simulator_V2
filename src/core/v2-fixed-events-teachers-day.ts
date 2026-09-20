@@ -186,6 +186,13 @@ export function createTeachersDayEvent(
   });
 }
 
+export function getTeachersDayResultPreviews(state: GameState, resolution: FixedEventResolution): PendingEvent[] {
+  if (resolution.kind !== "teachers-day-message" && resolution.kind !== "teachers-day-gift" && resolution.kind !== "teachers-day-stamp") return [];
+  return [0, 0.499999, 0.999999].flatMap((roll) => (
+    resolveTeachersDayFixedEvent(structuredClone(state), resolution, () => roll).enqueueEvents ?? []
+  ));
+}
+
 export function resolveTeachersDayFixedEvent(
   state: GameState,
   resolution: FixedEventResolution,

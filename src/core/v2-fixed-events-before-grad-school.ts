@@ -1,4 +1,4 @@
-import { createAdvisorProgressStateFromValues } from "./v2-advisor-progress";
+import { createAdvisorProgressState } from "./v2-advisor-progress";
 import { ADVISOR_REQUIREMENTS, ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
 import { ENROLLMENT_CALENDAR_YEAR } from "./v2-calendar";
 import {
@@ -22,12 +22,6 @@ import type {
   GameState,
   PendingEvent,
 } from "./v2-types";
-
-const LECTURER_INITIAL_PROFILE = {
-  researchResource: 4,
-  affinity: 4,
-  taskMultiplier: 6,
-} as const;
 
 const ADVISOR_INTEL_OPTIONS = {
   reporting: ["周报 + 组会", "每周组会", "隔周组会", "每月组会", "按需组会", "周报为主"],
@@ -140,6 +134,7 @@ function createAdvisorInfoEvent(
       {
         id: "before-grad-school-reroll",
         label: "换个导师",
+        cosmetic: true,
         outcome: "",
         effects: {
           stayOnEvent: true,
@@ -147,7 +142,6 @@ function createAdvisorInfoEvent(
             kind: "advisor-reroll",
             advisorCandidate: {
               advisorName,
-              ...LECTURER_INITIAL_PROFILE,
             },
             advisorIntel: intel,
           },
@@ -162,7 +156,6 @@ function createAdvisorInfoEvent(
             kind: "advisor-confirm",
             advisorCandidate: {
               advisorName,
-              ...LECTURER_INITIAL_PROFILE,
             },
           },
         },
@@ -236,6 +229,7 @@ export function createBeforeGradSchoolAct1Event(
       {
         id: "before-grad-school-reroll-name",
         label: "换个姓名",
+        cosmetic: true,
         outcome: "重新想一个名字。",
         effects: {
           stayOnEvent: true,
@@ -244,7 +238,6 @@ export function createBeforeGradSchoolAct1Event(
             studentName: candidateName,
             advisorCandidate: {
               advisorName,
-              ...LECTURER_INITIAL_PROFILE,
             },
             advisorIntel,
           },
@@ -321,11 +314,7 @@ export function resolveAdvisorConfirmation(
     selectedAdvisorName: candidate.advisorName,
     graduationScoreTarget: getGraduationScoreTarget("master", candidate.advisorName),
     relationshipState,
-    advisorProgressState: createAdvisorProgressStateFromValues(
-      candidate.researchResource,
-      candidate.affinity,
-      candidate.taskMultiplier,
-    ),
+    advisorProgressState: createAdvisorProgressState(),
   };
 
   return {

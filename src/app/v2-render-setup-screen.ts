@@ -8,6 +8,7 @@ import {
 } from "../core/v2-lobby";
 import { MAX_SAN } from "../core/v2-content";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
+import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
 import { BASE_RESEARCH_CAP } from "../core/v2-research-cap-system";
 import { getRoleLobbyAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
@@ -144,7 +145,7 @@ function renderRoleAchievementDisplay(
   `;
 }
 
-function renderRoleCardCornerBadge(level: number, owned: boolean): string {
+function renderRoleCardCornerBadge(roleId: RoleId, level: number, owned: boolean): string {
   if (!owned) {
     return `
       <span class="lobby-role-card-level-badge is-locked" aria-label="未解锁">
@@ -153,7 +154,7 @@ function renderRoleCardCornerBadge(level: number, owned: boolean): string {
     `;
   }
 
-  return `<span class="lobby-role-card-level-badge">Lv ${level}</span>`;
+  return `<span class="lobby-role-card-level-badge">Lv ${renderAnimatedNumber(`role:${roleId}:card:level`, level)}</span>`;
 }
 
 function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selectedRoleId: RoleId): string {
@@ -192,7 +193,7 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
               <span>${getRoleModeLabel(roleId)}</span>
             </div>
             ${renderRoleAchievementDisplay(role.id, progress, owned, accountProfile)}
-            ${renderRoleCardCornerBadge(progress.level, owned)}
+            ${renderRoleCardCornerBadge(roleId, progress.level, owned)}
           </div>
         </div>
       </div>
@@ -307,9 +308,9 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
             aria-valuemax="${visibleAchievements.length}"
             aria-valuenow="${unlockedCount}"
           >
-            <span style="width:${achievementProgressPercent}%;"></span>
+            <span ${animationBarAttribute(`role:${selectedRoleId}:achievements:progress`)} style="width:${achievementProgressPercent}%;"></span>
           </div>
-          <strong class="lobby-profile-achievement-progress-count">${unlockedCount}/${visibleAchievements.length}</strong>
+          <strong class="lobby-profile-achievement-progress-count">${renderAnimatedNumber(`role:${selectedRoleId}:achievements:unlocked`, unlockedCount)}/${renderAnimatedNumber(`role:${selectedRoleId}:achievements:total`, visibleAchievements.length)}</strong>
         </div>
       ` : ""}
       <div class="lobby-profile-achievement-list">
@@ -444,7 +445,7 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
             ${viewModel.historyStats.map((stat) => `
               <div class="lobby-profile-stat-row">
                 <span>${escapeHtml(stat.label)}</span>
-                <strong>${escapeHtml(stat.value)}</strong>
+                <strong>${stat.id === "representative" ? `${renderAnimatedNumber(`role:${viewModel.role.id}:history:representative:score`, viewModel.progress.historyBest.representativeScore)}分 | ${renderAnimatedNumber(`role:${viewModel.role.id}:history:representative:citations`, viewModel.progress.historyBest.representativeCitations)}引` : Number.isFinite(Number(stat.value)) && stat.value.trim() !== "" ? renderAnimatedNumber(`role:${viewModel.role.id}:history:${stat.id}`, Number(stat.value), stat.value) : escapeHtml(stat.value)}</strong>
               </div>
             `).join("")}
           </div>
@@ -469,7 +470,7 @@ function renderGrowthBoard(viewModel: LobbySelectedRoleViewModel): string {
     <section class="lobby-profile-growth-card lobby-profile-section">
       <div class="lobby-growth-summary-row">
         <span class="lobby-growth-inline-label">等级</span>
-        <strong class="lobby-growth-inline-value">${pointSummary.level}</strong>
+        <strong class="lobby-growth-inline-value" ${animationNumberAttributes(`role:${viewModel.role.id}:growth:level`, pointSummary.level)}>${pointSummary.level}</strong>
         <span class="lobby-growth-inline-label is-multiplier">经验倍率</span>
         <strong class="lobby-growth-inline-value">${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}</strong>
         <span
@@ -483,13 +484,13 @@ function renderGrowthBoard(viewModel: LobbySelectedRoleViewModel): string {
       <div class="lobby-growth-exp-row">
         <span class="lobby-growth-inline-label">经验</span>
         <div class="lobby-growth-exp-bar" aria-hidden="true">
-          <span style="width:${expProgressPercent}%;"></span>
+          <span ${animationBarAttribute(`role:${viewModel.role.id}:growth:experience`)} style="width:${expProgressPercent}%;"></span>
         </div>
-        <strong class="lobby-growth-exp-value">${pointSummary.currentExp} / ${expTarget}</strong>
+        <strong class="lobby-growth-exp-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:experience`, pointSummary.currentExp)} / ${renderAnimatedNumber(`role:${viewModel.role.id}:growth:experience-cap`, expTarget)}</strong>
       </div>
       <div class="lobby-growth-exp-detail-row">
         <div class="lobby-talent-allocation-meta">
-          <span>天赋点 ${pointSummary.availablePoints}</span>
+          <span>天赋点 ${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</span>
           <button class="lobby-talent-reset-button" type="button" disabled><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span></button>
         </div>
       </div>
@@ -503,7 +504,7 @@ function renderGrowthBoard(viewModel: LobbySelectedRoleViewModel): string {
             </div>
             <div class="lobby-talent-stepper">
               <button class="lobby-talent-step-button" type="button" disabled aria-label="${escapeHtml(`减少${talent.name}点数`)}">−</button>
-              <strong class="lobby-talent-step-value">${talent.allocatedPoints}</strong>
+              <strong class="lobby-talent-step-value" ${animationNumberAttributes(`role:${viewModel.role.id}:talent:${talent.id}:allocated`, talent.allocatedPoints)}>${talent.allocatedPoints}</strong>
               <button class="lobby-talent-step-button" type="button" disabled aria-label="${escapeHtml(`增加${talent.name}点数`)}">+</button>
             </div>
           </article>

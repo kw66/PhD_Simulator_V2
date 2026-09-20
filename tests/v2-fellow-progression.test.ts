@@ -3,6 +3,7 @@ import {
   createCustomFellowProgressProfile,
   createGeneratedFellowProfileAddition,
   getFellowName,
+  getFellowResearchTopic,
   getFellowTaskSanCost,
   getStableGeneratedFellowName,
 } from "../src/core/v2-fellow-progression";
@@ -11,6 +12,22 @@ import { pickStableRandomName } from "../src/core/v2-random-name";
 afterEach(() => vi.restoreAllMocks());
 
 describe("v2 fellow progression", () => {
+  it.each([
+    ["senior", 6], ["peer", 3], ["junior", 0],
+  ] as const)("generates %s research across four values with initial rapport one", (type, minimum) => {
+    const values = Array.from({ length: 12 }, (_, seed) => createGeneratedFellowProfileAddition(type, seed));
+    expect([...new Set(values.map((profile) => profile.research))]).toEqual([minimum, minimum + 1, minimum + 2, minimum + 3]);
+    expect(values.every((profile) => profile.affinity === 1)).toBe(true);
+  });
+  it("assigns a stable research direction per random person id without rerolling on reads", () => {
+    const profiles = Array.from({ length: 30 }, (_, index) => ({ id: `fellow-${index}`, startTotalMonths: 1 }));
+    const topics = profiles.map(getFellowResearchTopic);
+    expect(new Set(topics.map((topic) => topic.topicId)).size).toBeGreaterThan(1);
+    profiles.forEach((profile, index) => {
+      expect(getFellowResearchTopic(profile)).toEqual(topics[index]);
+      expect(getFellowResearchTopic({ ...profile, researchTopic: topics[index], startTotalMonths: 60 })).toEqual(topics[index]);
+    });
+  });
   it("creates custom preview profiles with stable task defaults", () => {
     const senior = createCustomFellowProgressProfile({ type: "senior", gender: "male", startTotalMonths: 12, research: 4, affinity: 2 });
     const peer = createCustomFellowProgressProfile({ type: "peer", gender: "female", startTotalMonths: 12, research: 3, affinity: 3 });
@@ -22,8 +39,7 @@ describe("v2 fellow progression", () => {
       research: 4,
       affinity: 2,
       taskType: "writing",
-      taskMax: 60,
-      relationMax: 40,
+      taskMax: 100,
       startTotalMonths: 12,
     });
     expect(peer).toMatchObject({
@@ -32,8 +48,7 @@ describe("v2 fellow progression", () => {
       research: 3,
       affinity: 3,
       taskType: "experiment",
-      taskMax: 60,
-      relationMax: 40,
+      taskMax: 100,
       startTotalMonths: 12,
     });
     expect(junior).toMatchObject({
@@ -42,8 +57,7 @@ describe("v2 fellow progression", () => {
       research: 0,
       affinity: 2,
       taskType: "idea",
-      taskMax: 60,
-      relationMax: 40,
+      taskMax: 100,
       startTotalMonths: 12,
     });
     expect(["idea", "experiment", "writing"].map((type) => getFellowTaskSanCost(type as "idea" | "experiment" | "writing"))).toEqual([2, 3, 4]);

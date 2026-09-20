@@ -28,7 +28,7 @@ function getPromotionFailure(state: GameState, paperId: string, promotionId: Pap
   ) {
     return "论文已经公开，挂 arXiv 不再带来提前曝光";
   }
-  const cost = getPaperPromotionCost(promotionId);
+  const cost = getPaperPromotionCost(promotionId, state.buffs);
   return state.player.san >= cost ? null : `SAN 不足，需要 ${cost}`;
 }
 
@@ -48,7 +48,7 @@ export function applyPaperPromotion(
   const paper = source[index];
   if (!paper?.publication || index < 0) return state;
 
-  const cost = getPaperPromotionCost(promotionId);
+  const cost = getPaperPromotionCost(promotionId, state.buffs);
   const bonus = getPaperPromotionMultiplierBonus(promotionId);
   const nextPublication = {
     ...paper.publication,

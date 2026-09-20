@@ -2,7 +2,6 @@ import {
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
   COFFEE_MACHINE_PRICE,
   getAvailableCoffeeMachineUpgrades,
-  getCoffeeBuyPrice,
   getCoffeeMachineSellPrice,
 } from "../core/v2-coffee-system";
 import { getAiModelForTotalMonths } from "../core/v2-ai-shop";
@@ -19,14 +18,14 @@ import {
   getGpuTierDefinition,
   getNextGpuTierDefinition,
   getShopItemDefinition,
-  getShopItemSellPrice,
   getShopUpgradeDefinition,
   GPU_TIER_DEFINITIONS,
   isShopItemOwned,
 } from "../core/v2-shop-items";
 import { getBikeTierDefinition, getNextBikeTierDefinition } from "../core/v2-bike-system";
-import { getSupportItemDefinition, getSupportItemSellPrice, isSupportItemOwned } from "../core/v2-support-items";
-import { getShopActionPrice } from "../core/v2-shop-transactions";
+import { getSupportItemDefinition, isSupportItemOwned } from "../core/v2-support-items";
+import { getGiftAwareShopSellPrice, getLoverGiftCount, getShopActionPrice } from "../core/v2-lover-gift";
+import { animationNumberAttributes, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
 import type {
   AiSlotId,
   CoffeeMachineUpgradeId,
@@ -70,6 +69,7 @@ type RowConfig = {
   statusTone?: "neutral" | "owned" | "locked";
   description: string;
   effectText?: string;
+  effectAnimation?: { key: string; template: string; values: Record<string, number> };
   dim?: boolean;
   selected?: boolean;
   selectionSlot?: boolean;
@@ -77,6 +77,7 @@ type RowConfig = {
     label: string;
     value: string;
     tone?: "neutral" | "active" | "warning";
+    animation?: { key: string; value: number; prefix?: string };
   }>;
   actions?: string[];
   rowAction?: {
@@ -108,6 +109,7 @@ type UpgradeRouteOption = {
   action: "upgrade-shop-item" | "upgrade-coffee-machine";
   upgradeId: ShopUpgradeId | Exclude<CoffeeMachineUpgradeId, null>;
   disabledReason?: string;
+  effectAnimation?: RowConfig["effectAnimation"];
 };
 
 const SHOP_TABS: ShopTabDefinition[] = [
@@ -209,21 +211,21 @@ function renderActionButton(config: ActionButtonConfig): string {
       ${config.price !== undefined ? `
         <span class="shop-item-btn-price is-${config.priceDirection ?? "cost"}">
           <span aria-hidden="true">💰</span>
-          <span>${config.price}</span>
+          <span${typeof config.price === "number" && config.action ? ` ${animationNumberAttributes(`shop:${config.itemId ?? config.supportItemId ?? config.aiSlotId ?? config.upgradeId ?? config.action}:${config.action}:price`, config.price)}` : ""}>${config.price}</span>
         </span>
       ` : ""}
     </button>
   `;
 }
 
-function renderShopEffectHtml(effectText: string): string {
+function renderShopEffectHtml(effectText: string, animation?: RowConfig["effectAnimation"]): string {
   const renderMetricTextHtml = (value: string): string => value
-    .split(/((?:SAN\s*)?(?:[+\-×=]\s*)?\d+(?:\.\d+)?%?(?:\s*(?:分|次|点|金币|杯|月))?)/giu)
+    .split(/((?:SAN\s*)?(?:[+\-×=]\s*)?(?:\{[\w-]+\}|\d+(?:\.\d+)?%?)(?:\s*(?:分|次|点|金币|杯|月))?)/giu)
     .filter(Boolean)
-    .map((part, index) => index % 2 === 1 ? `<strong>${escapeHtml(part)}</strong>` : escapeHtml(part))
+    .map((part, index) => index % 2 === 1 ? `<strong>${animation ? renderAnimatedTemplate(animation.key, part, animation.values) : escapeHtml(part)}</strong>` : escapeHtml(part))
     .join("");
 
-  return effectText.split("\n").map((rawLine) => {
+  return (animation?.template ?? effectText).split("\n").map((rawLine) => {
     const line = normalizeShopDescription(rawLine);
     const separatorIndex = line.indexOf("：");
     if (separatorIndex < 0) {
@@ -234,7 +236,7 @@ function renderShopEffectHtml(effectText: string): string {
     return `
       <span class="shop-effect-line${value ? "" : " is-label-only"}">
         <span>${escapeHtml(label)}</span>
-        ${value ? `<strong>${escapeHtml(value)}</strong>` : ""}
+        ${value ? `<strong>${animation ? renderAnimatedTemplate(animation.key, value, animation.values) : escapeHtml(value)}</strong>` : ""}
       </span>
     `;
   }).join("\n");
@@ -337,13 +339,13 @@ function renderShopRow(config: RowConfig): string {
       </div>
       <div class="shop-item-info">
         ${config.description ? `<p class="shop-item-desc">${escapeHtml(normalizeShopDescription(config.description))}</p>` : ""}
-        ${config.effectText ? `<div class="shop-item-effects">${renderShopEffectHtml(config.effectText)}</div>` : ""}
+        ${config.effectText ? `<div class="shop-item-effects">${renderShopEffectHtml(config.effectText, config.effectAnimation)}</div>` : ""}
         ${config.meta?.length ? `
           <div class="shop-item-meta-row">
             ${config.meta.map((item) => `
               <span class="shop-item-meta is-${item.tone ?? "neutral"}">
                 ${item.label ? `<span>${escapeHtml(item.label)}</span>` : ""}
-                <strong>${escapeHtml(item.value)}</strong>
+                <strong>${item.animation ? `${escapeHtml(item.animation.prefix ?? "")}${renderAnimatedNumber(item.animation.key, item.animation.value)}` : escapeHtml(item.value)}</strong>
               </span>
             `).join("")}
           </div>
@@ -372,9 +374,10 @@ function renderSelectableUpgradeOption(
     statusTone: "neutral",
     description: "",
     effectText: option.description,
+    effectAnimation: option.effectAnimation,
     selected,
     selectionSlot: true,
-    meta: [{ label: "升级费用", value: `💰 ${option.price}`, tone: "warning" }],
+    meta: [{ label: "升级费用", value: `💰 ${option.price}`, tone: "warning", animation: { key: `shop:${scope}:upgrade-option:${option.id}:price`, value: option.price, prefix: "💰 " } }],
     rowSelection: selectionDisabled
       ? undefined
         : {
@@ -433,11 +436,12 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
     statusTone: owned ? "owned" : "neutral",
     description: "",
     effectText: currentEffect,
+    effectAnimation: owned ? { key: "shop:chair", template: `${currentDefinition?.description ?? `${item.description}，升级路线5选一`}\n累计 +{recovered} SAN`, values: { recovered: Math.max(0, state.shopState.chairSanRecovered) } } : undefined,
     actions: owned
       ? [
           renderActionButton({
             label: "出售",
-            price: getShopItemSellPrice({ shopState: state.shopState, eventSupport: state.eventSupport }, "chair"),
+            price: getGiftAwareShopSellPrice(state, "chair"),
             priceDirection: "gain",
             variant: "secondary",
             action: "sell-shop-item",
@@ -513,11 +517,12 @@ function renderGpuRow(state: GameState): string {
     statusTone: currentTier ? "owned" : "neutral",
     description: "",
     effectText: experimentText,
+    effectAnimation: currentTier ? { key: "shop:gpu", template: "做实验：+{actions}次，+{bonus}分", values: { actions: currentLevel, bonus: currentLevel } } : undefined,
     actions: [
       canSell
         ? renderActionButton({
           label: "出售",
-          price: getShopItemSellPrice(shopView, "gpu_buy"),
+          price: getGiftAwareShopSellPrice(state, "gpu_buy"),
           priceDirection: "gain",
           variant: "secondary",
           action: "sell-shop-item",
@@ -563,7 +568,7 @@ function renderShopItemRow(
           canSell
             ? renderActionButton({
                 label: "出售",
-                price: getShopItemSellPrice(shopView, itemId),
+                price: getGiftAwareShopSellPrice(state, itemId),
                 priceDirection: "gain",
                 variant: "secondary",
                 action: "sell-shop-item",
@@ -607,9 +612,14 @@ function renderBikeRow(state: GameState): string {
     statusTone: owned ? "owned" : "neutral",
     description: "",
     effectText: [currentDescription, detail].filter(Boolean).join("\n"),
+    effectAnimation: tier ? {
+      key: "shop:bike",
+      template: `${capReached ? currentDescription : "每月 SAN -{cost}；每 -6 SAN，上限 +1（最多 +{cap-limit}）"}\n累计消耗 {spent} SAN｜当前上限 +{gained}/{cap}`,
+      values: { cost: tier.monthlySanCost, "cap-limit": capLimit, spent: state.shopState.bikeSanSpent, gained: state.shopState.bikeSanCapGains, cap: capLimit },
+    } : undefined,
     actions: [
       owned
-        ? renderActionButton({ label: "出售", price: getShopItemSellPrice({ shopState: state.shopState, eventSupport: state.eventSupport }, "bike"), priceDirection: "gain", variant: "secondary", action: "sell-shop-item", itemId: "bike" })
+        ? renderActionButton({ label: "出售", price: getGiftAwareShopSellPrice(state, "bike"), priceDirection: "gain", variant: "secondary", action: "sell-shop-item", itemId: "bike" })
         : "",
       nextTier
         ? renderActionButton({
@@ -630,7 +640,7 @@ function renderCoffeeRows(
   state: GameState,
   selectedCoffeeUpgradeId?: Exclude<CoffeeMachineUpgradeId, null> | null,
 ): string {
-  const coffeePrice = getCoffeeBuyPrice(state.coffeeState);
+  const coffeePrice = getShopActionPrice(state, "buy-coffee", {})!;
   const coffeeDescription = "基础 SAN +3";
   const coffeeMachineSellPrice = getCoffeeMachineSellPrice(state.coffeeState);
   const coffeeMachinePurchasePrice = getShopActionPrice(state, "buy-coffee-machine", {}) ?? COFFEE_MACHINE_PRICE;
@@ -658,6 +668,9 @@ function renderCoffeeRows(
       description: upgrade.id === "advanced" && state.coffeeState.machineTrackedCoffeeCount > 0 && !isCurrent
         ? `${upgrade.description}｜已保留累计 ${state.coffeeState.machineTrackedCoffeeCount} 杯`
         : upgrade.description,
+      effectAnimation: upgrade.id === "advanced" && state.coffeeState.machineTrackedCoffeeCount > 0 && !isCurrent
+        ? { key: "shop:coffee:upgrade-option:advanced", template: `${upgrade.description}｜已保留累计 {count} 杯`, values: { count: state.coffeeState.machineTrackedCoffeeCount } }
+        : undefined,
       current: isCurrent,
       unavailable,
       price: purchasePrice,
@@ -752,7 +765,8 @@ function renderSupportItemRow(
 ): string {
   const item = getSupportItemDefinition(itemId);
   const owned = isSupportItemOwned(state.eventSupport, itemId);
-  const sellPrice = getSupportItemSellPrice(itemId);
+  const sellPrice = getGiftAwareShopSellPrice(state, itemId);
+  const purchasePrice = getShopActionPrice(state, "buy-support-item", { supportItemId: itemId })!;
 
   return renderShopRow({
     icon,
@@ -775,11 +789,11 @@ function renderSupportItemRow(
         ]
       : [renderActionButton({
           label: "购买",
-          price: item.price,
+          price: purchasePrice,
           action: "buy-support-item",
           supportItemId: itemId,
-          disabled: state.player.money < item.price,
-          disabledReason: state.player.money < item.price ? "金币不足" : undefined,
+          disabled: state.player.money < purchasePrice,
+          disabledReason: state.player.money < purchasePrice ? "金币不足" : undefined,
         })],
   });
 }
@@ -796,13 +810,18 @@ const AI_SCORE_LABELS: Record<"idea" | "experiment" | "writing", string> = {
   writing: "写作",
 };
 
-function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>): string {
+function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>, values?: Record<string, number>): string {
+  const metric = (key: string, value: number): string => {
+    if (!values) return String(value);
+    values[key] = value;
+    return `{${key}}`;
+  };
   if (model.slot === "kimi") {
     const reading = model.readingEffect;
     return [
-      reading?.sanDelta ? `看论文：SAN ${reading.sanDelta}` : "",
-      reading?.manualExtraReads ? `手动看论文：+${reading.manualExtraReads}次` : "",
-      reading?.automaticReads ? `自动看论文：+${reading.automaticReads}次` : "",
+      reading?.sanDelta ? `看论文：SAN ${metric("reading-san", reading.sanDelta)}` : "",
+      reading?.manualExtraReads ? `手动看论文：+${metric("manual-reads", reading.manualExtraReads)}次` : "",
+      reading?.automaticReads ? `自动看论文：+${metric("automatic-reads", reading.automaticReads)}次` : "",
     ].filter(Boolean).join("\n") || "暂无效果";
   }
   if (model.slot === "claude") {
@@ -818,7 +837,7 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>):
       }
     }
     const polishText = polishGroups
-      .map((group) => `${group.labels.join("、")} ${group.bonus > 0 ? "+" : ""}${group.bonus}分`)
+      .map((group) => `${group.labels.join("、")} ${group.bonus > 0 ? "+" : ""}${metric(`polish-${group.labels.map((label) => Object.keys(AI_SCORE_LABELS).find((action) => AI_SCORE_LABELS[action as keyof typeof AI_SCORE_LABELS] === label)).join("-")}`, group.bonus)}分`)
       .join("；");
     return polishText ? `订购或续费时，自动提升可修改论文的分数：\n${polishText}` : "暂无效果";
   }
@@ -842,19 +861,19 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>):
     }
   }
 
-  const formatSigned = (value: number): string => value > 0 ? `+${value}` : String(value);
-  const formatEffect = (effect: { bonus?: number; extraActions?: number; sanDelta?: number }): string => [
-    effect.bonus ? `${formatSigned(effect.bonus)}分` : "",
-    effect.extraActions ? `${formatSigned(effect.extraActions)}次` : "",
-    effect.sanDelta ? `SAN ${formatSigned(effect.sanDelta)}` : "",
+  const formatSigned = (key: string, value: number): string => `${value > 0 ? "+" : ""}${metric(key, value)}`;
+  const formatEffect = (key: string, effect: { bonus?: number; extraActions?: number; sanDelta?: number }): string => [
+    effect.bonus ? `${formatSigned(`${key}-bonus`, effect.bonus)}分` : "",
+    effect.extraActions ? `${formatSigned(`${key}-actions`, effect.extraActions)}次` : "",
+    effect.sanDelta ? `SAN ${formatSigned(`${key}-san`, effect.sanDelta)}` : "",
   ].filter(Boolean).join("，");
 
   const researchText = groupedEffects
-    .map((group) => `${group.labels.join("、")}：${formatEffect(group.effect)}`)
+    .map((group) => `${group.labels.join("、")}：${formatEffect(group.labels.map((label) => Object.keys(AI_RESEARCH_ACTION_LABELS).find((action) => AI_RESEARCH_ACTION_LABELS[action as keyof typeof AI_RESEARCH_ACTION_LABELS] === label)).join("-"), group.effect)}`)
     .join("\n");
   const hasRelationshipDiscount = Boolean(model.relationshipOperationSanDelta);
   const extraText = hasRelationshipDiscount
-    ? [`人际操作消耗修正（暂未开放）：SAN -${Math.abs(model.relationshipOperationSanDelta ?? 0)}`]
+    ? [`人际操作消耗修正（暂未开放）：SAN -${metric("relationship-san", Math.abs(model.relationshipOperationSanDelta ?? 0))}`]
     : [];
 
   return [...(researchText ? [researchText] : []), ...extraText].join("\n") || "暂无效果";
@@ -866,9 +885,11 @@ function renderAiRows(state: GameState): string {
     const model = getAiModelForTotalMonths(state.totalMonths, slot);
     const subscription = state.aiShopState.subscriptions[slot];
     const reimbursed = state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths;
-    const price = reimbursed ? 0 : model.price;
+    const price = getShopActionPrice(state, "buy-ai-month", { aiSlotId: slot })!;
     const purchasedThisMonth = subscription.active;
     const effectText = renderAiEffectText(model);
+    const effectValues: Record<string, number> = {};
+    const effectTemplate = renderAiEffectText(model, effectValues);
     return renderShopRow({
       icon: "",
       iconHtml: renderAiIcon(slot),
@@ -876,6 +897,7 @@ function renderAiRows(state: GameState): string {
       name: model.name,
       description: "",
       effectText,
+      effectAnimation: { key: `shop:ai:${slot}`, template: effectTemplate, values: effectValues },
       actions: [
         renderAiSubscriptionToggle(slot, subscription.enabled, subscription.paused),
         renderActionButton({
@@ -926,21 +948,6 @@ function renderTabContent(
   }
 }
 
-function getShopTabNote(activeTab: ShopTabId): string | null {
-  switch (activeTab) {
-    case "ai":
-      return "订购仅在当月生效；游戏内 AI 模型按学年更新，效果和价格随之变化，更新后你需要重新开启自动续费";
-    case "coffee":
-      return "手动购买冰美式和月初自动续费均需咖啡机；自动续费在金币不足或 SAN 已满时跳过";
-    case "gear":
-      return "显卡和自行车可以逐档升级，提升效果；夏季（公历 6–8 月）主动操作的 SAN 消耗 +1，遮阳伞可免除；冬季（公历 12–2 月）每月 SAN -1，羽绒服可免除";
-    case "rest":
-      return "办公椅的升级路线选定后不能直接更换；出售并重新购买后可重新选择";
-    default:
-      return null;
-  }
-}
-
 export function renderShopSection(
   state: GameState,
   requestedTab?: ShopTabId,
@@ -965,13 +972,11 @@ export function renderShopSection(
         <nav class="shop-tab-btns" aria-label="商店分类">
           ${renderShopTabButtons(activeTab, upgradeNoticeTabs)}
         </nav>
-        ${getShopTabNote(activeTab)
-          ? `<p class="${activeTab === "ai" ? "shop-ai-note" : "shop-tab-note"} panel-tip-note">💡 小提示：${escapeHtml(getShopTabNote(activeTab)!)}</p>`
-          : ""}
       `}
       ${preEnrollment
         ? '<div class="section-empty play-module-lock-state">入学后开放</div>'
       : `<div class="shop-items-list" id="shop-items-list">
+          ${getLoverGiftCount(state) > 0 ? `<div class="shop-gift-notice">恋人赠礼 ×${renderAnimatedNumber("shop:lover:gift-coupons", getLoverGiftCount(state))}：下次付费购买或升级免费</div>` : ""}
           ${content || '<div class="shop-empty">暂无物品</div>'}
         </div>`}
     </div>

@@ -157,7 +157,7 @@ describe("v2 reading system", () => {
       remainingMonths: null,
       activeOperationSanMultiplier: 2.5,
     }];
-    for (const operation of ["read", "idea", "experiment", "writing", "relationship-task", "relationship-chat"] as const) {
+    for (const operation of ["read", "idea", "experiment", "writing", "relationship-task"] as const) {
       expect(getActiveOperationSanMultiplier(buffs, operation)).toBe(2.5);
       expect(getActiveOperationSanCost(1, buffs, operation)).toBe(3);
     }

@@ -1,7 +1,20 @@
-import type { GrantedPublicationEffect, JournalTarget, Paper, PaperPublicationState, PaperPromotionState } from "./v2-types";
+import type { Buff, GrantedPublicationEffect, JournalTarget, Paper, PaperPublicationState, PaperPromotionState } from "./v2-types";
+import { getActiveOperationSanDelta } from "./v2-buffs";
 import { getJournalRevisionScore } from "./v2-journal-score";
 
 export const HIGHLY_CITED_CITATION_FACTOR = 200;
+
+export function recordPaperAcceptances(papers: readonly Paper[], totalMonths: number, history: readonly Paper[]): Paper[] {
+  let order = [...history, ...papers].reduce((highest, paper) => paper.acceptedTotalMonths === totalMonths
+    ? Math.max(highest, paper.acceptedOrder ?? 0) : highest, 0);
+  const ordered = papers.map((paper, index) => ({ paper, slot: paper.paperSlotIndex ?? index }))
+    .sort((left, right) => left.slot - right.slot);
+  const recorded = new Map(ordered.map(({ paper }) => [paper.id,
+    paper.acceptedTotalMonths !== undefined && paper.acceptedOrder !== undefined
+      ? paper : { ...paper, acceptedTotalMonths: totalMonths, acceptedOrder: ++order },
+  ]));
+  return papers.map((paper) => recorded.get(paper.id)!);
+}
 
 export function getHighlyCitedThreshold(heatMultiplier: number): number {
   return Math.ceil(Math.max(0, heatMultiplier) * HIGHLY_CITED_CITATION_FACTOR);
@@ -51,10 +64,9 @@ export function attachPaperPublication(
   };
 }
 
-export function getPaperPromotionCost(promotion: keyof PaperPromotionState): number {
-  if (promotion === "arxiv") return 2;
-  if (promotion === "github") return 4;
-  return 3;
+export function getPaperPromotionCost(promotion: keyof PaperPromotionState, buffs: readonly Buff[] = []): number {
+  const cost = promotion === "arxiv" ? 2 : promotion === "github" ? 4 : 3;
+  return Math.max(0, cost + getActiveOperationSanDelta(buffs));
 }
 
 export function getPaperPromotionMultiplierBonus(promotion: keyof PaperPromotionState): number {
@@ -66,6 +78,7 @@ export function createGrantedPublishedPaper(
   totalMonths: number,
   existingPublicationCount: number,
   grant: GrantedPublicationEffect,
+  acceptanceHistory?: readonly Paper[],
 ): Paper {
   const acceptedScore = Math.max(0, Math.floor(grant.acceptedScore));
   const baseScore = Math.floor(acceptedScore / 3);
@@ -74,7 +87,7 @@ export function createGrantedPublishedPaper(
   const experiment = baseScore + (remainder > 1 ? 1 : 0);
   const writing = baseScore;
 
-  return {
+  const paper: Paper = {
     id: `granted-paper-${totalMonths}-${existingPublicationCount + 1}`,
     title: grant.title?.trim() || `赠送论文 ${existingPublicationCount + 1}`,
     topicId: "collaboration",
@@ -94,5 +107,8 @@ export function createGrantedPublishedPaper(
     nonFirstAuthor: grant.nonFirstAuthor === true,
     ...(grant.leadAuthorName?.trim() ? { leadAuthorName: grant.leadAuthorName.trim() } : {}),
   };
+  return acceptanceHistory
+    ? recordPaperAcceptances([paper], totalMonths, acceptanceHistory)[0]!
+    : { ...paper, acceptedTotalMonths: totalMonths, acceptedOrder: existingPublicationCount + 1 };
 }
 

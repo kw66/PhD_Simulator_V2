@@ -7,6 +7,7 @@ import { applyPrepublicationPaperDecay, createDraftPaper, discardDraftPaper, wit
 import { applyResearchOperation } from "../src/core/v2-research-operation";
 import {
   getJournalScore,
+  getJournalSubmissionFailure,
   getJournalRevisionScore,
   JOURNAL_DEFINITIONS,
   resolveReadyJournalPapers,
@@ -27,12 +28,41 @@ function playingState() {
 }
 
 describe("v2 journal system", () => {
-  it("uses the geometric journal score and the configured thresholds", () => {
-    expect(getJournalScore({ idea: 0, experiment: 80, writing: 80 })).toBe(0);
+  it("uses the sum of three scores and the configured thresholds", () => {
+    expect(getJournalScore({ idea: 0, experiment: 80, writing: 80 })).toBe(160);
     expect(getJournalScore({ idea: 40, experiment: 40, writing: 40 })).toBe(120);
+    expect(getJournalScore({ idea: 10, experiment: 100, writing: 15 })).toBe(125);
     expect(JOURNAL_DEFINITIONS.nature).toMatchObject({ submissionScore: 150, acceptanceScore: 500 });
     expect(JOURNAL_DEFINITIONS.nmi).toMatchObject({ submissionScore: 100, acceptanceScore: 250 });
     expect(JOURNAL_DEFINITIONS.pami).toMatchObject({ submissionScore: 75, acceptanceScore: 125 });
+  });
+
+  it("accepts an uneven paper by total score including collaboration", () => {
+    const base = playingState();
+    const paper = { ...createDraftPaper(1, 0), idea: 10, experiment: 100, writing: 15,
+      collaborationScores: { idea: 5, experiment: 20, writing: 5 } };
+    const next = submitJournalPaper({ ...base, papers: [paper] }, paper.id, "pami");
+    expect(next.externalPublications[0]?.publication).toMatchObject({ effectiveScore: 125 });
+    expect(next.totalResearchScore).toBe(base.totalResearchScore + 5);
+  });
+
+  it("keeps all three components required before submission even when the total reaches the threshold", () => {
+    const base = playingState();
+    const paper = { ...createDraftPaper(1, 0), idea: 150, experiment: 0, writing: 0 };
+    expect(getJournalSubmissionFailure(paper, "pami")).toContain("先完成idea、实验和写作");
+    const next = submitJournalPaper({ ...base, papers: [paper] }, paper.id, "pami");
+    expect(next.papers[0]!.status).toBe("draft");
+    expect(next.externalPublications).toHaveLength(0);
+  });
+
+  it("uses the current total for existing revisions rather than a submission-based floor", () => {
+    expect(getJournalRevisionScore({ idea: 10, experiment: 100, writing: 15,
+      submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40 })).toBe(125);
+    const base = playingState();
+    const paper = { ...createDraftPaper(1, 0), status: "journal-reviewing" as const, journalTarget: "pami" as const,
+      idea: 10, experiment: 100, writing: 15, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40 };
+    const next = resolveReadyJournalPapers({ ...base, papers: [paper] }).state;
+    expect(next.externalPublications[0]?.publication?.effectiveScore).toBe(125);
   });
 
   it("submits a paper into journal revision without a review deadline", () => {
@@ -171,7 +201,9 @@ describe("v2 journal system", () => {
     const state = playingState();
     const paper = { ...createDraftPaper(1, 0), idea: 40, experiment: 40, writing: 40 };
     const submitted = submitJournalPaper({ ...state, papers: [paper], selectedPaperId: paper.id }, paper.id, "nmi");
-    const html = renderApp({ ...submitted, month: 4, totalMonths: 4 }, createDefaultAccountProfile());
+    const html = renderApp({ ...submitted, month: 4, totalMonths: 4 }, createDefaultAccountProfile())
+      .replace(/<span class="animated-number" data-animate-key="[^"]*" data-animate-number="[^"]*">([^<]*)<\/span>/g, "$1")
+      .replace(/ data-animate-(?:key|number|bar)="[^"]*"/g, "");
     expect(html).toContain('is-journal-reviewing');
     expect(html).toContain("子刊NMI 修改中");
     expect(html).toContain("已修改 3 月 · ");
@@ -180,9 +212,9 @@ describe("v2 journal system", () => {
     expect(html).not.toContain(`data-action="discard-paper" data-paper-id="${paper.id}"`);
     const journalCard = html.match(/<article class="paper-card[^>]*is-journal-reviewing[\s\S]*?<\/article>/u)?.[0] ?? "";
     expect(journalCard).toContain('class="paper-score-strip"');
-    expect(journalCard).toContain('aria-label="idea 40，实验 40，写作 40，总分 120"');
-    expect(journalCard).toContain('class="paper-own-score-strip" aria-label="自身分：idea 40，实验 40，写作 40"');
-    expect(journalCard).toContain('<span><small>自身</small><strong>40</strong></span>');
+    expect(journalCard).toContain('aria-label="自身分：idea 40，实验 40，写作 40，总分 120"');
+    expect(journalCard).toContain('class="paper-collaboration-score-strip" aria-label="协作分：idea 0，实验 0，写作 0"');
+    expect(journalCard).toContain('<span><small>协作</small><strong>0</strong></span>');
     expect(journalCard).toContain('data-player-avatar="true"');
     expect(journalCard).not.toContain('class="paper-collaboration-strip"');
     expect(journalCard).not.toContain("当前期刊分");

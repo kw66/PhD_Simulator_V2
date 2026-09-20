@@ -5,11 +5,10 @@ import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-ca
 import { getCitationStats } from "../core/v2-citation-stats";
 import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-catalog";
 import type { ConferenceRegionId } from "../core/v2-conference-system";
-import { DEBUG_EVENT_GROUPS, DEBUG_MONTH_DELTAS, DEBUG_STAT_GROUPS } from "../core/v2-debug-tools";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
+import { canAutoResolveLinearEvent, isEventBlocking, isLinearEvent } from "../core/v2-event-auto-resolution";
 import { isTransientUiHintLog } from "../core/v2-engine-helpers";
-import { getJointTrainingCitationCapBonus } from "../core/v2-joint-training-system";
-import { getLabTalentActionBonus, getLabTalentTeamSize, isLabTalentActive } from "../core/v2-lab-talent";
+import { getTeachersDayResultPreviews } from "../core/v2-fixed-events-teachers-day";
 import { getMeetingSelfPayDiscount, hasFullGear } from "../core/v2-meeting-system";
 import {
   ACTIVITY_WIN_RATE_CAP,
@@ -18,12 +17,14 @@ import {
   getPokerWinRate,
 } from "../core/v2-growth-system";
 import { getBikeSanCapLimit, getBikeTierDefinition } from "../core/v2-bike-system";
+import { getActiveBuffs, getActiveOperationSanDelta } from "../core/v2-buffs";
 import { previewNextMonthEffects } from "../core/v2-monthly-effects";
-import { getFellowName, getFellowRoleLabel, getFellowTaskSanCost } from "../core/v2-fellow-progression";
-import { getInternshipMonthlyIncome, getPublishedAPaperCount } from "../core/v2-internship-system";
-import { LOVER_DATE_MONEY_COST } from "../core/v2-lover-progression";
+import { getFellowName, getFellowResearchTopic, getFellowRoleLabel } from "../core/v2-fellow-progression";
+import { getFellowDiscussionSanCost } from "../core/v2-fellow-actions";
+import { getFellowCurrentPaper } from "../core/v2-fellow-research";
+import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverPassiveGains, getLoverRouteCost, getLoverRouteGain, getLoverRouteProgress } from "../core/v2-lover-progression";
 import { previewPartTimeWork } from "../core/v2-part-time-work";
-import { getBeautifulMonthlyRecovery, getLoverName } from "../core/v2-lover-system";
+import { getLoverName } from "../core/v2-lover-system";
 import {
   getAcceptedPaperScore,
   getPaperPromotionCost,
@@ -34,7 +35,16 @@ import { getPublicationTalentChecklist } from "../core/v2-publication-talent";
 import { getAvailablePaperSlotCount, getPaperSubmissionFailure, getWorkstationPaperSlotMap } from "../core/v2-paper-rules";
 import { getPaperScoreBreakdown } from "../core/v2-paper-collaboration";
 import { getPaperHeatTier } from "../core/v2-paper-topics";
-import { ADVISOR_TASK_SAN_COST } from "../core/v2-advisor-progress";
+import {
+  ADVISOR_FUNDING_CAP,
+  ADVISOR_GRANTS,
+  ADVISOR_TASK_SAN_COST,
+  getActiveAdvisorGrants,
+  getAdvisorGrantLimit,
+  getAdvisorMonthlyResearchGrowth,
+  getAdvisorMonthlySalary,
+  getAdvisorRankLabel,
+} from "../core/v2-advisor-progress";
 import {
   getCalendarForTotalMonths,
   getRoleDefinition,
@@ -65,7 +75,7 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
-import type { DateDisplayMode, DebugStatId, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, RoleDefinition } from "../core/v2-types";
+import type { DateDisplayMode, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent, RoleDefinition } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type PlayTabId,
@@ -76,12 +86,15 @@ import { renderShopSection as renderInteractiveShopSection } from "./v2-render-s
 import { buildBuffDisplayBuckets } from "./v2-render-buffs";
 import { renderGameFeedbackOverlay } from "./v2-render-community";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "../core/v2-development-flags";
-import { getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
+import { renderPlayHelpPanel } from "./v2-play-help";
+import { isEndingSystemLog, renderEndingLog, renderEndingScreen } from "./v2-render-ending";
+import type { EventLayoutSample } from "./v2-event-layout";
+import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
 const RESEARCH_CHORE_SAN_DISCOUNT = [0, 1, 2, 3] as const;
 const FUTURE_MONTH_LOOKAHEAD = 6;
-const PENDING_PAGE_SIZE = 5;
+const PENDING_PAGE_SIZE = 6;
 const RESEARCH_PAGE_SIZE = 5;
 const RELATIONSHIP_SLOT_UNLOCK_THRESHOLDS = [0, 0, 6, 12, 18] as const;
 const DEFERRED_GAMEPLAY_ACTION_ATTRIBUTES = 'disabled aria-disabled="true" data-gameplay-status="deferred"';
@@ -111,16 +124,22 @@ type TalentPanelItem = {
   name: string;
   active: boolean;
   tagLabel?: string;
+  ruleCard?: boolean;
+  hideStatus?: boolean;
   description: string;
   detail?: string;
   requirement?: string;
-  metrics?: Array<{ label: string; value: string }>;
-  rewardTable?: { label: string; columns: string[]; rows: string[][] };
+  metrics?: Array<{ label: string; value: string; animation?: { template: string; values: Record<string, number>; displays?: Record<string, string> } }>;
+  descriptionAnimation?: { template: string; values: Record<string, number> };
+  rewardTable?: { label: string; columns: string[]; rows: string[][]; currentRow?: number };
+  advisorSalaryPager?: { startIndex: number; lastStartIndex: number };
+  loverRewardPager?: { page: number };
   rewardRules?: string[];
-  progress?: { label: string; value: number; max: number; valueLabel: string };
+  progress?: { label: string; value: number; max: number; valueLabel: string; displayValue?: number; animateMax?: boolean };
 };
 
 type LogPage = {
+  kind?: "ending";
   monthKey: number;
   label: string;
   entries: GameLogEntry[];
@@ -142,6 +161,7 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+
 function renderEventInlineHtml(value: string): string {
   return escapeHtml(normalizeGameDisplayText(value))
     .replace(/(^|\n)([^，。\n]+?)(?= · 讲师(?:\n|$))/gu, "$1<mark class=\"event-name-highlight\">$2</mark>")
@@ -153,14 +173,6 @@ function renderEventInlineHtml(value: string): string {
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
-}
-
-function formatMonthlyValue(value: number): string {
-  if (!Number.isFinite(value)) return "0";
-  if (Math.abs(value - Math.round(value)) < 1e-9) {
-    return String(Math.round(value));
-  }
-  return value.toFixed(1).replace(/\.0$/, "");
 }
 
 function formatSignedNumber(value: number): string {
@@ -382,7 +394,7 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
   const labels = { san: "SAN", research: "科研", social: "社交", favor: "好感", money: "金币" } as const;
   const resolution = previewNextMonthEffects(state);
 
-  return (Object.keys(labels) as Array<keyof typeof labels>).flatMap((statId) => {
+  const items = (Object.keys(labels) as Array<keyof typeof labels>).flatMap((statId) => {
     const sources = resolution.items.flatMap((item) => {
       const value = item.stats[statId] ?? 0;
       if (!Object.hasOwn(item.stats, statId)) return [];
@@ -410,6 +422,11 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
       isDebuff: value < 0,
     }];
   });
+  if (state.loverState.active && state.loverProgressState.active
+    && state.loverProgressState.sanDiscountMonths?.includes(state.totalMonths + 1)) {
+    upsertBucketItem(items, "next-month-lover-play-discount", "主动操作 SAN消耗 -1", "恋人玩耍 · 下个月生效，持续1个月");
+  }
+  return items;
 }
 
 function buildEffectBuckets(state: GameState): {
@@ -485,6 +502,17 @@ function buildEffectBuckets(state: GameState): {
     upsertBucketItem(single, "shop-free-workstation", `${workstationLabels.join("、")} 0金币`, "导师经费");
   }
   const buffBuckets = buildBuffDisplayBuckets(state.buffs);
+  for (const [timing, target] of [["permanent", permanent], ["monthly", monthly], ["next-action", single]] as const) {
+    const buffs = getActiveBuffs(state.buffs).filter((buff) => buff.timing === timing && buff.activeOperationSanDelta !== undefined);
+    const delta = getActiveOperationSanDelta(buffs);
+    if (delta === 0) continue;
+    for (const buff of buffs) {
+      const duration = timing === "permanent" ? "永久" : timing === "next-action" ? "对应效果触发后消耗"
+        : buff.remainingMonths === null ? "持续生效" : `剩余 ${buff.remainingMonths} 月`;
+      upsertBucketItem(target, `${timing}:rule:active-operation-san-delta`, `主动操作 SAN消耗 ${formatSignedNumber(delta)}`,
+        `${buff.source} · ${duration}${buff.description?.trim() ? `：${buff.description.trim()}` : ""}`, delta > 0);
+    }
+  }
   const permanentBuffItems = buffBuckets.permanent.filter((item) => (
     !((item.id === "permanent:monthly-stat:san" || item.id === "permanent:monthly-stat:money")
       && !item.isDebuff)
@@ -559,19 +587,13 @@ function renderLeftRail(state: GameState): string {
   `;
 }
 
-function getDeadlineText(deadlineMonths: number): string {
-  if (deadlineMonths <= 0) return "本月";
-  return `${deadlineMonths}月后`;
-}
-
-function getDeadlineTone(deadlineMonths: number): "due" | "soon" | "later" {
-  if (deadlineMonths <= 0) return "due";
-  if (deadlineMonths === 1) return "soon";
-  return "later";
+function getEventDeadlineTone(state: GameState, event: GameState["eventQueue"][number]): "blocking" | "pending" {
+  return isEventBlocking(state, event)
+    ? "blocking" : "pending";
 }
 
 function getFutureOccurrenceText(monthsLater: number): string {
-  return `${Math.max(1, monthsLater)}月后`;
+  return `${Math.max(1, monthsLater)}月后 发生`;
 }
 
 function getEventRootTitle(title: string): string {
@@ -580,6 +602,7 @@ function getEventRootTitle(title: string): string {
 
 export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[] {
   const items: TodoPreviewItem[] = [];
+  const reviewingPapers = state.papers.filter((paper) => paper.status === "reviewing" && paper.reviewMonthsLeft > 0);
   let sortOrder = 0;
 
   const addItem = (params: {
@@ -599,6 +622,12 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
     const nextTotalMonths = state.totalMonths + monthsLater;
     if (nextTotalMonths > state.maxMonths) {
       continue;
+    }
+
+    for (const paper of reviewingPapers) {
+      if (paper.reviewMonthsLeft === monthsLater) {
+        addItem({ title: "论文结果", monthsLater });
+      }
     }
 
     const calendar = getCalendarForTotalMonths(nextTotalMonths, state.degree);
@@ -655,7 +684,7 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
   return items;
 }
 
-function renderEventDescriptionHtml(description: string): string {
+function renderEventDescriptionHtml(description: string, mergeNarrative = true): string {
   const normalized = description.trim();
   if (!normalized) {
     return "<p>请点击下方按钮继续。</p>";
@@ -679,14 +708,27 @@ function renderEventDescriptionHtml(description: string): string {
         .flatMap((paragraph) => paragraph.split(/\r?\n/u))
         .map((line) => line.trim().replace(/[。.]+$/u, ""))
         .filter((line) => line && line !== "机制结算" && line !== "本次活动结果");
-  const storyHtml = storyParagraphs
-    .map((paragraph) => {
+  const storyBlocks: { paragraphs: string[]; isNarrative: boolean }[] = [];
+  for (const paragraph of storyParagraphs) {
+    const isNarrative = !/^(?:备注|小提示)：/u.test(paragraph) && !paragraph.includes("\n")
+      && paragraph.length <= 160 && !/^-{3,}$/u.test(paragraph)
+      && !/^(?:规则|条件|判定|培养安排|工资|待遇|毕业|转博|转博士|科研分|送审|录用|发表|会议)[：:]/u.test(paragraph);
+    const previous = storyBlocks.at(-1);
+    if (mergeNarrative && isNarrative && previous?.isNarrative && previous.paragraphs.join("").length + paragraph.length <= 260) {
+      previous.paragraphs.push(paragraph);
+    } else {
+      storyBlocks.push({ paragraphs: [paragraph], isNarrative });
+    }
+  }
+  const storyHtml = storyBlocks
+    .map(({ paragraphs: blockParagraphs, isNarrative }) => {
+      const paragraph = blockParagraphs.join("");
       if (/^-{3,}$/u.test(paragraph)) {
         return '<hr class="event-description-divider" role="separator">';
       }
       const isTip = /^(?:备注|小提示)：/u.test(paragraph);
       const displayText = paragraph.replace(/^备注：/u, "小提示：");
-      const className = isTip ? ' class="event-description-note"' : "";
+      const className = isTip ? ' class="event-description-note"' : isNarrative ? ' class="event-description-story"' : "";
       return `<p${className}>${isTip ? '<span aria-hidden="true">💡</span> ' : ""}${renderEventInlineHtml(displayText)}</p>`;
     })
     .join("");
@@ -787,27 +829,29 @@ function getPaperReviewImprovementText(report: PaperReviewerReport): string {
       ? [`${report.improvementAction === "idea" ? "idea" : report.improvementAction === "experiment" ? "实验" : "写作"} +${report.improvementAmount}`]
       : []),
   ];
-  if (report.sanChange) {
-    improvements.push(`SAN ${formatSignedNumber(report.sanChange)}`);
-  }
   return improvements.join(" · ");
 }
 
-function renderPaperReviewEvent(presentation: PaperReviewEventPresentation): string {
+function renderPaperReviewEvent(presentation: PaperReviewEventPresentation, settled = false): string {
+  const venue = presentation.conferenceName
+    ? `${presentation.conferenceName}${presentation.conferenceYear ?? ""}` : "会议评审";
+  const heading = `
+    <header class="paper-review-event-heading">
+      <span class="paper-review-venue">${escapeHtml(venue)}</span>
+      <strong>${escapeHtml(presentation.paperTitle)}</strong>
+    </header>`;
   if (presentation.kind === "overview") {
     return `
       <section class="paper-review-event is-overview">
-        <div class="paper-review-event-heading">
-          <span>投稿论文</span>
-          <strong>《${escapeHtml(presentation.paperTitle)}》</strong>
-        </div>
+        ${heading}
+        <p class="paper-review-intro">📬 等待三个月，审稿结果终于到了</p>
         <div class="paper-review-overview-grid">
-          <span><small>投稿会议</small><strong>${presentation.target}类 · ${escapeHtml(presentation.conferenceName)} ${presentation.conferenceYear}</strong></span>
-          <span><small>会议影响力</small><strong>${presentation.venueInfluence.toFixed(2)}</strong></span>
-          <span><small>审稿标准</small><strong>×${presentation.reviewStrictnessMultiplier.toFixed(2)}</strong></span>
+          <span><small>会议等级</small><strong>${presentation.target}类</strong></span>
           <span><small>投稿总分</small><strong>${presentation.submittedScore}</strong></span>
+          <span><small>影响力</small><strong>×${presentation.venueInfluence.toFixed(2)}</strong></span>
+          <span><small>审稿标准</small><strong>×${presentation.reviewStrictnessMultiplier.toFixed(2)}</strong></span>
         </div>
-        <p>三个月的审稿期结束，三份意见已经返回。先看看审稿人怎么评价这篇论文。</p>
+        <p class="paper-review-event-footnote">投稿时的分数决定本轮评审，先读读三位审稿人的意见</p>
       </section>
     `;
   }
@@ -815,10 +859,7 @@ function renderPaperReviewEvent(presentation: PaperReviewEventPresentation): str
   if (presentation.kind === "reviewers") {
     return `
       <section class="paper-review-event is-reviewers">
-        <div class="paper-review-event-heading">
-          <span>审稿意见</span>
-          <strong>《${escapeHtml(presentation.paperTitle)}》</strong>
-        </div>
+        ${heading}
         <div class="paper-reviewer-grid">
           ${presentation.reports.map((report, index) => {
             const improvement = getPaperReviewImprovementText(report);
@@ -826,20 +867,24 @@ function renderPaperReviewEvent(presentation: PaperReviewEventPresentation): str
             return `
               <article class="paper-reviewer-card is-${tone}">
                 <div class="paper-reviewer-card-head">
-                  <span>审稿人 ${index + 1}</span>
-                  <strong>${escapeHtml(formatPaperReviewDecision(report))} ${formatSignedNumber(report.reviewScore)}</strong>
+                  <span class="paper-reviewer-number">R${index + 1}</span>
+                  <h3>${escapeHtml(report.reviewer)}</h3>
                 </div>
-                <h3>${escapeHtml(report.reviewer)}</h3>
-                <p>${escapeHtml(report.comment ?? "未留下具体意见")}</p>
+                <div class="paper-reviewer-verdict">
+                  <strong>${escapeHtml(formatPaperReviewDecision(report))} ${report.reviewScore === 0 ? "0" : formatSignedNumber(report.reviewScore)}</strong>
+                  <span>有效分 <b>${report.effectiveScore}</b></span>
+                </div>
+                <p class="paper-reviewer-comment">${escapeHtml(report.comment ?? "未留下具体意见")}</p>
                 <div class="paper-reviewer-meta">
-                  <span>有效分 ${report.effectiveScore}</span>
-                  ${improvement ? `<span>${escapeHtml(improvement)}</span>` : ""}
+                  ${improvement ? `<div><span>拒稿后修改</span><strong>${escapeHtml(improvement)}</strong></div>` : ""}
+                  ${report.sanChange ? `<div><span>审稿影响</span><strong>SAN${formatSignedNumber(report.sanChange)}</strong></div>` : ""}
+                  ${!improvement && !report.sanChange ? "<div><span>无额外影响</span></div>" : ""}
                 </div>
               </article>
             `;
           }).join("")}
         </div>
-        <p class="paper-review-event-footnote">三位审稿人的意见已经齐了，接下来由 PC 给出最终决定。</p>
+        <p class="paper-review-event-footnote">接收+1 · 边缘0 · 拒稿−1，三人总评交由PC判定；修改加分仅在最终拒稿时生效</p>
       </section>
     `;
   }
@@ -847,26 +892,32 @@ function renderPaperReviewEvent(presentation: PaperReviewEventPresentation): str
   const resultItems = presentation.rewardText.split("；").map((item) => item.trim()).filter(Boolean);
   return `
     <section class="paper-review-event is-decision ${presentation.accepted ? "is-accepted" : "is-rejected"}">
+      ${heading}
       <div class="paper-review-decision-head">
         <div>
           <span>PC 最终决定</span>
           <strong>${presentation.accepted
-            ? `${presentation.target}类 · ${escapeHtml(presentation.acceptType ?? "Poster")}`
-            : "未录用"}</strong>
+            ? `🎉 接收 · ${escapeHtml(presentation.acceptType ?? "Poster")}`
+            : "📨 本轮未录用"}</strong>
         </div>
         <div class="paper-review-total-score">
           <small>总评</small>
-          <strong>${formatSignedNumber(presentation.totalReviewScore)}</strong>
+          <strong>${presentation.totalReviewScore === 0 ? "0" : formatSignedNumber(presentation.totalReviewScore)}</strong>
         </div>
       </div>
-      <p>${escapeHtml(presentation.resultText)}</p>
-      ${presentation.borderlineChance === null ? "" : `<div class="paper-review-borderline">边缘录用概率 ${Math.round(presentation.borderlineChance * 100)}%</div>`}
-      ${presentation.rewardReductionCount > 0
-        ? `<div class="paper-review-reduction">已有 ${presentation.rewardReductionCount} 篇同级或更高等级论文，本次奖励有所递减</div>`
-        : ""}
-      <div class="paper-review-result-strip">
-        ${resultItems.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      <div class="paper-review-votes">
+        ${(presentation.reports ?? []).map((report, index) => `<span class="is-${report.decision.toLowerCase()}">R${index + 1} <b>${report.reviewScore === 0 ? "0" : formatSignedNumber(report.reviewScore)}</b></span>`).join("")}
+        <span class="paper-review-decision-rule">${presentation.borderlineChance === null
+          ? presentation.accepted ? "总评≥+2，直接接收" : "总评≤−2，直接拒稿"
+          : `边缘录用概率 ${(presentation.borderlineChance * 100).toFixed(1)}%`}</span>
       </div>
+      <section class="paper-review-settlement">
+        <h3>${settled ? "结算记录" : "本次结算"}</h3>
+        <div class="paper-review-result-strip">${resultItems.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+      </section>
+      <p class="paper-review-event-footnote">${settled
+        ? presentation.accepted ? "论文已移入成果" : "论文已退回草稿，修改后可以再次投稿"
+        : presentation.accepted ? "确认后论文移入成果" : "确认后论文退回草稿，应用修改反馈，拒稿次数+1"}</p>
     </section>
   `;
 }
@@ -878,6 +929,10 @@ function getEventSceneLabel(title: string): string {
     return label === "结果" ? "处理结果" : normalizeGameDisplayText(label);
   }
   return title === "结果" ? "处理结果" : normalizeGameDisplayText(title);
+}
+
+function isSecondaryEventChoice(choice: { id: string; cosmetic?: boolean }): boolean {
+  return choice.cosmetic === true || choice.id === "before-grad-school-reroll-name" || choice.id === "before-grad-school-reroll";
 }
 
 function renderEventContentBox(
@@ -948,13 +1003,14 @@ function renderEventContentBox(
       </div>
       <div class="event-content-body" id="event-content-body">
         ${paperReviewPresentation
-          ? renderPaperReviewEvent(paperReviewPresentation)
-          : renderEventDescriptionHtml(displayEvent.description)}
+          ? renderPaperReviewEvent(paperReviewPresentation, historicalPage !== null)
+          : renderEventDescriptionHtml(displayEvent.description, displayEvent.choices.filter((choice) => !isSecondaryEventChoice(choice)).length <= 1)}
       </div>
       ${displayEvent.choices.length > 0 ? `
         <div class="event-content-buttons" id="event-content-buttons">
           ${displayEvent.choices.map((choice) => {
             const disabledReason = choice.disabledReason?.trim() ?? "";
+            const secondary = isSecondaryEventChoice(choice);
             const isDisabled = historicalPage !== null || disabledReason !== "";
             const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"` : "";
             const buttonAttributes = isDisabled
@@ -964,6 +1020,7 @@ function renderEventContentBox(
               <button
                 class="event-choice-btn event-action-btn${choice.id === selectedChoiceId ? " is-selected" : ""}"
                 type="button"
+                ${secondary ? "data-event-secondary" : ""}
                 ${buttonAttributes}
               ><span>${escapeHtml(normalizeGameDisplayText(choice.label))}</span>${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
             `;
@@ -972,6 +1029,41 @@ function renderEventContentBox(
       ` : ""}
     </div>
   `;
+}
+
+export function renderEventLayoutSamples(
+  currentEvent: GameState["eventQueue"][number] | null,
+  completedEvent: GameState["eventHistory"][number] | null,
+  state?: GameState,
+): EventLayoutSample[] {
+  if (completedEvent) {
+    return completedEvent.stages.map((_, index) => ({ key: `history:${index}`, html: renderEventContentBox(null, completedEvent, index) }));
+  }
+  if (!currentEvent) return [];
+  const samples = (currentEvent.history ?? []).map((_, index) => ({ key: `history:${index}`, html: renderEventContentBox(currentEvent, null, index) }));
+  const seen = new Set<PendingEvent>();
+  const visit = (event: PendingEvent, history: NonNullable<PendingEvent["history"]>, branch = ""): void => {
+    if (seen.has(event)) return;
+    seen.add(event);
+    samples.push({ key: `${event.id}:${history.map((stage) => stage.selectedChoiceId).join("/")}:${branch}`,
+      html: renderEventContentBox({ ...event, history, queueOrder: currentEvent.queueOrder }, null, null) });
+    const stage = { title: event.title, description: event.description, choices: event.choices,
+      paperReviewPresentation: event.paperReviewPresentation, selectedChoiceId: "" };
+    for (const choice of event.choices) {
+      const queued = [
+        ...(choice.effects.enqueueEvents ?? []),
+        ...(state && choice.effects.fixedEventResolution
+          ? getTeachersDayResultPreviews(state, choice.effects.fixedEventResolution) : []),
+      ];
+      queued.forEach((next, index) => {
+        if (next.chainId === currentEvent.chainId) {
+          visit(next, [...history, { ...stage, selectedChoiceId: choice.id }], queued.filter((entry) => entry.id === next.id).length > 1 ? String(index) : "");
+        }
+      });
+    }
+  };
+  visit(currentEvent, currentEvent.history ?? []);
+  return samples;
 }
 
 type PaperDisplayStatus = "draft" | "ready" | "reviewing" | "journal-reviewing" | "published";
@@ -1018,7 +1110,7 @@ function renderPaperReviewHeader(state: GameState, paper: Paper): string {
     <div class="paper-card-header paper-review-card-header">
       <div class="paper-card-header-main">
         <span class="paper-card-status is-reviewing">${escapeHtml(conferenceText)}</span>
-        <span class="paper-review-remaining">剩余 ${paper.reviewMonthsLeft} 月</span>
+        <span class="paper-review-remaining">剩余 ${renderAnimatedNumber(`paper:${paper.id}:workstation:review-months`, paper.reviewMonthsLeft)} 月</span>
         ${renderPaperParticipants(state, paper)}
       </div>
       <div class="paper-card-header-actions">${renderPaperReviewAction(paper)}</div>
@@ -1043,7 +1135,7 @@ function renderPaperJournalHeader(state: GameState, paper: Paper, selected: bool
       <div class="paper-card-header-main">
         ${renderPaperSelectionToggle(paper, selected, "期刊论文")}
         <span class="paper-card-status is-journal-reviewing">${escapeHtml(journal.name)} 修改中</span>
-        <span class="paper-review-remaining">已修改 ${revisedMonths} 月 · <span class="paper-journal-score" aria-label="期刊修改分数 ${score}/${journal.acceptanceScore}">${score}/${journal.acceptanceScore}</span></span>
+        <span class="paper-review-remaining">已修改 ${renderAnimatedNumber(`paper:${paper.id}:workstation:revision-months`, revisedMonths)} 月 · <span class="paper-journal-score" aria-label="期刊修改分数 ${score}/${journal.acceptanceScore}">${renderAnimatedNumber(`paper:${paper.id}:workstation:journal-score`, score)}/${journal.acceptanceScore}</span></span>
         ${renderPaperParticipants(state, paper)}
       </div>
       <div class="paper-card-header-actions">${renderPaperReviewAction(paper)}</div>
@@ -1059,7 +1151,13 @@ function formatPaperDecayRate(rate: number): string {
   return `${(rate * 100).toFixed(1).replace(/\.0$/, "")}%`;
 }
 
-function renderPaperTopicMeta(paper: Paper): string {
+function renderPaperHistoryBadges(paper: Paper, showParticipation = false, view = "workstation"): string {
+  const participated = paper.nonFirstAuthor === true || paper.collaborators?.some((person) => person.id === "player");
+  const rejectionCount = paper.rejectionCount ?? 0;
+  return `${showParticipation && participated ? '<span class="paper-history-badge paper-participation-badge" title="你已参与这篇论文" aria-label="你已参与这篇论文">✅</span>' : ""}${rejectionCount > 0 ? `<span class="paper-history-badge paper-rejection-badge" title="已被拒稿 ${rejectionCount} 次" aria-label="已被拒稿 ${rejectionCount} 次">rej×${renderAnimatedNumber(`paper:${paper.id}:${view}:rejections`, rejectionCount)}</span>` : ""}`;
+}
+
+function renderPaperTopicMeta(paper: Paper, showTooltip = true, showParticipation = false): string {
   const heatTier = getPaperHeatTier(paper.heatMultiplier);
   const decayText = paper.status === "journal-reviewing"
     ? "送审后不衰减"
@@ -1069,8 +1167,9 @@ function renderPaperTopicMeta(paper: Paper): string {
       <span class="paper-topic-tag">${escapeHtml(paper.topicLabel)}</span>
       <span
         class="paper-heat-badge is-${heatTier}"
-        title="${escapeHtml(`${decayText} · 引用倍率 ×${paper.heatMultiplier.toFixed(2)}`)}"
-      >热度 ×${paper.heatMultiplier.toFixed(2)}</span>
+        ${showTooltip ? `title="${escapeHtml(`${decayText} · 引用倍率 ×${paper.heatMultiplier.toFixed(2)}`)}"` : ""}
+      >热度 ×${renderAnimatedNumber(`paper:${paper.id}:${showParticipation ? "fellow" : "workstation"}:heat`, paper.heatMultiplier, paper.heatMultiplier.toFixed(2))}</span>
+      ${renderPaperHistoryBadges(paper, showParticipation, showParticipation ? "fellow" : "workstation")}
     </span>
   `;
 }
@@ -1102,30 +1201,15 @@ function renderPaperDraftActions(paper: Paper, canReroll: boolean): string {
     <div class="paper-card-header-actions paper-draft-actions">
       <button
         class="paper-draft-action-btn is-reroll"
+        data-card-icon-action
         type="button"
         ${canReroll
           ? `data-action="reroll-paper-topic" data-paper-id="${escapeHtml(paper.id)}"`
-          : 'disabled aria-disabled="true" title="论文已有进度，不能更换选题"'}
+          : 'disabled aria-disabled="true"'}
         aria-label="换个选题"
-        title="换个选题"
-      >🔄</button>
-      <button class="paper-draft-action-btn is-discard" type="button" aria-label="丢弃论文" title="丢弃论文" data-action="discard-paper" data-paper-id="${escapeHtml(paper.id)}">🚮</button>
-    </div>
-  `;
-}
-
-function renderPaperReviewSummary(paper: Paper): string {
-  const review = paper.lastReview;
-  if (!review) return "";
-  const decisionLabel = { Accept: "接收", Borderline: "边缘", Reject: "拒稿" } as const;
-  const totalText = review.totalReviewScore > 0 ? `+${review.totalReviewScore}` : String(review.totalReviewScore);
-  const chanceText = review.borderlineChance === null
-    ? ""
-    : ` · 边缘录用 ${Math.round(review.borderlineChance * 100)}%`;
-  return `
-    <div class="paper-review-summary ${review.accepted ? "is-accepted" : "is-rejected"}">
-      <div><strong>${review.accepted ? "本轮录用" : "上轮退稿"}</strong><span>总评 ${totalText}${chanceText}</span></div>
-      <p>${review.reports.map((report) => `${report.reviewer} ${decisionLabel[report.decision]} ${report.effectiveScore}分`).join("｜")}</p>
+        title="${canReroll ? "换个选题" : "论文已有进度，不能更换选题"}"
+      ><span aria-hidden="true">🎲</span></button>
+      <button class="paper-draft-action-btn is-discard" data-card-icon-action type="button" aria-label="丢弃论文" title="丢弃论文" data-action="discard-paper" data-paper-id="${escapeHtml(paper.id)}"><span aria-hidden="true">🗑️</span></button>
     </div>
   `;
 }
@@ -1135,32 +1219,34 @@ function renderPaperStats(paper: Paper): string {
   const experiment = getPaperScoreBreakdown(paper, "experiment");
   const writing = getPaperScoreBreakdown(paper, "writing");
   const total = idea.total + experiment.total + writing.total;
-  const ownScores = [idea.own, experiment.own, writing.own];
+  const collaborationScores = [idea.collaboration, experiment.collaboration, writing.collaboration];
   return `
     <div class="paper-score-breakdown">
-      <div class="paper-score-strip" aria-label="idea ${idea.total}，实验 ${experiment.total}，写作 ${writing.total}，总分 ${total}">
-        <span title="自身${idea.own}+协作${idea.collaboration}分"><small>idea</small><strong>${idea.total}</strong></span>
-        <span title="自身${experiment.own}+协作${experiment.collaboration}分"><small>实验</small><strong>${experiment.total}</strong></span>
-        <span title="自身${writing.own}+协作${writing.collaboration}分"><small>写作</small><strong>${writing.total}</strong></span>
-        <span class="paper-score-total" title="自身${idea.own + experiment.own + writing.own}+协作${idea.collaboration + experiment.collaboration + writing.collaboration}分"><small>总分</small><strong>${total}</strong></span>
+      <div class="paper-score-strip" aria-label="自身分：idea ${idea.own}，实验 ${experiment.own}，写作 ${writing.own}，总分 ${total}">
+        <span><small>idea</small><strong ${animationNumberAttributes(`paper:${paper.id}:workstation:idea:own`, idea.own)}>${idea.own}</strong></span>
+        <span><small>实验</small><strong ${animationNumberAttributes(`paper:${paper.id}:workstation:experiment:own`, experiment.own)}>${experiment.own}</strong></span>
+        <span><small>写作</small><strong ${animationNumberAttributes(`paper:${paper.id}:workstation:writing:own`, writing.own)}>${writing.own}</strong></span>
+        <span class="paper-score-total"><small>总分</small><strong ${animationNumberAttributes(`paper:${paper.id}:workstation:total`, total)}>${total}</strong></span>
       </div>
-      <div class="paper-own-score-strip" aria-label="自身分：idea ${idea.own}，实验 ${experiment.own}，写作 ${writing.own}">
-        ${ownScores.map((score) => `<span><small>自身</small><strong>${score}</strong></span>`).join("")}
+      <div class="paper-collaboration-score-strip" aria-label="协作分：idea ${idea.collaboration}，实验 ${experiment.collaboration}，写作 ${writing.collaboration}">
+        ${collaborationScores.map((score, index) => `<span><small>协作</small><strong ${animationNumberAttributes(`paper:${paper.id}:workstation:${["idea", "experiment", "writing"][index]}:collaboration`, score)}>${score}</strong></span>`).join("")}
       </div>
     </div>
-    ${renderPaperReviewSummary(paper)}
   `;
 }
 
 function renderPaperParticipants(state: GameState, paper: Paper): string {
-  const collaborators = (paper.collaborators ?? []).filter((collaborator) => collaborator.name.trim());
-  const participants = [{ id: "player", name: state.playerName?.trim() || getPendingStudentName(state) || "你" }, ...collaborators];
+  const leadAuthor = paper.leadAuthorId
+    ? { id: paper.leadAuthorId, name: paper.leadAuthorName?.trim() || getFellowName({ id: paper.leadAuthorId }) }
+    : { id: "player", name: state.playerName?.trim() || getPendingStudentName(state) || "你" };
+  const collaborators = (paper.collaborators ?? []).filter((collaborator) => collaborator.name.trim() && collaborator.id !== leadAuthor.id);
+  const participants = [leadAuthor, ...collaborators];
   const avatars = participants.map((participant, index) => {
     const name = participant.name.trim();
     const initial = [...name][0]!.toUpperCase();
     const color = `hsl(${getStableNameSeed(participant.id) % 360} 62% 42%)`;
-    const label = index === 0 && name !== "你" ? `${name}（你）` : name;
-    return `<span class="paper-collaborator-avatar"${index === 0 ? ' data-player-avatar="true"' : ""} style="--collaborator-color:${color}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(initial)}</span>`;
+    const label = `${participant.id === "player" && name !== "你" ? `${name}（你）` : name}${paper.leadAuthorId ? index === 0 ? " · 第一作者" : " · 协作者" : ""}`;
+    return `<span class="paper-collaborator-avatar"${participant.id === "player" ? ' data-player-avatar="true"' : ""} style="--collaborator-color:${color}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${escapeHtml(initial)}</span>`;
   }).join("");
   return `
     <div class="paper-collaborators" aria-label="论文参与者">
@@ -1177,11 +1263,8 @@ function getWorkstationPaperByPanelIndex(state: GameState, panelIndex: number): 
 }
 
 function renderPaperReviewAction(paper: Paper): string {
-  if (paper.status === "reviewing") {
-    return `<button class="paper-withdraw-btn" type="button" data-action="withdraw-paper" data-paper-id="${escapeHtml(paper.id)}">撤稿</button>`;
-  }
-  if (paper.status === "journal-reviewing") {
-    return `<button class="paper-withdraw-btn" type="button" data-action="withdraw-paper" data-paper-id="${escapeHtml(paper.id)}">撤稿</button>`;
+  if (paper.status === "reviewing" || paper.status === "journal-reviewing") {
+    return `<button class="paper-withdraw-btn" data-card-icon-action type="button" title="撤稿" aria-label="撤稿" data-action="withdraw-paper" data-paper-id="${escapeHtml(paper.id)}"><span aria-hidden="true">📥</span></button>`;
   }
   return "";
 }
@@ -1224,7 +1307,7 @@ function renderWorkstationPaperResearchActions(
           : state.player.san < preview.sanCost ? `需要 ${preview.sanCost} SAN` : "";
     const aiClass = preview.usesAiResearchBonus ? " is-ai-bonus" : "";
     const prerequisiteClass = paper !== null && !prerequisiteMet ? " is-prerequisite-locked" : "";
-    const effectText = `SAN-${preview.sanCost}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
+    const effectText = `SAN-${paper ? renderAnimatedNumber(`paper:${paper.id}:action:${type}:san-cost`, preview.sanCost) : preview.sanCost}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
     return `
       <button
         class="compact-action-btn workstation-main-action-btn workstation-paper-action-btn is-${type}${aiClass}${prerequisiteClass}"
@@ -1472,70 +1555,35 @@ function renderEnhancedWorkstationSection(state: GameState): string {
 
   const html = `
     <div class="right-section workstation-section" id="workstation-section">
-      ${preEnrollment ? "" : `
-        <div class="workstation-notes">
-          <details class="workstation-tip-note workstation-formula-note panel-tip-note">
-            <summary>💡 小提示：idea/实验/写作上行是包含协作的合计分，下行是自身分；科研只更新自身，同学帮助持续累加。点击展开看细则</summary>
-            <ol class="workstation-formula-list">
-              <li>
-                <strong>本次分 = 四舍五入(基础分 × 总倍率 + 固定分)</strong>
-                <span>基础分 = 科研能力 × 随机倍率（0.5～1.5）+ 随机加分（0～5）。</span>
-              </li>
-              <li>
-                <strong>Buff 顺序：先合并倍率，再加固定分</strong>
-                <span>倍率从 ×1 开始，只相加增减幅：×1.5 算 +0.5，×0.8 算 −0.2；两个 ×1.5 合并为 ×2。固定分来自当前生效的 Buff（包括 AI）和显卡。</span>
-              </li>
-              <li>
-                <strong>新自身 = max(原自身+1,本次)</strong>
-                <span>协作分不会被科研覆盖，同一人反复帮助、多人帮助都持续累加。例：某项自身20+协作10，本次25→新自身25+协作10=合计35。最右总分为三项合计。</span>
-              </li>
-              <li>
-                <strong>执行次数 = max(1, 1 + 向下取整(Buff额外次数 + 装备额外次数))</strong>
-                <span>额外次数逐次重新抽取，沿用上一遍自身分，不额外扣行动点或SAN。“仅下次”Buff 的加分与倍率只用于第一遍，持续Buff与装备每遍生效。</span>
-              </li>
-            </ol>
-          </details>
-          <details class="workstation-review-note panel-tip-note" data-workstation-note="review">
-            <summary>💡 小提示：会议按投稿时合计分审稿3个月；期刊送审后不衰减，可持续修改，达标接收。点击展开看细则</summary>
-            <div class="workstation-review-note-body">
-              <span>会议总评 ≥+2 接收，≤−2 拒稿，介于两者之间按边缘录用概率判定；接收后再根据投稿总分和会议影响力抽取 Poster、Spotlight、Oral 或 Best Paper 等类型。</span>
-              <span>会议投稿冻结三项合计分快照，3位审稿人据此评分；审稿期间当前分数仍衰减，快照不变。退稿回到草稿，保留衰减后的分数，再将审稿反馈加到自身分，协作分不变。</span>
-              <span>每月衰减：草稿和会议审稿期，各项扣分=向下取整(合计×热度×10%)，至少扣1分、合计最低1分；原本0或1不扣。先算合计扣分，再按自身/协作比例分摊。</span>
-              <span>期刊初始分=向下取整(3×三项合计的几何均值)；修改分=初始分+各项较送审时合计的净新增（逐项最低0），自身与协作新增均计入。</span>
-              <span>期刊送审线/达标线：PAMI 75/125 分、NMI 100/250 分、Nature 150/500 分；送审后不衰减，修改分达标后自动接收。</span>
-            </div>
-          </details>
-        </div>
-      `}
       <div class="workstation-action-toolbar" ${preEnrollment ? "hidden" : ""}>
       <div class="workstation-main-row">
           <div class="workstation-main-actions" id="workstation-main-actions">
             <button class="compact-action-btn workstation-main-action-btn is-read" type="button" ${readActionAttributes}>
               <span class="workstation-action-main">
                 <span class="workstation-action-icon" aria-hidden="true">📚</span>
-                <span class="btn-desc">看论文${readPreview.readCount > 1 ? ` ×${readPreview.readCount}` : ""}</span>
+                <span class="btn-desc">看论文${readPreview.readCount > 1 ? ` ×${renderAnimatedNumber("workstation:read:count", readPreview.readCount)}` : ""}</span>
               </span>
-              <span class="btn-effect">SAN-${readPreview.sanCost}</span>
+              <span class="btn-effect">SAN-${renderAnimatedNumber("workstation:read:san-cost", readPreview.sanCost)}</span>
             </button>
             <button class="compact-action-btn workstation-main-action-btn is-work" type="button" ${workActionAttributes}>
               <span class="workstation-action-main">
                 <span class="workstation-action-icon" aria-hidden="true">💼</span>
                 <span class="btn-desc">打工</span>
               </span>
-              <span class="btn-effect">SAN-${workPreview.sanCost} · 金币+${workPreview.moneyReward}</span>
+              <span class="btn-effect">SAN-${renderAnimatedNumber("workstation:work:san-cost", workPreview.sanCost)} · 金币+${renderAnimatedNumber("workstation:work:money", workPreview.moneyReward)}</span>
             </button>
             <button class="compact-action-btn workstation-main-action-btn is-rest" type="button" ${restActionAttributes}>
               <span class="workstation-action-main">
                 <span class="workstation-action-icon" aria-hidden="true">🛋</span>
                 <span class="btn-desc">休息</span>
               </span>
-              <span class="btn-effect">SAN+${restSanGain}</span>
+              <span class="btn-effect">SAN+${renderAnimatedNumber("workstation:rest:san-gain", restSanGain)}</span>
             </button>
             ${renderWorkstationPaperResearchActions(state, selectedPaper)}
           </div>
           <div class="workstation-action-points" aria-label="行动点 ${remainingActions}/${state.actionState.limit}">
             <span><span class="workstation-action-points-icon" aria-hidden="true">👣</span>行动点</span>
-            <strong>${remainingActions}/${state.actionState.limit}</strong>
+            <strong>${renderAnimatedNumber("workstation:actions:remaining", remainingActions)}/${renderAnimatedNumber("workstation:actions:limit", state.actionState.limit)}</strong>
           </div>
         </div>
       </div>
@@ -1556,7 +1604,7 @@ type RelationshipRenderCard = {
   buttonLabel: string;
   displayType: string;
   displayName: string;
-  detailItems: Array<{ label: string; value: number }>;
+  detailItems: Array<{ label: string; value: number; max?: number }>;
   knownMonths: number;
   taskProgress: number;
   taskMax: number;
@@ -1592,18 +1640,6 @@ function getRenderedFellowTypeLabel(profile: FellowProgressProfile): string {
   return getFellowRoleLabel(profile.type, profile.gender);
 }
 
-function getRenderedFellowTaskLabel(taskType: FellowProgressProfile["taskType"]): string {
-  if (taskType === "writing") return "帮写论文";
-  if (taskType === "experiment") return "帮做实验";
-  return "帮想idea";
-}
-
-function getRenderedFellowTaskRewardText(taskType: FellowProgressProfile["taskType"], research: number): string {
-  if (taskType === "writing") return `亲和度 +1、写作 +${research}`;
-  if (taskType === "experiment") return `亲和度 +1、实验 +${research}`;
-  return `亲和度 +1、idea +${research}`;
-}
-
 function getRenderedLoverType(type: LoverTypeId | null): string {
   if (type === "beautiful") return "活泼恋人";
   if (type === "smart") return "聪慧恋人";
@@ -1619,22 +1655,22 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       type: "advisor",
       buttonLabel: "导师",
       displayType: "导师",
-      displayName: `${state.selectedAdvisorName ?? "导师"} / 讲师`,
+      displayName: `${state.selectedAdvisorName} 🎓 ${getAdvisorRankLabel(state.advisorProgressState)}`,
       detailItems: [
-        { label: "科研资源", value: state.advisorProgressState.researchResource },
-        { label: "亲和度", value: state.advisorProgressState.affinity },
+        { label: "科研积累", value: state.advisorProgressState.researchAccumulation },
+        { label: "科研经费", value: state.advisorProgressState.funding, max: ADVISOR_FUNDING_CAP },
       ],
       knownMonths: Math.max(0, state.totalMonths),
-      taskProgress: state.advisorProgressState.taskProgress,
-      taskMax: state.advisorProgressState.taskMax,
-      relationProgress: state.advisorProgressState.relationProgress,
-      relationMax: state.advisorProgressState.relationMax,
-      relationGrowthPerMonth: Math.max(0, state.player.favor + state.advisorProgressState.affinity),
-      taskRewardText: "亲和度 +1、科研资源 +1、项目奖励",
-      taskLabel: "做项目",
-      taskCostLabel: `SAN-${ADVISOR_TASK_SAN_COST}`,
-      taskUsedThisMonth: state.advisorProgressState.taskUsedThisMonth,
-      canInteract: state.advisorProgressState.canInteract,
+      taskProgress: 0,
+      taskMax: 0,
+      relationProgress: 0,
+      relationMax: 0,
+      relationGrowthPerMonth: 0,
+      taskRewardText: "经费 +1",
+      taskLabel: "做横向",
+      taskCostLabel: `SAN-${Math.max(0, ADVISOR_TASK_SAN_COST + getActiveOperationSanDelta(state.buffs))}`,
+      taskUsedThisMonth: false,
+      canInteract: false,
     };
   }
 
@@ -1651,19 +1687,19 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
         displayName: getFellowName(profile),
         detailItems: [
           { label: "科研", value: profile.research },
-          { label: "亲和度", value: profile.affinity },
+          { label: "默契度", value: profile.affinity },
         ],
         knownMonths: Math.max(0, state.totalMonths - profile.startTotalMonths),
         taskProgress: profile.taskProgress,
-        taskMax: profile.taskMax,
-        relationProgress: profile.relationProgress,
-        relationMax: profile.relationMax,
-        relationGrowthPerMonth: Math.max(0, state.player.social + profile.affinity),
-        taskRewardText: getRenderedFellowTaskRewardText(profile.taskType, profile.research),
-        taskLabel: getRenderedFellowTaskLabel(profile.taskType),
-        taskCostLabel: `SAN-${getFellowTaskSanCost(profile.taskType)}`,
+        taskMax: 100,
+        relationProgress: 0,
+        relationMax: 0,
+        relationGrowthPerMonth: profile.affinity,
+        taskRewardText: "双方各获得1次自动帮助，各最多保留1次",
+        taskLabel: "科研协作",
+        taskCostLabel: `SAN-${getFellowDiscussionSanCost(state, profile)}`,
         taskUsedThisMonth: profile.taskUsedThisMonth,
-        canInteract: profile.canInteract,
+        canInteract: false,
       } satisfies RelationshipRenderCard,
     });
     }),
@@ -1684,8 +1720,8 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       displayType: getRenderedLoverType(state.loverState.type),
       displayName: getLoverName(state.loverState),
       detailItems: [
-        { label: "科研", value: state.loverProgressState.research },
-        { label: "亲密度", value: state.loverProgressState.intimacy },
+        { label: "科研", value: state.loverProgressState.research, max: 20 },
+        { label: "亲密度", value: state.loverProgressState.intimacy, max: 20 },
       ],
       knownMonths: Math.max(0, state.totalMonths - (state.loverState.startTotalMonths ?? state.totalMonths)),
       taskProgress: state.loverProgressState.taskProgress,
@@ -1695,7 +1731,7 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       relationGrowthPerMonth: Math.max(0, state.loverProgressState.intimacy),
       taskRewardText: "亲密度 +1、特殊效果",
       taskLabel: "约会",
-      taskCostLabel: `金币-${LOVER_DATE_MONEY_COST}`,
+      taskCostLabel: "",
       taskUsedThisMonth: state.loverProgressState.taskUsedThisMonth,
       canInteract: state.loverProgressState.canInteract,
     };
@@ -1821,56 +1857,231 @@ function renderRelationshipSection(state: GameState, uiState: PlayRenderUiState 
   `;
 }
 
-function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCard): string {
-  const canEndRelationship = card.type !== "advisor";
-  const endRelationshipLabel = card.type === "lover" ? "分手" : "停止合作";
+function renderFellowPaper(state: GameState, profile: FellowProgressProfile): string {
+  const paper = getFellowCurrentPaper(state, profile.id);
   return `
-    <article class="rel-card filled" data-relationship-type="${card.type}">
-      <div class="rel-card-identity">
-        <div class="rel-card-head rel-card-header">
-          <span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
-          <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
-          <div class="rel-card-meta">
-            <span class="rel-known-time">认识时间${card.knownMonths}月</span>
-            ${card.canInteract ? '<span class="rel-card-alert" aria-label="有可用操作">!</span>' : ""}
-          </div>
+    <div class="rel-paper-section">
+      ${paper ? `
+        <div class="rel-paper-title-block">
+          <strong class="paper-title">${escapeHtml(paper.title)}</strong>
+          ${renderPaperTopicMeta({ ...paper, ...getFellowResearchTopic(profile) }, false, true)}
         </div>
-        <div class="rel-detail-row">
-          ${card.detailItems.map((item) => `
-            <span class="rel-detail-item"><span class="rel-detail-label">${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${item.value}</strong></span>
-          `).join("")}
-        </div>
+        ${paper.status === "reviewing" ? renderFellowReviewStatus(paper) : `<div class="paper-score-strip rel-paper-scores" aria-label="idea ${paper.idea}，实验 ${paper.experiment}，写作 ${paper.writing}，总分 ${getPaperTotalScore(paper)}">
+          <span><small>idea</small><strong ${animationNumberAttributes(`paper:${paper.id}:fellow:idea:total`, paper.idea)}>${paper.idea}</strong></span>
+          <span><small>实验</small><strong ${animationNumberAttributes(`paper:${paper.id}:fellow:experiment:total`, paper.experiment)}>${paper.experiment}</strong></span>
+          <span><small>写作</small><strong ${animationNumberAttributes(`paper:${paper.id}:fellow:writing:total`, paper.writing)}>${paper.writing}</strong></span>
+          <span class="paper-score-total"><small>总分</small><strong ${animationNumberAttributes(`paper:${paper.id}:fellow:total`, getPaperTotalScore(paper))}>${getPaperTotalScore(paper)}</strong></span>
+        </div>`}
+      ` : '<span class="rel-progress-note">暂无在研论文</span>'}
+    </div>
+  `;
+}
+
+function renderFellowReviewStatus(paper: Paper): string {
+  const conference = getPaperReviewConference(paper);
+  return `
+    <div class="rel-paper-review-status is-reviewing">
+      <span class="paper-card-status is-reviewing">${escapeHtml(`${paper.target ?? "待定"}类 · ${conference?.name ?? "会议"}审稿中`)}</span>
+      <span class="paper-review-remaining">剩余 ${renderAnimatedNumber(`paper:${paper.id}:fellow:review-months`, paper.reviewMonthsLeft)} 月</span>
+      <span class="rel-paper-review-total">总分 ${renderAnimatedNumber(`paper:${paper.id}:fellow:total`, getPaperTotalScore(paper))}</span>
+    </div>
+  `;
+}
+
+function renderRelationshipIcon(icon: string): string {
+  return `<span class="rel-inline-icon" aria-hidden="true">${icon}</span>`;
+}
+
+function renderFellowCooperationButton(state: GameState, profile: FellowProgressProfile): string {
+  const relationshipId = escapeHtml(profile.id);
+  const sanCost = getFellowDiscussionSanCost(state, profile);
+  const blocked = isGameplayModuleLocked(state) ? "入学后开放"
+    : state.phase !== "playing" ? "本轮已结束" : "";
+  const paidReason = blocked || (profile.taskUsedThisMonth ? "本月已协作，下月恢复" : state.player.san < sanCost ? `SAN不足，需要${sanCost}` : "");
+  return `
+      <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="relationship-task" data-relationship-id="${relationshipId}"${paidReason ? ` disabled aria-disabled="true" aria-label="科研协作：${escapeHtml(paidReason)}"` : ""}>
+        <span class="rel-action-label">${renderRelationshipIcon("🤝")}科研协作</span>${profile.taskUsedThisMonth ? "" : `<span class="rel-action-cost">SAN-${renderAnimatedNumber(`person:${profile.id}:cooperation:san-cost`, sanCost)}</span>`}
+      </button>
+  `;
+}
+
+function getFellowCooperationSummaryText(state: GameState, profile: FellowProgressProfile): string {
+  const target = profile.type === "senior" ? "最高项" : profile.type === "junior" ? "最低项" : "随机项";
+  return `进度满：你的论文${target}+${Math.floor(profile.research)}分，对方论文最低项+${Math.floor(state.player.research)}分`;
+}
+
+function renderAdvisorFundSummary(state: GameState): string {
+  const advisor = state.advisorProgressState;
+  const calendarYear = getAcademicCalendarYear(state.year, state.month);
+  const quotaGrants = getActiveAdvisorGrants(advisor, calendarYear);
+  const awards = advisor.awards.map((award) => {
+    const grant = ADVISOR_GRANTS.find((definition) => definition.id === award.id);
+    if (!grant) return "";
+    const active = award.startYear !== null && award.endYear !== null
+      && calendarYear >= award.startYear && calendarYear <= award.endYear;
+    const period = award.startYear !== null && award.endYear !== null
+      ? `${award.startYear}–${award.endYear}年，${active ? "在研" : calendarYear < award.startYear ? "待启动" : "已结题"}`
+      : "每月经费+1";
+    return `${grant.name}：${award.awardedYear}年获批；${period}`;
+  }).filter(Boolean);
+  return `<span class="rel-advisor-grants" title="${escapeHtml(awards.length ? awards.join("\n") : "暂无获批基金")}">${renderRelationshipIcon("📋")}在研基金<strong>${renderAnimatedNumber("person:advisor:grants", quotaGrants.length)}/${renderAnimatedNumber("person:advisor:grant-cap", getAdvisorGrantLimit(advisor))}</strong></span>`;
+}
+
+function renderAdvisorStatus(state: GameState): string {
+  const advisor = state.advisorProgressState;
+  const sanCost = Math.max(0, ADVISOR_TASK_SAN_COST + getActiveOperationSanDelta(state.buffs));
+  const monthlyGrowth = getAdvisorMonthlyResearchGrowth(state);
+  const calendarYear = getAcademicCalendarYear(state.year, state.month);
+  const calendarMonth = getAcademicCalendarMonth(state.month);
+  const monthsToApplication = (3 - calendarMonth + 12) % 12 || 12;
+  const academician = advisor.awards.some((award) => award.id === "academician");
+  const score = advisor.researchAccumulation;
+  const nextTier = ADVISOR_GRANTS.find((grant) => grant.threshold > score);
+  const reachedTier = [...ADVISOR_GRANTS].reverse().find((grant) => grant.threshold <= score);
+  const researchMax = (nextTier ?? ADVISOR_GRANTS[ADVISOR_GRANTS.length - 1]!).threshold;
+  const pending = advisor.pendingApplication;
+  const pendingGrant = pending ? ADVISOR_GRANTS.find((grant) => grant.id === pending.id) : null;
+  const applicationYear = calendarYear + Number(calendarMonth >= 3);
+  const limited = !academician && !advisor.awards.some((award) => award.id === "distinguished")
+    && getActiveAdvisorGrants(advisor, applicationYear).length >= getAdvisorGrantLimit(advisor);
+  const applicationText = academician ? "已当选院士"
+    : pendingGrant ? `${pendingGrant.name}申请中 · ${(8 - calendarMonth + 12) % 12 || 12}个月后公布`
+    : `${monthsToApplication}个月后${limited ? "基金申请 · 限项" : "可申请基金"}`;
+  const progressBar = (label: string, value: number, max: number): string => `
+    <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${Math.min(value, max)}" aria-valuetext="${value}/${max}">
+      <div class="rel-progress-fill task ${label === "科研积累" ? "research" : "funding"}" ${animationBarAttribute(`person:advisor:${label === "科研积累" ? "research" : "funding"}`)} style="width:${clampPercent(value / max * 100)}%"></div>
+    </div>`;
+  const blocked = state.phase !== "playing" ? "本轮未在进行"
+    : !state.selectedAdvisorName || state.relationshipState.advisorCount <= 0 ? "请先选择导师"
+    : advisor.lastHorizontalTotalMonths === state.totalMonths ? "本月已做横向，下月恢复"
+    : state.player.san < sanCost ? `SAN不足，需要${sanCost}`
+    : advisor.funding >= ADVISOR_FUNDING_CAP ? "科研经费已满" : "";
+  return `
+    <div class="rel-advisor-status">
+      <div class="rel-advisor-application${pendingGrant ? " is-pending" : academician ? " is-achieved" : ""}">
+        <span class="rel-advisor-countdown">${academician ? applicationText : applicationText.replace(/\d+/, (display) => renderAnimatedNumber(`person:advisor:${pendingGrant ? "result" : "application"}:months`, Number(display)))}</span>
       </div>
-      <div class="rel-progress-section">
-        <div class="rel-progress-item">
-          <div class="rel-progress-header">
-            <span class="rel-progress-label">任务进度</span>
-            <span class="rel-progress-val">${card.taskProgress}/${card.taskMax}</span>
-          </div>
-          <div class="rel-progress-bar">
-            <div class="rel-progress-fill task" style="width:${clampPercent(card.taskProgress / Math.max(1, card.taskMax) * 100)}%"></div>
-          </div>
-          <div class="rel-progress-note">完成：${escapeHtml(card.taskRewardText)}</div>
-        </div>
-        <div class="rel-progress-item">
-          <div class="rel-progress-header">
-            <span class="rel-progress-label">关系积累</span>
-            <span class="rel-progress-val">${card.relationProgress}/${card.relationMax}</span>
-          </div>
-          <div class="rel-progress-bar">
-            <div class="rel-progress-fill relation" style="width:${clampPercent(card.relationProgress / Math.max(1, card.relationMax) * 100)}%"></div>
-          </div>
-          <div class="rel-progress-note">每月+${card.relationGrowthPerMonth} · 满后解锁交流</div>
-        </div>
+      <div class="paper-score-strip rel-advisor-growth-sources" aria-label="本月科研积累增长">
+          <span><small>经费收益</small><strong>+${renderAnimatedNumber("person:advisor:growth:funding", monthlyGrowth.funding ?? 0)}</strong></span>
+          <span><small>论文累计</small><strong>+${renderAnimatedNumber("person:advisor:growth:papers", monthlyGrowth.papers)}</strong></span>
+          <span><small>本月积累</small><strong>+${renderAnimatedNumber("person:advisor:growth:total", (monthlyGrowth.funding ?? 0) + monthlyGrowth.papers)}</strong></span>
       </div>
-      <div class="rel-actions">
-        <button class="btn-sm rel-action-btn" type="button" ${getDeferredGameplayActionAttributes(state)}>
-          <span class="rel-action-label">${escapeHtml(card.taskUsedThisMonth ? "✓ 本月已用" : card.taskLabel)}</span>
-          ${card.taskUsedThisMonth ? "" : `<span class="rel-action-cost">${escapeHtml(card.taskCostLabel)}</span>`}
+      <div class="rel-advisor-research">
+        <span class="rel-detail-label">${renderRelationshipIcon("💡")}科研积累</span>
+        ${progressBar("科研积累", score, researchMax)}
+        <span class="rel-progress-val rel-advisor-thresholds">${nextTier ? `<span>${renderAnimatedNumber("person:advisor:research:next", score)}/${renderAnimatedNumber("person:advisor:research:next-threshold", nextTier.threshold)}${nextTier.name}</span>` : ""}${reachedTier ? `<span class="is-reached">【${renderAnimatedNumber("person:advisor:research:reached", score)}/${renderAnimatedNumber("person:advisor:research:reached-threshold", reachedTier.threshold)}${reachedTier.name}】</span>` : ""}</span>
+      </div>
+    </div>
+    <div class="rel-advisor-action rel-resource-row">
+      <span class="rel-detail-label">${renderRelationshipIcon("💰")}科研经费</span>
+      ${progressBar("科研经费", advisor.funding, ADVISOR_FUNDING_CAP)}
+      <strong class="rel-progress-val">${renderAnimatedNumber("person:advisor:funding", advisor.funding)}/${ADVISOR_FUNDING_CAP}</strong>
+      <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="advisor-horizontal" title="不消耗行动点，每月限一次"${blocked ? ` disabled aria-disabled="true" aria-label="做横向：${escapeHtml(blocked)}"` : ""}>
+        <span class="rel-action-label">${renderRelationshipIcon("🛠️")}做横向</span>${advisor.lastHorizontalTotalMonths === state.totalMonths ? "" : `<span class="rel-action-cost">SAN-${renderAnimatedNumber("person:advisor:horizontal:san-cost", sanCost)}</span>`}
+      </button>
+    </div>
+  `;
+}
+
+function renderLoverRoutes(state: GameState): string {
+  const identity = `person:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`;
+  const icons = { play: "🎡", study: "📖", shopping: "🛍️" };
+  const labels = { play: "玩耍", study: "学习", shopping: "购物" };
+  const passive = getLoverPassiveGains(state);
+  const used = state.loverProgressState.taskUsedThisMonth
+    || state.loverProgressState.lastDateTotalMonths === state.totalMonths;
+  return `<div class="rel-lover-routes" aria-label="约会每月三选一">
+    ${LOVER_ROUTES.map((route) => {
+      const label = labels[route];
+      const progress = clampPercent(getLoverRouteProgress(state, route));
+      const cost = getLoverRouteCost(state, route);
+      const costLabel = [cost.money > 0 ? `金币-${renderAnimatedNumber(`${identity}:${route}:money-cost`, cost.money)}` : "", cost.san > 0 ? `SAN-${renderAnimatedNumber(`${identity}:${route}:san-cost`, cost.san)}` : ""].filter(Boolean).join(" / ");
+      const blocked = isPreEnrollmentState(state) ? "入学后开放"
+        : state.phase !== "playing" ? "本轮已结束"
+          : used ? "下月可再次约会" : getLoverDateFailure(state, route);
+      const gain = getLoverRouteGain(state, route);
+      const monthlyGain = route === "shopping" ? 0 : passive[route];
+      const passiveHint = route === "shopping" ? "每月自动+0（无自动进度）" : `恋爱次月起每月自动+${monthlyGain}`;
+      const hint = `约会进度+${gain}；${passiveHint}`;
+      return `<div class="rel-lover-route" data-lover-route="${route}">
+        <span class="rel-detail-label">${renderRelationshipIcon(icons[route])}${label}</span>
+        <div class="rel-progress-bar" role="progressbar" aria-label="${escapeHtml(`${label}：${hint}`)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}" title="${escapeHtml(hint)}" data-tooltip="${escapeHtml(hint)}" tabindex="0">
+          <div class="rel-progress-fill task lover-${route}" ${animationBarAttribute(`${identity}:${route}:progress`)} style="width:${progress}%"></div>
+        </div>
+        <span class="rel-progress-val">${renderAnimatedNumber(`${identity}:${route}:progress`, progress)}/100</span>
+        <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="lover-${route}"${blocked ? ` disabled aria-disabled="true" aria-label="${label}：${escapeHtml(blocked)}"` : ""}>
+          <span class="rel-action-label">${renderRelationshipIcon(icons[route])}${label}</span>${used || !costLabel ? "" : `<span class="rel-action-cost">${costLabel}</span>`}
         </button>
-        <button class="btn-sm rel-action-btn is-chat" type="button" ${getDeferredGameplayActionAttributes(state)}>交流</button>
-        ${canEndRelationship ? `<button class="btn-sm rel-action-btn rel-end-btn" type="button" data-action="end-relationship" data-relationship-id="${escapeHtml(card.relationshipId)}">${endRelationshipLabel}</button>` : ""}
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+function renderRelationshipFootnote(state: GameState, card: RelationshipRenderCard, fellow: FellowProgressProfile | undefined): string {
+  if (fellow) {
+    return `<p class="rel-card-footnote">${escapeHtml(getFellowCooperationSummaryText(state, fellow))}</p>`;
+  }
+  if (card.type === "advisor") {
+    const advisor = state.advisorProgressState;
+    const incomingGrant = getAcademicCalendarMonth(state.month) === 7 && advisor.pendingApplication
+      ? ADVISOR_GRANTS.find((grant) => grant.id === advisor.pendingApplication?.id) : undefined;
+    const academician = advisor.awards.some((award) => award.id === "academician") || incomingGrant?.id === "academician";
+    const text = academician ? "下月经费+1、投入-1，科研积累+5%（下取整）"
+      : advisor.funding > 0 ? "下月科研经费-1，科研积累+5%（下取整）"
+        : incomingGrant && incomingGrant.funding > 0 ? "下月基金到账后，经费-1、科研积累+5%（下取整）"
+          : "下月经费不足，暂停科研积累的自然增长";
+    return `<p class="rel-card-footnote">${text}</p>`;
+  }
+  const labels = { play: "玩耍", study: "学习", shopping: "购物" };
+  const notes = LOVER_ROUTES.map((route) => `${labels[route]}条满：${getLoverNextReward(state, route)
+    .replace("永久idea、实验、写作各+1分", "论文三项分数永久+1")
+    .replace("双方科研较低者+1，相同不提升", "科研能力较低者+1")}`);
+  return `<div class="rel-card-footnote rel-lover-reward-ticker" data-lover-reward-identity="${escapeHtml(`${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`)}" role="group" aria-label="恋人条满奖励">
+    <button class="rel-reward-nav" type="button" data-ui-lover-reward-step="-1" aria-label="上一条奖励" aria-controls="lover-reward-messages">‹</button>
+    <div class="rel-lover-reward-window" id="lover-reward-messages" aria-label="${escapeHtml(notes.join("；"))}">
+      <div class="rel-lover-reward-track" aria-hidden="true">${[...notes, notes[0]!].map((note) => `<span>${escapeHtml(note)}</span>`).join("")}</div>
+    </div>
+    <button class="rel-reward-nav" type="button" data-ui-lover-reward-step="1" aria-label="下一条奖励" aria-controls="lover-reward-messages">›</button>
+  </div>`;
+}
+
+function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCard): string {
+  const identity = card.type === "lover" ? `person:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}` : `person:${card.relationshipId}`;
+  const fellow = state.fellowProgressState.find((profile) => profile.id === card.relationshipId);
+  const advisor = card.type === "advisor";
+  const attributes: RelationshipRenderCard["detailItems"] = fellow
+    ? [{ label: "科研", value: fellow.research, max: 20 }, { label: "默契", value: fellow.affinity, max: 20 }]
+    : card.detailItems.map((item) => ({ ...item, label: item.label === "亲密度" ? "亲密" : item.label }));
+  const renderAttributes = (): string => attributes.map((item) => `
+    <span class="rel-detail-item"><span class="rel-detail-label">${renderRelationshipIcon(item.label === "科研" ? "💡" : card.type === "lover" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedNumber(`${identity}:${item.label === "科研" ? "research" : card.type === "lover" ? "intimacy" : "affinity"}`, item.value)}${item.max === undefined ? "" : `/${item.max}`}</strong></span>
+  `).join("");
+  return `
+    <article class="rel-card filled rel-card-compact${fellow ? " rel-card-fellow" : card.type === "lover" ? " rel-card-lover" : ""}" data-relationship-type="${card.type}" data-relationship-id="${escapeHtml(card.relationshipId)}">
+      <div class="rel-card-identity">
+        <div class="rel-card-head rel-card-header paper-card-header">
+          <div class="rel-header-main">
+            <span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
+            <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
+            ${advisor ? "" : renderAttributes()}
+          </div>
+          ${advisor ? renderAdvisorFundSummary(state) : `<div class="rel-card-meta">
+            <span class="rel-known-time">${renderRelationshipIcon("🗓️")}认识<strong class="rel-detail-value" ${animationNumberAttributes(`${identity}:known-months`, card.knownMonths)}>${card.knownMonths}</strong>月</span>
+            <button class="rel-end-compact" data-card-icon-action type="button" title="${fellow ? "停止合作" : "分手"}" aria-label="${fellow ? "停止合作" : "分手"}" data-action="end-relationship" data-relationship-id="${escapeHtml(card.relationshipId)}"><span aria-hidden="true">${fellow ? "✂️" : "💔"}</span></button>
+          </div>`}
+        </div>
       </div>
+      ${fellow ? renderFellowPaper(state, fellow) : ""}
+      ${advisor ? renderAdvisorStatus(state) : card.type === "lover" ? renderLoverRoutes(state) : `<div class="rel-progress-section rel-resource-row">
+        <div class="rel-progress-item">
+          <div class="rel-progress-header">
+            <span class="rel-detail-label">${renderRelationshipIcon("🤝")}协作进度</span><span class="rel-progress-val">${renderAnimatedNumber(`${identity}:cooperation:progress`, card.taskProgress)}/${card.taskMax}</span>${fellow ? renderFellowCooperationButton(state, fellow) : ""}
+          </div>
+          <div class="rel-progress-bar" role="progressbar" aria-label="协作进度" aria-valuemin="0" aria-valuemax="${card.taskMax}" aria-valuenow="${card.taskProgress}">
+            <div class="rel-progress-fill task cooperation" ${animationBarAttribute(`${identity}:cooperation:progress`)} style="width:${clampPercent(card.taskProgress / Math.max(1, card.taskMax) * 100)}%"></div>
+          </div>
+        </div>
+      </div>`}
+      ${renderRelationshipFootnote(state, card, fellow)}
     </article>
   `;
 }
@@ -1902,7 +2113,7 @@ function renderRelationshipGridSlot(
     `;
   }
   if (!card) {
-    return `<article class="rel-card empty"><div class="section-empty">${getRelationshipEmptyText(slotIndex)}</div></article>`;
+    return `<article class="rel-card empty"${slotIndex === 0 ? ' data-relationship-type="advisor"' : ""}><div class="section-empty">${getRelationshipEmptyText(slotIndex)}</div></article>`;
   }
   return renderRelationshipGridCard(state, card);
 }
@@ -1916,7 +2127,7 @@ function renderRelationshipGridSection(state: GameState): string {
       <div class="rel-card-grid" id="rel-card-grid">
         ${preEnrollment
           ? '<div class="section-empty play-module-lock-state">\u5165\u5b66\u540e\u5f00\u653e</div>'
-          : cards.map((card, slotIndex) => renderRelationshipGridSlot(state, card, slotIndex, rel.unlockedSlots)).join("")}
+          : [0, 5, 1, 2, 3, 4].map((slotIndex) => renderRelationshipGridSlot(state, cards[slotIndex] ?? null, slotIndex, rel.unlockedSlots)).join("")}
       </div>
     </div>
   `;
@@ -1939,16 +2150,18 @@ const NAME_PINYIN: Readonly<Record<string, string>> = {
   刚: "Gang", 强: "Qiang", 龙: "Long",
 };
 
-function getNamePinyin(name: string): string {
-  if (name === "你") return "Ni";
+function getNamePinyin(name: string, abbreviated = true): string {
   if (name === "导师") return "Advisor";
   if (name === "合作者") return "Collaborator";
-  const chars = [...name].map((char) => NAME_PINYIN[char] ?? char);
+  if (!/^[\p{Script=Han}]+$/u.test(name)) {
+    const parts = name.trim().split(/\s+/);
+    return abbreviated && parts.length > 1 ? `${parts[0]!.charAt(0).toUpperCase()} ${parts.slice(1).join(" ")}` : name;
+  }
+  if ([...name].some((char) => !NAME_PINYIN[char])) return name;
+  const chars = [...name].map((char) => NAME_PINYIN[char]!);
   if (chars.length <= 1) return chars.join("");
-  const initials = chars.slice(1)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-  return `${chars[0]} ${initials}`;
+  const givenName = chars.slice(1).join("").toLowerCase();
+  return `${abbreviated ? givenName.charAt(0).toUpperCase() : givenName.charAt(0).toUpperCase() + givenName.slice(1)} ${chars[0]}`;
 }
 
 function getStableNameSeed(value: string): number {
@@ -2036,8 +2249,10 @@ function getPaperAuthors(state: GameState, paper: Paper): ResearchAuthor[] {
     || generatePaperAuthorName(`${enrollmentIdentitySeed}:advisor`, reservedNames);
   reservedNames.add(advisorName);
   if (paper.collaborators !== undefined) {
-    const collaboratorNames = [...new Set(paper.collaborators.map((collaborator) => collaborator.name.trim()))]
-      .filter((name) => name && !reservedNames.has(name));
+    const collaboratorNames = [...new Set(paper.collaborators
+      .filter((collaborator) => collaborator.id !== "player")
+      .map((collaborator) => collaborator.name.trim()))]
+      .filter((name) => name && name !== "你" && !reservedNames.has(name));
     const leadName = paper.nonFirstAuthor === true
       ? paper.leadAuthorName?.trim() || collaboratorNames[0] || generatePaperAuthorName(`${paper.id}:lead`, reservedNames)
       : undefined;
@@ -2100,6 +2315,8 @@ const JOURNAL_FULL_NAMES: Readonly<Record<JournalTarget, string>> = {
 };
 
 function getPaperVenue(state: GameState, paper: Paper): { marker: string; short: string; full: string; year: number; influence: number; journal: boolean } {
+  const acceptedCalendar = paper.acceptedTotalMonths === undefined ? state : getCalendarForTotalMonths(paper.acceptedTotalMonths);
+  const fallbackYear = getAcademicCalendarYear(acceptedCalendar.year, acceptedCalendar.month);
   if (paper.journalTarget) {
     const journal = getJournalDefinition(paper.journalTarget);
     return {
@@ -2108,7 +2325,7 @@ function getPaperVenue(state: GameState, paper: Paper): { marker: string; short:
       full: JOURNAL_FULL_NAMES[paper.journalTarget],
       year: typeof paper.submittedYear === "number" && typeof paper.submittedMonth === "number"
         ? getAcademicCalendarYear(paper.submittedYear, paper.submittedMonth)
-        : getAcademicCalendarYear(state.year, state.month),
+        : fallbackYear,
       influence: paper.publication?.influence ?? journal.citationInfluence,
       journal: true,
     };
@@ -2122,7 +2339,7 @@ function getPaperVenue(state: GameState, paper: Paper): { marker: string; short:
     marker: target,
     short: conference?.name ?? "会议",
     full: conference?.fullName ?? "学术会议",
-    year: conference?.year ?? getAcademicCalendarYear(state.year, state.month),
+    year: conference?.year ?? fallbackYear,
     influence: paper.publication?.influence ?? conference?.influence ?? 0,
     journal: false,
   };
@@ -2161,7 +2378,7 @@ function renderResearchPromotionActions(state: GameState, paper: Paper): string 
     <div class="research-promotion-block">
       <div class="research-promotion-actions">
         ${visiblePromotionIds.map((promotionId) => {
-          const cost = getPaperPromotionCost(promotionId);
+          const cost = getPaperPromotionCost(promotionId, state.buffs);
           const used = promotions[promotionId] === true;
           const affordable = state.player.san >= cost;
           return `
@@ -2175,7 +2392,7 @@ function renderResearchPromotionActions(state: GameState, paper: Paper): string 
             >
               <span class="research-promotion-topline">
                 <span>${escapeHtml(promotionLabels[promotionId])}${used ? " ✓" : ""}</span>
-                ${used ? "" : `<small>SAN -${cost}</small>`}
+                ${used ? "" : `<small>SAN -${renderAnimatedNumber(`paper:${paper.id}:promotion:${promotionId}:san-cost`, cost)}</small>`}
               </span>
               ${used ? "" : `<small class="research-promotion-effect">${promotionEffects[promotionId]}</small>`}
             </button>
@@ -2226,8 +2443,8 @@ function renderCitationProfile(state: GameState, publishedPapers: Paper[]): stri
             <span class="citation-grid-line is-bottom"></span>
           </div>
           <div class="citation-axis-labels" aria-hidden="true">
-            <span>${formatCitationAxisValue(axisMax)}</span>
-            <span>${formatCitationAxisValue(axisMid)}</span>
+            <span ${animationNumberAttributes("citations:axis:max", axisMax)}>${formatCitationAxisValue(axisMax)}</span>
+            <span ${animationNumberAttributes("citations:axis:mid", axisMid)}>${formatCitationAxisValue(axisMid)}</span>
             <span>0</span>
           </div>
           <div class="citation-bar-columns">
@@ -2238,6 +2455,7 @@ function renderCitationProfile(state: GameState, publishedPapers: Paper[]): stri
                   <div class="citation-bar-slot">
                     <span
                       class="citation-bar${item.citations === 0 ? " is-zero" : ""}"
+                      ${animationBarAttribute(`citations:year:${item.year}`)}
                       style="height:${percent.toFixed(2)}%"
                       title="${item.year} 年：${item.citations} 次引用"
                     ></span>
@@ -2251,9 +2469,9 @@ function renderCitationProfile(state: GameState, publishedPapers: Paper[]): stri
         </div>
       </div>
       <div class="citation-count-strip" aria-label="引用数量统计">
-        <span><strong>${stats.totalCitations}</strong><small>引用</small></span>
-        <span><strong>${stats.hIndex}</strong><small>h 指数</small></span>
-        <span><strong>${stats.i10Index}</strong><small>i10 指数</small></span>
+        <span><strong ${animationNumberAttributes("citations:total", stats.totalCitations)}>${stats.totalCitations}</strong><small>引用</small></span>
+        <span><strong ${animationNumberAttributes("citations:h-index", stats.hIndex)}>${stats.hIndex}</strong><small>h 指数</small></span>
+        <span><strong ${animationNumberAttributes("citations:i10-index", stats.i10Index)}>${stats.i10Index}</strong><small>i10 指数</small></span>
       </div>
     </section>
   `;
@@ -2271,25 +2489,11 @@ function renderResearchGlobalSummary(state: GameState, publishedPapers: Paper[])
   ] as const;
 
   return `
-    <div class="citation-venue-grid research-global-summary" aria-label="科研分与发表 venue 统计">
-      ${items.slice(0, 4).map(([label, count, score]) => `
-        <span class="citation-venue-cell">
-          <strong>${count}</strong>
-          <small>${label}${score === null ? "" : `（${score}分）`}</small>
-        </span>
-      `).join("")}
-      <details class="research-mechanism-note research-citation-mechanism-note" data-research-note="citation">
-        <summary>💡 小提示：引用按月结算；会议开会或挂 arXiv 后开始被引，期刊接收后直接开始；引用受热度、影响力和录用类型倍率影响。点击展开看细则</summary>
-        <div class="research-mechanism-note-body">
-          <span>会议论文接收后，开会才开始被引；开会前挂 arXiv 也可以提前开启被引。期刊接收后直接开始按月结算。</span>
-          <span>每月引用增长 = 当前分 × 0.05 × 总引用倍率；小数部分保留到下月，累计到整数后才增加引用。当前分每 4 个月衰减 10%。</span>
-          <span>总引用倍率 = 热度 × 影响力 × 录用/推广倍率 × 其他引用倍率。Poster/Spotlight ×1、Oral ×1.5、Best Paper ×5；期刊 ×1；小红书使引用倍率 +25%。arXiv 只负责提前开启被引，GitHub 只提升当前分。</span>
-        </div>
-      </details>
-      ${items.slice(4).map(([label, count, score]) => `
-        <span class="citation-venue-cell">
-          <strong>${count}</strong>
-          <small>${label}${score === null ? "" : `（${score}分）`}</small>
+    <div class="citation-venue-grid research-global-summary" aria-label="科研分与论文发表统计">
+      ${items.map(([label, count, score]) => `
+        <span class="citation-venue-cell" data-summary-kind="${score === null ? "score" : ["A", "B", "C"].includes(label) ? "conference" : "journal"}"${count === 0 ? ' data-empty="true"' : ""}>
+          <strong ${animationNumberAttributes(`achievements:publication:${label}`, count)}>${count}</strong>
+          <small>${label}${score === null ? "" : `<span>（${score}分）</span>`}</small>
         </span>
       `).join("")}
     </div>
@@ -2324,7 +2528,7 @@ function renderResearchPaperRow(
         <span class="research-paper-venue" title="${escapeHtml(`${venue.full} (${venue.short})`)}">${escapeHtml(venue.full)} <span>(${escapeHtml(venue.short)})</span></span>
       </span>
       <span class="research-paper-row-meta">
-        <span class="research-paper-row-stat" aria-label="引用 ${citations}"><strong>${citations}</strong><small>引用</small></span>
+        <span class="research-paper-row-stat" aria-label="引用 ${citations}"><strong ${animationNumberAttributes(`paper:${paper.id}:research-list:citations`, citations)}>${citations}</strong><small>引用</small></span>
         <span class="research-paper-row-stat" aria-label="年份 ${venue.year}"><strong>${venue.year}</strong><small>年份</small></span>
       </span>
     </button>
@@ -2334,8 +2538,8 @@ function renderResearchPaperRow(
 function renderResearchPaperAuthors(state: GameState, paper: Paper): string {
   return getPaperAuthors(state, paper)
     .map((author) => author.isPlayer
-      ? `<strong class="research-paper-author is-player">${escapeHtml(getNamePinyin(author.name))}</strong>`
-      : `<span class="research-paper-author">${escapeHtml(getNamePinyin(author.name))}</span>`)
+      ? `<strong class="research-paper-author is-player">${escapeHtml(getNamePinyin(author.name, false))}</strong>`
+      : `<span class="research-paper-author">${escapeHtml(getNamePinyin(author.name, false))}</span>`)
     .join('<span class="research-paper-author-separator">, </span>');
 }
 
@@ -2379,27 +2583,27 @@ function renderSelectedResearchPaper(state: GameState, paper: Paper | null): str
         </div>
         <div class="research-paper-lifecycle">
           <span>${venue.year} 年</span>
-          <span>${citations} 引用</span>
+          <span>${renderAnimatedNumber(`paper:${paper.id}:research-lifecycle:citations`, citations)} 引用</span>
           <span>热度 ×${paper.heatMultiplier.toFixed(2)}</span>
         </div>
         <div class="research-metric-grid research-metric-grid-legacy">
           <div class="research-metric-item"><span>录用分</span><strong>${acceptedScore}</strong></div>
-          <div class="research-metric-item"><span>当前分</span><strong>${currentScore}</strong></div>
-          <div class="research-metric-item"><span>引用倍率</span><strong>×${citationMultiplier.toFixed(2)}</strong></div>
+          <div class="research-metric-item"><span>当前分</span><strong ${animationNumberAttributes(`paper:${paper.id}:research-legacy:score`, currentScore)}>${currentScore}</strong></div>
+          <div class="research-metric-item"><span>引用倍率</span><strong>×${renderAnimatedNumber(`paper:${paper.id}:research-legacy:citation-multiplier`, citationMultiplier, citationMultiplier.toFixed(2))}</strong></div>
         </div>
         <div class="research-metric-grid research-metric-grid-expanded">
-          <div class="research-metric-item"><span>\u5f15\u7528</span><strong>${citations}</strong></div>
+          <div class="research-metric-item"><span>\u5f15\u7528</span><strong ${animationNumberAttributes(`paper:${paper.id}:research-detail:citations`, citations)}>${citations}</strong></div>
           <div class="research-metric-item"><span>\u5f55\u7528\u5206</span><strong>${acceptedScore}</strong></div>
-          <div class="research-metric-item"><span>\u5f53\u524d\u5206</span><strong>${currentScore}</strong></div>
-          <div class="research-metric-item"><span>\u5386\u65f6</span><strong>${durationMonths}\u4e2a\u6708</strong></div>
+          <div class="research-metric-item"><span>\u5f53\u524d\u5206</span><strong ${animationNumberAttributes(`paper:${paper.id}:research-detail:score`, currentScore)}>${currentScore}</strong></div>
+          <div class="research-metric-item"><span>\u5386\u65f6</span><strong>${renderAnimatedNumber(`paper:${paper.id}:research-detail:months`, durationMonths)}\u4e2a\u6708</strong></div>
           <div class="research-metric-item research-metric-item-publication-type">
             <span class="research-publication-label">${publicationLabel === "Best Paper Candidate"
               ? '<span>Best Paper</span><span>Candidate</span>'
-              : escapeHtml(publicationLabel)}</span><strong>\u00d7${venue.journal ? publicationMultiplier.toFixed(1) : publicationMultiplier}</strong>
+              : escapeHtml(publicationLabel)}</span><strong>\u00d7${renderAnimatedNumber(`paper:${paper.id}:research-detail:publication-multiplier`, publicationMultiplier, venue.journal ? publicationMultiplier.toFixed(1) : String(publicationMultiplier))}</strong>
           </div>
-          <div class="research-metric-item"><span>\u70ed\u5ea6</span><strong>\u00d7${paper.heatMultiplier.toFixed(2)}</strong></div>
+          <div class="research-metric-item"><span>\u70ed\u5ea6${renderPaperHistoryBadges(paper, paper.nonFirstAuthor === true, "research-detail")}</span><strong>\u00d7${renderAnimatedNumber(`paper:${paper.id}:research-detail:heat`, paper.heatMultiplier, paper.heatMultiplier.toFixed(2))}</strong></div>
           <div class="research-metric-item"><span>\u5f71\u54cd\u529b</span><strong>\u00d7${venue.influence.toFixed(2)}</strong></div>
-          <div class="research-metric-item"><span>\u603b\u5f15\u7528\u500d\u7387</span><strong>${displayedCitationMultiplier === 0 ? "0" : `\u00d7${displayedCitationMultiplier.toFixed(2)}`}</strong></div>
+          <div class="research-metric-item"><span>\u603b\u5f15\u7528\u500d\u7387</span><strong>${displayedCitationMultiplier === 0 ? renderAnimatedNumber(`paper:${paper.id}:research-detail:citation-multiplier`, 0) : `\u00d7${renderAnimatedNumber(`paper:${paper.id}:research-detail:citation-multiplier`, displayedCitationMultiplier, displayedCitationMultiplier.toFixed(2))}`}</strong></div>
         </div>
         ${renderResearchPromotionActions(state, paper)}
       </div>
@@ -2424,6 +2628,7 @@ function renderResearchSection(state: GameState, uiState: PlayRenderUiState = {}
   const filteredPapers = publishedPapers.filter((paper) => authorshipFilter === "all"
     || (authorshipFilter === "first" ? paper.nonFirstAuthor !== true : paper.nonFirstAuthor === true));
   const sortMode: ResearchSortMode = uiState.researchSortMode === "citations" ? "citations" : "year";
+  const publicationIndices = new Map(publishedPapers.map((paper, index) => [paper.id, index]));
   const sortedPapers = [...filteredPapers].sort((left, right) => {
     const leftVenue = getPaperVenue(state, left);
     const rightVenue = getPaperVenue(state, right);
@@ -2432,7 +2637,9 @@ function renderResearchSection(state: GameState, uiState: PlayRenderUiState = {}
         || rightVenue.year - leftVenue.year;
     }
     return rightVenue.year - leftVenue.year
-      || (right.publication?.citations ?? 0) - (left.publication?.citations ?? 0);
+      || (right.acceptedTotalMonths ?? 0) - (left.acceptedTotalMonths ?? 0)
+      || (right.acceptedOrder ?? 0) - (left.acceptedOrder ?? 0)
+      || publicationIndices.get(right.id)! - publicationIndices.get(left.id)!;
   });
   const currentPaperIndex = sortedPapers.length === 0
     ? 0
@@ -2494,14 +2701,16 @@ function renderTalentTabButton(tabId: TalentPanelTabId, icon: string, label: str
   `;
 }
 
-function renderTalentPanelItem(item: TalentPanelItem): string {
+function renderTalentPanelItem(item: TalentPanelItem, showStatus = true): string {
   const progress = item.progress;
+  const progressLabel = progress ? progress.valueLabel.replace(/\d+(?:\.\d+)?/, (display) => renderAnimatedNumber(`talent:${item.id}:progress:value`, progress.displayValue ?? progress.value, display))
+    .replace(/(?<=\/)\+?\d+(?:\.\d+)?/, (display) => progress.animateMax ? `${display.startsWith("+") ? "+" : ""}${renderAnimatedNumber(`talent:${item.id}:progress:cap`, progress.max)}` : display) : "";
   const progressPercent = progress
     ? clampPercent(progress.value / Math.max(1, progress.max) * 100)
     : 0;
   return `
     <article
-      class="talent-item talent-item-row${item.active ? " is-active" : " is-inactive"}"
+      class="talent-item talent-item-row${item.active ? " is-active" : " is-inactive"}${item.ruleCard ? " talent-rule-card" : ""}"
       data-talent-item-id="${escapeHtml(item.id)}"
     >
       <div class="talent-item-head">
@@ -2509,23 +2718,30 @@ function renderTalentPanelItem(item: TalentPanelItem): string {
         <div class="talent-item-heading">
           <strong class="talent-item-title">${escapeHtml(item.name)}</strong>
         </div>
-        <span class="talent-item-tag${item.active ? " is-active" : " is-inactive"}">${escapeHtml(item.tagLabel ?? (item.active ? "已激活" : "未激活"))}</span>
+        ${showStatus && !item.hideStatus ? `<span class="talent-item-tag${item.advisorSalaryPager || item.loverRewardPager ? " talent-item-status" : ""}${item.active ? " is-active" : " is-inactive"}">${escapeHtml(item.tagLabel ?? (item.active ? "已激活" : "未激活"))}</span>` : ""}
+        ${item.advisorSalaryPager ? `<div class="research-pagination" role="group" aria-label="查看导师职称">
+          <button type="button" data-ui-advisor-salary-start="${item.advisorSalaryPager.startIndex - 1}"${item.advisorSalaryPager.startIndex === 0 ? " disabled" : ""} title="查看较低职称" aria-label="查看较低职称"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+          <button type="button" data-ui-advisor-salary-start="${item.advisorSalaryPager.startIndex + 1}"${item.advisorSalaryPager.startIndex === item.advisorSalaryPager.lastStartIndex ? " disabled" : ""} title="查看较高职称" aria-label="查看较高职称"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+        </div>` : item.loverRewardPager ? `<div class="research-pagination" role="group" aria-label="查看恋人奖励">
+          <button type="button" data-ui-lover-reward-page="${item.loverRewardPager.page - 1}"${item.loverRewardPager.page === 0 ? " disabled" : ""} title="上一条奖励" aria-label="上一条奖励"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+          <button type="button" data-ui-lover-reward-page="${item.loverRewardPager.page + 1}"${item.loverRewardPager.page === 2 ? " disabled" : ""} title="下一条奖励" aria-label="下一条奖励"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+        </div>` : ""}
       </div>
       ${item.metrics ? `
         <div class="talent-item-metrics">
           ${item.metrics.map((metric) => `
             <div class="talent-item-metric">
               <span>${escapeHtml(metric.label)}</span>
-              <strong>${escapeHtml(metric.value)}</strong>
+              <strong>${metric.animation ? renderAnimatedTemplate(`talent:${item.id}:metric:${metric.label}`, metric.animation.template, metric.animation.values, metric.animation.displays) : escapeHtml(metric.value)}</strong>
             </div>
           `).join("")}
         </div>
       ` : ""}
       ${item.rewardTable ? `
         <table class="talent-item-rewards" aria-label="${escapeHtml(item.rewardTable.label)}">
-          <thead><tr>${item.rewardTable.columns.map((column) => `<th scope="col">${escapeHtml(column)}</th>`).join("")}</tr></thead>
-          <tbody>${item.rewardTable.rows.map((row) => `
-            <tr>${row.map((value, index) => index === 0
+          ${item.id === "lover" ? "" : `<thead><tr>${item.rewardTable.columns.map((column) => `<th scope="col">${escapeHtml(column)}</th>`).join("")}</tr></thead>`}
+          <tbody>${item.rewardTable.rows.map((row, rowIndex) => `
+            <tr${item.rewardTable?.currentRow === rowIndex ? ' class="is-current" aria-current="true"' : ""}>${row.map((value, index) => index === 0
               ? `<th scope="row">${escapeHtml(value)}</th>`
               : `<td>${escapeHtml(value)}</td>`).join("")}</tr>
           `).join("")}</tbody>
@@ -2535,13 +2751,13 @@ function renderTalentPanelItem(item: TalentPanelItem): string {
         <div class="talent-item-progress">
           <div class="talent-item-progress-head">
             <div class="talent-item-progress-track" role="progressbar" aria-label="${escapeHtml(`${progress.label} ${progress.valueLabel}`)}" aria-valuemin="0" aria-valuemax="${progress.max}" aria-valuenow="${progress.value}" aria-valuetext="${escapeHtml(progress.valueLabel)}">
-              <span style="width:${progressPercent.toFixed(1)}%"></span>
+              <span ${animationBarAttribute(`talent:${item.id}:progress`)} style="width:${progressPercent.toFixed(1)}%"></span>
             </div>
-            <strong>${escapeHtml(progress.valueLabel)}</strong>
+            <strong>${progressLabel}</strong>
           </div>
         </div>
       ` : ""}
-      <p class="talent-item-desc">${escapeHtml(item.description)}</p>
+      ${item.description ? `<p class="talent-item-desc">${item.descriptionAnimation ? renderAnimatedTemplate(`talent:${item.id}:description`, item.descriptionAnimation.template, item.descriptionAnimation.values) : escapeHtml(item.description)}</p>` : ""}
       ${item.rewardRules ? `
         <details class="talent-item-reward-rules">
           <summary>奖励规则</summary>
@@ -2552,20 +2768,6 @@ function renderTalentPanelItem(item: TalentPanelItem): string {
       ${!item.active && item.requirement ? `<p class="talent-item-note is-requirement">${escapeHtml(item.requirement)}</p>` : ""}
     </article>
   `;
-}
-
-function getTalentFellowTypeLabel(profile: FellowProgressProfile): string {
-  return getFellowRoleLabel(profile.type, profile.gender);
-}
-
-function getTalentFellowTaskLabel(type: FellowProgressProfile["taskType"]): string {
-  if (type === "writing") return "写作";
-  if (type === "experiment") return "实验";
-  return "idea";
-}
-
-function getTalentLoverTypeLabel(type: LoverTypeId): string {
-  return type === "smart" ? "聪慧恋人" : "活泼恋人";
 }
 
 function buildCharacterTalentItems(state: GameState, role: RoleDefinition): TalentPanelItem[] {
@@ -2602,152 +2804,110 @@ function buildCharacterTalentItems(state: GameState, role: RoleDefinition): Tale
   return items;
 }
 
-function buildRelationTalentItems(state: GameState): TalentPanelItem[] {
-  const fellowTypeOrder: Record<FellowProgressProfile["type"], number> = {
-    senior: 0,
-    peer: 1,
-    junior: 2,
+function buildLoverTalentItem(state: GameState, requestedPage = 0): TalentPanelItem {
+  const page = Number.isFinite(requestedPage) ? Math.min(2, Math.max(0, Math.floor(requestedPage))) : 0;
+  const route = LOVER_ROUTES[page]!;
+  const active = state.loverState.active && state.loverProgressState.active;
+  const nextReward = route === "shopping" ? 0 : (state.loverProgressState.routes?.[route].completed ?? 0) % 3;
+  const labels = { play: "玩耍", study: "学习", shopping: "购物" };
+  const rows = route === "play"
+    ? [["玩耍奖励Ⅰ", "SAN+6"], ["玩耍奖励Ⅱ", "SAN上限+1"], ["玩耍奖励Ⅲ", "下月SAN消耗-1"]]
+    : route === "study"
+      ? [["学习奖励Ⅰ", "论文随机一项+恋人科研"], ["学习奖励Ⅱ", "论文三项分数永久+1"], ["学习奖励Ⅲ", "科研能力较低者+1"]]
+      : [["购物奖励", "礼物券+1、亲密+2"]];
+  return {
+    id: "lover",
+    icon: "💕",
+    name: "恋人",
+    active,
+    ruleCard: true,
+    loverRewardPager: { page },
+    rewardTable: {
+      label: `${labels[route]}进度满100奖励`,
+      columns: [],
+      rows,
+      currentRow: active ? nextReward : undefined,
+    },
+    description: "对应进度条满100后，循环获得奖励",
   };
-  const fellows = [...state.fellowProgressState].sort((left, right) => {
-    const leftOrder = fellowTypeOrder[left.type];
-    const rightOrder = fellowTypeOrder[right.type];
-    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
-    return left.startTotalMonths - right.startTotalMonths;
+}
+
+function buildRelationTalentItems(state: GameState, requestedSalaryStart?: number | null, loverRewardPage = 0): TalentPanelItem[] {
+  const salaryRows = [null, ...ADVISOR_GRANTS].map((grant) => {
+    const advisor = {
+      ...state.advisorProgressState,
+      awards: grant ? [{ id: grant.id, awardedYear: 0, startYear: null, endYear: null }] : [],
+    };
+    return [getAdvisorRankLabel(advisor), grant?.name ?? "—", String(getAdvisorMonthlySalary(advisor, "master")), String(getAdvisorMonthlySalary(advisor, "phd"))];
   });
-  const jointTrainingProgress = state.conferenceEncounterState.metBigBullCoop
-    ? `${Math.min(2, state.conferenceEncounterState.bigBullDeepCount)}/2`
-    : "0/2";
-  const jointTrainingBonus = Math.max(
-    state.researchCapacityState.jointTrainingCitationCapBonus,
-    getJointTrainingCitationCapBonus(state.totalCitations),
-  );
-  const internshipIncome = getInternshipMonthlyIncome(getPublishedAPaperCount(state), state.totalCitations);
-  const labTalentActive = isLabTalentActive(state.relationshipState);
-  const labBonus = getLabTalentActionBonus(state.relationshipState);
-  const labTeamSize = getLabTalentTeamSize(state.relationshipState);
-  const mentoringBuffs = state.buffs.filter((buff) => (
-    buff.name === "长期带教"
-    && buff.source === "指导师弟师妹"
-    && buff.scheduledPublication !== undefined
-  ));
-  const items: TalentPanelItem[] = [
+  const currentRank = salaryRows.findIndex((row) => row[0] === getAdvisorRankLabel(state.advisorProgressState));
+  const lastStartIndex = salaryRows.length - 2;
+  const startIndex = Math.max(0, Math.min(lastStartIndex, Math.floor(
+    typeof requestedSalaryStart === "number" && Number.isFinite(requestedSalaryStart) ? requestedSalaryStart : currentRank,
+  )));
+  return [
     {
       id: "advisor",
       icon: "👨‍🏫",
-      name: "导师关系",
-      active: state.relationshipState.advisorCount > 0,
-      description: "效果：导师任务循环奖励与关系成长。",
-      detail: state.relationshipState.advisorCount > 0
-        ? `当前科研资源 ${state.advisorProgressState.researchResource}，好感 ${state.player.favor}/20，项目进度 ${state.advisorProgressState.taskProgress}/${state.advisorProgressState.taskMax}。`
-        : undefined,
-      requirement: "条件：开局选择导师后自动获得。",
-    },
-    ...fellows.map((profile) => ({
-      id: `fellow-${profile.id}`,
-      icon: profile.type === "senior" ? "🧑‍🏫" : profile.type === "peer" ? "🤝" : "🧑‍🎓",
-      name: `${getTalentFellowTypeLabel(profile)}·${getFellowName(profile)}`,
+      name: "导师晋升",
       active: true,
-      description: `效果：帮忙${getTalentFellowTaskLabel(profile.taskType)} +${profile.research}。`,
-      detail: `当前亲和 ${profile.affinity}，任务进度 ${profile.taskProgress}/${profile.taskMax}。`,
-    })),
-    ...mentoringBuffs.map((buff) => {
-      const schedule = buff.scheduledPublication!;
-      const interval = Math.max(1, Math.floor(schedule.intervalMonths));
-      const elapsed = Math.max(0, Math.min(interval - 1, Math.floor(schedule.elapsedMonths ?? 0)));
-      return {
-        id: `mentoring-${buff.id}`,
-        icon: "🧑‍🏫",
-        name: "长期带教",
-        active: true,
-        description: `效果：每月 SAN -2；每 ${interval} 月自动生成一篇非一作合作论文。`,
-        detail: `当前周期进度 ${elapsed}/${interval} 月。`,
-      };
-    }),
-    {
-      id: "joint-training",
-      icon: "🧠",
-      name: "大牛联培",
-      active: state.conferenceEncounterState.bigBullCooperation,
-      description: state.conferenceEncounterState.bigBullCooperation
-        ? `效果：每次想 idea +5、做实验 +5；导师科研资源 +2；联培引用成长带来科研上限 +${jointTrainingBonus}。`
-        : "效果：建立联培后会接入科研上限成长与导师资源提升。",
-      detail: state.conferenceEncounterState.bigBullCooperation
-        ? `当前总引用 ${state.totalCitations}，联培累计上限加成 ${jointTrainingBonus}。`
-        : undefined,
-      requirement: `条件：会议中先建立合作，再完成 2 次深入交流（当前 ${jointTrainingProgress}）。`,
+      ruleCard: true,
+      advisorSalaryPager: { startIndex, lastStartIndex },
+      rewardTable: {
+        label: "各职称每月补助，单位金币",
+        columns: ["职称", "晋升条件", "硕士/月", "博士/月"],
+        rows: salaryRows.slice(startIndex, startIndex + 2),
+        currentRow: currentRank - startIndex,
+      },
+      description: "晋升后下月加薪；小数累计，发放整数金币",
     },
     {
-      id: "internship",
-      icon: "💼",
-      name: "企业实习",
-      active: state.internshipState.active,
-      description: state.internshipState.active
-        ? `效果：做实验 ×${formatMonthlyValue(state.internshipState.experimentMultiplier)}，每月工资 +${formatMonthlyValue(internshipIncome)} 金币，SAN -2。`
-        : "效果：企业实习会提升实验收益，并按成果带来月薪。",
-      detail: state.internshipState.active
-        ? `剩余 ${state.internshipState.remainingMonths} 个月，累计完成 ${state.internshipCount} 次。`
-        : undefined,
-      requirement: `条件：会议中的企业交流达到 3 次（当前 ${state.conferenceCareerState.enterpriseCount}/3）。`,
-    },
-    {
-      id: "lab-talent",
+      id: "lab-mutual-growth",
       icon: "🧪",
-      name: "实验室互帮互助",
-      active: labTalentActive,
-      description: labTalentActive
-        ? `效果：想 idea / 做实验 / 写论文 +${labBonus}。`
-        : "效果：想 idea / 做实验 / 写论文会获得团队人数加成。",
-      detail: labTalentActive
-        ? `当前团队 ${labTeamSize} 人，指导层数 ${state.relationshipState.mentorshipStacks}。`
-        : undefined,
-      requirement: "条件：同时拥有导师、师兄/师姐、师弟/师妹。",
+      name: "实验室传承",
+      active: true,
+      hideStatus: true,
+      ruleCard: true,
+      metrics: [
+        { label: "认识周期", value: "12个月" },
+        { label: "同学科研", value: "+⌊n/2⌋" },
+      ],
+      description: "n为科研比自己高的人数，比较玩家和其他同学；导师视为1人，恋人不计",
     },
-  ];
-
-  if (state.loverState.active && state.loverProgressState.active && state.loverState.type) {
-    if (state.loverState.type === "smart") {
-      items.push({
-        id: "lover",
-        icon: "💕",
-        name: getTalentLoverTypeLabel(state.loverState.type),
-        active: true,
-        description: "效果：科研 +2，约会开销 -2；每次想 idea、做实验、写论文各多 1 次。",
-        detail: `已约会 ${state.loverProgressState.completedTaskCount} 次，亲密 ${state.loverProgressState.intimacy}，恋人科研 ${state.loverProgressState.research}。`,
-      });
-    } else {
-      const recoveryRate = 10 + state.loverState.beautifulExtraRecoveryRate;
-      const currentRecovery = getBeautifulMonthlyRecovery(state.loverState, state.player.san, state.sanCap);
-      items.push({
-        id: "lover",
-        icon: "💕",
-        name: getTalentLoverTypeLabel(state.loverState.type),
-        active: true,
-        description: `效果：SAN 上限 +4，约会开销 -2；每月恢复已损 SAN 的 ${recoveryRate}%。`,
-        detail: `已约会 ${state.loverProgressState.completedTaskCount} 次，当前月结按现状可恢复 SAN ${currentRecovery}。`,
-      });
-    }
-  } else {
-    items.push({
-      id: "lover",
-      icon: "💕",
-      name: "恋人",
+    {
+      id: "fellow-paper-cooperation",
+      icon: "🤝",
+      name: "论文合作",
+      active: true,
+      hideStatus: true,
+      ruleCard: true,
+      metrics: [
+        { label: "共同发表", value: "每篇" },
+        { label: "默契增加", value: "+1" },
+      ],
+      description: "双方任一人一作均可，中稿后提升与参与同学的默契",
+    },
+    buildLoverTalentItem(state, loverRewardPage),
+    ...[
+      { id: "joint-training", icon: "🧠", name: "大牛联培" },
+      { id: "internship", icon: "💼", name: "企业实习" },
+    ].map((item) => ({
+      ...item,
       active: false,
-      description: "效果：根据恋人类型提供不同的长期陪伴收益。",
-      detail: `当前活泼线索 ${state.conferenceEncounterState.beautifulCount}/2，聪慧线索 ${state.conferenceEncounterState.smartCount}/2。`,
-      requirement: "条件：在会议中与同一类型学者多次交流并确认关系。",
-    });
-  }
-
-  return items;
+      tagLabel: "待定",
+      description: "具体天赋效果待定",
+    })),
+  ];
 }
 
 function getChairTalentItem(state: GameState): TalentPanelItem | null {
   if (!state.shopState.chairOwned) return null;
 
   const chairSanRecovered = Math.max(0, Math.floor(state.shopState.chairSanRecovered ?? 0));
-  const recoveryMetrics = (effect: string) => [
-    { label: "累计回复 SAN", value: `+${chairSanRecovered}` },
-    { label: "当前效果", value: effect },
+  const recoveryMetrics = (effect: string): NonNullable<TalentPanelItem["metrics"]> => [
+    { label: "累计回复 SAN", value: `+${chairSanRecovered}`, animation: { template: "+{recovered}", values: { recovered: chairSanRecovered } } },
+    { label: "当前效果", value: effect, ...(state.shopState.chairUpgrade === "massage" || state.shopState.chairUpgrade === "torture"
+      ? { animation: { template: "每月 +{recovery}", values: { recovery: getChairMonthlyRecovery(state.shopState, state.player.san, state.sanCap) } } } : {}) },
   ];
   const currentRecovery = getChairMonthlyRecovery(state.shopState, state.player.san, state.sanCap);
   if (state.shopState.chairUpgrade === "advanced") {
@@ -2767,6 +2927,7 @@ function getChairTalentItem(state: GameState): TalentPanelItem | null {
       name: "电动按摩椅",
       active: true,
       description: `效果：每月恢复已损 SAN 的 20%（下取整，当前 +${currentRecovery}）。`,
+      descriptionAnimation: { template: "效果：每月恢复已损 SAN 的 20%（下取整，当前 +{recovery}）。", values: { recovery: currentRecovery } },
       metrics: recoveryMetrics(`每月 +${currentRecovery}`),
     };
   }
@@ -2777,6 +2938,7 @@ function getChairTalentItem(state: GameState): TalentPanelItem | null {
       name: "沙发",
       active: true,
       description: `效果：每月恢复当前 SAN 的 20%（下取整，当前 +${currentRecovery}）。`,
+      descriptionAnimation: { template: "效果：每月恢复当前 SAN 的 20%（下取整，当前 +{recovery}）。", values: { recovery: currentRecovery } },
       metrics: recoveryMetrics(`每月 +${currentRecovery}`),
     };
   }
@@ -2830,8 +2992,8 @@ function getBikeTalentItem(state: GameState): TalentPanelItem | null {
       : "效果：购入后逐级提升骑行消耗与 SAN 上限成长。",
     metrics: tier
       ? [
-          { label: "累计消耗 SAN", value: `${sanSpent}` },
-          { label: "每月消耗", value: capReached ? "0" : `-${tier.monthlySanCost}` },
+          { label: "累计消耗 SAN", value: `${sanSpent}`, animation: { template: "{spent}", values: { spent: sanSpent } } },
+          { label: "每月消耗", value: capReached ? "0" : `-${tier.monthlySanCost}`, animation: { template: capReached ? "{cost}" : "-{cost}", values: { cost: capReached ? 0 : tier.monthlySanCost } } },
         ]
       : undefined,
     progress: tier
@@ -2840,31 +3002,36 @@ function getBikeTalentItem(state: GameState): TalentPanelItem | null {
           value: capGains,
           max: Math.max(1, capLimit),
           valueLabel: `+${capGains}/+${capLimit}`,
+          animateMax: true,
         }
       : undefined,
   };
 }
 
-function formatPublicationTalentReward(reward: ReturnType<typeof getPublicationTalentChecklist>[number]["reward"]): string {
-  return [
-    `SAN+${reward.san}`,
-    `好感+${reward.favor}`,
-    `社交+${reward.social}`,
-    `科研+${reward.research}`,
-    `科研上限+${reward.researchCap}`,
-  ].join(" ｜ ");
+function renderPublicationTalentReward(reward: ReturnType<typeof getPublicationTalentChecklist>[number]["reward"]): string {
+  const rewards = [
+    { label: "SAN", value: reward.san },
+    { label: "好感", value: reward.favor },
+    { label: "社交", value: reward.social },
+    { label: "科研", value: reward.research },
+    { label: "科研上限", value: reward.researchCap },
+  ].filter((entry) => entry.value !== 0);
+  return `<div class="publication-talent-reward">${rewards.map((entry) =>
+    `<span class="publication-reward-item"><span>${entry.label}</span><strong>+${entry.value}</strong></span>`).join("")}</div>`;
 }
 
-function buildPublicationTalentItems(state: GameState): TalentPanelItem[] {
-  return getPublicationTalentChecklist(state).map((item) => ({
-    id: `publication-talent-${item.id}`,
-    icon: item.completed ? "✅" : "⬜",
-    name: item.name,
-    active: item.completed,
-    tagLabel: item.completed ? "已完成" : "未完成",
-    description: `奖励：${formatPublicationTalentReward(item.reward)}`,
-    detail: item.description,
-  }));
+function renderPublicationTalentCards(state: GameState): string {
+  return getPublicationTalentChecklist(state).map((item) => `
+    <article class="talent-item talent-item-row publication-talent-card${item.completed ? " is-completed" : ""}" data-talent-item-id="publication-talent-${item.id}">
+      <div class="publication-talent-heading">
+        <span class="publication-talent-icon" aria-hidden="true">${escapeHtml(item.icon)}</span>
+        <strong>${escapeHtml(item.name)}</strong>
+        <span class="talent-item-tag ${item.completed ? "is-active" : "is-inactive"}">${item.completed ? "已达成" : "未达成"}</span>
+      </div>
+      ${renderPublicationTalentReward(item.reward)}
+      <p class="talent-item-desc publication-talent-condition">${escapeHtml(item.description)}</p>
+    </article>
+  `).join("");
 }
 
 function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
@@ -2891,8 +3058,8 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
       active: true,
       description: "每 10 次阅读，科研 +1；idea buff 效果 +1",
       metrics: [
-        { label: "已看", value: `${readCount} 次` },
-        { label: "下次想 idea", value: `+${nextReadingIdeaBonus}` },
+        { label: "已看", value: `${readCount} 次`, animation: { template: "{count} 次", values: { count: readCount } } },
+        { label: "下次想 idea", value: `+${nextReadingIdeaBonus}`, animation: { template: "+{bonus}", values: { bonus: nextReadingIdeaBonus } } },
       ],
       progress: {
         label: "升档进度",
@@ -2908,9 +3075,9 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
       active: true,
       description: "每 8 次打工，金币收入 +1，SAN 消耗 +1",
       metrics: [
-        { label: "已打工", value: `${workCount} 次` },
-        { label: "下次金币", value: `+${workPreview.moneyReward}` },
-        { label: "下次 SAN", value: `-${workPreview.sanCost}` },
+        { label: "已打工", value: `${workCount} 次`, animation: { template: "{count} 次", values: { count: workCount } } },
+        { label: "下次金币", value: `+${workPreview.moneyReward}`, animation: { template: "+{reward}", values: { reward: workPreview.moneyReward } } },
+        { label: "下次 SAN", value: `-${workPreview.sanCost}`, animation: { template: "-{cost}", values: { cost: workPreview.sanCost } } },
       ],
       progress: {
         label: "升档进度",
@@ -2926,10 +3093,8 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
       active: true,
       description: "每 4 次参会，参会减免 +1 金币（最多半价）",
       metrics: [
-        { label: "已参会", value: `${meetingCount} 次` },
-        { label: "国内", value: `-${meetingDiscounts[0]}` },
-        { label: "亚太", value: `-${meetingDiscounts[1]}` },
-        { label: "欧美", value: `-${meetingDiscounts[2]}` },
+        { label: "已参会", value: `${meetingCount} 次`, animation: { template: "{count} 次", values: { count: meetingCount } } },
+        ...["国内", "亚太", "欧美"].map((label, index) => ({ label, value: `-${meetingDiscounts[index]}`, animation: { template: "-{discount}", values: { discount: meetingDiscounts[index]! } } })),
       ],
       progress: {
         label: "升级进度",
@@ -2946,13 +3111,14 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
       description: `获胜：SAN×（参加次数 + 3）+ 球拍 40达${BADMINTON_VICTORY_THRESHOLD}`,
       metrics: [
         { label: "获胜后每月 SAN +1", value: state.eventSupport.hasStrongBodyTalent ? "✅" : "—" },
-        { label: "已参加", value: `${badmintonCount} 次` },
+        { label: "已参加", value: `${badmintonCount} 次`, animation: { template: "{count} 次", values: { count: badmintonCount } } },
       ],
       progress: {
         label: "水平进度",
         value: Math.min(badmintonStrength, BADMINTON_VICTORY_THRESHOLD),
         max: BADMINTON_VICTORY_THRESHOLD,
         valueLabel: `${badmintonStrength}/${BADMINTON_VICTORY_THRESHOLD}`,
+        displayValue: badmintonStrength,
       },
     },
     {
@@ -2962,8 +3128,8 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
       active: true,
       description: "胜率 = 40 + 参加次数 × 10%",
       metrics: [
-        { label: "累计赚取金币", value: `${pokerProfit >= 0 ? "+ " : "- "}${Math.abs(pokerProfit)}` },
-        { label: "已参加", value: `${pokerCount} 次` },
+        { label: "累计赚取金币", value: `${pokerProfit >= 0 ? "+ " : "- "}${Math.abs(pokerProfit)}`, animation: { template: "{profit}", values: { profit: pokerProfit }, displays: { profit: `${pokerProfit >= 0 ? "+ " : "- "}${Math.abs(pokerProfit)}` } } },
+        { label: "已参加", value: `${pokerCount} 次`, animation: { template: "{count} 次", values: { count: pokerCount } } },
       ],
       progress: {
         label: "策略进度",
@@ -2984,7 +3150,7 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
       icon: "🎒",
       name: "整装待发",
       active: fullGearActive,
-      description: "激活后夏冬 SAN +1",
+      description: "激活后小电驴效果改为春夏秋冬 SAN +1",
       detail: undefined,
       metrics: [
         { label: "小电驴", value: state.shopState.ebikeOwned ? "✅" : "—" },
@@ -2997,11 +3163,11 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
       icon: "🤖",
       name: "AI 协作",
       active: aiCollaboration.active,
-      description: "激活后可额外进行 1 次科研操作；不消耗行动点，但 SAN 消耗 +2",
+      description: "激活后可额外进行 1 次科研操作，额外操作不消耗行动点，但 SAN 消耗 +2",
       metrics: [
         { label: "GPT/Claude", value: aiCollaboration.hasCoreModel ? "✅" : "—" },
-        { label: "AI2", value: aiCollaboration.activeAiCount >= 2 ? "✅" : "—" },
-        { label: "AI3", value: aiCollaboration.activeAiCount >= 3 ? "✅" : "—" },
+        { label: "AI·Ⅱ", value: aiCollaboration.activeAiCount >= 2 ? "✅" : "—" },
+        { label: "AI·Ⅲ", value: aiCollaboration.activeAiCount >= 3 ? "✅" : "—" },
       ],
     },
   ];
@@ -3047,8 +3213,8 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
       detail: detail ? `${detail}。` : undefined,
       metrics: coffeeUpgrade === "advanced"
         ? [
-            { label: "累计生产", value: `${trackedCoffeeCount} 杯` },
-            { label: "当前额外 SAN", value: `+${coffeeBonus}` },
+            { label: "累计生产", value: `${trackedCoffeeCount} 杯`, animation: { template: "{count} 杯", values: { count: trackedCoffeeCount } } },
+            { label: "当前额外 SAN", value: `+${coffeeBonus}`, animation: { template: "+{bonus}", values: { bonus: coffeeBonus } } },
           ]
         : undefined,
       progress: coffeeUpgrade === "advanced"
@@ -3071,6 +3237,7 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
       name: gpuTier?.name ?? "显卡",
       active: true,
       description: `效果：做实验 +${experimentModifier.extraActions} 次，做实验 +${experimentModifier.bonus} 分。`,
+      descriptionAnimation: { template: "效果：做实验 +{actions} 次，做实验 +{bonus} 分。", values: { actions: experimentModifier.extraActions, bonus: experimentModifier.bonus } },
     });
   }
 
@@ -3081,14 +3248,16 @@ function renderTalentSection(
   state: GameState,
   role: RoleDefinition,
   activeTalentTab: TalentPanelTabId | undefined,
+  advisorSalaryStartIndex?: number | null,
+  loverRewardPage?: number,
 ): string {
   const tabId = normalizeTalentPanelTab(activeTalentTab);
   const items = tabId === "relation"
-    ? buildRelationTalentItems(state)
+    ? buildRelationTalentItems(state, advisorSalaryStartIndex, loverRewardPage)
     : tabId === "equip"
       ? buildEquipTalentItems(state)
       : tabId === "publication"
-        ? buildPublicationTalentItems(state)
+        ? []
       : tabId === "growth"
         ? buildGrowthTalentItems(state)
         : buildCharacterTalentItems(state, role);
@@ -3105,225 +3274,20 @@ function renderTalentSection(
         </div>
       </div>
       <div class="talent-items-list" id="talent-items-list" data-talent-panel-tab="${tabId}">
-        ${items.map((item) => renderTalentPanelItem(item)).join("")}
+        ${tabId === "publication" ? renderPublicationTalentCards(state) : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
       </div>
     </div>
   `;
 }
 
-function renderDebugStatButtons(filter: "all" | "without-money" | "money" | DebugStatId = "all"): string {
-  return DEBUG_STAT_GROUPS
-    .filter((group) => (
-      filter === "all"
-      || (filter === "money" ? group.statId === "money" : filter === "without-money" ? group.statId !== "money" : group.statId === filter)
-    ))
-    .flatMap((group) =>
-    group.deltas.map((delta) => `
-      <button
-        class="debug-tool-btn"
-        type="button"
-        data-action="debug-adjust-stat"
-        data-debug-stat-id="${group.statId}"
-        data-delta="${delta}"
-      >${escapeHtml(`${group.label}${formatSignedNumber(delta)}`)}</button>
-    `),
-    ).join("");
-}
 
-function renderDebugMonthButtons(): string {
-  const shiftButtons = DEBUG_MONTH_DELTAS.map((delta) => `
-    <button
-      class="debug-tool-btn"
-      type="button"
-      data-action="debug-shift-month"
-      data-delta="${delta}"
-      aria-label="调整时间 ${formatSignedNumber(delta)}月"
-    >${escapeHtml(`${formatSignedNumber(delta)}月`)}</button>
-  `).join("");
-  return `${shiftButtons}
-    <button
-      class="debug-tool-btn is-force-next"
-      type="button"
-      data-action="force-next-month"
-      title="删除当前阻塞事件并真实结算下一月"
-      aria-label="删除当前阻塞事件并真实结算下一月"
-    >下一月</button>
-  `;
-}
-
-function renderDebugPaperButtons(): string {
-  const paperButtons = ([
-    ...(["A", "B", "C"] as const).map((target) => ({ target, authorship: "first" as const, label: `${target}一作` })),
-    ...(["A", "B", "C"] as const).map((target) => ({ target, authorship: "coauthor" as const, label: `${target}合作` })),
-  ]).map((button) => `
-    <button
-      class="debug-tool-btn"
-      type="button"
-      data-action="debug-add-paper"
-      data-debug-paper-target="${button.target}"
-      data-debug-paper-authorship="${button.authorship}"
-    >${button.label}</button>
-  `).join("");
-  return `${paperButtons}
-    <button class="debug-tool-btn debug-buff-btn" type="button" data-action="debug-add-all-buffs">全部buff</button>
-  `;
-}
-
-function renderDebugJournalButtons(): string {
-  return ([
-    { journalTarget: "nature" as const, authorship: "first" as const, label: "Nature一作" },
-    { journalTarget: "nature" as const, authorship: "coauthor" as const, label: "Nature合作" },
-    { journalTarget: "nmi" as const, authorship: "first" as const, label: "NMI一作" },
-    { journalTarget: "nmi" as const, authorship: "coauthor" as const, label: "NMI合作" },
-    { journalTarget: "pami" as const, authorship: "first" as const, label: "PAMI一作" },
-    { journalTarget: "pami" as const, authorship: "coauthor" as const, label: "PAMI合作" },
-  ]).map((button) => `
-    <button
-      class="debug-tool-btn"
-      type="button"
-      data-action="debug-add-paper"
-      data-debug-journal-target="${button.journalTarget}"
-      data-debug-paper-authorship="${button.authorship}"
-    >${button.label}</button>
-  `).join("");
-}
-
-function renderDebugEventGroups(): string {
-  return DEBUG_EVENT_GROUPS
-    .map((group, index) => `
-      <div class="debug-event-group${index > 0 ? " is-separated" : ""}">
-        ${group.buttons.map((button) => `
-          <button
-            class="debug-tool-btn"
-            type="button"
-            data-action="debug-trigger-event"
-            data-event-id="${button.id}"
-          >${escapeHtml(normalizeGameDisplayText(button.label))}</button>
-        `).join("")}
-      </div>
-    `)
-    .join("");
-}
-
-function renderDebugBottomBar(): string {
-  return `
-    <aside class="debug-bottom-bar" id="debug-bottom-bar" aria-label="开发测试工具">
-      <div class="debug-bottom-bar-inner">
-        <div class="debug-bottom-column">
-          <div class="debug-bottom-group">
-            <div class="debug-bottom-stat-grid">
-              ${renderDebugStatButtons("san")}
-            </div>
-          </div>
-          <div class="debug-bottom-group">
-            <div class="debug-bottom-stat-grid">
-              ${renderDebugStatButtons("research")}
-            </div>
-          </div>
-        </div>
-        <div class="debug-bottom-column">
-          <div class="debug-bottom-group">
-            <div class="debug-bottom-stat-grid">
-              ${renderDebugStatButtons("social")}
-            </div>
-          </div>
-          <div class="debug-bottom-group">
-            <div class="debug-bottom-stat-grid">
-              ${renderDebugStatButtons("favor")}
-            </div>
-          </div>
-        </div>
-        <div class="debug-bottom-column">
-          <div class="debug-bottom-group">
-            <div class="debug-bottom-stat-grid">
-              ${renderDebugStatButtons("money")}
-            </div>
-          </div>
-          <div class="debug-bottom-group">
-            <div class="debug-bottom-time-grid">
-              ${renderDebugMonthButtons()}
-            </div>
-          </div>
-        </div>
-        <div class="debug-bottom-column debug-bottom-paper-column">
-          <div class="debug-bottom-group">
-            <div class="debug-bottom-paper-grid">
-              ${renderDebugPaperButtons()}
-            </div>
-          </div>
-          <div class="debug-bottom-group">
-            <div class="debug-bottom-paper-grid debug-bottom-journal-grid">
-              ${renderDebugJournalButtons()}
-            </div>
-          </div>
-        </div>
-        <div class="debug-bottom-column debug-bottom-relationship-column" role="group" aria-label="新增人际关系">
-          <div class="debug-bottom-group">
-            <button class="debug-tool-btn" type="button"
-              data-action="debug-add-relationship" data-debug-relationship-type="senior">新增师兄/师姐</button>
-            <button class="debug-tool-btn" type="button"
-              data-action="debug-add-relationship" data-debug-relationship-type="junior">新增师弟/师妹</button>
-          </div>
-          <div class="debug-bottom-group">
-            <button class="debug-tool-btn" type="button"
-              data-action="debug-add-relationship" data-debug-relationship-type="peer">新增同门</button>
-            <button class="debug-tool-btn" type="button"
-              data-action="debug-add-relationship" data-debug-relationship-type="lover">新增恋人</button>
-          </div>
-        </div>
-        <div class="debug-bottom-actions">
-          <button class="settings-primary-btn is-restart" type="button" data-action="restart-game">
-            <i data-lucide="rotate-ccw" aria-hidden="true"></i>
-            <span>重开</span>
-          </button>
-          <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
-            <i data-lucide="house" aria-hidden="true"></i>
-            <span>返回开始页</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  `;
-}
-
-function renderSettingsSection(showDebugEventRail = true, showDebugBottomBar = true): string {
+function renderSettingsSection(state: GameState): string {
   return `
     <div class="settings-panel">
-      <section class="settings-layout-controls" aria-labelledby="settings-layout-title">
-        <div class="settings-layout-heading">
-          <h3 id="settings-layout-title">界面栏位</h3>
-          <span>开发栏可按需收起</span>
-        </div>
-        <div class="settings-layout-toggle-list">
-          <label class="settings-layout-toggle">
-            <span class="settings-layout-toggle-copy">
-              <strong>最右侧栏</strong>
-              <small>开发事件快捷栏</small>
-            </span>
-            <input
-              type="checkbox"
-              data-ui-layout-toggle="debug-event-rail"
-              aria-label="显示最右侧栏"
-              ${showDebugEventRail ? "checked" : ""}
-            />
-            <span class="settings-layout-switch" aria-hidden="true"><span></span></span>
-          </label>
-          <label class="settings-layout-toggle">
-            <span class="settings-layout-toggle-copy">
-              <strong>底部栏</strong>
-              <small>开发测试工具栏</small>
-            </span>
-            <input
-              type="checkbox"
-              data-ui-layout-toggle="debug-bottom-bar"
-              aria-label="显示底部栏"
-              ${showDebugBottomBar ? "checked" : ""}
-            />
-            <span class="settings-layout-switch" aria-hidden="true"><span></span></span>
-          </label>
-        </div>
-      </section>
       <div class="settings-quick-actions" id="settings-panel-content">
+        <button class="settings-primary-btn" type="button" data-ui-open-debug-window>
+          <span aria-hidden="true">🛠️</span><span>打开调试面板</span>
+        </button>
         <button class="settings-primary-btn is-restart" type="button" data-action="restart-game">
           <i data-lucide="rotate-ccw" aria-hidden="true"></i>
           <span>重开</span>
@@ -3337,61 +3301,20 @@ function renderSettingsSection(showDebugEventRail = true, showDebugBottomBar = t
           <span>留言反馈</span>
         </button>
       </div>
+      ${state.phase === "playing" && state.totalMonths > 0 ? '<div class="settings-quit-row"><button type="button" data-action="quit-game">🚪 主动退学</button></div>' : ""}
     </div>
   `;
 }
 
-function renderFinishedCenterShell(state: GameState): string {
-  const endingCopy = {
-    master: ["硕士毕业", "你达到了硕士毕业要求，本轮结束。"],
-    phd: ["博士毕业", "你达到了博士毕业要求，本轮结束。"],
-    delay: ["延期毕业", "培养期限已到，但科研分还没有达到毕业要求。"],
-    burnout: ["SAN 耗尽", "SAN 跌破 0，本轮提前结束。"],
-    poor: ["金币耗尽", "金币跌破 0，本轮提前结束。"],
-    expelled: ["被退学", "导师好感跌破 0，本轮提前结束。"],
-    isolated: ["被孤立", "社交能力跌破 0，本轮提前结束。"],
-  } as const;
-  const [title, description] = state.ending
-    ? endingCopy[state.ending]
-    : ["本轮结束", "本轮已经结束。"];
-  const scoreText = state.graduationScoreTarget === null
-    ? `科研分 ${state.totalResearchScore}`
-    : `科研分 ${state.totalResearchScore}/${state.graduationScoreTarget}`;
-
-  return `
-    <section class="play-center-column game-main-area">
-      <div class="center-shell ending-shell" id="center-shell">
-        <div class="ending-panel">
-          <span class="ending-kicker">本轮结束</span>
-          <h1>${escapeHtml(title)}</h1>
-          <p>${escapeHtml(description)}</p>
-          <div class="ending-score">${escapeHtml(scoreText)}</div>
-          <div class="ending-actions">
-            <button class="settings-primary-btn is-restart" type="button" data-action="restart-game">
-              <i data-lucide="rotate-ccw" aria-hidden="true"></i>
-              <span>重开</span>
-            </button>
-            <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
-              <i data-lucide="house" aria-hidden="true"></i>
-              <span>返回开始页</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-}
 
 function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): string {
-  if (state.phase === "finished") return renderFinishedCenterShell(state);
-
   const role = getRoleDefinition(state.selectedRoleId);
-  const blockingEventCount = state.eventQueue.filter((event) => event.blocking && event.deadlineMonths <= 0).length;
-  const researchPreview = isGameplayModuleLocked(state) ? null : previewReadPaperAction(state);
+  const blockingEventCount = state.eventQueue.filter((event) => isEventBlocking(state, event)).length;
+  const researchPreview = state.phase === "finished" || isGameplayModuleLocked(state) ? null : previewReadPaperAction(state);
   const regularResearchActionCount = researchPreview?.canRead
     ? Math.max(0, state.actionState.limit - state.actionState.used)
     : 0;
-  const aiResearchActionAvailable = !isGameplayModuleLocked(state)
+  const aiResearchActionAvailable = state.phase === "playing" && !isGameplayModuleLocked(state)
     && getActiveOperationAllowance(state, "idea").usesAiResearchBonus;
   const aiResearchActionCount = aiResearchActionAvailable ? 1 : 0;
   const researchActionCount = regularResearchActionCount + aiResearchActionCount;
@@ -3404,15 +3327,18 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
   const dateDisplayMode = getDateDisplayMode(uiState);
   const openEvent = activeEventId ? getCurrentEvent(state.eventQueue, activeEventId) : null;
   const openHistoryEvent = activeEventHistoryId
-    ? state.eventHistory.find((event) => event.id === activeEventHistoryId) ?? null
+    ? state.eventHistory.find((event) => event.id === activeEventHistoryId && !event.stages.some((stage) => stage.talentTrigger)) ?? null
     : null;
   const logPages = buildLogPages(state.log, state.degree, dateDisplayMode, state.totalMonths);
+  if (state.phase === "finished") {
+    logPages.push({ kind: "ending", monthKey: state.totalMonths, label: "结局", entries: [] });
+  }
   const latestLogPageIndex = Math.max(0, logPages.length - 1);
   const currentLogPageIndex = logPages.findIndex((logPage) => logPage.monthKey === state.totalMonths);
   const hasFutureLogEntriesAtInitialMonth = state.totalMonths === 0 && logPages.some((logPage) => (
     logPage.monthKey > state.totalMonths && logPage.entries.length > 0
   ));
-  const defaultLogPageIndex = hasFutureLogEntriesAtInitialMonth
+  const defaultLogPageIndex = state.phase === "finished" || hasFutureLogEntriesAtInitialMonth
     ? latestLogPageIndex
     : currentLogPageIndex >= 0 ? currentLogPageIndex : latestLogPageIndex;
   const resolvedLogPageIndex = logPages.length === 0
@@ -3450,7 +3376,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
             class="center-tab-btn center-tab-btn-next"
             type="button"
             data-action="next-month"
-            ${blockingEventCount > 0 ? 'disabled aria-disabled="true" title="请先处理本月事件"' : ""}
+            ${state.phase === "finished" ? 'disabled aria-disabled="true" title="本轮已结束，可继续查看各栏目"' : blockingEventCount > 0 ? 'disabled aria-disabled="true" title="请先处理本月事件"' : ""}
           >
             <span class="center-tab-next-label">下一月</span>
             <span class="center-tab-next-arrow" aria-hidden="true">→</span>
@@ -3467,7 +3393,9 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
                 logPages,
                 openEvent || openHistoryEvent
                   ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null)
-                  : "",
+                  : activeLogPage?.kind === "ending"
+                    ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state)
+                    : "",
               )}
             </div>
           </section>
@@ -3495,11 +3423,11 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("talent")}" data-tab-panel="talent"${getTabPanelHidden("talent")}>
-            ${renderTalentSection(state, role, uiState.activeTalentTab)}
+            ${renderTalentSection(state, role, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.loverRewardPage)}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("settings")}" data-tab-panel="settings"${getTabPanelHidden("settings")}>
-            ${renderSettingsSection(uiState.showDebugEventRail !== false, uiState.showDebugBottomBar !== false)}
+            ${renderSettingsSection(state)}
           </section>
         </div>
       </div>
@@ -3519,8 +3447,11 @@ function sortTodoPreviewItems(items: TodoPreviewItem[]): TodoPreviewItem[] {
 function renderTodoPreviewRow(item: TodoPreviewItem): string {
   return `
     <article class="todo-item todo-preview-item todo-preview-future">
-      <strong class="todo-title">${escapeHtml(item.title)}</strong>
-      <span class="todo-deadline" data-deadline="${getDeadlineTone(item.monthsLater)}">${escapeHtml(item.timeText)}</span>
+      <div class="todo-preview-name"><strong class="todo-title">${escapeHtml(item.title)}</strong></div>
+      <div class="event-row-status">
+        <span class="event-auto-slot" aria-hidden="true"></span>
+        <span class="todo-deadline" data-deadline="future">${escapeHtml(item.timeText)}</span>
+      </div>
     </article>
   `;
 }
@@ -3537,7 +3468,8 @@ type PendingAgendaPage = {
 
 function buildPendingAgendaPage(state: GameState, requestedPageIndex = 0): PendingAgendaPage {
   const pendingItems: PendingAgendaItem[] = getSortedEventQueue(state.eventQueue)
-    .map((event) => ({ kind: "pending" as const, event }));
+    .map((event) => ({ kind: "pending" as const, event, linear: isLinearEvent(state, event) }))
+    .sort((left, right) => left.event.deadlineMonths - right.event.deadlineMonths || Number(left.linear) - Number(right.linear));
   const futureItems: PendingAgendaItem[] = sortTodoPreviewItems(buildFutureTodoPreviewItems(state))
     .map((preview) => ({ kind: "future" as const, preview }));
   const allItems = [...pendingItems, ...futureItems];
@@ -3551,7 +3483,7 @@ function buildPendingAgendaPage(state: GameState, requestedPageIndex = 0): Pendi
   };
 }
 
-function renderPendingAgendaList(page: PendingAgendaPage): string {
+function renderPendingAgendaList(state: GameState, page: PendingAgendaPage): string {
   if (page.items.length === 0) {
     return `<div class="todo-empty">暂无待办事件</div>`;
   }
@@ -3560,12 +3492,15 @@ function renderPendingAgendaList(page: PendingAgendaPage): string {
     <div class="new-todo-list">
       <div class="todo-group">${page.items.map((item) => item.kind === "pending"
         ? `
-          <button class="event-card" type="button" data-ui-open-event-id="${escapeHtml(item.event.id)}">
-            <div class="event-card-header">
+          <article class="pending-event-row">
+            <button class="event-card" type="button" data-ui-open-event-id="${escapeHtml(item.event.id)}" aria-describedby="agenda-status-${escapeHtml(item.event.id)}">
               <span class="event-title">${escapeHtml(getEventRootTitle(item.event.title))}</span>
-              <span class="event-ddl-badge" data-deadline="${getDeadlineTone(item.event.deadlineMonths)}">期限 ${getDeadlineText(item.event.deadlineMonths)}</span>
+            </button>
+            <div class="event-row-status" id="agenda-status-${escapeHtml(item.event.id)}">
+              <span class="event-auto-slot">${canAutoResolveLinearEvent(state, item.event) ? '<span class="event-auto-indicator" role="img" aria-label="可自动处理" title="下一月自动处理">⏩</span>' : ""}</span>
+              <span class="event-ddl-badge" data-deadline="${getEventDeadlineTone(state, item.event)}">期限 ${item.event.deadlineMonths > 0 ? `${renderAnimatedNumber(`event:${item.event.id}:agenda:deadline-months`, item.event.deadlineMonths)}月后` : renderAnimatedNumber(`event:${item.event.id}:agenda:deadline-months`, item.event.deadlineMonths, "本月")}</span>
             </div>
-          </button>
+          </article>
         `
         : renderTodoPreviewRow(item.preview)).join("")}</div>
     </div>
@@ -3598,7 +3533,8 @@ function buildLogPages(
   currentTotalMonths = 0,
 ): LogPage[] {
   const visibleEntries = logEntries.filter((entry) => (
-    !isTransientUiHintLog(entry.text) && !isEmptyMonthAdvanceLog(entry.text)
+    !isTransientUiHintLog(entry.text) && !isEmptyMonthAdvanceLog(entry.text) && !isEndingSystemLog(entry.text)
+    && !/^(?:科研：在论文槽\s*\d+\s*开启|丢弃论文：|论文时效：)/u.test(entry.text.trim())
   ));
 
   const pageMap = new Map<number, LogPage>();
@@ -3644,7 +3580,7 @@ function getLogEntryClassName(text: string): string {
   ].filter(Boolean).join(" ");
 }
 
-const LOG_VALUE_CHANGE_PATTERN = /(?:(?:SAN\s*(?:值|上限)?)|金币|导师好感(?:度)?|好感(?:度)?|亲和度|社交(?:能力)?|科研(?:能力|资源|上限|分)?|生病概率|每月实验次数|参加次数|idea|实验|写作|引用)\s*[+＋\-−]\s*\d+(?:\.\d+)?%?/giu;
+const LOG_VALUE_CHANGE_PATTERN = /(?:(?:SAN\s*(?:值|上限)?)|金币|导师好感(?:度)?|好感(?:度)?|默契度|亲密度|亲和度|社交(?:能力)?|科研(?:能力|积累|经费|上限|分)?|生病概率|每月实验次数|参加次数|idea|实验|写作|引用)\s*[+＋\-−]\s*\d+(?:\.\d+)?%?/giu;
 
 function renderLogLineHtml(text: string): string {
   let cursor = 0;
@@ -3714,6 +3650,13 @@ function getEventLogPresentation(
   if (!entry.eventHistoryId) return monthAdvancePresentation;
   const record = eventHistory.find((event) => event.id === entry.eventHistoryId);
   if (!record) return monthAdvancePresentation;
+  const talentTrigger = record.stages.find((stage) => stage.talentTrigger)?.talentTrigger;
+  if (talentTrigger) {
+    return {
+      title: parsed.title,
+      result: [talentTrigger.recipient, talentTrigger.reason, ...talentTrigger.effects, ...(talentTrigger.details ?? [])].filter(Boolean).join("；"),
+    };
+  }
 
   const selectedChoices = record.stages.flatMap((stage) => {
     const selected = stage.choices.find((choice) => choice.id === stage.selectedChoiceId);
@@ -3753,13 +3696,15 @@ function renderLogList(
     .reverse()
     .map((entry) => {
       const { title, result } = getEventLogPresentation(entry, eventHistory);
-      const eventHistoryAttributes = entry.eventHistoryId
+      const record = eventHistory.find((event) => event.id === entry.eventHistoryId);
+      const canReplay = Boolean(entry.eventHistoryId) && !record?.stages.some((stage) => stage.talentTrigger);
+      const eventHistoryAttributes = canReplay && entry.eventHistoryId
         ? ` data-ui-open-event-history-id="${escapeHtml(entry.eventHistoryId)}" aria-label="回看${escapeHtml(normalizeGameDisplayText(title))}"`
         : "";
-      const entryTag = entry.eventHistoryId ? "button" : "div";
-      const entryTypeAttributes = entry.eventHistoryId ? ' type="button"' : "";
+      const entryTag = canReplay ? "button" : "div";
+      const entryTypeAttributes = canReplay ? ' type="button"' : "";
       return `
-        <${entryTag} class="${getLogEntryClassName(entry.text)}${entry.eventHistoryId ? " event-history-log-entry" : ""}"${entryTypeAttributes}${eventHistoryAttributes}>
+        <${entryTag} class="${getLogEntryClassName(entry.text)}${canReplay ? " event-history-log-entry" : ""}"${entryTypeAttributes}${eventHistoryAttributes}>
           <div class="event"><span class="log-entry-title${result ? "" : " log-entry-title-only"}">${escapeHtml(normalizeGameDisplayText(title))}</span></div>
           ${result ? `<div class="result">${renderLogResultHtml(result)}</div>` : ""}
         </${entryTag}>
@@ -3788,7 +3733,7 @@ function renderEventLogSection(
               type="button"
               role="listitem"
               data-ui-log-page-index="${index}"
-              aria-label="${escapeHtml(`${timelinePage.label}：${markerTitle}`)}"
+              ${timelinePage.kind === "ending" ? 'data-ui-ending-page aria-label="结局"' : `aria-label="${escapeHtml(`${timelinePage.label}：${markerTitle}`)}"`}
               aria-pressed="${isCurrent ? "true" : "false"}"
               >
                 <span class="event-timeline-node" aria-hidden="true"></span>
@@ -3798,20 +3743,10 @@ function renderEventLogSection(
         }).join("")}
       </div>
       ${eventContentHtml}
-      <div class="log-content event-log-content" id="log-content">
+      ${page?.kind === "ending" ? "" : `<div class="log-content event-log-content" id="log-content">
         ${renderLogList(page, eventHistory)}
-      </div>
+      </div>`}
     </div>
-  `;
-}
-
-function renderDebugEventRail(): string {
-  return `
-    <section class="debug-event-rail" id="debug-event-rail" aria-label="开发事件">
-      <div class="debug-event-list">
-        ${renderDebugEventGroups()}
-      </div>
-    </section>
   `;
 }
 
@@ -3820,12 +3755,15 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
   const dateDisplayMode = getDateDisplayMode(uiState);
   const preEnrollment = isPreEnrollmentState(state);
   const pendingEvents = getSortedEventQueue(state.eventQueue);
-  const pendingBlockingCount = pendingEvents.filter((event) => event.blocking && event.deadlineMonths <= 0).length;
+  const pendingBlockingCount = pendingEvents.filter((event) => isEventBlocking(state, event)).length;
   const pendingPage = buildPendingAgendaPage(state, uiState.activePendingPage ?? 0);
   const atFirstPendingPage = pendingPage.pageIndex <= 0;
   const atLastPendingPage = pendingPage.pageIndex >= pendingPage.pageCount - 1;
   const seasonLabel = getSeasonLabel(state);
-  const role = getRoleDefinition(state.selectedRoleId);
+  const blockLinearEvents = state.blockLinearEvents !== false;
+  const eventBlockingHint = blockLinearEvents
+    ? "无分支事件：阻塞，需手动处理。点击切换为不阻塞"
+    : "无分支事件：不阻塞，下一月自动结算到期事件。点击切换为阻塞";
 
   return `
     <aside class="play-right-rail new-right-container" id="new-right-container">
@@ -3838,12 +3776,13 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
               <span class="new-time-item" id="new-time-month">${getMonthText(state, dateDisplayMode)}</span>
               <button
                 class="new-time-display-toggle"
+                data-card-icon-action
                 type="button"
                 data-action="set-date-display-mode"
                 data-date-display-mode="${dateDisplayMode === "academic" ? "calendar" : "academic"}"
                 aria-label="切换日期显示"
                 title="切换日期显示"
-              >🔄</button>
+              ><span aria-hidden="true">🔄</span></button>
               ${seasonLabel ? `<span class="new-time-item new-time-season" id="new-time-season" tabindex="0" aria-label="${escapeHtml(getSeasonEffectText(state))}" data-tooltip="${escapeHtml(getSeasonEffectText(state))}" title="${escapeHtml(getSeasonEffectText(state))}">${seasonLabel}</span>` : ""}
               <span class="new-time-item new-time-remaining" id="new-time-remaining">${getRemainingMonthsText(state)}</span>
             `}
@@ -3861,44 +3800,35 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
                 ? `<span class="center-tab-badge is-${pendingBlockingCount > 0 ? "blocking" : "available"}" aria-label="${pendingEvents.length} 个待办事件">${pendingEvents.length}</span>`
                 : ""}
             </span>
-            <div class="todo-nav-btns" aria-label="待办事件分页">
+            <div class="todo-nav-btns" aria-label="待办事件操作">
+              <button
+                class="pending-event-blocking-toggle"
+                data-card-icon-action
+                type="button"
+                data-action="set-linear-event-blocking"
+                data-ui-event-blocking="linear"
+                data-block-linear-events="${!blockLinearEvents}"
+                aria-label="无分支事件阻塞"
+                aria-pressed="${blockLinearEvents}"
+                title="${eventBlockingHint}"
+              ><span aria-hidden="true">${blockLinearEvents ? "⏸️" : "▶️"}</span></button>
               <button class="todo-nav-btn" id="pending-nav-prev" type="button" data-ui-pending-nav="prev" aria-label="上一页" ${atFirstPendingPage ? "disabled" : ""}>&lt;</button>
               <button class="todo-nav-btn" id="pending-nav-next" type="button" data-ui-pending-nav="next" aria-label="下一页" ${atLastPendingPage ? "disabled" : ""}>&gt;</button>
             </div>
           </div>
           <div class="new-calendar-content new-pending-event-content event-queue" id="pending-event-list">
-            ${renderPendingAgendaList(pendingPage)}
+            ${renderPendingAgendaList(state, pendingPage)}
           </div>
         </div>
       </div>
-      <section class="out-of-game-role-panel" aria-label="当前人物立绘">
-        <img
-          class="out-of-game-role-portrait"
-          src="${escapeHtml(getRoleDetailPortraitUrl(role.id))}"
-          width="432"
-          height="774"
-          loading="eager"
-          decoding="async"
-          alt="${escapeHtml(`${role.name}立绘`)}"
-        />
-      </section>
+      ${renderPlayHelpPanel(uiState)}
     </aside>
   `;
 }
 
 export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = {}): string {
-  const isPlaying = state.phase === "playing";
-  const showDebugEventRail = SHOW_ALL_MODULES_DURING_DEVELOPMENT
-    && isPlaying
-    && uiState.showDebugEventRail !== false;
-  const showDebugBottomBar = SHOW_ALL_MODULES_DURING_DEVELOPMENT
-    && isPlaying
-    && uiState.showDebugBottomBar !== false;
-  const debugLayoutClass = showDebugEventRail ? " has-debug-bar" : "";
-  const debugBottomClass = showDebugBottomBar ? " has-debug-bottom-bar" : "";
-
   return `
-    <main class="play-page${debugLayoutClass}${debugBottomClass}" data-phase="${state.phase}" data-scale-mode="fixed">
+    <main class="play-page" data-phase="${state.phase}" data-scale-mode="fixed">
       <section class="play-stage-shell">
         <div class="play-stage-scale">
           <section class="play-stage">
@@ -3907,13 +3837,11 @@ export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = 
                 ${renderLeftRail(state)}
                 ${renderCenterShell(state, uiState)}
                 ${renderRightRail(state, uiState)}
-                ${showDebugEventRail ? renderDebugEventRail() : ""}
               </div>
             </section>
           </section>
         </div>
       </section>
-      ${showDebugBottomBar ? renderDebugBottomBar() : ""}
       ${uiState.isFeedbackOpen ? renderGameFeedbackOverlay() : ""}
     </main>
   `;

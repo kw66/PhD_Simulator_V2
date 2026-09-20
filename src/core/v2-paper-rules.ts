@@ -7,7 +7,7 @@ import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo } from "./v2-conference-catalog";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getJournalDefinition } from "./v2-journal-system";
-import { generatePaperTopic } from "./v2-paper-topics";
+import { generatePaperTopic, type FixedPaperTopic } from "./v2-paper-topics";
 import { setPaperTotalScores } from "./v2-paper-collaboration";
 import {
   getBorderlineAcceptChance,
@@ -114,8 +114,9 @@ export function createDraftPaper(
   existingPaperCount: number,
   random: () => number = Math.random,
   calendarYear = 2023,
+  fixedTopic?: FixedPaperTopic,
 ): Paper {
-  const topic = generatePaperTopic(calendarYear, random);
+  const topic = generatePaperTopic(calendarYear, random, fixedTopic);
   return {
     id: `paper-${totalMonths}-${existingPaperCount + 1}`,
     ...topic,
@@ -174,7 +175,7 @@ export function discardDraftPaper(state: GameState, paperId: string): GameState 
   const nextSelectedPaperId = state.selectedPaperId === paperId
     ? papers.find((entry) => entry.status === "draft" || entry.status === "journal-reviewing")?.id ?? null
     : state.selectedPaperId;
-  return pushLog({ ...state, papers, selectedPaperId: nextSelectedPaperId }, `丢弃论文：${paper.title}`);
+  return { ...state, papers, selectedPaperId: nextSelectedPaperId };
 }
 
 function decayPrepublicationScore(score: number, decayRate: number): number {
@@ -185,24 +186,16 @@ function decayPrepublicationScore(score: number, decayRate: number): number {
 
 export function applyPrepublicationPaperDecay(state: GameState): GameState {
   if (state.phase !== "playing") return state;
-  const changes: string[] = [];
-  const papers = state.papers.map((paper) => {
-    if (paper.status === "published" || paper.status === "journal-reviewing") return paper;
-    const nextIdea = decayPrepublicationScore(paper.idea, paper.prepublicationDecayRate);
-    const nextExperiment = decayPrepublicationScore(paper.experiment, paper.prepublicationDecayRate);
-    const nextWriting = decayPrepublicationScore(paper.writing, paper.prepublicationDecayRate);
-    const paperChanges = [
-      ...(nextIdea < paper.idea ? [`idea -${paper.idea - nextIdea}`] : []),
-      ...(nextExperiment < paper.experiment ? [`实验 -${paper.experiment - nextExperiment}`] : []),
-      ...(nextWriting < paper.writing ? [`写作 -${paper.writing - nextWriting}`] : []),
-    ];
-    if (paperChanges.length > 0) changes.push(`${paper.title}：${paperChanges.join("、")}`);
-    return setPaperTotalScores(paper, { idea: nextIdea, experiment: nextExperiment, writing: nextWriting });
+  return { ...state, papers: state.papers.map(decayUnpublishedPaper) };
+}
+
+export function decayUnpublishedPaper(paper: Paper): Paper {
+  if (paper.status === "published" || paper.status === "journal-reviewing") return paper;
+  return setPaperTotalScores(paper, {
+    idea: decayPrepublicationScore(paper.idea, paper.prepublicationDecayRate),
+    experiment: decayPrepublicationScore(paper.experiment, paper.prepublicationDecayRate),
+    writing: decayPrepublicationScore(paper.writing, paper.prepublicationDecayRate),
   });
-  const nextState = { ...state, papers };
-  return changes.length > 0
-    ? pushLog(nextState, `论文时效：${changes.join("｜")}`)
-    : nextState;
 }
 
 export function getPaperSubmissionFailure(
@@ -230,21 +223,7 @@ export function submitPaper(
   if (!paper || paperIndex < 0) return state;
 
   const submittedScore = paper.idea + paper.experiment + paper.writing;
-  const submittedPaper: Paper = {
-    ...paper,
-    status: "reviewing",
-    target,
-    reviewMonthsLeft: PAPER_REVIEW_MONTHS,
-    submittedIdea: paper.idea,
-    submittedExperiment: paper.experiment,
-    submittedWriting: paper.writing,
-    ...(paper.collaborationScores ? { submittedCollaborationScores: { ...paper.collaborationScores } } : {}),
-    submittedMonth: state.month,
-    submittedYear: state.year,
-    conferenceHandled: false,
-    publication: null,
-    lastReview: null,
-  };
+  const submittedPaper = prepareConferenceSubmission(paper, target, state.month, state.year);
   const papers = [...state.papers];
   papers[paperIndex] = submittedPaper;
   const nextSelectedPaperId = papers.find((entry) => entry.status === "draft")?.id ?? null;
@@ -256,6 +235,25 @@ export function submitPaper(
     },
     `投稿：${paper.title} 已投 ${target} 类会议，总分 ${submittedScore}，进入 ${PAPER_REVIEW_MONTHS} 个月审稿期`,
   );
+}
+
+export function prepareConferenceSubmission(paper: Paper, target: PaperTarget, month: number, year: number): Paper {
+  if (getPaperSubmissionFailure(paper, target)) return paper;
+  return {
+    ...paper,
+    status: "reviewing",
+    target,
+    reviewMonthsLeft: PAPER_REVIEW_MONTHS,
+    submittedIdea: paper.idea,
+    submittedExperiment: paper.experiment,
+    submittedWriting: paper.writing,
+    ...(paper.collaborationScores ? { submittedCollaborationScores: { ...paper.collaborationScores } } : {}),
+    submittedMonth: month,
+    submittedYear: year,
+    conferenceHandled: false,
+    publication: null,
+    lastReview: null,
+  };
 }
 
 export function withdrawPaper(state: GameState, paperId: string): GameState {
@@ -298,6 +296,8 @@ export function withdrawPaper(state: GameState, paperId: string): GameState {
   const target = paper.target;
   const withdrawnPaper: Paper = {
     ...paper,
+    acceptedTotalMonths: undefined,
+    acceptedOrder: undefined,
     status: "draft",
     target: null,
     reviewMonthsLeft: 0,

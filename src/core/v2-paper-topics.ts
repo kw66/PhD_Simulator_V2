@@ -10,6 +10,8 @@ export interface GeneratedPaperTopic {
   prepublicationDecayRate: number;
 }
 
+export type FixedPaperTopic = Omit<GeneratedPaperTopic, "title">;
+
 interface PaperTopicDefinition {
   id: string;
   label: string;
@@ -464,14 +466,16 @@ export function getPaperHeatTierLabel(heatMultiplier: number): string {
 export function generatePaperTopic(
   calendarYear: number,
   random: () => number = Math.random,
+  fixedTopic?: FixedPaperTopic,
 ): GeneratedPaperTopic {
-  const heatMultiplier = pick(PAPER_HEAT_MULTIPLIERS, random);
+  const heatMultiplier = fixedTopic?.heatMultiplier ?? pick(PAPER_HEAT_MULTIPLIERS, random);
   const prepublicationDecayRate = Number((heatMultiplier * 0.1).toFixed(3));
   const tier = getPaperHeatTier(heatMultiplier);
   const yearIndex = getYearIndex(calendarYear);
   const activeTopics = PAPER_TOPICS.filter((topic) => topic.tiers[yearIndex] !== null);
   const topicPool = activeTopics.filter((topic) => topic.tiers[yearIndex] === tier);
-  const topic = pick(topicPool.length > 0 ? topicPool : activeTopics, random);
+  const topic = PAPER_TOPICS.find((candidate) => candidate.id === fixedTopic?.topicId)
+    ?? pick(topicPool.length > 0 ? topicPool : activeTopics, random);
   const technique = pick(topic.techniques, random);
   const goal = pick(topic.goals, random);
   const title = pick(TITLE_TEMPLATES, random)(technique, goal);

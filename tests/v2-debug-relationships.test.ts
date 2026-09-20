@@ -47,7 +47,28 @@ function expectFullGeneratedName(name: string | undefined) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("v2 debug relationship additions", () => {
-  it.each(["setup", "finished"] as const)("only logs the existing warning during %s", (phase) => {
+  it.each(relationshipTypes)("randomizes each new %s name even when month and occupancy stay the same", (type) => {
+    const initial = admittedState();
+    const state: GameState = { ...initial, month: 6, totalMonths: 6, eventQueue: [], availableRandomEvents: [] };
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.2);
+    const first = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: type });
+    const firstName = type === "lover" ? first.loverState.name : first.fellowProgressState[0]?.name;
+    const relationshipId = type === "lover" ? "lover" : first.fellowProgressState[0]!.id;
+    const removed = dispatchAction(first, "end-relationship", { relationshipId });
+
+    random.mockReturnValue(0.8);
+    for (const base of [state, removed]) {
+      const added = dispatchAction(base, "debug-add-relationship", { debugRelationshipType: type });
+      const name = type === "lover" ? added.loverState.name : added.fellowProgressState[0]?.name;
+      expectFullGeneratedName(name);
+      expect(name).not.toBe(firstName);
+      expect(added.totalMonths).toBe(state.totalMonths);
+    }
+    expectFullGeneratedName(firstName);
+    expect(type === "lover" ? first.loverState.name : first.fellowProgressState[0]?.name).toBe(firstName);
+  });
+
+  it.each(["setup", "finished"] as const)("keeps debug tools inactive during %s", (phase) => {
     const state: GameState = phase === "setup"
       ? createInitialState()
       : { ...admittedState(), phase, ending: "burnout" };
@@ -56,7 +77,7 @@ describe("v2 debug relationship additions", () => {
     for (const debugRelationshipType of relationshipTypes) {
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType });
 
-      expect(next).toEqual({
+      expect(next).toEqual(phase === "finished" ? before : {
         ...before,
         log: [expect.objectContaining({ text: "开始本轮后才能使用测试工具。" }), ...before.log],
       });
@@ -64,7 +85,7 @@ describe("v2 debug relationship additions", () => {
     }
   });
 
-  it.each(["senior", "junior", "peer"] as const)("adds a generated %s before and after enrollment without gameplay effects", (type) => {
+  it.each(["senior", "junior", "peer"] as const)("adds a generated %s with an untouched paper before and after enrollment", (type) => {
     const generated = fellowProgression.createGeneratedFellowProfileAddition(type, 23);
     const generator = vi.spyOn(fellowProgression, "createGeneratedFellowProfileAddition").mockReturnValue(generated);
     const preEnrollment = startGame();
@@ -84,7 +105,13 @@ describe("v2 debug relationship additions", () => {
       expect(generator).toHaveBeenLastCalledWith(type, expect.any(Number));
       expect(next).toEqual({
         ...before,
-        fellowProgressState: [...before.fellowProgressState, { ...expectedProfile, id: expect.any(String) }],
+        fellowProgressState: [...before.fellowProgressState, { ...expectedProfile, id: expect.any(String), researchTopic: fellowProgression.getFellowResearchTopic({ ...next.fellowProgressState.at(-1)!, researchTopic: undefined }) }],
+        fellowPapers: [...(before.fellowPapers ?? []), expect.objectContaining({
+          leadAuthorId: next.fellowProgressState.at(-1)!.id,
+          leadAuthorName: expectedProfile.name,
+          createdTotalMonths: before.totalMonths,
+          status: "draft", idea: 0, experiment: 0, writing: 0,
+        })],
         relationshipState: {
           ...before.relationshipState,
           [fellowCountKeys[type]]: before.relationshipState[fellowCountKeys[type]] + 1,
@@ -115,6 +142,10 @@ describe("v2 debug relationship additions", () => {
       expect(next).toEqual({
         ...before,
         fellowProgressState: [...before.fellowProgressState, expect.objectContaining({ type })],
+        fellowPapers: [...(before.fellowPapers ?? []), expect.objectContaining({
+          leadAuthorId: next.fellowProgressState.at(-1)!.id,
+          status: "draft", idea: 0, experiment: 0, writing: 0,
+        })],
         relationshipState: {
           ...before.relationshipState,
           [fellowCountKeys[type]]: before.relationshipState[fellowCountKeys[type]] + 1,
@@ -140,6 +171,7 @@ describe("v2 debug relationship additions", () => {
   });
 
   it("creates only the smart lover fixtures before and after enrollment using the role's gender", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     for (const state of [startGame("rich"), admittedState()]) {
       const before = structuredClone(state);
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: "lover" });
@@ -147,8 +179,11 @@ describe("v2 debug relationship additions", () => {
       expect(next).toEqual({
         ...before,
         relationshipState: { ...before.relationshipState, loverCount: 1 },
-        loverState: activateLover("smart", before.totalMonths, getRoleDefinition(before.selectedRoleId).gender),
-        loverProgressState: { ...createLoverProgressState(), active: true },
+        loverState: {
+          ...activateLover("smart", before.totalMonths, getRoleDefinition(before.selectedRoleId).gender),
+          name: expect.any(String),
+        },
+        loverProgressState: createLoverProgressState("smart", () => 0.5),
         log: next.log,
       });
       expect(next.log).toHaveLength(before.log.length + 1);
@@ -159,15 +194,17 @@ describe("v2 debug relationship additions", () => {
 
   it.each(["senior", "junior", "peer"] as const)("stores full names through real debug %s additions for both genders and preserves them next month", (type) => {
     const initial = admittedState();
-    for (const totalMonths of [6, 7]) {
+    const totalMonths = 6;
+    for (const seed of [6, 7]) {
       const state: GameState = {
         ...initial, month: totalMonths, totalMonths, eventQueue: [], availableRandomEvents: [],
       };
+      vi.spyOn(Math, "random").mockReturnValueOnce(seed / 0x100000000);
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: type });
       const profile = next.fellowProgressState[0];
 
-      expect(profile?.gender).toBe(totalMonths === 6 ? "male" : "female");
-      expect(profile?.name).toBe(fellowProgression.getStableGeneratedFellowName(totalMonths, profile!.gender));
+      expect(profile?.gender).toBe(seed === 6 ? "male" : "female");
+      expect(profile?.name).toBe(fellowProgression.getStableGeneratedFellowName(seed, profile!.gender));
       expectFullGeneratedName(profile?.name);
       const progressed = dispatchAction(next, "next-month");
       expect(progressed.totalMonths).toBe(totalMonths + 1);
@@ -188,6 +225,7 @@ describe("v2 debug relationship additions", () => {
   });
 
   it("adds an independent lover when the advisor and all four fellow cards are occupied", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     const state = fillFellowCards(admittedState());
     const before = structuredClone(state);
     expect(before.fellowProgressState).toHaveLength(4);
@@ -198,8 +236,11 @@ describe("v2 debug relationship additions", () => {
     expect(next).toEqual({
       ...before,
       relationshipState: { ...before.relationshipState, loverCount: 1 },
-      loverState: activateLover("smart", before.totalMonths, getRoleDefinition(before.selectedRoleId).gender),
-      loverProgressState: { ...createLoverProgressState(), active: true },
+      loverState: {
+        ...activateLover("smart", before.totalMonths, getRoleDefinition(before.selectedRoleId).gender),
+        name: expect.any(String),
+      },
+      loverProgressState: createLoverProgressState("smart", () => 0.5),
       log: next.log,
     });
     expect(state).toEqual(before);

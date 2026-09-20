@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { createInitialState } from "../src/core/v2-engine";
+import { createLoverProgressState } from "../src/core/v2-lover-progression";
+import { activateLover } from "../src/core/v2-lover-system";
+import type { AdvisorGrantId, GameState } from "../src/core/v2-types";
 import {
   applyMonthlyEffects,
   previewNextMonthEffects,
@@ -21,6 +24,52 @@ function createPlayingMonth(month: number, totalMonths: number, san = 10) {
 }
 
 describe("monthly effects", () => {
+  it.each([
+    [null, 1, 3], ["youth", 1.25, 3.5], ["general", 1.5, 4],
+    ["excellent", 1.75, 4.5], ["distinguished", 2, 5], ["academician", 2.25, 5.5],
+  ] satisfies Array<[AdvisorGrantId | null, number, number]>)("accumulates fractional master and PhD salary for %s without funding", (award, master, phd) => {
+    const state = createPlayingMonth(2, 2);
+    state.selectedAdvisorName = "林老师";
+    state.advisorProgressState.awards = award ? [{ id: award, awardedYear: 2023, startYear: 2024, endYear: 2027 }] : [];
+    state.player.money = 10;
+    for (const [degree, salary] of [["master", master], ["phd", phd]] as const) {
+      let current: GameState = { ...state, degree };
+      for (let paymentIndex = 1; paymentIndex <= 4; paymentIndex += 1) {
+        const payment = Math.floor(salary * paymentIndex) - Math.floor(salary * (paymentIndex - 1));
+        const before = structuredClone(current);
+        for (let repeat = 0; repeat < 2; repeat += 1) {
+          expect(previewNextMonthEffects(current).items.find((item) => item.id === "advisor-salary")?.stats.money).toBe(payment);
+        }
+        expect(current).toEqual(before);
+        const settled = applyMonthlyEffects({ ...current, month: paymentIndex + 1, totalMonths: paymentIndex + 1 });
+        expect(settled.resolution.items.find((item) => item.id === "advisor-salary")?.appliedStats.money).toBe(payment);
+        expect(settled.nextState.player.money).toBe(10 + Math.floor(salary * paymentIndex));
+        current = settled.nextState;
+      }
+      expect(current.advisorProgressState.salaryRemainder).toBe(0);
+    }
+  });
+
+  it("retains the fractional balance across promotion and conversion to PhD", () => {
+    const state = createPlayingMonth(2, 2);
+    state.selectedAdvisorName = "林老师";
+    state.advisorProgressState.awards = [{ id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2027 }];
+    const first = applyMonthlyEffects(state).nextState;
+    expect(first.advisorProgressState.salaryRemainder).toBe(0.25);
+    const promoted = applyMonthlyEffects({ ...first, advisorProgressState: {
+      ...first.advisorProgressState,
+      awards: [{ id: "general", awardedYear: 2024, startYear: 2025, endYear: 2028 }],
+    } }).nextState;
+    expect(promoted.player.money - first.player.money).toBe(1);
+    expect(promoted.advisorProgressState.salaryRemainder).toBe(0.75);
+    const phd = applyMonthlyEffects({ ...promoted, degree: "phd" }).nextState;
+    expect(phd.player.money - promoted.player.money).toBe(4);
+    expect(phd.advisorProgressState.salaryRemainder).toBe(0.75);
+    const noAdvisor = applyMonthlyEffects({ ...phd, selectedAdvisorName: null }).nextState;
+    expect(noAdvisor.advisorProgressState.salaryRemainder).toBe(0.75);
+    expect(createInitialState().advisorProgressState.salaryRemainder ?? 0).toBe(0);
+  });
+
   it("restores base SAN and applies autumn as a separate source", () => {
     const resolution = resolveMonthlyEffects(createPlayingMonth(2, 2));
 
@@ -85,22 +134,17 @@ describe("monthly effects", () => {
     ]));
   });
 
-  it("settles active lover benefits and the monthly dating cost", () => {
+  it.each(["beautiful", "smart"] as const)("does not charge monthly dates or grant old passive benefits for %s lovers", (type) => {
     const state = createPlayingMonth(8, 8, 10);
     state.sanCap = 20;
-    state.loverState = {
-      ...state.loverState,
-      active: true,
-      type: "beautiful",
-    };
-
-    const resolution = resolveMonthlyEffects(state);
-    expect(resolution.player.san).toBe(12);
-    expect(resolution.player.money).toBe(-2);
-    expect(resolution.items.map((item) => item.id)).toEqual(expect.arrayContaining([
-      "lover-recovery",
-      "lover-date-cost",
-    ]));
+    const baseline = resolveMonthlyEffects(state);
+    const dating = { ...state, loverState: activateLover(type, 1, "male"), loverProgressState: createLoverProgressState(type, () => 0) };
+    const resolution = resolveMonthlyEffects(dating);
+    expect(resolution).toEqual(baseline);
+    expect(resolution.player.san).toBe(11);
+    expect(resolution.player.money).toBe(state.player.money);
+    expect(resolution.items.some((item) => item.id.startsWith("lover-"))).toBe(false);
+    expect(applyMonthlyEffects(dating).nextState.loverProgressState).toEqual(dating.loverProgressState);
   });
 
   it("runs the automatic coffee machine independently at month start", () => {

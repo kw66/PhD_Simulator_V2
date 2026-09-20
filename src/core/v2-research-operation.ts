@@ -103,12 +103,12 @@ export function createResearchPaper(state: GameState, slotIndex: number): GameSt
     ),
     paperSlotIndex: slotIndex,
   };
-  return pushLog({
+  return {
     ...state,
     paperSlotsUnlocked: availableSlotCount,
     papers: [...state.papers, paper],
     selectedPaperId: paper.id,
-  }, `科研：在论文槽 ${slotIndex + 1} 开启${paper.title}`);
+  };
 }
 
 function canRunPaperAction(
@@ -131,7 +131,7 @@ function canRunPaperAction(
   return { allowed: true, paperIndex };
 }
 
-function generateResearchScore(
+export function generateResearchScore(
   research: number,
   currentScore: number,
   multiplier: number,

@@ -28,6 +28,7 @@ export function createInitialState(): GameState {
   const calendar = getCalendarForTotalMonths(0);
   return {
     phase: "setup",
+    blockLinearEvents: true,
     selectedRoleId: "normal",
     setupSelectedRoleId: null,
     playerName: null,
@@ -59,6 +60,7 @@ export function createInitialState(): GameState {
     actionState: { used: 0, limit: 1, aiResearchBonusUsed: false },
     relationshipState: createRelationshipState(),
     fellowProgressState: [],
+    fellowPapers: [],
     conferenceEncounterState: createConferenceEncounterState(),
     conferenceLocationSeed: null,
     conferenceCareerState: createConferenceCareerState(),

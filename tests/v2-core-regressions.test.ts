@@ -108,6 +108,11 @@ describe("v2 core regression boundaries", () => {
     });
     expect(state.relationshipState.juniorCount).toBe(1);
     expect(state.fellowProgressState).toHaveLength(1);
+    expect(state.fellowPapers).toEqual([expect.objectContaining({
+      leadAuthorId: state.fellowProgressState[0]!.id,
+      createdTotalMonths: state.totalMonths,
+      status: "draft", idea: 0, experiment: 0, writing: 0,
+    })]);
     expect(state.eventQueue).toHaveLength(0);
 
     let rejected = {

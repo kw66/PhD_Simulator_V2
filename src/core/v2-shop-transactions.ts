@@ -6,10 +6,8 @@ import {
 import { applyAiActivationEffects } from "./v2-ai-activation";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import {
-  COFFEE_MACHINE_PRICE,
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
   getAvailableCoffeeMachineUpgrades,
-  getCoffeeBuyPrice,
   getCoffeeMachineSellPrice,
   getCurrentCoffeeBonus,
 } from "./v2-coffee-system";
@@ -18,16 +16,15 @@ import {
   canBuyShopItem,
   canSellShopItem,
   getGpuTierDefinition,
-  getNextGpuPrice,
   getNextGpuTierDefinition,
   getAvailableShopUpgrades,
   getShopItemDefinition,
-  getShopItemSellPrice,
   getShopUpgradeDefinition,
 } from "./v2-shop-items";
 import { getNextBikeTierDefinition } from "./v2-bike-system";
 import { getSupportItemDefinition, getSupportItemSellPrice, isSupportItemOwned } from "./v2-support-items";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "./v2-development-flags";
+import { consumeLoverGift, getGiftAwareShopSellPrice, getLoverGiftQuote, getShopActionBasePrice, recordBikeGiftDiscount, recordShopInvestment } from "./v2-lover-gift";
 import type { AiSlotId, CoffeeMachineUpgradeId, DispatchPayload, GameActionId, GameState, ShopItemId, ShopUpgradeId, SupportItemId } from "./v2-types";
 
 type CoffeeMachineUpgrade = Exclude<CoffeeMachineUpgradeId, null>;
@@ -73,46 +70,21 @@ function isCoffeeMachineUpgrade(value: string): value is CoffeeMachineUpgrade {
   return COFFEE_MACHINE_UPGRADE_DEFINITIONS.some((upgrade) => upgrade.id === value);
 }
 
-function getCoffeeMachinePurchasePrice(state: GameState): number {
-  return state.shopState.entitlements.coffeeMachinePurchase > 0 ? 0 : COFFEE_MACHINE_PRICE;
+function payForPurchase(state: GameState, price: number, usesGift: boolean): GameState {
+  return updateMoney(usesGift ? consumeLoverGift(state) : state, state.player.money - price);
 }
 
-function getCoffeeMachineUpgradePurchasePrice(state: GameState, upgradeId: CoffeeMachineUpgrade): number {
-  const basePrice = COFFEE_MACHINE_UPGRADE_DEFINITIONS.find((upgrade) => upgrade.id === upgradeId)?.price ?? 0;
-  return state.shopState.entitlements.coffeeMachineUpgrade > 0 ? 0 : basePrice;
-}
-
-function getShopItemPurchasePrice(state: GameState, itemId: ShopItemId): number | null {
-  if (itemId === "gpu_buy") {
-    const basePrice = getNextGpuPrice(state.shopState.gpuLevel);
-    if (basePrice === null) return null;
-    return state.shopState.entitlements.gpuTransaction > 0 ? 0 : basePrice;
-  }
-
-  if (itemId === "bike") {
-    return getNextBikeTierDefinition(state.shopState.bikeLevel)?.price ?? null;
-  }
-
-  const basePrice = getShopItemDefinition(itemId).price;
-  if (itemId === "keyboard" && state.shopState.entitlements.keyboardPurchase > 0) return 0;
-  if (itemId === "monitor" && state.shopState.entitlements.monitorPurchase > 0) return 0;
-  if (itemId === "chair" && state.shopState.entitlements.chairPurchase > 0) return 0;
-  return basePrice;
-}
-
-function getShopUpgradePurchasePrice(state: GameState, upgradeId: ShopUpgradeId): number {
-  const basePrice = getShopUpgradeDefinition(upgradeId).price;
-  return upgradeId.startsWith("chair-") && state.shopState.entitlements.chairUpgrade > 0
-    ? 0
-    : basePrice;
+function purchaseCostText(price: number, usesGift: boolean): string {
+  return usesGift ? "恋人赠礼，本次免费" : price === 0 ? "导师经费报销" : `金币 -${price}`;
 }
 
 function buyShopItem(state: GameState, itemId: ShopItemId): GameState {
   const item = getShopItemDefinition(itemId);
   const view = { shopState: state.shopState, eventSupport: state.eventSupport };
   if (!canBuyShopItem(view, itemId)) return fail(state, `${item.name} 当前无法购买。`);
-  const price = getShopItemPurchasePrice(state, itemId);
-  if (price === null) return fail(state, `${item.name} 当前无法购买。`);
+  const basePrice = getShopActionBasePrice(state, "buy-shop-item", { shopItemId: itemId });
+  if (basePrice === null) return fail(state, `${item.name} 当前无法购买。`);
+  const { price, usesGift } = getLoverGiftQuote(state, basePrice);
   if (state.player.money < price) return fail(state, `金币不足，购买${item.name}需要 ${price} 金币。`);
 
   let shopState = {
@@ -149,20 +121,23 @@ function buyShopItem(state: GameState, itemId: ShopItemId): GameState {
     shopState.bikeOwned = true;
     shopState.bikeLevel = nextTier.level;
     shopState.investments.bike = (shopState.investments.bike ?? 0) + price;
+    if (usesGift) shopState.investments = recordBikeGiftDiscount({ ...state, shopState }, basePrice);
     transactionText = shopState.bikeLevel === 1
       ? `购买${nextTier.name}`
       : `自行车升级为${nextTier.name}`;
   } else if (itemId === "ebike") {
     shopState.ebikeOwned = true;
+    shopState.investments = recordShopInvestment(state, itemId, price);
   } else if (itemId === "down_jacket") {
     eventSupport.hasDownJacket = true;
+    shopState.investments = recordShopInvestment(state, itemId, price);
   }
 
   return pushLog({
-    ...updateMoney(state, state.player.money - price),
+    ...payForPurchase(state, price, usesGift),
     shopState,
     eventSupport,
-  }, `商店：${transactionText}，${price === 0 ? "导师经费报销" : `金币 -${price}`}。`);
+  }, `商店：${transactionText}，${purchaseCostText(price, usesGift)}。`);
 }
 
 function sellShopItem(state: GameState, itemId: ShopItemId): GameState {
@@ -170,7 +145,7 @@ function sellShopItem(state: GameState, itemId: ShopItemId): GameState {
   const view = { shopState: state.shopState, eventSupport: state.eventSupport };
   if (!canSellShopItem(view, itemId)) return fail(state, `你没有可出售的${item.name}。`);
 
-  const sellPrice = getShopItemSellPrice(view, itemId);
+  const sellPrice = getGiftAwareShopSellPrice(state, itemId);
   const shopState = {
     ...state.shopState,
     investments: { ...state.shopState.investments },
@@ -196,10 +171,13 @@ function sellShopItem(state: GameState, itemId: ShopItemId): GameState {
     shopState.bikeOwned = false;
     shopState.bikeLevel = 0;
     shopState.investments.bike = 0;
+    shopState.investments = recordShopInvestment({ ...state, shopState }, "bikeGiftDiscount");
   } else if (itemId === "ebike") {
     shopState.ebikeOwned = false;
+    shopState.investments = recordShopInvestment(state, itemId);
   } else if (itemId === "down_jacket") {
     eventSupport.hasDownJacket = false;
+    shopState.investments = recordShopInvestment(state, itemId);
   }
 
   return pushLog({
@@ -218,7 +196,7 @@ function upgradeShopItem(state: GameState, upgradeId: ShopUpgradeId): GameState 
   const itemId = getShopUpgradeItemId(upgradeId);
   const available = getAvailableShopUpgrades({ shopState: state.shopState }, itemId).some((entry) => entry.id === upgradeId);
   if (!available) return fail(state, `${upgrade.name} 当前无法升级。`);
-  const price = getShopUpgradePurchasePrice(state, upgradeId);
+  const { price, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "upgrade-shop-item", { shopUpgradeId: upgradeId })!);
   if (state.player.money < price) return fail(state, `金币不足，升级${upgrade.name}需要 ${price} 金币。`);
 
   const upgradeName = upgradeId.split("-")[1] as "advanced" | "massage" | "torture" | "spike" | "hammock";
@@ -233,13 +211,13 @@ function upgradeShopItem(state: GameState, upgradeId: ShopUpgradeId): GameState 
     if (shopState.entitlements.chairUpgrade > 0) shopState.entitlements.chairUpgrade -= 1;
   }
   return pushLog({
-    ...updateMoney(state, state.player.money - price),
+    ...payForPurchase(state, price, usesGift),
     shopState,
-  }, `商店：升级${upgrade.name}，${price === 0 ? "导师经费报销" : `金币 -${price}`}。`);
+  }, `商店：升级${upgrade.name}，${purchaseCostText(price, usesGift)}。`);
 }
 
 function buyCoffee(state: GameState): GameState {
-  const coffeePrice = getCoffeeBuyPrice(state.coffeeState);
+  const { price: coffeePrice, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "buy-coffee", {})!);
   const coffeeState = state.coffeeState;
   if (!coffeeState.machineOwned) return fail(state, "需要先购买咖啡机，才能生产冰美式。 ");
   if (coffeeState.machineUpgrade !== "unlimited" && coffeeState.coffeePurchaseCountThisMonth >= 1) {
@@ -257,14 +235,14 @@ function buyCoffee(state: GameState): GameState {
     machineTrackedCoffeeCount: coffeeState.machineTrackedCoffeeCount + 1,
   };
   return pushLog({
-    ...updateMoney(state, state.player.money - coffeePrice),
+    ...payForPurchase(state, coffeePrice, usesGift),
     coffeeState: nextCoffeeState,
     player: {
       ...state.player,
       money: state.player.money - coffeePrice,
       san: nextSan,
     },
-  }, `商店：购买冰美式，金币 -${coffeePrice}；SAN +${actualCoffeeGain}。`);
+  }, `商店：购买冰美式，${purchaseCostText(coffeePrice, usesGift)}；SAN +${actualCoffeeGain}。`);
 }
 
 function sellCoffeeMachine(state: GameState): GameState {
@@ -285,7 +263,7 @@ function sellCoffeeMachine(state: GameState): GameState {
 
 function buyCoffeeMachine(state: GameState): GameState {
   if (state.coffeeState.machineOwned) return fail(state, "你已经拥有咖啡机。 ");
-  const price = getCoffeeMachinePurchasePrice(state);
+  const { price, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "buy-coffee-machine", {})!);
   if (state.player.money < price) return fail(state, `金币不足，购买咖啡机需要 ${price} 金币。`);
   const shopState = {
     ...state.shopState,
@@ -293,20 +271,20 @@ function buyCoffeeMachine(state: GameState): GameState {
   };
   if (shopState.entitlements.coffeeMachinePurchase > 0) shopState.entitlements.coffeeMachinePurchase -= 1;
   return pushLog({
-    ...updateMoney(state, state.player.money - price),
+    ...payForPurchase(state, price, usesGift),
     shopState,
     coffeeState: {
       ...state.coffeeState,
       machineOwned: true,
       machineInvestment: price,
     },
-  }, `商店：购买咖啡机，${price === 0 ? "导师经费报销" : `金币 -${price}`}。`);
+  }, `商店：购买咖啡机，${purchaseCostText(price, usesGift)}。`);
 }
 
 function upgradeCoffeeMachine(state: GameState, upgradeId: CoffeeMachineUpgrade): GameState {
   const upgrade = getAvailableCoffeeMachineUpgrades(state.coffeeState).find((entry) => entry.id === upgradeId);
   if (!upgrade) return fail(state, "该咖啡机升级当前无法使用。 ");
-  const price = getCoffeeMachineUpgradePurchasePrice(state, upgradeId);
+  const { price, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "upgrade-coffee-machine", { shopUpgradeId: upgradeId })!);
   if (state.player.money < price) return fail(state, `金币不足，升级${upgrade.name}需要 ${price} 金币。`);
   const shopState = {
     ...state.shopState,
@@ -314,14 +292,14 @@ function upgradeCoffeeMachine(state: GameState, upgradeId: CoffeeMachineUpgrade)
   };
   if (shopState.entitlements.coffeeMachineUpgrade > 0) shopState.entitlements.coffeeMachineUpgrade -= 1;
   return pushLog({
-    ...updateMoney(state, state.player.money - price),
+    ...payForPurchase(state, price, usesGift),
     shopState,
     coffeeState: {
       ...state.coffeeState,
       machineUpgrade: upgrade.id,
       machineInvestment: state.coffeeState.machineInvestment + price,
     },
-  }, `商店：升级${upgrade.name}，${price === 0 ? "导师经费报销" : `金币 -${price}`}。`);
+  }, `商店：升级${upgrade.name}，${purchaseCostText(price, usesGift)}。`);
 }
 
 function toggleCoffeeSubscription(state: GameState): GameState {
@@ -340,36 +318,40 @@ function toggleCoffeeSubscription(state: GameState): GameState {
 function buySupportItem(state: GameState, itemId: SupportItemId): GameState {
   const item = getSupportItemDefinition(itemId);
   if (isSupportItemOwned(state.eventSupport, itemId)) return fail(state, `你已经拥有${item.name}。`);
-  if (state.player.money < item.price) return fail(state, `金币不足，购买${item.name}需要 ${item.price} 金币。`);
+  const { price, usesGift } = getLoverGiftQuote(state, item.price);
+  if (state.player.money < price) return fail(state, `金币不足，购买${item.name}需要 ${price} 金币。`);
   const eventSupport = { ...state.eventSupport };
   if (itemId === "badminton_racket") eventSupport.hasBadmintonRacket = true;
   if (itemId === "parasol") eventSupport.hasParasol = true;
   return pushLog({
-    ...updateMoney(state, state.player.money - item.price),
+    ...payForPurchase(state, price, usesGift),
+    shopState: { ...state.shopState, investments: recordShopInvestment(state, itemId, price) },
     eventSupport,
-  }, `商店：购买${item.name}，金币 -${item.price}。`);
+  }, `商店：购买${item.name}，${purchaseCostText(price, usesGift)}。`);
 }
 
 function sellSupportItem(state: GameState, itemId: SupportItemId): GameState {
   const item = getSupportItemDefinition(itemId);
   if (!isSupportItemOwned(state.eventSupport, itemId)) return fail(state, `你没有可出售的${item.name}。`);
+  const sellPrice = getGiftAwareShopSellPrice(state, itemId);
   const eventSupport = { ...state.eventSupport };
   if (itemId === "badminton_racket") eventSupport.hasBadmintonRacket = false;
   if (itemId === "parasol") eventSupport.hasParasol = false;
   return pushLog({
-    ...updateMoney(state, state.player.money + getSupportItemSellPrice(itemId)),
+    ...updateMoney(state, state.player.money + sellPrice),
+    shopState: { ...state.shopState, investments: recordShopInvestment(state, itemId) },
     eventSupport,
-  }, `商店：出售${item.name}，金币 +${getSupportItemSellPrice(itemId)}。`);
+  }, `商店：出售${item.name}，金币 +${sellPrice}。`);
 }
 
 function buyAiMonth(state: GameState, slot: AiSlotId): GameState {
   const model = getAiModelForTotalMonths(state.totalMonths, slot);
   const subscription = getAiState(state).subscriptions[slot];
   if (subscription.active) return fail(state, `${model.name} 本月已经订购。`);
-  const price = hasAiReimbursement(state) ? 0 : model.price;
+  const { price, usesGift } = getLoverGiftQuote(state, hasAiReimbursement(state) ? 0 : model.price);
   if (state.player.money < price) return fail(state, `金币不足，${model.name}本月需要 ${price} 金币。`);
   const purchasedState = syncAiBuffs({
-    ...updateMoney(state, state.player.money - price),
+    ...payForPurchase(state, price, usesGift),
     aiShopState: {
       subscriptions: {
         ...getAiState(state).subscriptions,
@@ -386,7 +368,8 @@ function buyAiMonth(state: GameState, slot: AiSlotId): GameState {
   const activated = applyAiActivationEffects(purchasedState, [model]);
   const effectDetails = [...activated.polishDetails, ...activated.readingDetails];
   const effectText = effectDetails.length > 0 ? `；${effectDetails.join("；")}` : "";
-  return pushLog(activated.nextState, `商店：${price === 0 ? "报销" : "购买"}${model.name}${price > 0 ? `，金币 -${price}` : ""}，本月生效${effectText}。`);
+  const costText = usesGift ? "恋人赠礼，本次免费" : hasAiReimbursement(state) ? "导师经费报销" : price === 0 ? "免费" : `金币 -${price}`;
+  return pushLog(activated.nextState, `商店：购买${model.name}，${costText}，本月生效${effectText}。`);
 }
 
 function toggleAiSubscription(state: GameState, slot: AiSlotId): GameState {
@@ -447,28 +430,7 @@ export function applyShopAction(state: GameState, actionId: ShopActionId, payloa
   }
 }
 
-export function getShopActionPrice(
-  state: GameState,
-  actionId: "buy-shop-item" | "upgrade-shop-item" | "buy-coffee" | "buy-coffee-machine" | "upgrade-coffee-machine" | "buy-ai-month",
-  payload: Pick<DispatchPayload, "shopItemId" | "shopUpgradeId" | "aiSlotId">,
-): number | null {
-  if (actionId === "buy-shop-item" && payload.shopItemId) return getShopItemPurchasePrice(state, payload.shopItemId);
-  if (actionId === "upgrade-shop-item" && payload.shopUpgradeId) {
-    return getShopUpgradePurchasePrice(state, payload.shopUpgradeId as ShopUpgradeId);
-  }
-  if (actionId === "buy-coffee") return getCoffeeBuyPrice(state.coffeeState);
-  if (actionId === "buy-coffee-machine") return getCoffeeMachinePurchasePrice(state);
-  if (actionId === "upgrade-coffee-machine" && payload.shopUpgradeId) {
-    return isCoffeeMachineUpgrade(payload.shopUpgradeId)
-      ? getCoffeeMachineUpgradePurchasePrice(state, payload.shopUpgradeId)
-      : null;
-  }
-  if (actionId === "buy-ai-month" && payload.aiSlotId) {
-    const model = getAiModelForTotalMonths(state.totalMonths, payload.aiSlotId);
-    return hasAiReimbursement(state) ? 0 : model.price;
-  }
-  return null;
-}
+export { getShopActionPrice } from "./v2-lover-gift";
 
 export function isSupportItemOwnedInState(state: GameState, itemId: SupportItemId): boolean {
   return isSupportItemOwned(state.eventSupport, itemId);

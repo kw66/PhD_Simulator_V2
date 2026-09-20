@@ -5,7 +5,6 @@ import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
-import { getConferencePublicationRewardPreview } from "../src/core/v2-publication-system";
 import {
   applyPublicationTalentRewards,
   getPublicationTalentChecklist,
@@ -36,63 +35,58 @@ function getTalentCard(html: string, id: string): string {
 }
 
 describe("v2 publication growth transparency", () => {
-  it("previews all conference awards without adding research ability rewards", () => {
+  it.each([false, true])("preserves every publication talent icon while showing completed status %s in its badge", (completed) => {
     const state = createStartedGameState("normal");
-    const expected = {
-      A: { Poster: [6, 2], Spotlight: [6, 2], Oral: [8, 3], "Best Paper Candidate": [12, 4], "Best Paper": [12, 4] },
-      B: { Poster: [3, 1], Spotlight: [3, 1], Oral: [4, 1], "Best Paper Candidate": [5, 2], "Best Paper": [5, 2] },
-      C: { Poster: [2, 0], Spotlight: [2, 0], Oral: [2, 0], "Best Paper Candidate": [3, 1], "Best Paper": [3, 1] },
-    } as const;
-
-    for (const target of ["A", "B", "C"] as const) {
-      for (const acceptType of ["Poster", "Spotlight", "Oral", "Best Paper Candidate", "Best Paper"] as const) {
-        const [sanReward, favorReward] = expected[target][acceptType];
-        expect(getConferencePublicationRewardPreview(state, target, acceptType)).toEqual({
-          baseSanReward: sanReward,
-          baseFavorReward: favorReward,
-          rewardReductionCount: 0,
-          sanReward,
-          favorReward,
-        });
-      }
+    if (completed) {
+      const bestPaper = publishedPaper("A", "Best Paper");
+      state.externalPublications = [
+        { ...bestPaper, id: "best-paper", rejectionCount: 3, publication: { ...bestPaper.publication!, highlyCited: true } },
+        { ...publishedPaper("A", "Best Paper", true), id: "coauthor-best-paper" },
+        { ...publishedJournal("nmi"), id: "nmi-paper" },
+        { ...publishedJournal("nature"), id: "nature-paper" },
+      ];
+      state.totalCitations = 10000;
+    }
+    const checklist = getPublicationTalentChecklist(state);
+    const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "talent", activeTalentTab: "publication" });
+    for (const item of checklist) {
+      const card = getTalentCard(html, `publication-talent-${item.id}`);
+      expect(item.completed).toBe(completed);
+      expect(card.match(/class="publication-talent-icon"/g)).toHaveLength(1);
+      expect(card).toContain(`<span class="publication-talent-icon" aria-hidden="true">${item.icon}</span>`);
+      expect(card).toContain(`<strong>${item.name}</strong>`);
+      expect(card).toContain(`class="talent-item-tag ${completed ? "is-active" : "is-inactive"}">${completed ? "已达成" : "未达成"}</span>`);
+      expect(card).not.toMatch(/publication-talent-check|>✓<|>—</);
+      expect(card.indexOf('class="publication-talent-icon"')).toBeLessThan(card.indexOf(`<strong>${item.name}</strong>`));
     }
   });
 
-  it("counts higher-ranked first-author publications across both lists, not drafts, coauthors or journals", () => {
+  it.each(["conference", "journal"])("awards perseverance once after the same first-author %s paper survives three rejections", (venue) => {
     const state = createStartedGameState("normal");
-    state.papers = [publishedPaper("A", "Poster"), publishedPaper("A", "Oral"), createDraftPaper(1, 1)];
-    state.externalPublications = [
-      publishedPaper("B", "Best Paper"),
-      publishedPaper("C", "Poster"),
-      publishedPaper("A", "Best Paper", true),
-      { ...publishedPaper("A", "Best Paper"), target: null, journalTarget: "nature" },
-    ];
-    const snapshot = structuredClone(state);
-
-    expect(getConferencePublicationRewardPreview(state, "A", "Oral")).toMatchObject({
-      rewardReductionCount: 1, sanReward: 7, favorReward: 3,
-    });
-    expect(getConferencePublicationRewardPreview(state, "A", "Poster")).toMatchObject({
-      rewardReductionCount: 2, sanReward: 4, favorReward: 1,
-    });
-    expect(getConferencePublicationRewardPreview(state, "B", "Poster")).toMatchObject({
-      rewardReductionCount: 3, sanReward: 1, favorReward: 0,
-    });
-    expect(getConferencePublicationRewardPreview(state, "C", "Poster").rewardReductionCount).toBe(4);
-    expect(state).toEqual(snapshot);
+    state.player.san = 0;
+    const paper = { ...(venue === "journal" ? publishedJournal("pami") : publishedPaper("C", "Poster")), rejectionCount: 3 };
+    state.externalPublications = [{ ...paper, rejectionCount: 2 }];
+    const before = applyPublicationTalentRewards(state);
+    const claimedBefore = before.publicationTalentState!.claimedIds;
+    expect(claimedBefore).not.toContain("perseverance");
+    const completed = applyPublicationTalentRewards({ ...before, externalPublications: [paper] });
+    expect(completed.publicationTalentState!.claimedIds).toEqual([...claimedBefore, "perseverance"]);
+    expect(completed.player.san).toBe(before.player.san + 4);
+    expect(completed.player.research).toBe(before.player.research + 1);
+    expect(completed.player.favor).toBe(before.player.favor);
+    const repeated = { ...completed, externalPublications: [paper, { ...paper, id: "second-rejected-paper" }] };
+    expect(applyPublicationTalentRewards(repeated)).toEqual(repeated);
   });
 
-  it("preserves pending-batch reductions and lower bounds without applying SAN caps or favor resistance in previews", () => {
+  it("does not combine rejections across papers or award perseverance for drafts and coauthored papers", () => {
     const state = createStartedGameState("normal");
-    state.player.san = state.sanCap;
-    state.player.favor = 20;
-
-    expect(getConferencePublicationRewardPreview(state, "A", "Poster", 2)).toMatchObject({
-      rewardReductionCount: 2, sanReward: 4, favorReward: 1,
-    });
-    expect(getConferencePublicationRewardPreview(state, "A", "Poster", 100)).toMatchObject({
-      rewardReductionCount: 100, sanReward: 1, favorReward: 0,
-    });
+    state.externalPublications = [
+      { ...publishedPaper("A", "Poster", true), rejectionCount: 3 },
+      { ...publishedPaper("C", "Poster"), rejectionCount: 2 },
+      { ...publishedPaper("C", "Poster"), rejectionCount: 1 },
+    ];
+    state.papers = [{ ...createDraftPaper(1, 0), rejectionCount: 3 }];
+    expect(getPublicationTalentChecklist(state).find((item) => item.id === "perseverance")?.completed).toBe(false);
   });
 
   it("renders the publication talent checklist in its own tab", () => {
@@ -101,9 +95,20 @@ describe("v2 publication growth transparency", () => {
     const publicationList = html;
 
     expect(html).toContain('data-ui-talent-tab="publication"');
-    expect(publicationList.match(/data-talent-item-id="publication-talent-/g)).toHaveLength(12);
-    expect(publicationList).toContain("首发论文");
-    expect(publicationList).toContain("SAN+2 ｜ 好感+1 ｜ 社交+0 ｜ 科研+1 ｜ 科研上限+0");
+    expect(publicationList.match(/data-talent-item-id="publication-talent-/g)).toHaveLength(13);
+    expect(publicationList).not.toContain('data-publication-group=');
+    expect(publicationList.match(/<article[^>]*publication-talent-card/g)).toHaveLength(13);
+    expect(getTalentCard(html, "publication-talent-first-paper")).toContain("<strong>研究之始</strong>");
+    expect(getTalentCard(html, "publication-talent-first-paper")).toContain('class="talent-item-desc publication-talent-condition">一作发表任意论文');
+    expect(publicationList).toContain("学术影响·Ⅰ");
+    expect(publicationList).toContain("学术影响·Ⅱ");
+    expect(publicationList).toContain("学术影响·Ⅲ");
+    expect(publicationList).toContain('<span>SAN</span><strong>+2</strong>');
+    expect(publicationList).toContain('<span>好感</span><strong>+1</strong>');
+    expect(publicationList).toContain('<span>科研</span><strong>+1</strong>');
+    expect(getTalentCard(html, "publication-talent-first-paper")).toContain('<span class="publication-talent-icon" aria-hidden="true">📄</span>');
+    expect(getTalentCard(html, "publication-talent-first-paper")).not.toMatch(/社交\+0|科研上限\+0/);
+    expect(getTalentCard(html, "publication-talent-first-paper")).toContain('class="talent-item-tag is-inactive">未达成</span>');
     expect(getTalentCard(html, "publication-talent-first-paper")).not.toContain("科研分");
     expect(html).not.toContain('data-talent-item-id="conference-publication-growth"');
     expect(html).not.toContain('data-talent-item-id="journal-publication-growth"');
@@ -119,9 +124,10 @@ describe("v2 publication growth transparency", () => {
     expect(completedIds).toEqual(["first-paper", "first-a-or-journal", "first-a-best-paper"]);
 
     const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "talent", activeTalentTab: "publication" });
-    expect(getTalentCard(html, "publication-talent-first-paper")).toContain("✅");
-    expect(getTalentCard(html, "publication-talent-first-a-or-journal")).toContain("✅");
-    expect(getTalentCard(html, "publication-talent-first-a-best-paper")).toContain("✅");
+    expect(getTalentCard(html, "publication-talent-first-paper")).toContain('<span class="publication-talent-icon" aria-hidden="true">📄</span>');
+    expect(getTalentCard(html, "publication-talent-first-paper")).toContain('class="talent-item-tag is-active">已达成</span>');
+    expect(getTalentCard(html, "publication-talent-first-a-or-journal")).toContain('<span class="publication-talent-icon" aria-hidden="true">🏅</span>');
+    expect(getTalentCard(html, "publication-talent-first-a-best-paper")).toContain('<span class="publication-talent-icon" aria-hidden="true">🏆</span>');
   });
 
   it("does not count Best Paper Candidate as Best Paper", () => {

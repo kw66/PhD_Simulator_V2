@@ -145,9 +145,6 @@ describe("v2 before grad school events", () => {
       kind: "advisor-confirm",
       advisorCandidate: {
         advisorName: "梁哲哲",
-        researchResource: 4,
-        affinity: 4,
-        taskMultiplier: 6,
       },
     });
     expect(visibleCopy).not.toContain("分配");
@@ -172,8 +169,8 @@ describe("v2 before grad school events", () => {
     expect(lastInfo.description).toContain(
       "周报为主；项目可选；不限制实习；同门带得多；可借校内算力；比较随和；组内常交流；方向较稳定；平时较松",
     );
-    expect(firstCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
-    expect(lastCandidate).toMatchObject({ researchResource: 4, affinity: 4, taskMultiplier: 6 });
+    expect(firstCandidate).toEqual({ advisorName: "李旭旭" });
+    expect(lastCandidate).toEqual({ advisorName: "王江" });
   });
 
   it("provides six variants across every lecturer information category", () => {
@@ -236,10 +233,8 @@ describe("v2 before grad school events", () => {
       expect(state.log).toEqual(originalLog);
       expect(refreshedEvent?.description).not.toBe(originalEvent.description);
       expect(refreshedCandidate?.advisorName).not.toBe(originalCandidate?.advisorName);
-      expect(refreshedCandidate).toMatchObject({
-        researchResource: 4,
-        affinity: 4,
-        taskMultiplier: 6,
+      expect(refreshedCandidate).toEqual({
+        advisorName: expect.any(String),
       });
       expect(state.player).toEqual(originalPlayer);
       expect(state.advisorProgressState).toEqual(originalAdvisorProgress);
@@ -285,11 +280,14 @@ describe("v2 before grad school events", () => {
     expect(resolved.nextState.selectedAdvisorName).toBe("李旭旭");
     expect(resolved.nextState.graduationScoreTarget).toBe(1);
     expect(resolved.nextState.relationshipState.advisorCount).toBe(1);
-    expect(resolved.nextState.advisorProgressState).toMatchObject({
-      researchResource: 4,
-      affinity: 4,
-      taskMax: 44,
-      relationMax: 40,
+    expect(resolved.nextState.advisorProgressState).toEqual({
+      researchAccumulation: 20,
+      funding: 0,
+      awards: [],
+      pendingApplication: null,
+      countedPaperIds: [],
+      lastSettledTotalMonths: null,
+      lastHorizontalTotalMonths: null,
     });
     expect(resolved.outcome).toContain("加入李旭旭讲师的课题组");
     expect(resolved.outcome).toContain("进了实验室群");

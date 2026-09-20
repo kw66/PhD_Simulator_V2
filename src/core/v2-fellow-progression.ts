@@ -1,8 +1,10 @@
 import type { FellowProfileAddition, FellowProgressProfile, FellowTaskType, FellowTypeId, Gender } from "./v2-types";
 import { pickStableRandomName } from "./v2-random-name";
+import { generatePaperTopic, type FixedPaperTopic } from "./v2-paper-topics";
+import { getAcademicCalendarYear } from "./v2-calendar";
+import { getCalendarForTotalMonths } from "./v2-progression";
 
-const FELLOW_TASK_MAX = 60;
-const FELLOW_RELATION_MAX = 40;
+const FELLOW_TASK_MAX = 100;
 
 const FELLOW_CONFIG: Record<FellowTypeId, {
   taskType: FellowTaskType;
@@ -64,16 +66,29 @@ export function createGeneratedFellowProfileAddition(
 ): FellowProfileAddition {
   const normalizedSeed = Math.abs(Math.floor(seed));
   const profileBase = type === "senior"
-    ? { research: 4 + normalizedSeed % 9, affinity: 2 + normalizedSeed % 2 }
+    ? { research: 6 + normalizedSeed % 4, affinity: 1 }
     : type === "peer"
-      ? { research: 3 + normalizedSeed % 7, affinity: 3 + normalizedSeed % 3 }
-      : { research: normalizedSeed % 7, affinity: 2 + normalizedSeed % 3 };
+      ? { research: 3 + normalizedSeed % 4, affinity: 1 }
+      : { research: normalizedSeed % 4, affinity: 1 };
 
   return { type, gender, name: getStableGeneratedFellowName(seed, gender), ...profileBase };
 }
 
 function createFellowProgressProfileId(type: FellowTypeId, startTotalMonths: number): string {
   return `${type}-${startTotalMonths}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function getFellowResearchTopic(profile: Pick<FellowProgressProfile, "id" | "startTotalMonths" | "researchTopic">): FixedPaperTopic {
+  if (profile.researchTopic) return profile.researchTopic;
+  let seed = 2166136261;
+  for (const character of profile.id) seed = Math.imul(seed ^ character.charCodeAt(0), 16777619) >>> 0;
+  const random = (): number => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const calendar = getCalendarForTotalMonths(profile.startTotalMonths);
+  const { topicId, topicLabel, heatMultiplier, prepublicationDecayRate } = generatePaperTopic(getAcademicCalendarYear(calendar.year, calendar.month), random);
+  return { topicId, topicLabel, heatMultiplier, prepublicationDecayRate };
 }
 
 export function createCustomFellowProgressProfile(input: {
@@ -90,6 +105,7 @@ export function createCustomFellowProgressProfile(input: {
   return {
     id,
     name: getFellowName({ id, name: input.name }),
+    researchTopic: getFellowResearchTopic({ id, startTotalMonths: input.startTotalMonths }),
     type: input.type,
     gender: input.gender,
     research: Math.max(0, Math.floor(input.research)),
@@ -97,10 +113,8 @@ export function createCustomFellowProgressProfile(input: {
     taskType: input.taskType ?? config.taskType,
     taskProgress: 0,
     taskMax: FELLOW_TASK_MAX,
-    relationProgress: 0,
-    relationMax: FELLOW_RELATION_MAX,
-    canInteract: false,
     taskUsedThisMonth: false,
     startTotalMonths: input.startTotalMonths,
+    affinityRewardedPaperIds: [],
   };
 }

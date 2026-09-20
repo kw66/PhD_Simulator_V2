@@ -65,6 +65,7 @@ function hasRemainingBuffEffects(buff: Buff): boolean {
 
   return hasNumericRecordValue(buff.monthlyStats as Record<string, unknown> | undefined)
     || Number.isFinite(buff.activeOperationSanMultiplier)
+    || Number.isFinite(buff.activeOperationSanDelta)
     || Number.isFinite(buff.relationshipOperationSanDelta)
     || hasActionEffect
     || hasNumericRecordValue(buff.paperPolishEffects as Record<string, unknown> | undefined)
@@ -93,10 +94,14 @@ export function getActiveOperationSanCost(
   const resolvedCost = applyMultipliersThenAdditions(
     normalizedCost,
     [getActiveOperationSanMultiplier(buffs, operation)],
-    [fixedSanDelta],
+    [fixedSanDelta + getActiveOperationSanDelta(buffs)],
     "ceil",
   );
   return Math.max(0, resolvedCost);
+}
+
+export function getActiveOperationSanDelta(buffs: readonly Buff[]): number {
+  return buffs.reduce((total, buff) => total + (isActiveBuff(buff) ? buff.activeOperationSanDelta ?? 0 : 0), 0);
 }
 
 export function getActiveOperationSanCostForState(

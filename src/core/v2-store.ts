@@ -83,7 +83,7 @@ export function createStore() {
       }
 
       if (actionId === "restart-game") {
-        const nextState = dispatchAction(createInitialState(), "start-game", {
+        const nextState = dispatchAction({ ...createInitialState(), blockLinearEvents: state.blockLinearEvents }, "start-game", {
           roleId: state.selectedRoleId,
         });
         commit(nextState);

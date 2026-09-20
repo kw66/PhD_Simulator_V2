@@ -20,6 +20,20 @@ import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 
 describe("generic buffs", () => {
+  it.each([-1, 0, 1])("distinguishes SAN costs from monthly SAN changes for delta %s", (delta) => {
+    const buckets = buildBuffDisplayBuckets([{
+      id: "san-directions", name: "SAN效果", source: "测试", timing: "monthly", remainingMonths: 1,
+      actionEffects: { idea: { sanDelta: delta } },
+      readingEffect: { sanDelta: delta },
+      relationshipOperationSanDelta: delta,
+      monthlyStats: { san: delta },
+    }]);
+    for (const id of ["monthly:action:idea:san-delta", "monthly:reading:san-delta", "monthly:rule:relationship-operation-san-delta"]) {
+      expect(buckets.monthly.find((item) => item.id === id)?.isDebuff).toBe(delta > 0);
+    }
+    expect(buckets.monthly.find((item) => item.id === "monthly:monthly-stat:san")?.isDebuff).toBe(delta < 0);
+  });
+
   it("shows Claude's paper polishing effect without turning it into a research action bonus", () => {
     const aiShopState = createAiShopState();
     aiShopState.subscriptions.claude = {
@@ -427,7 +441,7 @@ describe("generic buffs", () => {
         relationshipAdditions: ["junior"],
         mentorshipStacks: 1,
         researchCapacityStateDeltas: { baseCap: 1 },
-        advisorProgressStateDeltas: { researchResource: 2 },
+        advisorProgressStateDeltas: { funding: 2 },
         conferenceCareerUpdates: { enterpriseCount: 1 },
       },
     }).nextState;
@@ -435,7 +449,7 @@ describe("generic buffs", () => {
     expect(resolved.relationshipState.juniorCount).toBe(initial.relationshipState.juniorCount + 1);
     expect(resolved.relationshipState.mentorshipStacks).toBe(1);
     expect(resolved.researchCapacityState.baseCap).toBe(initial.researchCapacityState.baseCap + 1);
-    expect(resolved.advisorProgressState.researchResource).toBe(initial.advisorProgressState.researchResource + 2);
+    expect(resolved.advisorProgressState.funding).toBe(initial.advisorProgressState.funding + 2);
     expect(resolved.conferenceCareerState.enterpriseCount).toBe(1);
     expect(resolved.buffs).toEqual([]);
   });

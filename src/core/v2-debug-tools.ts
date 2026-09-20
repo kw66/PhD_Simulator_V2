@@ -5,6 +5,7 @@ import { SCORE_BY_TARGET } from "./v2-content";
 import type { CareerType } from "./v2-career-rules";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { addOrReplaceBuffs } from "./v2-buffs";
+import { createAiBuffs, createAiShopState, getAiModelById } from "./v2-ai-shop";
 import { clampSan, pushLog } from "./v2-engine-helpers";
 import { createBeforeGradSchoolAct1Event } from "./v2-fixed-events-before-grad-school";
 import { createCcigEvent } from "./v2-fixed-events-ccig";
@@ -23,7 +24,7 @@ import { createPhdDecisionEvent } from "./v2-phd-decision-event";
 import { createDraftPaper, REVIEW_STABLE_SCORE_BY_TARGET } from "./v2-paper-rules";
 import { getJournalDefinition } from "./v2-journal-system";
 import { getCalendarForTotalMonths, getRoleDefinition } from "./v2-progression";
-import { attachPaperPublication, createGrantedPublishedPaper } from "./v2-publication-rules";
+import { attachPaperPublication, createGrantedPublishedPaper, recordPaperAcceptances } from "./v2-publication-rules";
 import { resolveDuePaperReviews } from "./v2-publication-system";
 import { createRandomEventById } from "./v2-random-event-router";
 import { createIllnessRandomEvent } from "./v2-random-events-core-health";
@@ -34,6 +35,7 @@ import { DEBUG_RELATIONSHIP_TYPES } from "./v2-action-ids";
 import { createCustomFellowProgressProfile, createGeneratedFellowProfileAddition, getFellowRoleLabel } from "./v2-fellow-progression";
 import { createLoverProgressState } from "./v2-lover-progression";
 import { activateLover } from "./v2-lover-system";
+import { pickRandomAdvisorName } from "./v2-random-name";
 import { isPaperCompetitionEventId } from "./v2-paper-competition";
 import { activatePendingPaperCompetitionEvents, rememberPendingPaperCompetitionEvent } from "./v2-paper-competition-waiting";
 import type {
@@ -51,15 +53,22 @@ import type {
 
 /** Representative fixtures use the same source labels as their gameplay counterparts. */
 export function createDebugBuffs(): Buff[] {
+  const aiBuffs = [
+    ["ai-debug-gpt", "gpt-5.6-sol"],
+    ["ai-debug-claude", "claude-fable-5"],
+    ["ai-debug-gemini", "gemini-3"],
+    ["ai-debug-deepseek", "deepseek-v4"],
+    ["ai-debug-doubao", "doubao-seed-4"],
+    ["ai-debug-kimi-manual", "kimi-k1.5"],
+    ["ai-debug-kimi-auto", "kimi-k3"],
+  ].map(([id, modelId]) => {
+    const model = getAiModelById(modelId);
+    if (!model) throw new Error(`Unknown debug AI model: ${modelId}`);
+    const shop = createAiShopState();
+    shop.subscriptions[model.slot] = { ...shop.subscriptions[model.slot], modelId: model.id, active: true };
+    return { ...createAiBuffs(shop)[0]!, id: id! };
+  });
   return [
-    {
-      id: "debug-buff-base-recovery",
-      name: "自动恢复",
-      source: "基础规则",
-      timing: "permanent",
-      remainingMonths: null,
-      monthlyStats: { san: 1 },
-    },
     {
       id: "debug-buff-phd-pressure",
       name: "读博压力",
@@ -67,14 +76,6 @@ export function createDebugBuffs(): Buff[] {
       timing: "permanent",
       remainingMonths: null,
       monthlyStats: { san: -1 },
-    },
-    {
-      id: "debug-buff-advisor-salary",
-      name: "导师工资",
-      source: "导师待遇",
-      timing: "permanent",
-      remainingMonths: null,
-      monthlyStats: { money: 1 },
     },
     {
       id: "debug-buff-learning",
@@ -85,98 +86,26 @@ export function createDebugBuffs(): Buff[] {
       actionEffects: { idea: { bonus: 1 } },
     },
     {
-      id: "debug-buff-lover",
-      name: "科研陪伴",
-      source: "发展关系",
+      id: "debug-buff-lover-study",
+      name: "共同学习",
+      source: "恋人约会",
       timing: "permanent",
       remainingMonths: null,
       actionEffects: {
-        idea: { extraActions: 1 },
-        experiment: { extraActions: 1 },
-        writing: { extraActions: 1 },
+        idea: { bonus: 1 },
+        experiment: { bonus: 1 },
+        writing: { bonus: 1 },
       },
     },
     {
-      id: "debug-buff-citation-penalty",
-      name: "引用受损",
-      source: "人物影响",
-      timing: "permanent",
-      remainingMonths: null,
-      publicationEffects: { citationDebuffMultiplier: 0.75 },
-    },
-    {
-      id: "ai-debug-gpt",
-      name: "GPT-6-Astra",
-      source: "商店 GPT-6-Astra",
+      id: "debug-buff-lover-play",
+      name: "约会余韵",
+      source: "恋人玩耍",
       timing: "monthly",
       remainingMonths: 1,
-      actionEffects: {
-        idea: { bonus: 6 },
-        experiment: { bonus: 6 },
-        writing: { bonus: 6 },
-      },
+      activeOperationSanDelta: -1,
     },
-    {
-      id: "ai-debug-claude",
-      name: "Claude Fable 5",
-      source: "商店 Claude Fable 5",
-      timing: "monthly",
-      remainingMonths: 1,
-      paperPolishEffects: { idea: 4, experiment: 2, writing: 2 },
-    },
-    {
-      id: "ai-debug-gemini",
-      name: "Gemini 3",
-      source: "商店 Gemini 3",
-      timing: "monthly",
-      remainingMonths: 1,
-      actionEffects: {
-        idea: { sanDelta: -1 },
-        experiment: { sanDelta: -1 },
-        writing: { sanDelta: -1 },
-      },
-      relationshipOperationSanDelta: -1,
-    },
-    {
-      id: "ai-debug-deepseek",
-      name: "DeepSeek-V4",
-      source: "商店 DeepSeek-V4",
-      timing: "monthly",
-      remainingMonths: 1,
-      actionEffects: {
-        idea: { extraActions: 2 },
-        experiment: { extraActions: 2 },
-        writing: { extraActions: 2 },
-      },
-    },
-    {
-      id: "ai-debug-doubao",
-      name: "豆包 Seed 4",
-      source: "商店 豆包 Seed 4",
-      timing: "monthly",
-      remainingMonths: 1,
-      actionEffects: {
-        idea: { bonus: 2, sanDelta: 1 },
-        experiment: { bonus: 2, sanDelta: 1 },
-        writing: { bonus: 2, sanDelta: 1 },
-      },
-    },
-    {
-      id: "ai-debug-kimi-manual",
-      name: "Kimi k1.5",
-      source: "商店 Kimi k1.5",
-      timing: "monthly",
-      remainingMonths: 1,
-      readingEffect: { sanDelta: -1, manualExtraReads: 1 },
-    },
-    {
-      id: "ai-debug-kimi-auto",
-      name: "Kimi K3",
-      source: "商店 Kimi K3",
-      timing: "monthly",
-      remainingMonths: 1,
-      readingEffect: { automaticReads: 1 },
-    },
+    ...aiBuffs,
     {
       id: "debug-buff-illness",
       name: "带病工作",
@@ -184,19 +113,6 @@ export function createDebugBuffs(): Buff[] {
       timing: "monthly",
       remainingMonths: null,
       activeOperationSanMultiplier: 1.5,
-    },
-    {
-      id: "debug-buff-mentoring",
-      name: "长期带教",
-      source: "指导师弟师妹",
-      timing: "monthly",
-      remainingMonths: null,
-      monthlyStats: { san: -2 },
-      scheduledPublication: {
-        intervalMonths: 12,
-        nonFirstAuthor: true,
-        targetWeights: { A: 0.2, B: 0.3, C: 0.5 },
-      },
     },
     {
       id: "debug-buff-next-idea",
@@ -453,7 +369,7 @@ function triggerConferenceDebugEvent(state: GameState): GameState {
         title: "测试录用论文",
         target: "C",
         acceptedScore: REVIEW_STABLE_SCORE_BY_TARGET.C,
-      }),
+      }, [...workingState.papers, ...workingState.externalPublications, ...(workingState.fellowPapers ?? [])]),
       id: `debug-conference-${workingState.totalMonths}-${publicationIndex + 1}`,
       submittedMonth: Math.max(1, workingState.month),
       submittedYear: Math.max(1, workingState.year),
@@ -739,7 +655,8 @@ function addDebugPublishedPaper(
     effectiveScore: acceptedScore,
     monthsSincePublish: 0,
   } : null;
-  const randomizedPaper = { ...paper, publication };
+  const randomizedPaper = recordPaperAcceptances([{ ...paper, publication }], state.totalMonths,
+    [...state.papers, ...state.externalPublications, ...(state.fellowPapers ?? [])])[0]!;
   const scoreGain = nonFirstAuthor ? 0 : SCORE_BY_TARGET[target];
   const citationGain = publication?.citations ?? 0;
 
@@ -798,7 +715,8 @@ function addDebugPublishedJournalPaper(
     citations: 0,
     monthsSincePublish: 0,
   } : null;
-  const randomizedPaper = { ...paper, publication };
+  const randomizedPaper = recordPaperAcceptances([{ ...paper, publication }], state.totalMonths,
+    [...state.papers, ...state.externalPublications, ...(state.fellowPapers ?? [])])[0]!;
   const citationGain = publication?.citations ?? 0;
   const researchScoreGain = nonFirstAuthor ? 0 : journal.researchScore;
   const citationHistoryByYear = { ...state.citationHistoryByYear };
@@ -815,11 +733,19 @@ function addDebugPublishedJournalPaper(
 }
 
 function addAllDebugBuffs(state: GameState): GameState {
-  const debugBuffs = createDebugBuffs();
-  const hasAllDebugBuffs = DEBUG_BUFF_IDS.every((id) => state.buffs.some((buff) => buff.id === id));
+  const debugBuffs = addOrReplaceBuffs([], createDebugBuffs());
+  const isDebugBuff = (buff: Buff) => buff.id.startsWith("debug-buff-") || buff.id.startsWith("ai-debug-");
+  const existingDebugBuffs = state.buffs.filter(isDebugBuff);
+  const signature = (buff: Buff | undefined) => JSON.stringify(buff, (_key, value) => (
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
+      : value
+  ));
+  const hasAllDebugBuffs = existingDebugBuffs.length === debugBuffs.length
+    && debugBuffs.every((buff) => signature(existingDebugBuffs.find((existing) => existing.id === buff.id)) === signature(buff));
   if (hasAllDebugBuffs) return state;
   return pushLog(
-    { ...state, buffs: addOrReplaceBuffs(state.buffs, debugBuffs) },
+    { ...state, buffs: addOrReplaceBuffs(state.buffs.filter((buff) => !isDebugBuff(buff)), debugBuffs) },
     "测试：已添加全部 buff。",
   );
 }
@@ -832,15 +758,18 @@ function addDebugRelationship(state: GameState, type: DebugRelationshipType): Ga
     return pushLog({
       ...state,
       relationshipState: { ...state.relationshipState, loverCount: 1 },
-      loverState: activateLover("smart", state.totalMonths, getRoleDefinition(state.selectedRoleId).gender),
-      loverProgressState: { ...createLoverProgressState(), active: true },
+      loverState: {
+        ...activateLover("smart", state.totalMonths, getRoleDefinition(state.selectedRoleId).gender),
+        name: pickRandomAdvisorName(),
+      },
+      loverProgressState: createLoverProgressState("smart"),
     }, "测试：已新增恋人，不触发恋爱奖励");
   }
 
   if (state.fellowProgressState.length >= 4) {
     return pushLog(state, "测试：已有 4 位同学，未继续添加");
   }
-  const seed = state.totalMonths + state.fellowProgressState.length;
+  const seed = Math.floor(Math.random() * 0x100000000);
   const profile = createCustomFellowProgressProfile({
     ...createGeneratedFellowProfileAddition(type, seed),
     startTotalMonths: state.totalMonths,

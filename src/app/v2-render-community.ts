@@ -61,8 +61,18 @@ function renderMessageComposer(mode: "board" | "feedback"): string {
 
 function renderVisitMetrics(): string {
   return `
-    <span title="访客：同一浏览器去重计数；总数（今日，北京时间）"><i aria-hidden="true">👥</i>访客 <strong data-community-stat="visitors">--（--）</strong></span>
-    <span title="访问：每次打开或刷新页面计一次；总数（今日，北京时间）"><i aria-hidden="true">👁️</i>访问 <strong data-community-stat="views">--（--）</strong></span>
+    <span>
+      <span class="lobby-metric-label"><i data-lucide="eye" aria-hidden="true"></i><span>访问（今日）</span></span>
+      <strong data-community-stat="views">--（--）</strong>
+    </span>
+    <span>
+      <span class="lobby-metric-label"><i data-lucide="users" aria-hidden="true"></i><span>访客（今日）</span></span>
+      <strong data-community-stat="visitors">--（--）</strong>
+    </span>
+    <span>
+      <span class="lobby-metric-label"><i data-lucide="gamepad-2" aria-hidden="true"></i><span>游玩（今日）</span></span>
+      <strong data-community-stat="games">--（--）</strong>
+    </span>
   `;
 }
 
@@ -191,7 +201,7 @@ function renderLobbyInfoArticle(section: LobbyInfoSectionId): string {
           <article><span>01</span><h2>开局路线</h2><p>先看清毕业要求，再决定本月是补科研能力，还是推进手头的论文。</p><small>前 12 个月安排 · 待补充</small></article>
           <article><span>02</span><h2>月度安排</h2><p>先判断事件期限，再分配 SAN、行动次数和金币。</p><small>行动优先级 · 待补充</small></article>
           <article><span>03</span><h2>科研路线</h2><p>你要分别关注科研能力、论文进度和科研分；毕业与转博看的是科研分。</p><small>论文与科研分 · 待补充</small></article>
-          <article><span>04</span><h2>关系经营</h2><p>你可以通过事件结识同门等关系；人际栏的主动操作暂未开放。</p><small>关系组合 · 待补充</small></article>
+          <article><span>04</span><h2>关系经营</h2><p>同学每2个月推进自己的论文；协作进度每月增加默契值，也可消耗SAN推进。每满100，双方各自动帮助一次；暂时无法帮助时各保留一次。每篇共同发表的论文默契+1（上限20），参与同学论文后获得非一作成果。</p><small>做横向支持导师发展；每月可选择玩耍、学习或购物约会</small></article>
           <article><span>05</span><h2>资源管理</h2><p>购买前先看效果和价格，别为了升级装备花光生活费。</p><small>消费顺序 · 待补充</small></article>
           <article><span>06</span><h2>疾病与 SAN</h2><p>疾病会增加主动操作的 SAN 消耗，SAN 不足时部分行动无法执行。</p><small>风险控制 · 待补充</small></article>
           <article><span>07</span><h2>毕业与转博</h2><p>转博前先检查科研分是否达标，也要看清转博后的毕业要求。</p><small>时间节点 · 待补充</small></article>

@@ -1,4 +1,5 @@
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
+import { ADVISOR_FUNDING_CAP } from "./v2-advisor-progress";
 import { createCustomFellowProgressProfile } from "./v2-fellow-progression";
 import { applyFixedEventResolution } from "./v2-fixed-events";
 import { getGraduationScoreTarget, getMonthLimitByDegree, getRoleDefinition } from "./v2-progression";
@@ -12,6 +13,7 @@ import { canAddRelationship, syncRelationshipState, tryAddRelationship } from ".
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
+import { createLoverProgressState } from "./v2-lover-progression";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { addPaperCollaboration, applyPaperEffectUpdates, setPaperTotalScores } from "./v2-paper-collaboration";
 import type { Buff, EventChoice, GameState, PaperActionType, PendingEvent } from "./v2-types";
@@ -246,9 +248,11 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   }
   const advisorProgressState = { ...state.advisorProgressState };
   for (const [key, value] of Object.entries(effects.advisorProgressStateDeltas ?? {})) {
-    const numericState = advisorProgressState as unknown as Record<string, number>;
-    numericState[key] = (numericState[key] ?? 0) + (value ?? 0);
+    if (key === "researchAccumulation" || key === "funding") {
+      advisorProgressState[key] = Math.max(0, advisorProgressState[key] + (value ?? 0));
+    }
   }
+  advisorProgressState.funding = Math.min(ADVISOR_FUNDING_CAP, advisorProgressState.funding);
 
   const thesisProgress = Math.min(100, state.thesis.progress + (effects.thesisProgress ?? 0));
   const thesis = effects.abandonThesis
@@ -297,7 +301,8 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   const externalPublications = effects.grantedPublication
     ? [
         ...updatedExternalPublications,
-        createGrantedPublishedPaper(state.totalMonths, updatedExternalPublications.length, effects.grantedPublication),
+        createGrantedPublishedPaper(state.totalMonths, updatedExternalPublications.length, effects.grantedPublication,
+          [...papers, ...updatedExternalPublications, ...(state.fellowPapers ?? [])]),
       ]
     : updatedExternalPublications;
   const conferenceEncounterState = {
@@ -311,8 +316,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   const internshipState = { ...state.internshipState, ...(effects.internshipStateUpdates ?? {}) };
   const loverState = { ...state.loverState, ...(effects.loverStateUpdates ?? {}) };
   const loverProgressState = {
-    ...state.loverProgressState,
-    ...(effects.activateLoverProgress ? { active: true } : {}),
+    ...(effects.activateLoverProgress ? createLoverProgressState(effects.activateLoverProgress) : state.loverProgressState),
     ...(effects.loverProgressStateUpdates ?? {}),
   };
 

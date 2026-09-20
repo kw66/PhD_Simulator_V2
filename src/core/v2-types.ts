@@ -55,7 +55,7 @@ export type RoleGrowthStatId = DebugStatId;
 export type GamePhase = "setup" | "playing" | "finished";
 export type Degree = "master" | "phd";
 export type DateDisplayMode = "academic" | "calendar";
-export type EndingId = "master" | "phd" | "delay" | "burnout" | "poor" | "expelled" | "isolated" | null;
+export type EndingId = "master" | "phd" | "delay" | "burnout" | "poor" | "expelled" | "isolated" | "quit" | null;
 export type PaperTarget = "C" | "B" | "A";
 export type JournalTarget = "nature" | "nmi" | "pami";
 export type PaperStatus = "draft" | "reviewing" | "journal-reviewing" | "published";
@@ -88,8 +88,7 @@ export type ActiveOperationType =
   | "read"
   | "work"
   | PaperActionType
-  | "relationship-task"
-  | "relationship-chat";
+  | "relationship-task";
 
 export type PersistentExtraActions = Record<PaperActionType, number>;
 
@@ -161,11 +160,6 @@ export interface PaperReviewSettlement {
   venueInfluence: number;
   reviewStrictnessMultiplier: number;
   scoreGain: number;
-  baseSanReward: number;
-  baseFavorReward: number;
-  rewardReductionCount: number;
-  sanReward: number;
-  favorReward: number;
   reviewerSanChange: number;
   reports: PaperReviewerReport[];
 }
@@ -185,6 +179,8 @@ export type PaperReviewEventPresentation =
       kind: "reviewers";
       paperTitle: string;
       reports: PaperReviewerReport[];
+      conferenceName?: string;
+      conferenceYear?: number;
     }
   | {
       kind: "decision";
@@ -195,8 +191,10 @@ export type PaperReviewEventPresentation =
       resultText: string;
       totalReviewScore: number;
       borderlineChance: number | null;
-      rewardReductionCount: number;
       rewardText: string;
+      conferenceName?: string;
+      conferenceYear?: number;
+      reports?: PaperReviewerReport[];
     };
 
 export interface PaperPromotionState {
@@ -247,6 +245,7 @@ export interface Buff {
   monthlyStats?: Partial<PlayerStats>;
   /** Multiplies SAN costs for player-initiated work while this Buff is active. */
   activeOperationSanMultiplier?: number;
+  activeOperationSanDelta?: number;
   /** Fixed SAN adjustment for relationship operations. */
   relationshipOperationSanDelta?: number;
   /** Structured effects for the three paper actions. */
@@ -373,6 +372,8 @@ export interface AdvisorRequirements {
 
 export interface Paper {
   id: string;
+  acceptedTotalMonths?: number;
+  acceptedOrder?: number;
   /** Workstation slot identity; omitted on legacy papers and assigned by fallback order. */
   paperSlotIndex?: number;
   title: string;
@@ -402,9 +403,12 @@ export interface Paper {
   /** Paper-bound citation debuff captured before submission. */
   citationDebuffMultiplierOnPublish?: number;
   lastReview?: PaperReviewResult | null;
+  rejectionCount?: number;
   nonFirstAuthor?: boolean;
   /** Optional relationship author used for non-first-author publications. */
   leadAuthorName?: string;
+  leadAuthorId?: string;
+  createdTotalMonths?: number;
 }
 
 export interface GameLogEntry {
@@ -442,6 +446,7 @@ export interface EventChoice {
   label: string;
   outcome: string;
   disabledReason?: string;
+  cosmetic?: boolean;
   effects: {
     san?: number;
     research?: number;
@@ -481,7 +486,7 @@ export interface EventChoice {
     loverProgressStateUpdates?: Partial<LoverProgressState>;
     activateLoverProgress?: LoverTypeId;
     researchCapacityStateDeltas?: Partial<Record<keyof ResearchCapacityState, number>>;
-    advisorProgressStateDeltas?: Partial<Record<keyof AdvisorProgressState, number>>;
+    advisorProgressStateDeltas?: Partial<Pick<AdvisorProgressState, "researchAccumulation" | "funding">>;
     restoreSanToCap?: boolean;
     triggerInternshipInvite?: boolean;
     triggerJointTrainingInvite?: boolean;
@@ -514,6 +519,7 @@ export interface ResolvedEventStage {
   title: string;
   description: string;
   paperReviewPresentation?: PaperReviewEventPresentation;
+  talentTrigger?: import("./v2-talent-history").TalentTriggerRecord;
   choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason">[];
   selectedChoiceId: string;
 }
@@ -561,6 +567,7 @@ export interface EventQueueItem extends PendingEvent {
 }
 
 export interface GameState extends RandomEventState {
+  blockLinearEvents: boolean;
   phase: GamePhase;
   selectedRoleId: RoleId;
   setupSelectedRoleId?: RoleId | null;
@@ -601,6 +608,8 @@ export interface GameState extends RandomEventState {
   loverState: LoverState;
   loverProgressState: LoverProgressState;
   fellowProgressState: FellowProgressProfile[];
+  fellowPapers?: Paper[];
+  fellowResearchLastTotalMonths?: number;
   researchCapacityState: ResearchCapacityState;
   advisorProgressState: AdvisorProgressState;
   eventSupport: EventSupportState;
@@ -611,6 +620,7 @@ export interface GameState extends RandomEventState {
   player: PlayerStats;
   log: GameLogEntry[];
   ending: EndingId;
+  endingCause?: { text: string; totalMonths: number };
   eventQueue: EventQueueItem[];
   eventHistory: ResolvedEventRecord[];
 }
@@ -624,6 +634,7 @@ export interface DeferredEventStateChange {
 export type DeferredEventStatePatch = DeferredEventStateChange[];
 
 export interface DispatchPayload {
+  blockLinearEvents?: boolean | undefined;
   roleId?: RoleId | undefined;
   paperId?: string | undefined;
   paperSlotIndex?: number | undefined;

@@ -1,12 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { renderApp } from "../src/app/v2-render";
+import { getPlayHelpContext } from "../src/app/v2-play-help";
+import type { PlayRenderUiState } from "../src/app/v2-render-types";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import { applyResearchOperation, previewResearchOperation } from "../src/core/v2-research-operation";
 import type { Buff, GameState, Paper } from "../src/core/v2-types";
+
+function getHelpText(uiState: PlayRenderUiState): string {
+  return getPlayHelpContext(uiState).pages.map((page) => page.summary + page.body).join("\n")
+    .replace(/<[^>]*>/g, "").replace(/\s+/g, "").replace(/／/g, "/");
+}
 
 function createResearchState(): GameState {
   const state = createStartedGameState("normal");
@@ -29,52 +36,154 @@ function createBuff(id: string, effects: Partial<Buff>): Buff {
 
 function renderMetrics(paper: Paper): string {
   const state = createResearchState();
-  const html = renderApp({ ...state, papers: [paper] }, createDefaultAccountProfile(), { activePlayTab: "research" });
+  const html = renderApp({ ...state, papers: [paper] }, createDefaultAccountProfile(), { activePlayTab: "research" })
+    .replace(/<span class="animated-number" data-animate-key="[^"]*" data-animate-number="[^"]*">([^<]*)<\/span>/g, "$1")
+    .replace(/ data-animate-(?:key|number|bar)="[^"]*"/g, "");
   return html.split('<div class="research-metric-grid research-metric-grid-expanded">')[1]?.split('</section>')[0] ?? "";
 }
 
 describe("v2 research rule details and publication metrics", () => {
-  it("keeps formulas collapsed and explains random scores, buff order and repeated execution", () => {
-    const html = renderApp(createResearchState(), createDefaultAccountProfile(), { activePlayTab: "workstation" });
-    const details = html.match(/<details class="workstation-tip-note workstation-formula-note panel-tip-note">([\s\S]*?)<\/details>/)?.[1] ?? "";
+  it("points players to current lover reward controls and the shop gift notice", () => {
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("进度条和卡片底部提示显示当前路线效果");
+    expect(help).toContain("进度条和卡片底部提示显示当前路线效果");
+    expect(help).toContain("礼物券优先用于手动商店购买");
+    expect(help).toContain("礼物券优先用于手动商店购买");
+  });
 
-    const summary = details.match(/<summary>[\s\S]*?<\/summary>/)?.[0] ?? "";
-    expect(summary).toBe("<summary>💡 小提示：idea/实验/写作上行是包含协作的合计分，下行是自身分；科研只更新自身，同学帮助持续累加。点击展开看细则</summary>");
-    expect(details).toContain("本次分 = 四舍五入(基础分 × 总倍率 + 固定分)");
-    expect(details).not.toContain("科研分 =");
-    expect(details).toContain("基础分 = 科研能力 × 随机倍率（0.5～1.5）+ 随机加分（0～5）");
-    expect(details).toContain("Buff 顺序：先合并倍率，再加固定分");
-    expect(details).toContain("×1.5 算 +0.5，×0.8 算 −0.2");
-    expect(details).toContain("两个 ×1.5 合并为 ×2");
-    expect(details).toContain("新自身 = max(原自身+1,本次)");
-    expect(details).toContain("协作分不会被科研覆盖，同一人反复帮助、多人帮助都持续累加");
-    expect(details).toContain("某项自身20+协作10，本次25→新自身25+协作10=合计35");
-    expect(details).toContain("最右总分为三项合计");
-    expect(details).not.toContain("期刊送审后本次分直接累加");
-    expect(details).toContain("执行次数 = max(1, 1 + 向下取整(Buff额外次数 + 装备额外次数))");
-    expect(details).toContain("沿用上一遍自身分，不额外扣行动点或SAN");
-    expect(details).toContain("“仅下次”Buff 的加分与倍率只用于第一遍");
-    expect(details).toContain("持续Buff与装备每遍生效");
-    expect(details).not.toContain("SAN消耗");
-    expect(details).not.toContain("每月衰减");
-    expect(details).not.toContain("重掷");
-    const reviewNote = html.match(/<details class="workstation-review-note panel-tip-note"[\s\S]*?<\/details>/)?.[0] ?? "";
-    const reviewSummary = reviewNote.match(/<summary>[\s\S]*?<\/summary>/)?.[0] ?? "";
-    expect(reviewNote).toContain('data-workstation-note="review"');
-    expect(reviewSummary).toContain("会议按投稿时合计分审稿3个月");
-    expect(reviewSummary).toContain("期刊送审后不衰减，可持续修改，达标接收");
-    expect(reviewNote).toContain("会议投稿冻结三项合计分快照，3位审稿人据此评分");
-    expect(reviewNote).toContain("审稿期间当前分数仍衰减，快照不变");
-    expect(reviewNote).toContain("保留衰减后的分数，再将审稿反馈加到自身分，协作分不变");
-    expect(reviewNote).toContain("各项扣分=向下取整(合计×热度×10%)，至少扣1分、合计最低1分");
-    expect(reviewNote).toContain("原本0或1不扣。先算合计扣分，再按自身/协作比例分摊");
-    expect(reviewNote).toContain("期刊初始分=向下取整(3×三项合计的几何均值)");
-    expect(reviewNote).toContain("修改分=初始分+各项较送审时合计的净新增（逐项最低0）");
-    expect(reviewNote).toContain("自身与协作新增均计入");
-    expect(reviewNote).toContain("期刊送审线/达标线：PAMI 75/125 分、NMI 100/250 分、Nature 150/500 分");
-    expect(reviewNote).not.toContain("接收奖励会随");
-    expect(reviewNote).not.toContain("递减");
-    expect(html).toContain('class="workstation-notes"');
+  it("describes active publication and event mechanics without development history or repeated reward exclusions", () => {
+    const publication = getHelpText({ activePlayTab: "talent", activeTalentTab: "publication" });
+    expect(publication).toContain("每项每局奖励一次，满足条件自动结算");
+    expect(publication).toContain("首发、高被引、越挫越勇限一作；合作奖励限非一作，累计引用包含两者");
+    expect(publication).toContain("一篇论文可同时完成首发、等级及其他符合条件的天赋");
+    expect(publication).not.toMatch(/不重复发奖|重复发表不额外奖励SAN或好感/);
+    const events = getHelpText({ activePlayTab: "events" });
+    expect(events).toContain("到期的阻塞事件须处理完才能进入下一月");
+    expect(events).toContain("点击待办事件右上角的⏸️或▶️切换无分支事件阻塞");
+    expect(events).toContain("优先完成当前事件的后续情节");
+    expect(events).toContain("遇到需要你选择的阻塞事件时暂停");
+    expect(events).toContain("论文结果自动处理后，可在日志回看审稿意见、录用决定与天赋奖励");
+    const contexts: PlayRenderUiState[] = [
+      { activePlayTab: "workstation" }, { activePlayTab: "relationship" }, { activePlayTab: "research" },
+      { activePlayTab: "events" }, { activePlayTab: "settings" },
+      ...(["ai", "coffee", "gear", "rest"] as const).map((activeShopTab) => ({ activePlayTab: "shop" as const, activeShopTab })),
+      ...(["character", "relation", "equip", "growth", "publication"] as const).map((activeTalentTab) => ({ activePlayTab: "talent" as const, activeTalentTab })),
+    ];
+    for (const context of contexts) {
+      expect(getHelpText(context)).not.toMatch(/旧版|新版|不再|实现细节|走同一事件流程|仅同学自主科研间隔|三项合计分快照/);
+    }
+  });
+
+  it("documents lover route formulas, passive gains and the shared monthly date limit", () => {
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("每月只能选择一次，三条路线共用次数");
+    expect(help).toContain("消耗为金币-2、SAN-4、金币-3");
+    expect(help).toContain("科研与亲密上限均为20");
+    expect(help).toContain("玩耍=⌊(亲密+你的社交)/2⌋");
+    expect(help).toContain("学习=⌊(恋人科研+你的科研)/2⌋");
+    expect(help).toContain("购物=⌊亲密/2⌋+10");
+    expect(help).toContain("活泼恋人玩耍+亲密、学习+⌊亲密/2⌋");
+    expect(help).toContain("聪慧恋人学习+亲密、玩耍+⌊亲密/2⌋");
+    expect(help).toContain("购物只靠手动约会");
+    expect(help).toContain("恋爱次月起");
+    expect(help).toContain("恋人有活泼和聪慧两种类型");
+    expect(help).toContain("初始属性：活泼恋人科研3～6、亲密9～12；聪慧恋人科研9～12、亲密3～6");
+    expect(help).not.toMatch(/没有一次性奖励|不再每月自动扣费|固定每月金币奖励/);
+  });
+
+  it("explains separate three-cycle lover rewards and gift purchase priority", () => {
+    const context = getPlayHelpContext({ activePlayTab: "relationship" });
+    const pages = context.pages.filter((page) => page.title.startsWith("恋人"));
+    expect(pages).toHaveLength(2);
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("SAN+6");
+    expect(help).toContain("论文三项分数永久+1");
+    expect(help).toContain("礼物券+1、亲密+2");
+    expect(help).toContain("没有其他可购买项目时才用于自动续费");
+  });
+
+  it("distinguishes fellow research every two months from monthly cooperation and review", () => {
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("此后每2个月科研一次");
+    expect(help).toContain("审稿3个月");
+    expect(help).not.toContain("仅同学自主科研间隔2个月");
+    expect(help).toContain("每位同学每月可主动协作一次");
+    expect(help).toContain("默契也会自动推进协作进度");
+  });
+
+  it("documents mentor funding, paper contributions and the annual grant timeline", () => {
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("科研积累从20开始");
+    expect(help).toContain("经费上限20");
+    expect(help).toContain("SAN-5、经费+1");
+    expect(help).toContain("每月先结算导师收入，再消耗经费");
+    expect(help).toContain("科研积累按5%自然增长，增长量下取整");
+    expect(help).toContain("经费不足时暂停自然增长");
+    expect(help).toContain("论文固定科研分会增加导师积累");
+    expect(help).toMatch(/3月先增长再申请，8月公布结果/);
+    expect(help).toContain("讲师限1项，晋升后限2项");
+    expect(help).toContain("项目到期释放名额");
+    expect(help).toContain("1000且已获杰青");
+    expect(help).toContain("获选后每月经费+1");
+    for (const [threshold, funding, duration] of [[25, 5, 3], [50, 10, 4], [150, 15, 3], [400, 20, 5]]) {
+      expect(help).toContain(`${threshold}+${funding}${duration}年`);
+    }
+    expect(help).not.toMatch(/科研资源|信任度/);
+  });
+
+  it("retains score formulas and review rules across workstation help pages", () => {
+    const html = renderApp(createResearchState(), createDefaultAccountProfile(), { activePlayTab: "workstation" });
+    const help = getHelpText({ activePlayTab: "workstation" });
+
+    expect(help).toContain("分数格上行是自身分，下行是协作分，右侧总分为六格之和");
+    expect(help).toContain("实验需要idea有分，写作需要实验有分");
+    expect(help).toContain("基础分=科研能力×随机倍率（0.5～1.5）+随机加分（0～5）");
+    expect(help).toContain("本次分=基础分×总倍率+固定分，结果四舍五入");
+    expect(help).toContain("更新自身分：原自身+1与本次分，取较大值");
+    expect(help).toContain("协作分持续累加，不会被覆盖");
+    expect(help).toContain("先合并倍率，再加固定分");
+    expect(help).toContain("×1.5算+0.5，×0.8算−0.2");
+    expect(help).toContain("两个×1.5合并为×2");
+    expect(help).toContain("不额外扣行动点或SAN");
+    expect(help).toContain("每遍都重新生成分数");
+    expect(help).toContain("每遍与上一遍自身分+1取最大值");
+    expect(help).toContain("总次数=1+⌊n⌋，n为额外次数之和，至少执行1次");
+    expect(help).toContain("“仅下次”加分与倍率只用于第一遍");
+    expect(help).toContain("持续Buff和装备每遍生效");
+    expect(help).not.toContain("期刊送审后本次分直接累加");
+
+    expect(help).toContain("审稿3个月，期间不能修改");
+    expect(help).toContain("投稿时idea、实验、写作各项的自身分与协作分之和");
+    expect(help).toContain("审稿期间的衰减不影响本次评审");
+    expect(help).toContain("草稿和会议审稿中的论文每月衰减");
+    expect(help).toContain("拒稿后从衰减后的分数继续修改");
+    expect(help).toContain("保留衰减后的分数，再将审稿反馈加到自身分，协作分不变");
+    expect(help).toContain("每项扣分=⌊s×h×10%⌋，至少扣1");
+    expect(help).toContain("s为该项自身与协作合计分，h为热度");
+    expect(help).toContain("合计最低保留1");
+    expect(help).toContain("原本0或1分不扣");
+    expect(help).toContain("先算合计扣分，再按自身/协作比例分摊");
+    expect(help).toContain("3位独立抽取，类型可重复");
+    expect(help).toContain("y=投稿学年−1，首年y=0");
+    expect(help).toContain("普通与LLM的三项权重随机生成，权重之和均为3");
+    expect(help).toContain("有效分四舍五入");
+    expect(help).toContain("最高/最低按投稿时的各项合计分选取");
+    expect(help).toContain("拒稿：最低两项各+3");
+    expect(help).toContain("SAN变化无论中稿或拒稿都生效");
+    expect(help).toContain("总评≥+2接收，≤−2拒稿");
+    expect(help).toContain("实际门槛=基础门槛×会议影响力÷等级均值，四舍五入");
+
+    expect(help).toContain("期刊送审后不衰减，可继续修改、接受协作");
+    expect(help).toContain("达到录用线即发表并开始被引");
+    expect(help).toContain("期刊分=idea+实验+写作");
+    expect(help).toContain("自身与协作分均计入");
+    expect(help).toContain("送审后继续按当前总分判断");
+    for (const [journal, submission, acceptance] of [["PAMI", 75, 125], ["NMI", 100, 250], ["Nature", 150, 500]]) {
+      expect(help).toContain(`${journal}${submission}${acceptance}`);
+    }
+    expect(html).not.toContain('class="workstation-notes"');
+    expect(html).not.toContain('data-workstation-note="review"');
+    expect(html).toContain('data-help-context="workstation"');
   });
 
   it.each([[0, 8], [50, 51]])("matches the documented score formula for current score %s", (currentScore, expectedScore) => {
@@ -161,29 +270,57 @@ describe("v2 research rule details and publication metrics", () => {
   });
 
   it("explains coffee prerequisites, subscription skips and the different seasonal penalties", () => {
-    const state = createResearchState();
-    const coffeeHtml = renderApp(state, createDefaultAccountProfile(), { activeShopTab: "coffee" });
-    const gearHtml = renderApp(state, createDefaultAccountProfile(), { activeShopTab: "gear" });
+    const coffee = getHelpText({ activePlayTab: "shop", activeShopTab: "coffee" });
+    const gear = getHelpText({ activePlayTab: "shop", activeShopTab: "gear" });
+    const rest = getHelpText({ activePlayTab: "shop", activeShopTab: "rest" });
 
-    expect(coffeeHtml).toContain("手动购买冰美式和月初自动续费均需咖啡机；自动续费在金币不足或 SAN 已满时跳过");
-    expect(gearHtml).toContain("显卡和自行车可以逐档升级，提升效果");
-    expect(gearHtml).toContain("夏季（公历 6–8 月）主动操作的 SAN 消耗 +1，遮阳伞可免除");
-    expect(gearHtml).toContain("冬季（公历 12–2 月）每月 SAN -1，羽绒服可免除");
+    expect(coffee).toMatch(/先买咖啡机.*才能手动购买冰美式或使用月初自动续费/);
+    expect(coffee).toContain("SAN已满时，自动续费当月跳过");
+    expect(coffee).toContain("金币不足且没有可用于续费的礼物券时，当月暂停续费");
+    expect(gear).toContain("显卡和自行车可逐档升级");
+    expect(gear).toMatch(/夏季（公历6–8月）.*主动操作SAN消耗\+1，遮阳伞可免除/);
+    expect(gear).toMatch(/冬季（公历12–2月）.*每月SAN-1，羽绒服可免除/);
+    expect(rest).toContain("选定后不能直接换路线");
+    expect(rest).toContain("出售并重新购买后可重新选择");
+    expect(rest).toContain("SAN+2提升为SAN+5");
   });
 
-  it("keeps the citation explanation in the results page", () => {
+  it("keeps citation rules in results help and statistics in the main panel", () => {
     const html = renderApp(createResearchState(), createDefaultAccountProfile(), { activePlayTab: "research" });
-    const notes = html.match(/<details class="research-mechanism-note[^>]*data-research-note="citation"[\s\S]*?<\/details>/)?.[0] ?? "";
-    const noteIndex = html.indexOf('data-research-note="citation"');
-
-    expect((notes.match(/<details class="research-mechanism-note[^>]*"/g) ?? [])).toHaveLength(1);
-    expect(notes).toContain('data-research-note="citation"');
-    expect(notes).not.toContain('data-research-note="review"');
-    expect(notes).toContain("会议开会或挂 arXiv 后开始被引，期刊接收后直接开始");
-    expect(notes).toContain("会议论文接收后，开会才开始被引");
-    expect(notes).toContain("每月引用增长 = 当前分 × 0.05 × 总引用倍率");
-    expect(notes).toContain("Poster/Spotlight ×1、Oral ×1.5、Best Paper ×5");
-    expect(notes).toContain("GitHub 只提升当前分");
+    const notes = getHelpText({ activePlayTab: "research" });
+    expect(getPlayHelpContext({ activePlayTab: "research" }).pages).toHaveLength(5);
+    const noteIndex = html.indexOf('data-help-context="research"');
+    const summary = html.match(/<div class="citation-venue-grid research-global-summary"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
+    expect(summary.match(/class="citation-venue-cell"/g)).toHaveLength(7);
+    expect(summary).not.toContain("<details");
+    expect(html).not.toContain('class="research-mechanism-notes"');
+    expect(html).not.toContain('data-research-note="citation"');
+    expect(noteIndex).toBeGreaterThan(html.indexOf('class="play-right-rail'));
+    expect(notes).toContain("会议开会或挂arXiv后开始被引");
+    expect(notes).toContain("期刊接收后直接开始");
+    expect(notes).toContain("开会后才启用录用与推广加成");
+    expect(notes).toContain("会议开会前挂arXiv，录用/推广部分先按×1");
+    expect(notes).toContain("每月引用增长=当前分×0.05×总引用倍率");
+    expect(notes).toContain("小数留到下月，累积满1才增加引用");
+    expect(notes).toContain("尚未公开时总引用倍率显示0");
+    expect(notes).toContain("Poster/Spotlight×1");
+    expect(notes).toContain("Oral×1.5");
+    expect(notes).toContain("BestPaper/Candidate×5");
+    expect(notes).toContain("期刊×1");
+    expect(notes).toContain("GitHub增加当前分的25%（增加量向下取整），录用分不变");
+    expect(notes).toContain("录用/推广倍率+0.25");
+    expect(notes).toContain("Oral从×1.5变为×1.75");
+    expect(notes).toContain("当前分每4个月衰减10%");
+    expect(notes).toContain("尚未公开也会衰减");
+    expect(notes).toContain("向上取整，扣后最低0");
+    expect(notes).toContain("该月先算引用，再扣分");
+    expect(notes).toContain("ESI高被引");
+    expect(notes).toContain("发表满12个月后");
+    expect(notes).toContain("发表时热度×200");
+    expect(notes).toContain("热度×0.75需150次");
+    expect(notes).toContain("“同行瞩目”只奖励首篇一作高被引");
+    expect(notes).toContain("科研分只算一作");
+    expect(notes).toContain("引用、h指数和i10指数均包含一作与非一作");
     expect(html.indexOf("科研分")).toBeLessThan(noteIndex);
     expect(html.indexOf("A（")).toBeLessThan(noteIndex);
     expect(html.indexOf("C（")).toBeLessThan(noteIndex);

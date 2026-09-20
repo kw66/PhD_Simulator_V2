@@ -218,10 +218,32 @@ describe("deferred-system event content", () => {
     loverState = resolve(resolve(loverState, "continue"), "accept");
     expect(loverState.player.research).toBe(researchBeforeRelationship);
     loverState = resolve(loverState, "close");
-    expect(loverState.player.research).toBe(2);
-    expect(loverState.buffs.some((buff) => buff.name === "新增人际关系")).toBe(false);
+    expect(loverState.player.research).toBe(researchBeforeRelationship);
+    expect(loverState.buffs).toEqual([]);
     expect(loverState.loverState.active).toBe(true);
     expect(loverState.loverProgressState.active).toBe(true);
+  });
+
+  it.each(["beautiful", "smart"] as const)("initializes %s only on result acceptance without start bonuses", (type) => {
+    const base: GameState = { ...createInitialState(), phase: "playing", totalMonths: 5 };
+    const event = createLoverDevelopmentAct1(buildLoverDevelopmentContext({
+      conferenceEncounterState: base.conferenceEncounterState, totalMonths: base.totalMonths, type, playerGender: "female",
+    }));
+    const chosen = resolve(resolve({ ...base, eventQueue: [createEventQueueItem(event, 5)] }, "continue"), "accept");
+    expect(chosen.loverState.active).toBe(false);
+    expect(chosen.loverProgressState.active).toBe(false);
+    const accepted = resolve(chosen, "close");
+    expect(accepted.loverState).toMatchObject({ active: true, type, gender: "male", startTotalMonths: 5 });
+    expect(accepted.loverProgressState.research).toBeGreaterThanOrEqual(type === "smart" ? 9 : 3);
+    expect(accepted.loverProgressState.research).toBeLessThanOrEqual(type === "smart" ? 12 : 6);
+    expect(accepted.loverProgressState.intimacy).toBeGreaterThanOrEqual(type === "beautiful" ? 9 : 3);
+    expect(accepted.loverProgressState.intimacy).toBeLessThanOrEqual(type === "beautiful" ? 12 : 6);
+    expect(accepted.loverProgressState.routes).toEqual({
+      play: { progress: 0, completed: 0 }, study: { progress: 0, completed: 0 }, shopping: { progress: 0, completed: 0 },
+    });
+    expect(accepted.player).toEqual(base.player);
+    expect(accepted.sanCap).toBe(base.sanCap);
+    expect(accepted.buffs).toEqual(base.buffs);
   });
 
   it("keeps conference construction and grouping intact", () => {

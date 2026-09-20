@@ -13,10 +13,11 @@ export interface PlayRenderUiState {
   activeLobbyInfoSection?: LobbyInfoSectionId;
   isFeedbackOpen?: boolean;
   dateDisplayMode?: AccountProfile["dateDisplayMode"];
-  showDebugEventRail?: boolean;
-  showDebugBottomBar?: boolean;
   activePlayTab?: PlayTabId;
+  helpPageByContext?: Readonly<Record<string, number>>;
+  isHelpOpen?: boolean;
   isEventContentOpen?: boolean;
+  isEndingContentOpen?: boolean;
   activeEventId?: string | null;
   activeEventHistoryId?: string | null;
   activeEventHistoryIndex?: number | null;
@@ -29,6 +30,8 @@ export interface PlayRenderUiState {
   selectedChairUpgradeId?: ShopUpgradeId | null;
   selectedCoffeeUpgradeId?: Exclude<CoffeeMachineUpgradeId, null> | null;
   activeTalentTab?: TalentPanelTabId;
+  advisorSalaryStartIndex?: number | null;
+  loverRewardPage?: number;
   currentResearchPaperIndex?: number | null;
   researchSortMode?: ResearchSortMode;
   researchAuthorshipFilter?: ResearchAuthorshipFilter;

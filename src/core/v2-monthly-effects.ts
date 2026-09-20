@@ -1,8 +1,8 @@
 import { addOrReplaceBuffs, advanceBuffDurations, getActiveBuffs, removeBuffs } from "./v2-buffs";
-import { ADVISOR_SALARY } from "./v2-content";
+import { getAdvisorSalaryPayment } from "./v2-advisor-progress";
+import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { getInternshipMonthlyIncome, getPublishedAPaperCount } from "./v2-internship-system";
-import { getBeautifulMonthlyRecovery } from "./v2-lover-system";
-import { LOVER_DATE_MONEY_COST } from "./v2-lover-progression";
+import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
 import { clampResearchToCap } from "./v2-research-cap-system";
 import { createGrantedPublishedPaper } from "./v2-publication-rules";
@@ -77,7 +77,7 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
       id: "advisor-salary",
       name: "导师工资",
       source: "导师待遇",
-      stats: { money: state.degree === "phd" ? ADVISOR_SALARY.phd : ADVISOR_SALARY.master },
+      stats: { money: getAdvisorSalaryPayment(state.advisorProgressState, state.degree).payment },
     });
   }
 
@@ -90,23 +90,6 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
     });
   }
 
-  if (state.loverState.active) {
-    const recovery = getBeautifulMonthlyRecovery(state.loverState, state.player.san, state.sanCap);
-    if (recovery > 0) {
-      effects.push({
-        id: "lover-recovery",
-        name: "恋人陪伴",
-        source: "活泼恋人",
-        stats: { san: recovery },
-      });
-    }
-    effects.push({
-      id: "lover-date-cost",
-      name: "约会开销",
-      source: "恋人",
-      stats: { money: -LOVER_DATE_MONEY_COST },
-    });
-  }
 
   if (state.internshipState.active) {
     const income = getInternshipMonthlyIncome(getPublishedAPaperCount(state), state.totalCitations);
@@ -341,7 +324,8 @@ export function applyMonthStartSubscriptions(
     price: getAiRenewalPrice(state.totalMonths, slot, reimbursement),
     order,
   }));
-  if (state.coffeeState.subscriptionEnabled && state.coffeeState.machineOwned) {
+  if (state.coffeeState.subscriptionEnabled && state.coffeeState.machineOwned
+    && state.coffeeState.coffeePurchaseCountThisMonth === 0) {
     renewalTargets.push({ kind: "coffee", price: getCoffeeBuyPrice(state.coffeeState), order: AI_SLOT_IDS.length });
   }
   renewalTargets.sort((left, right) => left.price - right.price || left.order - right.order);
@@ -349,6 +333,7 @@ export function applyMonthStartSubscriptions(
   let nextState: GameState = { ...state, player: { ...resolution.player } };
   const paidModels: AiModelOffer[] = [];
   for (const target of renewalTargets) {
+    const { price, usesGift } = getLoverGiftQuote(nextState, target.price, true);
     if (target.kind === "coffee") {
       if (resolution.player.san >= nextState.sanCap) {
         appendMonthlyEffect(nextState, resolution, {
@@ -365,16 +350,17 @@ export function applyMonthStartSubscriptions(
         };
         continue;
       }
-      const canPay = resolution.player.money >= target.price;
+      const canPay = resolution.player.money >= price;
       if (canPay) {
         appendMonthlyEffect(nextState, resolution, {
           id: "coffee-subscription",
           name: "冰美式续费",
           source: "商店订阅",
-          stats: { money: -target.price, san: 3 + getCurrentCoffeeBonus(nextState.coffeeState) },
+          stats: { money: -price, san: 3 + getCurrentCoffeeBonus(nextState.coffeeState) },
+          note: usesGift ? "恋人赠礼，本次免费" : undefined,
         });
         nextState = {
-          ...nextState,
+          ...(usesGift ? consumeLoverGift(nextState) : nextState),
           player: { ...resolution.player },
           coffeeState: {
             ...nextState.coffeeState,
@@ -406,13 +392,14 @@ export function applyMonthStartSubscriptions(
       nextState.totalMonths,
       resolution.player.money,
       target.slot,
-      reimbursement,
+      reimbursement || usesGift,
     );
     nextState = { ...nextState, aiShopState: renewed.state };
     for (const item of renewed.items) {
       const note = item.reason === "model-updated"
         ? "模型已更新，自动续费已关闭"
-        : item.reason === "insufficient-money" ? "金币不足，本月暂停" : undefined;
+        : item.reason === "insufficient-money" ? "金币不足，本月暂停"
+          : usesGift ? "恋人赠礼，本次免费" : undefined;
       appendMonthlyEffect(nextState, resolution, {
         id: `ai-renewal-${item.slot}`,
         name: `${item.model.name}续费`,
@@ -420,7 +407,10 @@ export function applyMonthStartSubscriptions(
         stats: { money: item.paid ? -item.price : 0 },
         note,
       });
-      if (item.paid) paidModels.push(item.model);
+      if (item.paid) {
+        paidModels.push(item.model);
+        if (usesGift) nextState = consumeLoverGift(nextState);
+      }
       nextState = { ...nextState, player: { ...resolution.player } };
     }
   }
@@ -481,7 +471,7 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
       target,
       acceptedScore,
       nonFirstAuthor: schedule.nonFirstAuthor,
-    }));
+    }, [...state.papers, ...externalPublications, ...(state.fellowPapers ?? [])]));
     resolution.items.push({
       id: `${buff.id}-publication-${state.totalMonths}`,
       name: "长期带教论文",
@@ -540,7 +530,7 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     internshipState,
     buffs: advanceBuffDurations(buffs),
   };
-  const automaticCoffeeState = applyAutomaticCoffeeMachineEffect(monthStartState, resolution);
+  const automaticCoffeeState = applyAutomaticCoffeeMachineEffect(activateLoverMonthlyDiscount(monthStartState), resolution);
   const subscriptionSettlement = applyMonthStartSubscriptions(automaticCoffeeState, resolution);
   const existingPublicationIds = new Set([
     ...state.papers.filter((paper) => paper.status === "published").map((paper) => paper.id),
@@ -571,6 +561,12 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     resolution: subscriptionSettlement.resolution,
     nextState: {
       ...journalSettlement.state,
+      advisorProgressState: resolution.items.some((item) => item.id === "advisor-salary")
+        ? {
+          ...journalSettlement.state.advisorProgressState,
+          salaryRemainder: getAdvisorSalaryPayment(state.advisorProgressState, state.degree).remainder,
+        }
+        : journalSettlement.state.advisorProgressState,
       sanCap: state.sanCap + bikeCapGain,
       relationshipState: syncRelationshipState(
         state.relationshipState,
@@ -613,6 +609,6 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
     actionState: { ...nextMonthState.actionState, used: 0, aiResearchBonusUsed: false },
     buffs: advanceBuffDurations(nextMonthState.buffs),
   };
-  const automaticCoffeeState = applyAutomaticCoffeeMachineEffect(monthStartState, resolution);
+  const automaticCoffeeState = applyAutomaticCoffeeMachineEffect(activateLoverMonthlyDiscount(monthStartState), resolution);
   return applyMonthStartSubscriptions(automaticCoffeeState, resolution).resolution;
 }
