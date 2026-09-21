@@ -140,6 +140,7 @@ export interface PaperReviewerReport {
   improvements?: Partial<Record<PaperActionType, number>>;
   /** SAN change applied when the player confirms the review result. */
   sanChange?: number;
+  baseSanChange?: number;
 }
 
 export interface PaperReviewResult {
@@ -244,7 +245,7 @@ export interface Buff {
   timing: BuffTiming;
   remainingMonths: number | null;
   monthlyStats?: Partial<PlayerStats>;
-  /** Multiplies SAN costs for player-initiated work while this Buff is active. */
+  /** Multiplies immediate SAN costs, excluding fixed drains and recovery. */
   activeOperationSanMultiplier?: number;
   activeOperationSanDelta?: number;
   /** Fixed SAN adjustment for relationship operations. */

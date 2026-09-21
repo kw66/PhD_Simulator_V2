@@ -1,5 +1,6 @@
 import type { GameState, Paper } from "./v2-types";
 import { setPaperTotalScore } from "./v2-paper-collaboration";
+import { getActualResearchMiscSanChange } from "./v2-sanity-rules";
 
 export const PAPER_COMPETITION_EVENT_IDS = [17, 18] as const;
 
@@ -22,6 +23,7 @@ export interface PaperCompetitionPreview {
   resolvedOutcome: string;
   paper?: Paper;
   score?: number;
+  sanCost?: number;
 }
 
 export function isPaperCompetitionEventId(eventId: number): eventId is PaperCompetitionEventId {
@@ -61,10 +63,10 @@ function getAdjustedScore(paper: Paper, resolution: PaperCompetitionResolution):
   return Math.max(1, Math.round(paper[resolution.field] * resolution.multiplier));
 }
 
-export function formatPaperCompetitionOutcome(paper: Paper, resolution: PaperCompetitionResolution): string {
+export function formatPaperCompetitionOutcome(paper: Paper, resolution: PaperCompetitionResolution, sanCost = resolution.sanCost): string {
   const fieldLabel = resolution.field === "idea" ? "idea" : "实验";
   const score = getAdjustedScore(paper, resolution);
-  const sanOutcome = resolution.sanCost > 0 ? `SAN-${resolution.sanCost}｜` : "";
+  const sanOutcome = resolution.sanCost > 0 ? `SAN-${sanCost}｜` : "";
   return `${sanOutcome}${fieldLabel}×${resolution.multiplier}（${paper[resolution.field]}→${score}）`;
 }
 
@@ -91,12 +93,13 @@ export function previewPaperCompetitionResolution(
 
   const paper = currentPaper;
   const score = getAdjustedScore(paper, resolution);
-  const san = state.player.san - resolution.sanCost;
+  const sanCost = Math.abs(getActualResearchMiscSanChange(-resolution.sanCost, state.player.research, state.month, state.eventSupport, state.buffs));
+  const san = state.player.san - sanCost;
   if (!Number.isFinite(score) || !Number.isFinite(san)) {
     return { applicable: false, paper, resolvedOutcome: "本次不作处理" };
   }
 
-  return { applicable: true, paper, score, resolvedOutcome: formatPaperCompetitionOutcome(paper, resolution) };
+  return { applicable: true, paper, score, sanCost, resolvedOutcome: formatPaperCompetitionOutcome(paper, resolution, sanCost) };
 }
 
 export function applyPaperCompetitionResolution(
@@ -104,7 +107,7 @@ export function applyPaperCompetitionResolution(
   resolution: PaperCompetitionResolution,
 ): { nextState: GameState; resolvedOutcome: string } {
   const preview = previewPaperCompetitionResolution(state, resolution);
-  if (!preview.applicable || !preview.paper || preview.score === undefined) {
+  if (!preview.applicable || !preview.paper || preview.score === undefined || preview.sanCost === undefined) {
     return { nextState: state, resolvedOutcome: preview.resolvedOutcome };
   }
   const { paper, score } = preview;
@@ -112,7 +115,7 @@ export function applyPaperCompetitionResolution(
   return {
     nextState: {
       ...state,
-      player: resolution.sanCost === 0 ? state.player : { ...state.player, san: state.player.san - resolution.sanCost },
+      player: preview.sanCost === 0 ? state.player : { ...state.player, san: state.player.san - preview.sanCost },
       papers: state.papers.map((candidate) => candidate === paper
         ? setPaperTotalScore(paper, resolution.field, score)
         : candidate),

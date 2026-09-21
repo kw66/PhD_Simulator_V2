@@ -60,7 +60,7 @@ function createCareerChoices(state: GameState, careerType: CareerType): {
       internshipCount: state.internshipCount,
     });
     const sanChange = option.sanCost > 0
-      ? getActualSanChange(-option.sanCost, state.month, state.eventSupport)
+      ? getActualSanChange(-option.sanCost, state.month, state.eventSupport, state.buffs)
       : 0;
     const newProgress = oldProgress + progressGain;
     results[option.id] = {

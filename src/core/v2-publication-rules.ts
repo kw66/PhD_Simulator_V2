@@ -1,5 +1,5 @@
-import type { Buff, GrantedPublicationEffect, JournalTarget, Paper, PaperPublicationState, PaperPromotionState } from "./v2-types";
-import { getActiveOperationSanDelta } from "./v2-buffs";
+import type { Buff, GameState, GrantedPublicationEffect, JournalTarget, Paper, PaperPublicationState, PaperPromotionState } from "./v2-types";
+import { getActualSanChange, getSanConsumptionCost } from "./v2-sanity-rules";
 import { getJournalRevisionScore } from "./v2-journal-score";
 
 export const HIGHLY_CITED_CITATION_FACTOR = 200;
@@ -64,9 +64,12 @@ export function attachPaperPublication(
   };
 }
 
-export function getPaperPromotionCost(promotion: keyof PaperPromotionState, buffs: readonly Buff[] = []): number {
+export function getPaperPromotionCost(promotion: keyof PaperPromotionState, context: readonly Buff[] | Pick<GameState, "buffs" | "month" | "eventSupport"> = []): number {
+  if (promotion === "quantum") return 0;
   const cost = promotion === "arxiv" ? 2 : promotion === "github" ? 4 : 3;
-  return Math.max(0, cost + getActiveOperationSanDelta(buffs));
+  return "buffs" in context
+    ? Math.abs(getActualSanChange(-cost, context.month, context.eventSupport, context.buffs))
+    : getSanConsumptionCost(cost, context);
 }
 
 export function getPaperPromotionMoneyCost(promotion: keyof PaperPromotionState): number {

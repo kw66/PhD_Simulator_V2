@@ -594,7 +594,7 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(4);
     expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(1);
     expect(getDecisionChoices(result.events[0])[2]?.effects.money).toBe(3);
-    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-4);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-5);
     expect(getDecisionChoices(result.events[0])[2]?.effects.temporaryActionEffectUpdates?.experiment?.bonus).toBe(4);
   });
 
@@ -812,7 +812,7 @@ describe("v2 event scheduler", () => {
       totalRandomEventCount: 0,
     };
     const talkResult = collectRandomEventsForMonth(talkState, fromRolls([0.7, 0]));
-    expect(getDecisionChoices(talkResult.events[0])[2]?.effects.san).toBe(-5);
+    expect(getDecisionChoices(talkResult.events[0])[2]?.effects.san).toBe(-6);
 
     const meetingState = {
       ...initial,

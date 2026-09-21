@@ -76,8 +76,8 @@ describe("v2 research rule details and publication metrics", () => {
 
   it("documents lover route formulas, passive gains and the shared monthly date limit", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain("每月只能选择一次，三条路线共用次数");
-    expect(help).toContain("消耗为金币-2、SAN-4、金币-3");
+    expect(help).toContain("玩耍、学习、购物各有100进度，每月共用一次约会");
+    expect(help).toContain("基础消耗依次为金币-2、SAN-4、金币-3，实际见按钮");
     expect(help).toContain("科研与亲密上限均为20");
     expect(help).toContain("玩耍=⌊(亲密+你的社交)/2⌋");
     expect(help).toContain("学习=⌊(恋人科研+你的科研)/2⌋");
@@ -98,6 +98,7 @@ describe("v2 research rule details and publication metrics", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
     expect(help).toContain("SAN+6");
     expect(help).toContain("论文三项分数永久+1");
+    expect(help).toContain("下个月SAN消耗-1，含事件与审稿等即时损失，不影响固定月耗和恢复");
     expect(help).toContain("礼物券+1、亲密+2");
     expect(help).toContain("没有其他可购买项目时才用于自动续费");
   });
@@ -115,7 +116,8 @@ describe("v2 research rule details and publication metrics", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
     expect(help).toContain("科研积累从20开始");
     expect(help).toContain("经费上限20");
-    expect(help).toContain("SAN-5、经费+1");
+    expect(help).toContain("基础SAN-5、经费+1，实际消耗见按钮");
+    expect(help).toContain("人际SAN减免（含Gemini3及后续型号）适用于同学、导师和恋人");
     expect(help).toContain("每月先结算导师收入，再消耗经费");
     expect(help).toContain("科研积累按5%自然增长，增长量下取整");
     expect(help).toContain("经费不足时暂停自然增长");
@@ -279,7 +281,9 @@ describe("v2 research rule details and publication metrics", () => {
     expect(coffee).toContain("SAN已满时，自动续费当月跳过");
     expect(coffee).toContain("金币不足且没有可用于续费的礼物券时，当月暂停续费");
     expect(gear).toContain("显卡和自行车可逐档升级");
-    expect(gear).toMatch(/夏季（公历6–8月）.*主动操作SAN消耗\+1，遮阳伞可免除/);
+    expect(gear).toMatch(/夏季（公历6–8月）.*SAN消耗\+1，遮阳伞可免除/);
+    expect(gear).toContain("季节、疾病与恋人玩耍减耗影响所有即时SAN损失，含事件和审稿人影响");
+    expect(gear).toContain("最低0，不影响固定月耗和恢复");
     expect(gear).toMatch(/冬季（公历12–2月）.*每月SAN-1，羽绒服可免除/);
     expect(rest).toContain("选定后不能直接换路线");
     expect(rest).toContain("出售并重新购买后可重新选择");

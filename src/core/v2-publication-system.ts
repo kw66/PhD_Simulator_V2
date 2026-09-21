@@ -11,6 +11,7 @@ import { enqueueEventQueueItem } from "./v2-event-queue";
 import type { GameState, Paper, PaperAcceptType, PaperReviewResult, PaperReviewSettlement, PaperTarget, PendingEvent } from "./v2-types";
 import { getJournalDefinition } from "./v2-journal-system";
 import { applyPublicationTalentRewards } from "./v2-publication-talent";
+import { getActualSanChange } from "./v2-sanity-rules";
 
 const DEFAULT_TARGET_INFLUENCE: Record<PaperTarget, number> = { A: 1.1, B: 0.6, C: 0.3 };
 export const CITATION_SETTLEMENT_INTERVAL_MONTHS = 1;
@@ -74,6 +75,81 @@ function getReviewRewardText(settlement: PaperReviewSettlement): string {
   return `科研分+${settlement.scoreGain}${sanText}`;
 }
 
+function resolveReviewerSan(state: GameState, settlement: PaperReviewSettlement): PaperReviewSettlement {
+  const reports = settlement.reports.map((report) => {
+    const baseSanChange = report.baseSanChange ?? report.sanChange;
+    return baseSanChange === undefined ? report : {
+      ...report,
+      baseSanChange,
+      sanChange: getActualSanChange(baseSanChange, state.month, state.eventSupport, state.buffs),
+    };
+  });
+  return { ...settlement, reports, reviewerSanChange: reports.reduce((sum, report) => sum + (report.sanChange ?? 0), 0) };
+}
+
+function getReviewResultDescription(settlement: PaperReviewSettlement): string {
+  return [
+    `PC 最终决定：${getReviewResultText(settlement)}。`,
+    `总评 ${settlement.totalReviewScore >= 0 ? "+" : ""}${settlement.totalReviewScore}。`,
+    ...(settlement.borderlineChance !== null
+      ? [`边缘录用概率 ${(settlement.borderlineChance * 100).toFixed(1)}%。`] : []),
+    "机制结算",
+    getReviewRewardText(settlement),
+  ].join("\n\n");
+}
+
+function getReviewerDescription(settlement: PaperReviewSettlement): string {
+  return [
+    "三份审稿意见陆续回来，有人盯新颖性，有人盯实验，也有人更看重论文整体。",
+    ...getReviewerLines(settlement),
+    "看完这些意见，接下来就等 PC 做最后决定。",
+  ].join("\n\n");
+}
+
+function findReviewSettlement(event: PendingEvent): PaperReviewSettlement | undefined {
+  for (const choice of event.choices) {
+    if (choice.effects.paperReviewSettlement) return choice.effects.paperReviewSettlement;
+    for (const followUp of choice.effects.enqueueEvents ?? []) {
+      const settlement = findReviewSettlement(followUp);
+      if (settlement) return settlement;
+    }
+  }
+  return undefined;
+}
+
+export function refreshPaperReviewEvent<Event extends PendingEvent>(state: GameState, event: Event): Event {
+  if (event.source !== "review" || !event.paperReviewPresentation) return event;
+  const original = findReviewSettlement(event);
+  if (!original) return event;
+  const settlement = resolveReviewerSan(state, original);
+  if (JSON.stringify(settlement) === JSON.stringify(original)) return event;
+  const refresh = <Entry extends PendingEvent>(entry: Entry): Entry => {
+    const presentation = entry.paperReviewPresentation;
+    const result = presentation?.kind === "decision";
+    const reviewers = presentation?.kind === "reviewers";
+    return {
+      ...entry,
+      ...(result ? {
+        description: getReviewResultDescription(settlement),
+        completionLog: `${getReviewResultText(settlement)}；${getReviewRewardText(settlement)}`,
+      } : reviewers ? { description: getReviewerDescription(settlement) } : {}),
+      paperReviewPresentation: result ? { ...presentation, reports: settlement.reports, rewardText: getReviewRewardText(settlement) }
+        : reviewers ? { ...presentation, reports: settlement.reports } : presentation,
+      choices: entry.choices.map((choice) => ({ ...choice, effects: {
+        ...choice.effects,
+        ...(choice.effects.paperReviewSettlement ? { paperReviewSettlement: settlement } : {}),
+        ...(choice.effects.enqueueEvents ? { enqueueEvents: choice.effects.enqueueEvents.map(refresh) } : {}),
+      } })),
+    };
+  };
+  return refresh(event);
+}
+
+export function refreshPaperReviewEvents(state: GameState): GameState {
+  const eventQueue = state.eventQueue.map((event) => refreshPaperReviewEvent(state, event));
+  return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };
+}
+
 /**
  * A forced month advance discards blocking events without applying their
  * choices.  Review-result chains therefore need to release the paper back to
@@ -102,34 +178,21 @@ function createReviewDiscardUpdate(paper: Paper) {
 
 /**
  * Review outcomes are calculated before the event is queued. The three stages
- * below only reveal that immutable settlement and apply it on the final click.
+ * below reveal the fixed review decision; SAN costs follow current modifiers.
  */
 export function createPaperReviewResultEvent(paper: Paper, settlement: PaperReviewSettlement): PendingEvent {
   const conference = paper.target && typeof paper.submittedMonth === "number" && typeof paper.submittedYear === "number"
     ? getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear)
     : null;
   const resultText = getReviewResultText(settlement);
-  const reviewerLines = getReviewerLines(settlement);
   const rewardText = getReviewRewardText(settlement);
   const chainId = `paper-review-result-${paper.id}`;
-  const resultDescription = [
-    `PC 最终决定：${resultText}。`,
-    `总评 ${settlement.totalReviewScore >= 0 ? "+" : ""}${settlement.totalReviewScore}。`,
-    ...(settlement.borderlineChance !== null
-      ? [`边缘录用概率 ${(settlement.borderlineChance * 100).toFixed(1)}%。`]
-      : []),
-    "机制结算",
-    rewardText,
-  ].join("\n\n");
+  const resultDescription = getReviewResultDescription(settlement);
 
   const reviewerEvent: PendingEvent = {
     id: `paper-review-result-${paper.id}-reviewers`,
     title: "论文结果 ➜ 你的三个审稿人",
-    description: [
-      "三份审稿意见陆续回来，有人盯新颖性，有人盯实验，也有人更看重论文整体。",
-      ...reviewerLines,
-      "看完这些意见，接下来就等 PC 做最后决定。",
-    ].join("\n\n"),
+    description: getReviewerDescription(settlement),
     source: "review",
     blocking: true,
     deadlineMonths: 0,
@@ -284,6 +347,7 @@ export function applyPaperReviewSettlement(state: GameState, settlement: PaperRe
   const paperIndex = state.papers.findIndex((paper) => paper.id === settlement.paperId);
   if (paperIndex < 0) return state;
   const paper = state.papers[paperIndex]!;
+  settlement = resolveReviewerSan(state, settlement);
   const reviewResult = {
     reports: settlement.reports,
     totalReviewScore: settlement.totalReviewScore,
@@ -355,8 +419,12 @@ export function resolveDuePaperReviews(
     activePapers.push(paper);
     const accepted = resolved.nextPaper.status === "published";
     if (accepted) acceptedPaperIds.push(paper.id);
-    const reviewerSanChange = resolved.nextPaper.lastReview?.reports
-      .reduce((total, report) => total + (report.sanChange ?? 0), 0) ?? 0;
+    const reports = (resolved.nextPaper.lastReview?.reports ?? []).map((report) => report.sanChange === undefined ? report : {
+      ...report,
+      baseSanChange: report.sanChange,
+      sanChange: getActualSanChange(report.sanChange, state.month, state.eventSupport, state.buffs),
+    });
+    const reviewerSanChange = reports.reduce((total, report) => total + (report.sanChange ?? 0), 0);
     const settlement: PaperReviewSettlement = {
       paperId: paper.id,
       target: paper.target!,
@@ -369,7 +437,7 @@ export function resolveDuePaperReviews(
       reviewStrictnessMultiplier: getReviewStrictnessMultiplier(paper.target!, getPaperVenueInfluence(paper)),
       scoreGain: accepted ? resolved.scoreGain : 0,
       reviewerSanChange,
-      reports: resolved.nextPaper.lastReview?.reports ?? [],
+      reports,
     };
     const reviewEvent = createPaperReviewResultEvent(paper, settlement);
     reviewEvents.push(reviewEvent);

@@ -830,7 +830,7 @@ describe("minimal game engine", () => {
     expect(state.actionState.used).toBe(0);
 
     state = resolveCurrent(state);
-    expect(state.player.san).toBe(6);
+    expect(state.player.san).toBe(0);
     expect(state.actionState.used).toBe(1);
     expect(state.buffs).toHaveLength(0);
   });

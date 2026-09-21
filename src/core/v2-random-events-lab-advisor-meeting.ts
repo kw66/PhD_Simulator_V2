@@ -12,11 +12,11 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   const advisorPresentForPrepared = getRoll() < 0.5;
   const advisorPresentForSeries = getRoll() < 0.5;
   const advisorPresentForSlack = getRoll() < 0.5;
-  const preparedSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport);
-  const preparedSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport);
+  const preparedSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
+  const preparedSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const preparedSanNarrative = getResearchMiscSanNarrative(-2, state.player.research);
-  const seriesSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport);
-  const seriesSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport);
+  const seriesSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
+  const seriesSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const seriesSanNarrative = getResearchMiscSanNarrative(-4, state.player.research);
   const preparedFavorResult = applyTierResist(1, state.player.favor, getRoll);
   const preparedFavorChange = preparedFavorResult.effectiveChange;

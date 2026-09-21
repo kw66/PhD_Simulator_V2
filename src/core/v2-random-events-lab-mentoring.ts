@@ -32,8 +32,8 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
   const delegateSocialResult = applyTierResist(delegateSocialRaw, state.player.social, getRoll);
   const delegateSocialChange = delegateSocialResult.effectiveChange;
   const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw, delegateSocialResult);
-  const mentoringSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport);
-  const mentoringSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport);
+  const mentoringSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
+  const mentoringSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const mentoringSanNarrative = getResearchMiscSanNarrative(-4, state.player.research);
 
   const event: PendingEvent = {
@@ -275,8 +275,8 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   const juniorAddition = createGeneratedFellowProfileAddition("junior", serial, juniorGender);
   const roleText = getFellowRoleLabel("junior", juniorGender);
   const eventTitle = roleText === "师弟" ? "指导师弟" : "指导师妹";
-  const shortTermSan = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport);
-  const shortTermSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport);
+  const shortTermSan = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
+  const shortTermSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
   const shortTermSanNarrative = getResearchMiscSanNarrative(-5, state.player.research);
   const shortTermSocialResult = applyTierResist(1, state.player.social, getRoll);
   const shortTermSocialGain = shortTermSocialResult.effectiveChange;

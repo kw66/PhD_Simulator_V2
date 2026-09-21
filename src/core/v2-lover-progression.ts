@@ -1,4 +1,4 @@
-import { getActiveOperationSanDelta, addOrReplaceBuffs } from "./v2-buffs";
+import { getRelationshipSanCost, addOrReplaceBuffs } from "./v2-buffs";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { addPaperCollaboration } from "./v2-paper-collaboration";
 import { getLoverName } from "./v2-lover-system";
@@ -49,7 +49,7 @@ export function getLoverRouteGain(state: GameState, route: LoverRoute): number {
 
 export function getLoverRouteCost(state: GameState, route: LoverRoute): { money: number; san: number } {
   return { money: route === "play" ? 2 : route === "shopping" ? 3 : 0,
-    san: route === "study" ? Math.max(0, 4 + getActiveOperationSanDelta(state.buffs)) : 0 };
+    san: route === "study" ? getRelationshipSanCost(state, 4) : 0 };
 }
 
 export function getLoverDateFailure(state: GameState, route: LoverRoute): string | null {
@@ -118,7 +118,7 @@ function advanceRoute(state: GameState, route: LoverRoute, gain: number): GameSt
       } else {
         const month = state.totalMonths + 1;
         nextState.loverProgressState.sanDiscountMonths = [...new Set([...(lover.sanDiscountMonths ?? []), month])];
-        effects.push("下月主动操作SAN消耗-1，最低为0");
+        effects.push("下月SAN消耗-1，最低为0");
       }
     } else if (route === "shopping") {
       nextState.loverProgressState.giftCoupons = (lover.giftCoupons ?? 0) + 1;

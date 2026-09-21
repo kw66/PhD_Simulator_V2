@@ -96,10 +96,11 @@ describe("ending failure boundaries", () => {
 
   it("applies spike protection centrally after advisor work and counts recovery once", () => {
     const state = makeState();
-    state.player.san = 5;
+    state.player.san = 6;
     state.shopState = { ...state.shopState, chairOwned: true, chairUpgrade: "spike" };
     const next = dispatchAction(state, "advisor-horizontal");
     expect(next.player.san).toBe(3);
+    expect(next.advisorProgressState.funding).toBe(state.advisorProgressState.funding + 1);
     expect(next.shopState.chairSanRecovered).toBe(3);
     expect(next.phase).toBe("playing");
     expect(dispatchAction(next, "advisor-horizontal").shopState.chairSanRecovered).toBe(3);

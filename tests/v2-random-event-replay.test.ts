@@ -228,7 +228,7 @@ describe("random event replay", () => {
     const getChoices = (eventId: number) => createRandomEventById(eventId, state, () => 0.5)
       .event?.choices[0]?.effects.enqueueEvents?.[0]?.choices ?? [];
 
-    expect(getChoices(5).find((choice) => choice.label === "提出远程实习")?.effects.san).toBe(-2);
+    expect(getChoices(5).find((choice) => choice.label === "提出远程实习")?.effects.san).toBe(-5);
     expect(getChoices(10).find((choice) => choice.label === "全面合作")?.effects.san).toBe(0);
     expect(getChoices(11).find((choice) => choice.label === "深入合作")?.effects.san).toBe(0);
     expect(getChoices(11).find((choice) => choice.label === "拜入门下")?.effects.san).toBe(-1);

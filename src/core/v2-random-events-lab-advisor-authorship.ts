@@ -5,7 +5,7 @@ import type { GameState, PendingEvent } from "./v2-types";
 export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
   const lowFavor = state.player.favor < 6;
-  const argueSanChange = getActualSanChange(-2, state.month, state.eventSupport);
+  const argueSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
   const transferSocialResult = applyTierResist(-1, state.player.social, getRoll);
   const transferSocialChange = transferSocialResult.effectiveChange;
   const transferSocialNarrative = getTierResistedNarrative("社交", -1, transferSocialResult);

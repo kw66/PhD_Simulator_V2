@@ -5,9 +5,9 @@ import type { GameState, PendingEvent } from "./v2-types";
 
 export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
-  const terrariaSanChange = getActualSanChange(-4, state.month, state.eventSupport);
-  const magicTowerSanChange = getActualSanChange(-6, state.month, state.eventSupport);
-  const kingsSanChange = getActualSanChange(-5, state.month, state.eventSupport);
+  const terrariaSanChange = getActualSanChange(-4, state.month, state.eventSupport, state.buffs);
+  const magicTowerSanChange = getActualSanChange(-6, state.month, state.eventSupport, state.buffs);
+  const kingsSanChange = getActualSanChange(-5, state.month, state.eventSupport, state.buffs);
   const socialResult = applyTierResist(1, state.player.social, getRoll);
   const researchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
   const socialNarrative = getTierResistedNarrative("社交", 1, socialResult);

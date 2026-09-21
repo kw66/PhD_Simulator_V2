@@ -40,12 +40,12 @@ import { getPaperHeatTier } from "../core/v2-paper-topics";
 import {
   ADVISOR_FUNDING_CAP,
   ADVISOR_GRANTS,
-  ADVISOR_TASK_SAN_COST,
   getActiveAdvisorGrants,
   getAdvisorGrantLimit,
   getAdvisorMonthlyResearchGrowth,
   getAdvisorMonthlySalary,
   getAdvisorRankLabel,
+  getAdvisorTaskSanCost,
 } from "../core/v2-advisor-progress";
 import {
   getCalendarForTotalMonths,
@@ -118,7 +118,7 @@ function getAvailablePromotionCount(state: GameState): number {
     return count + ids.filter((id) => {
       if (promotions[id] === true) return false;
       if (id === "arxiv" && (paper.target === null || paper.conferenceHandled === true || (paper.publication?.monthsSincePublish ?? 0) >= 3)) return false;
-      return state.player.san >= getPaperPromotionCost(id, state.buffs)
+      return state.player.san >= getPaperPromotionCost(id, state)
         && state.player.money >= getPaperPromotionMoneyCost(id);
     }).length;
   }, 0);
@@ -126,7 +126,7 @@ function getAvailablePromotionCount(state: GameState): number {
 
 function getAvailableRelationshipActionCount(state: GameState): number {
   if (state.phase !== "playing" || isGameplayModuleLocked(state)) return 0;
-  const advisorCost = Math.max(0, ADVISOR_TASK_SAN_COST + getActiveOperationSanDelta(state.buffs));
+  const advisorCost = getAdvisorTaskSanCost(state);
   const advisorAvailable = Boolean(state.selectedAdvisorName)
     && state.relationshipState.advisorCount > 0
     && state.advisorProgressState.lastHorizontalTotalMonths !== state.totalMonths
@@ -316,8 +316,8 @@ function getSeasonLabel(state: GameState): string | null {
 
 function getSeasonEffectText(state: GameState): string {
   const season = getSeasonByMonth(getAcademicMonth(state.totalMonths));
-  if (season === "spring") return "春季：主动操作 SAN -1";
-  if (season === "summer") return state.eventSupport.hasParasol ? "夏季：遮阳伞抵消主动操作 SAN +1" : "夏季：主动操作 SAN +1";
+  if (season === "spring") return "春季：SAN消耗 -1";
+  if (season === "summer") return state.eventSupport.hasParasol ? "夏季：遮阳伞抵消 SAN消耗 +1" : "夏季：SAN消耗 +1";
   if (season === "autumn") return "秋季：月初 SAN +1";
   return state.eventSupport.hasDownJacket ? "冬季：羽绒服抵消月初 SAN -1" : "冬季：月初 SAN -1";
 }
@@ -352,7 +352,7 @@ function getAttrTierTooltip(kind: AttrTierId, value: number, illnessProbability 
     return `当前疾病概率 ${illnessProbability}%｜月末结算 ${signedChange}%`;
   }
   if (kind === "research") {
-    return `科研增减有${currentChance}%概率无效\n事件中科研杂活 SAN 减免 ${RESEARCH_CHORE_SAN_DISCOUNT[tier]}`;
+    return `科研增减有${currentChance}%概率无效\n事件科研任务 SAN 减免 ${RESEARCH_CHORE_SAN_DISCOUNT[tier]}`;
   }
   const label = kind === "social" ? "社交" : "好感";
   return `${label}增减有${currentChance}%概率无效`;
@@ -473,7 +473,7 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
   });
   if (state.loverState.active && state.loverProgressState.active
     && state.loverProgressState.sanDiscountMonths?.includes(state.totalMonths + 1)) {
-    upsertBucketItem(items, "next-month-lover-play-discount", "主动操作 SAN消耗 -1", "恋人玩耍 · 下个月生效，持续1个月");
+    upsertBucketItem(items, "next-month-lover-play-discount", "SAN消耗 -1", "恋人玩耍 · 下个月生效，持续1个月");
   }
   return items;
 }
@@ -562,7 +562,7 @@ function buildEffectBuckets(state: GameState): {
       sources.push(`${buff.source} · ${duration} · SAN消耗 ${formatSignedNumber(buff.activeOperationSanDelta ?? 0)}${buff.description?.trim() ? `：${buff.description.trim()}` : ""}`);
     }
     for (const source of sources) {
-      upsertBucketItem(target, `${timing}:rule:active-operation-san-delta`, `主动操作 SAN消耗 ${formatSignedNumber(delta)}`, source, delta > 0);
+      upsertBucketItem(target, `${timing}:rule:active-operation-san-delta`, `SAN消耗 ${formatSignedNumber(delta)}`, source, delta > 0);
     }
   }
   const permanentBuffItems = buffBuckets.permanent.filter((item) => (
@@ -1723,7 +1723,7 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       relationGrowthPerMonth: 0,
       taskRewardText: "经费 +1",
       taskLabel: "做横向",
-      taskCostLabel: `SAN-${Math.max(0, ADVISOR_TASK_SAN_COST + getActiveOperationSanDelta(state.buffs))}`,
+      taskCostLabel: `SAN-${getAdvisorTaskSanCost(state)}`,
       taskUsedThisMonth: false,
       canInteract: false,
     };
@@ -1984,7 +1984,7 @@ function renderAdvisorFundSummary(state: GameState): string {
 
 function renderAdvisorStatus(state: GameState): string {
   const advisor = state.advisorProgressState;
-  const sanCost = Math.max(0, ADVISOR_TASK_SAN_COST + getActiveOperationSanDelta(state.buffs));
+  const sanCost = getAdvisorTaskSanCost(state);
   const monthlyGrowth = getAdvisorMonthlyResearchGrowth(state);
   const calendarYear = getAcademicCalendarYear(state.year, state.month);
   const calendarMonth = getAcademicCalendarMonth(state.month);
@@ -2444,7 +2444,7 @@ function renderResearchPromotionActions(state: GameState, paper: Paper): string 
     <div class="research-promotion-block">
       <div class="research-promotion-actions">
         ${visiblePromotionIds.map((promotionId) => {
-          const cost = getPaperPromotionCost(promotionId, state.buffs);
+          const cost = getPaperPromotionCost(promotionId, state);
           const moneyCost = getPaperPromotionMoneyCost(promotionId);
           const used = promotions[promotionId] === true;
           const affordable = state.player.san >= cost && state.player.money >= moneyCost;

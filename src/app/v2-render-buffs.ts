@@ -277,7 +277,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       value: buff.activeOperationSanMultiplier,
       source: getSourceText(buff),
       isDebuffWhenAboveOne: true,
-      renderLabel: (value) => `主动操作 SAN ×${formatNumber(value)}`,
+      renderLabel: (value) => `SAN消耗 ×${formatNumber(value)}`,
     });
   }
   if (buff.relationshipOperationSanDelta !== undefined) {
@@ -286,7 +286,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       timing: buff.timing,
       operation: "sum",
       value: buff.relationshipOperationSanDelta,
-      source: getSourceText(buff),
+      source: `${getSourceText(buff)} · 适用于同学、导师和恋人`,
       isCost: true,
       showWhenZero: true,
       renderLabel: (value) => `人际操作 SAN ${formatSignedNumber(value)}`,

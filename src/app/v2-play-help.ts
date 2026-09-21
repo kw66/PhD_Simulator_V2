@@ -35,7 +35,7 @@ function renderReviewerGuide(section: ReviewerGuideSection, offset = 0, count = 
     expert: ["最高两项各×1.5", "拒稿：idea+10"],
     kind: ["最高一项×3", "结算：SAN+1"],
     strict: ["最低两项各×1.5", "拒稿：最低两项各+3"],
-    hostile: ["最低一项×3", "结算：SAN-2"],
+    hostile: ["最低一项×3", "基础：SAN-2"],
   };
   const weights = new Map(REVIEWER_BASE_WEIGHTS);
   const deltas = new Map(REVIEWER_ANNUAL_WEIGHT_DELTAS);
@@ -85,7 +85,7 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
     <p>原本0或1分不扣。先算合计扣分，再按自身／协作比例分摊。</p>`),
   directPage("审稿人概率", `<p>3位独立抽取，类型可重复。<b>y=投稿学年−1</b>，首年y=0。</p>${renderReviewerGuide("probability")}`),
   directPage("审稿评分", `${renderReviewerGuide("method")}<p>普通与LLM的三项权重随机生成，<b>权重之和均为3</b>。最高／最低按投稿时的各项合计分选取，有效分四舍五入。</p>`),
-  directPage("审稿人反馈", `<p>拒稿加分只在退稿后生效；<b>SAN变化无论中稿或拒稿都生效</b>，三位审稿人的效果可叠加。</p>${renderReviewerGuide("effect")}`),
+  directPage("审稿人反馈", `<p>拒稿加分只在退稿后生效；<b>SAN变化无论中稿或拒稿都生效</b>，三位审稿人的效果可叠加。扣SAN先乘疾病倍率并向上取整，再加季节与恋人固定修正，最低0；恢复不受影响。</p>${renderReviewerGuide("effect")}`),
   directPage("审稿门槛", `<p><b>基础门槛：边缘／接收</b>，低于前值拒稿，达到后值接收。</p>${renderReviewerThresholds()}
     <details class="play-help-details"><summary>按会议影响力换算</summary><div class="play-help-detail-content">
     <p>实际门槛=基础门槛×会议影响力÷等级均值，四舍五入。等级均值：A ${REVIEW_TARGET_AVERAGE_INFLUENCE.A}，B ${REVIEW_TARGET_AVERAGE_INFLUENCE.B}，C ${REVIEW_TARGET_AVERAGE_INFLUENCE.C}。</p></div></details>`),
@@ -103,9 +103,10 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
 
 const RELATIONSHIP_PAGES: readonly PlayHelpPage[] = [
   detailPage("导师成长", `<p>科研积累从<b>20</b>开始；科研经费初始0、经费上限20。有经费时每月消耗1，科研积累按5%自然增长，增长量下取整；经费不足时暂停自然增长。</p>
-    <p>做横向：<b>SAN-5、经费+1</b>，不耗行动点，每月限一次。</p>`,
+    <p>做横向：<b>基础SAN-5、经费+1</b>，实际消耗见按钮；不耗行动点，每月限一次。</p>`,
     `<p>每月先结算导师收入，再消耗经费；论文固定科研分会增加导师积累，同一篇论文只计一次。3月先增长再申请，8月公布结果，积累不扣除。</p>
-    <p>项目门槛与期限见下一条提示；院士需积累1000且已获杰青，获选后每月经费+1。</p>`),
+    <p>项目门槛与期限见下一条提示；院士需积累1000且已获杰青，获选后每月经费+1。</p>
+    <p>人际SAN减免（含Gemini 3及后续型号）适用于同学、导师和恋人。</p>`),
   directPage("导师项目", `<table class="panel-tip-table"><thead><tr><th>项目</th><th>积累</th><th>经费</th><th>期限</th></tr></thead><tbody>${ADVISOR_GRANTS.filter((grant) => grant.id !== "academician").map((grant) => `<tr><th>${grant.name}</th><td>${grant.threshold}</td><td>+${grant.funding}</td><td>${grant.durationYears}年</td></tr>`).join("")}</tbody></table>
     <p>每年按积累申请符合门槛且不限项的最高新项目，积累不扣除。</p>`),
   detailPage("导师职称与补助", `<p><b>晋升后下月加薪</b>：硕士每级+0.25金币，博士每级+0.5金币。</p>
@@ -124,12 +125,12 @@ const RELATIONSHIP_PAGES: readonly PlayHelpPage[] = [
     <p>达到当月会议参考分后，优先投A，其次B、C。<b>审稿3个月</b>，拒稿继续改，中稿开新篇。</p>
     <p><b>你实际帮这篇论文加过分才会署名</b>；接收后计入合作成果、引用和合作发表奖励，不计玩家科研分。</p>`),
   detailPage("恋人类型与约会", `<p>恋人有<b>活泼</b>和<b>聪慧</b>两种类型，科研与亲密的初始侧重点相反。</p>
-    <p>玩耍、学习、购物各有100进度，每月只能选择一次，三条路线共用次数；消耗为金币-2、SAN-4、金币-3，科研与亲密上限均为20。</p>`,
+    <p>玩耍、学习、购物各有100进度，每月共用一次约会；基础消耗依次为金币-2、SAN-4、金币-3，实际见按钮；科研与亲密上限均为20。</p>`,
     `<p>初始属性：活泼恋人科研3～6、亲密9～12；聪慧恋人科研9～12、亲密3～6。</p>
     <p>手动进度：玩耍=⌊(亲密+你的社交)/2⌋；学习=⌊(恋人科研+你的科研)/2⌋；购物=⌊亲密/2⌋+10。</p>
     <p>恋爱次月起：活泼恋人玩耍+亲密、学习+⌊亲密/2⌋；聪慧恋人学习+亲密、玩耍+⌊亲密/2⌋，购物只靠手动约会。进度条和卡片底部提示显示当前路线效果。</p>`),
   detailPage("恋人条满奖励", `<p>玩耍和学习每次满100，亲密+1并按三轮循环；购物每次满100获得礼物券和亲密。</p>`,
-    `<p><b>玩耍：</b>①SAN+6；②SAN上限+1；③下个月主动操作SAN消耗-1。</p>
+    `<p><b>玩耍：</b>①SAN+6；②SAN上限+1；③下个月SAN消耗-1，含事件与审稿等即时损失，不影响固定月耗和恢复。</p>
     <p><b>学习：</b>①随机论文协作项+恋人科研；②论文三项分数永久+1；③科研能力较低者+1。</p>
     <p><b>购物：</b>礼物券+1、亲密+2。礼物券优先用于手动商店购买，没有其他可购买项目时才用于自动续费。</p>
     <p>没有可帮助的论文时，学习奖励暂存，之后自动使用。</p>`),

@@ -23,8 +23,8 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
   }
 
   const serial = state.totalRandomEventCount;
-  const stayUpSanChange = getActualResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport);
-  const stayUpSanSummary = formatResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport);
+  const stayUpSanChange = getActualResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport, state.buffs);
+  const stayUpSanSummary = formatResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport, state.buffs);
   const stayUpSanNarrative = getResearchMiscSanNarrative(-6, state.player.research);
   const event: PendingEvent = {
     id: `random-16-y${state.year}-m${state.month}-n${serial}`,

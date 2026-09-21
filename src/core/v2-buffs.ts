@@ -6,8 +6,8 @@ import type {
   ReadingEffect,
   TemporaryActionEffectUpdates,
 } from "./v2-types";
-import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
-import { getSeasonSanModifier } from "./v2-sanity-rules";
+import { combineEffectMultipliers } from "./v2-numeric-modifiers";
+import { getSanConsumptionCost, getSeasonSanModifier } from "./v2-sanity-rules";
 
 export interface ResolvedActionEffect {
   bonus: number;
@@ -87,17 +87,10 @@ export function getActiveOperationSanMultiplier(
 export function getActiveOperationSanCost(
   baseSanCost: number,
   buffs: readonly Buff[],
-  operation: ActiveOperationType,
+  _operation: ActiveOperationType,
   fixedSanDelta = 0,
 ): number {
-  const normalizedCost = Number.isFinite(baseSanCost) ? Math.max(0, baseSanCost) : 0;
-  const resolvedCost = applyMultipliersThenAdditions(
-    normalizedCost,
-    [getActiveOperationSanMultiplier(buffs, operation)],
-    [fixedSanDelta + getActiveOperationSanDelta(buffs)],
-    "ceil",
-  );
-  return Math.max(0, resolvedCost);
+  return getSanConsumptionCost(baseSanCost, buffs, fixedSanDelta);
 }
 
 export function getActiveOperationSanDelta(buffs: readonly Buff[]): number {
@@ -189,6 +182,10 @@ export function getRelationshipOperationSanDelta(buffs: readonly Buff[]): number
     if (!isActiveBuff(buff) || !Number.isFinite(buff.relationshipOperationSanDelta)) return total;
     return total + (buff.relationshipOperationSanDelta ?? 0);
   }, 0);
+}
+
+export function getRelationshipSanCost(state: Pick<GameState, "buffs" | "month" | "eventSupport">, baseSanCost: number): number {
+  return getActiveOperationSanCostForState(state, baseSanCost, "relationship-task", getRelationshipOperationSanDelta(state.buffs));
 }
 
 export function getReadingEffect(buffs: readonly Buff[]): Required<ReadingEffect> {

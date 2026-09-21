@@ -1,9 +1,7 @@
 ﻿import {
   applyTierResist,
-  formatResearchMiscSanChange,
   formatTierResistedOutcome,
-  getActualResearchMiscSanChange,
-  getResearchMiscSanNarrative,
+  getActualSanChange,
   getTierResistedNarrative,
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
@@ -14,9 +12,8 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
   const serial = state.totalRandomEventCount;
   const isHighResearch = state.player.research >= 6;
   const isHighFavor = state.player.favor >= 6;
-  const internshipSanChange = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport);
-  const internshipSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport);
-  const internshipSanNarrative = getResearchMiscSanNarrative(-5, state.player.research);
+  const internshipSanChange = getActualSanChange(-5, state.month, state.eventSupport, state.buffs);
+  const internshipSanSummary = `SAN ${internshipSanChange > 0 ? "+" : ""}${internshipSanChange}`;
   const ideaBonus = drawInclusiveInt(4, 6, getRoll);
   const experimentBonus = drawInclusiveInt(4, 6, getRoll);
   const reportFavorResult = applyTierResist(-1, state.player.favor, getRoll);
@@ -137,7 +134,6 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
               "导师想了想：“可以，但组里的实验节点不能耽误。”",
               "你和公司确认了远程安排，白天处理实习任务，空档时间继续跑实验。",
               "两边来回切换有些累，好在拿到了实习报酬，也学到几种能用于下轮实验的工程做法。",
-              ...(internshipSanNarrative ? [internshipSanNarrative] : []),
             ].join("\n\n")
           : [
               "“老师，我想做一段远程实习……”",

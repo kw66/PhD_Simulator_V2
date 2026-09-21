@@ -179,7 +179,7 @@ function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "su
 }
 
 export function createScholarshipEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
-  const applicationSanChange = getActualSanChange(-2, state.month, state.eventSupport);
+  const applicationSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
   const requirement = getScholarshipRequirement(state.year, getRoll);
   const reward = getScholarshipReward(state.year);
   const [estimateMin, estimateMax] = getScholarshipEstimateRange(state.year);

@@ -8,8 +8,8 @@ import type { GameState, PendingEvent } from "./v2-types";
 
 export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
-  const reinstallSanChange = getActualSanChange(-3, state.month, state.eventSupport);
-  const taobaoFailureSanChange = getActualSanChange(-2, state.month, state.eventSupport);
+  const reinstallSanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
+  const taobaoFailureSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
   const reinstallSuccess = getRoll() < 0.5;
   const taobaoSuccess = getRoll() < 0.5;
   const reportSocialResult = applyTierResist(-2, state.player.social, getRoll);

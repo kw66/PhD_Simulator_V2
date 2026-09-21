@@ -672,7 +672,7 @@ describe("v2 render lobby shell", () => {
     expect(infoHtml).toContain("游戏机制");
     expect(infoHtml).toContain("数值规则");
     expect(infoHtml).toContain("攻略指南");
-    expect(valuesHtml).toContain("事件中科研杂活");
+    expect(valuesHtml).toContain("事件科研任务");
     expect(valuesHtml).toContain("减免 0</strong>");
     expect(valuesHtml).not.toContain("最低消耗");
     expect(guideHtml).toContain("开局路线");
@@ -864,7 +864,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("play-right-rail");
     expect(html).toContain('class="new-attr-panel"');
     expect(html).toContain('data-tooltip="当前疾病概率 0%｜月末结算 -2%"');
-    expect(html).toContain('data-tooltip="科研增减有0%概率无效\n事件中科研杂活 SAN 减免 0"');
+    expect(html).toContain('data-tooltip="科研增减有0%概率无效\n事件科研任务 SAN 减免 0"');
     expect(html).toContain('data-tooltip="社交增减有0%概率无效"');
     expect(html).toContain('data-tooltip="好感增减有0%概率无效"');
     expect(html).toContain("SAN值");
@@ -1192,7 +1192,9 @@ describe("v2 render lobby shell", () => {
     expect(futureAiHtml).toContain("Kimi K3");
     expect(futureAiHtml).toContain("自动看论文：");
     expect(futureAiHtml).toContain("+1次");
-    expect(futureAiHtml).not.toContain("事件中的科研杂活");
+    const futureGeminiCard = getShopCardHtml(futureAiHtml, "Gemini 3");
+    expect(futureGeminiCard).toContain("人际操作");
+    expect(futureGeminiCard).not.toContain("事件科研任务");
 
     const purchasedAiHtml = renderApp({
       ...state,
@@ -3274,9 +3276,9 @@ describe("v2 render lobby shell", () => {
 
     expect(autumnHtml).not.toContain("月初 SAN+1（已结算）");
     expect(winterHtml).not.toContain("月初 SAN-1（已结算）");
-    expect(springHtml).toContain("主动操作 SAN消耗 -1");
+    expect(springHtml).toContain("SAN消耗 -1");
     expect(springHtml).toContain('data-effect-sources="[&quot;春季：SAN消耗 -1&quot;]"');
-    expect(summerHtml).toContain("主动操作 SAN消耗 +1");
+    expect(summerHtml).toContain("SAN消耗 +1");
     expect(summerHtml).toContain('data-effect-sources="[&quot;夏季：SAN消耗 +1&quot;]"');
   });
 
@@ -3297,7 +3299,7 @@ describe("v2 render lobby shell", () => {
 
     expect(summerHtml).toContain("夏季炎热已抵消");
     expect(summerHtml).toContain('data-effect-sources="[&quot;遮阳伞&quot;]"');
-    expect(summerHtml).not.toContain("主动操作 SAN消耗 +1");
+    expect(summerHtml).not.toContain(">SAN消耗 +1</button>");
     expect(winterHtml).not.toContain("冬季寒冷已抵消");
     expect(winterHtml).not.toContain("月初 SAN-1（已结算）");
   });
@@ -3307,8 +3309,8 @@ describe("v2 render lobby shell", () => {
     state = dispatchAction(state, "start-game", { roleId: "normal" });
     const html = renderApp(state, createDefaultAccountProfile());
 
-    expect(html).not.toContain("主动操作 SAN消耗 -1");
-    expect(html).not.toContain("主动操作 SAN消耗 +1");
+    expect(html).not.toContain("SAN消耗 -1");
+    expect(html).not.toContain("SAN消耗 +1");
     expect(html).not.toContain("月初 SAN+1（已结算）");
     expect(html).not.toContain("月初 SAN-1（已结算）");
   });
@@ -3560,7 +3562,7 @@ describe("v2 render lobby shell", () => {
     expect(permanentEffects).toContain("恋人学习 · 永久");
     expect(permanentEffects).toContain("实验 +1分");
     expect(permanentEffects).toContain("论文 +1分");
-    expect(monthlyEffects).toContain("主动操作 SAN消耗 -1");
+    expect(monthlyEffects).toContain("SAN消耗 -1");
     expect(nextMonthEffects).not.toContain("羽毛球获胜");
     expect(state.buffs.some((buff) => buff.id === "debug-buff-strong-body")).toBe(false);
     expect(nextMonthEffects).toContain("硕士工资：每月 +1");
@@ -3572,7 +3574,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("自动idea+4分");
     expect(html).not.toContain("自动论文+2分");
     expect(html).not.toContain("每 12 月自动合作论文");
-    expect(html).toContain("主动操作 SAN ×1.5");
+    expect(html).toContain("SAN消耗 ×1.5");
     expect(html).toContain("看论文 SAN -2");
     expect(html).toContain("手动看论文 +1次");
     expect(html).toContain("自动看论文 +1次");
@@ -3591,7 +3593,7 @@ describe("v2 render lobby shell", () => {
     ]);
     expect(aiIdeaEffect?.sources.join("、")).not.toContain("肚子虚弱");
 
-    const illnessEffect = buckets.monthly.find((item) => item.label === "主动操作 SAN ×1.5");
+    const illnessEffect = buckets.monthly.find((item) => item.label === "SAN消耗 ×1.5");
     expect(illnessEffect?.sources).toEqual(["肚子虚弱 · 持续生效"]);
     expect(illnessEffect?.sources.join("、")).not.toContain("商店");
 
@@ -3642,7 +3644,7 @@ describe("v2 render lobby shell", () => {
     const pending = pendingHtml.split('id="new-next-month-effect-list">')[1]?.split('</div>')[0] ?? "";
     const current = pendingHtml.split('id="new-monthly-effect-list">')[1]?.split('</div>')[0] ?? "";
     expect(pending).toContain('data-effect-id="next-month-lover-play-discount-');
-    expect(pending).toContain("主动操作 SAN消耗 -1");
+    expect(pending).toContain("SAN消耗 -1");
     expect(current).not.toContain("active-operation-san-delta");
     expect(getRelationshipCardHtml(pendingHtml, "advisor")).toContain('class="rel-action-cost">SAN-5</span>');
 
@@ -3651,7 +3653,7 @@ describe("v2 render lobby shell", () => {
     const activeHtml = renderApp(state);
     const active = activeHtml.split('id="new-monthly-effect-list">')[1]?.split('</div>')[0] ?? "";
     const chip = active.match(/<button[^>]*data-effect-id="monthly:rule:active-operation-san-delta-[^"]+"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-    expect(chip).toContain("主动操作 SAN消耗 -1");
+    expect(chip).toContain("SAN消耗 -1");
     expect(chip).toContain("恋人玩耍 · 剩余 1 月");
     expect(chip).not.toContain("is-debuff");
     expect(activeHtml).not.toContain('data-effect-id="next-month-lover-play-discount-');
@@ -3677,7 +3679,7 @@ describe("v2 render lobby shell", () => {
     const chip = html.match(/<button[^>]*data-effect-id="monthly:rule:active-operation-san-delta-[^"]+"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
     if (deltas.length === 0) expect(chip).toBe("");
     else {
-      expect(chip).toContain(`主动操作 SAN消耗 ${total >= 0 ? "+" : ""}${total}`);
+      expect(chip).toContain(`SAN消耗 ${total >= 0 ? "+" : ""}${total}`);
       expect(chip.includes("is-debuff")).toBe(total > 0);
       deltas.forEach((_, index) => expect(chip).toContain(`来源${index}`));
       expect(chip).not.toContain(`来源${deltas.length}`);
@@ -3699,7 +3701,7 @@ describe("v2 render lobby shell", () => {
     const monthly = html.split('id="new-monthly-effect-list">')[1]?.split('</div>')[0] ?? "";
     const chips = monthly.match(/<button[^>]*data-effect-id="monthly:rule:active-operation-san-delta-[^"]+"[^>]*>[\s\S]*?<\/button>/g) ?? [];
     expect(chips).toHaveLength(1);
-    expect(chips[0]).toContain(`主动操作 SAN消耗 ${expected}`);
+    expect(chips[0]).toContain(`SAN消耗 ${expected}`);
     expect(chips[0]).toContain("恋人玩耍 · 剩余 1 月 · SAN消耗 -1");
     expect(chips[0]).not.toContain("is-debuff");
     if (season) expect(chips[0]).toContain(season);

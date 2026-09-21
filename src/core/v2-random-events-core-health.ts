@@ -1,7 +1,7 @@
 import { getActualSanChange } from "./v2-sanity-rules";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { createThreeStageRandomEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
-import type { EventChoice, GameState, PendingEvent } from "./v2-types";
+import type { Buff, EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type IllnessType = "stomach" | "flu" | "fever";
 
@@ -119,12 +119,22 @@ export function createIllnessRandomEvent(
   const severity = illnessType === "stomach" ? 0 : illnessType === "flu" ? 1 : 2;
   const hardCapDelta = -(1 + severity);
   const medicineMoney = -(1 + severity);
-  const medicineSan = getActualSanChange(-severity, state.month, state.eventSupport);
   const hospitalMoney = -(3 + severity);
-  const restSan = getActualSanChange(-(4 + severity * 2), state.month, state.eventSupport);
   const restSanGain = getShopRestSanGain(state.shopState);
   const activeOperationSanMultiplier = illnessType === "stomach" ? 1.5 : illnessType === "flu" ? 2 : 2.5;
   const pendingBuffId = `illness-work-penalty-${illnessType}-${state.totalMonths}-${serial}`;
+  const illnessBuff: Buff = {
+    id: pendingBuffId,
+    name: `SAN消耗 ×${activeOperationSanMultiplier}`,
+    source: copy.title,
+    timing: "monthly",
+    remainingMonths: 1,
+    activeOperationSanMultiplier,
+    description: "硬撑时持续至本月结束；影响操作、事件及审稿压力的SAN消耗，不影响固定扣除与恢复",
+  };
+  const illnessBuffs = [...state.buffs.filter((buff) => buff.id !== pendingBuffId), illnessBuff];
+  const medicineSan = getActualSanChange(-severity, state.month, state.eventSupport, illnessBuffs);
+  const restSan = getActualSanChange(-(4 + severity * 2), state.month, state.eventSupport, illnessBuffs);
 
   const event: PendingEvent = {
     id: `illness-${illnessType}-y${state.year}-m${state.month}-n${serial}`,
@@ -135,15 +145,7 @@ export function createIllnessRandomEvent(
     deadlineMonths: 0,
     chainId: `illness-${illnessType}`,
     stage: "act1",
-    pendingBuffs: [{
-      id: pendingBuffId,
-      name: `主动操作 SAN ×${activeOperationSanMultiplier}`,
-      source: copy.title,
-      timing: "monthly",
-      remainingMonths: 1,
-      activeOperationSanMultiplier,
-      description: "硬撑时持续至本月结束；作用于看论文、想 idea、写论文、做实验和人际主动操作",
-    }],
+    pendingBuffs: [illnessBuff],
     choices: [
       {
         id: `illness-${illnessType}-hard-${serial}`,

@@ -26,9 +26,9 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   const peerPronoun = getFellowPronoun(peerGender);
   const isLowSocial = state.player.social < 6;
   const canAddPeer = canAddRelationship(state.relationshipState, "peer");
-  const exchangeSanChange = getActualSanChange(-2, state.month, state.eventSupport);
-  const fullSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport);
-  const fullSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport);
+  const exchangeSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
+  const fullSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
+  const fullSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const fullSanNarrative = getResearchMiscSanNarrative(-2, state.player.research);
   const mutualSuccess = getRoll() < 0.5;
   const targetRoll = getRoll();
@@ -175,11 +175,11 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender);
   const eventTitle = roleText === "\u5e08\u59d0" ? "\u5e08\u59d0\u6307\u5bfc" : "\u5e08\u5144\u6307\u5bfc";
   const lightIdeaBonus = drawInclusiveInt(6, 10, getRoll);
-  const deepSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport);
-  const deepSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport);
+  const deepSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
+  const deepSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const deepSanNarrative = getResearchMiscSanNarrative(-2, state.player.research);
-  const mentorSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport);
-  const mentorSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport);
+  const mentorSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
+  const mentorSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const mentorSanNarrative = getResearchMiscSanNarrative(-4, state.player.research);
   const deepResearchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
   const deepResearchChange = deepResearchResult.effectiveChange;

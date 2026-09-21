@@ -1,5 +1,6 @@
 import { getAttributeTier } from "./v2-random-event-rules";
-import type { EventSupportState } from "./v2-types";
+import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
+import type { Buff, EventSupportState } from "./v2-types";
 
 export type SeasonId = "spring" | "summer" | "autumn" | "winter";
 
@@ -35,18 +36,30 @@ export function applySanCostModifiers(
   delta: number,
   month: number,
   eventSupport: Pick<EventSupportState, "hasParasol">,
+  buffs: readonly Buff[] = [],
 ): number {
   if (delta >= 0) return delta;
-  const nextDelta = delta + getSeasonSanModifier(month, eventSupport);
-  return nextDelta > 0 ? 0 : nextDelta;
+  return 0 - getSanConsumptionCost(-delta, buffs, -getSeasonSanModifier(month, eventSupport));
+}
+
+export function getSanConsumptionCost(baseCost: number, buffs: readonly Buff[], fixedDelta = 0): number {
+  if (!Number.isFinite(baseCost) || baseCost <= 0) return 0;
+  const activeBuffs = buffs.filter((buff) => buff.remainingMonths === null || buff.remainingMonths > 0);
+  const multiplier = combineEffectMultipliers(activeBuffs.flatMap((buff) => (
+    Number.isFinite(buff.activeOperationSanMultiplier) && (buff.activeOperationSanMultiplier ?? -1) >= 0
+      ? [buff.activeOperationSanMultiplier!] : []
+  )));
+  const additive = activeBuffs.reduce((total, buff) => total + (buff.activeOperationSanDelta ?? 0), fixedDelta);
+  return Math.max(0, applyMultipliersThenAdditions(baseCost, [multiplier], [additive], "ceil"));
 }
 
 export function getActualSanChange(
   delta: number,
   month: number,
   eventSupport: Pick<EventSupportState, "hasParasol">,
+  buffs: readonly Buff[] = [],
 ): number {
-  return applySanCostModifiers(delta, month, eventSupport);
+  return applySanCostModifiers(delta, month, eventSupport, buffs);
 }
 
 function getResearchMiscTierDiscount(baseDelta: number, research: number): number {
@@ -63,11 +76,11 @@ export function getActualResearchMiscSanChange(
   research: number,
   month: number,
   eventSupport: Pick<EventSupportState, "hasParasol">,
+  buffs: readonly Buff[] = [],
 ): number {
-  const discountedDelta = getResearchMiscSanChange(baseDelta, research);
-  if (baseDelta >= 0) return discountedDelta;
-  const seasonalDelta = getSeasonSanModifier(month, eventSupport);
-  return Math.min(0, discountedDelta + seasonalDelta);
+  if (baseDelta >= 0) return baseDelta;
+  return 0 - getSanConsumptionCost(-baseDelta, buffs,
+    -getResearchMiscTierDiscount(baseDelta, research) - getSeasonSanModifier(month, eventSupport));
 }
 
 const RESEARCH_MISC_TIER_NAMES = ["小白", "入门", "熟练", "大佬"] as const;
@@ -81,8 +94,9 @@ export function formatResearchMiscSanChange(
   research: number,
   month: number,
   eventSupport: Pick<EventSupportState, "hasParasol">,
+  buffs: readonly Buff[] = [],
 ): string {
-  const finalDelta = getActualResearchMiscSanChange(baseDelta, research, month, eventSupport);
+  const finalDelta = getActualResearchMiscSanChange(baseDelta, research, month, eventSupport, buffs);
   const tierDiscount = getResearchMiscTierDiscount(baseDelta, research);
   const signedDelta = finalDelta >= 0 ? `+${finalDelta}` : String(finalDelta);
   const discountText = tierDiscount > 0 ? `（减免${tierDiscount}）` : "";

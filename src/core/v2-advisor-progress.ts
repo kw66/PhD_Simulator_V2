@@ -4,7 +4,7 @@ import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getJournalDefinition } from "./v2-journal-system";
 import type { AdvisorGrantId, AdvisorProgressState, Degree, GameState, Paper } from "./v2-types";
 import { recordTalentTrigger } from "./v2-talent-history";
-import { getActiveOperationSanDelta } from "./v2-buffs";
+import { getRelationshipSanCost } from "./v2-buffs";
 
 export const ADVISOR_FUNDING_CAP = 20;
 export const ADVISOR_TASK_SAN_COST = 5;
@@ -138,11 +138,15 @@ export function syncAdvisorResearchAccumulation(state: GameState): GameState {
   }, `实验室成果：新增${newIds.length}篇论文，导师科研积累+${scoreGain}`);
 }
 
+export function getAdvisorTaskSanCost(state: GameState): number {
+  return getRelationshipSanCost(state, ADVISOR_TASK_SAN_COST);
+}
+
 export function advanceAdvisorHorizontal(state: GameState): GameState {
   if (state.phase !== "playing" || !state.selectedAdvisorName) return state;
   if (state.advisorProgressState.lastHorizontalTotalMonths === state.totalMonths) return pushNoOpLog(state, "横向：本月已做，下月恢复");
   if (state.advisorProgressState.funding >= ADVISOR_FUNDING_CAP) return pushNoOpLog(state, "横向：科研经费已达上限");
-  const sanCost = Math.max(0, ADVISOR_TASK_SAN_COST + getActiveOperationSanDelta(state.buffs));
+  const sanCost = getAdvisorTaskSanCost(state);
   if (state.player.san < sanCost) return pushNoOpLog(state, `横向：SAN不足${sanCost}`);
   return pushLog({
     ...state,

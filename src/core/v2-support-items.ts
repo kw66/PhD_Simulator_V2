@@ -14,7 +14,7 @@ const SUPPORT_ITEM_STATE_KEYS: Record<SupportItemId, keyof EventSupportState> = 
 
 export const SUPPORT_ITEM_DEFINITIONS: SupportItemDefinition[] = [
   { id: "badminton_racket", name: "羽毛球拍", description: "羽毛球实力 +40", price: 6 },
-  { id: "parasol", name: "遮阳伞", description: "免除夏季主动操作的额外消耗：SAN +1", price: 10 },
+  { id: "parasol", name: "遮阳伞", description: "免除夏季额外的SAN消耗+1", price: 10 },
 ];
 
 export function getSupportItemDefinition(itemId: SupportItemId): SupportItemDefinition {

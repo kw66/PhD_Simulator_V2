@@ -240,7 +240,7 @@ export function resolveTeachersDayFixedEvent(
       }
 
       if (getRoll() < 0.5) {
-        const sanChange = getActualSanChange(-3, state.month, state.eventSupport);
+        const sanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
         const favorResult = applyTierResist(1, state.player.favor, getRoll);
         const favorChange = favorResult.effectiveChange;
         const favorNarrative = getTierResistedNarrative("导师好感", 1, favorResult);

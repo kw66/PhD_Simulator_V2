@@ -190,7 +190,7 @@ function renderLobbyInfoArticle(section: LobbyInfoSectionId): string {
         <div class="lobby-info-value-groups">
           <section><h2>基础属性</h2><div><span>SAN</span><strong>基础上限 20</strong></div><div><span>科研 / 社交 / 好感</span><strong>基础上限 20</strong></div><div><span>金币</span><strong>按事件与行动增减</strong></div></section>
           <section><h2>属性档位</h2><div><span>0–5</span><strong>基础档</strong></div><div><span>6–11</span><strong>进阶档</strong></div><div><span>12–17</span><strong>熟练档</strong></div><div><span>18+</span><strong>高阶档</strong></div></section>
-          <section><h2>事件中科研杂活</h2><div><span>基础档</span><strong>减免 0</strong></div><div><span>进阶档</span><strong>减免 1</strong></div><div><span>熟练档</span><strong>减免 2</strong></div><div><span>高阶档</span><strong>减免 3</strong></div></section>
+          <section><h2>事件科研任务</h2><div><span>基础档</span><strong>减免 0</strong></div><div><span>进阶档</span><strong>减免 1</strong></div><div><span>熟练档</span><strong>减免 2</strong></div><div><span>高阶档</span><strong>减免 3</strong></div></section>
           <section><h2>论文评分</h2><div><span>成果系统</span><strong>投稿、审稿与引用已开放</strong></div><div><span>毕业与转博</span><strong>按科研分与阶段条件判定</strong></div></section>
         </div>
       `;
@@ -203,7 +203,7 @@ function renderLobbyInfoArticle(section: LobbyInfoSectionId): string {
           <article><span>03</span><h2>科研路线</h2><p>你要分别关注科研能力、论文进度和科研分；毕业与转博看的是科研分。</p><small>论文与科研分 · 待补充</small></article>
           <article><span>04</span><h2>关系经营</h2><p>同学每2个月推进自己的论文；协作进度每月增加默契值，也可消耗SAN推进。每满100，双方各自动帮助一次；暂时无法帮助时各保留一次。每篇共同发表的论文默契+1（上限20），参与同学论文后获得非一作成果。</p><small>做横向支持导师发展；每月可选择玩耍、学习或购物约会</small></article>
           <article><span>05</span><h2>资源管理</h2><p>购买前先看效果和价格，别为了升级装备花光生活费。</p><small>消费顺序 · 待补充</small></article>
-          <article><span>06</span><h2>疾病与 SAN</h2><p>疾病会增加主动操作的 SAN 消耗，SAN 不足时部分行动无法执行。</p><small>风险控制 · 待补充</small></article>
+          <article><span>06</span><h2>疾病与 SAN</h2><p>季节、疾病和恋人减耗影响所有即时 SAN 损失，含事件与审稿；最低0，不影响固定月耗与恢复。</p><small>SAN 不足时部分行动无法执行</small></article>
           <article><span>07</span><h2>毕业与转博</h2><p>转博前先检查科研分是否达标，也要看清转博后的毕业要求。</p><small>时间节点 · 待补充</small></article>
           <article><span>08</span><h2>角色成长</h2><p>你可以查看角色和成就说明；经验结算、天赋分配和成就解锁尚未开放。</p><small>解锁路线 · 待补充</small></article>
         </div>

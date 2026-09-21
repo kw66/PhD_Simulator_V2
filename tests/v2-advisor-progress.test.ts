@@ -6,6 +6,7 @@ import {
   getAdvisorGrantLimit,
   getAdvisorMonthlyResearchGrowth,
   getAdvisorRankLabel,
+  getAdvisorTaskSanCost,
   getEligibleAdvisorGrant,
   settleAdvisorMonth,
   syncAdvisorResearchAccumulation,
@@ -62,12 +63,36 @@ describe("advisor funding and monthly research", () => {
     state.buffs = [{ id: "illness", name: "Illness", source: "test", timing: "monthly", remainingMonths: 1, activeOperationSanMultiplier: 2 }];
     for (let payment = 0; payment < 5; payment += 1) state = advanceAdvisorHorizontal(state);
     expect(state.advisorProgressState).toMatchObject({ funding: 1, researchAccumulation: 20, lastHorizontalTotalMonths: 2 });
-    expect(state.player).toEqual({ ...initial.player, san: 25 });
+    expect(state.player).toEqual({ ...initial.player, san: 20 });
     expect(state.actionState).toEqual({ ...initial.actionState, used: initial.actionState.limit });
     expect(state.totalMonths).toBe(2);
     const next = advanceAdvisorHorizontal(atMonth(state, 3));
     expect(next.advisorProgressState).toMatchObject({ funding: 2, lastHorizontalTotalMonths: 3 });
-    expect(next.player.san).toBe(20);
+    expect(next.player.san).toBe(10);
+  });
+
+  it.each([
+    { month: 8, hasParasol: false, cost: 5 },
+    { month: 11, hasParasol: false, cost: 7 },
+    { month: 11, hasParasol: true, cost: 6 },
+  ])("uses the adjusted horizontal cost for affordability in month $month with parasol $hasParasol", ({ month, hasParasol, cost }) => {
+    const state = atMonth(makeState(), month);
+    state.eventSupport.hasParasol = hasParasol;
+    state.buffs = [
+      { id: "illness", name: "Illness", source: "test", timing: "monthly", remainingMonths: 1, activeOperationSanMultiplier: 1.5 },
+      { id: "lover-play-discount", name: "Date", source: "test", timing: "monthly", remainingMonths: 1, activeOperationSanDelta: -1 },
+      { id: "gemini", name: "Gemini", source: "test", timing: "monthly", remainingMonths: 1, relationshipOperationSanDelta: -1 },
+      { id: "expired", name: "Expired", source: "test", timing: "monthly", remainingMonths: 0, relationshipOperationSanDelta: -10 },
+    ];
+    state.player.san = cost - 1;
+    expect(getAdvisorTaskSanCost(state)).toBe(cost);
+    const rejected = advanceAdvisorHorizontal(state);
+    expect(rejected.player).toEqual(state.player);
+    expect(rejected.advisorProgressState).toEqual(state.advisorProgressState);
+    const funded = advanceAdvisorHorizontal({ ...rejected, player: { ...rejected.player, san: cost } });
+    expect(funded.player.san).toBe(0);
+    expect(funded.advisorProgressState).toMatchObject({ funding: 1, lastHorizontalTotalMonths: month });
+    expect(funded.actionState).toEqual(state.actionState);
   });
 
   it("accepts exactly five SAN, rejects insufficient SAN, and stops charging at funding 20", () => {

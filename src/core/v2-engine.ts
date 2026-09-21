@@ -32,7 +32,7 @@ import {
   withdrawPaper,
 } from "./v2-paper-rules";
 import { applyPaperPromotion } from "./v2-publication-actions";
-import { advancePaperReviewDeadlines, resolveDuePaperReviews } from "./v2-publication-system";
+import { advancePaperReviewDeadlines, refreshPaperReviewEvents, resolveDuePaperReviews } from "./v2-publication-system";
 import { resolveReadyJournalPapers, submitJournalPaper } from "./v2-journal-system";
 import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
@@ -273,7 +273,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   const settledState = actionId === "resolve-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;
-  const refreshed = refreshPaperCompetitionEvents(activatePendingPaperCompetitionEvents(syncAdvisorResearchAccumulation(settledState)));
+  const refreshed = refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingPaperCompetitionEvents(syncAdvisorResearchAccumulation(settledState))));
   if (debugAction) return refreshed;
   const evaluated = evaluateCoreEndings(refreshed);
   if (evaluated.phase !== "playing") return evaluated;

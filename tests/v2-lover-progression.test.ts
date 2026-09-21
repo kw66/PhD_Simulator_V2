@@ -118,7 +118,7 @@ describe("lover initialization and monthly progression", () => {
 describe("manual lover dates", () => {
   it.each(LOVER_ROUTES)("charges the %s cost once and shares the monthly limit across all routes", (route) => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const state = makeState();
+    const state = { ...makeState(), totalMonths: 14, month: 2, year: 2 };
     const before = structuredClone(state);
     const cost = { play: { money: 2, san: 0 }, study: { money: 0, san: 4 }, shopping: { money: 3, san: 0 } }[route];
     const gain = { play: 5, study: 9, shopping: 12 }[route];
@@ -127,7 +127,7 @@ describe("manual lover dates", () => {
     const dated = dispatchAction(state, `lover-${route}`);
     expect(dated.player).toEqual({ ...state.player, money: state.player.money - cost.money, san: state.player.san - cost.san });
     expect(dated.loverProgressState.routes![route]).toEqual({ progress: gain, completed: 0 });
-    expect(dated.loverProgressState).toMatchObject({ lastDateTotalMonths: 8, taskUsedThisMonth: true });
+    expect(dated.loverProgressState).toMatchObject({ lastDateTotalMonths: 14, taskUsedThisMonth: true });
     expect(dated.actionState).toEqual(state.actionState);
     for (const other of LOVER_ROUTES) {
       expect(getLoverDateFailure(dated, other)).toBe("本月已约会，下月恢复");
@@ -138,12 +138,12 @@ describe("manual lover dates", () => {
     const next = nextMonth(dated);
     expect(next.loverProgressState.taskUsedThisMonth).toBe(false);
     expect(getLoverDateFailure(next, route)).toBeNull();
-    expect(dispatchAction(next, `lover-${route}`).loverProgressState.lastDateTotalMonths).toBe(9);
+    expect(dispatchAction(next, `lover-${route}`).loverProgressState.lastDateTotalMonths).toBe(15);
     expect(state).toEqual(before);
   });
 
   it.each(LOVER_ROUTES)("rejects unaffordable %s dates without consuming the monthly opportunity", (route) => {
-    const state = makeState();
+    const state = { ...makeState(), totalMonths: 14, month: 2, year: 2 };
     state.player.money = route === "play" ? 1 : 2;
     state.player.san = 3;
     const next = advanceLoverDate(state, route);
@@ -166,6 +166,36 @@ describe("manual lover dates", () => {
         expect(advanceLoverDate(state, route).loverProgressState).toEqual(state.loverProgressState);
       }
     }
+  });
+
+  it.each([
+    { month: 8, hasParasol: false, cost: 3 },
+    { month: 11, hasParasol: false, cost: 5 },
+    { month: 11, hasParasol: true, cost: 4 },
+  ])("uses the adjusted study cost for affordability in month $month with parasol $hasParasol", ({ month, hasParasol, cost }) => {
+    const state = { ...makeState(), month, totalMonths: month };
+    state.eventSupport.hasParasol = hasParasol;
+    state.buffs = [
+      { id: "illness", name: "Illness", source: "test", timing: "monthly", remainingMonths: 1, activeOperationSanMultiplier: 1.5 },
+      { id: "lover-play-discount", name: "Date", source: "test", timing: "monthly", remainingMonths: 1, activeOperationSanDelta: -1 },
+      { id: "gemini", name: "Gemini", source: "test", timing: "monthly", remainingMonths: 1, relationshipOperationSanDelta: -1 },
+      { id: "expired", name: "Expired", source: "test", timing: "monthly", remainingMonths: 0, relationshipOperationSanDelta: -10 },
+    ];
+    state.player.san = cost - 1;
+    expect(getLoverRouteCost(state, "study")).toEqual({ money: 0, san: cost });
+    expect(getLoverRouteCost(state, "play")).toEqual({ money: 2, san: 0 });
+    expect(getLoverRouteCost(state, "shopping")).toEqual({ money: 3, san: 0 });
+    expect(getLoverDateFailure(state, "study")).toBe(`SAN不足，需要${cost}`);
+    const rejected = advanceLoverDate(state, "study");
+    expect(rejected.player).toEqual(state.player);
+    expect(rejected.loverProgressState).toEqual(state.loverProgressState);
+    const affordable = { ...rejected, player: { ...rejected.player, san: cost } };
+    expect(getLoverDateFailure(affordable, "study")).toBeNull();
+    const dated = advanceLoverDate(affordable, "study");
+    expect(dated.player.san).toBe(0);
+    expect(dated.loverProgressState).toMatchObject({ lastDateTotalMonths: month, taskUsedThisMonth: true });
+    expect(dated.loverProgressState.routes!.study).toEqual({ progress: 9, completed: 0 });
+    expect(dated.actionState).toEqual(state.actionState);
   });
 });
 
@@ -191,10 +221,11 @@ describe("lover route reward cycles", () => {
 
   it("activates the play discount next month, floors costs at zero and expires it the following month", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const reward = advanceLoverDate(withRoute(makeState(), "play", 99, 2), "play");
+    const state = { ...makeState(), totalMonths: 26, month: 2, year: 3 };
+    const reward = advanceLoverDate(withRoute(state, "play", 99, 2), "play");
     expect(getLoverRouteCost(reward, "study").san).toBe(4);
     const discounted = nextMonth(reward);
-    expect(discounted.totalMonths).toBe(9);
+    expect(discounted.totalMonths).toBe(27);
     expect(discounted.buffs.find((buff) => buff.id === "lover-play-discount")).toMatchObject({ activeOperationSanDelta: -1, remainingMonths: 1 });
     expect(discounted.loverProgressState.sanDiscountMonths).toEqual([]);
     expect(getLoverRouteCost(discounted, "study").san).toBe(3);
@@ -203,7 +234,7 @@ describe("lover route reward cycles", () => {
     expect(previewResearchOperation(discounted, "idea", 0).sanCost).toBe(0);
     expect(dispatchAction(discounted, "lover-study").player.san).toBe(discounted.player.san - 3);
     const later = nextMonth(discounted);
-    expect(later.totalMonths).toBe(10);
+    expect(later.totalMonths).toBe(28);
     expect(later.buffs.some((buff) => buff.id === "lover-play-discount")).toBe(false);
     expect(getLoverRouteCost(later, "study").san).toBe(4);
   });

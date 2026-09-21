@@ -11,6 +11,7 @@ import { applyChoiceEffectsToState } from "./v2-engine-event-resolution-state";
 import { clampResearchToCap } from "./v2-research-cap-system";
 import { createRandomEventById } from "./v2-random-event-router";
 import { refreshPaperCompetitionEvent } from "./v2-paper-competition-preview";
+import { refreshPaperReviewEvent } from "./v2-publication-system";
 import type {
   DeferredEventStatePatch,
   EventChoice,
@@ -283,7 +284,7 @@ function rebuildRandomEventFromCurrentState(
 }
 
 export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
-  return refreshPaperCompetitionEvent(state, rebuildRandomEventFromCurrentState(state, queuedEvent));
+  return refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state, rebuildRandomEventFromCurrentState(state, queuedEvent)));
 }
 
 export function applyQueuedEventEffects(

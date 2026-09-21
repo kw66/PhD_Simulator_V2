@@ -1,11 +1,11 @@
-import { getActiveOperationSanCostForState, getRelationshipOperationSanDelta } from "./v2-buffs";
+import { getRelationshipSanCost } from "./v2-buffs";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { advanceFellowCooperation, settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { getFellowName, getFellowTaskSanCost } from "./v2-fellow-progression";
 import type { FellowProgressProfile, GameState } from "./v2-types";
 
 export function getFellowDiscussionSanCost(state: GameState, profile: FellowProgressProfile): number {
-  return getActiveOperationSanCostForState(state, getFellowTaskSanCost(profile.taskType), "relationship-task", getRelationshipOperationSanDelta(state.buffs));
+  return getRelationshipSanCost(state, getFellowTaskSanCost(profile.taskType));
 }
 
 export function advanceFellowTask(state: GameState, fellowId: string, random: () => number = Math.random): GameState {

@@ -22,7 +22,7 @@ function createThesisChoices(state: GameState): {
   const choices: EventChoice[] = THESIS_OPTIONS.map((option) => {
     const result = applyThesisOption(nextThesis, option, publishedPaperCount, state.player.research);
     const sanChange = result.sanCost > 0
-      ? getActualSanChange(-result.sanCost, state.month, state.eventSupport)
+      ? getActualSanChange(-result.sanCost, state.month, state.eventSupport, state.buffs)
       : 0;
     results[option.id] = {
       title: "推进结果",
