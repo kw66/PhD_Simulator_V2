@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { renderShopSection } from "../src/app/v2-render-shop-panel";
+import { renderApp } from "../src/app/v2-render";
 import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../src/core/v2-ai-shop";
 import { BIKE_TIER_DEFINITIONS } from "../src/core/v2-bike-system";
-import { createInitialState } from "../src/core/v2-engine";
+import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { getGiftAwareShopSellPrice, getLoverGiftCount, getLoverGiftQuote, hasOtherLoverGiftPurchases } from "../src/core/v2-lover-gift";
 import { advanceLoverDate, createLoverProgressState } from "../src/core/v2-lover-progression";
 import { applyMonthlyEffects, applyMonthStartSubscriptions, previewNextMonthEffects } from "../src/core/v2-monthly-effects";
@@ -119,10 +120,7 @@ describe("lover shopping gifts", () => {
 
   it("does not spend gifts on free models or reimbursed purchases and upgrades", () => {
     const state = giftState();
-    state.shopState.entitlements.keyboardPurchase = 1;
-    state.shopState.entitlements.chairUpgrade = 1;
-    state.shopState.entitlements.coffeeMachinePurchase = 1;
-    state.shopState.entitlements.coffeeMachineUpgrade = 1;
+    state.shopState.entitlements.workstationTransaction = 4;
     state.shopState.chairOwned = true;
     state.eventSupport.aiCostsCoveredUntilTotalMonths = state.totalMonths;
     let current = applyShopAction(state, "buy-shop-item", { shopItemId: "keyboard" });
@@ -136,6 +134,40 @@ describe("lover shopping gifts", () => {
     expect(getLoverGiftCount(applyShopAction(giftState(), "buy-ai-month", { aiSlotId: "doubao" }))).toBe(1);
   });
 
+  it("adds all reimbursement effects in debug without stacking or consuming existing gifts", () => {
+    const initial = giftState(3);
+    initial.shopState.entitlements.gpuTransaction = 2;
+    const state = dispatchAction(initial, "debug-add-all-buffs");
+    expect(state.loverProgressState.giftCoupons).toBe(3);
+    expect(state.shopState.entitlements.gpuTransaction).toBe(2);
+    expect(Object.values(state.shopState.entitlements).every((count) => count >= 1)).toBe(true);
+    expect(state.log).toEqual(initial.log);
+    expect(dispatchAction(state, "debug-add-all-buffs")).toEqual(state);
+    const html = renderApp(state);
+    expect(html).toContain(">显卡免单 ×2</button>");
+    expect(html).toContain(">工位报销</button>");
+    expect(html).toContain(">恋人回礼 ×3</button>");
+    const spent = { ...state, shopState: { ...state.shopState, entitlements: { ...state.shopState.entitlements, gpuTransaction: 0 } },
+      loverProgressState: { ...state.loverProgressState, giftCoupons: 0 } };
+    const replenished = dispatchAction(spent, "debug-add-all-buffs");
+    expect(replenished.shopState.entitlements.gpuTransaction).toBe(1);
+    expect(replenished.loverProgressState.giftCoupons).toBe(1);
+  });
+
+  it.each([0, 1])("uses GPU reimbursement before a lover gift at GPU level %s", (gpuLevel) => {
+    const state = giftState();
+    state.shopState.gpuLevel = gpuLevel;
+    state.shopState.entitlements.gpuTransaction = 1;
+    const reimbursed = applyShopAction(state, "buy-shop-item", { shopItemId: "gpu_buy" });
+    expect(reimbursed.shopState.gpuLevel).toBe(gpuLevel + 1);
+    expect(reimbursed.shopState.entitlements.gpuTransaction).toBe(0);
+    expect(getLoverGiftCount(reimbursed)).toBe(1);
+    expect(reimbursed.player.money).toBe(0);
+    const gifted = applyShopAction(reimbursed, "buy-shop-item", { shopItemId: "gpu_buy" });
+    expect(getLoverGiftCount(gifted)).toBe(0);
+    expect(gifted.player.money).toBe(0);
+  });
+
   it("retains coupons on unavailable, missing-payload, toggle and failed purchases", () => {
     const state = giftState();
     state.shopState.keyboardOwned = true;
@@ -146,7 +178,7 @@ describe("lover shopping gifts", () => {
       applyShopAction(state, "buy-shop-item", {}),
       applyShopAction(state, "upgrade-shop-item", { shopUpgradeId: "chair-advanced" }),
       applyShopAction(state, "upgrade-coffee-machine", { shopUpgradeId: "manual" }),
-      applyShopAction(state, "buy-coffee", {}),
+      applyShopAction({ ...state, coffeeState: { ...state.coffeeState, coffeePurchaseCountThisMonth: 1 } }, "buy-coffee", {}),
       applyShopAction(state, "toggle-ai-subscription", { aiSlotId: "gpt" }),
       applyShopAction(state, "toggle-coffee-subscription", {}),
     ];
@@ -192,11 +224,11 @@ describe("lover shopping gifts", () => {
   });
 
   it.each([
-    ["keyboard", (state: GameState) => { state.shopState.keyboardOwned = false; state.shopState.entitlements.keyboardPurchase = 1; }],
+    ["keyboard", (state: GameState) => { state.shopState.keyboardOwned = false; state.shopState.entitlements.workstationTransaction = 1; }],
     ["GPU", (state: GameState) => { state.shopState.gpuLevel = 9; state.shopState.entitlements.gpuTransaction = 1; }],
-    ["chair upgrade", (state: GameState) => { state.shopState.chairUpgrade = null; state.shopState.entitlements.chairUpgrade = 1; }],
-    ["coffee machine", (state: GameState) => { state.coffeeState.machineOwned = false; state.shopState.entitlements.coffeeMachinePurchase = 1; }],
-    ["coffee upgrade", (state: GameState) => { state.coffeeState.machineUpgrade = null; state.shopState.entitlements.coffeeMachineUpgrade = 1; }],
+    ["chair upgrade", (state: GameState) => { state.shopState.chairUpgrade = null; state.shopState.entitlements.workstationTransaction = 1; }],
+    ["coffee machine", (state: GameState) => { state.coffeeState.machineOwned = false; state.shopState.entitlements.workstationTransaction = 1; }],
+    ["coffee upgrade", (state: GameState) => { state.coffeeState.machineUpgrade = null; state.shopState.entitlements.workstationTransaction = 1; }],
     ["free AI", (state: GameState) => { state.aiShopState.subscriptions.doubao.enabled = false; }],
     ["reimbursed AI", (state: GameState) => {
       state.aiShopState.subscriptions.gpt.enabled = false;
@@ -213,7 +245,7 @@ describe("lover shopping gifts", () => {
   it("allows fallback after the free remaining equipment is acquired", () => {
     const state = fullyEquipped();
     state.shopState.keyboardOwned = false;
-    state.shopState.entitlements.keyboardPurchase = 1;
+    state.shopState.entitlements.workstationTransaction = 1;
     const bought = applyShopAction(state, "buy-shop-item", { shopItemId: "keyboard" });
     expect(getLoverGiftCount(bought)).toBe(1);
     expect(hasOtherLoverGiftPurchases(bought)).toBe(false);
@@ -407,6 +439,18 @@ describe("lover shopping gifts", () => {
       expect(button).not.toContain("disabled");
       expect(button).toContain("has-free-price");
     }
-    expect(gear.replace(/<[^>]*>/g, "")).toContain("恋人赠礼 ×1");
+    for (const shop of [gear, ai, coffee, rest]) expect(shop).not.toContain("shop-gift-notice");
+  });
+
+  it("tracks gift coupons in next-action effects until the last coupon is consumed", () => {
+    const getNextEffects = (state: GameState) => renderApp(state).split('id="new-single-effect-list">')[1]?.split('</div>')[0] ?? "";
+    const state = giftState(2);
+    expect(getNextEffects(state)).toContain("恋人回礼 ×2");
+    expect(getNextEffects(state)).toContain("恋人购物");
+    const firstPurchase = applyShopAction(state, "buy-shop-item", { shopItemId: "keyboard" });
+    expect(getNextEffects(firstPurchase)).toContain("恋人回礼</button>");
+    expect(getNextEffects(firstPurchase)).not.toContain("×2");
+    const secondPurchase = applyShopAction(firstPurchase, "buy-shop-item", { shopItemId: "monitor" });
+    expect(getNextEffects(secondPurchase)).not.toContain("shop-free-lover-gift");
   });
 });

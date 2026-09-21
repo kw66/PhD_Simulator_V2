@@ -25,6 +25,7 @@ import { getFellowCurrentPaper } from "../core/v2-fellow-research";
 import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverPassiveGains, getLoverRouteCost, getLoverRouteGain, getLoverRouteProgress } from "../core/v2-lover-progression";
 import { previewPartTimeWork } from "../core/v2-part-time-work";
 import { getLoverName } from "../core/v2-lover-system";
+import { getLoverGiftCount } from "../core/v2-lover-gift";
 import {
   getAcceptedPaperScore,
   getPaperPromotionCost,
@@ -67,6 +68,7 @@ import {
 import {
   DISEASE_MONTH_END_CHANGE_BY_SAN_TIER,
   getSeasonByMonth,
+  getSeasonSanModifier,
   getTierResistChance,
 } from "../core/v2-sanity-rules";
 import {
@@ -490,16 +492,20 @@ function buildEffectBuckets(state: GameState): {
   const writingModifier = getShopPaperActionModifier(state.shopState, "writing");
   const readSanDiscount = getShopReadSanDiscount(state.shopState);
   const coffeeBonus = getCurrentCoffeeBonus(state.coffeeState);
+  let seasonalSanCostDelta = 0;
+  const seasonalSanSources: string[] = [];
 
   if (!isPreEnrollmentState(state)) {
-    const season = getSeasonByMonth(getAcademicMonth(state.totalMonths));
+    const month = getAcademicMonth(state.totalMonths);
+    const season = getSeasonByMonth(month);
+    seasonalSanCostDelta = -getSeasonSanModifier(month, state.eventSupport);
     if (season === "spring") {
-      upsertBucketItem(monthly, "season", "主动操作 SAN-1", "春季");
+      seasonalSanSources.push("春季：SAN消耗 -1");
     } else if (season === "summer") {
       if (state.eventSupport.hasParasol) {
         upsertBucketItem(monthly, "season", "夏季炎热已抵消", "遮阳伞");
       } else {
-        upsertBucketItem(monthly, "season", "主动操作 SAN+1", "夏季", true);
+        seasonalSanSources.push("夏季：SAN消耗 +1");
       }
     }
   }
@@ -526,38 +532,37 @@ function buildEffectBuckets(state: GameState): {
     upsertBucketItem(monthly, "monthly", "AI 使用费 0 金币", "导师经费");
   }
   const entitlementCountText = (count: number) => count > 1 ? ` ×${count}` : "";
+  const loverGiftCount = getLoverGiftCount(state);
+  if (loverGiftCount > 0) {
+    upsertBucketItem(single, "shop-free-lover-gift",
+      `恋人回礼${entitlementCountText(loverGiftCount)}`,
+      "恋人购物：下次付费购买或升级免费，含手动购买咖啡；优先使用导师报销，不消耗回礼；无其他可新购或升级项目时，可用于自动续费");
+  }
   if (state.shopState.entitlements.gpuTransaction > 0) {
     upsertBucketItem(
       single,
       "shop-free-gpu",
-      `显卡下次购买/升级 0金币${entitlementCountText(state.shopState.entitlements.gpuTransaction)}`,
-      "导师经费",
+      `显卡免单${entitlementCountText(state.shopState.entitlements.gpuTransaction)}`,
+      "导师经费：下次购买或升级显卡免费，优先于恋人回礼使用",
     );
   }
-  const workstationEntitlements = [
-    ["机械键盘购买", state.shopState.entitlements.keyboardPurchase],
-    ["2K显示器购买", state.shopState.entitlements.monitorPurchase],
-    ["办公椅购买", state.shopState.entitlements.chairPurchase],
-    ["办公椅升级", state.shopState.entitlements.chairUpgrade],
-    ["咖啡机购买", state.shopState.entitlements.coffeeMachinePurchase],
-    ["咖啡机升级", state.shopState.entitlements.coffeeMachineUpgrade],
-  ] as const;
-  const workstationLabels = workstationEntitlements
-    .filter(([, count]) => count > 0)
-    .map(([label, count]) => `${label}${entitlementCountText(count)}`);
-  if (workstationLabels.length > 0) {
-    upsertBucketItem(single, "shop-free-workstation", `${workstationLabels.join("、")} 0金币`, "导师经费");
+  const workstationCount = state.shopState.entitlements.workstationTransaction;
+  if (workstationCount > 0) {
+    upsertBucketItem(single, "shop-free-workstation", `工位报销${entitlementCountText(workstationCount)}`,
+      "导师经费：购买机械键盘、2K显示器、办公椅、咖啡机，或升级办公椅、咖啡机，任选一次免单；优先于恋人回礼使用");
   }
   const buffBuckets = buildBuffDisplayBuckets(state.buffs);
   for (const [timing, target] of [["permanent", permanent], ["monthly", monthly], ["next-action", single]] as const) {
     const buffs = getActiveBuffs(state.buffs).filter((buff) => buff.timing === timing && buff.activeOperationSanDelta !== undefined);
-    const delta = getActiveOperationSanDelta(buffs);
-    if (delta === 0) continue;
+    const delta = getActiveOperationSanDelta(buffs) + (timing === "monthly" ? seasonalSanCostDelta : 0);
+    const sources = timing === "monthly" ? [...seasonalSanSources] : [];
     for (const buff of buffs) {
       const duration = timing === "permanent" ? "永久" : timing === "next-action" ? "对应效果触发后消耗"
         : buff.remainingMonths === null ? "持续生效" : `剩余 ${buff.remainingMonths} 月`;
-      upsertBucketItem(target, `${timing}:rule:active-operation-san-delta`, `主动操作 SAN消耗 ${formatSignedNumber(delta)}`,
-        `${buff.source} · ${duration}${buff.description?.trim() ? `：${buff.description.trim()}` : ""}`, delta > 0);
+      sources.push(`${buff.source} · ${duration} · SAN消耗 ${formatSignedNumber(buff.activeOperationSanDelta ?? 0)}${buff.description?.trim() ? `：${buff.description.trim()}` : ""}`);
+    }
+    for (const source of sources) {
+      upsertBucketItem(target, `${timing}:rule:active-operation-san-delta`, `主动操作 SAN消耗 ${formatSignedNumber(delta)}`, source, delta > 0);
     }
   }
   const permanentBuffItems = buffBuckets.permanent.filter((item) => (

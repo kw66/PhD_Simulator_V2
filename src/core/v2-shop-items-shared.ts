@@ -94,12 +94,7 @@ export function createShopState(): ShopState {
     },
     entitlements: {
       gpuTransaction: 0,
-      keyboardPurchase: 0,
-      monitorPurchase: 0,
-      chairPurchase: 0,
-      chairUpgrade: 0,
-      coffeeMachinePurchase: 0,
-      coffeeMachineUpgrade: 0,
+      workstationTransaction: 0,
     },
     chairOwned: false,
     chairUpgrade: null,

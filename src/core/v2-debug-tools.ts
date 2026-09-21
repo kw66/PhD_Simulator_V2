@@ -88,7 +88,7 @@ export function createDebugBuffs(): Buff[] {
     {
       id: "debug-buff-lover-study",
       name: "共同学习",
-      source: "恋人约会",
+      source: "恋人学习",
       timing: "permanent",
       remainingMonths: null,
       actionEffects: {
@@ -743,11 +743,21 @@ function addAllDebugBuffs(state: GameState): GameState {
   ));
   const hasAllDebugBuffs = existingDebugBuffs.length === debugBuffs.length
     && debugBuffs.every((buff) => signature(existingDebugBuffs.find((existing) => existing.id === buff.id)) === signature(buff));
-  if (hasAllDebugBuffs) return state;
-  return pushLog(
-    { ...state, buffs: addOrReplaceBuffs(state.buffs.filter((buff) => !isDebugBuff(buff)), debugBuffs) },
-    "测试：已添加全部 buff。",
-  );
+  const entitlements = { ...state.shopState.entitlements };
+  for (const key of Object.keys(entitlements) as Array<keyof typeof entitlements>) {
+    entitlements[key] = Math.max(1, entitlements[key]);
+  }
+  const giftCoupons = Math.max(1, state.loverProgressState.giftCoupons ?? 0);
+  const hasAllEntitlements = Object.keys(entitlements).every((key) => (
+    entitlements[key as keyof typeof entitlements] === state.shopState.entitlements[key as keyof typeof entitlements]
+  )) && giftCoupons === state.loverProgressState.giftCoupons;
+  if (hasAllDebugBuffs && hasAllEntitlements) return state;
+  return {
+    ...state,
+    buffs: addOrReplaceBuffs(state.buffs.filter((buff) => !isDebugBuff(buff)), debugBuffs),
+    shopState: { ...state.shopState, entitlements },
+    loverProgressState: { ...state.loverProgressState, giftCoupons },
+  };
 }
 
 function addDebugRelationship(state: GameState, type: DebugRelationshipType): GameState {

@@ -60,7 +60,8 @@ function getDurationText(buff: Buff): string {
 
 function getSourceText(buff: Buff): string {
   const description = buff.description?.trim();
-  return `${buff.source} · ${getDurationText(buff)}${description ? `：${description}` : ""}`;
+  const source = buff.id === "lover-study-score" || buff.id === "debug-buff-lover-study" ? "恋人学习" : buff.source;
+  return `${source} · ${getDurationText(buff)}${description ? `：${description}` : ""}`;
 }
 
 /**
@@ -170,6 +171,7 @@ function addActionEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): 
 }
 
 function addPaperPolishEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): void {
+  if (buff.id.startsWith("ai-")) return;
   const source = getSourceText(buff);
   for (const [action, bonus] of Object.entries(buff.paperPolishEffects ?? {})) {
     if (!Number.isFinite(bonus) || (bonus ?? 0) <= 0) continue;

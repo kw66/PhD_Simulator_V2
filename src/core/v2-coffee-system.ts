@@ -35,6 +35,10 @@ export function getCurrentCoffeeBonus(coffeeState: CoffeeState): number {
   return Math.min(5, Math.floor(coffeeState.machineTrackedCoffeeCount / 10));
 }
 
+export function getCoffeeSanGain(coffeeState: CoffeeState): number {
+  return (coffeeState.machineOwned ? 3 : 2) + getCurrentCoffeeBonus(coffeeState);
+}
+
 export function getCoffeeBuyPrice(coffeeState: CoffeeState): number {
   if (coffeeState.machineUpgrade === "unlimited") {
     return BASE_COFFEE_PRICE + coffeeState.coffeePurchaseCountThisMonth;

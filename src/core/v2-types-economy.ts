@@ -29,12 +29,7 @@ export interface ShopInvestmentState {
 
 export interface ShopEntitlementState {
   gpuTransaction: number;
-  keyboardPurchase: number;
-  monitorPurchase: number;
-  chairPurchase: number;
-  chairUpgrade: number;
-  coffeeMachinePurchase: number;
-  coffeeMachineUpgrade: number;
+  workstationTransaction: number;
 }
 
 /** AI providers shown in the shop. Each provider has one model active at a time. */

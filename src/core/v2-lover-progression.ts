@@ -132,7 +132,7 @@ function advanceRoute(state: GameState, route: LoverRoute, gain: number): GameSt
       const previous = nextState.buffs.find((buff) => buff.id === "lover-study-score");
       const bonus = (previous?.actionEffects?.idea?.bonus ?? 0) + 1;
       nextState = { ...nextState, buffs: addOrReplaceBuffs(nextState.buffs, [{
-        id: "lover-study-score", name: "共同学习", source: "恋人约会", timing: "permanent", remainingMonths: null,
+        id: "lover-study-score", name: "共同学习", source: "恋人学习", timing: "permanent", remainingMonths: null,
         actionEffects: { idea: { bonus }, experiment: { bonus }, writing: { bonus } },
       }]) };
       effects.push(`永久idea、实验、写作各+1分（累计+${bonus}）`);

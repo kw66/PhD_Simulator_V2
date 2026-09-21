@@ -26,6 +26,28 @@ function admittedState() {
 }
 
 describe("v2 shop transactions", () => {
+  it("buys coffee without a machine and increases recovery only while a machine is owned", () => {
+    const initial = admittedState();
+    const bought = dispatchAction(initial, "buy-coffee");
+    expect(bought.player.san).toBe(12);
+    expect(bought.player.money).toBe(initial.player.money - 2);
+    expect(bought.coffeeState).toMatchObject({ coffeePurchaseCountThisMonth: 1, coffeeProducedCountThisMonth: 0, machineTrackedCoffeeCount: 0 });
+    expect(bought.actionState).toEqual(initial.actionState);
+    expect(dispatchAction(bought, "buy-coffee").player).toEqual(bought.player);
+    const equipped = dispatchAction(bought, "buy-coffee-machine");
+    expect(dispatchAction(equipped, "buy-coffee").player).toEqual(equipped.player);
+    const nextCup = dispatchAction({ ...equipped, coffeeState: { ...equipped.coffeeState, coffeePurchaseCountThisMonth: 0 } }, "buy-coffee");
+    expect(nextCup.player.san).toBe(equipped.player.san + 3);
+    const sold = dispatchAction(nextCup, "sell-coffee-machine");
+    const withoutMachine = dispatchAction({ ...sold, coffeeState: { ...sold.coffeeState, coffeePurchaseCountThisMonth: 0 } }, "buy-coffee");
+    expect(withoutMachine.player.san).toBe(sold.player.san + 2);
+    expect(withoutMachine.coffeeState.machineTrackedCoffeeCount).toBe(sold.coffeeState.machineTrackedCoffeeCount);
+    const capped = dispatchAction({ ...initial, player: { ...initial.player, san: initial.sanCap - 1 } }, "buy-coffee");
+    expect(capped.player.san).toBe(initial.sanCap);
+    const poor = { ...initial, player: { ...initial.player, money: 1 } };
+    expect(dispatchAction(poor, "buy-coffee").player).toEqual(poor.player);
+  });
+
   it("allows shop interactions before enrollment during development", () => {
     let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
     state = { ...state, player: { ...state.player, money: 5 } };
@@ -129,12 +151,7 @@ describe("v2 shop transactions", () => {
         ...admitted.shopState,
         entitlements: {
           gpuTransaction: 1,
-          keyboardPurchase: 1,
-          monitorPurchase: 1,
-          chairPurchase: 1,
-          chairUpgrade: 1,
-          coffeeMachinePurchase: 1,
-          coffeeMachineUpgrade: 1,
+          workstationTransaction: 6,
         },
       },
     };
@@ -153,7 +170,7 @@ describe("v2 shop transactions", () => {
     expect(state.shopState.monitorOwned).toBe(true);
     expect(state.shopState.chairUpgrade).toBe("advanced");
     expect(state.coffeeState.machineUpgrade).toBe("manual");
-    expect(Object.values(state.shopState.entitlements)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(Object.values(state.shopState.entitlements)).toEqual([0, 0]);
     expect(state.shopState.investments).toEqual({ gpu: 0, chair: 0, keyboard: 0, monitor: 0, bike: 0 });
 
     state = dispatchAction(state, "sell-shop-item", { shopItemId: "gpu_buy" });

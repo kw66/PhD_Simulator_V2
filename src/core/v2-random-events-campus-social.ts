@@ -196,15 +196,10 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
       {
         id: `random-8-renovate-${serial}`,
         label: "装修工位",
-        outcome: "下次购买机械键盘、2K 显示器、办公椅、咖啡机，以及下次升级办公椅、咖啡机：0 金币。",
+        outcome: "工位报销+1：购买机械键盘、2K 显示器、办公椅、咖啡机，或升级办公椅、咖啡机，任选一次免单。",
         effects: {
           shopEntitlementDeltas: {
-            keyboardPurchase: 1,
-            monitorPurchase: 1,
-            chairPurchase: 1,
-            chairUpgrade: 1,
-            coffeeMachinePurchase: 1,
-            coffeeMachineUpgrade: 1,
+            workstationTransaction: 1,
           },
         },
       },
@@ -260,7 +255,7 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
       [`random-8-renovate-${serial}`]: {
         title: "布置工位",
         description: [
-          "“工位确实该改善一下。”导师同意报销机械键盘、2K 显示器、办公椅和咖啡机，各一次；办公椅和咖啡机的下次升级也能报销。",
+          "“工位确实该改善一下。”导师同意报销一笔开销。机械键盘、2K 显示器、办公椅和咖啡机，可以挑一样买；也可以用来升级已有的办公椅或咖啡机。",
           "你把清单记好，打算按需要慢慢挑。天天坐在这里，能舒服一点也是件正经事。",
         ].join("\n\n"),
       },

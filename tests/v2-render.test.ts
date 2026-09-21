@@ -1253,18 +1253,14 @@ describe("v2 render lobby shell", () => {
         ...state.shopState,
         entitlements: {
           gpuTransaction: 1,
-          keyboardPurchase: 1,
-          monitorPurchase: 1,
-          chairPurchase: 1,
-          chairUpgrade: 1,
-          coffeeMachinePurchase: 1,
-          coffeeMachineUpgrade: 1,
+          workstationTransaction: 1,
         },
       },
     };
     const fundedGearHtml = renderApp(fundedState, createDefaultAccountProfile(), { activeShopTab: "gear" });
-    expect(fundedGearHtml).toContain("显卡下次购买/升级 0金币");
-    expect(fundedGearHtml).toContain("机械键盘购买、2K显示器购买、办公椅购买、办公椅升级、咖啡机购买、咖啡机升级 0金币");
+    expect(fundedGearHtml).toContain(">显卡免单</button>");
+    expect(fundedGearHtml).toContain(">工位报销</button>");
+    expect(fundedGearHtml).toContain("购买机械键盘、2K显示器、办公椅、咖啡机，或升级办公椅、咖啡机，任选一次免单");
     expect(fundedGearHtml).toMatch(/<button[^>]*has-free-price[^>]*data-shop-item-id="gpu_buy"[^>]*>[\s\S]*?<span>0<\/span>/);
     expect(fundedGearHtml).toMatch(/<button[^>]*has-free-price[^>]*data-shop-item-id="keyboard"[^>]*>[\s\S]*?<span>0<\/span>/);
 
@@ -1281,12 +1277,13 @@ describe("v2 render lobby shell", () => {
     const coffeeMachineCard = getShopCardHtml(coffeeHtml, "咖啡机");
     expect(coffeeHtml).toContain('data-ui-shop-tab="coffee"');
     const coffeeHelp = getHelpText({ activePlayTab: "shop", activeShopTab: "coffee" });
-    expect(coffeeHelp).toMatch(/先买咖啡机.*才能手动购买冰美式或使用月初自动续费/);
+    expect(coffeeHelp).toContain("冰美式可直接购买，SAN+2");
+    expect(coffeeHelp).toContain("购入咖啡机后提升为SAN+3");
     expect(coffeeHelp).toContain("SAN已满时，自动续费当月跳过");
     expect(coffeeHelp).toContain("金币不足且没有可用于续费的礼物券时，当月暂停续费");
     expect(coffeeCard).toContain("SAN +3");
     expect(coffeeCard).not.toContain("本月已生产");
-    expect(coffeeMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("可生产冰美式，每月 1 杯");
+    expect(coffeeMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式 SAN+3，可自动续费，每月1杯");
     expect(coffeeHtml).toContain('data-action="buy-coffee"');
     expect(coffeeMachineCard).not.toContain('data-action="buy-coffee-machine"');
     expect(coffeeMachineCard).toContain('class="shop-item-status is-owned">可升级</span>');
@@ -1454,7 +1451,7 @@ describe("v2 render lobby shell", () => {
 
     const unownedHtml = renderApp(state, createDefaultAccountProfile(), { activeShopTab: "coffee" });
     const unownedMachineCard = getShopCardHtml(unownedHtml, "咖啡机");
-    expect(unownedMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("购入后可生产冰美式并选择一条升级路线");
+    expect(unownedMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式 SAN+2提升为+3，开启自动续费，可升级");
     expect((unownedHtml.match(/data-shop-upgrade-option-id=/g) ?? [])).toHaveLength(4);
     expect((unownedHtml.match(/class="shop-item-row[^\"]*is-upgrade-option/g) ?? [])).toHaveLength(4);
     expect((unownedHtml.match(/shop-upgrade-check/g) ?? [])).toHaveLength(4);
@@ -1469,6 +1466,13 @@ describe("v2 render lobby shell", () => {
     expect(unownedHtml).not.toContain('<strong class="shop-item-name">⚙️ 升级 · </strong>');
     expect(unownedHtml).not.toContain("升级 -0");
     expect(unownedHtml).toContain('data-action="toggle-coffee-subscription"');
+    const fundedHtml = renderApp({ ...state, player: { ...state.player, money: 2 } }, createDefaultAccountProfile(), { activeShopTab: "coffee" });
+    const unownedCoffee = getShopCardHtml(fundedHtml, "冰美式");
+    expect(unownedCoffee).toContain("SAN +2");
+    expect(unownedCoffee).not.toContain("基础 SAN");
+    const buyCoffeeButton = unownedCoffee.match(/<button[^>]*data-action="buy-coffee"[^>]*>/)?.[0] ?? "";
+    expect(buyCoffeeButton).not.toBe("");
+    expect(buyCoffeeButton).not.toContain("disabled");
 
     const ownedState = {
       ...state,
@@ -3270,10 +3274,10 @@ describe("v2 render lobby shell", () => {
 
     expect(autumnHtml).not.toContain("月初 SAN+1（已结算）");
     expect(winterHtml).not.toContain("月初 SAN-1（已结算）");
-    expect(springHtml).toContain("主动操作 SAN-1");
-    expect(springHtml).toContain('data-effect-sources="[&quot;春季&quot;]"');
-    expect(summerHtml).toContain("主动操作 SAN+1");
-    expect(summerHtml).toContain('data-effect-sources="[&quot;夏季&quot;]"');
+    expect(springHtml).toContain("主动操作 SAN消耗 -1");
+    expect(springHtml).toContain('data-effect-sources="[&quot;春季：SAN消耗 -1&quot;]"');
+    expect(summerHtml).toContain("主动操作 SAN消耗 +1");
+    expect(summerHtml).toContain('data-effect-sources="[&quot;夏季：SAN消耗 +1&quot;]"');
   });
 
   it("renders equipment-neutralized seasonal effects", () => {
@@ -3293,7 +3297,7 @@ describe("v2 render lobby shell", () => {
 
     expect(summerHtml).toContain("夏季炎热已抵消");
     expect(summerHtml).toContain('data-effect-sources="[&quot;遮阳伞&quot;]"');
-    expect(summerHtml).not.toContain("主动操作 SAN+1");
+    expect(summerHtml).not.toContain("主动操作 SAN消耗 +1");
     expect(winterHtml).not.toContain("冬季寒冷已抵消");
     expect(winterHtml).not.toContain("月初 SAN-1（已结算）");
   });
@@ -3303,8 +3307,8 @@ describe("v2 render lobby shell", () => {
     state = dispatchAction(state, "start-game", { roleId: "normal" });
     const html = renderApp(state, createDefaultAccountProfile());
 
-    expect(html).not.toContain("主动操作 SAN-1");
-    expect(html).not.toContain("主动操作 SAN+1");
+    expect(html).not.toContain("主动操作 SAN消耗 -1");
+    expect(html).not.toContain("主动操作 SAN消耗 +1");
     expect(html).not.toContain("月初 SAN+1（已结算）");
     expect(html).not.toContain("月初 SAN-1（已结算）");
   });
@@ -3553,7 +3557,7 @@ describe("v2 render lobby shell", () => {
     expect(nextMonthEffects).not.toContain("长期带教");
     expect(permanentEffects).not.toContain("发展关系");
     expect(permanentEffects).not.toContain("+1次");
-    expect(permanentEffects).toContain("恋人约会 · 永久");
+    expect(permanentEffects).toContain("恋人学习 · 永久");
     expect(permanentEffects).toContain("实验 +1分");
     expect(permanentEffects).toContain("论文 +1分");
     expect(monthlyEffects).toContain("主动操作 SAN消耗 -1");
@@ -3565,8 +3569,8 @@ describe("v2 render lobby shell", () => {
     expect(nextMonthEffects).toContain('data-effect-id="next-month-money"');
     expect(html).not.toContain("调试工具");
     expect(html).not.toContain("基础规则、导师待遇、羽毛球冠军");
-    expect(html).toContain("自动idea+4分");
-    expect(html).toContain("自动论文+2分");
+    expect(html).not.toContain("自动idea+4分");
+    expect(html).not.toContain("自动论文+2分");
     expect(html).not.toContain("每 12 月自动合作论文");
     expect(html).toContain("主动操作 SAN ×1.5");
     expect(html).toContain("看论文 SAN -2");
@@ -3627,7 +3631,7 @@ describe("v2 render lobby shell", () => {
     expect(state.buffs.find((buff) => buff.id === "lover-study-score")?.actionEffects?.writing?.bonus).toBe(1);
     const permanent = renderApp(state).split('id="new-permanent-effect-list">')[1]?.split('</div>')[0] ?? "";
     for (const label of ["idea +1分", "实验 +1分", "论文 +1分"]) expect(permanent).toContain(label);
-    expect(permanent).toContain("恋人约会 · 永久");
+    expect(permanent).toContain("恋人学习 · 永久");
 
     state.totalMonths += 1;
     state.loverProgressState.taskUsedThisMonth = false;
@@ -3663,19 +3667,45 @@ describe("v2 render lobby shell", () => {
     { deltas: [], expired: -1, total: 0 },
   ])("aggregates active SAN cost effects $deltas and ignores expired $expired", ({ deltas, expired, total }) => {
     const state = createRelationshipCardTestState();
+    state.month = 1;
+    state.totalMonths = 1;
     state.buffs = [...deltas, expired].map((delta, index) => ({
       id: `san-cost-${index}`, name: "操作消耗", source: `来源${index}`, timing: "monthly", remainingMonths: index === deltas.length ? 0 : 1,
       activeOperationSanDelta: delta,
     }));
     const html = renderApp(state);
     const chip = html.match(/<button[^>]*data-effect-id="monthly:rule:active-operation-san-delta-[^"]+"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-    if (total === 0) expect(chip).toBe("");
+    if (deltas.length === 0) expect(chip).toBe("");
     else {
-      expect(chip).toContain(`主动操作 SAN消耗 ${total > 0 ? "+" : ""}${total}`);
+      expect(chip).toContain(`主动操作 SAN消耗 ${total >= 0 ? "+" : ""}${total}`);
       expect(chip.includes("is-debuff")).toBe(total > 0);
       deltas.forEach((_, index) => expect(chip).toContain(`来源${index}`));
       expect(chip).not.toContain(`来源${deltas.length}`);
     }
+  });
+
+  it.each([
+    { month: 11, parasol: false, expected: "+0", season: "夏季：SAN消耗 +1" },
+    { month: 8, parasol: false, expected: "-2", season: "春季：SAN消耗 -1" },
+    { month: 11, parasol: true, expected: "-1", season: null },
+  ])("merges seasonal and monthly SAN costs in month $month with parasol $parasol", ({ month, parasol, expected, season }) => {
+    const base = createAdmittedTestState();
+    const state = {
+      ...base, month, totalMonths: month,
+      eventSupport: { ...base.eventSupport, hasParasol: parasol },
+      buffs: [{ id: "lover-play-discount", name: "约会余韵", source: "恋人玩耍", timing: "monthly" as const, remainingMonths: 1, activeOperationSanDelta: -1 }],
+    };
+    const html = renderApp(state);
+    const monthly = html.split('id="new-monthly-effect-list">')[1]?.split('</div>')[0] ?? "";
+    const chips = monthly.match(/<button[^>]*data-effect-id="monthly:rule:active-operation-san-delta-[^"]+"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toContain(`主动操作 SAN消耗 ${expected}`);
+    expect(chips[0]).toContain("恋人玩耍 · 剩余 1 月 · SAN消耗 -1");
+    expect(chips[0]).not.toContain("is-debuff");
+    if (season) expect(chips[0]).toContain(season);
+    else expect(chips[0]).not.toContain("夏季");
+    expect(monthly).not.toContain("主动操作 SAN+1");
+    expect(monthly).not.toContain("主动操作 SAN-1");
   });
 
   it("renders badminton victory recovery alongside month-start Buff effects", () => {

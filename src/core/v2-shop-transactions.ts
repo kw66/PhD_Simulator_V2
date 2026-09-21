@@ -9,7 +9,7 @@ import {
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
   getAvailableCoffeeMachineUpgrades,
   getCoffeeMachineSellPrice,
-  getCurrentCoffeeBonus,
+  getCoffeeSanGain,
 } from "./v2-coffee-system";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import {
@@ -106,15 +106,15 @@ function buyShopItem(state: GameState, itemId: ShopItemId): GameState {
   } else if (itemId === "chair") {
     shopState.chairOwned = true;
     shopState.investments.chair += price;
-    if (shopState.entitlements.chairPurchase > 0) shopState.entitlements.chairPurchase -= 1;
+    if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   } else if (itemId === "keyboard") {
     shopState.keyboardOwned = true;
     shopState.investments.keyboard += price;
-    if (shopState.entitlements.keyboardPurchase > 0) shopState.entitlements.keyboardPurchase -= 1;
+    if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   } else if (itemId === "monitor") {
     shopState.monitorOwned = true;
     shopState.investments.monitor += price;
-    if (shopState.entitlements.monitorPurchase > 0) shopState.entitlements.monitorPurchase -= 1;
+    if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   } else if (itemId === "bike") {
     const nextTier = getNextBikeTierDefinition(shopState.bikeLevel);
     if (!nextTier) return fail(state, "自行车已经升级到最高等级。 ");
@@ -208,7 +208,7 @@ function upgradeShopItem(state: GameState, upgradeId: ShopUpgradeId): GameState 
   if (itemId === "chair") {
     shopState.chairUpgrade = upgradeName as typeof shopState.chairUpgrade;
     shopState.investments.chair += price;
-    if (shopState.entitlements.chairUpgrade > 0) shopState.entitlements.chairUpgrade -= 1;
+    if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   }
   return pushLog({
     ...payForPurchase(state, price, usesGift),
@@ -219,20 +219,19 @@ function upgradeShopItem(state: GameState, upgradeId: ShopUpgradeId): GameState 
 function buyCoffee(state: GameState): GameState {
   const { price: coffeePrice, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "buy-coffee", {})!);
   const coffeeState = state.coffeeState;
-  if (!coffeeState.machineOwned) return fail(state, "需要先购买咖啡机，才能生产冰美式。 ");
   if (coffeeState.machineUpgrade !== "unlimited" && coffeeState.coffeePurchaseCountThisMonth >= 1) {
     return fail(state, "本月的冰美式已经买过了。 ");
   }
   if (state.player.money < coffeePrice) return fail(state, `金币不足，购买冰美式需要 ${coffeePrice} 金币。`);
 
-  const coffeeGain = 3 + getCurrentCoffeeBonus(coffeeState);
+  const coffeeGain = getCoffeeSanGain(coffeeState);
   const nextSan = Math.min(state.sanCap, state.player.san + coffeeGain);
   const actualCoffeeGain = nextSan - state.player.san;
   const nextCoffeeState = {
     ...coffeeState,
     coffeePurchaseCountThisMonth: coffeeState.coffeePurchaseCountThisMonth + 1,
-    coffeeProducedCountThisMonth: coffeeState.coffeeProducedCountThisMonth + 1,
-    machineTrackedCoffeeCount: coffeeState.machineTrackedCoffeeCount + 1,
+    coffeeProducedCountThisMonth: coffeeState.coffeeProducedCountThisMonth + Number(coffeeState.machineOwned),
+    machineTrackedCoffeeCount: coffeeState.machineTrackedCoffeeCount + Number(coffeeState.machineOwned),
   };
   return pushLog({
     ...payForPurchase(state, coffeePrice, usesGift),
@@ -269,7 +268,7 @@ function buyCoffeeMachine(state: GameState): GameState {
     ...state.shopState,
     entitlements: { ...state.shopState.entitlements },
   };
-  if (shopState.entitlements.coffeeMachinePurchase > 0) shopState.entitlements.coffeeMachinePurchase -= 1;
+  if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   return pushLog({
     ...payForPurchase(state, price, usesGift),
     shopState,
@@ -290,7 +289,7 @@ function upgradeCoffeeMachine(state: GameState, upgradeId: CoffeeMachineUpgrade)
     ...state.shopState,
     entitlements: { ...state.shopState.entitlements },
   };
-  if (shopState.entitlements.coffeeMachineUpgrade > 0) shopState.entitlements.coffeeMachineUpgrade -= 1;
+  if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   return pushLog({
     ...payForPurchase(state, price, usesGift),
     shopState,

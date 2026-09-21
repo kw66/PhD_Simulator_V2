@@ -10,7 +10,7 @@ import { syncRelationshipState } from "./v2-relationship-rules";
 import { getMonthlySeasonSanModifier, getSeasonByMonth } from "./v2-sanity-rules";
 import { getBikeMonthlySanCost, getBikeSanCapLimit } from "./v2-bike-system";
 import { hasFullGear } from "./v2-meeting-system";
-import { BASE_COFFEE_PRICE, getCoffeeBuyPrice, getCurrentCoffeeBonus } from "./v2-coffee-system";
+import { BASE_COFFEE_PRICE, getCoffeeBuyPrice, getCoffeeSanGain } from "./v2-coffee-system";
 import { getChairMonthlyRecovery, getShopEmergencySan } from "./v2-shop-items-effects";
 import {
   AI_SLOT_IDS,
@@ -356,7 +356,7 @@ export function applyMonthStartSubscriptions(
           id: "coffee-subscription",
           name: "冰美式续费",
           source: "商店订阅",
-          stats: { money: -price, san: 3 + getCurrentCoffeeBonus(nextState.coffeeState) },
+          stats: { money: -price, san: getCoffeeSanGain(nextState.coffeeState) },
           note: usesGift ? "恋人赠礼，本次免费" : undefined,
         });
         nextState = {

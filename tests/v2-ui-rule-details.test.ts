@@ -274,7 +274,8 @@ describe("v2 research rule details and publication metrics", () => {
     const gear = getHelpText({ activePlayTab: "shop", activeShopTab: "gear" });
     const rest = getHelpText({ activePlayTab: "shop", activeShopTab: "rest" });
 
-    expect(coffee).toMatch(/先买咖啡机.*才能手动购买冰美式或使用月初自动续费/);
+    expect(coffee).toContain("冰美式可直接购买，SAN+2");
+    expect(coffee).toContain("购入咖啡机后提升为SAN+3，并可开启月初自动续费");
     expect(coffee).toContain("SAN已满时，自动续费当月跳过");
     expect(coffee).toContain("金币不足且没有可用于续费的礼物券时，当月暂停续费");
     expect(gear).toContain("显卡和自行车可逐档升级");

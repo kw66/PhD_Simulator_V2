@@ -3,6 +3,7 @@ import {
   COFFEE_MACHINE_PRICE,
   getAvailableCoffeeMachineUpgrades,
   getCoffeeMachineSellPrice,
+  getCoffeeSanGain,
 } from "../core/v2-coffee-system";
 import { getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { isPreEnrollmentState } from "../core/v2-progression";
@@ -24,7 +25,7 @@ import {
 } from "../core/v2-shop-items";
 import { getBikeTierDefinition, getNextBikeTierDefinition } from "../core/v2-bike-system";
 import { getSupportItemDefinition, isSupportItemOwned } from "../core/v2-support-items";
-import { getGiftAwareShopSellPrice, getLoverGiftCount, getShopActionPrice } from "../core/v2-lover-gift";
+import { getGiftAwareShopSellPrice, getShopActionPrice } from "../core/v2-lover-gift";
 import { animationNumberAttributes, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
 import type {
   AiSlotId,
@@ -641,7 +642,7 @@ function renderCoffeeRows(
   selectedCoffeeUpgradeId?: Exclude<CoffeeMachineUpgradeId, null> | null,
 ): string {
   const coffeePrice = getShopActionPrice(state, "buy-coffee", {})!;
-  const coffeeDescription = "基础 SAN +3";
+  const coffeeDescription = `SAN +${getCoffeeSanGain(state.coffeeState)}`;
   const coffeeMachineSellPrice = getCoffeeMachineSellPrice(state.coffeeState);
   const coffeeMachinePurchasePrice = getShopActionPrice(state, "buy-coffee-machine", {}) ?? COFFEE_MACHINE_PRICE;
   const machineUpgrades = getAvailableCoffeeMachineUpgrades(state.coffeeState);
@@ -650,8 +651,8 @@ function renderCoffeeRows(
     ? COFFEE_MACHINE_UPGRADE_DEFINITIONS.find((upgrade) => upgrade.id === currentUpgrade) ?? null
     : null;
   const machineDescription = !state.coffeeState.machineOwned
-    ? "购入后可生产冰美式并选择一条升级路线"
-    : currentDefinition?.description ?? "可生产冰美式，每月 1 杯";
+    ? "冰美式 SAN+2提升为+3，开启自动续费，可升级"
+    : currentDefinition?.description ?? "冰美式 SAN+3，可自动续费，每月1杯";
 
   const availableUpgradeIds = new Set(machineUpgrades.map((upgrade) => upgrade.id));
   const upgradeOptions = COFFEE_MACHINE_UPGRADE_DEFINITIONS.map((upgrade): UpgradeRouteOption => {
@@ -706,8 +707,8 @@ function renderCoffeeRows(
               label: "购买本月",
               price: coffeePrice,
               action: "buy-coffee",
-              disabled: !state.coffeeState.machineOwned || state.player.money < coffeePrice,
-              disabledReason: !state.coffeeState.machineOwned ? "需先购买咖啡机" : state.player.money < coffeePrice ? "金币不足" : undefined,
+              disabled: state.player.money < coffeePrice,
+              disabledReason: state.player.money < coffeePrice ? "金币不足" : undefined,
             }),
       ],
     }),
@@ -839,7 +840,7 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>, 
     const polishText = polishGroups
       .map((group) => `${group.labels.join("、")} ${group.bonus > 0 ? "+" : ""}${metric(`polish-${group.labels.map((label) => Object.keys(AI_SCORE_LABELS).find((action) => AI_SCORE_LABELS[action as keyof typeof AI_SCORE_LABELS] === label)).join("-")}`, group.bonus)}分`)
       .join("；");
-    return polishText ? `订购或续费时，自动提升可修改论文的分数：\n${polishText}` : "暂无效果";
+    return polishText ? `自动提升可修改论文的分数：\n${polishText}` : "暂无效果";
   }
 
   const groupedEffects: Array<{
@@ -873,7 +874,7 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>, 
     .join("\n");
   const hasRelationshipDiscount = Boolean(model.relationshipOperationSanDelta);
   const extraText = hasRelationshipDiscount
-    ? [`人际操作消耗修正（暂未开放）：SAN -${metric("relationship-san", Math.abs(model.relationshipOperationSanDelta ?? 0))}`]
+    ? [`人际操作消耗修正：SAN -${metric("relationship-san", Math.abs(model.relationshipOperationSanDelta ?? 0))}`]
     : [];
 
   return [...(researchText ? [researchText] : []), ...extraText].join("\n") || "暂无效果";
@@ -976,7 +977,6 @@ export function renderShopSection(
       ${preEnrollment
         ? '<div class="section-empty play-module-lock-state">入学后开放</div>'
       : `<div class="shop-items-list" id="shop-items-list">
-          ${getLoverGiftCount(state) > 0 ? `<div class="shop-gift-notice">恋人赠礼 ×${renderAnimatedNumber("shop:lover:gift-coupons", getLoverGiftCount(state))}：下次付费购买或升级免费</div>` : ""}
           ${content || '<div class="shop-empty">暂无物品</div>'}
         </div>`}
     </div>

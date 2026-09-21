@@ -33,19 +33,19 @@ export function getShopActionBasePrice(state: GameState, actionId: ShopPurchaseA
       return price === null ? null : entitlements.gpuTransaction > 0 ? 0 : price;
     }
     if (itemId === "bike") return getNextBikeTierDefinition(state.shopState.bikeLevel)?.price ?? null;
-    if (itemId === "keyboard" && entitlements.keyboardPurchase > 0) return 0;
-    if (itemId === "monitor" && entitlements.monitorPurchase > 0) return 0;
-    if (itemId === "chair" && entitlements.chairPurchase > 0) return 0;
+    if (itemId === "keyboard" && entitlements.workstationTransaction > 0) return 0;
+    if (itemId === "monitor" && entitlements.workstationTransaction > 0) return 0;
+    if (itemId === "chair" && entitlements.workstationTransaction > 0) return 0;
     return getShopItemDefinition(itemId).price;
   }
   if (actionId === "upgrade-shop-item" && payload.shopUpgradeId) {
-    return entitlements.chairUpgrade > 0 ? 0 : getShopUpgradeDefinition(payload.shopUpgradeId as ShopUpgradeId).price;
+    return entitlements.workstationTransaction > 0 ? 0 : getShopUpgradeDefinition(payload.shopUpgradeId as ShopUpgradeId).price;
   }
   if (actionId === "buy-coffee") return getCoffeeBuyPrice(state.coffeeState);
-  if (actionId === "buy-coffee-machine") return entitlements.coffeeMachinePurchase > 0 ? 0 : COFFEE_MACHINE_PRICE;
+  if (actionId === "buy-coffee-machine") return entitlements.workstationTransaction > 0 ? 0 : COFFEE_MACHINE_PRICE;
   if (actionId === "upgrade-coffee-machine" && payload.shopUpgradeId) {
     const upgrade = COFFEE_MACHINE_UPGRADE_DEFINITIONS.find((entry) => entry.id === payload.shopUpgradeId);
-    return upgrade ? entitlements.coffeeMachineUpgrade > 0 ? 0 : upgrade.price : null;
+    return upgrade ? entitlements.workstationTransaction > 0 ? 0 : upgrade.price : null;
   }
   if (actionId === "buy-ai-month" && payload.aiSlotId) {
     return state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths

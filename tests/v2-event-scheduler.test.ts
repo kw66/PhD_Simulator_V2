@@ -676,27 +676,15 @@ describe("v2 event scheduler", () => {
     expect(choices[0]?.effects.shopEntitlementDeltas).toEqual({ gpuTransaction: 1 });
     expect(choices[1]?.effects.money).toBe(7);
     expect(choices[2]?.effects.shopEntitlementDeltas).toEqual({
-      keyboardPurchase: 1,
-      monitorPurchase: 1,
-      chairPurchase: 1,
-      chairUpgrade: 1,
-      coffeeMachinePurchase: 1,
-      coffeeMachineUpgrade: 1,
+      workstationTransaction: 1,
     });
     const funded = applyChoiceEffectsToState(baseState, choices[2]!).nextState;
     expect(funded.shopState.entitlements).toEqual({
       gpuTransaction: 0,
-      keyboardPurchase: 1,
-      monitorPurchase: 1,
-      chairPurchase: 1,
-      chairUpgrade: 1,
-      coffeeMachinePurchase: 1,
-      coffeeMachineUpgrade: 1,
+      workstationTransaction: 1,
     });
     const fundedTwice = applyChoiceEffectsToState(funded, choices[2]!).nextState;
-    expect(fundedTwice.shopState.entitlements.keyboardPurchase).toBe(2);
-    expect(fundedTwice.shopState.entitlements.chairUpgrade).toBe(2);
-    expect(fundedTwice.shopState.entitlements.coffeeMachineUpgrade).toBe(2);
+    expect(fundedTwice.shopState.entitlements.workstationTransaction).toBe(2);
     expect(choices[3]?.outcome).toContain("AI");
     expect(choices[3]?.effects.addBuffs).toBeUndefined();
     expect(choices[3]?.effects.eventSupportUpdates).toEqual({ aiCostsCoveredUntilTotalMonths: 17 });

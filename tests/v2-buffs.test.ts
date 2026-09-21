@@ -34,7 +34,7 @@ describe("generic buffs", () => {
     expect(buckets.monthly.find((item) => item.id === "monthly:monthly-stat:san")?.isDebuff).toBe(delta < 0);
   });
 
-  it("shows Claude's paper polishing effect without turning it into a research action bonus", () => {
+  it("hides Claude's automatic score bonuses without removing its polishing effects", () => {
     const aiShopState = createAiShopState();
     aiShopState.subscriptions.claude = {
       ...aiShopState.subscriptions.claude,
@@ -49,11 +49,8 @@ describe("generic buffs", () => {
       extraActions: 0,
       sanDelta: 0,
     });
-    expect(buildBuffDisplayBuckets([claudeBuff]).monthly.map((item) => item.label)).toEqual([
-      "自动idea+4分",
-      "自动实验+4分",
-      "自动论文+2分",
-    ]);
+    expect(claudeBuff.paperPolishEffects).toEqual({ idea: 4, experiment: 4, writing: 2 });
+    expect(buildBuffDisplayBuckets([claudeBuff]).monthly).toEqual([]);
   });
 
   it("exposes Kimi reading effects through the shared Buff system", () => {
