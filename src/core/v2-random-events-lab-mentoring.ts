@@ -314,12 +314,12 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
         label: "长期合作，共同成长",
          outcome: canAddJunior
            ? "新增师弟师妹｜每月 SAN -2｜每 12 个月新增一篇非一作论文。"
-           : "关系栏已满，放弃长期带教。",
+           : "关系栏已满，放弃持续指导。",
          effects: canAddJunior ? {
           fellowAdditions: [juniorAddition],
           addBuffs: [{
             id: `random-14-long-term-${serial}-monthly`,
-            name: "长期带教",
+            name: "持续指导",
             source: "指导师弟师妹",
             timing: "monthly",
             remainingMonths: null,
@@ -346,7 +346,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
       ...(!canAddJunior ? ["普通关系栏已满，继续合作不会新增师弟师妹；你可以现在选择退出。"] : []),
       "最近实在忙不过来，可以直接说明情况。",
       `也可以先帮${pronounText}把眼前的问题跑通，之后让${pronounText}自己做。`,
-      "长期带教要每月持续投入，也能一起积累合作成果；你得先确认自己还有精力维持这段合作。",
+      "持续指导要每月投入精力，也能一起积累合作成果；你得先确认自己还有余力维持这段合作。",
     ].join("\n\n"),
     results: {
       [`random-14-decline-${serial}`]: {
@@ -368,14 +368,14 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
         ].join("\n\n"),
       },
       [`random-14-long-term-${serial}`]: {
-        title: canAddJunior ? "长期带教" : "放弃带教",
+        title: canAddJunior ? "持续指导" : "放弃指导",
         description: canAddJunior ? [
           `你和${roleText}约好每周固定讨论一次，代码、实验和论文都一起过。`,
           `${pronounText}开始参与实验、读文献，也会主动整理问题来找你。`,
           "你每个月都要额外花时间指导，不过有人一起做实验后，组里的工作也推进得更顺了。",
         ].join("\n\n") : [
           "你想了想，眼下维持的合作已经够多，实在排不出固定的指导时间。",
-          "你如实说明情况，建议对方再问问其他同门。这次没有接下长期带教，也就不用勉强作出做不到的承诺。",
+          "你如实说明情况，建议对方再问问其他同门。这次没有接下持续指导，也就不用勉强作出做不到的承诺。",
         ].join("\n\n"),
       },
     },

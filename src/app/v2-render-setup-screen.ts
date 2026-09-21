@@ -4,6 +4,7 @@ import {
   getLobbyRolePageRows,
   getRoleAchievementPageCount,
   isRoleOwned,
+  LOBBY_ROLE_PAGE_ROW_COUNT,
   ROLE_ACHIEVEMENT_PAGE_SIZE,
 } from "../core/v2-lobby";
 import { MAX_SAN } from "../core/v2-content";
@@ -575,7 +576,7 @@ export function renderSetupScreen(
                       ${renderRolePager(accountProfile)}
                     </div>
                   </div>
-                  <div class="lobby-role-list">
+                  <div class="lobby-role-list" style="--lobby-role-page-rows: ${LOBBY_ROLE_PAGE_ROW_COUNT}">
                     ${rolePageRows.map((row) => `
                       <div class="lobby-role-row">
                         ${row.map((roleId) => renderRoleCard(roleId, accountProfile, selectedRoleId)).join("")}

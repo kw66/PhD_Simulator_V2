@@ -69,8 +69,12 @@ export function getPaperPromotionCost(promotion: keyof PaperPromotionState, buff
   return Math.max(0, cost + getActiveOperationSanDelta(buffs));
 }
 
+export function getPaperPromotionMoneyCost(promotion: keyof PaperPromotionState): number {
+  return promotion === "quantum" ? 5 : 0;
+}
+
 export function getPaperPromotionMultiplierBonus(promotion: keyof PaperPromotionState): number {
-  if (promotion === "xiaohongshu") return 0.25;
+  if (promotion === "xiaohongshu" || promotion === "quantum") return 0.25;
   return 0;
 }
 

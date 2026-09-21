@@ -430,6 +430,7 @@ export function getPaperCitationMultiplierBreakdown(
       : 1,
     conferencePromotionReady ? paper.publication?.promotionMultiplier ?? 1 : 1,
     conferencePromotionReady && paper.publication?.promotions?.xiaohongshu === true ? 1.25 : 1,
+    conferencePromotionReady && paper.publication?.promotions?.quantum === true ? 1.25 : 1,
   ]);
   const citationDebuff = getPaperCitationDebuffMultiplier(state, paper);
   return {

@@ -17,6 +17,7 @@ export interface RandomEventPoolContext extends RandomEventState {
   research?: number;
   publishedPaperCount?: number;
   hasRecoverableDraftPaper?: boolean;
+  hasAuthorshipEligibleDraftPaper?: boolean;
 }
 
 export interface RandomEventPoolSnapshot {

@@ -467,14 +467,14 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
       : roll < schedule.targetWeights.A + schedule.targetWeights.B ? "B" : "C";
     const acceptedScore = target === "A" ? 4 : target === "B" ? 2 : 1;
     externalPublications.push(createGrantedPublishedPaper(state.totalMonths, externalPublications.length, {
-      title: `长期带教合作论文 ${externalPublications.length + 1}`,
+      title: `持续指导合作论文 ${externalPublications.length + 1}`,
       target,
       acceptedScore,
       nonFirstAuthor: schedule.nonFirstAuthor,
     }, [...state.papers, ...externalPublications, ...(state.fellowPapers ?? [])]));
     resolution.items.push({
       id: `${buff.id}-publication-${state.totalMonths}`,
-      name: "长期带教论文",
+      name: "持续指导论文",
       source: buff.source,
       stats: {},
       appliedStats: {},

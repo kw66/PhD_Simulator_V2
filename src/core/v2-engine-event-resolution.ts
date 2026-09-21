@@ -337,7 +337,7 @@ export function applyQueuedEventEffects(
       title: resolvedEvent.title,
       description: resolvedEvent.description,
       paperReviewPresentation: resolvedEvent.paperReviewPresentation,
-      choices: resolvedEvent.choices.map(({ id, label, outcome, disabledReason }) => ({ id, label, outcome, disabledReason })),
+      choices: resolvedEvent.choices.map(({ id, label, outcome, disabledReason, fellowCandidate }) => ({ id, label, outcome, disabledReason, fellowCandidate })),
       selectedChoiceId: choice.id,
     },
   ];

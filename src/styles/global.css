@@ -2263,6 +2263,7 @@ p {
 
 .lobby-role-list {
   display: grid;
+  grid-template-rows: repeat(var(--lobby-role-page-rows, 5), 1fr);
   gap: 5px;
   align-content: start;
   min-height: 0;
@@ -4146,23 +4147,74 @@ p {
   right: 0;
   top: calc(100% + 7px);
   bottom: auto;
-  width: 252px;
-  padding: 8px 10px;
+  width: max-content;
+  max-width: 200px;
+  padding: 5px 8px;
   border: 1px solid rgba(69, 65, 55, 0.2);
   background: rgba(52, 51, 46, 0.97);
   color: rgba(255, 252, 242, 0.97);
   box-shadow: 0 5px 12px rgba(24, 30, 27, 0.18);
   content: attr(data-tooltip);
   font-family: var(--ui-font-cjk);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  line-height: 1.55;
+  line-height: 1.4;
   letter-spacing: 0;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-3px);
   transition: opacity 120ms ease, transform 120ms ease;
   white-space: pre-line;
+}
+
+.play-tooltip {
+  position: relative;
+}
+
+.play-tooltip::after {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  right: 0;
+  width: max-content;
+  max-width: 190px;
+  padding: 5px 8px;
+  border: 1px solid rgba(69, 65, 55, 0.2);
+  border-radius: 4px;
+  background: rgba(52, 51, 46, 0.97);
+  color: rgba(255, 252, 242, 0.97);
+  box-shadow: 0 5px 12px rgba(24, 30, 27, 0.18);
+  content: attr(data-tooltip);
+  font-family: var(--ui-font-cjk);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: pre-line;
+}
+
+.play-tooltip:hover::after,
+.play-tooltip:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pending-event-blocking-toggle.play-tooltip::after {
+  right: 0;
+  text-align: left;
+}
+
+.new-time-season.play-tooltip::after {
+  right: 50%;
+  transform: translate(50%, -3px);
+}
+
+.new-time-season.play-tooltip:hover::after,
+.new-time-season.play-tooltip:focus-visible::after {
+  transform: translate(50%, 0);
 }
 
 .new-attr-level:hover::after,
@@ -8732,6 +8784,86 @@ button[data-card-icon-action]:focus-visible {
   outline-offset: 2px;
 }
 
+.settings-plan {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(184, 139, 58, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 250, 239, 0.58);
+  overflow: hidden;
+}
+
+.settings-plan-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(184, 139, 58, 0.2);
+  color: var(--ink);
+  font-size: 0.76rem;
+}
+
+.settings-plan-header span {
+  color: #8a6430;
+  font-size: 0.66rem;
+  font-weight: 650;
+}
+
+.settings-plan-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-plan-list li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  padding: 6px 9px;
+  border-top: 1px solid rgba(184, 139, 58, 0.16);
+  color: var(--ink);
+  font-size: 0.7rem;
+}
+
+.settings-plan-list li:nth-child(even) {
+  border-left: 1px solid rgba(184, 139, 58, 0.16);
+}
+
+.settings-plan-list li > span {
+  color: #8d774c;
+  font-weight: 800;
+  text-align: center;
+}
+
+.settings-plan-list li > strong {
+  white-space: nowrap;
+}
+
+.settings-plan-list li > small {
+  min-width: 0;
+  color: var(--card-ink);
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.settings-plan-list li.is-complete > span {
+  color: var(--success);
+}
+
+.settings-plan-list li.is-current {
+  background: rgba(233, 215, 169, 0.28);
+}
+
+.settings-plan-list li.is-current > span,
+.settings-plan-list li.is-current > strong {
+  color: var(--accent-deep);
+}
+
 .debug-tool-btn {
   min-width: 0;
   flex: 0 0 auto;
@@ -10175,6 +10307,53 @@ button[data-card-icon-action]:focus-visible {
 
 .event-panel.showing-content .event-content-box {
   display: grid;
+}
+
+.event-content-buttons.event-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.event-candidate-grid .event-choice-btn.event-candidate-card {
+  position: relative;
+  width: 100%;
+  max-width: none;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 8px;
+}
+
+.event-candidate-grid .event-candidate-card > span {
+  font-size: var(--workstation-font-main);
+  line-height: 1.5;
+}
+
+.event-candidate-grid .event-candidate-card > .event-candidate-stats,
+.event-candidate-grid .event-candidate-card > .event-candidate-description {
+  font-weight: 400;
+}
+
+.event-candidate-grid .event-candidate-stats strong {
+  font-weight: 800;
+}
+
+.event-candidate-grid .event-candidate-card > .event-candidate-description {
+  text-align: left;
+}
+
+.event-candidate-grid .event-candidate-card.is-selected > svg,
+.event-candidate-grid .event-candidate-card.is-selected > [data-lucide="check"] {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+@media (max-width: 600px) {
+  .event-content-buttons.event-candidate-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .event-content-box.is-paper-review-result .event-content-body {
@@ -14238,4 +14417,125 @@ button[aria-disabled="true"][title] {
 .research-section .citation-chart-empty,
 .research-section .citation-chart.is-empty .citation-chart-empty {
   inset: 0;
+}
+
+button.pending-event-blocking-toggle.play-tooltip::after {
+  content: attr(data-tooltip);
+  top: calc(100% + 6px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+  width: max-content;
+  max-width: 190px;
+  height: auto;
+  padding: 5px 8px;
+  border: 1px solid rgba(69, 65, 55, 0.2);
+  border-radius: 4px;
+  background: rgba(52, 51, 46, 0.97);
+  color: rgba(255, 252, 242, 0.97);
+  box-shadow: 0 5px 12px rgba(24, 30, 27, 0.18);
+  line-height: 1.4;
+  transform: translateY(-3px);
+  white-space: pre-line;
+}
+
+button.pending-event-blocking-toggle.play-tooltip:hover::after,
+button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
+  transform: translateY(0);
+}
+
+/* Keep the blocking hint above the first agenda row instead of letting the
+   row text paint through the hint's stacking context. */
+.new-pending-event-section .new-calendar-header {
+  position: relative;
+  z-index: 3;
+}
+
+.new-pending-event-section .new-pending-event-content {
+  position: relative;
+  z-index: 1;
+}
+
+button.pending-event-blocking-toggle.play-tooltip::after {
+  background: #34332e;
+  opacity: 0;
+  pointer-events: none;
+}
+
+button.pending-event-blocking-toggle.play-tooltip:hover::after,
+button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
+  opacity: 1;
+}
+
+/* All in-game hover hints share one compact, opaque two-line presentation. */
+.new-attr-level[data-tooltip]::after,
+.center-tab-badge[aria-label]::after,
+button.pending-event-blocking-toggle.play-tooltip::after {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  right: 0;
+  content: attr(data-tooltip);
+  width: max-content;
+  max-width: 190px;
+  min-height: 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(69, 65, 55, 0.2);
+  border-radius: 4px;
+  background: #34332e;
+  color: rgba(255, 252, 242, 0.97);
+  box-shadow: 0 5px 12px rgba(24, 30, 27, 0.18);
+  font-family: var(--ui-font-cjk);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: pre-line;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.new-attr-level[data-tooltip],
+.center-tab-badge[aria-label] {
+  position: relative;
+}
+
+.center-tab-badge[aria-label]::after {
+  content: attr(aria-label);
+}
+
+.new-attr-level[data-tooltip]:hover::after,
+.new-attr-level[data-tooltip]:focus-visible::after,
+.center-tab-badge[aria-label]:hover::after,
+.center-tab-badge[aria-label]:focus-visible::after,
+button.pending-event-blocking-toggle.play-tooltip:hover::after,
+button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.center-tab-badge[aria-label] {
+  position: relative;
+}
+
+.center-tab-badge[aria-label]::after {
+  top: calc(100% + 6px);
+  right: 50%;
+  transform: translate(50%, -3px);
+}
+
+.center-tab-badge[aria-label]:hover::after,
+.center-tab-badge[aria-label]:focus-visible::after {
+  transform: translate(50%, 0);
+}
+
+@media (max-width: 560px) {
+  .settings-plan-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-plan-list li:nth-child(even) {
+    border-left: 0;
+  }
 }

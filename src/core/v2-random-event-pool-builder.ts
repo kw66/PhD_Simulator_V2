@@ -7,6 +7,7 @@ export interface CandidateEventContext {
   research?: number;
   publishedPaperCount?: number;
   hasRecoverableDraftPaper?: boolean;
+  hasAuthorshipEligibleDraftPaper?: boolean;
   pendingPaperCompetitionEvents?: PendingPaperCompetitionEvent[];
 }
 
@@ -42,6 +43,7 @@ export function buildCandidateEventIds(params: {
   let candidateEventIds = context.availableRandomEvents.filter((eventId) => (
     eventId !== DISEASE_EVENT_ID
     && !pendingIds.has(eventId)
+    && (eventId !== 12 || context.hasAuthorshipEligibleDraftPaper === true)
     && (eventId !== 16 || context.hasRecoverableDraftPaper === true)
   ));
 

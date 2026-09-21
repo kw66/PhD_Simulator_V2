@@ -201,6 +201,7 @@ export interface PaperPromotionState {
   arxiv: boolean;
   github: boolean;
   xiaohongshu: boolean;
+  quantum?: boolean;
 }
 
 export type PaperPromotionId = keyof PaperPromotionState;
@@ -445,6 +446,7 @@ export interface EventChoice {
   id: string;
   label: string;
   outcome: string;
+  fellowCandidate?: { description: string; research: number; affinity: number };
   disabledReason?: string;
   cosmetic?: boolean;
   effects: {
@@ -520,7 +522,7 @@ export interface ResolvedEventStage {
   description: string;
   paperReviewPresentation?: PaperReviewEventPresentation;
   talentTrigger?: import("./v2-talent-history").TalentTriggerRecord;
-  choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason">[];
+  choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason" | "fellowCandidate">[];
   selectedChoiceId: string;
 }
 

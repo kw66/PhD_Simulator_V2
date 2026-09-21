@@ -912,6 +912,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="settings-panel"');
     expect(html).toContain('id="settings-panel-content"');
     expect(html).toContain('class="settings-quick-actions"');
+    expect(html).toContain('id="settings-plan-title">🗺️ 后续计划</strong>');
+    expect(html).toContain("事件与人际联动");
     expect(html).not.toContain('data-ui-layout-toggle="debug-event-rail"');
     expect(html).not.toContain('data-ui-layout-toggle="debug-bottom-bar"');
     expect(html).toContain('data-ui-open-debug-window');
@@ -995,8 +997,8 @@ describe("v2 render lobby shell", () => {
     expect(getTabHtml("events")).not.toContain("is-blocking");
     expect(html).toMatch(/class="center-tab-btn center-tab-btn-next"[\s\S]*?data-action="next-month"/);
     expect(html.match(/<button[\s\S]*?class="center-tab-btn center-tab-btn-next"[\s\S]*?<\/button>/)?.[0]).not.toContain("disabled");
-    expect(getTabHtml("workstation")).toContain("center-tab-badge is-available");
-    expect(getTabHtml("relationship")).not.toContain("center-tab-badge is-available");
+    expect(getTabHtml("workstation")).not.toContain("center-tab-badge is-available");
+    expect(getTabHtml("relationship")).toContain("center-tab-badge is-available");
     expect(getTabHtml("shop")).not.toContain("center-tab-badge is-available");
 
     const advisorCard = getRelationshipCardHtml(html, "advisor");
@@ -1044,7 +1046,7 @@ describe("v2 render lobby shell", () => {
     expect(restButton).toContain("本月行动次数已用尽");
   });
 
-  it("keeps all three lover dates disabled in the pre-enrollment preview", () => {
+  it("keeps all three lover dates clickable in the pre-enrollment preview", () => {
     const initial = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
     const state = {
       ...initial,
@@ -1059,8 +1061,8 @@ describe("v2 render lobby shell", () => {
     expect(dateButtons).toHaveLength(3);
     dateButtons.forEach((button, index) => {
       expect(button).toContain(`data-action="lover-${LOVER_ROUTES[index]}"`);
-      expect(button).toContain('disabled aria-disabled="true"');
-      expect(button).toContain("入学后开放");
+      expect(button).not.toContain('disabled aria-disabled="true"');
+      expect(button).not.toContain("入学后开放");
     });
   });
 
@@ -1809,7 +1811,7 @@ describe("v2 render lobby shell", () => {
       },
     };
     const html = renderApp(state, createDefaultAccountProfile());
-    expect(html).toContain('aria-label="AI行动可用 1 次"');
+    expect(html).toContain('aria-label="AI行动 1 次 · 可投稿 0 篇"');
     expect(html).toMatch(/data-ui-play-tab="workstation"[\s\S]*class="center-tab-badge is-available"[^>]*>1<\/span>/);
   });
 
@@ -3243,6 +3245,13 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("硕士工资：每月 +1");
     expect(html).toContain("测试事件：临时补贴 +3");
     expect(html).not.toContain("基础开销");
+  });
+
+  it("keeps long interactive tooltips compact and multiline", () => {
+    const html = renderApp(createAdmittedTestState(), createDefaultAccountProfile());
+    expect(html).toContain("pending-event-blocking-toggle play-tooltip");
+    expect(html).toContain("无分支事件：阻塞，需手动处理。\n点击切换为不阻塞");
+    expect(html).toContain("class=\"new-attr-level attr-level-research\"");
   });
 
   it("renders the current season in monthly effects", () => {

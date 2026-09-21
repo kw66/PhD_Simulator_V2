@@ -75,7 +75,7 @@ describe("v2 core regression boundaries", () => {
     expect(resolved.relationshipState.unlockedSlots).toBe(3);
   });
 
-  it("lets the player accept or reject a mentor-assigned junior without candidate selection", () => {
+  it("lets the player choose one of four mentor-assigned juniors", () => {
     const base = {
       ...startGame(),
       year: 4,
@@ -89,19 +89,20 @@ describe("v2 core regression boundaries", () => {
     };
 
     const intro = state.eventQueue[0];
-    expect(intro?.description).not.toContain("候选人");
+    expect(intro?.description).toContain("四位新生");
     state = dispatchAction(state, "resolve-event", {
       eventId: intro?.id,
       eventChoiceId: intro?.choices[0]?.id,
     });
     const decision = state.eventQueue[0];
-    expect(decision?.choices.map((choice) => choice.label)).toEqual(["接受安排", "拒绝安排"]);
+    expect(decision?.choices).toHaveLength(4);
     state = dispatchAction(state, "resolve-event", {
       eventId: decision?.id,
       eventChoiceId: decision?.choices[0]?.id,
     });
     const result = state.eventQueue[0];
-    expect(result?.title).toContain("接受安排");
+    expect(result?.title).toMatch(/师弟|师妹/);
+    expect(result?.description).toMatch(/师弟\+1|师妹\+1/);
     state = dispatchAction(state, "resolve-event", {
       eventId: result?.id,
       eventChoiceId: result?.choices[0]?.id,
@@ -115,22 +116,6 @@ describe("v2 core regression boundaries", () => {
     })]);
     expect(state.eventQueue).toHaveLength(0);
 
-    let rejected = {
-      ...base,
-      eventQueue: [createEventQueueItem(createMentorAssignEvent(base), 1)],
-    };
-    const rejectedIntro = rejected.eventQueue[0];
-    rejected = dispatchAction(rejected, "resolve-event", {
-      eventId: rejectedIntro?.id,
-      eventChoiceId: rejectedIntro?.choices[0]?.id,
-    });
-    const rejectedDecision = rejected.eventQueue[0];
-    rejected = dispatchAction(rejected, "resolve-event", {
-      eventId: rejectedDecision?.id,
-      eventChoiceId: rejectedDecision?.choices[1]?.id,
-    });
-    expect(rejected.relationshipState.juniorCount).toBe(0);
-    expect(rejected.fellowProgressState).toHaveLength(0);
   });
 
   it("never advances beyond the training limit", () => {

@@ -25,7 +25,7 @@ const RESEARCH_PAGES: readonly PlayHelpPage[] = [
         <tr><th scope="row">Best Paper / Candidate</th><td>×5</td></tr>
         <tr><th scope="row">期刊</th><td>×1</td></tr>
       </tbody>
-    </table><p>每篇一作论文各可推广一次：<b>arXiv提前被引，GitHub提高当前分，小红书提高倍率。</b>GitHub增加当前分的25%（增加量向下取整），录用分不变；小红书使录用/推广倍率+0.25，如Oral从×1.5变为×1.75。</p>`,
+    </table><p>每篇一作论文各可推广一次：<b>arXiv提前被引，GitHub提高当前分，小红书和量子位提高倍率。</b>量子位仅用于期刊论文，金币-5，引用倍率+0.25；GitHub增加当前分的25%（增加量向下取整），录用分不变；小红书和量子位均使录用/推广倍率+0.25，如Oral从×1.5变为×1.75。</p>`,
     expandable: true,
   },
   {

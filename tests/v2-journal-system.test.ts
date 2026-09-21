@@ -132,6 +132,7 @@ describe("v2 journal system", () => {
     expect(html).not.toMatch(/data-promotion-id=.*arxiv/);
     expect(html).toMatch(/data-promotion-id=.*github/);
     expect(html).toMatch(/data-promotion-id=.*xiaohongshu/);
+    expect(html).toMatch(/data-promotion-id=.*quantum/);
   });
 
   it("treats post-submission journal work as additive revision score", () => {

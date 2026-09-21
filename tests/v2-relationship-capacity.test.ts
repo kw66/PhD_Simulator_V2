@@ -60,11 +60,12 @@ describe("v2 relationship capacity", () => {
     expect(decision.description).toContain("选择退出");
   });
 
-  it("warns before accepting a full mentor assignment", () => {
+  it("shows the no-op result when mentor-assignment slots are full", () => {
     const decision = getDecisionEvent(createMentorAssignEvent(createFullFellowState()));
 
-    expect(decision.description).toContain("普通关系栏已满");
-    expect(decision.description).toContain("选择拒绝");
+    expect(decision.description).toContain("四位新生");
+    expect(decision.description).not.toContain("没有负面结果");
+    expect(decision.choices[0]?.effects.enqueueEvents?.[0]?.description).toContain("无事发生");
   });
 
   it("ends fellow cooperation while preserving unrelated state and releasing one slot", () => {

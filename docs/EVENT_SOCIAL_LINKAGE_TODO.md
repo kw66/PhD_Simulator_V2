@@ -42,9 +42,9 @@
 | [ ] E04 | 毕设辅导 `random-1`：亲自指导、转给师弟师妹 | 亲自指导可新增留组的师弟师妹，现已自动建稿；委托仅取列表第一位师弟师妹，按有无熟人扣玩家社交，不更新受托者论文或关系进度 | 明确本科毕设与研究生会议论文的区别；已有同学是否承接带教任务，是否影响当月科研、默契或成长；不能把本科毕业设计直接赠成会议成果 | [createRandomEvent1](../src/core/v2-random-events-lab-mentoring.ts) |
 | [ ] E05 | 帮忙审稿 `random-2`：转给师弟师妹 | 玩家自己审稿调用阅读收益；委托只判断有无师弟师妹并扣社交，不反映受托者科研、关系、工作负担 | 选择具体受托人，讨论工作量与关系变化；这是一项替导师完成的外部审稿工作，不应擅自改成给自己的论文审稿或提高录用率 | [createRandomEvent2](../src/core/v2-random-events-lab-mentoring.ts) |
 | [ ] E06 | 开会活动：和同学约一次后续合作 `peer-collaboration` | 只有“下次实验+5”，没有人物、后续论文或合作记录，叙事里的后续合作未落地 | 是一次讨论启发、一次待用协作还是认识新同学；如进入长期合作，遵守普通关系容量与次月科研规则 | [createBaseConferenceActivityOptions](../src/core/v2-conference-activity-base-options.ts) |
-| [ ] E07 | 署名风波 `random-12` | 不选具体论文或合作者；文本描述一作变化、恢复署名，实际只改玩家属性或下次 idea，不改作者名单 | 有真实合作稿时绑定稳定论文 ID 与作者；区分玩家主导与同学主导，禁止凭空把对方论文变为玩家一作；是否限制触发、是否等待合适稿件均待定 | [createAdvisorAuthorshipRandomEvent](../src/core/v2-random-events-lab-advisor-authorship.ts) |
+| [ ] E07 | 署名风波 `random-12` | 已要求存在总分大于 0 的未投稿草稿；尚不选具体论文或合作者，实际只改玩家属性或下次 idea，不改作者名单 | 有真实合作稿时绑定稳定论文 ID 与作者；区分玩家主导与同学主导，禁止凭空把对方论文变为玩家一作；进一步的作者联动待讨论 | [createAdvisorAuthorshipRandomEvent](../src/core/v2-random-events-lab-advisor-authorship.ts) |
 
-固定事件“指导新生”（`mentor-assign`）已通过新增同学自动开启论文，没有直接赠稿冲突。仅记录为 E04 的复核入口：以后若区分导师安排的带教与普通同学关系，应同步检查 [createMentorAssignEvent](../src/core/v2-fixed-events-mentor-assign.ts)，避免再次建稿或重复发入队奖励。
+固定事件“指导新生”（`mentor-assign`）已改为四名新生选一名，候选卡片显示与科研值匹配的描述、科研能力和默契度，新增同学自动开启论文。仅记录为 E04 的复核入口：以后若区分导师安排的指导与普通同学关系，应同步检查 [createMentorAssignEvent](../src/core/v2-fixed-events-mentor-assign.ts)，避免再次建稿或重复发入队奖励。
 
 ## 实验室与事件影响范围
 

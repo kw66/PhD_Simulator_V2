@@ -1,6 +1,7 @@
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import {
   getPaperPromotionCost,
+  getPaperPromotionMoneyCost,
   getPaperPromotionMultiplierBonus,
 } from "./v2-publication-rules";
 import type { GameState, PaperPromotionId } from "./v2-types";
@@ -9,6 +10,7 @@ const PROMOTION_LABELS: Record<PaperPromotionId, string> = {
   arxiv: "挂 arXiv",
   github: "GitHub 开源",
   xiaohongshu: "小红书宣发",
+  quantum: "量子位宣发",
 };
 
 function getPromotionFailure(state: GameState, paperId: string, promotionId: PaperPromotionId): string | null {
@@ -18,6 +20,7 @@ function getPromotionFailure(state: GameState, paperId: string, promotionId: Pap
   if (paper.status !== "published" || !paper.publication) return "只有已发表论文可以推广";
   if (paper.nonFirstAuthor === true) return "非一作论文不能由你进行宣传";
   if (paper.publication.promotions?.[promotionId] === true) return "这项推广已经完成";
+  if (promotionId === "quantum" && !paper.journalTarget && !paper.publication.journalTarget) return "量子位宣传仅适用于期刊论文";
   if (
     promotionId === "arxiv"
     && (
@@ -29,6 +32,8 @@ function getPromotionFailure(state: GameState, paperId: string, promotionId: Pap
     return "论文已经公开，挂 arXiv 不再带来提前曝光";
   }
   const cost = getPaperPromotionCost(promotionId, state.buffs);
+  const moneyCost = getPaperPromotionMoneyCost(promotionId);
+  if (moneyCost > 0) return state.player.money >= moneyCost ? null : `金币不足，需要 ${moneyCost}`;
   return state.player.san >= cost ? null : `SAN 不足，需要 ${cost}`;
 }
 
@@ -60,6 +65,7 @@ export function applyPaperPromotion(
       arxiv: paper.publication.promotions?.arxiv ?? false,
       github: paper.publication.promotions?.github ?? false,
       xiaohongshu: paper.publication.promotions?.xiaohongshu ?? false,
+      quantum: paper.publication.promotions?.quantum ?? false,
       [promotionId]: true,
     },
   };
@@ -69,12 +75,17 @@ export function applyPaperPromotion(
   if (paperIndex >= 0) nextPapers[paperIndex] = updatedPaper;
   if (externalIndex >= 0) nextExternal[externalIndex] = updatedPaper;
 
-  const player = { ...state.player, san: state.player.san - cost };
-  const result = promotionId === "github"
+  const moneyCost = getPaperPromotionMoneyCost(promotionId);
+  const player = moneyCost > 0
+    ? { ...state.player, money: state.player.money - moneyCost }
+    : { ...state.player, san: state.player.san - cost };
+  const result = promotionId === "quantum"
+    ? `金币 -${moneyCost}；引用倍率 +${Math.round(bonus * 100)}%`
+    : promotionId === "github"
     ? `SAN -${cost}；当前分 +${Math.floor(paper.publication.effectiveScore * 0.25)}`
     : promotionId === "arxiv"
       ? `SAN -${cost}；提前公开`
-      : `SAN -${cost}；引用倍率 +${Math.round(bonus * 100)}%`;
+    : `SAN -${cost}；引用倍率 +${Math.round(bonus * 100)}%`;
   return pushLog(
     { ...state, papers: nextPapers, externalPublications: nextExternal, player },
     `${PROMOTION_LABELS[promotionId]}：${paper.title}；${result}`,

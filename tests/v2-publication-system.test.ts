@@ -679,6 +679,33 @@ describe("v2 publication loop", () => {
     expect(next.papers[0]?.publication?.citationDebuffMultiplier).toBe(1);
   });
 
+  it("uses Quantum Bit for journal promotion and charges five coins", () => {
+    const paper = attachPaperPublication({
+      ...createDraftPaper(1, 0),
+      idea: 8,
+      experiment: 7,
+      writing: 5,
+      status: "published" as const,
+      journalTarget: "pami" as const,
+      submittedIdea: 8,
+      submittedExperiment: 7,
+      submittedWriting: 5,
+      conferenceHandled: true,
+    });
+    const state = {
+      ...createStartedGameState("normal"),
+      eventQueue: [],
+      papers: [paper],
+      selectedPaperId: paper.id,
+      player: { ...createStartedGameState("normal").player, money: 10 },
+    };
+    const next = dispatchAction(state, "promote-paper", { paperId: paper.id, promotionId: "quantum" });
+    expect(next.player.money).toBe(5);
+    expect(next.player.san).toBe(state.player.san);
+    expect(next.papers[0]?.publication?.promotions?.quantum).toBe(true);
+    expect(getPaperCitationMultiplierBreakdown(next, next.papers[0]!).promotion).toBe(1.25);
+  });
+
   it("keeps promotion and citation debuffs in independent multiplier zones", () => {
     const paper = attachPaperPublication({
       ...createDraftPaper(1, 0),

@@ -61,6 +61,9 @@ export function collectRandomEventsForMonth(
         research: nextState.player.research,
         publishedPaperCount: getPublishedPaperCount(nextState),
         hasRecoverableDraftPaper: hasRecoverableDraftPaper(nextState),
+        hasAuthorshipEligibleDraftPaper: nextState.papers.some((paper) =>
+          paper.status === "draft" && paper.idea + paper.experiment + paper.writing > 0
+        ),
       },
       getRoll(),
     );

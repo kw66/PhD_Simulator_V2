@@ -16,6 +16,7 @@ import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "../src/cor
 import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
 import { collectThesisEventForMonth } from "../src/core/v2-monthly-thesis-events";
 import { createFundingCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
+import { createDraftPaper } from "../src/core/v2-paper-rules";
 import type { EventChoice, PendingEvent } from "../src/core/v2-types";
 
 function fromRolls(rolls: number[]): RandomRollProvider {
@@ -777,6 +778,7 @@ describe("v2 event scheduler", () => {
       month: 5,
       totalMonths: 17,
       player: { ...initial.player, favor: 5 },
+      papers: [{ ...createDraftPaper(1, 1), idea: 1 }],
       availableRandomEvents: [12],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
@@ -845,6 +847,7 @@ describe("v2 event scheduler", () => {
       month: 10,
       totalMonths: 22,
       player: { ...initial.player, favor: 5 },
+      papers: [{ ...createDraftPaper(1, 1), idea: 1 }],
       availableRandomEvents: [12],
       usedRandomEvents: [],
       totalRandomEventCount: 0,

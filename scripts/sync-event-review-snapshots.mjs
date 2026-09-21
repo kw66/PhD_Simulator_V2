@@ -866,7 +866,7 @@ function syncRuntimeEventMetadata(data) {
       status: "active",
       trigger: "随机事件数大于 0、科研 >= 6 或社交 >= 6、当学年尚未使用；随后随机抽取；可延后一个月处理",
     },
-    "署名风波": { status: "active", trigger: "普通随机抽取；当学年尚未使用；可延后一个月处理" },
+    "署名风波": { status: "active", trigger: "存在总分大于 0 的未投稿草稿；普通随机抽取；当学年尚未使用；可延后一个月处理" },
     "显卡故障": { status: "active", trigger: "普通随机抽取；当学年尚未使用" },
     "指导师弟/师妹": {
       status: "active",
