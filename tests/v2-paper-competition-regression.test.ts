@@ -112,7 +112,7 @@ describe("paper competition regression", () => {
     expect(state.eventQueue[0]!.description).not.toContain("SAN-6");
     state = dispatchAction(state, "withdraw-paper", { paperId });
     expect(state.eventQueue[0]!.description).toContain("SAN-6｜idea×1.25（100→125）");
-    expect(state.eventQueue[0]!.description).toContain("新方案比原先更进一步");
+    expect(state.eventQueue[0]!.description).toContain("新方案比原先多走了一步");
     expect(state.eventQueue[0]!.description).not.toContain("已不再受这次竞争影响");
     expect(state.eventQueue[0]!.description.match(/涉及论文：/g)).toHaveLength(1);
     expect(state.eventQueue[0]!.description.match(/机制结算/g)).toHaveLength(1);

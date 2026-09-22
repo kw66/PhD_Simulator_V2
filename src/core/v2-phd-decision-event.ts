@@ -49,8 +49,8 @@ export function createPhdDecisionEvent(state: GameState, requestedYear = state.y
   results["continue-master"] = {
     title: "转博结果",
     description: decisionYear === 2
-      ? "你向老师说明，今年先不转博，把手头的研究继续做完。老师收起材料，你也不用在今天就决定往后几年的安排。\n\n明年还有一次机会。回到工位，你把这件事暂时放下，先打开了今天还没改完的文档。"
-      : "你向老师说明，这次继续按硕士的安排完成学业，不再准备转博。聊完以后，手头的论文和毕业任务并没有因此少一项。\n\n回到工位，你重新看了看接下来的计划。比起反复犹豫要不要读博，现在更需要把毕业和去向逐件落实。",
+      ? "你跟老师说，今年先按硕士的安排继续做。话题回到手头课题上，你终于翻到了原本准备汇报的那一页。\n\n明年还有一次机会。回到工位，屏幕上还停着出门前的文档。刚才想了那么远，眼下先接着做今天的事。"
+      : "你跟老师说，这次继续读完硕士，不再准备转博。老师把转博材料收到一边，你们接着核对起毕业安排。\n\n回到工位，你在日程里记下接下来要做的事。刚才说出决定只用了一句话，剩下的毕业准备，却还得占上好几行。",
   };
 
   if (canTransfer) {
@@ -73,7 +73,7 @@ export function createPhdDecisionEvent(state: GameState, requestedYear = state.y
     });
     results["transfer-phd"] = {
       title: "转博结果",
-      description: `你向老师确认了转博的决定。聊到后续研究时，问题一下多了起来：哪些结果还站得住，哪些地方值得继续做，都得重新想清楚。\n\n回到熟悉的工位，你把需要讨论的问题逐条记下。研究还是这些研究，只是不能再想着做完眼前这一篇就收工了。\n\n培养安排：总培养期仍为 68 个月，博士毕业要求调整为科研分 ${ADVISOR_REQUIREMENTS.phdGrad}。基础的每月 SAN +1 仍会生效，但读博压力也会使每月 SAN -1。`,
+      description: `你点头确认了转博的决定。老师把话题转到后续研究上，你翻开记录本，本来留给近期安排的几行空白，很快就写到了页脚。\n\n回到工位，椅子还是那把椅子，待解决的问题却像是忽然排远了。你往后翻了一页继续记，心里有点发怵，也有点想看看自己到底能做到哪一步。\n\n培养安排：总培养期仍为 68 个月，博士毕业要求调整为科研分 ${ADVISOR_REQUIREMENTS.phdGrad}。基础的每月 SAN +1 仍会生效，但读博压力也会使每月 SAN -1。`,
       buttonLabel: "开始博士阶段",
     };
   }
@@ -93,25 +93,25 @@ export function createPhdDecisionEvent(state: GameState, requestedYear = state.y
   const decisionDescription = canTransfer
     ? [
         describePublishedPapers(state),
-        `今年转博需要达到 ${requiredScore} 分，你已经过线。同届同门也在准备材料，但你还得决定自己是否愿意继续留在组里做研究。`,
+        `今年转博需要达到 ${requiredScore} 分，你已经过线。同届同门在聊材料怎么填，你看着眼前的课题记录，想的却是：熟悉的工位再坐几年，自己还愿不愿意？`,
         `转博要求：毕业科研分 ${ADVISOR_REQUIREMENTS.phdGrad}；永久效果“读博压力”：每月 SAN -1。`,
       ].join("\n\n")
     : decisionYear === 2
       ? [
           describePublishedPapers(state),
-          `今年转博需要达到 ${requiredScore} 分，你的成果还不够。同届同门在准备材料，你也对照着看了自己的进展。`,
-          "今年暂时不能转博，明年还有一次机会。你把材料收好，先回去做完手头的研究。",
+          `今年转博需要达到 ${requiredScore} 分，你的成果还不够。同届同门在核对材料，你低头看看记录，几处工作还没做完。`,
+          "今年暂时不能转博，明年还有一次机会。你翻回课题记录，盘算着接下来先往哪处使劲。",
         ].join("\n\n")
       : [
           describePublishedPapers(state),
-          `今年转博需要达到 ${requiredScore} 分，你的成果还不够。同届同门陆续定下了去向，你也到了要作安排的时候。`,
+          `今年转博需要达到 ${requiredScore} 分，你的成果还不够。同届同门聊起去向，你看着面前的材料，开始重排毕业前的日程。`,
           "这是硕士阶段最后一次转博机会。按目前的成果，你将继续准备硕士毕业，不再递交转博材料。",
         ].join("\n\n");
 
   return createThreeStageEvent(event, {
     introDescription: [
-      `硕士第${decisionYear}年，导师找你聊起转博。你带着手头课题的记录坐下，老师先问了最近的进展，又问你愿不愿意继续做下去。`,
-      "你原本只准备汇报近期结果，话题却变成了往后几年的打算。留在熟悉的组里并不陌生，是否还想继续读下去，却不能只看最近做得顺不顺。",
+      `硕士第${decisionYear}年，导师叫你去办公室聊聊。你带着课题记录坐下，刚讲完最近的进展，老师便问起了转博的打算。`,
+      "你出门前还在琢磨那几页记录够不够汇报，这会儿老师已经问到了往后几年。笔还夹在刚才那页，你一时没顾上往下翻。",
     ].join("\n\n"),
     decisionTitle: "转博选择",
     decisionDescription,

@@ -9,7 +9,7 @@ import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
 import { canAutoResolveLinearEvent, isEventBlocking, isLinearEvent } from "../core/v2-event-auto-resolution";
 import { isTransientUiHintLog } from "../core/v2-engine-helpers";
 import { getTeachersDayResultPreviews } from "../core/v2-fixed-events-teachers-day";
-import { getMeetingSelfPayDiscount, hasFullGear } from "../core/v2-meeting-system";
+import { getMeetingSelfPayDiscount, hasFullGear, hasPerfectWorkstation } from "../core/v2-meeting-system";
 import {
   ACTIVITY_WIN_RATE_CAP,
   BADMINTON_VICTORY_THRESHOLD,
@@ -165,6 +165,7 @@ type EffectBucketItem = {
   label: string;
   sources: string[];
   isDebuff?: boolean;
+  category?: "san" | "research" | "money" | "action" | "relationship" | "publication" | "attribute" | "general";
 };
 
 type TalentPanelItem = {
@@ -250,6 +251,7 @@ function upsertBucketItem(
   label: string,
   source: string,
   isDebuff = false,
+  category: EffectBucketItem["category"] = inferEffectCategory(bucketId, label),
 ): void {
   const normalizedLabel = label.trim();
   if (!normalizedLabel) return;
@@ -265,7 +267,20 @@ function upsertBucketItem(
     label: normalizedLabel,
     sources: source.trim() ? [source.trim()] : [],
     isDebuff,
+    category,
   });
+}
+
+function inferEffectCategory(id: string, label: string): EffectBucketItem["category"] {
+  if (id.includes("san") || label.includes("SAN")) return "san";
+  if (id.includes("money") || label.includes("金币")) return "money";
+  if (id.startsWith("shop-free")) return "money";
+  if (id.includes("publication") || label.includes("论文")) return "publication";
+  if (id.includes("relationship") || label.includes("人际")) return "relationship";
+  if (id.includes("action") || label.includes("行动")) return "action";
+  if (id.includes("research") || label.includes("科研") || /idea|实验/.test(label)) return "research";
+  if (id.includes("social") || id.includes("favor")) return "attribute";
+  return "general";
 }
 
 function getAcademicMonth(totalMonths: number): number {
@@ -423,7 +438,7 @@ function renderEffectItems(items: EffectBucketItem[]): string {
     .map((item) => `
       <button
         type="button"
-        class="effect-chip${item.isDebuff ? " is-debuff" : ""}"
+        class="effect-chip is-${item.category ?? inferEffectCategory(item.id, item.label)}${item.isDebuff ? " is-debuff" : ""}"
         data-effect-id="${escapeHtml(item.id)}"
         data-effect-sources="${escapeHtml(JSON.stringify(item.sources))}"
         aria-pressed="false"
@@ -469,6 +484,7 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
       label: `${labels[statId]} ${formatSignedNumber(value)}`,
       sources,
       isDebuff: value < 0,
+      category: inferEffectCategory(`next-month-${statId}`, labels[statId]),
     }];
   });
   if (state.loverState.active && state.loverProgressState.active
@@ -542,7 +558,7 @@ function buildEffectBuckets(state: GameState): {
     upsertBucketItem(
       single,
       "shop-free-gpu",
-      `显卡免单${entitlementCountText(state.shopState.entitlements.gpuTransaction)}`,
+      `显卡报销${entitlementCountText(state.shopState.entitlements.gpuTransaction)}`,
       "导师经费：下次购买或升级显卡免费，优先于恋人回礼使用",
     );
   }
@@ -565,9 +581,11 @@ function buildEffectBuckets(state: GameState): {
       upsertBucketItem(target, `${timing}:rule:active-operation-san-delta`, `SAN消耗 ${formatSignedNumber(delta)}`, source, delta > 0);
     }
   }
+  // Monthly stats are settled by the month-start preview. Keep their Buffs
+  // permanent in state, but show the actual settlement only in “下个月初”
+  // so the same SAN/money change is not listed in both sections.
   const permanentBuffItems = buffBuckets.permanent.filter((item) => (
-    !((item.id === "permanent:monthly-stat:san" || item.id === "permanent:monthly-stat:money")
-      && !item.isDebuff)
+    !item.id.startsWith("permanent:monthly-stat:")
   ));
   for (const [target, items] of [
     [permanent, permanentBuffItems],
@@ -576,7 +594,7 @@ function buildEffectBuckets(state: GameState): {
   ] as const) {
     for (const item of items) {
       for (const source of item.sources) {
-        upsertBucketItem(target, item.id, item.label, source, item.isDebuff);
+        upsertBucketItem(target, item.id, item.label, source, item.isDebuff, item.category);
       }
     }
   }
@@ -896,7 +914,7 @@ function renderPaperReviewEvent(presentation: PaperReviewEventPresentation, sett
     return `
       <section class="paper-review-event is-overview">
         ${heading}
-        <p class="paper-review-intro">📬 等待三个月，审稿结果终于到了</p>
+        <p class="paper-review-intro">📬 刷了三个月邮箱，审稿结果终于到了</p>
         <div class="paper-review-overview-grid">
           <span><small>会议等级</small><strong>${presentation.target}类</strong></span>
           <span><small>投稿总分</small><strong>${presentation.submittedScore}</strong></span>
@@ -3212,6 +3230,8 @@ function buildGrowthTalentItems(state: GameState): TalentPanelItem[] {
 function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
   const aiCollaboration = getAiCollaborationStatus(state.aiShopState);
   const fullGearActive = hasFullGear(state.shopState, state.eventSupport);
+  const perfectWorkstationActive = state.buffs.some((buff) => buff.id === "perfect-workstation")
+    || hasPerfectWorkstation(state.shopState, state.coffeeState);
   const items: TalentPanelItem[] = [
     {
       id: "full-gear",
@@ -3224,6 +3244,19 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
         { label: "小电驴", value: state.shopState.ebikeOwned ? "✅" : "—" },
         { label: "遮阳伞", value: state.eventSupport.hasParasol ? "✅" : "—" },
         { label: "羽绒服", value: state.eventSupport.hasDownJacket ? "✅" : "—" },
+      ],
+    },
+    {
+      id: "perfect-workstation",
+      icon: "🖥️",
+      name: "完美工位",
+      active: perfectWorkstationActive,
+      description: "集齐机械键盘、2K显示器、办公椅和咖啡机后，idea、实验、论文永久+1分",
+      metrics: [
+        { label: "机械键盘", value: state.shopState.keyboardOwned ? "✅" : "—" },
+        { label: "2K显示器", value: state.shopState.monitorOwned ? "✅" : "—" },
+        { label: "办公椅", value: state.shopState.chairOwned ? "✅" : "—" },
+        { label: "咖啡机", value: state.coffeeState.machineOwned ? "✅" : "—" },
       ],
     },
     {

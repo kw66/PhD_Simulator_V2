@@ -58,7 +58,7 @@ export function createCcigActivityDecisionEvent(
     title: "年会活动 ➜ 选择安排",
     description: [
       `你在${location}的 CCIG ${realYear} 会场翻着日程，几项安排撞在一起，总得有所取舍。`,
-      "坐下听报告、出去走走，或是请同学吃顿饭，你想先挑一件。",
+      "你在报告题目和同学发来的餐馆地址之间来回切换。难得来一趟，是多听点东西，还是留些时间逛逛、和大家聊聊？",
       posterPaper ? `你也可以留在海报区，介绍 A 类论文《${posterPaper.title}》。` : "",
       "机制结算",
       `参会确认：${attendanceSummary}`,

@@ -13,29 +13,29 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
   const socialCapped = state.player.social >= 20;
   const favorCapped = state.player.favor >= 20;
   const sleepHint = state.player.san < 6
-    ? "“最近真的累坏了，得先缓缓。”"
+    ? "最近看几行字都累，想好好睡一觉。"
     : state.player.san < 12
-      ? "“有点疲惫，想把欠的觉补上。”"
-      : "“虽然精神还行，也想歇一歇。”";
+      ? "这阵子总按掉闹钟，欠的觉该补补了。"
+      : "精神还行，也想睡个不用定闹钟的觉。";
   const socialHint = socialCapped
-    ? "“熟人不少，先顾好已有来往。”"
+    ? "熟人已经不少，约出来吃顿饭也好。"
     : state.player.social < 6
-      ? "“平时来往不多，想认识些同学。”"
-      : "“多参加活动，换个话题聊聊。”";
+      ? "每天两点一线，也想认识些同学。"
+      : "参加个活动，换个课题组的人聊聊。";
   const favorHint = favorCapped
-    ? "“和老师沟通顺畅，保持就好。”"
+    ? "和老师沟通顺畅，组里杂事也能搭把手。"
     : state.player.favor < 6
-      ? "“和导师最近有些生疏，找机会聊聊。”"
-      : "“组里的事多承担一点，搭把手。”";
+      ? "跟导师还不太熟，帮忙时能多聊两句。"
+      : "组里的材料还要整理，帮老师分担一点也行。";
   const partTimeHint = state.player.money < 3
-    ? "“手头有点紧，得找份兼职。”"
-    : "“找份兼职，再攒点钱备用。”";
+    ? "只是手头有些紧，找份兼职也挺迫切。"
+    : "或者找份兼职，给日常开销多留点余地。";
 
   return createFixedEvent({
     id: `year-summary-choice-y${state.year}-m${state.month}`,
     title: "学年总结 ➜ 年度总结",
     description: [
-      "翻过这一年的记录，你发现几件事总惦记着。趁这阵子有空，你想先顾哪一头？",
+      "总结写了半页，你的笔慢下来。想调整的事不少，时间却只有这么多。",
       `${sleepHint}${socialHint}`,
       `${favorHint}${partTimeHint}`,
     ].join("\n\n"),
@@ -85,7 +85,7 @@ export function createYearSummaryEvent(state: GameState): PendingEvent {
     title: "学年总结",
     description: [
       `${yearLabel}接近尾声，你翻开月历，准备给这一学年写个总结。组会日期、任务节点和随手记的备忘挤在一起，当时嫌忙，回头看却有些记不清了。`,
-      "你把最近的日常也列在旁边：哪些事做着顺手，哪些一直让你头疼？趁这个空档，挑一件先调整看看。",
+      "几页纸翻过去，连某天忘带钥匙都记着，正经的学年总结却还只写了个标题。你重新摆好本子，把笔帽拔下来。",
     ].join("\n\n"),
     chainId: "year-summary",
     choices: [

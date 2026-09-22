@@ -324,7 +324,7 @@ export function applyMonthStartSubscriptions(
     price: getAiRenewalPrice(state.totalMonths, slot, reimbursement),
     order,
   }));
-  if (state.coffeeState.subscriptionEnabled && state.coffeeState.machineOwned
+  if (state.coffeeState.subscriptionEnabled
     && state.coffeeState.coffeePurchaseCountThisMonth === 0) {
     renewalTargets.push({ kind: "coffee", price: getCoffeeBuyPrice(state.coffeeState), order: AI_SLOT_IDS.length });
   }
@@ -366,8 +366,8 @@ export function applyMonthStartSubscriptions(
             ...nextState.coffeeState,
             subscriptionPaused: false,
             coffeePurchaseCountThisMonth: nextState.coffeeState.coffeePurchaseCountThisMonth + 1,
-            coffeeProducedCountThisMonth: nextState.coffeeState.coffeeProducedCountThisMonth + 1,
-            machineTrackedCoffeeCount: nextState.coffeeState.machineTrackedCoffeeCount + 1,
+            coffeeProducedCountThisMonth: nextState.coffeeState.coffeeProducedCountThisMonth + Number(nextState.coffeeState.machineOwned),
+            machineTrackedCoffeeCount: nextState.coffeeState.machineTrackedCoffeeCount + Number(nextState.coffeeState.machineOwned),
           },
         };
       } else {

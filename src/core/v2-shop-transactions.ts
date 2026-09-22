@@ -253,8 +253,6 @@ function sellCoffeeMachine(state: GameState): GameState {
       ...state.coffeeState,
       machineOwned: false,
       machineUpgrade: null,
-      subscriptionEnabled: false,
-      subscriptionPaused: false,
       machineInvestment: 0,
     },
   }, `商店：出售咖啡机，金币 +${sellPrice}。`);
@@ -302,7 +300,6 @@ function upgradeCoffeeMachine(state: GameState, upgradeId: CoffeeMachineUpgrade)
 }
 
 function toggleCoffeeSubscription(state: GameState): GameState {
-  if (!state.coffeeState.machineOwned) return fail(state, "需要先购买咖啡机，才能开启冰美式自动续费。 ");
   const enabled = !state.coffeeState.subscriptionEnabled;
   return {
     ...state,

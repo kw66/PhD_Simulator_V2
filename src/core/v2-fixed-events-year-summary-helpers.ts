@@ -30,7 +30,7 @@ export function createYearSummaryResultEvent(params: {
     title: "学年总结 ➜ 年度总结 ➜ 辞旧迎新",
     description: appendMechanismSettlement([
       `${yearLabel}的总结写到了最后一页。${params.description}`,
-      "你把这次尝试记在总结末尾。待办事项还在，不过至少有一件已经动手做了。",
+      "你在总结末尾添上几笔，合起本子。这一页字写得有点歪，倒比开头那句“继续努力”具体多了。",
     ].join("\n\n"), params.settlement),
     chainId: "year-summary",
     stage: "result",
@@ -60,7 +60,7 @@ export function resolveYearSummaryChoice(
           year: state.year,
           month: state.month,
           description: [
-            "你趁任务间隙留出休息时间，晚上不再躺在床上刷组里的消息，困了就睡。少盯几次屏幕，睡醒再去吃顿热饭，你难得没在休息时反复盘算进度，也给自己留了点喘气的空当。",
+            "你趁任务间隙留出时间，晚上把手机放到枕头够不着的地方。起初还伸手摸了两次，后来就睡着了。再醒来时，窗帘缝里透着光，你在床上多躺了一会儿，才慢慢起身去吃饭。",
           ].join("\n\n"),
           outcome: "SAN +5。",
           settlement: "SAN +5",
@@ -100,7 +100,7 @@ export function resolveYearSummaryChoice(
           year: state.year,
           month: state.month,
           description: [
-            "你趁整理年度材料，帮组里核对了文档，也把自己卡住的问题列清楚，找老师聊了一次。汇报完才发现，进度没有想象中好看，但总算不用一被问起就现场组织语言。",
+            "你帮组里整理年度材料，逐项核对附件，把几个名字几乎一样的文件分清楚。导师问起时，你总算能直接指出该打开哪一份，不用跟着鼠标一起在文件夹里迷路。",
             ...(favorNarrative ? [favorNarrative] : []),
           ].join("\n\n"),
           outcome: formatTierResistedOutcome("导师好感", 1, favorResult),

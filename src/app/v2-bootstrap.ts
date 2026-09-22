@@ -193,6 +193,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let queuedSetupPortraitWarmup = false;
   let fixedStageScaleFrame = 0;
   let activePlayTab: PlayTabId = "events";
+  const playTabOrder: readonly PlayTabId[] = ["events", "workstation", "relationship", "shop", "research", "talent", "settings"];
+  let playTabTransitionDirection: "from-left" | "from-right" | null = null;
+  const shopTabOrder: readonly ShopTabId[] = ["ai", "coffee", "gear", "rest"];
+  let shopTabTransitionDirection: "from-left" | "from-right" | null = null;
   let helpPageByContext: Record<string, number> = {};
   let isHelpOpen = false;
   let activeLobbyView: LobbyViewId = "roles";
@@ -202,6 +206,105 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let selectedChairUpgradeId: ShopUpgradeId | null = null;
   let selectedCoffeeUpgradeId: Exclude<CoffeeMachineUpgradeId, null> | null = null;
   let activeTalentTab: TalentPanelTabId = "character";
+  const talentTabOrder: readonly TalentPanelTabId[] = ["character", "relation", "equip", "growth", "publication"];
+  let talentTabTransitionDirection: "from-left" | "from-right" | null = null;
+  type TabSliderOrigin = { left: number; top: number; width: number; height: number };
+  const pendingTabSliderOrigins = new Map<string, TabSliderOrigin>();
+  const tabSliderConfigs = [
+    { key: "lobby", container: ".lobby-view-tabs", active: ".lobby-view-tab.is-active" },
+    { key: "center", container: ".center-main-tabs", active: ".center-tab-btn.active" },
+    { key: "shop", container: ".shop-panel > .shop-tab-btns", active: ".shop-tab-btn.active" },
+    { key: "talent", container: ".talent-tab-switches", active: ".panel-switch-btn.active" },
+  ] as const;
+
+  const getTabSliderRect = (container: HTMLElement, active: HTMLElement): TabSliderOrigin | null => {
+    if (container.offsetWidth <= 0 || container.offsetHeight <= 0) return null;
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    if (activeRect.width <= 0 || activeRect.height <= 0) return null;
+    const scaleX = container.offsetWidth > 0 ? containerRect.width / container.offsetWidth : 1;
+    const scaleY = container.offsetHeight > 0 ? containerRect.height / container.offsetHeight : 1;
+    return {
+      left: (activeRect.left - containerRect.left - container.clientLeft) / scaleX,
+      top: (activeRect.top - containerRect.top - container.clientTop) / scaleY,
+      width: activeRect.width / scaleX,
+      height: activeRect.height / scaleY,
+    };
+  };
+
+  const rememberTabSliderOrigin = (key: string): void => {
+    const config = tabSliderConfigs.find((item) => item.key === key);
+    if (!config) return;
+    const container = root.querySelector<HTMLElement>(config.container);
+    const active = container?.querySelector<HTMLElement>(config.active);
+    if (!container || !active) return;
+    const origin = getTabSliderRect(container, active);
+    if (origin) pendingTabSliderOrigins.set(key, origin);
+  };
+
+  const mountTabSliders = (): void => {
+    for (const config of tabSliderConfigs) {
+      const container = root.querySelector<HTMLElement>(config.container);
+      const active = container?.querySelector<HTMLElement>(config.active);
+      if (!container || !active) continue;
+      const target = getTabSliderRect(container, active);
+      if (!target) continue;
+      const origin = pendingTabSliderOrigins.get(config.key);
+      const slider = document.createElement("span");
+      slider.className = `ui-tab-slider ui-tab-slider-${config.key}`;
+      slider.setAttribute("aria-hidden", "true");
+      slider.style.left = `${origin?.left ?? target.left}px`;
+      slider.style.top = `${origin?.top ?? target.top}px`;
+      slider.style.width = `${origin?.width ?? target.width}px`;
+      slider.style.height = `${origin?.height ?? target.height}px`;
+      container.append(slider);
+      if (origin && (
+        origin.left !== target.left
+        || origin.top !== target.top
+        || origin.width !== target.width
+        || origin.height !== target.height
+      ) && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        slider.getBoundingClientRect();
+        slider.addEventListener("transitionend", () => {
+          slider.classList.remove("is-moving");
+        }, { once: true });
+        window.requestAnimationFrame(() => {
+          slider.classList.add("is-moving");
+          slider.style.left = `${target.left}px`;
+          slider.style.top = `${target.top}px`;
+          slider.style.width = `${target.width}px`;
+          slider.style.height = `${target.height}px`;
+        });
+      }
+      pendingTabSliderOrigins.delete(config.key);
+    }
+  };
+
+  const syncMountedTabSliders = (): void => {
+    for (const config of tabSliderConfigs) {
+      const container = root.querySelector<HTMLElement>(config.container);
+      const active = container?.querySelector<HTMLElement>(config.active);
+      const slider = container?.querySelector<HTMLElement>(`.ui-tab-slider-${config.key}`);
+      if (!container || !active || !slider) continue;
+      if (slider.classList.contains("is-moving")) continue;
+      const target = getTabSliderRect(container, active);
+      if (!target) continue;
+      slider.classList.remove("is-moving");
+      slider.style.left = `${target.left}px`;
+      slider.style.top = `${target.top}px`;
+      slider.style.width = `${target.width}px`;
+      slider.style.height = `${target.height}px`;
+    }
+  };
+
+  const selectPlayTab = (nextPlayTab: PlayTabId): void => {
+    if (nextPlayTab === activePlayTab) return;
+    rememberTabSliderOrigin("center");
+    playTabTransitionDirection = playTabOrder.indexOf(nextPlayTab) > playTabOrder.indexOf(activePlayTab)
+      ? "from-right"
+      : "from-left";
+    activePlayTab = nextPlayTab;
+  };
   let advisorSalaryStartIndex: number | null = null;
   let loverRewardPage = 0;
   let advisorSalaryContext = "";
@@ -415,6 +518,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     fixedStageScaleFrame = window.requestAnimationFrame(() => {
       fixedStageScaleFrame = 0;
       syncAllFixedStageScales();
+      syncMountedTabSliders();
     });
   };
 
@@ -518,7 +622,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
-    activePlayTab = "events";
+    selectPlayTab("events");
     isEventContentOpen = true;
     if (state.phase === "finished") activeLogPage = state.totalMonths;
     eventLayout.reset();
@@ -536,7 +640,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
-    activePlayTab = "events";
+    selectPlayTab("events");
     isEventContentOpen = true;
     if (state.phase === "finished") activeLogPage = historyEvent.completedAtTotalMonths;
     eventLayout.reset();
@@ -745,6 +849,23 @@ export function bootstrapApp(root: HTMLDivElement): void {
       researchSortMode,
       researchAuthorshipFilter,
     });
+    mountTabSliders();
+    if (playTabTransitionDirection) {
+      root.querySelector<HTMLElement>(`[data-tab-panel="${activePlayTab}"]`)?.classList.add(`is-tab-entering-${playTabTransitionDirection}`);
+      playTabTransitionDirection = null;
+    }
+    if (shopTabTransitionDirection) {
+      root.querySelector<HTMLElement>(".shop-items-list")?.classList.add(`is-tab-entering-${shopTabTransitionDirection}`);
+      shopTabTransitionDirection = null;
+    }
+    if (talentTabTransitionDirection) {
+      root.querySelector<HTMLElement>(".talent-items-list")?.classList.add(`is-tab-entering-${talentTabTransitionDirection}`);
+      talentTabTransitionDirection = null;
+    }
+    const roleGrid = root.querySelector<HTMLElement>(".lobby-grid");
+    if (roleGrid) {
+      root.style.setProperty("--lobby-role-view-height", getComputedStyle(roleGrid).height);
+    }
     visitStats.render(root);
     if (state.phase === "finished") {
       for (const button of root.querySelectorAll<HTMLButtonElement>("button[data-action]")) {
@@ -953,6 +1074,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     const lobbyViewButton = target.closest<HTMLButtonElement>("button[data-ui-lobby-view]");
     if (lobbyViewButton && !lobbyViewButton.disabled && isLobbyViewId(lobbyViewButton.dataset.uiLobbyView)) {
+      rememberTabSliderOrigin("lobby");
       activeLobbyView = lobbyViewButton.dataset.uiLobbyView;
       render();
       return;
@@ -1003,7 +1125,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     const playTabButton = target.closest<HTMLButtonElement>("button[data-ui-play-tab]");
     if (playTabButton && !playTabButton.disabled && isPlayTabId(playTabButton.dataset.uiPlayTab)) {
-      activePlayTab = playTabButton.dataset.uiPlayTab;
+      selectPlayTab(playTabButton.dataset.uiPlayTab);
       if (activePlayTab === "shop") {
         for (const notice of getShopUpgradeNotices(store.getState())) {
           acknowledgedShopUpgradeKeys.add(notice.key);
@@ -1032,7 +1154,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     const shopTabButton = target.closest<HTMLButtonElement>("button[data-ui-shop-tab]");
     if (shopTabButton && !shopTabButton.disabled && isShopTabId(shopTabButton.dataset.uiShopTab)) {
-      activeShopTab = normalizeShopTab(shopTabButton.dataset.uiShopTab);
+      rememberTabSliderOrigin("shop");
+      const nextShopTab = normalizeShopTab(shopTabButton.dataset.uiShopTab);
+      if (nextShopTab !== activeShopTab) {
+        shopTabTransitionDirection = shopTabOrder.indexOf(nextShopTab) > shopTabOrder.indexOf(activeShopTab)
+          ? "from-right"
+          : "from-left";
+      }
+      activeShopTab = nextShopTab;
       if (activeShopTab === "ai" || activeShopTab === "coffee") {
         acknowledgeShopTabNotice(store.getState(), activeShopTab);
       }
@@ -1087,7 +1216,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     const talentTabButton = target.closest<HTMLButtonElement>("button[data-ui-talent-tab]");
     if (talentTabButton && !talentTabButton.disabled && isTalentPanelTabId(talentTabButton.dataset.uiTalentTab)) {
-      activeTalentTab = talentTabButton.dataset.uiTalentTab;
+      rememberTabSliderOrigin("talent");
+      const nextTalentTab = talentTabButton.dataset.uiTalentTab;
+      if (nextTalentTab !== activeTalentTab) {
+        talentTabTransitionDirection = talentTabOrder.indexOf(nextTalentTab) > talentTabOrder.indexOf(activeTalentTab)
+          ? "from-right"
+          : "from-left";
+      }
+      activeTalentTab = nextTalentTab;
       render();
       return;
     }

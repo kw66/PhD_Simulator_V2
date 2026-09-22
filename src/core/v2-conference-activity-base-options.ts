@@ -33,7 +33,7 @@ export function createBaseConferenceActivityOptions(
       id: "experiment-discussion",
       label: "🔬 和同行深聊实验思路",
       outcome: "下次做实验多 3 次。",
-      resultDescription: "你把拿不准的实验设置讲给几位同行听，对方追问了数据处理的细节，提醒你漏掉的对照。你在议程背面记下三组新尝试，打算回去逐一验证，而不是继续盲目改参数。",
+      resultDescription: "你把拿不准的实验设置讲给几位同行听。对方问了句‘这个对照做过吗’，你翻了翻记录，还真没有。议程背面很快记满三组新尝试，这趟回去，显卡又有得忙了。",
       effects: {
         temporaryActionEffectUpdates: {
           experiment: { extraActions: 3 },
@@ -44,7 +44,7 @@ export function createBaseConferenceActivityOptions(
       id: "idea-networking",
       label: "💡 广泛交流找灵感",
       outcome: "下次想 idea 多 3 次。",
-      resultDescription: "你在不同会场听报告，茶歇时又追着问了几个问题。记在纸上的方法越来越杂，但整理时，你发现其中几种正好能用来重新想自己的课题，不算白走这些路。",
+      resultDescription: "你在几个会场间来回跑，笔记上画满箭头，连页边都没放过。整理时，几种看似不搭边的方法竟和自己的课题接上了。你赶紧补了几行字，免得明天只记得‘当时觉得很有道理’。",
       effects: {
         temporaryActionEffectUpdates: {
           idea: { extraActions: 3 },
@@ -66,7 +66,7 @@ export function createBaseConferenceActivityOptions(
       id: "famous-scholar",
       label: "🌟 主动请教著名学者",
       outcome: "下次想 idea ×1.25。",
-      resultDescription: "轮到提问时，你尽量把自己的问题压成几句话。对方反问你究竟想验证什么，你一时答得磕绊，却也发现自己此前把问题想得太绕。你赶紧记下这句追问，准备换个角度再想想。",
+      resultDescription: "排队时，你把问题在心里练了两遍。轮到你，对方听完反问一句‘你究竟想验证什么’，倒把你问住了。回去看笔记，方法画了半页，问题只有一行，确实该先把这一行想清楚。",
       effects: {
         temporaryActionEffectUpdates: {
           idea: { multiplier: 1.25 },

@@ -63,7 +63,7 @@ describe("v2 relationship capacity", () => {
   it("shows the no-op result when mentor-assignment slots are full", () => {
     const decision = getDecisionEvent(createMentorAssignEvent(createFullFellowState()));
 
-    expect(decision.description).toContain("四位新生");
+    expect(decision.description).toContain("四份材料");
     expect(decision.description).not.toContain("没有负面结果");
     expect(decision.choices[0]?.effects.enqueueEvents?.[0]?.description).toContain("无事发生");
   });

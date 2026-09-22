@@ -43,7 +43,7 @@ describe("v2 before grad school events", () => {
     expect(act1.description).toContain("计算机类专业");
     expect(act1.description).toContain("是计算机类专业");
     expect(act1.description).toContain("还没想清楚是否喜欢科研");
-    expect(act1.description).toContain("准备随大流继续读研");
+    expect(act1.description).toContain("打算随大流继续读研");
     expect(act1.description).toContain("随大流");
     expect(act1.description).not.toContain("机器学习和深度学习");
     expect(act1.description).not.toContain("招聘信息");
@@ -53,8 +53,8 @@ describe("v2 before grad school events", () => {
     expect(act1.description).toContain("夏令营");
     expect(act1.description).toContain("预推免");
     expect(act1.description).toContain("心仪学校的预录取");
-    expect(act1.description).toContain("接下来，该联系导师了");
-    expect(act1.description).toContain("你给感兴趣的老师发了邮件，又找组里的学生问了问。");
+    expect(act1.description).toContain("有人答应入组后去了别处");
+    expect(act1.description).toContain("才被告知老师没了名额");
     expect(act1.description.indexOf("夏令营")).toBeLessThan(act1.description.lastIndexOf("预推免"));
     expect(act1.description).not.toContain("年级群");
     expect(act1.description).not.toContain("推免资格名单");
@@ -300,7 +300,7 @@ describe("v2 before grad school events", () => {
     });
     expect(admissionEvent?.description).toContain("录取通知书");
     expect(admissionEvent?.description).toContain("2023年夏天");
-    expect(admissionEvent?.description).toContain("晒到朋友圈");
+    expect(admissionEvent?.description).toContain("都没有变卦");
     expect(admissionEvent?.description).toContain("做点有趣的研究");
     expect(admissionEvent?.description).toContain("多发几篇论文");
     expect(admissionEvent?.description).toContain("参加几次学术会议");

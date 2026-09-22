@@ -1260,7 +1260,7 @@ describe("v2 render lobby shell", () => {
       },
     };
     const fundedGearHtml = renderApp(fundedState, createDefaultAccountProfile(), { activeShopTab: "gear" });
-    expect(fundedGearHtml).toContain(">显卡免单</button>");
+    expect(fundedGearHtml).toContain(">显卡报销</button>");
     expect(fundedGearHtml).toContain(">工位报销</button>");
     expect(fundedGearHtml).toContain("购买机械键盘、2K显示器、办公椅、咖啡机，或升级办公椅、咖啡机，任选一次免单");
     expect(fundedGearHtml).toMatch(/<button[^>]*has-free-price[^>]*data-shop-item-id="gpu_buy"[^>]*>[\s\S]*?<span>0<\/span>/);
@@ -1285,7 +1285,7 @@ describe("v2 render lobby shell", () => {
     expect(coffeeHelp).toContain("金币不足且没有可用于续费的礼物券时，当月暂停续费");
     expect(coffeeCard).toContain("SAN +3");
     expect(coffeeCard).not.toContain("本月已生产");
-    expect(coffeeMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式 SAN+3，可自动续费，每月1杯");
+    expect(coffeeMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式 SAN+3，每月1杯");
     expect(coffeeHtml).toContain('data-action="buy-coffee"');
     expect(coffeeMachineCard).not.toContain('data-action="buy-coffee-machine"');
     expect(coffeeMachineCard).toContain('class="shop-item-status is-owned">可升级</span>');
@@ -1453,7 +1453,7 @@ describe("v2 render lobby shell", () => {
 
     const unownedHtml = renderApp(state, createDefaultAccountProfile(), { activeShopTab: "coffee" });
     const unownedMachineCard = getShopCardHtml(unownedHtml, "咖啡机");
-    expect(unownedMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式 SAN+2提升为+3，开启自动续费，可升级");
+    expect(unownedMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式 SAN+2提升为+3，可升级");
     expect((unownedHtml.match(/data-shop-upgrade-option-id=/g) ?? [])).toHaveLength(4);
     expect((unownedHtml.match(/class="shop-item-row[^\"]*is-upgrade-option/g) ?? [])).toHaveLength(4);
     expect((unownedHtml.match(/shop-upgrade-check/g) ?? [])).toHaveLength(4);
@@ -1472,6 +1472,8 @@ describe("v2 render lobby shell", () => {
     const unownedCoffee = getShopCardHtml(fundedHtml, "冰美式");
     expect(unownedCoffee).toContain("SAN +2");
     expect(unownedCoffee).not.toContain("基础 SAN");
+    const unownedSubscriptionToggle = unownedCoffee.match(/<button[^>]*data-action="toggle-coffee-subscription"[^>]*>/)?.[0] ?? "";
+    expect(unownedSubscriptionToggle).not.toContain("disabled");
     const buyCoffeeButton = unownedCoffee.match(/<button[^>]*data-action="buy-coffee"[^>]*>/)?.[0] ?? "";
     expect(buyCoffeeButton).not.toBe("");
     expect(buyCoffeeButton).not.toContain("disabled");
@@ -3084,6 +3086,7 @@ describe("v2 render lobby shell", () => {
     const equipHtml = renderApp(state, createDefaultAccountProfile(), { activeTalentTab: "equip" });
     expect(equipHtml).toContain('data-talent-panel-tab="equip"');
     expect(equipHtml).toContain('data-talent-item-id="full-gear"');
+    expect(equipHtml).toContain('data-talent-item-id="perfect-workstation"');
     expect(equipHtml).toContain('data-talent-item-id="ai-collaboration"');
     const fullGearCard = getTalentCardHtml(equipHtml, "full-gear");
     const inactiveAiCard = getTalentCardHtml(equipHtml, "ai-collaboration");
@@ -3092,6 +3095,9 @@ describe("v2 render lobby shell", () => {
     for (const itemName of ["小电驴", "遮阳伞", "羽绒服"]) {
       expect(fullGearCard).toMatch(new RegExp(`<span>${itemName}</span>\\s*<strong>✅</strong>`));
     }
+    const perfectWorkstationCard = getTalentCardHtml(equipHtml, "perfect-workstation");
+    expect(perfectWorkstationCard).toContain("idea、实验、论文永久+1分");
+    expect(perfectWorkstationCard.match(/class="talent-item-metric"/g) ?? []).toHaveLength(4);
     expect(inactiveAiCard).toContain("激活后可额外进行 1 次科研操作，额外操作不消耗行动点，但 SAN 消耗 +2");
     expect(inactiveAiCard).toContain('class="talent-item-tag is-inactive">未激活</span>');
     expect(inactiveAiCard.match(/class="talent-item-metric"/g) ?? []).toHaveLength(3);
@@ -3363,8 +3369,8 @@ describe("v2 render lobby shell", () => {
     };
     const html = renderApp(state, createDefaultAccountProfile());
 
-    expect(html).toContain("每月 SAN -1");
-    expect(html).toContain("转博 · 永久：博士阶段的长期压力使每月 SAN -1");
+    const permanentEffects = html.match(/id="new-permanent-effect-list">([\s\S]*?)<\/div>/u)?.[1] ?? "";
+    expect(permanentEffects.trim()).toBe("");
     expect(html).toContain('data-effect-id="next-month-san"');
     expect(html).toContain("SAN +1");
     expect(html).toContain("自然回复：每月 +1");
@@ -3477,7 +3483,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("不断学习 · 永久");
     expect(html).toContain("联合培养 · 永久");
     expect(html).toContain("idea 总分 ×0.5");
-    expect(html).toContain('class="effect-chip is-debuff"');
+    expect(html).toMatch(/class="effect-chip is-[^"]+ is-debuff"/);
     expect(html).not.toContain("论文状态已更新");
   });
 
@@ -3576,8 +3582,8 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("每 12 月自动合作论文");
     expect(html).toContain("SAN消耗 ×1.5");
     expect(html).toContain("看论文 SAN -2");
-    expect(html).toContain("手动看论文 +1次");
-    expect(html).toContain("自动看论文 +1次");
+    expect(html).toContain("看论文 +1次");
+    expect(html).not.toContain("自动看论文 +1次");
     expect(html).toContain("人际操作 SAN -1");
     expect(html).toContain("实验 总分 ×0.25");
     expect(html).not.toContain("人物影响");

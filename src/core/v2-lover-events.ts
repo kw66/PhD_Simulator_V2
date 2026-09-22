@@ -37,14 +37,14 @@ function getTypeName(type: LoverTypeId): string {
 
 function getIntroText(type: LoverTypeId): string {
   return type === "beautiful"
-    ? "你和那位开朗的同行又聊了很久。起初还在说今天的报告，后来连赶材料时吃什么都聊到了。"
-    : "你和那位思路清楚的同行又讨论起论文。意见不同的时候，你们会把问题拆开慢慢说，谁也不急着结束话题。";
+    ? "你和那位开朗的同行渐渐熟了。起初互发论文链接，后来连食堂出了什么新菜，也要拍张照片给对方看。"
+    : "你和那位思路清楚的同行又聊起论文。一个问题讨论到深夜，聊天记录里夹着公式、草图，还有一句互相提醒的‘早点睡’。";
 }
 
 function getSceneText(type: LoverTypeId): string {
   return type === "beautiful"
-    ? "分别以后，你还想起刚才没说完的笑话，拿起手机补发了一句。对方很快回了消息，你也发现自己一直在等。"
-    : "讨论结束后，你们又聊了些研究之外的琐事。消息提示亮起来时，你先看了发信人，才想起自己刚才还在改文档。";
+    ? "手机亮起来，你看一眼名字就忍不住笑。旁边的同学探头问是不是中稿了，你赶紧把屏幕扣下。"
+    : "后来，论文讲完了，话题还没结束。对方问你今天过得怎么样，你打了句‘实验还行’，想了想，又多写了几句。";
 }
 
 function getThoughtText(context: LoverDevelopmentContext): string {
@@ -63,15 +63,15 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
     title: "发展关系 ➜ 你的心意 ➜ 暂缓关系",
     description: permanentlyBlocked
       ? [
-          "你把自己的意思说清楚了：不再往恋人的方向发展，也不想让对方继续等一个含糊的答复。这话不太好开口，却比一直回避更合适。",
-          "对方表示理解，没有再追问。你们仍可以像普通同行那样交流，只是这次不再为下次见面留下别的暗示。",
+          "你删掉打了几遍的‘再看看’，认真说明自己想做普通朋友。对方过了一会儿，回了句‘明白了’。",
+          "你们仍可以交流论文，只是聊完正事，便各自道别。下一次见面的安排没有再提。",
           "机制结算",
           `关系线拒绝计数 +1（当前 ${nextRejectCount}/2）`,
           "今后不会再与对方发展恋人关系。",
         ].join("\n\n")
       : [
-          "你说自己还没想好，暂时想保持现在的距离。说完以后有一点尴尬，好在对方没有催你回答，也没有把话题彻底停住。",
-          "你们又聊了几句近况，随后各自去忙。联系还在，只是你没有作出交往的承诺，也不想让这份犹豫变成对方的负担。",
+          "你说自己还没想好，想先保持现在的关系。发出去以后，聊天框安静了一会儿，对方回了句‘好，不着急’。",
+          "你们又聊了几句近况。关掉手机时，你没有再补一句‘等我忙完’，毕竟研究生什么时候能忙完，自己也说不准。",
           "机制结算",
           `关系线拒绝计数 +1（当前 ${nextRejectCount}/2）`,
           "以后还有一次机会。",
@@ -104,7 +104,7 @@ function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent
     title: "发展关系 ➜ 你的心意 ➜ 关系确认",
     description: [
       "你把心意说了出来，也得到了明确的回应。确定开始交往以后，你们反倒有点不好意思，刚才想好的话一时都忘了。",
-      "你们约好找时间一起吃顿饭，再慢慢商量往后的相处。课题和日常安排仍要继续，只是现在除了赶进度，你也想认真留些时间给对方。",
+      "你们约好找时间一起吃顿饭。第一顿饭还没吃，聊天框里已经问起了忌口。你翻开日历，在组会和实验之间，认真圈出一个空着的晚上。",
       "机制结算",
       `${typeLabel}：${effectText}`,
     ].join("\n\n"),
@@ -134,8 +134,8 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
     id: `lover-development-act2-${context.type}-${context.totalMonths}`,
     title: "发展关系 ➜ 你的心意",
     description: [
-      getThoughtText(context),
       "聊到下次见面时，对方问起了你的想法。你几次想把话说得更明白，又担心以后见面会尴尬。",
+      getThoughtText(context),
       warningText,
     ].join("\n\n"),
     source: "fixed",

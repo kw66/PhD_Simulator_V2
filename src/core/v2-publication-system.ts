@@ -100,9 +100,9 @@ function getReviewResultDescription(settlement: PaperReviewSettlement): string {
 
 function getReviewerDescription(settlement: PaperReviewSettlement): string {
   return [
-    "三份审稿意见陆续回来，有人盯新颖性，有人盯实验，也有人更看重论文整体。",
+    "你先扫了一眼评分，又从头读起三份审稿意见。这篇改过不知多少遍的论文，到了别人眼里，会是什么样？",
     ...getReviewerLines(settlement),
-    "看完这些意见，接下来就等 PC 做最后决定。",
+    "三份意见翻完，你又看了一遍分数。接下来，就看 PC 的最终决定了。",
   ].join("\n\n");
 }
 
@@ -251,10 +251,9 @@ export function createPaperReviewResultEvent(paper: Paper, settlement: PaperRevi
     id: `paper-review-result-${paper.id}`,
     title: "论文结果",
     description: [
-      `《${paper.title}》的审稿结果出来了。${conference ? `投稿至 ${conference.name} ${conference.year}。` : ""}`,
+      `邮箱弹出审稿通知，你把手头的窗口切到一边。${conference ? `${conference.name} ${conference.year} 的结果终于到了。` : "审稿结果终于到了。"}`,
       `本年会议概况：会议影响力 ${settlement.venueInfluence.toFixed(2)}，审稿标准 ×${settlement.reviewStrictnessMultiplier.toFixed(2)}。`,
-      `投稿时总分 ${settlement.submittedScore}，等了几个月，这篇论文终于轮到审稿。`,
-      "先看看这届会议的整体口径，再读具体审稿意见。",
+      `投稿时总分 ${settlement.submittedScore}。你点开邮件，先找了找查看审稿意见的入口。`,
     ].join("\n"),
     source: "review",
     blocking: true,

@@ -23,7 +23,7 @@ describe("generic buffs", () => {
   it.each([-1, 0, 1])("distinguishes SAN costs from monthly SAN changes for delta %s", (delta) => {
     const buckets = buildBuffDisplayBuckets([{
       id: "san-directions", name: "SAN效果", source: "测试", timing: "monthly", remainingMonths: 1,
-      actionEffects: { idea: { sanDelta: delta } },
+      actionEffects: { idea: { bonus: 1, sanDelta: delta } },
       readingEffect: { sanDelta: delta },
       relationshipOperationSanDelta: delta,
       monthlyStats: { san: delta },
@@ -31,6 +31,8 @@ describe("generic buffs", () => {
     for (const id of ["monthly:action:idea:san-delta", "monthly:reading:san-delta", "monthly:rule:relationship-operation-san-delta"]) {
       expect(buckets.monthly.find((item) => item.id === id)?.isDebuff).toBe(delta > 0);
     }
+    expect(buckets.monthly.find((item) => item.id === "monthly:action:idea:san-delta")?.category).toBe("san");
+    expect(buckets.monthly.find((item) => item.id === "monthly:action:idea:bonus")?.category).toBe("research");
     expect(buckets.monthly.find((item) => item.id === "monthly:monthly-stat:san")?.isDebuff).toBe(delta < 0);
   });
 
@@ -65,7 +67,6 @@ describe("generic buffs", () => {
     expect(getReadingEffect([kimiBuff])).toEqual({ sanDelta: -1, manualExtraReads: 0, automaticReads: 2 });
     expect(buildBuffDisplayBuckets([kimiBuff]).monthly.map((item) => item.label)).toEqual([
       "看论文 SAN -1",
-      "自动看论文 +2次",
     ]);
   });
 

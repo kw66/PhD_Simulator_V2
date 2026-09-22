@@ -58,9 +58,9 @@ describe("v2 event scheduler", () => {
     for (const item of cases) {
       const event = createTeachersDayEvent(state, () => item.roll);
       const choiceEvent = event.choices[0]?.effects.enqueueEvents?.[0];
-      expect(event.description).toContain("你和导师关系一般（当前好感等级：陌生），也开始琢磨该怎么表示一下。");
+      expect(event.description).toContain("你和导师关系一般（当前好感等级：陌生）");
       expect(event.description).not.toContain("分寸感");
-      expect(choiceEvent?.description).toContain("“发个祝福就好，简单自然也挺好。”");
+      expect(choiceEvent?.description).toContain("祝福");
       expect(choiceEvent?.description).not.toContain("万一导师正好有事找我帮忙");
       expect(choiceEvent?.description).not.toContain("不会显得空手");
       expect(choiceEvent?.description).not.toContain("不会显得敷衍");
@@ -401,11 +401,12 @@ describe("v2 event scheduler", () => {
     const decision = result.events[0]?.choices[0]?.effects.enqueueEvents?.[0]?.description ?? "";
 
     expect(`${intro}\n${decision}`).toContain("深度学习论文");
-    expect(intro).toContain("公式不少");
-    expect(intro).toContain("推导与实验结论还对不上");
+    expect(intro).toContain("公式一路排到附录");
+    expect(intro).toContain("有两步怎么也没找到解释");
     expect(decision).not.toContain("篇幅长、信息密");
     expect(intro).not.toContain("认真审能学到些东西");
-    expect(decision).toContain("认真审稿得核对公式、实验和相关工作");
+    expect(decision).toContain("核对清楚");
+    expect(decision).toContain("参考文献");
   });
 
   it("separates familiar and unfamiliar junior delegation in mentoring", () => {
@@ -442,7 +443,7 @@ describe("v2 event scheduler", () => {
     expect(familiarChoice?.effects.social).toBe(-1);
     expect(unfamiliarDecision?.description).not.toMatch(/社交.*\d/);
     expect(familiarDecision?.description).not.toMatch(/社交.*\d/);
-    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("没有熟悉的师弟师妹");
+    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("暂无熟悉的师弟或师妹");
     expect(familiarChoice?.effects.enqueueEvents?.[0]?.description).toContain("师弟");
   });
 
@@ -480,7 +481,7 @@ describe("v2 event scheduler", () => {
     expect(familiarChoice?.effects.social).toBe(-1);
     expect(unfamiliarDecision?.description).not.toMatch(/社交.*\d/);
     expect(familiarDecision?.description).not.toMatch(/社交.*\d/);
-    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("没有熟悉的师弟师妹");
+    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("暂无熟悉的师弟或师妹");
     expect(familiarChoice?.effects.enqueueEvents?.[0]?.description).toContain("师妹");
   });
 
@@ -690,8 +691,8 @@ describe("v2 event scheduler", () => {
     expect(choices[3]?.effects.eventSupportUpdates).toEqual({ aiCostsCoveredUntilTotalMonths: 17 });
     const aiResult = choices[3]?.effects.enqueueEvents?.at(-1);
     expect(aiResult?.title).toContain("报销 AI 费用");
-    expect(aiResult?.description).toContain("你提议报销本月的 AI 费用");
-    expect(aiResult?.description).toContain("商店里的 AI 费用都变成了 0 金币");
+    expect(aiResult?.description).toContain("本月的费用");
+    expect(aiResult?.description).toContain("本月商店中的 AI 使用费用为 0");
   });
 
   it("maps all four advisor-favor tiers to the new funding salary values", () => {

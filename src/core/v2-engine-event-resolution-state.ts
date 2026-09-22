@@ -1,6 +1,6 @@
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import { ADVISOR_FUNDING_CAP } from "./v2-advisor-progress";
-import { createCustomFellowProgressProfile } from "./v2-fellow-progression";
+import { createCustomFellowProgressProfile, getFellowName, getUniqueFellowName } from "./v2-fellow-progression";
 import { applyFixedEventResolution } from "./v2-fixed-events";
 import { getGraduationScoreTarget, getMonthLimitByDegree, getRoleDefinition } from "./v2-progression";
 import { createGrantedPublishedPaper } from "./v2-publication-rules";
@@ -217,6 +217,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     relationshipState = tryAddRelationship(relationshipState, relationshipKind).nextState;
   }
   let fellowProgressState = state.fellowProgressState;
+  const usedFellowNames = fellowProgressState.map((profile) => getFellowName(profile));
   for (const addition of effects.fellowAdditions ?? []) {
     const relationshipResult = tryAddRelationship(relationshipState, addition.type);
     relationshipState = relationshipResult.nextState;
@@ -231,8 +232,10 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
           affinity: addition.affinity,
           ...(addition.name ? { name: addition.name } : {}),
           ...(addition.taskType ? { taskType: addition.taskType } : {}),
+          usedNames: usedFellowNames,
         }),
       ];
+      usedFellowNames.push(fellowProgressState.at(-1)!.name ?? "");
     }
   }
   if (effects.mentorshipStacks) {
@@ -314,7 +317,15 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     ...(effects.conferenceCareerUpdates ?? {}),
   };
   const internshipState = { ...state.internshipState, ...(effects.internshipStateUpdates ?? {}) };
-  const loverState = { ...state.loverState, ...(effects.loverStateUpdates ?? {}) };
+  const mergedLoverState = { ...state.loverState, ...(effects.loverStateUpdates ?? {}) };
+  const loverUsedNames = [
+    ...fellowProgressState.map((profile) => getFellowName(profile)),
+    state.selectedAdvisorName ?? "",
+    state.playerName ?? "",
+  ];
+  const loverState = mergedLoverState.name
+    ? { ...mergedLoverState, name: getUniqueFellowName(mergedLoverState.name, loverUsedNames, `lover:${mergedLoverState.type}:${mergedLoverState.startTotalMonths}:${mergedLoverState.gender}`) }
+    : mergedLoverState;
   const loverProgressState = {
     ...(effects.activateLoverProgress ? createLoverProgressState(effects.activateLoverProgress) : state.loverProgressState),
     ...(effects.loverProgressStateUpdates ?? {}),

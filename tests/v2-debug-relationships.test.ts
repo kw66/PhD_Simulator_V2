@@ -102,7 +102,7 @@ describe("v2 debug relationship additions", () => {
       });
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: type });
 
-      expect(generator).toHaveBeenLastCalledWith(type, expect.any(Number));
+      expect(generator).toHaveBeenLastCalledWith(type, expect.any(Number), undefined, expect.any(Array));
       expect(next).toEqual({
         ...before,
         fellowProgressState: [...before.fellowProgressState, { ...expectedProfile, id: expect.any(String), researchTopic: fellowProgression.getFellowResearchTopic({ ...next.fellowProgressState.at(-1)!, researchTopic: undefined }) }],

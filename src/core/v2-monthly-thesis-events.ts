@@ -28,14 +28,14 @@ function createThesisChoices(state: GameState): {
       title: "推进结果",
       description: result.progressGain > 0
         ? [
-            "你把这个月留给毕业论文的时间用上了，整理已有材料，补写内容，再把前后说不通的地方改顺。保存文档时，终于不只是改了个文件名。",
+            "你按目录理顺材料，把几处“这里再补”换成了正文。有一段写的时候觉得挺明白，回头读却连自己也绕进去，只好拆开重写。",
             `总进度从 ${nextThesis.progress}% 提升到 ${result.nextThesis.progress}%，当前阶段来到「${getThesisStage(result.nextThesis.progress).name}」。`,
-            "你备份好这一版，也记下了下次查看时需要留意的地方。",
+            "保存，再备份。你又往下翻了翻，这回确实多了些自己写下的东西。",
           ].join("\n\n")
         : [
-            "你看了一眼上次保存的文档，还是没有动笔。这个月先不往毕业论文上加任务，桌面上的文件日期也就没有更新。",
+            "你打开毕业论文文档，光标在原处闪了一会儿，最后还是关掉了窗口。这个月先搁置，正文没有多出一个字。",
             `总进度保持在 ${nextThesis.progress}%，当前阶段仍是「${getThesisStage(nextThesis.progress).name}」。`,
-            "没写完的部分不会自己长出来，只能留到之后再安排。",
+            "关窗口时倒很利索，下回点开，却还是得接着面对这一页。",
           ].join("\n\n"),
     };
     return {
@@ -62,8 +62,8 @@ function createThesisChoices(state: GameState): {
   results["abandon-thesis"] = {
     title: "放弃确认",
     description: [
-      "你关掉毕业论文文档，决定不再继续写下去。这次不是把待办拖到下个月，而是从此不再给它安排时间。",
-      "已有的材料还保存在文件夹里，只是你不再逐项补齐目录。这个决定并不等于论文已经完成，你也没有给这份文档换上“终稿”的名字。",
+      "你关掉毕业论文文档，把后续写作从日程里删去。这次不再往下个月挪，也不再继续补正文。",
+      "文件还在原来的文件夹里，目录中空着的地方也照旧空着。你看了一眼文件名，没有给它添上“终稿”两个字。",
     ].join("\n\n"),
   };
 
@@ -86,14 +86,14 @@ function createThesisEvent(state: GameState): { nextState: GameState; event: Pen
   const stage = getThesisStage(nextState.thesis.progress);
   const progress = nextState.thesis.progress;
   const backgroundDescription = progress < 20
-    ? "你打开毕业论文文档，先核对题目和目录。正文还没成形，之前随手存下的材料也得重新理一遍。"
+    ? "你打开毕业论文文档，封面和目录倒是齐整，往下翻却没多少正文。光标停在第一章开头，你把题目又读了一遍。"
     : progress < 40
-      ? "你翻开开题材料，检查研究问题、已有工作和计划安排。题目写在第一页，具体要做什么却还得一项项说清楚。"
+      ? "你翻开开题材料，停在“拟解决的问题”这一栏。题目已经很像样了，可要说清到底准备做什么，你又删掉了半行。"
       : progress < 60
-        ? "你把几篇相关论文并排打开，整理它们用了什么方法、解决了什么问题。参考文献越攒越多，综述却不能只列一串名字。"
+        ? "你把几篇相关论文并排打开，来回找各自的方法和结论。PDF里满是高亮，轮到在综述里串成一段话，光标却迟迟没往前走。"
         : progress < 80
-          ? "你重新核对研究记录和结果，把能写进论文的材料整理出来。零散记录当时都看得懂，现在却得想办法让别人也看明白。"
-          : "你在正文、图表和参考文献之间来回翻页。论文已经有了样子，重复的段落要删，前后不一致的表述也得逐一改好。";
+          ? "你翻出研究记录，对着结果核查当时的步骤。一处备注只写了“同上”，你往上翻了好几页，开始怀疑当时的自己到底有多赶时间。"
+          : "你在正文、图表和参考文献间来回跳转。刚改好图号，又发现后面还引用着旧编号；论文有了样子，细看却到处要伸手修一修。";
   const event: PendingEvent = {
     id: `thesis-progress-y${state.year}-m${state.month}`,
     title: "毕业论文",
@@ -111,12 +111,12 @@ function createThesisEvent(state: GameState): { nextState: GameState; event: Pen
     event: createThreeStageEvent(event, {
       introDescription: [
         backgroundDescription,
-        `当前阶段：${stage.name}，进度 ${progress}%。你对照目录记下接下来要做的事，准备给这个月留出写论文的时间。`,
+        `当前阶段：${stage.name}，进度 ${progress}%。你顺手把待处理的地方记在目录旁，本来以为只剩几处，写着写着又多了一行。`,
       ].join("\n\n"),
       decisionTitle: "本月安排",
       decisionDescription: [
-        "你对着日程算了算：可以暂时搁置，也可以每天挤一点时间写；若想多完成一些，就得花更多精力。",
-        "之前发表的论文和积累的研究经验能帮上忙，但文档还是要自己打开。这个月打算写到什么程度？",
+        "文档还开着，你先翻了翻日程。每天挤一点时间能慢慢写，想多推些，就得花更多精力；暂时搁置也行。",
+        "能用上的已发表论文和研究经验，都能省些工夫。你看着目录旁的待办：这个月准备写到什么程度？",
       ].join("\n\n"),
       results,
     }),

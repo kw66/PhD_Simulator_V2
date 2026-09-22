@@ -62,8 +62,8 @@ export function resolveCcigFixedEvent(
           mode: "listen",
           title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
-            "你挑了几场贴近课题的报告，边听边记。遇到没跟上的地方，先把图和关键词抄下来，留着回去查。",
-            "茶歇时，你拿着笔记请教了一处实验设计，才发现自己一直把问题想窄了。回程再翻笔记，几处想法渐渐接上了，连以后该怎么提问也有了点头绪。",
+            "你挑了几场贴近课题的报告，边听边记。前半本还是整齐的标题，后半本只剩箭头和问号，好在关键的图没漏。",
+            "茶歇时，你拿着笔记请教了一处实验设计。讲者换个角度一解释，你才发现自己一直把问题想窄了，赶紧在那个最大的问号旁补上答案。",
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
@@ -105,7 +105,7 @@ export function resolveCcigFixedEvent(
           description: [
             `你把《${paper.title}》的海报贴上展板，留在旁边向过来的同行介绍工作。`,
             "有人追问基线和实验设置，你指着图解释了几轮，也把对方的疑问记在空白处。",
-            "收海报时嗓子已经有些哑了，好在路过的同行不只是看了个标题，多少记住了你在做什么。",
+            "收海报时，开场白已经说得不用过脑子，嗓子也有些哑了。有同行拍下海报，说回去细看，你赶紧指了指角落的论文链接。",
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
@@ -177,7 +177,7 @@ export function resolveCcigFixedEvent(
           title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你约了几位同学去吃${location}当地菜：${food}。`,
-            "饭桌上聊起刚听的报告，也吐槽各自没跑通的实验，话题比会场里随意得多。结账时你主动买了单，这顿饭花了钱，好歹也吃得舒坦。",
+            "饭桌上，大家从报告聊到各自没跑通的实验，越聊越发现熟悉。你主动买了单，约好回去继续交流；这顿饭下来，几个只认得胸牌的名字总算对上了人。",
             ...(socialNarrative ? [socialNarrative] : []),
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,

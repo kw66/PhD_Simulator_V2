@@ -7,7 +7,10 @@ export interface BuffDisplayItem {
   label: string;
   sources: string[];
   isDebuff: boolean;
+  category: BuffEffectCategory;
 }
+
+export type BuffEffectCategory = "san" | "research" | "money" | "action" | "relationship" | "publication" | "attribute" | "general";
 
 export interface BuffDisplayBuckets {
   permanent: BuffDisplayItem[];
@@ -27,6 +30,7 @@ interface AccumulatedEffect {
   showWhenZero?: boolean;
   isDebuffWhenAboveOne?: boolean;
   isCost?: boolean;
+  category?: BuffEffectCategory;
   renderLabel: (value: number) => string;
 }
 
@@ -114,8 +118,20 @@ function addEffect(
     showWhenZero: config.showWhenZero,
     isDebuffWhenAboveOne: config.isDebuffWhenAboveOne,
     isCost: config.isCost,
+    category: config.category ?? inferEffectCategory(config.id),
     renderLabel: config.renderLabel,
   });
+}
+
+function inferEffectCategory(id: string): BuffEffectCategory {
+  if (id.includes("san")) return "san";
+  if (id.includes("money")) return "money";
+  if (id.includes("publication") || id.includes("paper-polish")) return "publication";
+  if (id.includes("relationship")) return "relationship";
+  if (id.includes("extra-actions") || id.includes("reading:manual") || id.includes("reading:automatic")) return "action";
+  if (id.includes("research") || id.includes(":action:")) return "research";
+  if (id.includes("social") || id.includes("favor")) return "attribute";
+  return "general";
 }
 
 function addActionEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): void {
@@ -170,23 +186,6 @@ function addActionEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): 
   }
 }
 
-function addPaperPolishEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): void {
-  if (buff.id.startsWith("ai-")) return;
-  const source = getSourceText(buff);
-  for (const [action, bonus] of Object.entries(buff.paperPolishEffects ?? {})) {
-    if (!Number.isFinite(bonus) || (bonus ?? 0) <= 0) continue;
-    const typedAction = action as PaperActionType;
-    addEffect(effects, {
-      id: `${buff.timing}:paper-polish:${typedAction}`,
-      timing: buff.timing,
-      operation: "sum",
-      value: bonus!,
-      source,
-      renderLabel: (value) => `自动${ACTION_LABELS[typedAction]}${formatSignedNumber(value)}分`,
-    });
-  }
-}
-
 function addReadingEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): void {
   const source = getSourceText(buff);
   const reading = buff.readingEffect;
@@ -210,17 +209,7 @@ function addReadingEffects(effects: Map<string, AccumulatedEffect>, buff: Buff):
       operation: "sum",
       value: reading.manualExtraReads,
       source,
-      renderLabel: (value) => `手动看论文 ${formatSignedNumber(value)}次`,
-    });
-  }
-  if (reading.automaticReads !== undefined) {
-    addEffect(effects, {
-      id: `${buff.timing}:reading:automatic`,
-      timing: buff.timing,
-      operation: "sum",
-      value: reading.automaticReads,
-      source,
-      renderLabel: (value) => `自动看论文 ${formatSignedNumber(value)}次`,
+      renderLabel: (value) => `看论文 ${formatSignedNumber(value)}次`,
     });
   }
 }
@@ -289,6 +278,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       source: `${getSourceText(buff)} · 适用于同学、导师和恋人`,
       isCost: true,
       showWhenZero: true,
+      category: "relationship",
       renderLabel: (value) => `人际操作 SAN ${formatSignedNumber(value)}`,
     });
   }
@@ -298,7 +288,6 @@ export function buildBuffDisplayBuckets(buffs: readonly Buff[]): BuffDisplayBuck
   const effects = new Map<string, AccumulatedEffect>();
   for (const buff of getActiveBuffs(buffs)) {
     addActionEffects(effects, buff);
-    addPaperPolishEffects(effects, buff);
     addReadingEffects(effects, buff);
     addMonthlyStats(effects, buff);
     addPublicationEffects(effects, buff);
@@ -312,6 +301,7 @@ export function buildBuffDisplayBuckets(buffs: readonly Buff[]): BuffDisplayBuck
       id: effect.id,
       label: effect.renderLabel(effect.value),
       sources: effect.sources,
+      category: effect.category ?? inferEffectCategory(effect.id),
       isDebuff: effect.operation === "multiplier"
         ? effect.isDebuffWhenAboveOne ? effect.value > 1 : effect.value < 1
         : effect.isCost ? effect.value > 0 : effect.value < 0,

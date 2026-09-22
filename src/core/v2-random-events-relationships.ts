@@ -9,7 +9,7 @@
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import { canAddRelationship } from "./v2-relationship-rules";
-import { createGeneratedFellowProfileAddition, getFellowPronoun, getFellowRoleLabel } from "./v2-fellow-progression";
+import { createGeneratedFellowProfileAddition, getFellowName, getFellowPronoun, getFellowRoleLabel } from "./v2-fellow-progression";
 import {
   createThreeStageRandomEvent,
   drawInclusiveInt,
@@ -21,7 +21,8 @@ import type { GameState, PendingEvent } from "./v2-types";
 function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
   const peerGender = getRoll() < 0.5 ? "male" : "female";
-  const peerAddition = createGeneratedFellowProfileAddition("peer", serial, peerGender);
+  const usedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
+  const peerAddition = createGeneratedFellowProfileAddition("peer", serial, peerGender, usedNames);
   const peerName = peerAddition.name ?? "同门";
   const peerPronoun = getFellowPronoun(peerGender);
   const isLowSocial = state.player.social < 6;
@@ -41,7 +42,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   const event: PendingEvent = {
     id: `random-10-y${state.year}-m${state.month}-n${serial}`,
     title: "\u540c\u95e8\u5408\u4f5c",
-    description: "同门拿着一个还不错的想法来找你，希望合作写篇论文。多个人能分担工作，也可能在分工和署名上添些麻烦。",
+    description: "同门拿着一页画满箭头的草图来找你，说有个方向想一起试试。你挪开桌上的水杯，给这份还没讲清楚的期待腾了个位置。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -99,68 +100,63 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      `同级同门${peerName}来找你，想把一个新想法一起做成论文。`,
-      "方向看起来有潜力，不过谁做实验、谁写论文、最后怎么署名，都得提前说清楚。",
-      "平时聊得来，真一起做事却是另一回事。你得先想好，这次愿意投入多少。",
+      `同级同门${peerName}在实验室门口叫住你，递来一页画满箭头的草图。纸角有点卷，最中间的那个问题倒是圈得很用力。`,
+      `“我觉得这个方向可以试试，你要不要一起做？”${peerName}指着其中一条线讲起来。你们站着说了几句，索性找间空教室，借块白板慢慢画。`,
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
       ...(!isLowSocial && !canAddPeer ? ["普通关系栏已满，全面合作仍可获得本次合作收益，但不会新增同门；你可以现在选择退出。"] : []),
-      "可以只交流思路，也可以互补实验、共同署名；若想全面合作，就得把后续安排一起商量好。",
-      "如果手头已经够忙，婉拒也很正常。",
+      "白板上很快列出实验、写作和投稿，旁边的负责人却还空着。刚才聊方向时你们都很起劲，聊到谁来补实验，转笔的动作就慢了下来。",
+      "只交换思路，还是各做一部分、谈好署名，又或者从头一起推进？你翻了翻日程，能腾出的时间总得有个数；真接不下来，也该趁现在说清楚。",
     ].join("\n\n"),
     results: {
       [`random-10-exchange-${serial}`]: {
         title: "交换合作",
         description: isLowSocial
           ? [
-              "你们找了间空会议室，把各自正在做的问题摊开来聊。",
-              `${peerName}追问了不少细节，你却不太擅长把想法说清楚，几处误会来回解释了很久。`,
-              "聊得有些累，好在白板上还是留下了几条新思路。你拍照记下，准备回去试试。",
+              `你们决定先聊思路。${peerName}问起草图里的一处细节，你脑中明明有个大概，话说出口却又得从头补充。`,
+              "几个箭头擦了又画，总算对上了意思。散场时你有些疲惫，还是认真拍下白板：下次想方案，至少不用再对着空白页发呆。",
             ].join("\n\n")
           : [
-              "你们找了间空会议室，把各自正在做的问题摊开来聊。",
-              `${peerName}帮你指出一个被忽略的对照，你也替${peerPronoun}补上了实验设计里的漏洞。`,
-              "聊到最后，白板上已经多了好几条可以直接验证的新思路。你拍了张照片，准备回去逐个试。",
+              `你们决定先聊思路。${peerName}提醒你别漏掉一组对照，你也替${peerPronoun}补上了实验设计里没交代清楚的一步。`,
+              "聊到白板快写不下，你才发现原本绕不出来的问题，换个人接着问几句就有了新方向。临走拍好照片，下次构思方案时正好拿出来用。",
             ].join("\n\n"),
       },
       [`random-10-mutual-${serial}`]: {
         title: "互补合作",
         description: mutualSuccess
           ? [
-              "你们互相补做实验，投稿前确认了各自贡献和署名。这次由对方主导，你负责其中一部分。",
-              `${peerName}的论文传来录用消息，作者列表里也有你的名字。虽不是一作，从修改稿到录用通知，你也跟着高兴了一回。`,
+              "你们谈好各自承担的部分和署名顺序，由对方主导这篇论文。你接下补充实验，把设置和结果一起整理过去，省得临交稿还要翻聊天记录。",
+              `${peerName}发来录用消息时，你把作者列表看了两遍。不是一作，名字却实实在在印在上面；那几张反复核对的表格，总算有了去处。`,
             ].join("\n\n")
           : [
-              "你们商量了互补实验和共同署名的方案，但真正排时间时，才发现彼此都抽不出手。",
-              `${peerName}也没能继续推进。这次合作暂时搁下，还没有形成可以计入成果的论文。`,
+              "你们把各自能补的实验和署名谈了一遍，打开日历才发现，能一起开工的时间怎么也对不上。口头上的分工很齐，排期里却没有位置。",
+              `${peerName}最后说，那就先放一放。你把讨论记录留在文件夹里，这次没做出论文，也没有别的后续。`,
             ].join("\n\n"),
       },
       [`random-10-reject-${serial}`]: {
         title: "拒绝合作",
         description: [
-          "你把自己的排期给对方看了看，说明这几个月确实接不下新项目。",
-          `${peerName}表示理解，只说以后有合适的题目再聊。`,
+          `你看了看日程，还是把这次邀请婉拒了。${peerName}点点头，把白板上的草图拍下来：“没事，以后有合适的再聊。”`,
           rejectSuccess
-            ? "你们又聊了几句近况，各自回去忙手头的事。合作没谈成，也没有因此变得尴尬。"
-            : "腾出时间后，你重新梳理自己的选题和草稿，补上了几处卡住的思路。下次动手时，可以直接从这里继续。",
+            ? "你们一起走出教室，话题已经换成了食堂今天开哪个窗口。合作没谈成，倒也没有你担心的那么尴尬。"
+            : "回到座位，你顺手记下刚才想到的问题，又试着列了个论证提纲。合作虽然没接，下次想选题和动笔时，倒有了可以接着往下理的线头。",
         ].join("\n\n"),
       },
       [`random-10-full-${serial}`]: {
         title: isLowSocial ? "合作受阻" : canAddPeer ? "新增同门" : "继续合作",
         description: isLowSocial
           ? [
-              "你们很快开了共享文档，却一直没有把分工和更新时间说清楚。",
-              "同一组实验被重复跑了两遍，真正缺的数据反而没人补，临近节点时只能一起返工。",
-              "这轮合作磕磕绊绊，好在两人分担后，还是多整理了一些思路和草稿。接下来你想先把自己的部分做好。",
+              "共享文档很快建好，分工却只写了个大概。等你们各自忙完一轮，才发现两个人都以为那组对照是对方在做。",
+              "你们对着记录重新分了工，把选题拆成两条备选，也把写作提纲先列在文档里。这回先做到这里，下次继续时不用再从白板上的第一个箭头开始。",
               ...(fullSanNarrative ? [fullSanNarrative] : []),
             ].join("\n\n")
           : [
-              "正式开工前，你们先把实验、写作和每周节点写进共享文档。",
-              `你负责 idea 和写作，${peerName}负责实验和数据，遇到问题就在固定时间一起处理。`,
+              `你和${peerName}把分工逐项写进共享文档，连什么时候碰头都定了下来。页面不算好看，至少每项任务后面都有个明确的人名。`,
+              "共享文档里留下了选题提纲、实验分工和两条备选方案。下次再打开它，你至少知道该从哪一页接着做。",
               canAddPeer
-                ? "第一轮讨论就理清了不少思路，草稿也分好了工。你们约定定期碰面，把合作继续做下去。"
-                : "这次讨论和分工都很顺利，思路与草稿也有了着落。不过手头的长期合作已经排满，你们暂时只完成这次任务。",
+                ? "临走前，你们约好下次继续。以后遇到问题，总算有个知道前情、可以直接接着聊的同门。"
+                : "你们收好这次的讨论记录，没再约固定合作。眼下要顾的同伴已经够多，再添一位，怕是连碰头的时间都凑不齐。",
               ...(fullSanNarrative ? [fullSanNarrative] : []),
             ].join("\n\n"),
       },
@@ -172,7 +168,12 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   const serial = state.totalRandomEventCount;
   const seniorGender = getRoll() < 0.5 ? "male" : "female";
   const roleText = getFellowRoleLabel("senior", seniorGender);
-  const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender);
+  const usedNames = [
+    ...state.fellowProgressState.map((profile) => getFellowName(profile)),
+    state.selectedAdvisorName ?? "",
+    state.loverState.name ?? "",
+  ];
+  const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender, usedNames);
   const eventTitle = roleText === "\u5e08\u59d0" ? "\u5e08\u59d0\u6307\u5bfc" : "\u5e08\u5144\u6307\u5bfc";
   const lightIdeaBonus = drawInclusiveInt(6, 10, getRoll);
   const deepSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
@@ -189,7 +190,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   const event: PendingEvent = {
     id: `random-11-y${state.year}-m${state.month}-n${serial}`,
     title: eventTitle,
-    description: `${roleText}邀请你一起做个项目，方向和你的研究正好有些交集。机会不错，但你手头的时间也不宽裕，得先谈好怎么合作。`,
+    description: `${roleText}带着项目记录来找你，问你要不要一起做。你接过材料，先翻到实验那页，发现有几处正是自己想弄明白的问题。`,
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -237,40 +238,35 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      `临近毕业的${roleText}邀你一起做项目。`,
-      `${roleText}做事很快，跟着做能学到不少，任务量也不会小。`,
-      "你可以先帮一点，也可以完整跟完这个项目。",
+      `${roleText}搬了把椅子坐到你旁边，说手上的项目缺个人一起做。项目记录摊开好几页，有张图改过几次，旧线条还隐约留在纸上。`,
+      `你接过材料，翻到实验那页停了下来。${roleText}见你看得认真，把椅子又往近处挪了一点：“这块我从头给你讲讲。”`,
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
       ...(!canAddSenior ? ["普通关系栏已满，深度合作仍可结算本次收益，但不会新增师兄或师姐；你可以现在选择退出。"] : []),
-      "先观望最省事，对方可能很快就会找别人。",
-      "浅合作只负责一部分，深合作则要从头跟到尾。",
-      `如果想长期跟着${roleText}学，也可以直接开口。`,
+      `${roleText}把接下来要做的实验一项项圈出来。刚听方向时你还觉得可以，听到每项都得自己动手，已经悄悄翻开了日程。`,
+      "接一小块可以先摸摸路数，深入参与就得留出认真跟进的时间。若想多学些写作，也可以请对方细讲；你看着纸上的批注，知道这大概免不了几轮修改。暂时不接，同样说得出口。",
     ].join("\n\n"),
     results: {
       [`random-11-watch-${serial}`]: {
         title: "先观望",
         description: [
-          "你没有马上答应，只说想先看看自己的排期。",
-          `${roleText}点点头：“行，我这边也得尽快开工。”`,
-          `几天后，${roleText}已经和另一位同门开始讨论项目。你空出这段时间，好好休息了几晚。`,
+          `你把材料还给${roleText}，说想先缓一缓。对方点点头：“行，那我先往下做，有兴趣再聊。”`,
+          "这次没有多接一项任务。晚上离开实验室时，你终于没再站在门口回想是不是忘了什么，回去踏踏实实歇了歇。",
         ].join("\n\n"),
       },
       [`random-11-light-${serial}`]: {
         title: "浅合作",
         description: [
-          "你答应先负责其中一组实验，不把整条项目线都接下来。",
-          `${roleText}把之前踩过的坑和关键论文整理给你，还帮你改了两次实验设置。`,
-          "任务结束时，你已经记下几种可以用在自己课题上的做法，准备下次构思方案时试一试。",
+          `你接下一组实验，${roleText}把相关文献和设置发了过来，还特意圈出一个容易弄错的地方。你刚想问，发现答案已经写在旁边。`,
+          "跟着做完这一小块，你在笔记里记下几种新的切入方式。下次琢磨选题时，可以先翻这几页，不必又从搜索框开始漫游。",
         ].join("\n\n"),
       },
       [`random-11-deep-${serial}`]: {
         title: "深合作",
         description: [
-          `你和${roleText}说，自己愿意从头跟完这个项目。`,
-          `${roleText}把完整排期发给你：“那就一起做，过程可能会比较累。”`,
-          "你跟着梳理选题、实验和写作，补上了自己不熟悉的环节。再面对类似问题时，心里多了些章法。",
+          `你跟着${roleText}把选题、实验和写作过了一遍。记录里几行轻描淡写的“调整设置”，摊开讲竟占了大半页笔记。`,
+          "你把每一步为什么这样做补在旁边，又回头核对了一轮。讨论结束，桌上的水早就凉了，你把这次用到的方法单独标出来，留着以后对照。",
           ...(deepResearchNarrative ? [deepResearchNarrative] : []),
           ...(deepSanNarrative ? [deepSanNarrative] : []),
         ].join("\n\n"),
@@ -278,11 +274,11 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
       [`random-11-mentor-${serial}`]: {
         title: "拜入门下",
         description: [
-          `你拿着草稿请${roleText}仔细指点。对方从论证顺序到图表说明逐处标注，密密麻麻写了一整页。`,
-          "你照着批注改了几轮，才发现自己总在同样的地方说不清楚。改稿很累，这些写作习惯却终于有了纠正的机会。",
+          `你请${roleText}多教些写作，把刚讨论的思路写成一段练习。对方从论证顺序到句子衔接逐处批注，你原以为挺清楚的一段，旁边多了好几个问号。`,
+          "照着改过几轮，你慢慢认出了自己总爱含糊带过的地方。这套写法逐句练过，以后动笔也用得上。",
           canAddSenior
-            ? `${roleText}答应以后继续帮你看稿：“不过你得先自己认真改过，再拿来一起讨论。”`
-            : "你记下这次的建议，先不再约固定讨论。已有的合作已经占满时间，之后要靠自己继续练习。",
+            ? `${roleText}答应以后继续帮你看写作：“先自己改一遍，再拿来聊。”你点点头，把这页批注仔细收好。`
+            : "你收好这次的批注，没有再约固定讨论。已有的合作还要照顾，这套写法先留给自己慢慢练熟。",
           ...(mentorSanNarrative ? [mentorSanNarrative] : []),
         ].join("\n\n"),
       },

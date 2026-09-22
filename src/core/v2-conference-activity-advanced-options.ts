@@ -21,7 +21,7 @@ export function createAdvancedConferenceActivityOptions(
       id: "big-bull-coop",
       label: "🎓 找大牛合作（借联培继续深挖）",
       outcome: "社交 +1，下次写论文 +8，科研上限 +1。",
-      resultDescription: "有了联培合作的基础，这次见面不必再从自我介绍聊起。你们对着关键实验讨论写作安排，对方把推理中的缺口逐一指出，你也学会了更仔细地核对结论。",
+      resultDescription: "有了联培合作的基础，这次见面直接从草稿聊起。对方在几处结论后面打上问号，你们顺着证据逐一推敲。聊完，稿子短了几行，论证倒比原先扎实了。",
       effects: {
         social: 1,
         temporaryActionEffectUpdates: {
@@ -58,7 +58,7 @@ export function createAdvancedConferenceActivityOptions(
       id: "beautiful-scholar",
       label: "💕 和活泼学者交流",
       outcome: "SAN +5，社交 +1。",
-      resultDescription: "你和邻座从刚才的报告聊到各自课题组，对方说起组会里的小插曲，逗得你差点忘了手里的茶。临走前你们交换了联系方式，原本拘谨的自我介绍也变成了闲聊。",
+      resultDescription: "你和邻座从刚才的报告聊到各自课题组。对方讲起把旧版 PPT 带去组会的经历，你笑着承认，自己也干过差不多的事。散场前交换联系方式时，已经不用再看胸牌认名字了。",
       effects: {
         san: 5,
         social: 1,
@@ -75,7 +75,7 @@ export function createAdvancedConferenceActivityOptions(
       id: "smart-scholar",
       label: "🧠 和聪慧学者交流（深聊研究）",
       outcome: "SAN +1，社交 +1，下次想 idea 多 2 次。",
-      resultDescription: "你们对着同一篇论文讨论了很久，把疑问写在空白处，再挨个想能怎么验证。聊到后来，你发现自己不只是在点头，已经能接着对方的思路提出别的假设。",
+      resultDescription: "你们对着同一篇论文讨论了很久。对方在草稿上改了一个假设，你接着往下推，又冒出两种值得试的办法。直到下一场报告开始，才发现手边的咖啡已经凉了。",
       effects: {
         san: 1,
         social: 1,

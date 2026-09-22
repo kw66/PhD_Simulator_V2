@@ -32,7 +32,7 @@ import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { clampResearchToCap } from "./v2-research-cap-system";
 import { canAddRelationship, syncRelationshipState } from "./v2-relationship-rules";
 import { DEBUG_RELATIONSHIP_TYPES } from "./v2-action-ids";
-import { createCustomFellowProgressProfile, createGeneratedFellowProfileAddition, getFellowRoleLabel } from "./v2-fellow-progression";
+import { createCustomFellowProgressProfile, createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import { createLoverProgressState } from "./v2-lover-progression";
 import { activateLover } from "./v2-lover-system";
 import { pickRandomAdvisorName } from "./v2-random-name";
@@ -780,9 +780,15 @@ function addDebugRelationship(state: GameState, type: DebugRelationshipType): Ga
     return pushLog(state, "测试：已有 4 位同学，未继续添加");
   }
   const seed = Math.floor(Math.random() * 0x100000000);
+  const usedNames = [
+    ...state.fellowProgressState.map((fellow) => getFellowName(fellow)),
+    state.selectedAdvisorName ?? "",
+    state.loverState.name ?? "",
+  ];
   const profile = createCustomFellowProgressProfile({
-    ...createGeneratedFellowProfileAddition(type, seed),
+    ...createGeneratedFellowProfileAddition(type, seed, undefined, usedNames),
     startTotalMonths: state.totalMonths,
+    usedNames,
   });
   const countKey = ({ senior: "seniorCount", junior: "juniorCount", peer: "peerCount" } as const)[type];
   return pushLog({

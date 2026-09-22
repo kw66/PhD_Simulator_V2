@@ -162,6 +162,8 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("保留衰减后的分数，再将审稿反馈加到自身分，协作分不变");
     expect(help).toContain("每项扣分=⌊s×h×10%⌋，至少扣1");
     expect(help).toContain("s为该项自身与协作合计分，h为热度");
+    expect(help).toContain("热度会影响引用倍率");
+    expect(help).toContain("不同topic的热度会随时间变化，新建论文按当年热度抽取");
     expect(help).toContain("合计最低保留1");
     expect(help).toContain("原本0或1分不扣");
     expect(help).toContain("先算合计扣分，再按自身/协作比例分摊");
@@ -277,7 +279,8 @@ describe("v2 research rule details and publication metrics", () => {
     const rest = getHelpText({ activePlayTab: "shop", activeShopTab: "rest" });
 
     expect(coffee).toContain("冰美式可直接购买，SAN+2");
-    expect(coffee).toContain("购入咖啡机后提升为SAN+3，并可开启月初自动续费");
+    expect(coffee).toContain("购入咖啡机后提升为SAN+3");
+    expect(coffee).toContain("无需咖啡机即可开启月初自动续费");
     expect(coffee).toContain("SAN已满时，自动续费当月跳过");
     expect(coffee).toContain("金币不足且没有可用于续费的礼物券时，当月暂停续费");
     expect(gear).toContain("显卡和自行车可逐档升级");

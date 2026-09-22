@@ -38,7 +38,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   const event: PendingEvent = {
     id: `random-6-y${state.year}-m${state.month}-n${serial}`,
     title: "组会汇报",
-    description: "这周组会轮到你汇报，PPT 还空着一半，实验也没跑出理想结果。离开会只剩一点时间，你得决定今晚怎么准备。",
+    description: "群里发来明天的组会顺序，你的名字排在第一个。PPT 已经有了封面和“谢谢聆听”，中间还空着。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -78,24 +78,22 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "离周组会只剩一个晚上，这次轮到你汇报。",
-      "自己的实验还没有理想结果，待读列表里倒是攒了不少论文。",
-      "明天导师是否到场还不确定，但 PPT 今晚总得做完。",
+      "群里发来明天的组会顺序，你的名字排在第一个。打开 PPT，封面和“谢谢聆听”都在，中间还没几页能讲的。",
+      "工位旁的人已经收包去吃饭了，你还在翻记录和待读论文。有人问明天导师来不来，群里暂时没人回复。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "认真整理自己的进展最稳，但得花时间把材料讲清楚。",
-      "把几篇相关论文串起来讲，能理清方法之间的关系，只是今晚恐怕得熬得更晚。",
-      "临时凑一份最省事，但要是明天导师到场追问，就未必能应付过去了。",
+      "认真整理手头的进展，至少被问到时知道该翻哪页记录；把几篇论文串起来讲，也许能弄懂它们到底差在哪儿，只是今晚要读的恐怕不止正文。",
+      "你看了眼时间。凑几页图当然快，可明天导师要是指着其中一张问“这是什么意思”，总不能现场一起读。",
     ].join("\n\n"),
     results: {
       [`random-6-deep-${serial}`]: {
         title: "深入汇报",
         description: [
-          "你把汇报材料重新整理了一遍，把重点放在自己真正理解的部分。",
+          "你把材料从头过了一遍，删掉两页自己都讲不明白的内容，又给关键图补上标注。保存时，旁边的饭盒已经凉透了。",
           advisorPresentForPrepared
-            ? "导师听完后提了几个问题，也给了你一些具体建议。散会后，你把建议逐条补进下一轮实验计划。"
-            : "导师临时有事没来，你把准备好的内容完整讲完。同门追问了两处细节，也帮你发现有张图的标注不够清楚。",
+            ? "导师来了，问的问题恰好有几处是你昨晚核对过的。你顺着记录答完，把剩下的建议记在页边，散会后才松开一直攥着的翻页笔。"
+            : "导师临时没来。你照样讲完，同门问到一处标注时，你们凑近屏幕才发现坐标轴没写单位。昨晚检查了那么久，偏偏漏了这个。",
           ...(advisorPresentForPrepared && preparedFavorNarrative ? [preparedFavorNarrative] : []),
           ...(preparedSanNarrative ? [preparedSanNarrative] : []),
         ].join("\n\n"),
@@ -104,17 +102,15 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         title: "系列汇报",
         description: advisorPresentForSeries
           ? [
-              "你把同一方向的几篇论文放在一起，重新整理了方法演进和实验差异。",
-              "组会上，导师盯着对比表看了很久，追问两种方法为什么会得出相反结论。",
-              "你昨晚核对过实验条件，总算答了上来。散会后，导师建议把这份整理写进论文的相关工作部分。",
+              "你把几篇论文列成一张对比表，补充材料也翻到了最后。原本各看各的都挺有道理，放在一起才发现实验条件不一样。",
+              "导师果然指着两项相反的结论追问。你翻出昨晚核对的设置，总算答了上来；散会时又把那张表存好，以后读这个方向不用重找一遍。",
               ...(researchNarrative ? [researchNarrative] : []),
               ...(seriesFavorNarrative ? [seriesFavorNarrative] : []),
               ...(seriesSanNarrative ? [seriesSanNarrative] : []),
             ].join("\n\n")
           : [
-              "你把同一方向的几篇论文放在一起，重新整理了方法演进和实验差异。",
-              "组会开始前，导师临时通知不来，由一位师兄主持。",
-              "同门围着你的对比表讨论了很久，还补上了两篇你漏掉的工作。这份准备没有白做。",
+              "你熬夜把几篇论文列成对比表，连实验设置里的小字也抄了上去。第二天刚接好投影，群里通知导师临时不来。",
+              "本以为会很快讲完，同门却围着那张表讨论了好一会儿，还补上两篇遗漏。你困得揉眼睛，手上还是把题目记了下来。",
               ...(researchNarrative ? [researchNarrative] : []),
               ...(seriesSanNarrative ? [seriesSanNarrative] : []),
             ].join("\n\n"),
@@ -123,15 +119,13 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         title: "摸鱼划水",
         description: advisorPresentForSlack
           ? [
-              "你临时挑了一篇不太难的论文，PPT 也只摘了摘要和几张原图。",
-              "导师听了两页就问起实验设置，你对着图找了半天也没说清楚。",
-              "“下次至少先把论文读完。”导师让你结束汇报，你默默回到座位。",
+              "你挑了篇看着不难的论文，往 PPT 里放了摘要和几张原图。导师听了两页，问起图里那条虚线代表什么。",
+              "你放大图片找了一圈，还是没说清楚。导师让你下次先读完论文，你拔掉投影线回到座位，终于开始认真看那张图。",
               ...(slackFavorNarrative ? [slackFavorNarrative] : []),
             ].join("\n\n")
           : [
-              "你临时挑了一篇不太难的论文，PPT 也只摘了摘要和几张原图。",
-              "导师当天没有到场，主持组会的师兄也没多追问。",
-              "不到十分钟，你就翻到了最后一页。这次算是混过去了。",
+              "你挑了篇看着不难的论文，往 PPT 里放了摘要和几张原图。导师没来，主持的师兄也只问了一句有没有人要提问。",
+              "大家低头翻了翻笔记，没有接话。你不到十分钟就翻到了“谢谢聆听”，拔投影线的动作格外利索。",
             ].join("\n\n"),
       },
     },

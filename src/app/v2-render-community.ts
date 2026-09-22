@@ -99,7 +99,7 @@ export function renderLobbyMasthead(activeView: LobbyViewId): string {
         ${renderVisitMetrics()}
       </div>
       <div class="lobby-project-links" aria-label="项目链接">
-        <a href="https://xhslink.com/m/A2DFslJF4mb" target="_blank" rel="noreferrer"><i data-lucide="user-round" aria-hidden="true"></i><span>作者</span></a>
+        <a href="https://xhslink.com/m/A2DFslJF4mb" target="_blank" rel="noreferrer"><i data-lucide="user-round" aria-hidden="true"></i><span>开发者</span></a>
         <a href="https://github.com/kw66/PhD_Simulator_V2" target="_blank" rel="noreferrer"><i data-lucide="git-fork" aria-hidden="true"></i><span>GitHub</span></a>
         <a href="https://kw66.github.io/games/" target="_blank" rel="noreferrer"><i data-lucide="gamepad-2" aria-hidden="true"></i><span>游戏合集</span></a>
       </div>

@@ -1,6 +1,7 @@
 import { getAiCollaborationStatus } from "./v2-ai-shop";
 import { getCurrentCoffeeBonus } from "./v2-coffee-system";
-import { getMeetingSelfPayDiscount, hasFullGear } from "./v2-meeting-system";
+import { getMeetingSelfPayDiscount, hasFullGear, hasPerfectWorkstation } from "./v2-meeting-system";
+import { addOrReplaceBuffs } from "./v2-buffs";
 import { getReadingIdeaBonus } from "./v2-reading-system";
 import { getResearchCap } from "./v2-research-cap-system";
 import { describeTalentChange, recordTalentTrigger } from "./v2-talent-history";
@@ -52,6 +53,26 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
   ]);
   if (!hasFullGear(before.shopState, before.eventSupport) && hasFullGear(after.shopState, after.eventSupport)) {
     add("full-gear", "整装待发", "集齐小电驴、遮阳伞和羽绒服", ["小电驴改为春夏秋冬每月SAN+1"]);
+  }
+  if (hasPerfectWorkstation(after.shopState, after.coffeeState)
+    && !state.buffs.some((buff) => buff.id === "perfect-workstation")) {
+    state = {
+      ...state,
+      buffs: addOrReplaceBuffs(state.buffs, [{
+        id: "perfect-workstation",
+        name: "完美工位",
+        source: "完美工位",
+        timing: "permanent",
+        remainingMonths: null,
+        actionEffects: {
+          idea: { bonus: 1 },
+          experiment: { bonus: 1 },
+          writing: { bonus: 1 },
+        },
+        description: "集齐机械键盘、2K显示器、办公椅和咖啡机后，论文三项分数永久+1",
+      }]),
+    };
+    add("perfect-workstation", "完美工位", "集齐机械键盘、2K显示器、办公椅和咖啡机", ["idea、实验、论文永久+1分"]);
   }
   if (!getAiCollaborationStatus(before.aiShopState).active && getAiCollaborationStatus(after.aiShopState).active) {
     add("ai-collaboration", "AI协作", "三路AI同时生效，且包含GPT或Claude", ["每月额外1次科研操作，不消耗行动点，SAN消耗+2"]);

@@ -69,8 +69,10 @@ function createConferenceDecisionAct3(
     id: `${context.id}-act3-${decision.mode}`,
     title: "论文参会 ➜ 参会方式 ➜ 参会确认",
     description: [
-      "参会方式定下来了。你重新核对展示时间和材料要求，把论文、图表和说明放进同一个文件夹，免得临时找漏。",
-      "原以为收到录用就能松口气，结果还得逐封翻会务邮件。现在安排总算清楚，你把需要联系的人和待办事项记好。",
+      decision.mode === "proxy"
+        ? "你把展示材料和时间表发给同学，附上几条可能被问到的问题。消息发出后，又补了一句‘辛苦了’，这回真得靠对方帮忙。"
+        : "参会方式定下来了，你照着会务邮件准备材料。电脑里存了一份，邮箱里再留一份，毕竟会场的网速还没见识过。",
+      "录用时以为终于忙完了，眼下才发现，会务邮件也能攒出一份待办清单。你挨个打上勾，总算把这趟安排妥当。",
       ...(decision.resistanceNarrative ? [decision.resistanceNarrative] : []),
       "机制结算",
       ...settlementItems,
@@ -149,10 +151,10 @@ function createConferenceDecisionAct2(
     id: `${context.id}-act2`,
     title: "论文参会 ➜ 参会方式",
     description: [
-      `你对照去${context.city}的行程查预算，这次会议在${regionName}。自己承担费用、找导师商量报销，还是请同学帮忙？`,
+      `你查好去${context.city}的行程，把${regionName}参会的费用加了一遍。收到录用时只顾着高兴，现在轮到账户余额参与讨论了。`,
       context.paperCount >= 2
         ? `同会的 ${context.paperCount} 篇论文得一起安排，展示材料也要逐份核对。`
-        : "这次只有 1 篇论文要展示，但材料也得提前准备，不能临到会场再找文件。",
+        : "这次有 1 篇论文要展示。你打开和导师的聊天框，又看看预算：自己出钱、问问报销，还是请同学代为展示？",
       hasMeetingExperience
         ? `会务经验可以减免 ${discount} 金币，自费会便宜一些。`
         : "这次自费没有减免，花费要全部自己承担。",
@@ -184,8 +186,8 @@ export function createConferenceDecisionAct1(
     description: [
       `会议临近，会务邮件催你确认展示安排。这次是 ${context.conferenceName} ${context.conferenceYear}，地点在 ${context.city}，${context.country}。`,
       context.paperCount >= 2
-        ? `同一场会议有 ${context.paperCount} 篇论文要展示，你在日历上挨个标好。去不去现场、材料由谁带，都得尽早定下来。`
-        : "这次只有一篇论文要展示，你把会务要求重新读了一遍。去不去现场、材料由谁带，都得尽早定下来。",
+        ? `同一场会议有 ${context.paperCount} 篇论文要展示，你在日历上挨个标好。平时看着挺空的几格，忽然写得密密麻麻。`
+        : "这次有一篇论文要展示。你把自己的名字从日程里找出来，又核了一遍时间，才把那封长长的会务邮件往下翻。",
       ...getConferencePaperPresentationResults(context),
     ].join("\n\n"),
     source: "fixed",

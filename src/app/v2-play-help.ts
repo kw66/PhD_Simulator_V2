@@ -82,6 +82,7 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
   detailPage("会议分数衰减", `<p>草稿和会议审稿中的论文每月衰减，<b>热度越高，衰减越快</b>。拒稿后从衰减后的分数继续修改。</p>`,
     `<p>每项扣分=⌊s×h×10%⌋，至少扣1；合计最低保留1。</p>
     <p>s为该项自身与协作合计分，h为热度。</p>
+    <p><b>热度会影响引用倍率</b>；不同topic的热度会随时间变化，新建论文按当年热度抽取。</p>
     <p>原本0或1分不扣。先算合计扣分，再按自身／协作比例分摊。</p>`),
   directPage("审稿人概率", `<p>3位独立抽取，类型可重复。<b>y=投稿学年−1</b>，首年y=0。</p>${renderReviewerGuide("probability")}`),
   directPage("审稿评分", `${renderReviewerGuide("method")}<p>普通与LLM的三项权重随机生成，<b>权重之和均为3</b>。最高／最低按投稿时的各项合计分选取，有效分四舍五入。</p>`),

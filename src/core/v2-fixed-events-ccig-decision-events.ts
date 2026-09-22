@@ -85,7 +85,7 @@ export function createCcigAttendResultEvent(
     title: "年会 ➜ 参会决定 ➜ 参会确认",
     description: [
       `参会方式定下来后，你订好前往${location}参加 CCIG ${realYear} 的车票和住宿，又核对了一遍日期。`,
-      "几位同学在群里约好到时碰面。你把电脑、充电器和证件装进包，又摸了一遍侧袋，生怕落下最常用的东西。",
+      "几位同学在群里约好到时碰面。你把电脑、充电器和证件装进包，拉上拉链后又打开看了一眼——充电器确实带了，这才放心。",
       ...(narrative ? [narrative] : []),
       ...(gearNarrative ? [gearNarrative] : []),
       "机制结算",
@@ -141,7 +141,7 @@ export function createCcigEvent(state: GameState): PendingEvent {
     title: "年会",
     description: [
       `导师把 CCIG ${realYear} 的通知转进群里，会址在${location}。有人翻分论坛名单，也有人开始查车票。`,
-      "你点开日程，找到几场和课题有关的报告，顺手把页面存了下来。难得有机会见见文献里的作者，不过出门前还得把行程和预算算清楚。",
+      "你点开日程，几位常在参考文献里见到的作者都在。群里很快又多了一份当地美食清单，下载的人一点不比报告日程少。",
     ].join("\n\n"),
     chainId: getCcigChainId(state),
     choices: [

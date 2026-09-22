@@ -59,10 +59,22 @@ export function getFellowName(profile: Pick<FellowProgressProfile, "id" | "name"
   return profile.name?.trim() || pickStableRandomName(`fellow:${profile.id}`);
 }
 
+export function getUniqueFellowName(candidate: string, usedNames: readonly string[], seed: string): string {
+  const occupied = new Set(usedNames.map((name) => name.trim()).filter(Boolean));
+  const normalized = candidate.trim();
+  if (!occupied.has(normalized)) return normalized;
+  for (let attempt = 1; attempt <= 64; attempt += 1) {
+    const alternative = pickStableRandomName(`fellow:unique:${seed}:${attempt}`);
+    if (!occupied.has(alternative)) return alternative;
+  }
+  return pickStableRandomName(`fellow:unique:${seed}:fallback`);
+}
+
 export function createGeneratedFellowProfileAddition(
   type: FellowTypeId,
   seed: number,
   gender = getStableGeneratedGender(seed),
+  usedNames: readonly string[] = [],
 ): FellowProfileAddition {
   const normalizedSeed = Math.abs(Math.floor(seed));
   const profileBase = type === "senior"
@@ -71,7 +83,18 @@ export function createGeneratedFellowProfileAddition(
       ? { research: 3 + normalizedSeed % 4, affinity: 1 }
       : { research: normalizedSeed % 4, affinity: 1 };
 
-  return { type, gender, name: getStableGeneratedFellowName(seed, gender), ...profileBase };
+  const occupied = new Set(usedNames.map((name) => name.trim()).filter(Boolean));
+  let name = getStableGeneratedFellowName(seed, gender);
+  if (occupied.has(name)) {
+    for (let attempt = 1; attempt <= 32; attempt += 1) {
+      const candidate = pickStableRandomName(`fellow:${Math.abs(Math.floor(seed))}:${gender}:unique:${attempt}`);
+      if (!occupied.has(candidate)) {
+        name = candidate;
+        break;
+      }
+    }
+  }
+  return { type, gender, name, ...profileBase };
 }
 
 function createFellowProgressProfileId(type: FellowTypeId, startTotalMonths: number): string {
@@ -99,12 +122,14 @@ export function createCustomFellowProgressProfile(input: {
   affinity: number;
   name?: string;
   taskType?: FellowTaskType;
+  usedNames?: readonly string[];
 }): FellowProgressProfile {
   const config = FELLOW_CONFIG[input.type];
   const id = createFellowProgressProfileId(input.type, input.startTotalMonths);
+  const generatedName = input.name?.trim() || pickStableRandomName(`fellow:${id}`);
   return {
     id,
-    name: getFellowName({ id, name: input.name }),
+    name: getUniqueFellowName(generatedName, input.usedNames ?? [], id),
     researchTopic: getFellowResearchTopic({ id, startTotalMonths: input.startTotalMonths }),
     type: input.type,
     gender: input.gender,

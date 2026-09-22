@@ -30,7 +30,7 @@ export function createConferenceActivityResult(
     title: "会场活动 ➜ 选择安排 ➜ 活动结果",
     description: [
       option.resultDescription,
-      "收拾东西时，你把胸牌和会议手册放在一起。今天的安排告一段落，回去再慢慢整理。",
+      "回程时，你把胸牌塞进会务袋。下次再挂上它，又不知道会在哪座城市了。",
       "机制结算",
       activitySummary,
       ...getConferencePaperPresentationResults(context),
@@ -71,10 +71,10 @@ export function createConferenceActivityDecisionEvent(
     id: `${activityChainId}-act2`,
     title: "会场活动 ➜ 选择安排",
     description: [
-      `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，一边看时间，一边盘算先去哪里。`,
+      `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，先前圈过的几项恰好撞了时间。原来选报告也得做取舍。`,
       context.paperCount >= 2
         ? `忙完 ${context.paperCount} 篇论文的展示，你不想再来回赶场，准备挑一项好好参加。`
-        : "你不想再把空当塞满。接下来想留在会场交流，还是出去透口气？",
+        : "展示已经忙完，接下来总算能按自己的兴趣走。留下交流、找人请教，还是暂时把胸牌摘下来，出去透口气？",
       ...getConferencePaperPresentationResults(context),
     ].join("\n\n"),
     source: "fixed",

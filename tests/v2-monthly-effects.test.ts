@@ -432,14 +432,22 @@ describe("monthly effects", () => {
     expect(preview.player.money).toBe(0);
   });
 
-  it("requires a coffee machine before ice-Americano renewal can run", () => {
+  it("renews ice-Americano without a coffee machine and keeps it out of machine production", () => {
     const state = createPlayingMonth(1, 1, 10);
     state.player = { ...state.player, money: 2 };
     state.coffeeState = { ...state.coffeeState, subscriptionEnabled: true };
 
     const preview = previewNextMonthEffects(state);
-    expect(preview.items.find((item) => item.id === "coffee-subscription")).toBeUndefined();
-    expect(preview.player.money).toBe(2);
+    expect(preview.items.find((item) => item.id === "coffee-subscription")?.appliedStats).toEqual({ money: -2, san: 2 });
+    expect(preview.player).toMatchObject({ money: 0, san: 14 });
+
+    const settled = applyMonthlyEffects(state);
+    expect(settled.nextState.coffeeState).toMatchObject({
+      subscriptionEnabled: true,
+      coffeePurchaseCountThisMonth: 1,
+      coffeeProducedCountThisMonth: 0,
+      machineTrackedCoffeeCount: 0,
+    });
   });
 
   it("skips ice-Americano renewal at full SAN without charging money", () => {

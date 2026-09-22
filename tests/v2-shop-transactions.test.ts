@@ -172,6 +172,14 @@ describe("v2 shop transactions", () => {
     expect(state.coffeeState.machineUpgrade).toBe("manual");
     expect(Object.values(state.shopState.entitlements)).toEqual([0, 0]);
     expect(state.shopState.investments).toEqual({ gpu: 0, chair: 0, keyboard: 0, monitor: 0, bike: 0 });
+    expect(state.buffs.find((buff) => buff.id === "perfect-workstation")).toMatchObject({
+      timing: "permanent",
+      actionEffects: {
+        idea: { bonus: 1 },
+        experiment: { bonus: 1 },
+        writing: { bonus: 1 },
+      },
+    });
 
     state = dispatchAction(state, "sell-shop-item", { shopItemId: "gpu_buy" });
     state = dispatchAction(state, "sell-shop-item", { shopItemId: "keyboard" });
@@ -179,6 +187,7 @@ describe("v2 shop transactions", () => {
     state = dispatchAction(state, "sell-shop-item", { shopItemId: "chair" });
     state = dispatchAction(state, "sell-coffee-machine");
     expect(state.player.money).toBe(0);
+    expect(state.buffs.some((buff) => buff.id === "perfect-workstation")).toBe(true);
   });
 
   it("applies coffee recovery and resets the monthly cup counter at month start", () => {
@@ -197,12 +206,13 @@ describe("v2 shop transactions", () => {
     expect(nextMonth.coffeeState.coffeeProducedCountThisMonth).toBe(0);
   });
 
-  it("requires a coffee machine before controlling the ice-Americano subscription", () => {
+  it("allows ice-Americano subscription without a coffee machine", () => {
     let state: ReturnType<typeof createInitialState> = admittedState();
     state = dispatchAction(state, "toggle-coffee-subscription");
-    expect(state.coffeeState.subscriptionEnabled).toBe(false);
+    expect(state.coffeeState.subscriptionEnabled).toBe(true);
     state = dispatchAction(state, "buy-coffee-machine");
-    state = dispatchAction(state, "toggle-coffee-subscription");
+    expect(state.coffeeState.subscriptionEnabled).toBe(true);
+    state = dispatchAction(state, "sell-coffee-machine");
     expect(state.coffeeState.subscriptionEnabled).toBe(true);
     state = dispatchAction(state, "toggle-coffee-subscription");
     expect(state.coffeeState.subscriptionEnabled).toBe(false);
@@ -215,7 +225,6 @@ describe("v2 shop transactions", () => {
     state = dispatchAction(state, "toggle-ai-subscription", { aiSlotId: "gpt" });
     expect(state.log).toHaveLength(initialLogLength);
 
-    state = dispatchAction(state, "buy-coffee-machine");
     const afterMachineLogLength = state.log.length;
     state = dispatchAction(state, "toggle-coffee-subscription");
     state = dispatchAction(state, "toggle-coffee-subscription");

@@ -144,7 +144,7 @@ describe("lover shopping gifts", () => {
     expect(state.log).toEqual(initial.log);
     expect(dispatchAction(state, "debug-add-all-buffs")).toEqual(state);
     const html = renderApp(state);
-    expect(html).toContain(">显卡免单 ×2</button>");
+    expect(html).toContain(">显卡报销 ×2</button>");
     expect(html).toContain(">工位报销</button>");
     expect(html).toContain(">恋人回礼 ×3</button>");
     const spent = { ...state, shopState: { ...state.shopState, entitlements: { ...state.shopState.entitlements, gpuTransaction: 0 } },

@@ -1,4 +1,4 @@
-import { createGeneratedFellowProfileAddition, getFellowRoleLabel } from "./v2-fellow-progression";
+import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import { createFixedEvent } from "./v2-fixed-events-shared";
 import { createThreeStageEvent } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -13,11 +13,15 @@ const CANDIDATE_DESCRIPTIONS = [
 
 export function createMentorAssignEvent(state: GameState): PendingEvent {
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
+  const generatedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
   const candidates = Array.from({ length: 4 }, (_, index) => {
     const addition = createGeneratedFellowProfileAddition(
       "junior",
       state.totalMonths * 1000 + state.year * 10 + state.month + (index + 1) * 97,
+      undefined,
+      generatedNames,
     );
+    generatedNames.push(addition.name ?? "");
     const roleLabel = getFellowRoleLabel(addition.type, addition.gender);
     const label = `${roleLabel} ${addition.name ?? "新生"}`;
     const description = CANDIDATE_DESCRIPTIONS[addition.research]!;
@@ -52,16 +56,16 @@ export function createMentorAssignEvent(state: GameState): PendingEvent {
 
   return createThreeStageEvent(event, {
     introDescription: [
-      "转博后的新学期，导师告诉你组里来了四位新生，希望你帮他们熟悉代码、实验和组会流程。",
-      "导师把四份材料推到你面前，让你先看看各自的情况，再从中选一位认识。之后具体怎么熟悉课题，可以等见面后再慢慢安排。",
+      "转博后的新学期，导师发来四位新生的材料，希望你带其中一位熟悉代码、实验和组会流程。群里刚拉进来的几个头像还很陌生，已经有人在问实验室怎么走。",
+      "你翻开材料，入学照片一张比一张精神。电脑右下角又弹出导师的消息：“先认识一下，有问题多帮帮忙。”",
     ].join("\n\n"),
     decisionTitle: "选择一位新生",
-    decisionDescription: "导师把四位新生的基本情况发给你。你逐份看过材料，准备先找一位聊聊。",
+    decisionDescription: "你翻看四份材料，盘算着能留多少时间。基础好的可以少讲几遍，刚入门的就得从读论文教起。选谁之前，还得看看彼此能不能聊到一起。",
     results: Object.fromEntries(candidates.map((candidate) => [candidate.choiceId, {
       title: candidate.label,
       description: canAddJunior
-        ? `你和${candidate.label}约好在实验室见面，先从最近读的一篇论文聊起。`
-        : "无事发生",
+        ? `你和${candidate.label}约好在实验室见面，发去门牌号，又补了句“找不到就发消息”。原来现在也轮到你给别人指路了。`
+        : "你看完材料，还是没接下这次指导。眼下已有的合作还要顾，新生的安排只能请导师另找人选。",
     }])),
   });
 }

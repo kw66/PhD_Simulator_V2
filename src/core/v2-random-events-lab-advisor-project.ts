@@ -1,6 +1,6 @@
 ﻿import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
-import { createGeneratedFellowProfileAddition, getFellowRoleLabel } from "./v2-fellow-progression";
+import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import {
   createThreeStageRandomEvent,
   type RandomRollProvider,
@@ -33,7 +33,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   const familiarJunior = state.fellowProgressState.find((profile) => profile.type === "junior");
   const hasJunior = familiarJunior !== undefined;
   const familiarJuniorLabel = familiarJunior ? getFellowRoleLabel(familiarJunior.type, familiarJunior.gender) : "";
-  const familiarJuniorName = familiarJunior?.name?.trim() || familiarJuniorLabel;
+  const familiarJuniorName = familiarJunior ? getFellowName(familiarJunior) : familiarJuniorLabel;
   const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 307);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const shareSocialRaw = hasJunior ? -1 : -2;
@@ -44,7 +44,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   const event: PendingEvent = {
     id: `random-4-y${state.year}-m${state.month}-n${serial}`,
     title: "导师项目",
-    description: "实验室来了新项目，需要所有学生一起分担。导师让大家选择加入横向、纵向项目，或找同门协作。",
+    description: "组会快散场，导师又打开一页项目清单。大家刚合上的电脑重新掀开，开始听这次的分工。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -93,21 +93,20 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "组会快结束时，导师又翻出一页项目清单。组里的设备和劳务费要靠项目经费支撑，大家得各自分担一部分工作。",
-      "同门陆续报了分工。轮到你时，导师停在这一页，等你表态。你看了看手头的实验安排，一时没有开口。",
+      "组会快结束，你已经把笔帽扣好，导师又翻出一页项目清单。前排刚收起的电脑重新打开，椅子挪动的声音也停了。",
+      "清单上列着横向和纵向的任务，旁边留了一列填负责人。同门陆续报了分工，导师往下移了移光标，问到你的安排。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "横向项目的交付时间很紧，做完能拿到一笔劳务费。",
-      "纵向项目周期更长，对科研更有帮助。",
-      "也可以申请调整分工，或者请师弟师妹分担一部分。",
+      "横向那边要赶交付，劳务费很实在，来回改需求的工夫也省不了；纵向要多啃些材料、琢磨实验，倒能顺便练练研究的本事。你拿笔在清单旁停了停，两边都不是签个名字就能结束的事。",
+      "实在挤不出时间，也可以申请调整，只是不知道导师听了会是什么脸色。找师弟师妹分担能少熬一些，可要挪动的就不止你一个人的日程了。",
     ].join("\n\n"),
     results: {
       [`random-4-horizontal-${serial}`]: {
         title: "横向项目",
         description: [
-          "你接下横向项目的一部分工作，第一版演示下周就要用。白天改方案，晚上跑实验，还得抽空回复甲方的新需求。",
-          "几轮返工后，这批任务总算交付，导师也发来了劳务费。你松了口气，把耽搁的论文任务重新排回日历。",
+          "你接下这批横向任务，赶着把演示跑通。甲方发来的“再小改一下”攒了好几条，你对着验收清单逐项打勾，文件名里的版本号也跟着往上加。",
+          "这批任务交付后，劳务费到了账，你终于能关掉那几页需求。趴在桌边缓了一会儿，再翻开原来的研究笔记，竟得先想想上次做到哪里。",
           ...(horizontalFavorNarrative ? [horizontalFavorNarrative] : []),
           ...(horizontalSanNarrative ? [horizontalSanNarrative] : []),
         ].join("\n\n"),
@@ -115,8 +114,8 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       [`random-4-vertical-${serial}`]: {
         title: "纵向项目",
         description: [
-          "你接下纵向项目中的一项研究任务，从立项材料和相关论文读起。问题比自己的课题更广，实验方案也改了几轮。",
-          "阶段汇报时，导师认可了你对问题的梳理。虽然费了不少功夫，你也学会了怎样拆解任务、安排更有说服力的对照。",
+          "你接下纵向项目里的一项研究任务，从立项材料翻到参考文献。方案写到一半才发现少了一组关键对照，只好把刚排齐的实验表重新拆开。",
+          "汇报时，导师追问起设计依据，你把补过的对照逐项说明。这轮材料总算交了上去，你揉着发酸的肩膀收电脑，脑子里还在过刚才那几个问题。",
           ...(verticalFavorNarrative ? [verticalFavorNarrative] : []),
           ...(verticalResearchNarrative ? [verticalResearchNarrative] : []),
           ...(verticalSanNarrative ? [verticalSanNarrative] : []),
@@ -126,15 +125,13 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
         title: "调整分工",
         description: rejectFavorChange < 0
           ? [
-              "你和导师说明，自己手头的实验已经排满，想调整到节奏更合适的项目。",
-              "导师皱了下眉，还是把你调去别的项目：“下次早点把安排说清楚。”",
-              "这次的分工调整了，但组里的任务并不会凭空消失。你把现有安排重新列好，准备以后早点沟通。",
+              "你把近期的安排摊给导师，申请这次先不接项目任务。导师皱了下眉，说了句“大家都忙”，停了一会儿才把分工表往下翻。",
+              "这次没有再往你这里派活，导师的语气却明显冷了些。你把本子合上，原来的日程保住了，刚才准备的几句解释还在心里打转。",
               ...(rejectFavorNarrative ? [rejectFavorNarrative] : []),
             ].join("\n\n")
           : [
-              "你和导师说明，自己手头的实验已经排满，想调整到节奏更合适的项目。",
-              "导师看了看你的排期，同意把你调到另一项工作里：“那边的任务你也要跟住。”",
-              "项目换了，但该分担的工作一点没少。你把新任务记进日历，准备重新排一下时间。",
+              "你把近期的安排摊给导师，申请这次先不接项目任务。导师看了一遍，问清手头的事做到哪里，终于点了点头。",
+              "这次没有再添新的分工，谈话也平稳收了尾。你把本子收回包里，回到工位才松开一直攥着的笔；日程上那几行暂时不用擦掉重写了。",
               ...(rejectFavorNarrative ? [rejectFavorNarrative] : []),
             ].join("\n\n"),
       },
@@ -143,31 +140,27 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
         description: hasJunior
           ? shareSocialChange < 0
             ? [
-                `你找到了${familiarJuniorName}，请对方分担一部分工作。`,
-                "对方没有推辞，只是接下任务时提醒你，下次早点说，自己也有排期。",
-                "项目赶完了，这份人情也欠下了。",
+                `你去找${familiarJuniorName}分担这批任务。对方看了眼清单，答应帮忙，却把自己的日程也推过来：“下次早点说，我这边也得挪。”`,
+                "两人把这批工作赶完，你少熬了一些，对方说话却没先前那么热络。交接材料时，你多等了一会儿，也没等到往常那句闲聊。",
                 ...(shareSocialNarrative ? [shareSocialNarrative] : []),
                 ...(shareSanNarrative ? [shareSanNarrative] : []),
               ].join("\n\n")
             : [
-                `你找到${familiarJuniorName}，商量着一起做这个项目。`,
-                "“没问题，我来帮你分担一部分。”对方爽快地答应了。",
-                "有了帮手，项目进展顺利多了，比一个人扛着轻松不少。",
+                `你带着清单找到${familiarJuniorName}，商量哪些能请对方帮忙。对方看完说了句“你这安排可真紧”，还是拿笔圈走了其中几项。`,
+                "你把剩下的部分做完，再一起核对交接。这批任务总算收了尾，有人帮着分担，回到工位时还留着一点精神整理自己的笔记。",
                 ...(shareSocialNarrative ? [shareSocialNarrative] : []),
                 ...(shareSanNarrative ? [shareSanNarrative] : []),
               ].join("\n\n")
           : shareSocialChange < 0
             ? [
-                `组里暂时没有熟悉的师弟师妹，你只好找一位不太熟的${unfamiliarJuniorLabel}分担一部分工作。`,
-                "对方表面上答应了，之后却在组里抱怨你把麻烦推了过去。",
-                "项目照常推进，实验室里的气氛却有点微妙。",
+                `你找一位不太熟的${unfamiliarJuniorLabel}分担任务，对方翻了翻清单，勉强接下几项。你以为已经说妥，后来才听说对方为临时添活抱怨了好几句。`,
+                "这批工作做完，你确实少费了些精力。只是再到对方工位前，道谢的话还没说完，对方就先问了一句“还有事吗”，让你有点站不住。",
                 ...(shareSocialNarrative ? [shareSocialNarrative] : []),
                 ...(shareSanNarrative ? [shareSanNarrative] : []),
               ].join("\n\n")
             : [
-                `你找了一位不太熟的${unfamiliarJuniorLabel}帮忙，对方犹豫后接下了任务。`,
-                "各自的任务按时完成，这次没有再传来别的议论。",
-                "你松了口气，也提醒自己下次最好提前把分工说清楚。",
+                `你请一位不太熟的${unfamiliarJuniorLabel}帮忙，把要做的几项单独列了出来。对方问清交接时间，念叨了一句“还挺赶”，最后还是应下了。`,
+                "各自的部分交齐，这批工作总算结束。你过去道谢，对方抬头说了声“不客气”；气氛还算平和，你也终于能收起那张反复核对的清单。",
                 ...(shareSocialNarrative ? [shareSocialNarrative] : []),
                 ...(shareSanNarrative ? [shareSanNarrative] : []),
               ].join("\n\n"),

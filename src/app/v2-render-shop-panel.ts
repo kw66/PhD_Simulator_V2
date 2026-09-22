@@ -262,7 +262,7 @@ function renderAiSubscriptionToggle(slot: AiSlotId, enabled: boolean, paused: bo
   `;
 }
 
-function renderCoffeeSubscriptionToggle(enabled: boolean, paused: boolean, disabled = false): string {
+function renderCoffeeSubscriptionToggle(enabled: boolean, paused: boolean): string {
   const nextAction = enabled ? "关闭" : "开启";
   return `
     <button
@@ -271,9 +271,8 @@ function renderCoffeeSubscriptionToggle(enabled: boolean, paused: boolean, disab
       role="switch"
       aria-checked="${enabled ? "true" : "false"}"
       aria-label="${nextAction}冰美式自动续费"
-      title="${disabled ? "需先购买咖啡机" : paused ? "金币不足，本月暂停" : `${nextAction}自动续费`}"
+      title="${paused ? "金币不足，本月暂停" : `${nextAction}自动续费`}"
       data-action="toggle-coffee-subscription"
-      ${disabled ? "disabled" : ""}
     >
       <span class="shop-subscription-label">自动续费</span>
       <span class="shop-subscription-track" aria-hidden="true"><span></span></span>
@@ -651,8 +650,8 @@ function renderCoffeeRows(
     ? COFFEE_MACHINE_UPGRADE_DEFINITIONS.find((upgrade) => upgrade.id === currentUpgrade) ?? null
     : null;
   const machineDescription = !state.coffeeState.machineOwned
-    ? "冰美式 SAN+2提升为+3，开启自动续费，可升级"
-    : currentDefinition?.description ?? "冰美式 SAN+3，可自动续费，每月1杯";
+    ? "冰美式 SAN+2提升为+3，可升级"
+    : currentDefinition?.description ?? "冰美式 SAN+3，每月1杯";
 
   const availableUpgradeIds = new Set(machineUpgrades.map((upgrade) => upgrade.id));
   const upgradeOptions = COFFEE_MACHINE_UPGRADE_DEFINITIONS.map((upgrade): UpgradeRouteOption => {
@@ -699,7 +698,6 @@ function renderCoffeeRows(
         renderCoffeeSubscriptionToggle(
           state.coffeeState.subscriptionEnabled,
           state.coffeeState.subscriptionPaused,
-          !state.coffeeState.machineOwned,
         ),
         state.coffeeState.machineUpgrade !== "unlimited" && state.coffeeState.coffeePurchaseCountThisMonth >= 1
           ? renderActionButton({ label: "本月已购", variant: "current", disabled: true })

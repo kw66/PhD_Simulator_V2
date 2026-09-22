@@ -11,7 +11,7 @@ import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 function createWinterVacationDescription(branchDescription: string, moneyGain: number, isRich: boolean): string {
   return [
     branchDescription,
-    `这几天，你不再天天盯着进度，陪家里人吃饭散步。长辈给的红包共${moneyGain}金币${isRich ? "（家境殷实，红包格外丰厚！）" : ""}，你收好，留作日常开销。`,
+    `长辈给的红包共${moneyGain}金币${isRich ? "（家境殷实，红包格外丰厚！）" : ""}。你嘴上说着“都这么大了”，还是仔细收好；家里人又往碗里添了菜，催你趁热吃。`,
   ].join("\n\n");
 }
 
@@ -50,8 +50,8 @@ function createWinterVacationPlanEvent(state: GameState): PendingEvent {
     id: `winter-vacation-plan-y${state.year}-m${state.month}`,
     title: "寒假 ➜ 假期计划",
     description: [
-      "这学期，你的作息几乎跟着实验和截止日期走，连周末睡个懒觉都惦记着进度。",
-      "回家少不了串门和亲戚问话，不过眼下总算能歇一歇。你打算先把觉睡好，暂时不往假期里塞任务。",
+      "你点开手机里的闹钟，手指停在平日起床的时间上。真把它关掉，又怕一觉睡到中午，醒来先为没干活心虚。",
+      "可电脑都一路背回来了，也不差今晚这一会儿。串门和亲戚问话留到明天应付，你想先睡个不用赶去实验室的觉。",
     ].join("\n\n"),
     chainId: "winter-vacation",
     stage: "act2",
@@ -74,7 +74,7 @@ export function createWinterVacationEvent(state: GameState): PendingEvent {
     title: "寒假",
     description: [
       "放假通知发到群里时，你还在整理实验记录。合上电脑、拖着行李出校门，脑子里那份待办清单却没跟着放假。",
-      "到家后，热饭热汤端上桌，家里人问你一路累不累。你把电脑包放到一边，决定先踏实吃顿饭。",
+      "到家后，热饭热汤端上桌，家里人问你一路累不累。电脑包刚放下，筷子就递到了手里，碗里的菜很快堆出了一个小尖。",
     ].join("\n\n"),
     chainId: "winter-vacation",
     choices: [
@@ -118,7 +118,7 @@ export function resolveWinterVacationFixedEvent(
         year: state.year,
         month: state.month,
         description: createWinterVacationDescription([
-          "“最近在忙什么？”逛街时碰到高中同学，你们顺势聊起近况。你讲起实验室的日常，也听对方吐槽生活琐事，聊着聊着就找回了熟悉的感觉。",
+          "逛街碰到高中同学，对方问你最近在忙什么。你刚讲到课题名称，就看见那张熟悉的脸露出迷茫，只好换成实验室的日常。聊到吃饭和作息，你们倒又像课间趴在走廊上那样有话说了。",
           ...(socialNarrative ? [socialNarrative] : []),
         ].join("\n\n"), redEnvelope, state.selectedRoleId === "rich"),
         outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}，${socialText}。`,
@@ -140,7 +140,7 @@ export function resolveWinterVacationFixedEvent(
           month: state.month,
           description: createWinterVacationDescription([
             "你带恋人回家吃饭，父母问完学校生活，又聊起你们以后的打算。你们默契地低头夹菜，长辈笑着打住，还特意给你多包了一份红包。",
-            "离开饭桌后，你们对视一眼，忍不住笑了。",
+            "离开饭桌后，你们对视一眼，才发现刚才光顾着夹菜，谁都没吃几口。",
           ].join("\n\n"), doubledEnvelope, state.selectedRoleId === "rich"),
           outcome: `金币 +${doubledEnvelope}，SAN +${sanRecovery}。`,
           moneyGain: doubledEnvelope,
@@ -174,7 +174,7 @@ export function resolveWinterVacationFixedEvent(
       year: state.year,
       month: state.month,
       description: createWinterVacationDescription([
-        "这个假期，你没有安排远行。白天睡到自然醒，帮家里收拾屋子；晚上窝在沙发上看电视，偶尔回几条老朋友的消息。待办清单还在电脑里，至少这会儿不用盯着它。",
+        "这个假期，你没安排远行。睡醒时家里人已经买菜回来，电视里放着你小时候看过的剧。你窝在沙发上剥橘子，明明知道下一句台词，还是跟着看了下去。",
       ].join("\n\n"), redEnvelope, state.selectedRoleId === "rich"),
       outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}。`,
       moneyGain: redEnvelope,

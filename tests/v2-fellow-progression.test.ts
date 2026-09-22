@@ -78,6 +78,14 @@ describe("v2 fellow progression", () => {
     expect(random).not.toHaveBeenCalled();
   });
 
+  it("keeps generated fellow names unique against existing relationships", () => {
+    const existing = createGeneratedFellowProfileAddition("peer", 23, "female");
+    const generated = createGeneratedFellowProfileAddition("junior", 23, "female", [existing.name!]);
+
+    expect(generated.name).not.toBe(existing.name);
+    expect(generated.name).toMatch(/^[\p{Script=Han}]{2,3}$/u);
+  });
+
   it.each([undefined, "", " \t\n "])("stores a generated name for a custom profile with blank input %j", (name) => {
     const random = vi.spyOn(Math, "random").mockReturnValue(0.123456);
     const profile = createCustomFellowProgressProfile({

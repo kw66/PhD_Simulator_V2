@@ -30,8 +30,8 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
         "达到 2 次后，实习机会永久关闭。",
       ].join("\n\n")
     : [
-        "你回复说，手头的课题暂时腾不出空来，这次先不接受实习。写到‘以后有机会再聊’时，你还是停了一下，毕竟这份邀请确实合适。",
-        "邮件发出后，你关掉附件，回去整理实验记录。眼下不必兼顾项目交付，但这份实习收入也只能先放下。",
+        "你把课题安排说明白，婉拒了这次实习。发送前又看了眼报酬那一栏，才把鼠标移回发送键。",
+        "对方表示以后还可以联系。你关掉附件，继续整理实验记录，今晚的待办总算没有再多一份。",
         "机制结算",
         `实习拒绝计数 +1（当前 ${nextRejectCount}/2）`,
         "下次企业交流还有一次机会。",
@@ -63,7 +63,7 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
     id: `internship-invite-result-accept-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择 ➜ 实习已确认",
     description: [
-      "你确认了远程实习安排，把每周交付记进日历。报酬会随论文和引用情况调整，你又核对了一遍邮件里按目前情况列出的金额。",
+      "你确认了远程实习安排，把每周交付记进日历。公司的工作群很快发来欢迎消息，你刚回完‘请多指教’，就收到了第一份任务文档。",
       "课题还得继续，项目也要交差。你把两边的待办放到一起，才发现最难安排的不是工作地点，而是晚上几点能合上电脑。",
       "机制结算",
       "实习周期：6 个月",
@@ -138,7 +138,7 @@ export function createInternshipInviteAct1(context: InternshipInviteContext): Pe
     title: "实习邀请",
     description: [
       `${context.origin ? `${context.origin}结束后` : "会后"}，你收到企业代表发来的远程实习邀请。附件里列着项目任务，正好用得上你现在做课题的方法。`,
-      "你往下翻，报酬和工作安排都写得挺具体。对方希望你尽快答复，你先保存了附件，准备看看能不能和手头的课题兼顾。",
+      "你往下翻到报酬那一栏，停了几秒，又往上翻回工作要求。对方希望尽快答复，邮件末尾还附了联系人和入职流程。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
