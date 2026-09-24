@@ -22,9 +22,6 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   const serial = state.totalRandomEventCount;
   const peerGender = getRoll() < 0.5 ? "male" : "female";
   const usedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
-  const peerAddition = createGeneratedFellowProfileAddition("peer", serial, peerGender, usedNames);
-  const peerName = peerAddition.name ?? "同门";
-  const peerPronoun = getFellowPronoun(peerGender);
   const isLowSocial = state.player.social < 6;
   const canAddPeer = canAddRelationship(state.relationshipState, "peer");
   const exchangeSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
@@ -38,6 +35,9 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   const rejectSuccess = getRoll() < 0.5;
   const rejectIdeaBonus = drawInclusiveInt(3, 5, getRoll);
   const rejectWritingBonus = drawInclusiveInt(3, 5, getRoll);
+  const peerAddition = createGeneratedFellowProfileAddition("peer", serial, peerGender, usedNames, getRoll);
+  const peerName = peerAddition.name ?? "同门";
+  const peerPronoun = getFellowPronoun(peerGender);
 
   const event: PendingEvent = {
     id: `random-10-y${state.year}-m${state.month}-n${serial}`,
@@ -106,8 +106,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
     decisionTitle: "你的选择",
     decisionDescription: [
       ...(!isLowSocial && !canAddPeer ? ["普通关系栏已满，全面合作仍可获得本次合作收益，但不会新增同门；你可以现在选择退出。"] : []),
-      "白板上很快列出实验、写作和投稿，旁边的负责人却还空着。刚才聊方向时你们都很起劲，聊到谁来补实验，转笔的动作就慢了下来。",
-      "只交换思路，还是各做一部分、谈好署名，又或者从头一起推进？你翻了翻日程，能腾出的时间总得有个数；真接不下来，也该趁现在说清楚。",
+      "白板上很快列出实验、写作和投稿，旁边的负责人却还空着。刚才聊得起劲，你连新点子都记了两条；现在真要往后面填名字，笔尖反倒停住了。",
+      "你翻开自己的日程，往旁边让了让，方便对方一起看。这个方向确实让你心动，手头没做完的实验也还在排队。趁两个人都在，得把愿意接下多少、署名怎么安排说清楚。",
     ].join("\n\n"),
     results: {
       [`random-10-exchange-${serial}`]: {
@@ -173,7 +173,6 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
     state.selectedAdvisorName ?? "",
     state.loverState.name ?? "",
   ];
-  const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender, usedNames);
   const eventTitle = roleText === "\u5e08\u59d0" ? "\u5e08\u59d0\u6307\u5bfc" : "\u5e08\u5144\u6307\u5bfc";
   const lightIdeaBonus = drawInclusiveInt(6, 10, getRoll);
   const deepSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
@@ -186,6 +185,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   const deepResearchChange = deepResearchResult.effectiveChange;
   const deepResearchNarrative = getTierResistedNarrative("科研", 1, deepResearchResult);
   const canAddSenior = canAddRelationship(state.relationshipState, "senior");
+  const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender, usedNames, getRoll);
 
   const event: PendingEvent = {
     id: `random-11-y${state.year}-m${state.month}-n${serial}`,
@@ -244,8 +244,8 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
     decisionTitle: "你的选择",
     decisionDescription: [
       ...(!canAddSenior ? ["普通关系栏已满，深度合作仍可结算本次收益，但不会新增师兄或师姐；你可以现在选择退出。"] : []),
-      `${roleText}把接下来要做的实验一项项圈出来。刚听方向时你还觉得可以，听到每项都得自己动手，已经悄悄翻开了日程。`,
-      "接一小块可以先摸摸路数，深入参与就得留出认真跟进的时间。若想多学些写作，也可以请对方细讲；你看着纸上的批注，知道这大概免不了几轮修改。暂时不接，同样说得出口。",
+      `${roleText}把接下来要做的实验一项项圈出来。你指着其中两处追问，听到解释才发现，之前卡住的地方还有这样的做法，忍不住往前凑了凑。`,
+      "翻到写作那页，密密麻麻的批注又让你坐直了些。想学的东西一下多起来，真跟着做也得花时间。你把自己的进度说给对方听，准备先谈谈能从哪一块开始。",
     ].join("\n\n"),
     results: {
       [`random-11-watch-${serial}`]: {

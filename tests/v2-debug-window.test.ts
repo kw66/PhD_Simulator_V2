@@ -24,6 +24,11 @@ describe("independent debug window", () => {
     for (const action of ["force-next-month", "debug-add-all-buffs", "restart-game", "reset-game"]) {
       expect(html).toContain(`data-action="${action}"`);
     }
+    expect(html).toContain('data-action="debug-toggle-event-replay" data-debug-event-replay-enabled="true"');
+    expect(html).toContain('data-action="debug-adjust-action-points" data-delta="-1"');
+    expect(html).toContain('data-action="debug-adjust-action-points" data-delta="1"');
+    expect(html).toContain("读研之始 ✓");
+    expect(renderDebugPanel({ ...state, eventHistory: [] }, true)).toContain("读研之始 ✓");
   });
 
   it("disables tools on disconnection or outside a running game and escapes status logs", () => {

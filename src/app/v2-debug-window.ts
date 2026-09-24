@@ -5,6 +5,7 @@ import "../styles/debug-panel.css";
 const DEBUG_WINDOW_ACTIONS = new Set([
   "debug-adjust-stat", "debug-shift-month", "force-next-month", "debug-add-paper",
   "debug-add-all-buffs", "debug-add-relationship", "debug-trigger-event", "restart-game", "reset-game",
+  "debug-toggle-event-replay", "debug-adjust-action-points",
 ]);
 
 export function isDebugWindowActionData(value: unknown): value is Record<string, string> {

@@ -54,7 +54,7 @@ describe("v2 reading system", () => {
       consumeMonthlyAction: false,
       allowSanOverdraw: true,
       writeLog: false,
-      source: "帮忙审稿",
+      source: "审稿任务",
     });
 
     expect(resolved.appliedCount).toBe(2);

@@ -58,9 +58,9 @@ describe("v2 event scheduler", () => {
     for (const item of cases) {
       const event = createTeachersDayEvent(state, () => item.roll);
       const choiceEvent = event.choices[0]?.effects.enqueueEvents?.[0];
-      expect(event.description).toContain("你和导师关系一般（当前好感等级：陌生）");
-      expect(event.description).not.toContain("分寸感");
-      expect(choiceEvent?.description).toContain("祝福");
+      expect(event.description).toContain("导师在群里回了句“谢谢大家”");
+      expect(event.description).not.toContain("好感等级");
+      expect(choiceEvent?.description).toContain("节日问候");
       expect(choiceEvent?.description).not.toContain("万一导师正好有事找我帮忙");
       expect(choiceEvent?.description).not.toContain("不会显得空手");
       expect(choiceEvent?.description).not.toContain("不会显得敷衍");
@@ -175,6 +175,25 @@ describe("v2 event scheduler", () => {
     expect(result.outcome).toContain("SAN -3，导师好感+1");
     expect(result.enqueueEvents?.[0]?.description).toContain("SAN -3\n导师好感+1");
     expect(result.enqueueEvents?.[0]?.completionLog).toContain("SAN -3，导师好感+1");
+    expect(result.outcome).toContain("报销跑腿（50%）");
+    expect(result.enqueueEvents?.[0]?.description).toContain("透明概率：导师好感 < 6 时");
+  });
+
+  it("shows both Teacher's Day message conditions and their probabilities", () => {
+    const base = createInitialState();
+    const state = {
+      ...base,
+      phase: "playing" as const,
+      year: 1,
+      month: 1,
+      totalMonths: 1,
+      player: { ...base.player, favor: 6 },
+    };
+    const choiceEvent = createTeachersDayEvent(state, () => 0).choices[0]?.effects.enqueueEvents?.[0];
+    expect(choiceEvent?.description).toContain("导师好感 ≥ 6 时");
+    const result = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => 0);
+    expect(result.outcome).toContain("导师分享想法（50%）");
+    expect(result.enqueueEvents?.[0]?.description).toContain("导师礼貌回复（50%）");
   });
 
   it("collects fixed events by month", () => {
@@ -235,7 +254,7 @@ describe("v2 event scheduler", () => {
       const hardResult = hardChoice?.effects.enqueueEvents?.at(-1);
       const medicineChoice = decision?.choices.find((choice) => choice.label === "先买药");
       const medicineResult = medicineChoice?.effects.enqueueEvents?.at(-1);
-      expect(decision?.description).toContain("买药要");
+      expect(decision?.description).toContain("买药");
       expect(hardChoice?.outcome).toMatch(/^SAN 上限 -[123]｜生病概率 ×0\.5$/u);
       expect(hardChoice?.outcome).not.toContain("大病一场");
       expect(hardResult?.description.split("机制结算")[0]).toContain("去了实验室");
@@ -331,6 +350,25 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(-2);
   });
 
+  it("can generate a female junior for the mentoring event", () => {
+    const initial = createInitialState();
+    const state = {
+      ...initial,
+      phase: "playing" as const,
+      year: 2,
+      month: 5,
+      totalMonths: 17,
+      player: { ...initial.player, social: 0 },
+      availableRandomEvents: [1],
+      usedRandomEvents: [],
+      totalRandomEventCount: 0,
+    };
+    const result = collectRandomEventsForMonth(state, fromRolls([0.7, 0, 0, 0.99, 0.99, 0.99]));
+    const junior = getDecisionChoices(result.events[0])[1]?.effects.fellowAdditions?.[0];
+
+    expect(junior?.gender).toBe("female");
+  });
+
   it("builds the real event 2 choices with independent review effects and junior hooks", () => {
     const initial = createInitialState();
     const baseState = {
@@ -347,7 +385,7 @@ describe("v2 event scheduler", () => {
 
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
-    expect(result.events[0]?.title).toBe("帮忙审稿");
+    expect(result.events[0]?.title).toBe("审稿任务");
     expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["婉言推辞", "认真审稿", "交给师弟师妹"]);
     expect(getDecisionChoices(result.events[0])[0]?.effects.favor).toBe(-1);
     expect(getDecisionChoices(result.events[0])[1]?.effects).toMatchObject({
@@ -443,7 +481,7 @@ describe("v2 event scheduler", () => {
     expect(familiarChoice?.effects.social).toBe(-1);
     expect(unfamiliarDecision?.description).not.toMatch(/社交.*\d/);
     expect(familiarDecision?.description).not.toMatch(/社交.*\d/);
-    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("暂无熟悉的师弟或师妹");
+    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("无熟悉的师弟/师妹");
     expect(familiarChoice?.effects.enqueueEvents?.[0]?.description).toContain("师弟");
   });
 
@@ -481,7 +519,7 @@ describe("v2 event scheduler", () => {
     expect(familiarChoice?.effects.social).toBe(-1);
     expect(unfamiliarDecision?.description).not.toMatch(/社交.*\d/);
     expect(familiarDecision?.description).not.toMatch(/社交.*\d/);
-    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("暂无熟悉的师弟或师妹");
+    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("无熟悉的师弟/师妹");
     expect(familiarChoice?.effects.enqueueEvents?.[0]?.description).toContain("师妹");
   });
 

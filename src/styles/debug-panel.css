@@ -24,6 +24,9 @@ body.debug-popup-page {
 .debug-popup-stat-row .debug-popup-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .debug-popup-stat-row strong { font-size: 12px; white-space: nowrap; }
 .debug-popup-stat-row b { margin-left: 4px; font-variant-numeric: tabular-nums; }
+.debug-popup-debug-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 1.6fr); align-items: center; gap: 8px; margin-bottom: 7px; }
+.debug-popup-debug-row strong { font-size: 12px; white-space: nowrap; }
+.debug-popup-debug-row b { margin-left: 4px; font-variant-numeric: tabular-nums; }
 .debug-popup-buttons { display: flex; flex-wrap: wrap; gap: 5px; }
 .debug-popup button { min-height: 30px; margin: 0; padding: 4px 8px; border: 1px solid #b6a17b; border-radius: 4px; background: linear-gradient(#fffdf7, #f2ecdf); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; box-shadow: 0 1px 0 #d1c4ac; }
 .debug-popup button:hover:not(:disabled) { border-color: #a6803f; background: #f7ecd5; }

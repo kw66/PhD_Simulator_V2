@@ -1,5 +1,5 @@
 import type { FellowProfileAddition, FellowProgressProfile, FellowTaskType, FellowTypeId, Gender } from "./v2-types";
-import { pickStableRandomName } from "./v2-random-name";
+import { pickRandomAdvisorName, pickStableRandomName } from "./v2-random-name";
 import { generatePaperTopic, type FixedPaperTopic } from "./v2-paper-topics";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { getCalendarForTotalMonths } from "./v2-progression";
@@ -73,10 +73,14 @@ export function getUniqueFellowName(candidate: string, usedNames: readonly strin
 export function createGeneratedFellowProfileAddition(
   type: FellowTypeId,
   seed: number,
-  gender = getStableGeneratedGender(seed),
+  gender?: Gender,
   usedNames: readonly string[] = [],
+  getNameRoll?: () => number,
 ): FellowProfileAddition {
   const normalizedSeed = Math.abs(Math.floor(seed));
+  const resolvedGender = gender ?? (getNameRoll
+    ? (getNameRoll() < 0.5 ? "male" : "female")
+    : getStableGeneratedGender(seed));
   const profileBase = type === "senior"
     ? { research: 6 + normalizedSeed % 4, affinity: 1 }
     : type === "peer"
@@ -84,17 +88,32 @@ export function createGeneratedFellowProfileAddition(
       : { research: normalizedSeed % 4, affinity: 1 };
 
   const occupied = new Set(usedNames.map((name) => name.trim()).filter(Boolean));
-  let name = getStableGeneratedFellowName(seed, gender);
+  let name = getNameRoll
+    ? pickRandomAdvisorName(getNameRoll)
+    : getStableGeneratedFellowName(seed, resolvedGender);
   if (occupied.has(name)) {
-    for (let attempt = 1; attempt <= 32; attempt += 1) {
-      const candidate = pickStableRandomName(`fellow:${Math.abs(Math.floor(seed))}:${gender}:unique:${attempt}`);
-      if (!occupied.has(candidate)) {
-        name = candidate;
-        break;
+    if (getNameRoll) {
+      for (let attempt = 1; attempt <= 32; attempt += 1) {
+        const candidate = pickRandomAdvisorName(getNameRoll);
+        if (!occupied.has(candidate)) {
+          name = candidate;
+          break;
+        }
+      }
+    } else {
+      for (let attempt = 1; attempt <= 32; attempt += 1) {
+        const candidate = pickStableRandomName(`fellow:${Math.abs(Math.floor(seed))}:${resolvedGender}:unique:${attempt}`);
+        if (!occupied.has(candidate)) {
+          name = candidate;
+          break;
+        }
       }
     }
+    if (occupied.has(name)) {
+      name = getUniqueFellowName(name, usedNames, `random:${seed}`);
+    }
   }
-  return { type, gender, name, ...profileBase };
+  return { type, gender: resolvedGender, name, ...profileBase };
 }
 
 function createFellowProgressProfileId(type: FellowTypeId, startTotalMonths: number): string {

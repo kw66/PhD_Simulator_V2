@@ -15,15 +15,15 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
       ? `凭之前攒下的会务经验，自费能省 ${discount} 金币。`
     : "";
   const advisorHint = state.player.favor >= 6
-    ? "你对着报告日程算了算预算：“老师平时挺支持我，这次问问能不能报销？”"
-    : "你对着报告日程算了算预算：“和老师说话还有点拘谨，这次要开口问报销吗？”";
+    ? "你把几场想听的报告圈了出来，越看越想去。老师平时支持你出去交流，申请报销的消息已经在心里打好了草稿。"
+    : "日程上有好几场你想听的报告。你打开导师的聊天框，刚打下“老师，我想去参会”，到了报销两个字，又开始斟酌措辞。";
   const selfPayHint = state.player.favor >= 6
     ? actualCost === 0
-      ? "“这次参会不用自己花金币，倒是不用再麻烦老师。”"
-      : `“自己出 ${actualCost} 金币也行，就是这趟得从生活费里匀了。”`
+      ? "预算算到最后，自费也不用花金币。你一下轻松了，刚才还在盘算的开销终于可以划掉。"
+      : `自费要 ${actualCost} 金币。你对着这个数又算了一遍生活费，刚才看报告日程的兴奋里，添了一点心疼。`
     : actualCost === 0
-      ? "“这次参会不用自己花金币，那就不用开口问老师了。”"
-      : `“自己出 ${actualCost} 金币，至少不用为报销来回琢磨了。”`;
+      ? "再核对预算，自费居然也不用花金币。你松了口气，刚才琢磨半天的那句报销申请终于用不上了。"
+      : `自费要 ${actualCost} 金币。你在余额和聊天框之间切了两回：钱花出去心疼，申请报销这几个字也真难开口。`;
 
   return createFixedEvent({
     id: `ccig-decision-act2-y${state.year}-m${state.month}`,

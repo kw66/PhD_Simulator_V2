@@ -14,6 +14,9 @@ export function enqueueResolvedEventFollowUps(
   resolvedChainId: string,
   resolvedHistory: ResolvedEventStage[],
   deferredStatePatch?: DeferredEventStatePatch,
+  debugRootEventId?: string,
+  replayContext?: PendingEvent["replayContext"],
+  randomReplay?: PendingEvent["randomReplay"],
 ): { nextState: GameState; hasSameChainFollowUp: boolean } {
   let nextState = state;
   let hasSameChainFollowUp = false;
@@ -22,12 +25,17 @@ export function enqueueResolvedEventFollowUps(
   for (const event of [...resolvedEnqueueEvents, ...(choice.effects.enqueueEvents ?? [])]) {
     const shouldAttachDeferredPatch = !attachedDeferredPatch
       && deferredStatePatch !== undefined
-      && event.chainId === resolvedChainId
-      && (event.stage === "result" || event.description.includes("机制结算"));
+      && event.chainId === resolvedChainId;
     const eventWithHistory = event.chainId === resolvedChainId
       ? {
           ...event,
           history: resolvedHistory,
+          ...(replayContext ? { replayContext } : {}),
+          ...(randomReplay ? { randomReplay } : {}),
+          ...(debugRootEventId ? {
+            debugReplayable: true,
+            debugRootEventId,
+          } : {}),
           ...(shouldAttachDeferredPatch ? { deferredStatePatch } : {}),
         }
       : event;

@@ -102,7 +102,7 @@ describe("v2 debug relationship additions", () => {
       });
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: type });
 
-      expect(generator).toHaveBeenLastCalledWith(type, expect.any(Number), undefined, expect.any(Array));
+      expect(generator).toHaveBeenLastCalledWith(type, expect.any(Number), undefined, expect.any(Array), expect.any(Function));
       expect(next).toEqual({
         ...before,
         fellowProgressState: [...before.fellowProgressState, { ...expectedProfile, id: expect.any(String), researchTopic: fellowProgression.getFellowResearchTopic({ ...next.fellowProgressState.at(-1)!, researchTopic: undefined }) }],
@@ -203,8 +203,7 @@ describe("v2 debug relationship additions", () => {
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: type });
       const profile = next.fellowProgressState[0];
 
-      expect(profile?.gender).toBe(seed === 6 ? "male" : "female");
-      expect(profile?.name).toBe(fellowProgression.getStableGeneratedFellowName(seed, profile!.gender));
+      expect(["male", "female"]).toContain(profile?.gender);
       expectFullGeneratedName(profile?.name);
       const progressed = dispatchAction(next, "next-month");
       expect(progressed.totalMonths).toBe(totalMonths + 1);
@@ -329,7 +328,7 @@ describe("v2 natural relationship names", () => {
 
       const profile = state.fellowProgressState[0];
       const gender = roll < 0.5 ? "male" : "female";
-      expect(profile).toMatchObject({ type, gender, name: fellowProgression.getStableGeneratedFellowName(serial, gender) });
+      expect(profile).toMatchObject({ type, gender });
       expectFullGeneratedName(profile?.name);
       const progressed = dispatchAction(state, "next-month");
       expect(progressed.totalMonths).toBe(7);

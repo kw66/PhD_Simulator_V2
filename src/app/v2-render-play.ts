@@ -78,7 +78,7 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
-import type { DateDisplayMode, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent, RoleDefinition } from "../core/v2-types";
+import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent, RoleDefinition } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type PlayTabId,
@@ -670,6 +670,102 @@ function getEventRootTitle(title: string): string {
   return normalizeGameDisplayText(title.split("➜")[0]?.trim() || title.trim());
 }
 
+const EVENT_EMOJI_THEMES: readonly [string, readonly [string, string, string]][] = [
+  ["肚子虚弱", ["💩", "🚽", "😮‍💨"]],
+  ["流感来袭", ["🤧", "💊", "😷"]],
+  ["高烧不退", ["🌡️", "💉", "🥵"]],
+  ["教师节", ["🎁", "💬", "😊"]],
+  ["寒假", ["🏠", "🧳", "😌"]],
+  ["暑假", ["☀️", "🗓️", "😎"]],
+  ["国奖", ["🏆", "📋", "🎉"]],
+  ["学年总结", ["📅", "📝", "✅"]],
+  ["读研之始", ["🎓", "🧭", "🚪"]],
+  ["转博", ["🔬", "🧠", "🎓"]],
+  ["指导新生", ["🧑‍🏫", "💻", "🤝"]],
+  ["指导师弟", ["🧑‍💻", "🧑‍🏫", "🤝"]],
+  ["指导师妹", ["🧑‍💻", "🧑‍🏫", "🤝"]],
+  ["师兄指导", ["🧑‍🏫", "📚", "💡"]],
+  ["师姐指导", ["🧑‍🏫", "📚", "💡"]],
+  ["毕设辅导", ["🎓", "🗂️", "😮‍💨"]],
+  ["审稿", ["📄", "🔍", "📝"]],
+  ["论文结果", ["📄", "👀", "📬"]],
+  ["论文推进", ["📄", "✍️", "✅"]],
+  ["导师项目", ["📋", "💼", "💰"]],
+  ["横向项目", ["📋", "🤝", "💰"]],
+  ["纵向项目", ["📋", "🔬", "💰"]],
+  ["调整分工", ["📋", "🧩", "🤝"]],
+  ["分工协作", ["📋", "🤝", "✅"]],
+  ["导师约谈", ["🧑‍🏫", "💬", "📅"]],
+  ["汇报进展", ["📊", "💬", "✅"]],
+  ["当面请教", ["🧑‍🏫", "❓", "💡"]],
+  ["组会汇报", ["📊", "🗣️", "😅"]],
+  ["深入汇报", ["📊", "🧪", "✅"]],
+  ["系列汇报", ["📊", "🗣️", "📚"]],
+  ["摸鱼划水", ["📊", "😅", "🫠"]],
+  ["组内团建", ["🎉", "🍽️", "😄"]],
+  ["导师经费", ["💰", "🧾", "😌"]],
+  ["显卡采购", ["🖥️", "💳", "✅"]],
+  ["涨工资", ["💰", "🧾", "😊"]],
+  ["布置工位", ["🪑", "🛠️", "✨"]],
+  ["报销 AI 费用", ["🤖", "🧾", "💡"]],
+  ["不断学习", ["📚", "💡", "🧠"]],
+  ["基础学习", ["📚", "🔎", "💡"]],
+  ["技术深挖", ["💻", "🔬", "🧠"]],
+  ["读源码", ["💻", "🔍", "💡"]],
+  ["理论推导", ["📐", "🧠", "✅"]],
+  ["同门合作", ["🤝", "🧩", "💬"]],
+  ["师兄/师姐指导", ["🧑‍🏫", "📚", "🤝"]],
+  ["交换合作", ["🤝", "💬", "💡"]],
+  ["互补合作", ["🤝", "📄", "✅"]],
+  ["拒绝合作", ["🤝", "🛑", "🧘"]],
+  ["新增同门", ["🤝", "📝", "🎉"]],
+  ["继续合作", ["🤝", "📋", "🔗"]],
+  ["先观望", ["👀", "⏳", "😌"]],
+  ["浅合作", ["🤝", "🧩", "💡"]],
+  ["深合作", ["🤝", "🔬", "📄"]],
+  ["拜入门下", ["🧑‍🏫", "📚", "💡"]],
+  ["署名风波", ["✍️", "💬", "⚖️"]],
+  ["向导师诉苦", ["✍️", "💬", "🧑‍🏫"]],
+  ["转移目标", ["✍️", "🔄", "📝"]],
+  ["据理力争", ["✍️", "⚖️", "✅"]],
+  ["极端施压", ["✍️", "⚠️", "🧯"]],
+  ["显卡故障", ["🖥️", "🛠️", "✅"]],
+  ["找导师", ["🖥️", "🧑‍🏫", "🛠️"]],
+  ["举报挖矿", ["🖥️", "🚫", "✅"]],
+  ["自己重装", ["🖥️", "🛠️", "✅"]],
+  ["淘宝维修", ["🖥️", "📦", "✅"]],
+  ["淘宝翻车", ["🖥️", "📦", "😵"]],
+  ["游戏放松", ["🎮", "🕹️", "😄"]],
+  ["数据丢失", ["💾", "🧰", "😵"]],
+  ["熬夜恢复", ["💾", "🌙", "✅"]],
+  ["重新开始", ["💾", "🔁", "📁"]],
+  ["数据找回", ["💾", "🧰", "✅"]],
+  ["留下隐患", ["💾", "⚠️", "😬"]],
+  ["被抢发idea", ["💡", "🛡️", "🧩"]],
+  ["新SOTA", ["📈", "🧪", "🚀"]],
+  ["联合培养", ["🤝", "🌐", "🧳"]],
+  ["毕业论文", ["🎓", "📚", "✅"]],
+  ["临时事务", ["📝", "📋", "✅"]],
+  ["会场活动", ["🏟️", "🎤", "🌆"]],
+  ["年会", ["🎤", "🧳", "🌆"]],
+  ["年会活动", ["🏟️", "🎤", "🌆"]],
+  ["论文参会", ["📄", "🎤", "🧳"]],
+  ["羽毛球", ["🏸", "🏃", "🏅"]],
+  ["德州扑克", ["🃏", "💰", "😅"]],
+  ["KTV 唱歌", ["🎤", "🎶", "😄"]],
+  ["聚餐", ["🍽️", "💬", "😊"]],
+  ["发展关系", ["💬", "❤️", "💞"]],
+  ["实习邀请", ["💼", "📅", "🚀"]],
+  ["招聘", ["💼", "📄", "🎉"]],
+];
+
+function getEventEmoji(title: string, stage: EventStage = "act1"): string {
+  const root = getEventRootTitle(title);
+  const theme = EVENT_EMOJI_THEMES.find(([keyword]) => root.includes(keyword))?.[1]
+    ?? ["📌", "🧭", "✅"] as const;
+  return stage === "act2" ? theme[1] : stage === "act3" || stage === "act4" || stage === "result" ? theme[2] : theme[0];
+}
+
 export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[] {
   const items: TodoPreviewItem[] = [];
   const reviewingPapers = state.papers.filter((paper) => paper.status === "reviewing" && paper.reviewMonthsLeft > 0);
@@ -754,7 +850,11 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
   return items;
 }
 
-function renderEventDescriptionHtml(description: string, mergeNarrative = true): string {
+function renderEventDescriptionHtml(
+  description: string,
+  _mergeNarrative = true,
+  eventEmoji = "",
+): string {
   const normalized = description.trim();
   if (!normalized) {
     return "<p>请点击下方按钮继续。</p>";
@@ -779,19 +879,23 @@ function renderEventDescriptionHtml(description: string, mergeNarrative = true):
         .map((line) => line.trim().replace(/[。.]+$/u, ""))
         .filter((line) => line && line !== "机制结算" && line !== "本次活动结果");
   const storyBlocks: { paragraphs: string[]; isNarrative: boolean }[] = [];
+  let narrativeBlockCount = 0;
   for (const paragraph of storyParagraphs) {
     const isNarrative = !/^(?:备注|小提示)：/u.test(paragraph) && !paragraph.includes("\n")
       && paragraph.length <= 160 && !/^-{3,}$/u.test(paragraph)
       && !/^(?:规则|条件|判定|培养安排|工资|待遇|毕业|转博|转博士|科研分|送审|录用|发表|会议)[：:]/u.test(paragraph);
-    const previous = storyBlocks.at(-1);
-    if (mergeNarrative && isNarrative && previous?.isNarrative && previous.paragraphs.join("").length + paragraph.length <= 260) {
-      previous.paragraphs.push(paragraph);
-    } else {
-      storyBlocks.push({ paragraphs: [paragraph], isNarrative });
+    if (isNarrative && narrativeBlockCount >= 2) {
+      const previousNarrative = [...storyBlocks].reverse().find((block) => block.isNarrative);
+      if (previousNarrative) {
+        previousNarrative.paragraphs[previousNarrative.paragraphs.length - 1] = `${previousNarrative.paragraphs.at(-1) ?? ""} ${paragraph}`;
+        continue;
+      }
     }
+    if (isNarrative) narrativeBlockCount += 1;
+    storyBlocks.push({ paragraphs: [paragraph], isNarrative });
   }
   const storyHtml = storyBlocks
-    .map(({ paragraphs: blockParagraphs, isNarrative }) => {
+    .map(({ paragraphs: blockParagraphs, isNarrative }, index) => {
       const paragraph = blockParagraphs.join("");
       if (/^-{3,}$/u.test(paragraph)) {
         return '<hr class="event-description-divider" role="separator">';
@@ -799,7 +903,14 @@ function renderEventDescriptionHtml(description: string, mergeNarrative = true):
       const isTip = /^(?:备注|小提示)：/u.test(paragraph);
       const displayText = paragraph.replace(/^备注：/u, "小提示：");
       const className = isTip ? ' class="event-description-note"' : isNarrative ? ' class="event-description-story"' : "";
-      return `<p${className}>${isTip ? '<span aria-hidden="true">💡</span> ' : ""}${renderEventInlineHtml(displayText)}</p>`;
+      const renderedText = renderEventInlineHtml(displayText);
+      const inlineEmoji = index === 0 && eventEmoji && !/^\s*\p{Extended_Pictographic}/u.test(displayText)
+        ? `<span class="event-description-emoji" aria-hidden="true">${eventEmoji}</span>`
+        : "";
+      const body = inlineEmoji
+        ? renderedText.replace(/([。！？!?])/u, `$1${inlineEmoji}`)
+        : renderedText;
+      return `<p${className}>${isTip ? '<span aria-hidden="true">💡</span> ' : ""}${body}</p>`;
     })
     .join("");
   const settlementHtml = renderEventSettlementSummary(settlementItems);
@@ -809,7 +920,7 @@ function renderEventDescriptionHtml(description: string, mergeNarrative = true):
 
 function isEventSettlementCondition(value: string): boolean {
   if (/[<>≥≤]/u.test(value) || /第\s*\d+\s*档/u.test(value)) return true;
-  return /^(?:达到科研分门槛|获胜|落败|无本金|押注|导师请客|AA 聚餐|重装成功|重装失败|维修成功|维修翻车|导师到场|导师缺席|有熟悉的|暂无熟悉的|获得审稿灵感|未获得审稿灵感|对方选择留组|对方毕业离组|互挂成功|互挂未成|没有后续波澜|转而专注自身研究)/u.test(value);
+  return /^(?:达到科研分门槛|获胜|落败|无本金|押注|导师请客|AA 聚餐|重装成功|重装失败|维修成功|维修翻车|导师到场|导师缺席|有熟悉的|无熟悉的|获得审稿灵感|未获得审稿灵感|对方考研进组|对方毕业|互挂成功|互挂未成|没有后续波澜|转而专注自身研究)/u.test(value);
 }
 
 function splitEventSettlementItems(text: string): string[] {
@@ -862,9 +973,44 @@ function splitEventSettlementRows(items: string[]): { conditions: string[]; resu
   return { conditions, results };
 }
 
+const EVENT_SETTLEMENT_EFFECT_PATTERN = /(导师科研积累|科研积累|导师经费|科研经费|经费|恋人科研|恋人亲密度|恋人亲密|师兄科研|师弟科研|师妹科研|同门科研|师兄默契|师弟默契|师妹默契|同门默契|科研分|科研上限|SAN\s*上限|SAN\s*消耗|SAN|金币|导师好感|生病概率|社交|亲密度|默契|科研|idea|实验|写作|论文进度|下次写论文|下次做实验|下次想 idea|行动点)(\s*)([+＋\-−]?\s*\d+(?:\.\d+)?(?:%|分|次|月)?|×\s*\d+(?:\.\d+)?)/gu;
+
+function getEventSettlementEffectTone(label: string): string {
+  if (/SAN|生病概率/u.test(label)) return "is-san";
+  if (/金币/u.test(label)) return "is-money";
+  if (/导师科研积累|科研积累/u.test(label)) return "is-advisor-research";
+  if (/经费/u.test(label)) return "is-advisor-funding";
+  if (/科研分/u.test(label)) return "is-score";
+  if (/恋人科研|师兄科研|师弟科研|师妹科研|同门科研|科研/u.test(label)) return "is-research";
+  if (/idea|实验|写作|论文/u.test(label)) return "is-research";
+  if (/社交|好感|亲密/u.test(label)) return "is-relationship";
+  if (/师兄默契|师弟默契|师妹默契|同门默契|默契/u.test(label)) return "is-relationship";
+  if (/恋人/u.test(label)) return "is-lover";
+  if (/师兄|师弟|师妹|同门/u.test(label)) return "is-fellow";
+  return "is-general";
+}
+
+function renderEventSettlementValue(value: string): string {
+  const normalized = normalizeGameDisplayText(value).replace(/[。.]+$/u, "");
+  let cursor = 0;
+  let hasEffect = false;
+  let html = "";
+  for (const match of normalized.matchAll(EVENT_SETTLEMENT_EFFECT_PATTERN)) {
+    const token = match[0] ?? "";
+    const label = match[1] ?? "";
+    const offset = match.index ?? cursor;
+    hasEffect = true;
+    html += escapeHtml(normalized.slice(cursor, offset));
+    html += `<span class="event-settlement-effect ${getEventSettlementEffectTone(label)}">${escapeHtml(token)}</span>`;
+    cursor = offset + token.length;
+  }
+  html += escapeHtml(normalized.slice(cursor));
+  return `<span class="event-settlement-item${hasEffect ? " has-effects" : ""}">${html}</span>`;
+}
+
 function renderEventSettlementValues(values: string[]): string {
   return values
-    .map((value) => `<span class="event-settlement-item">${escapeHtml(normalizeGameDisplayText(value).replace(/[。.]+$/u, ""))}</span>`)
+    .map(renderEventSettlementValue)
     .join('<span class="event-settlement-divider" aria-hidden="true">|</span>');
 }
 
@@ -1009,6 +1155,7 @@ function renderEventContentBox(
   currentEvent: GameState["eventQueue"][number] | null,
   completedEvent: GameState["eventHistory"][number] | null,
   activeHistoryIndex: number | null,
+  debugEventReplayEnabled = false,
 ): string {
   if (!currentEvent && !completedEvent) {
     return `
@@ -1034,7 +1181,17 @@ function renderEventContentBox(
   const displayEvent = historicalPage ?? currentEvent;
   if (!displayEvent) return "";
   const paperReviewPresentation = displayEvent.paperReviewPresentation;
+  const displayStage: EventStage = "stage" in displayEvent
+    ? displayEvent.stage
+    : /结果$/.test(displayEvent.title)
+      ? "result"
+      : displayPageIndex === 0 ? "act1" : "act2";
   const currentEventId = currentEvent?.id ?? "";
+  // A pending event may be replayed while its next scene is awaiting
+  // confirmation. Once the last scene is confirmed it is history only.
+  const debugReplayable = debugEventReplayEnabled
+    && currentEvent?.replayContext !== undefined
+    && historicalPage !== null;
   const selectedChoiceId = historicalPage?.selectedChoiceId ?? null;
   const sceneTabs = isCompleted
     ? completedStages.map((page, index) => ({
@@ -1074,16 +1231,23 @@ function renderEventContentBox(
       <div class="event-content-body" id="event-content-body">
         ${paperReviewPresentation
           ? renderPaperReviewEvent(paperReviewPresentation, historicalPage !== null)
-          : renderEventDescriptionHtml(displayEvent.description, displayEvent.choices.filter((choice) => !isSecondaryEventChoice(choice)).length <= 1)}
+          : renderEventDescriptionHtml(
+            displayEvent.description,
+            displayEvent.choices.filter((choice) => !isSecondaryEventChoice(choice)).length <= 1,
+            getEventEmoji(displayEvent.title, displayStage),
+          )}
       </div>
       ${displayEvent.choices.length > 0 ? `
         <div class="event-content-buttons${displayEvent.choices.every((choice) => choice.fellowCandidate) ? " event-candidate-grid" : ""}" id="event-content-buttons">
           ${displayEvent.choices.map((choice) => {
             const disabledReason = choice.disabledReason?.trim() ?? "";
             const secondary = isSecondaryEventChoice(choice);
-            const isDisabled = historicalPage !== null || disabledReason !== "";
+            const canReplay = debugReplayable && disabledReason === "";
+            const isDisabled = !canReplay && (historicalPage !== null || disabledReason !== "");
             const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"` : "";
-            const buttonAttributes = isDisabled
+            const buttonAttributes = canReplay
+              ? `data-action="debug-replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
+              : isDisabled
               ? `disabled aria-disabled="true"${titleAttribute}`
               : `data-action="resolve-event" data-event-id="${escapeHtml(currentEventId)}" data-event-choice-id="${escapeHtml(choice.id)}"`;
             return `
@@ -1722,7 +1886,9 @@ function getRenderedLoverType(type: LoverTypeId | null): string {
 function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard | null> {
   const cards: Array<RelationshipRenderCard | null> = Array.from({ length: 6 }, () => null);
 
-  if (state.selectedAdvisorName && state.relationshipState.advisorCount > 0) {
+  // The selected advisor is immutable once confirmed.  Keep the card visible
+  // from the stored name even if an older save has a stale advisor counter.
+  if (state.selectedAdvisorName) {
     cards[0] = {
       relationshipId: "advisor",
       type: "advisor",
@@ -2170,8 +2336,11 @@ function renderRelationshipGridSlot(
     if (card) return renderRelationshipGridCard(state, card);
     return `
       <article class="rel-card locked rel-card-lover-locked">
-        <div class="rel-lover-lock-icon" aria-hidden="true">💕</div>
-        <span class="rel-lover-lock-text">恋爱后解锁</span>
+        <div class="rel-card-header rel-card-empty-header" aria-hidden="true"></div>
+        <div class="rel-card-empty-content rel-card-lover-empty-content">
+          <div class="rel-lover-lock-icon" aria-hidden="true">💕</div>
+          <span class="rel-lover-lock-text">恋爱后解锁</span>
+        </div>
       </article>
     `;
   }
@@ -2180,14 +2349,20 @@ function renderRelationshipGridSlot(
     const tierName = getAttrTierName("social", threshold);
     return `
       <article class="rel-card locked">
-        <div class="paper-card-lock-message relationship-card-lock-message">
-          <strong>社交达到${threshold}<span class="new-attr-level attr-level-social relationship-lock-tier">${tierName}</span>解锁</strong>
+        <div class="rel-card-header rel-card-empty-header" aria-hidden="true"></div>
+        <div class="rel-card-empty-content">
+          <div class="paper-card-lock-message relationship-card-lock-message">
+            <strong>社交达到${threshold}<span class="new-attr-level attr-level-social relationship-lock-tier">${tierName}</span>解锁</strong>
+          </div>
         </div>
       </article>
     `;
   }
   if (!card) {
-    return `<article class="rel-card empty"${slotIndex === 0 ? ' data-relationship-type="advisor"' : ""}><div class="section-empty">${getRelationshipEmptyText(slotIndex)}</div></article>`;
+    return `<article class="rel-card empty"${slotIndex === 0 ? ' data-relationship-type="advisor"' : ""}>
+      <div class="rel-card-header rel-card-empty-header" aria-hidden="true"></div>
+      <div class="rel-card-empty-content"><div class="section-empty">${getRelationshipEmptyText(slotIndex)}</div></div>
+    </article>`;
   }
   return renderRelationshipGridCard(state, card);
 }
@@ -3503,7 +3678,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
                 state.eventHistory,
                 logPages,
                 openEvent || openHistoryEvent
-                  ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null)
+                  ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null, state.debugEventReplayEnabled === true)
                   : activeLogPage?.kind === "ending"
                     ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state)
                     : "",

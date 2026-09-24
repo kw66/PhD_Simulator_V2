@@ -29,6 +29,7 @@ export function createInitialState(): GameState {
   return {
     phase: "setup",
     blockLinearEvents: true,
+    debugEventReplayEnabled: false,
     selectedRoleId: "normal",
     setupSelectedRoleId: null,
     playerName: null,

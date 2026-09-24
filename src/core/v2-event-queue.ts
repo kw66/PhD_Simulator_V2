@@ -9,6 +9,9 @@ function clampDeadlineMonths(value: number): number {
 export function createEventQueueItem(event: PendingEvent, queueOrder: number): EventQueueItem {
   return {
     ...event,
+    ...(event.stage === "act1" && !event.history?.length && !event.replayContext ? {
+      replayContext: { rootEvent: event },
+    } : {}),
     blocking: event.blocking === true,
     deadlineMonths: clampDeadlineMonths(event.deadlineMonths),
     queueOrder,
@@ -67,7 +70,8 @@ export function enqueueEventQueueItem(eventQueue: EventQueueItem[], event: Pendi
 export function enqueueEventQueueItem(state: GameState, event: PendingEvent): GameState;
 export function enqueueEventQueueItem(input: EventQueueItem[] | GameState, event: PendingEvent): EventQueueItem[] | GameState {
   const eventQueue = Array.isArray(input) ? input : input.eventQueue;
-  if (eventQueue.some((item) => item.id === event.id)) {
+  if (eventQueue.some((item) => item.id === event.id
+    || (event.stage === "act1" && !event.history?.length && item.replayContext?.rootEvent.id === event.id))) {
     return input;
   }
 

@@ -51,6 +51,7 @@ export function createThreeStageEvent(
         deadlineMonths: 0,
         chainId: event.chainId,
         stage: "result",
+        ...(event.randomReplay ? { randomReplay: event.randomReplay } : {}),
         removeBuffIdsOnCompletion: event.removeBuffIdsOnCompletion,
         completionLog: `${choice.label}：${choice.outcome}`,
         choices: [

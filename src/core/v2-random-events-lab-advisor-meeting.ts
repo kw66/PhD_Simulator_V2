@@ -38,7 +38,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   const event: PendingEvent = {
     id: `random-6-y${state.year}-m${state.month}-n${serial}`,
     title: "组会汇报",
-    description: "群里发来明天的组会顺序，你的名字排在第一个。PPT 已经有了封面和“谢谢聆听”，中间还空着。",
+    description: "群里发来明天的组会顺序，你的名字排在第一个。PPT 已经有了封面和“谢谢聆听”，中间还空着😅。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -83,8 +83,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "认真整理手头的进展，至少被问到时知道该翻哪页记录；把几篇论文串起来讲，也许能弄懂它们到底差在哪儿，只是今晚要读的恐怕不止正文。",
-      "你看了眼时间。凑几页图当然快，可明天导师要是指着其中一张问“这是什么意思”，总不能现场一起读。",
+      "实验记录里有几张能用的图，最近看的几篇论文也正好接得上。你试着排了两页，才发现每张图后面都有个还没解释清楚的问题，附录又在浏览器里开了一排。",
+      "饭点已经过了，你把鼠标移到一张现成的图上，真想直接复制过去收工。可那条曲线连自己都没看明白，想到明天站在投影前等人提问，手又停住了。导师会不会来，群里仍然没有准信。",
     ].join("\n\n"),
     results: {
       [`random-6-deep-${serial}`]: {

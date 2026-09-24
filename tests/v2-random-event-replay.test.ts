@@ -124,7 +124,7 @@ describe("random event replay", () => {
     expect(getChoices(10).find((choice) => choice.label === "互挂论文")?.outcome).toContain("互挂未成（50%）");
     expect(getChoices(13).find((choice) => choice.label === "自己重装")?.outcome).toContain("重装失败（50%）");
     expect(getChoices(13).find((choice) => choice.label === "淘宝找人")?.outcome).toContain("维修翻车（50%）");
-    expect(getChoices(1).find((choice) => choice.label === "亲自指导")?.outcome).toContain("对方毕业离组（50%）");
+    expect(getChoices(1).find((choice) => choice.label === "亲自指导")?.outcome).toContain("对方毕业（50%）");
   });
 
   it("adds SAN multiplier and racket bonuses to badminton strength", () => {

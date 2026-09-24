@@ -17,6 +17,7 @@ import type {
   EventChoice,
   EventQueueItem,
   GameState,
+  PendingEvent,
   ResolvedEventStage,
 } from "./v2-types";
 
@@ -42,6 +43,7 @@ const DEFERRED_STATE_EXCLUDED_KEYS: ReadonlySet<keyof GameState> = new Set([
   "log",
   "eventQueue",
   "eventHistory",
+  "debugEventReplayEnabled",
 ]);
 
 function stateValuesMatch(left: unknown, right: unknown): boolean {
@@ -119,6 +121,7 @@ function mergeDeferredArray(previous: unknown[], intended: unknown[], current: u
 }
 
 function rebaseDeferredValue(currentValue: unknown, previousValue: unknown, intendedValue: unknown): unknown {
+  if (stateValuesMatch(previousValue, intendedValue)) return currentValue;
   if (
     typeof currentValue === "number"
     && typeof previousValue === "number"
@@ -224,7 +227,7 @@ function applyDeferredStatePatch(state: GameState, patch: DeferredEventStatePatc
   return nextState;
 }
 
-function rebaseGeneratedEventIds<T>(value: T, generatedEventId: string, queuedEventId: string): T {
+export function rebaseGeneratedEventIds<T>(value: T, generatedEventId: string, queuedEventId: string): T {
   if (generatedEventId === queuedEventId) return value;
   if (typeof value === "string") {
     return value.replaceAll(generatedEventId, queuedEventId) as T;
@@ -247,7 +250,7 @@ function rebuildRandomEventFromCurrentState(
   queuedEvent: EventQueueItem,
 ): EventQueueItem {
   const replay = queuedEvent.randomReplay;
-  if (!replay || queuedEvent.source !== "random" || queuedEvent.stage !== "act1") {
+  if (!replay || queuedEvent.source !== "random" || (queuedEvent.stage !== "act1" && queuedEvent.stage !== "act2")) {
     return queuedEvent;
   }
 
@@ -272,7 +275,20 @@ function rebuildRandomEventFromCurrentState(
     return queuedEvent;
   }
 
-  const rebuiltWithStableIds = rebaseGeneratedEventIds(rebuilt, rebuilt.id, queuedEvent.id);
+  const rootEventId = queuedEvent.replayContext?.rootEvent.id
+    ?? queuedEvent.debugRootEventId
+    ?? /^(.*?)(?:-choice|-result-.*)$/u.exec(queuedEvent.id)?.[1]
+    ?? queuedEvent.id;
+  const rebuiltRoot = rebaseGeneratedEventIds(rebuilt, rebuilt.id, rootEventId);
+  let rebuiltCurrent: PendingEvent = rebuiltRoot;
+  for (const stage of queuedEvent.history ?? []) {
+    const selectedChoice = rebuiltCurrent.choices.find((choice) => choice.id === stage.selectedChoiceId);
+    const nextEvent = selectedChoice?.effects.enqueueEvents?.find((event) => event.chainId === queuedEvent.chainId)
+      ?? selectedChoice?.effects.enqueueEvents?.[0];
+    if (!nextEvent) return queuedEvent;
+    rebuiltCurrent = nextEvent;
+  }
+  const rebuiltWithStableIds = rebaseGeneratedEventIds(rebuiltCurrent, rebuiltCurrent.id, queuedEvent.id);
 
   return {
     ...rebuiltWithStableIds,
@@ -280,11 +296,66 @@ function rebuildRandomEventFromCurrentState(
     queueOrder: queuedEvent.queueOrder,
     history: queuedEvent.history,
     randomReplay: replay,
+    replayContext: queuedEvent.replayContext,
+    deferredStatePatch: queuedEvent.deferredStatePatch,
+    debugRootEventId: queuedEvent.debugRootEventId,
+    ...(queuedEvent.debugReplayable ? {
+      debugReplayable: true,
+      debugRootEventId: queuedEvent.debugRootEventId ?? queuedEvent.id,
+    } : {}),
   };
 }
 
 export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
-  return refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state, rebuildRandomEventFromCurrentState(state, queuedEvent)));
+  return refreshOccupiedLoverEvent(state, refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state,
+    refreshRandomResultPreview(state, rebuildRandomEventFromCurrentState(state, queuedEvent)))));
+}
+
+function refreshOccupiedLoverEvent(state: GameState, event: EventQueueItem): EventQueueItem {
+  if (event.chainId !== "lover-development" || !(state.loverState.active || state.relationshipState.loverCount > 0)) return event;
+  if (event.stage === "act2") {
+    return { ...event, choices: event.choices.map((choice) => choice.id === "accept"
+      ? { ...choice, disabledReason: "已有恋人，无法开始新的恋爱关系。" } : choice) };
+  }
+  if (event.stage !== "result" || event.history?.at(-1)?.selectedChoiceId !== "accept") return event;
+  return {
+    ...event,
+    description: "你已经有了恋人，决定放下这段尚未确认的关系。\n\n机制结算\n已有恋人，本次不新增关系。",
+    deferredStatePatch: undefined,
+    completionLog: "已有恋人，本次不新增关系。",
+  };
+}
+
+function refreshRandomResultPreview(state: GameState, event: EventQueueItem): EventQueueItem {
+  const previousScene = event.history?.at(-1);
+  const source = previousScene?.replayEvent;
+  if (event.stage !== "result" || !event.randomReplay || !source || source.stage !== "act2") return event;
+  const decision: EventQueueItem = {
+    ...source,
+    queueOrder: event.queueOrder,
+    history: event.history?.slice(0, -1),
+    replayContext: event.replayContext,
+    randomReplay: event.randomReplay,
+  };
+  // Recalculate the pending preview from today's relationships/modifiers.
+  // applyQueuedEventEffects defers every same-chain effect, so this never
+  // settles the event. Only its replacement result is kept.
+  const preview = applyQueuedEventEffects({
+    ...state,
+    eventQueue: state.eventQueue.filter((item) => item.id !== event.id),
+  }, decision, previousScene.selectedChoiceId, {
+    evaluateImmediateEndings: (nextState) => nextState,
+    runPostQueuePipeline: (nextState) => nextState,
+  });
+  const result = preview.eventQueue.find((item) => item.id === event.id);
+  return result ? { ...result, queueOrder: event.queueOrder } : event;
+}
+
+export function refreshPendingEventDecisions(state: GameState): GameState {
+  const eventQueue = state.eventQueue.map((event) => (event.stage === "act2" || event.stage === "result")
+    && (event.randomReplay || event.chainId === "lover-development")
+    ? getResolvableQueuedEvent(state, event) : event);
+  return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };
 }
 
 export function applyQueuedEventEffects(
@@ -316,18 +387,26 @@ export function applyQueuedEventEffects(
   );
 
   if (choice.effects.stayOnEvent === true) {
-    return callbacks.evaluateImmediateEndings(resolvedState);
+    const pendingPatch = createDeferredStatePatch(state, resolvedState);
+    return {
+      ...state,
+      eventQueue: resolvedState.eventQueue.map((event) => event.id !== resolvedEvent.id ? event : {
+        ...event,
+        deferredStatePatch: pendingPatch,
+        replayContext: event.replayContext ?? resolvedEvent.replayContext,
+      }),
+    };
   }
 
   const followUpEvents = [...resolvedEnqueueEvents, ...(choice.effects.enqueueEvents ?? [])];
-  const hasSettlementFollowUp = resolvedEvent.stage !== "result" && followUpEvents.some((event) => (
-    event.chainId === resolvedEvent.chainId
-    && (event.stage === "result" || event.description.includes("机制结算"))
-  ));
-  const deferredStatePatch = hasSettlementFollowUp
+  // Every intermediate scene is a preview. Carry its cumulative effects
+  // forward, and commit only when the final confirmation closes this chain.
+  const hasSameChainFollowUp = followUpEvents.some((event) => event.chainId === resolvedEvent.chainId);
+  const deferredStatePatch = hasSameChainFollowUp
     ? createDeferredStatePatch(state, resolvedState)
     : undefined;
-  const committedState = deferredStatePatch ? state : resolvedState;
+  const committedState = hasSameChainFollowUp ? state : resolvedState;
+  const { history: _history, replayContext: _context, ...sceneSource } = resolvedEvent;
   let nextState: GameState = {
     ...committedState,
     eventQueue: removeEventQueueItem(committedState.eventQueue, resolvedEvent.id),
@@ -340,6 +419,7 @@ export function applyQueuedEventEffects(
       paperReviewPresentation: resolvedEvent.paperReviewPresentation,
       choices: resolvedEvent.choices.map(({ id, label, outcome, disabledReason, fellowCandidate }) => ({ id, label, outcome, disabledReason, fellowCandidate })),
       selectedChoiceId: choice.id,
+      replayEvent: sceneSource,
     },
   ];
   const followUpResult = enqueueResolvedEventFollowUps(
@@ -349,6 +429,10 @@ export function applyQueuedEventEffects(
     resolvedEvent.chainId,
     resolvedHistory,
     deferredStatePatch,
+    resolvedEvent.debugReplayable || state.debugEventReplayEnabled
+      ? resolvedEvent.replayContext?.rootEvent.id ?? resolvedEvent.debugRootEventId ?? resolvedEvent.id : undefined,
+    resolvedEvent.replayContext ?? (resolvedEvent.stage === "act1" ? { rootEvent: resolvedEvent } : undefined),
+    resolvedEvent.randomReplay,
   );
   nextState = followUpResult.nextState;
   if (!followUpResult.hasSameChainFollowUp) {
@@ -365,7 +449,11 @@ export function applyQueuedEventEffects(
           completedAtTotalMonths: state.totalMonths,
           completedAtYear: state.year,
           completedAtMonth: state.month,
-          stages: resolvedHistory,
+          stages: resolvedHistory.map(({ replayEvent: _source, ...stage }) => stage),
+          ...(resolvedEvent.debugReplayable ? {
+            debugReplayable: true,
+            debugRootEventId: resolvedEvent.debugRootEventId ?? resolvedEvent.id,
+          } : {}),
         },
       ],
     };

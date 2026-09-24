@@ -40,8 +40,8 @@ describe("v2 before grad school events", () => {
     const act1 = createBeforeGradSchoolAct1Event(createInitialState(), () => 0);
 
     expect(act1.description).toContain("大三下");
-    expect(act1.description).toContain("计算机类专业");
-    expect(act1.description).toContain("是计算机类专业");
+    expect(act1.description).toContain("人工智能专业");
+    expect(act1.description).toContain("是人工智能专业");
     expect(act1.description).toContain("还没想清楚是否喜欢科研");
     expect(act1.description).toContain("打算随大流继续读研");
     expect(act1.description).toContain("随大流");

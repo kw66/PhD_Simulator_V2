@@ -1,5 +1,6 @@
 ﻿import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel, getFellowPronoun, getPlayerHonorific } from "./v2-fellow-progression";
+import { getActiveAiModels } from "./v2-ai-shop";
 import { getRoleDefinition } from "./v2-progression";
 import { canAddRelationship } from "./v2-relationship-rules";
 import { previewReadPaperActions } from "./v2-reading-system";
@@ -17,19 +18,14 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
     state.selectedAdvisorName ?? "",
     state.loverState.name ?? "",
   ];
-  const mentorshipJunior = createGeneratedFellowProfileAddition("junior", serial, undefined, usedNames);
-  const mentorshipJuniorName = mentorshipJunior.name ?? "这名本科生";
-  const mentorshipJuniorLabel = getFellowRoleLabel(mentorshipJunior.type, mentorshipJunior.gender);
-  const mentorshipJuniorPronoun = getFellowPronoun(mentorshipJunior.gender);
   const familiarJunior = state.fellowProgressState.find((profile) => profile.type === "junior");
   const hasJunior = familiarJunior !== undefined;
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
   const familiarJuniorLabel = familiarJunior ? getFellowRoleLabel(familiarJunior.type, familiarJunior.gender) : "";
   const familiarJuniorName = familiarJunior ? getFellowName(familiarJunior) : familiarJuniorLabel;
-  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 101);
-  const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const playerHonorific = getPlayerHonorific(getRoleDefinition(state.selectedRoleId).gender);
-  const becomesJunior = canAddJunior && getRoll() < 0.5;
+  const staysForGradSchool = getRoll() < 0.5;
+  const becomesJunior = staysForGradSchool && canAddJunior;
   const refuseFavorResult = applyTierResist(-1, state.player.favor, getRoll);
   const refuseFavorChange = refuseFavorResult.effectiveChange;
   const refuseFavorNarrative = getTierResistedNarrative("导师好感", -1, refuseFavorResult);
@@ -40,11 +36,22 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
   const mentoringSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const mentoringSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const mentoringSanNarrative = getResearchMiscSanNarrative(-4, state.player.research);
+  const mentorshipJunior = createGeneratedFellowProfileAddition("junior", serial, undefined, usedNames, getRoll);
+  const guidedJunior = {
+    ...mentorshipJunior,
+    research: Math.min(20, mentorshipJunior.research + 1),
+    affinity: Math.min(20, mentorshipJunior.affinity + 1),
+  };
+  const mentorshipJuniorName = mentorshipJunior.name ?? "这名本科生";
+  const mentorshipJuniorLabel = getFellowRoleLabel(mentorshipJunior.type, mentorshipJunior.gender);
+  const mentorshipJuniorPronoun = getFellowPronoun(mentorshipJunior.gender);
+  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 101, undefined, [], getRoll);
+  const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
 
   const event: PendingEvent = {
     id: `random-1-y${state.year}-m${state.month}-n${serial}`,
     title: "毕设辅导",
-    description: "导师转来一份本科毕设草稿，请你帮忙看看。你翻到实验部分，表格里的空白格比预想的多了几处。",
+    description: `导师把本科生${mentorshipJuniorName}的毕设进展发给你，安排你接手其中的实验核对。已有结果还缺关键对照，答辩时间也已经排进日程。`,
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -60,13 +67,13 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
       {
         id: `random-1-self-${serial}`,
         label: "亲自指导",
-        outcome: becomesJunior
-          ? `${formatProbabilityCondition("对方选择留组", 0.5)}｜${mentoringSanSummary}${canAddJunior ? `｜新增一位${mentorshipJuniorLabel}` : "｜关系栏已满，暂不新增"}`
-          : `${canAddJunior ? formatProbabilityCondition("对方毕业离组", 0.5) : "对方毕业离组"}｜${mentoringSanSummary}`,
+        outcome: staysForGradSchool
+          ? `${formatProbabilityCondition("对方考研进组", 0.5)}｜${mentoringSanSummary}${canAddJunior ? `｜新增一位${mentorshipJuniorLabel}（${mentorshipJuniorLabel}科研+1，${mentorshipJuniorLabel}默契+1）` : "｜关系栏已满，暂不新增"}`
+          : `${formatProbabilityCondition("对方毕业", 0.5)}｜${mentoringSanSummary}`,
         effects: becomesJunior
           ? {
             san: mentoringSanChange,
-            ...(canAddJunior ? { fellowAdditions: [mentorshipJunior] } : {}),
+            ...(canAddJunior ? { fellowAdditions: [guidedJunior] } : {}),
           }
           : {
             san: mentoringSanChange,
@@ -75,7 +82,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
       {
         id: `random-1-delegate-${serial}`,
         label: "转给师弟师妹",
-        outcome: `${hasJunior ? `有熟悉的${familiarJuniorLabel}` : "暂无熟悉的师弟或师妹"}｜${formatTierResistedOutcome("社交", delegateSocialRaw, delegateSocialResult)}`,
+        outcome: `${hasJunior ? `有熟悉的${familiarJuniorLabel}` : "无熟悉的师弟/师妹"}｜${formatTierResistedOutcome("社交", delegateSocialRaw, delegateSocialResult)}`,
         effects: delegateSocialChange < 0 ? { social: delegateSocialChange } : {},
       },
     ],
@@ -83,19 +90,19 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      `导师转来一份本科毕设草稿，请你帮忙把关。没过多久，本科生也抱着电脑来了，${mentorshipJuniorPronoun}打开文档，几处表格还空着。`,
-      `你翻到实验部分，结论写得很有把握，对照结果却还没补齐。旁边的批注留着一句“这里后面再改”，光标正停在那里。`,
+      `导师把本科生${mentorshipJuniorName}的毕设进展发给你，安排你接手其中的实验核对。已有结果还缺关键对照，答辩时间也已经排进日程。`,
+      `你翻到实验部分，结论写得很有把握，对照结果却还没补齐。导师在消息里标出几处需要补上的表格，让你先从最关键的一组开始。`,
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "这些空白格要一项项补，亲自带着做，少不了几晚对着屏幕解释。你才刚排好的研究计划，看来又得给别人的答辩让一让。",
-      "直接推辞能留住时间，只是导师未必高兴；转给师弟师妹也能搭把手，可对方的日程大概也没比你空多少。",
+      "你在空白表格旁标出几个问题，往下翻，又添了两条。光把结果补上还不够，答辩时为什么这样做，也得让对方自己讲清楚。",
+      "自己的会议 ddl 也在逼近。你把两边的安排放在一起，刚腾出来的那点空闲又填满了。想到要向导师推辞，你有些难开口；再看看同门的聊天列表，把这份任务转过去也让你过意不去。",
     ].join("\n\n"),
     results: {
       [`random-1-refuse-${serial}`]: {
         title: "婉拒",
         description: [
-          "你把近期的研究安排发给导师，说明这次实在腾不出时间。消息发出后，你盯着聊天框等了一会儿，才收到一句“知道了”。",
+          "你把近期的研究安排发给导师，说明最近要赶会议 ddl，这次实在腾不出时间。消息发出后，你盯着聊天框等了一会儿，才收到导师一句“好”。",
           refuseFavorChange < 0
             ? "导师没有再安排辅导，回复却比平时冷了些。你关掉草稿，回到自己的工作上，手倒是空出来了，心里还有点不自在。"
             : "导师没再追问，你也关掉了草稿。今晚的安排总算不用重写，桌上摊开的那页笔记终于能接着往下看。",
@@ -104,15 +111,17 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
       },
       [`random-1-self-${serial}`]: {
         title: "亲自指导",
-        description: becomesJunior
+        description: staysForGradSchool
           ? [
               `你陪${mentorshipJuniorName}补对照、改草稿，同一张表来回讲了几遍，桌边的水早已凉了。等${mentorshipJuniorPronoun}终于能自己解释结果，你才发现自己的任务还停在原处。`,
-              `${mentorshipJuniorPronoun}决定留组读研，又抱着笔记本来找你：“谢谢${playerHonorific}，以后还得多请教。”你多了一位${mentorshipJuniorLabel}，这回翻开的笔记里，已经有了自己整理的问题。`,
+              canAddJunior
+                ? `${mentorshipJuniorPronoun}决定考研进组，又抱着笔记本来找你：“谢谢${playerHonorific}，以后还得多请教。”这次辅导让${mentorshipJuniorLabel}的科研 +1、与你的默契 +1；目前科研 ${guidedJunior.research}、默契 ${guidedJunior.affinity}。你多了一位${mentorshipJuniorLabel}，这回翻开的笔记里，已经有了自己整理的问题。`
+                : `${mentorshipJuniorPronoun}决定考研进组，但关系栏已经满了，暂时没能把对方记入人际栏。你把资料整理好发回去，之后仍得各自处理手头的事。`,
               ...(mentoringSanNarrative ? [mentoringSanNarrative] : []),
             ].join("\n\n")
           : [
               `你陪${mentorshipJuniorName}补实验、改草稿，答辩前还对着共享屏幕过了一遍图表。${mentorshipJuniorPronoun}总算能把结果讲明白，你也揉了揉盯得发酸的眼睛。`,
-              `答辩结束，${mentorshipJuniorPronoun}按原计划毕业离组，发来一长段道谢。你回了句“一切顺利”，关掉文档，终于不用再等下一版草稿。`,
+              `答辩结束，${mentorshipJuniorPronoun}按原计划毕业，之后去了另一所学校。对方发来一长段道谢，你回了句“一切顺利”，关掉文档，终于不用再等下一版草稿。`,
               ...(mentoringSanNarrative ? [mentoringSanNarrative] : []),
             ].join("\n\n"),
       },
@@ -152,8 +161,6 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
   const hasJuniorForReview = familiarJunior !== undefined;
   const familiarJuniorLabel = familiarJunior ? getFellowRoleLabel(familiarJunior.type, familiarJunior.gender) : "";
   const familiarJuniorName = familiarJunior ? getFellowName(familiarJunior) : familiarJuniorLabel;
-  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 211);
-  const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const playerHonorific = getPlayerHonorific(getRoleDefinition(state.selectedRoleId).gender);
   const refuseFavorResult = applyTierResist(-1, state.player.favor, getRoll);
   const refuseFavorChange = refuseFavorResult.effectiveChange;
@@ -162,10 +169,25 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
   const delegateSocialResult = applyTierResist(delegateSocialRaw, state.player.social, getRoll);
   const delegateSocialChange = delegateSocialResult.effectiveChange;
   const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw, delegateSocialResult);
+  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 211, undefined, [], getRoll);
+  const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const reviewReadPreview = previewReadPaperActions(state, 2, {
     consumeMonthlyAction: false,
     allowSanOverdraw: true,
   });
+  const activeKimi = getActiveAiModels(state.aiShopState).find((model) => model.slot === "kimi");
+  const reviewSupportHint = [
+    state.shopState.monitorOwned ? "桌上的 2K 显示器正好能把正文和附录分开" : "",
+    activeKimi ? `${activeKimi.name}也能帮你整理这篇长文` : "",
+  ].filter(Boolean).join("；");
+  const reviewSupportNarrative = [
+    state.shopState.monitorOwned
+      ? "你打开商店买来的 2K 显示器，把正文和附录分别放到两块屏幕上，来回对照时少翻了几次窗口。"
+      : "你把正文和附录在同一块屏幕上来回切换，页码很快记满了便签。",
+    activeKimi
+      ? `${activeKimi.name}先把长附录按公式编号整理出提纲，你顺着它标出的页码逐项核对，少在重复的定义之间绕圈。`
+      : "附录太长，你只能自己从头标页码，再一点点把公式和实验表对起来。",
+  ].join("\n\n");
   const reviewOutcome = [
     `看论文 ${reviewReadPreview.appliedCount} 次`,
     `SAN -${reviewReadPreview.totalSanCost}`,
@@ -175,8 +197,8 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
 
   const event: PendingEvent = {
     id: `random-2-y${state.year}-m${state.month}-n${serial}`,
-    title: "帮忙审稿",
-    description: "导师转来一篇深度学习论文，请你帮忙审稿。公式从正文排到附录，审稿期限却已经近在眼前。",
+    title: "审稿任务",
+    description: "导师把你和几位同学拉进审稿群，每人分配一篇论文，要求在截止前交回审稿意见。分到你的是一篇深度学习论文，公式从正文排到附录，期限却已经近在眼前。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -200,7 +222,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
       {
         id: `random-2-delegate-${serial}`,
         label: "交给师弟师妹",
-        outcome: `${hasJuniorForReview ? `有熟悉的${familiarJuniorLabel}` : "暂无熟悉的师弟或师妹"}｜${formatTierResistedOutcome("社交", delegateSocialRaw, delegateSocialResult)}`,
+        outcome: `${hasJuniorForReview ? `有熟悉的${familiarJuniorLabel}` : "无熟悉的师弟/师妹"}｜${formatTierResistedOutcome("社交", delegateSocialRaw, delegateSocialResult)}`,
         effects: delegateSocialChange < 0 ? { social: delegateSocialChange } : {},
       },
     ],
@@ -208,30 +230,32 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "导师转来一篇深度学习论文，邮件正文只有一句“有空帮忙看看”。你往下翻，审稿期限也列在里面，比这句嘱咐具体得多。",
-      "稿件的公式一路排到附录。你对着实验表翻回前文，刚才还连贯的推导，有两步怎么也没找到解释。",
+      "导师把你和几位同学拉进审稿群，直接发出分工：“每人一篇，按分配把审稿意见写好，截止前发给我。”紧接着，论文和对应的名字一条条刷了出来，你的名字也在其中。",
+      "你点开分到的那篇深度学习论文，公式一路排到附录。对着实验表翻回前文，刚才还连贯的推导，有两步怎么也没找到解释。群里的截止日期倒是写得清清楚楚。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "要把这几步核对清楚，恐怕还得找来参考文献。认真读一遍总能学点东西，只是今晚留给自己研究的时间，又要先借出去了。",
-      "推辞能保住原来的安排，导师那边却不一定好交代。也可以请师弟师妹代劳，不过这几十页公式转过去，对方多半也得重新排时间。",
+      "要把这几步核对清楚，还得找来参考文献。认真读完能学到东西，可看着排满的日程，你还是忍不住叹了口气：今晚又得加班了。",
+      "任务已经分到你头上，推辞就得向导师说明缘由。想到要开这个口，你心里有点发怵。也可以请师弟师妹代劳，只是对方也得挤出时间；把这几十页公式转过去，你又觉得有些过意不去。",
+      ...(reviewSupportHint ? [`${reviewSupportHint}。你看着桌面上的设备和订阅，心里稍微有了点底。`] : []),
     ].join("\n\n"),
     results: {
       [`random-2-refuse-${serial}`]: {
         title: "婉拒",
         description: [
-          "你把这周的安排发给导师，说明没法在期限前认真读完。导师回了句“那我再问问其他同学”，稿件没有继续留在你这边。",
+          "你私聊导师，把这周的安排发过去，说明没法在期限前认真读完。导师回了句“好，我重新分配”，又补了一句：“你的学习安排排得这么满，科研进展却还是偏慢，时间还是要多放在科研上。”随后调整了群里的分工。",
           refuseFavorChange < 0
-            ? "导师对这次推辞有些不满，回复里透着冷淡。你把邮件标成已读，回到原来的工作上，敲了几行字才慢慢找回思路。"
-            : "你关掉邮件，接着做原来的事。浏览器终于少了一个待看的标签页，今晚也不用在公式之间来回找下标。",
+            ? "你盯着这句提醒看了几秒。导师没有把话说重，敲打的意思却很清楚：安排再满，如果科研进展跟不上，忙也只是忙。你收起聊天窗口，回到原来的工作上，敲了几行字才慢慢找回思路。"
+            : "你看着这句提醒，又把日程翻了一遍。确实排得满，可真正推进的科研没几项；今晚不用审稿，正好把一件该做的事往前推。",
           ...(refuseFavorNarrative ? [refuseFavorNarrative] : []),
         ].join("\n\n"),
       },
       [`random-2-self-${serial}`]: {
         title: "自己审稿",
         description: [
+          reviewSupportNarrative,
           "你把稿件和一篇关键参考文献并排打开，对着公式核到实验表，笔记里写满了页码。最初那句“这里好像不对”，终于被改成了能说清依据的审稿意见。",
-          "意见发给导师后，你又记下几个值得借鉴的实验设计。窗外已经暗了，原来的安排还没顾上，倒是下次琢磨方向时多了些可翻的笔记。",
+          "你按群里的要求把意见发给导师，又记下几个值得借鉴的实验设计。窗外已经暗了，原来的安排还没顾上，倒是下次琢磨方向时多了些可翻的笔记。",
         ].join("\n\n"),
       },
       [`random-2-delegate-${serial}`]: {
@@ -244,7 +268,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
                 ...(delegateSocialNarrative ? [delegateSocialNarrative] : []),
               ].join("\n\n")
             : [
-                `你找到熟悉的${familiarJuniorLabel}${familiarJuniorName === familiarJuniorLabel ? "" : ` ${familiarJuniorName}`}，请对方帮忙看看稿件。对方翻到附录，笑着问了一句“有空看看是吧”，还是接下了。`,
+                `你找到熟悉的${familiarJuniorLabel}${familiarJuniorName === familiarJuniorLabel ? "" : ` ${familiarJuniorName}`}，请对方接手分给你的稿件。对方翻到附录，笑着说了一句“这一篇可真够长的”，还是接下了。`,
                 "意见发回来时，几个存疑的公式旁都标好了页码。你逐项核对，整理后交给导师，回头又认真道了谢；这次总算没有把场面弄僵。",
                 ...(delegateSocialNarrative ? [delegateSocialNarrative] : []),
               ].join("\n\n")
@@ -272,7 +296,6 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
     state.selectedAdvisorName ?? "",
     state.loverState.name ?? "",
   ];
-  const juniorAddition = createGeneratedFellowProfileAddition("junior", serial, juniorGender, usedNames);
   const roleText = getFellowRoleLabel("junior", juniorGender);
   const eventTitle = roleText === "师弟" ? "指导师弟" : "指导师妹";
   const shortTermSan = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
@@ -282,6 +305,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   const shortTermSocialGain = shortTermSocialResult.effectiveChange;
   const shortTermSocialNarrative = getTierResistedNarrative("社交", 1, shortTermSocialResult);
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
+  const juniorAddition = createGeneratedFellowProfileAddition("junior", serial, juniorGender, usedNames, getRoll);
 
   const event: PendingEvent = {
     id: `random-14-y${state.year}-m${state.month}-n${serial}`,
@@ -345,7 +369,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
     decisionDescription: [
       ...(!canAddJunior ? ["普通关系栏已满，继续合作不会新增师弟师妹；你可以现在选择退出。"] : []),
       "眼前这副对着报错无从下手的样子，让你想起自己刚进组的时候。如今轮到别人来问你了，可你屏幕上的问题，也还在等一个答案。",
-      `抽空帮${pronounText}理顺思路，至少能少绕几段路；长期一起做，就要每月留出时间讨论。你看了看日程，实在排不开的话，也只能把这声抱歉说出口。`,
+      `${pronounText}把笔记翻到最后一页，等你看那几个反复报错的位置。你已经想好该先查哪里，手上的工作却也停在半途。帮这一次还能挤挤时间，真要一直带下去，日程上每个月都得留出一个位置。`,
     ].join("\n\n"),
     results: {
       [`random-14-decline-${serial}`]: {

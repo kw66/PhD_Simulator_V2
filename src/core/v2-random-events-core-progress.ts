@@ -29,7 +29,7 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
   const event: PendingEvent = {
     id: `random-16-y${state.year}-m${state.month}-n${serial}`,
     title: "数据丢失",
-    description: "电脑突然读不出科研文件。你连着点了几次，弹出的还是同一个报错；再看备份日期，才发现少了最近这一批。",
+    description: "电脑突然读不出科研文件。你连着点了几次，弹出的还是同一个报错😵；再看备份日期，才发现少了最近这一批。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -77,8 +77,8 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
     ].join("\n\n"),
     decisionTitle: "如何应对",
     decisionDescription: [
-      "旧笔记和零散备份摊了一桌，熬夜拼一拼，还能把进度补回来；若是放弃抢救，所有未投稿论文都得从头做。你盯着文件日期，已经开始心疼今晚的觉。",
-      "找人恢复要花 4 金币。另一个念头也冒了出来：拿编造的数据填空，文件看着就齐了。可真有人问起原始记录，你拿什么回答？",
+      "你从抽屉里翻出旧笔记，按日期摊在桌上。一页页补回去，今晚的觉就别想了；可这些都是还没投稿的心血，真要全部从头来，你连新建文件夹都不愿点。",
+      "数据恢复团队回了报价：4 金币。你打开余额又关上，目光落回缺失的记录，甚至冒出拿几个编造的数字填上的念头。想到今后要把这些数字写进论文，你的手又停了下来。",
     ].join("\n\n"),
     results: {
       [`random-16-stay-up-${serial}`]: {
@@ -132,7 +132,7 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
   const event: PendingEvent = {
     id: `random-9-y${state.year}-m${state.month}-n${serial}`,
     title: "不断学习",
-    description: "讨论时又碰上几个似懂非懂的概念。你回去打开收藏夹，才发现上次存下的教程还停在第一页。",
+    description: "讨论时又碰上几个似懂非懂的概念。你回去打开收藏夹，才发现上次存下的教程还停在第一页😅。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -189,8 +189,8 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "真要坐下来学，时间只够先啃一块。基础不牢的地方总让你心虚，可新论文里的思路也让人惦记；两个标签页切来切去，哪个都舍不得关。",
-      "读源码能少在报错上打转，啃理论则有助于把方法讲清楚。你把笔记翻到新的一页，总得先挑一样，免得今晚又只整理了收藏夹。",
+      "你把笔记翻到画着问号的那一页，教材里正好有对应的章节。手刚搭上鼠标，又看见那篇没读完的新论文；摘要里的思路很有意思，刚才散会时你还在琢磨。",
+      "代码教程停在熟悉的报错附近，理论讲义里还有一行看不懂的推导。想学的东西越摆越多，空白笔记却一个字没添。你把手机翻面放好，今晚先弄懂一样也好。",
     ].join("\n\n"),
     results: {
       [`random-9-basic-${serial}`]: {

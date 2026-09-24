@@ -17,7 +17,8 @@ export function enqueuePendingEvents(state: GameState, events: PendingEvent[]): 
       eventQueue: nextEventQueue,
       buffs: addOrReplaceBuffs(nextState.buffs, event.pendingBuffs ?? []),
     };
-    queuedEvents.push(event);
+    const queuedEvent = nextEventQueue.find((item) => item.id === event.id) ?? event;
+    queuedEvents.push(queuedEvent);
   }
 
   return { nextState, queuedEvents };

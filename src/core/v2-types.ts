@@ -525,6 +525,8 @@ export interface ResolvedEventStage {
   talentTrigger?: import("./v2-talent-history").TalentTriggerRecord;
   choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason" | "fellowCandidate">[];
   selectedChoiceId: string;
+  /** Scene source retained only while its chain is pending. */
+  replayEvent?: PendingEvent;
 }
 
 export interface ResolvedEventRecord {
@@ -535,6 +537,8 @@ export interface ResolvedEventRecord {
   completedAtYear: number;
   completedAtMonth: number;
   stages: ResolvedEventStage[];
+  debugReplayable?: boolean;
+  debugRootEventId?: string;
 }
 
 export interface PendingEvent {
@@ -563,6 +567,11 @@ export interface PendingEvent {
   removeBuffIdsOnCompletion?: string[];
   /** Bookkeeping-only paper updates applied when a debug action discards this event. */
   discardPaperUpdates?: PaperEffectUpdate[];
+  /** Debug-marked event chains can replay an earlier scene while pending. */
+  debugReplayable?: boolean;
+  debugRootEventId?: string;
+  /** Root description for replaying this pending chain; never a full game snapshot. */
+  replayContext?: { rootEvent: PendingEvent; debugEventId?: string };
 }
 
 export interface EventQueueItem extends PendingEvent {
@@ -571,6 +580,7 @@ export interface EventQueueItem extends PendingEvent {
 
 export interface GameState extends RandomEventState {
   blockLinearEvents: boolean;
+  debugEventReplayEnabled?: boolean;
   phase: GamePhase;
   selectedRoleId: RoleId;
   setupSelectedRoleId?: RoleId | null;
@@ -647,12 +657,14 @@ export interface DispatchPayload {
   promotionId?: PaperPromotionId | undefined;
   eventId?: string | undefined;
   eventChoiceId?: string | undefined;
+  eventHistoryIndex?: number | undefined;
   relationshipId?: string | undefined;
   debugStatId?: DebugStatId | undefined;
   debugPaperTarget?: PaperTarget | undefined;
   debugJournalTarget?: JournalTarget | undefined;
   debugPaperAuthorship?: "first" | "coauthor" | undefined;
   debugRelationshipType?: DebugRelationshipType | undefined;
+  debugEventReplayEnabled?: boolean | undefined;
   delta?: number | undefined;
   dateDisplayMode?: DateDisplayMode | undefined;
   shopItemId?: ShopItemId | undefined;

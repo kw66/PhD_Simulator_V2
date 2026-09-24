@@ -11,7 +11,7 @@ const CANDIDATE_DESCRIPTIONS = [
   "做过简单的课题，能独立复现实验、整理结果。",
 ] as const;
 
-export function createMentorAssignEvent(state: GameState): PendingEvent {
+export function createMentorAssignEvent(state: GameState, getNameRoll: () => number = Math.random): PendingEvent {
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
   const generatedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
   const candidates = Array.from({ length: 4 }, (_, index) => {
@@ -20,6 +20,7 @@ export function createMentorAssignEvent(state: GameState): PendingEvent {
       state.totalMonths * 1000 + state.year * 10 + state.month + (index + 1) * 97,
       undefined,
       generatedNames,
+      getNameRoll,
     );
     generatedNames.push(addition.name ?? "");
     const roleLabel = getFellowRoleLabel(addition.type, addition.gender);
@@ -60,7 +61,7 @@ export function createMentorAssignEvent(state: GameState): PendingEvent {
       "你翻开材料，入学照片一张比一张精神。电脑右下角又弹出导师的消息：“先认识一下，有问题多帮帮忙。”",
     ].join("\n\n"),
     decisionTitle: "选择一位新生",
-    decisionDescription: "你翻看四份材料，盘算着能留多少时间。基础好的可以少讲几遍，刚入门的就得从读论文教起。选谁之前，还得看看彼此能不能聊到一起。",
+    decisionDescription: "四份材料摊在眼前，有人已经做过小课题，有人还在跟着教程跑代码。那些入门时卡住自己的问题又冒了出来，你忽然很想告诉新生几条少走弯路的办法。可想到以后也有人追着自己问“这个报错怎么办”，刚冒头的成就感里又添了一点紧张。",
     results: Object.fromEntries(candidates.map((candidate) => [candidate.choiceId, {
       title: candidate.label,
       description: canAddJunior

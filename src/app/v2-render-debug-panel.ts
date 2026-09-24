@@ -1,4 +1,4 @@
-import { DEBUG_EVENT_GROUPS, DEBUG_MONTH_DELTAS, DEBUG_STAT_GROUPS } from "../core/v2-debug-tools";
+import { DEBUG_COMPLETED_EVENT_IDS, DEBUG_EVENT_GROUPS, DEBUG_MONTH_DELTAS, DEBUG_STAT_GROUPS } from "../core/v2-debug-tools";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getResearchCap } from "../core/v2-research-cap-system";
 import type { GameState } from "../core/v2-types";
@@ -23,6 +23,14 @@ export function renderDebugPanel(state: GameState | null, connected: boolean, ta
     return `<div class="debug-popup-stat-row"><strong>${escapeHtml(group.label)} <b data-debug-value="${group.statId}">${state?.player[group.statId] ?? "—"}${cap == null ? "" : `/${cap}`}</b></strong>
       <div class="debug-popup-buttons">${group.deltas.map((delta) => button(`${delta > 0 ? "+" : ""}${delta}`, "debug-adjust-stat", { "debug-stat-id": group.statId, delta })).join("")}</div></div>`;
   }).join("");
+  const replayEnabled = state?.debugEventReplayEnabled === true;
+  const actionLimit = state?.actionState.limit ?? 0;
+  const actionUsed = state?.actionState.used ?? 0;
+  const actionRemaining = Math.max(0, actionLimit - actionUsed);
+  const debugOptions = `<div class="debug-popup-debug-row"><strong>事件回退：<b>${replayEnabled ? "开启" : "关闭"}</b></strong>
+            <div class="debug-popup-buttons">${button(replayEnabled ? "关闭" : "开启", "debug-toggle-event-replay", { "debug-event-replay-enabled": String(!replayEnabled) })}</div></div>
+          <div class="debug-popup-debug-row"><strong>行动点 <b data-debug-action-points>${actionRemaining}/${actionLimit}</b></strong>
+            <div class="debug-popup-buttons">${button("-1", "debug-adjust-action-points", { delta: -1 })}${button("+1", "debug-adjust-action-points", { delta: 1 })}</div></div>`;
   const paperButtons = (["first", "coauthor"] as const).flatMap((authorship) => (["A", "B", "C"] as const).map((target) => (
     button(`${target}${authorship === "first" ? "一作" : "合作"}`, "debug-add-paper", { "debug-paper-target": target, "debug-paper-authorship": authorship })
   ))).join("");
@@ -38,7 +46,7 @@ export function renderDebugPanel(state: GameState | null, connected: boolean, ta
     <fieldset class="debug-popup-tools" ${playable ? "" : "disabled"}>
       <div class="debug-popup-common"${tab === "tools" ? "" : " hidden"}>
       <div class="debug-popup-columns">
-        <section class="debug-popup-card"><h2>📊 属性与时间 <span data-debug-date>${date}</span></h2>${attributes}
+        <section class="debug-popup-card"><h2>📊 属性与时间 <span data-debug-date>${date}</span></h2>${attributes}${debugOptions}
           <div class="debug-popup-time debug-popup-buttons">${DEBUG_MONTH_DELTAS.map((delta) => button(`${delta > 0 ? "+" : ""}${delta}月`, "debug-shift-month", { delta })).join("")}
             <button type="button" data-action="force-next-month" title="删除当前阻塞事件并真实结算下一月">下一月</button>
           </div>
@@ -55,7 +63,7 @@ export function renderDebugPanel(state: GameState | null, connected: boolean, ta
         </section>
       </div>
       <section class="debug-popup-card debug-popup-events" aria-label="事件触发"${tab === "events" ? "" : " hidden"}>
-        ${DEBUG_EVENT_GROUPS.map((group) => `<section class="debug-popup-event-group"><h3>${escapeHtml(group.title)}</h3><div class="debug-popup-event-buttons debug-popup-buttons">${group.buttons.map((item) => button(item.label, "debug-trigger-event", { "event-id": item.id })).join("")}</div></section>`).join("")}
+        ${DEBUG_EVENT_GROUPS.map((group) => `<section class="debug-popup-event-group"><h3>${escapeHtml(group.title)}</h3><div class="debug-popup-event-buttons debug-popup-buttons">${group.buttons.map((item) => button(`${item.label}${DEBUG_COMPLETED_EVENT_IDS.includes(item.id as typeof DEBUG_COMPLETED_EVENT_IDS[number]) ? " ✓" : ""}`, "debug-trigger-event", { "event-id": item.id })).join("")}</div></section>`).join("")}
       </section>
     </fieldset>
     <footer class="debug-popup-footer">

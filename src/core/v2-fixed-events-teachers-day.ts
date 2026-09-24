@@ -6,6 +6,7 @@ import {
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
+import { formatProbabilityCondition } from "./v2-random-events-core-shared";
 import type {
   FixedEventResolution,
   GameState,
@@ -29,8 +30,8 @@ const TEACHERS_DAY_GIFTS: readonly TeachersDayGiftDefinition[] = [
     name: "茶叶",
     choiceLabel: "送茶叶",
     amountText: "一盒茶叶",
-    highFavorHint: "花 1 金币送盒茶叶，去办公室当面道声祝福，也挺自然。",
-    lowFavorHint: "茶叶要花 1 金币，可你没留意过老师爱喝什么，选起来拿不准。",
+    highFavorHint: "同学推荐了一盒茶叶，标价 1 金币。你想起老师桌上的茶杯，拎着它去办公室，连开场白都有了。",
+    lowFavorHint: "同学推荐了一盒茶叶，标价 1 金币。你放大照片看了看，脑子里全是论文题目，老师爱喝哪种茶却一点也想不起来。",
     resultDescription: [
       "你买好一盒茶叶，下午敲开办公室的门。导师正对着电脑看论文，你等对方抬起头，才把盒子递过去：“老师，教师节快乐！给您带了盒茶叶。”",
       "导师接过盒子：“谢谢你的心意。”你道了声“不打扰您了”，轻轻带上门。回工位时才发现，刚才一直把空袋子攥在手里。",
@@ -41,8 +42,8 @@ const TEACHERS_DAY_GIFTS: readonly TeachersDayGiftDefinition[] = [
     name: "月饼",
     choiceLabel: "送月饼",
     amountText: "一盒月饼",
-    highFavorHint: "店里已经摆出月饼，花 1 金币带一盒过去，正好聊两句。",
-    lowFavorHint: "月饼要花 1 金币。见面请老师尝尝，总比站在门口找话说容易。",
+    highFavorHint: "店里的月饼礼盒标着 1 金币。看着包装上的月亮，你连“提前祝中秋快乐”都想好了。",
+    lowFavorHint: "月饼礼盒要花 1 金币。你在心里试了一句“老师，尝尝这个”，比刚才想的那段正式祝词顺口多了。",
     resultDescription: [
       "你拎着一盒月饼来到办公室，等导师回完邮件，再递上盒子：“老师，教师节快乐！给您带了盒月饼，尝尝看。”",
       "导师接过盒子，向你道谢。你回了句“不客气”，又寒暄几句便告辞，没有把节日问候聊成一场临时汇报。",
@@ -53,8 +54,8 @@ const TEACHERS_DAY_GIFTS: readonly TeachersDayGiftDefinition[] = [
     name: "鲜花",
     choiceLabel: "送鲜花",
     amountText: "一束鲜花",
-    highFavorHint: "鲜花要花 1 金币，摆在老师桌上挺好，那堆资料旁得腾个位置。",
-    lowFavorHint: "鲜花要花 1 金币，不必猜口味，只是捧进办公室还有点不好意思。",
+    highFavorHint: "花店里的一束鲜花要 1 金币。想到老师得从那堆资料旁腾个位置放花，你忍不住笑了。",
+    lowFavorHint: "花店里的一束鲜花要 1 金币。花是挺好看，可一想到要捧着它穿过走廊，你先有点不好意思了。",
     resultDescription: [
       "你捧着一束鲜花来到办公室，正好碰见导师整理课件。你把花递过去：“老师，教师节快乐！给您带了束花。”",
       "导师向你道谢，腾出桌角放好花束。你看着花挨着一摞资料摆好，忽然觉得这间总让人惦记进度的办公室，也有了点过节的样子。",
@@ -66,16 +67,15 @@ function getTeachersDayGift(giftId: TeachersDayGiftId | undefined): TeachersDayG
   return TEACHERS_DAY_GIFTS.find((gift) => gift.id === giftId) ?? null;
 }
 
+function getTeachersDayMessageProbabilityNote(state: Pick<GameState, "player">): string {
+  return state.player.favor >= 6
+    ? `透明概率：导师好感 ≥ 6 时，${formatProbabilityCondition("导师分享想法", 0.5)}，${formatProbabilityCondition("导师礼貌回复", 0.5)}。`
+    : `透明概率：导师好感 < 6 时，${formatProbabilityCondition("报销跑腿", 0.5)}，${formatProbabilityCondition("普通回复", 0.5)}。`;
+}
+
 function drawTeachersDayGift(getRoll: RandomRollProvider): TeachersDayGiftDefinition {
   return TEACHERS_DAY_GIFTS[drawInclusiveInt(0, TEACHERS_DAY_GIFTS.length - 1, getRoll)]
     ?? TEACHERS_DAY_GIFTS[0];
-}
-
-function getFavorLevelName(favor: number): string {
-  if (favor >= 18) return "心腹";
-  if (favor >= 12) return "信任";
-  if (favor >= 6) return "认可";
-  return "陌生";
 }
 
 function createTeachersDayResultEvent(params: {
@@ -109,12 +109,12 @@ function createTeachersDayChoiceEvent(
   gift: TeachersDayGiftDefinition,
 ): PendingEvent {
   const noGiftHint = state.player.favor >= 6
-    ? "平时和老师聊得来，发条祝福也好。你点开聊天框，又有些犹豫。"
-    : "聊天框上面几条还都是“收到”。发句祝福，会不会又聊到工作？";
+    ? "聊天框里上一条还是你和老师讨论实验的记录。你写下“教师节快乐”，顺手又添了句祝福。这回总算有一句消息，和实验进度没关系。"
+    : "聊天记录往上翻，几乎全是“收到”。你打好一句“教师节快乐”，想再添点什么，憋了半天还是这五个字最顺口。";
   const giftHint = state.player.favor >= 6 ? gift.highFavorHint : gift.lowFavorHint;
   const stampHint = state.player.favor >= 6
-    ? "邮票也能送，只是要花 3 金币。你看了看价格，没急着决定。"
-    : "邮票要花 3 金币。你在价格上停了一下，再看看还空着的聊天框。";
+    ? "礼品页里还有一套邮票，要 3 金币。图案让你多看了两眼，价格又让你顿了一下：这份心意还真挺郑重。"
+    : "礼品页里还有一套邮票，要 3 金币。你停在介绍页上，心里已经排练起递给老师时该说什么，越想越像在准备一次汇报。";
 
   return createFixedEvent({
     id: `teachers-day-choice-y${state.year}-m${state.month}`,
@@ -123,6 +123,7 @@ function createTeachersDayChoiceEvent(
       noGiftHint,
       giftHint,
       stampHint,
+      getTeachersDayMessageProbabilityNote(state),
     ].join("\n\n"),
     chainId: "teachers-day",
     stage: "act2",
@@ -162,15 +163,13 @@ export function createTeachersDayEvent(
   state: GameState,
   getRoll: RandomRollProvider = Math.random,
 ): PendingEvent {
-  const relationText = state.player.favor >= 6 ? "还不错" : "一般";
-  const favorLevelName = getFavorLevelName(state.player.favor);
   const gift = drawTeachersDayGift(getRoll);
   return createFixedEvent({
     id: `teachers-day-y${state.year}-m${state.month}`,
     title: "教师节",
     description: [
       "9 月 10 日一早，你打开实验室群，满屏都是“教师节快乐”。还没翻到底，同学又发来消息，问今天去不去办公室，有没有准备小礼物。",
-      `导师在群里回了句“谢谢大家”，后面又跟上几条祝福。你和导师关系${relationText}（当前好感等级：${favorLevelName}）。`,
+      "导师在群里回了句“谢谢大家”，后面又跟上几条祝福。你看着不断刷新的消息，也想起自己该说点什么。",
     ].join("\n\n"),
     chainId: "teachers-day",
     choices: [
@@ -201,13 +200,14 @@ export function resolveTeachersDayFixedEvent(
   switch (resolution.kind) {
     case "teachers-day-message":
       if (state.player.favor >= 6) {
+        const probabilityNote = getTeachersDayMessageProbabilityNote(state);
         if (getRoll() < 0.5) {
           const ideaBonus = drawInclusiveInt(3, 5, getRoll);
           return {
             nextState: applyStateMutation(state, {
               temporaryIdeaBonus: ideaBonus,
             }, "教师节"),
-            outcome: `你发去节日祝福，导师顺势分享了一个想法，下次想 idea +${ideaBonus}。`,
+            outcome: `${formatProbabilityCondition("导师分享想法", 0.5)}｜你发去节日祝福，导师顺势分享了一个想法，下次想 idea +${ideaBonus}。`,
             enqueueEvents: [createTeachersDayResultEvent({
               state,
               resultId: "message-idea",
@@ -215,16 +215,17 @@ export function resolveTeachersDayFixedEvent(
               description: [
                 "你发了条微信：“老师，教师节快乐！祝您身体健康，工作顺利！”没过多久，手机响了，来电正是导师。",
                 "“谢谢！正好有个想法跟你聊聊。”你赶紧找纸笔，先在手边的便签上记了几行。挂断后重新誊一遍，才发现几个问题能连起来了，连刚才随手画的箭头都有了用处。",
+                probabilityNote,
                 `机制结算\n下次想 idea +${ideaBonus}`,
               ].join("\n\n"),
               buttonLabel: "期待明天",
-              outcome: `你发了教师节祝福，导师分享了一个想法，下次想 idea +${ideaBonus}。`,
+              outcome: `${formatProbabilityCondition("导师分享想法", 0.5)}｜你发了教师节祝福，导师分享了一个想法，下次想 idea +${ideaBonus}。`,
             })],
           };
         }
         return {
           nextState: state,
-          outcome: "你发去节日祝福，导师礼貌回复，没有额外数值变化。",
+          outcome: `${formatProbabilityCondition("导师礼貌回复", 0.5)}｜你发去节日祝福，导师礼貌回复，没有额外数值变化。`,
           enqueueEvents: [createTeachersDayResultEvent({
             state,
             resultId: "message-reply",
@@ -232,14 +233,16 @@ export function resolveTeachersDayFixedEvent(
             description: [
               "你发了条微信：“老师，教师节快乐！祝您身体健康，工作顺利！”导师很快回复：“谢谢！也祝你新学期顺利。”",
               "你回了个笑脸，等了一小会儿，没再收到消息。手机扣回桌上时，你才松了口气：今天这句“谢谢”后面，确实没有跟着一份附件。",
+              probabilityNote,
             ].join("\n\n"),
             buttonLabel: "继续",
-            outcome: "你发了教师节祝福，导师礼貌回复，无事发生。",
+            outcome: `${formatProbabilityCondition("导师礼貌回复", 0.5)}｜你发了教师节祝福，导师礼貌回复，无事发生。`,
           })],
         };
       }
 
       if (getRoll() < 0.5) {
+        const probabilityNote = getTeachersDayMessageProbabilityNote(state);
         const sanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
         const favorResult = applyTierResist(1, state.player.favor, getRoll);
         const favorChange = favorResult.effectiveChange;
@@ -249,7 +252,7 @@ export function resolveTeachersDayFixedEvent(
             san: sanChange,
             favor: favorChange,
           }),
-          outcome: `你发去祝福后，导师顺手把报销跑腿交给了你，SAN ${sanChange}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+          outcome: `${formatProbabilityCondition("报销跑腿", 0.5)}｜你发去祝福后，导师顺手把报销跑腿交给了你，SAN ${sanChange}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           enqueueEvents: [createTeachersDayResultEvent({
             state,
             resultId: "message-errand",
@@ -258,17 +261,18 @@ export function resolveTeachersDayFixedEvent(
               "你发了条微信：“老师，教师节快乐！”导师很快回复：“谢谢。正好有份报销材料，下午帮我送到财务处吧。”",
               "你拿齐材料，在财务处排了快一个小时的队，回来再向导师报了受理情况。坐回工位，水杯里的茶已经凉了。你只是发了句祝福，怎么半个下午也跟着送出去了。",
               ...(favorNarrative ? [favorNarrative] : []),
+              probabilityNote,
               `机制结算\nSAN ${sanChange}\n${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
             ].join("\n\n"),
             buttonLabel: "认命",
-            outcome: `你发了教师节祝福，被叫去财务处跑腿，SAN ${sanChange}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+            outcome: `${formatProbabilityCondition("报销跑腿", 0.5)}｜你发了教师节祝福，被叫去财务处跑腿，SAN ${sanChange}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           })],
         };
       }
 
       return {
         nextState: state,
-        outcome: "你发去节日祝福，导师简短回了一句“新学期加油”，这次无事发生。",
+        outcome: `${formatProbabilityCondition("普通回复", 0.5)}｜你发去节日祝福，导师简短回了一句“新学期加油”，这次无事发生。`,
         enqueueEvents: [createTeachersDayResultEvent({
           state,
           resultId: "message-plain",
@@ -276,9 +280,10 @@ export function resolveTeachersDayFixedEvent(
           description: [
             "你发了条微信：“老师，教师节快乐！”过了一会儿，导师回复：“谢谢，新学期加油。”",
             "你敲了几句新学期的打算，想想又删掉，最后只回了“谢谢老师”。聊天框安静下来，你把手机放到一边，桌上的资料还摊在刚才那一页。",
+            getTeachersDayMessageProbabilityNote(state),
           ].join("\n\n"),
           buttonLabel: "继续",
-          outcome: "你发了教师节祝福，导师简短回复，无事发生。",
+          outcome: `${formatProbabilityCondition("普通回复", 0.5)}｜你发了教师节祝福，导师简短回复，无事发生。`,
         })],
       };
     case "teachers-day-gift": {

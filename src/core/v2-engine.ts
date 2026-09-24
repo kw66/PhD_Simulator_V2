@@ -2,7 +2,7 @@ import { dispatchDebugAction } from "./v2-debug-tools";
 import { recordTalentTransitions } from "./v2-talent-transitions";
 import { dispatchSetupAction } from "./v2-engine-action-dispatch";
 import { evaluateCoreEndings, finishTrainingIfReady, quitGame } from "./v2-ending-system";
-import { applyQueuedEventEffects } from "./v2-engine-event-resolution";
+import { applyQueuedEventEffects, refreshPendingEventDecisions } from "./v2-engine-event-resolution";
 import { hasManualBlockingEvents, settleLinearEvents } from "./v2-event-auto-resolution";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "./v2-development-flags";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
@@ -82,6 +82,42 @@ function buildMonthAdvanceLog(
   resolution: ReturnType<typeof applyMonthlyEffects>["resolution"],
 ): string {
   return `进入第 ${year} 年 ${month} 月。${buildMonthStartSettlementLog(resolution)}`;
+}
+
+function preserveExistingRelationships(before: GameState, after: GameState): GameState {
+  const beforeFellows = before.fellowProgressState;
+  const afterFellowIds = new Set(after.fellowProgressState.map((profile) => profile.id));
+  const missingFellows = beforeFellows.filter((profile) => !afterFellowIds.has(profile.id));
+  const fellowProgressState = missingFellows.length > 0
+    ? [...after.fellowProgressState, ...missingFellows]
+    : after.fellowProgressState;
+  const fellowCountMinimums = {
+    seniorCount: before.relationshipState.seniorCount,
+    juniorCount: before.relationshipState.juniorCount,
+    peerCount: before.relationshipState.peerCount,
+  };
+  const relationshipState = {
+    ...after.relationshipState,
+    seniorCount: Math.max(after.relationshipState.seniorCount, fellowCountMinimums.seniorCount),
+    juniorCount: Math.max(after.relationshipState.juniorCount, fellowCountMinimums.juniorCount),
+    peerCount: Math.max(after.relationshipState.peerCount, fellowCountMinimums.peerCount),
+    occupiedSlots: Math.max(after.relationshipState.occupiedSlots, before.relationshipState.occupiedSlots),
+    advisorCount: Math.max(after.relationshipState.advisorCount, before.relationshipState.advisorCount),
+    loverCount: Math.max(after.relationshipState.loverCount, before.relationshipState.loverCount),
+  };
+  const loverWasActive = before.loverState.active || before.loverProgressState.active || before.relationshipState.loverCount > 0;
+  const loverWasCleared = loverWasActive && (!after.loverState.active || !after.loverProgressState.active);
+  return {
+    ...after,
+    fellowProgressState,
+    relationshipState,
+    ...(loverWasCleared ? {
+      loverState: before.loverState,
+      loverProgressState: before.loverProgressState,
+    } : {}),
+    ...(before.selectedAdvisorName && !after.selectedAdvisorName
+      ? { selectedAdvisorName: before.selectedAdvisorName } : {}),
+  };
 }
 
 function takeRest(state: GameState): GameState {
@@ -265,7 +301,10 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
     if (checkedState.phase !== "playing") return checkedState;
     state = checkedState;
   }
-  const nextState = dispatchGameAction(ensureFellowPapers(state), actionId, payload);
+  const nextStateRaw = dispatchGameAction(ensureFellowPapers(state), actionId, payload);
+  const nextState = actionId === "resolve-event"
+    ? preserveExistingRelationships(state, nextStateRaw)
+    : nextStateRaw;
   if (nextState.phase !== "playing") return nextState;
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
@@ -273,7 +312,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   const settledState = actionId === "resolve-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;
-  const refreshed = refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingPaperCompetitionEvents(syncAdvisorResearchAccumulation(settledState))));
+  const refreshed = refreshPendingEventDecisions(refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingPaperCompetitionEvents(syncAdvisorResearchAccumulation(settledState)))));
   if (debugAction) return refreshed;
   const evaluated = evaluateCoreEndings(refreshed);
   if (evaluated.phase !== "playing") return evaluated;

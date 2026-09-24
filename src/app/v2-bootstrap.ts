@@ -950,6 +950,17 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (actionId === "next-month" || actionId === "force-next-month") {
       animateEventPanelAfterNextMonth = activePlayTab === "events";
     }
+    if (actionId === "debug-replay-event") {
+      selectPlayTab("events");
+      isEventContentOpen = true;
+      activeEventHistoryId = null;
+      activeEventHistoryIndex = null;
+      const replaySourceEvent = dataset.eventId
+        ? store.getState().eventQueue.find((event) => event.id === dataset.eventId)
+        : undefined;
+      activeEventId = null;
+      activeEventChainId = replaySourceEvent?.chainId ?? null;
+    }
     if (actionId === "restart-game") {
       skipNextPlayerAnimation = true;
     }
@@ -976,12 +987,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
       promotionId: isPaperPromotionId(dataset.promotionId) ? dataset.promotionId : undefined,
       eventId: typeof dataset.eventId === "string" ? dataset.eventId : undefined,
       eventChoiceId: typeof dataset.eventChoiceId === "string" ? dataset.eventChoiceId : undefined,
+      eventHistoryIndex: typeof dataset.eventHistoryIndex === "string" ? Number(dataset.eventHistoryIndex) : undefined,
       relationshipId: typeof dataset.relationshipId === "string" ? dataset.relationshipId : undefined,
       debugStatId: isDebugStatId(dataset.debugStatId) ? dataset.debugStatId : undefined,
       debugPaperTarget: isPaperTarget(dataset.debugPaperTarget) ? dataset.debugPaperTarget : undefined,
       debugJournalTarget: isJournalTarget(dataset.debugJournalTarget) ? dataset.debugJournalTarget : undefined,
       debugPaperAuthorship: isDebugPaperAuthorship(dataset.debugPaperAuthorship) ? dataset.debugPaperAuthorship : undefined,
       debugRelationshipType: isDebugRelationshipType(dataset.debugRelationshipType) ? dataset.debugRelationshipType : undefined,
+      debugEventReplayEnabled: dataset.debugEventReplayEnabled === undefined ? undefined : dataset.debugEventReplayEnabled === "true",
       delta: typeof dataset.delta === "string" ? Number(dataset.delta) : undefined,
       dateDisplayMode: isDateDisplayMode(dataset.dateDisplayMode) ? dataset.dateDisplayMode : undefined,
       blockLinearEvents: dataset.blockLinearEvents === undefined ? undefined : dataset.blockLinearEvents === "true",

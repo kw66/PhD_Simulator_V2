@@ -74,7 +74,7 @@ export function createConferenceActivityDecisionEvent(
       `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，先前圈过的几项恰好撞了时间。原来选报告也得做取舍。`,
       context.paperCount >= 2
         ? `忙完 ${context.paperCount} 篇论文的展示，你不想再来回赶场，准备挑一项好好参加。`
-        : "展示已经忙完，接下来总算能按自己的兴趣走。留下交流、找人请教，还是暂时把胸牌摘下来，出去透口气？",
+        : "展示已经忙完，接下来总算能按自己的兴趣走。你把讲稿收进包里，听见旁边有人聊起熟悉的研究问题，脚步慢了下来。门外也透着阳光，忙了这么久，出去走走同样让人心动。",
       ...getConferencePaperPresentationResults(context),
     ].join("\n\n"),
     source: "fixed",

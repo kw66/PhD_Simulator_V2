@@ -22,7 +22,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
   const event: PendingEvent = {
     id: `random-13-y${state.year}-m${state.month}-n${serial}`,
     title: "显卡故障",
-    description: "实验室服务器突然离线，几张显卡接连报错。组群里的“你们还能连上吗”一条接一条，排队的任务全停在原地。",
+    description: "实验室服务器突然离线，几张显卡接连报错💥。组群里的“你们还能连上吗”一条接一条，排队的任务全停在原地。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -79,9 +79,9 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "报错截图可以发给导师安排检修。不过坏卡未必能换新，往后可能得挤着剩下的算力跑。",
-      "上报异常占用能查清有没有人在挖矿。只是查到组里人，之后还要天天在实验室碰面。",
-      "自己重装得花精力，弄坏公共环境还要向同门解释。淘宝能找到维修，可低报价未必是最后付的钱。",
+      "你截好报错，停在给导师的聊天框前。送修的流程熟悉，空着的卡位也熟悉；想到坏卡停用后，大家还得挤着剩下的算力跑，你有些发愁。",
+      "那几条异常占用还留在日志里。你放大看了看，上报查一查就能知道是不是挖矿，可抬头全是每天见面的同门，这个举报键按下去也让人不自在。",
+      "重装教程和淘宝维修页面各开在一边。自己动手得照看整组的公共环境，客服给的低报价又没写清追加费用。风扇还在响，群里又有人问：“修好了吗？”你揉了揉眉心。",
     ].join("\n\n"),
     results: {
       [`random-13-advisor-${serial}`]: {
@@ -120,7 +120,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
               "机器当天恢复。测试跑过一轮，你付清维修费，还了机房钥匙；总算不用反复刷新远程连接了。",
             ].join("\n\n")
           : [
-              "报价便宜，来人却只会反复拆装试错。折腾几天没找准故障，聊天框里倒先发来了追加费用。",
+              "报价便宜，来人却只会反复拆装试错🧰。折腾几天没找准故障，聊天框里倒先发来了追加费用。",
               "你争了半天，还是多付了钱，只好请组里重新安排检修。回到工位，远程连接依旧报错，维修聊天还挂在旁边。",
             ].join("\n\n"),
       },

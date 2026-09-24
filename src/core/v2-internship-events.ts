@@ -97,8 +97,8 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
     id: `internship-invite-act2-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择",
     description: [
-      "你对照实验计划核了一遍实习安排，项目交付和组会都不能落下，接了就得挤出时间。",
-      "远程不用搬家，但也不是挂着聊天软件就能领钱。你得想清楚，眼下有没有余力兼顾。",
+      "你把实习任务和实验计划并排打开，逐项核对。项目里的方法很熟悉，真用到公司业务里又是另一回事；想到能亲手试试，你有点跃跃欲试。",
+      "再看一眼组会日期，刚才的兴奋里又混进些心虚。远程省了搬家的麻烦，每周交付却照样要做。你在日历上找了又找，想给这份工作挪出几个完整的晚上。",
       warningText,
     ].join("\n\n"),
     source: "fixed",

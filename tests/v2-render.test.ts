@@ -2404,7 +2404,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="event-scene-tab is-active"');
     expect(html).toContain('data-ui-event-scene-index="0"');
     expect(eventButtonsBlock).toContain('class="event-choice-btn event-action-btn"');
-    expect(html).toMatch(/你叫<mark class="event-name-highlight">[^<]+<\/mark>，是计算机类专业学生/);
+    expect(html).toMatch(/你叫<mark class="event-name-highlight">[^<]+<\/mark>，是人工智能专业学生/);
     expect(eventButtonsBlock).toContain('data-action="resolve-event"');
     expect(eventButtonsBlock).toMatch(/data-event-id="[^"]+"/);
     expect(eventButtonsBlock).toMatch(/data-event-choice-id="[^"]+"/);
@@ -2583,9 +2583,9 @@ describe("v2 render lobby shell", () => {
     expect(html.match(/class="event-settlement-summary"/g)).toHaveLength(1);
     expect(summary).toContain('<span class="event-settlement-label">结果</span>');
     expect(summary).not.toContain('<span class="event-settlement-label">条件</span>');
-    expect(summary).toContain('<span class="event-settlement-item">金币 -1</span>');
+    expect(summary).toContain('<span class="event-settlement-effect is-money">金币 -1</span>');
     expect(summary).toContain('<span class="event-settlement-divider" aria-hidden="true">|</span>');
-    expect(summary).toContain('<span class="event-settlement-item">导师好感 +1</span>');
+    expect(summary).toContain('<span class="event-settlement-effect is-relationship">导师好感 +1</span>');
     expect(summary).not.toContain("。");
   });
 
@@ -2613,8 +2613,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('<span class="event-settlement-label">条件</span>');
     expect(html).toContain('<span class="event-settlement-item">导师到场</span>');
     expect(html).toContain('<span class="event-settlement-label">结果</span>');
-    expect(html).toContain('<span class="event-settlement-item">SAN -2</span>');
-    expect(html).toContain('<span class="event-settlement-item">导师好感 +1</span>');
+    expect(html).toContain('<span class="event-settlement-effect is-san">SAN -2</span>');
+    expect(html).toContain('<span class="event-settlement-effect is-relationship">导师好感 +1</span>');
   });
 
   it("omits no-op settlement results while retaining their condition", () => {
@@ -2785,6 +2785,7 @@ describe("v2 render lobby shell", () => {
     expect(currentHtml).toContain(">教师节</button>");
     expect(currentHtml).toContain(">你的选择</button>");
     expect(currentHtml).toContain(">礼物送达</button>");
+    expect(currentHtml).toContain('class="event-description-emoji"');
 
     state = dispatchAction(state, "resolve-event", {
       eventId: state.eventQueue[0]?.id,
@@ -3814,6 +3815,9 @@ describe("v2 render lobby shell", () => {
     expect(advisorHtml).toContain("合群");
     expect(advisorHtml).toContain("💕");
     expect(advisorHtml).toContain("恋爱后解锁");
+    const inactiveRelationshipCards = advisorHtml.match(/<article class="rel-card (?:locked|empty)[^"]*"[\s\S]*?<\/article>/g) ?? [];
+    expect(inactiveRelationshipCards.length).toBeGreaterThan(0);
+    expect(inactiveRelationshipCards.every((card) => card.includes('class="rel-card-header rel-card-empty-header"'))).toBe(true);
     expect(advisorHtml).not.toContain('class="rel-switch-badge is-task"');
     const advisorCard = getRelationshipCardHtml(advisorHtml, "advisor");
     expect(advisorCard).not.toMatch(/rel-actions|做项目|交流/);

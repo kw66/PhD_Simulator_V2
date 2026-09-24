@@ -35,7 +35,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
   const event: PendingEvent = {
     id: `random-7-y${state.year}-m${state.month}-n${serial}`,
     title: "组内团建",
-    description: "导师在组群里发了团建通知，打球、打牌、唱歌和聚餐的提议接连冒出来。平时问进度要等半天的群，这会儿消息一条接一条。",
+    description: "导师在组群里发了团建通知，打球、打牌、唱歌和聚餐的提议接连冒出来。平时问进度要等半天的群，这会儿消息一条接一条💬。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -104,14 +104,15 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
   return createThreeStageRandomEvent(event, {
     introDescription: [
       "导师在组群里发了团建通知，打球、打牌、唱歌和聚餐的提议接连冒出来。平时问进度要等半天的群，这会儿消息一条接一条。",
-      "有人确认要不要带电脑，导师回了句“不用汇报”。你把装到一半的电源适配器放回桌上，群里的活动投票也发出来了。",
+      "有人确认要不要带电脑，导师回了句“不用汇报”😌。你把装到一半的电源适配器放回桌上，群里的活动投票也发出来了。",
     ].join("\n\n"),
     decisionTitle: "活动选择",
     decisionDescription: [
+      "羽毛球那一栏刚多了一票，群里就有人开始约双打搭子。你转了转僵硬的肩膀，点开下一条语音，却听见同门在哼歌——这位已经在为 KTV 选曲了。",
       pokerStake === 0
-        ? "你活动了一下肩膀，打球倒适合给久坐的自己松松筋骨。坐下来打牌也行，手头没有本金，同门说只拿筹码记个输赢也能一起玩。"
-        : `你活动了一下肩膀，打球倒适合给久坐的自己松松筋骨。坐下来打牌也行，只是这次德州扑克要押注 ${pokerStake} 金币，跟注上头可就真要输掉本金了。`,
-      "唱歌的提议下已经有人报歌名，聚餐那边则在挑校门口的馆子。你有点想跟着热闹一回；不过聚餐还没说定谁结账，可能导师请客，也可能每人各出 2 金币。",
+        ? "提议打牌的同门也在招呼人。你说手头没有本金，对方很快回了消息：“那就只用筹码记输赢，一样玩。”"
+        : `提议打牌的同门也在招呼人，这次押注 ${pokerStake} 金币。你算了算本金，先在心里提醒自己：拿到烂牌就弃，别又舍不得。`,
+      "聚餐的菜单也发来了，你往下划了两页，肚子先替你表了态。只是导师还没说请客，真要 AA，每人得出 2 金币。",
     ].join("\n\n"),
     results: {
       [`random-7-badminton-${serial}`]: {
@@ -152,7 +153,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
             ].join("\n\n")
           : [
               "大家在校门口找了家餐厅，菜单传了一圈，点菜比平时讨论实验方案还热闹。菜上来以后，话题从哪个食堂窗口好吃，一路聊到谁在校园里迷过路。",
-              "最后按 AA 结账，每人付了 2 金币。你付完钱才发现，刚才光顾着接话，碗里还有半个丸子没吃。大家又坐着聊了一会儿，才慢慢往校门走。",
+              "最后按 AA 结账，每人付了 2 金币。你付完钱才发现，刚才光顾着接话，碗里还有半个丸子没吃😅。大家又坐着聊了一会儿，才慢慢往校门走。",
             ].join("\n\n"),
       },
     },
@@ -218,8 +219,8 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "你把几项提议看了一遍。给显卡留预算，下次购买或升级就不用自己付钱；劳务费则直接到账，花在哪里可以自己安排。",
-      "工位设备也让你有点心动，买新设备或升级能报销一次。也可以报销本月的 AI 费用，平时查资料、改代码都用得上。真要只留一项，你又把清单从头看了一遍。",
+      "你接过导师递来的笔，刚才查的显卡报价还开着，椅子一往后靠又吱呀响了一声；旁边的同门小声说，直接发劳务费也挺好。你很难不点头。",
+      "你在纸上圈下报销范围：下次购买或升级显卡、一次工位设备购买或升级，还有本月的 AI 费用。平时舍不得花的钱，这会儿每一笔都想起来了。导师看着被你圈了一遍的清单，等你在选定的那项旁打勾。",
     ].join("\n\n"),
     results: {
       [`random-8-gpu-${serial}`]: {

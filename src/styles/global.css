@@ -6719,14 +6719,37 @@ button[data-card-icon-action]:focus-visible {
 .rel-card.locked,
 .rel-card.empty {
   min-height: 0;
-  place-items: center;
+  grid-template-rows: 30px minmax(0, 1fr);
+  gap: 0;
+  place-items: stretch;
   text-align: center;
 }
 
+/* Empty and locked relationship slots keep the same top header footprint as
+   research cards, so their content starts below a quiet divider line. */
+.rel-card-grid .rel-card-empty-header {
+  min-height: 30px;
+  margin: 0;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(57, 68, 103, 0.13);
+  background: transparent;
+}
+
+.rel-card-empty-content {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+}
+
 .rel-card-lover-locked {
-  grid-template-columns: max-content max-content;
-  min-height: 64px;
-  align-content: center;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rel-card-lover-empty-content {
+  display: flex;
+  align-items: center;
   justify-content: center;
   gap: 7px;
 }
@@ -10072,6 +10095,14 @@ button[data-card-icon-action]:focus-visible {
   line-break: strict;
 }
 
+.event-description-emoji {
+  display: inline-block;
+  margin-right: 0.28em;
+  font-size: 1.08em;
+  line-height: 1;
+  vertical-align: -0.06em;
+}
+
 .event-story-word {
   white-space: nowrap;
 }
@@ -10177,6 +10208,40 @@ button[data-card-icon-action]:focus-visible {
   background: #f5eddd;
   overflow-wrap: anywhere;
 }
+
+.event-settlement-item.has-effects {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.event-settlement-effect {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 23px;
+  min-height: 23px;
+  margin: 0 2px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in oklab, var(--event-effect-accent) 36%, #c4b390);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--event-effect-accent) 11%, #f5eddd);
+  color: color-mix(in oklab, var(--event-effect-accent) 76%, var(--ink));
+  font-weight: 780;
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.event-settlement-effect.is-san { --event-effect-accent: #a03f58; }
+.event-settlement-effect.is-money,
+.event-settlement-effect.is-advisor-funding { --event-effect-accent: #9a6b18; }
+.event-settlement-effect.is-advisor-research,
+.event-settlement-effect.is-research { --event-effect-accent: #2563a8; }
+.event-settlement-effect.is-score { --event-effect-accent: #6d4aa2; }
+.event-settlement-effect.is-fellow { --event-effect-accent: #0f766e; }
+.event-settlement-effect.is-lover,
+.event-settlement-effect.is-relationship { --event-effect-accent: #a23e72; }
+.event-settlement-effect.is-general { --event-effect-accent: #66736d; }
 
 .event-settlement-divider {
   display: none;

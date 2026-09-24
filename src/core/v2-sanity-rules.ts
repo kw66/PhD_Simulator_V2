@@ -106,7 +106,7 @@ export function formatResearchMiscSanChange(
 export function getResearchMiscSanNarrative(baseDelta: number, research: number): string {
   const tierDiscount = getResearchMiscTierDiscount(baseDelta, research);
   return tierDiscount > 0
-    ? `有了“${RESEARCH_MISC_TIER_NAMES[getAttributeTier(research)]}”档的经验，这类事务处理起来省力了一些。`
+    ? `科研能力提升到“${RESEARCH_MISC_TIER_NAMES[getAttributeTier(research)]}”档位后，你对这类科研事务更熟悉了。`
     : "";
 }
 

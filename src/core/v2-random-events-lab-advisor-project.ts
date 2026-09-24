@@ -34,12 +34,12 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   const hasJunior = familiarJunior !== undefined;
   const familiarJuniorLabel = familiarJunior ? getFellowRoleLabel(familiarJunior.type, familiarJunior.gender) : "";
   const familiarJuniorName = familiarJunior ? getFellowName(familiarJunior) : familiarJuniorLabel;
-  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 307);
-  const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const shareSocialRaw = hasJunior ? -1 : -2;
   const shareSocialResult = applyTierResist(shareSocialRaw, state.player.social, getRoll);
   const shareSocialChange = shareSocialResult.effectiveChange;
   const shareSocialNarrative = getTierResistedNarrative("社交", shareSocialRaw, shareSocialResult);
+  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 307, undefined, [], getRoll);
+  const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
 
   const event: PendingEvent = {
     id: `random-4-y${state.year}-m${state.month}-n${serial}`,
@@ -82,7 +82,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       {
         id: `random-4-share-${serial}`,
         label: "让师弟师妹分担",
-        outcome: `${hasJunior ? `有熟悉的${familiarJuniorLabel}` : "暂无熟悉的师弟或师妹"}；${shareSanSummary}；${formatTierResistedOutcome("社交", shareSocialRaw, shareSocialResult)}`,
+        outcome: `${hasJunior ? `有熟悉的${familiarJuniorLabel}` : "无熟悉的师弟/师妹"}；${shareSanSummary}；${formatTierResistedOutcome("社交", shareSocialRaw, shareSocialResult)}`,
         effects: {
           san: shareSanChange,
           social: shareSocialChange,
@@ -98,8 +98,8 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "横向那边要赶交付，劳务费很实在，来回改需求的工夫也省不了；纵向要多啃些材料、琢磨实验，倒能顺便练练研究的本事。你拿笔在清单旁停了停，两边都不是签个名字就能结束的事。",
-      "实在挤不出时间，也可以申请调整，只是不知道导师听了会是什么脸色。找师弟师妹分担能少熬一些，可要挪动的就不止你一个人的日程了。",
+      "横向任务旁标着交付时间和劳务费，你多看了一眼报酬，又往下读那几行需求。纵向的材料里倒有个问题让你想接着看，只是参考文献一翻，又是一长串。",
+      "导师还等着你报分工。你低头翻开自己的日程，几项任务的日期挤在同一周，刚有的一点兴致又被拉了回来。旁边的同门还在记刚领到的活，你攥着笔，得先说清自己这次能接下多少。",
     ].join("\n\n"),
     results: {
       [`random-4-horizontal-${serial}`]: {

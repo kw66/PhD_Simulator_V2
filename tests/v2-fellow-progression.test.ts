@@ -78,6 +78,15 @@ describe("v2 fellow progression", () => {
     expect(random).not.toHaveBeenCalled();
   });
 
+  it("uses the supplied random stream for gameplay fellow names", () => {
+    const first = createGeneratedFellowProfileAddition("junior", 0, "male", [], () => 0);
+    const second = createGeneratedFellowProfileAddition("junior", 0, "male", [], () => 0.999999);
+
+    expect(first.name).not.toBe(second.name);
+    expect(first.name).toMatch(/^[\p{Script=Han}]{2,3}$/u);
+    expect(second.name).toMatch(/^[\p{Script=Han}]{2,3}$/u);
+  });
+
   it("keeps generated fellow names unique against existing relationships", () => {
     const existing = createGeneratedFellowProfileAddition("peer", 23, "female");
     const generated = createGeneratedFellowProfileAddition("junior", 23, "female", [existing.name!]);

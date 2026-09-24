@@ -13,29 +13,29 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
   const socialCapped = state.player.social >= 20;
   const favorCapped = state.player.favor >= 20;
   const sleepHint = state.player.san < 6
-    ? "最近看几行字都累，想好好睡一觉。"
+    ? "写着写着，眼前的字又有点发花。现在最想补上的，其实是一场好觉。"
     : state.player.san < 12
-      ? "这阵子总按掉闹钟，欠的觉该补补了。"
-      : "精神还行，也想睡个不用定闹钟的觉。";
+      ? "你打了个哈欠，想起这阵子每天都要按掉好几遍闹钟。连补觉都还欠着，难怪写总结也提不起劲。"
+      : "这一年倒没把精神熬垮。可想到不用定闹钟、醒了也不急着出门，还是很向往。";
   const socialHint = socialCapped
-    ? "熟人已经不少，约出来吃顿饭也好。"
+    ? "往前翻几页，聚餐时记下的几个笑话又让你乐了，那帮人该再约一次。"
     : state.player.social < 6
-      ? "每天两点一线，也想认识些同学。"
-      : "参加个活动，换个课题组的人聊聊。";
+      ? "再看月历，除了实验室就是宿舍。你停了一下，这一年居然没认识几个新朋友。"
+      : "月历上夹着一张活动票根，那天聊得很开心。最近一忙起来，又只剩下同组的几张脸了。";
   const favorHint = favorCapped
-    ? "和老师沟通顺畅，组里杂事也能搭把手。"
+    ? "组里的事情已经很熟，老师交代起事来也放心。你想到还有一摞材料没整理，顺手把它记在页边。"
     : state.player.favor < 6
-      ? "跟导师还不太熟，帮忙时能多聊两句。"
-      : "组里的材料还要整理，帮老师分担一点也行。";
+      ? "写到导师时，你发现自己连平时该聊些什么都答不上来。一年过去，见老师居然还是这么拘谨。"
+      : "组里那摞待整理的材料也浮上心头。平时老师没少操心，你也想把手边的事接过来一些。";
   const partTimeHint = state.player.money < 3
-    ? "只是手头有些紧，找份兼职也挺迫切。"
-    : "或者找份兼职，给日常开销多留点余地。";
+    ? "手机上的余额提醒又亮了。你叹口气，在旁边补上“找份兼职”，这件事实在拖不下去了。"
+    : "写到开销，你又添了一行“找份兼职”。手头多攒点钱，花起来心里也踏实。";
 
   return createFixedEvent({
     id: `year-summary-choice-y${state.year}-m${state.month}`,
     title: "学年总结 ➜ 年度总结",
     description: [
-      "总结写了半页，你的笔慢下来。想调整的事不少，时间却只有这么多。",
+      "总结写了半页，你发现自己一直在写“忙”。可忙了一整年，有几件惦记的事还是没顾上。",
       `${sleepHint}${socialHint}`,
       `${favorHint}${partTimeHint}`,
     ].join("\n\n"),

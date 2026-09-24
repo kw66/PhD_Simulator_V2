@@ -38,8 +38,8 @@ function createSummerVacationPlanEvent(state: GameState): PendingEvent {
     id: `summer-vacation-plan-y${state.year}-m${state.month}`,
     title: "暑假 ➜ 暑假计划",
     description: [
-      "回家的车票页面开着，桌上还摊着没读完的文献。回去能补补觉、陪陪家人，留下来倒也清静，正好把那些读到一半的问题理一理。",
-      "朋友发来的旅行攻略也让你有点心动。这趟要花 4 金币，想好去哪儿之前，得先看看钱包答不答应。",
+      "家里又问起哪天到站，你切到车票页面，已经想起了家里的饭菜。桌上那篇文献还摊着，旁边标了好几个问号；实验室难得这么安静，放下它又有点舍不得。",
+      "朋友的旅行攻略偏偏这时候发来。你一张张翻着照片，越看越想走。这趟要花 4 金币，翻到账户余额时，你的手终于停了下来。",
     ].join("\n\n"),
     chainId: "summer-vacation",
     stage: "act2",

@@ -57,9 +57,9 @@ export function createCcigActivityDecisionEvent(
     id: `${activityChainId}-act2`,
     title: "年会活动 ➜ 选择安排",
     description: [
-      `你在${location}的 CCIG ${realYear} 会场翻着日程，几项安排撞在一起，总得有所取舍。`,
-      "你在报告题目和同学发来的餐馆地址之间来回切换。难得来一趟，是多听点东西，还是留些时间逛逛、和大家聊聊？",
-      posterPaper ? `你也可以留在海报区，介绍 A 类论文《${posterPaper.title}》。` : "",
+      `你站在${location}的 CCIG ${realYear} 会场里，低头对着日程找分会场。广播开始提醒入场，同学却在群里发来餐馆定位，还问谁想顺路逛逛。`,
+      "刚圈好的报告题目还在眼前，美食照片又一张接一张。你咽了咽口水，突然很佩服自己出发前那份排得满满当当的学习计划。",
+      posterPaper ? `海报区也有展示 A 类论文《${posterPaper.title}》的机会。想到同行会停下来听自己讲，你既兴奋，又忍不住在心里过了一遍开场白。` : "",
       "机制结算",
       `参会确认：${attendanceSummary}`,
     ].filter(Boolean).join("\n\n"),

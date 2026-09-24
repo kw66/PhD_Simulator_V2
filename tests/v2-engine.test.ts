@@ -5,6 +5,7 @@ import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { collectRandomEventsForMonth } from "../src/core/v2-event-scheduler";
 import { collectFixedEventsForState } from "../src/core/v2-fixed-events";
+import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import { createPhdDecisionEvent } from "../src/core/v2-phd-decision-event";
@@ -49,6 +50,47 @@ describe("minimal game engine", () => {
     const next = dispatchAction(state, "next-month");
     expect(next.totalMonths).toBe(0);
     expect(next.log).toEqual(state.log);
+  });
+
+  it("preserves existing relationship cards when mentoring is delegated", () => {
+    const initial = createInitialState();
+    const fellow = createCustomFellowProgressProfile({
+      type: "junior",
+      gender: "female",
+      startTotalMonths: 17,
+      research: 3,
+      affinity: 3,
+      name: "现有同学",
+    });
+    const base = {
+      ...initial,
+      phase: "playing" as const,
+      year: 2,
+      month: 5,
+      totalMonths: 17,
+      eventQueue: [],
+      availableRandomEvents: [1],
+      usedRandomEvents: [],
+      totalRandomEventCount: 0,
+      selectedAdvisorName: "导师",
+      player: { ...initial.player, social: 0 },
+      relationshipState: { ...initial.relationshipState, advisorCount: 1, juniorCount: 1, occupiedSlots: 1, unlockedSlots: 3 },
+      fellowProgressState: [fellow],
+    };
+    const rolls = [0.7, 0, 0];
+    const collected = collectRandomEventsForMonth(base, () => rolls.shift() ?? 0);
+    let state = {
+      ...collected.nextState,
+      eventQueue: [createEventQueueItem(collected.events[0]!, 1)],
+    };
+    const intro = state.eventQueue[0]!;
+    state = dispatchAction(state, "resolve-event", { eventId: intro.id, eventChoiceId: intro.choices[0]?.id });
+    const decision = state.eventQueue.find((event) => event.chainId === "random-1")!;
+    const delegate = decision.choices.find((choice) => choice.id.includes("delegate"))!;
+    state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: delegate.id });
+
+    expect(state.fellowProgressState).toEqual([fellow]);
+    expect(state.relationshipState).toMatchObject({ advisorCount: 1, juniorCount: 1, occupiedSlots: 1 });
   });
 
   it("delays the conference event by three months after a confirmed publication", () => {

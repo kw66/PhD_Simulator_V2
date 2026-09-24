@@ -4,6 +4,7 @@ import { getConferenceInfo } from "./v2-conference-catalog";
 import { SCORE_BY_TARGET } from "./v2-content";
 import type { CareerType } from "./v2-career-rules";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
+import { applyQueuedEventEffects, rebaseGeneratedEventIds } from "./v2-engine-event-resolution";
 import { addOrReplaceBuffs } from "./v2-buffs";
 import { createAiBuffs, createAiShopState, getAiModelById } from "./v2-ai-shop";
 import { clampSan, pushLog } from "./v2-engine-helpers";
@@ -38,6 +39,7 @@ import { activateLover } from "./v2-lover-system";
 import { pickRandomAdvisorName } from "./v2-random-name";
 import { isPaperCompetitionEventId } from "./v2-paper-competition";
 import { activatePendingPaperCompetitionEvents, rememberPendingPaperCompetitionEvent } from "./v2-paper-competition-waiting";
+import { getCurrentEvent } from "./v2-event-queue";
 import type {
   Buff,
   DebugRelationshipType,
@@ -172,6 +174,9 @@ export const DEBUG_STAT_GROUPS: Array<{ statId: DebugStatId; label: string; delt
 
 export const DEBUG_MONTH_DELTAS = [-12, -1, 1, 12] as const;
 
+/** Manual cross-run audit checklist. Add an id here after the user confirms that the event has been checked. */
+export const DEBUG_COMPLETED_EVENT_IDS = ["before-grad-school", "random-1"] as const;
+
 export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
   {
     title: "固定事件",
@@ -190,7 +195,7 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
     title: "随机事件",
     buttons: [
       { id: "random-1", label: "毕设辅导" },
-      { id: "random-2", label: "帮忙审稿" },
+      { id: "random-2", label: "审稿任务" },
       { id: "illness-stomach", label: "肚子虚弱" },
       { id: "illness-flu", label: "流感来袭" },
       { id: "illness-fever", label: "高烧不退" },
@@ -466,6 +471,81 @@ function triggerReviewResultDebugEvent(state: GameState): GameState {
   return reviewResolution.state;
 }
 
+function markTriggeredEventForReplay(before: GameState, after: GameState, debugEventId: string): GameState {
+  const previousIds = new Set(before.eventQueue.map((event) => event.id));
+  return {
+    ...after,
+    eventQueue: after.eventQueue.map((event) => previousIds.has(event.id) ? event : {
+      ...event,
+      replayContext: {
+        rootEvent: event.replayContext?.rootEvent ?? event,
+        debugEventId,
+      },
+    }),
+  };
+}
+
+function rebuildDebugReplayRootEvent(rootEvent: PendingEvent, state: GameState, debugEventId?: string): PendingEvent {
+  const eventId = debugEventId ?? rootEvent.chainId;
+  const serialMatch = /-n(\d+)(?:-|$)/u.exec(rootEvent.id);
+  const replaySerial = serialMatch ? Number(serialMatch[1]) : rootEvent.randomReplay?.serial;
+  const eventState = rootEvent.paperCompetitionTargetId
+    ? { ...state, papers: state.papers.filter((paper) => paper.id === rootEvent.paperCompetitionTargetId) }
+    : state;
+  const rebuilt = buildDebugEvent(eventState, eventId, replaySerial)?.event;
+  if (!rebuilt || rebuilt.stage !== "act1" || rebuilt.chainId !== rootEvent.chainId) {
+    return rootEvent;
+  }
+  // Keep choice ids stable if the date changed while this event was pending.
+  const stableRoot = rebaseGeneratedEventIds(rebuilt, rebuilt.id, rootEvent.id);
+  return { ...stableRoot, paperCompetitionTargetId: rootEvent.paperCompetitionTargetId };
+}
+
+function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?: string, eventId?: string): GameState {
+  if (state.debugEventReplayEnabled !== true || !Number.isInteger(targetIndex) || targetIndex < 0) return state;
+  const currentEvent = getCurrentEvent(state.eventQueue, eventId);
+  const context = currentEvent?.replayContext;
+  const history = currentEvent?.history;
+  if (!currentEvent || !context || !history || targetIndex >= history.length) return state;
+
+  const targetScene = history[targetIndex]?.replayEvent;
+  if (!targetScene) return state;
+  // No event effects are committed before final confirmation. Replacing the
+  // pending scene discards its preview without touching the live game state.
+  const baseState = state;
+  let targetEvent = targetScene;
+  let nextContext = context;
+  if (targetScene.source === "random") {
+    const rootEvent = rebuildDebugReplayRootEvent(context.rootEvent, baseState, context.debugEventId);
+    targetEvent = rootEvent;
+    for (const stage of history.slice(0, targetIndex)) {
+      const choice = targetEvent.choices.find((item) => item.id === stage.selectedChoiceId);
+      const followUp = choice?.effects.enqueueEvents?.find((event) => event.chainId === currentEvent.chainId);
+      if (!followUp) return state;
+      targetEvent = followUp;
+    }
+    nextContext = { ...context, rootEvent };
+  }
+  const replayedState: GameState = {
+    ...baseState,
+    eventQueue: baseState.eventQueue.map((event) => event.id !== currentEvent.id ? event : {
+      ...targetEvent,
+      history: history.slice(0, targetIndex),
+      debugReplayable: true,
+      debugRootEventId: context.rootEvent.id,
+      replayContext: nextContext,
+      queueOrder: currentEvent.queueOrder,
+    }),
+  };
+  if (!choiceId) return replayedState;
+  const event = replayedState.eventQueue.find((item) => item.id === targetEvent.id);
+  if (!event || !event.choices.some((choice) => choice.id === choiceId)) return state;
+  return applyQueuedEventEffects(replayedState, event, choiceId, {
+    evaluateImmediateEndings: (nextState) => nextState,
+    runPostQueuePipeline: (nextState) => nextState,
+  });
+}
+
 function buildCareerEvent(state: GameState, eventId: string): PendingEvent | null {
   const careerTypeMap: Record<string, CareerType> = {
     "career-internet": "internet",
@@ -477,7 +557,27 @@ function buildCareerEvent(state: GameState, eventId: string): PendingEvent | nul
   return careerType ? createCareerEventForType(state, careerType) : null;
 }
 
-function buildDebugEvent(state: GameState, eventId: string): { nextState: GameState; event: PendingEvent | null } | null {
+function attachDebugRandomReplay(event: PendingEvent, replay: NonNullable<PendingEvent["randomReplay"]>): PendingEvent {
+  return {
+    ...event,
+    randomReplay: replay,
+    choices: event.choices.map((choice) => ({
+      ...choice,
+      effects: {
+        ...choice.effects,
+        ...(choice.effects.enqueueEvents
+          ? { enqueueEvents: choice.effects.enqueueEvents.map((followUp) => attachDebugRandomReplay(followUp, replay)) }
+          : {}),
+      },
+    })),
+  };
+}
+
+function buildDebugEvent(
+  state: GameState,
+  eventId: string,
+  stableRandomSerial?: number,
+): { nextState: GameState; event: PendingEvent | null } | null {
   switch (eventId) {
     case "scholarship":
       return { nextState: state, event: createScholarshipEvent(state, Math.random) };
@@ -559,7 +659,36 @@ function buildDebugEvent(state: GameState, eventId: string): { nextState: GameSt
               selectedPaperId: draft.id,
             };
           }
-          return createRandomEventById(randomId, randomState, Math.random);
+          // Debug events must not all use serial 0. The regular monthly
+          // scheduler increments totalRandomEventCount before building an
+          // event, while the debug panel intentionally leaves the live state
+          // untouched. Use a throwaway random serial for generated profiles
+          // and event copy, then keep the real state unchanged.
+          const debugEventState = {
+            ...randomState,
+            totalRandomEventCount: stableRandomSerial ?? (
+              randomState.totalRandomEventCount + 1
+              + Math.floor(Math.random() * 0x1000000)
+            ),
+          };
+          const randomRolls: number[] = [];
+          const recordRoll = (): number => {
+            const roll = Math.random();
+            randomRolls.push(roll);
+            return roll;
+          };
+          const built = createRandomEventById(randomId, debugEventState, recordRoll);
+          const replay = {
+            eventId: randomId,
+            serial: debugEventState.totalRandomEventCount,
+            rolls: randomRolls,
+          };
+          return {
+            nextState: randomState,
+            event: built.event
+              ? attachDebugRandomReplay(built.event, replay)
+              : null,
+          };
         }
       }
 
@@ -569,27 +698,29 @@ function buildDebugEvent(state: GameState, eventId: string): { nextState: GameSt
 }
 
 function triggerDebugEvent(state: GameState, eventId: string): GameState {
+  const replayState = state;
   const randomMatch = /^random-(\d+)$/u.exec(eventId);
   const randomId = randomMatch ? Number(randomMatch[1]) : NaN;
   if (isPaperCompetitionEventId(randomId)) {
-    const pendingState = rememberPendingPaperCompetitionEvent(state, randomId, state.totalRandomEventCount + 1);
-    return activatePendingPaperCompetitionEvents(pendingState === state ? state : {
+    const pendingState = rememberPendingPaperCompetitionEvent(replayState, randomId, replayState.totalRandomEventCount + 1);
+    const triggeredState = activatePendingPaperCompetitionEvents(pendingState === replayState ? replayState : {
       ...pendingState,
-      totalRandomEventCount: state.totalRandomEventCount + 1,
+      totalRandomEventCount: replayState.totalRandomEventCount + 1,
     });
+    return markTriggeredEventForReplay(replayState, triggeredState, eventId);
   }
   if (eventId === "conference") {
-    return triggerConferenceDebugEvent(state);
+    return markTriggeredEventForReplay(replayState, triggerConferenceDebugEvent(replayState), eventId);
   }
   if (eventId === "review-result") {
-    return triggerReviewResultDebugEvent(state);
+    return markTriggeredEventForReplay(replayState, triggerReviewResultDebugEvent(replayState), eventId);
   }
 
-  const built = buildDebugEvent(state, eventId);
+  const built = buildDebugEvent(replayState, eventId);
   const label = DEBUG_EVENT_LABELS[eventId] ?? eventId;
 
   if (!built) {
-    return pushLog(state, `测试触发失败：未找到事件 ${label}。`);
+    return pushLog(replayState, `测试触发失败：未找到事件 ${label}。`);
   }
 
   if (!built.event) {
@@ -601,7 +732,7 @@ function triggerDebugEvent(state: GameState, eventId: string): GameState {
     return pushLog(enqueueResult.nextState, `测试触发：${label} 已在待办中。`);
   }
 
-  return enqueueResult.nextState;
+  return markTriggeredEventForReplay(replayState, enqueueResult.nextState, eventId);
 }
 
 function addDebugPublishedPaper(
@@ -786,7 +917,7 @@ function addDebugRelationship(state: GameState, type: DebugRelationshipType): Ga
     state.loverState.name ?? "",
   ];
   const profile = createCustomFellowProgressProfile({
-    ...createGeneratedFellowProfileAddition(type, seed, undefined, usedNames),
+    ...createGeneratedFellowProfileAddition(type, seed, undefined, usedNames, Math.random),
     startTotalMonths: state.totalMonths,
     usedNames,
   });
@@ -815,6 +946,9 @@ export function dispatchDebugAction(
       case "debug-add-relationship":
       case "debug-shift-month":
       case "debug-trigger-event":
+      case "debug-replay-event":
+      case "debug-toggle-event-replay":
+      case "debug-adjust-action-points":
       case "debug-add-all-buffs":
         return pushLog(state, "开始本轮后才能使用测试工具。");
       default:
@@ -823,6 +957,20 @@ export function dispatchDebugAction(
   }
 
   switch (actionId) {
+    case "debug-toggle-event-replay":
+      if (typeof payload.debugEventReplayEnabled !== "boolean") return state;
+      return { ...state, debugEventReplayEnabled: payload.debugEventReplayEnabled };
+    case "debug-adjust-action-points": {
+      if (typeof payload.delta !== "number" || !Number.isInteger(payload.delta) || payload.delta === 0) return state;
+      const currentLimit = state.actionState.limit;
+      const nextLimit = Math.max(0, currentLimit + payload.delta);
+      if (nextLimit === currentLimit) return state;
+      const nextUsed = Math.min(state.actionState.used, nextLimit);
+      return {
+        ...state,
+        actionState: { ...state.actionState, limit: nextLimit, used: nextUsed },
+      };
+    }
     case "debug-adjust-stat":
       if (!payload.debugStatId || typeof payload.delta !== "number" || !Number.isInteger(payload.delta) || payload.delta === 0) {
         return state;
@@ -846,6 +994,10 @@ export function dispatchDebugAction(
         : state;
     case "debug-trigger-event":
       return payload.eventId ? triggerDebugEvent(state, payload.eventId) : state;
+    case "debug-replay-event":
+      return typeof payload.eventHistoryIndex === "number"
+        ? replayDebugEventScene(state, payload.eventHistoryIndex, payload.eventChoiceId, payload.eventId)
+        : state;
     case "debug-add-all-buffs":
       return addAllDebugBuffs(state);
     default:

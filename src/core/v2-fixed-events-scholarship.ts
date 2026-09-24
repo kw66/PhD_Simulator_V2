@@ -134,7 +134,7 @@ function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "su
     innerThoughts = [
       `这次能计入 ${context.score} 分。${estimateText}，你又核了一遍，确认没有重复申报。`,
     ];
-    finalThought = "回执存进文件夹，你暂时关掉页面。看起来有希望，可现在就开始盘算奖金怎么花，似乎又早了点。";
+    finalThought = "回执存进文件夹，你已经在心里列起了购物清单。刚列到第二件，赶紧把自己叫停：名单还没出呢，钱倒先花上了。";
   } else if (diff === 0) {
     innerThoughts = [
       `这次能计入 ${context.score} 分。${estimateText}，你在估分表上圈出自己的分数。`,

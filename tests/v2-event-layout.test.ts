@@ -23,7 +23,7 @@ describe("event layout samples", () => {
       expect(html).toContain("简单祝福");
       expect(html).toContain("礼物送达");
       expect(html).toContain("邮票送达");
-      expect(samples[1]?.html.match(/class="event-description-story"/g)).toHaveLength(3);
+      expect(samples[1]?.html.match(/class="event-description-story"/g)).toHaveLength(2);
       expect(new Set(samples.map((sample) => sample.key)).size).toBe(samples.length);
       expect(state).toEqual(before);
       expect(random).not.toHaveBeenCalled();

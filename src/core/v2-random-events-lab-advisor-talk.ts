@@ -32,7 +32,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
   const event: PendingEvent = {
     id: `random-5-y${state.year}-m${state.month}-n${serial}`,
     title: "导师约谈",
-    description: "导师发来一句“来办公室聊聊”，后面没有别的消息。你把聊天框盯了一会儿，抱起电脑走向办公室。",
+    description: "导师发来一句“来办公室聊聊”，后面没有别的消息👀。你把聊天框盯了一会儿，抱起电脑走向办公室。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -89,8 +89,8 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "电脑还没解锁，你先在心里排了一遍顺序。照着进度汇报，哪些做完、哪些没做完都得摊开；把拿不准的问题摆出来请教，又怕被反问“你自己怎么想”。",
-      "远程实习的事也可以趁这次聊聊。只是导师还没开口，你先提要分时间去别处，得想好怎么说明课题这边的安排。",
+      "电脑亮起来，你找到最近的记录。做完的几项已经打了勾，卡住的地方还留着问号。刚才在路上想好的开场白，坐到导师对面又忘了半句，你清了清嗓子，想先把话理顺。",
+      "文件夹里还放着那份远程实习介绍，时间安排是你昨晚改好的。机会挺让人心动，可课题还压在手上；你看了看介绍，又看了看实验记录，两件事都想讲清楚。",
     ].join("\n\n"),
     results: {
       [`random-5-report-${serial}`]: {

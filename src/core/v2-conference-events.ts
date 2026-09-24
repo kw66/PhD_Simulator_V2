@@ -154,7 +154,7 @@ function createConferenceDecisionAct2(
       `你查好去${context.city}的行程，把${regionName}参会的费用加了一遍。收到录用时只顾着高兴，现在轮到账户余额参与讨论了。`,
       context.paperCount >= 2
         ? `同会的 ${context.paperCount} 篇论文得一起安排，展示材料也要逐份核对。`
-        : "这次有 1 篇论文要展示。你打开和导师的聊天框，又看看预算：自己出钱、问问报销，还是请同学代为展示？",
+        : "这次有 1 篇论文要展示。你还挺想亲口讲讲自己的工作，看到费用又犹豫了。导师和同学的聊天框都打开了，第一句话还没发出去。",
       hasMeetingExperience
         ? `会务经验可以减免 ${discount} 金币，自费会便宜一些。`
         : "这次自费没有减免，花费要全部自己承担。",
