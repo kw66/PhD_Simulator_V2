@@ -4,7 +4,7 @@ import { addPaperCollaboration } from "./v2-paper-collaboration";
 import { getLoverName } from "./v2-lover-system";
 import { getResearchCap } from "./v2-research-cap-system";
 import { recordTalentTrigger } from "./v2-talent-history";
-import type { GameState, LoverProgressState, LoverTypeId, PaperActionType } from "./v2-types";
+import type { GameState, LoverProgressState, LoverTypeId } from "./v2-types";
 
 const LOVER_RELATION_MAX = 40;
 export const LOVER_TASK_MAX = 100;
@@ -73,17 +73,20 @@ export function getLoverNextReward(state: GameState, route: LoverRoute): string 
   const cycle = getRoute(state, route).completed % 3;
   return (route === "play"
     ? ["SAN+6", "SAN上限+1", "下月SAN消耗-1"]
-    : [`论文随机一项+${state.loverProgressState.research}分`, "永久idea、实验、写作各+1分", "双方科研较低者+1，相同不提升"])[cycle]! + "、亲密+1";
+    : [`论文最低项+${state.loverProgressState.research}分`, "永久idea、实验、写作各+1分", "双方科研较低者+1，相同不提升"])[cycle]! + "、亲密+1";
 }
 
 export function settlePendingLoverHelp(state: GameState, random: () => number = Math.random): GameState {
   const help = state.loverProgressState.pendingPaperHelp;
   if (state.phase !== "playing" || !help || !state.loverState.active) return state;
-  const fields: PaperActionType[] = ["idea", "experiment", "writing"];
   const targets = state.papers.flatMap((paper) => !paper.nonFirstAuthor && (paper.status === "draft" || paper.status === "journal-reviewing")
-    ? fields.filter((field) => field === "idea" || (field === "experiment" ? paper.idea > 0 : paper.experiment > 0)).map((field) => ({ paper, field })) : []);
+    ? (["idea", "experiment", "writing"] as const)
+      .filter((field) => field === "idea" || (field === "experiment" ? paper.idea > 0 : paper.experiment > 0))
+      .map((field) => ({ paper, field })) : []);
   if (targets.length === 0) return state;
-  const target = targets[Math.floor(random() * targets.length)]!;
+  const lowestScore = Math.min(...targets.map(({ paper, field }) => paper[field]));
+  const lowestTargets = targets.filter(({ paper, field }) => paper[field] === lowestScore);
+  const target = lowestTargets[Math.floor(random() * lowestTargets.length)]!;
   const paper = addPaperCollaboration(target.paper, { paperId: target.paper.id,
     collaborator: { id: help.collaboratorId, name: help.name }, scores: { [target.field]: help.amount } });
   return pushLog({ ...state,
@@ -127,7 +130,7 @@ function advanceRoute(state: GameState, route: LoverRoute, gain: number): GameSt
       const stored = lover.pendingPaperHelp;
       nextState.loverProgressState.pendingPaperHelp = stored ?? { amount: lover.research,
         collaboratorId: `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`, name: getLoverName(state.loverState) };
-      effects.push(stored ? "已有一次论文帮助待使用" : `论文随机一项+${lover.research}分，无可操作论文时保留一次`);
+      effects.push(stored ? "已有一次论文帮助待使用" : `论文最低项+${lover.research}分，无可操作论文时保留一次`);
     } else if (cycle === 1) {
       const previous = nextState.buffs.find((buff) => buff.id === "lover-study-score");
       const bonus = (previous?.actionEffects?.idea?.bonus ?? 0) + 1;

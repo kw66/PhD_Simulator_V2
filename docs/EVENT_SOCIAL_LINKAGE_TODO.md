@@ -62,7 +62,7 @@
 - [ ] E12 开会找大牛合作、深入合作与联培邀请：当前用合作标志、下次写作 Buff、科研上限等承接，尚无固定校外合作者及其论文；旧导师资源加成已随新导师系统删除。是否接入真实合著待讨论，不要求将校外大牛塞入普通同学栏。入口：[开会高级选项](../src/core/v2-conference-activity-advanced-options.ts)、[联培邀请](../src/core/v2-joint-training-events.ts)。
 - [ ] E13 学术恋人：恋爱事件已有独立人物与关系状态，聪慧恋人仍主要给玩家科研和永久额外科研次数等效果，没有恋人自己的在研论文或双向协作。待恋人玩法确定后评估如何接入；恋人独立占位，不参与玩家导师和实验室贡献，合著按实际一作归属计入对应成果。入口：[恋爱发展事件](../src/core/v2-lover-events.ts)、[开会高级选项](../src/core/v2-conference-activity-advanced-options.ts)。
 - [ ] E14 导师经费：事件当前提供玩家显卡、工位设备、AI 免费权益或按好感分档的劳务费，尚未连接新人际导师的科研经费余额。是否接入新经费及如何调整奖励待讨论；不能把目前玩家的免费购买权益当成全组已有资源。入口：[createFundingCampusRandomEvent](../src/core/v2-random-events-campus-social.ts)。
-- [ ] E15 企业交流与实习：企业交流给玩家下次实验倍率、积累企业交流次数并触发邀请；实习按期结算 SAN 和收入，没有具体企业合作者或真实项目论文。是否加入企业合作产出属于后续扩展，不预设新增同学或赠送非一作成果。入口：[企业交流](../src/core/v2-conference-activity-base-options.ts)、[实习邀请](../src/core/v2-internship-events.ts)。
+- [ ] E15 企业交流与实习：导师约谈已接入三个月远程实习，第三幕确认后从次月开始，每月SAN-3、金币+1，期间实验操作固定分+4、费用-1金币（最低0）、倍率×1.0。结束当月的实验收益保留到月末，下月失效。天赋关系页显示五项效果和剩余月份，Buff栏同步生效中的实验收益。会议邀请仍保留六个月企业实习、SAN-2、按论文与引用计算收入、实验倍率×1.25及企业交流增长；两种实习不能重叠或互相覆盖。企业合作者与项目论文仍待设计。入口：[导师约谈](../src/core/v2-random-events-lab-advisor-talk.ts)、[实习规则](../src/core/v2-internship-system.ts)、[企业交流](../src/core/v2-conference-activity-base-options.ts)、[实习邀请](../src/core/v2-internship-events.ts)。
 
 校外实习、联培的资源/训练 Buff、听报告/广泛交流的个人灵感、教师节分享的想法，不因包含“论文”或“合作”字样就全部改成协作加法。CCIG 海报展示已经绑定真实已发表论文；奖学金、转博按玩家一作成果统计是现有规则，不能自动扩大到全组论文。
 

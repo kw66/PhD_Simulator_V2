@@ -24,6 +24,10 @@ export function getShopReadSanDiscount(shopState: ShopState): number {
   return shopState.monitorOwned ? 1 : 0;
 }
 
+export function getShopExperimentMoneyDiscount(shopState: ShopState): number {
+  return shopState.gpuLevel >= 8 ? 2 : shopState.gpuLevel >= 4 ? 1 : 0;
+}
+
 export function getShopRestSanGain(shopState: ShopState): number {
   return shopState.chairUpgrade === "hammock" ? 5 : 2;
 }

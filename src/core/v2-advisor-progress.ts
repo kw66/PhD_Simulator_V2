@@ -23,11 +23,11 @@ export interface AdvisorGrantDefinition {
 }
 
 export const ADVISOR_GRANTS: readonly AdvisorGrantDefinition[] = [
-  { id: "youth", name: "青基", threshold: 25, funding: 5, durationYears: 3 },
-  { id: "general", name: "面上", threshold: 50, funding: 10, durationYears: 4 },
-  { id: "excellent", name: "优青", threshold: 150, funding: 15, durationYears: 3 },
-  { id: "distinguished", name: "杰青", threshold: 400, funding: 20, durationYears: 5 },
-  { id: "academician", name: "院士", threshold: 1000, funding: 0, durationYears: 0 },
+  { id: "youth", name: "青基", threshold: 25, funding: 10, durationYears: 3 },
+  { id: "general", name: "面上", threshold: 50, funding: 20, durationYears: 4 },
+  { id: "excellent", name: "优青", threshold: 150, funding: 50, durationYears: 3 },
+  { id: "distinguished", name: "杰青", threshold: 400, funding: 100, durationYears: 5 },
+  { id: "academician", name: "院士", threshold: 1000, funding: 200, durationYears: 0 },
 ];
 
 export function createAdvisorProgressState(): AdvisorProgressState {
@@ -91,6 +91,7 @@ export function getEligibleAdvisorGrant(advisor: AdvisorProgressState, calendarY
 }
 
 export function getAdvisorApplicationSummary(state: GameState): string {
+  if (state.month <= 0 || state.totalMonths <= 0) return "入学后开放";
   const advisor = state.advisorProgressState;
   const pending = advisor.pendingApplication;
   if (pending) return `${ADVISOR_GRANTS.find((grant) => grant.id === pending.id)!.name}申请中 · 8月公布`;
@@ -169,7 +170,7 @@ export function advanceAdvisorProject(
       lastProjectTotalMonths: state.totalMonths,
       ...(projectType === "horizontal" ? { lastHorizontalTotalMonths: state.totalMonths } : {}),
     },
-  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN-${sanCost}${completed ? projectType === "horizontal" ? `，科研经费+${ADVISOR_HORIZONTAL_REWARD}，劳务费+5` : "，导师科研积累提升，导师指导学生" : `，进度+${result.gain}`}`);
+  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN-${sanCost}${completed ? projectType === "horizontal" ? `，科研经费+${ADVISOR_HORIZONTAL_REWARD}，劳务费+5` : "，科研积累提升，指导论文" : `，进度+${result.gain}`}`);
 }
 
 export function advanceAdvisorHorizontal(state: GameState, random: () => number = Math.random): GameState {
@@ -202,7 +203,7 @@ export function settleAdvisorMonth(state: GameState, random: () => number = Math
         nextProject: projectType === "horizontal" ? "vertical" : "horizontal",
         lastAdvisorProjectTotalMonths: state.totalMonths,
         lastProjectTotalMonths: state.totalMonths,
-        monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度+10${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导学生论文" : "（项目完成）" : ""}`,
+        monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度+10${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导论文" : "（项目完成）" : ""}`,
       };
     }
   }
@@ -224,7 +225,7 @@ export function settleAdvisorMonth(state: GameState, random: () => number = Math
           endYear: grant.durationYears > 0 ? calendarYear + grant.durationYears : null,
         }],
       };
-      nextState = pushLog(nextState, `导师${grant.id === "academician" ? "当选" : "获批"}${grant.name}：晋升${getAdvisorRankLabel(advisor)}${grant.funding > 0 ? `，科研经费+${addedFunding}` : "，科研经费每月+1"}`);
+      nextState = pushLog(nextState, `导师${grant.id === "academician" ? "当选" : "获批"}${grant.name}：晋升${getAdvisorRankLabel(advisor)}，科研经费+${addedFunding}`);
       const salary = getAdvisorMonthlySalary(advisor, state.degree);
       if (salary > previousSalary) {
         nextState = recordTalentTrigger(nextState, `advisor-salary:${grant.id}:${calendarYear}`, {

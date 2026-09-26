@@ -21,10 +21,9 @@ function getHelpTargets(papers: Paper[]): HelpTarget[] {
 }
 
 function selectHelpTarget(targets: HelpTarget[], type: FellowProgressProfile["type"], random: () => number): HelpTarget | undefined {
-  if (type === "peer") return targets.length > 0 ? targets[Math.floor(random() * targets.length)] : undefined;
-  return targets.reduce<HelpTarget | undefined>((selected, candidate) => !selected
-    || (type === "senior" ? candidate.paper[candidate.field] > selected.paper[selected.field]
-      : candidate.paper[candidate.field] < selected.paper[selected.field]) ? candidate : selected, undefined);
+  const fixedField = type === "senior" ? "idea" : type === "junior" ? "experiment" : null;
+  const candidates = fixedField ? targets.filter((target) => target.field === fixedField) : targets;
+  return candidates.length > 0 ? candidates[Math.floor(random() * candidates.length)] : undefined;
 }
 
 export function advanceFellowCooperation(profile: FellowProgressProfile, amount: number, playerResearch: number): FellowProgressProfile {
@@ -39,7 +38,7 @@ export function advanceFellowCooperation(profile: FellowProgressProfile, amount:
   };
 }
 
-export function settlePendingFellowHelp(state: GameState, random: () => number = Math.random): GameState {
+function settleFellowHelpPass(state: GameState, random: () => number): GameState {
   if (state.phase !== "playing") return state;
   let nextState = state;
   for (const original of state.fellowProgressState) {
@@ -63,7 +62,9 @@ export function settlePendingFellowHelp(state: GameState, random: () => number =
     }
     if (profile.pendingHelpToFellow != null) {
       const amount = profile.pendingHelpToFellow;
-      const target = selectHelpTarget(getHelpTargets((nextState.fellowPapers ?? []).filter((paper) => paper.leadAuthorId === profile.id)), "junior", random);
+      const targets = getHelpTargets((nextState.fellowPapers ?? []).filter((paper) => paper.leadAuthorId === profile.id));
+      const target = targets.reduce<HelpTarget | undefined>((selected, candidate) => !selected
+        || candidate.paper[candidate.field] < selected.paper[selected.field] ? candidate : selected, undefined);
       if (target) {
         const paper = addPaperCollaboration(target.paper, {
           paperId: target.paper.id,
@@ -83,4 +84,13 @@ export function settlePendingFellowHelp(state: GameState, random: () => number =
     }
   }
   return nextState;
+}
+
+export function settlePendingFellowHelp(state: GameState, random: () => number = Math.random): GameState {
+  let current = state;
+  while (true) {
+    const next = settleFellowHelpPass(current, random);
+    if (next === current) return next;
+    current = next;
+  }
 }

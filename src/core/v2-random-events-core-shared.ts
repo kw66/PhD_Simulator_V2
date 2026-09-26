@@ -2,13 +2,6 @@ import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type RandomRollProvider = () => number;
 
-export function formatProbabilityCondition(label: string, probability: number): string {
-  const normalizedProbability = Number.isFinite(probability)
-    ? Math.max(0, Math.min(1, probability))
-    : 0;
-  return `${label}（${Math.round(normalizedProbability * 100)}%）`;
-}
-
 export function drawInclusiveInt(min: number, max: number, getRoll: RandomRollProvider): number {
   const normalized = Math.max(0, Math.min(0.999999999999, getRoll()));
   return min + Math.floor(normalized * (max - min + 1));

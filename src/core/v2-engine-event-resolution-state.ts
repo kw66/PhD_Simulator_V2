@@ -10,6 +10,7 @@ import { clampResearchToCap } from "./v2-research-cap-system";
 import { applyReadPaperActions, applyReadingCountProgress } from "./v2-reading-system";
 import { canAddRelationship, syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
+import { activateInternship, activateRemoteInternship, hasOngoingInternship, increaseInternshipExperimentMultiplier } from "./v2-internship-system";
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
 import { createLoverProgressState } from "./v2-lover-progression";
@@ -22,6 +23,7 @@ export interface ResolvedEventChoiceState {
   nextState: GameState;
   resolvedOutcome: string;
   resolvedEnqueueEvents: PendingEvent[];
+  resolvedPresentation?: Pick<PendingEvent, "title" | "description" | "completionLog">;
 }
 
 function createTriggeredFollowUpEvents(state: GameState, choice: EventChoice): PendingEvent[] {
@@ -31,7 +33,7 @@ function createTriggeredFollowUpEvents(state: GameState, choice: EventChoice): P
   if (
     effects.triggerInternshipInvite
     && !state.conferenceCareerState.permanentlyBlockedInternship
-    && !state.internshipState.active
+    && !hasOngoingInternship(state)
     && !hasQueuedChain("internship-invite")
   ) {
     events.push(createInternshipInviteAct1({
@@ -316,7 +318,20 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     ...state.conferenceCareerState,
     ...(effects.conferenceCareerUpdates ?? {}),
   };
-  const internshipState = { ...state.internshipState, ...(effects.internshipStateUpdates ?? {}) };
+  let internshipState = state.internshipState;
+  if (effects.internshipStateUpdates) {
+    if (effects.triggerInternshipInvite) {
+      if (hasOngoingInternship(state)) {
+        internshipState = increaseInternshipExperimentMultiplier(state.internshipState);
+      }
+    } else if (!hasOngoingInternship(state)) {
+      if (effects.internshipStateUpdates.kind === "remote3") {
+        if (state.player.favor >= 6) internshipState = activateRemoteInternship(state.totalMonths);
+      } else if (!state.conferenceCareerState.permanentlyBlockedInternship) {
+        internshipState = activateInternship();
+      }
+    }
+  }
   const mergedLoverState = { ...state.loverState, ...(effects.loverStateUpdates ?? {}) };
   const loverUsedNames = [
     ...fellowProgressState.map((profile) => getFellowName(profile)),
@@ -433,6 +448,7 @@ export function applyChoiceEffectsToState(
   state: GameState,
   choice: EventChoice,
   buffSource = "事件",
+  currentEvent?: PendingEvent,
 ): ResolvedEventChoiceState {
   if (choice.effects.paperCompetitionResolution) {
     return {
@@ -452,6 +468,33 @@ export function applyChoiceEffectsToState(
   }
   let resolvedOutcome = choice.outcome;
   let resolvedEnqueueEvents: PendingEvent[] = [];
+  let resolvedPresentation: ResolvedEventChoiceState["resolvedPresentation"];
+
+  if (choice.effects.internshipStateUpdates && !choice.effects.triggerInternshipInvite
+    && nextState.internshipState === state.internshipState) {
+    resolvedOutcome = hasOngoingInternship(state)
+      ? "已有实习安排，本次不新增、不延期，原实习保持不变。"
+      : choice.effects.internshipStateUpdates.kind === "remote3"
+        ? "导师好感不足，本次未确认远程实习。"
+        : "企业实习机会已关闭，本次未开始实习。";
+    resolvedPresentation = {
+      title: "实习安排未变更",
+      description: `确认前，你又核对了一遍眼下的安排，把这次申请暂时放下。\n\n机制结算\n${resolvedOutcome}`,
+      completionLog: resolvedOutcome,
+    };
+    if (currentEvent?.stage === "result") {
+      resolvedEnqueueEvents.push({
+        ...resolvedPresentation,
+        id: `${currentEvent.id}-unavailable`,
+        source: currentEvent.source,
+        blocking: true,
+        deadlineMonths: 0,
+        chainId: currentEvent.chainId,
+        stage: "result",
+        choices: [{ id: `${choice.id}-unavailable-close`, label: "确定", outcome: resolvedOutcome, effects: {} }],
+      });
+    }
+  }
 
   if (choice.effects.fixedEventResolution) {
     const result = applyFixedEventResolution(nextState, choice.effects.fixedEventResolution);
@@ -465,5 +508,5 @@ export function applyChoiceEffectsToState(
     ...createTriggeredFollowUpEvents(nextState, choice),
   ];
 
-  return { nextState, resolvedOutcome, resolvedEnqueueEvents };
+  return { nextState, resolvedOutcome, resolvedEnqueueEvents, resolvedPresentation };
 }

@@ -1,7 +1,6 @@
 import { addPaperCollaboration } from "./v2-paper-collaboration";
-import type { GameState, Paper, PaperActionType } from "./v2-types";
+import type { GameState, Paper } from "./v2-types";
 
-const PAPER_FIELDS: readonly PaperActionType[] = ["idea", "experiment", "writing"];
 const GUIDANCE_AMOUNT = 10;
 
 function applyGuidance(
@@ -12,9 +11,7 @@ function applyGuidance(
 ): Paper | undefined {
   const targets = papers.flatMap((paper) => {
     if (paper.nonFirstAuthor === true || (paper.status !== "draft" && paper.status !== "journal-reviewing")) return [];
-    return PAPER_FIELDS.filter((field) => field === "idea"
-      || (field === "experiment" ? paper.idea > 0 : paper.experiment > 0))
-      .map((field) => ({ paper, field }));
+    return paper.experiment > 0 ? [{ paper, field: "writing" as const }] : [];
   });
   if (targets.length === 0) return undefined;
   const target = targets[Math.floor(random() * targets.length)]!;

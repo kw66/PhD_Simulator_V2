@@ -284,6 +284,15 @@ export function createInitialState(): GameState {
   return buildInitialState();
 }
 
+function settlePendingPaperHelp(state: GameState): GameState {
+  let current = ensureFellowPapers(state);
+  while (true) {
+    const next = settleAdvisorGuidance(settlePendingLoverHelp(settlePendingFellowHelp(current)));
+    if (next === current) return next;
+    current = next;
+  }
+}
+
 export function dispatchAction(state: GameState, actionId: GameActionId, payload: DispatchPayload = {}): GameState {
   if (actionId === "restart-game") {
     return dispatchAction({ ...createInitialState(), blockLinearEvents: state.blockLinearEvents }, "start-game", {
@@ -309,7 +318,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   if (nextState.phase !== "playing") return nextState;
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
-  const helpedState = settleAdvisorGuidance(settlePendingLoverHelp(settlePendingFellowHelp(ensureFellowPapers(checkedState))));
+  const helpedState = settlePendingPaperHelp(checkedState);
   const settledState = actionId === "resolve-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;

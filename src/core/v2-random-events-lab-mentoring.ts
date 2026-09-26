@@ -6,7 +6,6 @@ import { canAddRelationship } from "./v2-relationship-rules";
 import { previewReadPaperActions } from "./v2-reading-system";
 import {
   createThreeStageRandomEvent,
-  formatProbabilityCondition,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -68,8 +67,8 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
         id: `random-1-self-${serial}`,
         label: "亲自指导",
         outcome: staysForGradSchool
-          ? `${formatProbabilityCondition("对方考研进组", 0.5)}｜${mentoringSanSummary}${canAddJunior ? `｜新增一位${mentorshipJuniorLabel}（${mentorshipJuniorLabel}科研+1，${mentorshipJuniorLabel}默契+1）` : "｜关系栏已满，暂不新增"}`
-          : `${formatProbabilityCondition("对方毕业", 0.5)}｜${mentoringSanSummary}`,
+          ? `对方考研进组｜${mentoringSanSummary}${canAddJunior ? `｜新增一位${mentorshipJuniorLabel}（${mentorshipJuniorLabel}科研+1，${mentorshipJuniorLabel}默契+1）` : "｜关系栏已满，暂不新增"}`
+          : `对方毕业｜${mentoringSanSummary}`,
         effects: becomesJunior
           ? {
             san: mentoringSanChange,
@@ -95,8 +94,8 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "你在空白表格旁标出几个问题，往下翻，又添了两条。光把结果补上还不够，答辩时为什么这样做，也得让对方自己讲清楚。",
-      "自己的会议 ddl 也在逼近。你把两边的安排放在一起，刚腾出来的那点空闲又填满了。想到要向导师推辞，你有些难开口；再看看同门的聊天列表，把这份任务转过去也让你过意不去。",
+      `你在空白表格旁标出几个问题，往下翻，又添了两条。光把结果补上还不够，也得让对方自己讲清楚。${mentorshipJuniorName}还在犹豫毕业后去哪儿，认真带一程，或许以后能在组里继续合作；若去别处，也就到答辩为止。${canAddJunior ? "" : "只是你已有的合作排满了日程，即使对方留下，也腾不出位置继续结伴。"}`,
+      `自己的会议 ddl 也在逼近，亲自指导会挤掉不少时间，向导师推辞又怕让他失望。${hasJunior ? `你翻到${familiarJuniorName}的聊天框，平时一起做事，转交至少好说些，可临时添活仍难免惹人抱怨。` : "联系人里没有熟悉的师弟师妹，临时把任务推给不熟的人，恐怕比找老熟人更伤情面。"}`,
     ].join("\n\n"),
     results: {
       [`random-1-refuse-${serial}`]: {
@@ -240,9 +239,8 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "要把这几步核对清楚，还得找来参考文献。认真读完能学到东西，可看着排满的日程，你还是忍不住叹了口气：今晚又得加班了。",
-      "任务已经分到你头上，推辞就得向导师说明缘由。想到要开这个口，你心里有点发怵。也可以请师弟师妹代劳，只是对方也得挤出时间；把这几十页公式转过去，你又觉得有些过意不去。",
-      ...(reviewSupportHint ? [`${reviewSupportHint}。你看着桌面上的设备和订阅，心里稍微有了点底。`] : []),
+      `要把这几步核对清楚，还得找来参考文献。认真读完能学到东西，可看着排满的日程，你还是忍不住叹了口气：今晚又得加班了。${reviewSupportHint ? `${reviewSupportHint}，多少能省些力气。` : ""}`,
+      `任务已经分到你头上，推辞就得向导师说明缘由，想到他的追问，你心里有点发怵。${hasJuniorForReview ? `也可以请${familiarJuniorName}代劳；平时一起做事好商量些，可对方也有截止日期，把这几十页公式临时转过去，还是觉得过意不去。` : "你还没有熟悉的师弟师妹，临时请不熟的人代劳，比找老熟人更难开口；看着这几十页公式，已经能想象对方收到时的神情。"}`,
     ].join("\n\n"),
     results: {
       [`random-2-refuse-${serial}`]: {
@@ -372,9 +370,8 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
     ].join("\n\n"),
     decisionTitle: "如何抉择",
     decisionDescription: [
-      ...(!canAddJunior ? ["普通关系栏已满，继续合作不会新增师弟师妹；你可以现在选择退出。"] : []),
-      "眼前这副对着报错无从下手的样子，让你想起自己刚进组的时候。如今轮到别人来问你了，可你屏幕上的问题，也还在等一个答案。",
-      `${pronounText}把笔记翻到最后一页，等你看那几个反复报错的位置。你已经想好该先查哪里，手上的工作却也停在半途。帮这一次还能挤挤时间，真要一直带下去，日程上每个月都得留出一个位置。`,
+      `${!canAddJunior ? "普通关系栏已满，继续合作不会新增师弟师妹；你可以现在选择退出。" : ""}眼前这副对着报错无从下手的样子，让你想起自己刚进组的时候。如今轮到别人来问你了，可你屏幕上的问题，也还在等一个答案。`,
+      `${pronounText}把笔记翻到最后一页，等你看那几个反复报错的位置。帮这一次还能挤挤时间，一起把问题讲清也能熟络些；真要一直带下去，每个月都得留出精力，带上一年，才会有一篇共同署名的成果。${canAddJunior ? "" : "可眼下连下一次固定讨论都排不进去，长期的约定只能先放下。"}`,
     ].join("\n\n"),
     results: {
       [`random-14-decline-${serial}`]: {

@@ -18,6 +18,35 @@ function createDiscardPaperUpdates(context: ConferenceActivityContext) {
   return (context.paperIds ?? []).map((id) => ({ id, conferenceHandled: true }));
 }
 
+function getActivityDecisionHint(option: ConferenceActivityOptionDefinition, state: ConferenceActivityBuildState): string {
+  switch (option.id) {
+    case "enterprise-networking":
+      return state.internshipState.active
+        ? "企业代表认出了你，问起你正在做的实习项目，还想听听实验中遇到的问题。"
+        : state.conferenceCareerState.permanentlyBlockedInternship
+          ? "企业代表记得你先前说暂不考虑实习，这回只问起了研究近况。"
+          : "企业展台前的人翻着你的论文，问你有没有时间聊聊他们正在招的实习岗位。";
+    case "big-bull-coop":
+      return state.conferenceEncounterState.bigBullCooperation
+        ? "联培合作的老师朝你招手，手里还拿着你前几天发去的草稿。"
+        : "那位学者还在讲台边答疑，你把自己的论文翻出来，先在心里练了一遍开场白。";
+    case "big-bull-joint-training":
+      return option.effects.triggerJointTrainingInvite
+        ? "前几次讨论的结果已经寄给对方，回信里除了改稿意见，还问起你能否来组里待一段时间。"
+        : "上回聊过的学者还记得你的问题，说想看看你后来补的实验。";
+    case "beautiful-lover-development":
+      return option.effects.triggerLoverDevelopment
+        ? "那位总能把你逗笑的同行发来消息，约你散场后单独走走，末尾还添了个有些害羞的表情。"
+        : "上次聊得很投缘的同行认出了你，隔着人群挥了挥手。";
+    case "smart-lover-development":
+      return option.effects.triggerLoverDevelopment
+        ? "那位常和你讨论问题的同行问起散场后的安排，又补了一句：“这回不聊论文也行。”"
+        : "上次一起推过公式的同行发来座位号，说给你留了旁边的位置。";
+    default:
+      return "";
+  }
+}
+
 export function createConferenceActivityResult(
   context: ConferenceActivityContext,
   option: ConferenceActivityOptionDefinition,
@@ -71,11 +100,14 @@ export function createConferenceActivityDecisionEvent(
     id: `${activityChainId}-act2`,
     title: "会场活动 ➜ 选择安排",
     description: [
-      `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，先前圈过的几项恰好撞了时间。原来选报告也得做取舍。`,
-      context.paperCount >= 2
+      `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，先前圈过的几项恰好撞了时间。` + (context.paperCount >= 2
         ? `忙完 ${context.paperCount} 篇论文的展示，你不想再来回赶场，准备挑一项好好参加。`
-        : "展示已经忙完，接下来总算能按自己的兴趣走。你把讲稿收进包里，听见旁边有人聊起熟悉的研究问题，脚步慢了下来。门外也透着阳光，忙了这么久，出去走走同样让人心动。",
-      ...getConferencePaperPresentationResults(context),
+        : "展示已经忙完，你把讲稿收进包里，准备挑一项好好参加。"),
+      "你把讲稿收进包里，终于有空看看周围。" + (selectedOptions.map((option) => getActivityDecisionHint(option, state)).filter(Boolean).join("")
+        || "茶歇区还在聊刚才的报告，门外也透着阳光。忙了这么久，出去走走同样让人心动。"),
+      ...(getConferencePaperPresentationResults(context).length > 0
+        ? ["机制结算", ...getConferencePaperPresentationResults(context)]
+        : []),
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

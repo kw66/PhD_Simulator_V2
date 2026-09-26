@@ -86,7 +86,7 @@ describe("advisor project economy", () => {
   });
 
   it.each(["horizontal", "vertical"] as const)("preserves the advisor's month-start activity after manual %s work", (project) => {
-    const before = makeState({ monthlyActivity: "推进纵向项目 +10，指导学生论文", horizontalProgress: 99, verticalProgress: 99 });
+    const before = makeState({ monthlyActivity: "推进纵向项目 +10，指导论文", horizontalProgress: 99, verticalProgress: 99 });
     const after = advanceAdvisorProject(before, project, () => 0);
     expect(after.advisorProgressState.monthlyActivity).toBe(before.advisorProgressState.monthlyActivity);
   });
@@ -113,6 +113,28 @@ describe("advisor project economy", () => {
 });
 
 describe("advisor publication credit and grants", () => {
+  it("awards 200 funding once for academician and has no monthly funding income", () => {
+    const march = settleAdvisorMonth(atMonth(makeState({
+      researchAccumulation: 1000,
+      awards: [{ id: "distinguished", awardedYear: 2023, startYear: 2024, endYear: 2028 }],
+    }), 7));
+    expect(march.advisorProgressState.pendingApplication?.id).toBe("academician");
+    const august = settleAdvisorMonth(atMonth(march, 12));
+    expect(august.advisorProgressState.funding).toBe(210);
+    expect(august.advisorProgressState.awards.at(-1)).toEqual({
+      id: "academician", awardedYear: 2024, startYear: null, endYear: null,
+    });
+    expect(august.log.some((entry) => entry.text.includes("导师当选院士：晋升教授·一级，科研经费+200"))).toBe(true);
+    expect(settleAdvisorMonth(august).advisorProgressState.funding).toBe(210);
+    const september = settleAdvisorMonth(atMonth(august, 13));
+    expect(september.advisorProgressState.funding).toBe(210);
+    const repeatedAugust = settleAdvisorMonth(atMonth({ ...september,
+      advisorProgressState: { ...september.advisorProgressState,
+        pendingApplication: { id: "academician", calendarYear: 2025, researchSnapshot: 1000 } },
+    }, 24));
+    expect(repeatedAugust.advisorProgressState.funding).toBe(210);
+  });
+
   it("counts each published paper once, including fellow papers", () => {
     const fellow = createCustomFellowProgressProfile({ type: "junior", gender: "female", research: 10, affinity: 2, startTotalMonths: 1, name: "Test junior" });
     const paper = publishedPaper("fellow-paper", { leadAuthorId: fellow.id });
@@ -142,7 +164,7 @@ describe("advisor publication credit and grants", () => {
     const august = settleAdvisorMonth(atMonth(march, 12));
     expect(august.advisorProgressState.awards).toEqual([{ id: "youth", awardedYear: 2024, startYear: 2025, endYear: 2027 }]);
     expect(august.advisorProgressState.researchAccumulation).toBe(25);
-    expect(august.advisorProgressState.funding).toBe(15);
+    expect(august.advisorProgressState.funding).toBe(20);
     expect(getActiveAdvisorGrants(august.advisorProgressState, 2024)).toHaveLength(1);
   });
 });

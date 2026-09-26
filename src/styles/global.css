@@ -4208,6 +4208,8 @@ p {
 
 .relationship-tooltip {
   position: fixed;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
   z-index: 1000;
   right: auto;
   max-width: min(440px, calc(100vw - 24px));
@@ -7874,6 +7876,7 @@ button[data-card-icon-action]:focus-visible {
   padding: 2px 4px;
   border: var(--talent-table-divider);
   color: var(--ink);
+  font-size: inherit;
   white-space: nowrap;
 }
 
@@ -8089,6 +8092,33 @@ button[data-card-icon-action]:focus-visible {
 
 .talent-panel .talent-item-row[data-talent-item-id="ai-collaboration"] .talent-item-metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.talent-panel .talent-item-row[data-talent-item-id="internship"] .talent-item-metrics {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-flow: row;
+}
+
+.talent-item-row[data-talent-item-id="internship"] .talent-item-metric {
+  grid-column: span 3;
+  padding: 2px 4px;
+  text-align: center;
+}
+
+.talent-item-row[data-talent-item-id="internship"] .talent-item-metrics:has(> :nth-child(5)) .talent-item-metric:nth-child(n + 3) {
+  grid-column: span 2;
+}
+
+.talent-item-row[data-talent-item-id="internship"] .talent-item-metric:nth-child(n + 3) {
+  border-top: var(--talent-table-divider);
+}
+
+.talent-item-row[data-talent-item-id="internship"] .talent-item-metric:nth-child(3) {
+  border-left: 0;
+}
+
+.talent-item-row[data-talent-item-id="internship"] .talent-item-metric strong {
+  font-size: 0.78rem;
 }
 
 .talent-item-rewards {
@@ -14464,7 +14494,6 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
 
 /* All in-game hover hints share one compact, opaque two-line presentation. */
 .new-attr-level[data-tooltip]::after,
-.center-tab-badge[aria-label]::after,
 button.pending-event-blocking-toggle.play-tooltip::after {
   position: absolute;
   z-index: 60;
@@ -14491,38 +14520,16 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   transition: opacity 120ms ease, transform 120ms ease;
 }
 
-.new-attr-level[data-tooltip],
-.center-tab-badge[aria-label] {
+.new-attr-level[data-tooltip] {
   position: relative;
-}
-
-.center-tab-badge[aria-label]::after {
-  content: attr(aria-label);
 }
 
 .new-attr-level[data-tooltip]:hover::after,
 .new-attr-level[data-tooltip]:focus-visible::after,
-.center-tab-badge[aria-label]:hover::after,
-.center-tab-badge[aria-label]:focus-visible::after,
 button.pending-event-blocking-toggle.play-tooltip:hover::after,
 button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
   opacity: 1;
   transform: translateY(0);
-}
-
-.center-tab-badge[aria-label] {
-  position: relative;
-}
-
-.center-tab-badge[aria-label]::after {
-  top: calc(100% + 6px);
-  right: 50%;
-  transform: translate(50%, -3px);
-}
-
-.center-tab-badge[aria-label]:hover::after,
-.center-tab-badge[aria-label]:focus-visible::after {
-  transform: translate(50%, 0);
 }
 
 @media (max-width: 560px) {
@@ -14599,9 +14606,7 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
 .ui-tab-slider-shop,
 .ui-tab-slider-talent {
   background: #eee1c4;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 253, 247, 0.72),
-    inset 0 -1px 0 rgba(184, 139, 58, 0.16);
+  box-shadow: none;
 }
 
 .lobby-view-tabs > .lobby-view-tab,
@@ -14717,7 +14722,7 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
     border-color: transparent;
     background: rgba(255, 251, 242, 0.56);
     color: var(--ink);
-    box-shadow: inset 0 -2px 0 rgba(146, 105, 37, 0.3);
+    box-shadow: none;
   }
 }
 

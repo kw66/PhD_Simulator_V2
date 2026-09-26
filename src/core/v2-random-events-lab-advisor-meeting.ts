@@ -1,6 +1,5 @@
 ﻿import {
   createThreeStageRandomEvent,
-  formatProbabilityCondition,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
@@ -30,10 +29,6 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   const slackFavorResult = applyTierResist(-1, state.player.favor, getRoll);
   const slackFavorChange = slackFavorResult.effectiveChange;
   const slackFavorNarrative = getTierResistedNarrative("导师好感", -1, slackFavorResult);
-  const advisorAttendanceCondition = (present: boolean): string => formatProbabilityCondition(
-    present ? "导师到场" : "导师缺席",
-    0.5,
-  );
 
   const event: PendingEvent = {
     id: `random-6-y${state.year}-m${state.month}-n${serial}`,
@@ -49,8 +44,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-deep-${serial}`,
         label: "认真准备",
         outcome: advisorPresentForPrepared
-          ? `${advisorAttendanceCondition(true)}｜${preparedSanSummary}；${formatTierResistedOutcome("导师好感", 1, preparedFavorResult)}`
-          : `${advisorAttendanceCondition(false)}｜${preparedSanSummary}`,
+          ? `导师到场｜${preparedSanSummary}；${formatTierResistedOutcome("导师好感", 1, preparedFavorResult)}`
+          : `导师缺席｜${preparedSanSummary}`,
         effects: advisorPresentForPrepared
           ? { san: preparedSanChange, favor: preparedFavorChange }
           : { san: preparedSanChange },
@@ -59,8 +54,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-series-${serial}`,
         label: "讲系列论文",
         outcome: advisorPresentForSeries
-          ? `${advisorAttendanceCondition(true)}｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}；${formatTierResistedOutcome("导师好感", 1, seriesFavorResult)}`
-          : `${advisorAttendanceCondition(false)}｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}`,
+          ? `导师到场｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}；${formatTierResistedOutcome("导师好感", 1, seriesFavorResult)}`
+          : `导师缺席｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}`,
         effects: advisorPresentForSeries
           ? { san: seriesSanChange, research: researchChange, favor: seriesFavorChange }
           : { san: seriesSanChange, research: researchChange },
@@ -69,8 +64,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-slack-${serial}`,
         label: "随便水一下",
         outcome: advisorPresentForSlack
-          ? `${advisorAttendanceCondition(true)}｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
-          : `${advisorAttendanceCondition(false)}｜无事发生。`,
+          ? `导师到场｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
+          : "导师缺席｜无事发生。",
         effects: advisorPresentForSlack && slackFavorChange < 0 ? { favor: slackFavorChange } : {},
       },
     ],
@@ -83,8 +78,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "实验记录里有几张能用的图，最近看的几篇论文也正好接得上。你试着排了两页，才发现每张图后面都有个还没解释清楚的问题，附录又在浏览器里开了一排。",
-      "饭点已经过了，你把鼠标移到一张现成的图上，真想直接复制过去收工。可那条曲线连自己都没看明白，想到明天站在投影前等人提问，手又停住了。导师会不会来，群里仍然没有准信。",
+      "实验记录里有几张能用的图，最近看的几篇论文也正好接得上。认真核对一遍，明天被问到至少能答上来；若把几篇串成系列，今晚得多熬一阵，却也能替自己理清这个方向。附录在浏览器里开了一排，饭点已经过了。",
+      "你把鼠标移到一张现成的图上，真想直接复制过去收工。可那条曲线连自己都没看明白，若导师坐在台下，恐怕两句就会问住你。群里仍没说他来不来；真不来，准备再多他也看不到，草草讲几页倒可能就这么过去。",
     ].join("\n\n"),
     results: {
       [`random-6-deep-${serial}`]: {

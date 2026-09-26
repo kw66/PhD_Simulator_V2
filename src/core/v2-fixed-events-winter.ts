@@ -50,8 +50,14 @@ function createWinterVacationPlanEvent(state: GameState): PendingEvent {
     id: `winter-vacation-plan-y${state.year}-m${state.month}`,
     title: "寒假 ➜ 假期计划",
     description: [
-      "你点开手机里的闹钟，手指停在平日起床的时间上。真把它关掉，又怕一觉睡到中午，醒来先为没干活心虚。",
-      "可电脑都一路背回来了，也不差今晚这一会儿。串门和亲戚问话留到明天应付，你想先睡个不用赶去实验室的觉。",
+      "你点开手机里的闹钟，手指停在平日起床的时间上。真把它关掉，又怕一觉睡到中午，醒来先为没干活心虚。可电脑都一路背回来了，也不差今晚这一会儿。",
+      [
+        state.selectedRoleId === "rich" ? "长辈说备了厚厚的红包，语气轻松得像在说多添一双筷子。" : "家里说留了红包，等你回去吃年夜饭。",
+        state.loverState.active
+          ? "听说恋人也会来拜年，长辈又问了一遍名字，说红包可不能只备你一份。"
+          : "亲戚已经问起有没有对象，饭桌上恐怕还得想办法接话。",
+        "你先把闹钟关了，串门和亲戚问话都留到明天。",
+      ].join(""),
     ].join("\n\n"),
     chainId: "winter-vacation",
     stage: "act2",

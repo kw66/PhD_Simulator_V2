@@ -474,6 +474,12 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
 
 function renderShopTabButtons(activeTab: ShopTabId, upgradeNoticeTabs: readonly ShopTabId[] = []): string {
   const noticeTabSet = new Set(upgradeNoticeTabs);
+  const hints: Record<ShopTabId, string> = {
+    ai: "订阅AI，辅助科研和阅读",
+    coffee: "购买冰美式、升级咖啡机",
+    gear: "购买与升级个人设备",
+    rest: "选择休息设备及升级路线",
+  };
   return SHOP_TABS.map((tab) => {
     const activeClass = tab.id === activeTab ? " active" : "";
     const upgradeBadge = noticeTabSet.has(tab.id)
@@ -485,6 +491,7 @@ function renderShopTabButtons(activeTab: ShopTabId, upgradeNoticeTabs: readonly 
         type="button"
         data-ui-shop-tab="${tab.id}"
         aria-pressed="${tab.id === activeTab ? "true" : "false"}"
+        data-tooltip="${escapeHtml(hints[tab.id])}"
       >
         <span class="shop-tab-icon" aria-hidden="true">${tab.icon}</span>
         <span>${tab.label}</span>
@@ -843,15 +850,15 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>, 
 
   const groupedEffects: Array<{
     labels: string[];
-    effect: { bonus?: number; extraActions?: number; sanDelta?: number };
+    effect: { bonus?: number; multiplier?: number; extraActions?: number; sanDelta?: number };
   }> = [];
 
   for (const action of ["idea", "experiment", "writing"] as const) {
     const effect = model.researchEffects[action];
     if (!effect) continue;
-    const signature = [effect.bonus ?? 0, effect.extraActions ?? 0, effect.sanDelta ?? 0].join("|");
+    const signature = [effect.bonus ?? 0, effect.multiplier ?? 1, effect.extraActions ?? 0, effect.sanDelta ?? 0].join("|");
     const existing = groupedEffects.find((group) => (
-      [group.effect.bonus ?? 0, group.effect.extraActions ?? 0, group.effect.sanDelta ?? 0].join("|") === signature
+      [group.effect.bonus ?? 0, group.effect.multiplier ?? 1, group.effect.extraActions ?? 0, group.effect.sanDelta ?? 0].join("|") === signature
     ));
     if (existing) {
       existing.labels.push(AI_RESEARCH_ACTION_LABELS[action]);
@@ -861,14 +868,15 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>, 
   }
 
   const formatSigned = (key: string, value: number): string => `${value > 0 ? "+" : ""}${metric(key, value)}`;
-  const formatEffect = (key: string, effect: { bonus?: number; extraActions?: number; sanDelta?: number }): string => [
+  const formatEffect = (key: string, effect: { bonus?: number; multiplier?: number; extraActions?: number; sanDelta?: number }): string => [
+    effect.multiplier && effect.multiplier !== 1 ? `基础分×${metric(`${key}-multiplier`, effect.multiplier)}` : "",
     effect.bonus ? `${formatSigned(`${key}-bonus`, effect.bonus)}分` : "",
     effect.extraActions ? `${formatSigned(`${key}-actions`, effect.extraActions)}次` : "",
     effect.sanDelta ? `SAN ${formatSigned(`${key}-san`, effect.sanDelta)}` : "",
   ].filter(Boolean).join("，");
 
   const researchText = groupedEffects
-    .map((group) => `${group.labels.join("、")}：${formatEffect(group.labels.map((label) => Object.keys(AI_RESEARCH_ACTION_LABELS).find((action) => AI_RESEARCH_ACTION_LABELS[action as keyof typeof AI_RESEARCH_ACTION_LABELS] === label)).join("-"), group.effect)}`)
+    .map((group) => `${group.labels.join("、")}：${group.effect.multiplier ? "\n" : ""}${formatEffect(group.labels.map((label) => Object.keys(AI_RESEARCH_ACTION_LABELS).find((action) => AI_RESEARCH_ACTION_LABELS[action as keyof typeof AI_RESEARCH_ACTION_LABELS] === label)).join("-"), group.effect)}`)
     .join("\n");
   const hasRelationshipDiscount = Boolean(model.relationshipOperationSanDelta);
   const extraText = hasRelationshipDiscount

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createConferenceActivityDecisionEvent, selectConferenceActivityOptions } from "../src/core/v2-conference-activity";
 import { createConferenceCareerState } from "../src/core/v2-conference-career";
 import { createConferenceEncounterState } from "../src/core/v2-conference-encounters";
-import { activateInternship, createInternshipState } from "../src/core/v2-internship-system";
+import { activateInternship, activateRemoteInternship, createInternshipState } from "../src/core/v2-internship-system";
 import { createLoverState } from "../src/core/v2-lover-system";
 import { createRelationshipState } from "../src/core/v2-relationship-rules";
 
@@ -133,9 +133,24 @@ describe("v2 conference activity", () => {
 
     expect(enterpriseChoice?.effects.internshipStateUpdates).toEqual({
       active: true,
+      kind: "conference6",
       remainingMonths: 6,
       experimentMultiplier: 1.3,
+      experimentBonus: 0,
+      experimentMoneyDiscount: 0,
     });
+  });
+
+  it("does not add enterprise multiplier growth to remote placements", () => {
+    const internshipState = activateRemoteInternship(11);
+    const options = selectConferenceActivityOptions(
+      { ...baseContext, grade: "B" },
+      createBuildState({ social: 6, internshipState }),
+      () => 0.99,
+    );
+    const choice = options.find((option) => option.id === "enterprise-networking")!;
+    expect(choice.effects.internshipStateUpdates).toEqual(internshipState);
+    expect(choice.effects.temporaryActionEffectUpdates).toEqual({ experiment: { multiplier: 1.25 } });
   });
 
   it("offers the audited deep joint-training option after big-bull cooperation has been opened", () => {

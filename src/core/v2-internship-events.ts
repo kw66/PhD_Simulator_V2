@@ -1,20 +1,22 @@
-import { activateInternship, getInternshipMonthlyIncome, getPublishedAPaperCount } from "./v2-internship-system";
+import { activateInternship, getInternshipMonthlyIncome, getPublishedAPaperCount, hasOngoingInternship } from "./v2-internship-system";
 import type { ConferenceCareerState, GameState, PendingEvent } from "./v2-types";
 
 export interface InternshipInviteContext {
   totalMonths: number;
   rejectedInternshipCount: number;
   currentMonthlyIncome: number;
+  unavailable: boolean;
   origin?: string;
 }
 
 export function buildInternshipInviteContext(
-  state: Pick<GameState, "totalMonths" | "conferenceCareerState" | "papers" | "externalPublications" | "totalCitations">,
+  state: Pick<GameState, "totalMonths" | "conferenceCareerState" | "internshipState" | "papers" | "externalPublications" | "totalCitations">,
 ): InternshipInviteContext {
   return {
     totalMonths: state.totalMonths,
     rejectedInternshipCount: state.conferenceCareerState.rejectedInternshipCount,
     currentMonthlyIncome: getInternshipMonthlyIncome(getPublishedAPaperCount(state), state.totalCitations),
+    unavailable: hasOngoingInternship(state) || state.conferenceCareerState.permanentlyBlockedInternship,
   };
 }
 
@@ -81,7 +83,7 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
       id: "close",
       label: "继续",
       outcome: "实习开始。",
-      effects: {},
+      effects: { internshipStateUpdates: activateInternship() },
     }],
   };
 }
@@ -97,9 +99,10 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
     id: `internship-invite-act2-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择",
     description: [
-      "你把实习任务和实验计划并排打开，逐项核对。项目里的方法很熟悉，真用到公司业务里又是另一回事；想到能亲手试试，你有点跃跃欲试。",
-      "再看一眼组会日期，刚才的兴奋里又混进些心虚。远程省了搬家的麻烦，每周交付却照样要做。你在日历上找了又找，想给这份工作挪出几个完整的晚上。",
-      warningText,
+      `你把实习任务和实验计划并排打开。对方参考了你的论文和引用，给这份六个月的远程实习开出每月 ${context.currentMonthlyIncome} 金币的报酬。项目里的方法很熟悉，真用到公司业务里又是另一回事；想到能亲手试试，你有点跃跃欲试。`,
+      "再看一眼组会日期，刚才的兴奋里又混进些心虚。远程省了搬家的麻烦，每周交付却照样要做。" + (context.unavailable
+        ? "可先前的安排还摆在那里，这回实在接不下来。"
+        : "你在日历上找了又找，想挪出几个完整的晚上。") + warningText,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -122,9 +125,9 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
       {
         id: "accept",
         label: "接受这份实习",
-        outcome: "接受 6 个月远程实习。",
+        outcome: `接受 6 个月远程实习；期间做实验 ×1.25，每月 SAN -2；按当前成果每月金币 +${context.currentMonthlyIncome}。`,
+        ...(context.unavailable ? { disabledReason: "已有实习安排或企业实习机会已关闭。" } : {}),
         effects: {
-          internshipStateUpdates: activateInternship(),
           enqueueEvents: [createInternshipAcceptResult(context)],
         },
       },

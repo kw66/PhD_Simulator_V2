@@ -1,7 +1,6 @@
 ﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import {
   createThreeStageRandomEvent,
-  formatProbabilityCondition,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -47,8 +46,8 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
         id: `random-13-reinstall-${serial}`,
         label: "自己重装",
         outcome: reinstallSuccess
-          ? `${formatProbabilityCondition("重装成功", 0.5)}｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。`
-          : `${formatProbabilityCondition("重装失败", 0.5)}｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("社交", -1, reinstallSocialResult)}｜下次实验 ×0.25`,
+          ? `重装成功｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。`
+          : `重装失败｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("社交", -1, reinstallSocialResult)}｜下次实验 ×0.25`,
         effects: reinstallSuccess
           ? { san: reinstallSanChange }
           : {
@@ -63,8 +62,8 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
         id: `random-13-taobao-${serial}`,
         label: "淘宝找人",
         outcome: taobaoSuccess
-          ? `${formatProbabilityCondition("维修成功", 0.5)}｜金币 -2。`
-          : `${formatProbabilityCondition("维修翻车", 0.5)}｜金币 -4｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。`,
+          ? "维修成功｜金币 -2。"
+          : `维修翻车｜金币 -4｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。`,
         effects: taobaoSuccess
           ? { money: -2 }
           : { money: -4, san: taobaoFailureSanChange },
@@ -79,9 +78,8 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "你截好报错，停在给导师的聊天框前。送修的流程熟悉，空着的卡位也熟悉；想到坏卡停用后，大家还得挤着剩下的算力跑，你有些发愁。",
-      "那几条异常占用还留在日志里。你放大看了看，上报查一查就能知道是不是挖矿，可抬头全是每天见面的同门，这个举报键按下去也让人不自在。",
-      "重装教程和淘宝维修页面各开在一边。自己动手得照看整组的公共环境，客服给的低报价又没写清追加费用。风扇还在响，群里又有人问：“修好了吗？”你揉了揉眉心。",
+      "你截好报错，停在给导师的聊天框前。老师要是直接停掉这块卡，以后大家就得挤着剩下的算力跑。那几条异常占用也还在，上报能把挖矿的事查清，可抬头全是每天见面的同门，这句话发出去就收不回来了。",
+      "重装教程和淘宝维修页面各开在一边。自己动手省钱，弄坏公共环境却得挨个帮人补依赖。客服报了 2 金币，翻到一条差评，却有人说钱收了两遍还没修好。群里又问：“修好了吗？”你看了眼教程的滚动条，离底还早。",
     ].join("\n\n"),
     results: {
       [`random-13-advisor-${serial}`]: {

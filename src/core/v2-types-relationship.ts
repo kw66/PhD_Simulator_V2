@@ -42,8 +42,13 @@ export interface ConferenceCareerState {
 
 export interface InternshipState {
   active: boolean;
+  kind?: "remote3" | "conference6";
+  startTotalMonths?: number;
+  endTotalMonths?: number;
   remainingMonths: number;
   experimentMultiplier: number;
+  experimentBonus?: number;
+  experimentMoneyDiscount?: number;
 }
 
 export interface LoverState {

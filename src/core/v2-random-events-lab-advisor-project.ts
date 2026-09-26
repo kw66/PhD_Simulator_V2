@@ -72,7 +72,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       {
         id: `random-4-vertical-${serial}`,
         label: "接纵向项目",
-        outcome: `${verticalSanSummary}；纵向进度 +${PROJECT_PROGRESS_MAX}；导师科研积累 +${accumulationGain}；导师指导：你和每位同学的论文随机一项协作分 +${getAdvisorGuidanceAmount()}；${formatTierResistedOutcome("导师好感", 1, verticalFavorResult)}；${formatTierResistedOutcome("科研", 1, verticalResearchResult)}`,
+        outcome: `${verticalSanSummary}；纵向进度 +${PROJECT_PROGRESS_MAX}；科研积累 +${accumulationGain}；论文写作协作 +${getAdvisorGuidanceAmount()}；${formatTierResistedOutcome("导师好感", 1, verticalFavorResult)}；${formatTierResistedOutcome("科研", 1, verticalResearchResult)}`,
         effects: {
           san: verticalSanChange,
           ...(verticalFavorChange > 0 ? { favor: verticalFavorChange } : {}),
@@ -105,7 +105,12 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
     decisionTitle: "你的选择",
     decisionDescription: [
       "你盘算了一下：横向要对接甲方、赶交付，做完能给实验室补经费，自己也有一笔劳务费；纵向得把研究问题啃下来，成果能帮导师积累科研成绩，结题后导师也会和大家一起打磨论文。平时在人际栏参与项目，是和同学一起往前推；这次接下来，就得由你牵头把一个项目做完。",
-      "想到自己的论文还开着好几个坑，你又有些犹豫。可以把主要工作交给师弟师妹分担，自己负责交接，只是临时给别人添活，难免惹人抱怨；也可以坦白说这次不接，导师未必愿意听。",
+      [
+        "想到自己的论文还开着好几个坑，你又有些犹豫。可以请师弟师妹分担，自己负责交接；也可以坦白说这次不接，导师未必愿意听。",
+        hasJunior
+          ? `你翻到${familiarJuniorName}的聊天框，以前一起做事，交接不用从头解释。不过熟归熟，对方也有截止日期，临时添活难免惹人抱怨。`
+          : "翻了一遍联系人，你还没有能直接商量分工的师弟师妹。临时找不熟的人接手，比找老熟人更容易惹来不满。",
+      ].join(""),
     ].join("\n\n"),
     results: {
       [`random-4-horizontal-${serial}`]: {
@@ -140,20 +145,20 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
           ? shareSocialChange < 0
             ? [
                 `你去找${familiarJuniorName}分担主要工作。对方看了眼材料，答应接手，却把自己的日程也推过来：“下次早点说，我这边也得挪。”`,
-                ["你把手头资料整理好交过去，后续工作由对方接着安排。交接时，你多等了一会儿，也没等到往常那句闲聊。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
+                ["你把手头资料整理好，把其中重复核对、整理表格的活交给对方，后续工作由对方接着安排。交接时，你多等了一会儿，也没等到往常那句闲聊。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
               ].join("\n\n")
             : [
                 `你带着材料找到${familiarJuniorName}，商量能否请对方接过主要工作。对方看完说了句“你这安排可真紧”，还是答应接手。`,
-                ["你把背景和交接事项一一说明，后续安排总算有了着落。回到工位时，你还留着一点精神整理自己的笔记。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
+                ["你把背景和交接事项一一说明，把重复跑表、整理材料的部分交给对方，后续安排总算有了着落。回到工位时，你还留着一点精神整理自己的笔记。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
               ].join("\n\n")
           : shareSocialChange < 0
             ? [
                 `你找一位不太熟的${unfamiliarJuniorLabel}分担主要工作，对方翻了翻材料，勉强接下。你以为已经说妥，后来才听说对方为临时添活抱怨了好几句。`,
-                ["资料交接完，你确实少担了一摊事。只是再到对方工位前，道谢的话还没说完，对方就先问了一句“还有事吗”，让你有点站不住。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
+                ["你把重复核对和整理材料的部分交出去，资料交接完，确实少担了一摊事。只是再到对方工位前，道谢的话还没说完，对方就先问了一句“还有事吗”，让你有点站不住。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
               ].join("\n\n")
             : [
                 `你请一位不太熟的${unfamiliarJuniorLabel}接过主要工作，把背景材料和当前进展整理给对方。对方问清交接时间，念叨了一句“还挺赶”，最后还是应下了。`,
-                ["交接结束，你过去道谢，对方抬头说了声“不客气”。气氛还算平和，你把剩下的注意事项补进文档，发了过去。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
+                ["你把重复核对、整理表格这类工作交给对方，交接结束后过去道谢，对方抬头说了声“不客气”。气氛还算平和，你把剩下的注意事项补进文档，发了过去。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
               ].join("\n\n"),
       },
     },

@@ -15,8 +15,8 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
       ? `凭之前攒下的会务经验，自费能省 ${discount} 金币。`
     : "";
   const advisorHint = state.player.favor >= 6
-    ? "你把几场想听的报告圈了出来，越看越想去。老师平时支持你出去交流，申请报销的消息已经在心里打好了草稿。"
-    : "日程上有好几场你想听的报告。你打开导师的聊天框，刚打下“老师，我想去参会”，到了报销两个字，又开始斟酌措辞。";
+    ? "你把几场想听的报告圈了出来，越看越想去。报销能办下来，只是要麻烦老师；好在平时的交情在，这点开销未必会让老师介意。"
+    : "日程上有好几场你想听的报告。报销能办下来，只是你和老师还不熟，这次让老师承担开销，难免欠下一点人情。";
   const selfPayHint = state.player.favor >= 6
     ? actualCost === 0
       ? "预算算到最后，自费也不用花金币。你一下轻松了，刚才还在盘算的开销终于可以划掉。"
@@ -30,8 +30,7 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
     title: "年会 ➜ 参会决定",
     description: [
       advisorHint,
-      selfPayHint,
-      ...(meetingExperienceHint ? [meetingExperienceHint] : []),
+      `${selfPayHint}${meetingExperienceHint}`,
     ].join("\n\n"),
     chainId: getCcigChainId(state),
     stage: "act2",

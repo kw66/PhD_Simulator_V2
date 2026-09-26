@@ -380,10 +380,12 @@ export function applyQueuedEventEffects(
     nextState: resolvedState,
     resolvedOutcome,
     resolvedEnqueueEvents,
+    resolvedPresentation,
   } = applyChoiceEffectsToState(
     stateWithDeferredResolution,
     choice,
     resolvedEvent.history?.[0]?.title ?? resolvedEvent.title.split(" ➜ ")[0] ?? "事件",
+    resolvedEvent,
   );
 
   if (choice.effects.stayOnEvent === true) {
@@ -406,6 +408,11 @@ export function applyQueuedEventEffects(
     ? createDeferredStatePatch(state, resolvedState)
     : undefined;
   const committedState = hasSameChainFollowUp ? state : resolvedState;
+  const recordedEvent = resolvedPresentation ? {
+    ...resolvedEvent,
+    ...resolvedPresentation,
+    choices: resolvedEvent.choices.map((entry) => entry.id === choice.id ? { ...entry, outcome: resolvedOutcome } : entry),
+  } : resolvedEvent;
   const { history: _history, replayContext: _context, ...sceneSource } = resolvedEvent;
   let nextState: GameState = {
     ...committedState,
@@ -414,10 +421,10 @@ export function applyQueuedEventEffects(
   const resolvedHistory: ResolvedEventStage[] = [
     ...(resolvedEvent.history ?? []),
     {
-      title: resolvedEvent.title,
-      description: resolvedEvent.description,
+      title: recordedEvent.title,
+      description: recordedEvent.description,
       paperReviewPresentation: resolvedEvent.paperReviewPresentation,
-      choices: resolvedEvent.choices.map(({ id, label, outcome, disabledReason, fellowCandidate }) => ({ id, label, outcome, disabledReason, fellowCandidate })),
+      choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason, fellowCandidate }) => ({ id, label, outcome, disabledReason, fellowCandidate })),
       selectedChoiceId: choice.id,
       replayEvent: sceneSource,
     },
@@ -458,7 +465,7 @@ export function applyQueuedEventEffects(
       ],
     };
     nextState = pushLog(nextState, buildCompletedEventLog(
-      resolvedEvent,
+      recordedEvent,
       resolvedHistory,
       resolvedOutcome,
     ), { eventHistoryId });

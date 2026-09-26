@@ -16,6 +16,7 @@ import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "../src/cor
 import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
 import { collectThesisEventForMonth } from "../src/core/v2-monthly-thesis-events";
 import { createFundingCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
+import { createAdvisorTalkRandomEvent } from "../src/core/v2-random-events-lab-advisor-talk";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import type { EventChoice, PendingEvent } from "../src/core/v2-types";
 
@@ -40,6 +41,53 @@ function getDecisionChoices(event: PendingEvent | undefined): EventChoice[] {
 }
 
 describe("v2 event scheduler", () => {
+  it.each([
+    { research: 5, favor: 5 },
+    { research: 5, favor: 6 },
+    { research: 6, favor: 5 },
+    { research: 6, favor: 6 },
+  ])("keeps advisor preparation and familiarity hints independent at $research/$favor", ({ research, favor }) => {
+    const initial = createInitialState();
+    const event = createAdvisorTalkRandomEvent({ ...initial, player: { ...initial.player, research, favor } }, () => 0.99);
+    const decision = event.choices[0]!.effects.enqueueEvents![0]!;
+    const paragraphs = decision.description.split(/\n\s*\n/u);
+
+    expect(paragraphs).toHaveLength(2);
+    expect(paragraphs[0]).toContain(research >= 6 ? "依据都能一一对上" : "对照也没补齐");
+    expect(paragraphs[1]).toContain(favor >= 6 ? "记得你上次卡住的地方" : "还在核对你的课题和进度");
+    expect(paragraphs[0]!.length).toBeLessThanOrEqual(90);
+    expect(paragraphs[1]!.length).toBeLessThanOrEqual(130);
+    expect(decision.description).not.toMatch(/科研\s*[≥<]|好感\s*[≥<]|\d+%/u);
+    expect(decision.choices.every((choice) => !/[≥<]|\d+%/u.test(choice.outcome))).toBe(true);
+    expect(decision.choices[0]!.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(research >= 6 ? 6 : undefined);
+    expect(decision.choices[0]!.effects.favor).toBe(research < 6 ? -1 : undefined);
+    expect(decision.choices[1]!.effects.research).toBe(favor >= 6 ? 1 : undefined);
+    expect(decision.choices[1]!.effects.favor).toBe(favor < 6 ? -1 : undefined);
+  });
+
+  it.each([5, 6, 18])("keeps advisor talk narrative within two natural paragraphs at favor %i", (favor) => {
+    const initial = createInitialState();
+    const event = createAdvisorTalkRandomEvent({ ...initial, player: { ...initial.player, favor, research: favor } }, () => 0.99);
+    const decision = event.choices[0]!.effects.enqueueEvents![0]!;
+    expect(event.description).toContain("群");
+    expect(event.description).toContain("PPT");
+    expect(event.description).toContain("开场白");
+    expect(decision.description).toContain("招聘");
+    expect(decision.description).toContain("三个月");
+    expect(decision.description).toContain("实验室");
+    const results = decision.choices.map((choice) => choice.effects.enqueueEvents!.at(-1)!);
+    for (const scene of [event, decision, ...results]) {
+      const story = scene.description.split("机制结算")[0]!.trim();
+      expect(story.split(/\n\s*\n/u).length).toBeLessThanOrEqual(2);
+      expect(story).not.toMatch(/SAN|倍率|金币|科研\s*[≥<]|好感\s*[≥<]/u);
+    }
+    const confirmation = results[2]!.choices[0]!.effects;
+    expect(Boolean(confirmation.internshipStateUpdates)).toBe(favor >= 6);
+    expect(confirmation.temporaryActionEffectUpdates).toBeUndefined();
+    expect(confirmation.san).toBeUndefined();
+    expect(confirmation.money).toBeUndefined();
+  });
+
   it("prefers different event categories for multiple ordinary events in one month", () => {
     const initial = createInitialState();
     const state = {
@@ -197,11 +245,11 @@ describe("v2 event scheduler", () => {
     expect(result.outcome).toContain("SAN -3，导师好感+1");
     expect(result.enqueueEvents?.[0]?.description).toContain("SAN -3\n导师好感+1");
     expect(result.enqueueEvents?.[0]?.completionLog).toContain("SAN -3，导师好感+1");
-    expect(result.outcome).toContain("报销跑腿（50%）");
-    expect(result.enqueueEvents?.[0]?.description).toContain("透明概率：导师好感 < 6 时");
+    expect(result.outcome).toContain("报销跑腿");
+    expect(result.enqueueEvents?.[0]?.description).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
   });
 
-  it("shows both Teacher's Day message conditions and their probabilities", () => {
+  it("hints at Teacher's Day branches through familiarity without numerical odds", () => {
     const base = createInitialState();
     const state = {
       ...base,
@@ -212,10 +260,24 @@ describe("v2 event scheduler", () => {
       player: { ...base.player, favor: 6 },
     };
     const choiceEvent = createTeachersDayEvent(state, () => 0).choices[0]?.effects.enqueueEvents?.[0];
-    expect(choiceEvent?.description).toContain("导师好感 ≥ 6 时");
+    expect(choiceEvent?.description).toContain("聊得熟了");
+    expect(choiceEvent?.description).toContain("研究想法");
+    expect(choiceEvent?.description).toContain("也可能只来得及回一句谢谢");
+    expect(choiceEvent?.description.split(/\n\s*\n/u)).toHaveLength(2);
+    expect(choiceEvent?.description).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
     const result = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => 0);
-    expect(result.outcome).toContain("导师分享想法（50%）");
-    expect(result.enqueueEvents?.[0]?.description).toContain("导师礼貌回复（50%）");
+    expect(result.outcome).toContain("导师顺势分享了一个想法");
+    expect(result.outcome).toContain("下次想 idea +3");
+    expect(result.outcome).not.toMatch(/\d+%/u);
+    expect(result.enqueueEvents?.[0]?.description).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
+    const lowFavorState = { ...state, player: { ...state.player, favor: 5 } };
+    const lowFavorChoice = createTeachersDayEvent(lowFavorState, () => 0).choices[0]?.effects.enqueueEvents?.[0];
+    expect(lowFavorChoice?.description).toContain("还不算熟");
+    expect(lowFavorChoice?.description).toContain("报销");
+    expect(lowFavorChoice?.description).toContain("客气的回复");
+    expect(lowFavorChoice?.description).toContain("1 金币");
+    expect(lowFavorChoice?.description).toContain("3 金币");
+    expect(lowFavorChoice?.description.split(/\n\s*\n/u)).toHaveLength(2);
   });
 
   it("collects fixed events by month", () => {
@@ -654,9 +716,17 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["认真汇报", "请教推进方法", "提出远程实习"]);
     expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(4);
     expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(1);
-    expect(getDecisionChoices(result.events[0])[2]?.effects.money).toBe(3);
-    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-5);
-    expect(getDecisionChoices(result.events[0])[2]?.effects.temporaryActionEffectUpdates?.experiment?.bonus).toBe(4);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.internshipStateUpdates).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[2]?.effects.enqueueEvents?.at(-1)?.choices[0]?.effects.internshipStateUpdates).toMatchObject({
+      active: true,
+      kind: "remote3",
+      startTotalMonths: 18,
+      endTotalMonths: 20,
+      remainingMonths: 3,
+      experimentMultiplier: 1,
+      experimentBonus: 4,
+      experimentMoneyDiscount: 1,
+    });
   });
 
   it("builds the real event 6 choices with research threshold and meeting attendance rolls", () => {
@@ -792,7 +862,7 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-2);
 
     const rejectResult = getDecisionChoices(result.events[0])[2]?.effects.enqueueEvents?.at(-1);
-    expect(rejectResult?.completionLog).toBe("婉拒合作：没有后续波澜（50%）｜无事发生。");
+    expect(rejectResult?.completionLog).toBe("婉拒合作：没有后续波澜｜无事发生。");
   });
 
   it("builds the real event 11 choices with one-shot action effects", () => {
@@ -852,14 +922,14 @@ describe("v2 event scheduler", () => {
     };
     const highFavorResult = collectRandomEventsForMonth(highFavorState, fromRolls([0.7, 0]));
     const highFavorChoices = getDecisionChoices(highFavorResult.events[0]);
-    expect(highFavorChoices[0]?.outcome).toBe("导师好感 ≥ 6｜无变化。");
-    expect(highFavorChoices[2]?.outcome).toBe("导师好感 ≥ 6｜无变化。");
+    expect(highFavorChoices[0]?.outcome).toBe("无事发生。");
+    expect(highFavorChoices[2]?.outcome).toBe("无事发生。");
     const complainResult = highFavorChoices[0]?.effects.enqueueEvents?.at(-1);
     expect(complainResult?.description.split("机制结算")[0]).toContain("一作按原来的安排");
     expect(complainResult?.description.split("机制结算")[1]).not.toContain("安抚");
   });
 
-  it("applies summer season SAN penalty to advisor talk, meeting and authorship branches", () => {
+  it("keeps remote internship costs in monthly settlement", () => {
     const initial = createInitialState();
 
     const talkState = {
@@ -874,7 +944,8 @@ describe("v2 event scheduler", () => {
       totalRandomEventCount: 0,
     };
     const talkResult = collectRandomEventsForMonth(talkState, fromRolls([0.7, 0]));
-    expect(getDecisionChoices(talkResult.events[0])[2]?.effects.san).toBe(-6);
+    expect(getDecisionChoices(talkResult.events[0])[2]?.effects.san).toBeUndefined();
+    expect(getDecisionChoices(talkResult.events[0])[2]?.effects.enqueueEvents?.at(-1)?.choices[0]?.effects.internshipStateUpdates?.remainingMonths).toBe(3);
 
     const meetingState = {
       ...initial,

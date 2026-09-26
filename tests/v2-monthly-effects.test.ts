@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { createInitialState } from "../src/core/v2-engine";
+import { createInitialState, dispatchAction } from "../src/core/v2-engine";
+import { activateInternship, activateRemoteInternship, createInternshipState, getInternshipStatus } from "../src/core/v2-internship-system";
+import { createDraftPaper } from "../src/core/v2-paper-rules";
+import { applyResearchOperation, getResearchExperimentMoneyCost, previewResearchOperation } from "../src/core/v2-research-operation";
 import { createLoverProgressState } from "../src/core/v2-lover-progression";
 import { activateLover } from "../src/core/v2-lover-system";
 import type { AdvisorGrantId, GameState } from "../src/core/v2-types";
@@ -225,19 +228,70 @@ describe("monthly effects", () => {
     expect(nextState.coffeeState.machineTrackedCoffeeCount).toBe(2);
   });
 
-  it("settles and expires a six-month remote internship", () => {
+  it("preserves settlement and expiry of a six-month conference internship", () => {
     const state = createPlayingMonth(8, 8, 10);
     state.internshipState = {
-      active: true,
+      ...activateInternship(),
       remainingMonths: 1,
-      experimentMultiplier: 1.25,
     };
 
     const { nextState, resolution } = applyMonthlyEffects(state);
     expect(resolution.items.find((item) => item.id === "internship-monthly")?.stats).toEqual({ san: -2, money: 1 });
     expect(nextState.player.san).toBe(9);
     expect(nextState.player.money).toBe(1);
-    expect(nextState.internshipState).toEqual({ active: false, remainingMonths: 0, experimentMultiplier: 1 });
+    expect(nextState.internshipState).toEqual({ active: false, remainingMonths: 0, experimentMultiplier: 1, experimentBonus: 0, experimentMoneyDiscount: 0 });
+  });
+
+  it("keeps all three future remote action months across a year boundary and expires in month four", () => {
+    const initial = createPlayingMonth(11, 11, 20);
+    const paper = { ...createDraftPaper(11, 0, () => 0), idea: 1 };
+    let state: GameState = { ...initial, internshipState: activateRemoteInternship(11),
+      player: { ...initial.player, research: 4, money: 20 }, papers: [paper] };
+    expect(getResearchExperimentMoneyCost(state)).toBe(3);
+    expect(previewResearchOperation(state, "experiment", 3).scoreBonus).toBe(0);
+    expect(resolveMonthlyEffects(state).items.some((item) => item.id === "internship-monthly")).toBe(false);
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    let sanTotal = 0;
+    let moneyTotal = 0;
+    try {
+      for (const totalMonths of [12, 13, 14, 15]) {
+        const before = structuredClone(state);
+        const firstPreview = previewNextMonthEffects(state);
+        expect(previewNextMonthEffects(state)).toEqual(firstPreview);
+        expect(state).toEqual(before);
+        const item = firstPreview.items.find((entry) => entry.id === "internship-monthly");
+        const effective = totalMonths <= 14;
+        expect(item?.stats).toEqual(effective ? { san: -3, money: 1 } : undefined);
+        sanTotal += item?.stats.san ?? 0;
+        moneyTotal += item?.stats.money ?? 0;
+        state = dispatchAction({ ...state, eventQueue: [] }, "next-month");
+        expect(state.totalMonths).toBe(totalMonths);
+        expect(getInternshipStatus(state)).toMatchObject({ active: effective, pending: false, remainingMonths: effective ? 15 - totalMonths : 0 });
+        expect(getResearchExperimentMoneyCost(state)).toBe(effective ? 2 : 3);
+        expect(previewResearchOperation(state, "experiment", 3)).toMatchObject({ scoreBonus: effective ? 4 : 0, scoreMultiplier: 1 });
+        const execution = applyResearchOperation({ ...state, papers: [paper] }, paper.id, "experiment", () => 0);
+        expect(execution.papers[0]?.experiment).toBe(effective ? 6 : 2);
+      }
+    } finally {
+      random.mockRestore();
+    }
+    expect({ sanTotal, moneyTotal }).toEqual({ sanTotal: -9, moneyTotal: 3 });
+    expect(state.internshipState).toEqual(createInternshipState());
+  });
+
+  it("retains six conference settlements and the publication-based income", () => {
+    const initial = createPlayingMonth(5, 5, 20);
+    const publication = { ...createDraftPaper(1, 0, () => 0), status: "published" as const, target: "A" as const };
+    let state: GameState = { ...initial, internshipState: activateInternship(), totalCitations: 1000, papers: [publication] };
+    expect(resolveMonthlyEffects(state).items.find((item) => item.id === "internship-monthly")?.stats).toEqual({ san: -2, money: 2.5 });
+    state = { ...state, totalCitations: 0, papers: [] };
+    for (let elapsed = 1; elapsed <= 6; elapsed += 1) {
+      const settled = applyMonthlyEffects({ ...state, totalMonths: 5 + elapsed });
+      expect(settled.resolution.items.find((item) => item.id === "internship-monthly")?.stats).toEqual({ san: -2, money: 1 });
+      expect(settled.nextState.internshipState.remainingMonths).toBe(6 - elapsed);
+      state = settled.nextState;
+    }
+    expect(resolveMonthlyEffects(state).items.some((item) => item.id === "internship-monthly")).toBe(false);
   });
 
   it("stacks strong body and active monthly buffs, then expires finite buffs", () => {

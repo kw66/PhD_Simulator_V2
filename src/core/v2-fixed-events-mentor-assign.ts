@@ -61,7 +61,12 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
       "你翻开材料，入学照片一张比一张精神。电脑右下角又弹出导师的消息：“先认识一下，有问题多帮帮忙。”",
     ].join("\n\n"),
     decisionTitle: "选择一位新生",
-    decisionDescription: "四份材料摊在眼前，有人已经做过小课题，有人还在跟着教程跑代码。那些入门时卡住自己的问题又冒了出来，你忽然很想告诉新生几条少走弯路的办法。可想到以后也有人追着自己问“这个报错怎么办”，刚冒头的成就感里又添了一点紧张。",
+    decisionDescription: [
+      "四份材料摊在眼前，有人已经做过小课题，有人还在跟着教程跑代码。那些入门时卡住自己的问题又冒了出来，你忽然很想告诉新生几条少走弯路的办法。可想到以后也有人追着自己问“这个报错怎么办”，刚冒头的成就感里又添了一点紧张。",
+      canAddJunior
+        ? "你翻过现有的合作安排，还能接下一位新生。材料里写着各自的研究基础，相处是否投缘，也值得一起看看。"
+        : "再看现有的合作安排，你已经顾不过来了。材料可以继续看，这次却接不下任何一位，只能请导师另作安排。",
+    ].join("\n\n"),
     results: Object.fromEntries(candidates.map((candidate) => [candidate.choiceId, {
       title: candidate.label,
       description: canAddJunior

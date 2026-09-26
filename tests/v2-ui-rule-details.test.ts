@@ -131,7 +131,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("横向完成后科研经费+20");
     expect(help).toContain("纵向完成后导师科研积累增加当前值的10%");
     expect(help).toContain("实验基础花费3金币");
-    expect(help).toContain("纵向项目满100时，导师为玩家和每位同学各指导一次");
+    expect(help).toContain("纵向项目满100时，导师为玩家和每位同学各随机选择一篇论文，写作协作+10");
     expect(help).toContain("同学做实验每次经费-3，不足3时改做横向");
     expect(help).toContain("导师、同学和你共同推进卡片上的两条项目进度");
     expect(help).not.toContain("每月为玩家和每位同学各提供一次论文指导");
@@ -140,7 +140,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("项目到期释放名额");
     expect(help).toContain("院士需先获得杰青");
     expect(help).toContain("院士");
-    for (const [threshold, funding, duration] of [[25, 5, 3], [50, 10, 4], [150, 15, 3], [400, 20, 5]]) {
+    for (const [threshold, funding, duration] of [[25, 10, 3], [50, 20, 4], [150, 50, 3], [400, 100, 5]]) {
       expect(help).toContain(`${threshold}+${funding}${duration}年`);
     }
     expect(help).not.toMatch(/科研资源|信任度/);
@@ -163,7 +163,8 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("实验基础费用3金币，优先用导师经费，不足部分自付；按钮显示你实际承担的金币");
     expect(help).toContain("实验金币也只收一次");
     expect(help).toContain("个人显卡RTX4090起每次实验减1金币，H20起减2");
-    expect(help).toContain("先算显卡减免，再扣导师经费，最后扣你的金币");
+    expect(help).toContain("远程实习期间再减1，最低0");
+    expect(help).toContain("先算减免，再扣导师经费，最后扣你的金币");
     expect(help).toContain("每遍都重新生成分数");
     expect(help).toContain("每遍与上一遍自身分+1取最大值");
     expect(help).toContain("总次数=1+⌊n⌋，n为额外次数之和，至少执行1次");
@@ -214,7 +215,8 @@ describe("v2 research rule details and publication metrics", () => {
     funded.player.money = 0;
     const fundedHtml = renderApp(funded, createDefaultAccountProfile(), { activePlayTab: "workstation" });
     const fundedButton = fundedHtml.match(/<button[^>]*data-paper-action-type="experiment"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-    expect(fundedButton).toContain("金币-0 · SAN-");
+    expect(fundedButton.replace(/<[^>]*>/g, "")).toContain("SAN-3 · 金币-0");
+    expect(fundedButton).toContain('data-card-tooltip data-tooltip="消耗3导师经费"');
     expect(fundedButton).not.toContain("经费-");
     expect(fundedButton).toContain('data-animate-number="3"');
     expect(fundedButton).toContain('data-action="research-paper"');
@@ -228,7 +230,10 @@ describe("v2 research rule details and publication metrics", () => {
       };
       const html = renderApp(partial, createDefaultAccountProfile(), { activePlayTab: "workstation" });
       const button = html.match(/<button[^>]*data-paper-action-type="experiment"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-      expect(button).toContain(`金币-${playerCost} · SAN-`);
+      expect(button.replace(/<[^>]*>/g, "")).toContain(`SAN-3 · 金币-${playerCost}`);
+      expect(button).toContain("导师经费不足");
+      expect(button).toContain(`自费租卡：金币-${playerCost}`);
+      if (funding > 0) expect(button).toContain(`消耗${funding}导师经费`);
       expect(button).not.toContain("经费-");
       expect(button).toContain('data-action="research-paper"');
       expect(button).not.toContain("disabled");
@@ -237,10 +242,21 @@ describe("v2 research rule details and publication metrics", () => {
     const selfPaid = { ...funded, advisorProgressState: { ...funded.advisorProgressState, funding: 0 }, player: { ...funded.player, money: 2 } };
     const selfPaidHtml = renderApp(selfPaid, createDefaultAccountProfile(), { activePlayTab: "workstation" });
     const selfPaidButton = selfPaidHtml.match(/<button[^>]*workstation-paper-action-btn is-experiment[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-    expect(selfPaidButton).toContain("金币-3 · SAN-");
+    expect(selfPaidButton.replace(/<[^>]*>/g, "")).toContain("SAN-3 · 金币-3");
+    expect(selfPaidButton).toContain("导师经费不足，自费租卡：金币-3");
     expect(selfPaidButton).toContain('data-animate-number="3"');
     expect(selfPaidButton).toContain("金币不足，需要 3");
     expect(selfPaidButton).toContain("disabled aria-disabled=\"true\"");
+  });
+
+  it.each([[4, 2], [8, 1]])("uses the actual funding cost after GPU upgrade %s", (gpuLevel, cost) => {
+    const state = createResearchState();
+    state.shopState.gpuLevel = gpuLevel;
+    state.advisorProgressState.funding = 10;
+    const html = renderApp(state);
+    const button = html.match(/<button[^>]*workstation-paper-action-btn is-experiment[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(button).toContain(`消耗${cost}导师经费`);
+    expect(button.replace(/<[^>]*>/g, "")).toContain("SAN-3 · 金币-0");
   });
 
   it.each([[0, 8], [50, 51]])("matches the documented score formula for current score %s", (currentScore, expectedScore) => {

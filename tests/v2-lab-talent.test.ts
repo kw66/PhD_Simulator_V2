@@ -228,11 +228,16 @@ describe("coauthored paper talent", () => {
     expect(lover).toContain('<th scope="row">玩耍奖励Ⅰ</th><td>SAN+6</td>');
     expect(lover).toContain('data-ui-lover-reward-page="1"');
     expect(lover).not.toContain("具体天赋效果待定");
-    for (const id of ["joint-training", "internship"]) {
+    for (const id of ["joint-training"]) {
       const pending = panel.split('data-talent-item-id="' + id + '"')[1]!.split("</article>")[0]!;
       expect(pending).toContain("具体天赋效果待定");
       expect(pending).not.toContain("未激活");
       expect(pending).not.toContain("条件：");
     }
+    const internship = panel.split('data-talent-item-id="internship"')[1]!.split("</article>")[0]!;
+    expect(internship).not.toContain("具体天赋效果待定");
+    expect(internship.match(/class="talent-item-metric"/g)).toHaveLength(4);
+    expect(internship).not.toContain("实验倍率");
+    expect(internship).toContain("远程实习");
   });
 });

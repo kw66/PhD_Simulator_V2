@@ -78,7 +78,7 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
     decisionTitle: "如何应对",
     decisionDescription: [
       "你从抽屉里翻出旧笔记，按日期摊在桌上。一页页补回去，今晚的觉就别想了；可这些都是还没投稿的心血，真要全部从头来，你连新建文件夹都不愿点。",
-      "数据恢复团队回了报价：4 金币。你打开余额又关上，目光落回缺失的记录，甚至冒出拿几个编造的数字填上的念头。想到今后要把这些数字写进论文，你的手又停了下来。",
+      "数据恢复团队回了报价：4 金币。你打开余额又关上，甚至冒出拿几个编造的数字填空的念头。稿子是能接着写，可等别人照着论文复现，拿什么交代？想到这里，你的手又停了下来。",
     ].join("\n\n"),
     results: {
       [`random-16-stay-up-${serial}`]: {
@@ -126,8 +126,8 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
     ? null
     : applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
   const basicOutcome = basicGain > 0
-    ? "科研 < 6｜科研上限 +1。"
-    : `科研 ≥ 6｜${formatTierResistedOutcome("科研", 1, basicResearchResult!)}。`;
+    ? "科研上限 +1。"
+    : `${formatTierResistedOutcome("科研", 1, basicResearchResult!)}。`;
 
   const event: PendingEvent = {
     id: `random-9-y${state.year}-m${state.month}-n${serial}`,
@@ -189,8 +189,10 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "你把笔记翻到画着问号的那一页，教材里正好有对应的章节。手刚搭上鼠标，又看见那篇没读完的新论文；摘要里的思路很有意思，刚才散会时你还在琢磨。",
-      "代码教程停在熟悉的报错附近，理论讲义里还有一行看不懂的推导。想学的东西越摆越多，空白笔记却一个字没添。你把手机翻面放好，今晚先弄懂一样也好。",
+      basicGain > 0
+        ? "你把笔记翻到画着问号的那一页，教材里正好有对应的章节。前沿论文已经翻过几篇，往深处看却总被同几个概念拦住。先把这块地基补上，以后才走得远。"
+        : "你把笔记翻到画着问号的那一页，教材里的结论已经用过不少次，证明却未必还讲得清。拿自己的课题对照着重新推一遍，说不定能把眼前这步做得更扎实。",
+      "代码教程停在熟悉的报错附近，理论讲义里还有一行看不懂的推导。那篇没读完的新论文也开着，摘要里的思路很有意思。想学的越摆越多，笔记却一个字没添；你把手机翻面放好，今晚先弄懂一样也好。",
     ].join("\n\n"),
     results: {
       [`random-9-basic-${serial}`]: {

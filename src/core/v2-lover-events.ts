@@ -134,9 +134,10 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
     id: `lover-development-act2-${context.type}-${context.totalMonths}`,
     title: "发展关系 ➜ 你的心意",
     description: [
-      "聊到下次见面时，对方问起了你的想法。你几次想把话说得更明白，又担心以后见面会尴尬。",
-      getThoughtText(context),
-      warningText,
+      "聊到下次见面时，对方问起了你的想法。" + getThoughtText(context),
+      (context.canAddRelationship === false
+        ? "你想起已有的恋人，把刚要说出口的话收了回去。这份心意，眼下只能先放在一边。"
+        : "对方把话说得很认真，说愿意试着一起走下去，现在只等你的回答。") + warningText,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -164,7 +165,7 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
       {
         id: "accept",
         label: context.canAddRelationship === false ? "暂时放下" : "尝试在一起",
-        outcome: context.canAddRelationship === false ? "关系栏已满，暂时放下这段关系。" : "确认关系。",
+        outcome: context.canAddRelationship === false ? "已有恋人，暂时放下；不增加拒绝次数。" : "确认关系，恋人 +1。",
         effects: context.canAddRelationship === false ? {} : {
           loverStateUpdates: activateLover(context.type, context.totalMonths, context.playerGender),
           activateLoverProgress: context.type,

@@ -5,6 +5,7 @@ import type { AiShopState, AiSlotId, AiSubscriptionState } from "./v2-types-econ
 
 export interface AiModelActionEffect {
   bonus?: number;
+  multiplier?: number;
   extraActions?: number;
   sanDelta?: number;
 }
@@ -33,8 +34,8 @@ const AI_MODEL_TIMELINE: readonly AiModelOffer[] = [
   { id: "gpt-4o", slot: "gpt", name: "GPT-4o", provider: "OpenAI", releaseYear: 2024, releaseMonth: 9, price: 2, description: "帮你梳理研究思路、检查实验方案和起草论文。", researchEffects: { idea: { bonus: 4 }, experiment: { bonus: 4 }, writing: { bonus: 4 } } },
   { id: "gpt-5", slot: "gpt", name: "GPT-5", provider: "OpenAI", releaseYear: 2025, releaseMonth: 9, price: 3, description: "为你想 idea、做实验和写论文提供更高的得分加成。", researchEffects: { idea: { bonus: 5 }, experiment: { bonus: 5 }, writing: { bonus: 5 } } },
   { id: "gpt-5.6-sol", slot: "gpt", name: "GPT-6-Astra", provider: "OpenAI", releaseYear: 2026, releaseMonth: 9, price: 3, description: "想 idea、做实验、写论文时，都能帮你提高得分。", researchEffects: { idea: { bonus: 6 }, experiment: { bonus: 6 }, writing: { bonus: 6 } } },
-  { id: "gpt-6", slot: "gpt", name: "GPT-7", provider: "OpenAI", releaseYear: 2027, releaseMonth: 9, price: 4, description: "你想 idea、做实验和写论文时，能获得更高的得分加成。", researchEffects: { idea: { bonus: 7 }, experiment: { bonus: 7 }, writing: { bonus: 7 } } },
-  { id: "gpt-7", slot: "gpt", name: "GPT-8", provider: "OpenAI", releaseYear: 2028, releaseMonth: 9, price: 4, description: "三项科研操作的得分加成继续提高，不过论文还得你来做。", researchEffects: { idea: { bonus: 8 }, experiment: { bonus: 8 }, writing: { bonus: 8 } } },
+  { id: "gpt-6", slot: "gpt", name: "GPT-7", provider: "OpenAI", releaseYear: 2027, releaseMonth: 9, price: 5, description: "三项科研基础分 ×1.25，再各 +7 分。", researchEffects: { idea: { bonus: 7, multiplier: 1.25 }, experiment: { bonus: 7, multiplier: 1.25 }, writing: { bonus: 7, multiplier: 1.25 } } },
+  { id: "gpt-7", slot: "gpt", name: "GPT-8", provider: "OpenAI", releaseYear: 2028, releaseMonth: 9, price: 5, description: "三项科研基础分 ×1.25，再各 +8 分。", researchEffects: { idea: { bonus: 8, multiplier: 1.25 }, experiment: { bonus: 8, multiplier: 1.25 }, writing: { bonus: 8, multiplier: 1.25 } } },
 
   { id: "claude-2", slot: "claude", name: "Claude 2", provider: "Anthropic", releaseYear: 2023, releaseMonth: 9, price: 2, description: "订购或续费时，帮你梳理论文思路，提高现有可修改论文的 idea 分数。", researchEffects: { idea: { bonus: 2 } } },
   { id: "claude-3.5-sonnet", slot: "claude", name: "Claude 3.5 Sonnet", provider: "Anthropic", releaseYear: 2024, releaseMonth: 9, price: 2, description: "订购或续费时，帮你梳理思路和实验方案，提高现有可修改论文的 idea 与实验分数。", researchEffects: { idea: { bonus: 2 }, experiment: { bonus: 2 } } },

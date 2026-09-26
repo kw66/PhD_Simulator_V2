@@ -156,7 +156,10 @@ describe("shared lab project lifecycle", () => {
     const before = {
       ...base,
       fellowProgressState: [...base.fellowProgressState, second],
-      fellowPapers: [...base.fellowPapers!, makePaper("second-paper", { leadAuthorId: second.id, leadAuthorName: second.name })],
+      fellowPapers: [
+        ...base.fellowPapers!.map((paper) => ({ ...paper, experiment: 10 })),
+        makePaper("second-paper", { leadAuthorId: second.id, leadAuthorName: second.name, experiment: 10 }),
+      ],
       loverState: activateLover("smart", 1, "male"),
       loverProgressState: createLoverProgressState("smart", () => 0),
       advisorProgressState: { ...base.advisorProgressState, verticalProgress: 90, researchAccumulation: 29 },
@@ -169,7 +172,7 @@ describe("shared lab project lifecycle", () => {
     expect(completed).toMatchObject({ gain: 2, completed: 1, state: { advisorProgressState: { verticalProgress: 1, researchAccumulation: 31, funding: 10 }, player: { money: 20 } } });
     for (const paper of [...completed.state.papers, ...completed.state.fellowPapers!]) {
       expect(collaborationTotal(paper)).toBe(10);
-      expect(Object.values(paper.collaborationScores!).filter((amount) => amount > 0)).toEqual([10]);
+      expect(paper).toMatchObject({ idea: 10, experiment: 10, writing: 10, collaborationScores: { idea: 0, experiment: 0, writing: 10 } });
       expect(paper.collaborators).toEqual([{ id: "advisor", name: "Advisor" }]);
     }
     expect(completed.state.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
@@ -232,7 +235,7 @@ describe("monthly fellow experiment funding", () => {
 });
 
 describe("vertical completion guidance across actions", () => {
-  it.each([false, true])("preserves guidance on every paper when a fellow completes vertical work mid-month (completerLast=%s)", (completerLast) => {
+  it.each([false, true])("guides eligible recipients and waits for experiments when a fellow completes vertical work mid-month (completerLast=%s)", (completerLast) => {
     const base = makeState();
     const researcher = makeFellow("researcher");
     const profiles = [...base.fellowProgressState, researcher];
@@ -245,21 +248,27 @@ describe("vertical completion guidance across actions", () => {
     };
     const after = nextMonth(before);
     expect(after.advisorProgressState).toMatchObject({
-      funding: completerLast ? 20 : 23,
+      funding: 20,
       verticalProgress: completerLast ? 2 : 0,
       researchAccumulation: 22,
       pendingGuidanceToPlayer: null,
     });
     expect(after.papers.map((paper) => paper.id)).toEqual(before.papers.map((paper) => paper.id));
     expect(after.fellowPapers?.map((paper) => paper.id)).toEqual(before.fellowPapers.map((paper) => paper.id));
-    for (const paper of [...after.papers, ...after.fellowPapers!]) {
+    const researcherPaper = after.fellowPapers!.find((paper) => paper.id === "researcher-paper")!;
+    for (const paper of [...after.papers, researcherPaper]) {
       expect(collaborationTotal(paper)).toBe(10);
+      expect(paper.collaborationScores).toEqual({ idea: 0, experiment: 0, writing: 10 });
       expect(paper.collaborators).toEqual([{ id: "advisor", name: "Advisor" }]);
     }
-    expect(after.fellowPapers?.find((paper) => paper.id === "researcher-paper")?.experiment).toBeGreaterThan(0);
+    const completerPaper = after.fellowPapers!.find((paper) => paper.id === "fellow-paper")!;
+    expect(completerPaper).toMatchObject({ experiment: 0, writing: 0, collaborators: [] });
+    expect(collaborationTotal(completerPaper)).toBe(0);
+    expect(researcherPaper.experiment).toBeGreaterThan(0);
     expect(after.fellowProgressState.find((profile) => profile.id === researcher.id)?.monthlyActivity)
-      .toMatch(completerLast ? /论文实验\+\d+（经费-3）/ : /论文写作\+\d+/);
-    expect(after.fellowProgressState.map((profile) => profile.pendingGuidanceFromAdvisor)).toEqual([null, null]);
+      .toMatch(/论文实验\+\d+（经费-3）/);
+    expect(after.fellowProgressState.find((profile) => profile.id === researcher.id)?.pendingGuidanceFromAdvisor).toBeNull();
+    expect(after.fellowProgressState.find((profile) => profile.id === "fellow-one")?.pendingGuidanceFromAdvisor).toBe(10);
     const settled = settleAdvisorGuidance(after);
     expect(settled.papers).toEqual(after.papers);
     expect(settled.fellowPapers).toEqual(after.fellowPapers);
@@ -269,7 +278,10 @@ describe("vertical completion guidance across actions", () => {
     const base = makeState({ papers: [] });
     const second = makeFellow("fellow-two");
     const frozen = prepareConferenceSubmission(makePaper("frozen", { idea: 10, experiment: 10, writing: 10, leadAuthorId: second.id }), "A", 1, 1);
-    const before = { ...base, fellowProgressState: [...base.fellowProgressState, second], fellowPapers: [...base.fellowPapers!, frozen] };
+    const before = {
+      ...base, fellowProgressState: [...base.fellowProgressState, second],
+      fellowPapers: [...base.fellowPapers!.map((paper) => ({ ...paper, experiment: 10 })), frozen],
+    };
     const queued = queueAdvisorGuidance(queueAdvisorGuidance(before));
     expect(queued.papers).toEqual(before.papers);
     expect(queued.fellowPapers).toEqual(before.fellowPapers);
@@ -279,13 +291,14 @@ describe("vertical completion guidance across actions", () => {
     expect(settled.advisorProgressState.pendingGuidanceToPlayer).toBe(10);
     expect(settled.fellowProgressState.map((profile) => profile.pendingGuidanceFromAdvisor)).toEqual([null, 10]);
     expect(collaborationTotal(settled.fellowPapers![0]!)).toBe(10);
+    expect(settled.fellowPapers![0]!.collaborationScores).toEqual({ idea: 0, experiment: 0, writing: 10 });
     expect(settled.fellowPapers?.[1]).toEqual(frozen);
     const repeated = settleAdvisorGuidance(settled);
     expect(repeated.fellowPapers).toEqual(settled.fellowPapers);
     expect(repeated.fellowProgressState.map((profile) => profile.pendingGuidanceFromAdvisor)).toEqual([null, 10]);
   });
 
-  it("keeps one pending opportunity across repeated vertical completions and consumes it once on create-paper", () => {
+  it("keeps one pending opportunity across completions, paper creation and idea work, then consumes it after experiment", () => {
     const before = makeState({
       papers: [], fellowProgressState: [], fellowPapers: [],
       advisorProgressState: { ...createAdvisorProgressState(), verticalProgress: 90, nextProject: "vertical" },
@@ -294,16 +307,29 @@ describe("vertical completion guidance across actions", () => {
     expect(completed.advisorProgressState).toMatchObject({ researchAccumulation: 22, pendingGuidanceToPlayer: 10 });
     const repeated = advanceSharedLabProject(completed, "vertical", 200, Math.random).state;
     expect(repeated.advisorProgressState).toMatchObject({ researchAccumulation: 26, pendingGuidanceToPlayer: 10 });
-    const created = dispatchAction(repeated, "create-paper", { paperSlotIndex: 0 });
+    const created = dispatchAction({ ...repeated, actionState: { ...repeated.actionState, limit: 2 } }, "create-paper", { paperSlotIndex: 0 });
     expect(created.papers).toHaveLength(1);
-    expect(created.papers[0]).toMatchObject({ idea: 10, experiment: 0, writing: 0, collaborators: [{ id: "advisor", name: "Advisor" }] });
-    expect(created.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
-    const second = dispatchAction(created, "create-paper", { paperSlotIndex: 1 });
+    expect(created.papers[0]).toMatchObject({ idea: 0, experiment: 0, writing: 0, collaborators: [] });
+    expect(created.advisorProgressState.pendingGuidanceToPlayer).toBe(10);
+    const paperId = created.papers[0]!.id;
+    const idea = dispatchAction(created, "research-paper", { paperId, paperActionType: "idea" });
+    expect(idea.papers[0]!.idea).toBeGreaterThan(0);
+    expect(idea.papers[0]).toMatchObject({ experiment: 0, writing: 0, collaborators: [] });
+    expect(idea.advisorProgressState.pendingGuidanceToPlayer).toBe(10);
+    const experiment = dispatchAction(idea, "research-paper", { paperId, paperActionType: "experiment" });
+    expect(experiment.papers[0]!.experiment).toBeGreaterThan(0);
+    expect(experiment.papers[0]).toMatchObject({
+      idea: idea.papers[0]!.idea, writing: 10,
+      collaborationScores: { idea: 0, experiment: 0, writing: 10 },
+      collaborators: [{ id: "advisor", name: "Advisor" }],
+    });
+    expect(experiment.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
+    const second = dispatchAction(experiment, "create-paper", { paperSlotIndex: 1 });
     expect(second.papers).toHaveLength(2);
-    expect(second.papers[0]).toEqual(created.papers[0]);
+    expect(second.papers[0]).toEqual(experiment.papers[0]);
     expect(collaborationTotal(second.papers[1]!)).toBe(0);
     const later = nextMonth({ ...second, eventQueue: [] });
-    expect(later.papers[0]).toMatchObject({ idea: 9, collaborationScores: { idea: 9 } });
+    expect(later.papers[0]).toMatchObject({ writing: 9, collaborationScores: { idea: 0, experiment: 0, writing: 9 } });
     expect(collaborationTotal(later.papers[1]!)).toBe(0);
     expect(later.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
   });
@@ -328,6 +354,7 @@ describe("vertical completion guidance across actions", () => {
     }
     expect(state.papers[0]).toMatchObject({ status: "draft", lastReview: { accepted: false } });
     expect(collaborationTotal(state.papers[0]!)).toBe(10);
+    expect(state.papers[0]?.collaborationScores).toEqual({ idea: 0, experiment: 0, writing: 10 });
     expect(state.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
     expect(dispatchAction(state, "select-paper", { paperId: submitted.id }).papers).toEqual(state.papers);
   });
@@ -347,6 +374,7 @@ describe("vertical completion guidance across actions", () => {
     const published = after.externalPublications[0]!;
     expect(published).toMatchObject({
       id: journal.id, status: "published", journalTarget: "pami",
+      idea: 40, experiment: 40, writing: 50, collaborationScores: { idea: 0, experiment: 0, writing: 10 },
       publication: { effectiveScore: 130 }, collaborators: [{ id: "advisor", name: "Advisor" }],
     });
     expect(collaborationTotal(published)).toBe(10);

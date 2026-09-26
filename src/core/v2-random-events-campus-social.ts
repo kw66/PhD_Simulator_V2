@@ -2,7 +2,6 @@ import { getAttributeTier } from "./v2-random-event-rules";
 import { BADMINTON_VICTORY_THRESHOLD, getBadmintonStrength, getPokerWinRate } from "./v2-growth-system";
 import {
   createThreeStageRandomEvent,
-  formatProbabilityCondition,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
@@ -46,8 +45,8 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         id: `random-7-badminton-${serial}`,
         label: "打羽毛球",
         outcome: badmintonChampion
-          ? `获胜（实力 ${badmintonStrength}/${BADMINTON_VICTORY_THRESHOLD}）｜生病概率 -10%｜羽毛球参加次数 +1${state.eventSupport.hasStrongBodyTalent ? "" : "｜解锁每月 SAN +1"}`
-          : `落败（实力 ${badmintonStrength}/${BADMINTON_VICTORY_THRESHOLD}）｜生病概率 -10%｜羽毛球参加次数 +1`,
+          ? `获胜｜生病概率 -10%｜羽毛球参加次数 +1${state.eventSupport.hasStrongBodyTalent ? "" : "｜解锁每月 SAN +1"}`
+          : "落败｜生病概率 -10%｜羽毛球参加次数 +1",
         effects: {
           illnessProbabilityDelta: -10,
           counterDeltas: { badmintonCount: 1 },
@@ -58,8 +57,8 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         id: `random-7-poker-${serial}`,
         label: "打德州扑克",
         outcome: pokerStake === 0
-          ? (pokerWin ? `无本金，纯游戏获胜（胜率 ${Math.round(pokerWinRate * 100)}%）｜德州扑克参加次数 +1` : `无本金，纯游戏落败（胜率 ${Math.round(pokerWinRate * 100)}%）｜德州扑克参加次数 +1`)
-          : pokerWin ? `押注 ${pokerStake} 金币；获胜（胜率 ${Math.round(pokerWinRate * 100)}%）｜金币 +${pokerStake}｜德州扑克参加次数 +1` : `押注 ${pokerStake} 金币；落败（胜率 ${Math.round(pokerWinRate * 100)}%）｜金币 -${pokerStake}｜德州扑克参加次数 +1`,
+          ? (pokerWin ? "无本金，纯游戏获胜｜德州扑克参加次数 +1" : "无本金，纯游戏落败｜德州扑克参加次数 +1")
+          : pokerWin ? `押注 ${pokerStake} 金币；获胜｜金币 +${pokerStake}｜德州扑克参加次数 +1` : `押注 ${pokerStake} 金币；落败｜金币 -${pokerStake}｜德州扑克参加次数 +1`,
         effects: pokerWin
           ? {
             ...(pokerStake > 0 ? { money: pokerStake } : {}),
@@ -82,8 +81,8 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         id: `random-7-dinner-${serial}`,
         label: "聚餐",
         outcome: dinnerAdvisorTreat
-          ? `${formatProbabilityCondition("导师请客", 0.5)}｜SAN +5｜${formatTierResistedOutcome("导师好感", 1, dinnerFavorResult!)}。`
-          : `${formatProbabilityCondition("AA 聚餐", 0.5)}｜SAN +5｜金币 -2。`,
+          ? `导师请客｜SAN +5｜${formatTierResistedOutcome("导师好感", 1, dinnerFavorResult!)}。`
+          : "AA 聚餐｜SAN +5｜金币 -2。",
         effects: dinnerAdvisorTreat
           ? {
             san: 5,
@@ -113,11 +112,10 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
     ].join("\n\n"),
     decisionTitle: "活动选择",
     decisionDescription: [
-      "羽毛球那一栏刚多了一票，群里就有人开始约双打搭子。你转了转僵硬的肩膀，点开下一条语音，却听见同门在哼歌——这位已经在为 KTV 选曲了。",
-      pokerStake === 0
+      `羽毛球那一栏刚多了一票，群里就有人约双打搭子。${badmintonChampion ? "掂了掂球拍，想起最近练熟的几招，你倒真想上场比一比。" : "你试着挥了两下，身体还没活动开。真想打赢，平时的练习、今天的精神和手里的球拍，哪样都不能全靠临场发挥。"}下一条语音里，同门已经在为 KTV 选曲了。`,
+      (pokerStake === 0
         ? "提议打牌的同门也在招呼人。你说手头没有本金，对方很快回了消息：“那就只用筹码记输赢，一样玩。”"
-        : `提议打牌的同门也在招呼人，这次押注 ${pokerStake} 金币。你算了算本金，先在心里提醒自己：拿到烂牌就弃，别又舍不得。`,
-      "聚餐的菜单也发来了，你往下划了两页，肚子先替你表了态。只是导师还没说请客，真要 AA，每人得出 2 金币。",
+        : `提议打牌的同门也在招呼人，这次押注 ${pokerStake} 金币。你想起上次那手看着稳赢的牌，还是先摸了摸钱包。`) + "聚餐菜单也发来了，导师还没说请客，真要 AA，每人得出 2 金币。你在几个群消息之间来回切，歌还没选好，菜倒先看饿了。",
     ].join("\n\n"),
     results: {
       [`random-7-badminton-${serial}`]: {
@@ -191,7 +189,7 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
       {
         id: `random-8-salary-${serial}`,
         label: "发劳务费",
-        outcome: `导师好感第 ${favorTier + 1} 档｜金币 +${salaryGain}。`,
+        outcome: `金币 +${salaryGain}。`,
         effects: {
           money: salaryGain,
         },
@@ -224,7 +222,7 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "你接过导师递来的笔，刚才查的显卡报价还开着，椅子一往后靠又吱呀响了一声；旁边的同门小声说，直接发劳务费也挺好。你很难不点头。",
+      `你接过导师递来的笔，显卡报价还开着，椅子一往后靠又吱呀响了一声；旁边的同门小声说，直接发劳务费也挺好。${favorTier >= 2 ? "导师提起你这阵子做的事，说要是选劳务费，会给你多安排些。" : favorTier >= 1 ? "导师翻了翻你最近的工作记录，点头说劳务费可以再添一点。" : "你和导师还不太熟，老师按惯常的标准在劳务费那栏写了个数。"}`,
       "你在纸上圈下报销范围：下次购买或升级显卡、一次工位设备购买或升级，还有本月的 AI 费用。平时舍不得花的钱，这会儿每一笔都想起来了。导师看着被你圈了一遍的清单，等你在选定的那项旁打勾。",
     ].join("\n\n"),
     results: {

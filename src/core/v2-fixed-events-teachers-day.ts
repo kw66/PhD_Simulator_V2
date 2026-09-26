@@ -6,7 +6,6 @@ import {
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
-import { formatProbabilityCondition } from "./v2-random-events-core-shared";
 import type {
   FixedEventResolution,
   GameState,
@@ -67,10 +66,10 @@ function getTeachersDayGift(giftId: TeachersDayGiftId | undefined): TeachersDayG
   return TEACHERS_DAY_GIFTS.find((gift) => gift.id === giftId) ?? null;
 }
 
-function getTeachersDayMessageProbabilityNote(state: Pick<GameState, "player">): string {
+function getTeachersDayMessageHint(state: Pick<GameState, "player">): string {
   return state.player.favor >= 6
-    ? `透明概率：导师好感 ≥ 6 时，${formatProbabilityCondition("导师分享想法", 0.5)}，${formatProbabilityCondition("导师礼貌回复", 0.5)}。`
-    : `透明概率：导师好感 < 6 时，${formatProbabilityCondition("报销跑腿", 0.5)}，${formatProbabilityCondition("普通回复", 0.5)}。`;
+    ? "你和老师已经聊得熟了，有时一句问候也会接上没聊完的研究想法。今天若碰上他有空，兴许还能听到些新思路；不过节日消息这么多，也可能只来得及回一句谢谢。"
+    : "你和老师还不算熟，平时收到的多是事务通知。桌上那叠待报销的票据还没送走，这条问候也许会让他想起找你搭把手；当然，也可能和群里那些祝福一样，停在一句客气的回复上。";
 }
 
 function drawTeachersDayGift(getRoll: RandomRollProvider): TeachersDayGiftDefinition {
@@ -120,10 +119,8 @@ function createTeachersDayChoiceEvent(
     id: `teachers-day-choice-y${state.year}-m${state.month}`,
     title: "教师节 ➜ 你的选择",
     description: [
-      noGiftHint,
-      giftHint,
-      stampHint,
-      getTeachersDayMessageProbabilityNote(state),
+      `${noGiftHint}${getTeachersDayMessageHint(state)}`,
+      `${giftHint}${stampHint}`,
     ].join("\n\n"),
     chainId: "teachers-day",
     stage: "act2",
@@ -200,14 +197,13 @@ export function resolveTeachersDayFixedEvent(
   switch (resolution.kind) {
     case "teachers-day-message":
       if (state.player.favor >= 6) {
-        const probabilityNote = getTeachersDayMessageProbabilityNote(state);
         if (getRoll() < 0.5) {
           const ideaBonus = drawInclusiveInt(3, 5, getRoll);
           return {
             nextState: applyStateMutation(state, {
               temporaryIdeaBonus: ideaBonus,
             }, "教师节"),
-            outcome: `${formatProbabilityCondition("导师分享想法", 0.5)}｜你发去节日祝福，导师顺势分享了一个想法，下次想 idea +${ideaBonus}。`,
+            outcome: `你发去节日祝福，导师顺势分享了一个想法，下次想 idea +${ideaBonus}。`,
             enqueueEvents: [createTeachersDayResultEvent({
               state,
               resultId: "message-idea",
@@ -215,17 +211,16 @@ export function resolveTeachersDayFixedEvent(
               description: [
                 "你发了条微信：“老师，教师节快乐！祝您身体健康，工作顺利！”没过多久，手机响了，来电正是导师。",
                 "“谢谢！正好有个想法跟你聊聊。”你赶紧找纸笔，先在手边的便签上记了几行。挂断后重新誊一遍，才发现几个问题能连起来了，连刚才随手画的箭头都有了用处。",
-                probabilityNote,
                 `机制结算\n下次想 idea +${ideaBonus}`,
               ].join("\n\n"),
               buttonLabel: "期待明天",
-              outcome: `${formatProbabilityCondition("导师分享想法", 0.5)}｜你发了教师节祝福，导师分享了一个想法，下次想 idea +${ideaBonus}。`,
+              outcome: `你发了教师节祝福，导师分享了一个想法，下次想 idea +${ideaBonus}。`,
             })],
           };
         }
         return {
           nextState: state,
-          outcome: `${formatProbabilityCondition("导师礼貌回复", 0.5)}｜你发去节日祝福，导师礼貌回复，没有额外数值变化。`,
+          outcome: "你发去节日祝福，导师礼貌回复，没有额外数值变化。",
           enqueueEvents: [createTeachersDayResultEvent({
             state,
             resultId: "message-reply",
@@ -233,16 +228,14 @@ export function resolveTeachersDayFixedEvent(
             description: [
               "你发了条微信：“老师，教师节快乐！祝您身体健康，工作顺利！”导师很快回复：“谢谢！也祝你新学期顺利。”",
               "你回了个笑脸，等了一小会儿，没再收到消息。手机扣回桌上时，你才松了口气：今天这句“谢谢”后面，确实没有跟着一份附件。",
-              probabilityNote,
             ].join("\n\n"),
             buttonLabel: "继续",
-            outcome: `${formatProbabilityCondition("导师礼貌回复", 0.5)}｜你发了教师节祝福，导师礼貌回复，无事发生。`,
+            outcome: "你发了教师节祝福，导师礼貌回复，无事发生。",
           })],
         };
       }
 
       if (getRoll() < 0.5) {
-        const probabilityNote = getTeachersDayMessageProbabilityNote(state);
         const sanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
         const favorResult = applyTierResist(1, state.player.favor, getRoll);
         const favorChange = favorResult.effectiveChange;
@@ -252,7 +245,7 @@ export function resolveTeachersDayFixedEvent(
             san: sanChange,
             favor: favorChange,
           }),
-          outcome: `${formatProbabilityCondition("报销跑腿", 0.5)}｜你发去祝福后，导师顺手把报销跑腿交给了你，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+          outcome: `你发去祝福后，导师顺手把报销跑腿交给了你，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           enqueueEvents: [createTeachersDayResultEvent({
             state,
             resultId: "message-errand",
@@ -261,18 +254,17 @@ export function resolveTeachersDayFixedEvent(
               "你发了条微信：“老师，教师节快乐！”导师很快回复：“谢谢。正好有份报销材料，下午帮我送到财务处吧。”",
               "你拿齐材料，在财务处排了快一个小时的队，回来再向导师报了受理情况。坐回工位，水杯里的茶已经凉了。你只是发了句祝福，怎么半个下午也跟着送出去了。",
               ...(favorNarrative ? [favorNarrative] : []),
-              probabilityNote,
               `机制结算\n${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}\n${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
             ].join("\n\n"),
             buttonLabel: "认命",
-            outcome: `${formatProbabilityCondition("报销跑腿", 0.5)}｜你发了教师节祝福，被叫去财务处跑腿，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+            outcome: `你发了教师节祝福，被叫去财务处跑腿，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           })],
         };
       }
 
       return {
         nextState: state,
-        outcome: `${formatProbabilityCondition("普通回复", 0.5)}｜你发去节日祝福，导师简短回了一句“新学期加油”，这次无事发生。`,
+        outcome: "你发去节日祝福，导师简短回了一句“新学期加油”，这次无事发生。",
         enqueueEvents: [createTeachersDayResultEvent({
           state,
           resultId: "message-plain",
@@ -280,10 +272,9 @@ export function resolveTeachersDayFixedEvent(
           description: [
             "你发了条微信：“老师，教师节快乐！”过了一会儿，导师回复：“谢谢，新学期加油。”",
             "你敲了几句新学期的打算，想想又删掉，最后只回了“谢谢老师”。聊天框安静下来，你把手机放到一边，桌上的资料还摊在刚才那一页。",
-            getTeachersDayMessageProbabilityNote(state),
           ].join("\n\n"),
           buttonLabel: "继续",
-          outcome: `${formatProbabilityCondition("普通回复", 0.5)}｜你发了教师节祝福，导师简短回复，无事发生。`,
+          outcome: "你发了教师节祝福，导师简短回复，无事发生。",
         })],
       };
     case "teachers-day-gift": {

@@ -135,6 +135,9 @@ function createConferenceDecisionAct2(
   const proxyCostHint = proxyDecision.actualCost === 0
     ? "请同学代参会不需要花金币。"
     : `请同学代参会需要 ${proxyDecision.actualCost} 金币。`;
+  const advisorHint = state.favor >= 6
+    ? "导师报销能省下这笔钱，平时的交情也能缓和麻烦老师的顾虑，但未必完全不伤人情。"
+    : "导师报销能省下这笔钱，只是你和老师还不熟，这趟开销会欠下一些人情。";
 
   const createChoice = (mode: ConferenceDecisionMode, decision: ReturnType<typeof resolveConferenceDecisionCost>) => ({
     id: mode,
@@ -151,15 +154,12 @@ function createConferenceDecisionAct2(
     id: `${context.id}-act2`,
     title: "论文参会 ➜ 参会方式",
     description: [
-      `你查好去${context.city}的行程，把${regionName}参会的费用加了一遍。收到录用时只顾着高兴，现在轮到账户余额参与讨论了。`,
-      context.paperCount >= 2
+      `你查好去${context.city}的行程，把${regionName}参会的费用加了一遍。` + (context.paperCount >= 2
         ? `同会的 ${context.paperCount} 篇论文得一起安排，展示材料也要逐份核对。`
-        : "这次有 1 篇论文要展示。你还挺想亲口讲讲自己的工作，看到费用又犹豫了。导师和同学的聊天框都打开了，第一句话还没发出去。",
-      hasMeetingExperience
-        ? `会务经验可以减免 ${discount} 金币，自费会便宜一些。`
-        : "这次自费没有减免，花费要全部自己承担。",
-      selfCostHint,
-      proxyCostHint,
+        : "这次有 1 篇论文要展示，你还挺想亲口讲讲自己的工作。") + (hasMeetingExperience
+        ? `会务经验可以减免 ${discount} 金币。`
+        : "这次自费没有减免。") + selfCostHint,
+      `${advisorHint}${proxyCostHint}托同学能完成论文展示，却也会错过自己到场交流和安排行程的机会。`,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

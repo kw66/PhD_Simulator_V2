@@ -26,7 +26,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
       {
         id: `random-12-complain-${serial}`,
         label: "向导师诉苦",
-        outcome: lowFavor ? "导师好感 < 6｜下次想 idea -5。" : "导师好感 ≥ 6｜无变化。",
+        outcome: lowFavor ? "下次想 idea -5。" : "无事发生。",
         effects: lowFavor
           ? {
             temporaryActionEffectUpdates: {
@@ -44,7 +44,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
       {
         id: `random-12-argue-${serial}`,
         label: "据理力争",
-        outcome: lowFavor ? `导师好感 < 6｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。` : "导师好感 ≥ 6｜无变化。",
+        outcome: lowFavor ? `${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。` : "无事发生。",
         effects: lowFavor ? { san: argueSanChange } : {},
       },
       {
@@ -66,8 +66,13 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "聊天框里打了半句，又被你删掉。名字只往后挪了一行，前面那些熬夜补实验的晚上却一下涌了上来。你把分工记录截好图，心里堵着一句：说好的事，怎么就改了？",
-      "名单上的几个人每天都在实验室碰面，导师那边还有后续工作等着你接着做。你不想把话说僵，可照着新名单继续干，又实在咽不下这口气。输入框空了半天，你还在斟酌第一句怎么说。",
+      [
+        "聊天框里打了半句，又被你删掉。你把分工记录截好图，心里堵着一句：说好的事，怎么就改了？",
+        lowFavor
+          ? "平时和导师说不上几句，这回恐怕免不了来回解释。只诉苦，谈完也容易把委屈带回工位，搅乱研究的思绪；逐项讲道理能守住署名，却也得耗上一番心力。"
+          : "你和导师平时沟通还算顺畅，先前也认真谈过分工。把难处说清，或把记录摊开核对，都有希望平和地把署名改回来。",
+      ].join(""),
+      "名单上的人每天都在实验室碰面，把别人的名字往后挪，眼前的事或许能解决，往后见面却难免尴尬。若拿后续工作施压，连劳务费一起谈清，话一旦说重了，和导师之间也很难像从前那样自在。",
     ].join("\n\n"),
     results: {
       [`random-12-complain-${serial}`]: {

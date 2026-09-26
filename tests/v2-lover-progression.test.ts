@@ -345,7 +345,7 @@ describe("stored lover paper collaboration", () => {
     expect(settlePendingLoverHelp(helped)).toBe(helped);
   });
 
-  it.each(["draft", "journal-reviewing"] as const)("adds one random collaboration field to a %s paper without consuming actions", (status) => {
+  it.each(["draft", "journal-reviewing"] as const)("breaks minimum-score ties randomly on a %s paper without consuming actions", (status) => {
     for (const [random, field] of [[0, "idea"], [0.5, "experiment"], [0.999, "writing"]] as const) {
       const base = makeState();
       base.loverProgressState.pendingPaperHelp = { amount: 10, collaboratorId: "lover:7:林青", name: "林青" };
@@ -358,6 +358,28 @@ describe("stored lover paper collaboration", () => {
       expect(next.actionState).toEqual(base.actionState);
       expect(next.loverProgressState.pendingPaperHelp).toBeNull();
     }
+  });
+
+  it("helps only the global minimum combined score across eligible papers", () => {
+    const base = makeState();
+    base.loverProgressState.pendingPaperHelp = { amount: 10, collaboratorId: "lover:7:林青", name: "林青" };
+    base.papers = [
+      makePaper({ id: "first", idea: 20, experiment: 15, writing: 12,
+        collaborationScores: { idea: 19, experiment: 0, writing: 0 } }),
+      makePaper({ id: "second", idea: 9, experiment: 4, writing: 8,
+        collaborationScores: { idea: 0, experiment: 1, writing: 0 } }),
+      makePaper({ id: "review", status: "reviewing", idea: 1, experiment: 1, writing: 1 }),
+      makePaper({ id: "other", nonFirstAuthor: true, idea: 1, experiment: 1, writing: 1 }),
+    ];
+    const before = structuredClone(base);
+    const next = settlePendingLoverHelp(base, () => 0.999);
+    expect(next.papers[0]).toEqual(base.papers[0]);
+    expect(next.papers.slice(2)).toEqual(base.papers.slice(2));
+    expect(next.papers[1]).toMatchObject({ idea: 9, experiment: 14, writing: 8 });
+    expect(getPaperScoreBreakdown(next.papers[1]!, "experiment")).toEqual({ own: 3, collaboration: 11, total: 14 });
+    expect(next.loverProgressState.pendingPaperHelp).toBeNull();
+    expect(settlePendingLoverHelp(next)).toBe(next);
+    expect(base).toEqual(before);
   });
 
   it("retains help for locked papers and respects prerequisites when another draft appears", () => {

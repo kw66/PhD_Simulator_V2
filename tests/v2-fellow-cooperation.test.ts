@@ -38,6 +38,41 @@ function scores(paper: Paper): number[] {
 afterEach(() => vi.restoreAllMocks());
 
 describe("fellow cooperation completion", () => {
+  it.each([false, true])("immediately settles a junior unlocked by senior help regardless of card order (%s)", (seniorFirst) => {
+    const base = makeState("junior");
+    const junior = { ...base.fellowProgressState[0]!, pendingHelpToPlayer: 7 };
+    const senior = { ...createCustomFellowProgressProfile({
+      type: "senior", gender: "male", name: "陈林", research: 6, affinity: 1, startTotalMonths: 1,
+    }), pendingHelpToPlayer: 6 };
+    const before = { ...base, papers: [makePaper(0, 0, 0, 0)],
+      fellowProgressState: seniorFirst ? [senior, junior] : [junior, senior] };
+    const after = settlePendingFellowHelp(before, () => 0);
+    expect(scores(after.papers[0]!)).toEqual([6, 7, 0]);
+    expect(after.papers[0]!.collaborationScores).toEqual({ idea: 6, experiment: 7, writing: 0 });
+    expect(after.fellowProgressState.map((profile) => profile.pendingHelpToPlayer)).toEqual([null, null]);
+    expect(settlePendingFellowHelp(after, () => 0)).toBe(after);
+    expect(scores(before.papers[0]!)).toEqual([0, 0, 0]);
+  });
+
+  it("settles lover, junior and advisor help in one action when they unlock each other", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const base = withPending(makeState("junior"), { pendingHelpToPlayer: 7 });
+    const before = { ...base, selectedAdvisorName: "林老师", papers: [],
+      advisorProgressState: { ...base.advisorProgressState, pendingGuidanceToPlayer: 10 },
+      loverState: { ...base.loverState, active: true },
+      loverProgressState: { ...base.loverProgressState,
+        pendingPaperHelp: { amount: 6, collaboratorId: "lover-test", name: "赵明" } },
+    };
+    const after = dispatchAction(before, "create-paper", { paperSlotIndex: 0 });
+    expect(scores(after.papers[0]!)).toEqual([6, 7, 10]);
+    expect(after.papers[0]!.collaborationScores).toEqual({ idea: 6, experiment: 7, writing: 10 });
+    expect(after.fellowProgressState[0]!.pendingHelpToPlayer).toBeNull();
+    expect(after.loverProgressState.pendingPaperHelp).toBeNull();
+    expect(after.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
+    const repeated = dispatchAction(after, "select-paper", { paperId: after.papers[0]!.id });
+    expect(scores(repeated.papers[0]!)).toEqual([6, 7, 10]);
+  });
+
   it("retains excess progress and snapshots both researchers at completion", () => {
     const profile = { ...makeState().fellowProgressState[0]!, taskProgress: 99 };
     const next = advanceFellowCooperation(profile, 14, 10);
@@ -171,22 +206,27 @@ describe("automatic reciprocal help", () => {
 
 describe("cooperation field routing", () => {
   it.each([
-    { type: "senior" as const, expected: [[10, 40, 5], [20, 3, 70]] },
-    { type: "junior" as const, expected: [[10, 40, 5], [20, 23, 50]] },
-  ])("chooses one global field for $type across drafts and journal revisions", ({ type, expected }) => {
+    { type: "senior" as const, expected: [[30, 40, 5], [20, 3, 50]] },
+    { type: "junior" as const, expected: [[10, 60, 5], [20, 3, 50]] },
+  ])("chooses only the fixed $type field across drafts and journal revisions", ({ type, expected }) => {
     const base = withPending(makeState(type), { pendingHelpToPlayer: 20 });
     const state = { ...base, papers: [makePaper(0, 10, 40, 5), { ...makePaper(1, 20, 3, 50), status: "journal-reviewing" as const, journalTarget: "nmi" as const, submittedIdea: 20, submittedExperiment: 3, submittedWriting: 50 }] };
     const next = settlePendingFellowHelp(state, () => 0);
     expect(next.papers.map(scores)).toEqual(expected);
-    expect(next.papers[0]!.collaborators ?? []).toEqual([]);
+    expect(next.papers[0]!.collaborators).toHaveLength(1);
+    expect(next.papers[0]!.collaborators?.[0]?.name).toBe("林青");
     expect(next.papers[1]).toMatchObject({ submittedIdea: 20, submittedExperiment: 3, submittedWriting: 50 });
   });
 
-  it.each(["senior", "junior"] as const)("breaks %s ties by array paper order then idea, experiment, writing", (type) => {
+  it.each([
+    { type: "senior" as const, expected: [30, 10, 10] },
+    { type: "junior" as const, expected: [10, 30, 10] },
+  ])("selects one random paper for the fixed $type field", ({ type, expected }) => {
     const base = withPending(makeState(type), { pendingHelpToPlayer: 20 });
     const state = { ...base, papers: [makePaper(2, 10, 10, 10), makePaper(0, 10, 10, 10)] };
     const next = settlePendingFellowHelp(state, () => 0.999);
-    expect(next.papers.map(scores)).toEqual([[30, 10, 10], [10, 10, 10]]);
+    expect(next.papers.map(scores)).toEqual([[10, 10, 10], expected]);
+    expect(next.papers[0]).toEqual(state.papers[0]);
   });
 
   it.each([
@@ -235,6 +275,7 @@ describe("engine and research lifecycle retries", () => {
   it("retries after research unlocks another field without consuming the same help twice", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const state = { ...withPending(makeState("junior"), { pendingHelpToPlayer: 20 }), papers: [makePaper(0, 0, 0, 0)] };
+    expect(settlePendingFellowHelp(state)).toBe(state);
     const next = dispatchAction(state, "research-paper", { paperId: state.papers[0]!.id, paperActionType: "idea" });
     expect(next.papers[0]!.idea).toBeGreaterThan(0);
     expect(getPaperScoreBreakdown(next.papers[0]!, "experiment")).toEqual({ own: 0, collaboration: 20, total: 20 });

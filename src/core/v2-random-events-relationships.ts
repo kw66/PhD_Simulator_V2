@@ -14,7 +14,6 @@ import { createGeneratedFellowProfileAddition, getFellowName, getFellowPronoun, 
 import {
   createThreeStageRandomEvent,
   drawInclusiveInt,
-  formatProbabilityCondition,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -54,8 +53,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-exchange-${serial}`,
         label: "\u5b66\u672f\u4ea4\u6d41",
         outcome: isLowSocial
-          ? `社交 < 6｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}｜下次想 idea +${ideaBonus}。`
-          : `社交 ≥ 6｜下次想 idea +${ideaBonus}。`,
+          ? `${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}｜下次想 idea +${ideaBonus}。`
+          : `下次想 idea +${ideaBonus}。`,
         effects: {
           ...(isLowSocial ? { san: exchangeSanChange } : {}),
           temporaryActionEffectUpdates: { idea: { bonus: ideaBonus } },
@@ -65,8 +64,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-mutual-${serial}`,
         label: "\u4e92\u6302\u8bba\u6587",
         outcome: mutualSuccess
-          ? `${formatProbabilityCondition("互挂成功", 0.5)}｜生成一篇非一作 ${mutualTarget} 类论文，仅计引用。`
-          : `${formatProbabilityCondition("互挂未成", 0.5)}｜无事发生。`,
+          ? `互挂成功｜生成一篇非一作 ${mutualTarget} 类论文，仅计引用。`
+          : "互挂未成｜无事发生。",
         effects: mutualSuccess
           ? { grantedPublication: { target: mutualTarget, acceptedScore: mutualTarget === "A" ? 4 : mutualTarget === "B" ? 2 : 1, nonFirstAuthor: true } }
           : {},
@@ -75,8 +74,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-reject-${serial}`,
         label: "\u5a49\u62d2\u5408\u4f5c",
         outcome: rejectSuccess
-          ? `${formatProbabilityCondition("没有后续波澜", 0.5)}｜无事发生。`
-          : `${formatProbabilityCondition("转而专注自身研究", 0.5)}｜下次想 idea +${rejectIdeaBonus}｜下次写作 +${rejectWritingBonus}。`,
+          ? "没有后续波澜｜无事发生。"
+          : `转而专注自身研究｜下次想 idea +${rejectIdeaBonus}｜下次写作 +${rejectWritingBonus}。`,
         effects: rejectSuccess
           ? {}
           : { temporaryActionEffectUpdates: { idea: { bonus: rejectIdeaBonus }, writing: { bonus: rejectWritingBonus } } },
@@ -85,8 +84,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-full-${serial}`,
         label: "\u5168\u9762\u5408\u4f5c",
         outcome: isLowSocial
-          ? `社交 < 6｜${fullSanSummary}｜下次想 idea 额外 1 次｜下次写作额外 1 次。`
-          : `社交 ≥ 6｜${fullSanSummary}${canAddPeer ? "｜新增同门" : "｜关系栏已满，暂不新增同门"}｜下次想 idea 额外 1 次｜下次写作额外 1 次。`,
+          ? `${fullSanSummary}｜下次想 idea 额外 1 次｜下次写作额外 1 次。`
+          : `${fullSanSummary}${canAddPeer ? "｜新增同门" : "｜关系栏已满，暂不新增同门"}｜下次想 idea 额外 1 次｜下次写作额外 1 次。`,
         effects: {
           san: fullSanChange,
           ...(!isLowSocial && canAddPeer ? { fellowAdditions: [peerAddition] } : {}),
@@ -106,9 +105,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      ...(!isLowSocial && !canAddPeer ? ["普通关系栏已满，全面合作仍可获得本次合作收益，但不会新增同门；你可以现在选择退出。"] : []),
-      "白板上很快列出实验、写作和投稿，旁边的负责人却还空着。刚才聊得起劲，你连新点子都记了两条；现在真要往后面填名字，笔尖反倒停住了。",
-      "你翻开自己的日程，往旁边让了让，方便对方一起看。这个方向确实让你心动，手头没做完的实验也还在排队。趁两个人都在，得把愿意接下多少、署名怎么安排说清楚。",
+      `白板上列出实验、写作和投稿，负责人却还空着。${isLowSocial ? `你和${peerName}还不太会接彼此的话，解释一组实验就绕了几圈。一起做完眼前的事还行，往后能不能一直配合，你心里没底。` : `你和${peerName}越聊越顺，几句话就分清了各自擅长的部分。对方翻出下个月的日程，已经在问以后什么时候一起讨论。`}`,
+      `若只互相补点工作、挂个名字，得等对方确认排期，口头约好也未必落得下来。真要全面合作，你自己的实验也还在排队；婉拒倒不至于闹僵，刚记下的几个点子还能带回去想想。${!isLowSocial && !canAddPeer ? "普通关系栏已满，全面合作仍可获得本次合作收益，但不会新增同门；你可以现在选择退出。" : ""}`,
     ].join("\n\n"),
     results: {
       [`random-10-exchange-${serial}`]: {
@@ -244,9 +242,8 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      ...(!canAddSenior ? ["普通关系栏已满，深度合作仍可结算本次收益，但不会新增师兄或师姐；你可以现在选择退出。"] : []),
-      `${roleText}把接下来要做的实验一项项圈出来。你指着其中两处追问，听到解释才发现，之前卡住的地方还有这样的做法，忍不住往前凑了凑。`,
-      "翻到写作那页，密密麻麻的批注又让你坐直了些。想学的东西一下多起来，真跟着做也得花时间。你把自己的进度说给对方听，准备先谈谈能从哪一块开始。",
+      `${roleText}把接下来要做的实验一项项圈出来。你指着两处追问，听到解释才发现，之前卡住的地方还有这样的做法。翻到写作那页，密密麻麻的批注又让你坐直了些，这些写法要是学会，以后自己动笔也用得上。`,
+      `想学的东西一下多起来，真跟着做也得花时间。${canAddSenior ? "对方说可以把分工定下来，往后固定找时间讨论。你翻出自己的日程，盘算着从哪一块开始。" : "你手头的合作已经排满，再答应长期讨论，怕是谁也顾不好。普通关系栏已满，本次仍可获得收益，但不会新增师兄或师姐；你可以现在选择退出。"}`,
     ].join("\n\n"),
     results: {
       [`random-11-watch-${serial}`]: {

@@ -177,8 +177,8 @@ describe("advisor project random event effects", () => {
     expect(after.player).toEqual({ ...state.player, san: 94, favor: 4, research: 1 });
     for (const paper of [...after.papers, ...after.fellowPapers!]) {
       expect(paper).toMatchObject({
-        idea: 20, experiment: 10, writing: 10,
-        collaborationScores: { idea: 10, experiment: 0, writing: 0 },
+        idea: 10, experiment: 10, writing: 20,
+        collaborationScores: { idea: 0, experiment: 0, writing: 10 },
         collaborators: [{ id: "advisor", name: "Advisor" }],
       });
     }
@@ -203,6 +203,10 @@ describe("advisor project random event effects", () => {
     expect(after.advisorProgressState.researchAccumulation).toBe(type === "vertical" ? 34 : 29);
     for (const paper of [...after.papers, ...after.fellowPapers!]) {
       expect(collaborationTotal(paper)).toBe(type === "vertical" ? 20 : 0);
+      expect(paper).toMatchObject({
+        idea: 10, experiment: 10, writing: type === "vertical" ? 30 : 10,
+        collaborationScores: { idea: 0, experiment: 0, writing: type === "vertical" ? 20 : 0 },
+      });
     }
   });
 
@@ -241,13 +245,23 @@ describe("advisor project random event effects", () => {
 
   it.each([0, 0.999])("uses saved guidance rolls rather than ambient randomness: %s", (roll) => {
     const state = makeState();
+    state.papers.push(makePaper("second-player-paper"));
+    state.fellowPapers = state.fellowProgressState.flatMap((profile) => [
+      makePaper(`first-${profile.id}`, { leadAuthorId: profile.id }),
+      makePaper(`second-${profile.id}`, { leadAuthorId: profile.id }),
+    ]);
     const choice = decisionChoice(makeEvent(state, () => roll), "vertical");
     vi.spyOn(Math, "random").mockReturnValue(roll === 0 ? 0.999 : 0);
     const after = applyChoiceEffectsToState(state, choice).nextState;
-    for (const paper of [...after.papers, ...after.fellowPapers!]) {
-      expect(paper.collaborationScores).toEqual(roll === 0
-        ? { idea: 10, experiment: 0, writing: 0 }
-        : { idea: 0, experiment: 0, writing: 10 });
+    for (const papers of [after.papers, ...state.fellowProgressState.map((profile) =>
+      after.fellowPapers!.filter((paper) => paper.leadAuthorId === profile.id))]) {
+      const selectedIndex = roll === 0 ? 0 : 1;
+      expect(papers[selectedIndex]).toMatchObject({
+        idea: 10, experiment: 10, writing: 20,
+        collaborationScores: { idea: 0, experiment: 0, writing: 10 },
+      });
+      const untouched = papers[1 - selectedIndex]!;
+      expect(untouched).toEqual([...state.papers, ...state.fellowPapers!].find((paper) => paper.id === untouched.id));
     }
   });
 });
@@ -342,7 +356,7 @@ describe("advisor project SAN and attribute rules", () => {
 describe("advisor project three-stage settlement", () => {
   it.each([
     { type: "horizontal" as const, effects: [/横向进度\s*\+\s*100/u, /科研经费\s*\+\s*20/u, /金币\s*\+\s*5/u] },
-    { type: "vertical" as const, effects: [/纵向进度\s*\+\s*100/u, /导师科研积累\s*\+\s*2/u, /论文随机一项协作分\s*\+\s*10/u] },
+    { type: "vertical" as const, effects: [/纵向进度\s*\+\s*100/u, /科研积累\s*\+\s*2/u, /论文写作协作\s*\+\s*10/u] },
   ])("renders $type progress and rewards as settlement effect chips without applying them", ({ type, effects }) => {
     const state = makeState();
     const afterIntro = resolve(queueEvent(state));
@@ -475,6 +489,7 @@ describe("advisor project three-stage settlement", () => {
     expect(completed.externalPublications).toHaveLength(1);
     expect(completed.externalPublications[0]).toMatchObject({
       id: "journal-paper", status: "published", journalTarget: "pami",
+      idea: 40, experiment: 40, writing: 50, collaborationScores: { idea: 0, experiment: 0, writing: 10 },
       publication: { effectiveScore: 130 }, collaborators: [{ id: "advisor", name: "Advisor" }],
     });
     expect(collaborationTotal(completed.externalPublications[0]!)).toBe(10);

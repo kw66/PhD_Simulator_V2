@@ -74,8 +74,12 @@ describe("new advisor project economy", () => {
     const after = advanceFellowResearch({ ...researched, totalMonths: 3, month: 3 }, () => 0);
     expect(after.advisorProgressState.verticalProgress).toBe(9);
     expect(after.advisorProgressState.researchAccumulation).toBe(22);
-    expect(after.fellowPapers?.[0]?.collaborationScores?.idea).toBe(10);
+    expect(after.fellowPapers?.[0]?.collaborationScores).toEqual({ idea: 0, experiment: 0, writing: 0 });
+    expect(after.fellowProgressState[0]?.pendingGuidanceFromAdvisor).toBe(10);
     expect(after.fellowProgressState[0]?.monthlyActivity).toContain("完成并指导论文");
+    const experimented = advanceFellowResearch({ ...after, totalMonths: 4, month: 4 }, () => 0);
+    expect(experimented.fellowPapers?.[0]?.collaborationScores).toEqual({ idea: 0, experiment: 0, writing: 10 });
+    expect(experimented.fellowProgressState[0]?.pendingGuidanceFromAdvisor).toBeNull();
   });
 
   it("charges shared funding when a fellow advances its experiment", () => {

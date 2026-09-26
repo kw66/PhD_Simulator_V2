@@ -453,8 +453,8 @@ describe("automatic assistance and submission", () => {
   it.each(["research", "project"] as const)("automatic help and guidance preserve the pending %s action", (nextMonthlyAction) => {
     const before = makeState({ fellows: [makeFellow("fellow", { nextMonthlyAction, pendingHelpToFellow: 10, pendingGuidanceFromAdvisor: 10 })] });
     const next = dispatchAction(before, "select-paper", { paperId: before.papers[0]!.id });
-    expect(fellow(next)).toMatchObject({ nextMonthlyAction, pendingHelpToFellow: null, pendingGuidanceFromAdvisor: null });
-    expect(getPaperScoreBreakdown(currentPaper(next), "idea")).toEqual({ own: 0, collaboration: 20, total: 20 });
+    expect(fellow(next)).toMatchObject({ nextMonthlyAction, pendingHelpToFellow: null, pendingGuidanceFromAdvisor: 10 });
+    expect(getPaperScoreBreakdown(currentPaper(next), "idea")).toEqual({ own: 0, collaboration: 10, total: 10 });
     expect(next.advisorProgressState).toEqual(before.advisorProgressState);
     expect(next.actionState).toEqual(before.actionState);
   });
@@ -471,11 +471,15 @@ describe("automatic assistance and submission", () => {
   it("keeps a scheduled project when guidance and help arrive during that month", () => {
     const before = makeState({ fellows: [makeFellow("fellow", { nextMonthlyAction: "project", pendingHelpToFellow: 10, pendingGuidanceFromAdvisor: 10 })] });
     const next = nextMonth(before);
-    expect(getPaperScoreBreakdown(currentPaper(next), "idea")).toEqual({ own: 0, collaboration: 20, total: 20 });
+    expect(getPaperScoreBreakdown(currentPaper(next), "idea")).toEqual({ own: 0, collaboration: 10, total: 10 });
     expect(currentPaper(next).experiment).toBe(0);
+    expect(fellow(next).pendingGuidanceFromAdvisor).toBe(10);
     expect(next.advisorProgressState).toMatchObject({ horizontalProgress: 20, verticalProgress: 0, funding: 10 });
     expect(fellow(next).nextMonthlyAction).toBe("research");
-    expect(currentPaper(nextMonth(next)).experiment).toBe(10);
+    const researched = nextMonth(next);
+    expect(currentPaper(researched).experiment).toBe(10);
+    expect(getPaperScoreBreakdown(currentPaper(researched), "writing")).toEqual({ own: 0, collaboration: 10, total: 10 });
+    expect(fellow(researched).pendingGuidanceFromAdvisor).toBeNull();
   });
 
   it.each([1, 4])("submits after own research using current A/B/C reference scores in year %s", (year) => {

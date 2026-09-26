@@ -1,7 +1,7 @@
 import { addOrReplaceBuffs, advanceBuffDurations, getActiveBuffs, removeBuffs } from "./v2-buffs";
+import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipStatus } from "./v2-internship-system";
 import { getAdvisorSalaryPayment } from "./v2-advisor-progress";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
-import { getInternshipMonthlyIncome, getPublishedAPaperCount } from "./v2-internship-system";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
 import { clampResearchToCap } from "./v2-research-cap-system";
@@ -91,14 +91,14 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
   }
 
 
-  if (state.internshipState.active) {
-    const income = getInternshipMonthlyIncome(getPublishedAPaperCount(state), state.totalCitations);
+  const internship = getInternshipStatus(state);
+  if (internship.active) {
     effects.push({
       id: "internship-monthly",
-      name: "远程实习",
-      source: "实习邀请",
-      stats: { san: -2, money: income },
-      note: `剩余 ${state.internshipState.remainingMonths} 个月`,
+      name: internship.kind === "remote3" ? "远程实习" : "企业实习",
+      source: internship.kind === "remote3" ? "导师约谈" : "实习邀请",
+      stats: getInternshipMonthlyStats(state),
+      note: `剩余 ${internship.remainingMonths} 个月`,
     });
   }
 
@@ -482,11 +482,7 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     });
     return { ...buff, scheduledPublication: { ...schedule, elapsedMonths: 0 } };
   });
-  const internshipState = state.internshipState.active
-    ? state.internshipState.remainingMonths <= 1
-      ? { active: false, remainingMonths: 0, experimentMultiplier: 1 }
-      : { ...state.internshipState, remainingMonths: state.internshipState.remainingMonths - 1 }
-    : state.internshipState;
+  const internshipState = advanceInternshipMonth(state);
   const monthlyChairRecovery = getMonthlyChairRecoveryContribution(state, resolution);
   const emergencyChairRecovery = Math.max(0, resolution.items
     .find((item) => item.id === "chair-emergency")?.appliedStats.san ?? 0);
@@ -545,16 +541,15 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     newPublicationIds,
   );
   if (citationSettlement.changes.length > 0) {
-    for (const change of citationSettlement.changes) {
-      resolution.items.push({
-        id: `citation-${state.totalMonths}-${change.title}`,
-        name: "论文引用",
-        source: "论文成果",
-        stats: {},
-        appliedStats: {},
-        note: `${change.title} 引用 +${change.amount}`,
-      });
-    }
+    const citationGain = citationSettlement.changes.reduce((total, change) => total + change.amount, 0);
+    resolution.items.push({
+      id: `citation-${state.totalMonths}`,
+      name: "论文引用",
+      source: "论文成果",
+      stats: {},
+      appliedStats: {},
+      note: `论文引用 +${citationGain}`,
+    });
   }
   const journalSettlement = resolveReadyJournalPapers(citationSettlement.state);
   return {

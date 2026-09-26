@@ -108,15 +108,18 @@ describe("event SAN scope", () => {
     expect(state.buffs.some((buff) => buff.activeOperationSanMultiplier)).toBe(false);
   });
 
-  it.each([1, 6, 12, 18])("does not discount the old internship branch at research %i", (research) => {
+  it.each([1, 6, 12, 18])("defers remote internship costs to monthly settlement at research %i", (research) => {
     const state = stateForMonth(11);
     state.player.research = research;
     state.buffs = [modifierBuff({ activeOperationSanMultiplier: 1.5, activeOperationSanDelta: -1, relationshipOperationSanDelta: -10 })];
     const event = createRandomEventById(5, state, () => 0).event!;
     const choice = event.choices[0]!.effects.enqueueEvents![0]!.choices.find((entry) => entry.label === "提出远程实习")!;
-    expect(choice.effects.san).toBe(-8);
-    expect(choice.outcome).toContain("SAN -8");
-    expect(choice.outcome).not.toContain("减免");
+    expect(choice.effects.san).toBeUndefined();
+    const approval = choice.effects.enqueueEvents!.at(-1)!.choices[0]!.effects.internshipStateUpdates!;
+    expect(approval).toMatchObject({ remainingMonths: 3, kind: "remote3", startTotalMonths: 12, endTotalMonths: 14 });
+    const monthly = resolveMonthlyEffects({ ...state, totalMonths: 12, month: 12, internshipState: { ...state.internshipState, ...approval } });
+    expect(monthly.items.find((item) => item.id === "internship-monthly")?.appliedStats).toEqual({ san: -3, money: 1 });
+    expect(choice.outcome).toContain("SAN -3");
   });
 
   it("shows and settles an event cost exactly once with all global modifiers", () => {

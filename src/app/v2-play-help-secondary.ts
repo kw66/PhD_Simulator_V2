@@ -46,7 +46,7 @@ const SHOP_PAGES: Record<ShopTabId, readonly PlayHelpPage[]> = {
   ai: [{
     title: "AI订阅",
     summary: "",
-    body: "<p><b>订购仅在当月生效</b>，可开启月初自动续费。</p><p>AI模型按学年更新，价格与效果随之变化；<b>更新后需要重新开启自动续费</b>。</p>",
+    body: "<p><b>订购仅在当月生效</b>，可开启月初自动续费。</p><p>AI模型按学年更新，价格与效果随之变化；<b>更新后需要重新开启自动续费</b>。</p><p>GPT-7和GPT-8均为每月5金币，想idea、做实验、写论文的基础分×1.25，再加固定分。固定加分分别为+7、+8。</p>",
   }],
   rest: [{
     title: "休息设备",

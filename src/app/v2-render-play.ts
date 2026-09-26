@@ -27,6 +27,7 @@ import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverRouteCos
 import { previewPartTimeWork } from "../core/v2-part-time-work";
 import { getLoverName } from "../core/v2-lover-system";
 import { getLoverGiftCount } from "../core/v2-lover-gift";
+import { activateRemoteInternship, getInternshipExperimentEffect, getInternshipMonthlyStats, getInternshipStatus } from "../core/v2-internship-system";
 import {
   getAcceptedPaperScore,
   getPaperPromotionCost,
@@ -76,6 +77,7 @@ import {
 } from "../core/v2-sanity-rules";
 import {
   getChairMonthlyRecovery,
+  getShopExperimentMoneyDiscount,
   getShopPaperActionModifier,
   getShopReadSanDiscount,
   getShopRestSanGain,
@@ -533,6 +535,11 @@ function buildEffectBuckets(state: GameState): {
   if (experimentModifier.extraActions > 0) {
     upsertBucketItem(permanent, "permanent", `实验 +${experimentModifier.extraActions}次`, "显卡");
   }
+  const experimentMoneyDiscount = getShopExperimentMoneyDiscount(state.shopState);
+  if (experimentMoneyDiscount > 0) {
+    upsertBucketItem(permanent, "gpu-experiment-money", `实验金币-${experimentMoneyDiscount}`,
+      "个人显卡 · 先减实验费用，再使用导师经费", false, "money");
+  }
   if (writingModifier.bonus > 0) {
     upsertBucketItem(permanent, "permanent", `论文 +${writingModifier.bonus}分`, "机械键盘");
   }
@@ -568,7 +575,21 @@ function buildEffectBuckets(state: GameState): {
     upsertBucketItem(single, "shop-free-workstation", `工位报销${entitlementCountText(workstationCount)}`,
       "导师经费：购买机械键盘、2K显示器、办公椅、咖啡机，或升级办公椅、咖啡机，任选一次免单；优先于恋人回礼使用");
   }
-  const buffBuckets = buildBuffDisplayBuckets(state.buffs);
+  const internship = getInternshipStatus(state);
+  const internshipEffect = getInternshipExperimentEffect(state);
+  const internshipSource = internship.kind === "remote3" ? "远程实习" : "企业实习";
+  const buffBuckets = buildBuffDisplayBuckets(internship.active ? [...state.buffs, {
+    id: "internship-experiment",
+    name: internshipSource,
+    source: internshipSource,
+    timing: "monthly",
+    remainingMonths: internship.remainingMonths,
+    actionEffects: { experiment: { bonus: internshipEffect.bonus, multiplier: internshipEffect.multiplier } },
+  }] : state.buffs);
+  if (internshipEffect.moneyDiscount > 0) {
+    upsertBucketItem(monthly, "internship-experiment-money", `实验金币-${internshipEffect.moneyDiscount}`,
+      `${internshipSource} · 剩余 ${internship.remainingMonths} 月 · 先减实验费用，再使用导师经费`, false, "money");
+  }
   for (const [timing, target] of [["permanent", permanent], ["monthly", monthly], ["next-action", single]] as const) {
     const buffs = getActiveBuffs(state.buffs).filter((buff) => buff.timing === timing && buff.activeOperationSanDelta !== undefined);
     const delta = getActiveOperationSanDelta(buffs) + (timing === "monthly" ? seasonalSanCostDelta : 0);
@@ -974,7 +995,7 @@ function splitEventSettlementRows(items: string[]): { conditions: string[]; resu
   return { conditions, results };
 }
 
-const EVENT_SETTLEMENT_EFFECT_PATTERN = /(导师科研积累|科研积累|导师经费|科研经费|经费|横向进度|纵向进度|论文随机一项协作分|恋人科研|恋人亲密度|恋人亲密|师兄科研|师弟科研|师妹科研|同门科研|师兄默契|师弟默契|师妹默契|同门默契|科研分|科研上限|SAN\s*上限|(?:清除本月\s*)?SAN\s*消耗|SAN|金币|导师好感|生病概率|社交|亲密度|默契|科研|idea|实验|写作|论文进度|下次写论文|下次做实验|下次想 idea|行动点)(\s*)([+＋\-−]?\s*\d+(?:\.\d+)?(?:%|分|次|月)?|×\s*\d+(?:\.\d+)?)(?:（(?:减免|抵抗|疾病增加)[^（）]*）)*/gu;
+const EVENT_SETTLEMENT_EFFECT_PATTERN = /(导师科研积累|科研积累|导师经费|科研经费|经费|横向进度|纵向进度|论文写作协作|论文随机协作|论文随机一项协作分|实验金币|恋人科研|恋人亲密度|恋人亲密|师兄科研|师弟科研|师妹科研|同门科研|师兄默契|师弟默契|师妹默契|同门默契|科研分|科研上限|SAN\s*上限|(?:清除本月\s*)?SAN\s*消耗|SAN|金币|导师好感|生病概率|社交|亲密度|默契|科研|idea|实验|写作|论文进度|下次写论文|下次做实验|下次想 idea|行动点)(\s*)([+＋\-−]?\s*\d+(?:\.\d+)?(?:%|分|次|月)?|×\s*\d+(?:\.\d+)?)(?:（(?:减免|抵抗|疾病增加)[^（）]*）)*/gu;
 
 function getEventSettlementEffectTone(label: string): string {
   if (/SAN|生病概率/u.test(label)) return "is-san";
@@ -1559,16 +1580,23 @@ function renderWorkstationPaperResearchActions(
     const aiClass = preview.usesAiResearchBonus ? " is-ai-bonus" : "";
     const prerequisiteClass = paper !== null && !prerequisiteMet ? " is-prerequisite-locked" : "";
     const moneyText = type === "experiment"
-      ? `金币-${experimentCost.playerMoney} · `
+      ? ` · 金币-${experimentCost.playerMoney}`
       : "";
-    const effectText = `${moneyText}SAN-${paper ? renderAnimatedNumber(`paper:${paper.id}:action:${type}:san-cost`, preview.sanCost) : preview.sanCost}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
+    const effectText = `SAN-${paper ? renderAnimatedNumber(`paper:${paper.id}:action:${type}:san-cost`, preview.sanCost) : preview.sanCost}${moneyText}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
+    const fundingHint = experimentCost.playerMoney === 0
+      ? `消耗${experimentCost.advisorFunding}导师经费`
+      : experimentCost.advisorFunding > 0
+        ? `导师经费不足，消耗${experimentCost.advisorFunding}导师经费\n自费租卡：金币-${experimentCost.playerMoney}`
+        : `导师经费不足，自费租卡：金币-${experimentCost.playerMoney}`;
+    const experimentHint = [fundingHint, enabled ? "" : disabledReason].filter(Boolean).join("\n");
     return `
       <button
         class="compact-action-btn workstation-main-action-btn workstation-paper-action-btn is-${type}${aiClass}${prerequisiteClass}"
         type="button"
+        ${type === "experiment" ? `data-card-tooltip data-tooltip="${escapeHtml(experimentHint)}" aria-description="${escapeHtml(experimentHint)}"` : ""}
         ${enabled && paper
           ? `data-action="research-paper" data-paper-id="${escapeHtml(paper.id)}" data-paper-action-type="${type}"`
-          : `disabled aria-disabled="true"${disabledReason ? ` title="${escapeHtml(disabledReason)}"` : ""}`}
+          : `disabled aria-disabled="true"${disabledReason && type !== "experiment" ? ` title="${escapeHtml(disabledReason)}"` : ""}`}
       >
         <span class="workstation-action-main">
           <span class="workstation-action-icon" aria-hidden="true">${prerequisiteClass ? "🔒" : icon}</span>
@@ -2109,9 +2137,8 @@ function renderRelationshipSection(state: GameState, uiState: PlayRenderUiState 
 
 function renderFellowPaper(state: GameState, profile: FellowProgressProfile): string {
   const paper = getFellowCurrentPaper(state, profile.id);
-  const cooperationHint = "论文合作：与你共同署名的论文中稿，默契+1（上限20）\n你实际帮这篇论文加分后署名；双方主导的合作论文均可触发，每篇结算一次";
   return `
-    <div class="rel-paper-section" ${relationshipTooltip(cooperationHint)}>
+    <div class="rel-paper-section">
       ${paper ? `
         <div class="rel-paper-title-block">
           <strong class="paper-title">${escapeHtml(paper.title)}</strong>
@@ -2143,14 +2170,14 @@ function renderRelationshipIcon(icon: string): string {
   return `<span class="rel-inline-icon" aria-hidden="true">${icon}</span>`;
 }
 
-function relationshipTooltip(hint: string): string {
-  return `data-relationship-tooltip data-tooltip="${escapeHtml(hint)}" tabindex="0" aria-description="${escapeHtml(hint)}"`;
+function relationshipTooltip(hint: string, align: "left" | "right" = "left"): string {
+  return `data-relationship-tooltip data-tooltip="${escapeHtml(hint)}" data-tooltip-align="${align}" tabindex="0" aria-description="${escapeHtml(hint)}"`;
 }
 
 function getFellowCooperationHint(state: GameState, profile: FellowProgressProfile): string {
   const research = Math.max(0, Math.floor(state.player.research));
   const role = getFellowRoleLabel(profile.type, profile.gender);
-  const target = profile.type === "senior" ? "最高项" : profile.type === "peer" ? "随机项" : "最低项";
+  const target = profile.type === "senior" ? "idea" : profile.type === "peer" ? "随机项" : "实验";
   return `科研协作：⌊你的科研⌋+随机0～5，即${research}～${research + 5}\n满100：${role}帮你论文${target}+${Math.floor(profile.research)}分，你帮对方论文最低项+${research}分`;
 }
 
@@ -2183,7 +2210,7 @@ function renderAdvisorFundSummary(state: GameState): string {
       && calendarYear >= award.startYear && calendarYear <= award.endYear;
     const period = award.startYear !== null && award.endYear !== null
       ? `${award.startYear}–${award.endYear}年，${active ? "在研" : calendarYear < award.startYear ? "待启动" : "已结题"}`
-      : "每月经费+1";
+      : `一次性科研经费+${grant.funding}`;
     return `${grant.name}：${award.awardedYear}年获批；${period}`;
   }).filter(Boolean);
   return `<span class="rel-advisor-grants" title="${escapeHtml(awards.length ? awards.join("\n") : "暂无获批基金")}">${renderRelationshipIcon("📋")}在研基金<strong>${renderAnimatedNumber("person:advisor:grants", quotaGrants.length)}/${renderAnimatedNumber("person:advisor:grant-cap", getAdvisorGrantLimit(advisor))}</strong></span>`;
@@ -2208,8 +2235,8 @@ function renderAdvisorStatus(state: GameState): string {
   const limited = !academician && !advisor.awards.some((award) => award.id === "distinguished")
     && getActiveAdvisorGrants(advisor, applicationYear).length >= getAdvisorGrantLimit(advisor);
   const applicationText = academician ? "已当选院士"
-    : pendingGrant ? `${pendingGrant.name}申请中 · ${(8 - calendarMonth + 12) % 12 || 12}个月后公布`
-    : `${monthsToApplication}个月后${limited ? `申请${applicationGrant.name} · 限项` : `可申请${applicationGrant.name}`}`;
+    : pendingGrant ? `${pendingGrant.name}申请·${(8 - calendarMonth + 12) % 12 || 12}月后公布`
+    : `${monthsToApplication}月后可申请${applicationGrant.name}${limited ? "·限项" : ""}`;
   const accumulationHint = `科研积累：纵向项目满100，+⌊当前积累×10%⌋\n玩家和同学发表论文按科研分计入，同篇去重\n${nextTier ? `下一档${nextTier.name}：${score}/${nextTier.threshold}` : ""}${reachedTier ? `；已达到${reachedTier.name}：${score}/${reachedTier.threshold}` : ""}`;
   const progressBar = (label: string, value: number, max: number): string => `
     <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${Math.min(value, max)}" aria-valuetext="${value}/${max}">
@@ -2225,9 +2252,9 @@ function renderAdvisorStatus(state: GameState): string {
         <span class="rel-detail-label" ${relationshipTooltip(accumulationHint)}>${renderRelationshipIcon("💡")}科研积累</span>
         ${progressBar("科研积累", score, researchMax)}
         <strong class="rel-progress-val rel-advisor-thresholds">${renderAnimatedNumber("person:advisor:research:next", score)}/${renderAnimatedNumber("person:advisor:research:next-threshold", researchMax)}${(nextTier ?? reachedTier)!.name}</strong>
-        <span class="rel-advisor-countdown" ${relationshipTooltip(`${applicationText}\n申请时需达到${applicationGrant.name}门槛${applicationGrant.threshold}并符合限项；每年3月申请，8月公布`)}>${academician ? applicationText : applicationText.replace(/\d+/, (display) => renderAnimatedNumber(`person:advisor:${pendingGrant ? "result" : "application"}:months`, Number(display)))}</span>
+        ${!isPreEnrollmentState(state) ? `<span class="rel-advisor-countdown" ${relationshipTooltip(`${applicationText}\n申请时需达到${applicationGrant.name}门槛${applicationGrant.threshold}并符合限项；每年3月申请，8月公布`)}>${academician ? applicationText : applicationText.replace(/\d+/, (display) => renderAnimatedNumber(`person:advisor:${pendingGrant ? "result" : "application"}:months`, Number(display)))}</span>` : ""}
       </div>
-        ${(["horizontal", "vertical"] as const).map((projectType) => {
+        ${(["vertical", "horizontal"] as const).map((projectType) => {
           const label = projectType === "horizontal" ? "横向项目" : "纵向项目";
           const icon = projectType === "horizontal" ? "🛠️" : "🧪";
           const progress = projectType === "horizontal" ? advisor.horizontalProgress ?? 0 : advisor.verticalProgress ?? 0;
@@ -2235,7 +2262,7 @@ function renderAdvisorStatus(state: GameState): string {
           const blocked = baseBlocked || (state.player.san < projectSanCost ? `SAN不足，需要${projectSanCost}` : "");
           const research = Math.max(0, Math.floor(state.player.research));
           const reward = projectType === "horizontal" ? `经费+${ADVISOR_HORIZONTAL_REWARD}、你的劳务费+5`
-            : "科研积累+10%（下取整），你和每位同学各获论文随机项协作分+10";
+            : "科研积累+10%（下取整），你和每位同学各获论文写作协作+10";
           const hint = `${label}：⌊你的科研⌋+随机0～5，即${research}～${research + 5}\n满100：${reward}`;
           return `<div class="rel-advisor-project-row" data-advisor-project="${projectType}">
             <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icon)}${label}</span>
@@ -2296,6 +2323,8 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
   const identity = card.type === "lover" ? `person:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}` : `person:${card.relationshipId}`;
   const fellow = state.fellowProgressState.find((profile) => profile.id === card.relationshipId);
   const advisor = card.type === "advisor";
+  const knownHint = fellow ? getFellowInheritanceHint(state, fellow)
+    : `相恋${card.knownMonths}个月\n${state.loverState.type === "beautiful" ? "活泼恋人更擅长推进玩耍，也会陪你学习" : "聪慧恋人更擅长推进学习，也会陪你玩耍"}`;
   const attributes: RelationshipRenderCard["detailItems"] = fellow
     ? [{ label: "科研", value: fellow.research, max: 20 }, { label: "默契", value: fellow.affinity, max: 20 }]
     : card.detailItems.map((item) => ({ ...item, label: item.label === "亲密度" ? "亲密" : item.label }));
@@ -2312,7 +2341,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
             ${advisor ? `<div class="rel-advisor-funding-value"><span class="rel-detail-label">${renderRelationshipIcon("💰")}科研经费</span><strong class="rel-progress-val" aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", state.advisorProgressState.funding)}</strong></div>` : renderAttributes()}
           </div>
           ${advisor ? renderAdvisorFundSummary(state) : `<div class="rel-card-meta">
-            <span class="rel-known-time"${fellow ? ` ${relationshipTooltip(getFellowInheritanceHint(state, fellow))}` : ""}>${renderRelationshipIcon("🗓️")}认识<strong class="rel-detail-value" ${animationNumberAttributes(`${identity}:known-months`, card.knownMonths)}>${card.knownMonths}</strong>月</span>
+            <span class="rel-known-time" ${relationshipTooltip(knownHint, "right")}>${renderRelationshipIcon("🗓️")}认识<strong class="rel-detail-value" ${animationNumberAttributes(`${identity}:known-months`, card.knownMonths)}>${card.knownMonths}</strong>月</span>
             <button class="rel-end-compact" data-card-icon-action type="button" title="${fellow ? "停止合作" : "分手"}" aria-label="${fellow ? "停止合作" : "分手"}" data-action="end-relationship" data-relationship-id="${escapeHtml(card.relationshipId)}"><span aria-hidden="true">${fellow ? "✂️" : "💔"}</span></button>
           </div>`}
         </div>
@@ -2966,6 +2995,7 @@ function renderTalentTabButton(tabId: TalentPanelTabId, icon: string, label: str
       type="button"
       data-ui-talent-tab="${tabId}"
       aria-pressed="${active ? "true" : "false"}"
+      data-tooltip="查看${label}天赋"
     ><span class="talent-tab-icon" aria-hidden="true">${icon}</span><span>${label}</span></button>
   `;
 }
@@ -3073,6 +3103,35 @@ function buildCharacterTalentItems(state: GameState, role: RoleDefinition): Tale
   return items;
 }
 
+function buildInternshipTalentItem(state: GameState): TalentPanelItem {
+  const status = getInternshipStatus(state);
+  const ongoing = status.active || status.pending;
+  const preview = ongoing
+    ? { ...state, totalMonths: status.pending ? state.internshipState.startTotalMonths! : state.totalMonths }
+    : { ...state, totalMonths: state.totalMonths + 1, internshipState: activateRemoteInternship(state.totalMonths) };
+  const monthly = getInternshipMonthlyStats(preview);
+  const experiment = getInternshipExperimentEffect(preview);
+  const label = status.kind === "conference6" && ongoing ? "企业实习" : "远程实习";
+  return {
+    id: "internship",
+    icon: "💼",
+    name: "企业实习",
+    active: status.active,
+    ruleCard: true,
+    ...(status.pending ? { tagLabel: "下月开始" } : {}),
+    metrics: [
+      { label: "每月 SAN", value: formatSignedNumber(monthly.san) },
+      { label: "每月金币", value: formatSignedNumber(monthly.money) },
+      { label: "实验金币", value: `${experiment.moneyDiscount > 0 ? `-${experiment.moneyDiscount}` : "0"}` },
+      { label: "实验分数", value: formatSignedNumber(experiment.bonus) },
+      ...(experiment.multiplier !== 1 ? [{ label: "实验", value: `×${experiment.multiplier}` }] : []),
+    ],
+    description: status.pending ? `${label}：下月起持续3个月`
+      : status.active ? `${label}：剩余${status.remainingMonths}个月（含本月）`
+        : "远程实习：导师约谈获准后，次月起3个月",
+  };
+}
+
 function buildLoverTalentItem(state: GameState, requestedPage = 0): TalentPanelItem {
   const page = Number.isFinite(requestedPage) ? Math.min(2, Math.max(0, Math.floor(requestedPage))) : 0;
   const route = LOVER_ROUTES[page]!;
@@ -3082,7 +3141,7 @@ function buildLoverTalentItem(state: GameState, requestedPage = 0): TalentPanelI
   const rows = route === "play"
     ? [["玩耍奖励Ⅰ", "SAN+6"], ["玩耍奖励Ⅱ", "SAN上限+1"], ["玩耍奖励Ⅲ", "下月SAN消耗-1"]]
     : route === "study"
-      ? [["学习奖励Ⅰ", "论文随机一项+恋人科研"], ["学习奖励Ⅱ", "论文三项分数永久+1"], ["学习奖励Ⅲ", "科研能力较低者+1"]]
+      ? [["学习奖励Ⅰ", "论文最低项+恋人科研"], ["学习奖励Ⅱ", "论文三项分数永久+1"], ["学习奖励Ⅲ", "科研能力较低者+1"]]
       : [["购物奖励", "礼物券+1、亲密+2"]];
   return {
     id: "lover",
@@ -3107,10 +3166,17 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
       ...state.advisorProgressState,
       awards: grant ? [{ id: grant.id, awardedYear: 0, startYear: null, endYear: null }] : [],
     };
-    return [getAdvisorRankLabel(advisor), grant?.name ?? "—", String(getAdvisorMonthlySalary(advisor, "master")), String(getAdvisorMonthlySalary(advisor, "phd"))];
+    return [
+      getAdvisorRankLabel(advisor),
+      grant?.name ?? "—",
+      grant ? `+${grant.funding}` : "—",
+      grant ? grant.durationYears > 0 ? `${grant.durationYears}年` : "永久" : "—",
+      String(getAdvisorMonthlySalary(advisor, "master")),
+      String(getAdvisorMonthlySalary(advisor, "phd")),
+    ];
   });
   const currentRank = salaryRows.findIndex((row) => row[0] === getAdvisorRankLabel(state.advisorProgressState));
-  const lastStartIndex = salaryRows.length - 2;
+  const lastStartIndex = salaryRows.length - 1;
   const startIndex = Math.max(0, Math.min(lastStartIndex, Math.floor(
     typeof requestedSalaryStart === "number" && Number.isFinite(requestedSalaryStart) ? requestedSalaryStart : currentRank,
   )));
@@ -3124,9 +3190,9 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
       advisorSalaryPager: { startIndex, lastStartIndex },
       rewardTable: {
         label: "各职称每月补助，单位金币",
-        columns: ["职称", "晋升条件", "硕士/月", "博士/月"],
-        rows: salaryRows.slice(startIndex, startIndex + 2),
-        currentRow: currentRank - startIndex,
+        columns: ["职称", "晋升", "经费", "期限", "硕士/月", "博士/月"],
+        rows: salaryRows.slice(startIndex, startIndex + 1),
+        currentRow: currentRank === startIndex ? 0 : undefined,
       },
       description: "晋升后下月加薪；小数累计，发放整数金币",
     },
@@ -3158,14 +3224,16 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
     },
     buildLoverTalentItem(state, loverRewardPage),
     ...[
-      { id: "joint-training", icon: "🧠", name: "大牛联培" },
-      { id: "internship", icon: "💼", name: "企业实习" },
-    ].map((item) => ({
-      ...item,
-      active: false,
-      tagLabel: "待定",
-      description: "具体天赋效果待定",
-    })),
+      {
+        id: "joint-training",
+        icon: "🧠",
+        name: "大牛联培",
+        active: false,
+        tagLabel: "待定",
+        description: "具体天赋效果待定",
+      },
+      buildInternshipTalentItem(state),
+    ],
   ];
 }
 
@@ -3656,16 +3724,16 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
     <section class="play-center-column game-main-area">
       <div class="center-shell" id="center-shell">
         <div class="center-main-tabs" id="center-main-tabs">
-          <button class="center-tab-btn${getTabActiveClass("events")}" type="button" aria-pressed="${getTabAriaPressed("events")}" data-ui-play-tab="events">
+          <button class="center-tab-btn${getTabActiveClass("events")}" type="button" aria-pressed="${getTabAriaPressed("events")}" data-ui-play-tab="events" data-tooltip="查看事件、待办和游戏日志">
             <span class="center-tab-icon" aria-hidden="true">🔔</span>
             <span>事件</span>
           </button>
-          <button class="center-tab-btn${getTabActiveClass("workstation")}" type="button" aria-pressed="${getTabAriaPressed("workstation")}" data-ui-play-tab="workstation"><span class="center-tab-icon" aria-hidden="true">🔬</span><span>科研</span>${renderTabBadge(researchActionCount, "available", researchActionLabel)}</button>
-          <button class="center-tab-btn${getTabActiveClass("relationship")}" type="button" aria-pressed="${getTabAriaPressed("relationship")}" data-ui-play-tab="relationship"><span class="center-tab-icon" aria-hidden="true">🤝</span><span>人际</span>${renderTabBadge(relationshipActionCount, "available", `${relationshipActionCount} 个可用操作`)}</button>
-          <button class="center-tab-btn${getTabActiveClass("shop")}" type="button" aria-pressed="${getTabAriaPressed("shop")}" data-ui-play-tab="shop"><span class="center-tab-icon" aria-hidden="true">🛒</span><span>商店</span>${shopUpgradeBadge}</button>
-          <button class="center-tab-btn${getTabActiveClass("research")}" type="button" aria-pressed="${getTabAriaPressed("research")}" data-ui-play-tab="research"><span class="center-tab-icon" aria-hidden="true">🏆</span><span>成果</span>${renderTabBadge(availablePromotionCount, "available", `${availablePromotionCount} 个可推广操作`)}</button>
-          <button class="center-tab-btn${getTabActiveClass("talent")}" type="button" aria-pressed="${getTabAriaPressed("talent")}" data-ui-play-tab="talent"><span class="center-tab-icon" aria-hidden="true">🌱</span><span>天赋</span></button>
-          <button class="center-tab-btn${getTabActiveClass("settings")}" type="button" aria-pressed="${getTabAriaPressed("settings")}" data-ui-play-tab="settings"><span class="center-tab-icon" aria-hidden="true">⚙️</span><span>设置</span></button>
+          <button class="center-tab-btn${getTabActiveClass("workstation")}" type="button" aria-pressed="${getTabAriaPressed("workstation")}" data-ui-play-tab="workstation" data-tooltip="管理论文、科研操作和投稿"><span class="center-tab-icon" aria-hidden="true">🔬</span><span>科研</span>${renderTabBadge(researchActionCount, "available", researchActionLabel)}</button>
+          <button class="center-tab-btn${getTabActiveClass("relationship")}" type="button" aria-pressed="${getTabAriaPressed("relationship")}" data-ui-play-tab="relationship" data-tooltip="查看导师、同学和恋人"><span class="center-tab-icon" aria-hidden="true">🤝</span><span>人际</span>${renderTabBadge(relationshipActionCount, "available", `${relationshipActionCount} 个可用操作`)}</button>
+          <button class="center-tab-btn${getTabActiveClass("shop")}" type="button" aria-pressed="${getTabAriaPressed("shop")}" data-ui-play-tab="shop" data-tooltip="购买装备、咖啡和 AI"><span class="center-tab-icon" aria-hidden="true">🛒</span><span>商店</span>${shopUpgradeBadge}</button>
+          <button class="center-tab-btn${getTabActiveClass("research")}" type="button" aria-pressed="${getTabAriaPressed("research")}" data-ui-play-tab="research" data-tooltip="查看论文成果、引用和宣传"><span class="center-tab-icon" aria-hidden="true">🏆</span><span>成果</span>${renderTabBadge(availablePromotionCount, "available", `${availablePromotionCount} 个可推广操作`)}</button>
+          <button class="center-tab-btn${getTabActiveClass("talent")}" type="button" aria-pressed="${getTabAriaPressed("talent")}" data-ui-play-tab="talent" data-tooltip="查看角色、关系、装备和成长"><span class="center-tab-icon" aria-hidden="true">🌱</span><span>天赋</span></button>
+          <button class="center-tab-btn${getTabActiveClass("settings")}" type="button" aria-pressed="${getTabAriaPressed("settings")}" data-ui-play-tab="settings" data-tooltip="调整游戏设置和查看计划"><span class="center-tab-icon" aria-hidden="true">⚙️</span><span>设置</span></button>
           <button
             class="center-tab-btn center-tab-btn-next"
             type="button"

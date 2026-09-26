@@ -40,10 +40,11 @@ describe("audited fixed-event rules", () => {
     expect([2, 3, 4, 5].map(getScholarshipReward)).toEqual([6, 6, 9, 9]);
   });
 
-  it("offers scholarship application from an uncertain historical range", () => {
+  it("hints at scholarship eligibility without revealing the hidden cutoff", () => {
     const event = createScholarshipEvent(playingState({ year: 2, month: 2, totalMonths: 14 }), () => 0);
-    expect(event.description).toContain("往年分数线");
-    expect(event.description).toContain("具体门槛要等名单公布");
+    expect(event.description).toContain("往年的获奖材料");
+    expect(event.description).toContain("今年的结果仍要等正式名单");
+    expect(event.description).not.toMatch(/分数线.*\d|[≥≤<>]/u);
     expect(event.description).toContain("用于获奖的论文不能再次计入");
     expect(event.description).not.toContain("积分页面");
     expect(event.choices.map((choice) => choice.label)).toEqual(["准备材料并申报", "暂不申报"]);

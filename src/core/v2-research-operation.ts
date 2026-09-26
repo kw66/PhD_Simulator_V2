@@ -4,8 +4,10 @@ import { getAcademicCalendarYear } from "./v2-calendar";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getQueuedPaperTargetIds } from "./v2-event-queue";
 import { createDraftPaper, getAvailablePaperSlotCount, getWorkstationPaperSlotMap } from "./v2-paper-rules";
-import { getShopPaperActionModifier } from "./v2-shop-items-effects";
+import { getShopExperimentMoneyDiscount, getShopPaperActionModifier } from "./v2-shop-items-effects";
 import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
+import { combineEffectMultipliers } from "./v2-numeric-modifiers";
+import { getInternshipExperimentEffect } from "./v2-internship-system";
 import type { GameState, PaperActionType } from "./v2-types";
 
 export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
@@ -16,12 +18,13 @@ export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
 
 export const RESEARCH_EXPERIMENT_MONEY_COST = 3;
 
-export function getResearchExperimentMoneyCost(state: Pick<GameState, "shopState">): number {
+export function getResearchExperimentMoneyCost(state: Pick<GameState, "shopState" | "internshipState" | "totalMonths">): number {
   return Math.max(0, RESEARCH_EXPERIMENT_MONEY_COST
-    - (state.shopState.gpuLevel >= 8 ? 2 : state.shopState.gpuLevel >= 4 ? 1 : 0));
+    - getShopExperimentMoneyDiscount(state.shopState)
+    - getInternshipExperimentEffect(state).moneyDiscount);
 }
 
-export function getResearchExperimentCostBreakdown(state: Pick<GameState, "shopState" | "advisorProgressState">): {
+export function getResearchExperimentCostBreakdown(state: Pick<GameState, "shopState" | "advisorProgressState" | "internshipState" | "totalMonths">): {
   total: number;
   advisorFunding: number;
   playerMoney: number;
@@ -29,6 +32,17 @@ export function getResearchExperimentCostBreakdown(state: Pick<GameState, "shopS
   const total = getResearchExperimentMoneyCost(state);
   const advisorFunding = Math.min(Math.max(0, state.advisorProgressState.funding), total);
   return { total, advisorFunding, playerMoney: total - advisorFunding };
+}
+
+export function getResearchActionEffect(state: GameState, actionType: PaperActionType, includeNextAction = true) {
+  const effect = getActionEffect(state, actionType, { includeNextAction });
+  if (actionType !== "experiment") return effect;
+  const internship = getInternshipExperimentEffect(state);
+  return {
+    ...effect,
+    bonus: effect.bonus + internship.bonus,
+    multiplier: combineEffectMultipliers([effect.multiplier, internship.multiplier]),
+  };
 }
 
 const RESEARCH_OPERATION_LABEL: Record<PaperActionType, string> = {
@@ -58,7 +72,7 @@ export function previewResearchOperation(
   baseSanCost: number,
 ): ResearchOperationPreview {
   const allowance = getActiveOperationAllowance(state, actionType);
-  const effect = getActionEffect(state, actionType);
+  const effect = getResearchActionEffect(state, actionType);
   const equipmentEffect = getShopPaperActionModifier(state.shopState, actionType);
   const sanCost = getActiveOperationSanCostForState(
     state,
@@ -192,7 +206,7 @@ export function applyResearchOperation(
   let score = getPaperScoreBreakdown(paper, actionType).own;
 
   for (let index = 0; index < executionCount; index += 1) {
-    const buffEffect = getActionEffect(state, actionType, { includeNextAction: index === 0 });
+    const buffEffect = getResearchActionEffect(state, actionType, index === 0);
     score = generateResearchScore(
       state.player.research,
       score,

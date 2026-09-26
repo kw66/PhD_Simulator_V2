@@ -7,6 +7,7 @@ import { buildBuffDisplayBuckets } from "../src/app/v2-render-buffs";
 import { buildFutureTodoPreviewItems } from "../src/app/v2-render-play";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { getAiModelForTotalMonths } from "../src/core/v2-ai-shop";
+import { activateInternship, activateRemoteInternship } from "../src/core/v2-internship-system";
 import { createCustomFellowProgressProfile, getFellowName, getFellowResearchTopic } from "../src/core/v2-fellow-progression";
 import { getFellowDiscussionSanCost } from "../src/core/v2-fellow-actions";
 import { activateLover, getLoverName } from "../src/core/v2-lover-system";
@@ -186,6 +187,88 @@ function readAnimationNumbers(html: string): Map<string, number> {
 }
 
 describe("v2 explicit render animation markers", () => {
+  it("shows academician funding as a one-time 200 reward in cards and help", () => {
+    const state = createRelationshipCardTestState();
+    state.advisorProgressState.awards = [{ id: "academician", awardedYear: 2024, startYear: null, endYear: null }];
+    const relationship = renderApp(state, undefined, { activePlayTab: "relationship" });
+    expect(relationship).toContain("一次性科研经费+200");
+    expect(relationship).not.toContain("每月经费+1");
+    expect(getHelpText({ activePlayTab: "relationship" })).toContain("当选时一次性经费+200");
+  });
+
+  it.each([0, 3, 4, 7, 8])("keeps GPU level %i cost buffs and funding tooltips in sync", (gpuLevel) => {
+    const state = createRelationshipCardTestState();
+    state.shopState.gpuLevel = gpuLevel;
+    state.papers = [{ ...createDraftPaper(state.totalMonths, 0, () => 0), idea: 10 }];
+    const discount = gpuLevel >= 8 ? 2 : gpuLevel >= 4 ? 1 : 0;
+    for (const internshipActive of [false, true]) {
+      if (internshipActive) state.internshipState = activateRemoteInternship(state.totalMonths - 1);
+      const total = Math.max(0, 3 - discount - Number(internshipActive));
+      for (const funding of [0, 1, 10]) {
+        state.advisorProgressState.funding = funding;
+        const html = renderApp(state, undefined, { activePlayTab: "workstation" });
+        const experimentButton = html.match(/<button[^>]*class="[^"]*workstation-paper-action-btn is-experiment[^"]*"[\s\S]*?<\/button>/)?.[0] ?? "";
+        const funded = Math.min(total, funding);
+        const paid = total - funded;
+        expect(experimentButton).toContain(`金币-${paid}`);
+        expect(experimentButton).toContain(paid === 0 || funded > 0 ? `消耗${funded}导师经费` : `自费租卡：金币-${paid}`);
+        if (discount > 0) {
+          expect(html).toContain(`实验金币-${discount}`);
+          expect(html).toContain("个人显卡 · 先减实验费用，再使用导师经费");
+        } else expect(html).not.toContain("gpu-experiment-money");
+        if (internshipActive) {
+          expect(html).toContain("实验金币-1");
+          expect(html).toContain("远程实习 · 剩余 3 月");
+        }
+      }
+    }
+  });
+
+  it("shows all five remote internship effects and switches pending, active and expired states", () => {
+    const state = createRelationshipCardTestState();
+    state.internshipState = activateRemoteInternship(state.totalMonths);
+    const getHtml = () => renderApp(state, undefined, { activePlayTab: "talent", activeTalentTab: "relation" });
+    const pending = getTalentCardHtml(getHtml(), "internship");
+    expect(pending.match(/class="talent-item-metric"/g)).toHaveLength(4);
+    expect(pending).toContain("下月开始");
+    expect(pending).toContain("下月起持续3个月");
+    for (const value of ["-3", "+1", "-1", "+4"]) expect(pending).toContain(`<strong>${value}</strong>`);
+    expect(getHtml()).not.toContain("internship-experiment-money");
+    state.totalMonths += 1;
+    const activeHtml = getHtml();
+    expect(getTalentCardHtml(activeHtml, "internship")).toContain("剩余3个月（含本月）");
+    expect(activeHtml).toContain("实验金币-1");
+    expect(activeHtml).toContain("远程实习 · 剩余 3 月");
+    state.totalMonths += 2;
+    expect(getTalentCardHtml(getHtml(), "internship")).toContain("剩余1个月（含本月）");
+    state.totalMonths += 1;
+    expect(getTalentCardHtml(getHtml(), "internship")).toContain("未激活");
+    expect(getHtml()).not.toContain("internship-experiment-money");
+  });
+
+  it("renders enterprise internship terms from its current effects rather than remote defaults", () => {
+    const state = createRelationshipCardTestState();
+    state.internshipState = { ...activateInternship(), remainingMonths: 4, experimentMultiplier: 1.35 };
+    state.totalCitations = 1000;
+    const html = renderApp(state, undefined, { activePlayTab: "talent", activeTalentTab: "relation" });
+    const card = getTalentCardHtml(html, "internship");
+    expect(card).toContain("剩余4个月（含本月）");
+    for (const value of ["-2", "+2", "0", "+0", "×1.35"]) expect(card).toContain(`<strong>${value}</strong>`);
+    expect(card).not.toContain("远程实习");
+  });
+
+  it("labels the advisor condition column concisely and adds navigation hover text", () => {
+    const html = renderApp(createRelationshipCardTestState(), undefined, { activePlayTab: "talent", activeTalentTab: "relation" });
+    const advisor = getTalentCardHtml(html, "advisor");
+    expect(advisor).toContain('<th scope="col">晋升</th>');
+    expect(advisor).not.toContain("晋升条件");
+    for (const attribute of ["data-ui-play-tab", "data-ui-shop-tab", "data-ui-talent-tab"]) {
+      const buttons = [...html.matchAll(new RegExp(`<button[^>]*${attribute}="[^"]+"[^>]*>`, "g"))];
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const button of buttons) expect(button[0]).toMatch(/data-tooltip="[^"]+"/);
+    }
+  });
+
   it("prepends decorative relationship icons while retaining names, labels and numeric markers", () => {
     const html = renderAppWithAnimations(createRelationshipCardTestState());
     const advisor = getRelationshipCardHtml(html, "advisor");
@@ -3107,17 +3190,16 @@ describe("v2 render lobby shell", () => {
     expect(advisorTalent).toContain('<th scope="col">硕士/月</th>');
     expect(advisorTalent).toContain('<th scope="col">博士/月</th>');
     const salaryRows = [
-      ["讲师", "—", 1, 3], ["副教授", "青基", 1.25, 3.5], ["教授·四级", "面上", 1.5, 4],
-      ["教授·三级", "优青", 1.75, 4.5], ["教授·二级", "杰青", 2, 5], ["教授·一级", "院士", 2.25, 5.5],
+      ["讲师", "—", "—", "—", 1, 3], ["副教授", "青基", "+10", "3年", 1.25, 3.5], ["教授·四级", "面上", "+20", "4年", 1.5, 4],
+      ["教授·三级", "优青", "+50", "3年", 1.75, 4.5], ["教授·二级", "杰青", "+100", "5年", 2, 5], ["教授·一级", "院士", "+200", "永久", 2.25, 5.5],
     ];
-    for (let startIndex = 0; startIndex < 5; startIndex += 1) {
+    for (let startIndex = 0; startIndex < 6; startIndex += 1) {
       const page = getTalentCardHtml(renderApp(state, createDefaultAccountProfile(), {
         activeTalentTab: "relation", advisorSalaryStartIndex: startIndex,
       }), "advisor");
-      expect(page.match(/scope="row"/g)).toHaveLength(2);
-      for (const [rank, condition, master, phd] of salaryRows.slice(startIndex, startIndex + 2)) {
-        expect(page).toContain(`<th scope="row">${rank}</th><td>${condition}</td><td>${master}</td><td>${phd}</td>`);
-      }
+      expect(page.match(/scope="row"/g)).toHaveLength(1);
+      const [rank, condition, funding, duration, master, phd] = salaryRows[startIndex]!;
+      expect(page).toContain(`<th scope="row">${rank}</th><td>${condition}</td><td>${funding}</td><td>${duration}</td><td>${master}</td><td>${phd}</td>`);
     }
     expect(getTalentCardHtml(relationHtml, "advisor")).not.toContain("具体天赋效果待定");
     expect(relationHtml).not.toMatch(/导师科研资源|导师资源提升|导师任务循环/);
@@ -3890,7 +3972,7 @@ describe("v2 render lobby shell", () => {
     expect(card).toContain('aria-label="科研积累" aria-valuemin="0" aria-valuemax="25" aria-valuenow="20"');
     expect(card).toContain('<strong class="rel-progress-val" aria-label="科研经费">10</strong>');
     expect(card).toContain('20/25青基');
-    expect(card).toContain('6个月后可申请青基');
+    expect(card).not.toContain('月后可申请');
     expect(card).toContain('玩家和同学发表论文按科研分计入，同篇去重');
     const header = card.split('class="rel-advisor-status"')[0]!;
     expect(header).toContain('aria-label="科研经费"');
@@ -3908,12 +3990,14 @@ describe("v2 render lobby shell", () => {
     { score: 1200, max: 1000, reached: "院士", target: null, ratio: "1200/1000" },
   ])("uses the next research threshold at accumulation $score", ({ score, max, reached, target, ratio }) => {
     const state = createAdmittedTestState();
+    state.totalMonths = 1;
+    state.month = 1;
     state.advisorProgressState.researchAccumulation = score;
     const card = getRelationshipCardHtml(renderApp(state), "advisor");
     expect(card).toContain(`已达到${reached}：${ratio}`);
     if (target) expect(card).toContain(`${score}/${max}${target}`);
     const application = card.match(/<span class="rel-advisor-countdown"[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? "";
-    expect(application).toContain("个月后");
+    expect(application).toContain("月后");
     expect(application).not.toContain(ratio);
     if (target) expect(application).not.toContain(target);
     expect(card).toContain(`aria-label="科研积累" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${Math.min(score, max)}"`);
@@ -3922,7 +4006,8 @@ describe("v2 render lobby shell", () => {
   it.each([[1, 6], [6, 1], [7, 12], [12, 7]])("counts down from academic month %i to March", (month, remaining) => {
     const state = createAdmittedTestState();
     state.month = month;
-    expect(getRelationshipCardHtml(renderApp(state), "advisor")).toContain(`${remaining}个月后可申请青基`);
+    state.totalMonths = month;
+    expect(getRelationshipCardHtml(renderApp(state), "advisor")).toContain(`${remaining}月后可申请青基`);
   });
 
   it("renders current mentor activity without the removed growth-source strip", () => {
@@ -4019,7 +4104,7 @@ describe("v2 render lobby shell", () => {
     ];
     state.advisorProgressState.pendingApplication = { id: "excellent", calendarYear: 2026, researchSnapshot: 150 };
     const card = getRelationshipCardHtml(renderApp(state), "advisor");
-    expect(card).toContain("优青申请中 · 5个月后公布");
+    expect(card).toContain("优青申请·5月后公布");
     expect(card).toContain("在研基金<strong>1/2</strong>");
     expect(card).toContain("2024–2026年，在研");
     expect(card).toContain("2025–2028年，在研");
@@ -4091,9 +4176,9 @@ describe("v2 render lobby shell", () => {
     expect(buttons).toHaveLength(expected.type === "advisor" ? 2 : 1);
     if (expected.type === "advisor") {
       expect(card).not.toMatch(/>做项目<|科研资源|信任度/);
-      expect(buttons[0]).toContain('data-action="advisor-horizontal"');
-      expect(buttons[0]).toContain('class="rel-action-label">做横向</span>');
-      expect(buttons[0]).toContain('class="rel-action-cost">SAN-5</span>');
+      expect(buttons[0]).toContain('data-action="advisor-project"');
+      expect(buttons[0]).toContain('class="rel-action-label">做纵向</span>');
+      expect(buttons[0]).toContain('class="rel-action-cost">SAN-4</span>');
       expect(card).toContain('aria-label="科研经费"');
       expect(card).toContain('class="rel-progress-val" aria-label="科研经费">4</strong>');
       expect(buttons[0]).not.toContain("disabled");
@@ -4265,7 +4350,7 @@ describe("v2 render lobby shell", () => {
     const fellow = state.fellowProgressState.find((profile) => profile.type === type)!;
     fellow.monthlyActivity = "推进论文实验，导师指导论文";
     const card = getRelationshipCardHtml(renderAppWithAnimations(state), type);
-    const target = type === "senior" ? "最高项" : type === "peer" ? "随机项" : "最低项";
+    const target = type === "senior" ? "idea" : type === "peer" ? "随机项" : "实验";
     expect(card).toContain(`帮你论文${target}+7分，你帮对方论文最低项+1分`);
     const bar = card.match(/<div class="rel-progress-bar"[^>]*>/)?.[0] ?? "";
     expect(bar).toContain('role="progressbar" aria-label="协作进度"');
@@ -4277,7 +4362,8 @@ describe("v2 render lobby shell", () => {
     expect(known).toContain('实验室传承：每12个月，同学科研+⌊n/2⌋，上限20');
     expect(known).toContain('导师计1人');
     expect(known).toContain('当前预计+0');
-    expect(card).toContain('与你共同署名的论文中稿，默契+1（上限20）');
+    expect(known).toContain('data-tooltip-align="right"');
+    expect(card).not.toContain('与你共同署名的论文中稿，默契+1（上限20）');
     expect(card).toContain('data-action="relationship-task"');
     expect(card).not.toContain('rel-card-footnote');
     expect(card).toContain('<div class="rel-monthly-activity"><strong>本月</strong><span>同学：推进论文实验，导师指导论文</span></div>');
@@ -4306,6 +4392,19 @@ describe("v2 render lobby shell", () => {
     expect(card).not.toContain('rel-lover-reward-ticker');
     expect(card).toContain('<div class="rel-monthly-activity"><strong>本月</strong><span>恋人：玩耍进度+2，学习进度+4</span></div>');
     expect(card.indexOf('class="rel-monthly-activity"')).toBeGreaterThan(card.indexOf('data-action="lover-shopping"'));
+  });
+
+  it.each(["beautiful", "smart"] as const)("adds a right-aligned known-month tooltip for the %s lover", (type) => {
+    const state = createRelationshipCardTestState();
+    state.loverState.type = type;
+    const card = getRelationshipCardHtml(renderApp(state), "lover");
+    const known = card.match(/<span class="rel-known-time"[^>]*>/)?.[0] ?? "";
+    expect(known).toContain('data-relationship-tooltip');
+    expect(known).toContain('data-tooltip-align="right"');
+    expect(known).toContain('tabindex="0"');
+    expect(known).toContain(`相恋${Math.max(0, state.totalMonths - state.loverState.startTotalMonths!)}个月`);
+    expect(known).toContain(type === "beautiful" ? "活泼恋人更擅长推进玩耍" : "聪慧恋人更擅长推进学习");
+    expect(known).not.toContain("实验室传承");
   });
 
   it.each([0, 1, 2])("shows all next lover rewards in focusable progress tooltips at cycle %s", (completed) => {
@@ -4348,8 +4447,8 @@ describe("v2 render lobby shell", () => {
 
     if (type === "advisor") {
       expect(card).toEqual(unusedCard);
-      expect(taskButton).toContain('data-action="advisor-horizontal"');
-      expect(taskButton).toContain("SAN-5");
+      expect(taskButton).toContain('data-action="advisor-project"');
+      expect(taskButton).toContain("SAN-4");
       expect(taskButton).not.toContain("disabled");
     } else if (type === "lover") {
       expect(taskButton).toMatch(/<span class="rel-action-label">玩耍<\/span>\s*<\/button>$/);
@@ -4426,9 +4525,9 @@ describe("v2 render lobby shell", () => {
   });
 
   it.each([
-    { type: "senior", rule: "师兄／师姐提升最高项" },
-    { type: "junior", rule: "师弟／师妹提升最低项" },
-    { type: "peer", rule: "同门随机提升一项" },
+    { type: "senior", rule: "师兄／师姐随机一篇的idea" },
+    { type: "junior", rule: "师弟／师妹随机一篇的实验" },
+    { type: "peer", rule: "同门随机一篇的一项" },
   ] as const)("explains automatic targeting for $type in sidebar help and card tooltips", ({ type, rule }) => {
     const state = createRelationshipCardTestState();
     const html = renderApp(state);

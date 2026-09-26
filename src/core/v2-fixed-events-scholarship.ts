@@ -13,8 +13,6 @@ interface ScholarshipOutcomeContext {
   score: number;
   requirement: number;
   reward: number;
-  estimateMin: number;
-  estimateMax: number;
   scoreBaseline: number;
   eligiblePaperIds: string[];
   success: boolean;
@@ -29,13 +27,6 @@ export function getScholarshipRequirement(year: number, getRoll: RandomRollProvi
 
 export function getScholarshipReward(year: number): number {
   return year >= 4 ? 9 : 6;
-}
-
-function getScholarshipEstimateRange(year: number): [number, number] {
-  if (year <= 2) return [1, 1];
-  if (year === 3) return [2, 4];
-  if (year === 4) return [5, 8];
-  return [8, 12];
 }
 
 function getScholarshipGradeLabel(state: Pick<GameState, "year" | "degree" | "phdStartYear">): string {
@@ -121,35 +112,32 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
 function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "success">): PendingEvent {
   const diff = context.score - context.requirement;
   const success = diff >= 0;
-  const estimateText = context.estimateMin === context.estimateMax
-    ? `往年分数线大约是 ${context.estimateMin} 分`
-    : `按往年情况，分数线大约在 ${context.estimateMin}～${context.estimateMax} 分`;
   let innerThoughts = [
-    `你把这次能计入的成果算了一遍，共 ${context.score} 分。${estimateText}。`,
+    `你把这次能计入的成果算了一遍，共 ${context.score} 分。积累比往年获奖材料充实不少，心里总算有了底。`,
   ];
   let finalThought = "你保存好回执，已经有点想把好消息告诉家里。手指停在聊天框上，还是决定等名单出了再说。";
   let label = "等待结果";
 
   if (diff >= 1 && diff < 3) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分。${estimateText}，你又核了一遍，确认没有重复申报。`,
+      `这次能计入 ${context.score} 分。对照往年的获奖材料，你觉得有些把握，又核了一遍，确认没有重复申报。`,
     ];
     finalThought = "回执存进文件夹，你已经在心里列起了购物清单。刚列到第二件，赶紧把自己叫停：名单还没出呢，钱倒先花上了。";
   } else if (diff === 0) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分。${estimateText}，你在估分表上圈出自己的分数。`,
+      `这次能计入 ${context.score} 分。和往年的获奖材料比起来，你像是刚好够得着，却没有多少余裕。`,
     ];
     finalThought = "你盯着“提交成功”看了一会儿。这四个字只管材料交没交上，可惜不管今年到底够不够分。";
     label = "继续等待";
   } else if (diff < 0 && diff >= -2) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分。${estimateText}，你有些忐忑，又检查了一遍材料。`,
+      `这次能计入 ${context.score} 分。翻过往年的获奖材料，你总觉得还差一点，又检查了一遍有没有漏填的成果。`,
     ];
     finalThought = "你把回执存好，又忍不住翻了一次往年的通知。材料已经交了，先别急着替评审把自己划掉。";
     label = "继续等待";
   } else if (diff < -2) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分。${estimateText}，光凭往年的范围还猜不出结果。`,
+      `这次能计入 ${context.score} 分。对照往年的获奖材料，手头的积累还显得单薄，这回恐怕不太乐观。`,
     ];
     finalThought = "你把回执和申报表放在一起，免得下回又到处找。未用于获奖的成果可以继续累计，这次先等正式消息。";
     label = "继续等待";
@@ -159,8 +147,7 @@ function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "su
     id: `scholarship-score-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 自己估分",
     description: [
-      "你按申报清单逐项核对，该填的填上，没有的留空，最后连文件名里的空格都检查了一遍。",
-      ...innerThoughts,
+      `你按申报清单逐项核对，连文件名里的空格都检查了一遍。${innerThoughts.join("")}`,
       finalThought,
     ].join("\n\n"),
     chainId: "scholarship",
@@ -182,7 +169,6 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
   const applicationSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
   const requirement = getScholarshipRequirement(state.year, getRoll);
   const reward = getScholarshipReward(state.year);
-  const [estimateMin, estimateMax] = getScholarshipEstimateRange(state.year);
   const scoreBaseline = state.scholarshipState.scoreBaseline;
   const eligiblePaperIds = getEligiblePublishedPaperIds(state);
   const context = {
@@ -191,29 +177,24 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
     score: Math.max(0, state.totalResearchScore - scoreBaseline),
     requirement,
     reward,
-    estimateMin,
-    estimateMax,
     scoreBaseline,
     eligiblePaperIds,
   };
-  const estimateText = estimateMin === estimateMax
-    ? `往年分数线大约在 ${estimateMin} 分左右`
-    : `往年分数线大约在 ${estimateMin}～${estimateMax} 分之间`;
-
   return createFixedEvent({
     id: `scholarship-y${state.year}-m${state.month}`,
     title: "国奖评选",
     description: [
-      `晚上十点，你收到学院系统推送的“国奖评选启动”通知。本轮评选中，${getScholarshipGradeLabel(state)}共有 5 个名额，按科研积分排名。`,
-      `${estimateText}，具体门槛要等名单公布才知道。已经用于获奖的论文不能再次计入。`,
-      "通知后面跟着申报表和填写说明，光附件就占了半屏。群里很快有人追问格式，回复的消息还在一条条往上跳。",
+      `晚上十点，你收到学院系统推送的“国奖评选启动”通知。本轮评选中，${getScholarshipGradeLabel(state)}共有 5 个名额，按科研积分排名。你找出往年的获奖材料作参考，今年的结果仍要等正式名单。已经用于获奖的论文不能再次计入。`,
+      "通知后面跟着半屏附件，群里很快有人追问格式。" + (context.score > 0
+        ? "手里还有没用于获奖的成果，可以整理出来试一试。准备材料要花些精力，暂不申报也能把成果留到以后。"
+        : "你翻了一遍成果记录，这次还没有能计入的新积累。现在申报恐怕很难入选，材料也仍要花精力准备。"),
     ].join("\n\n"),
     chainId: "scholarship",
     choices: [
       {
         id: `scholarship-apply-y${state.year}-m${state.month}`,
         label: "准备材料并申报",
-        outcome: `准备申报材料，${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。`,
+        outcome: `准备申报材料，${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}；入选后金币 +${reward}。`,
         effects: {
           san: applicationSanChange,
           enqueueEvents: [buildScholarshipScoreEvent(context)],

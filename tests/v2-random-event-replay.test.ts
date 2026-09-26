@@ -96,7 +96,9 @@ describe("random event replay", () => {
     const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
     const poker = choiceEvent?.choices.find((choice) => choice.label === "打德州扑克");
 
-    expect(poker?.outcome).toContain(`${money > 0 ? "获胜" : "落败"}（胜率 ${winRate}%）`);
+    expect(getPokerWinRate(participations)).toBe(winRate);
+    expect(poker?.outcome).toContain(money > 0 ? "获胜" : "落败");
+    expect(poker?.outcome).not.toMatch(/胜率|\d+%/u);
     expect(poker?.effects.money).toBe(money);
     expect(poker?.effects.counterDeltas).toEqual({ pokerCount: 1, pokerProfit: money });
   });
@@ -110,21 +112,31 @@ describe("random event replay", () => {
     const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
     const poker = choiceEvent?.choices.find((choice) => choice.label === "打德州扑克");
 
-    expect(badminton?.outcome).toContain("实力 60/100");
-    expect(poker?.outcome).toContain("胜率 40%");
+    expect(badminton?.outcome).toContain("落败");
+    expect(badminton?.outcome).not.toContain("60/100");
+    expect(poker?.outcome).toContain("落败");
+    expect(poker?.outcome).not.toContain("胜率");
   });
 
-  it("shows the probability beside every audited conditional result", () => {
+  it("describes conditional results without numerical odds and preserves buff effects", () => {
     const state = createReplayReadyState();
     const getChoices = (eventId: number, roll = 0.5) => createRandomEventById(eventId, state, () => roll)
       .event?.choices[0]?.effects.enqueueEvents?.[0]?.choices ?? [];
 
-    expect(getChoices(6).every((choice) => choice.outcome.includes("导师缺席（50%）"))).toBe(true);
-    expect(getChoices(7, 0.4).find((choice) => choice.label === "聚餐")?.outcome).toContain("AA 聚餐（50%）");
-    expect(getChoices(10).find((choice) => choice.label === "互挂论文")?.outcome).toContain("互挂未成（50%）");
-    expect(getChoices(13).find((choice) => choice.label === "自己重装")?.outcome).toContain("重装失败（50%）");
-    expect(getChoices(13).find((choice) => choice.label === "淘宝找人")?.outcome).toContain("维修翻车（50%）");
-    expect(getChoices(1).find((choice) => choice.label === "亲自指导")?.outcome).toContain("对方毕业（50%）");
+    expect(getChoices(6).every((choice) => choice.outcome.includes("导师缺席"))).toBe(true);
+    expect(getChoices(7, 0.4).find((choice) => choice.label === "聚餐")?.outcome).toContain("AA 聚餐");
+    expect(getChoices(10).find((choice) => choice.label === "互挂论文")?.outcome).toContain("互挂未成");
+    expect(getChoices(13).find((choice) => choice.label === "自己重装")?.outcome).toContain("重装失败");
+    expect(getChoices(13).find((choice) => choice.label === "淘宝找人")?.outcome).toContain("维修翻车");
+    expect(getChoices(1).find((choice) => choice.label === "亲自指导")?.outcome).toContain("对方毕业");
+    for (const eventId of RANDOM_EVENT_IDS) {
+      for (const roll of [0, 0.5, 0.999]) {
+        for (const choice of getChoices(eventId, roll)) {
+          expect(choice.outcome.replace("生病概率 -10%", "")).not.toMatch(/\d+%|[≥<>]\s*\d|实力\s*\d+\/\d+/u);
+        }
+      }
+    }
+    expect(getChoices(7).find((choice) => choice.id.includes("-badminton-"))?.outcome).toContain("生病概率 -10%");
   });
 
   it("adds SAN multiplier and racket bonuses to badminton strength", () => {
@@ -136,8 +148,9 @@ describe("random event replay", () => {
       state.eventCounters = { ...state.eventCounters, badmintonCount: 0 };
       const event = createRandomEventById(7, state, () => 0.99).event;
       const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
+      expect(getBadmintonStrength(san, 0, false)).toBe(san * 3);
       expect(choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"))?.outcome)
-        .toContain(`实力 ${san * 3}/100`);
+        .toContain("落败");
     }
 
     const experienced = createReplayReadyState();
@@ -146,7 +159,7 @@ describe("random event replay", () => {
     const experiencedEvent = createRandomEventById(7, experienced, () => 0.99).event;
     const experiencedChoiceEvent = experiencedEvent?.choices[0]?.effects.enqueueEvents?.[0];
     expect(experiencedChoiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"))?.outcome)
-      .toContain("实力 100/100");
+      .toContain("获胜");
 
     const boosted = createReplayReadyState();
     boosted.player = { ...boosted.player, san: 18 };
@@ -155,7 +168,7 @@ describe("random event replay", () => {
     const boostedEvent = createRandomEventById(7, boosted, () => 0.99).event;
     const boostedChoiceEvent = boostedEvent?.choices[0]?.effects.enqueueEvents?.[0];
     expect(boostedChoiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"))?.outcome)
-      .toContain("实力 166/100");
+      .toContain("获胜");
   });
 
   it.each([
@@ -171,7 +184,9 @@ describe("random event replay", () => {
       const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
       const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
 
-      expect(badminton?.outcome).toContain(`${wins ? "获胜" : "落败"}（实力 ${strength}/100）`);
+      expect(getBadmintonStrength(san, participations, false)).toBe(strength);
+      expect(badminton?.outcome).toContain(wins ? "获胜" : "落败");
+      expect(badminton?.outcome).not.toContain("实力");
       expect(badminton?.outcome.includes("解锁每月 SAN +1")).toBe(wins);
       expect(badminton?.effects.illnessProbabilityDelta).toBe(-10);
       expect(badminton?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
@@ -188,7 +203,7 @@ describe("random event replay", () => {
     const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
     const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
 
-    expect(badminton?.outcome).toContain("获胜（实力 100/100）");
+    expect(badminton?.outcome).toContain("获胜");
     expect(badminton?.outcome).toContain("解锁每月 SAN +1");
     expect(badminton?.effects.eventSupportUpdates).toEqual({ hasStrongBodyTalent: true });
   });
@@ -202,7 +217,7 @@ describe("random event replay", () => {
     const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
     const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
 
-    expect(badminton?.outcome).toContain("获胜（实力 100/100）");
+    expect(badminton?.outcome).toContain("获胜");
     expect(badminton?.outcome).not.toContain("解锁每月 SAN +1");
     expect(badminton?.effects.illnessProbabilityDelta).toBe(-10);
     expect(badminton?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
@@ -228,7 +243,8 @@ describe("random event replay", () => {
     const getChoices = (eventId: number) => createRandomEventById(eventId, state, () => 0.5)
       .event?.choices[0]?.effects.enqueueEvents?.[0]?.choices ?? [];
 
-    expect(getChoices(5).find((choice) => choice.label === "提出远程实习")?.effects.san).toBe(-5);
+    expect(getChoices(5).find((choice) => choice.label === "提出远程实习")?.effects.san).toBeUndefined();
+    expect(getChoices(5).find((choice) => choice.label === "提出远程实习")?.effects.enqueueEvents?.at(-1)?.choices[0]?.effects.internshipStateUpdates?.remainingMonths).toBe(3);
     expect(getChoices(10).find((choice) => choice.label === "全面合作")?.effects.san).toBe(0);
     expect(getChoices(11).find((choice) => choice.label === "深入合作")?.effects.san).toBe(0);
     expect(getChoices(11).find((choice) => choice.label === "拜入门下")?.effects.san).toBe(-1);

@@ -89,11 +89,12 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
     id: "joint-training-act2",
     title: "联合培养 ➜ 联培抉择",
     description: [
-      "你把方案拿去和导师商量，顺手带上自己的课题计划。翻到对方能提供的设备和研究支持时，你圈出好几处，原来一直想试的那套方案，终于有条件做了。",
-      "兴奋过后，你又翻回合作安排。往后要带着自己的进展和两边讨论，光想象第一次汇报，就有些紧张。你把几处还没弄明白的地方记下来，想在答复前再问仔细些。",
-      context.rejectedBigBullCoopCount === 0
-        ? "若这次暂不接受，以后还有一次机会。"
-        : "这已经是最后一次联培机会。",
+      "你把方案拿去和导师商量，对方能提供的设备和研究支持让你圈出好几处。" + (context.pendingCitationCapBonus > 0
+        ? "对方提到同行读过你的论文，还想让你试试几个更难的问题。你翻回自己的成果列表，头一回觉得那些引用不只是数字。"
+        : "对方对你的工作还不太熟悉，打算先从眼前的课题合作起。你把一直缺条件验证的那套方案翻出来，准备再仔细讲讲。"),
+      "兴奋过后，你又翻回合作安排，想到以后要和两边讨论进展，还是有点紧张。" + (context.rejectedBigBullCoopCount === 0
+        ? "对方说不必急着答复，之后有合适的时间还可以再谈。"
+        : "这份邀请已经为你留过一回，对方也要排下一轮计划，再推辞就不好一直让人等着了。"),
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -116,7 +117,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
       {
         id: "accept",
         label: "接受联培",
-        outcome: "接受联合培养。",
+        outcome: `科研上限 +${context.pendingCitationCapBonus}；永久想 idea +5、做实验 +5。`,
         effects: {
           conferenceEncounterUpdates: {
             bigBullCooperation: true,
