@@ -61,7 +61,7 @@ describe("paper competition regression", () => {
     let state = advanceEvent(advanceEvent(startCompetition()), 3);
     state = dispatchAction(state, "discard-paper", { paperId: state.papers[0]!.id });
     expect(state.eventQueue[0]!.description).not.toContain("40→50");
-    expect(state.eventQueue[0]!.choices[0]!.outcome).not.toContain("SAN-6");
+    expect(state.eventQueue[0]!.choices[0]!.outcome).not.toContain("SAN -6");
     const beforeSan = state.player.san;
     state = advanceEvent(state);
     expect(state.player.san).toBe(beforeSan);
@@ -75,7 +75,7 @@ describe("paper competition regression", () => {
     expect(state.eventQueue[0]!.description).toContain("小提示：本轮审稿仍按投稿分数");
     state = advanceEvent(state);
     expect(state.papers[0]).toMatchObject({ idea: 20, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 20 });
-    expect(state.eventHistory[0]!.stages.at(-1)!.choices[0]!.outcome).toBe("SAN-1｜idea×0.5（40→20）");
+    expect(state.eventHistory[0]!.stages.at(-1)!.choices[0]!.outcome).toBe("SAN -1｜idea×0.5（40→20）");
   });
 
   it("recognizes a target moved to published results before the competition is confirmed", () => {
@@ -109,14 +109,14 @@ describe("paper competition regression", () => {
     const paperId = state.papers[0]!.id;
     state = dispatchAction(state, "submit-journal-paper", { paperId, journalTarget: "nature" });
     expect(state.eventQueue[0]!.description).toContain("目标论文已进入期刊修改");
-    expect(state.eventQueue[0]!.description).not.toContain("SAN-6");
+    expect(state.eventQueue[0]!.description).not.toContain("SAN -6");
     state = dispatchAction(state, "withdraw-paper", { paperId });
-    expect(state.eventQueue[0]!.description).toContain("SAN-6｜idea×1.25（100→125）");
+    expect(state.eventQueue[0]!.description).toContain("SAN -6｜idea×1.25（100→125）");
     expect(state.eventQueue[0]!.description).toContain("新方案比原先多走了一步");
     expect(state.eventQueue[0]!.description).not.toContain("已不再受这次竞争影响");
     expect(state.eventQueue[0]!.description.match(/涉及论文：/g)).toHaveLength(1);
     expect(state.eventQueue[0]!.description.match(/机制结算/g)).toHaveLength(1);
-    expect(dispatchAction(state, "select-paper", { paperId })).toBe(state);
+    expect(dispatchAction(state, "select-paper", { paperId })).toEqual(state);
   });
 
   it.each([17, 18] as const)("renders event %s with distinct narrative, target, review tip and compact effects", (eventId) => {
@@ -126,12 +126,12 @@ describe("paper competition regression", () => {
     const event = state.eventQueue[0]!;
     const effect = eventId === 17 ? "idea×0.5（40→20）" : "实验×0.5（40→20）";
     const description = event.description;
-    expect(description.split("\n\n机制结算\n")[1]).toBe(`SAN-1｜${effect}`);
+    expect(description.split("\n\n机制结算\n")[1]).toBe(`SAN -1｜${effect}`);
     expect(description).toContain(`涉及论文：**《${state.papers[0]!.title}》**`);
     expect(description).not.toContain("至于审稿人会不会注意到");
     const html = renderApp(state, undefined, { activePlayTab: "events", activeEventId: event.id, isEventContentOpen: true });
     const results = html.match(/<div class="event-settlement-summary">[\s\S]*?<\/div>/)?.[0] ?? "";
-    expect(results).toContain('class="event-settlement-effect is-san">SAN-1</span>');
+    expect(results).toContain('class="event-settlement-effect is-san">SAN -1</span>');
     const [effectLabel, effectDelta] = effect.split("（");
     expect(results).toContain(`class="event-settlement-effect is-research">${effectLabel}</span>（${effectDelta}`);
     expect(results).not.toContain(state.papers[0]!.title);

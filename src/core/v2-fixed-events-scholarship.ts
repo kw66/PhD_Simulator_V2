@@ -4,7 +4,7 @@ import {
   drawInclusiveInt,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
-import { getActualSanChange } from "./v2-sanity-rules";
+import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 import type { GameState, PendingEvent } from "./v2-types";
 
 interface ScholarshipOutcomeContext {
@@ -213,7 +213,7 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
       {
         id: `scholarship-apply-y${state.year}-m${state.month}`,
         label: "准备材料并申报",
-        outcome: `准备申报材料，SAN ${applicationSanChange}。`,
+        outcome: `准备申报材料，${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。`,
         effects: {
           san: applicationSanChange,
           enqueueEvents: [buildScholarshipScoreEvent(context)],

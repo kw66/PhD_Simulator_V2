@@ -25,7 +25,34 @@ describe("event candidate eligibility and presentation", () => {
     const result = collectRandomEventsForMonth(state, () => 0.7);
     expect(result.events.some((event) => event.chainId === "random-12")).toBe(eligible);
     expect(result.nextState.usedRandomEvents.includes(12)).toBe(eligible);
-    if (!eligible) expect(result.nextState.availableRandomEvents).toContain(12);
+    if (!eligible) {
+      expect(result.nextState.availableRandomEvents).not.toContain(12);
+      expect(result.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId: 12, serial: 1 }]);
+      expect(result.nextState.usedRandomEvents).not.toContain(12);
+    }
+  });
+
+  it("reveals a drawn conditional event when its prerequisite later appears", () => {
+    const initial = {
+      ...createInitialState(),
+      phase: "playing" as const,
+      availableRandomEvents: [12],
+      usedRandomEvents: [],
+      papers: [],
+    };
+    const hidden = collectRandomEventsForMonth(initial, () => 0.7);
+    expect(hidden.events).toHaveLength(0);
+    expect(hidden.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId: 12, serial: 1 }]);
+    expect(hidden.nextState.usedRandomEvents).not.toContain(12);
+
+    const eligible = {
+      ...hidden.nextState,
+      papers: [{ ...createDraftPaper(1, 1), idea: 1 }],
+    };
+    const revealed = dispatchAction(eligible, "select-paper", { paperId: eligible.papers[0]!.id });
+    expect(revealed.eventQueue.some((event) => event.chainId === "random-12")).toBe(true);
+    expect(revealed.usedRandomEvents).toContain(12);
+    expect(revealed.pendingPaperCompetitionEvents).toEqual([]);
   });
 
   it("keeps candidate attributes and cards through selection and history replay", () => {

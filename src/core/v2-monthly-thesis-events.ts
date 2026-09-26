@@ -8,7 +8,7 @@ import {
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 import { getPublishedPaperCount } from "./v2-monthly-event-shared";
 import { createThreeStageEvent, type RandomEventResultCopy } from "./v2-random-events-core-shared";
-import { getActualSanChange } from "./v2-sanity-rules";
+import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 
 function createThesisChoices(state: GameState): {
   nextState: GameState;
@@ -42,7 +42,7 @@ function createThesisChoices(state: GameState): {
       id: option.id,
       label: option.text,
       outcome: result.progressGain > 0
-        ? `大论文推进 +${result.progressGain}，SAN ${sanChange < 0 ? sanChange : "不变"}。`
+        ? `大论文推进 +${result.progressGain}，${sanChange < 0 ? formatActualSanChange(-result.sanCost, state.month, state.eventSupport, state.buffs) : "SAN 不变"}。`
         : "当前方案没有带来明显进展。",
       effects: {
         san: sanChange,

@@ -62,6 +62,54 @@ export function getActualSanChange(
   return applySanCostModifiers(delta, month, eventSupport, buffs);
 }
 
+export function withoutIllnessSanBuffs(buffs: readonly Buff[]): Buff[] {
+  return buffs.filter((buff) => !buff.id.startsWith("illness-work-penalty-") && buff.id !== "debug-buff-illness");
+}
+
+/** Isolate disease costs while preserving every other modifier and rounding rule. */
+export function getIllnessSanIncrease(
+  baseDelta: number,
+  month: number,
+  eventSupport: Pick<EventSupportState, "hasParasol">,
+  buffs: readonly Buff[],
+  research?: number,
+): number {
+  if (baseDelta >= 0) return 0;
+  const change = (activeBuffs: readonly Buff[]): number => research === undefined
+    ? getActualSanChange(baseDelta, month, eventSupport, activeBuffs)
+    : getActualResearchMiscSanChange(baseDelta, research, month, eventSupport, activeBuffs);
+  return Math.max(0, change(withoutIllnessSanBuffs(buffs)) - change(buffs));
+}
+
+function formatSignedEffectChange(finalDelta: number, originalDelta = finalDelta): string {
+  // A fully resisted cost is still a loss; a net zero keeps the default +0.
+  if (finalDelta === 0 && originalDelta < 0) return "-0";
+  return finalDelta >= 0 ? `+${finalDelta}` : String(finalDelta);
+}
+
+export function formatEventSanChange(finalDelta: number, illnessIncrease = 0, researchDiscount = 0, originalDelta = finalDelta): string {
+  const signedDelta = formatSignedEffectChange(finalDelta, originalDelta);
+  const notes = [
+    researchDiscount > 0 ? `（减免${researchDiscount}）` : "",
+    finalDelta < 0 && illnessIncrease > 0 ? `（疾病增加${illnessIncrease}）` : "",
+  ].join("");
+  return `SAN ${signedDelta}${notes}`;
+}
+
+export function formatActualSanChange(
+  baseDelta: number,
+  month: number,
+  eventSupport: Pick<EventSupportState, "hasParasol">,
+  buffs: readonly Buff[] = [],
+): string {
+  return formatEventSanChange(
+    getActualSanChange(baseDelta, month, eventSupport, buffs),
+    getIllnessSanIncrease(baseDelta, month, eventSupport, buffs),
+    0,
+    baseDelta,
+  );
+}
+
 function getResearchMiscTierDiscount(baseDelta: number, research: number): number {
   return Math.min(getAttributeTier(research), Math.max(0, Math.abs(baseDelta)));
 }
@@ -87,7 +135,8 @@ const RESEARCH_MISC_TIER_NAMES = ["小白", "入门", "熟练", "大佬"] as con
 
 /**
  * Formats only the SAN change applied by a fixed research chore. The result
- * keeps the research-tier discount visible without repeating its calculation.
+ * keeps the research discount and illness surcharge visible without listing
+ * the other modifiers already included in the final SAN change.
  */
 export function formatResearchMiscSanChange(
   baseDelta: number,
@@ -98,9 +147,7 @@ export function formatResearchMiscSanChange(
 ): string {
   const finalDelta = getActualResearchMiscSanChange(baseDelta, research, month, eventSupport, buffs);
   const tierDiscount = getResearchMiscTierDiscount(baseDelta, research);
-  const signedDelta = finalDelta >= 0 ? `+${finalDelta}` : String(finalDelta);
-  const discountText = tierDiscount > 0 ? `（减免${tierDiscount}）` : "";
-  return `SAN ${signedDelta}${discountText}`;
+  return formatEventSanChange(finalDelta, getIllnessSanIncrease(baseDelta, month, eventSupport, buffs, research), tierDiscount, baseDelta);
 }
 
 export function getResearchMiscSanNarrative(baseDelta: number, research: number): string {
@@ -120,7 +167,7 @@ export function formatTierResistedOutcome(
   result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount" | "cappedCount">,
 ): string {
   const actual = result.effectiveChange;
-  const signedActual = actual >= 0 ? `+${actual}` : String(actual);
+  const signedActual = formatSignedEffectChange(actual, rawChange);
   const details: string[] = [];
   if (result.resistedCount > 0) details.push(`抵抗${result.resistedCount}`);
   if (result.cappedCount && rawChange > 0) details.push("上限");

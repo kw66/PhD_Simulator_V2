@@ -1,4 +1,4 @@
-﻿import { applyTierResist, formatTierResistedOutcome, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import { createThreeStageRandomEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -26,7 +26,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
       {
         id: `random-15-terraria-${serial}`,
         label: "玩泰拉瑞亚",
-        outcome: `${formatTierResistedOutcome("社交", 1, socialResult)}，SAN ${terrariaSanChange}`,
+        outcome: `${formatTierResistedOutcome("社交", 1, socialResult)}，${formatActualSanChange(-4, state.month, state.eventSupport, state.buffs)}`,
         effects: {
           ...(socialResult.effectiveChange > 0 ? { social: socialResult.effectiveChange } : {}),
           san: terrariaSanChange,
@@ -35,7 +35,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
       {
         id: `random-15-magic-tower-${serial}`,
         label: "玩魔塔50层",
-        outcome: `${formatTierResistedOutcome("科研", 1, researchResult)}，SAN ${magicTowerSanChange}`,
+        outcome: `${formatTierResistedOutcome("科研", 1, researchResult)}，${formatActualSanChange(-6, state.month, state.eventSupport, state.buffs)}`,
         effects: {
           ...(researchResult.effectiveChange > 0 ? { research: researchResult.effectiveChange } : {}),
           san: magicTowerSanChange,
@@ -52,7 +52,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
       {
         id: `random-15-kings-${serial}`,
         label: "打王者荣耀",
-        outcome: `金币 +2，SAN ${kingsSanChange}。`,
+        outcome: `金币 +2，${formatActualSanChange(-5, state.month, state.eventSupport, state.buffs)}。`,
         effects: {
           money: 2,
           san: kingsSanChange,

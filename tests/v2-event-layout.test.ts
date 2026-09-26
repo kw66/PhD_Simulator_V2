@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderEventLayoutSamples } from "../src/app/v2-render-play";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createTeachersDayEvent } from "../src/core/v2-fixed-events-teachers-day";
+import { createAdvisorProjectRandomEvent } from "../src/core/v2-random-events-lab-advisor-project";
 import type { EventQueueItem, PendingEvent, ResolvedEventRecord } from "../src/core/v2-types";
 
 function scene(id: string, description: string, next: PendingEvent[] = [], chainId = "layout-test"): PendingEvent {
@@ -10,6 +11,22 @@ function scene(id: string, description: string, next: PendingEvent[] = [], chain
 }
 
 describe("event layout samples", () => {
+  it("reserves the selected advisor choice checkmark before entering the result scene", () => {
+    const state = createStartedGameState("normal");
+    const current: EventQueueItem = { ...createAdvisorProjectRandomEvent(state, () => 0), queueOrder: 1 };
+    const before = structuredClone(current);
+    const samples = renderEventLayoutSamples(current, null, state);
+    const selected = samples.filter((sample) => sample.key.includes(":selected:"));
+    expect(selected).toHaveLength(4);
+    for (const sample of selected) {
+      expect(sample.html).toContain('is-selected');
+      expect(sample.html).toContain('data-lucide="check"');
+      expect(sample.html).toContain('disabled aria-disabled="true"');
+    }
+    expect(new Set(samples.map((sample) => sample.key)).size).toBe(samples.length);
+    expect(current).toEqual(before);
+  });
+
   it.each([0, 6])("includes teacher-day result variants at favor %i without changing state or consuming randomness", (favor) => {
     const state = createStartedGameState("normal");
     state.player.favor = favor;

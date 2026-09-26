@@ -18,7 +18,13 @@ export function createEventQueueItem(event: PendingEvent, queueOrder: number): E
   };
 }
 
+export function getEventQueuePriority(event: Pick<PendingEvent, "id" | "chainId">): number {
+  return event.chainId?.startsWith("illness-") || event.id.startsWith("illness-") ? 0 : 1;
+}
+
 export function compareEventQueueItems(left: EventQueueItem, right: EventQueueItem): number {
+  const priorityDifference = getEventQueuePriority(left) - getEventQueuePriority(right);
+  if (priorityDifference !== 0) return priorityDifference;
   const deadlineDifference = left.deadlineMonths - right.deadlineMonths;
   if (deadlineDifference !== 0) {
     return deadlineDifference;

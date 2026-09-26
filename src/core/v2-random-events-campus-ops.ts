@@ -1,4 +1,4 @@
-﻿import { applyTierResist, formatTierResistedOutcome, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import {
   createThreeStageRandomEvent,
   formatProbabilityCondition,
@@ -47,8 +47,8 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
         id: `random-13-reinstall-${serial}`,
         label: "自己重装",
         outcome: reinstallSuccess
-          ? `${formatProbabilityCondition("重装成功", 0.5)}｜SAN ${reinstallSanChange}。`
-          : `${formatProbabilityCondition("重装失败", 0.5)}｜SAN ${reinstallSanChange}｜${formatTierResistedOutcome("社交", -1, reinstallSocialResult)}｜下次实验 ×0.25`,
+          ? `${formatProbabilityCondition("重装成功", 0.5)}｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。`
+          : `${formatProbabilityCondition("重装失败", 0.5)}｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("社交", -1, reinstallSocialResult)}｜下次实验 ×0.25`,
         effects: reinstallSuccess
           ? { san: reinstallSanChange }
           : {
@@ -64,7 +64,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
         label: "淘宝找人",
         outcome: taobaoSuccess
           ? `${formatProbabilityCondition("维修成功", 0.5)}｜金币 -2。`
-          : `${formatProbabilityCondition("维修翻车", 0.5)}｜金币 -4｜SAN ${taobaoFailureSanChange}。`,
+          : `${formatProbabilityCondition("维修翻车", 0.5)}｜金币 -4｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。`,
         effects: taobaoSuccess
           ? { money: -2 }
           : { money: -4, san: taobaoFailureSanChange },

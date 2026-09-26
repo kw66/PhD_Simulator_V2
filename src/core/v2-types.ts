@@ -141,6 +141,8 @@ export interface PaperReviewerReport {
   /** SAN change applied when the player confirms the review result. */
   sanChange?: number;
   baseSanChange?: number;
+  /** Extra SAN spent because of illness at the time of settlement. */
+  illnessSanIncrease?: number;
 }
 
 export interface PaperReviewResult {
@@ -490,6 +492,11 @@ export interface EventChoice {
     activateLoverProgress?: LoverTypeId;
     researchCapacityStateDeltas?: Partial<Record<keyof ResearchCapacityState, number>>;
     advisorProgressStateDeltas?: Partial<Pick<AdvisorProgressState, "researchAccumulation" | "funding">>;
+    labProjectProgress?: {
+      type: "horizontal" | "vertical";
+      amount: number;
+      guidanceRolls?: number[];
+    };
     restoreSanToCap?: boolean;
     triggerInternshipInvite?: boolean;
     triggerJointTrainingInvite?: boolean;
@@ -659,6 +666,7 @@ export interface DispatchPayload {
   eventChoiceId?: string | undefined;
   eventHistoryIndex?: number | undefined;
   relationshipId?: string | undefined;
+  projectType?: "horizontal" | "vertical" | undefined;
   debugStatId?: DebugStatId | undefined;
   debugPaperTarget?: PaperTarget | undefined;
   debugJournalTarget?: JournalTarget | undefined;

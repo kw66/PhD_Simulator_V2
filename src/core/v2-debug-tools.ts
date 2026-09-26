@@ -175,7 +175,14 @@ export const DEBUG_STAT_GROUPS: Array<{ statId: DebugStatId; label: string; delt
 export const DEBUG_MONTH_DELTAS = [-12, -1, 1, 12] as const;
 
 /** Manual cross-run audit checklist. Add an id here after the user confirms that the event has been checked. */
-export const DEBUG_COMPLETED_EVENT_IDS = ["before-grad-school", "random-1"] as const;
+export const DEBUG_COMPLETED_EVENT_IDS = [
+  "before-grad-school",
+  "random-1",
+  "random-2",
+  "illness-stomach",
+  "illness-flu",
+  "illness-fever",
+] as const;
 
 export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
   {

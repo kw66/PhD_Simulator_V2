@@ -33,8 +33,8 @@ import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
 import { createVisitStats } from "./v2-visit-stats";
 import { createValueAnimations } from "./v2-value-animations";
-import { createLoverRewardTicker } from "./v2-lover-reward-ticker";
 import { createEventLayout } from "./v2-event-layout";
+import { createRelationshipTooltips } from "./v2-relationship-tooltips";
 import { createDebugWindow } from "./v2-debug-window";
 import { renderEventLayoutSamples } from "./v2-render-play";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
@@ -332,7 +332,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let lastPhase = store.getState().phase;
   let lastRenderedPlayer: PlayerStats | null = null;
   const animatePanelValues = createValueAnimations(root);
-  const loverRewardTicker = createLoverRewardTicker(root);
   let lastRenderedPaperSlotCount: number | null = null;
   let animateEventPanelAfterNextMonth = false;
   let skipNextPlayerAnimation = false;
@@ -492,8 +491,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
   };
 
   const eventLayout = createEventLayout(root);
+  const relationshipTooltips = createRelationshipTooltips(root);
   const syncAllFixedStageScales = (): void => {
     eventLayout.sync();
+    relationshipTooltips.sync();
     syncFixedStageScale(
       '.lobby-page[data-scale-mode="fixed"] .lobby-stage-shell',
       '.lobby-page[data-scale-mode="fixed"] .lobby-stage',
@@ -928,7 +929,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     eventLayout.update(isEventContentOpen ? renderEventLayoutSamples(getActiveQueueEvent(state), getActiveHistoryEvent(state), state) : []);
     scheduleAllFixedStageScales();
     animatePanelValues(shouldAnimatePlayer);
-    loverRewardTicker.render();
     if (shouldAnimatePlayer && previousRenderedPlayer) {
       animatePlayerStatChanges(previousRenderedPlayer, state.player);
     }
@@ -989,6 +989,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       eventChoiceId: typeof dataset.eventChoiceId === "string" ? dataset.eventChoiceId : undefined,
       eventHistoryIndex: typeof dataset.eventHistoryIndex === "string" ? Number(dataset.eventHistoryIndex) : undefined,
       relationshipId: typeof dataset.relationshipId === "string" ? dataset.relationshipId : undefined,
+      projectType: dataset.projectType === "horizontal" || dataset.projectType === "vertical" ? dataset.projectType : undefined,
       debugStatId: isDebugStatId(dataset.debugStatId) ? dataset.debugStatId : undefined,
       debugPaperTarget: isPaperTarget(dataset.debugPaperTarget) ? dataset.debugPaperTarget : undefined,
       debugJournalTarget: isJournalTarget(dataset.debugJournalTarget) ? dataset.debugJournalTarget : undefined,
@@ -1198,12 +1199,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const upgradeId = coffeeUpgradeOption.dataset.uiSelectCoffeeUpgrade;
       selectedCoffeeUpgradeId = selectedCoffeeUpgradeId === upgradeId ? null : upgradeId;
       render();
-      return;
-    }
-
-    const loverRewardStep = target.closest<HTMLButtonElement>("button[data-ui-lover-reward-step]");
-    if (loverRewardStep) {
-      loverRewardTicker.step(Number(loverRewardStep.dataset.uiLoverRewardStep));
       return;
     }
 

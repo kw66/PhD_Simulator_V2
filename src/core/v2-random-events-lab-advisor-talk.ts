@@ -1,6 +1,7 @@
 ﻿import {
   applyTierResist,
   formatTierResistedOutcome,
+  formatActualSanChange,
   getActualSanChange,
   getTierResistedNarrative,
 } from "./v2-sanity-rules";
@@ -13,7 +14,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
   const isHighResearch = state.player.research >= 6;
   const isHighFavor = state.player.favor >= 6;
   const internshipSanChange = getActualSanChange(-5, state.month, state.eventSupport, state.buffs);
-  const internshipSanSummary = `SAN ${internshipSanChange > 0 ? "+" : ""}${internshipSanChange}`;
+  const internshipSanSummary = formatActualSanChange(-5, state.month, state.eventSupport, state.buffs);
   const ideaBonus = drawInclusiveInt(4, 6, getRoll);
   const experimentBonus = drawInclusiveInt(4, 6, getRoll);
   const reportFavorResult = applyTierResist(-1, state.player.favor, getRoll);

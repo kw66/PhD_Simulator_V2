@@ -99,12 +99,12 @@ describe("event SAN scope", () => {
     const medicine = decision.choices.find((entry) => entry.label === "先买药")!;
     const rest = decision.choices.find((entry) => entry.label === "休息")!;
     expect(medicine.effects.san).toBe(-1);
-    expect(rest.effects.san).toBe(-11);
+    expect(rest.effects.san).toBe(-5);
     expect(rest.outcome).toContain("休息（SAN+2");
     state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: rest.id });
     const result = state.eventQueue[0]!;
     state = dispatchAction(state, "resolve-event", { eventId: result.id, eventChoiceId: result.choices[0]!.id });
-    expect(state.player.san).toBe(11);
+    expect(state.player.san).toBe(17);
     expect(state.buffs.some((buff) => buff.activeOperationSanMultiplier)).toBe(false);
   });
 
@@ -144,7 +144,7 @@ describe("event SAN scope", () => {
     const paper = { ...createDraftPaper(1, 0), idea: 40, experiment: 40 };
     state.papers = [paper];
     const resolution = { paperId: paper.id, field, multiplier: 1.25, sanCost: 6 };
-    expect(previewPaperCompetitionResolution(state, resolution).resolvedOutcome).toContain("SAN-4");
+    expect(previewPaperCompetitionResolution(state, resolution).resolvedOutcome).toContain("SAN -4");
     expect(applyPaperCompetitionResolution(state, resolution).nextState.player.san).toBe(16);
     const free = { ...resolution, multiplier: 0.25, sanCost: 0 };
     expect(applyPaperCompetitionResolution({ ...state, month: 11 }, free).nextState.player.san).toBe(20);

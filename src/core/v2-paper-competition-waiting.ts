@@ -1,11 +1,10 @@
 import { enqueuePendingEvents } from "./v2-event-enqueue";
-import type { PaperCompetitionEventId } from "./v2-paper-competition";
-import { createPaperCompetitionRandomEvent } from "./v2-random-events-paper-competition";
+import { createRandomEventById, isRandomEventEligible } from "./v2-random-event-router";
 import type { GameState } from "./v2-types";
 
-export function rememberPendingPaperCompetitionEvent(
+export function rememberPendingRandomEvent(
   state: GameState,
-  eventId: PaperCompetitionEventId,
+  eventId: number,
   serial: number,
 ): GameState {
   const pending = state.pendingPaperCompetitionEvents ?? [];
@@ -15,11 +14,14 @@ export function rememberPendingPaperCompetitionEvent(
     ...state,
     pendingPaperCompetitionEvents: [...pending, { eventId, serial }],
     availableRandomEvents: state.availableRandomEvents.filter((id) => id !== eventId),
-    usedRandomEvents: [...new Set([...state.usedRandomEvents, eventId])],
+    usedRandomEvents: state.usedRandomEvents.filter((id) => id !== eventId),
   };
 }
 
-export function activatePendingPaperCompetitionEvents(
+/** Compatibility export for older callers and saved test fixtures. */
+export const rememberPendingPaperCompetitionEvent = rememberPendingRandomEvent;
+
+export function activatePendingRandomEvents(
   state: GameState,
   getRoll: () => number = Math.random,
 ): GameState {
@@ -27,8 +29,9 @@ export function activatePendingPaperCompetitionEvents(
   let nextState = state;
   for (const pending of state.pendingPaperCompetitionEvents) {
     if (nextState.eventQueue.some((event) => event.chainId === `random-${pending.eventId}`)) continue;
+    if (!isRandomEventEligible(nextState, pending.eventId)) continue;
     const rolls: number[] = [];
-    const event = createPaperCompetitionRandomEvent(
+    const built = createRandomEventById(
       pending.eventId,
       { ...nextState, totalRandomEventCount: pending.serial },
       () => {
@@ -37,9 +40,9 @@ export function activatePendingPaperCompetitionEvents(
         return roll;
       },
     );
-    if (!event) continue;
+    if (!built.event) continue;
     const enqueued = enqueuePendingEvents(nextState, [{
-      ...event,
+      ...built.event,
       randomReplay: { eventId: pending.eventId, serial: pending.serial, rolls },
     }]);
     if (enqueued.queuedEvents.length === 0) continue;
@@ -53,3 +56,6 @@ export function activatePendingPaperCompetitionEvents(
   }
   return nextState;
 }
+
+/** Compatibility export for callers that still use the old paper-specific name. */
+export const activatePendingPaperCompetitionEvents = activatePendingRandomEvents;

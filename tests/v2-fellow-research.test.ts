@@ -47,8 +47,6 @@ describe("fellow research lifecycle", () => {
     })] };
     const paperId = state.fellowPapers![0]!.id;
     state = nextMonth(state);
-    expect(state.fellowPapers![0]!.status).toBe("draft");
-    state = nextMonth(state);
     state = { ...state, fellowProgressState: [{ ...state.fellowProgressState[0]!, pendingHelpToFellow: 10 }] };
     const submitted = state.fellowPapers!.find((paper) => paper.id === paperId)!;
     expect(submitted).toMatchObject({ status: "reviewing", reviewMonthsLeft: 3 });
@@ -95,12 +93,10 @@ describe("fellow research lifecycle", () => {
     expect(restored.fellowProgressState[0]!.researchTopic).toEqual(state.fellowProgressState[0]!.researchTopic);
     expect(restored.fellowPapers).toEqual(state.fellowPapers);
   });
-  it("opens a paper immediately, researches every two months and decays scores every month", () => {
+  it("starts research next month, alternates projects and decays scores every month", () => {
     let state = makeState();
     expect(state.fellowPapers).toHaveLength(1);
     expect(advanceFellowResearch(state).fellowPapers![0]).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
-    state = nextMonth(state);
-    expect(state.fellowPapers![0]).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
     state = nextMonth(state);
     expect(state.fellowPapers![0]).toMatchObject({ idea: 23, experiment: 0, writing: 0, status: "draft" });
     expect(advanceFellowResearch(state)).toBe(state);
@@ -113,6 +109,7 @@ describe("fellow research lifecycle", () => {
     state = nextMonth(state);
     expect(state.fellowPapers![0]).toMatchObject({ writing: 23, status: "reviewing", reviewMonthsLeft: 3 });
     expect(state.fellowPapers![0]!.target).not.toBeNull();
+    expect(state.fellowProgressState[0]!.monthlyActivity).toContain("投稿");
     expect(state.player).toEqual(makeState().player);
     expect(state.actionState.used).toBe(0);
   });
@@ -126,25 +123,19 @@ describe("fellow research lifecycle", () => {
     for (const elapsed of [1, 2, 3, 4]) {
       state = nextMonth(state);
       expect(state.fellowPapers![0]).toMatchObject({
-        idea: elapsed >= 2 ? 25 - elapsed : 0, experiment: elapsed >= 4 ? 23 : 0, writing: 0,
+        idea: 24 - elapsed, experiment: elapsed >= 3 ? 26 - elapsed : 0, writing: 0,
       });
       expect(state.fellowProgressState[0]!.taskProgress).toBe(elapsed * 2);
       expect(advanceFellowResearch(state)).toBe(state);
     }
   });
 
-  it.each([2, 3])("waits at least two months for a paper created at month %s without resetting the join cadence", (createdTotalMonths) => {
+  it.each([2, 3])("researches a replacement draft created at month %s without waiting for join parity", (createdTotalMonths) => {
     const base = makeState();
     let state: GameState = { ...base, totalMonths: createdTotalMonths, month: createdTotalMonths,
       fellowPapers: [{ ...base.fellowPapers![0]!, createdTotalMonths }],
     };
-    state = advanceFellowResearch(state);
-    expect(state.fellowPapers![0]).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
-    while (state.totalMonths < 4) {
-      state = nextMonth(state);
-      expect(state.fellowPapers![0]).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
-    }
-    state = nextMonth(state);
+    state = advanceFellowResearch(state, () => 0.5);
     expect(state.fellowPapers![0]).toMatchObject({ idea: 23, experiment: 0, writing: 0 });
     state = nextMonth(state);
     expect(state.fellowPapers![0]).toMatchObject({ idea: 22, experiment: 0, writing: 0 });
@@ -153,9 +144,15 @@ describe("fellow research lifecycle", () => {
   });
 
   it("does not catch up missed research operations after skipping a scheduled month", () => {
-    const state = advanceFellowResearch({ ...makeState(), totalMonths: 4, month: 4 });
-    expect(state.fellowPapers![0]).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
-    expect(nextMonth(state).fellowPapers![0]).toMatchObject({ idea: 23, experiment: 0, writing: 0 });
+    const state = advanceFellowResearch({ ...makeState(), totalMonths: 4, month: 4 }, () => 0.5);
+    expect(state.fellowPapers![0]).toMatchObject({ idea: 23, experiment: 0, writing: 0 });
+    expect(nextMonth(state).fellowPapers![0]).toMatchObject({ idea: 22, experiment: 0, writing: 0 });
+  });
+
+  it("keeps automatic fellow research and submission out of the ordinary game log", () => {
+    const state = { ...makeState(), log: [{ id: "existing", month: 2, text: "玩家操作" }] };
+    const next = advanceFellowResearch(state, () => 0);
+    expect(next.log).toEqual(state.log);
   });
 
   it("chooses the best eligible conference using the same current year and month reference scores", () => {
@@ -174,9 +171,7 @@ describe("fellow research lifecycle", () => {
     const before = state.fellowPapers![0]!;
     const collaborated = addPaperCollaboration(before, { paperId: before.id, collaborator: { id: "player", name: "张明" }, scores: { idea: 2 } });
     state = { ...state, fellowPapers: [collaborated] };
-    state = nextMonth(state, () => 0);
-    expect(state.fellowPapers![0]).toEqual(decayUnpublishedPaper(collaborated));
-    const decayed = decayUnpublishedPaper(state.fellowPapers![0]!);
+    const decayed = decayUnpublishedPaper(collaborated);
     const playerState = { ...state, player: { ...state.player, research: 0 }, papers: [decayed] };
     const expected = applyResearchOperation(playerState, decayed.id, "experiment", () => 0).papers[0]!;
     const next = nextMonth(state, () => 0);
@@ -192,39 +187,41 @@ describe("fellow research lifecycle", () => {
     expect(getFellowSubmissionTarget(state, { ...paper, idea: 500, collaborationScores: { idea: 500 } })).toBe("A");
   });
 
-  it("keeps submitted scores frozen during review and uses the shared feedback after rejection", () => {
-    let state = replacePaper(makeState(), { idea: 6, experiment: 6, writing: 6, prepublicationDecayRate: 0.15 });
+  it("keeps review snapshots frozen and revises and resubmits after shared rejection feedback", () => {
+    let state = replacePaper(makeState(0), { idea: 6, experiment: 6, writing: 6, prepublicationDecayRate: 0.15 });
     const submitted = prepareConferenceSubmission(state.fellowPapers![0]!, "A", 1, 1);
     state = { ...state, fellowPapers: [{ ...submitted, reviewMonthsLeft: 1 }] };
     const decayed = decayUnpublishedPaper(state.fellowPapers![0]!);
     const result = resolvePaperReview(decayed, () => 0);
+    const rejected = applyRejectedPaperReview(decayed, result.nextPaper.lastReview!);
+    const expected = applyResearchOperation({ ...state, player: { ...state.player, research: 0 }, papers: [rejected] },
+      rejected.id, getFellowResearchAction(rejected), () => 0).papers[0]!;
     const next = nextMonth(state, () => 0);
-    expect(next.fellowPapers![0]).toEqual(applyRejectedPaperReview(decayed, result.nextPaper.lastReview!));
-    expect(next.fellowPapers![0]!.lastReview?.accepted).toBe(false);
+    expect(rejected.lastReview?.accepted).toBe(false);
+    expect(next.fellowPapers![0]).toEqual(prepareConferenceSubmission(expected, "C", 2, 1));
+    expect(next.fellowProgressState[0]?.monthlyActivity).toContain("论文退稿");
     expect(next.fellowPapers![0]!.rejectionCount).toBe(1);
     expect(next.fellowPapers).toHaveLength(1);
     expect(nextMonth(next, () => 0).fellowPapers![0]!.id).toBe(submitted.id);
     expect(next.player).toEqual(state.player);
   });
 
-  it("publishes independently without player rewards and immediately creates a new untouched draft", () => {
+  it("publishes independently without player rewards and researches the new draft immediately", () => {
     let state = replacePaper(makeState(), { idea: 100, experiment: 100, writing: 100 });
     const submitted = prepareConferenceSubmission(state.fellowPapers![0]!, "A", 1, 1);
     state = { ...state, fellowPapers: [{ ...submitted, reviewMonthsLeft: 1 }] };
     const next = nextMonth(state, () => 0.5);
     expect(next.fellowPapers).toHaveLength(2);
     expect(next.fellowPapers![0]).toMatchObject({ status: "published", publication: { citations: 0, effectiveScore: 300 }, conferenceHandled: false });
-    expect(getFellowCurrentPaper(next, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
+    expect(getFellowCurrentPaper(next, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 23, experiment: 0, writing: 0 });
     expect(new Set(next.fellowPapers!.map((paper) => paper.id)).size).toBe(2);
     expect(next.externalPublications).toHaveLength(0);
     expect(next.player).toEqual(state.player);
     expect(next.totalResearchScore).toBe(state.totalResearchScore);
     let later = nextMonth(next);
-    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
+    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 22, experiment: 0, writing: 0 });
     later = nextMonth(later);
-    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
-    later = nextMonth(later);
-    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 23, experiment: 0, writing: 0 });
+    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 21, experiment: 23, writing: 0 });
   });
 
   it("uses shared exposure, citation fractions, promotion and decay without crediting unrelated papers to the player", () => {
@@ -349,10 +346,11 @@ describe("fellow reciprocal cooperation", () => {
     const joined = dispatchAction(base, "debug-add-relationship", { debugRelationshipType: "peer" });
     expect(joined.fellowPapers).toHaveLength(1);
     const next = dispatchAction(joined, "next-month");
-    expect(next.fellowPapers![0]).toMatchObject({ idea: 0, experiment: 0, writing: 0 });
-    const researched = dispatchAction({ ...next, eventQueue: [] }, "next-month");
-    expect(researched.fellowPapers![0]!.idea).toBeGreaterThan(0);
-    expect(researched.fellowPapers![0]!.experiment).toBe(0);
+    expect(next.fellowPapers![0]!.idea).toBeGreaterThan(0);
+    expect(next.fellowProgressState[0]?.nextMonthlyAction).toBe("project");
+    const projectMonth = dispatchAction({ ...next, eventQueue: [] }, "next-month");
+    expect(projectMonth.fellowPapers![0]).toEqual(decayUnpublishedPaper(next.fellowPapers![0]!));
+    expect(projectMonth.fellowProgressState[0]?.monthlyActivity).toMatch(/[横纵]向进度\+/);
   });
 
   it("waits until the month after attending to earn citations, matching the player conference timeline", () => {

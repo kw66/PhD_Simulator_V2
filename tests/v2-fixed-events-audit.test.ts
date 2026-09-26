@@ -373,15 +373,15 @@ describe("audited fixed-event rules", () => {
       player: { ...createInitialState().player, san: 20, favor: 1 },
     });
     const restedChoice = resolveYearSummaryFixedEvent(rested, { kind: "year-summary-open" }, () => 0)?.enqueueEvents?.[0];
-    expect(restedChoice?.description).toContain("精神还行");
+    expect(restedChoice?.description).toContain("这一年倒没把精神熬垮");
     expect(restedChoice?.description).not.toContain("最近看几行字都累");
-    expect(restedChoice?.description).toContain("跟导师还不太熟");
+    expect(restedChoice?.description).toContain("见老师居然还是这么拘谨");
 
     const exhausted = playingState({
       player: { ...createInitialState().player, san: 5, favor: 6 },
     });
     const exhaustedChoice = resolveYearSummaryFixedEvent(exhausted, { kind: "year-summary-open" }, () => 0)?.enqueueEvents?.[0];
-    expect(exhaustedChoice?.description).toContain("最近看几行字都累");
-    expect(exhaustedChoice?.description).toContain("帮老师分担一点");
+    expect(exhaustedChoice?.description).toContain("眼前的字又有点发花");
+    expect(exhaustedChoice?.description).toContain("把手边的事接过来一些");
   });
 });

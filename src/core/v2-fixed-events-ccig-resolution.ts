@@ -7,7 +7,7 @@ import {
 } from "./v2-fixed-events-ccig-events";
 import { getCcigLocation, getCcigSelfPayCost } from "./v2-fixed-events-ccig-shared";
 import { combineEffectMultipliers } from "./v2-numeric-modifiers";
-import { applyTierResist, formatTierResistedOutcome, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState } from "./v2-types";
 
 export function resolveCcigFixedEvent(
@@ -93,7 +93,7 @@ export function resolveCcigFixedEvent(
         1.5,
       ]);
       const sanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
-      const activityOutcome = `SAN ${sanChange}；《${paper.title}》宣传倍率 +50%`;
+      const activityOutcome = `${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}；《${paper.title}》宣传倍率 +50%`;
       const completionLog = [resolution.ccigAttendanceSummary, "海报展示", activityOutcome].filter(Boolean).join("；");
       return {
         nextState: state,

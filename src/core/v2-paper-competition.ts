@@ -1,15 +1,18 @@
 import type { GameState, Paper } from "./v2-types";
 import { setPaperTotalScore } from "./v2-paper-collaboration";
-import { getActualResearchMiscSanChange } from "./v2-sanity-rules";
+import { formatResearchMiscSanChange, getActualResearchMiscSanChange } from "./v2-sanity-rules";
 
 export const PAPER_COMPETITION_EVENT_IDS = [17, 18] as const;
 
 export type PaperCompetitionEventId = typeof PAPER_COMPETITION_EVENT_IDS[number];
 
-export interface PendingPaperCompetitionEvent {
-  eventId: PaperCompetitionEventId;
+export interface PendingRandomEvent {
+  eventId: number;
   serial: number;
 }
+
+/** Compatibility alias for states and callers created before generic pending events. */
+export type PendingPaperCompetitionEvent = PendingRandomEvent;
 
 export interface PaperCompetitionResolution {
   paperId: string;
@@ -63,10 +66,10 @@ function getAdjustedScore(paper: Paper, resolution: PaperCompetitionResolution):
   return Math.max(1, Math.round(paper[resolution.field] * resolution.multiplier));
 }
 
-export function formatPaperCompetitionOutcome(paper: Paper, resolution: PaperCompetitionResolution, sanCost = resolution.sanCost): string {
+export function formatPaperCompetitionOutcome(paper: Paper, resolution: PaperCompetitionResolution, sanCost = resolution.sanCost, sanSummary = `SAN-${sanCost}`): string {
   const fieldLabel = resolution.field === "idea" ? "idea" : "实验";
   const score = getAdjustedScore(paper, resolution);
-  const sanOutcome = resolution.sanCost > 0 ? `SAN-${sanCost}｜` : "";
+  const sanOutcome = resolution.sanCost > 0 ? `${sanSummary}｜` : "";
   return `${sanOutcome}${fieldLabel}×${resolution.multiplier}（${paper[resolution.field]}→${score}）`;
 }
 
@@ -99,7 +102,8 @@ export function previewPaperCompetitionResolution(
     return { applicable: false, paper, resolvedOutcome: "本次不作处理" };
   }
 
-  return { applicable: true, paper, score, sanCost, resolvedOutcome: formatPaperCompetitionOutcome(paper, resolution, sanCost) };
+  const sanSummary = formatResearchMiscSanChange(-resolution.sanCost, state.player.research, state.month, state.eventSupport, state.buffs);
+  return { applicable: true, paper, score, sanCost, resolvedOutcome: formatPaperCompetitionOutcome(paper, resolution, sanCost, sanSummary) };
 }
 
 export function applyPaperCompetitionResolution(

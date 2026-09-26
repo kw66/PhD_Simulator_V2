@@ -264,7 +264,7 @@ describe("engine and research lifecycle retries", () => {
     const submitted = { ...prepareConferenceSubmission({ ...base.fellowPapers![0]!, idea: score, experiment: score, writing: score }, "A", 1, 1), reviewMonthsLeft: 1 };
     const next = advanceFellowResearch({ ...base, totalMonths: 2, month: 2, fellowPapers: [submitted] }, () => 0);
     const draft = getFellowCurrentPaper(next, base.fellowProgressState[0]!.id)!;
-    expect(draft.status).toBe("draft");
+    expect(draft.status).toBe(accepted ? "draft" : "reviewing");
     expect(draft.id === submitted.id).toBe(!accepted);
     expect(Object.values(draft.collaborationScores ?? {}).reduce((total, amount) => total + amount, 0)).toBe(10);
     expect(draft.collaborators).toEqual([{ id: "player", name: "张明" }]);
@@ -272,7 +272,7 @@ describe("engine and research lifecycle retries", () => {
   });
 
   it("settles help before choosing automatic research and freezes it into submission", () => {
-    const base = withPending(makeState(), { pendingHelpToFellow: 10 });
+    const base = withPending(makeState(), { pendingHelpToFellow: 10, nextMonthlyAction: "project" });
     const paper = { ...base.fellowPapers![0]!, idea: 0, experiment: 100, writing: 100, prepublicationDecayRate: 0 };
     const helped = advanceFellowResearch({ ...base, totalMonths: 2, month: 2, fellowPapers: [paper] }, () => 0);
     expect(helped.fellowPapers![0]).toMatchObject({ status: "draft", idea: 10 });
@@ -287,12 +287,12 @@ describe("engine and research lifecycle retries", () => {
     expect(next.fellowProgressState[0]!.pendingHelpToFellow).toBeNull();
   });
 
-  it.each([2, 3])("settles newly completed monthly help at month %s independently of the research cadence", (totalMonths) => {
-    const base = withPending(makeState(), { taskProgress: 99 });
-    const next = advanceFellowResearch({ ...base, totalMonths, month: totalMonths,
+  it.each(["research", "project"] as const)("settles newly completed monthly help before the %s action", (nextMonthlyAction) => {
+    const base = withPending(makeState(), { taskProgress: 99, nextMonthlyAction });
+    const next = advanceFellowResearch({ ...base, totalMonths: 2, month: 2,
       fellowPapers: [{ ...base.fellowPapers![0]!, prepublicationDecayRate: 0 }],
     }, () => 0);
-    expect(next.fellowPapers![0]).toMatchObject({ idea: 10, experiment: totalMonths === 3 ? 10 : 0, writing: 0 });
+    expect(next.fellowPapers![0]).toMatchObject({ idea: 10, experiment: nextMonthlyAction === "research" ? 10 : 0, writing: 0 });
     expect(next.fellowProgressState[0]).toMatchObject({ taskProgress: 1, affinity: 2, pendingHelpToPlayer: null, pendingHelpToFellow: null });
     expect(advanceFellowResearch(next, () => 0).fellowPapers).toEqual(next.fellowPapers);
   });

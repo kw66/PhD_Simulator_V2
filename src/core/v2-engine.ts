@@ -18,7 +18,7 @@ import {
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { yearlyResetRandomEventState } from "./v2-random-event-rules";
-import { activatePendingPaperCompetitionEvents } from "./v2-paper-competition-waiting";
+import { activatePendingRandomEvents } from "./v2-paper-competition-waiting";
 import { refreshPaperCompetitionEvents } from "./v2-paper-competition-preview";
 import { applyMonthlyEffects, applyMonthStartSubscriptions, resolveMonthlyEffects } from "./v2-monthly-effects";
 import { applyReadPaperActions, getManualReadPaperCount } from "./v2-reading-system";
@@ -43,7 +43,8 @@ import { endRelationship } from "./v2-relationship-actions";
 import { advanceFellowTask } from "./v2-fellow-actions";
 import { settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { advanceFellowResearch, attendFellowConferences, ensureFellowPapers } from "./v2-fellow-research";
-import { advanceAdvisorHorizontal, settleAdvisorMonth, syncAdvisorResearchAccumulation } from "./v2-advisor-progress";
+import { advanceAdvisorProject, settleAdvisorMonth, syncAdvisorResearchAccumulation } from "./v2-advisor-progress";
+import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { advanceLoverDate, advanceLoverMonth, settlePendingLoverHelp } from "./v2-lover-progression";
 import type { DispatchPayload, GameActionId, GameState, PlayerStats } from "./v2-types";
 
@@ -308,11 +309,11 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   if (nextState.phase !== "playing") return nextState;
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
-  const helpedState = settlePendingLoverHelp(settlePendingFellowHelp(ensureFellowPapers(checkedState)));
+  const helpedState = settleAdvisorGuidance(settlePendingLoverHelp(settlePendingFellowHelp(ensureFellowPapers(checkedState))));
   const settledState = actionId === "resolve-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;
-  const refreshed = refreshPendingEventDecisions(refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingPaperCompetitionEvents(syncAdvisorResearchAccumulation(settledState)))));
+  const refreshed = refreshPendingEventDecisions(refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingRandomEvents(syncAdvisorResearchAccumulation(settledState)))));
   if (debugAction) return refreshed;
   const evaluated = evaluateCoreEndings(refreshed);
   if (evaluated.phase !== "playing") return evaluated;
@@ -393,8 +394,9 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return payload.relationshipId ? resolveReadyJournalPapers(advanceFellowTask(state, payload.relationshipId)).state : state;
     case "advisor-horizontal":
+    case "advisor-project":
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
-      return advanceAdvisorHorizontal(state);
+      return advanceAdvisorProject(state, payload.projectType ?? "horizontal");
     case "lover-play":
       return advanceLoverDate(state, "play");
     case "lover-study":

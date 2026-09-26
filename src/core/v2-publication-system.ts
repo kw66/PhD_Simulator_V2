@@ -11,7 +11,7 @@ import { enqueueEventQueueItem } from "./v2-event-queue";
 import type { GameState, Paper, PaperAcceptType, PaperReviewResult, PaperReviewSettlement, PaperTarget, PendingEvent } from "./v2-types";
 import { getJournalDefinition } from "./v2-journal-system";
 import { applyPublicationTalentRewards } from "./v2-publication-talent";
-import { getActualSanChange } from "./v2-sanity-rules";
+import { formatEventSanChange, getActualSanChange, getIllnessSanIncrease } from "./v2-sanity-rules";
 
 const DEFAULT_TARGET_INFLUENCE: Record<PaperTarget, number> = { A: 1.1, B: 0.6, C: 0.3 };
 export const CITATION_SETTLEMENT_INTERVAL_MONTHS = 1;
@@ -54,14 +54,15 @@ function getReviewerLines(settlement: PaperReviewSettlement): string[] {
         : []),
     ];
     const improvement = improvementItems.length > 0 ? `，拒稿后修改${improvementItems.join("、")}` : "";
-    const san = report.sanChange ? `，确认后 SAN ${report.sanChange > 0 ? "+" : ""}${report.sanChange}` : "";
+    const san = report.sanChange ? `，确认后 ${formatEventSanChange(report.sanChange, report.illnessSanIncrease)}` : "";
     return `**审稿人${index + 1} · ${report.reviewer}**：${decision}，有效分 ${report.effectiveScore}${feedback}${improvement}${san}`;
   });
 }
 
 function getReviewRewardText(settlement: PaperReviewSettlement): string {
+  const illnessIncrease = settlement.reports.reduce((sum, report) => sum + (report.illnessSanIncrease ?? 0), 0);
   const sanText = settlement.reviewerSanChange !== 0
-    ? `；审稿影响 SAN ${settlement.reviewerSanChange > 0 ? "+" : ""}${settlement.reviewerSanChange}`
+    ? `；审稿影响 ${formatEventSanChange(settlement.reviewerSanChange, illnessIncrease)}`
     : "";
   if (!settlement.accepted) {
     const gains = ["idea", "experiment", "writing"].map((field) => {
@@ -82,6 +83,7 @@ function resolveReviewerSan(state: GameState, settlement: PaperReviewSettlement)
       ...report,
       baseSanChange,
       sanChange: getActualSanChange(baseSanChange, state.month, state.eventSupport, state.buffs),
+      illnessSanIncrease: getIllnessSanIncrease(baseSanChange, state.month, state.eventSupport, state.buffs),
     };
   });
   return { ...settlement, reports, reviewerSanChange: reports.reduce((sum, report) => sum + (report.sanChange ?? 0), 0) };
@@ -422,6 +424,7 @@ export function resolveDuePaperReviews(
       ...report,
       baseSanChange: report.sanChange,
       sanChange: getActualSanChange(report.sanChange, state.month, state.eventSupport, state.buffs),
+      illnessSanIncrease: getIllnessSanIncrease(report.sanChange, state.month, state.eventSupport, state.buffs),
     });
     const reviewerSanChange = reports.reduce((total, report) => total + (report.sanChange ?? 0), 0);
     const settlement: PaperReviewSettlement = {

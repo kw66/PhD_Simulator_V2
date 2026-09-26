@@ -41,7 +41,7 @@ export function applyAiActivationEffects(
     const completion = reading.appliedCount < requestedReads
       ? `自动看论文 ${reading.appliedCount}/${requestedReads} 次`
       : `自动看论文 ${reading.appliedCount} 次`;
-    const sanText = reading.totalSanCost === 0 ? "SAN +0" : `SAN -${reading.totalSanCost}`;
+    const sanText = `SAN -${reading.totalSanCost}`;
     readingDetails.push(`${model.name} ${completion}，${sanText}，下次想 idea +${reading.totalIdeaBonus}${reading.researchGain > 0 ? `，科研 +${reading.researchGain}` : ""}`);
   }
 

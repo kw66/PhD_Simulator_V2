@@ -40,6 +40,28 @@ function getDecisionChoices(event: PendingEvent | undefined): EventChoice[] {
 }
 
 describe("v2 event scheduler", () => {
+  it("prefers different event categories for multiple ordinary events in one month", () => {
+    const initial = createInitialState();
+    const state = {
+      ...initial,
+      phase: "playing" as const,
+      totalMonths: 20,
+      maxMonths: 68,
+      availableRandomEvents: [1, 2, 7, 13],
+      usedRandomEvents: [],
+    };
+    let firstRoll = true;
+    const result = collectRandomEventsForMonth(state, () => {
+      if (firstRoll) {
+        firstRoll = false;
+        return 0.95;
+      }
+      return 0;
+    });
+
+    expect(result.events.map((event) => event.chainId)).toEqual(["random-1", "random-2", "random-7"]);
+  });
+
   it("randomizes one unified Teacher's Day gift without the removed stamp choice", () => {
     const state = {
       ...createInitialState(),
@@ -60,7 +82,7 @@ describe("v2 event scheduler", () => {
       const choiceEvent = event.choices[0]?.effects.enqueueEvents?.[0];
       expect(event.description).toContain("导师在群里回了句“谢谢大家”");
       expect(event.description).not.toContain("好感等级");
-      expect(choiceEvent?.description).toContain("节日问候");
+      expect(choiceEvent?.description).toContain("聊天记录往上翻");
       expect(choiceEvent?.description).not.toContain("万一导师正好有事找我帮忙");
       expect(choiceEvent?.description).not.toContain("不会显得空手");
       expect(choiceEvent?.description).not.toContain("不会显得敷衍");
@@ -566,7 +588,7 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("导师项目");
-    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["接横向项目", "接纵向项目", "申请调整", "让师弟师妹分担"]);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["接横向项目", "接纵向项目", "拒绝承担", "让师弟师妹分担"]);
     expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(1);
     expect(getDecisionChoices(result.events[0])[2]?.effects.favor).toBe(-2);
     expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-2);
@@ -783,6 +805,7 @@ describe("v2 event scheduler", () => {
       availableRandomEvents: [11],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
+      player: { ...createInitialState().player, social: 6 },
     };
 
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0, 0]));
@@ -942,6 +965,7 @@ describe("v2 event scheduler", () => {
       availableRandomEvents: [14],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
+      papers: [{ ...createDraftPaper(1, 0), status: "published" as const }],
     };
 
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0, 0]));
@@ -1080,7 +1104,7 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-5);
   });
 
-  it("skips event 16 when there is no recoverable draft progress but still consumes the draw", () => {
+  it("hides event 16 when there is no recoverable draft progress", () => {
     const initial = createInitialState();
     const baseState = {
       ...initial,
@@ -1115,9 +1139,10 @@ describe("v2 event scheduler", () => {
 
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0]));
     expect(result.events).toEqual([]);
-    expect(result.nextState.availableRandomEvents).toEqual([16]);
+    expect(result.nextState.availableRandomEvents).toEqual([]);
     expect(result.nextState.usedRandomEvents).toEqual([]);
-    expect(result.nextState.totalRandomEventCount).toBe(0);
+    expect(result.nextState.totalRandomEventCount).toBe(1);
+    expect(result.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId: 16, serial: 1 }]);
   });
 
   it("does not queue a disease event from the ordinary random pool", () => {

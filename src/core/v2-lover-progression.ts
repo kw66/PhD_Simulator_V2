@@ -178,6 +178,7 @@ export function advanceLoverMonth(state: GameState): GameState {
     || state.totalMonths <= (lover.lastAdvancedTotalMonths ?? -1)) return state;
   const gains = getLoverPassiveGains(state);
   let nextState: GameState = { ...activateLoverMonthlyDiscount(state), loverProgressState: { ...lover, taskUsedThisMonth: false, lastAdvancedTotalMonths: state.totalMonths,
+    monthlyActivity: `玩耍进度+${gains.play}，学习进度+${gains.study}`,
     sanDiscountMonths: (lover.sanDiscountMonths ?? []).filter((month) => month > state.totalMonths) } };
   nextState = advanceRoute(nextState, "play", gains.play);
   nextState = advanceRoute(nextState, "study", gains.study);

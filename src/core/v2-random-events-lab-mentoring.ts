@@ -1,4 +1,4 @@
-﻿import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
+﻿import { applyTierResist, formatEventSanChange, withoutIllnessSanBuffs, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel, getFellowPronoun, getPlayerHonorific } from "./v2-fellow-progression";
 import { getActiveAiModels } from "./v2-ai-shop";
 import { getRoleDefinition } from "./v2-progression";
@@ -175,6 +175,11 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
     consumeMonthlyAction: false,
     allowSanOverdraw: true,
   });
+  const healthyReadPreview = previewReadPaperActions({ ...state, buffs: withoutIllnessSanBuffs(state.buffs) }, 2, {
+    consumeMonthlyAction: false,
+    allowSanOverdraw: true,
+  });
+  const reviewIllnessIncrease = Math.max(0, reviewReadPreview.totalSanCost - healthyReadPreview.totalSanCost);
   const activeKimi = getActiveAiModels(state.aiShopState).find((model) => model.slot === "kimi");
   const reviewSupportHint = [
     state.shopState.monitorOwned ? "桌上的 2K 显示器正好能把正文和附录分开" : "",
@@ -182,15 +187,15 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
   ].filter(Boolean).join("；");
   const reviewSupportNarrative = [
     state.shopState.monitorOwned
-      ? "你打开商店买来的 2K 显示器，把正文和附录分别放到两块屏幕上，来回对照时少翻了几次窗口。"
-      : "你把正文和附录在同一块屏幕上来回切换，页码很快记满了便签。",
+      ? "还好之前买了 2K 显示器，这一大篇正文和附录看着没那么累，来回核对也顺畅了不少。"
+      : "",
     activeKimi
-      ? `${activeKimi.name}先把长附录按公式编号整理出提纲，你顺着它标出的页码逐项核对，少在重复的定义之间绕圈。`
-      : "附录太长，你只能自己从头标页码，再一点点把公式和实验表对起来。",
-  ].join("\n\n");
+      ? `${state.shopState.monitorOwned ? "再加上订阅的" : "还好订阅了"} ${activeKimi.name}，有它帮着梳理长文，审稿效率高了不少。`
+      : "",
+  ].filter(Boolean).join("");
   const reviewOutcome = [
     `看论文 ${reviewReadPreview.appliedCount} 次`,
-    `SAN -${reviewReadPreview.totalSanCost}`,
+    reviewReadPreview.totalSanCost > 0 ? formatEventSanChange(-reviewReadPreview.totalSanCost, reviewIllnessIncrease) : "",
     `下次想 idea +${reviewReadPreview.totalIdeaBonus}分`,
     reviewReadPreview.researchGain > 0 ? `科研 +${reviewReadPreview.researchGain}` : "",
   ].filter(Boolean).join("｜");
@@ -253,7 +258,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
       [`random-2-self-${serial}`]: {
         title: "自己审稿",
         description: [
-          reviewSupportNarrative,
+          ...(reviewSupportNarrative ? [reviewSupportNarrative] : []),
           "你把稿件和一篇关键参考文献并排打开，对着公式核到实验表，笔记里写满了页码。最初那句“这里好像不对”，终于被改成了能说清依据的审稿意见。",
           "你按群里的要求把意见发给导师，又记下几个值得借鉴的实验设计。窗外已经暗了，原来的安排还没顾上，倒是下次琢磨方向时多了些可翻的笔记。",
         ].join("\n\n"),

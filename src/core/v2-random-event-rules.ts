@@ -1,8 +1,9 @@
 import {
   buildCandidateEventIds as buildCandidateEventIdsFromContext,
   buildWeightedPool,
+  type RandomEventCategory,
 } from "./v2-random-event-pool-builder";
-import { PAPER_COMPETITION_EVENT_IDS, type PendingPaperCompetitionEvent } from "./v2-paper-competition";
+import { type PendingPaperCompetitionEvent } from "./v2-paper-competition";
 
 export interface RandomEventState {
   availableRandomEvents: number[];
@@ -18,6 +19,7 @@ export interface RandomEventPoolContext extends RandomEventState {
   publishedPaperCount?: number;
   hasRecoverableDraftPaper?: boolean;
   hasAuthorshipEligibleDraftPaper?: boolean;
+  excludedCategories?: readonly RandomEventCategory[];
 }
 
 export interface RandomEventPoolSnapshot {
@@ -31,10 +33,9 @@ export interface RandomEventDrawResult {
   nextState: RandomEventState;
 }
 
-export const BASE_RANDOM_EVENT_IDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15, ...PAPER_COMPETITION_EVENT_IDS] as const;
-
-const SOCIAL_UNLOCK_EVENT_ID = 11;
-const MENTORING_EVENT_ID = 14;
+export const BASE_RANDOM_EVENT_IDS = [
+  1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+] as const;
 const BASE_WEIGHT_REPEAT = 10;
 
 function cloneRandomEventState(state: RandomEventState): RandomEventState {
@@ -60,23 +61,30 @@ export function getAttributeTier(value: number): 0 | 1 | 2 | 3 {
   return 0;
 }
 
-export function calculateRandomEventCount(roll: number): number {
+export interface RandomEventProtectionWindow {
+  totalMonths: number;
+  maxMonths: number;
+}
+
+export function isRandomEventProtectionWindow({ totalMonths, maxMonths }: RandomEventProtectionWindow): boolean {
+  if (!Number.isFinite(totalMonths) || !Number.isFinite(maxMonths) || maxMonths <= 0) return false;
+  return (totalMonths >= 1 && totalMonths <= 3)
+    || (totalMonths >= maxMonths - 8 && totalMonths <= maxMonths);
+}
+
+export function calculateRandomEventCount(roll: number, protectionWindow?: RandomEventProtectionWindow): number {
   const normalizedRoll = Math.max(0, Math.min(0.999999999999, roll));
+  if (protectionWindow && isRandomEventProtectionWindow(protectionWindow)) {
+    return normalizedRoll < 0.70 ? 0 : 1;
+  }
   if (normalizedRoll < 0.70) return 0;
   if (normalizedRoll < 0.85) return 1;
   if (normalizedRoll < 0.95) return 2;
   return 3;
 }
 
-export function createRandomEventPool(publishedPaperCount: number, hasRecoverableDraftPaper = false): number[] {
-  const nextPool: number[] = [...BASE_RANDOM_EVENT_IDS];
-  if (publishedPaperCount > 0) {
-    nextPool.push(MENTORING_EVENT_ID);
-  }
-  if (hasRecoverableDraftPaper) {
-    nextPool.push(16);
-  }
-  return nextPool;
+export function createRandomEventPool(_publishedPaperCount = 0, _hasRecoverableDraftPaper = false): number[] {
+  return [...BASE_RANDOM_EVENT_IDS];
 }
 
 export function createInitialRandomEventState(publishedPaperCount = 0): RandomEventState {
@@ -97,14 +105,13 @@ export function yearlyResetRandomEventState(
   const pendingIds = new Set<number>((nextState.pendingPaperCompetitionEvents ?? []).map((event) => event.eventId));
   nextState.availableRandomEvents = createRandomEventPool(publishedPaperCount, hasRecoverableDraftPaper)
     .filter((eventId) => !pendingIds.has(eventId));
-  nextState.usedRandomEvents = [...pendingIds];
+  nextState.usedRandomEvents = [];
   return nextState;
 }
 
 export function buildWeightedRandomEventPool(context: RandomEventPoolContext): RandomEventPoolSnapshot {
   const { candidateEventIds } = buildCandidateEventIdsFromContext({
     context,
-    socialUnlockEventId: SOCIAL_UNLOCK_EVENT_ID,
   });
 
   const weightedPool = buildWeightedPool({
@@ -122,9 +129,7 @@ function consumeRandomEvent(state: RandomEventState, eventId: number): RandomEve
   return {
     ...cloneRandomEventState(state),
     availableRandomEvents: state.availableRandomEvents.filter((currentEventId) => currentEventId !== eventId),
-    usedRandomEvents: state.usedRandomEvents.includes(eventId)
-      ? [...state.usedRandomEvents]
-      : [...state.usedRandomEvents, eventId],
+    usedRandomEvents: [...state.usedRandomEvents],
   };
 }
 

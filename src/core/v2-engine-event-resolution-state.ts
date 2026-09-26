@@ -1,5 +1,4 @@
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
-import { ADVISOR_FUNDING_CAP } from "./v2-advisor-progress";
 import { createCustomFellowProgressProfile, getFellowName, getUniqueFellowName } from "./v2-fellow-progression";
 import { applyFixedEventResolution } from "./v2-fixed-events";
 import { getGraduationScoreTarget, getMonthLimitByDegree, getRoleDefinition } from "./v2-progression";
@@ -15,6 +14,7 @@ import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-t
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
 import { createLoverProgressState } from "./v2-lover-progression";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
+import { advanceSharedLabProject } from "./v2-lab-projects";
 import { addPaperCollaboration, applyPaperEffectUpdates, setPaperTotalScores } from "./v2-paper-collaboration";
 import type { Buff, EventChoice, GameState, PaperActionType, PendingEvent } from "./v2-types";
 
@@ -255,7 +255,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       advisorProgressState[key] = Math.max(0, advisorProgressState[key] + (value ?? 0));
     }
   }
-  advisorProgressState.funding = Math.min(ADVISOR_FUNDING_CAP, advisorProgressState.funding);
+  advisorProgressState.funding = Math.max(0, advisorProgressState.funding);
 
   const thesisProgress = Math.min(100, state.thesis.progress + (effects.thesisProgress ?? 0));
   const thesis = effects.abandonThesis
@@ -441,6 +441,12 @@ export function applyChoiceEffectsToState(
     };
   }
   let nextState = applyDirectCoreEffects(state, choice, buffSource);
+  if (choice.effects.labProjectProgress) {
+    const { type, amount, guidanceRolls } = choice.effects.labProjectProgress;
+    let rollIndex = 0;
+    const random = guidanceRolls ? () => guidanceRolls[rollIndex++] ?? 0 : Math.random;
+    nextState = advanceSharedLabProject(nextState, type, amount, random).state;
+  }
   if (choice.effects.paperReviewSettlement) {
     nextState = applyPaperReviewSettlement(nextState, choice.effects.paperReviewSettlement);
   }

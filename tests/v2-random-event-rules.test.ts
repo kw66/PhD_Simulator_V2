@@ -6,6 +6,7 @@ import {
   createInitialRandomEventState,
   drawRandomEvent,
   getAttributeTier,
+  isRandomEventProtectionWindow,
   yearlyResetRandomEventState,
 } from "../src/core/v2-random-event-rules";
 import { applyTierResist } from "../src/core/v2-sanity-rules";
@@ -31,11 +32,25 @@ describe("v2 random event rules", () => {
     expect(calculateRandomEventCount(0.95)).toBe(3);
   });
 
+  it("uses one-event protection at the start and end of a run", () => {
+    const protection = { totalMonths: 1, maxMonths: 68 };
+    expect(isRandomEventProtectionWindow(protection)).toBe(true);
+    expect(calculateRandomEventCount(0.69, protection)).toBe(0);
+    expect(calculateRandomEventCount(0.70, protection)).toBe(1);
+    expect(calculateRandomEventCount(0.99, protection)).toBe(1);
+    expect(isRandomEventProtectionWindow({ totalMonths: 3, maxMonths: 68 })).toBe(true);
+    expect(isRandomEventProtectionWindow({ totalMonths: 4, maxMonths: 68 })).toBe(false);
+    expect(isRandomEventProtectionWindow({ totalMonths: 59, maxMonths: 68 })).toBe(false);
+    expect(isRandomEventProtectionWindow({ totalMonths: 60, maxMonths: 68 })).toBe(true);
+    expect(calculateRandomEventCount(0.99, { totalMonths: 60, maxMonths: 68 })).toBe(1);
+    expect(calculateRandomEventCount(0.99, { totalMonths: 59, maxMonths: 68 })).toBe(3);
+  });
+
   it("initializes and yearly resets the pool using published paper state", () => {
     const initialState = createInitialRandomEventState();
     expect(initialState.availableRandomEvents).toEqual([...BASE_RANDOM_EVENT_IDS]);
-    expect(initialState.availableRandomEvents).not.toContain(14);
-    expect(initialState.availableRandomEvents).not.toContain(16);
+    expect(initialState.availableRandomEvents).toContain(14);
+    expect(initialState.availableRandomEvents).toContain(16);
 
     const resetState = yearlyResetRandomEventState(
       {
@@ -52,33 +67,44 @@ describe("v2 random event rules", () => {
     expect(resetState.totalRandomEventCount).toBe(4);
   });
 
-  it("keeps the normal pool in the first semester and still allows dynamic event 11", () => {
+  it("keeps every ordinary event in the same pool and excludes only disease", () => {
     const snapshot = buildWeightedRandomEventPool({
       ...createInitialRandomEventState(),
       social: 6,
     });
 
-    expect(snapshot.candidateEventIds).toEqual([1, 2, 4, 5, 6, 7, 8, 9, 10, 13, 15, 17, 18, 11]);
+    expect(snapshot.candidateEventIds).toEqual([...BASE_RANDOM_EVENT_IDS]);
     expect(snapshot.candidateEventIds).not.toContain(3);
     expect(snapshot.weightedPool.filter((eventId) => eventId === 3)).toHaveLength(0);
   });
 
-  it("does not replace the normal pool with a month-7 cooperation pool", () => {
+  it("does not change the ordinary pool when prerequisites become available", () => {
     const gameMonthSeven = buildWeightedRandomEventPool({
       ...createInitialRandomEventState(1),
       social: 6,
     });
-    expect(gameMonthSeven.candidateEventIds).toContain(1);
-    expect(gameMonthSeven.candidateEventIds).toContain(10);
-    expect(gameMonthSeven.candidateEventIds).toContain(14);
-    expect(gameMonthSeven.candidateEventIds).toContain(11);
+    expect(gameMonthSeven.candidateEventIds).toEqual([...BASE_RANDOM_EVENT_IDS]);
 
     const gameMonthEleven = buildWeightedRandomEventPool({
       ...createInitialRandomEventState(1),
       social: 6,
     });
     expect(gameMonthEleven.candidateEventIds).not.toContain(3);
-    expect(gameMonthEleven.candidateEventIds).not.toEqual([1, 10, 14, 11]);
+    expect(gameMonthEleven.candidateEventIds).toEqual([...BASE_RANDOM_EVENT_IDS]);
+  });
+
+  it("prefers event categories that have not appeared in the same month", () => {
+    const base = {
+      ...createInitialRandomEventState(),
+      availableRandomEvents: [1, 2, 7, 13],
+      social: 0,
+    };
+    expect(buildWeightedRandomEventPool({ ...base, excludedCategories: ["guidance"] }).candidateEventIds)
+      .toEqual([2, 7, 13]);
+    expect(buildWeightedRandomEventPool({
+      ...base,
+      excludedCategories: ["guidance", "balance", "reward", "punishment"],
+    }).candidateEventIds).toEqual([1, 2, 7, 13]);
   });
 
   it("does not advertise a resisted gain that the stat cap will discard", () => {
@@ -113,13 +139,13 @@ describe("v2 random event rules", () => {
     const first = drawRandomEvent(context, 0);
     expect(first.eventId).toBe(eventId);
     expect(first.nextState.availableRandomEvents).toEqual([]);
-    expect(first.nextState.usedRandomEvents).toEqual([eventId]);
+    expect(first.nextState.usedRandomEvents).toEqual([]);
 
     const second = drawRandomEvent({ ...context, ...first.nextState }, 0);
     expect(second.outcome).toBe("none");
     expect(second.eventId).toBeNull();
     expect(second.nextState.availableRandomEvents).toEqual([]);
-    expect(second.nextState.usedRandomEvents).toEqual([eventId]);
+    expect(second.nextState.usedRandomEvents).toEqual([]);
   });
 
   it("never draws the removed illness event from the ordinary pool", () => {
@@ -139,21 +165,21 @@ describe("v2 random event rules", () => {
     expect(result.nextState.totalRandomEventCount).toBe(4);
   });
 
-  it("adds data-loss to the ordinary pool only while a draft can be recovered", () => {
+  it("keeps data-loss in the ordinary pool and defers its prerequisite check", () => {
     const base = {
       ...createInitialRandomEventState(),
       social: 0,
     };
-    expect(buildWeightedRandomEventPool({ ...base, hasRecoverableDraftPaper: false }).candidateEventIds).not.toContain(16);
+    expect(buildWeightedRandomEventPool({ ...base, hasRecoverableDraftPaper: false }).candidateEventIds).toContain(16);
     expect(buildWeightedRandomEventPool({ ...base, hasRecoverableDraftPaper: true }).candidateEventIds).toContain(16);
   });
 
-  it("adds junior mentoring as soon as a first-author paper is published", () => {
+  it("keeps junior mentoring in the ordinary pool before its prerequisite is met", () => {
     const base = {
       ...createInitialRandomEventState(),
       social: 0,
     };
-    expect(buildWeightedRandomEventPool({ ...base, publishedPaperCount: 0 }).candidateEventIds).not.toContain(14);
+    expect(buildWeightedRandomEventPool({ ...base, publishedPaperCount: 0 }).candidateEventIds).toContain(14);
     expect(buildWeightedRandomEventPool({ ...base, publishedPaperCount: 1 }).candidateEventIds).toContain(14);
     expect(buildWeightedRandomEventPool({
       ...base,

@@ -83,6 +83,8 @@ describe("lover initialization and monthly progression", () => {
       shopping: { progress: 0, completed: 0 },
     });
     expect(next.loverProgressState).toMatchObject({ intimacy: 7, lastAdvancedTotalMonths: 8, pendingPaperHelp: { amount: 10 } });
+    expect(next.loverProgressState.monthlyActivity).toBe(type === "beautiful" ? "玩耍进度+5，学习进度+2" : "玩耍进度+2，学习进度+5");
+    expect(advanceLoverDate(next, "study").loverProgressState.monthlyActivity).toBe(next.loverProgressState.monthlyActivity);
     expect(next.player).toEqual({ ...state.player, san: 16 });
     expect(advanceLoverMonth(next)).toBe(next);
     expect(state).toEqual(before);

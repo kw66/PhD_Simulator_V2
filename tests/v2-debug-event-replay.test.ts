@@ -153,7 +153,7 @@ describe("debug event scene replay", () => {
   it("can opt into replay after the opening event was already queued", () => {
     let state = startGame();
     const opening = state.eventQueue.find((event) => event.chainId === "before-grad-school");
-    expect(opening?.replayContext).toBeUndefined();
+    expect(opening?.replayContext).toBeDefined();
 
     state = dispatchAction(state, "debug-toggle-event-replay", { debugEventReplayEnabled: true });
     const markedOpening = state.eventQueue.find((event) => event.chainId === "before-grad-school");

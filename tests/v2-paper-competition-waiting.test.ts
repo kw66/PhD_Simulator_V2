@@ -81,7 +81,7 @@ afterEach(() => {
 describe("hidden paper competition lifecycle", () => {
   it("includes both competition events in a fresh pool even without papers", () => {
     expect(createRandomEventPool(0, false)).toEqual(expect.arrayContaining([17, 18]));
-    expect(createRandomEventPool(0, false)).not.toContain(16);
+    expect(createRandomEventPool(0, false)).toContain(16);
     const state = makeState();
     expect(buildWeightedRandomEventPool({
       ...state, social: 4, research: 4, hasRecoverableDraftPaper: false,
@@ -97,7 +97,7 @@ describe("hidden paper competition lifecycle", () => {
     expect(drawn.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId, serial: 8 }]);
     expect(drawn.nextState.totalRandomEventCount).toBe(8);
     expect(drawn.nextState.availableRandomEvents).not.toContain(eventId);
-    expect(drawn.nextState.usedRandomEvents.filter((entry) => entry === eventId)).toHaveLength(1);
+    expect(drawn.nextState.usedRandomEvents.filter((entry) => entry === eventId)).toHaveLength(0);
     expect(drawn.nextState.eventQueue).toEqual(state.eventQueue);
     expect(drawn.nextState.log).toEqual(state.log);
     expect(drawn.nextState.eventHistory).toEqual(state.eventHistory);
@@ -135,7 +135,7 @@ describe("hidden paper competition lifecycle", () => {
     expect(repeated.pendingPaperCompetitionEvents).toEqual([{ eventId: 17, serial: 6 }]);
     expect(both.pendingPaperCompetitionEvents).toEqual([{ eventId: 17, serial: 6 }, { eventId: 18, serial: 7 }]);
     expect(both.availableRandomEvents).toEqual([]);
-    expect(both.usedRandomEvents).toEqual([11, 14, 16, 17, 18]);
+    expect(both.usedRandomEvents).toEqual([11, 14, 16]);
     expect(both.totalRandomEventCount).toBe(7);
     expect(both.log).toEqual(state.log);
     expect(both.eventQueue).toEqual(state.eventQueue);
@@ -292,8 +292,8 @@ describe("hidden paper competition lifecycle", () => {
       expect(reset.totalRandomEventCount).toBe(7);
       expect(reset.availableRandomEvents).not.toContain(17);
       expect(reset.availableRandomEvents).not.toContain(18);
-      expect(reset.usedRandomEvents.filter((eventId) => eventId === 17)).toHaveLength(1);
-      expect(reset.usedRandomEvents.filter((eventId) => eventId === 18)).toHaveLength(1);
+      expect(reset.usedRandomEvents.filter((eventId) => eventId === 17)).toHaveLength(0);
+      expect(reset.usedRandomEvents.filter((eventId) => eventId === 18)).toHaveLength(0);
       reset = rememberBoth(reset);
       expect(reset.pendingPaperCompetitionEvents).toHaveLength(2);
     }
@@ -377,7 +377,7 @@ describe("hidden paper competition lifecycle", () => {
     expect(advanced.availableRandomEvents).not.toContain(17);
     expect(advanced.availableRandomEvents).not.toContain(18);
     expect(advanced.usedRandomEvents.filter((eventId) => eventId === 17)).toHaveLength(1);
-    expect(advanced.usedRandomEvents.filter((eventId) => eventId === 18)).toHaveLength(1);
+    expect(advanced.usedRandomEvents.filter((eventId) => eventId === 18)).toHaveLength(0);
     expect(rememberPendingPaperCompetitionEvent(advanced, 17, 999)).toEqual(advanced);
   });
 });

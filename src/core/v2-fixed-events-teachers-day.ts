@@ -1,4 +1,4 @@
-import { applyTierResist, formatTierResistedOutcome, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import {
   applyStateMutation,
   createFixedEvent,
@@ -252,7 +252,7 @@ export function resolveTeachersDayFixedEvent(
             san: sanChange,
             favor: favorChange,
           }),
-          outcome: `${formatProbabilityCondition("报销跑腿", 0.5)}｜你发去祝福后，导师顺手把报销跑腿交给了你，SAN ${sanChange}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+          outcome: `${formatProbabilityCondition("报销跑腿", 0.5)}｜你发去祝福后，导师顺手把报销跑腿交给了你，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           enqueueEvents: [createTeachersDayResultEvent({
             state,
             resultId: "message-errand",
@@ -262,10 +262,10 @@ export function resolveTeachersDayFixedEvent(
               "你拿齐材料，在财务处排了快一个小时的队，回来再向导师报了受理情况。坐回工位，水杯里的茶已经凉了。你只是发了句祝福，怎么半个下午也跟着送出去了。",
               ...(favorNarrative ? [favorNarrative] : []),
               probabilityNote,
-              `机制结算\nSAN ${sanChange}\n${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
+              `机制结算\n${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}\n${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
             ].join("\n\n"),
             buttonLabel: "认命",
-            outcome: `${formatProbabilityCondition("报销跑腿", 0.5)}｜你发了教师节祝福，被叫去财务处跑腿，SAN ${sanChange}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+            outcome: `${formatProbabilityCondition("报销跑腿", 0.5)}｜你发了教师节祝福，被叫去财务处跑腿，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           })],
         };
       }

@@ -101,6 +101,17 @@ describe("v2 before grad school events", () => {
       eventChoiceId: "before-grad-school-open-advisor-info",
     });
 
+    expect(state.playerName).toBeNull();
+    const advisorInfo = state.eventQueue.find((event) => event.chainId === "before-grad-school")!;
+    const confirm = advisorInfo.choices.find((choice) => choice.effects.fixedEventResolution?.kind === "advisor-confirm")!;
+    state = dispatchAction(state, "resolve-event", { eventId: advisorInfo.id, eventChoiceId: confirm.id });
+    for (let index = 0; index < 3 && state.playerName === null; index += 1) {
+      const followUp = state.eventQueue.find((event) => event.chainId === "before-grad-school");
+      if (!followUp) break;
+      const choice = followUp.choices[0];
+      if (!choice) break;
+      state = dispatchAction(state, "resolve-event", { eventId: followUp.id, eventChoiceId: choice.id });
+    }
     expect(state.playerName).toBe(candidateName);
   });
 
@@ -282,12 +293,17 @@ describe("v2 before grad school events", () => {
     expect(resolved.nextState.relationshipState.advisorCount).toBe(1);
     expect(resolved.nextState.advisorProgressState).toEqual({
       researchAccumulation: 20,
-      funding: 0,
+      funding: 10,
+      horizontalProgress: 0,
+      verticalProgress: 0,
+      nextProject: "horizontal",
+      monthlyActivity: "暂无项目安排",
       awards: [],
       pendingApplication: null,
       countedPaperIds: [],
       lastSettledTotalMonths: null,
       lastHorizontalTotalMonths: null,
+      lastProjectTotalMonths: null,
     });
     expect(resolved.outcome).toContain("加入李旭旭讲师的课题组");
     expect(resolved.outcome).toContain("进了实验室群");

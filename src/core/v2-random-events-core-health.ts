@@ -1,4 +1,4 @@
-import { getActualSanChange } from "./v2-sanity-rules";
+import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { createThreeStageRandomEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { Buff, EventChoice, GameState, PendingEvent } from "./v2-types";
@@ -6,6 +6,7 @@ import type { Buff, EventChoice, GameState, PendingEvent } from "./v2-types";
 export type IllnessType = "stomach" | "flu" | "fever";
 
 const ILLNESS_INDEX: IllnessType[] = ["stomach", "flu", "fever"];
+const ILLNESS_REST_BASE_SAN_COST = 3;
 const ILLNESS_COPY: Record<IllnessType, {
   title: string;
   intro: string[];
@@ -15,11 +16,11 @@ const ILLNESS_COPY: Record<IllnessType, {
   stomach: {
     title: "肚子虚弱",
     intro: [
-      "早上起来，你的肚子就一阵阵不舒服，早餐只勉强吃了两口。刚坐到电脑前，又得起身往洗手间跑。",
-      "桌上的粥放凉了，电脑还停在刚打开的页面。你拉开椅子坐下，没过多久又站了起来。",
+      "最近你熬夜赶进度，三餐也没个准点，SAN 一直偏低，生病的风险也一天天累积。被你忽略的疲惫和不适，今天早上终于一起找上了门：肚子一阵阵绞痛，早餐只勉强吃了两口。",
+      "刚坐到电脑前，你又得起身往洗手间跑。桌上的粥放凉了，电脑还停在刚打开的页面。之前总想着忍一忍就过去，身体这次却不肯再配合。",
     ],
     decision: [
-      "你伸手去拿书包，肚子又绞了一下，只好先扶着桌沿站住。待办清单还开着，一条都没划掉；今天才刚开始，你已经盼着能躺回床上。",
+      "你伸手去拿书包，肚子又绞了一下，只好先扶着桌沿站住。待办清单还开着，一条都没划掉。真要继续硬撑，这个月看书、做实验都得忍着腹痛，身体再这么透支下去，还可能落下病根。",
       "手机里查到的买药费用是 1 金币，去医院要 3 金币。你摸了摸口袋，又看向床边的水杯。留在宿舍休息的话，今天的学习和实验都只能先放下。",
     ],
     results: {
@@ -44,11 +45,11 @@ const ILLNESS_COPY: Record<IllnessType, {
   flu: {
     title: "流感来袭",
     intro: [
-      "早上醒来，你的嗓子发紧，鼻子也堵得厉害。洗漱时喷嚏一个接一个，浑身酸痛，咳嗽迟迟停不下来。",
-      "你在床边坐了好一会儿，书包就在脚边，伸手收拾都觉得累。桌上的纸巾很快就用了小半包。",
+      "这阵子你白天赶实验，晚上又熬到很晚，休息和吃饭都没个规律，SAN 长期偏低，生病风险也跟着一点点攒了起来。身体终于扛不住了：一觉醒来，嗓子发紧，鼻子堵得厉害。",
+      "洗漱时喷嚏一个接一个，浑身酸痛，咳嗽迟迟停不下来。你在床边坐了好一会儿，连收拾脚边的书包都觉得累，桌上的纸巾很快就用了小半包。",
     ],
     decision: [
-      "群里有人问你几点到，你打下“马上”，一阵咳嗽又把手震得按错了键。你删掉那两个字，拿纸巾擦了擦鼻子，实在提不起背书包出门的劲。",
+      "群里有人问你几点到，你打下“马上”，一阵咳嗽又把手震得按错了键。你删掉那两个字：要是硬撑着照常干活，这个月学习和做实验都得在咳嗽、头昏里熬过去，身体持续透支，还可能落下病根。",
       "翻了一圈抽屉，没找到现成的药。买药要 2 金币，去医院要 4 金币；留在宿舍休息就得把今天的实验和组会都推后。聊天框还等着回复，你靠回枕头上，先把气喘匀。",
     ],
     results: {
@@ -73,11 +74,11 @@ const ILLNESS_COPY: Record<IllnessType, {
   fever: {
     title: "高烧不退",
     intro: [
-      "早上醒来，你浑身发烫，连下床都觉得腿软。体温计连续几次停在 39.5°C 左右，高烧始终没有退。",
-      "室友看了眼温度，又看了眼你，催你不要再硬扛。",
+      "最近你连着熬夜，生活作息乱成一团，SAN 一直偏低，生病风险也在这段日子里越积越高。你始终没给自己喘口气的时间，积累的疲惫和不适终于爆发：早上醒来，浑身发烫，连下床都觉得腿软。",
+      "体温计连续几次停在 39.5°C 左右，高烧始终没有退。室友看了眼温度，又看了眼你，催你别再把身体的警报当耳旁风。",
     ],
     decision: [
-      "你拿起手机想交代今天的安排，短短一句话删改了好几次，连屏幕都看得费劲。室友把水杯递到手里，又把查好的就诊路线给你看。有人在旁边照应，心里总算踏实一点。",
+      "你拿起手机想交代今天的安排，短短一句话删改了好几次，连屏幕都看得费劲。继续硬撑的话，这个月连学习都得强打精神，实验更会格外难熬。身体已经吃不消，再透支下去，可能真会落下病根。",
       "买药要 3 金币，去医院要 5 金币；留在宿舍休息就意味着今天完全无法学习和工作。你捧着水杯没出声，室友蹲下来找你的鞋：“先想想身体，工作晚点再说。”",
     ],
     results: {
@@ -131,12 +132,14 @@ export function createIllnessRandomEvent(
   };
   const illnessBuffs = [...state.buffs.filter((buff) => buff.id !== pendingBuffId), illnessBuff];
   const medicineSan = getActualSanChange(-severity, state.month, state.eventSupport, illnessBuffs);
-  const restSan = getActualSanChange(-(4 + severity * 2), state.month, state.eventSupport, illnessBuffs);
+  const restSan = getActualSanChange(-ILLNESS_REST_BASE_SAN_COST, state.month, state.eventSupport, illnessBuffs);
+  const clearIllnessOutcome = `清除本月 SAN 消耗 ×${activeOperationSanMultiplier}`;
   const medicineSettlement = [
     `金币 ${medicineMoney}`,
-    medicineSan !== 0 ? `SAN ${medicineSan}` : "",
+    medicineSan !== 0 ? formatActualSanChange(-severity, state.month, state.eventSupport, illnessBuffs) : "",
     severity > 0 ? `SAN 上限 -${severity}` : "",
     "生病概率 ×0.25",
+    clearIllnessOutcome,
   ].filter(Boolean).join("｜");
 
   const event: PendingEvent = {
@@ -171,14 +174,14 @@ export function createIllnessRandomEvent(
       {
         id: `illness-${illnessType}-hospital-${serial}`,
         label: "去医院",
-        outcome: `金币 ${hospitalMoney}｜生病概率 ×0`,
+        outcome: `金币 ${hospitalMoney}｜生病概率 ×0｜${clearIllnessOutcome}`,
         effects: { money: hospitalMoney, illnessProbabilityMultiplier: 0, removeBuffIds: [pendingBuffId] },
       },
       {
         id: `illness-${illnessType}-rest-${serial}`,
         label: "休息",
         ...(state.actionState.used >= state.actionState.limit ? { disabledReason: "本月行动点已用尽，无法休息" } : {}),
-        outcome: `SAN ${restSan}｜休息（SAN+${restSanGain}｜行动点-1）｜生病概率 ×0.5`,
+        outcome: `${formatActualSanChange(-ILLNESS_REST_BASE_SAN_COST, state.month, state.eventSupport, illnessBuffs)}｜休息（SAN+${restSanGain}｜行动点-1）｜生病概率 ×0.5｜${clearIllnessOutcome}`,
         effects: { san: restSan, illnessProbabilityMultiplier: 0.5, restAction: true, removeBuffIds: [pendingBuffId] },
       },
     ],

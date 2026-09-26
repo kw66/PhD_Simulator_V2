@@ -5,9 +5,14 @@ import { getJournalDefinition } from "./v2-journal-system";
 import type { AdvisorGrantId, AdvisorProgressState, Degree, GameState, Paper } from "./v2-types";
 import { recordTalentTrigger } from "./v2-talent-history";
 import { getRelationshipSanCost } from "./v2-buffs";
+import { settleAdvisorGuidance } from "./v2-advisor-guidance";
+import { advanceSharedLabProject, ADVISOR_HORIZONTAL_REWARD } from "./v2-lab-projects";
 
-export const ADVISOR_FUNDING_CAP = 20;
-export const ADVISOR_TASK_SAN_COST = 5;
+export const ADVISOR_HORIZONTAL_SAN_COST = 5;
+export const ADVISOR_VERTICAL_SAN_COST = 4;
+/** Kept as the default horizontal cost for callers that do not choose a project. */
+export const ADVISOR_TASK_SAN_COST = ADVISOR_HORIZONTAL_SAN_COST;
+export { ADVISOR_HORIZONTAL_REWARD, PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
 
 export interface AdvisorGrantDefinition {
   id: AdvisorGrantId;
@@ -28,12 +33,17 @@ export const ADVISOR_GRANTS: readonly AdvisorGrantDefinition[] = [
 export function createAdvisorProgressState(): AdvisorProgressState {
   return {
     researchAccumulation: 20,
-    funding: 0,
+    funding: 10,
+    horizontalProgress: 0,
+    verticalProgress: 0,
+    nextProject: "horizontal",
+    monthlyActivity: "暂无项目安排",
     awards: [],
     pendingApplication: null,
     countedPaperIds: [],
     lastSettledTotalMonths: null,
     lastHorizontalTotalMonths: null,
+    lastProjectTotalMonths: null,
   };
 }
 
@@ -85,7 +95,7 @@ export function getAdvisorApplicationSummary(state: GameState): string {
   const pending = advisor.pendingApplication;
   if (pending) return `${ADVISOR_GRANTS.find((grant) => grant.id === pending.id)!.name}申请中 · 8月公布`;
   const highest = getHighestAdvisorAwardIndex(advisor);
-  if (highest === ADVISOR_GRANTS.length - 1) return "院士 · 每月科研经费+1";
+  if (highest === ADVISOR_GRANTS.length - 1) return "已获院士";
   const year = getAcademicCalendarYear(state.year, state.month);
   const applicationYear = year + (getAcademicCalendarMonth(state.month) >= 3 ? 1 : 0);
   const eligible = getEligibleAdvisorGrant(advisor, applicationYear);
@@ -100,13 +110,6 @@ export function getAdvisorApplicationSummary(state: GameState): string {
 function getAdvisorPaperScore(paper: Paper): number {
   const journal = paper.journalTarget ?? paper.publication?.journalTarget;
   return journal ? getJournalDefinition(journal).researchScore : paper.target ? SCORE_BY_TARGET[paper.target] : 0;
-}
-
-export function getAdvisorMonthlyResearchGrowth(state: GameState) {
-  const growth = state.advisorProgressState.monthlyResearchGrowth;
-  return growth?.totalMonths === state.totalMonths
-    ? growth
-    : { totalMonths: state.totalMonths, funding: null, papers: 0 };
 }
 
 export function syncAdvisorResearchAccumulation(state: GameState): GameState {
@@ -126,48 +129,83 @@ export function syncAdvisorResearchAccumulation(state: GameState): GameState {
     scoreGain += score;
   }
   if (newIds.length === 0) return state;
-  const monthlyGrowth = getAdvisorMonthlyResearchGrowth(state);
-  return pushLog({
+  return {
     ...state,
     advisorProgressState: {
       ...state.advisorProgressState,
       researchAccumulation: state.advisorProgressState.researchAccumulation + scoreGain,
       countedPaperIds: [...state.advisorProgressState.countedPaperIds, ...newIds],
-      monthlyResearchGrowth: { ...monthlyGrowth, papers: monthlyGrowth.papers + scoreGain },
     },
-  }, `实验室成果：新增${newIds.length}篇论文，导师科研积累+${scoreGain}`);
+  };
 }
 
-export function getAdvisorTaskSanCost(state: GameState): number {
-  return getRelationshipSanCost(state, ADVISOR_TASK_SAN_COST);
+export function getAdvisorTaskSanCost(
+  state: GameState,
+  projectType: "horizontal" | "vertical" = "horizontal",
+): number {
+  return getRelationshipSanCost(
+    state,
+    projectType === "vertical" ? ADVISOR_VERTICAL_SAN_COST : ADVISOR_HORIZONTAL_SAN_COST,
+  );
 }
 
-export function advanceAdvisorHorizontal(state: GameState): GameState {
+export function advanceAdvisorProject(
+  state: GameState,
+  projectType: "horizontal" | "vertical",
+  random: () => number = Math.random,
+): GameState {
   if (state.phase !== "playing" || !state.selectedAdvisorName) return state;
-  if (state.advisorProgressState.lastHorizontalTotalMonths === state.totalMonths) return pushNoOpLog(state, "横向：本月已做，下月恢复");
-  if (state.advisorProgressState.funding >= ADVISOR_FUNDING_CAP) return pushNoOpLog(state, "横向：科研经费已达上限");
-  const sanCost = getAdvisorTaskSanCost(state);
-  if (state.player.san < sanCost) return pushNoOpLog(state, `横向：SAN不足${sanCost}`);
+  if (state.advisorProgressState.lastPlayerProjectTotalMonths === state.totalMonths) return pushNoOpLog(state, "科研项目：本月已推进，下月恢复");
+  const sanCost = getAdvisorTaskSanCost(state, projectType);
+  if (state.player.san < sanCost) return pushNoOpLog(state, `科研项目：SAN不足，需要${sanCost}`);
+  const result = advanceSharedLabProject(state, projectType, Math.floor(state.player.research) + Math.floor(random() * 6), random);
+  const completed = result.completed > 0;
   return pushLog({
-    ...state,
-    player: { ...state.player, san: state.player.san - sanCost },
+    ...result.state,
+    player: { ...result.state.player, san: state.player.san - sanCost },
     advisorProgressState: {
-      ...state.advisorProgressState,
-      funding: state.advisorProgressState.funding + 1,
-      lastHorizontalTotalMonths: state.totalMonths,
+      ...result.state.advisorProgressState,
+      lastPlayerProjectTotalMonths: state.totalMonths,
+      lastProjectTotalMonths: state.totalMonths,
+      ...(projectType === "horizontal" ? { lastHorizontalTotalMonths: state.totalMonths } : {}),
     },
-  }, `推进横向：SAN-${sanCost}，科研经费+1`);
+  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN-${sanCost}${completed ? projectType === "horizontal" ? `，科研经费+${ADVISOR_HORIZONTAL_REWARD}，劳务费+5` : "，导师科研积累提升，导师指导学生" : `，进度+${result.gain}`}`);
 }
 
-export function settleAdvisorMonth(state: GameState): GameState {
+export function advanceAdvisorHorizontal(state: GameState, random: () => number = Math.random): GameState {
+  return advanceAdvisorProject(state, "horizontal", random);
+}
+
+export function settleAdvisorMonth(state: GameState, random: () => number = Math.random): GameState {
   if (state.phase !== "playing" || !state.selectedAdvisorName || state.totalMonths <= 1) return state;
   if ((state.advisorProgressState.lastSettledTotalMonths ?? -1) >= state.totalMonths) return state;
   let nextState = syncAdvisorResearchAccumulation(state);
-  let advisor = {
+  let advisor: AdvisorProgressState = {
     ...nextState.advisorProgressState,
     lastSettledTotalMonths: state.totalMonths,
-    monthlyResearchGrowth: { ...getAdvisorMonthlyResearchGrowth(nextState) },
   };
+  if (state.totalMonths > 0 && advisor.lastAdvisorProjectTotalMonths !== state.totalMonths) {
+    const projectType = advisor.nextProject ?? "horizontal";
+    if (projectType === "horizontal" && advisor.funding <= 0) {
+      advisor = {
+        ...advisor,
+        nextProject: "vertical",
+        lastAdvisorProjectTotalMonths: state.totalMonths,
+        lastProjectTotalMonths: state.totalMonths,
+        monthlyActivity: "横向项目暂停（科研经费不足）",
+      };
+    } else {
+      const result = advanceSharedLabProject({ ...nextState, advisorProgressState: advisor }, projectType, 10, random);
+      nextState = result.state;
+      advisor = {
+        ...nextState.advisorProgressState,
+        nextProject: projectType === "horizontal" ? "vertical" : "horizontal",
+        lastAdvisorProjectTotalMonths: state.totalMonths,
+        lastProjectTotalMonths: state.totalMonths,
+        monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度+10${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导学生论文" : "（项目完成）" : ""}`,
+      };
+    }
+  }
   const calendarMonth = getAcademicCalendarMonth(state.month);
   const calendarYear = getAcademicCalendarYear(state.year, state.month);
   const pending = advisor.pendingApplication;
@@ -175,7 +213,7 @@ export function settleAdvisorMonth(state: GameState): GameState {
     const grant = ADVISOR_GRANTS.find((definition) => definition.id === pending.id)!;
     if (!advisor.awards.some((award) => award.id === grant.id)) {
       const previousSalary = getAdvisorMonthlySalary(advisor, state.degree);
-      const addedFunding = Math.min(grant.funding, ADVISOR_FUNDING_CAP - advisor.funding);
+      const addedFunding = grant.funding;
       advisor = {
         ...advisor,
         funding: advisor.funding + addedFunding,
@@ -186,7 +224,7 @@ export function settleAdvisorMonth(state: GameState): GameState {
           endYear: grant.durationYears > 0 ? calendarYear + grant.durationYears : null,
         }],
       };
-      nextState = pushLog(nextState, `导师${grant.id === "academician" ? "当选" : "获批"}${grant.name}：晋升${getAdvisorRankLabel(advisor)}${grant.funding > 0 ? `，科研经费+${addedFunding}` : "，每月科研经费+1"}`);
+      nextState = pushLog(nextState, `导师${grant.id === "academician" ? "当选" : "获批"}${grant.name}：晋升${getAdvisorRankLabel(advisor)}${grant.funding > 0 ? `，科研经费+${addedFunding}` : "，科研经费每月+1"}`);
       const salary = getAdvisorMonthlySalary(advisor, state.degree);
       if (salary > previousSalary) {
         nextState = recordTalentTrigger(nextState, `advisor-salary:${grant.id}:${calendarYear}`, {
@@ -200,18 +238,6 @@ export function settleAdvisorMonth(state: GameState): GameState {
     }
     advisor = { ...advisor, pendingApplication: null };
   }
-  const academicianIncome = advisor.awards.some((award) => award.id === "academician") ? 1 : 0;
-  const availableFunding = advisor.funding + academicianIncome;
-  if (availableFunding > 0) {
-    const gain = Math.floor(advisor.researchAccumulation * 0.05);
-    advisor = {
-      ...advisor,
-      funding: Math.min(ADVISOR_FUNDING_CAP, availableFunding - 1),
-      researchAccumulation: advisor.researchAccumulation + gain,
-      monthlyResearchGrowth: { ...advisor.monthlyResearchGrowth, funding: gain },
-    };
-    nextState = pushLog(nextState, `导师科研：${academicianIncome ? "院士经费+1，" : ""}科研经费-1，科研积累+${gain}`);
-  }
   if (calendarMonth === 3 && advisor.pendingApplication === null) {
     const grant = getEligibleAdvisorGrant(advisor, calendarYear);
     if (grant) {
@@ -221,5 +247,5 @@ export function settleAdvisorMonth(state: GameState): GameState {
       nextState = pushLog(nextState, "年度申请：尚无符合门槛且不限项的新项目，本年不申请");
     }
   }
-  return { ...nextState, advisorProgressState: advisor };
+  return settleAdvisorGuidance({ ...nextState, advisorProgressState: advisor }, random);
 }

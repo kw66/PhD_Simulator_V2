@@ -1,5 +1,5 @@
 import type { GameState } from "../core/v2-types";
-import { renderDebugPanel } from "./v2-render-debug-panel";
+import { renderDebugPanel, type DebugConnectionStatus } from "./v2-render-debug-panel";
 import "../styles/debug-panel.css";
 
 const DEBUG_WINDOW_ACTIONS = new Set([
@@ -15,14 +15,32 @@ export function isDebugWindowActionData(value: unknown): value is Record<string,
 }
 
 export function createDebugWindow(getState: () => GameState, onAction: (data: DOMStringMap) => void) {
-  const channel = crypto.randomUUID();
+  let channel: string = crypto.randomUUID();
+  const hostId = crypto.randomUUID();
   const origin = window.location.origin;
   let popup: Window | null = null;
   let revision = 0;
   const sendState = (): void => {
-    if (popup && !popup.closed) popup.postMessage({ channel, type: "debug-state", state: getState(), revision }, origin);
+    if (popup && !popup.closed) popup.postMessage({ channel, type: "debug-state", state: getState(), revision, hostId }, origin);
   };
   window.addEventListener("message", (event: MessageEvent) => {
+    if (event.origin !== origin) return;
+    if ((!popup || popup.closed) && event.data?.type === "debug-ready") {
+      const source = event.source as Window | null;
+      const requestedChannel: unknown = event.data.channel;
+      if (!source || typeof requestedChannel !== "string" || !requestedChannel || requestedChannel.length > 128) return;
+      try {
+        if (source.closed || source.opener !== window) return;
+        const sourceUrl = new URL(source.location.href);
+        const hostUrl = new URL(window.location.href);
+        if (sourceUrl.origin !== origin || sourceUrl.pathname !== hostUrl.pathname
+          || sourceUrl.searchParams.get("debugPanel") !== requestedChannel) return;
+      } catch {
+        return;
+      }
+      popup = source;
+      channel = requestedChannel;
+    }
     if (!popup || popup.closed || event.source !== popup || event.origin !== origin || event.data?.channel !== channel) return;
     if (event.data.type === "debug-ready") sendState();
     if (event.data.type === "debug-action" && isDebugWindowActionData(event.data.data)) {
@@ -33,6 +51,7 @@ export function createDebugWindow(getState: () => GameState, onAction: (data: DO
   window.addEventListener("pagehide", () => {
     if (popup && !popup.closed) popup.postMessage({ channel, type: "debug-disconnected" }, origin);
   });
+  window.addEventListener("pageshow", sendState);
   return {
     open(): boolean {
       if (popup && !popup.closed) {
@@ -63,20 +82,22 @@ export function bootstrapDebugWindow(root: HTMLDivElement, channel: string): voi
   let state: GameState | null = null;
   let connected = false;
   let revision = -1;
+  let hostId: string | undefined;
+  let connectionStatus: DebugConnectionStatus = "connecting";
   let lastReceived = Date.now();
-  let activeTab: "tools" | "events" = "tools";
   const render = (): void => {
     const focused = root.querySelector<HTMLButtonElement>("button:focus");
     const focusKey = focused ? JSON.stringify({ ...focused.dataset }) : null;
     const scrollY = window.scrollY;
-    root.innerHTML = renderDebugPanel(state, connected, activeTab);
+    root.innerHTML = renderDebugPanel(state, connected, connectionStatus);
     if (focusKey) [...root.querySelectorAll<HTMLButtonElement>("button")]
       .find((button) => JSON.stringify({ ...button.dataset }) === focusKey)?.focus({ preventScroll: true });
     window.scrollTo(0, scrollY);
   };
-  const disconnect = (): void => {
-    if (!connected && root.childElementCount > 0) return;
+  const disconnect = (status: DebugConnectionStatus = "disconnected"): void => {
+    if (!connected && connectionStatus === status && root.childElementCount > 0) return;
     connected = false;
+    connectionStatus = status;
     render();
   };
   render();
@@ -88,19 +109,17 @@ export function bootstrapDebugWindow(root: HTMLDivElement, channel: string): voi
     }
     if (event.data.type !== "debug-state" || !event.data.state) return;
     lastReceived = Date.now();
-    if (connected && revision === event.data.revision) return;
+    if (connected && revision === event.data.revision && hostId === event.data.hostId) return;
     state = event.data.state as GameState;
     revision = event.data.revision;
+    hostId = event.data.hostId;
     connected = true;
     render();
   });
   root.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
-    const tabButton = event.target.closest<HTMLButtonElement>("button[data-debug-tab]");
-    if (tabButton) {
-      activeTab = tabButton.dataset.debugTab === "events" ? "events" : "tools";
-      render();
-      root.querySelector<HTMLButtonElement>(`[data-debug-tab="${activeTab}"]`)?.focus({ preventScroll: true });
+    if (event.target.closest("button[data-debug-reconnect]")) {
+      requestState();
       return;
     }
     if (!connected || !host || host.closed) return;
@@ -110,14 +129,26 @@ export function bootstrapDebugWindow(root: HTMLDivElement, channel: string): voi
     if (isDebugWindowActionData(data)) host.postMessage({ channel, type: "debug-action", data }, origin);
   });
   const requestState = (): void => {
-    if (!host || host.closed) {
-      disconnect();
+    if (!host) {
+      disconnect("unavailable");
+      return;
+    }
+    if (host.closed) {
+      disconnect("closed");
       return;
     }
     if (Date.now() - lastReceived > 5000) disconnect();
     host.postMessage({ channel, type: "debug-ready" }, origin);
   };
   requestState();
-  const heartbeat = window.setInterval(requestState, 1500);
-  window.addEventListener("pagehide", () => window.clearInterval(heartbeat), { once: true });
+  let heartbeat: number | undefined = window.setInterval(requestState, 1500);
+  window.addEventListener("pagehide", () => {
+    window.clearInterval(heartbeat);
+    heartbeat = undefined;
+    disconnect();
+  });
+  window.addEventListener("pageshow", () => {
+    requestState();
+    if (heartbeat === undefined) heartbeat = window.setInterval(requestState, 1500);
+  });
 }

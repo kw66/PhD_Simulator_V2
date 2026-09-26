@@ -9,6 +9,7 @@ export interface CandidateEventContext {
   hasRecoverableDraftPaper?: boolean;
   hasAuthorshipEligibleDraftPaper?: boolean;
   pendingPaperCompetitionEvents?: PendingPaperCompetitionEvent[];
+  excludedCategories?: readonly RandomEventCategory[];
 }
 
 export interface CandidateEventBuildResult {
@@ -16,7 +17,34 @@ export interface CandidateEventBuildResult {
 }
 
 const DISEASE_EVENT_ID = 3;
-const MENTORING_EVENT_ID = 14;
+
+export type RandomEventCategory = "punishment" | "reward" | "guidance" | "balance";
+
+// User-confirmed buckets: punishment 12/13/16/17/18, reward 7/8/9/15,
+// guidance 1/10/11/14, and balance 2/4/5/6.
+const RANDOM_EVENT_CATEGORIES: Readonly<Record<number, RandomEventCategory>> = {
+  1: "guidance",
+  2: "balance",
+  4: "balance",
+  5: "balance",
+  6: "balance",
+  7: "reward",
+  8: "reward",
+  9: "reward",
+  10: "guidance",
+  11: "guidance",
+  12: "punishment",
+  13: "punishment",
+  14: "guidance",
+  15: "reward",
+  16: "punishment",
+  17: "punishment",
+  18: "punishment",
+};
+
+export function getRandomEventCategory(eventId: number): RandomEventCategory | null {
+  return RANDOM_EVENT_CATEGORIES[eventId] ?? null;
+}
 
 function uniqueEventIds(eventIds: number[]): number[] {
   const seen = new Set<number>();
@@ -36,33 +64,25 @@ function uniqueEventIds(eventIds: number[]): number[] {
 
 export function buildCandidateEventIds(params: {
   context: CandidateEventContext;
-  socialUnlockEventId: number;
+  socialUnlockEventId?: number;
 }): CandidateEventBuildResult {
-  const { context, socialUnlockEventId } = params;
+  const { context } = params;
   const pendingIds = new Set<number>((context.pendingPaperCompetitionEvents ?? []).map((event) => event.eventId));
-  let candidateEventIds = context.availableRandomEvents.filter((eventId) => (
+  const candidateEventIds = context.availableRandomEvents.filter((eventId) => (
     eventId !== DISEASE_EVENT_ID
     && !pendingIds.has(eventId)
-    && (eventId !== 12 || context.hasAuthorshipEligibleDraftPaper === true)
-    && (eventId !== 16 || context.hasRecoverableDraftPaper === true)
+    && !context.usedRandomEvents.includes(eventId)
   ));
-
-  if ((context.research ?? 0) >= 6 || context.social >= 6) {
-    if (!candidateEventIds.includes(socialUnlockEventId) && !context.usedRandomEvents.includes(socialUnlockEventId)) {
-      candidateEventIds.push(socialUnlockEventId);
-    }
-  }
-
-  if ((context.publishedPaperCount ?? 0) > 0 && !candidateEventIds.includes(MENTORING_EVENT_ID) && !context.usedRandomEvents.includes(MENTORING_EVENT_ID)) {
-    candidateEventIds.push(MENTORING_EVENT_ID);
-  }
-
-  if (context.hasRecoverableDraftPaper === true && !candidateEventIds.includes(16) && !context.usedRandomEvents.includes(16)) {
-    candidateEventIds.push(16);
-  }
+  const excludedCategories = new Set(context.excludedCategories ?? []);
+  const alternateCategoryCandidates = excludedCategories.size === 0
+    ? candidateEventIds
+    : candidateEventIds.filter((eventId) => {
+      const category = getRandomEventCategory(eventId);
+      return category === null || !excludedCategories.has(category);
+    });
 
   return {
-    candidateEventIds: uniqueEventIds(candidateEventIds),
+    candidateEventIds: uniqueEventIds(alternateCategoryCandidates.length > 0 ? alternateCategoryCandidates : candidateEventIds),
   };
 }
 

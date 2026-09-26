@@ -3,6 +3,7 @@
   formatResearchMiscSanChange,
   formatTierResistedOutcome,
   getActualResearchMiscSanChange,
+  formatActualSanChange,
   getActualSanChange,
   getResearchMiscSanNarrative,
   getTierResistedNarrative,
@@ -53,7 +54,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-exchange-${serial}`,
         label: "\u5b66\u672f\u4ea4\u6d41",
         outcome: isLowSocial
-          ? `社交 < 6｜SAN ${exchangeSanChange}｜下次想 idea +${ideaBonus}。`
+          ? `社交 < 6｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}｜下次想 idea +${ideaBonus}。`
           : `社交 ≥ 6｜下次想 idea +${ideaBonus}。`,
         effects: {
           ...(isLowSocial ? { san: exchangeSanChange } : {}),

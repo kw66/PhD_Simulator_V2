@@ -1,15 +1,15 @@
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { hasBlockingQueueEvent } from "./v2-event-queue";
 import { collectFixedEventsForState } from "./v2-fixed-events";
-import { createRandomEventById } from "./v2-random-event-router";
+import { createRandomEventById, isRandomEventEligible } from "./v2-random-event-router";
 import {
   calculateRandomEventCount,
   drawRandomEvent,
 } from "./v2-random-event-rules";
+import { getRandomEventCategory, type RandomEventCategory } from "./v2-random-event-pool-builder";
 import { createIllnessRandomEvent } from "./v2-random-events-core-health";
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
-import { isPaperCompetitionEventId } from "./v2-paper-competition";
-import { rememberPendingPaperCompetitionEvent } from "./v2-paper-competition-waiting";
+import { rememberPendingRandomEvent } from "./v2-paper-competition-waiting";
 import { getPublishedPaperCount } from "./v2-monthly-event-shared";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -41,13 +41,17 @@ export function collectRandomEventsForMonth(
     return { nextState: state, events: [] };
   }
 
-  const randomEventCount = calculateRandomEventCount(getRoll());
+  const randomEventCount = calculateRandomEventCount(getRoll(), {
+    totalMonths: state.totalMonths,
+    maxMonths: state.maxMonths,
+  });
   if (randomEventCount <= 0) {
     return { nextState: state, events: [] };
   }
 
   let nextState = state;
   const events: PendingEvent[] = [];
+  const selectedCategories = new Set<RandomEventCategory>();
 
   for (let index = 0; index < randomEventCount; index += 1) {
     const drawResult = drawRandomEvent(
@@ -64,6 +68,7 @@ export function collectRandomEventsForMonth(
         hasAuthorshipEligibleDraftPaper: nextState.papers.some((paper) =>
           paper.status === "draft" && paper.idea + paper.experiment + paper.writing > 0
         ),
+        excludedCategories: [...selectedCategories],
       },
       getRoll(),
     );
@@ -84,12 +89,22 @@ export function collectRandomEventsForMonth(
       return roll;
     };
     const serial = nextState.totalRandomEventCount;
-    const builtEvent = createRandomEventById(drawResult.eventId, nextState, recordRoll);
+    const builtEvent = isRandomEventEligible(nextState, drawResult.eventId)
+      ? createRandomEventById(drawResult.eventId, nextState, recordRoll)
+      : { nextState, event: null };
     nextState = builtEvent.nextState;
-    if (!builtEvent.event && isPaperCompetitionEventId(drawResult.eventId)) {
-      nextState = rememberPendingPaperCompetitionEvent(nextState, drawResult.eventId, serial);
+    if (!builtEvent.event) {
+      nextState = rememberPendingRandomEvent(nextState, drawResult.eventId, serial);
     }
     if (builtEvent.event) {
+      const category = getRandomEventCategory(drawResult.eventId);
+      if (category) selectedCategories.add(category);
+      nextState = {
+        ...nextState,
+        usedRandomEvents: nextState.usedRandomEvents.includes(drawResult.eventId)
+          ? nextState.usedRandomEvents
+          : [...nextState.usedRandomEvents, drawResult.eventId],
+      };
       events.push({
         ...builtEvent.event,
         randomReplay: {

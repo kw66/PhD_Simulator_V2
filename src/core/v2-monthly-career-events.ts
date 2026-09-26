@@ -8,7 +8,7 @@ import {
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 import { getPublishedPaperCount } from "./v2-monthly-event-shared";
 import { createThreeStageEvent, type RandomEventResultCopy } from "./v2-random-events-core-shared";
-import { getActualSanChange } from "./v2-sanity-rules";
+import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 
 const CAREER_COPY: Record<CareerType, {
   intro: string;
@@ -82,7 +82,7 @@ function createCareerChoices(state: GameState, careerType: CareerType): {
       id: option.id,
       label: option.text,
       outcome: progressGain > 0
-        ? `${definition.name}进度 +${progressGain}，SAN ${sanChange < 0 ? sanChange : "不变"}。`
+        ? `${definition.name}进度 +${progressGain}，${sanChange < 0 ? formatActualSanChange(-option.sanCost, state.month, state.eventSupport, state.buffs) : "SAN 不变"}。`
         : `这次尝试没有推进 ${definition.name} 进度。`,
       effects: {
         san: sanChange,

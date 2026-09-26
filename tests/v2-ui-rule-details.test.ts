@@ -45,8 +45,8 @@ function renderMetrics(paper: Paper): string {
 describe("v2 research rule details and publication metrics", () => {
   it("points players to current lover reward controls and the shop gift notice", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain("进度条和卡片底部提示显示当前路线效果");
-    expect(help).toContain("进度条和卡片底部提示显示当前路线效果");
+    expect(help).toContain("悬浮标签可看主动推进和下次奖励");
+    expect(help).toContain("底部记录恋人本月推进");
     expect(help).toContain("礼物券优先用于手动商店购买");
     expect(help).toContain("礼物券优先用于手动商店购买");
   });
@@ -103,30 +103,43 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("没有其他可购买项目时才用于自动续费");
   });
 
-  it("distinguishes fellow research every two months from monthly cooperation and review", () => {
+  it("explains alternating fellow research, monthly review work and experiment retries", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain("此后每2个月科研一次");
+    expect(help).toContain("次月开始科研；成功科研后，下月做项目");
+    expect(help).toContain("等待时每月做项目");
+    expect(help).toContain("中稿当月开始新稿，退稿当月继续修改");
+    expect(help).toContain("不足时改做横向，下月重新判断最低项并尝试科研");
+    expect(help).toContain("按卡片顺序结算");
     expect(help).toContain("审稿3个月");
     expect(help).not.toContain("仅同学自主科研间隔2个月");
     expect(help).toContain("每位同学每月可主动协作一次");
-    expect(help).toContain("默契也会自动推进协作进度");
+    expect(help).toContain("默契每月推进协作进度");
+    expect(help).toContain("同学科研+⌊n/2⌋，上限20");
+    expect(help).toContain("再加导师1人，恋人不计");
+    expect(help).toContain("双方主导的合作论文均可触发");
   });
 
   it("documents mentor funding, paper contributions and the annual grant timeline", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
     expect(help).toContain("科研积累从20开始");
-    expect(help).toContain("经费上限20");
-    expect(help).toContain("基础SAN-5、经费+1，实际消耗见按钮");
-    expect(help).toContain("人际SAN减免（含Gemini3及后续型号）适用于同学、导师和恋人");
-    expect(help).toContain("每月先结算导师收入，再消耗经费");
-    expect(help).toContain("科研积累按5%自然增长，增长量下取整");
-    expect(help).toContain("经费不足时暂停自然增长");
-    expect(help).toContain("论文固定科研分会增加导师积累");
-    expect(help).toMatch(/3月先增长再申请，8月公布结果/);
+    expect(help).toContain("你和同学发表论文，按科研分增加导师积累");
+    expect(help).toContain("科研经费初始10");
+    expect(help).toContain("没有上限");
+    expect(help).toContain("项目进度满100才结算");
+    expect(help).toContain("对应进度+100，结算同样的完成奖励");
+    expect(help).toContain("横向基础SAN-8、纵向基础SAN-6，享受科研档位减免");
+    expect(help).toContain("横向完成后科研经费+20");
+    expect(help).toContain("纵向完成后导师科研积累增加当前值的10%");
+    expect(help).toContain("实验基础花费3金币");
+    expect(help).toContain("纵向项目满100时，导师为玩家和每位同学各指导一次");
+    expect(help).toContain("同学做实验每次经费-3，不足3时改做横向");
+    expect(help).toContain("导师、同学和你共同推进卡片上的两条项目进度");
+    expect(help).not.toContain("每月为玩家和每位同学各提供一次论文指导");
+    expect(help).toContain("每年按科研积累申请");
     expect(help).toContain("讲师限1项，晋升后限2项");
     expect(help).toContain("项目到期释放名额");
-    expect(help).toContain("1000且已获杰青");
-    expect(help).toContain("获选后每月经费+1");
+    expect(help).toContain("院士需先获得杰青");
+    expect(help).toContain("院士");
     for (const [threshold, funding, duration] of [[25, 5, 3], [50, 10, 4], [150, 15, 3], [400, 20, 5]]) {
       expect(help).toContain(`${threshold}+${funding}${duration}年`);
     }
@@ -147,6 +160,10 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("×1.5算+0.5，×0.8算−0.2");
     expect(help).toContain("两个×1.5合并为×2");
     expect(help).toContain("不额外扣行动点或SAN");
+    expect(help).toContain("实验基础费用3金币，优先用导师经费，不足部分自付；按钮显示你实际承担的金币");
+    expect(help).toContain("实验金币也只收一次");
+    expect(help).toContain("个人显卡RTX4090起每次实验减1金币，H20起减2");
+    expect(help).toContain("先算显卡减免，再扣导师经费，最后扣你的金币");
     expect(help).toContain("每遍都重新生成分数");
     expect(help).toContain("每遍与上一遍自身分+1取最大值");
     expect(help).toContain("总次数=1+⌊n⌋，n为额外次数之和，至少执行1次");
@@ -188,6 +205,42 @@ describe("v2 research rule details and publication metrics", () => {
     expect(html).not.toContain('class="workstation-notes"');
     expect(html).not.toContain('data-workstation-note="review"');
     expect(html).toContain('data-help-context="workstation"');
+  });
+
+  it("shows only the player's experiment cost and blocks only their unpaid remainder", () => {
+    const funded = createResearchState();
+    funded.papers[0] = { ...funded.papers[0]!, idea: 1 };
+    funded.advisorProgressState.funding = 3;
+    funded.player.money = 0;
+    const fundedHtml = renderApp(funded, createDefaultAccountProfile(), { activePlayTab: "workstation" });
+    const fundedButton = fundedHtml.match(/<button[^>]*data-paper-action-type="experiment"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(fundedButton).toContain("金币-0 · SAN-");
+    expect(fundedButton).not.toContain("经费-");
+    expect(fundedButton).toContain('data-animate-number="3"');
+    expect(fundedButton).toContain('data-action="research-paper"');
+
+    for (const [funding, gpuLevel, playerCost] of [[2, 0, 1], [1, 4, 1], [0, 8, 1]] as const) {
+      const partial = {
+        ...funded,
+        advisorProgressState: { ...funded.advisorProgressState, funding },
+        shopState: { ...funded.shopState, gpuLevel },
+        player: { ...funded.player, money: 1 },
+      };
+      const html = renderApp(partial, createDefaultAccountProfile(), { activePlayTab: "workstation" });
+      const button = html.match(/<button[^>]*data-paper-action-type="experiment"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+      expect(button).toContain(`金币-${playerCost} · SAN-`);
+      expect(button).not.toContain("经费-");
+      expect(button).toContain('data-action="research-paper"');
+      expect(button).not.toContain("disabled");
+    }
+
+    const selfPaid = { ...funded, advisorProgressState: { ...funded.advisorProgressState, funding: 0 }, player: { ...funded.player, money: 2 } };
+    const selfPaidHtml = renderApp(selfPaid, createDefaultAccountProfile(), { activePlayTab: "workstation" });
+    const selfPaidButton = selfPaidHtml.match(/<button[^>]*workstation-paper-action-btn is-experiment[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(selfPaidButton).toContain("金币-3 · SAN-");
+    expect(selfPaidButton).toContain('data-animate-number="3"');
+    expect(selfPaidButton).toContain("金币不足，需要 3");
+    expect(selfPaidButton).toContain("disabled aria-disabled=\"true\"");
   });
 
   it.each([[0, 8], [50, 51]])("matches the documented score formula for current score %s", (currentScore, expectedScore) => {

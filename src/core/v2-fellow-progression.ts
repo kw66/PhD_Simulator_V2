@@ -59,6 +59,13 @@ export function getFellowName(profile: Pick<FellowProgressProfile, "id" | "name"
   return profile.name?.trim() || pickStableRandomName(`fellow:${profile.id}`);
 }
 
+export function getFellowsInCardOrder(profiles: readonly FellowProgressProfile[]): FellowProgressProfile[] {
+  return profiles.map((profile, index) => ({
+    profile,
+    order: typeof profile.startTotalMonths === "number" ? profile.startTotalMonths : 1000 + index,
+  })).sort((left, right) => left.order - right.order).map(({ profile }) => profile);
+}
+
 export function getUniqueFellowName(candidate: string, usedNames: readonly string[], seed: string): string {
   const occupied = new Set(usedNames.map((name) => name.trim()).filter(Boolean));
   const normalized = candidate.trim();
@@ -159,6 +166,7 @@ export function createCustomFellowProgressProfile(input: {
     taskMax: FELLOW_TASK_MAX,
     taskUsedThisMonth: false,
     startTotalMonths: input.startTotalMonths,
+    nextMonthlyAction: "research",
     affinityRewardedPaperIds: [],
   };
 }

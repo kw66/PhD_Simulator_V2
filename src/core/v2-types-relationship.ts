@@ -79,17 +79,20 @@ export interface AdvisorGrantApplication {
 export interface AdvisorProgressState {
   researchAccumulation: number;
   funding: number;
+  horizontalProgress?: number;
+  verticalProgress?: number;
+  nextProject?: "horizontal" | "vertical";
   awards: AdvisorGrantAward[];
   pendingApplication: AdvisorGrantApplication | null;
   countedPaperIds: string[];
   lastSettledTotalMonths: number | null;
   lastHorizontalTotalMonths?: number | null;
+  lastProjectTotalMonths?: number | null;
+  lastAdvisorProjectTotalMonths?: number | null;
+  lastPlayerProjectTotalMonths?: number | null;
+  pendingGuidanceToPlayer?: number | null;
+  monthlyActivity?: string;
   salaryRemainder?: number;
-  monthlyResearchGrowth?: {
-    totalMonths: number;
-    funding: number | null;
-    papers: number;
-  };
 }
 
 export interface LoverProgressState {
@@ -109,6 +112,7 @@ export interface LoverProgressState {
   lastDateTotalMonths?: number;
   lastAdvancedTotalMonths?: number;
   sanDiscountMonths?: number[];
+  monthlyActivity?: string;
 }
 
 export interface FellowProgressProfile {
@@ -127,7 +131,11 @@ export interface FellowProgressProfile {
   pendingHelpToPlayer?: number | null;
   pendingHelpToFellow?: number | null;
   lastAdvancedTotalMonths?: number;
+  nextMonthlyAction?: "research" | "project";
   lastAnnualGrowthTotalMonths?: number;
+  lastProjectTotalMonths?: number;
+  monthlyActivity?: string;
+  pendingGuidanceFromAdvisor?: number | null;
   affinityRewardedPaperIds?: string[];
 }
 

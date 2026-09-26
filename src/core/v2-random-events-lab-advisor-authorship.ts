@@ -1,4 +1,4 @@
-﻿import { applyTierResist, formatTierResistedOutcome, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { createThreeStageRandomEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -44,7 +44,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
       {
         id: `random-12-argue-${serial}`,
         label: "据理力争",
-        outcome: lowFavor ? `导师好感 < 6｜SAN ${argueSanChange}。` : "导师好感 ≥ 6｜无变化。",
+        outcome: lowFavor ? `导师好感 < 6｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。` : "导师好感 ≥ 6｜无变化。",
         effects: lowFavor ? { san: argueSanChange } : {},
       },
       {

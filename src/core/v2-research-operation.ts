@@ -14,6 +14,23 @@ export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
   writing: 4,
 };
 
+export const RESEARCH_EXPERIMENT_MONEY_COST = 3;
+
+export function getResearchExperimentMoneyCost(state: Pick<GameState, "shopState">): number {
+  return Math.max(0, RESEARCH_EXPERIMENT_MONEY_COST
+    - (state.shopState.gpuLevel >= 8 ? 2 : state.shopState.gpuLevel >= 4 ? 1 : 0));
+}
+
+export function getResearchExperimentCostBreakdown(state: Pick<GameState, "shopState" | "advisorProgressState">): {
+  total: number;
+  advisorFunding: number;
+  playerMoney: number;
+} {
+  const total = getResearchExperimentMoneyCost(state);
+  const advisorFunding = Math.min(Math.max(0, state.advisorProgressState.funding), total);
+  return { total, advisorFunding, playerMoney: total - advisorFunding };
+}
+
 const RESEARCH_OPERATION_LABEL: Record<PaperActionType, string> = {
   idea: "想 idea",
   experiment: "做实验",
@@ -160,6 +177,15 @@ export function applyResearchOperation(
     return pushNoOpLog(state, `${RESEARCH_OPERATION_LABEL[actionType]}：SAN 不足，需要 ${preview.sanCost}`);
   }
 
+  const experimentCost = actionType === "experiment"
+    ? getResearchExperimentCostBreakdown(state)
+    : { total: 0, advisorFunding: 0, playerMoney: 0 };
+  const advisorFundingUsed = experimentCost.advisorFunding;
+  const playerMoneyCost = experimentCost.playerMoney;
+  if (state.player.money < playerMoneyCost) {
+    return pushNoOpLog(state, `${RESEARCH_OPERATION_LABEL[actionType]}：金币不足，需要 ${playerMoneyCost}`);
+  }
+
   const paper = state.papers[eligibility.paperIndex]!;
   const equipmentEffect = getShopPaperActionModifier(state.shopState, actionType);
   const executionCount = Math.max(1, 1 + Math.floor(preview.extraActions));
@@ -183,7 +209,10 @@ export function applyResearchOperation(
     ...actionState,
     papers: state.papers.map((entry, index) => index === eligibility.paperIndex ? updatedPaper : entry),
     selectedPaperId: paper.id,
-    player: { ...state.player, san: state.player.san - preview.sanCost },
+    player: { ...state.player, san: state.player.san - preview.sanCost, money: state.player.money - playerMoneyCost },
+    advisorProgressState: actionType === "experiment"
+      ? { ...state.advisorProgressState, funding: state.advisorProgressState.funding - advisorFundingUsed }
+      : state.advisorProgressState,
   }, actionType);
   const operationCountText = executionCount > 1 ? `，共 ${executionCount} 次` : "";
   return pushLog(
