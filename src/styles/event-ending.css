@@ -30,6 +30,8 @@
 .ending-summary-attributes > div { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 3px 8px; padding: 6px 10px; border-top: 1px solid #c6b89e; }
 .ending-summary-attributes > div:not(:nth-child(3n+1)) { border-left: 1px solid #c6b89e; }
 .ending-summary-attributes .is-failed { color: #913e32; background: #f4e3db; }
+.ending-experience { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 16px 12px; color: #795b31; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ending-experience strong { color: #704b22; font-weight: 800; }
 .ending-buttons { display: flex; gap: 8px; margin-left: auto; }
 .ending-buttons > button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 5px 9px; border-radius: 4px; font-size: 12px; font-weight: 700; box-shadow: none; }
 .ending-buttons > button.is-restart { border-color: var(--ending-accent); background: var(--ending-tint); color: var(--ending-accent); }

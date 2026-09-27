@@ -42,6 +42,7 @@ export interface ConferenceCareerState {
 
 export interface InternshipState {
   active: boolean;
+  salaryRemainder?: number;
   kind?: "remote3" | "conference6";
   startTotalMonths?: number;
   endTotalMonths?: number;
@@ -142,6 +143,9 @@ export interface FellowProgressProfile {
   monthlyActivity?: string;
   pendingGuidanceFromAdvisor?: number | null;
   affinityRewardedPaperIds?: string[];
+  helpedPlayerCount?: number;
+  helpedFellowCount?: number;
+  annualResearchGrowthTotal?: number;
 }
 
 export interface FellowProfileAddition {

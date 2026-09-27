@@ -4,6 +4,29 @@ import type { FellowProgressProfile, GameState } from "./v2-types";
 
 export const FELLOW_RESEARCH_CAP = 20;
 
+export function getFellowPublicationTotals(state: GameState): { playerLed: number; fellowLed: number } {
+  const papers = [...state.papers, ...state.externalPublications, ...(state.fellowPapers ?? [])];
+  const fellowIds = new Set(state.fellowProgressState.map((profile) => profile.id));
+  for (const paper of papers) {
+    if (paper.leadAuthorId) fellowIds.add(paper.leadAuthorId);
+  }
+  const playerLed = new Set<string>();
+  const fellowLed = new Set<string>();
+  for (const paper of papers) {
+    if (paper.status !== "published") continue;
+    if (paper.leadAuthorId && fellowIds.has(paper.leadAuthorId)) {
+      if (paper.collaborators?.some((person) => person.id === "player")) {
+        fellowLed.add(JSON.stringify([paper.id, paper.leadAuthorId]));
+      }
+    } else if (!paper.leadAuthorId && paper.nonFirstAuthor !== true) {
+      for (const person of paper.collaborators ?? []) {
+        if (fellowIds.has(person.id)) playerLed.add(JSON.stringify([paper.id, person.id]));
+      }
+    }
+  }
+  return { playerLed: playerLed.size, fellowLed: fellowLed.size };
+}
+
 export function getFellowAnnualResearchGrowth(state: GameState, profile: FellowProgressProfile): number {
   const higherCount = 1 + Number(state.player.research > profile.research)
     + state.fellowProgressState.filter((other) => other.id !== profile.id && other.research > profile.research).length;
@@ -23,7 +46,12 @@ export function settleLabResearchGrowth(state: GameState): GameState {
       effects: [growth > 0 ? describeTalentChange("科研", profile.research, profile.research + growth)
         : profile.research >= FELLOW_RESEARCH_CAP ? "科研已达上限20" : "本轮科研不变，符合条件的人数不足2人"],
     } });
-    return { ...profile, research: profile.research + growth, lastAnnualGrowthTotalMonths: state.totalMonths };
+    return {
+      ...profile,
+      research: profile.research + growth,
+      lastAnnualGrowthTotalMonths: state.totalMonths,
+      ...(growth > 0 ? { annualResearchGrowthTotal: (profile.annualResearchGrowthTotal ?? 0) + growth } : {}),
+    };
   });
   if (triggers.length === 0) return state;
   let nextState = { ...state, fellowProgressState };

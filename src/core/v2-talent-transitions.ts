@@ -27,7 +27,7 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
     ]);
   }
   const workGrowth = Math.floor(after.partTimeWorkCount / 8) - Math.floor(before.partTimeWorkCount / 8);
-  if (workGrowth > 0) add("part-time-growth", "兼职熟练度", `累计打工${after.partTimeWorkCount}次`, [
+  if (workGrowth > 0) add("part-time-growth", "熟练打工", `累计打工${after.partTimeWorkCount}次`, [
     `后续打工金币收入+${workGrowth}`, `后续打工SAN消耗+${workGrowth}`,
   ]);
   const meetingEffects = [2, 4, 6].flatMap((cost, index) => {

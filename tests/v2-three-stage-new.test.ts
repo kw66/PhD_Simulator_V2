@@ -28,11 +28,11 @@ describe("new multi-stage event shape", () => {
       conferenceEncounterUpdates: { bigBullCooperation: true },
       researchCapacityStateDeltas: { jointTrainingCitationCapBonus: 3 },
       ideaBonus: 5,
-      experimentBonus: 5,
+      writingBonus: 5,
       enqueueEvents: [result],
     });
     expect(result?.description).toContain("科研上限 +3");
-    expect(result?.description).toContain("永久：想 idea +5 分、做实验 +5 分");
+    expect(result?.description).toContain("永久：想 idea +5 分、写论文 +5 分");
     expect(result?.description).not.toContain("导师科研资源");
     expect(result?.completionLog).toBe("你接受了联合培养，科研上限 +3。");
     expect(result?.choices[0]?.effects).toEqual({});

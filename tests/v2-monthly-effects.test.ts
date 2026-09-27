@@ -239,7 +239,7 @@ describe("monthly effects", () => {
     expect(resolution.items.find((item) => item.id === "internship-monthly")?.stats).toEqual({ san: -2, money: 1 });
     expect(nextState.player.san).toBe(9);
     expect(nextState.player.money).toBe(1);
-    expect(nextState.internshipState).toEqual({ active: false, remainingMonths: 0, experimentMultiplier: 1, experimentBonus: 0, experimentMoneyDiscount: 0 });
+    expect(nextState.internshipState).toEqual(createInternshipState());
   });
 
   it("keeps all three future remote action months across a year boundary and expires in month four", () => {
@@ -283,7 +283,7 @@ describe("monthly effects", () => {
     const initial = createPlayingMonth(5, 5, 20);
     const publication = { ...createDraftPaper(1, 0, () => 0), status: "published" as const, target: "A" as const };
     let state: GameState = { ...initial, internshipState: activateInternship(), totalCitations: 1000, papers: [publication] };
-    expect(resolveMonthlyEffects(state).items.find((item) => item.id === "internship-monthly")?.stats).toEqual({ san: -2, money: 2.5 });
+    expect(resolveMonthlyEffects(state).items.find((item) => item.id === "internship-monthly")?.stats).toEqual({ san: -2, money: 2 });
     state = { ...state, totalCitations: 0, papers: [] };
     for (let elapsed = 1; elapsed <= 6; elapsed += 1) {
       const settled = applyMonthlyEffects({ ...state, totalMonths: 5 + elapsed });
@@ -292,6 +292,46 @@ describe("monthly effects", () => {
       state = settled.nextState;
     }
     expect(resolveMonthlyEffects(state).items.some((item) => item.id === "internship-monthly")).toBe(false);
+  });
+
+  it("pays internship salary independently of fractional advisor salary and previews without consuming it", () => {
+    const initial = createPlayingMonth(2, 2, 20);
+    initial.selectedAdvisorName = "林老师";
+    initial.advisorProgressState.awards = [{ id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2027 }];
+    const publication = { ...createDraftPaper(1, 0, () => 0), status: "published" as const, target: "A" as const };
+    let state: GameState = { ...initial, internshipState: activateInternship(), papers: [publication], totalCitations: 9000 };
+    let total = 0;
+    for (const [index, payment] of [2, 2, 2, 2, 2, 2].entries()) {
+      const before = structuredClone(state);
+      for (let repeat = 0; repeat < 2; repeat += 1) {
+        expect(previewNextMonthEffects(state).items.find((item) => item.id === "internship-monthly")?.stats.money).toBe(payment);
+      }
+      expect(state).toEqual(before);
+      const settled = applyMonthlyEffects({ ...state, totalMonths: index + 3, month: index + 3 });
+      expect(settled.resolution.items.find((item) => item.id === "internship-monthly")?.appliedStats.money).toBe(payment);
+      expect(settled.resolution.items.find((item) => item.id === "advisor-salary")?.appliedStats.money)
+        .toBe(Math.floor(1.25 * (index + 1)) - Math.floor(1.25 * index));
+      total += payment;
+      state = settled.nextState;
+      expect(state.player.money).toBe(total + Math.floor(1.25 * (index + 1)));
+      expect(state.internshipState.salaryRemainder).toBe(0);
+    }
+    expect(state.internshipState.active).toBe(false);
+    expect(total).toBe(12);
+  });
+
+  it("retains internship salary fractions through a raise, expiry and months without internship", () => {
+    const initial = createPlayingMonth(2, 2, 20);
+    const publication = { ...createDraftPaper(1, 0, () => 0), status: "published" as const, target: "A" as const };
+    let state = applyMonthlyEffects({ ...initial, papers: [publication], internshipState: { ...activateInternship(0.5), remainingMonths: 2 } }).nextState;
+    expect(state.internshipState.salaryRemainder).toBe(0.5);
+    state.externalPublications = [{ ...publication, id: "another-first-author-a" }];
+    const second = applyMonthlyEffects(state);
+    expect(second.resolution.items.find((item) => item.id === "internship-monthly")?.stats.money).toBe(3);
+    expect(second.nextState.internshipState).toEqual(createInternshipState(0.5));
+    state = applyMonthlyEffects(second.nextState).nextState;
+    expect(state.internshipState).toEqual(createInternshipState(0.5));
+    expect(state.player.money).toBe(5);
   });
 
   it("stacks strong body and active monthly buffs, then expires finite buffs", () => {

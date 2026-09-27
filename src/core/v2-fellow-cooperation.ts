@@ -53,7 +53,7 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
           scores: { [target.field]: amount },
         });
         if (paper !== target.paper) {
-          profile = { ...profile, pendingHelpToPlayer: null };
+          profile = { ...profile, pendingHelpToPlayer: null, helpedPlayerCount: (profile.helpedPlayerCount ?? 0) + 1 };
           nextState = pushLog({ ...nextState, papers: nextState.papers.map((entry) => entry.id === paper.id ? paper : entry) },
             `论文帮助：${getFellowName(profile)}帮你完善《${paper.title}》，${SCORE_LABELS[target.field]}+${amount}`);
         }
@@ -72,7 +72,7 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
           scores: { [target.field]: amount },
         });
         if (paper !== target.paper) {
-          profile = { ...profile, pendingHelpToFellow: null };
+          profile = { ...profile, pendingHelpToFellow: null, helpedFellowCount: (profile.helpedFellowCount ?? 0) + 1 };
           nextState = pushLog({ ...nextState, fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? paper : entry) },
             `论文帮助：你帮${getFellowName(profile)}完善《${paper.title}》，${SCORE_LABELS[target.field]}+${amount}`);
         }

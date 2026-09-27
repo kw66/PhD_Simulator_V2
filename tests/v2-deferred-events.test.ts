@@ -201,8 +201,9 @@ describe("deferred-system event content", () => {
     state = resolve(resolve(state, "continue"), "accept");
     expect(state.buffs).toHaveLength(0);
     state = resolve(state, "close");
-    expect(state.buffs.map((buff) => buff.name)).toEqual(expect.arrayContaining(["每次想 idea +5分", "每次做实验 +5分"]));
-    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(4);
+    expect(state.buffs.map((buff) => buff.name)).toEqual(expect.arrayContaining(["每次想 idea +5分", "每次写论文 +5分"]));
+    expect(state.buffs.some((buff) => buff.actionEffects?.experiment)).toBe(false);
+    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(5);
 
     let loverState: GameState = { ...createInitialState(), phase: "playing" };
     loverState = {

@@ -64,7 +64,7 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
       "你把合作笔记放进课题文件夹，准备先核清后续实验的设置。新的条件总算落实了，实验该重跑的还是得重跑。",
       "机制结算",
       `科研上限 +${context.pendingCitationCapBonus}`,
-      "永久：想 idea +5 分、做实验 +5 分",
+      "永久：想 idea +5 分、写论文 +5 分",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -89,7 +89,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
     id: "joint-training-act2",
     title: "联合培养 ➜ 联培抉择",
     description: [
-      "你把方案拿去和导师商量，对方能提供的设备和研究支持让你圈出好几处。" + (context.pendingCitationCapBonus > 0
+      "你把方案拿去和导师商量，对方能提供的设备和研究支持让你圈出好几处。" + (context.pendingCitationCapBonus > 1
         ? "对方提到同行读过你的论文，还想让你试试几个更难的问题。你翻回自己的成果列表，头一回觉得那些引用不只是数字。"
         : "对方对你的工作还不太熟悉，打算先从眼前的课题合作起。你把一直缺条件验证的那套方案翻出来，准备再仔细讲讲。"),
       "兴奋过后，你又翻回合作安排，想到以后要和两边讨论进展，还是有点紧张。" + (context.rejectedBigBullCoopCount === 0
@@ -117,7 +117,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
       {
         id: "accept",
         label: "接受联培",
-        outcome: `科研上限 +${context.pendingCitationCapBonus}；永久想 idea +5、做实验 +5。`,
+        outcome: `科研上限 +${context.pendingCitationCapBonus}；永久想 idea +5、写论文 +5。`,
         effects: {
           conferenceEncounterUpdates: {
             bigBullCooperation: true,
@@ -126,7 +126,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
             jointTrainingCitationCapBonus: context.pendingCitationCapBonus,
           },
           ideaBonus: 5,
-          experimentBonus: 5,
+          writingBonus: 5,
           enqueueEvents: [createJointTrainingAcceptResult(context)],
         },
       },

@@ -49,6 +49,104 @@ describe("session store", () => {
     expect(store.getState().phase).toBe("setup");
   });
 
+  it("awards final research score once and restores role experience in a new store", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+    };
+    const store = createStore({ storage });
+    store.dispatch("start-game", { roleId: "normal" });
+    store.dispatch("debug-add-paper", { debugJournalTarget: "nature", debugPaperAuthorship: "first" });
+    expect(store.getState().totalResearchScore).toBe(20);
+    store.dispatch("quit-game");
+
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 1, exp: 0 });
+    expect(store.getLobbyState().lastRunExperience).toMatchObject({ gained: 20, previousLevel: 0, level: 1 });
+    expect(renderApp(store.getState(), store.getLobbyState())).toContain("本局经验 <strong>+20</strong>");
+    store.dispatch("quit-game");
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 1, exp: 0 });
+
+    store.dispatch("reset-game");
+    store.dispatch("start-game", { roleId: "normal" });
+    store.dispatch("debug-add-paper", { debugPaperTarget: "A", debugPaperAuthorship: "first" });
+    store.dispatch("restart-game");
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 1, exp: 0 });
+    store.dispatch("quit-game");
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 1, exp: 0 });
+
+    const restored = createStore({ storage });
+    expect(restored.getLobbyState().roleProgress.normal).toMatchObject({ level: 1, exp: 0 });
+    expect(restored.getLobbyState().lastRunExperience).toBeUndefined();
+    expect(restored.getLobbyState().roleProgress.rich.unlocked).toBe(false);
+  });
+
+  it("awards the same ending again in a new run but skips a run that opened debugging", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+    };
+    const store = createStore({ storage });
+
+    store.dispatch("start-game", { roleId: "normal" });
+    store.dispatch("debug-add-paper", { debugJournalTarget: "nature", debugPaperAuthorship: "first" });
+    store.markCurrentRunAsDebugged();
+    store.dispatch("quit-game");
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 0, exp: 0 });
+    expect(store.getLobbyState().lastRunExperience?.disqualifiedByDebug).toBe(true);
+    expect(renderApp(store.getState(), store.getLobbyState())).toContain("调试局，本局不结算角色经验");
+    expect(values.size).toBe(0);
+
+    for (const [level, exp] of [[1, 0], [1, 20]]) {
+      store.dispatch("reset-game");
+      store.dispatch("start-game", { roleId: "normal" });
+      store.dispatch("debug-add-paper", { debugJournalTarget: "nature", debugPaperAuthorship: "first" });
+      store.dispatch("quit-game");
+      expect(store.getState().ending).toBe("quit");
+      expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level, exp });
+      expect(store.getLobbyState().lastRunExperience?.gained).toBe(20);
+      expect(store.getLobbyState().lastRunExperience?.disqualifiedByDebug).toBeUndefined();
+    }
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal).toMatchObject({ level: 1, exp: 20 });
+  });
+
+  it("persists and displays experience earned at the level cap", () => {
+    const values = new Map<string, string>([["phd_simulator_v2_role_experience_v1", JSON.stringify({
+      version: 1,
+      roles: { normal: { level: 9, exp: 819 } },
+    })]]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+    };
+    const store = createStore({ storage });
+    store.dispatch("start-game", { roleId: "normal" });
+    store.dispatch("debug-add-paper", { debugJournalTarget: "nature", debugPaperAuthorship: "first" });
+    store.dispatch("quit-game");
+
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 10, exp: 19 });
+    expect(renderApp(store.getState(), store.getLobbyState())).toContain("经验 <strong>19/∞</strong>");
+    store.dispatch("reset-game");
+    expect(renderApp(store.getState(), store.getLobbyState())).toContain(">19</span>/∞");
+
+    const restored = createStore({ storage });
+    expect(restored.getLobbyState().roleProgress.normal).toMatchObject({ level: 10, exp: 19 });
+    restored.dispatch("start-game", { roleId: "normal" });
+    restored.dispatch("debug-add-paper", { debugJournalTarget: "nature", debugPaperAuthorship: "first" });
+    restored.dispatch("quit-game");
+    expect(restored.getLobbyState().roleProgress.normal).toMatchObject({ level: 10, exp: 39 });
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal).toMatchObject({ level: 10, exp: 39 });
+  });
+
+  it("ignores corrupt saved experience without blocking a new game", () => {
+    const storage = { getItem: () => '{broken', setItem: () => {} };
+    const store = createStore({ storage });
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 0, exp: 0 });
+    store.dispatch("start-game", { roleId: "normal" });
+    expect(store.getState().phase).toBe("playing");
+  });
+
   it("notifies the UI immediately when final event confirmation adds a Buff", () => {
     const store = createStore();
     let latestHtml = "";

@@ -8,7 +8,9 @@ import {
   getInternshipExperimentEffect,
   getInternshipMonthlyIncome,
   getInternshipMonthlyStats,
+  getInternshipSalaryPayment,
   getInternshipStatus,
+  getPublishedAPaperCount,
   hasOngoingInternship,
   increaseInternshipExperimentMultiplier,
 } from "../src/core/v2-internship-system";
@@ -17,6 +19,7 @@ import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolutio
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "../src/core/v2-internship-events";
 import { createAdvisorTalkRandomEvent } from "../src/core/v2-random-events-lab-advisor-talk";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
+import { createDraftPaper } from "../src/core/v2-paper-rules";
 import type { GameState, PendingEvent } from "../src/core/v2-types";
 
 function playingState(): GameState {
@@ -40,6 +43,7 @@ describe("v2 internship system", () => {
 
     expect(state).toEqual({
       active: true,
+      salaryRemainder: 0,
       kind: "conference6",
       remainingMonths: 6,
       experimentMultiplier: 1.25,
@@ -54,9 +58,39 @@ describe("v2 internship system", () => {
     expect(nextState.experimentMultiplier).toBe(1.3);
   });
 
-  it("uses the audited monthly income formula", () => {
-    expect(getInternshipMonthlyIncome(2, 1200)).toBe(3);
-    expect(getInternshipMonthlyIncome(100, 10000)).toBe(6);
+  it.each([[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [100, 6]])("calculates salary for %s first-author A papers", (papers, salary) => {
+    expect(getInternshipMonthlyIncome(papers)).toBe(salary);
+  });
+
+  it("counts only published first-author A papers in salary and ignores citations", () => {
+    const publication = { ...createDraftPaper(1, 0, () => 0), status: "published" as const, target: "A" as const };
+    const state = {
+      ...playingState(),
+      internshipState: activateInternship(),
+      papers: [publication, { ...publication, id: "coauthor-a", nonFirstAuthor: true }],
+      externalPublications: [
+        { ...publication, id: "archived-first-author-a", nonFirstAuthor: false },
+        { ...publication, id: "archived-coauthor-a", nonFirstAuthor: true },
+        { ...publication, id: "first-author-b", target: "B" as const },
+        { ...publication, id: "reviewing-a", status: "reviewing" as const },
+      ],
+    };
+    expect(getPublishedAPaperCount(state)).toBe(2);
+    for (const totalCitations of [0, 100000]) {
+      const current = { ...state, totalCitations };
+      expect(getInternshipMonthlyStats(current).money).toBe(3);
+      expect(buildInternshipInviteContext(current).currentMonthlyIncome).toBe(3);
+    }
+  });
+
+  it.each(["remote3", "conference6"] as const)("preserves unpaid salary when accepting a new %s placement", (kind) => {
+    const initial = { ...playingState(), internshipState: createInternshipState(0.5) };
+    const next = applyChoiceEffectsToState(initial, { id: "internship", label: "实习", outcome: "", effects: {
+      internshipStateUpdates: kind === "remote3" ? activateRemoteInternship(initial.totalMonths) : activateInternship(),
+    } }).nextState;
+    expect(next.internshipState.salaryRemainder).toBe(0.5);
+    const effective = { ...next, totalMonths: next.totalMonths + 1 };
+    expect(getInternshipSalaryPayment(effective)).toEqual({ payment: 1, remainder: 0.5 });
   });
 
   it("exposes pure scheduled, three effective months and expired remote benefits", () => {
@@ -162,7 +196,7 @@ describe("v2 internship system", () => {
     };
     const expectedOutcome = reason === "ongoing"
       ? "已有实习安排，本次不新增、不延期，原实习保持不变。"
-      : "企业实习机会已关闭，本次未开始实习。";
+      : "大厂实习机会已关闭，本次未开始实习。";
     const denied = dispatchAction(state, "resolve-event", { eventId: approval.id, eventChoiceId: "close" });
     const failure = denied.eventQueue.find((event) => event.id === `${approval.id}-unavailable`)!;
     expect(failure).toMatchObject({ chainId: approval.chainId, completionLog: expectedOutcome });
@@ -222,7 +256,7 @@ describe("v2 internship system", () => {
     const blocked = { ...state, conferenceCareerState: { ...state.conferenceCareerState, permanentlyBlockedInternship: true } };
     const denied = resolveFirst(blocked);
     expect(denied.internshipState.active).toBe(false);
-    expect(denied.eventQueue[0]?.description).toContain("企业实习机会已关闭");
+    expect(denied.eventQueue[0]?.description).toContain("大厂实习机会已关闭");
     expect(resolveFirst(denied).log[0]?.text).toContain("本次未开始实习");
   });
 

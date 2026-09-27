@@ -131,7 +131,26 @@ describe("independent debug window", () => {
 
   it("reports popup blocking so the main window can offer a retry", () => {
     vi.stubGlobal("window", { location: { origin: "https://example.test", href: "https://example.test/" }, open: () => null, addEventListener: vi.fn() });
-    expect(createDebugWindow(() => createStartedGameState("normal"), vi.fn()).open()).toBe(false);
+    const onOpened = vi.fn();
+    const control = createDebugWindow(() => createStartedGameState("normal"), vi.fn(), onOpened);
+    expect(control.open()).toBe(false);
+    expect(control.isOpen()).toBe(false);
+    expect(onOpened).not.toHaveBeenCalled();
+  });
+
+  it("marks the active run when the panel opens or is reopened", () => {
+    const popup = { closed: false, focus: vi.fn(), postMessage: vi.fn() };
+    vi.stubGlobal("window", {
+      location: { origin: "https://example.test", href: "https://example.test/" },
+      open: vi.fn(() => popup),
+      addEventListener: vi.fn(),
+    });
+    const onOpened = vi.fn();
+    const control = createDebugWindow(() => createStartedGameState("normal"), vi.fn(), onOpened);
+    expect(control.open()).toBe(true);
+    expect(control.isOpen()).toBe(true);
+    control.open();
+    expect(onOpened).toHaveBeenCalledTimes(2);
   });
 
   it("reattaches its surviving child on ready without opening or focusing a new window", () => {

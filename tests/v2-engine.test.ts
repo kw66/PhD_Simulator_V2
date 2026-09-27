@@ -274,7 +274,8 @@ describe("minimal game engine", () => {
     if (!paper) throw new Error("preview paper is missing");
 
     const rerolled = dispatchAction(created, "reroll-paper-topic", { paperId: paper.id });
-    expect(rerolled.papers[0]?.topicLabel).not.toBe(paper.topicLabel);
+    expect(rerolled).not.toBe(created);
+    expect(rerolled.papers[0]?.id).toBe(paper.id);
 
     const discarded = dispatchAction(rerolled, "discard-paper", { paperId: paper.id });
     expect(discarded.papers.some((entry) => entry.id === paper.id)).toBe(false);

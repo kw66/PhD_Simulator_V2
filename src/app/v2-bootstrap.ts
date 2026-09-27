@@ -1,30 +1,66 @@
 import {
+  Activity,
+  ArrowRight,
   Award,
+  BadgeCheck,
   Bell,
+  BookOpen,
+  Brain,
+  Briefcase,
+  CalendarDays,
+  ChartNoAxesCombined,
   ChartNoAxesColumn,
   Check,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  ChevronUp,
   CircleHelp,
+  Coffee,
   createIcons,
+  Crown,
+  Database,
+  Dumbbell,
   Eye,
+  Feather,
+  FileText,
   FlaskConical,
   Gamepad2,
+  Gem,
   GitFork,
+  GraduationCap,
+  Handshake,
+  Heart,
+  HeartPulse,
   House,
+  Laptop,
+  Lightbulb,
   Lock,
+  Medal,
+  MessageCircle,
   MessageSquare,
   MessagesSquare,
+  Microscope,
   Microchip,
+  Network,
+  NotebookPen,
+  Presentation,
+  Reply,
   RotateCcw,
   Send,
   Settings,
+  Shield,
+  Smile,
+  Sparkles,
   Sprout,
+  Star,
   Store,
+  Target,
+  Trophy,
   Users,
   UserRound,
   X,
+  Zap,
 } from "lucide";
 
 import { DEBUG_RELATIONSHIP_TYPES, DEBUG_STAT_IDS, GAME_ACTION_IDS } from "../core/v2-action-ids";
@@ -32,11 +68,12 @@ import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
 import { createVisitStats } from "./v2-visit-stats";
+import { createCommunityMessages, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
 import { createRelationshipTooltips } from "./v2-relationship-tooltips";
 import { createDebugWindow } from "./v2-debug-window";
-import { renderEventLayoutSamples } from "./v2-render-play";
+import { renderEventLayoutSamples, renderRelationTalentCard } from "./v2-render-play";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
 import { getRoleOptions, isPreEnrollmentState } from "../core/v2-progression";
 import { getAttributeTier } from "../core/v2-random-event-rules";
@@ -62,10 +99,10 @@ import type {
 import {
   renderApp,
 } from "./v2-render";
+import { renderRoleRail } from "./v2-render-setup-screen";
 import { normalizeShopTab, type ShopTabId } from "./v2-render-shop-panel";
 import {
-  type LobbyInfoSectionId,
-  type LobbyViewId,
+  type RoleRailViewId,
   type PlayTabId,
   type ResearchAuthorshipFilter,
   type ResearchSortMode,
@@ -78,8 +115,7 @@ import { getPlayHelpContext, getPlayHelpPageIndex } from "./v2-play-help";
 const ROLE_IDS: ReadonlySet<string> = new Set(getRoleOptions().map((role) => role.id));
 const ROLE_IDS_IN_DISPLAY_ORDER = getRoleOptions().map((role) => role.id);
 const PLAY_TAB_IDS: ReadonlySet<string> = new Set(["events", "workstation", "relationship", "shop", "research", "talent", "settings"]);
-const LOBBY_VIEW_IDS: ReadonlySet<string> = new Set(["roles", "info", "messages"]);
-const LOBBY_INFO_SECTION_IDS: ReadonlySet<string> = new Set(["overview", "mechanics", "values", "guide", "events", "systems", "endings", "updates"]);
+const ROLE_RAIL_VIEW_IDS: ReadonlySet<string> = new Set(["achievements", "messages"]);
 const SHOP_TAB_IDS: ReadonlySet<string> = new Set(["ai", "rest", "coffee", "gear"]);
 const TALENT_PANEL_TAB_IDS: ReadonlySet<string> = new Set(["character", "relation", "equip", "growth", "publication"]);
 const DATE_DISPLAY_MODES: ReadonlySet<string> = new Set(["academic", "calendar"]);
@@ -99,7 +135,7 @@ const CHAIR_UPGRADE_ID_SET: ReadonlySet<string> = new Set([
   "chair-hammock",
 ]);
 const COFFEE_UPGRADE_ID_SET: ReadonlySet<string> = new Set(["manual", "automatic", "advanced", "unlimited"]);
-const SETUP_STAGE_WIDTH = 1460;
+const SETUP_STAGE_WIDTH = 1540;
 const PLAY_STAGE_WIDTH = 1540;
 const ANIMATED_ATTRIBUTE_IDS = ["san", "research", "social", "favor"] as const;
 
@@ -135,12 +171,8 @@ function isCoffeeUpgradeId(value: string | undefined): value is Exclude<CoffeeMa
   return value !== undefined && COFFEE_UPGRADE_ID_SET.has(value);
 }
 
-function isLobbyViewId(value: string | undefined): value is LobbyViewId {
-  return value !== undefined && LOBBY_VIEW_IDS.has(value);
-}
-
-function isLobbyInfoSectionId(value: string | undefined): value is LobbyInfoSectionId {
-  return value !== undefined && LOBBY_INFO_SECTION_IDS.has(value);
+function isRoleRailViewId(value: string | undefined): value is RoleRailViewId {
+  return value !== undefined && ROLE_RAIL_VIEW_IDS.has(value);
 }
 
 function isShopTabId(value: string | undefined): value is ShopTabId {
@@ -190,6 +222,14 @@ function isDebugRelationshipType(value: string | undefined): value is DebugRelat
 export function bootstrapApp(root: HTMLDivElement): void {
   const store = createStore();
   const visitStats = createVisitStats({ recordVisit: import.meta.env.PROD && window.location.protocol === "https:" });
+  const community = createCommunityMessages({ onChange: () => syncCommunityView() });
+  function syncCommunityView(): void {
+    renderCommunityMessages(root, community);
+    createIcons({
+      icons: { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, Gamepad2, MessagesSquare, Reply, Send, Users, X },
+      root,
+    });
+  }
   let queuedSetupPortraitWarmup = false;
   let fixedStageScaleFrame = 0;
   let activePlayTab: PlayTabId = "events";
@@ -199,8 +239,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let shopTabTransitionDirection: "from-left" | "from-right" | null = null;
   let helpPageByContext: Record<string, number> = {};
   let isHelpOpen = false;
-  let activeLobbyView: LobbyViewId = "roles";
-  let activeLobbyInfoSection: LobbyInfoSectionId = "overview";
+  let activeRoleRailView: RoleRailViewId = "achievements";
+  let talentTreePageIndex = 0;
+  const talentTreeSelectedNodeByPage: number[] = [0];
   let isFeedbackOpen = false;
   let activeShopTab: ShopTabId = "ai";
   let selectedChairUpgradeId: ShopUpgradeId | null = null;
@@ -211,7 +252,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
   type TabSliderOrigin = { left: number; top: number; width: number; height: number };
   const pendingTabSliderOrigins = new Map<string, TabSliderOrigin>();
   const tabSliderConfigs = [
-    { key: "lobby", container: ".lobby-view-tabs", active: ".lobby-view-tab.is-active" },
     { key: "center", container: ".center-main-tabs", active: ".center-tab-btn.active" },
     { key: "shop", container: ".shop-panel > .shop-tab-btns", active: ".shop-tab-btn.active" },
     { key: "talent", container: ".talent-tab-switches", active: ".panel-switch-btn.active" },
@@ -307,6 +347,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   };
   let advisorSalaryStartIndex: number | null = null;
   let loverRewardPage = 0;
+  let internshipPage = 0;
   let advisorSalaryContext = "";
   let isEventContentOpen = false;
   let isEndingContentOpen = true;
@@ -331,6 +372,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let lastLogSignature = "";
   let lastPhase = store.getState().phase;
   let lastRenderedPlayer: PlayerStats | null = null;
+  let lastRenderedSetupRoleId: RoleId | null = null;
   const animatePanelValues = createValueAnimations(root);
   let lastRenderedPaperSlotCount: number | null = null;
   let animateEventPanelAfterNextMonth = false;
@@ -761,6 +803,30 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeRelationshipIndex = Math.min(Math.max(activeRelationshipIndex, 0), 4);
   };
 
+  const renderRelationCardPage = (cardId: "advisor" | "lover" | "internship", button: HTMLButtonElement): void => {
+    const card = button.closest<HTMLElement>(`[data-talent-item-id="${cardId}"]`);
+    if (!card) return;
+    const buttons = [...card.querySelectorAll<HTMLButtonElement>(".research-pagination button")];
+    const focusedIndex = document.activeElement === button ? buttons.indexOf(button) : -1;
+    const template = document.createElement("template");
+    template.innerHTML = renderRelationTalentCard(store.getState(), cardId, {
+      advisorSalaryStartIndex,
+      loverRewardPage,
+      internshipPage,
+    });
+    const updatedCard = template.content.firstElementChild;
+    if (!updatedCard) return;
+    card.replaceChildren(...updatedCard.childNodes);
+    createIcons({ icons: { ChevronLeft, ChevronRight }, root: card });
+    if (focusedIndex >= 0) {
+      const updatedButtons = [...card.querySelectorAll<HTMLButtonElement>(".research-pagination button")];
+      const focusTarget = updatedButtons[focusedIndex]?.disabled
+        ? updatedButtons.find((entry) => !entry.disabled)
+        : updatedButtons[focusedIndex];
+      focusTarget?.focus({ preventScroll: true });
+    }
+  };
+
   const render = (): void => {
     const state = store.getState();
     const previousRenderedPlayer = lastRenderedPlayer;
@@ -774,11 +840,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (state.phase !== lastPhase) {
       isEndingContentOpen = true;
       loverRewardPage = 0;
+      internshipPage = 0;
       helpPageByContext = {};
       isHelpOpen = false;
       if (state.phase === "playing") {
-        activeLobbyView = "roles";
-        activeLobbyInfoSection = "overview";
+        activeRoleRailView = "achievements";
         isFeedbackOpen = false;
         activePlayTab = "events";
         activeShopTab = "ai";
@@ -797,8 +863,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
         resetEventContentUiState();
         activeLogPage = null;
       } else if (state.phase === "setup") {
-        activeLobbyView = "roles";
-        activeLobbyInfoSection = "overview";
+        activeRoleRailView = "achievements";
+        talentTreePageIndex = 0;
+        talentTreeSelectedNodeByPage.length = 1;
+        talentTreeSelectedNodeByPage[0] = 0;
         isFeedbackOpen = false;
         activePlayTab = "events";
         activeShopTab = "ai";
@@ -822,13 +890,18 @@ export function bootstrapApp(root: HTMLDivElement): void {
     syncRelationshipUiState();
     syncShopUpgradeNotices(state);
     const shopUpgradeNotices = getShopUpgradeNotices(state);
+    const lobby = store.getLobbyState();
+    const previousTalentTree = state.phase === "setup" && lobby.selectedLobbyRoleId === lastRenderedSetupRoleId
+      ? root.querySelector<HTMLElement>(".lobby-talent-tree")
+      : null;
     root.dataset.phase = state.phase;
-    root.innerHTML = renderApp(state, store.getLobbyState(), {
+    root.innerHTML = renderApp(state, lobby, {
       activePlayTab,
       helpPageByContext,
       isHelpOpen,
-      activeLobbyView,
-      activeLobbyInfoSection,
+      activeRoleRailView,
+      talentTreePageIndex,
+      talentTreeSelectedNodeByPage,
       isFeedbackOpen,
       isEventContentOpen,
       isEndingContentOpen,
@@ -847,9 +920,16 @@ export function bootstrapApp(root: HTMLDivElement): void {
       currentResearchPaperIndex,
       advisorSalaryStartIndex,
       loverRewardPage,
+      internshipPage,
       researchSortMode,
       researchAuthorshipFilter,
     });
+    if (previousTalentTree) {
+      // Keep the preview stable when a different part of the setup screen rerenders.
+      previousTalentTree.querySelector(".lobby-talent-tree-page.is-entering")?.classList.remove("is-entering");
+      root.querySelector(".lobby-talent-tree")?.replaceWith(previousTalentTree);
+    }
+    lastRenderedSetupRoleId = state.phase === "setup" ? lobby.selectedLobbyRoleId : null;
     mountTabSliders();
     if (playTabTransitionDirection) {
       root.querySelector<HTMLElement>(`[data-tab-panel="${activePlayTab}"]`)?.classList.add(`is-tab-entering-${playTabTransitionDirection}`);
@@ -863,11 +943,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
       root.querySelector<HTMLElement>(".talent-items-list")?.classList.add(`is-tab-entering-${talentTabTransitionDirection}`);
       talentTabTransitionDirection = null;
     }
-    const roleGrid = root.querySelector<HTMLElement>(".lobby-grid");
-    if (roleGrid) {
-      root.style.setProperty("--lobby-role-view-height", getComputedStyle(roleGrid).height);
-    }
     visitStats.render(root);
+    renderCommunityMessages(root, community);
     if (state.phase === "finished") {
       for (const button of root.querySelectorAll<HTMLButtonElement>("button[data-action]")) {
         if (["restart-game", "reset-game", "set-date-display-mode"].includes(button.dataset.action ?? "")) continue;
@@ -884,31 +961,67 @@ export function bootstrapApp(root: HTMLDivElement): void {
     }
     createIcons({
       icons: {
+        Activity,
+        ArrowRight,
         Award,
+        BadgeCheck,
         Bell,
+        BookOpen,
+        Brain,
+        Briefcase,
+        CalendarDays,
+        ChartNoAxesCombined,
         ChartNoAxesColumn,
         Check,
         ChevronDown,
         ChevronRight,
         ChevronLeft,
+        ChevronUp,
         CircleHelp,
+        Coffee,
+        Crown,
+        Database,
+        Dumbbell,
         Eye,
+        Feather,
+        FileText,
         FlaskConical,
         Gamepad2,
+        Gem,
         GitFork,
+        GraduationCap,
+        Handshake,
+        Heart,
+        HeartPulse,
         House,
+        Laptop,
+        Lightbulb,
         Lock,
+        Medal,
+        MessageCircle,
         MessageSquare,
         MessagesSquare,
+        Microscope,
         Microchip,
+        Network,
+        NotebookPen,
+        Presentation,
+        Reply,
         RotateCcw,
         Send,
         Settings,
+        Shield,
+        Smile,
+        Sparkles,
         Sprout,
+        Star,
         Store,
+        Target,
+        Trophy,
         Users,
         UserRound,
         X,
+        Zap,
       },
       root,
     });
@@ -1006,9 +1119,16 @@ export function bootstrapApp(root: HTMLDivElement): void {
       aiSlotId: typeof dataset.aiSlotId === "string" ? dataset.aiSlotId as AiSlotId : undefined,
       supportItemId: typeof dataset.supportItemId === "string" ? dataset.supportItemId as SupportItemId : undefined,
     });
+    if ((actionId === "start-game" || actionId === "restart-game") && debugWindow.isOpen()) {
+      store.markCurrentRunAsDebugged();
+    }
   }
 
-  const debugWindow = createDebugWindow(() => store.getState(), executeButtonAction);
+  const debugWindow = createDebugWindow(
+    () => store.getState(),
+    executeButtonAction,
+    () => store.markCurrentRunAsDebugged(),
+  );
 
   store.subscribe((state) => {
     debugWindow.update();
@@ -1023,17 +1143,22 @@ export function bootstrapApp(root: HTMLDivElement): void {
     scheduleAllFixedStageScales();
   });
 
-  root.addEventListener("toggle", (event) => {
-    const openedAchievement = event.target;
-    if (!(openedAchievement instanceof HTMLDetailsElement)) return;
-    if (!openedAchievement.matches(".lobby-profile-achievement[open]")) return;
-
-    root.querySelectorAll<HTMLDetailsElement>(".lobby-profile-achievement[open]").forEach((achievement) => {
-      if (achievement !== openedAchievement) {
-        achievement.open = false;
-      }
-    });
-  }, true);
+  root.addEventListener("input", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && (target.dataset.communityNickname === "board" || target.dataset.communityNickname === "feedback")) {
+      community.setNickname(target.value);
+      const counter = target.closest(".community-compose")?.querySelector<HTMLElement>("[data-community-nickname-count]");
+      if (counter) counter.textContent = `${target.value.length}/${target.maxLength}`;
+    } else if (target instanceof HTMLTextAreaElement && (target.dataset.communityContent === "board" || target.dataset.communityContent === "feedback")) {
+      community.setContent(target.dataset.communityContent, target.value);
+      const counter = target.closest(".community-compose")?.querySelector<HTMLElement>("[data-community-char-count]");
+      if (counter) counter.textContent = `${target.value.length}/150`;
+    }
+    if (target instanceof HTMLElement && (target.hasAttribute("data-community-nickname") || target.hasAttribute("data-community-content"))) {
+      const notice = target.closest(".community-compose")?.querySelector<HTMLElement>("[data-community-notice]");
+      if (notice) notice.textContent = "";
+    }
+  });
 
   root.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
@@ -1080,28 +1205,133 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    const talentTreePageButton = target.closest<HTMLButtonElement>("button[data-ui-talent-tree-page-delta]");
+    if (talentTreePageButton && !talentTreePageButton.disabled) {
+      const tree = talentTreePageButton.closest<HTMLElement>(".lobby-talent-tree");
+      const pages = tree?.querySelectorAll<HTMLElement>(".lobby-talent-tree-page");
+      const currentPage = Number(tree?.dataset.activePage);
+      const nextPage = currentPage + Number(talentTreePageButton.dataset.uiTalentTreePageDelta);
+      if (tree && pages && Number.isInteger(nextPage) && nextPage >= 0 && nextPage < pages.length) {
+        talentTreePageIndex = nextPage;
+        tree.dataset.activePage = String(nextPage);
+        tree.dataset.direction = nextPage > currentPage ? "forward" : "backward";
+        pages.forEach((page, index) => {
+          page.hidden = index !== nextPage;
+          page.classList.toggle("is-active", index === nextPage);
+          page.classList.remove("is-entering");
+          if (index === nextPage && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            page.classList.add("is-entering");
+            page.addEventListener("animationend", () => page.classList.remove("is-entering"), { once: true });
+          }
+        });
+        tree.querySelectorAll<HTMLButtonElement>("button[data-ui-talent-tree-page-delta]").forEach((button) => {
+          button.disabled = nextPage + Number(button.dataset.uiTalentTreePageDelta) < 0
+            || nextPage + Number(button.dataset.uiTalentTreePageDelta) >= pages.length;
+        });
+        tree.querySelectorAll<HTMLElement>(".lobby-talent-tree-page-dots span").forEach((dot, index) => {
+          dot.classList.toggle("is-active", index === nextPage);
+        });
+      }
+      return;
+    }
+
+    const talentTreeNode = target.closest<HTMLButtonElement>("button[data-ui-talent-tree-node]");
+    if (talentTreeNode) {
+      const page = talentTreeNode.closest<HTMLElement>(".lobby-talent-tree-page");
+      const nodes = page?.querySelectorAll<HTMLButtonElement>("button[data-ui-talent-tree-node]");
+      const pageIndex = Number(page?.dataset.treePage);
+      const nodeIndex = nodes ? [...nodes].indexOf(talentTreeNode) : -1;
+      if (Number.isInteger(pageIndex) && nodeIndex >= 0) talentTreeSelectedNodeByPage[pageIndex] = nodeIndex;
+      nodes?.forEach((node) => {
+        const selected = node === talentTreeNode;
+        node.classList.toggle("is-selected", selected);
+        node.setAttribute("aria-pressed", String(selected));
+      });
+      return;
+    }
+
+    const sendMessageButton = target.closest<HTMLButtonElement>("button[data-community-send]");
+    if (sendMessageButton && !sendMessageButton.disabled) {
+      const source = sendMessageButton.dataset.communitySend;
+      if (source === "board" || source === "feedback") void community.submit(source);
+      return;
+    }
+
+    const replyButton = target.closest<HTMLButtonElement>("button[data-community-reply-to]");
+    if (replyButton && !replyButton.disabled) {
+      const id = Number(replyButton.dataset.communityReplyTo);
+      if (Number.isSafeInteger(id)) {
+        const source = replyButton.closest(".community-feedback-overlay") ? "feedback" : "board";
+        community.openReply(id, source);
+        root.querySelector<HTMLTextAreaElement>(`textarea[data-community-content="${source}"]`)?.focus({ preventScroll: false });
+      }
+      return;
+    }
+
+    const cancelReplyButton = target.closest<HTMLButtonElement>("button[data-community-cancel-reply]");
+    if (cancelReplyButton && !cancelReplyButton.disabled) {
+      const source = cancelReplyButton.dataset.communityCancelReply;
+      if (source === "board" || source === "feedback") community.cancelReply(source);
+      return;
+    }
+
+    const toggleRepliesButton = target.closest<HTMLButtonElement>("button[data-community-toggle-replies]");
+    if (toggleRepliesButton && !toggleRepliesButton.disabled) {
+      const id = Number(toggleRepliesButton.dataset.communityToggleReplies);
+      if (Number.isSafeInteger(id)) community.toggleReplies(id);
+      return;
+    }
+
+    const messagePageNumberButton = target.closest<HTMLButtonElement>("button[data-community-page]");
+    if (messagePageNumberButton && !messagePageNumberButton.disabled) {
+      const requestedPage = Number(messagePageNumberButton.dataset.communityPage);
+      if (Number.isSafeInteger(requestedPage) && requestedPage >= 0) void community.loadPage(requestedPage);
+      return;
+    }
+
+    const messagePageButton = target.closest<HTMLButtonElement>("button[data-community-page-delta]");
+    if (messagePageButton && !messagePageButton.disabled) {
+      const delta = Number(messagePageButton.dataset.communityPageDelta);
+      if (delta === -1 || delta === 1) void community.loadPage(community.snapshot().page + delta);
+      return;
+    }
+
+    const retryMessagesButton = target.closest<HTMLButtonElement>("button[data-community-retry]");
+    if (retryMessagesButton && !retryMessagesButton.disabled) {
+      void community.loadPage(community.snapshot().page);
+      return;
+    }
+
     if (suppressTimelineClick && target.closest(".event-timeline-track")) {
       suppressTimelineClick = false;
       return;
     }
     suppressTimelineClick = false;
 
-    const lobbyViewButton = target.closest<HTMLButtonElement>("button[data-ui-lobby-view]");
-    if (lobbyViewButton && !lobbyViewButton.disabled && isLobbyViewId(lobbyViewButton.dataset.uiLobbyView)) {
-      rememberTabSliderOrigin("lobby");
-      activeLobbyView = lobbyViewButton.dataset.uiLobbyView;
-      render();
-      return;
-    }
-
-    const lobbyInfoSectionButton = target.closest<HTMLButtonElement>("button[data-ui-lobby-info-section]");
+    const roleRailViewButton = target.closest<HTMLButtonElement>("button[data-ui-role-rail-view]");
     if (
-      lobbyInfoSectionButton
-      && !lobbyInfoSectionButton.disabled
-      && isLobbyInfoSectionId(lobbyInfoSectionButton.dataset.uiLobbyInfoSection)
+      roleRailViewButton
+      && !roleRailViewButton.disabled
+      && isRoleRailViewId(roleRailViewButton.dataset.uiRoleRailView)
     ) {
-      activeLobbyInfoSection = lobbyInfoSectionButton.dataset.uiLobbyInfoSection;
-      render();
+      if (activeRoleRailView === roleRailViewButton.dataset.uiRoleRailView) return;
+      activeRoleRailView = roleRailViewButton.dataset.uiRoleRailView;
+      const rail = root.querySelector<HTMLElement>(".lobby-profile-achievement-rail");
+      if (!rail) {
+        render();
+        return;
+      }
+      const lobby = store.getLobbyState();
+      rail.outerHTML = renderRoleRail(lobby, lobby.selectedLobbyRoleId, activeRoleRailView);
+      root.querySelectorAll<HTMLButtonElement>("button[data-ui-role-rail-view]").forEach((button) => {
+        const selected = button.dataset.uiRoleRailView === activeRoleRailView;
+        button.classList.toggle("is-active", selected);
+        button.setAttribute("aria-selected", String(selected));
+      });
+      visitStats.render(root);
+      syncCommunityView();
+      scheduleAllFixedStageScales();
+      if (activeRoleRailView === "messages") void community.loadPage(community.snapshot().page);
       return;
     }
 
@@ -1109,6 +1339,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (openFeedbackButton && !openFeedbackButton.disabled) {
       isFeedbackOpen = true;
       render();
+      void community.loadPage(community.snapshot().page);
       return;
     }
 
@@ -1207,7 +1438,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const page = Number(loverRewardButton.dataset.uiLoverRewardPage);
       if (Number.isInteger(page) && page >= 0 && page < 3) {
         loverRewardPage = page;
-        render();
+        renderRelationCardPage("lover", loverRewardButton);
       }
       return;
     }
@@ -1217,7 +1448,17 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const startIndex = Number(advisorSalaryButton.dataset.uiAdvisorSalaryStart);
       if (Number.isInteger(startIndex) && startIndex >= 0) {
         advisorSalaryStartIndex = startIndex;
-        render();
+        renderRelationCardPage("advisor", advisorSalaryButton);
+      }
+      return;
+    }
+
+    const internshipPageButton = target.closest<HTMLButtonElement>("button[data-ui-internship-page]");
+    if (internshipPageButton && !internshipPageButton.disabled) {
+      const page = Number(internshipPageButton.dataset.uiInternshipPage);
+      if (Number.isInteger(page) && page >= 0 && page < 2) {
+        internshipPage = page;
+        renderRelationCardPage("internship", internshipPageButton);
       }
       return;
     }

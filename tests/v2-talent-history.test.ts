@@ -97,7 +97,7 @@ describe("talent trigger history", () => {
     expect(read.player.research).toBe(11);
     const workBase = { ...base, partTimeWorkCount: 7 };
     const work = dispatchAction(workBase, "part-time-work");
-    expect(triggers(work).map((trigger) => trigger.name)).toEqual(["兼职熟练度"]);
+    expect(triggers(work).map((trigger) => trigger.name)).toEqual(["熟练打工"]);
   });
 
   it("records equipment activation and growth once across nested dispatches", () => {

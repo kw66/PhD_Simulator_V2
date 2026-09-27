@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getFellowAnnualResearchGrowth, settleFellowCoauthoredPapers, settleLabResearchGrowth } from "../src/core/v2-lab-talent";
+import { getFellowAnnualResearchGrowth, getFellowPublicationTotals, settleFellowCoauthoredPapers, settleLabResearchGrowth } from "../src/core/v2-lab-talent";
 import { applyPublicationTalentRewards } from "../src/core/v2-publication-talent";
 import { submitJournalPaper } from "../src/core/v2-journal-system";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -116,6 +116,33 @@ describe("fellow publication settlement", () => {
 });
 
 describe("coauthored paper talent", () => {
+  it("counts published person-times in both directions without copies, draft help or advisor/lover credit", () => {
+    const state = makeState([2, 6]);
+    const playerPaper: Paper = {
+      ...published("fellow-0", "A"), id: "player-led", leadAuthorId: undefined,
+      collaborators: [
+        { id: "fellow-0", name: "同学0" }, { id: "fellow-1", name: "同学1" },
+        { id: "fellow-1", name: "同学1" }, { id: "advisor", name: "导师" }, { id: "lover:1", name: "恋人" },
+      ],
+    };
+    const fellowPaper = { ...published("fellow-0", "B"), collaborators: [{ id: "player", name: "你" }] };
+    state.papers = [playerPaper, { ...playerPaper, id: "draft", status: "draft" }];
+    state.externalPublications = [playerPaper, { ...fellowPaper, nonFirstAuthor: true }];
+    state.fellowPapers = [fellowPaper, published("fellow-1", "C")];
+    state.fellowProgressState[0]!.helpedPlayerCount = 50;
+    state.fellowProgressState[1]!.helpedFellowCount = 20;
+    expect(getFellowPublicationTotals(state)).toEqual({ playerLed: 2, fellowLed: 1 });
+    const settled = settleFellowCoauthoredPapers(state);
+    expect(settled.fellowProgressState.map((profile) => profile.affinity)).toEqual([3, 2]);
+    expect(getFellowPublicationTotals({ ...settled, fellowProgressState: [] })).toEqual({ playerLed: 2, fellowLed: 1 });
+    expect(getFellowPublicationTotals({ ...state, fellowProgressState: [], fellowPapers: [], papers: [], externalPublications: [fellowPaper] }))
+      .toEqual({ playerLed: 0, fellowLed: 1 });
+    const html = renderApp(settled, undefined, { activePlayTab: "talent", activeTalentTab: "relation" });
+    const card = html.split('data-talent-item-id="fellow-paper-cooperation"')[1]!.split("</article>")[0]!;
+    expect(card).toMatch(/你带同学发表<\/span>\s*<strong>\+2人次<\/strong>/);
+    expect(card).toMatch(/同学带你发表<\/span>\s*<strong>\+1人次<\/strong>/);
+  });
+
   it("awards successive fellow-led papers and does not transfer credit to a replacement", () => {
     const state = makeState([2]);
     const paper = { ...published("fellow-0", "B"), collaborators: [{ id: "player", name: "你" }] };
@@ -204,40 +231,41 @@ describe("coauthored paper talent", () => {
   });
 
   it("shows inheritance and cooperation with lover fourth and deferred cards", () => {
-    const html = renderApp(makeState([2, 6]), undefined, { activePlayTab: "talent", activeTalentTab: "relation" });
+    const state = makeState([2, 6]);
+    state.relationshipState.advisorCount = 1;
+    const html = renderApp(state, undefined, { activePlayTab: "talent", activeTalentTab: "relation" });
     const panel = html.split('data-talent-panel-tab="relation"')[1]!.split("</section>")[0]!;
     const ids = [...panel.matchAll(/data-talent-item-id="([^"]+)"/g)].map((match) => match[1]);
     expect(ids).toEqual(["advisor", "lab-mutual-growth", "fellow-paper-cooperation", "lover", "joint-training", "internship"]);
     expect(panel).not.toMatch(/同学0|同学1|首次挂名|每轮互助默契/);
     const card = panel.split('data-talent-item-id="fellow-paper-cooperation"')[1]!.split("</article>")[0]!;
-    expect(card).not.toContain("talent-item-rewards");
-    expect(card).toMatch(/共同发表<\/span>\s*<strong>每篇<\/strong>/);
-    expect(card).toMatch(/默契增加<\/span>\s*<strong>\+1<\/strong>/);
+    expect(card).toContain("talent-item-metrics");
+    expect(card).toContain("同学带你发表");
+    expect(card).toContain("你带同学发表");
     expect(card).not.toContain("默契上限");
     for (const id of ids.slice(0, 3)) {
       expect(panel).toMatch(new RegExp(`class="talent-item talent-item-row is-active(?: talent-rule-card)?"\\s+data-talent-item-id="${id}"`));
     }
     expect(panel).not.toContain("同学成长");
-    expect(panel).toMatch(/认识周期<\/span>\s*<strong>12个月<\/strong>/);
-    expect(panel).toMatch(/同学科研<\/span>\s*<strong>\+⌊n\/2⌋<\/strong>/);
-    expect(panel).toContain("导师视为1人，恋人不计");
-    expect(panel).not.toContain("科研上限");
+    expect(panel).not.toContain("认识周期");
+    expect(panel).toContain("认识每12个月");
+    expect(panel).toMatch(/同学科研<\/span>\s*<strong>\+x<\/strong>/);
+    expect(panel).toContain("认识每12个月，同学科研+⌊n/2⌋，n为实验室科研高于他的人数");
     const lover = panel.split('data-talent-item-id="lover"')[1]!.split("</article>")[0]!;
     expect(lover).toContain("恋人");
     expect(lover).toContain('<strong class="talent-item-title">恋人</strong>');
-    expect(lover).toContain('<th scope="row">玩耍奖励Ⅰ</th><td>SAN+6</td>');
+    expect(lover).toContain('<span>玩耍奖励</span>');
     expect(lover).toContain('data-ui-lover-reward-page="1"');
     expect(lover).not.toContain("具体天赋效果待定");
-    for (const id of ["joint-training"]) {
-      const pending = panel.split('data-talent-item-id="' + id + '"')[1]!.split("</article>")[0]!;
-      expect(pending).toContain("具体天赋效果待定");
-      expect(pending).not.toContain("未激活");
-      expect(pending).not.toContain("条件：");
-    }
+    const training = panel.split('data-talent-item-id="joint-training"')[1]!.split("</article>")[0]!;
+    expect(training).not.toContain("具体天赋效果待定");
+    expect(training).toContain("未激活");
+    expect(training).toContain("论文参会事件激活");
+    expect(training.match(/class="talent-item-metric"/g)).toHaveLength(3);
     const internship = panel.split('data-talent-item-id="internship"')[1]!.split("</article>")[0]!;
     expect(internship).not.toContain("具体天赋效果待定");
-    expect(internship.match(/class="talent-item-metric"/g)).toHaveLength(4);
-    expect(internship).not.toContain("实验倍率");
+    expect(internship.match(/class="talent-item-metric"/g)).toHaveLength(6);
+    expect(internship).toContain("实验");
     expect(internship).toContain("远程实习");
   });
 });

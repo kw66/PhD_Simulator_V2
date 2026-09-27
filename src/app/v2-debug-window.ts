@@ -14,7 +14,7 @@ export function isDebugWindowActionData(value: unknown): value is Record<string,
     && DEBUG_WINDOW_ACTIONS.has((value as Record<string, string>).action ?? "");
 }
 
-export function createDebugWindow(getState: () => GameState, onAction: (data: DOMStringMap) => void) {
+export function createDebugWindow(getState: () => GameState, onAction: (data: DOMStringMap) => void, onOpened?: () => void) {
   let channel: string = crypto.randomUUID();
   const hostId = crypto.randomUUID();
   const origin = window.location.origin;
@@ -42,7 +42,10 @@ export function createDebugWindow(getState: () => GameState, onAction: (data: DO
       channel = requestedChannel;
     }
     if (!popup || popup.closed || event.source !== popup || event.origin !== origin || event.data?.channel !== channel) return;
-    if (event.data.type === "debug-ready") sendState();
+    if (event.data.type === "debug-ready") {
+      onOpened?.();
+      sendState();
+    }
     if (event.data.type === "debug-action" && isDebugWindowActionData(event.data.data)) {
       if (getState().phase !== "playing" && event.data.data.action !== "restart-game" && event.data.data.action !== "reset-game") return;
       onAction(event.data.data);
@@ -56,6 +59,7 @@ export function createDebugWindow(getState: () => GameState, onAction: (data: DO
     open(): boolean {
       if (popup && !popup.closed) {
         popup.focus();
+        onOpened?.();
         sendState();
         return true;
       }
@@ -65,7 +69,11 @@ export function createDebugWindow(getState: () => GameState, onAction: (data: DO
       popup = window.open(url.href, `phd-debug-${channel}`, "popup=yes,width=760,height=780,resizable=yes,scrollbars=yes");
       if (!popup) return false;
       popup.focus();
+      onOpened?.();
       return true;
+    },
+    isOpen(): boolean {
+      return popup !== null && !popup.closed;
     },
     update(): void {
       revision += 1;

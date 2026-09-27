@@ -1,18 +1,19 @@
-import type { AccountProfile, CoffeeMachineUpgradeId, ShopUpgradeId } from "../core/v2-types";
+import type { AccountProfile, CoffeeMachineUpgradeId, RoleExperienceAward, ShopUpgradeId } from "../core/v2-types";
 import type { ShopTabId } from "./v2-render-shop-panel";
 
 export type PlayTabId = "events" | "workstation" | "relationship" | "shop" | "research" | "talent" | "settings";
-export type LobbyViewId = "roles" | "info" | "messages";
-export type LobbyInfoSectionId = "overview" | "mechanics" | "values" | "guide" | "events" | "systems" | "endings" | "updates";
+export type RoleRailViewId = "achievements" | "messages";
 export type TalentPanelTabId = "character" | "relation" | "equip" | "growth" | "publication";
 export type ShopUpgradeNoticeTab = Extract<ShopTabId, "ai" | "coffee">;
 export type ResearchSortMode = "year" | "citations";
 export type ResearchAuthorshipFilter = "all" | "first" | "coauthor";
 export interface PlayRenderUiState {
-  activeLobbyView?: LobbyViewId;
-  activeLobbyInfoSection?: LobbyInfoSectionId;
+  activeRoleRailView?: RoleRailViewId;
+  talentTreePageIndex?: number;
+  talentTreeSelectedNodeByPage?: readonly number[];
   isFeedbackOpen?: boolean;
   dateDisplayMode?: AccountProfile["dateDisplayMode"];
+  roleExperienceAward?: RoleExperienceAward;
   activePlayTab?: PlayTabId;
   helpPageByContext?: Readonly<Record<string, number>>;
   isHelpOpen?: boolean;
@@ -32,6 +33,7 @@ export interface PlayRenderUiState {
   activeTalentTab?: TalentPanelTabId;
   advisorSalaryStartIndex?: number | null;
   loverRewardPage?: number;
+  internshipPage?: number;
   currentResearchPaperIndex?: number | null;
   researchSortMode?: ResearchSortMode;
   researchAuthorshipFilter?: ResearchAuthorshipFilter;

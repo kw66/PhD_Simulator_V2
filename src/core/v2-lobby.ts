@@ -23,7 +23,7 @@ import type {
 
 export const LOBBY_ROLE_PAGE_SIZE = 10;
 export const LOBBY_ROLE_PAGE_ROW_COUNT = Math.max(1, Math.floor(LOBBY_ROLE_PAGE_SIZE / 2));
-export const ROLE_ACHIEVEMENT_PAGE_SIZE = 8;
+export const ROLE_ACHIEVEMENT_PAGE_SIZE = 5;
 const LOBBY_ROLE_ROWS: ReadonlyArray<ReadonlyArray<RoleId>> = [
   ["normal", "normal-reversed"],
   ["rich", "rich-reversed"],
@@ -116,6 +116,7 @@ export function createDefaultAccountProfile(): AccountProfile {
     selectedLobbyRoleId: "normal",
     lobbyRolePage: 0,
     lobbyRoleAchievementPage: 0,
+    achievementUnlockedAt: {},
     roleProgress,
   };
 }
@@ -229,8 +230,8 @@ function buildRoleHistoryStatsViewModel(progress: RoleMetaProgress): LobbySelect
     { id: "nature-count", label: "Nature", value: String(progress.historyBest.natureCount) },
     {
       id: "representative",
-      label: "代表作",
-      value: `${progress.historyBest.representativeScore}分 | ${progress.historyBest.representativeCitations}引`,
+      label: "代表作（分）",
+      value: String(progress.historyBest.representativeScore),
     },
     { id: "completed-runs", label: "通关次数", value: String(progress.completedRuns) },
   ];

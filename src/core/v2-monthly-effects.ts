@@ -1,5 +1,5 @@
 import { addOrReplaceBuffs, advanceBuffDurations, getActiveBuffs, removeBuffs } from "./v2-buffs";
-import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipStatus } from "./v2-internship-system";
+import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipSalaryPayment, getInternshipStatus } from "./v2-internship-system";
 import { getAdvisorSalaryPayment } from "./v2-advisor-progress";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
@@ -95,7 +95,7 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
   if (internship.active) {
     effects.push({
       id: "internship-monthly",
-      name: internship.kind === "remote3" ? "远程实习" : "企业实习",
+      name: internship.kind === "remote3" ? "远程实习" : "大厂实习",
       source: internship.kind === "remote3" ? "导师约谈" : "实习邀请",
       stats: getInternshipMonthlyStats(state),
       note: `剩余 ${internship.remainingMonths} 个月`,
@@ -483,6 +483,9 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     return { ...buff, scheduledPublication: { ...schedule, elapsedMonths: 0 } };
   });
   const internshipState = advanceInternshipMonth(state);
+  if (resolution.items.some((item) => item.id === "internship-monthly")) {
+    internshipState.salaryRemainder = getInternshipSalaryPayment(state).remainder;
+  }
   const monthlyChairRecovery = getMonthlyChairRecoveryContribution(state, resolution);
   const emergencyChairRecovery = Math.max(0, resolution.items
     .find((item) => item.id === "chair-emergency")?.appliedStats.san ?? 0);

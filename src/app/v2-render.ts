@@ -5,8 +5,7 @@ import { renderSetupScreen } from "./v2-render-setup-screen";
 import type { PlayRenderUiState } from "./v2-render-types";
 
 export type {
-  LobbyInfoSectionId,
-  LobbyViewId,
+  RoleRailViewId,
   PlayRenderUiState,
   PlayTabId,
   ResearchAuthorshipFilter,
@@ -19,9 +18,16 @@ export function renderApp(
   playUiState: PlayRenderUiState = {},
 ): string {
   return state.phase === "setup"
-    ? renderSetupScreen(state, accountProfile, playUiState.activeLobbyView, playUiState.activeLobbyInfoSection)
+    ? renderSetupScreen(
+      state,
+      accountProfile,
+      playUiState.activeRoleRailView,
+      playUiState.talentTreePageIndex,
+      playUiState.talentTreeSelectedNodeByPage,
+    )
     : renderPlayScreen(state, {
       ...playUiState,
       dateDisplayMode: playUiState.dateDisplayMode ?? accountProfile.dateDisplayMode,
+      roleExperienceAward: accountProfile.lastRunExperience,
     });
 }

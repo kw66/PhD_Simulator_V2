@@ -326,9 +326,9 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       }
     } else if (!hasOngoingInternship(state)) {
       if (effects.internshipStateUpdates.kind === "remote3") {
-        if (state.player.favor >= 6) internshipState = activateRemoteInternship(state.totalMonths);
+        if (state.player.favor >= 6) internshipState = activateRemoteInternship(state.totalMonths, state.internshipState.salaryRemainder);
       } else if (!state.conferenceCareerState.permanentlyBlockedInternship) {
-        internshipState = activateInternship();
+        internshipState = activateInternship(state.internshipState.salaryRemainder);
       }
     }
   }
@@ -476,7 +476,7 @@ export function applyChoiceEffectsToState(
       ? "已有实习安排，本次不新增、不延期，原实习保持不变。"
       : choice.effects.internshipStateUpdates.kind === "remote3"
         ? "导师好感不足，本次未确认远程实习。"
-        : "企业实习机会已关闭，本次未开始实习。";
+        : "大厂实习机会已关闭，本次未开始实习。";
     resolvedPresentation = {
       title: "实习安排未变更",
       description: `确认前，你又核对了一遍眼下的安排，把这次申请暂时放下。\n\n机制结算\n${resolvedOutcome}`,

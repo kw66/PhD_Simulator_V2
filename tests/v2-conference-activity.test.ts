@@ -135,6 +135,7 @@ describe("v2 conference activity", () => {
       active: true,
       kind: "conference6",
       remainingMonths: 6,
+      salaryRemainder: 0,
       experimentMultiplier: 1.3,
       experimentBonus: 0,
       experimentMoneyDiscount: 0,

@@ -1,5 +1,11 @@
 export type NumericRounding = "none" | "ceil" | "floor" | "round";
 
+export function getAccumulatedPayment(amount: number, remainder = 0): { payment: number; remainder: number } {
+  const accrued = amount + remainder;
+  const payment = Math.floor(accrued);
+  return { payment, remainder: accrued - payment };
+}
+
 function getFiniteValues(values: Iterable<number | null | undefined>): number[] {
   return [...values].filter((value): value is number => Number.isFinite(value));
 }

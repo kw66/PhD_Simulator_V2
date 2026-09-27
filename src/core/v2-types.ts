@@ -299,6 +299,15 @@ export interface RoleMetaProgress {
   unlocked: boolean;
 }
 
+export interface RoleExperienceAward {
+  roleId: RoleId;
+  gained: number;
+  previousLevel: number;
+  level: number;
+  exp: number;
+  disqualifiedByDebug?: boolean;
+}
+
 export interface RoleHistoryBest {
   researchScore: number;
   totalCitations: number;
@@ -322,7 +331,9 @@ export interface AccountProfile {
   selectedLobbyRoleId: RoleId;
   lobbyRolePage: number;
   lobbyRoleAchievementPage: number;
+  achievementUnlockedAt: Record<string, string>;
   roleProgress: Record<RoleId, RoleMetaProgress>;
+  lastRunExperience?: RoleExperienceAward;
 }
 
 export interface LobbySelectedRoleStatViewModel {

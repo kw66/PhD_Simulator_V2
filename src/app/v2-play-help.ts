@@ -174,9 +174,9 @@ export function renderPlayHelpPanel(uiState: PlayRenderUiState = {}): string {
       <div class="play-help-header">
         <strong class="play-help-topic">💡 ${page.title}提示</strong>
         <nav class="play-help-pagination" aria-label="提示分页"${context.pages.length === 1 ? " hidden" : ""}>
-          <button class="todo-nav-btn" type="button" data-ui-help-page="${index - 1}" aria-label="上一条提示" ${index === 0 ? "disabled" : ""}>‹</button>
+          <button class="todo-nav-btn pager-arrow" type="button" data-ui-help-page="${index - 1}" aria-label="上一条提示" ${index === 0 ? "disabled" : ""}><i data-lucide="chevron-left" aria-hidden="true"></i></button>
           <span>${index + 1}/${context.pages.length}</span>
-          <button class="todo-nav-btn" type="button" data-ui-help-page="${index + 1}" aria-label="下一条提示" ${index === context.pages.length - 1 ? "disabled" : ""}>›</button>
+          <button class="todo-nav-btn pager-arrow" type="button" data-ui-help-page="${index + 1}" aria-label="下一条提示" ${index === context.pages.length - 1 ? "disabled" : ""}><i data-lucide="chevron-right" aria-hidden="true"></i></button>
         </nav>
         <button class="play-help-close todo-nav-btn" type="button" data-ui-help-toggle aria-label="收起小提示">×</button>
       </div>

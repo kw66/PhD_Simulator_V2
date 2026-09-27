@@ -222,7 +222,6 @@ function renderActionButton(config: ActionButtonConfig): string {
 function renderShopEffectHtml(effectText: string, animation?: RowConfig["effectAnimation"]): string {
   const renderMetricTextHtml = (value: string): string => value
     .split(/((?:SAN\s*)?(?:[+\-×=]\s*)?(?:\{[\w-]+\}|\d+(?:\.\d+)?%?)(?:\s*(?:分|次|点|金币|杯|月))?)/giu)
-    .filter(Boolean)
     .map((part, index) => index % 2 === 1 ? `<strong>${animation ? renderAnimatedTemplate(animation.key, part, animation.values) : escapeHtml(part)}</strong>` : escapeHtml(part))
     .join("");
 
@@ -869,7 +868,7 @@ function renderAiEffectText(model: ReturnType<typeof getAiModelForTotalMonths>, 
 
   const formatSigned = (key: string, value: number): string => `${value > 0 ? "+" : ""}${metric(key, value)}`;
   const formatEffect = (key: string, effect: { bonus?: number; multiplier?: number; extraActions?: number; sanDelta?: number }): string => [
-    effect.multiplier && effect.multiplier !== 1 ? `基础分×${metric(`${key}-multiplier`, effect.multiplier)}` : "",
+    effect.multiplier && effect.multiplier !== 1 ? `×${metric(`${key}-multiplier`, effect.multiplier)}` : "",
     effect.bonus ? `${formatSigned(`${key}-bonus`, effect.bonus)}分` : "",
     effect.extraActions ? `${formatSigned(`${key}-actions`, effect.extraActions)}次` : "",
     effect.sanDelta ? `SAN ${formatSigned(`${key}-san`, effect.sanDelta)}` : "",

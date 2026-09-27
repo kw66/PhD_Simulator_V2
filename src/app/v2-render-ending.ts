@@ -2,7 +2,8 @@ import "../styles/event-ending.css";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getCalendarForTotalMonths, getRoleDefinition } from "../core/v2-progression";
 import { getResearchCap } from "../core/v2-research-cap-system";
-import type { EndingId, GameState } from "../core/v2-types";
+import { getNextRoleLevelExperience } from "../core/v2-role-experience";
+import type { EndingId, GameState, RoleExperienceAward } from "../core/v2-types";
 
 interface EndingPresentation {
   title: string;
@@ -111,7 +112,7 @@ function renderEndingSummary(state: GameState): string {
   </section>`;
 }
 
-export function renderEndingScreen(state: GameState): string {
+export function renderEndingScreen(state: GameState, experienceAward?: RoleExperienceAward): string {
   const ending = state.ending;
   const copy = ending ? ENDINGS[ending] : {
     title: "本轮结束", icon: "📖", label: "本轮结束", tone: "pause", story: ["这段研究生生活暂时告一段落。"], closing: "感谢游玩研究生模拟器 v2.0",
@@ -130,6 +131,8 @@ export function renderEndingScreen(state: GameState): string {
   const calendar = getCalendarForTotalMonths(state.totalMonths, state.degree);
   const date = state.totalMonths > 0 ? `${getAcademicCalendarYear(calendar.year, calendar.month)}年${getAcademicCalendarMonth(calendar.month)}月` : "入学前";
   const identity = state.playerName?.trim() || "你";
+  const award = experienceAward?.roleId === state.selectedRoleId ? experienceAward : null;
+  const nextLevelExp = award ? getNextRoleLevelExperience(award.level) : null;
   return `<section class="ending-panel" data-ending="${ending ?? "unknown"}" data-tone="${copy.tone}" aria-labelledby="ending-title">
         <header class="ending-header">
           <span class="ending-role">${escapeHtml(role.name)}</span>
@@ -143,6 +146,11 @@ export function renderEndingScreen(state: GameState): string {
           ${cause ? `<p class="ending-cause"><strong>最后发生的事</strong>${escapeHtml(cause)}</p>` : ""}
         </section>
         ${renderEndingSummary(state)}
+        ${award?.disqualifiedByDebug ? `<div class="ending-experience" aria-label="角色经验结算">调试局，本局不结算角色经验</div>` : award ? `<div class="ending-experience" aria-label="角色经验结算">
+          <span>本局经验 <strong>+${award.gained}</strong></span>
+          <span>等级 <strong>Lv${award.previousLevel}${award.level > award.previousLevel ? ` → Lv${award.level}` : ""}</strong></span>
+          <span>经验 <strong>${award.exp}/${nextLevelExp ?? "∞"}</strong></span>
+        </div>` : ""}
         <footer class="ending-actions">
           <p class="ending-closing">${copy.closing}</p>
           <div class="ending-buttons">
