@@ -16,6 +16,7 @@ import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-l
 import { createLoverProgressState } from "./v2-lover-progression";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { advanceSharedLabProject } from "./v2-lab-projects";
+import { settleAdvisorGrantResult } from "./v2-advisor-progress";
 import { addPaperCollaboration, applyPaperEffectUpdates, setPaperTotalScores } from "./v2-paper-collaboration";
 import type { Buff, EventChoice, GameState, PaperActionType, PendingEvent } from "./v2-types";
 
@@ -465,6 +466,9 @@ export function applyChoiceEffectsToState(
   }
   if (choice.effects.paperReviewSettlement) {
     nextState = applyPaperReviewSettlement(nextState, choice.effects.paperReviewSettlement);
+  }
+  if (choice.effects.advisorGrantResult) {
+    nextState = settleAdvisorGrantResult(nextState, choice.effects.advisorGrantResult);
   }
   let resolvedOutcome = choice.outcome;
   let resolvedEnqueueEvents: PendingEvent[] = [];

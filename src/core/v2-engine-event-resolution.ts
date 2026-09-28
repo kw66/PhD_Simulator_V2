@@ -373,7 +373,7 @@ export function applyQueuedEventEffects(
     return state;
   }
 
-  choice = deferPaperChoiceEffects(resolvedEvent, choice);
+  choice = deferResearchChoiceEffects(resolvedEvent, choice);
 
   const stateWithDeferredResolution = applyDeferredStatePatch(state, resolvedEvent.deferredStatePatch);
   const {
@@ -475,10 +475,10 @@ export function applyQueuedEventEffects(
   return callbacks.runPostQueuePipeline(nextState);
 }
 
-function deferPaperChoiceEffects(event: EventQueueItem, choice: EventChoice): EventChoice {
+function deferResearchChoiceEffects(event: EventQueueItem, choice: EventChoice): EventChoice {
   if (event.stage === "result") return choice;
-  const { clearDraftProgress, paperCollaborations, paperUpdates, ...otherEffects } = choice.effects;
-  if (!clearDraftProgress && !paperCollaborations?.length && !paperUpdates?.length) return choice;
+  const { clearDraftProgress, paperCollaborations, paperUpdates, labProjectProgress, ...otherEffects } = choice.effects;
+  if (!clearDraftProgress && !paperCollaborations?.length && !paperUpdates?.length && !labProjectProgress) return choice;
   const followUps = choice.effects.enqueueEvents ?? [];
   const resultIndex = followUps.findIndex((followUp) => followUp.chainId === event.chainId
     && (followUp.stage === "result" || followUp.description.includes("机制结算")));
@@ -493,6 +493,7 @@ function deferPaperChoiceEffects(event: EventQueueItem, choice: EventChoice): Ev
           ...resultChoice,
           effects: {
             ...resultChoice.effects,
+            labProjectProgress: labProjectProgress ?? resultChoice.effects.labProjectProgress,
             clearDraftProgress: clearDraftProgress || resultChoice.effects.clearDraftProgress,
             paperUpdates: [...(paperUpdates ?? []), ...(resultChoice.effects.paperUpdates ?? [])],
             paperCollaborations: [...(paperCollaborations ?? []), ...(resultChoice.effects.paperCollaborations ?? [])],

@@ -24,6 +24,7 @@ export function renderApp(
       playUiState.activeRoleRailView,
       playUiState.talentTreePageIndex,
       playUiState.talentTreeSelectedNodeByPage,
+      playUiState.announcementPageIndex,
     )
     : renderPlayScreen(state, {
       ...playUiState,

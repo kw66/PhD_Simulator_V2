@@ -22,7 +22,7 @@ function makeFellow(id = "fellow", patch: Partial<FellowProgressProfile> = {}): 
     }),
     id,
     researchTopic: {
-      topicId: "video-generation", topicLabel: "Video generation", heatMultiplier: 0.5, prepublicationDecayRate: 0,
+      topicId: "video-generation", topicLabel: "Video generation", heatMultiplier: 0.5, prepublicationDecayRate: 0.01,
     },
     ...patch,
   };
@@ -63,7 +63,7 @@ function makeState(options: {
     fellowProgressState: profiles,
     fellowPapers: state.fellowPapers!.map((paper) => ({
       ...paper,
-      prepublicationDecayRate: 0,
+      prepublicationDecayRate: 0.01,
       createdTotalMonths: state.fellowProgressState.find((profile) => profile.id === paper.leadAuthorId)!.startTotalMonths,
     })),
   };

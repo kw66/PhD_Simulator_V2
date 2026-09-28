@@ -329,7 +329,7 @@ describe("vertical completion guidance across actions", () => {
     expect(second.papers[0]).toEqual(experiment.papers[0]);
     expect(collaborationTotal(second.papers[1]!)).toBe(0);
     const later = nextMonth({ ...second, eventQueue: [] });
-    expect(later.papers[0]).toMatchObject({ writing: 9, collaborationScores: { idea: 0, experiment: 0, writing: 9 } });
+    expect(later.papers[0]).toMatchObject({ writing: 8, collaborationScores: { idea: 0, experiment: 0, writing: 8 } });
     expect(collaborationTotal(later.papers[1]!)).toBe(0);
     expect(later.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
   });

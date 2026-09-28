@@ -10,6 +10,7 @@ import {
   syncAdvisorResearchAccumulation,
 } from "../src/core/v2-advisor-progress";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
+import { dispatchAction } from "../src/core/v2-engine";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import type { AdvisorProgressState, GameState, Paper } from "../src/core/v2-types";
@@ -39,6 +40,16 @@ function atMonth(state: GameState, totalMonths: number): GameState {
 
 function publishedPaper(id: string, patch: Partial<Paper> = {}): Paper {
   return { ...createDraftPaper(1, 0, () => 0), id, status: "published", target: "A", ...patch };
+}
+
+function finishGrantEvent(state: GameState): GameState {
+  let current = state;
+  for (let stage = 0; stage < 3; stage += 1) {
+    const event = current.eventQueue.find((entry) => entry.chainId?.startsWith("advisor-grant-"));
+    if (!event) return current;
+    current = dispatchAction(current, "resolve-event", { eventId: event.id, eventChoiceId: event.choices[0]!.id });
+  }
+  return current;
 }
 
 describe("advisor project economy", () => {
@@ -75,7 +86,8 @@ describe("advisor project economy", () => {
     const after = advanceAdvisorProject(before, "horizontal", () => 0);
     expect(after.advisorProgressState).toMatchObject({ funding: 120, horizontalProgress: 19 });
     expect(after.player.money).toBe(25);
-    expect(after.log[0]?.text).toContain("劳务费+5");
+    expect(after.log[0]?.text).toBe("推进横向项目：SAN-5，进度+20");
+    expect(after.log[1]?.text).toBe("横向项目完成：科研经费 +20；金币 +5");
   });
 
   it("adds ten percent of current accumulation when vertical project completes", () => {
@@ -119,12 +131,12 @@ describe("advisor publication credit and grants", () => {
       awards: [{ id: "distinguished", awardedYear: 2023, startYear: 2024, endYear: 2028 }],
     }), 7));
     expect(march.advisorProgressState.pendingApplication?.id).toBe("academician");
-    const august = settleAdvisorMonth(atMonth(march, 12));
+    const august = finishGrantEvent(settleAdvisorMonth(atMonth(march, 12)));
     expect(august.advisorProgressState.funding).toBe(210);
     expect(august.advisorProgressState.awards.at(-1)).toEqual({
       id: "academician", awardedYear: 2024, startYear: null, endYear: null,
     });
-    expect(august.log.some((entry) => entry.text.includes("导师当选院士：晋升教授·一级，科研经费+200"))).toBe(true);
+    expect(august.log.some((entry) => entry.text.includes("导师当选院士") && entry.text.includes("科研经费 +200"))).toBe(true);
     expect(settleAdvisorMonth(august).advisorProgressState.funding).toBe(210);
     const september = settleAdvisorMonth(atMonth(august, 13));
     expect(september.advisorProgressState.funding).toBe(210);
@@ -161,7 +173,7 @@ describe("advisor publication credit and grants", () => {
   it("submits the March application and awards it in August without spending accumulation", () => {
     const march = settleAdvisorMonth(atMonth(makeState({ researchAccumulation: 25 }), 7));
     expect(march.advisorProgressState.pendingApplication).toEqual({ id: "youth", calendarYear: 2024, researchSnapshot: 25 });
-    const august = settleAdvisorMonth(atMonth(march, 12));
+    const august = finishGrantEvent(settleAdvisorMonth(atMonth(march, 12)));
     expect(august.advisorProgressState.awards).toEqual([{ id: "youth", awardedYear: 2024, startYear: 2025, endYear: 2027 }]);
     expect(august.advisorProgressState.researchAccumulation).toBe(25);
     expect(august.advisorProgressState.funding).toBe(20);

@@ -4,6 +4,7 @@ import {
   applyPrepublicationPaperDecay,
   ACCEPT_TYPE_SCORE_BY_TARGET,
   createDraftPaper,
+  decayUnpublishedPaper,
   discardDraftPaper,
   getAvailablePaperSlotCount,
   getPaperSubmissionFailure,
@@ -178,9 +179,19 @@ describe("v2 paper rules", () => {
 
     const decayed = applyPrepublicationPaperDecay(state);
     expect(decayed.papers[0]).toMatchObject({ idea: 18, experiment: 8, writing: 6 });
-    expect(decayed.papers[1]).toMatchObject({ idea: 8, experiment: 1, writing: 5 });
+    expect(decayed.papers[1]).toMatchObject({ idea: 8, experiment: 1, writing: 4 });
     expect(decayed.papers[1]).toMatchObject({ submittedIdea: 10, submittedExperiment: 2, submittedWriting: 6 });
     expect(decayed.log).toBe(state.log);
+  });
+
+  it.each([
+    { rate: 0.06, expected: 18 },
+    { rate: 0.005, expected: 19 },
+    { rate: 0, expected: 20 },
+    { rate: -0.05, expected: 20 },
+  ])("衰减率 $rate 时分数从20变为 $expected", ({ rate, expected }) => {
+    const paper = { ...createDraftPaper(1, 0), idea: 20, prepublicationDecayRate: rate };
+    expect(decayUnpublishedPaper(paper).idea).toBe(expected);
   });
 
   it("审稿期间可以随时撤稿并完整保留三项分数", () => {

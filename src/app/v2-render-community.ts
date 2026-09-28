@@ -29,7 +29,7 @@ function renderMessageComposer(mode: "board" | "feedback"): string {
   `;
 }
 
-function renderVisitMetrics(): string {
+export function renderVisitMetrics(): string {
   return `
     <span>
       <span class="lobby-metric-label"><i data-lucide="eye" aria-hidden="true"></i><span>访问（今日）</span></span>
@@ -48,9 +48,9 @@ function renderVisitMetrics(): string {
 
 function renderMessagePagination(): string {
   return `
-    <div class="community-pagination" data-community-pagination data-community-page-window="3" aria-label="留言分页">
+    <div class="community-pagination compact-pagination" data-community-pagination aria-label="留言分页">
       <button class="pager-arrow" type="button" data-community-page-delta="-1" aria-label="上一页"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-      <div class="community-page-buttons" data-community-page-buttons></div>
+      <span class="pagination-count" data-community-page-count aria-live="polite" aria-atomic="true">1/1</span>
       <button class="pager-arrow" type="button" data-community-page-delta="1" aria-label="下一页"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
     </div>
   `;
@@ -101,6 +101,15 @@ function renderRoleRailViewSwitcher(activeView: RoleRailViewId): string {
         data-ui-role-rail-view="messages"
       >
         <i data-lucide="message-square" aria-hidden="true"></i><span>留言板</span>
+      </button>
+      <button
+        class="lobby-profile-rail-tab${activeView === "announcements" ? " is-active" : ""}"
+        type="button"
+        role="tab"
+        aria-selected="${activeView === "announcements"}"
+        data-ui-role-rail-view="announcements"
+      >
+        <i data-lucide="bell" aria-hidden="true"></i><span>游戏公告</span>
       </button>
     </div>
   `;

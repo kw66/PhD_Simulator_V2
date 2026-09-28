@@ -7,6 +7,7 @@ import { getResolvableQueuedEvent, refreshPendingEventDecisions } from "../src/c
 import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolution-state";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
+import { settleLinearEvents } from "../src/core/v2-event-auto-resolution";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { ensureFellowPapers } from "../src/core/v2-fellow-research";
 import * as labProjects from "../src/core/v2-lab-projects";
@@ -198,6 +199,7 @@ describe("advisor project random event effects", () => {
     }).nextState;
 
     expect(after.advisorProgressState[type === "horizontal" ? "horizontalProgress" : "verticalProgress"]).toBe(87);
+    expect(after.log.filter((entry) => entry.text.startsWith(`${type === "horizontal" ? "横向" : "纵向"}项目完成：`))).toHaveLength(2);
     expect(after.advisorProgressState.funding).toBe(type === "horizontal" ? 53 : 13);
     expect(after.player.money).toBe(type === "horizontal" ? 17 : 7);
     expect(after.advisorProgressState.researchAccumulation).toBe(type === "vertical" ? 34 : 29);
@@ -220,6 +222,7 @@ describe("advisor project random event effects", () => {
 
     const repeated = applyChoiceEffectsToState(after, decisionChoice(makeEvent(after), "vertical")).nextState;
     expect(repeated.advisorProgressState.pendingGuidanceToPlayer).toBe(10);
+    expect(repeated.log[0]?.text).toContain("论文写作协作待使用（10分）");
     expect(repeated.fellowProgressState.map((profile) => profile.pendingGuidanceFromAdvisor)).toEqual([10, 10, 10]);
     const ready = settleAdvisorGuidance({
       ...repeated,
@@ -355,9 +358,9 @@ describe("advisor project SAN and attribute rules", () => {
 
 describe("advisor project three-stage settlement", () => {
   it.each([
-    { type: "horizontal" as const, effects: [/横向进度\s*\+\s*100/u, /科研经费\s*\+\s*20/u, /金币\s*\+\s*5/u] },
-    { type: "vertical" as const, effects: [/纵向进度\s*\+\s*100/u, /科研积累\s*\+\s*2/u, /论文写作协作\s*\+\s*10/u] },
-  ])("renders $type progress and rewards as settlement effect chips without applying them", ({ type, effects }) => {
+    { type: "horizontal" as const, effects: [/横向进度\s*\+\s*100/u, /SAN\s*-\s*8/u, /导师好感\s*\+\s*1/u] },
+    { type: "vertical" as const, effects: [/纵向进度\s*\+\s*100/u, /SAN\s*-\s*6/u, /科研\s*\+\s*1/u] },
+  ])("renders $type progress and direct event effects without duplicate completion rewards", ({ type, effects }) => {
     const state = makeState();
     const afterIntro = resolve(queueEvent(state));
     const afterDecision = resolve(afterIntro, decisionChoice(currentEvent(afterIntro), type).id);
@@ -377,6 +380,7 @@ describe("advisor project three-stage settlement", () => {
     for (const effect of effects) {
       expect(chips.some((chip) => effect.test(chip)), `Missing settlement effect chip: ${effect}`).toBe(true);
     }
+    expect(chips.join("；")).not.toMatch(/科研经费|金币|科研积累|论文写作协作/u);
     random.mockReturnValue(0.999);
     expect(renderSummary()).toBe(summary);
     expect(afterDecision).toEqual(snapshot);
@@ -398,6 +402,7 @@ describe("advisor project three-stage settlement", () => {
     expect(result.deferredStatePatch).toBeDefined();
     expect(settlementState(afterDecision)).toEqual(settlementState(state));
     expect(afterDecision.eventHistory).toEqual(state.eventHistory);
+    expect(afterDecision.log).toEqual(state.log);
 
     const snapshot = structuredClone(afterDecision);
     const firstPreview = getResolvableQueuedEvent(afterDecision, result);
@@ -407,14 +412,27 @@ describe("advisor project three-stage settlement", () => {
     expect(afterDecision).toEqual(snapshot);
 
     const completed = resolve(refreshed);
+    expect(refreshed.log).toEqual(state.log);
     expect(settlementState(completed)).toEqual(settlementState(expected));
     expect(completed.eventQueue.some((entry) => entry.chainId === "random-4")).toBe(false);
     expect(completed.eventHistory).toHaveLength(1);
+    const completionLogs = completed.log.filter((entry) => entry.text.startsWith(`${type === "horizontal" ? "横向" : "纵向"}项目完成：`));
+    expect(completionLogs).toHaveLength(1);
+    expect(completionLogs[0]!.text).toBe(type === "horizontal"
+      ? "横向项目完成：科研经费 +20；金币 +5"
+      : "纵向项目完成：科研积累 +2；论文写作协作 +10");
+    expect(completed.log.find((entry) => entry.eventHistoryId)?.text).not.toMatch(/科研经费|金币|科研积累|论文写作协作/u);
+    const automatic = settleLinearEvents({ ...refreshed, blockLinearEvents: false }, (current, eventId, eventChoiceId) =>
+      dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
+    expect(settlementState(automatic)).toEqual(settlementState(completed));
+    expect(automatic.log.filter((entry) => entry.text.startsWith(`${type === "horizontal" ? "横向" : "纵向"}项目完成：`)).map((entry) => entry.text))
+      .toEqual(completionLogs.map((entry) => entry.text));
     const repeated = dispatchAction(completed, "resolve-event", {
       eventId: result.id, eventChoiceId: result.choices[0]!.id,
     });
     expect(settlementState(repeated)).toEqual(settlementState(completed));
     expect(repeated.eventHistory).toEqual(completed.eventHistory);
+    expect(repeated.log).toEqual(completed.log);
   });
 
   it("keeps repeated vertical previews and final guidance stable when ambient randomness changes", () => {

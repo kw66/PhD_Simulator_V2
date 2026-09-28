@@ -128,6 +128,50 @@ describe("V2 visit statistics", () => {
     expect(backend.counters.get(`${PREFIX}_pv_total`)).toBe(2);
   });
 
+  it("refreshes the same open page after Beijing midnight without counting another visit", async () => {
+    const backend = createBackend();
+    let timestamp = Date.parse("2026-09-14T15:59:59Z");
+    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => timestamp });
+    await stats.load();
+    const increments = backend.fetch.mock.calls.filter(([url]) => String(url).endsWith("/increment_counter")).length;
+    timestamp += 1000;
+    backend.counters.set(`${PREFIX}_pv_2026-09-15`, 4);
+    backend.counters.set(`${PREFIX}_uv_2026-09-15`, 3);
+    backend.counters.set(`${PREFIX}_games_2026-09-15`, 2);
+    await Promise.all([stats.load(), stats.load()]);
+    expect(stats.getDisplayValues()).toEqual({ visitors: "1（3）", views: "1（4）", games: "0（2）" });
+    expect(backend.fetch.mock.calls.filter(([url]) => String(url).endsWith("/increment_counter"))).toHaveLength(increments);
+    expect(backend.fetch.mock.calls.filter(([url]) => String(url).endsWith("/get_counters"))).toHaveLength(2);
+  });
+
+  it("retries failed display reads without repeating increments and throttles rendering retries", async () => {
+    const backend = createBackend();
+    let timestamp = TODAY;
+    let offline = true;
+    const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
+      offline && String(input).endsWith("/get_counters")
+        ? Promise.reject(new Error("offline")) : backend.fetch(input, init));
+    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch, now: () => timestamp });
+    const targets = new Map<string, { textContent: string }>();
+    const root = { querySelectorAll: (selector: string) => {
+      if (!targets.has(selector)) targets.set(selector, { textContent: "" });
+      return [targets.get(selector)!];
+    } } as unknown as ParentNode;
+    await stats.load();
+    const requests = fetch.mock.calls.length;
+    stats.render(root);
+    stats.render(root);
+    expect(fetch).toHaveBeenCalledTimes(requests);
+    offline = false;
+    timestamp += 60_000;
+    stats.render(root);
+    await stats.load();
+    expect(targets.get('[data-community-stat="views"]')?.textContent).toBe("1（1）");
+    expect(backend.counters.get(`${PREFIX}_pv_total`)).toBe(1);
+    expect(backend.counters.get(`${PREFIX}_uv_total`)).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(requests + 1);
+  });
+
   it("reads shared totals without recording local development or preview traffic", async () => {
     const backend = createBackend();
     backend.counters.set(`${PREFIX}_uv_total`, 123);

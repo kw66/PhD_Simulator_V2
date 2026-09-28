@@ -16,6 +16,8 @@ import { createSummerVacationEvent } from "./v2-fixed-events-summer";
 import { createTeachersDayEvent } from "./v2-fixed-events-teachers-day";
 import { createWinterVacationEvent } from "./v2-fixed-events-winter";
 import { createYearSummaryEvent } from "./v2-fixed-events-year-summary";
+import { ADVISOR_GRANTS, getAdvisorGrantResultContext } from "./v2-advisor-progress";
+import { createAdvisorGrantResultEvent } from "./v2-advisor-grant-events";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
@@ -196,6 +198,8 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
       { id: "before-grad-school", label: "读研之始" },
       { id: "phd-choice", label: "转博抉择" },
       { id: "mentor-assign", label: "指导新生" },
+      { id: "advisor-grant-success", label: "基金结果·获批" },
+      { id: "advisor-grant-failure", label: "基金结果·未获批" },
     ],
   },
   {
@@ -600,6 +604,29 @@ function buildDebugEvent(
       return { nextState: state, event: createCcigEvent(state) };
     case "mentor-assign":
       return { nextState: state, event: createMentorAssignEvent(state) };
+    case "advisor-grant-success":
+    case "advisor-grant-failure": {
+      const success = eventId === "advisor-grant-success";
+      const advisor = state.advisorProgressState;
+      const highestAward = ADVISOR_GRANTS.reduce((highest, entry, index) => advisor.awards.some((award) => award.id === entry.id) ? index : highest, -1);
+      const grant = ADVISOR_GRANTS.find((entry) => entry.id === advisor.pendingApplication?.id)
+        ?? ADVISOR_GRANTS[Math.min(highestAward + 1, ADVISOR_GRANTS.length - 1)]!;
+      const application = {
+        id: grant.id,
+        calendarYear: getAcademicCalendarYear(state.year, Math.max(1, state.month)),
+        researchSnapshot: success ? Math.max(grant.threshold, advisor.researchAccumulation) : grant.threshold - 1,
+      };
+      const nextState = {
+        ...state,
+        eventQueue: state.eventQueue.filter((event) => !event.chainId?.startsWith("advisor-grant-")),
+        advisorProgressState: {
+          ...advisor,
+          awards: advisor.awards.filter((award) => award.id !== grant.id),
+          pendingApplication: application,
+        },
+      };
+      return { nextState, event: createAdvisorGrantResultEvent(getAdvisorGrantResultContext(nextState, application)) };
+    }
     case "illness-stomach":
       return { nextState: state, event: createIllnessRandomEvent(state, Math.random, "stomach") };
     case "illness-flu":

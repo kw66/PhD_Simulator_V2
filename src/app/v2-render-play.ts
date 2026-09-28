@@ -54,6 +54,7 @@ import {
 import {
   getCalendarForTotalMonths,
   getRoleDefinition,
+  getRoleOptions,
   getMonthLimitByDegree,
   isPreEnrollmentState,
 } from "../core/v2-progression";
@@ -84,7 +85,7 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
-import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent } from "../core/v2-types";
+import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent, RoleId } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type PlayTabId,
@@ -99,6 +100,7 @@ import { renderPlayHelpPanel } from "./v2-play-help";
 import { isEndingSystemLog, renderEndingLog, renderEndingScreen } from "./v2-render-ending";
 import type { EventLayoutSample } from "./v2-event-layout";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
+import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
 const RESEARCH_CHORE_SAN_DISCOUNT = [0, 1, 2, 3] as const;
@@ -107,6 +109,36 @@ const PENDING_PAGE_SIZE = 6;
 const RESEARCH_PAGE_SIZE = 5;
 const RELATIONSHIP_SLOT_UNLOCK_THRESHOLDS = [0, 0, 6, 12, 18] as const;
 const DEFERRED_GAMEPLAY_ACTION_ATTRIBUTES = 'disabled aria-disabled="true" data-gameplay-status="deferred"';
+
+function getMonthlySupportingPortraits(state: GameState): RoleId[] {
+  const runSeed = state.conferenceLocationSeed ?? 0;
+  const candidates = getRoleOptions().map((role) => role.id).filter((id) => id !== state.selectedRoleId);
+  let selected: RoleId[] = [];
+  for (let month = 0; month <= Math.max(0, state.totalMonths); month += 1) {
+    const ranked = [...candidates].sort((left, right) => getStableNameSeed(`${runSeed}:${month}:${left}`)
+      - getStableNameSeed(`${runSeed}:${month}:${right}`));
+    const next = ranked.slice(0, 6);
+    if (selected.length > 0 && next.every((roleId) => selected.includes(roleId))) {
+      next[5] = ranked[6]!;
+    }
+    selected = next;
+  }
+  return selected;
+}
+
+function renderPlayCenterPortraits(state: GameState): string {
+  const supportingRoles = getMonthlySupportingPortraits(state);
+  const renderSide = (side: "left" | "right", roles: RoleId[]): string => {
+    return `<div class="play-center-cast is-${side}">${roles.map((supportRoleId) => (
+      `<img class="play-center-portrait is-support" src="${escapeHtml(getRoleCardPortraitUrl(supportRoleId))}" alt="" decoding="async">`
+    )).join("")}</div>`;
+  };
+  return `<div class="play-center-artwork" aria-hidden="true">
+    ${renderSide("left", supportingRoles.slice(0, 3))}
+    ${renderSide("right", supportingRoles.slice(3))}
+    <img class="play-center-portrait is-current" src="${escapeHtml(getRoleDetailPortraitUrl(state.selectedRoleId))}" alt="" decoding="async">
+  </div>`;
+}
 
 function getSubmittablePaperCount(state: GameState): number {
   return state.papers.filter((paper) => paper.status === "draft" && getPaperSubmissionFailure(paper, "C") === null).length;
@@ -728,6 +760,8 @@ const EVENT_EMOJI_THEMES: readonly [string, readonly [string, string, string]][]
   ["摸鱼划水", ["📊", "😅", "🫠"]],
   ["组内团建", ["🎉", "🍽️", "😄"]],
   ["导师经费", ["💰", "🧾", "😌"]],
+  ["导师基金结果", ["📝", "📨", "📣"]],
+  ["导师增选结果", ["📝", "📨", "🏅"]],
   ["显卡采购", ["🖥️", "💳", "✅"]],
   ["涨工资", ["💰", "🧾", "😊"]],
   ["布置工位", ["🪑", "🛠️", "✨"]],
@@ -821,6 +855,11 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
     }
 
     const calendar = getCalendarForTotalMonths(nextTotalMonths, state.degree);
+    const application = state.advisorProgressState.pendingApplication;
+    if (application && calendar.month === 12
+      && getAcademicCalendarYear(calendar.year, calendar.month) === application.calendarYear) {
+      addItem({ title: application.id === "academician" ? "导师增选结果" : "导师基金结果", monthsLater });
+    }
     if (calendar.month === 5) {
       addItem({
         title: "寒假",
@@ -997,7 +1036,7 @@ function splitEventSettlementRows(items: string[]): { conditions: string[]; resu
   return { conditions, results };
 }
 
-const EVENT_SETTLEMENT_EFFECT_PATTERN = /(导师科研积累|科研积累|导师经费|科研经费|经费|横向进度|纵向进度|论文写作协作|论文随机协作|论文随机一项协作分|实验金币|恋人科研|恋人亲密度|恋人亲密|师兄科研|师弟科研|师妹科研|同门科研|师兄默契|师弟默契|师妹默契|同门默契|科研分|科研上限|SAN\s*上限|(?:清除本月\s*)?SAN\s*消耗|SAN|金币|导师好感|生病概率|社交|亲密度|默契|科研|idea|实验|写作|论文进度|下次写论文|下次做实验|下次想 idea|行动点)(\s*)([+＋\-−]?\s*\d+(?:\.\d+)?(?:%|分|次|月)?|×\s*\d+(?:\.\d+)?)(?:（(?:减免|抵抗|疾病增加)[^（）]*）)*/gu;
+const EVENT_SETTLEMENT_EFFECT_PATTERN = /(导师科研积累|科研积累|导师经费|科研经费|经费|每月补助|横向进度|纵向进度|论文写作协作|论文随机协作|论文随机一项协作分|实验金币|恋人科研|恋人亲密度|恋人亲密|师兄科研|师弟科研|师妹科研|同门科研|师兄默契|师弟默契|师妹默契|同门默契|科研分|科研上限|SAN\s*上限|(?:清除本月\s*)?SAN\s*消耗|SAN|金币|导师好感|生病概率|社交|亲密度|默契|科研|idea|实验|写作|论文进度|下次写论文|下次做实验|下次想 idea|行动点)(\s*)([+＋\-−]?\s*\d+(?:\.\d+)?(?:%|分|次|月)?|×\s*\d+(?:\.\d+)?)(?:（(?:减免|抵抗|疾病增加)[^（）]*）)*/gu;
 
 function getEventSettlementEffectTone(label: string): string {
   if (/SAN|生病概率/u.test(label)) return "is-san";
@@ -2237,7 +2276,9 @@ function renderAdvisorStatus(state: GameState): string {
   const limited = !academician && !advisor.awards.some((award) => award.id === "distinguished")
     && getActiveAdvisorGrants(advisor, applicationYear).length >= getAdvisorGrantLimit(advisor);
   const applicationText = academician ? "已当选院士"
-    : pendingGrant ? `${pendingGrant.name}申请·${(8 - calendarMonth + 12) % 12 || 12}月后公布`
+    : pendingGrant && pending ? calendarYear > pending.calendarYear || (calendarYear === pending.calendarYear && calendarMonth >= 8)
+      ? `${pendingGrant.name}结果已公布`
+      : `${pendingGrant.name}申请·${(8 - calendarMonth + 12) % 12 || 12}月后公布`
     : `${monthsToApplication}月后可申请${applicationGrant.name}${limited ? "·限项" : ""}`;
   const accumulationHint = `科研积累：纵向项目满100，+⌊当前积累×10%⌋\n玩家和同学发表论文按科研分计入，同篇去重\n${nextTier ? `下一档${nextTier.name}：${score}/${nextTier.threshold}` : ""}${reachedTier ? `；已达到${reachedTier.name}：${score}/${reachedTier.threshold}` : ""}`;
   const progressBar = (label: string, value: number, max: number): string => `
@@ -3696,6 +3737,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
     : "";
   return `
     <section class="play-center-column game-main-area">
+      ${renderPlayCenterPortraits(state)}
       <div class="center-shell" id="center-shell">
         <div class="center-main-tabs" id="center-main-tabs">
           <button class="center-tab-btn${getTabActiveClass("events")}" type="button" aria-pressed="${getTabAriaPressed("events")}" data-ui-play-tab="events" data-tooltip="查看事件、待办和游戏日志">
@@ -3907,9 +3949,10 @@ function buildLogPages(
 
 function getLogEntryClassName(text: string): string {
   const normalized = text.trim();
+  const isAcademicYear = /^第 \d+ 学年 · 九月开学：/u.test(normalized);
   const isAchievement = /^(?:成就|角色解锁|通关|Nature(?:论文)?)\s*[：:]/u.test(normalized);
-  const isNegative = /(?:拒稿|拒绝|失败|落选|不足|无法|不能|未能|未达到|暂停|SAN -\d|金币 -\d|好感 -\d|社交 -\d)/u.test(normalized);
-  const isSystem = /^(?:进入第|正式入学|月初结算|系统|论文时效|测试)/u.test(normalized);
+  const isNegative = !isAcademicYear && /(?:拒稿|拒绝|失败|落选|不足|无法|不能|未能|未达到|暂停|SAN -\d|金币 -\d|好感 -\d|社交 -\d)/u.test(normalized);
+  const isSystem = isAcademicYear || /^(?:进入第|正式入学|月初结算|系统|论文时效|测试)/u.test(normalized);
   return [
     "log-entry",
     isAchievement ? "achievement" : "",
@@ -4150,8 +4193,11 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
                 aria-pressed="${blockLinearEvents}"
                 data-tooltip="${eventBlockingHint}"
               ><span aria-hidden="true">${blockLinearEvents ? "⏸️" : "▶️"}</span></button>
+              <nav class="compact-pagination" aria-label="待办事件分页">
               <button class="todo-nav-btn pager-arrow" id="pending-nav-prev" type="button" data-ui-pending-nav="prev" aria-label="上一页" ${atFirstPendingPage ? "disabled" : ""}><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+              <span class="pagination-count" aria-live="polite" aria-atomic="true">${pendingPage.pageIndex + 1}/${pendingPage.pageCount}</span>
               <button class="todo-nav-btn pager-arrow" id="pending-nav-next" type="button" data-ui-pending-nav="next" aria-label="下一页" ${atLastPendingPage ? "disabled" : ""}><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+              </nav>
             </div>
           </div>
           <div class="new-calendar-content new-pending-event-content event-queue" id="pending-event-list">

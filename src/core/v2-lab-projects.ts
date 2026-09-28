@@ -1,4 +1,4 @@
-import { queueAdvisorGuidance, settleAdvisorGuidance } from "./v2-advisor-guidance";
+import { getAdvisorGuidanceAmount, queueAdvisorGuidance, settleAdvisorGuidance } from "./v2-advisor-guidance";
 import type { GameState } from "./v2-types";
 
 export const PROJECT_PROGRESS_MAX = 100;
@@ -22,6 +22,7 @@ export function advanceSharedLabProject(
     advisorProgressState: { ...state.advisorProgressState, [field]: total % PROJECT_PROGRESS_MAX },
   };
   for (let index = 0; index < completed; index += 1) {
+    let completionSummary: string;
     if (type === "horizontal") {
       nextState = {
         ...nextState,
@@ -31,6 +32,7 @@ export function advanceSharedLabProject(
           funding: nextState.advisorProgressState.funding + ADVISOR_HORIZONTAL_REWARD,
         },
       };
+      completionSummary = `科研经费 +${ADVISOR_HORIZONTAL_REWARD}；金币 +${PROJECT_LABOR_REWARD}`;
     } else {
       const accumulation = nextState.advisorProgressState.researchAccumulation;
       nextState = {
@@ -41,7 +43,21 @@ export function advanceSharedLabProject(
         },
       };
       nextState = settleAdvisorGuidance(queueAdvisorGuidance(settleAdvisorGuidance(nextState, random)), random);
+      const guidanceSummary = nextState.selectedAdvisorName
+        ? nextState.advisorProgressState.pendingGuidanceToPlayer != null
+          ? `；论文写作协作待使用（${getAdvisorGuidanceAmount()}分）`
+          : `；论文写作协作 +${getAdvisorGuidanceAmount()}`
+        : "";
+      completionSummary = `科研积累 +${Math.floor(accumulation * 0.1)}${guidanceSummary}`;
     }
+    nextState = {
+      ...nextState,
+      log: [{
+        id: `lab-project-${type}-${nextState.totalMonths}-${nextState.log.length}`,
+        month: nextState.totalMonths,
+        text: `${type === "horizontal" ? "横向" : "纵向"}项目完成：${completionSummary}`,
+      }, ...nextState.log],
+    };
   }
   return { state: nextState, gain, completed };
 }

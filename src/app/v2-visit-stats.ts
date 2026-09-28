@@ -51,6 +51,9 @@ export function createVisitStats(options: VisitStatsOptions) {
   const now = options.now ?? Date.now;
   let snapshot: VisitSnapshot | null = null;
   let pendingLoad: Promise<void> | null = null;
+  let initialLoadStarted = false;
+  let loadedDay: string | null = null;
+  let lastLoadAttempt = -Infinity;
   let pendingGameRecords = Promise.resolve();
   let previousPhase: GamePhase = "setup";
 
@@ -102,7 +105,7 @@ export function createVisitStats(options: VisitStatsOptions) {
     return text ? JSON.parse(text) : null;
   };
 
-  const refresh = async (recordVisit: boolean, completedDay?: string): Promise<void> => {
+  const refresh = async (recordVisit: boolean, completedDay?: string): Promise<boolean> => {
     const day = getBeijingDay(now());
     const ids = [`${COUNTER_PREFIX}_uv_total`, `${COUNTER_PREFIX}_pv_total`, `${COUNTER_PREFIX}_uv_${day}`, `${COUNTER_PREFIX}_pv_${day}`, `${COUNTER_PREFIX}_games_total`, `${COUNTER_PREFIX}_games_${day}`];
     const increment = (id: string): Promise<unknown> => rpc("increment_counter", { counter_id: id });
@@ -146,8 +149,9 @@ export function createVisitStats(options: VisitStatsOptions) {
         todayGames: counters.get(ids[5]) ?? 0,
       };
       writeStorage(SNAPSHOT_KEY, JSON.stringify(snapshot));
+      return true;
     } catch {
-      return;
+      return false;
     }
   };
 
@@ -162,8 +166,24 @@ export function createVisitStats(options: VisitStatsOptions) {
   };
 
   const load = (): Promise<void> => {
-    pendingLoad ??= refresh(options.recordVisit);
+    if (pendingLoad) return pendingLoad;
+    const day = getBeijingDay(now());
+    if (loadedDay === day) return Promise.resolve();
+    const recordVisit = options.recordVisit && !initialLoadStarted;
+    initialLoadStarted = true;
+    lastLoadAttempt = now();
+    pendingLoad = refresh(recordVisit).then((success) => {
+      if (success) loadedDay = day;
+    }).finally(() => { pendingLoad = null; });
     return pendingLoad;
+  };
+
+  const renderValues = (root: ParentNode): void => {
+    for (const [metric, value] of Object.entries(getDisplayValues())) {
+      root.querySelectorAll(`[data-community-stat="${metric}"]`).forEach((target) => {
+        target.textContent = value;
+      });
+    }
   };
 
   return {
@@ -181,10 +201,9 @@ export function createVisitStats(options: VisitStatsOptions) {
     },
     getDisplayValues,
     render(root: ParentNode): void {
-      for (const [metric, value] of Object.entries(getDisplayValues())) {
-        root.querySelectorAll(`[data-community-stat="${metric}"]`).forEach((target) => {
-          target.textContent = value;
-        });
+      renderValues(root);
+      if (loadedDay !== getBeijingDay(now()) && !pendingLoad && now() - lastLoadAttempt >= 60_000) {
+        void load().then(() => renderValues(root));
       }
     },
   };

@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Award,
   BadgeCheck,
+  BadgeDollarSign,
   Bell,
   BookOpen,
   Brain,
@@ -17,8 +18,10 @@ import {
   ChevronLeft,
   ChevronUp,
   CircleHelp,
+  CircleDollarSign,
   Clock3,
   Coffee,
+  Coins,
   createIcons,
   Crown,
   Database,
@@ -116,6 +119,8 @@ import {
   renderApp,
 } from "./v2-render";
 import { renderRoleRail } from "./v2-render-setup-screen";
+import { getAnnouncementPageIndex } from "./v2-announcements";
+import { renderAnnouncementPage } from "./v2-render-announcements";
 import { normalizeShopTab, type ShopTabId } from "./v2-render-shop-panel";
 import {
   type RoleRailViewId,
@@ -131,7 +136,7 @@ import { getPlayHelpContext, getPlayHelpPageIndex } from "./v2-play-help";
 const ROLE_IDS: ReadonlySet<string> = new Set(getRoleOptions().map((role) => role.id));
 const ROLE_IDS_IN_DISPLAY_ORDER = getRoleOptions().map((role) => role.id);
 const PLAY_TAB_IDS: ReadonlySet<string> = new Set(["events", "workstation", "relationship", "shop", "research", "talent", "settings"]);
-const ROLE_RAIL_VIEW_IDS: ReadonlySet<string> = new Set(["achievements", "messages"]);
+const ROLE_RAIL_VIEW_IDS: ReadonlySet<string> = new Set(["achievements", "messages", "announcements"]);
 const SHOP_TAB_IDS: ReadonlySet<string> = new Set(["ai", "rest", "coffee", "gear"]);
 const TALENT_PANEL_TAB_IDS: ReadonlySet<string> = new Set(["character", "relation", "equip", "growth", "publication"]);
 const DATE_DISPLAY_MODES: ReadonlySet<string> = new Set(["academic", "calendar"]);
@@ -256,6 +261,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let helpPageByContext: Record<string, number> = {};
   let isHelpOpen = false;
   let activeRoleRailView: RoleRailViewId = "achievements";
+  let announcementPageIndex = 0;
   let talentTreePageIndex = 0;
   const talentTreeSelectedNodeByPage: number[] = [0];
   let isFeedbackOpen = false;
@@ -880,6 +886,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         activeLogPage = null;
       } else if (state.phase === "setup") {
         activeRoleRailView = "achievements";
+        announcementPageIndex = 0;
         talentTreePageIndex = 0;
         talentTreeSelectedNodeByPage.length = 1;
         talentTreeSelectedNodeByPage[0] = 0;
@@ -916,6 +923,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       helpPageByContext,
       isHelpOpen,
       activeRoleRailView,
+      announcementPageIndex,
       talentTreePageIndex,
       talentTreeSelectedNodeByPage,
       isFeedbackOpen,
@@ -981,6 +989,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         ArrowRight,
         Award,
         BadgeCheck,
+        BadgeDollarSign,
         Bell,
         BookOpen,
         Brain,
@@ -995,8 +1004,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
         ChevronLeft,
         ChevronUp,
         CircleHelp,
+        CircleDollarSign,
         Clock3,
         Coffee,
+        Coins,
         Crown,
         Database,
         Dumbbell,
@@ -1174,6 +1185,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
     visitStats.render(root);
     scheduleAllFixedStageScales();
   });
+  window.setInterval(() => {
+    if (!document.hidden) visitStats.render(root);
+  }, 30_000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) visitStats.render(root);
+  });
 
   root.addEventListener("input", (event) => {
     const target = event.target;
@@ -1317,13 +1334,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
-    const messagePageNumberButton = target.closest<HTMLButtonElement>("button[data-community-page]");
-    if (messagePageNumberButton && !messagePageNumberButton.disabled) {
-      const requestedPage = Number(messagePageNumberButton.dataset.communityPage);
-      if (Number.isSafeInteger(requestedPage) && requestedPage >= 0) void community.loadPage(requestedPage);
-      return;
-    }
-
     const messagePageButton = target.closest<HTMLButtonElement>("button[data-community-page-delta]");
     if (messagePageButton && !messagePageButton.disabled) {
       const delta = Number(messagePageButton.dataset.communityPageDelta);
@@ -1357,7 +1367,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         return;
       }
       const lobby = store.getLobbyState();
-      rail.outerHTML = renderRoleRail(lobby, lobby.selectedLobbyRoleId, activeRoleRailView);
+      rail.outerHTML = renderRoleRail(lobby, lobby.selectedLobbyRoleId, activeRoleRailView, announcementPageIndex);
       root.querySelectorAll<HTMLButtonElement>("button[data-ui-role-rail-view]").forEach((button) => {
         const selected = button.dataset.uiRoleRailView === activeRoleRailView;
         button.classList.toggle("is-active", selected);
@@ -1367,6 +1377,27 @@ export function bootstrapApp(root: HTMLDivElement): void {
       syncCommunityView();
       scheduleAllFixedStageScales();
       if (activeRoleRailView === "messages") void community.loadPage(community.snapshot().page);
+      return;
+    }
+
+    const announcementPageButton = target.closest<HTMLButtonElement>("button[data-ui-announcement-page]");
+    if (announcementPageButton && !announcementPageButton.disabled && activeRoleRailView === "announcements") {
+      const requestedPage = Number(announcementPageButton.dataset.uiAnnouncementPage);
+      const content = root.querySelector<HTMLElement>("[data-announcement-content]");
+      if (!content || !Number.isInteger(requestedPage)) return;
+      const nextPage = getAnnouncementPageIndex(requestedPage);
+      if (nextPage === announcementPageIndex) return;
+      const direction = nextPage > announcementPageIndex ? 1 : -1;
+      const restoreFocus = document.activeElement === announcementPageButton;
+      announcementPageIndex = nextPage;
+      content.innerHTML = renderAnnouncementPage(announcementPageIndex);
+      createIcons({ icons: { ChevronLeft, ChevronRight }, root: content });
+      if (restoreFocus) {
+        const nextButton = content.querySelector<HTMLButtonElement>(`[data-ui-announcement-page="${announcementPageIndex + direction}"]:not(:disabled)`)
+          ?? content.querySelector<HTMLButtonElement>("button:not(:disabled)");
+        nextButton?.focus({ preventScroll: true });
+      }
+      scheduleAllFixedStageScales();
       return;
     }
 

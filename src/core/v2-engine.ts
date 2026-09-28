@@ -1,4 +1,5 @@
 import { dispatchDebugAction } from "./v2-debug-tools";
+import { appendAcademicYearLog } from "./v2-academic-year-log";
 import { recordTalentTransitions } from "./v2-talent-transitions";
 import { dispatchSetupAction } from "./v2-engine-action-dispatch";
 import { evaluateCoreEndings, finishTrainingIfReady, quitGame } from "./v2-ending-system";
@@ -168,7 +169,7 @@ function createAdvancedCalendarState(state: GameState): GameState {
   const monthEndIllnessDelta = state.totalMonths > 0
     ? DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[state.player.san < 6 ? 0 : state.player.san < 12 ? 1 : state.player.san < 18 ? 2 : 3]
     : 0;
-  const calendarState: GameState = {
+  const calendarState = appendAcademicYearLog({
     ...state,
     ...randomState,
     totalMonths: nextTotalMonths,
@@ -177,7 +178,7 @@ function createAdvancedCalendarState(state: GameState): GameState {
     illnessProbability: Math.max(0, Math.min(100, state.illnessProbability + monthEndIllnessDelta)),
     actionState: { ...state.actionState, used: 0, aiResearchBonusUsed: false },
     eventQueue: decrementEventQueueDeadlines(state.eventQueue),
-  };
+  });
   const decayedPaperState = applyPrepublicationPaperDecay(calendarState);
   const reviewProgressState = advancePaperReviewDeadlines(decayedPaperState);
   const reviewResolution = resolveDuePaperReviews(reviewProgressState);
@@ -250,7 +251,7 @@ function advanceMonth(state: GameState): GameState {
   if (hasBlockingQueueEvent(state)) return pushNoOpLog(state, "必须先处理待办事件。");
 
   if (isPreEnrollmentState(state)) {
-    const enrolledState = {
+    const enrolledState = appendAcademicYearLog({
       ...state,
       year: 1,
       month: 1,
@@ -261,7 +262,7 @@ function advanceMonth(state: GameState): GameState {
         coffeeProducedCountThisMonth: 0,
       },
       actionState: { ...state.actionState, used: 0, aiResearchBonusUsed: false },
-    };
+    });
     const subscriptionSettlement = applyMonthStartSubscriptions(advanceFellowResearch(enrolledState));
     const settledState = evaluateCoreEndings(pushLog(
       subscriptionSettlement.nextState,

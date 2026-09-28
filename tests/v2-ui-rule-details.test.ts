@@ -126,7 +126,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("科研经费初始10");
     expect(help).toContain("没有上限");
     expect(help).toContain("项目进度满100才结算");
-    expect(help).toContain("对应进度+100，结算同样的完成奖励");
+    expect(help).toContain("对应进度+100。满条奖励单独记入项目完成日志");
     expect(help).toContain("横向基础SAN-8、纵向基础SAN-6，享受科研档位减免");
     expect(help).toContain("横向完成后科研经费+20");
     expect(help).toContain("纵向完成后导师科研积累增加当前值的10%");

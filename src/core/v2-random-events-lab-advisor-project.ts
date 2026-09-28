@@ -1,7 +1,6 @@
 ﻿import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
-import { ADVISOR_HORIZONTAL_REWARD, PROJECT_LABOR_REWARD, PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
-import { getAdvisorGuidanceAmount } from "./v2-advisor-guidance";
+import { PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import {
   createThreeStageRandomEvent,
@@ -43,9 +42,8 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 307, undefined, [], getRoll);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const guidanceRolls = Array.from({ length: (state.fellowProgressState.length + 1) * 2 }, () => getRoll());
-  const accumulationGain = Math.floor(state.advisorProgressState.researchAccumulation * 0.1);
   const introDescription = [
-    "导师叫你去办公室聊聊。你带着电脑过去，刚想打开论文，导师先说起了组里的开销：服务器要租，设备要维护，实验室每天一开门，就有花钱的地方。",
+    "导师叫你去办公室聊聊。你带着电脑过去，刚想打开论文，导师先说起了组里的开销：“GPU服务器要租，你们每做一次实验，就得花3科研经费。经费不够，差的那部分就只能自己掏钱了。”你默默看了眼还没跑完的实验列表。",
     "“项目得大家一起分担，实验室才能正常运转。”导师说，平时同学们各做一部分，有人补实验，有人改方案，这次想让你牵头负责一个，其他同学一起配合。你把电脑往回挪了挪，看来今天不只是来讲论文进度的。",
   ].join("\n\n");
 
@@ -62,7 +60,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       {
         id: `random-4-horizontal-${serial}`,
         label: "接横向项目",
-        outcome: `${horizontalSanSummary}；横向进度 +${PROJECT_PROGRESS_MAX}；科研经费 +${ADVISOR_HORIZONTAL_REWARD}；金币 +${PROJECT_LABOR_REWARD}；${formatTierResistedOutcome("导师好感", 1, horizontalFavorResult)}`,
+        outcome: `${horizontalSanSummary}；横向进度 +${PROJECT_PROGRESS_MAX}；${formatTierResistedOutcome("导师好感", 1, horizontalFavorResult)}`,
         effects: {
           san: horizontalSanChange,
           ...(horizontalFavorChange > 0 ? { favor: horizontalFavorChange } : {}),
@@ -72,7 +70,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       {
         id: `random-4-vertical-${serial}`,
         label: "接纵向项目",
-        outcome: `${verticalSanSummary}；纵向进度 +${PROJECT_PROGRESS_MAX}；科研积累 +${accumulationGain}；论文写作协作 +${getAdvisorGuidanceAmount()}；${formatTierResistedOutcome("导师好感", 1, verticalFavorResult)}；${formatTierResistedOutcome("科研", 1, verticalResearchResult)}`,
+        outcome: `${verticalSanSummary}；纵向进度 +${PROJECT_PROGRESS_MAX}；${formatTierResistedOutcome("导师好感", 1, verticalFavorResult)}；${formatTierResistedOutcome("科研", 1, verticalResearchResult)}`,
         effects: {
           san: verticalSanChange,
           ...(verticalFavorChange > 0 ? { favor: verticalFavorChange } : {}),
@@ -104,13 +102,10 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
     introDescription,
     decisionTitle: "你的选择",
     decisionDescription: [
-      "你盘算了一下：横向要对接甲方、赶交付，做完能给实验室补经费，自己也有一笔劳务费；纵向得把研究问题啃下来，成果能帮导师积累科研成绩，结题后导师也会和大家一起打磨论文。平时在人际栏参与项目，是和同学一起往前推；这次接下来，就得由你牵头把一个项目做完。",
-      [
-        "想到自己的论文还开着好几个坑，你又有些犹豫。可以请师弟师妹分担，自己负责交接；也可以坦白说这次不接，导师未必愿意听。",
-        hasJunior
-          ? `你翻到${familiarJuniorName}的聊天框，以前一起做事，交接不用从头解释。不过熟归熟，对方也有截止日期，临时添活难免惹人抱怨。`
-          : "翻了一遍联系人，你还没有能直接商量分工的师弟师妹。临时找不熟的人接手，比找老熟人更容易惹来不满。",
-      ].join(""),
+      "你盘算了一下：横向要赶甲方的交付，能补经费、挣劳务费；纵向要啃研究问题，结题后导师也会帮大家打磨论文。这次接下来，就得由你牵头做完。",
+      hasJunior
+        ? `自己的论文还没写完，你想到了${familiarJuniorName}。请对方分担倒是好交接，只是临时添活难免欠人情；直接拒绝，又怕导师不高兴。`
+        : "自己的论文还没写完，找师弟师妹分担也未必省心：组里还没有熟悉的后辈，临时托人容易惹来不满；直接拒绝，又怕导师不高兴。",
     ].join("\n\n"),
     results: {
       [`random-4-horizontal-${serial}`]: {

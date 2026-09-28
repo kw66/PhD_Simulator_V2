@@ -101,11 +101,11 @@ describe("fellow research lifecycle", () => {
     expect(state.fellowPapers![0]).toMatchObject({ idea: 23, experiment: 0, writing: 0, status: "draft" });
     expect(advanceFellowResearch(state)).toBe(state);
     state = nextMonth(state);
-    expect(state.fellowPapers![0]).toMatchObject({ idea: 22, experiment: 0, writing: 0 });
+    expect(state.fellowPapers![0]).toMatchObject({ idea: 21, experiment: 0, writing: 0 });
     state = nextMonth(state);
-    expect(state.fellowPapers![0]).toMatchObject({ idea: 21, experiment: 23, writing: 0 });
+    expect(state.fellowPapers![0]).toMatchObject({ idea: 19, experiment: 23, writing: 0 });
     state = nextMonth(state);
-    expect(state.fellowPapers![0]).toMatchObject({ idea: 20, experiment: 22, writing: 0 });
+    expect(state.fellowPapers![0]).toMatchObject({ idea: 18, experiment: 21, writing: 0 });
     state = nextMonth(state);
     expect(state.fellowPapers![0]).toMatchObject({ writing: 23, status: "reviewing", reviewMonthsLeft: 3 });
     expect(state.fellowPapers![0]!.target).not.toBeNull();
@@ -123,7 +123,7 @@ describe("fellow research lifecycle", () => {
     for (const elapsed of [1, 2, 3, 4]) {
       state = nextMonth(state);
       expect(state.fellowPapers![0]).toMatchObject({
-        idea: 24 - elapsed, experiment: elapsed >= 3 ? 26 - elapsed : 0, writing: 0,
+        idea: [23, 21, 19, 18][elapsed - 1], experiment: elapsed >= 3 ? [23, 21][elapsed - 3] : 0, writing: 0,
       });
       expect(state.fellowProgressState[0]!.taskProgress).toBe(elapsed * 2);
       expect(advanceFellowResearch(state)).toBe(state);
@@ -138,15 +138,15 @@ describe("fellow research lifecycle", () => {
     state = advanceFellowResearch(state, () => 0.5);
     expect(state.fellowPapers![0]).toMatchObject({ idea: 23, experiment: 0, writing: 0 });
     state = nextMonth(state);
-    expect(state.fellowPapers![0]).toMatchObject({ idea: 22, experiment: 0, writing: 0 });
+    expect(state.fellowPapers![0]).toMatchObject({ idea: 21, experiment: 0, writing: 0 });
     state = nextMonth(state);
-    expect(state.fellowPapers![0]).toMatchObject({ idea: 21, experiment: 23, writing: 0 });
+    expect(state.fellowPapers![0]).toMatchObject({ idea: 19, experiment: 23, writing: 0 });
   });
 
   it("does not catch up missed research operations after skipping a scheduled month", () => {
     const state = advanceFellowResearch({ ...makeState(), totalMonths: 4, month: 4 }, () => 0.5);
     expect(state.fellowPapers![0]).toMatchObject({ idea: 23, experiment: 0, writing: 0 });
-    expect(nextMonth(state).fellowPapers![0]).toMatchObject({ idea: 22, experiment: 0, writing: 0 });
+    expect(nextMonth(state).fellowPapers![0]).toMatchObject({ idea: 21, experiment: 0, writing: 0 });
   });
 
   it("keeps automatic fellow research and submission out of the ordinary game log", () => {
@@ -219,9 +219,9 @@ describe("fellow research lifecycle", () => {
     expect(next.player).toEqual(state.player);
     expect(next.totalResearchScore).toBe(state.totalResearchScore);
     let later = nextMonth(next);
-    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 22, experiment: 0, writing: 0 });
+    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 21, experiment: 0, writing: 0 });
     later = nextMonth(later);
-    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 21, experiment: 23, writing: 0 });
+    expect(getFellowCurrentPaper(later, state.fellowProgressState[0]!.id)).toMatchObject({ idea: 19, experiment: 23, writing: 0 });
   });
 
   it("uses shared exposure, citation fractions, promotion and decay without crediting unrelated papers to the player", () => {

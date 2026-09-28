@@ -388,24 +388,8 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
 function renderCommunityPagination(root: ParentNode, state: ReturnType<CommunityMessages["snapshot"]>): void {
   const pageCount = Math.max(1, Math.ceil(state.total / MESSAGE_PAGE_SIZE));
   root.querySelectorAll<HTMLElement>("[data-community-pagination]").forEach((pager) => {
-    const pageButtons = pager.querySelector<HTMLElement>("[data-community-page-buttons]");
-    if (pageButtons) {
-      const windowSize = Number(pager.dataset.communityPageWindow) || 5;
-      const start = Math.max(0, Math.min(state.page - Math.floor(windowSize / 2), pageCount - windowSize));
-      const buttons: HTMLButtonElement[] = [];
-      for (let index = start; index < Math.min(pageCount, start + windowSize); index += 1) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = `community-page-number${index === state.page ? " is-active" : ""}`;
-        button.dataset.communityPage = String(index);
-        button.textContent = String(index + 1);
-        button.setAttribute("aria-label", `第 ${index + 1} 页`);
-        if (index === state.page) button.setAttribute("aria-current", "page");
-        button.disabled = state.status === "loading" || index === state.page;
-        buttons.push(button);
-      }
-      pageButtons.replaceChildren(...buttons);
-    }
+    const pageLabel = pager.querySelector<HTMLElement>("[data-community-page-count]");
+    if (pageLabel) pageLabel.textContent = `${state.page + 1}/${pageCount}`;
     const previous = pager.querySelector<HTMLButtonElement>("[data-community-page-delta='-1']");
     const next = pager.querySelector<HTMLButtonElement>("[data-community-page-delta='1']");
     if (previous) previous.disabled = state.status === "loading" || state.page <= 0;

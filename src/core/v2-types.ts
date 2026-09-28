@@ -15,6 +15,7 @@ import type {
 } from "./v2-types-economy";
 import type { FixedEventResolution } from "./v2-types-fixed-events";
 import type {
+  AdvisorGrantApplication,
   AdvisorProgressState,
   ConferenceCareerState,
   ConferenceEncounterState,
@@ -481,6 +482,7 @@ export interface EventChoice {
     activateLoverProgress?: LoverTypeId;
     researchCapacityStateDeltas?: Partial<Record<keyof ResearchCapacityState, number>>;
     advisorProgressStateDeltas?: Partial<Pick<AdvisorProgressState, "researchAccumulation" | "funding">>;
+    advisorGrantResult?: AdvisorGrantApplication;
     labProjectProgress?: {
       type: "horizontal" | "vertical";
       amount: number;

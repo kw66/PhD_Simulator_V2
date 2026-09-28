@@ -621,7 +621,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("天赋加点");
     expect(html).not.toContain("天赋路线");
     expect(html).toContain("经验倍率");
-    expect(html).toContain('class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级0，每级+1天赋点" data-tooltip="每级+1天赋点"');
+    expect(html).toContain('class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级0，每级+2天赋点" data-tooltip="每级+2天赋点"');
     expect(html).toContain('class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率1.0，每局增加科研分✖经验倍率的经验。"');
     expect(html).not.toContain('class="lobby-growth-help"');
     expect(html).toContain('data-tooltip="每局增加科研分✖经验倍率的经验。"');
@@ -651,7 +651,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("可用天赋点");
     expect(html).not.toContain("已分配 0 点");
     expect(html).not.toContain("等级带来的效果");
-    expect(html).toContain("转博时属性提升20%/级");
+    expect(html).toContain("转博时科研、社交、导师好感提升10%/级");
     expect(html).not.toContain("+200%");
     expect(html).not.toContain("+1次");
     expect(html).not.toContain("+10次");
@@ -790,10 +790,11 @@ describe("v2 render lobby shell", () => {
     expect(messageRailHtml).toContain('class="lobby-profile-achievement-rail is-message-view"');
     expect(messageRailHtml).toContain('class="community-message-heading"');
     expect(messageRailHtml).toContain('<h2 id="lobby-message-rail-title">留言</h2>');
-    expect(messageRailHtml).toMatch(/<h2 id="lobby-message-rail-title">留言<\/h2>\s*<strong class="community-message-count"[^>]*>[^<]*<\/strong>\s*<div class="community-pagination" data-community-pagination/);
+    expect(messageRailHtml).toMatch(/<h2 id="lobby-message-rail-title">留言<\/h2>\s*<strong class="community-message-count"[^>]*>[^<]*<\/strong>\s*<div class="community-pagination compact-pagination" data-community-pagination/);
     expect(messageRailHtml).toContain('data-community-list hidden');
     expect(messageRailHtml).toContain('data-community-send="board"');
-    expect(messageRailHtml).toContain('data-community-page-buttons');
+    expect(messageRailHtml).toContain('data-community-page-count aria-live="polite" aria-atomic="true">1/1</span>');
+    expect(messageRailHtml).not.toContain('data-community-page-buttons');
     expect(messageRailHtml).toContain('data-community-char-count="board"');
     expect(messageRailHtml).toContain('data-community-reply-indicator="board"');
     expect(messageRailHtml.indexOf('data-community-reply-indicator="board"')).toBeLessThan(messageRailHtml.indexOf('id="lobby-message-nickname"'));
@@ -831,7 +832,8 @@ describe("v2 render lobby shell", () => {
     expect(feedbackHtml).not.toContain('class="community-feedback-header"');
     expect(feedbackHtml).not.toContain('<h1 id="game-feedback-title">游戏内留言</h1>');
     expect(feedbackHtml).toContain('data-community-list hidden');
-    expect(feedbackHtml).toContain('data-community-page-window="3"');
+    expect(feedbackHtml).toContain('data-community-page-count aria-live="polite" aria-atomic="true">1/1</span>');
+    expect(feedbackHtml).not.toContain('data-community-page-buttons');
   });
 
   it("renders unlocked role achievements with their details visible", () => {
@@ -882,7 +884,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('<button class="lobby-start-button is-disabled" type="button" disabled');
   });
 
-  it("shows the full normal talent design without spending points", () => {
+  it("shows the four-tier normal talent design with independent prices without spending points", () => {
     const account = createDefaultAccountProfile();
     account.roleProgress.normal.level = 6;
     account.roleProgress.normal.exp = 320;
@@ -890,25 +892,38 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(createInitialState(), account);
 
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-normal-tree" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">6</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">12</strong>');
     expect((tree.match(/data-tree-page="\d"/g) ?? []).length).toBe(1);
-    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(5);
+    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(8);
     expect(tree).not.toContain('data-ui-talent-tree-page-delta');
-    for (const name of ["满怀干劲", "我命由我", "勤能补拙", "突破极限", "燃烧生命"]) {
+    for (const name of ["满怀干劲", "我命由我", "勤能补拙", "突破极限", "燃烧生命α", "燃烧生命β", "燃尽", "顿悟"]) {
       expect(tree).toContain(name);
     }
-    expect(tree).toContain("首月（9月）结束后，下月初SAN回复+2/级");
-    expect(tree).toContain("转博时属性提升20%/级，向上取整");
-    expect(tree).toContain("转博后每月行动+0.2次/级，余数逐月累积");
-    expect(tree).toContain("转博后属性溢出时上限+1，最多+10");
-    expect(tree).toContain("每次消耗2点SAN上限");
-    for (const icon of ["heart-plus", "sunrise", "footprints", "rocket", "heart-crack"]) {
+    expect(tree).toContain("首月结束后，下月初SAN回复+1/级");
+    expect(tree).toContain("转博时科研、社交、导师好感提升10%/级，向上取整");
+    expect(tree).toContain("转博后每月行动+0.1次/级，余数逐月累积");
+    expect(tree).toContain("属性溢出时上限+1，最多+10");
+    expect(tree).toContain("转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限");
+    expect(tree).toContain("转博后每月SAN不足仍可免SAN消耗行动1次，消耗1点SAN上限");
+    expect(tree).toContain("SAN上限首次低于10时恢复到20");
+    expect(tree).toContain("转博后每年科研、社交、导师好感+1/级");
+    for (const icon of ["heart-plus", "sunrise", "footprints", "rocket", "heart-crack", "heart-pulse", "flame", "sparkles"]) {
       expect(tree).toContain(`data-lucide="${icon}"`);
     }
-    expect((tree.match(/class="lobby-normal-tree-node-level">0\/4/g) ?? []).length).toBe(1);
-    expect((tree.match(/class="lobby-normal-tree-node-level">0\/5/g) ?? []).length).toBe(2);
-    expect((tree.match(/class="lobby-normal-tree-node-level">0\/1/g) ?? []).length).toBe(2);
-    expect(tree).not.toContain("0/5 ·");
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/6<\/span>/g) ?? []).length).toBe(1);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/10<\/span>/g) ?? []).length).toBe(2);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/1<\/span>/g) ?? []).length).toBe(4);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/2<\/span>/g) ?? []).length).toBe(1);
+    expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
+    expect(tree).toContain('data-prerequisite-ids="burning-life-alpha burning-life-beta"');
+    expect(tree).toMatch(/data-talent-id="epiphany"[^>]*data-prerequisite-ids="breakthrough"/);
+    expect(tree).toMatch(/data-talent-id="burning-life-alpha"[^>]*data-prerequisite-ids="diligence"/);
+    expect(tree).toMatch(/data-talent-id="burning-life-beta"[^>]*data-prerequisite-ids="diligence"/);
+    const expectedPrices = [1, 1, 1, 3, 3, 2, 3, 3];
+    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual(expectedPrices);
+    expect((tree.match(/<path d=/g) ?? []).length).toBe(8);
+    expect(tree).toContain("1天赋点");
+    expect(tree).toContain("3天赋点");
     expect(tree).not.toContain("每级消耗");
     expect(tree).not.toContain("前置");
     expect(tree).not.toContain("lobby-normal-tree-detail-meta");
@@ -966,79 +981,104 @@ describe("v2 render lobby shell", () => {
     const geniusHtml = renderApp(createInitialState(), otherRole);
     const treeMarkup = (html: string) => html.match(/<div class="lobby-talent-tree is-designed-tree is-(?:normal|rich|genius)-tree" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
-    expect(normalHtml).toContain('天赋点 <strong class="lobby-talent-points-value">10</strong>');
+    expect(normalHtml).toContain('天赋点 <strong class="lobby-talent-points-value">20</strong>');
     expect(normalHtml).toContain('class="lobby-talent-tree is-designed-tree is-normal-tree"');
     expect(richHtml).toContain('class="lobby-talent-tree is-designed-tree is-rich-tree"');
     expect(geniusHtml).toContain('class="lobby-talent-tree is-designed-tree is-genius-tree"');
     expect(treeMarkup(normalHtml)).not.toBe(treeMarkup(richHtml));
     expect(treeMarkup(geniusHtml)).not.toBe(treeMarkup(richHtml));
+    for (const tree of [treeMarkup(normalHtml), treeMarkup(richHtml), treeMarkup(geniusHtml)]) {
+      expect(tree).not.toContain('lobby-talent-tree-artwork');
+    }
   });
 
-  it("shows two straight rich talent paths and an independent funding talent without spending points", () => {
+  it("shows the four-tier rich talent design with shared funding prerequisites and gold powers without spending points", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "rich";
     account.roleProgress.rich.level = 4;
-    const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [6] });
+    const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [9] });
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-rich-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">4</strong>');
-    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(7);
-    expect((tree.match(/<path d="M100 (?:32|160) H500" \/>/g) ?? []).length).toBe(2);
-    expect((tree.match(/class="lobby-normal-tree-node-level">0\/2/g) ?? []).length).toBe(3);
-    expect((tree.match(/class="lobby-normal-tree-node-level">0\/4/g) ?? []).length).toBe(2);
-    expect((tree.match(/class="lobby-normal-tree-node-level">0\/1/g) ?? []).length).toBe(2);
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">8</strong>');
+    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(10);
+    expect((tree.match(/<path d=/g) ?? []).length).toBe(9);
+    expect(tree).toContain('<path d="M225 96 H525" />');
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/4<\/span>/g) ?? []).length).toBe(3);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/8<\/span>/g) ?? []).length).toBe(1);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/3<\/span>/g) ?? []).length).toBe(1);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/2<\/span>/g) ?? []).length).toBe(1);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/5<\/span>/g) ?? []).length).toBe(1);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/1<\/span>/g) ?? []).length).toBe(3);
     for (const [name, effect, icon] of [
-      ["红包拿来", "压岁钱+2/级", "gift"],
-      ["千金小姐", "初始金币+4/级", "wallet"],
-      ["带资进组", "导师科研经费+10/级", "hand-coins"],
-      ["财富倍增", "转博时金币增加50%/级，向上取整", "trending-up"],
+      ["红包拿来", "压岁钱+1/级", "gift"],
+      ["千金小姐", "初始金币+2/级", "wallet"],
+      ["带资进组", "导师科研经费+5/级", "hand-coins"],
+      ["财富倍增", "转博时金币增加25%/级，向上取整", "trending-up"],
       ["书中自有黄金屋", "转博时每篇一作论文奖励1金币/级", "book-open"],
-      ["理财能手", "转博后每满12个月获得金币30%的利息，向上取整", "piggy-bank"],
-      ["身价不菲", "打工、实习收入+50%，向上取整", "briefcase-business"],
+      ["理财能手", "每12个月获得金币20%/级的利息，向上取整", "piggy-bank"],
+      ["身价不菲", "实习收入+33%/级，向上取整", "briefcase-business"],
+      ["金之力α", "金币达到50时，每点SAN消耗转为1金币", "circle-dollar-sign"],
+      ["金之力β", "金币达到50时，每点导师好感消耗转为消耗2金币", "badge-dollar-sign"],
+      ["金之力γ", "金币达到50时，每点社交能力消耗转为2金币", "coins"],
     ]) {
       expect(tree).toContain(name);
       expect(tree).toContain(effect);
       expect(tree).toContain(`data-lucide="${icon}"`);
     }
-    expect(tree).toContain('data-talent-id="bring-funding" data-tier="0" aria-label="带资进组：导师科研经费+10/级，仅预览" title="带资进组" aria-pressed="false" style="grid-column:1;grid-row:2"');
-    expect(tree).toContain('data-talent-id="knowledge-is-wealth" data-tier="1" aria-label="书中自有黄金屋：转博时每篇一作论文奖励1金币/级，仅预览" title="书中自有黄金屋" aria-pressed="false" style="grid-column:2;grid-row:3"');
-    expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-6"');
-    expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="6"');
+    expect(tree).toContain('data-talent-id="bring-funding" data-tier="1" aria-label="带资进组：导师科研经费+5/级，1天赋点，仅预览" title="带资进组" aria-pressed="false" style="grid-column:2;grid-row:2"');
+    expect(tree).toContain('data-talent-id="knowledge-is-wealth" data-tier="1" aria-label="书中自有黄金屋：转博时每篇一作论文奖励1金币/级，2天赋点，仅预览" title="书中自有黄金屋" aria-pressed="false" style="grid-column:2;grid-row:3"');
+    expect(tree).toMatch(/data-talent-id="bring-funding"[^>]*data-prerequisite-ids="red-envelope heiress"/);
+    expect(tree).toMatch(/data-talent-id="gold-power-alpha"[^>]*data-prerequisite-ids="work-pays-off"/);
+    expect(tree).toMatch(/data-talent-id="gold-power-beta"[^>]*data-prerequisite-ids="bring-funding"/);
+    expect(tree).toMatch(/data-talent-id="gold-power-gamma"[^>]*data-prerequisite-ids="investment-savvy"/);
+    expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
+    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([1, 1, 1, 1, 2, 3, 2, 2, 2, 2]);
+    expect(tree).not.toContain("打工");
+    expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-9"');
+    expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="9"');
     expect(tree).not.toContain('data-ui-talent-tree-page-delta');
   });
 
-  it("shows the six genius talents in a crossed network without spending points", () => {
+  it("shows the four-tier genius research and paper-score paths without spending points", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "genius";
     account.roleProgress.genius.level = 5;
-    const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [5] });
+    const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [8] });
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-genius-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">5</strong>');
-    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(6);
-    expect((tree.match(/<path d="M(?:100|300) (?:50|150)[^"]*" \/>/g) ?? []).length).toBe(8);
-    expect(tree).toContain('M100 50 C180 50 220 150 300 150');
-    expect(tree).toContain('M300 150 C380 150 420 50 500 50');
-    expect(tree).toContain('data-prerequisite-mode="any"');
-    expect((tree.match(/data-prerequisite-ids="innate-insight tireless-scholar"/g) ?? []).length).toBe(2);
-    expect((tree.match(/data-prerequisite-ids="proven-by-papers boundless-study"/g) ?? []).length).toBe(2);
-    for (const maxLevel of [3, 1, 4, 4, 2, 1]) {
-      expect(tree).toContain(`class="lobby-normal-tree-node-level">0/${maxLevel}</span>`);
-    }
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">10</strong>');
+    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(9);
+    expect((tree.match(/<path d=/g) ?? []).length).toBe(8);
+    expect(tree).toContain('<path d="M225 32 C295 32 305 96 375 96" />');
+    expect(tree).toContain('<path d="M375 96 C445 96 455 32 525 32" />');
+    expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
+    expect(tree).toMatch(/data-talent-id="tireless-scholar"[^>]*data-prerequisite-ids="innate-insight"/);
+    expect(tree).toMatch(/data-talent-id="experiment-practice"[^>]*data-prerequisite-ids="idea-insight"/);
+    expect(tree).toMatch(/data-talent-id="proven-by-papers"[^>]*data-prerequisite-ids="tireless-scholar"/);
+    expect(tree).toMatch(/data-talent-id="boundless-study"[^>]*data-prerequisite-ids="tireless-scholar"/);
+    expect(tree).toMatch(/data-talent-id="writing-mastery"[^>]*data-prerequisite-ids="experiment-practice"/);
+    expect(tree).toMatch(/data-talent-id="lasting-work"[^>]*data-prerequisite-ids="writing-mastery"/);
+    expect(tree).toMatch(/data-talent-id="rise-together"[^>]*data-prerequisite-ids="proven-by-papers boundless-study"/);
+    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([1, 1, 3, 1, 2, 1, 1, 2, 2]);
+    expect([...tree.matchAll(/class="lobby-normal-tree-node-level">0\/(\d+)<\/span>/g)].map((match) => Number(match[1]))).toEqual([5, 5, 1, 5, 3, 5, 5, 3, 3]);
     for (const [name, effect, icon] of [
-      ["生而知之", "初始科研能力+2/级", "brain"],
+      ["生而知之", "初始科研能力+1/级", "brain"],
+      ["灵光乍现", "永久想idea+1分/级", "lightbulb"],
       ["学而不倦", "科研能力每年+1", "calendar-days"],
+      ["躬行求真", "永久做实验+1分/级", "flask-conical"],
       ["以文证道", "转博时每篇一作A类论文，科研能力+1/级", "file-text"],
-      ["学无止境", "转博时每篇一作A类论文，科研上限+2/级", "infinity"],
-      ["历久弥新", "转博后论文分数每月衰减减少50%/级", "hourglass"],
-      ["共攀高峰", "转博后同学、恋人的科研能力+2", "users"],
+      ["学无止境", "转博时每篇一作A类论文，科研上限+1/级", "infinity"],
+      ["妙笔成章", "永久写论文+1分/级", "notebook-pen"],
+      ["共攀高峰", "转博后同学的科研能力+1/级", "users"],
+      ["历久弥新", "转博后论文分数每月衰减率减少5个百分点/级", "hourglass"],
     ]) {
       expect(tree).toContain(name);
       expect(tree).toContain(effect);
       expect(tree).toContain(`data-lucide="${icon}"`);
     }
-    expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-5"');
-    expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="5"');
+    expect(tree).not.toContain("恋人");
+    expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-8"');
+    expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="8"');
     expect(tree).not.toContain('data-ui-talent-tree-page-delta');
   });
 
@@ -1051,7 +1091,7 @@ describe("v2 render lobby shell", () => {
     expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-4"');
     expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="4"');
     expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="0" hidden');
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">3</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">6</strong>');
     expect(account.roleProgress.normal.level).toBe(3);
   });
 
@@ -1129,6 +1169,11 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="play-workbench"');
     expect(html).toContain("play-left-rail");
     expect(html).toContain("play-center-column");
+    expect(html).toContain('class="play-center-artwork" aria-hidden="true"');
+    expect((html.match(/class="play-center-portrait is-(?:support|current)/g) ?? [])).toHaveLength(7);
+    expect(html).toContain('class="play-center-cast is-left"');
+    expect(html).toContain('class="play-center-cast is-right"');
+    expect(html).toMatch(/class="play-center-portrait is-current" src="[^"]*01_normal_upright_final_detail\.webp"/);
     expect(html).toContain("play-right-rail");
     expect(html).toContain('class="new-attr-panel"');
     expect(html).toContain('data-tooltip="当前疾病概率 0%｜月末结算 -2%"');
@@ -1223,6 +1268,26 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('class="play-workbench-header"');
     expect(html).not.toContain('class="play-workbench-metrics"');
     expect(html).not.toContain("角色图鉴");
+  });
+
+  it("keeps six background portraits stable within a month and changes the cast each month", () => {
+    const state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
+    const account = createDefaultAccountProfile();
+    const getCast = (totalMonths: number): string[] => {
+      const html = renderApp({ ...state, conferenceLocationSeed: 1234, totalMonths, month: totalMonths }, account);
+      return [...html.matchAll(/class="play-center-portrait is-support" src="([^"]+)"/g)].map((match) => match[1]!);
+    };
+
+    let previous = getCast(0);
+    expect(getCast(0)).toEqual(previous);
+    for (let month = 1; month <= 12; month += 1) {
+      const current = getCast(month);
+      expect(current).toHaveLength(6);
+      expect(new Set(current).size).toBe(6);
+      expect(current.every((src) => !src.includes("01_normal_upright_final_card.webp"))).toBe(true);
+      expect([...current].sort()).not.toEqual([...previous].sort());
+      previous = current;
+    }
   });
 
   it("keeps the main layout free of debug tools and exposes the popup opener in settings", () => {
@@ -3242,12 +3307,14 @@ describe("v2 render lobby shell", () => {
 
     expect(firstPending).toContain('data-pending-page-index="0"');
     expect(firstPending).toContain('data-pending-page-count="2"');
+    expect(firstPending).toContain('class="pagination-count" aria-live="polite" aria-atomic="true">1/2</span>');
     expect(firstPending).toContain("待办事件1");
     expect(firstPending).toContain("待办事件6");
     expect(firstPending).not.toContain("待办事件7");
     expect(firstPending).toMatch(/id="pending-nav-prev"[^>]*disabled/);
     expect(firstPending).not.toMatch(/id="pending-nav-next"[^>]*disabled/);
     expect(secondPending).toContain('data-pending-page-index="1"');
+    expect(secondPending).toContain('class="pagination-count" aria-live="polite" aria-atomic="true">2/2</span>');
     expect(secondPending).toContain("待办事件7");
     expect(secondPending).not.toContain("待办事件1");
     expect(secondPending).not.toMatch(/id="pending-nav-prev"[^>]*disabled/);

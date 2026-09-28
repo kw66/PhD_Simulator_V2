@@ -3,11 +3,13 @@ import { getAccumulatedPayment } from "./v2-numeric-modifiers";
 import { ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getJournalDefinition } from "./v2-journal-system";
-import type { AdvisorGrantId, AdvisorProgressState, Degree, GameState, Paper } from "./v2-types";
+import type { AdvisorGrantApplication, AdvisorGrantId, AdvisorProgressState, Degree, GameState, Paper } from "./v2-types";
+import { createAdvisorGrantResultEvent, type AdvisorGrantResultContext } from "./v2-advisor-grant-events";
+import { enqueueEventQueueItem } from "./v2-event-queue";
 import { recordTalentTrigger } from "./v2-talent-history";
 import { getRelationshipSanCost } from "./v2-buffs";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
-import { advanceSharedLabProject, ADVISOR_HORIZONTAL_REWARD } from "./v2-lab-projects";
+import { advanceSharedLabProject } from "./v2-lab-projects";
 
 export const ADVISOR_HORIZONTAL_SAN_COST = 5;
 export const ADVISOR_VERTICAL_SAN_COST = 4;
@@ -93,7 +95,12 @@ export function getAdvisorApplicationSummary(state: GameState): string {
   if (state.month <= 0 || state.totalMonths <= 0) return "入学后开放";
   const advisor = state.advisorProgressState;
   const pending = advisor.pendingApplication;
-  if (pending) return `${ADVISOR_GRANTS.find((grant) => grant.id === pending.id)!.name}申请中 · 8月公布`;
+  if (pending) {
+    const name = ADVISOR_GRANTS.find((grant) => grant.id === pending.id)!.name;
+    const year = getAcademicCalendarYear(state.year, state.month);
+    return year > pending.calendarYear || (year === pending.calendarYear && getAcademicCalendarMonth(state.month) >= 8)
+      ? `${name}结果已公布` : `${name}申请中 · 8月公布`;
+  }
   const highest = getHighestAdvisorAwardIndex(advisor);
   if (highest === ADVISOR_GRANTS.length - 1) return "已获院士";
   const year = getAcademicCalendarYear(state.year, state.month);
@@ -159,7 +166,6 @@ export function advanceAdvisorProject(
   const sanCost = getAdvisorTaskSanCost(state, projectType);
   if (state.player.san < sanCost) return pushNoOpLog(state, `科研项目：SAN不足，需要${sanCost}`);
   const result = advanceSharedLabProject(state, projectType, Math.floor(state.player.research) + Math.floor(random() * 6), random);
-  const completed = result.completed > 0;
   return pushLog({
     ...result.state,
     player: { ...result.state.player, san: state.player.san - sanCost },
@@ -169,11 +175,64 @@ export function advanceAdvisorProject(
       lastProjectTotalMonths: state.totalMonths,
       ...(projectType === "horizontal" ? { lastHorizontalTotalMonths: state.totalMonths } : {}),
     },
-  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN-${sanCost}${completed ? projectType === "horizontal" ? `，科研经费+${ADVISOR_HORIZONTAL_REWARD}，劳务费+5` : "，科研积累提升，指导论文" : `，进度+${result.gain}`}`);
+  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN-${sanCost}，进度+${result.gain}`);
 }
 
 export function advanceAdvisorHorizontal(state: GameState, random: () => number = Math.random): GameState {
   return advanceAdvisorProject(state, "horizontal", random);
+}
+
+export function getAdvisorGrantResultContext(state: GameState, application: AdvisorGrantApplication): AdvisorGrantResultContext {
+  const grant = ADVISOR_GRANTS.find((definition) => definition.id === application.id)!;
+  const advisor = state.advisorProgressState;
+  const success = application.researchSnapshot >= grant.threshold
+    && (grant.id !== "academician" || advisor.awards.some((award) => award.id === "distinguished"));
+  const awardedAdvisor = success ? {
+    ...advisor,
+    awards: [...advisor.awards, {
+      id: grant.id,
+      awardedYear: application.calendarYear,
+      startYear: grant.durationYears > 0 ? application.calendarYear + 1 : null,
+      endYear: grant.durationYears > 0 ? application.calendarYear + grant.durationYears : null,
+    }],
+  } : advisor;
+  return {
+    application: { ...application }, grantName: grant.name, funding: grant.funding, success,
+    rank: getAdvisorRankLabel(awardedAdvisor),
+    previousSalary: getAdvisorMonthlySalary(advisor, state.degree),
+    salary: getAdvisorMonthlySalary(awardedAdvisor, state.degree),
+  };
+}
+
+export function settleAdvisorGrantResult(state: GameState, application: AdvisorGrantApplication): GameState {
+  const advisor = state.advisorProgressState;
+  const pending = advisor.pendingApplication;
+  if (!pending || pending.id !== application.id || pending.calendarYear !== application.calendarYear
+    || pending.researchSnapshot !== application.researchSnapshot) return state;
+  let nextState = { ...state, advisorProgressState: { ...advisor, pendingApplication: null } };
+  if (advisor.awards.some((award) => award.id === application.id)) return nextState;
+  const context = getAdvisorGrantResultContext(state, application);
+  if (!context.success) return nextState;
+  const grant = ADVISOR_GRANTS.find((definition) => definition.id === application.id)!;
+  nextState = {
+    ...nextState,
+    advisorProgressState: {
+      ...nextState.advisorProgressState,
+      funding: advisor.funding + grant.funding,
+      awards: [...advisor.awards, {
+        id: grant.id, awardedYear: application.calendarYear,
+        startYear: grant.durationYears > 0 ? application.calendarYear + 1 : null,
+        endYear: grant.durationYears > 0 ? application.calendarYear + grant.durationYears : null,
+      }],
+    },
+  };
+  return context.salary > context.previousSalary
+    ? recordTalentTrigger(nextState, `advisor-salary:${grant.id}:${application.calendarYear}`, {
+      name: "导师晋升", recipient: "你", reason: `导师晋升${context.rank}`,
+      effects: [`每月补助+${context.salary - context.previousSalary}（${context.previousSalary}→${context.salary}金币）`],
+      details: ["下次月初起按新标准发放"],
+    })
+    : nextState;
 }
 
 export function settleAdvisorMonth(state: GameState, random: () => number = Math.random): GameState {
@@ -209,34 +268,14 @@ export function settleAdvisorMonth(state: GameState, random: () => number = Math
   const calendarMonth = getAcademicCalendarMonth(state.month);
   const calendarYear = getAcademicCalendarYear(state.year, state.month);
   const pending = advisor.pendingApplication;
-  if (calendarMonth === 8 && pending?.calendarYear === calendarYear) {
-    const grant = ADVISOR_GRANTS.find((definition) => definition.id === pending.id)!;
-    if (!advisor.awards.some((award) => award.id === grant.id)) {
-      const previousSalary = getAdvisorMonthlySalary(advisor, state.degree);
-      const addedFunding = grant.funding;
-      advisor = {
-        ...advisor,
-        funding: advisor.funding + addedFunding,
-        awards: [...advisor.awards, {
-          id: grant.id,
-          awardedYear: calendarYear,
-          startYear: grant.durationYears > 0 ? calendarYear + 1 : null,
-          endYear: grant.durationYears > 0 ? calendarYear + grant.durationYears : null,
-        }],
-      };
-      nextState = pushLog(nextState, `导师${grant.id === "academician" ? "当选" : "获批"}${grant.name}：晋升${getAdvisorRankLabel(advisor)}，科研经费+${addedFunding}`);
-      const salary = getAdvisorMonthlySalary(advisor, state.degree);
-      if (salary > previousSalary) {
-        nextState = recordTalentTrigger(nextState, `advisor-salary:${grant.id}:${calendarYear}`, {
-          name: "导师晋升",
-          recipient: "你",
-          reason: `导师晋升${getAdvisorRankLabel(advisor)}`,
-          effects: [`每月补助+${salary - previousSalary}（${previousSalary}→${salary}金币）`],
-          details: ["下次月初起按新标准发放"],
-        });
-      }
+  if (pending && (calendarYear > pending.calendarYear || (calendarYear === pending.calendarYear && calendarMonth >= 8))) {
+    if (advisor.awards.some((award) => award.id === pending.id)) {
+      advisor = { ...advisor, pendingApplication: null };
+    } else {
+      nextState = enqueueEventQueueItem(nextState, createAdvisorGrantResultEvent(
+        getAdvisorGrantResultContext({ ...nextState, advisorProgressState: advisor }, pending),
+      ));
     }
-    advisor = { ...advisor, pendingApplication: null };
   }
   if (calendarMonth === 3 && advisor.pendingApplication === null) {
     const grant = getEligibleAdvisorGrant(advisor, calendarYear);

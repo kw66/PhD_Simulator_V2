@@ -179,8 +179,8 @@ export function discardDraftPaper(state: GameState, paperId: string): GameState 
 }
 
 function decayPrepublicationScore(score: number, decayRate: number): number {
-  if (score <= 1) return score;
-  const decay = Math.max(1, Math.floor(score * decayRate));
+  if (score <= 1 || decayRate <= 0) return score;
+  const decay = Math.ceil(score * decayRate);
   return Math.max(1, score - decay);
 }
 

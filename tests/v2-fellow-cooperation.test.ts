@@ -322,9 +322,9 @@ describe("engine and research lifecycle retries", () => {
     const next = advanceFellowResearch({ ...helped, totalMonths: 3, month: 3 }, () => 0);
     const submitted = next.fellowPapers![0]!;
     expect(submitted.status).toBe("reviewing");
-    expect(submitted.submittedCollaborationScores).toEqual({ idea: 9, experiment: 0, writing: 0 });
-    expect(getPaperScoreBreakdown(submitted, "idea")).toEqual({ own: 10, collaboration: 9, total: 19 });
-    expect(submitted.submittedIdea).toBe(19);
+    expect(submitted.submittedCollaborationScores).toEqual({ idea: 10, experiment: 0, writing: 0 });
+    expect(getPaperScoreBreakdown(submitted, "idea")).toEqual({ own: 10, collaboration: 10, total: 20 });
+    expect(submitted.submittedIdea).toBe(20);
     expect(next.fellowProgressState[0]!.pendingHelpToFellow).toBeNull();
   });
 

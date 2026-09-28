@@ -2,13 +2,14 @@ import type { AccountProfile, CoffeeMachineUpgradeId, RoleExperienceAward, ShopU
 import type { ShopTabId } from "./v2-render-shop-panel";
 
 export type PlayTabId = "events" | "workstation" | "relationship" | "shop" | "research" | "talent" | "settings";
-export type RoleRailViewId = "achievements" | "messages";
+export type RoleRailViewId = "achievements" | "messages" | "announcements";
 export type TalentPanelTabId = "character" | "relation" | "equip" | "growth" | "publication";
 export type ShopUpgradeNoticeTab = Extract<ShopTabId, "ai" | "coffee">;
 export type ResearchSortMode = "year" | "citations";
 export type ResearchAuthorshipFilter = "all" | "first" | "coauthor";
 export interface PlayRenderUiState {
   activeRoleRailView?: RoleRailViewId;
+  announcementPageIndex?: number;
   talentTreePageIndex?: number;
   talentTreeSelectedNodeByPage?: readonly number[];
   isFeedbackOpen?: boolean;
