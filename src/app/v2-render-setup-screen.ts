@@ -20,15 +20,6 @@ import type { RoleRailViewId } from "./v2-render-types";
 
 const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain"]);
 
-type TalentSourceId = "awakening" | "hidden-awaken";
-
-type RoleTalentAllocationPreview = {
-  id: TalentSourceId;
-  name: string;
-  allocatedPoints: number;
-  effectText: string;
-};
-
 type TalentPointSummary = {
   level: number;
   currentExp: number;
@@ -51,8 +42,6 @@ const LOBBY_STARTING_STAT_CAPS: Partial<Record<keyof typeof DOSSIER_STAT_LABELS,
   favor: 20,
 };
 
-const NORMAL_EFFECT_MAX_LEVEL = 10;
-
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -61,27 +50,6 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
-
-function buildTalentPreviewDefinitions(...sourceIds: TalentSourceId[]): TalentSourceId[] {
-  return [...sourceIds];
-}
-
-const ROLE_TALENT_PREVIEW_DEFINITIONS: Record<RoleId, TalentSourceId[]> = {
-  normal: buildTalentPreviewDefinitions("awakening", "hidden-awaken"),
-  genius: buildTalentPreviewDefinitions("awakening", "hidden-awaken"),
-  social: buildTalentPreviewDefinitions("awakening", "hidden-awaken"),
-  rich: buildTalentPreviewDefinitions("awakening", "hidden-awaken"),
-  "teacher-child": buildTalentPreviewDefinitions("awakening", "hidden-awaken"),
-  chosen: buildTalentPreviewDefinitions("awakening", "hidden-awaken"),
-  rewinder: buildTalentPreviewDefinitions("awakening"),
-  "research-captain": buildTalentPreviewDefinitions("awakening"),
-  "normal-reversed": buildTalentPreviewDefinitions("awakening"),
-  "genius-reversed": buildTalentPreviewDefinitions("awakening"),
-  "social-reversed": buildTalentPreviewDefinitions("awakening"),
-  "rich-reversed": buildTalentPreviewDefinitions("awakening"),
-  "teacher-child-reversed": buildTalentPreviewDefinitions("awakening"),
-  "chosen-reversed": buildTalentPreviewDefinitions("awakening"),
-};
 
 function getRoleToneClass(roleId: RoleId): string {
   if (SPECIAL_ROLE_IDS.has(roleId)) {
@@ -325,82 +293,14 @@ function getDossierStatLabel(statId: string, fallback: string): string {
   return DOSSIER_STAT_LABELS[statId as keyof typeof DOSSIER_STAT_LABELS] ?? fallback;
 }
 
-function getRoleTalentPreviewDefinitions(roleId: RoleId): TalentSourceId[] {
-  return ROLE_TALENT_PREVIEW_DEFINITIONS[roleId] ?? [];
-}
-
-function clampNormalEffectLevel(level: number): number {
-  return Math.max(0, Math.min(NORMAL_EFFECT_MAX_LEVEL, Math.floor(level)));
-}
-
-function formatNormalAwakeningEffect(level: number): string {
-  const effectLevel = clampNormalEffectLevel(level);
-  const baseEffectText = `转博时科研能力、社交能力、导师好感+${effectLevel * 10}%（属性结果向上取整）`;
-  return effectLevel >= NORMAL_EFFECT_MAX_LEVEL
-    ? `${baseEffectText}；满级额外效果：每当属性溢出时上限+1`
-    : baseEffectText;
-}
-
-function formatNormalHiddenAwakenEffect(level: number): string {
-  const effectLevel = clampNormalEffectLevel(level);
-  const actionBonusText = effectLevel <= 0 ? "0" : (effectLevel / 10).toFixed(1);
-  const baseEffectText = `每月行动次数+${actionBonusText}（小数累积，满1生效）`;
-  return effectLevel >= NORMAL_EFFECT_MAX_LEVEL
-    ? `${baseEffectText}；满级额外效果：第一个月有10次行动机会`
-    : baseEffectText;
-}
-
-function getRoleTalentEffectText(
-  roleId: RoleId,
-  sourceId: TalentSourceId,
-  level: number,
-  _fallbackText: string,
-): string {
-  if (roleId === "normal") {
-    return sourceId === "awakening"
-      ? formatNormalAwakeningEffect(level)
-      : formatNormalHiddenAwakenEffect(level);
-  }
-
-  return "";
-}
-
-function buildRoleTalentAllocationPreview(viewModel: LobbySelectedRoleViewModel): RoleTalentAllocationPreview[] {
-  const passiveById = new Map(viewModel.passives.map((passive) => [passive.definition.id, passive]));
-
-  return getRoleTalentPreviewDefinitions(viewModel.role.id).flatMap((sourceId) => {
-    const passive = passiveById.get(sourceId);
-    if (!passive) {
-      return [];
-    }
-
-    return [{
-      id: sourceId,
-      name: passive.definition.name,
-      allocatedPoints: Math.max(0, passive.level),
-      effectText: getRoleTalentEffectText(
-        viewModel.role.id,
-        sourceId,
-        Math.max(0, passive.level),
-        passive.definition.description,
-      ),
-    }];
-  });
-}
-
-function buildTalentPointSummary(
-  viewModel: LobbySelectedRoleViewModel,
-  talents: RoleTalentAllocationPreview[],
-): TalentPointSummary {
+function buildTalentPointSummary(viewModel: LobbySelectedRoleViewModel): TalentPointSummary {
   const nextExp = getNextRoleLevelExperience(viewModel.progress.level);
-  const allocatedPoints = talents.reduce((sum, talent) => sum + talent.allocatedPoints, 0);
-  const totalPoints = viewModel.progress.level;
 
   return {
     level: viewModel.progress.level,
     currentExp: viewModel.progress.exp,
     nextExp,
-    availablePoints: Math.max(totalPoints - allocatedPoints, 0),
+    availablePoints: viewModel.progress.level,
   };
 }
 
@@ -416,17 +316,16 @@ function renderGrowthProgress(
   return `
     <div class="lobby-profile-growth-summary">
       <div class="lobby-growth-summary-row">
-        <span class="lobby-growth-inline-label">等级</span>
-        <strong class="lobby-growth-inline-value" ${animationNumberAttributes(`role:${viewModel.role.id}:growth:level`, pointSummary.level)}>${pointSummary.level}</strong>
-        <span class="lobby-growth-inline-label is-multiplier">经验倍率</span>
-        <strong class="lobby-growth-inline-value">${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}</strong>
-        <span
-          class="lobby-growth-help"
-          role="img"
-          tabindex="0"
-          aria-label="经验倍率说明"
-          data-tooltip="每局增加科研分✖经验倍率的经验。"
-        ><i data-lucide="circle-help" aria-hidden="true"></i></span>
+        <div class="lobby-growth-level-group">
+          <span class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级${pointSummary.level}，每级+1天赋点" data-tooltip="每级+1天赋点">
+            <span class="lobby-growth-inline-label">等级</span>
+            <strong class="lobby-growth-inline-value" ${animationNumberAttributes(`role:${viewModel.role.id}:growth:level`, pointSummary.level)}>${pointSummary.level}</strong>
+          </span>
+          <span class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}，每局增加科研分✖经验倍率的经验。" data-tooltip="每局增加科研分✖经验倍率的经验。">
+            <span class="lobby-growth-inline-label">经验倍率</span>
+            <strong class="lobby-growth-inline-value">${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}</strong>
+          </span>
+        </div>
         <div class="lobby-growth-exp-detail-row">
           <div class="lobby-talent-allocation-meta">
             <span>天赋点 <strong class="lobby-talent-points-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</strong></span>
@@ -446,8 +345,7 @@ function renderGrowthProgress(
 }
 
 function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
-  const talents = buildRoleTalentAllocationPreview(viewModel);
-  const pointSummary = buildTalentPointSummary(viewModel, talents);
+  const pointSummary = buildTalentPointSummary(viewModel);
   const unlockAchievement = getRoleLobbyAchievementDefinitions(viewModel.role.id)
     .find((achievement) => achievement.unlocksRoleId === viewModel.role.id);
   const unlockHint = unlockAchievement
@@ -495,6 +393,90 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
 function formatLobbyStartingStatValue(statId: string, value: number): string {
   const cap = LOBBY_STARTING_STAT_CAPS[statId as keyof typeof LOBBY_STARTING_STAT_CAPS];
   return typeof cap === "number" ? `${value}/${cap}` : `${value}`;
+}
+
+const NORMAL_TALENT_NODES = [
+  { id: "first-month-drive", name: "满怀干劲", icon: "heart-plus", tier: 0, column: "1", row: "1 / 3", maxLevel: 4, cost: 1, effect: "首月（9月）结束后，下月初SAN回复+2/级", prerequisite: "" },
+  { id: "self-determination", name: "我命由我", icon: "sunrise", tier: 1, column: "2", row: "1", maxLevel: 5, cost: 2, effect: "转博时属性提升20%/级，向上取整", prerequisite: "满怀干劲至少1级" },
+  { id: "diligence", name: "勤能补拙", icon: "footprints", tier: 2, column: "2", row: "2", maxLevel: 5, cost: 2, effect: "转博后每月行动+0.2次/级，余数逐月累积", prerequisite: "满怀干劲至少1级" },
+  { id: "breakthrough", name: "突破极限", icon: "rocket", tier: 3, column: "3", row: "1", maxLevel: 1, cost: 3, effect: "转博后属性溢出时上限+1，最多+10", prerequisite: "我命由我" },
+  { id: "burning-life", name: "燃烧生命", icon: "heart-crack", tier: 4, column: "3", row: "2", maxLevel: 1, cost: 3, effect: "转博后行动点耗尽仍可行动，每次消耗2点SAN上限", prerequisite: "勤能补拙" },
+] as const;
+
+const RICH_TALENT_NODES = [
+  { id: "red-envelope", name: "红包拿来", icon: "gift", tier: 0, column: "1", row: "1", maxLevel: 2, cost: 1, effect: "压岁钱+2/级", prerequisite: "" },
+  { id: "bring-funding", name: "带资进组", icon: "hand-coins", tier: 0, column: "1", row: "2", maxLevel: 2, cost: 1, effect: "导师科研经费+10/级", prerequisite: "" },
+  { id: "heiress", name: "千金小姐", icon: "wallet", tier: 0, column: "1", row: "3", maxLevel: 2, cost: 1, effect: "初始金币+4/级", prerequisite: "" },
+  // Preview rule for later activation: both transfer bonuses use the pre-transfer state, so paper rewards do not compound the coin bonus.
+  { id: "wealth-growth", name: "财富倍增", icon: "trending-up", tier: 1, column: "2", row: "1", maxLevel: 4, cost: 2, effect: "转博时金币增加50%/级，向上取整", prerequisite: "红包拿来至少1级" },
+  { id: "knowledge-is-wealth", name: "书中自有黄金屋", icon: "book-open", tier: 1, column: "2", row: "3", maxLevel: 4, cost: 2, effect: "转博时每篇一作论文奖励1金币/级", prerequisite: "千金小姐至少1级" },
+  { id: "investment-savvy", name: "理财能手", icon: "piggy-bank", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 3, effect: "转博后每满12个月获得金币30%的利息，向上取整", prerequisite: "财富倍增" },
+  { id: "work-pays-off", name: "身价不菲", icon: "briefcase-business", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 3, effect: "打工、实习收入+50%，向上取整", prerequisite: "书中自有黄金屋" },
+] as const;
+
+const GENIUS_TALENT_NODES = [
+  { id: "innate-insight", name: "生而知之", icon: "brain", tier: 0, column: "1", row: "1", maxLevel: 3, effect: "初始科研能力+2/级", prerequisiteIds: [] },
+  { id: "tireless-scholar", name: "学而不倦", icon: "calendar-days", tier: 0, column: "1", row: "2", maxLevel: 1, effect: "科研能力每年+1", prerequisiteIds: [] },
+  { id: "proven-by-papers", name: "以文证道", icon: "file-text", tier: 1, column: "2", row: "1", maxLevel: 4, effect: "转博时每篇一作A类论文，科研能力+1/级", prerequisiteIds: ["innate-insight", "tireless-scholar"] },
+  { id: "boundless-study", name: "学无止境", icon: "infinity", tier: 1, column: "2", row: "2", maxLevel: 4, effect: "转博时每篇一作A类论文，科研上限+2/级", prerequisiteIds: ["innate-insight", "tireless-scholar"] },
+  { id: "lasting-work", name: "历久弥新", icon: "hourglass", tier: 2, column: "3", row: "1", maxLevel: 2, effect: "转博后论文分数每月衰减减少50%/级", prerequisiteIds: ["proven-by-papers", "boundless-study"] },
+  { id: "rise-together", name: "共攀高峰", icon: "users", tier: 2, column: "3", row: "2", maxLevel: 1, effect: "转博后同学、恋人的科研能力+2", prerequisiteIds: ["proven-by-papers", "boundless-study"] },
+] as const;
+
+const DESIGNED_TALENT_TREES = {
+  normal: {
+    nodes: NORMAL_TALENT_NODES,
+    viewBoxHeight: 200,
+    paths: ["M100 100 C195 100 205 50 300 50 H500", "M100 100 C195 100 205 150 300 150 H500"],
+  },
+  rich: {
+    nodes: RICH_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: ["M100 32 H500", "M100 160 H500"],
+  },
+  genius: {
+    nodes: GENIUS_TALENT_NODES,
+    viewBoxHeight: 200,
+    paths: [
+      "M100 50 H300", "M100 150 H300",
+      "M100 50 C180 50 220 150 300 150", "M100 150 C180 150 220 50 300 50",
+      "M300 50 H500", "M300 150 H500",
+      "M300 50 C380 50 420 150 500 150", "M300 150 C380 150 420 50 500 50",
+    ],
+  },
+} as const;
+
+function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, selectedNodeIndex: number): string {
+  const { nodes, paths, viewBoxHeight } = DESIGNED_TALENT_TREES[roleId];
+  const activeIndex = Number.isInteger(selectedNodeIndex) && selectedNodeIndex >= 0 && selectedNodeIndex < nodes.length
+    ? selectedNodeIndex : 0;
+  return `
+    <section class="lobby-profile-growth-card lobby-profile-section is-designed-growth-card">
+      <div class="lobby-talent-tree is-designed-tree is-${roleId}-tree" role="group" aria-label="天赋树预览" data-active-page="0"${roleId === "genius" ? ' data-prerequisite-mode="any"' : ""}>
+        <div class="lobby-talent-tree-pages">
+          <div class="lobby-talent-tree-page is-active is-designed-page" data-tree-page="0">
+            <svg class="lobby-normal-tree-connections" viewBox="0 0 600 ${viewBoxHeight}" preserveAspectRatio="none" aria-hidden="true">
+              ${paths.map((path) => `<path d="${path}" />`).join("")}
+            </svg>
+            ${nodes.map((node, index) => `
+              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.tier}" aria-label="${escapeHtml(`${node.name}：${node.effect}，仅预览`)}" title="${node.name}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}"${"prerequisiteIds" in node ? ` data-prerequisite-ids="${node.prerequisiteIds.join(" ")}"` : ""}>
+                <span class="lobby-talent-tree-node-ring"><i data-lucide="${node.icon}" aria-hidden="true"></i></span>
+                <span class="lobby-normal-tree-node-level">0/${node.maxLevel}</span>
+              </button>
+            `).join("")}
+            <div class="lobby-normal-tree-details" aria-live="polite">
+              ${nodes.map((node, index) => `
+                <div class="lobby-normal-tree-detail" data-detail-index="${index}"${index === activeIndex ? "" : " hidden"}>
+                  <div class="lobby-normal-tree-detail-heading"><strong>${node.name}</strong></div>
+                  <p>${node.effect}</p>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 const TALENT_TREE_PREVIEW_PAGES = [
@@ -608,7 +590,9 @@ function renderSelectedRoleDetail(
             </div>
             ${renderProfileInfoPanel(viewModel)}
           </section>
-          ${renderGrowthBoard(talentTreePageIndex, talentTreeSelectedNodeByPage)}
+          ${selectedRoleId === "normal" || selectedRoleId === "rich" || selectedRoleId === "genius"
+            ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0)
+            : renderGrowthBoard(talentTreePageIndex, talentTreeSelectedNodeByPage)}
         </div>
         ${renderRoleRail(accountProfile, selectedRoleId, activeRoleRailView)}
       </section>

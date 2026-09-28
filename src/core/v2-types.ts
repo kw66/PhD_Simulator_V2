@@ -221,14 +221,6 @@ export interface RoleDefinition {
   name: string;
   icon: string;
   startingStats: PlayerStats;
-  bonus: string;
-  awakenIcon: string;
-  awakenName: string;
-  awakenDesc: string;
-  hiddenAwakenName?: string;
-  hiddenAwakenIcon?: string;
-  hiddenAwakenDesc?: string;
-  initialPaperSlots?: number;
 }
 
 export type BuffTiming = "permanent" | "monthly" | "next-action";
@@ -273,16 +265,9 @@ export interface Buff {
   description?: string;
 }
 
-export interface RolePassiveDefinition {
-  id: string;
-  name: string;
-  description: string;
-}
-
 export interface RoleLobbyDefinition {
   summary: string;
   growthStatIds: RoleGrowthStatId[];
-  passiveDefinitions: RolePassiveDefinition[];
 }
 
 export interface RoleUnlockState {
@@ -294,7 +279,6 @@ export interface RoleMetaProgress {
   exp: number;
   completedRuns: number;
   unlockedAchievementIds: string[];
-  passiveLevels: Record<string, number>;
   historyBest: RoleHistoryBest;
   unlocked: boolean;
 }
@@ -348,11 +332,6 @@ export interface LobbySelectedRoleHistoryStatViewModel {
   value: string;
 }
 
-export interface LobbySelectedRolePassiveViewModel {
-  definition: RolePassiveDefinition;
-  level: number;
-}
-
 export interface RoleAchievementDefinition {
   id: string;
   icon: string;
@@ -374,7 +353,6 @@ export interface LobbySelectedRoleViewModel {
   unlockState: RoleUnlockState;
   stats: LobbySelectedRoleStatViewModel[];
   historyStats: LobbySelectedRoleHistoryStatViewModel[];
-  passives: LobbySelectedRolePassiveViewModel[];
   roleAchievements: LobbySelectedRoleAchievementViewModel[];
 }
 

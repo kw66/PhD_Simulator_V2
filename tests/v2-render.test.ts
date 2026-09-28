@@ -589,12 +589,13 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-profile-info"');
     expect((html.match(/class="lobby-profile-stat-column(?: is-history)?"/g) ?? []).length).toBe(2);
     expect(html).toContain("lobby-profile-history-stack");
-    expect(html).toContain('class="lobby-profile-growth-card lobby-profile-section"');
+    expect(html).toContain('class="lobby-profile-growth-card lobby-profile-section is-designed-growth-card"');
+    const growthCardIndex = html.indexOf('class="lobby-profile-growth-card lobby-profile-section is-designed-growth-card"');
     expect(html.indexOf('class="lobby-profile-stat-columns"')).toBeLessThan(html.indexOf('class="lobby-profile-growth-summary"'));
-    expect(html.indexOf('class="lobby-profile-growth-summary"')).toBeLessThan(html.indexOf('class="lobby-profile-growth-card lobby-profile-section"'));
+    expect(html.indexOf('class="lobby-profile-growth-summary"')).toBeLessThan(growthCardIndex);
     const talentPointsIndex = html.indexOf('class="lobby-talent-points-value"');
     expect(talentPointsIndex).toBeGreaterThan(html.indexOf('class="lobby-growth-summary-row"'));
-    expect(talentPointsIndex).toBeLessThan(html.indexOf('class="lobby-profile-growth-card lobby-profile-section"'));
+    expect(talentPointsIndex).toBeLessThan(growthCardIndex);
     expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">0</strong>');
     expect(html).toContain('class="lobby-profile-achievement-rail"');
     expect(html).toContain('class="lobby-profile-portrait"');
@@ -620,8 +621,9 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("天赋加点");
     expect(html).not.toContain("天赋路线");
     expect(html).toContain("经验倍率");
-    expect(html).toContain('class="lobby-growth-help"');
-    expect(html).toContain('data-lucide="circle-help"');
+    expect(html).toContain('class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级0，每级+1天赋点" data-tooltip="每级+1天赋点"');
+    expect(html).toContain('class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率1.0，每局增加科研分✖经验倍率的经验。"');
+    expect(html).not.toContain('class="lobby-growth-help"');
     expect(html).toContain('data-tooltip="每局增加科研分✖经验倍率的经验。"');
     expect(html).not.toContain("基础效果");
     expect(html).not.toContain("无效果");
@@ -634,9 +636,9 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">0</strong>');
     expect(html).toContain('<i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span>');
     expect(html).toContain('class="lobby-page-dot is-active"');
-    expect(html).toContain('class="lobby-talent-tree" role="group" aria-label="天赋树预览"');
+    expect(html).toContain('class="lobby-talent-tree is-designed-tree is-normal-tree" role="group" aria-label="天赋树预览"');
     expect(html).toContain('class="lobby-talent-tree-node is-selected"');
-    expect(html).toContain('data-ui-talent-tree-page-delta="1"');
+    expect(html).not.toContain('data-ui-talent-tree-page-delta="1"');
     expect(html).not.toContain('class="lobby-talent-tree-caption"');
     expect(html).not.toContain('class="lobby-growth-level-row"');
     expect(html).not.toContain('class="lobby-growth-exp-block"');
@@ -649,7 +651,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("可用天赋点");
     expect(html).not.toContain("已分配 0 点");
     expect(html).not.toContain("等级带来的效果");
-    expect(html).not.toContain("+20%");
+    expect(html).toContain("转博时属性提升20%/级");
     expect(html).not.toContain("+200%");
     expect(html).not.toContain("+1次");
     expect(html).not.toContain("+10次");
@@ -657,7 +659,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("角色成就");
     expect(html).toContain("小有积蓄");
     expect(html).toContain("金币达到30");
-    expect(html).toContain("经验+5，解锁富可敌国角色");
+    expect(html).toContain("经验+5×经验倍率，解锁富可敌国角色");
     expect(html).not.toContain('data-achievement-id="global:sickly"');
     expect(html).not.toContain("0 / 30");
     expect(getRoleLobbyAchievementDefinitions("chosen")[0]?.title).toBe("全面发展");
@@ -671,13 +673,13 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-profile-achievement-progress-label">成就</span>');
     expect(html).toContain('class="lobby-profile-achievement-progress-count">0/6</strong>');
     expect(achievementList).not.toContain("<details");
-    expect((achievementList.match(/<article class="lobby-profile-achievement/g) ?? []).length).toBe(5);
+    expect((achievementList.match(/<article class="lobby-profile-achievement/g) ?? []).length).toBe(6);
     expect(achievementList).not.toContain("未达成");
     expect(achievementList).not.toContain("已达成");
     expect(html).not.toContain("历史最高 0 / 30");
     expect(html).not.toContain("最佳单局：科研");
     expect(html).not.toContain('<span class="lobby-meta-count">0 / 6</span>');
-    expect(html).toContain('data-action="change-role-achievement-page"');
+    expect(html).not.toContain('data-action="change-role-achievement-page"');
     expect(html).not.toContain('class="lobby-profile-achievement-progress"');
     expect(html).not.toContain("平稳起步");
     expect(html).not.toContain("金币达到30。");
@@ -869,7 +871,7 @@ describe("v2 render lobby shell", () => {
 
   it.each([
     ["rich", "使用大多数角色，金币达到30"],
-    ["normal-reversed", "使用大多数角色，购买办公椅并升级为人体工学椅"],
+    ["normal-reversed", "使用大多数角色，获得人体工学椅"],
   ] as const)("shows the displayed unlock goal for %s on the locked start control", (roleId, description) => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = roleId;
@@ -880,20 +882,39 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('<button class="lobby-start-button is-disabled" type="button" disabled');
   });
 
-  it("keeps talent point accounting while the tree has no copy", () => {
+  it("shows the full normal talent design without spending points", () => {
     const account = createDefaultAccountProfile();
     account.roleProgress.normal.level = 6;
     account.roleProgress.normal.exp = 320;
-    account.roleProgress.normal.passiveLevels.awakening = 5;
-    account.roleProgress.normal.passiveLevels["hidden-awaken"] = 1;
 
     const html = renderApp(createInitialState(), account);
 
-    const tree = html.match(/<div class="lobby-talent-tree" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">0</strong>');
-    expect(tree.replace(/<[^>]*>/g, "").trim()).toBe("");
-    expect((tree.match(/data-tree-page="\d"/g) ?? []).length).toBe(4);
-    expect([0, 1, 2, 3].map((page) => (tree.match(new RegExp(`data-ui-talent-tree-node="${page}-`, "g")) ?? []).length)).toEqual([6, 11, 11, 8]);
+    const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-normal-tree" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">6</strong>');
+    expect((tree.match(/data-tree-page="\d"/g) ?? []).length).toBe(1);
+    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(5);
+    expect(tree).not.toContain('data-ui-talent-tree-page-delta');
+    for (const name of ["满怀干劲", "我命由我", "勤能补拙", "突破极限", "燃烧生命"]) {
+      expect(tree).toContain(name);
+    }
+    expect(tree).toContain("首月（9月）结束后，下月初SAN回复+2/级");
+    expect(tree).toContain("转博时属性提升20%/级，向上取整");
+    expect(tree).toContain("转博后每月行动+0.2次/级，余数逐月累积");
+    expect(tree).toContain("转博后属性溢出时上限+1，最多+10");
+    expect(tree).toContain("每次消耗2点SAN上限");
+    for (const icon of ["heart-plus", "sunrise", "footprints", "rocket", "heart-crack"]) {
+      expect(tree).toContain(`data-lucide="${icon}"`);
+    }
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/4/g) ?? []).length).toBe(1);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/5/g) ?? []).length).toBe(2);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/1/g) ?? []).length).toBe(2);
+    expect(tree).not.toContain("0/5 ·");
+    expect(tree).not.toContain("每级消耗");
+    expect(tree).not.toContain("前置");
+    expect(tree).not.toContain("lobby-normal-tree-detail-meta");
+    expect(tree).not.toMatch(/<p>[^<]*。<\/p>/);
+    expect(tree).not.toContain("lobby-normal-tree-node-cost");
+    expect(tree).not.toContain("lobby-normal-tree-node-caption");
   });
 
   it("keeps the six original achievements and mirrors unlock achievements onto target roles", () => {
@@ -933,24 +954,111 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-profile-achievement-progress-count">1/1</strong>');
   });
 
-  it("uses the same tree preview for different roles", () => {
+  it("renders separate talent designs for normal, rich, and genius roles", () => {
     const account = createDefaultAccountProfile();
     account.roleProgress.normal.level = 10;
-    account.roleProgress.normal.passiveLevels.awakening = 10;
-    account.roleProgress.normal.passiveLevels["hidden-awaken"] = 10;
 
     const normalHtml = renderApp(createInitialState(), account);
     const otherRole = createDefaultAccountProfile();
     otherRole.selectedLobbyRoleId = "rich";
     const richHtml = renderApp(createInitialState(), otherRole);
-    const treeMarkup = (html: string) => html.match(/<div class="lobby-talent-tree" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
+    otherRole.selectedLobbyRoleId = "genius";
+    const geniusHtml = renderApp(createInitialState(), otherRole);
+    const treeMarkup = (html: string) => html.match(/<div class="lobby-talent-tree is-designed-tree is-(?:normal|rich|genius)-tree" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
-    expect(normalHtml).toContain('天赋点 <strong class="lobby-talent-points-value">0</strong>');
-    expect(treeMarkup(normalHtml)).toBe(treeMarkup(richHtml));
+    expect(normalHtml).toContain('天赋点 <strong class="lobby-talent-points-value">10</strong>');
+    expect(normalHtml).toContain('class="lobby-talent-tree is-designed-tree is-normal-tree"');
+    expect(richHtml).toContain('class="lobby-talent-tree is-designed-tree is-rich-tree"');
+    expect(geniusHtml).toContain('class="lobby-talent-tree is-designed-tree is-genius-tree"');
+    expect(treeMarkup(normalHtml)).not.toBe(treeMarkup(richHtml));
+    expect(treeMarkup(geniusHtml)).not.toBe(treeMarkup(richHtml));
+  });
+
+  it("shows two straight rich talent paths and an independent funding talent without spending points", () => {
+    const account = createDefaultAccountProfile();
+    account.selectedLobbyRoleId = "rich";
+    account.roleProgress.rich.level = 4;
+    const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [6] });
+    const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-rich-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
+
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">4</strong>');
+    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(7);
+    expect((tree.match(/<path d="M100 (?:32|160) H500" \/>/g) ?? []).length).toBe(2);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/2/g) ?? []).length).toBe(3);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/4/g) ?? []).length).toBe(2);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/1/g) ?? []).length).toBe(2);
+    for (const [name, effect, icon] of [
+      ["红包拿来", "压岁钱+2/级", "gift"],
+      ["千金小姐", "初始金币+4/级", "wallet"],
+      ["带资进组", "导师科研经费+10/级", "hand-coins"],
+      ["财富倍增", "转博时金币增加50%/级，向上取整", "trending-up"],
+      ["书中自有黄金屋", "转博时每篇一作论文奖励1金币/级", "book-open"],
+      ["理财能手", "转博后每满12个月获得金币30%的利息，向上取整", "piggy-bank"],
+      ["身价不菲", "打工、实习收入+50%，向上取整", "briefcase-business"],
+    ]) {
+      expect(tree).toContain(name);
+      expect(tree).toContain(effect);
+      expect(tree).toContain(`data-lucide="${icon}"`);
+    }
+    expect(tree).toContain('data-talent-id="bring-funding" data-tier="0" aria-label="带资进组：导师科研经费+10/级，仅预览" title="带资进组" aria-pressed="false" style="grid-column:1;grid-row:2"');
+    expect(tree).toContain('data-talent-id="knowledge-is-wealth" data-tier="1" aria-label="书中自有黄金屋：转博时每篇一作论文奖励1金币/级，仅预览" title="书中自有黄金屋" aria-pressed="false" style="grid-column:2;grid-row:3"');
+    expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-6"');
+    expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="6"');
+    expect(tree).not.toContain('data-ui-talent-tree-page-delta');
+  });
+
+  it("shows the six genius talents in a crossed network without spending points", () => {
+    const account = createDefaultAccountProfile();
+    account.selectedLobbyRoleId = "genius";
+    account.roleProgress.genius.level = 5;
+    const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [5] });
+    const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-genius-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
+
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">5</strong>');
+    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(6);
+    expect((tree.match(/<path d="M(?:100|300) (?:50|150)[^"]*" \/>/g) ?? []).length).toBe(8);
+    expect(tree).toContain('M100 50 C180 50 220 150 300 150');
+    expect(tree).toContain('M300 150 C380 150 420 50 500 50');
+    expect(tree).toContain('data-prerequisite-mode="any"');
+    expect((tree.match(/data-prerequisite-ids="innate-insight tireless-scholar"/g) ?? []).length).toBe(2);
+    expect((tree.match(/data-prerequisite-ids="proven-by-papers boundless-study"/g) ?? []).length).toBe(2);
+    for (const maxLevel of [3, 1, 4, 4, 2, 1]) {
+      expect(tree).toContain(`class="lobby-normal-tree-node-level">0/${maxLevel}</span>`);
+    }
+    for (const [name, effect, icon] of [
+      ["生而知之", "初始科研能力+2/级", "brain"],
+      ["学而不倦", "科研能力每年+1", "calendar-days"],
+      ["以文证道", "转博时每篇一作A类论文，科研能力+1/级", "file-text"],
+      ["学无止境", "转博时每篇一作A类论文，科研上限+2/级", "infinity"],
+      ["历久弥新", "转博后论文分数每月衰减减少50%/级", "hourglass"],
+      ["共攀高峰", "转博后同学、恋人的科研能力+2", "users"],
+    ]) {
+      expect(tree).toContain(name);
+      expect(tree).toContain(effect);
+      expect(tree).toContain(`data-lucide="${icon}"`);
+    }
+    expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-5"');
+    expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="5"');
+    expect(tree).not.toContain('data-ui-talent-tree-page-delta');
+  });
+
+  it("shows the selected normal talent without allocating it", () => {
+    const account = createDefaultAccountProfile();
+    account.roleProgress.normal.level = 3;
+    const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [4] });
+    const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-normal-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
+
+    expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-4"');
+    expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="4"');
+    expect(tree).toContain('class="lobby-normal-tree-detail" data-detail-index="0" hidden');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">3</strong>');
+    expect(account.roleProgress.normal.level).toBe(3);
   });
 
   it("keeps the selected talent-tree page and node across setup renders", () => {
-    const html = renderApp(createInitialState(), createDefaultAccountProfile(), {
+    const account = createDefaultAccountProfile();
+    account.selectedLobbyRoleId = "social";
+    const html = renderApp(createInitialState(), account, {
       activeRoleRailView: "messages",
       talentTreePageIndex: 1,
       talentTreeSelectedNodeByPage: [0, 2],
@@ -962,17 +1070,17 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('class="lobby-talent-tree-page is-active is-entering"');
   });
 
-  it("renders the second achievement page with its remaining item", () => {
+  it("shows all six achievements together and clamps a stale page index", () => {
     const account = createDefaultAccountProfile();
     account.lobbyRoleAchievementPage = 1;
     const html = renderApp(createInitialState(), account);
 
     const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
-    expect(html).toContain('data-action="change-role-achievement-page"');
-    expect((achievementList.match(/<article class="lobby-profile-achievement/g) ?? []).length).toBe(1);
-    expect(achievementList).not.toContain("小有积蓄");
+    expect(html).not.toContain('data-action="change-role-achievement-page"');
+    expect((achievementList.match(/<article class="lobby-profile-achievement/g) ?? []).length).toBe(6);
+    expect(achievementList).toContain("小有积蓄");
     expect(achievementList).toContain("渐生惰性");
-    expect(achievementList).toContain("购买办公椅并升级为人体工学椅");
+    expect(achievementList).toContain("获得人体工学椅");
     expect(html).not.toContain("办公椅 0/1 · 工学椅 0/1");
   });
 
@@ -3146,8 +3254,8 @@ describe("v2 render lobby shell", () => {
     expect(secondPending).toMatch(/id="pending-nav-next"[^>]*disabled/);
   });
 
-  it("renders character talents by default with switch buttons", () => {
-    let state = createAdmittedTestState();
+  it("renders an empty character talent tab without legacy active effects", () => {
+    const state = createAdmittedTestState();
 
     const html = renderApp(state, createDefaultAccountProfile());
 
@@ -3155,8 +3263,10 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('data-ui-talent-tab="relation"');
     expect(html).toContain('data-ui-talent-tab="equip"');
     expect(html).toContain('data-talent-panel-tab="character"');
-    expect(html).toContain('data-talent-item-id="character-role"');
-    expect(html).toContain('data-talent-item-id="character-awaken"');
+    expect(html).toContain("暂无已生效的角色天赋");
+    expect(html).not.toContain('data-talent-item-id="character-role"');
+    expect(html).not.toContain('data-talent-item-id="character-awaken"');
+    expect(html).not.toContain('data-talent-item-id="character-hidden-awaken"');
     expect(html).not.toContain('data-talent-item-id="strong-body"');
     expect(html).not.toContain('data-talent-item-id="ai-collaboration"');
   });

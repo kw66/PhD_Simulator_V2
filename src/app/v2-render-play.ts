@@ -84,7 +84,7 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
-import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent, RoleDefinition } from "../core/v2-types";
+import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type PlayTabId,
@@ -3065,40 +3065,6 @@ function renderTalentPanelItem(item: TalentPanelItem, showStatus = true): string
   `;
 }
 
-function buildCharacterTalentItems(state: GameState, role: RoleDefinition): TalentPanelItem[] {
-  const items: TalentPanelItem[] = [
-    {
-      id: "character-role",
-      icon: role.icon,
-      name: role.name,
-      active: true,
-      description: role.bonus,
-      detail: role.mode === "reversed" ? "当前为逆位角色路线。" : "当前为正位角色路线。",
-    },
-    {
-      id: "character-awaken",
-      icon: role.awakenIcon,
-      name: role.awakenName,
-      active: state.degree === "phd",
-      description: role.awakenDesc,
-      requirement: "条件：转博后觉醒。",
-    },
-  ];
-
-  if (role.hiddenAwakenName && role.hiddenAwakenDesc) {
-    items.push({
-      id: "character-hidden-awaken",
-      icon: role.hiddenAwakenIcon ?? "🔒",
-      name: role.hiddenAwakenName,
-      active: false,
-      description: role.hiddenAwakenDesc,
-      requirement: "条件：达成隐藏触发条件。",
-    });
-  }
-
-  return items;
-}
-
 function buildInternshipTalentItem(state: GameState, requestedPage = 0): TalentPanelItem {
   const page = Number.isFinite(requestedPage) ? Math.min(1, Math.max(0, Math.floor(requestedPage))) : 0;
   const remote = page === 0;
@@ -3622,7 +3588,6 @@ export function renderRelationTalentCard(
 
 function renderTalentSection(
   state: GameState,
-  role: RoleDefinition,
   activeTalentTab: TalentPanelTabId | undefined,
   advisorSalaryStartIndex?: number | null,
   loverRewardPage?: number,
@@ -3637,7 +3602,7 @@ function renderTalentSection(
         ? []
       : tabId === "growth"
         ? buildGrowthTalentItems(state)
-        : buildCharacterTalentItems(state, role);
+        : [];
 
   return `
     <div class="talent-panel">
@@ -3651,7 +3616,7 @@ function renderTalentSection(
         </div>
       </div>
       <div class="talent-items-list" id="talent-items-list" data-talent-panel-tab="${tabId}">
-        ${tabId === "publication" ? renderPublicationTalentCards(state) : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
+        ${tabId === "publication" ? renderPublicationTalentCards(state) : tabId === "character" ? '<p class="talent-panel-empty">暂无已生效的角色天赋</p>' : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
       </div>
     </div>
   `;
@@ -3685,7 +3650,6 @@ function renderSettingsSection(state: GameState): string {
 
 
 function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): string {
-  const role = getRoleDefinition(state.selectedRoleId);
   const blockingEventCount = state.eventQueue.filter((event) => isEventBlocking(state, event)).length;
   const aiResearchActionAvailable = state.phase === "playing" && !isGameplayModuleLocked(state)
     && getActiveOperationAllowance(state, "idea").usesAiResearchBonus;
@@ -3795,7 +3759,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("talent")}" data-tab-panel="talent"${getTabPanelHidden("talent")}>
-            ${renderTalentSection(state, role, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.loverRewardPage, uiState.internshipPage)}
+            ${renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.loverRewardPage, uiState.internshipPage)}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("settings")}" data-tab-panel="settings"${getTabPanelHidden("settings")}>

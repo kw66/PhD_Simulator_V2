@@ -8,7 +8,6 @@ import type {
   AccountProfile,
   LobbySelectedRoleHistoryStatViewModel,
   LobbySelectedRoleAchievementViewModel,
-  LobbySelectedRolePassiveViewModel,
   LobbySelectedRoleStatViewModel,
   LobbySelectedRoleViewModel,
   RoleHistoryBest,
@@ -18,12 +17,11 @@ import type {
   RoleMetaProgress,
   RoleUnlockState,
   DateDisplayMode,
-  RolePassiveDefinition,
 } from "./v2-types";
 
 export const LOBBY_ROLE_PAGE_SIZE = 10;
 export const LOBBY_ROLE_PAGE_ROW_COUNT = Math.max(1, Math.floor(LOBBY_ROLE_PAGE_SIZE / 2));
-export const ROLE_ACHIEVEMENT_PAGE_SIZE = 5;
+export const ROLE_ACHIEVEMENT_PAGE_SIZE = 6;
 const LOBBY_ROLE_ROWS: ReadonlyArray<ReadonlyArray<RoleId>> = [
   ["normal", "normal-reversed"],
   ["rich", "rich-reversed"],
@@ -45,48 +43,15 @@ function createZeroHistoryBest(): RoleHistoryBest {
   };
 }
 
-function createPassiveDefinitions(roleId: RoleId): RolePassiveDefinition[] {
-  const role = getRoleDefinition(roleId);
-  const passiveDefinitions: RolePassiveDefinition[] = [
-    {
-      id: "trait",
-      name: "角色特性",
-      description: role.bonus,
-    },
-    {
-      id: "awakening",
-      name: role.awakenName,
-      description: role.awakenDesc,
-    },
-  ];
-
-  if (role.hiddenAwakenName && role.hiddenAwakenDesc) {
-    passiveDefinitions.push({
-      id: "hidden-awaken",
-      name: role.hiddenAwakenName,
-      description: role.hiddenAwakenDesc,
-    });
-  }
-
-  return passiveDefinitions;
-}
-
 const ROLE_LOBBY_DEFINITIONS: Record<RoleId, RoleLobbyDefinition> = Object.fromEntries(
   getRoleOptions().map((role) => [
     role.id,
     {
       summary: getRoleProfileSummary(role.id),
       growthStatIds: [...GROWTH_STAT_IDS],
-      passiveDefinitions: createPassiveDefinitions(role.id),
     },
   ]),
 ) as Record<RoleId, RoleLobbyDefinition>;
-
-function createPassiveLevelMap(roleId: RoleId): Record<string, number> {
-  return Object.fromEntries(
-    ROLE_LOBBY_DEFINITIONS[roleId].passiveDefinitions.map((definition) => [definition.id, 0]),
-  );
-}
 
 export function getRoleLobbyDefinition(roleId: RoleId): RoleLobbyDefinition {
   return ROLE_LOBBY_DEFINITIONS[roleId];
@@ -100,7 +65,6 @@ export function createDefaultRoleMetaProgress(roleId: RoleId): RoleMetaProgress 
     exp: 0,
     completedRuns: 0,
     unlockedAchievementIds: [],
-    passiveLevels: createPassiveLevelMap(roleId),
     historyBest: createZeroHistoryBest(),
     unlocked,
   };
@@ -237,13 +201,6 @@ function buildRoleHistoryStatsViewModel(progress: RoleMetaProgress): LobbySelect
   ];
 }
 
-function buildRolePassivesViewModel(roleId: RoleId, progress: RoleMetaProgress): LobbySelectedRolePassiveViewModel[] {
-  return getRoleLobbyDefinition(roleId).passiveDefinitions.map((definition) => ({
-    definition,
-    level: progress.passiveLevels[definition.id] ?? 0,
-  }));
-}
-
 function buildRoleAchievementsViewModel(
   roleId: RoleId,
   progress: RoleMetaProgress,
@@ -266,7 +223,6 @@ export function buildLobbySelectedRoleViewModel(account: AccountProfile, roleId:
     unlockState: buildRoleUnlockState(account, roleId),
     stats: buildRoleStatsViewModel(roleId),
     historyStats: buildRoleHistoryStatsViewModel(progress),
-    passives: buildRolePassivesViewModel(roleId, progress),
     roleAchievements: buildRoleAchievementsViewModel(roleId, progress),
   };
 }

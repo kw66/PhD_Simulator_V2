@@ -91,7 +91,7 @@ export function createStartedGameState(
   roleId: RoleId,
 ): GameState {
   const role = getRoleDefinition(roleId);
-  const initialPaperSlots = role.initialPaperSlots ?? getUnlockedPaperSlotCount(role.startingStats.research);
+  const initialPaperSlots = getUnlockedPaperSlotCount(role.startingStats.research);
   const baseState = createInitialState();
   const relationshipState = syncRelationshipState(createRelationshipState(), role.startingStats.social);
 

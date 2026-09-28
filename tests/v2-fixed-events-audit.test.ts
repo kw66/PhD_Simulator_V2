@@ -19,6 +19,7 @@ import {
 } from "../src/core/v2-fixed-events-year-summary";
 import { resolveSummerVacationFixedEvent } from "../src/core/v2-fixed-events-summer";
 import { resolveWinterVacationFixedEvent } from "../src/core/v2-fixed-events-winter";
+import { getRoleOptions } from "../src/core/v2-progression";
 import type { GameState } from "../src/core/v2-types";
 
 function playingState(overrides: Partial<GameState> = {}): GameState {
@@ -166,6 +167,26 @@ describe("audited fixed-event rules", () => {
       expect.stringContaining("+5"),
       expect.stringContaining("+6"),
     ]);
+  });
+
+  it.each(getRoleOptions())("冬季红包不再包含角色专属加成：$id", (role) => {
+    for (const [index, roll] of [0, 0.34, 0.67].entries()) {
+      for (const branchRoll of [0, 0.34, 0.67]) {
+        const resolve = (selectedRoleId: GameState["selectedRoleId"]) => {
+          const rolls = [roll, branchRoll, 0.99];
+          return resolveWinterVacationFixedEvent(
+            playingState({ selectedRoleId }),
+            { kind: "winter-vacation-rest" },
+            () => rolls.shift() ?? 0.99,
+          );
+        };
+        const result = resolve(role.id);
+        const baseline = resolve("normal");
+        expect(result?.outcome).toEqual(baseline?.outcome);
+        expect(result?.enqueueEvents).toEqual(baseline?.enqueueEvents);
+        expect(result?.enqueueEvents?.[0]?.choices[0]?.effects.money).toBe(index + 1);
+      }
+    }
   });
 
   it("adds a settlement block to fixed vacation and annual numeric results", () => {

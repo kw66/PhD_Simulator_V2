@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 
 import {
   getCalendarForTotalMonths,
@@ -10,22 +11,22 @@ import {
 
 describe("v2 progression", () => {
   it("提供稳定的角色内部配置访问", () => {
-    expect(getRoleDefinition("normal").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
-    expect(getRoleDefinition("genius").startingStats).toEqual({ san: 20, research: 6, social: 1, favor: 1, money: 1 });
-    expect(getRoleDefinition("social").startingStats).toEqual({ san: 20, research: 1, social: 6, favor: 1, money: 1 });
-    expect(getRoleDefinition("rich").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 9 });
-    expect(getRoleDefinition("teacher-child").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 6, money: 1 });
-    expect(getRoleDefinition("chosen").startingStats).toEqual({ san: 20, research: 3, social: 3, favor: 3, money: 3 });
-    expect(getRoleDefinition("normal-reversed").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
-    expect(getRoleDefinition("genius-reversed").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
-    expect(getRoleDefinition("social-reversed").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
-    expect(getRoleDefinition("rich-reversed").startingStats).toEqual({ san: 20, research: 1, social: 1, favor: 1, money: 1 });
     expect(getRoleDefinition("rewinder").name).toBe("轮回者");
     expect(getRoleDefinition("research-captain").name).toBe("统御者");
     expect(getRoleDefinition("genius-reversed").name).toBe("愚钝·院士转世");
     expect(getRoleDefinition("social-reversed").name).toBe("嫉妒·社交达人");
-    expect(getRoleDefinition("genius-reversed").initialPaperSlots).toBe(4);
     expect(getRoleOptions()).toHaveLength(14);
+  });
+
+  it.each(getRoleOptions())("所有角色统一白板开局：$id", (role) => {
+    const startingStats = { san: 20, research: 1, social: 1, favor: 1, money: 1 };
+    const state = createStartedGameState(role.id);
+    expect(role.startingStats).toEqual(startingStats);
+    expect(state.player).toEqual(startingStats);
+    expect(state.paperSlotsUnlocked).toBe(1);
+    expect(state.actionState.limit).toBe(1);
+    expect(state.buffs).toEqual([]);
+    expect(state.researchCapacityState).toEqual(createStartedGameState("normal").researchCapacityState);
   });
 
   it("统一处理 68 个月培养周期的日历口径", () => {

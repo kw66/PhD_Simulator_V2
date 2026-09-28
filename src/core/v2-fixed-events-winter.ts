@@ -8,10 +8,10 @@ import {
 import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
-function createWinterVacationDescription(branchDescription: string, moneyGain: number, isRich: boolean): string {
+function createWinterVacationDescription(branchDescription: string, moneyGain: number): string {
   return [
     branchDescription,
-    `长辈给的红包共${moneyGain}金币${isRich ? "（家境殷实，红包格外丰厚！）" : ""}。你嘴上说着“都这么大了”，还是仔细收好；家里人又往碗里添了菜，催你趁热吃。`,
+    `长辈给的红包共${moneyGain}金币。你嘴上说着“都这么大了”，还是仔细收好；家里人又往碗里添了菜，催你趁热吃。`,
   ].join("\n\n");
 }
 
@@ -52,7 +52,7 @@ function createWinterVacationPlanEvent(state: GameState): PendingEvent {
     description: [
       "你点开手机里的闹钟，手指停在平日起床的时间上。真把它关掉，又怕一觉睡到中午，醒来先为没干活心虚。可电脑都一路背回来了，也不差今晚这一会儿。",
       [
-        state.selectedRoleId === "rich" ? "长辈说备了厚厚的红包，语气轻松得像在说多添一双筷子。" : "家里说留了红包，等你回去吃年夜饭。",
+        "家里说留了红包，等你回去吃年夜饭。",
         state.loverState.active
           ? "听说恋人也会来拜年，长辈又问了一遍名字，说红包可不能只备你一份。"
           : "亲戚已经问起有没有对象，饭桌上恐怕还得想办法接话。",
@@ -107,9 +107,7 @@ export function resolveWinterVacationFixedEvent(
 
   const missingSan = Math.max(0, state.sanCap - state.player.san);
   const sanRecovery = Math.ceil(missingSan * 0.1);
-  const redEnvelope = state.selectedRoleId === "rich"
-    ? drawInclusiveInt(4, 6, getRoll)
-    : drawInclusiveInt(1, 3, getRoll);
+  const redEnvelope = drawInclusiveInt(1, 3, getRoll);
   const branch = drawInclusiveInt(1, 3, getRoll);
 
   if (branch === 1) {
@@ -126,7 +124,7 @@ export function resolveWinterVacationFixedEvent(
         description: createWinterVacationDescription([
           "逛街碰到高中同学，对方问你最近在忙什么。你刚讲到课题名称，就看见那张熟悉的脸露出迷茫，只好换成实验室的日常。聊到吃饭和作息，你们倒又像课间趴在走廊上那样有话说了。",
           ...(socialNarrative ? [socialNarrative] : []),
-        ].join("\n\n"), redEnvelope, state.selectedRoleId === "rich"),
+        ].join("\n\n"), redEnvelope),
         outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}，${socialText}。`,
         moneyGain: redEnvelope,
         sanRecovery,
@@ -147,7 +145,7 @@ export function resolveWinterVacationFixedEvent(
           description: createWinterVacationDescription([
             "你带恋人回家吃饭，父母问完学校生活，又聊起你们以后的打算。你们默契地低头夹菜，长辈笑着打住，还特意给你多包了一份红包。",
             "离开饭桌后，你们对视一眼，才发现刚才光顾着夹菜，谁都没吃几口。",
-          ].join("\n\n"), doubledEnvelope, state.selectedRoleId === "rich"),
+          ].join("\n\n"), doubledEnvelope),
           outcome: `金币 +${doubledEnvelope}，SAN +${sanRecovery}。`,
           moneyGain: doubledEnvelope,
           sanRecovery,
@@ -164,7 +162,7 @@ export function resolveWinterVacationFixedEvent(
         month: state.month,
         description: createWinterVacationDescription([
           "家里聚餐吃到一半，亲戚从课题问到对象，又问毕业后想去哪。你用“最近忙实验，还没想好”应付过去，趁话题转向别处赶紧夹菜：这顿饭比组会还考验临场发挥。",
-        ].join("\n\n"), redEnvelope, state.selectedRoleId === "rich"),
+        ].join("\n\n"), redEnvelope),
         outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}。`,
         moneyGain: redEnvelope,
         sanRecovery,
@@ -181,7 +179,7 @@ export function resolveWinterVacationFixedEvent(
       month: state.month,
       description: createWinterVacationDescription([
         "这个假期，你没安排远行。睡醒时家里人已经买菜回来，电视里放着你小时候看过的剧。你窝在沙发上剥橘子，明明知道下一句台词，还是跟着看了下去。",
-      ].join("\n\n"), redEnvelope, state.selectedRoleId === "rich"),
+      ].join("\n\n"), redEnvelope),
       outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}。`,
       moneyGain: redEnvelope,
       sanRecovery,
