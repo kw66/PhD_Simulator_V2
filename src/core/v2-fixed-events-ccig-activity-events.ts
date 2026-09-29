@@ -58,9 +58,9 @@ export function createCcigActivityDecisionEvent(
     id: `${activityChainId}-act2`,
     title: "年会活动 ➜ 选择安排",
     description: [
-      `你站在${location}的 CCIG ${realYear} 会场里，低头对着日程找分会场。广播开始提醒入场，同学却发来餐馆定位，说人均 2 金币。刚圈好的报告题目还在眼前，美食照片又一张接一张，你突然很佩服出发前那份排得满满当当的学习计划。`,
+      `你在${location}的 CCIG ${realYear} 会场对着日程找路。广播提醒入场，同学却发来餐馆定位，人均 2 金币。报告题目还在眼前，美食照片又接连弹出，你突然很佩服出发前那份排满的学习计划。`,
       posterPaper
-        ? `海报区也有展示《${posterPaper.title}》的机会。想到同行会停下来听自己讲，你既兴奋，又在心里过了一遍开场白；总不能只让论文躺在网上，等别人碰巧翻到。`
+        ? `海报区也能展示《${posterPaper.title}》。想到同行会来听，你兴奋地默念了一遍开场白；总不能只让论文躺在网上，等别人碰巧翻到。`
         : "海报区贴着一排 A 类论文，你手头还没有适合这次展示的稿子。你把日程折好，准备先去听听同行都在做些什么。",
       "机制结算",
       `参会确认：${attendanceSummary}`,
@@ -115,12 +115,13 @@ export function createCcigActivityResultEvent(params: {
   description: string;
   outcome: string;
   completionLog: string;
+  condition?: string;
   effects: PendingEvent["choices"][number]["effects"];
 }): PendingEvent {
   return createFixedEvent({
     id: `ccig-activity-result-y${params.state.year}-m${params.state.month}-${params.mode}`,
     title: params.title.includes("➜") ? params.title : `年会活动 ➜ 选择安排 ➜ ${params.title}`,
-    description: [params.description, "机制结算", params.outcome].join("\n\n"),
+    description: [params.description, "机制结算", ...(params.condition ? [`条件：${params.condition}`] : []), `结果：${params.outcome}`].join("\n\n"),
     chainId: getCcigActivityChainId(params.state),
     stage: "result",
     completionLog: params.completionLog,

@@ -41,6 +41,17 @@ export function pushLog(
   };
 }
 
+export function pushMilestoneLog(state: GameState, text: string, prefix: string): GameState {
+  return {
+    ...state,
+    log: [{
+      id: `${prefix}-${state.totalMonths}-${state.log.length}`,
+      month: state.totalMonths,
+      text,
+    }, ...state.log],
+  };
+}
+
 /** Records the first useful failure while collapsing repeated clicks on the same no-op. */
 export function pushNoOpLog(state: GameState, text: string): GameState {
   const normalizedText = text.trim();

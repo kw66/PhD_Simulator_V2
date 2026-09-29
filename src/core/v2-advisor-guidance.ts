@@ -1,4 +1,6 @@
 import { addPaperCollaboration } from "./v2-paper-collaboration";
+import { pushMilestoneLog } from "./v2-engine-helpers";
+import { getFellowName } from "./v2-fellow-progression";
 import type { GameState, Paper } from "./v2-types";
 
 const GUIDANCE_AMOUNT = 10;
@@ -50,6 +52,9 @@ export function settleAdvisorGuidance(state: GameState, random: () => number = M
         papers: nextState.papers.map((entry) => entry.id === paper.id ? paper : entry),
         advisorProgressState: { ...nextState.advisorProgressState, pendingGuidanceToPlayer: null },
       };
+      nextState = pushMilestoneLog(nextState,
+        `导师指导：你的《${paper.title}》，论文写作协作 +${playerAmount}`,
+        "advisor-guidance-player");
     }
   }
   for (const profile of nextState.fellowProgressState) {
@@ -67,6 +72,9 @@ export function settleAdvisorGuidance(state: GameState, random: () => number = M
       fellowProgressState: nextState.fellowProgressState.map((entry) => entry.id === profile.id
         ? { ...entry, pendingGuidanceFromAdvisor: null } : entry),
     };
+    nextState = pushMilestoneLog(nextState,
+      `导师指导：${getFellowName(profile)}的《${paper.title}》，论文写作协作 +${profile.pendingGuidanceFromAdvisor}`,
+      `advisor-guidance-${profile.id}`);
   }
   return nextState;
 }

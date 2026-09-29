@@ -4,7 +4,8 @@ import { getPaperConferencePromotionMultiplier } from "./v2-publication-system";
 import { getConferencePaperPresentationResults } from "./v2-conference-activity-shared";
 import type { EventCounters, EventSupportState, PaperAcceptType, PendingEvent, PaperTarget, ShopState } from "./v2-types";
 import type { ConferenceDecisionMode, ConferenceRegionId } from "./v2-conference-system";
-import { resolveConferenceDecisionCost } from "./v2-conference-system";
+import { getConferenceBaseCosts, resolveConferenceDecisionCost } from "./v2-conference-system";
+import { getTierResistChance } from "./v2-sanity-rules";
 
 export interface ConferenceAcceptedPaperCandidate {
   id: string;
@@ -45,6 +46,18 @@ function createPaperHandledUpdates(context: ConferenceEventContext) {
   return context.paperIds.map((id) => ({ id, conferenceHandled: true }));
 }
 
+function getPaymentResistanceCondition(label: string, value: number): string {
+  const resistanceChance = getTierResistChance(value);
+  const threshold = resistanceChance === 0
+    ? `${label} <6`
+    : resistanceChance === 0.25
+      ? `6 ≤${label} <12`
+      : resistanceChance === 0.5
+        ? `12 ≤${label} <18`
+        : `${label} ≥18`;
+  return `条件：${threshold}（抵抗概率 ${resistanceChance * 100}%）`;
+}
+
 function createConferenceDecisionAct3(
   context: ConferenceEventContext,
   state: ConferenceEventBuilderState,
@@ -57,13 +70,23 @@ function createConferenceDecisionAct3(
       ? `导师好感 -${decision.actualCost}`
       : `金币 -${decision.actualCost}`
     : decision.mode === "advisor"
-      ? "导师好感未变化"
+      ? "导师好感 -0"
       : decision.mode === "proxy"
         ? "代参会费用 0"
         : "参会费用 0";
   const settlementItems = [modeText, costText];
   const settlementSummary = settlementItems.join("，");
   const presentationResults = getConferencePaperPresentationResults(context);
+  const baseCosts = getConferenceBaseCosts(context.region);
+  const resistanceCondition = decision.mode === "advisor"
+    ? getPaymentResistanceCondition("导师好感", state.favor)
+    : decision.mode === "proxy" && baseCosts.proxyCost > 0
+      ? getPaymentResistanceCondition("社交", state.social)
+      : "";
+  const resultItems = [
+    `结果：${settlementSummary}`,
+    ...presentationResults.map((result) => `结果：${result}`),
+  ];
 
   return {
     id: `${context.id}-act3-${decision.mode}`,
@@ -75,8 +98,8 @@ function createConferenceDecisionAct3(
       "录用时以为终于忙完了，眼下才发现，会务邮件也能攒出一份待办清单。你挨个打上勾，总算把这趟安排妥当。",
       ...(decision.resistanceNarrative ? [decision.resistanceNarrative] : []),
       "机制结算",
-      ...settlementItems,
-      ...presentationResults,
+      ...(resistanceCondition ? [resistanceCondition] : []),
+      ...resultItems,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

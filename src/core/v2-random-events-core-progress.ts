@@ -1,5 +1,6 @@
 import {
   createThreeStageRandomEvent,
+  drawInclusiveInt,
   hasRecoverableDraftPaper,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
@@ -8,11 +9,35 @@ import {
   formatResearchMiscSanChange,
   formatTierResistedOutcome,
   getActualResearchMiscSanChange,
-  getResearchMiscSanNarrative,
   getTierResistedNarrative,
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import type { GameState, PendingEvent } from "./v2-types";
+
+const LEARNING_LATEST_TOPICS = [
+  { title: "多模态大模型的理解与推理", detail: "比较视觉编码、跨模态对齐和推理阶段的设计" },
+  { title: "高效注意力与长上下文", detail: "从 IO 复杂度、KV cache 和上下文压缩入手看效率问题" },
+  { title: "状态空间模型与序列建模", detail: "理解状态空间模型如何处理长序列，以及它和注意力机制的差异" },
+  { title: "扩散模型与流式生成", detail: "比较噪声预测、速度场和条件控制在生成过程中的作用" },
+  { title: "智能体的工具调用与训练", detail: "关注规划、工具使用、环境反馈和长期任务执行" },
+] as const;
+
+const LEARNING_CODE_PROJECTS = [
+  { name: "Qwen3", detail: "tokenizer、attention 模块和推理入口" },
+  { name: "DeepSeek-R1", detail: "训练配置、RL 数据管线和推理脚本" },
+  { name: "vLLM", detail: "PagedAttention、KV cache 和 continuous batching" },
+  { name: "SGLang", detail: "RadixAttention、结构化生成和长上下文调度" },
+  { name: "OpenHands", detail: "agent loop、工具调用和沙箱执行" },
+  { name: "SWE-agent", detail: "issue 解析、代码修改和自动测试" },
+] as const;
+
+const LEARNING_THEORY_TOPICS = [
+  { title: "PAC-Bayes 泛化界", detail: "把先验、后验和 KL 散度放进同一条界里讨论泛化" },
+  { title: "Neural Tangent Kernel", detail: "在无限宽网络极限里看梯度下降怎样变成核回归" },
+  { title: "最优传输与 Schrödinger Bridge", detail: "从 Wasserstein 距离到熵正则化路径，理解分布之间的运输" },
+  { title: "Conformal Prediction", detail: "不依赖具体分布假设地构造预测区间" },
+  { title: "信息瓶颈与表示学习", detail: "在保留任务信息和压缩输入之间做取舍" },
+] as const;
 
 export function createDataLossRandomEvent(state: GameState): { nextState: GameState; event: PendingEvent | null } {
   if (!hasRecoverableDraftPaper(state)) {
@@ -23,13 +48,18 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
   }
 
   const serial = state.totalRandomEventCount;
-  const stayUpSanChange = getActualResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport, state.buffs);
-  const stayUpSanSummary = formatResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport, state.buffs);
-  const stayUpSanNarrative = getResearchMiscSanNarrative(-6, state.player.research);
+  const stayUpBaseSanChange = -5;
+  const recoveryMoneyCost = 3;
+  const stayUpSanChange = getActualResearchMiscSanChange(stayUpBaseSanChange, state.player.research, state.month, state.eventSupport, state.buffs);
+  const stayUpSanSummary = formatResearchMiscSanChange(stayUpBaseSanChange, state.player.research, state.month, state.eventSupport, state.buffs);
+  const introDescription = [
+    "最近电脑总是烫手，风扇却时转时停。你怀疑风扇坏了，又想着“等这轮忙完再说”，顺手把电脑垫高了一点，接着赶论文。",
+    "今天打开自己的电脑，科研文件却怎么也读不出来，重启也没用。你赶紧翻出备份，那些叫着“最新”“最终”的文件，日期却一个比一个早，偏偏少了最近这一批。",
+  ].join("\n\n");
   const event: PendingEvent = {
     id: `random-16-y${state.year}-m${state.month}-n${serial}`,
     title: "数据丢失",
-    description: "电脑突然读不出科研文件。你连着点了几次，弹出的还是同一个报错😵；再看备份日期，才发现少了最近这一批。",
+    description: introDescription,
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -47,7 +77,7 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
       {
         id: `random-16-restart-${serial}`,
         label: "从头再来",
-        outcome: "所有未投稿论文进度清零。",
+        outcome: "论文进度清0。",
         effects: {
           clearDraftProgress: true,
         },
@@ -55,30 +85,28 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
       {
         id: `random-16-pay-${serial}`,
         label: "花钱恢复",
-        outcome: "金币 -4，论文进度保留。",
+        outcome: `金币 -${recoveryMoneyCost}；论文进度保留。`,
         effects: {
-          money: -4,
+          money: -recoveryMoneyCost,
         },
       },
       {
         id: `random-16-fake-${serial}`,
         label: "伪造数据",
-        outcome: "当前未投稿且已有进度的论文，未来引用 ×0.5。",
+        outcome: "论文进度保留；涉事论文引用 ×0.5；代价？",
         effects: {
           draftCitationDebuffMultiplier: 0.5,
+          markDraftImageMisuse: true,
         },
       },
     ],
   };
   const stagedEvent = createThreeStageRandomEvent(event, {
-    introDescription: [
-      "你打开 **自己的电脑**，准备接着做手头的论文，科研文件却怎么也读不出来。重启一次，报错还在原地。",
-      "你把电脑和移动硬盘里的备份挨个点开。那些叫着“最新”“最终”的文件，日期却一个比一个早，偏偏少了最近这一批。",
-    ].join("\n\n"),
+    introDescription,
     decisionTitle: "如何应对",
     decisionDescription: [
       "你从抽屉里翻出旧笔记，按日期摊在桌上。一页页补回去，今晚的觉就别想了；可这些都是还没投稿的心血，真要全部从头来，你连新建文件夹都不愿点。",
-      "数据恢复团队回了报价：4 金币。你打开余额又关上，甚至冒出拿几个编造的数字填空的念头。稿子是能接着写，可等别人照着论文复现，拿什么交代？想到这里，你的手又停了下来。",
+      `数据恢复团队回了报价：${recoveryMoneyCost} 金币。你打开余额又关上，鼠标却停在了 PS 图标上。旧文件里还剩几张结果图，修修补补，似乎也能把缺的部分凑齐。你盯了一会儿，手还没按下去。`,
     ].join("\n\n"),
     results: {
       [`random-16-stay-up-${serial}`]: {
@@ -86,7 +114,6 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
         description: [
           "你对着旧笔记和零散备份，一点点补回丢失的内容。夜里走廊的灯灭了，屏幕上还有文件在保存。",
           "已有进度总算补齐。最后一份保存成功后，你又复制了一份，亲眼看着备份进度条走到头，才敢合上电脑。",
-          ...(stayUpSanNarrative ? [stayUpSanNarrative] : []),
         ].join("\n\n"),
       },
       [`random-16-restart-${serial}`]: {
@@ -104,10 +131,10 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
         ].join("\n\n"),
       },
       [`random-16-fake-${serial}`]: {
-        title: "留下隐患",
+        title: "图片补齐",
         description: [
-          "你用编造的数据填上空缺，把文件保存下来。再打开时，缺失的地方已经补齐，原始记录却仍是一片空白。",
-          "这些内容没有真实实验支撑，即使写进论文，也经不起后来的核验与引用。光标停在保存按钮上，你迟迟没有关掉窗口。",
+          "你打开 PS，把旧文件里的结果图修修补补，凑齐缺失的几张，再塞回论文。导出的页面看着挺像那么回事，连自己都差点信了。",
+          "保存好文件，你把 PS 关掉，打算不再细想。论文是能接着写了，只是那些处理过的图片还在里面。你安慰自己：这么一点细节，总不至于被人翻出来吧。",
         ].join("\n\n"),
       },
     },
@@ -126,13 +153,22 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
     ? null
     : applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
   const basicOutcome = basicGain > 0
-    ? "科研上限 +1。"
-    : `${formatTierResistedOutcome("科研", 1, basicResearchResult!)}。`;
+    ? "科研 < 6｜科研上限 +1。"
+    : `科研 ≥ 6｜${formatTierResistedOutcome("科研", 1, basicResearchResult!)}。`;
+  const latestTopic = LEARNING_LATEST_TOPICS[
+    drawInclusiveInt(0, LEARNING_LATEST_TOPICS.length - 1, getRoll)
+  ]!;
+  const codeProject = LEARNING_CODE_PROJECTS[
+    drawInclusiveInt(0, LEARNING_CODE_PROJECTS.length - 1, getRoll)
+  ]!;
+  const theoryTopic = LEARNING_THEORY_TOPICS[
+    drawInclusiveInt(0, LEARNING_THEORY_TOPICS.length - 1, getRoll)
+  ]!;
 
   const event: PendingEvent = {
     id: `random-9-y${state.year}-m${state.month}-n${serial}`,
     title: "不断学习",
-    description: "讨论时又碰上几个似懂非懂的概念。你回去打开收藏夹，才发现上次存下的教程还停在第一页😅。",
+    description: "一篇论文刚投出去，想 idea、做实验、写论文、投稿的循环暂时停了一格。难得有点空闲，你想静下心学一会儿，却发现自己已经很久没有完整读完一段材料了😅。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -184,48 +220,48 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "讨论时，大家顺着一个概念往下说，你还在笔记角落悄悄给它画问号。散会后翻一翻，问号比记下的结论还醒目。",
-      "回去打开收藏夹，基础教材、前沿论文和代码教程排得整整齐齐。上次保存时觉得自己马上就会看，如今网页还停在第一页。",
+      "论文投出去，你本想休息一晚，却盯着收藏夹发起了呆。想 idea、做实验、写论文、投稿，日子被这四步推着走；上次静下心学习，已经不记得是什么时候了。",
+      "你决定今晚先不赶进度。B站的《跟李沐学 AI》、arXiv 论文、开源项目和总没啃懂的理论摆在眼前，至少先看完一样。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
       basicGain > 0
-        ? "你把笔记翻到画着问号的那一页，教材里正好有对应的章节。前沿论文已经翻过几篇，往深处看却总被同几个概念拦住。先把这块地基补上，以后才走得远。"
-        : "你把笔记翻到画着问号的那一页，教材里的结论已经用过不少次，证明却未必还讲得清。拿自己的课题对照着重新推一遍，说不定能把眼前这步做得更扎实。",
-      "代码教程停在熟悉的报错附近，理论讲义里还有一行看不懂的推导。那篇没读完的新论文也开着，摘要里的思路很有意思。想学的越摆越多，笔记却一个字没添；你把手机翻面放好，今晚先弄懂一样也好。",
+        ? "你把《跟李沐学 AI》点开，从线性回归和反向传播的视频重新看起。老师把公式和代码拆开讲，你暂停视频，把每一步写在纸上；不是内容突然变难，而是自己很久没有把基础完整推一遍了。"
+        : "你把《跟李沐学 AI》点开，回看一个从损失到梯度的推导。结论已经用过不少次，自己却未必能从头讲清；这次不追进度，先把眼前这步重新理顺。",
+      `${codeProject.name} 的源码还开着，${theoryTopic.title} 的推导只读到一半，arXiv 上的 ${latestTopic.title} 也没看完。想学的越摆越多，你把手机翻面，先弄懂一样。`,
     ].join("\n\n"),
     results: {
       [`random-9-basic-${serial}`]: {
         title: "基础学习",
         description: basicGain > 0
           ? [
-              "你重新翻开基础教材，从以前划着“略”的推导开始补。例题做错了两次，才发现问题就出在自己一直懒得查的定义里。",
-              "再读相关文献，几个原本只能背结论的地方终于接得上了。你在那页笔记旁补了个页码，以后往下学，至少知道该回哪里找。",
+              "你继续看《跟李沐学 AI》，从线性回归、反向传播一路补到自己的课题。视频里的公式和代码能跟上，轮到解释每一步为什么这样写，还是会卡。",
+              "你把关键公式和代码片段记在自己的课题旁，几个原本只能背结论的地方终于接得上了。以后再遇到它们，至少知道该从哪里重新推起。",
             ].join("\n\n")
           : [
-              "你挑出教材里几处容易忽略的假设，盖住答案，重新推了一遍。大部分步骤已经熟悉，笔尖仍在几处条件上停了停。",
-              "合上书前，你在页边补了几句提醒。下次再碰到这些结论，就不用对着“显然可得”猜半天了。",
+              "你继续看《跟李沐学 AI》，回看一个从损失到梯度的推导。大部分步骤已经熟悉，笔尖仍在几处条件上停了停：熟悉结论，和能从头讲清，终究不是一回事。",
+              "暂停视频，你把推导理由和代码里的对应位置记在笔记上。下次再遇到这一步，就不用只凭印象往下讲了。",
               ...(basicResearchNarrative ? [basicResearchNarrative] : []),
             ].join("\n\n"),
       },
       [`random-9-tech-${serial}`]: {
         title: "技术深挖",
         description: [
-          "你沿着几篇新论文的引用一路读下去，浏览器的标签页越开越多。原本只想看个摘要，连作者放出的代码都翻了起来。",
-          "几种方法摆在一起，终于看出还能从哪里试一试。你把疑问和改法记下来，这回收藏夹之外，总算留下了自己的想法。",
+          `你在 arXiv 翻开几篇关于“${latestTopic.title}”的最新论文，从摘要读到方法和消融实验。${latestTopic.detail}。原本只想看个摘要，最后连作者放出的实现也一起翻了起来。`,
+          "几种方法摆在一起，你终于看出还能从哪里试一试。你把疑问和改法记下来，这回收藏夹之外，总算留下了自己的想法。",
         ].join("\n\n"),
       },
       [`random-9-code-${serial}`]: {
         title: "读源码",
         description: [
-          "你找来一份公开的实验代码，开着调试器逐步往下走。那个以前见了就想复制去搜索的报错，这次终于看懂了来处。",
+          `你打开 ${codeProject.name} 的公开源码，顺着 ${codeProject.detail} 往下读。那个以前见了就想复制去搜索的报错，这次终于看懂了来处。`,
           "顺手把重复操作整理成脚本，容易填错的参数也加了检查。下一次做实验，至少不用再靠多按几遍运行碰运气。",
         ].join("\n\n"),
       },
       [`random-9-theory-${serial}`]: {
         title: "理论推导",
         description: [
-          "你挑了一章总是绕着走的理论，从符号定义开始逐行推。草稿纸铺了半张桌子，才发现前面有个下标一直看反了。",
+          `你挑出 ${theoryTopic.title}，从符号定义开始逐行推。${theoryTopic.detail}；草稿纸铺了半张桌子，才发现前面有个下标一直看反了。`,
           "推到第三遍，几行公式终于连上了。你试着用自己的话写下推导理由，这次不必再靠一句“由此可知”含糊带过。",
         ].join("\n\n"),
       },

@@ -131,8 +131,6 @@ export function getActualResearchMiscSanChange(
     -getResearchMiscTierDiscount(baseDelta, research) - getSeasonSanModifier(month, eventSupport));
 }
 
-const RESEARCH_MISC_TIER_NAMES = ["小白", "入门", "熟练", "大佬"] as const;
-
 /**
  * Formats only the SAN change applied by a fixed research chore. The result
  * keeps the research discount and illness surcharge visible without listing
@@ -148,13 +146,6 @@ export function formatResearchMiscSanChange(
   const finalDelta = getActualResearchMiscSanChange(baseDelta, research, month, eventSupport, buffs);
   const tierDiscount = getResearchMiscTierDiscount(baseDelta, research);
   return formatEventSanChange(finalDelta, getIllnessSanIncrease(baseDelta, month, eventSupport, buffs, research), tierDiscount, baseDelta);
-}
-
-export function getResearchMiscSanNarrative(baseDelta: number, research: number): string {
-  const tierDiscount = getResearchMiscTierDiscount(baseDelta, research);
-  return tierDiscount > 0
-    ? `科研能力提升到“${RESEARCH_MISC_TIER_NAMES[getAttributeTier(research)]}”档位后，你对这类科研事务更熟悉了。`
-    : "";
 }
 
 /**

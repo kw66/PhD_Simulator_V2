@@ -222,7 +222,7 @@ describe("advisor project random event effects", () => {
 
     const repeated = applyChoiceEffectsToState(after, decisionChoice(makeEvent(after), "vertical")).nextState;
     expect(repeated.advisorProgressState.pendingGuidanceToPlayer).toBe(10);
-    expect(repeated.log[0]?.text).toContain("论文写作协作待使用（10分）");
+    expect(repeated.log.filter((entry) => entry.text.includes("你的论文写作协作待使用（10分）"))).toHaveLength(1);
     expect(repeated.fellowProgressState.map((profile) => profile.pendingGuidanceFromAdvisor)).toEqual([10, 10, 10]);
     const ready = settleAdvisorGuidance({
       ...repeated,
@@ -232,6 +232,7 @@ describe("advisor project random event effects", () => {
     expect([...ready.papers, ...ready.fellowPapers!].map(collaborationTotal)).toEqual([10, 10, 10, 10]);
     expect(ready.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
     expect(ready.fellowProgressState.map((profile) => profile.pendingGuidanceFromAdvisor)).toEqual([null, null, null]);
+    expect(ready.log.filter((entry) => entry.text.startsWith("导师指导：") && entry.text.includes("论文写作协作 +10"))).toHaveLength(4);
     expect(settleAdvisorGuidance(ready, () => 0.99)).toBe(ready);
   });
 
@@ -420,7 +421,20 @@ describe("advisor project three-stage settlement", () => {
     expect(completionLogs).toHaveLength(1);
     expect(completionLogs[0]!.text).toBe(type === "horizontal"
       ? "横向项目完成：科研经费 +20；金币 +5"
-      : "纵向项目完成：科研积累 +2；论文写作协作 +10");
+      : "纵向项目完成：科研积累 +2");
+    const eventIndex = completed.log.findIndex((entry) => Boolean(entry.eventHistoryId));
+    const projectIndex = completed.log.findIndex((entry) => entry.id === completionLogs[0]!.id);
+    expect(projectIndex).toBeLessThan(eventIndex);
+    const guidanceLogs = completed.log.filter((entry) => entry.text.startsWith("导师指导："));
+    expect(guidanceLogs).toHaveLength(type === "vertical" ? 4 : 0);
+    for (const entry of guidanceLogs) {
+      expect(entry.text).toContain("论文写作协作 +10");
+      expect(completed.log.indexOf(entry)).toBeLessThan(projectIndex);
+    }
+    const renderedLog = renderApp(completed, undefined, { activePlayTab: "events", isEventContentOpen: false });
+    expect(renderedLog.indexOf(`${type === "horizontal" ? "横向" : "纵向"}项目完成`))
+      .toBeLessThan(renderedLog.indexOf(`回看导师项目`));
+    if (type === "vertical") expect(renderedLog).toMatch(/class="[^"]*log-[^"]*"[^>]*>论文写作协作 \+10<\/span>/u);
     expect(completed.log.find((entry) => entry.eventHistoryId)?.text).not.toMatch(/科研经费|金币|科研积累|论文写作协作/u);
     const automatic = settleLinearEvents({ ...refreshed, blockLinearEvents: false }, (current, eventId, eventChoiceId) =>
       dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));

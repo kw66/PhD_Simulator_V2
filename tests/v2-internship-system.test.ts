@@ -24,7 +24,7 @@ import type { GameState, PendingEvent } from "../src/core/v2-types";
 
 function playingState(): GameState {
   const initial = createInitialState();
-  return { ...initial, phase: "playing", totalMonths: 11, month: 11, year: 1,
+  return { ...initial, phase: "playing", totalMonths: 11, month: 11, year: 1, totalResearchScore: 2,
     player: { ...initial.player, favor: 6, san: 20, money: 20 }, eventQueue: [] };
 }
 
@@ -93,6 +93,24 @@ describe("v2 internship system", () => {
     expect(getInternshipSalaryPayment(effective)).toEqual({ payment: 1, remainder: 0.5 });
   });
 
+  it("records remote internship arrangement, start, and monthly settlement separately", () => {
+    const initial = playingState();
+    const accepted = applyChoiceEffectsToState(initial, {
+      id: "remote-internship",
+      label: "提出远程实习",
+      outcome: "科研分 ≥ 2｜下三个月 SAN -2、金币 +1、实验金币 -1、实验 +4。",
+      effects: { internshipStateUpdates: activateRemoteInternship(initial.totalMonths) },
+    }).nextState;
+    expect(accepted.log[0]?.text).toBe("远程实习安排已确认：下月开始，持续3个月");
+
+    const next = dispatchAction({ ...accepted, eventQueue: [] }, "next-month");
+    expect(next.log.some((entry) => entry.text === "远程实习开始：本月起生效。")).toBe(true);
+    const settlement = next.log.find((entry) => entry.text.startsWith("远程实习结算："));
+    expect(settlement?.text).toContain("远程实习结算：SAN -2、金币 +1");
+    expect(settlement?.text).not.toContain("实验");
+    expect(next.log.find((entry) => entry.text.startsWith("进入第"))?.text).not.toContain("远程实习");
+  });
+
   it("exposes pure scheduled, three effective months and expired remote benefits", () => {
     const state = { ...playingState(), internshipState: activateRemoteInternship(11) };
     const before = structuredClone(state);
@@ -105,13 +123,50 @@ describe("v2 internship system", () => {
       expect(getInternshipExperimentEffect(current)).toEqual(effective
         ? { bonus: 4, multiplier: 1, moneyDiscount: 1 }
         : { bonus: 0, multiplier: 1, moneyDiscount: 0 });
-      expect(getInternshipMonthlyStats(current)).toEqual(effective ? { san: -3, money: 1 } : { san: 0, money: 0 });
+      expect(getInternshipMonthlyStats(current)).toEqual(effective ? { san: -2, money: 1 } : { san: 0, money: 0 });
       expect(advanceInternshipMonth(current).active).toBe(totalMonths <= 14);
     }
     expect(advanceInternshipMonth({ ...state, totalMonths: 14 }).remainingMonths).toBe(1);
     expect(advanceInternshipMonth({ ...state, totalMonths: 15 })).toEqual(createInternshipState());
     expect(state).toEqual(before);
     expect(increaseInternshipExperimentMultiplier(state.internshipState)).toBe(state.internshipState);
+  });
+
+  it.each([
+    [0, 20, 20, false],
+    [1, 20, 20, false],
+    [2, 0, 1, true],
+    [2, 5, 20, true],
+    [3, 0, 1, true],
+  ] as const)("gates advisor internship by score=%s, not favor=%s or research=%s", (score, favor, research, accepted) => {
+    const initial = playingState();
+    let state: GameState = { ...initial, totalResearchScore: score, player: { ...initial.player, favor, research } };
+    state = resolveFirst(queueEvent(state, createAdvisorTalkRandomEvent(state, () => 0)));
+    const choice = state.eventQueue[0]!.choices.find((entry) => entry.label === "提出远程实习")!;
+    expect(choice.outcome).toContain(accepted ? "科研分 ≥ 2" : "科研分 < 2");
+    expect(choice.outcome).not.toMatch(/导师好感 [≥<] 6/);
+    expect(state.eventQueue[0]!.description).toContain(accepted ? "已经有些论文成果" : "论文成果还不多");
+    state = resolveFirst(state, choice.id);
+    expect(state.internshipState.active).toBe(false);
+    state = resolveFirst(state);
+    expect(hasOngoingInternship(state)).toBe(accepted);
+    if (accepted) {
+      expect(state.internshipState).toEqual(activateRemoteInternship(initial.totalMonths));
+      expect(state.player.favor).toBe(favor);
+    }
+  });
+
+  it.each([0, 1, 2, 3])("rechecks score %s when applying a stale remote internship approval", (score) => {
+    const initial = playingState();
+    const current = { ...initial, totalResearchScore: score, player: { ...initial.player, favor: score < 2 ? 20 : 0 } };
+    const next = applyChoiceEffectsToState(current, {
+      id: "approved-internship", label: "确认远程实习", outcome: "科研分 ≥ 2", effects: {
+        internshipStateUpdates: activateRemoteInternship(initial.totalMonths),
+      },
+    }).nextState;
+    expect(hasOngoingInternship(next)).toBe(score >= 2);
+    expect(next.player.san).toBe(current.player.san);
+    expect(next.player.money).toBe(current.player.money);
   });
 
   it.each([false, true])("starts remote only on final confirmation with replay=%s", (replay) => {
@@ -159,15 +214,16 @@ describe("v2 internship system", () => {
     }
   });
 
-  it("rebases a delayed approval to confirmation month and rechecks favor", () => {
+  it("rebases a delayed approval and rechecks research score instead of favor", () => {
     const initial = playingState();
     let state = resolveFirst(queueEvent(initial, createAdvisorTalkRandomEvent(initial, () => 0)));
     state = resolveFirst(state, state.eventQueue[0]!.choices[2]!.id);
     expect(resolveFirst({ ...state, totalMonths: 13, month: 1, year: 2 }).internshipState).toEqual(activateRemoteInternship(13));
-    const denied = resolveFirst({ ...state, player: { ...state.player, favor: 5 } });
+    expect(resolveFirst({ ...state, player: { ...state.player, favor: 0 } }).internshipState).toEqual(activateRemoteInternship(initial.totalMonths));
+    const denied = resolveFirst({ ...state, totalResearchScore: 1, player: { ...state.player, favor: 20 } });
     expect(denied.internshipState.active).toBe(false);
-    expect(denied.eventQueue[0]?.description).toContain("导师好感不足，本次未确认远程实习");
-    expect(resolveFirst(denied).log[0]?.text).toContain("未确认远程实习");
+    expect(denied.eventQueue[0]?.description).toContain("条件：科研分 < 2｜结果：无事发生");
+    expect(resolveFirst(denied).log[0]?.text).toContain("条件：科研分 < 2");
   });
 
   it.each(["ongoing", "blocked"] as const)("keeps a denied %s internship in its own chain when another result has the same close choice", (reason) => {

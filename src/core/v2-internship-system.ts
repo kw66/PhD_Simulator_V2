@@ -55,6 +55,10 @@ export function activateRemoteInternship(totalMonths: number, salaryRemainder = 
   };
 }
 
+export function hasRemoteInternshipScore(state: Pick<GameState, "totalResearchScore">): boolean {
+  return state.totalResearchScore >= 2;
+}
+
 export function getInternshipStatus({ internshipState, totalMonths }: InternshipContext): InternshipStatus {
   if (!internshipState.active) {
     return { kind: null, active: false, pending: false, remainingMonths: 0 };
@@ -101,7 +105,7 @@ export function getInternshipMonthlyStats(
 ): { san: number; money: number } {
   const status = getInternshipStatus(state);
   if (!status.active) return { san: 0, money: 0 };
-  return { san: status.kind === "remote3" ? -3 : -2, money: getInternshipSalaryPayment(state).payment };
+  return { san: -2, money: getInternshipSalaryPayment(state).payment };
 }
 
 export function getInternshipExperimentEffect(state: InternshipContext): {

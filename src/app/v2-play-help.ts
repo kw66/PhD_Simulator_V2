@@ -1,5 +1,6 @@
 import { REVIEW_BASE_THRESHOLDS, REVIEW_TARGET_AVERAGE_INFLUENCE, REVIEWER_ANNUAL_WEIGHT_DELTAS, REVIEWER_BASE_WEIGHTS, REVIEWER_DEFINITIONS } from "../core/v2-paper-rules";
 import { ADVISOR_GRANTS } from "../core/v2-advisor-progress";
+import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "../core/v2-lab-projects";
 import { getSecondaryPlayHelpContext } from "./v2-play-help-secondary";
 import type { PlayRenderUiState } from "./v2-render-types";
 
@@ -27,6 +28,10 @@ function detailPage(title: string, summary: string, body: string): PlayHelpPage 
 type ReviewerGuideSection = "probability" | "method" | "effect";
 
 function renderReviewerGuide(section: ReviewerGuideSection, offset = 0, count = 8): string {
+  if (section === "probability" && count > 4) {
+    const firstCount = Math.ceil(count / 2);
+    return `<div class="reviewer-probability-columns">${renderReviewerGuide(section, offset, firstCount)}${renderReviewerGuide(section, offset + firstCount, count - firstCount)}</div>`;
+  }
   const rules = {
     novelty: ["idea×2，其余各×0.5", "拒稿：idea+5"],
     experiment: ["实验×2，其余各×0.5", "拒稿：实验+5"],
@@ -63,14 +68,15 @@ function renderReviewerThresholds(): string {
 const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
   directPage("科研入门", `<p><b>新建论文→想idea→做实验→写论文</b>，点击卡片选择要修改的论文。</p>
     <p>实验需要idea有分，写作需要实验有分。</p>
-    <p><b>实验基础费用3金币</b>，优先用导师经费，不足部分自付；按钮显示你实际承担的金币。</p>
+    <p><b>实验基础费用3金币</b>；算力短缺持续6个月，玩家与同学每次实验费用+1。优先用导师经费，不足部分自付；按钮显示你实际承担的金币。</p>
     <p>分数格上行是<b>自身分</b>，下行是<b>协作分</b>，右侧总分为六格之和。</p>
-    <p><b>多次执行：</b>装备或Buff可让一次科研连续执行多遍，不额外扣行动点或SAN，实验金币也只收一次；每遍都重新生成分数，每遍与上一遍自身分+1取最大值。</p>
-    <details class="play-help-details"><summary>执行次数与实验费用</summary><div class="play-help-detail-content">
+    <p>个人显卡RTX 4090起每次实验减1金币，H20起减2；远程实习期间再减1，最低0。减免仅限玩家，不影响同学；先算共享涨价与个人减免，再扣导师经费，最后扣你的金币。</p>
+    <p>例如：实验费用3、导师经费2→你付1金币；导师经费充足→你付0金币。</p>`),
+  detailPage("多次执行", `<p>装备或Buff可让一次科研连续执行多遍，<b>不额外扣行动点或SAN，实验金币也只收一次</b>。</p>
+    <p>每遍都重新生成分数，每遍与上一遍自身分+1取最大值。</p>`,
+    `<p>总次数=1+⌊n⌋，n为额外次数之和，至少执行1次。</p>
     <p>“仅下次”加分与倍率只用于第一遍；持续Buff和装备每遍生效。协作分不变。</p>
-    <p>总次数=1+⌊n⌋，n为额外次数之和，至少执行1次。</p>
-    <p>个人显卡RTX 4090起每次实验减1金币，H20起减2；远程实习期间再减1，最低0。先算减免，再扣导师经费，最后扣你的金币。</p>
-    <p>例如：实验费用3、导师经费2→你付1金币；导师经费充足→你付0金币。</p></div></details>`),
+    <p>例如原自身分10，连续生成8和9分，两遍分别保底到11和12分。</p>`),
   detailPage("科研分数计算", `<p>科研越高，本次生成分数通常越高。操作只更新一项<b>自身分，至少+1</b>；协作分持续累加，不会被覆盖。</p>`,
     `<p><b>基础分</b> = 科研能力×随机倍率（0.5～1.5）+随机加分（0～5）</p>
     <p><b>本次分</b> = 基础分×总倍率+固定分，结果四舍五入</p>
@@ -92,8 +98,7 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
   directPage("审稿评分", `${renderReviewerGuide("method")}<p>普通与LLM的三项权重随机生成，<b>权重之和均为3</b>。最高／最低按投稿时的各项合计分选取，有效分四舍五入。</p>`),
   directPage("审稿人反馈", `<p>拒稿加分只在退稿后生效；<b>SAN变化无论中稿或拒稿都生效</b>，三位审稿人的效果可叠加。扣SAN先乘疾病倍率并向上取整，再加季节与恋人固定修正，最低0；恢复不受影响。</p>${renderReviewerGuide("effect")}`),
   directPage("审稿门槛", `<p><b>基础门槛：边缘／接收</b>，低于前值拒稿，达到后值接收。</p>${renderReviewerThresholds()}
-    <details class="play-help-details"><summary>按会议影响力换算</summary><div class="play-help-detail-content">
-    <p>实际门槛=基础门槛×会议影响力÷等级均值，四舍五入。等级均值：A ${REVIEW_TARGET_AVERAGE_INFLUENCE.A}，B ${REVIEW_TARGET_AVERAGE_INFLUENCE.B}，C ${REVIEW_TARGET_AVERAGE_INFLUENCE.C}。</p></div></details>`),
+    <p>实际门槛=基础门槛×会议影响力÷等级均值，四舍五入。等级均值：A ${REVIEW_TARGET_AVERAGE_INFLUENCE.A}，B ${REVIEW_TARGET_AVERAGE_INFLUENCE.B}，C ${REVIEW_TARGET_AVERAGE_INFLUENCE.C}。</p>`),
   directPage("会议结果", `<p><b>拒稿：</b>回到草稿，保留衰减后的分数，再将审稿反馈加到自身分，协作分不变。</p>
     <p><b>中稿：</b>论文移入成果、腾出卡片，一作按等级增加科研分。</p>
     <p>成长奖励另记为<b>天赋触发</b>，一篇可同时完成多项；审稿SAN影响在确认结果时结算。</p>
@@ -107,34 +112,38 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
 ];
 
 const RELATIONSHIP_PAGES: readonly PlayHelpPage[] = [
-  detailPage("导师成长", `<p>科研积累从<b>20</b>开始，科研经费初始<b>10</b>，没有上限。</p>
-    <p><b>你和同学发表论文，按科研分增加导师积累</b>；同篇去重，恋人论文不计。</p>
-    <p>导师每月轮流推进项目<b>10</b>；经费为0时跳过本月横向，下月推进纵向。你每月可选一个项目：横向 SAN-5，纵向 SAN-4。</p>`,
-    `<p>项目进度满100才结算：横向完成后科研经费+20，你获得劳务费+5；纵向完成后导师科研积累增加当前值的10%（下取整）。玩家项目推进=⌊科研能力⌋+随机0～5。</p>
-    <p>“导师项目”事件中牵头完成项目，对应进度+100。满条奖励单独记入项目完成日志。横向基础SAN-8、纵向基础SAN-6，享受科研档位减免。</p>
-    <p>实验优先使用导师科研经费，不足部分再使用你的金币；一次实验基础花费3金币，个人显卡可减免。同学做实验每次经费-3，不足3时改做横向。</p>
-    <p>导师、同学和你共同推进卡片上的两条项目进度，完成奖励相同。同学每次项目推进=⌊同学科研⌋+随机0～5；按月初经费选择，达到20选纵向，否则选横向。纵向项目满100时，导师为玩家和每位同学各随机选择一篇论文，写作协作+10；需要论文已有实验分，无合适论文时暂存一次。</p>`),
-  directPage("导师项目", `<table class="panel-tip-table"><thead><tr><th>项目</th><th>积累</th><th>经费</th><th>期限</th></tr></thead><tbody>${ADVISOR_GRANTS.filter((grant) => grant.id !== "academician").map((grant) => `<tr><th>${grant.name}</th><td>${grant.threshold}</td><td>+${grant.funding}</td><td>${grant.durationYears}年</td></tr>`).join("")}</tbody></table>
-    <p>每年按科研积累申请符合门槛且不限项的最高新项目，科研积累不会因申请而扣除；院士需先获得杰青，科研积累达到1000，当选时一次性经费+200。</p>`),
+  directPage("导师成长", `<p><b>你和同学发表论文，按科研分增加导师积累</b>；同篇去重，恋人论文不计。</p>
+    <p><b>项目进度满100才结算：</b>横向完成后科研经费+20、你的劳务费+5；纵向完成后导师科研积累增加当前值的10%（下取整）。</p>
+    <p>纵向项目满100时，导师为玩家和每位同学各随机选择一篇论文，<b>写作协作+10</b>。暂无可修改论文时，保留一次指导。</p>`),
+  detailPage("项目推进", `<p>导师、同学和你共同推进卡片上的两条项目进度。</p>
+    <p><b>玩家每月选一项：</b>横向 SAN-5、纵向 SAN-4；推进=⌊科研能力⌋+随机0～5。同学也按自身科研计算。</p>
+    <p>导师每月轮流推进项目<b>10</b>；横向经费为0时暂停一次，下一月继续纵向。</p>`,
+    `<p>“导师项目”事件由你牵头：横向基础SAN-8、纵向基础SAN-6，享受科研档位减免；对应进度+100。满条奖励单独记入项目完成日志。</p>`),
+  directPage("经费使用", `<p><b>实验基础花费3金币</b>，个人显卡和实习减免仅限玩家；先算共享涨价与个人减免，再使用导师经费，不足部分由你支付。</p>
+    <p>算力短缺持续6个月，玩家与同学每次实验费用+1。同学经费不足当次实验费用时改做横向；多人同时实验，按卡片顺序扣经费。</p>
+    <p>普通项目按月初经费选择：<b>≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}做纵向</b>，否则做横向。</p>
+    <p>“导师经费”事件抽中后，需经费<b>超过${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}</b>才会出现；未达标的机会暂存，达标后触发。</p>`),
+  directPage("基金申请", `<p>每年按科研积累申请符合门槛且不限项的最高新项目，<b>申请不扣积累</b>。</p>
+    <table class="panel-tip-table advisor-project-table"><thead><tr><th>基金</th><th>积累</th><th>经费</th><th>周期</th></tr></thead><tbody>${ADVISOR_GRANTS.filter((grant) => grant.id !== "academician").map((grant) => `<tr><th>${grant.name}</th><td>${grant.threshold}</td><td>+${grant.funding}</td><td>${grant.durationYears}年</td></tr>`).join("")}</tbody></table>
+    <p>院士需先获得杰青，科研积累达到1000，当选时一次性经费+200。</p>`),
   detailPage("导师职称与补助", `<p><b>晋升后下月加薪</b>：硕士每级+0.25金币，博士每级+0.5金币。</p>
     <p><b>小数累计、整数发放</b>，如1.5按1、2交替。</p>`,
-    `<table class="panel-tip-table"><thead><tr><th>获批</th><th>职称</th><th>硕士/月</th><th>博士/月</th></tr></thead><tbody>
+    `<table class="panel-tip-table advisor-salary-table"><thead><tr><th>获批</th><th>职称</th><th>硕士/月</th><th>博士/月</th></tr></thead><tbody>
     <tr><th>—</th><td>讲师</td><td>1</td><td>3</td></tr>
     <tr><th>青基</th><td>副教授</td><td>1.25</td><td>3.5</td></tr><tr><th>面上</th><td>教授·四级</td><td>1.5</td><td>4</td></tr><tr><th>优青</th><td>教授·三级</td><td>1.75</td><td>4.5</td></tr><tr><th>杰青</th><td>教授·二级</td><td>2</td><td>5</td></tr><tr><th>院士</th><td>教授·一级</td><td>2.25</td><td>5.5</td></tr>
     </tbody></table><p>讲师限1项，晋升后限2项；项目到期释放名额，职称与已获项目保留。</p>`),
-  detailPage("同学协作", `<p>每位同学每月可主动协作一次，默契每月推进协作进度；进度满100后触发互助，超出部分保留。</p>
-    <p>每篇共同发表的论文默契+1，默契上限20；双方主导的合作论文均可触发。</p>`,
-    `<p>主动推进=⌊你的科研⌋+随机0～5，SAN消耗见按钮；审稿期间也能推进。</p>
+  directPage("同学协作", `<p>每位同学每月可主动协作一次，师兄／师姐、同门、师弟／师妹基础SAN消耗为4、3、2；审稿时也可协作。</p>
+    <p>主动推进=⌊你的科研⌋+随机0～5；默契每月推进协作进度，数值为当前默契。</p>
+    <p><b>满100互助：</b>你帮同学论文最低项；同学帮你的方向见表，加分均为帮助者科研。</p>
     <table class="panel-tip-table rel-help-table"><thead><tr><th>同学</th><th>帮助方式</th></tr></thead><tbody>
     <tr><th>师兄／师姐</th><td>随机一篇的idea</td></tr><tr><th>同门</th><td>随机一篇的一项</td></tr><tr><th>师弟／师妹</th><td>随机一篇的实验</td></tr>
-    </tbody></table><p>你帮同学论文最低项。每次只帮一篇论文的一项，双方独立结算，条满时按帮助者科研能力加分；没有可修改论文时各保留一次。</p>
-    <p><b>实验室传承：</b>认识每12个月，同学科研+⌊n/2⌋，上限20。n为科研高于该同学的玩家及其他同学人数，再加导师1人，恋人不计；悬浮认识月数可看当前预计提升。</p>`),
+    </tbody></table><p>每次只帮一篇的一项，双方分别结算；没有可修改论文时各保留一次。</p>`),
   detailPage("同学论文", `<p>加入时开新稿，次月开始科研；<b>成功科研后，下月做项目</b>，两者交替。</p>
     <p><b>审稿3个月，等待时每月做项目</b>；中稿当月开始新稿，退稿当月继续修改。</p>
-    <p>你帮论文加过分才会署名；共同中稿<b>默契+1</b>，计入合作成果与引用，不计玩家科研分。</p>`,
+    <p>你帮论文加过分才会署名，成果与引用计入玩家，科研分不计。共同发表<b>默契+1，上限20</b>；双方主导的合作论文均可触发。</p>`,
     `<p>先补齐idea、实验、写作，再提升合计分最低项，并列按idea→实验→写作。科研后达到当月参考分即投稿，优先A，其次B、C；未达标继续修改。</p>
-    <p>同学实验每次经费-3，按卡片顺序结算；不足时改做横向，下月重新判断最低项并尝试科研。前面的横向完成后，到账经费可供后面的同学使用。</p>
-    <p>普通项目按月初经费选择：≥20做纵向，否则做横向。互助和导师指导不占行动，底部记录本月实际行动；同一人的研究方向固定。</p>`),
+    <p>实验经费不足时改做横向，下月重新判断最低项并尝试科研。卡片底部记录本月行动。</p>
+    <p><b>实验室传承：</b>认识每12个月，同学科研+⌊n/2⌋，上限20。n为科研更高的玩家和其他同学人数，再加导师1人，恋人不计。</p>`),
   detailPage("恋人类型与约会", `<p>恋人有<b>活泼</b>和<b>聪慧</b>两种类型，科研与亲密的初始侧重点相反。</p>
     <p>玩耍、学习、购物各有100进度，每月共用一次约会；基础消耗依次为金币-2、SAN-4、金币-3，实际见按钮；科研与亲密上限均为20。</p>`,
     `<p>初始属性：活泼恋人科研3～6、亲密9～12；聪慧恋人科研9～12、亲密3～6。</p>

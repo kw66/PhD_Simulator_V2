@@ -245,12 +245,18 @@ export interface Buff {
   activeOperationSanDelta?: number;
   /** Fixed SAN adjustment for relationship operations. */
   relationshipOperationSanDelta?: number;
+  labExperimentMoneyDelta?: number;
+  scholarshipDisqualified?: boolean;
   /** Structured effects for the three paper actions. */
   actionEffects?: TemporaryActionEffectUpdates;
   /** Automatic score polishing applied to editable drafts and journal revisions. */
   paperPolishEffects?: Partial<Record<PaperActionType, number>>;
   /** Reading modifiers used by AI models and future reading equipment. */
   readingEffect?: ReadingEffect;
+  /** Shop cost exemptions supplied by temporary events. */
+  shopEffects?: {
+    aiCostsCovered?: boolean;
+  };
   /** Publication multipliers consumed by publication and citation settlement. */
   publicationEffects?: {
     nextPromotionMultiplier?: number;
@@ -396,6 +402,7 @@ export interface Paper {
   publication?: PaperPublicationState | null;
   /** Paper-bound citation debuff captured before submission. */
   citationDebuffMultiplierOnPublish?: number;
+  imageMisusePending?: boolean;
   lastReview?: PaperReviewResult | null;
   rejectionCount?: number;
   nonFirstAuthor?: boolean;
@@ -466,6 +473,7 @@ export interface EventChoice {
     nextPublicationPromotionMultiplier?: number;
     citationDebuffMultiplier?: number;
     draftCitationDebuffMultiplier?: number;
+    markDraftImageMisuse?: boolean;
     clearDraftProgress?: boolean;
     grantedPublication?: GrantedPublicationEffect;
     eventSupportUpdates?: Partial<EventSupportState>;
@@ -560,6 +568,16 @@ export interface PendingEvent {
   };
   paperCompetitionTargetId?: string;
   paperCompetitionResult?: { description: string; choiceLabel: string; paperTitle: string };
+  scholarshipContext?: {
+    year: number;
+    month: number;
+    score: number;
+    requirement: number;
+    reward: number;
+    scoreBaseline: number;
+    eligiblePaperIds: string[];
+    success: boolean;
+  };
   /** Buffs that exist only while this event chain remains unresolved. */
   pendingBuffs?: Buff[];
   removeBuffIdsOnCompletion?: string[];

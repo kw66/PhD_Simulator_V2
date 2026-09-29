@@ -55,14 +55,14 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
     })),
   });
 
-  return createThreeStageEvent(event, {
+  const stagedEvent = createThreeStageEvent(event, {
     introDescription: [
       "转博后的新学期，导师发来四位新生的材料，希望你带其中一位熟悉代码、实验和组会流程。群里刚拉进来的几个头像还很陌生，已经有人在问实验室怎么走。",
       "你翻开材料，入学照片一张比一张精神。电脑右下角又弹出导师的消息：“先认识一下，有问题多帮帮忙。”",
     ].join("\n\n"),
     decisionTitle: "选择一位新生",
     decisionDescription: [
-      "四份材料摊在眼前，有人已经做过小课题，有人还在跟着教程跑代码。那些入门时卡住自己的问题又冒了出来，你忽然很想告诉新生几条少走弯路的办法。可想到以后也有人追着自己问“这个报错怎么办”，刚冒头的成就感里又添了一点紧张。",
+      "四份材料里，有人做过小课题，有人还跟着教程跑代码。想起入门时踩过的坑，你很想教新生少走弯路。可想到以后有人追着问“这个报错怎么办”，成就感里又添了点紧张。",
       canAddJunior
         ? "你翻过现有的合作安排，还能接下一位新生。材料里写着各自的研究基础，相处是否投缘，也值得一起看看。"
         : "再看现有的合作安排，你已经顾不过来了。材料可以继续看，这次却接不下任何一位，只能请导师另作安排。",
@@ -74,4 +74,12 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
         : "你看完材料，还是没接下这次指导。眼下已有的合作还要顾，新生的安排只能请导师另找人选。",
     }])),
   });
+  const fellowCapacity = Math.max(0, state.relationshipState.unlockedSlots - 1);
+  const condition = `条件：合作人数 ${state.relationshipState.occupiedSlots} ${canAddJunior ? "<" : "≥"} ${fellowCapacity}`;
+  for (const choice of stagedEvent.choices[0]?.effects.enqueueEvents?.[0]?.choices ?? []) {
+    for (const result of choice.effects.enqueueEvents ?? []) {
+      result.description = result.description.replace("机制结算\n", `机制结算\n${condition}\n结果：`);
+    }
+  }
+  return stagedEvent;
 }

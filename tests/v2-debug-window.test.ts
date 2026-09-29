@@ -70,6 +70,49 @@ describe("independent debug window", () => {
     expect(renderDebugPanel({ ...state, eventHistory: [] }, true)).toContain("读研之始 ✓");
   });
 
+  it("separates attributes and papers with action points under other tools", () => {
+    const html = renderDebugPanel(createStartedGameState("normal"), true);
+    const attributes = html.match(/aria-label="属性调整">([\s\S]*?)<\/section>/)?.[1] ?? "";
+    const papers = html.match(/aria-label="新增论文">([\s\S]*?)<\/section>/)?.[1] ?? "";
+    const other = html.match(/aria-label="其他调试">([\s\S]*?)<\/section>/)?.[1] ?? "";
+    expect(html).toContain('class="debug-popup-columns"');
+    expect(attributes.match(/data-debug-value=/g)).toHaveLength(5);
+    expect(attributes).not.toMatch(/debug-adjust-action-points|debug-add-paper/);
+    expect(papers.match(/data-action="debug-add-paper"/g)).toHaveLength(12);
+    expect(papers).not.toMatch(/debug-adjust-stat|debug-adjust-action-points|debug-add-relationship/);
+    for (const action of ["debug-adjust-action-points", "debug-toggle-event-replay", "debug-shift-month", "force-next-month", "debug-add-relationship", "debug-add-all-buffs"]) {
+      expect(other).toContain(`data-action="${action}"`);
+    }
+    expect(other).not.toMatch(/debug-adjust-stat|debug-add-paper/);
+    for (const group of DEBUG_EVENT_GROUPS) {
+      expect(html).toContain(`<div class="debug-popup-event-buttons debug-popup-buttons"><h3>${group.title}</h3><button`);
+    }
+  });
+
+  it("keeps conference, journal and relationship shortcuts on separate rows", () => {
+    const html = renderDebugPanel(createStartedGameState("normal"), true);
+    const conference = html.match(/aria-label="新增会议论文">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const journal = html.match(/aria-label="新增期刊论文">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const relationships = html.match(/aria-label="新增人际与效果">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    expect(conference.match(/data-debug-paper-target=/g)).toHaveLength(6);
+    expect(conference).not.toContain("data-debug-journal-target");
+    expect(journal.match(/data-debug-journal-target=/g)).toHaveLength(6);
+    expect(journal).not.toContain("debug-add-relationship");
+    expect(relationships.match(/data-action="debug-add-relationship"/g)).toHaveLength(4);
+    expect(relationships).toContain('data-action="debug-add-all-buffs"');
+    expect(relationships).not.toContain("debug-add-paper");
+  });
+
+  it.each(["playing", "setup", "finished"] as const)("keeps session buttons at the top and available during %s", (phase) => {
+    const html = renderDebugPanel({ ...createStartedGameState("normal"), phase }, true);
+    for (const action of ["restart-game", "reset-game"]) {
+      expect(html.indexOf(`data-action="${action}"`)).toBeLessThan(html.indexOf('<fieldset'));
+      expect(html).not.toContain(`data-action="${action}" disabled`);
+      expect(html.match(new RegExp(`data-action="${action}"`, "g"))).toHaveLength(1);
+    }
+    if (phase !== "playing") expect(html).toContain('<fieldset class="debug-popup-tools" disabled>');
+  });
+
   it("disables tools on disconnection or outside a running game and escapes status logs", () => {
     const state = createStartedGameState("normal");
     state.log = [{ id: "unsafe", month: 0, text: '<script>alert("test")</script>' }];

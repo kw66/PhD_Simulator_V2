@@ -83,7 +83,7 @@ function createCareerChoices(state: GameState, careerType: CareerType): {
       label: option.text,
       outcome: progressGain > 0
         ? `${definition.name}进度 +${progressGain}，${sanChange < 0 ? formatActualSanChange(-option.sanCost, state.month, state.eventSupport, state.buffs) : "SAN 不变"}。`
-        : `这次尝试没有推进 ${definition.name} 进度。`,
+        : `${definition.name}进度 +0${sanChange < 0 ? `｜${formatActualSanChange(-option.sanCost, state.month, state.eventSupport, state.buffs)}` : ""}。`,
       effects: {
         san: sanChange,
         careerType,
@@ -138,8 +138,8 @@ function createCareerEvent(state: GameState, careerType: CareerType): PendingEve
     ].join("\n\n"),
     decisionTitle: "本月安排",
     decisionDescription: [
-      "你翻开日历，把组会和实验的时间先标出来。刚在招聘页面上看得心热，回到这张日程表，又有些发愁：原来这个月已经排了这么多事。",
-      "求职材料还摊在桌上，你把最想先处理的几项圈了出来。认真准备得留出整段时间，也得花些精力；你看着圈好的待办，想把以后的去处落实下来，又舍不得把这个月排得太满。",
+      "你在日历上标好组会和实验。刚看招聘还心热，回到日程表却发了愁：这个月已经排了这么多事。",
+      "你圈出几项求职待办。认真准备得留出整段时间和精力；想把去处落实，又舍不得把这个月排得太满。",
     ].join("\n\n"),
     results,
   });

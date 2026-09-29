@@ -109,7 +109,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("等待时每月做项目");
     expect(help).toContain("中稿当月开始新稿，退稿当月继续修改");
     expect(help).toContain("不足时改做横向，下月重新判断最低项并尝试科研");
-    expect(help).toContain("按卡片顺序结算");
+    expect(help).toContain("按卡片顺序扣经费");
     expect(help).toContain("审稿3个月");
     expect(help).not.toContain("仅同学自主科研间隔2个月");
     expect(help).toContain("每位同学每月可主动协作一次");
@@ -121,10 +121,7 @@ describe("v2 research rule details and publication metrics", () => {
 
   it("documents mentor funding, paper contributions and the annual grant timeline", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain("科研积累从20开始");
     expect(help).toContain("你和同学发表论文，按科研分增加导师积累");
-    expect(help).toContain("科研经费初始10");
-    expect(help).toContain("没有上限");
     expect(help).toContain("项目进度满100才结算");
     expect(help).toContain("对应进度+100。满条奖励单独记入项目完成日志");
     expect(help).toContain("横向基础SAN-8、纵向基础SAN-6，享受科研档位减免");
@@ -132,7 +129,8 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("纵向完成后导师科研积累增加当前值的10%");
     expect(help).toContain("实验基础花费3金币");
     expect(help).toContain("纵向项目满100时，导师为玩家和每位同学各随机选择一篇论文，写作协作+10");
-    expect(help).toContain("同学做实验每次经费-3，不足3时改做横向");
+    expect(help).toContain("玩家与同学每次实验费用+1");
+    expect(help).toContain("同学经费不足当次实验费用时改做横向");
     expect(help).toContain("导师、同学和你共同推进卡片上的两条项目进度");
     expect(help).not.toContain("每月为玩家和每位同学各提供一次论文指导");
     expect(help).toContain("每年按科研积累申请");
@@ -160,11 +158,13 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("×1.5算+0.5，×0.8算−0.2");
     expect(help).toContain("两个×1.5合并为×2");
     expect(help).toContain("不额外扣行动点或SAN");
-    expect(help).toContain("实验基础费用3金币，优先用导师经费，不足部分自付；按钮显示你实际承担的金币");
+    expect(help).toContain("实验基础费用3金币");
+    expect(help).toContain("优先用导师经费，不足部分自付；按钮显示你实际承担的金币");
+    expect(help).toContain("算力短缺持续6个月，玩家与同学每次实验费用+1");
     expect(help).toContain("实验金币也只收一次");
     expect(help).toContain("个人显卡RTX4090起每次实验减1金币，H20起减2");
     expect(help).toContain("远程实习期间再减1，最低0");
-    expect(help).toContain("先算减免，再扣导师经费，最后扣你的金币");
+    expect(help).toContain("减免仅限玩家，不影响同学；先算共享涨价与个人减免，再扣导师经费，最后扣你的金币");
     expect(help).toContain("每遍都重新生成分数");
     expect(help).toContain("每遍与上一遍自身分+1取最大值");
     expect(help).toContain("总次数=1+⌊n⌋，n为额外次数之和，至少执行1次");
@@ -378,18 +378,18 @@ describe("v2 research rule details and publication metrics", () => {
     expect(notes).toContain("开会后才启用录用与推广加成");
     expect(notes).toContain("会议开会前挂arXiv，录用/推广部分先按×1");
     expect(notes).toContain("每月引用增长=当前分×0.05×总引用倍率");
-    expect(notes).toContain("小数留到下月，累积满1才增加引用");
+    expect(notes).toContain("小数累积满1才增加引用");
     expect(notes).toContain("尚未公开时总引用倍率显示0");
     expect(notes).toContain("Poster/Spotlight×1");
     expect(notes).toContain("Oral×1.5");
     expect(notes).toContain("BestPaper/Candidate×5");
     expect(notes).toContain("期刊×1");
-    expect(notes).toContain("GitHub增加当前分的25%（增加量向下取整），录用分不变");
+    expect(notes).toContain("GitHub：增加当前分的25%（增加量向下取整），录用分不变");
     expect(notes).toContain("录用/推广倍率+0.25");
     expect(notes).toContain("Oral从×1.5变为×1.75");
     expect(notes).toContain("当前分每4个月衰减10%");
     expect(notes).toContain("尚未公开也会衰减");
-    expect(notes).toContain("向上取整，扣后最低0");
+    expect(notes).toContain("向上取整，最低0");
     expect(notes).toContain("该月先算引用，再扣分");
     expect(notes).toContain("ESI高被引");
     expect(notes).toContain("发表满12个月后");

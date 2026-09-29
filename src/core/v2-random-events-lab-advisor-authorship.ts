@@ -26,7 +26,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
       {
         id: `random-12-complain-${serial}`,
         label: "向导师诉苦",
-        outcome: lowFavor ? "下次想 idea -5。" : "无事发生。",
+        outcome: lowFavor ? "导师好感 < 6｜下次想 idea -5。" : "导师好感 ≥ 6｜无事发生。",
         effects: lowFavor
           ? {
             temporaryActionEffectUpdates: {
@@ -44,7 +44,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
       {
         id: `random-12-argue-${serial}`,
         label: "据理力争",
-        outcome: lowFavor ? `${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。` : "无事发生。",
+        outcome: lowFavor ? `导师好感 < 6｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。` : "导师好感 ≥ 6｜无事发生。",
         effects: lowFavor ? { san: argueSanChange } : {},
       },
       {
@@ -67,26 +67,24 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
     decisionTitle: "你的选择",
     decisionDescription: [
       [
-        "聊天框里打了半句，又被你删掉。你把分工记录截好图，心里堵着一句：说好的事，怎么就改了？",
+        "你删掉聊天框里的半句话，截好分工记录：说好的事，怎么就改了？",
         lowFavor
-          ? "平时和导师说不上几句，这回恐怕免不了来回解释。只诉苦，谈完也容易把委屈带回工位，搅乱研究的思绪；逐项讲道理能守住署名，却也得耗上一番心力。"
-          : "你和导师平时沟通还算顺畅，先前也认真谈过分工。把难处说清，或把记录摊开核对，都有希望平和地把署名改回来。",
+          ? "平时和导师说不上几句，这回免不了解释。只诉苦，委屈怕会搅乱研究思绪；逐项讲道理能守住署名，却也得耗一番心力。"
+          : "你和导师平时沟通顺畅，也谈过分工。说清难处或摊开记录，都有希望平和地把署名改回来。",
       ].join(""),
-      "名单上的人每天都在实验室碰面，把别人的名字往后挪，眼前的事或许能解决，往后见面却难免尴尬。若拿后续工作施压，连劳务费一起谈清，话一旦说重了，和导师之间也很难像从前那样自在。",
+      "把别人的名字往后挪能解眼前的难，可每天在实验室碰面，难免尴尬。拿后续工作施压，连劳务费一起谈清也行，只是话说重了，和导师就难再像从前那样自在。",
     ].join("\n\n"),
     results: {
       [`random-12-complain-${serial}`]: {
         title: "向导师诉苦",
         description: !lowFavor
           ? [
-              "你把先前的分工记录递过去，说到最后，还是没忍住补了一句：“这篇我真的想守住一作。”",
-              "导师往上翻了翻聊天记录：“一作按原来的安排，我挂通讯。”你原本还准备了一大段话，这下都省了。",
-              "收到改好的名单后，你又核对了一遍。这次总算不用盯着那一行字发愣了。",
+              "你递过分工记录，还是没忍住补了一句：“这篇我真的想守住一作。”",
+              "导师翻了翻记录：“一作按原来的安排，我挂通讯。”你准备的一大段话都省了，收到名单又核对了一遍，总算不用盯着那行字发愣。",
             ].join("\n\n")
           : [
-              "你把原先的约定找出来，尽量平静地讲自己的难处。讲到一半，才发现同一句话已经解释了两遍。",
-              "导师同意把一作改回来，又提醒你以后早点确认署名。你点点头，把改好的名单存了下来。",
-              "回到工位想新方案，脑子里却还在重播刚才的对话。光标闪了半天，你只删掉了一个句号。",
+              "你找出原先的约定，尽量平静地讲难处，同一句话却解释了两遍。导师同意改回一作，提醒你以后早点确认。",
+              "你存好名单，回工位想新方案，脑子里却还在重播刚才的对话。光标闪了半天，你只删掉了一个句号。",
             ].join("\n\n"),
       },
       [`random-12-transfer-${serial}`]: {

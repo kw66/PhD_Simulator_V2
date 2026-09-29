@@ -31,3 +31,7 @@ export function describeTalentChange(label: string, before: number, after: numbe
   const delta = after - before;
   return `${label}${delta > 0 ? "+" : ""}${delta}（${before}→${after}）`;
 }
+
+export function describeTalentReward(label: string, reward: number, before: number, after: number): string {
+  return `${label}${reward > 0 ? "+" : ""}${reward}（${before}→${after}）`;
+}

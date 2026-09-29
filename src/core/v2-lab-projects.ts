@@ -1,9 +1,11 @@
 import { getAdvisorGuidanceAmount, queueAdvisorGuidance, settleAdvisorGuidance } from "./v2-advisor-guidance";
+import { pushMilestoneLog } from "./v2-engine-helpers";
 import type { GameState } from "./v2-types";
 
 export const PROJECT_PROGRESS_MAX = 100;
 export const ADVISOR_HORIZONTAL_REWARD = 20;
 export const PROJECT_LABOR_REWARD = 5;
+export const LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD = 20;
 export type LabProjectType = "horizontal" | "vertical";
 
 export function advanceSharedLabProject(
@@ -34,6 +36,7 @@ export function advanceSharedLabProject(
       };
       completionSummary = `科研经费 +${ADVISOR_HORIZONTAL_REWARD}；金币 +${PROJECT_LABOR_REWARD}`;
     } else {
+      nextState = settleAdvisorGuidance(nextState, random);
       const accumulation = nextState.advisorProgressState.researchAccumulation;
       nextState = {
         ...nextState,
@@ -42,22 +45,18 @@ export function advanceSharedLabProject(
           researchAccumulation: accumulation + Math.floor(accumulation * 0.1),
         },
       };
-      nextState = settleAdvisorGuidance(queueAdvisorGuidance(settleAdvisorGuidance(nextState, random)), random);
-      const guidanceSummary = nextState.selectedAdvisorName
-        ? nextState.advisorProgressState.pendingGuidanceToPlayer != null
-          ? `；论文写作协作待使用（${getAdvisorGuidanceAmount()}分）`
-          : `；论文写作协作 +${getAdvisorGuidanceAmount()}`
-        : "";
-      completionSummary = `科研积累 +${Math.floor(accumulation * 0.1)}${guidanceSummary}`;
+      completionSummary = `科研积累 +${Math.floor(accumulation * 0.1)}`;
     }
-    nextState = {
-      ...nextState,
-      log: [{
-        id: `lab-project-${type}-${nextState.totalMonths}-${nextState.log.length}`,
-        month: nextState.totalMonths,
-        text: `${type === "horizontal" ? "横向" : "纵向"}项目完成：${completionSummary}`,
-      }, ...nextState.log],
-    };
+    nextState = pushMilestoneLog(nextState,
+      `${type === "horizontal" ? "横向" : "纵向"}项目完成：${completionSummary}`, `lab-project-${type}`);
+    if (type === "vertical") {
+      const previousPending = nextState.advisorProgressState.pendingGuidanceToPlayer;
+      nextState = settleAdvisorGuidance(queueAdvisorGuidance(nextState), random);
+      if (previousPending == null && nextState.advisorProgressState.pendingGuidanceToPlayer != null) {
+        nextState = pushMilestoneLog(nextState,
+          `导师指导：你的论文写作协作待使用（${getAdvisorGuidanceAmount()}分）`, "advisor-guidance-pending");
+      }
+    }
   }
   return { state: nextState, gain, completed };
 }

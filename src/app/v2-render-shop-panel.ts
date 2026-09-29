@@ -5,7 +5,7 @@ import {
   getCoffeeMachineSellPrice,
   getCoffeeSanGain,
 } from "../core/v2-coffee-system";
-import { getAiModelForTotalMonths } from "../core/v2-ai-shop";
+import { getAiModelForTotalMonths, hasAiReimbursement } from "../core/v2-ai-shop";
 import { isPreEnrollmentState } from "../core/v2-progression";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "../core/v2-development-flags";
 import anthropicIcon from "../assets/ai/anthropic.svg?raw";
@@ -890,7 +890,7 @@ function renderAiRows(state: GameState): string {
   const rows = slots.map((slot) => {
     const model = getAiModelForTotalMonths(state.totalMonths, slot);
     const subscription = state.aiShopState.subscriptions[slot];
-    const reimbursed = state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths;
+    const reimbursed = hasAiReimbursement(state);
     const price = getShopActionPrice(state, "buy-ai-month", { aiSlotId: slot })!;
     const purchasedThisMonth = subscription.active;
     const effectText = renderAiEffectText(model);

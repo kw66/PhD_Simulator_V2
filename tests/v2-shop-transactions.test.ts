@@ -48,16 +48,15 @@ describe("v2 shop transactions", () => {
     expect(dispatchAction(poor, "buy-coffee").player).toEqual(poor.player);
   });
 
-  it("allows shop interactions before enrollment during development", () => {
+  it("blocks shop interactions before enrollment", () => {
     let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
     state = { ...state, player: { ...state.player, money: 5 } };
 
     const bought = dispatchAction(state, "buy-ai-month", { aiSlotId: "gpt" });
-    expect(bought.aiShopState.subscriptions.gpt.active).toBe(true);
-    expect(bought.player.money).toBe(3);
+    expect(bought).toEqual(state);
 
     const toggled = dispatchAction(state, "toggle-ai-subscription", { aiSlotId: "gpt" });
-    expect(toggled.aiShopState.subscriptions.gpt.enabled).toBe(true);
+    expect(toggled).toEqual(state);
   });
 
   it("selects the six-year model milestones for each provider", () => {

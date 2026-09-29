@@ -1,6 +1,7 @@
 import { settleFellowCoauthoredPapers } from "./v2-lab-talent";
+import { settlePublishedImageMisuse } from "./v2-academic-integrity";
 import { clampResearchToCap, getResearchCap } from "./v2-research-cap-system";
-import { describeTalentChange, recordTalentTrigger } from "./v2-talent-history";
+import { describeTalentReward, recordTalentTrigger } from "./v2-talent-history";
 import type { GameState, Paper } from "./v2-types";
 
 export interface PublicationTalentReward {
@@ -74,6 +75,7 @@ export function getPublicationTalentChecklist(state: GameState): PublicationTale
 }
 
 export function applyPublicationTalentRewards(state: GameState): GameState {
+  state = settlePublishedImageMisuse(state);
   state = settleFellowCoauthoredPapers(state);
   const claimed = new Set(state.publicationTalentState?.claimedIds ?? []);
   const newlyCompleted = getPublicationTalentChecklist(state).filter((item) => item.completed && !claimed.has(item.id));
@@ -115,8 +117,7 @@ export function applyPublicationTalentRewards(state: GameState): GameState {
       const before = values[stat];
       const applied = Math.min(nominal, Math.max(0, finalValues[stat] - before));
       values[stat] += applied;
-      return [applied > 0 ? describeTalentChange(labels[stat], before, values[stat])
-        : `${labels[stat]}已达上限（${before}）`];
+      return [describeTalentReward(labels[stat], nominal, before, values[stat])];
     });
     recordedState = recordTalentTrigger(recordedState, `publication:${item.id}`, {
       name: item.name, recipient: state.playerName ? `你·${state.playerName}` : "你", reason: item.description, effects,

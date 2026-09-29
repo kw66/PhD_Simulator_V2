@@ -23,20 +23,22 @@ export function buildInternshipInviteContext(
 function createInternshipDeclineResult(context: InternshipInviteContext): PendingEvent {
   const nextRejectCount = context.rejectedInternshipCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
+  const condition = `条件：本次拒绝后，实习拒绝次数 ${context.rejectedInternshipCount} + 1 = ${nextRejectCount} ${permanentlyBlocked ? "≥" : "<"}2`;
+  const result = `结果：实习拒绝计数 +1（当前 ${nextRejectCount}/2）；${permanentlyBlocked ? "永久关闭实习机会" : "保留后续邀请机会"}`;
   const description = permanentlyBlocked
     ? [
         "你再次婉拒了实习邀请，说明目前还是顾不过来。回复写到最后，你删掉了‘下次一定’，免得又给对方一个含糊的答复。",
         "这回你也把话说清楚了，之后不再考虑这类实习。关掉邮件时有点可惜，不过桌上没整理完的实验记录还等着你。",
         "机制结算",
-        `实习拒绝计数 +1（当前 ${nextRejectCount}/2）`,
-        "达到 2 次后，实习机会永久关闭。",
+        condition,
+        result,
       ].join("\n\n")
     : [
         "你把课题安排说明白，婉拒了这次实习。发送前又看了眼报酬那一栏，才把鼠标移回发送键。",
         "对方表示以后还可以联系。你关掉附件，继续整理实验记录，今晚的待办总算没有再多一份。",
         "机制结算",
-        `实习拒绝计数 +1（当前 ${nextRejectCount}/2）`,
-        "下次企业交流还有一次机会。",
+        condition,
+        result,
       ].join("\n\n");
 
   return {
@@ -68,10 +70,10 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
       "你确认了远程实习安排，把每周交付记进日历。公司的工作群很快发来欢迎消息，你刚回完‘请多指教’，就收到了第一份任务文档。",
       "课题还得继续，项目也要交差。你把两边的待办放到一起，才发现最难安排的不是工作地点，而是晚上几点能合上电脑。",
       "机制结算",
-      "实习周期：6 个月",
-      "实习期间：做实验分数 ×1.25",
-      `每月收益：金币 +${context.currentMonthlyIncome}`,
-      "每月压力：SAN -2",
+      "结果：实习周期：6 个月",
+      "结果：实习期间：做实验分数 ×1.25",
+      `结果：每月收益：金币 +${context.currentMonthlyIncome}`,
+      "结果：每月压力：SAN -2",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -99,8 +101,8 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
     id: `internship-invite-act2-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择",
     description: [
-      `你把实习任务和实验计划并排打开。对方参考了你的一作A类论文，给这份六个月的远程实习开出每月 ${context.currentMonthlyIncome} 金币的报酬。项目里的方法很熟悉，真用到公司业务里又是另一回事；想到能亲手试试，你有点跃跃欲试。`,
-      "再看一眼组会日期，刚才的兴奋里又混进些心虚。远程省了搬家的麻烦，每周交付却照样要做。" + (context.unavailable
+      `对方参考你的一作A类论文，为六个月的远程实习开出每月 ${context.currentMonthlyIncome} 金币。熟悉的方法真用到公司业务里又是另一回事，你有点跃跃欲试。`,
+      "再看组会日期，你又有些心虚。远程省了搬家，每周交付却照样要做。" + (context.unavailable
         ? "可先前的安排还摆在那里，这回实在接不下来。"
         : "你在日历上找了又找，想挪出几个完整的晚上。") + warningText,
     ].join("\n\n"),

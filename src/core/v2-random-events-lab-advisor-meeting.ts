@@ -2,7 +2,7 @@
   createThreeStageRandomEvent,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
-import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
+import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -13,10 +13,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   const advisorPresentForSlack = getRoll() < 0.5;
   const preparedSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const preparedSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
-  const preparedSanNarrative = getResearchMiscSanNarrative(-2, state.player.research);
   const seriesSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const seriesSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
-  const seriesSanNarrative = getResearchMiscSanNarrative(-4, state.player.research);
   const preparedFavorResult = applyTierResist(1, state.player.favor, getRoll);
   const preparedFavorChange = preparedFavorResult.effectiveChange;
   const preparedFavorNarrative = getTierResistedNarrative("导师好感", 1, preparedFavorResult);
@@ -33,7 +31,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   const event: PendingEvent = {
     id: `random-6-y${state.year}-m${state.month}-n${serial}`,
     title: "组会汇报",
-    description: "群里发来明天的组会顺序，你的名字排在第一个。PPT 已经有了封面和“谢谢聆听”，中间还空着😅。",
+    description: "这几天忙着调代码、等实验，转眼又到了组会前一天。你正准备收工，课题组群弹出汇报顺序：明天第一个就是你。PPT 已经有了封面和“谢谢聆听”，中间还空着😅。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -44,8 +42,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-deep-${serial}`,
         label: "认真准备",
         outcome: advisorPresentForPrepared
-          ? `导师到场｜${preparedSanSummary}；${formatTierResistedOutcome("导师好感", 1, preparedFavorResult)}`
-          : `导师缺席｜${preparedSanSummary}`,
+          ? `导师到场（50%）｜${preparedSanSummary}；${formatTierResistedOutcome("导师好感", 1, preparedFavorResult)}`
+          : `导师缺席（50%）｜${preparedSanSummary}`,
         effects: advisorPresentForPrepared
           ? { san: preparedSanChange, favor: preparedFavorChange }
           : { san: preparedSanChange },
@@ -54,8 +52,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-series-${serial}`,
         label: "讲系列论文",
         outcome: advisorPresentForSeries
-          ? `导师到场｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}；${formatTierResistedOutcome("导师好感", 1, seriesFavorResult)}`
-          : `导师缺席｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}`,
+          ? `导师到场（50%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}；${formatTierResistedOutcome("导师好感", 1, seriesFavorResult)}`
+          : `导师缺席（50%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}`,
         effects: advisorPresentForSeries
           ? { san: seriesSanChange, research: researchChange, favor: seriesFavorChange }
           : { san: seriesSanChange, research: researchChange },
@@ -64,8 +62,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-slack-${serial}`,
         label: "随便水一下",
         outcome: advisorPresentForSlack
-          ? `导师到场｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
-          : "导师缺席｜无事发生。",
+          ? `导师到场（50%）｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
+          : "导师缺席（50%）｜无事发生。",
         effects: advisorPresentForSlack && slackFavorChange < 0 ? { favor: slackFavorChange } : {},
       },
     ],
@@ -73,13 +71,13 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
 
   return createThreeStageRandomEvent(event, {
     introDescription: [
-      "群里发来明天的组会顺序，你的名字排在第一个。打开 PPT，封面和“谢谢聆听”都在，中间还没几页能讲的。",
+      "这几天忙着调代码、等实验，转眼又到了组会前一天。你正准备收工，课题组群弹出汇报顺序：明天第一个就是你。打开 PPT，封面和“谢谢聆听”都在，中间还没几页能讲的。",
       "工位旁的人已经收包去吃饭了，你还在翻记录和待读论文。有人问明天导师来不来，群里暂时没人回复。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      "实验记录里有几张能用的图，最近看的几篇论文也正好接得上。认真核对一遍，明天被问到至少能答上来；若把几篇串成系列，今晚得多熬一阵，却也能替自己理清这个方向。附录在浏览器里开了一排，饭点已经过了。",
-      "你把鼠标移到一张现成的图上，真想直接复制过去收工。可那条曲线连自己都没看明白，若导师坐在台下，恐怕两句就会问住你。群里仍没说他来不来；真不来，准备再多他也看不到，草草讲几页倒可能就这么过去。",
+      "实验图和最近读的论文都能用。认真核对，明天被问到至少能答上来；串成系列得多熬一阵，却能理清这个方向。附录开了一排，饭点已经过了。",
+      "鼠标停在现成的图上，你真想复制过去收工。可曲线连自己都没看明白，导师两句就能问住。群里仍没说他来不来；真不来，准备再多他也看不到，草草讲几页倒可能就这么过去。",
     ].join("\n\n"),
     results: {
       [`random-6-deep-${serial}`]: {
@@ -90,24 +88,21 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
             ? "导师来了，问的问题恰好有几处是你昨晚核对过的。你顺着记录答完，把剩下的建议记在页边，散会后才松开一直攥着的翻页笔。"
             : "导师临时没来。你照样讲完，同门问到一处标注时，你们凑近屏幕才发现坐标轴没写单位。昨晚检查了那么久，偏偏漏了这个。",
           ...(advisorPresentForPrepared && preparedFavorNarrative ? [preparedFavorNarrative] : []),
-          ...(preparedSanNarrative ? [preparedSanNarrative] : []),
         ].join("\n\n"),
       },
       [`random-6-series-${serial}`]: {
         title: "系列汇报",
         description: advisorPresentForSeries
           ? [
-              "你把几篇论文列成一张对比表，补充材料也翻到了最后。原本各看各的都挺有道理，放在一起才发现实验条件不一样。",
-              "导师果然指着两项相反的结论追问。你翻出昨晚核对的设置，总算答了上来；散会时又把那张表存好，以后读这个方向不用重找一遍。",
+              "你翻完补充材料，列出对比表。各看各的都有道理，放在一起才发现实验条件不一样。",
+              "你翻出昨晚核对的设置，答上了导师对相反结论的追问。这张表以后也用得上。",
               ...(researchNarrative ? [researchNarrative] : []),
               ...(seriesFavorNarrative ? [seriesFavorNarrative] : []),
-              ...(seriesSanNarrative ? [seriesSanNarrative] : []),
             ].join("\n\n")
           : [
               "你熬夜把几篇论文列成对比表，连实验设置里的小字也抄了上去。第二天刚接好投影，群里通知导师临时不来。",
               "本以为会很快讲完，同门却围着那张表讨论了好一会儿，还补上两篇遗漏。你困得揉眼睛，手上还是把题目记了下来。",
               ...(researchNarrative ? [researchNarrative] : []),
-              ...(seriesSanNarrative ? [seriesSanNarrative] : []),
             ].join("\n\n"),
       },
       [`random-6-slack-${serial}`]: {

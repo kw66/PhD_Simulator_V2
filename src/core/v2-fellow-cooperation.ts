@@ -1,4 +1,4 @@
-import { pushLog } from "./v2-engine-helpers";
+import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
 import { addPaperCollaboration } from "./v2-paper-collaboration";
 import type { FellowProgressProfile, GameState, Paper, PaperActionType } from "./v2-types";
@@ -38,6 +38,25 @@ export function advanceFellowCooperation(profile: FellowProgressProfile, amount:
   };
 }
 
+export function advanceFellowCooperationWithLog(state: GameState, fellowId: string, amount: number): GameState {
+  const profile = state.fellowProgressState.find((fellow) => fellow.id === fellowId);
+  if (!profile || amount <= 0) return state;
+  const progressed = advanceFellowCooperation(profile, amount, state.player.research);
+  const nextState = { ...state, fellowProgressState: state.fellowProgressState.map((fellow) => fellow.id === fellowId ? progressed : fellow) };
+  const completed = Math.floor((profile.taskProgress + Math.floor(amount)) / profile.taskMax);
+  if (completed <= 0) return nextState;
+  const name = getFellowName(profile);
+  const playerHelp = profile.pendingHelpToPlayer != null
+    ? `已有${name}帮你的论文帮助待生效（${profile.pendingHelpToPlayer}分），不叠加`
+    : `${name}帮你的论文帮助已就绪（${progressed.pendingHelpToPlayer}分）`;
+  const fellowHelp = profile.pendingHelpToFellow != null
+    ? `已有你帮${name}的论文帮助待生效（${profile.pendingHelpToFellow}分），不叠加`
+    : `你帮${name}的论文帮助已就绪（${progressed.pendingHelpToFellow}分）`;
+  return pushMilestoneLog(nextState,
+    `科研协作完成：${name}，协作进度满${profile.taskMax}${completed > 1 ? `（${completed}次）` : ""}；${playerHelp}；${fellowHelp}`,
+    "fellow-cooperation");
+}
+
 function settleFellowHelpPass(state: GameState, random: () => number): GameState {
   if (state.phase !== "playing") return state;
   let nextState = state;
@@ -54,8 +73,8 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
         });
         if (paper !== target.paper) {
           profile = { ...profile, pendingHelpToPlayer: null, helpedPlayerCount: (profile.helpedPlayerCount ?? 0) + 1 };
-          nextState = pushLog({ ...nextState, papers: nextState.papers.map((entry) => entry.id === paper.id ? paper : entry) },
-            `论文帮助：${getFellowName(profile)}帮你完善《${paper.title}》，${SCORE_LABELS[target.field]}+${amount}`);
+          nextState = pushMilestoneLog({ ...nextState, papers: nextState.papers.map((entry) => entry.id === paper.id ? paper : entry) },
+            `论文帮助：${getFellowName(profile)}帮你完善《${paper.title}》，${SCORE_LABELS[target.field]}+${amount}`, "fellow-help");
         }
       }
       if (amount === 0) profile = { ...profile, pendingHelpToPlayer: null };
@@ -73,8 +92,8 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
         });
         if (paper !== target.paper) {
           profile = { ...profile, pendingHelpToFellow: null, helpedFellowCount: (profile.helpedFellowCount ?? 0) + 1 };
-          nextState = pushLog({ ...nextState, fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? paper : entry) },
-            `论文帮助：你帮${getFellowName(profile)}完善《${paper.title}》，${SCORE_LABELS[target.field]}+${amount}`);
+          nextState = pushMilestoneLog({ ...nextState, fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? paper : entry) },
+            `论文帮助：你帮${getFellowName(profile)}完善《${paper.title}》，${SCORE_LABELS[target.field]}+${amount}`, "fellow-help");
         }
       }
       if (amount === 0) profile = { ...profile, pendingHelpToFellow: null };

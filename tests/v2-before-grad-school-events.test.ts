@@ -54,7 +54,7 @@ describe("v2 before grad school events", () => {
     expect(act1.description).toContain("预推免");
     expect(act1.description).toContain("心仪学校的预录取");
     expect(act1.description).toContain("有人答应入组后去了别处");
-    expect(act1.description).toContain("才被告知老师没了名额");
+    expect(act1.description).toContain("才得知老师没了名额");
     expect(act1.description.indexOf("夏令营")).toBeLessThan(act1.description.lastIndexOf("预推免"));
     expect(act1.description).not.toContain("年级群");
     expect(act1.description).not.toContain("推免资格名单");

@@ -5,6 +5,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { renderApp } from "../src/app/v2-render";
 import { createTeachersDayEvent } from "../src/core/v2-fixed-events-teachers-day";
 import { enqueuePendingEvents } from "../src/core/v2-event-enqueue";
+import { createIllnessRandomEvent } from "../src/core/v2-random-events-core-health";
 
 function startGame() {
   return dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
@@ -18,6 +19,61 @@ function resolveFirstChoice(state: ReturnType<typeof startGame>, chainId = "teac
 }
 
 describe("debug event scene replay", () => {
+  describe.each([false, true])("illness branch replay with spike chair %s", (spike) => {
+    it.each(["stomach", "flu", "fever"] as const)("preserves %s branch identities after later random events change the counter", (illness) => {
+      const initial = startGame();
+      let state: ReturnType<typeof startGame> = {
+        ...initial,
+        month: 1,
+        totalMonths: 1,
+        totalRandomEventCount: 7,
+        eventQueue: [],
+        debugEventReplayEnabled: true,
+        player: { ...initial.player, san: 3, money: 20 },
+        shopState: { ...initial.shopState, chairOwned: spike, chairUpgrade: spike ? "spike" as const : null },
+      };
+      const root = createIllnessRandomEvent(state, () => 0, illness);
+      state = { ...enqueuePendingEvents(state, [root]).nextState, totalRandomEventCount: 9 };
+      state = resolveFirstChoice(state, root.chainId);
+      const decision = state.eventQueue.find((event) => event.chainId === root.chainId)!;
+      const choices = decision.choices;
+      state = resolveFirstChoice(state, root.chainId);
+
+      for (const choice of choices) {
+        const previous = state.eventQueue.find((event) => event.chainId === root.chainId)!;
+        state = dispatchAction(state, "debug-replay-event", {
+          eventId: previous.id,
+          eventHistoryIndex: 1,
+          eventChoiceId: choice.id,
+        });
+        const result = state.eventQueue.find((event) => event.chainId === root.chainId)!;
+        expect(result.history?.at(-1)?.selectedChoiceId).toBe(choice.id);
+        expect(result.title).toContain(choice.label);
+        expect(result.description.split("机制结算\n")[1]).toBe(choice.outcome);
+        expect(state.totalRandomEventCount).toBe(9);
+        expect(state.sanCap).toBe(initial.sanCap);
+        expect(state.player.money).toBe(20);
+
+        const html = renderApp(state, createDefaultAccountProfile(), { isEventContentOpen: true, activeEventId: result.id });
+        expect(html).toContain(choice.label);
+        const settled = resolveFirstChoice(state, root.chainId);
+        expect(settled.sanCap).toBe(initial.sanCap + (choice.effects.sanCapDelta ?? 0));
+        expect(settled.player.money).toBe(20 + (choice.effects.money ?? 0));
+        expect(settled.totalRandomEventCount).toBe(9);
+        expect(settled.eventHistory.at(-1)?.stages.at(-1)?.description).toBe(result.description);
+        if (choice.label === "硬撑工作") {
+          expect(settled.buffs.some((buff) => buff.id === root.pendingBuffs![0]!.id)).toBe(true);
+        } else {
+          expect(settled.buffs.some((buff) => buff.id === root.pendingBuffs![0]!.id)).toBe(false);
+        }
+        if (spike) {
+          expect(settled.phase).toBe("playing");
+          expect(settled.player.san).toBeGreaterThan(0);
+        }
+      }
+    });
+  });
+
   it("rerolls random outcomes when replaying a debug event", () => {
     let state = dispatchAction(startGame(), "debug-toggle-event-replay", { debugEventReplayEnabled: true });
     const random = vi.spyOn(Math, "random");

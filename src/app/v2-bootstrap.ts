@@ -22,12 +22,14 @@ import {
   Clock3,
   Coffee,
   Coins,
+  Cpu,
   createIcons,
   Crown,
   Database,
   Dumbbell,
   Eye,
   Feather,
+  Files,
   FileText,
   Flame,
   FlaskConical,
@@ -55,6 +57,7 @@ import {
   MessagesSquare,
   Microscope,
   Microchip,
+  Monitor,
   MoveUpRight,
   Network,
   NotebookPen,
@@ -1008,11 +1011,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
         Clock3,
         Coffee,
         Coins,
+        Cpu,
         Crown,
         Database,
         Dumbbell,
         Eye,
         Feather,
+        Files,
         FileText,
         Flame,
         FlaskConical,
@@ -1040,6 +1045,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         MessagesSquare,
         Microscope,
         Microchip,
+        Monitor,
         MoveUpRight,
         Network,
         NotebookPen,
@@ -1162,6 +1168,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
       aiSlotId: typeof dataset.aiSlotId === "string" ? dataset.aiSlotId as AiSlotId : undefined,
       supportItemId: typeof dataset.supportItemId === "string" ? dataset.supportItemId as SupportItemId : undefined,
     });
+    if (actionId === "resolve-event" && dataset.eventChoiceId === "before-grad-school-finish") {
+      const afterEnrollmentConfirmation = store.getState();
+      if (afterEnrollmentConfirmation.phase === "playing" && isPreEnrollmentState(afterEnrollmentConfirmation)) {
+        animateEventPanelAfterNextMonth = activePlayTab === "events";
+        store.dispatch("next-month");
+      }
+    }
     if ((actionId === "start-game" || actionId === "restart-game") && debugWindow.isOpen()) {
       store.markCurrentRunAsDebugged();
     }

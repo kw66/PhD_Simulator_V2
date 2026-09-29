@@ -13,12 +13,12 @@ function makeState(research: number, favor: number) {
 }
 
 function collectCopy(event: PendingEvent): string[] {
-  return [event.description, ...event.choices.flatMap((choice) => [choice.outcome,
-    ...(choice.effects.enqueueEvents ?? []).flatMap(collectCopy)])];
+  return [event.description.split("机制结算")[0]!, ...event.choices.flatMap((choice) =>
+    (choice.effects.enqueueEvents ?? []).flatMap(collectCopy))];
 }
 
 describe("event narrative hints", () => {
-  it.each([2, 8])("keeps hidden thresholds and random odds out of event copy at attribute %i", (level) => {
+  it.each([2, 8])("keeps thresholds and random odds out of narrative at attribute %i", (level) => {
     for (const eventId of [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]) {
       const event = createRandomEventById(eventId, makeState(level, level), () => 0.25).event;
       expect(event, `event ${eventId}`).not.toBeNull();

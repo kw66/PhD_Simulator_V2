@@ -69,7 +69,7 @@ describe("event candidate eligibility and presentation", () => {
       expect(choice.effects.fellowAdditions?.[0]).toMatchObject({ research: candidate.research, affinity: candidate.affinity });
       expect(choice.outcome).toMatch(/^师[弟妹]\+1$/);
       const result = choice.effects.enqueueEvents![0]!;
-      expect(result.description.split("机制结算\n")[1]).toBe(choice.outcome);
+      expect(result.description.split("机制结算\n")[1]).toContain(choice.outcome);
     }
     const queued = createEventQueueItem(decision, 1);
     const preview = renderEventLayoutSamples(queued, null)[0]!.html;

@@ -1,4 +1,6 @@
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
+import { hasScholarshipDisqualification } from "./v2-academic-integrity";
+import { pushMilestoneLog } from "./v2-engine-helpers";
 import { createCustomFellowProgressProfile, getFellowName, getUniqueFellowName } from "./v2-fellow-progression";
 import { applyFixedEventResolution } from "./v2-fixed-events";
 import { getGraduationScoreTarget, getMonthLimitByDegree, getRoleDefinition } from "./v2-progression";
@@ -10,7 +12,7 @@ import { clampResearchToCap } from "./v2-research-cap-system";
 import { applyReadPaperActions, applyReadingCountProgress } from "./v2-reading-system";
 import { canAddRelationship, syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
-import { activateInternship, activateRemoteInternship, hasOngoingInternship, increaseInternshipExperimentMultiplier } from "./v2-internship-system";
+import { activateInternship, activateRemoteInternship, hasOngoingInternship, hasRemoteInternshipScore, increaseInternshipExperimentMultiplier } from "./v2-internship-system";
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
 import { createLoverProgressState } from "./v2-lover-progression";
@@ -272,7 +274,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
         [effects.careerType]: state.careerProgress[effects.careerType] + effects.careerProgress,
       }
     : state.careerProgress;
-  const scopedPapers = effects.draftCitationDebuffMultiplier === undefined
+  const scopedPapers = effects.draftCitationDebuffMultiplier === undefined && !effects.markDraftImageMisuse
     ? state.papers
     : state.papers.map((paper) => {
         if (
@@ -282,10 +284,13 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
         ) {
           return {
             ...paper,
-            citationDebuffMultiplierOnPublish: combineEffectMultipliers([
-              paper.citationDebuffMultiplierOnPublish ?? 1,
-              effects.draftCitationDebuffMultiplier,
-            ]),
+            ...(effects.markDraftImageMisuse ? { imageMisusePending: true } : {}),
+            ...(effects.draftCitationDebuffMultiplier !== undefined ? {
+              citationDebuffMultiplierOnPublish: combineEffectMultipliers([
+                paper.citationDebuffMultiplierOnPublish ?? 1,
+                effects.draftCitationDebuffMultiplier,
+              ]),
+            } : {}),
           };
         }
         return paper;
@@ -327,7 +332,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       }
     } else if (!hasOngoingInternship(state)) {
       if (effects.internshipStateUpdates.kind === "remote3") {
-        if (state.player.favor >= 6) internshipState = activateRemoteInternship(state.totalMonths, state.internshipState.salaryRemainder);
+        if (hasRemoteInternshipScore(state)) internshipState = activateRemoteInternship(state.totalMonths, state.internshipState.salaryRemainder);
       } else if (!state.conferenceCareerState.permanentlyBlockedInternship) {
         internshipState = activateInternship(state.internshipState.salaryRemainder);
       }
@@ -393,6 +398,14 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     buffs,
   };
   let resolvedState = directlyResolvedState;
+  if (!state.internshipState.active && directlyResolvedState.internshipState.active
+    && directlyResolvedState.internshipState.kind === "remote3") {
+    resolvedState = pushMilestoneLog(
+      directlyResolvedState,
+      "远程实习安排已确认：下月开始，持续3个月",
+      "remote-internship-arranged",
+    );
+  }
   if (effects.readPaperActions) {
     resolvedState = applyReadPaperActions(resolvedState, effects.readPaperActions, {
       consumeMonthlyAction: false,
@@ -451,6 +464,19 @@ export function applyChoiceEffectsToState(
   buffSource = "事件",
   currentEvent?: PendingEvent,
 ): ResolvedEventChoiceState {
+  const scholarshipAward = choice.effects.scholarshipAward;
+  if (scholarshipAward) {
+    const disqualified = hasScholarshipDisqualification(state);
+    const alreadyAwarded = (state.scholarshipState.lastAwardYear ?? 0) >= scholarshipAward.year;
+    if (disqualified || alreadyAwarded) {
+      const { money: _money, scholarshipAward: _award, ...effects } = choice.effects;
+      choice = {
+        ...choice,
+        outcome: disqualified ? "国奖资格取消，金币 +0。" : "本年度奖学金已领取。",
+        effects,
+      };
+    }
+  }
   if (choice.effects.paperCompetitionResolution) {
     return {
       ...applyPaperCompetitionResolution(state, choice.effects.paperCompetitionResolution),
@@ -479,7 +505,7 @@ export function applyChoiceEffectsToState(
     resolvedOutcome = hasOngoingInternship(state)
       ? "已有实习安排，本次不新增、不延期，原实习保持不变。"
       : choice.effects.internshipStateUpdates.kind === "remote3"
-        ? "导师好感不足，本次未确认远程实习。"
+        ? "条件：科研分 < 2｜结果：无事发生。"
         : "大厂实习机会已关闭，本次未开始实习。";
     resolvedPresentation = {
       title: "实习安排未变更",

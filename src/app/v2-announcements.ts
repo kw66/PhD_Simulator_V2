@@ -10,6 +10,30 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-09-30",
+    title: "角色天赋与事件反馈",
+    changes: [
+      { category: "更新", title: "角色路线预览", description: "补充导师子女、天选之人和社交达人的天赋树，完善事件联动、报销与协作路线；目前仅供预览，尚未开放加点和局内效果。" },
+      { category: "优化", title: "天选成长路线", description: "运动健将与牌运亨通移至第一层，交错连接异色之缘与手到擒来；吉人天相后新增“否极泰来”，查缺补漏后新增“齐头并进”。" },
+      { category: "平衡", title: "远程实习条件", description: "导师约谈中，远程实习的申请条件改为科研分达到2，不再以导师好感作为门槛。" },
+      { category: "修复", title: "疾病事件重选", description: "修复事件测试中持有锥刺股椅时，回退重选仍显示旧结果的问题；不同选项正确刷新条件与结算预览。" },
+      { category: "修复", title: "锥刺股椅反馈", description: "补充触发时的SAN恢复日志，展示恢复数值和前后变化，方便回看。" },
+      { category: "优化", title: "推进提示与结果", description: "人际悬浮提示补充每月推进规则，恋人玩耍与学习区分类型；教师节结果统一概率写法，无收益时显示“无事发生”。" },
+    ],
+  },
+  {
+    date: "2026-09-29",
+    title: "事件完善与调试优化",
+    changes: [
+      { category: "优化", title: "剧情与入学", description: "润色学习、团建、游戏放松等剧情，精简长段落；“读研之始”确认后直接入学。" },
+      { category: "更新", title: "论文事件", description: "调整抢发idea与数据恢复的处理消耗。伪造数据仍使涉事论文引用减半，正式发表后才触发“图片误用”，国奖入选会被取消。" },
+      { category: "更新", title: "实验室机制", description: "显卡故障改为全组6个月实验费用+1；导师经费超过20才触发报销事件。项目完成、导师指导和互助满条分别记录日志。" },
+      { category: "平衡", title: "日常开支", description: "远程实习每月SAN消耗降为2，羽毛球拍价格调整为8金币。" },
+      { category: "优化", title: "提示与效果显示", description: "精简小提示，统一深色橙框悬浮提示；补齐AI报销等Buff显示，事件结果明确展示条件和实际效果。" },
+      { category: "优化", title: "调试面板", description: "取消非事件分类，缩短按钮，前置重开与返回开始页；修复“被抢发idea”“新sota”的调试触发。" },
+    ],
+  },
+  {
     date: "2026-09-28",
     title: "基金消息与角色成长",
     changes: [
@@ -178,7 +202,7 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
     date: "2026-09-09",
     title: "研究竞争事件接入论文",
     changes: [
-      { category: "更新", title: "被抢发idea与新SOTA", description: "两个事件加入完整三幕与四个选项，每次影响一篇符合条件的论文；没有目标时暂存，满足条件后再出现。" },
+      { category: "更新", title: "被抢发idea与新sota", description: "两个事件加入完整三幕与四个选项，每次影响一篇符合条件的论文；没有目标时暂存，满足条件后再出现。" },
       { category: "修复", title: "事件目标不再串稿", description: "修复丢弃后新稿复用编号被旧事件误伤的问题；科研后选项预览同步刷新，论文录用后也能正确识别成果。" },
       { category: "优化", title: "结果变化更直观", description: "论文题目、审稿提示与数值结果分开展示，结果框明确显示SAN变化和分数调整前后的数值。" },
     ],
@@ -203,7 +227,7 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
     changes: [
       { category: "更新", title: "ESI高被引", description: "发表满12个月检查引用，门槛按发表时热度乘200确定；达标后永久保留高被引标记，不随后续热度变化。" },
       { category: "优化", title: "宣传入口按论文状态显示", description: "期刊与已参会论文隐藏arXiv，期刊接收后直接进入月度引用结算；重新整理详情与推广按钮，方便比较消耗和收益。" },
-      { category: "平衡", title: "羽毛球看实力", description: "当前SAN、参加次数与球拍共同决定实力，达到100获胜；球拍增加40实力，获胜后获得每月SAN+1的持续收益。" },
+      { category: "平衡", title: "羽毛球看实力", description: "当前SAN、参加次数与球拍共同决定实力，达到100获胜；球拍增加40实力，获胜后每周锻炼并获得每月SAN+1。" },
     ],
   },
   {

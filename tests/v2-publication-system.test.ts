@@ -195,7 +195,7 @@ describe("v2 publication loop", () => {
 
   it("counts each confirmed rejection once and preserves the count when accepted", () => {
     let state: GameState = {
-      ...createStartedGameState("normal"), eventQueue: [],
+      ...createStartedGameState("normal"), eventQueue: [], month: 1, totalMonths: 1,
       papers: [{ ...createDraftPaper(1, 0), idea: 1, experiment: 1, writing: 1 }],
     };
     for (const expectedCount of [1, 2, 3]) {
@@ -397,6 +397,7 @@ describe("v2 publication loop", () => {
     const state: GameState = {
       ...createStartedGameState("normal"),
       totalMonths: 2,
+      month: 2,
       eventQueue: [],
       papers: [paper],
       selectedPaperId: paper.id,

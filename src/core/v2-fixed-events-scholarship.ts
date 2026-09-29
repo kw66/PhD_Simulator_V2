@@ -5,17 +5,16 @@ import {
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
 import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
+import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import type { GameState, PendingEvent } from "./v2-types";
 
-interface ScholarshipOutcomeContext {
-  year: number;
-  month: number;
-  score: number;
-  requirement: number;
-  reward: number;
-  scoreBaseline: number;
-  eligiblePaperIds: string[];
-  success: boolean;
+type ScholarshipOutcomeContext = NonNullable<PendingEvent["scholarshipContext"]>;
+
+function createScholarshipScene(
+  context: ScholarshipOutcomeContext,
+  params: Parameters<typeof createFixedEvent>[0],
+): PendingEvent {
+  return { ...createFixedEvent(params), scholarshipContext: context };
 }
 
 export function getScholarshipRequirement(year: number, getRoll: RandomRollProvider): number {
@@ -45,7 +44,25 @@ function getEligiblePublishedPaperIds(state: GameState): string[] {
     .map((paper) => paper.id);
 }
 
-function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): PendingEvent {
+function buildScholarshipResultEvent(context: ScholarshipOutcomeContext, disqualified = false): PendingEvent {
+  if (context.success && disqualified) {
+    return createScholarshipScene(context, {
+      id: `scholarship-result-y${context.year}-m${context.month}`,
+      title: "国奖评选 ➜ 自己估分 ➜ 资格取消",
+      description: appendMechanismSettlement([
+        `公示名单里有你的名字：科研积分 ${context.score} 分，分数线 ${context.requirement} 分。你刚截好图，学院又发来消息——公示期间有人举报你曾有图片误用，核实后取消了你的国奖资格。`,
+        "你重新打开名单，自己的名字已经被划去。申报材料还放在桌边，那张准备发给家里的截图，最后也没发出去。",
+      ].join("\n\n"), `条件：本次可用科研积分 ${context.score} ≥ 分数线 ${context.requirement}；图片误用\n结果：资格取消，金币 +0`),
+      chainId: "scholarship",
+      stage: "result",
+      choices: [{
+        id: `scholarship-claim-y${context.year}-m${context.month}`,
+        label: "确定",
+        outcome: "国奖资格取消，金币 +0。",
+        effects: {},
+      }],
+    });
+  }
   if (context.success) {
     const diff = context.score - context.requirement;
     const reaction = diff >= 3
@@ -53,14 +70,13 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
       : diff >= 1
         ? "你找到自己的名字，才松开一直攥着鼠标的手。申报文件夹里又多了一份通知，这次不用改格式，也不用补附件了。"
         : "你把名字和分数来回核了两遍，刚好踩线。截完图还不放心，又放大看了一眼，生怕自己高兴得太早，看错了行。";
-    return createFixedEvent({
+    return createScholarshipScene(context, {
       id: `scholarship-result-y${context.year}-m${context.month}`,
       title: "国奖评选 ➜ 自己估分 ➜ 获得奖学金",
       description: appendMechanismSettlement([
-        "📱 学院通知弹出：“恭喜获得本年度国家奖学金。”",
-        `你的科研积分为 ${context.score} 分，分数线为 ${context.requirement} 分。`,
+        `📱 学院通知弹出：“恭喜获得本年度国家奖学金。”你的科研积分为 ${context.score} 分，分数线为 ${context.requirement} 分。`,
         reaction,
-      ].join("\n\n"), `金币 +${context.reward}`),
+      ].join("\n\n"), `条件：本次可用科研积分 ${context.score} ≥ 分数线 ${context.requirement}\n结果：金币 +${context.reward}`),
       chainId: "scholarship",
       stage: "result",
       choices: [
@@ -88,14 +104,13 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
       ? "你逐项核了一遍材料，没有漏算。申报页面停了好一会儿，最后还是关掉了；文件留在原处，未用于获奖的成果可以继续累计。"
       : "你看着分数线，原本准备好的安慰自己的话，一时也没想起来。申报材料先收进文件夹，未用于获奖的成果仍能累计，下次再用得上。";
 
-  return createFixedEvent({
+  return createScholarshipScene(context, {
     id: `scholarship-result-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 自己估分 ➜ 遗憾落选",
-    description: [
-      "📱 学院通知弹出，你没能进入获奖名单。",
-      `你的科研积分为 ${context.score} 分，距离 ${context.requirement} 分的分数线还差 ${diff} 分。`,
+    description: appendMechanismSettlement([
+      `📱 学院通知弹出，你没能进入获奖名单。你的科研积分为 ${context.score} 分，距离 ${context.requirement} 分的分数线还差 ${diff} 分。`,
       reaction,
-    ].join("\n\n"),
+    ].join("\n\n"), `条件：本次可用科研积分 ${context.score} < 分数线 ${context.requirement}\n结果：金币 +0`),
     chainId: "scholarship",
     stage: "result",
     choices: [
@@ -109,45 +124,45 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext): Pendin
   });
 }
 
-function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "success">): PendingEvent {
+function buildScholarshipScoreEvent(context: ScholarshipOutcomeContext, disqualified: boolean): PendingEvent {
   const diff = context.score - context.requirement;
   const success = diff >= 0;
   let innerThoughts = [
-    `你把这次能计入的成果算了一遍，共 ${context.score} 分。积累比往年获奖材料充实不少，心里总算有了底。`,
+    `这次能计入的成果共 ${context.score} 分，比往年获奖材料充实不少，心里总算有了底。`,
   ];
-  let finalThought = "你保存好回执，已经有点想把好消息告诉家里。手指停在聊天框上，还是决定等名单出了再说。";
+  let finalThought = "存好回执，你想把好消息告诉家里。手指停在聊天框上，还是等名单出了再说。";
   let label = "等待结果";
 
   if (diff >= 1 && diff < 3) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分。对照往年的获奖材料，你觉得有些把握，又核了一遍，确认没有重复申报。`,
+      `这次能计入 ${context.score} 分。对照往年的获奖材料，你觉得有些把握，又确认了一遍没有重复申报。`,
     ];
-    finalThought = "回执存进文件夹，你已经在心里列起了购物清单。刚列到第二件，赶紧把自己叫停：名单还没出呢，钱倒先花上了。";
+    finalThought = "存好回执，你在心里列起购物清单。刚到第二件，赶紧叫停：名单还没出呢，钱倒先花上了。";
   } else if (diff === 0) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分。和往年的获奖材料比起来，你像是刚好够得着，却没有多少余裕。`,
+      `这次能计入 ${context.score} 分。对照往年的获奖材料，像是刚好够得着，没多少余裕。`,
     ];
-    finalThought = "你盯着“提交成功”看了一会儿。这四个字只管材料交没交上，可惜不管今年到底够不够分。";
+    finalThought = "你盯着“提交成功”。这四个字只管材料交没交上，可惜不管今年够不够分。";
     label = "继续等待";
   } else if (diff < 0 && diff >= -2) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分。翻过往年的获奖材料，你总觉得还差一点，又检查了一遍有没有漏填的成果。`,
+      `这次能计入 ${context.score} 分。对照往年的获奖材料，总觉得还差一点，你又查了遍有没有漏填。`,
     ];
-    finalThought = "你把回执存好，又忍不住翻了一次往年的通知。材料已经交了，先别急着替评审把自己划掉。";
+    finalThought = "存好回执，你又翻起往年的通知。材料已经交了，先别急着替评审把自己划掉。";
     label = "继续等待";
   } else if (diff < -2) {
     innerThoughts = [
-      `这次能计入 ${context.score} 分。对照往年的获奖材料，手头的积累还显得单薄，这回恐怕不太乐观。`,
+      `这次能计入 ${context.score} 分。比起往年的获奖材料，积累仍显单薄，这回恐怕不太乐观。`,
     ];
-    finalThought = "你把回执和申报表放在一起，免得下回又到处找。未用于获奖的成果可以继续累计，这次先等正式消息。";
+    finalThought = "回执和申报表放好，下回不用到处找。未用于获奖的成果可以继续累计，先等正式消息。";
     label = "继续等待";
   }
 
-  return createFixedEvent({
+  return createScholarshipScene(context, {
     id: `scholarship-score-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 自己估分",
     description: [
-      `你按申报清单逐项核对，连文件名里的空格都检查了一遍。${innerThoughts.join("")}`,
+      `核完申报清单，连文件名里的空格也没放过。${innerThoughts.join("")}`,
       finalThought,
     ].join("\n\n"),
     chainId: "scholarship",
@@ -158,7 +173,7 @@ function buildScholarshipScoreEvent(context: Omit<ScholarshipOutcomeContext, "su
         label,
         outcome: success ? "估分结果已记下，等待正式名单。" : "材料已提交，等待正式名单。",
         effects: {
-          enqueueEvents: [buildScholarshipResultEvent({ ...context, success })],
+          enqueueEvents: [buildScholarshipResultEvent(context, disqualified)],
         },
       },
     ],
@@ -171,23 +186,25 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
   const reward = getScholarshipReward(state.year);
   const scoreBaseline = state.scholarshipState.scoreBaseline;
   const eligiblePaperIds = getEligiblePublishedPaperIds(state);
+  const score = Math.max(0, state.totalResearchScore - scoreBaseline);
   const context = {
     year: state.year,
     month: state.month,
-    score: Math.max(0, state.totalResearchScore - scoreBaseline),
+    score,
     requirement,
     reward,
     scoreBaseline,
     eligiblePaperIds,
+    success: score >= requirement,
   };
-  return createFixedEvent({
+  return createScholarshipScene(context, {
     id: `scholarship-y${state.year}-m${state.month}`,
     title: "国奖评选",
     description: [
-      `晚上十点，你收到学院系统推送的“国奖评选启动”通知。本轮评选中，${getScholarshipGradeLabel(state)}共有 5 个名额，按科研积分排名。你找出往年的获奖材料作参考，今年的结果仍要等正式名单。已经用于获奖的论文不能再次计入。`,
-      "通知后面跟着半屏附件，群里很快有人追问格式。" + (context.score > 0
-        ? "手里还有没用于获奖的成果，可以整理出来试一试。准备材料要花些精力，暂不申报也能把成果留到以后。"
-        : "你翻了一遍成果记录，这次还没有能计入的新积累。现在申报恐怕很难入选，材料也仍要花精力准备。"),
+      `晚上十点，学院发来“国奖评选启动”通知：${getScholarshipGradeLabel(state)}共 5 个名额，按科研积分排名。你翻出往年的获奖材料，今年的结果仍要等正式名单。用于获奖的论文不能再次计入。`,
+      "附件占了半屏，群里又在追问格式。" + (context.score > 0
+        ? "手里还有没用于获奖的成果，值得试试。准备材料费精力，暂不申报也能留到以后。"
+        : "翻过成果记录，这次还没有能计入的新积累。申报恐怕难入选，准备材料还得花精力。"),
     ].join("\n\n"),
     chainId: "scholarship",
     choices: [
@@ -197,7 +214,7 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
         outcome: `准备申报材料，${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}；入选后金币 +${reward}。`,
         effects: {
           san: applicationSanChange,
-          enqueueEvents: [buildScholarshipScoreEvent(context)],
+          enqueueEvents: [buildScholarshipScoreEvent(context, hasScholarshipDisqualification(state))],
         },
       },
       {
@@ -208,4 +225,32 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
       },
     ],
   });
+}
+
+export function refreshScholarshipEvent<T extends PendingEvent>(state: GameState, event: T): T {
+  const context = event.scholarshipContext;
+  if (event.chainId !== "scholarship" || !context) return event;
+  if (event.stage === "result") {
+    if (!context.success) return event;
+    const disqualified = hasScholarshipDisqualification(state);
+    const currentlyDisqualified = event.choices[0]?.effects.scholarshipAward === undefined;
+    if (disqualified === currentlyDisqualified) return event;
+    const result = buildScholarshipResultEvent(context, disqualified);
+    return {
+      ...event,
+      title: result.title,
+      description: result.description,
+      completionLog: result.completionLog,
+      choices: result.choices,
+    };
+  }
+  const choices = event.choices.map((choice) => {
+    const followUps = choice.effects.enqueueEvents;
+    if (!followUps) return choice;
+    const refreshed = followUps.map((followUp) => refreshScholarshipEvent(state, followUp));
+    return refreshed.every((followUp, index) => followUp === followUps[index])
+      ? choice
+      : { ...choice, effects: { ...choice.effects, enqueueEvents: refreshed } };
+  });
+  return choices.every((choice, index) => choice === event.choices[index]) ? event : { ...event, choices };
 }

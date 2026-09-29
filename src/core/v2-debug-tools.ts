@@ -6,6 +6,8 @@ import type { CareerType } from "./v2-career-rules";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyQueuedEventEffects, rebaseGeneratedEventIds } from "./v2-engine-event-resolution";
 import { addOrReplaceBuffs } from "./v2-buffs";
+import { createLabGpuFailureBuff } from "./v2-lab-compute";
+import { createImageMisuseBuff } from "./v2-academic-integrity";
 import { createAiBuffs, createAiShopState, getAiModelById } from "./v2-ai-shop";
 import { clampSan, pushLog } from "./v2-engine-helpers";
 import { createBeforeGradSchoolAct1Event } from "./v2-fixed-events-before-grad-school";
@@ -39,9 +41,9 @@ import { createCustomFellowProgressProfile, createGeneratedFellowProfileAddition
 import { createLoverProgressState } from "./v2-lover-progression";
 import { activateLover } from "./v2-lover-system";
 import { pickRandomAdvisorName } from "./v2-random-name";
-import { isPaperCompetitionEventId } from "./v2-paper-competition";
+import { getPaperCompetitionCandidates, isPaperCompetitionEventId } from "./v2-paper-competition";
 import { activatePendingPaperCompetitionEvents, rememberPendingPaperCompetitionEvent } from "./v2-paper-competition-waiting";
-import { getCurrentEvent } from "./v2-event-queue";
+import { getCurrentEvent, getQueuedPaperTargetIds } from "./v2-event-queue";
 import type {
   Buff,
   DebugRelationshipType,
@@ -109,6 +111,15 @@ export function createDebugBuffs(): Buff[] {
       remainingMonths: 1,
       activeOperationSanDelta: -1,
     },
+    {
+      id: "debug-buff-ai-reimbursement",
+      name: "AI报销",
+      source: "导师经费",
+      timing: "monthly",
+      remainingMonths: 1,
+      shopEffects: { aiCostsCovered: true },
+      description: "本月商店中的 AI 使用费用为 0。",
+    },
     ...aiBuffs,
     {
       id: "debug-buff-illness",
@@ -142,15 +153,8 @@ export function createDebugBuffs(): Buff[] {
       remainingMonths: null,
       actionEffects: { writing: { bonus: 3 } },
     },
-    {
-      id: "debug-buff-next-experiment-multiplier",
-      name: "重装环境",
-      source: "显卡故障",
-      timing: "next-action",
-      remainingMonths: null,
-      actionEffects: { experiment: { multiplier: 0.25 } },
-      description: "下次实验总分 ×0.25，完成一次实验后消失。",
-    },
+    createLabGpuFailureBuff(),
+    createImageMisuseBuff(),
   ];
 }
 
@@ -224,7 +228,7 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
       { id: "random-15", label: "游戏放松" },
       { id: "random-16", label: "数据丢失" },
       { id: "random-17", label: "被抢发idea" },
-      { id: "random-18", label: "新SOTA" },
+      { id: "random-18", label: "新sota" },
     ],
   },
   {
@@ -490,7 +494,8 @@ function markTriggeredEventForReplay(before: GameState, after: GameState, debugE
       ...event,
       replayContext: {
         rootEvent: event.replayContext?.rootEvent ?? event,
-        debugEventId,
+        debugEventId: event.source === "random" && /^random-\d+$/u.test(event.chainId)
+          ? event.chainId : debugEventId,
       },
     }),
   };
@@ -500,9 +505,13 @@ function rebuildDebugReplayRootEvent(rootEvent: PendingEvent, state: GameState, 
   const eventId = debugEventId ?? rootEvent.chainId;
   const serialMatch = /-n(\d+)(?:-|$)/u.exec(rootEvent.id);
   const replaySerial = serialMatch ? Number(serialMatch[1]) : rootEvent.randomReplay?.serial;
-  const eventState = rootEvent.paperCompetitionTargetId
-    ? { ...state, papers: state.papers.filter((paper) => paper.id === rootEvent.paperCompetitionTargetId) }
-    : state;
+  const eventState = {
+    ...state,
+    totalRandomEventCount: replaySerial ?? state.totalRandomEventCount,
+    ...(rootEvent.paperCompetitionTargetId
+      ? { papers: state.papers.filter((paper) => paper.id === rootEvent.paperCompetitionTargetId) }
+      : {}),
+  };
   const rebuilt = buildDebugEvent(eventState, eventId, replaySerial)?.event;
   if (!rebuilt || rebuilt.stage !== "act1" || rebuilt.chainId !== rootEvent.chainId) {
     return rootEvent;
@@ -736,10 +745,27 @@ function triggerDebugEvent(state: GameState, eventId: string): GameState {
   const randomMatch = /^random-(\d+)$/u.exec(eventId);
   const randomId = randomMatch ? Number(randomMatch[1]) : NaN;
   if (isPaperCompetitionEventId(randomId)) {
-    const pendingState = rememberPendingPaperCompetitionEvent(replayState, randomId, replayState.totalRandomEventCount + 1);
-    const triggeredState = activatePendingPaperCompetitionEvents(pendingState === replayState ? replayState : {
+    if (replayState.eventQueue.some((event) => event.chainId === eventId)) return replayState;
+    let readyState = replayState;
+    if (getPaperCompetitionCandidates(readyState, randomId).length === 0) {
+      const reservedIds = new Set([
+        ...readyState.papers.map((paper) => paper.id),
+        ...readyState.externalPublications.map((paper) => paper.id),
+        ...getQueuedPaperTargetIds(readyState.eventQueue),
+      ]);
+      let paperIndex = readyState.papers.length + 1;
+      while (reservedIds.has(`debug-draft-${readyState.totalMonths}-${paperIndex}`)) paperIndex += 1;
+      const draft = {
+        ...createDraftPaper(readyState.totalMonths, paperIndex - 1, Math.random, getAcademicCalendarYear(readyState.year, readyState.month)),
+        id: `debug-draft-${readyState.totalMonths}-${paperIndex}`,
+        title: "测试草稿", idea: 4, experiment: 3, writing: 2,
+      };
+      readyState = { ...readyState, papers: [...readyState.papers, draft], selectedPaperId: draft.id };
+    }
+    const pendingState = rememberPendingPaperCompetitionEvent(readyState, randomId, readyState.totalRandomEventCount + 1);
+    const triggeredState = activatePendingPaperCompetitionEvents(pendingState === readyState ? readyState : {
       ...pendingState,
-      totalRandomEventCount: replayState.totalRandomEventCount + 1,
+      totalRandomEventCount: readyState.totalRandomEventCount + 1,
     });
     return markTriggeredEventForReplay(replayState, triggeredState, eventId);
   }
@@ -899,7 +925,8 @@ function addDebugPublishedJournalPaper(
 
 function addAllDebugBuffs(state: GameState): GameState {
   const debugBuffs = addOrReplaceBuffs([], createDebugBuffs());
-  const isDebugBuff = (buff: Buff) => buff.id.startsWith("debug-buff-") || buff.id.startsWith("ai-debug-");
+  const isDebugBuff = (buff: Buff) => DEBUG_BUFF_IDS.includes(buff.id)
+    || buff.id.startsWith("debug-buff-") || buff.id.startsWith("ai-debug-");
   const existingDebugBuffs = state.buffs.filter(isDebugBuff);
   const signature = (buff: Buff | undefined) => JSON.stringify(buff, (_key, value) => (
     value && typeof value === "object" && !Array.isArray(value)

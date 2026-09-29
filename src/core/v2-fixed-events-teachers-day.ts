@@ -1,5 +1,6 @@
 import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import {
+  appendMechanismSettlement,
   applyStateMutation,
   createFixedEvent,
   drawInclusiveInt,
@@ -32,8 +33,8 @@ const TEACHERS_DAY_GIFTS: readonly TeachersDayGiftDefinition[] = [
     highFavorHint: "同学推荐了一盒茶叶，标价 1 金币。你想起老师桌上的茶杯，拎着它去办公室，连开场白都有了。",
     lowFavorHint: "同学推荐了一盒茶叶，标价 1 金币。你放大照片看了看，脑子里全是论文题目，老师爱喝哪种茶却一点也想不起来。",
     resultDescription: [
-      "你买好一盒茶叶，下午敲开办公室的门。导师正对着电脑看论文，你等对方抬起头，才把盒子递过去：“老师，教师节快乐！给您带了盒茶叶。”",
-      "导师接过盒子：“谢谢你的心意。”你道了声“不打扰您了”，轻轻带上门。回工位时才发现，刚才一直把空袋子攥在手里。",
+      "下午，你拎着茶叶敲开办公室的门，等导师从论文前抬头，递上盒子：“老师，教师节快乐！给您带了盒茶叶。”",
+      "导师接过盒子：“谢谢你的心意。”你说了声“不打扰您了”，带上门。回工位才发现，空袋子还攥在手里。",
     ],
   },
   {
@@ -68,8 +69,8 @@ function getTeachersDayGift(giftId: TeachersDayGiftId | undefined): TeachersDayG
 
 function getTeachersDayMessageHint(state: Pick<GameState, "player">): string {
   return state.player.favor >= 6
-    ? "你和老师已经聊得熟了，有时一句问候也会接上没聊完的研究想法。今天若碰上他有空，兴许还能听到些新思路；不过节日消息这么多，也可能只来得及回一句谢谢。"
-    : "你和老师还不算熟，平时收到的多是事务通知。桌上那叠待报销的票据还没送走，这条问候也许会让他想起找你搭把手；当然，也可能和群里那些祝福一样，停在一句客气的回复上。";
+    ? "和老师聊得熟了，问候也能接上研究想法。有空也许会聊新思路，忙起来可能只回一句谢谢。"
+    : "你和老师还不熟，平时多是事务通知。待报销的票据还在，老师也许会顺口叫你搭把手，也可能只回一句谢谢。";
 }
 
 function drawTeachersDayGift(getRoll: RandomRollProvider): TeachersDayGiftDefinition {
@@ -82,13 +83,14 @@ function createTeachersDayResultEvent(params: {
   resultId: string;
   resultTitle: string;
   description: string;
+  settlement: string;
   buttonLabel: string;
   outcome: string;
 }): PendingEvent {
   return createFixedEvent({
     id: `teachers-day-result-${params.resultId}-y${params.state.year}-m${params.state.month}`,
     title: `教师节 ➜ 你的选择 ➜ ${params.resultTitle}`,
-    description: params.description,
+    description: appendMechanismSettlement(params.description, params.settlement),
     chainId: "teachers-day",
     stage: "result",
     completionLog: params.outcome,
@@ -108,12 +110,12 @@ function createTeachersDayChoiceEvent(
   gift: TeachersDayGiftDefinition,
 ): PendingEvent {
   const noGiftHint = state.player.favor >= 6
-    ? "聊天框里上一条还是你和老师讨论实验的记录。你写下“教师节快乐”，顺手又添了句祝福。这回总算有一句消息，和实验进度没关系。"
-    : "聊天记录往上翻，几乎全是“收到”。你打好一句“教师节快乐”，想再添点什么，憋了半天还是这五个字最顺口。";
+    ? "上一条聊天还是讨论实验。写下“教师节快乐”，总算有句话和进度没关系。"
+    : "聊天记录几乎全是“收到”。打好“教师节快乐”，想再添点什么，憋了半天还是这五个字最顺口。";
   const giftHint = state.player.favor >= 6 ? gift.highFavorHint : gift.lowFavorHint;
   const stampHint = state.player.favor >= 6
-    ? "礼品页里还有一套邮票，要 3 金币。图案让你多看了两眼，价格又让你顿了一下：这份心意还真挺郑重。"
-    : "礼品页里还有一套邮票，要 3 金币。你停在介绍页上，心里已经排练起递给老师时该说什么，越想越像在准备一次汇报。";
+    ? "还有套邮票，要 3 金币。图案让你多看两眼，价格又让你一顿：这份心意还真挺郑重。"
+    : "还有套邮票，要 3 金币。你排练起递给老师时该说什么，越想越像在准备一次汇报。";
 
   return createFixedEvent({
     id: `teachers-day-choice-y${state.year}-m${state.month}`,
@@ -209,10 +211,13 @@ export function resolveTeachersDayFixedEvent(
               resultId: "message-idea",
               resultTitle: "导师来电",
               description: [
-                "你发了条微信：“老师，教师节快乐！祝您身体健康，工作顺利！”没过多久，手机响了，来电正是导师。",
-                "“谢谢！正好有个想法跟你聊聊。”你赶紧找纸笔，先在手边的便签上记了几行。挂断后重新誊一遍，才发现几个问题能连起来了，连刚才随手画的箭头都有了用处。",
-                `机制结算\n下次想 idea +${ideaBonus}`,
+                "你发微信：“老师，教师节快乐！祝您身体健康，工作顺利！”没多久，导师打来了电话。",
+                "“谢谢！正好有个想法跟你聊聊。”你赶紧拿便签记了几行。挂断后誊一遍，发现几个问题连起来了，连随手画的箭头都有了用处。",
               ].join("\n\n"),
+              settlement: [
+                "条件：导师好感 ≥ 6；分享想法（50%）",
+                `结果：下次想 idea +${ideaBonus}`,
+              ].join("\n"),
               buttonLabel: "期待明天",
               outcome: `你发了教师节祝福，导师分享了一个想法，下次想 idea +${ideaBonus}。`,
             })],
@@ -220,7 +225,7 @@ export function resolveTeachersDayFixedEvent(
         }
         return {
           nextState: state,
-          outcome: "你发去节日祝福，导师礼貌回复，没有额外数值变化。",
+          outcome: "你发去节日祝福，导师礼貌回复，无事发生。",
           enqueueEvents: [createTeachersDayResultEvent({
             state,
             resultId: "message-reply",
@@ -229,6 +234,7 @@ export function resolveTeachersDayFixedEvent(
               "你发了条微信：“老师，教师节快乐！祝您身体健康，工作顺利！”导师很快回复：“谢谢！也祝你新学期顺利。”",
               "你回了个笑脸，等了一小会儿，没再收到消息。手机扣回桌上时，你才松了口气：今天这句“谢谢”后面，确实没有跟着一份附件。",
             ].join("\n\n"),
+            settlement: "条件：导师好感 ≥ 6；普通回复（50%）\n结果：无事发生",
             buttonLabel: "继续",
             outcome: "你发了教师节祝福，导师礼貌回复，无事发生。",
           })],
@@ -251,11 +257,14 @@ export function resolveTeachersDayFixedEvent(
             resultId: "message-errand",
             resultTitle: "导师请求",
             description: [
-              "你发了条微信：“老师，教师节快乐！”导师很快回复：“谢谢。正好有份报销材料，下午帮我送到财务处吧。”",
-              "你拿齐材料，在财务处排了快一个小时的队，回来再向导师报了受理情况。坐回工位，水杯里的茶已经凉了。你只是发了句祝福，怎么半个下午也跟着送出去了。",
-              ...(favorNarrative ? [favorNarrative] : []),
-              `机制结算\n${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}\n${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
+              "你发微信：“老师，教师节快乐！”导师回复：“谢谢。正好有份报销材料，下午帮我送到财务处吧。”",
+              "你拿齐材料，在财务处排了快一个小时，回来向导师报了受理情况。茶已经凉了。只是发了句祝福，怎么半个下午也跟着送出去了。" + favorNarrative,
             ].join("\n\n"),
+            settlement: [
+              "条件：导师好感 < 6；报销跑腿（50%）",
+              `结果：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}`,
+              `结果：${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
+            ].join("\n"),
             buttonLabel: "认命",
             outcome: `你发了教师节祝福，被叫去财务处跑腿，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           })],
@@ -273,6 +282,7 @@ export function resolveTeachersDayFixedEvent(
             "你发了条微信：“老师，教师节快乐！”过了一会儿，导师回复：“谢谢，新学期加油。”",
             "你敲了几句新学期的打算，想想又删掉，最后只回了“谢谢老师”。聊天框安静下来，你把手机放到一边，桌上的资料还摊在刚才那一页。",
           ].join("\n\n"),
+          settlement: "条件：导师好感 < 6；普通回复（50%）\n结果：无事发生",
           buttonLabel: "继续",
           outcome: "你发了教师节祝福，导师简短回复，无事发生。",
         })],
@@ -298,11 +308,11 @@ export function resolveTeachersDayFixedEvent(
           state,
           resultId: `gift-${gift.id}`,
           resultTitle: "礼物送达",
-          description: [
-            ...gift.resultDescription,
-            ...(favorNarrative ? [favorNarrative] : []),
-            `机制结算\n金币 -1\n${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
-          ].join("\n\n"),
+          description: gift.resultDescription.join("\n\n") + favorNarrative,
+          settlement: [
+            "结果：金币 -1",
+            `结果：${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
+          ].join("\n"),
           buttonLabel: "继续",
           outcome: `你送了${gift.name}，导师${favorChange > 0 ? "开心收下" : "收下"}，金币 -1，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
         })],
@@ -322,10 +332,12 @@ export function resolveTeachersDayFixedEvent(
           resultTitle: "邮票送达",
           description: [
             "你选好一套邮票，装进保护袋，下午带到办公室。“老师，教师节快乐！”你把邮票递过去，简单介绍了一下图案。",
-            "导师接过来翻看，向你道谢。你原本准备了一段祝福，临到面前只说出一句“希望您喜欢”，说完自己也有点不好意思。",
-            ...(favorNarrative ? [favorNarrative] : []),
-            `机制结算\n金币 -3\n${formatTierResistedOutcome("导师好感", 2, favorResult)}`,
+            "导师接过来翻看，向你道谢。你原本准备了一段祝福，临到面前只说出一句“希望您喜欢”，说完自己也有点不好意思。" + favorNarrative,
           ].join("\n\n"),
+          settlement: [
+            "结果：金币 -3",
+            `结果：${formatTierResistedOutcome("导师好感", 2, favorResult)}`,
+          ].join("\n"),
           buttonLabel: "继续",
           outcome,
         })],

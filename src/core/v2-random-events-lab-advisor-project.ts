@@ -1,4 +1,4 @@
-﻿import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getResearchMiscSanNarrative, getTierResistedNarrative } from "./v2-sanity-rules";
+﻿import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import { PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
@@ -15,13 +15,10 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   const rejectFavorNarrative = getTierResistedNarrative("导师好感", -2, rejectFavorResult);
   const horizontalSanChange = getActualResearchMiscSanChange(-8, state.player.research, state.month, state.eventSupport, state.buffs);
   const horizontalSanSummary = formatResearchMiscSanChange(-8, state.player.research, state.month, state.eventSupport, state.buffs);
-  const horizontalSanNarrative = getResearchMiscSanNarrative(-8, state.player.research);
   const verticalSanChange = getActualResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport, state.buffs);
   const verticalSanSummary = formatResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport, state.buffs);
-  const verticalSanNarrative = getResearchMiscSanNarrative(-6, state.player.research);
   const shareSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const shareSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
-  const shareSanNarrative = getResearchMiscSanNarrative(-2, state.player.research);
   const horizontalFavorResult = applyTierResist(1, state.player.favor, getRoll);
   const horizontalFavorChange = horizontalFavorResult.effectiveChange;
   const horizontalFavorNarrative = getTierResistedNarrative("导师好感", 1, horizontalFavorResult);
@@ -43,8 +40,8 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const guidanceRolls = Array.from({ length: (state.fellowProgressState.length + 1) * 2 }, () => getRoll());
   const introDescription = [
-    "导师叫你去办公室聊聊。你带着电脑过去，刚想打开论文，导师先说起了组里的开销：“GPU服务器要租，你们每做一次实验，就得花3科研经费。经费不够，差的那部分就只能自己掏钱了。”你默默看了眼还没跑完的实验列表。",
-    "“项目得大家一起分担，实验室才能正常运转。”导师说，平时同学们各做一部分，有人补实验，有人改方案，这次想让你牵头负责一个，其他同学一起配合。你把电脑往回挪了挪，看来今天不只是来讲论文进度的。",
+    "导师叫你去办公室，先说起组里的开销：“GPU服务器要租，每次实验得花3科研经费。不够的部分，就得自己掏钱了。”你默默看了眼还没跑完的实验列表。",
+    "“项目得大家分担，实验室才能正常运转。”平时同学们各做一部分，这次导师想让你牵头，其他人配合。你把电脑往回挪了挪，看来今天不只是来讲论文进度的。",
   ].join("\n\n");
 
   const event: PendingEvent = {
@@ -89,7 +86,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       {
         id: `random-4-share-${serial}`,
         label: "让师弟师妹分担",
-        outcome: `${hasJunior ? `有熟悉的${familiarJuniorLabel}` : "无熟悉的师弟/师妹"}；${shareSanSummary}；${formatTierResistedOutcome("社交", shareSocialRaw, shareSocialResult)}`,
+        outcome: `${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}；${shareSanSummary}；${formatTierResistedOutcome("社交", shareSocialRaw, shareSocialResult)}`,
         effects: {
           san: shareSanChange,
           social: shareSocialChange,
@@ -111,15 +108,15 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       [`random-4-horizontal-${serial}`]: {
         title: "横向项目",
         description: [
-          "你牵头接下横向项目，把工作分给组里的同学，自己盯方案、对接甲方、收拢各处的结果。甲方每说一次“再小改一下”，文件名后面的版本号就往上跳一格，好在大家一起赶，总算把最后一版演示跑通了。",
-          ["项目终于通过验收，实验室的经费补上了，你的劳务费也到了账。导师看完交付材料，合上电脑说这次辛苦了。你趴在桌边缓了一会儿，再翻开自己的研究笔记，竟得先想想上次做到哪里。", horizontalFavorNarrative, horizontalSanNarrative].filter(Boolean).join(""),
+          "你牵头分好工，盯方案、对接甲方。甲方每说一次“再小改一下”，文件名的版本号就往上跳一格，大家总算赶出了最后一版演示。",
+          ["验收通过，经费和劳务费都到了账，导师说这次辛苦了。你再翻开自己的研究笔记，竟得先想想上次做到哪里。", horizontalFavorNarrative].filter(Boolean).join(""),
         ].join("\n\n"),
       },
       [`random-4-vertical-${serial}`]: {
         title: "纵向项目",
         description: [
           "你牵头负责纵向项目，和同学们一起查文献、拆问题、补实验。几轮讨论下来，桌上画不下的框图挪到了白板上，原本各做各的几组结果，总算能串成一条完整的思路。",
-          ["项目顺利结题，导师把这次成果记进了后续申请材料，又约大家逐个聊论文：有稿子的当场改思路，还没准备好的留着之后再聊。轮到你汇报时，曾经要翻半天文献的问题，如今也能讲清来龙去脉了。", verticalFavorNarrative, verticalResearchNarrative, verticalSanNarrative].filter(Boolean).join(""),
+          ["项目顺利结题，导师把这次成果记进了后续申请材料，又约大家逐个聊论文：有稿子的当场改思路，还没准备好的留着之后再聊。轮到你汇报时，曾经要翻半天文献的问题，如今也能讲清来龙去脉了。", verticalFavorNarrative, verticalResearchNarrative].filter(Boolean).join(""),
         ].join("\n\n"),
       },
       [`random-4-reject-${serial}`]: {
@@ -140,20 +137,20 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
           ? shareSocialChange < 0
             ? [
                 `你去找${familiarJuniorName}分担主要工作。对方看了眼材料，答应接手，却把自己的日程也推过来：“下次早点说，我这边也得挪。”`,
-                ["你把手头资料整理好，把其中重复核对、整理表格的活交给对方，后续工作由对方接着安排。交接时，你多等了一会儿，也没等到往常那句闲聊。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
+                ["你把手头资料整理好，把其中重复核对、整理表格的活交给对方，后续工作由对方接着安排。交接时，你多等了一会儿，也没等到往常那句闲聊。", shareSocialNarrative].filter(Boolean).join(""),
               ].join("\n\n")
             : [
                 `你带着材料找到${familiarJuniorName}，商量能否请对方接过主要工作。对方看完说了句“你这安排可真紧”，还是答应接手。`,
-                ["你把背景和交接事项一一说明，把重复跑表、整理材料的部分交给对方，后续安排总算有了着落。回到工位时，你还留着一点精神整理自己的笔记。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
+                ["你把背景和交接事项一一说明，把重复跑表、整理材料的部分交给对方，后续安排总算有了着落。回到工位时，你还留着一点精神整理自己的笔记。", shareSocialNarrative].filter(Boolean).join(""),
               ].join("\n\n")
           : shareSocialChange < 0
             ? [
                 `你找一位不太熟的${unfamiliarJuniorLabel}分担主要工作，对方翻了翻材料，勉强接下。你以为已经说妥，后来才听说对方为临时添活抱怨了好几句。`,
-                ["你把重复核对和整理材料的部分交出去，资料交接完，确实少担了一摊事。只是再到对方工位前，道谢的话还没说完，对方就先问了一句“还有事吗”，让你有点站不住。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
+                ["你把重复核对和整理材料的部分交出去，资料交接完，确实少担了一摊事。只是再到对方工位前，道谢的话还没说完，对方就先问了一句“还有事吗”，让你有点站不住。", shareSocialNarrative].filter(Boolean).join(""),
               ].join("\n\n")
             : [
-                `你请一位不太熟的${unfamiliarJuniorLabel}接过主要工作，把背景材料和当前进展整理给对方。对方问清交接时间，念叨了一句“还挺赶”，最后还是应下了。`,
-                ["你把重复核对、整理表格这类工作交给对方，交接结束后过去道谢，对方抬头说了声“不客气”。气氛还算平和，你把剩下的注意事项补进文档，发了过去。", shareSocialNarrative, shareSanNarrative].filter(Boolean).join(""),
+                `你请不太熟的${unfamiliarJuniorLabel}接过主要工作，整理好材料交过去。对方问清时间，念叨一句“还挺赶”，还是应下了。`,
+                ["重复核对、整理表格的活交了出去，你补好注意事项，道了谢。对方回了声“不客气”，气氛还算平和。", shareSocialNarrative].filter(Boolean).join(""),
               ].join("\n\n"),
       },
     },

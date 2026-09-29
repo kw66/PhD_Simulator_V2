@@ -2,6 +2,7 @@ import {
   AI_SLOT_IDS,
   createAiBuffs,
   getAiModelForTotalMonths,
+  hasAiReimbursement as hasAiReimbursementState,
 } from "./v2-ai-shop";
 import { applyAiActivationEffects } from "./v2-ai-activation";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
@@ -46,7 +47,7 @@ type ShopActionId = Extract<
 >;
 
 function hasAiReimbursement(state: GameState): boolean {
-  return state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths;
+  return hasAiReimbursementState(state);
 }
 
 function getAiState(state: GameState) {

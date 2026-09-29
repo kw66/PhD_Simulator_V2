@@ -37,6 +37,7 @@ function cloneBuff(buff: Buff): Buff {
     actionEffects: cloneActionEffects(buff.actionEffects),
     paperPolishEffects: buff.paperPolishEffects ? { ...buff.paperPolishEffects } : undefined,
     readingEffect: buff.readingEffect ? { ...buff.readingEffect } : undefined,
+    shopEffects: buff.shopEffects ? { ...buff.shopEffects } : undefined,
     publicationEffects: buff.publicationEffects ? { ...buff.publicationEffects } : undefined,
     scheduledPublication: buff.scheduledPublication
       ? { ...buff.scheduledPublication, targetWeights: { ...buff.scheduledPublication.targetWeights } }
@@ -67,6 +68,8 @@ function hasRemainingBuffEffects(buff: Buff): boolean {
     || Number.isFinite(buff.activeOperationSanMultiplier)
     || Number.isFinite(buff.activeOperationSanDelta)
     || Number.isFinite(buff.relationshipOperationSanDelta)
+    || Number.isFinite(buff.labExperimentMoneyDelta)
+    || buff.scholarshipDisqualified === true
     || hasActionEffect
     || hasNumericRecordValue(buff.paperPolishEffects as Record<string, unknown> | undefined)
     || hasReadingEffect
@@ -235,6 +238,10 @@ export function getActiveBuffs(
   timing?: Buff["timing"],
 ): Buff[] {
   return buffs.filter((buff) => isActiveBuff(buff) && (!timing || buff.timing === timing)).map(cloneBuff);
+}
+
+export function hasActiveAiCostCoverage(buffs: readonly Buff[]): boolean {
+  return buffs.some((buff) => isActiveBuff(buff) && buff.shopEffects?.aiCostsCovered === true);
 }
 
 export function getPublicationBuffEffect(

@@ -10,6 +10,7 @@ import { createPaperCompetitionRandomEvent } from "./v2-random-events-paper-comp
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { getPublishedPaperCount } from "./v2-monthly-event-shared";
 import { getPaperCompetitionCandidates } from "./v2-paper-competition";
+import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -47,6 +48,8 @@ export function createRandomEventById(
 
 export function isRandomEventEligible(state: GameState, eventId: number): boolean {
   switch (eventId) {
+    case 8:
+      return state.advisorProgressState.funding > LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD;
     case 11:
       return state.player.research >= 6 || state.player.social >= 6;
     case 12:

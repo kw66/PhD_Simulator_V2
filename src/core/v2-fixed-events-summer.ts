@@ -38,8 +38,8 @@ function createSummerVacationPlanEvent(state: GameState): PendingEvent {
     id: `summer-vacation-plan-y${state.year}-m${state.month}`,
     title: "暑假 ➜ 暑假计划",
     description: [
-      "家里又问起哪天到站，你切到车票页面，已经想起了家里的饭菜。桌上那篇文献还摊着，旁边标了好几个问号；实验室难得这么安静，放下它又有点舍不得。",
-      "朋友的旅行攻略偏偏这时候发来。你一张张翻着照片，越看越想走。这趟要花 4 金币，翻到账户余额时，你的手终于停了下来。",
+      "家里问哪天到站，你切到车票页面，惦记起家里的饭菜。桌上文献还标着几个问号；实验室难得安静，放下又有点舍不得。",
+      "朋友偏偏发来旅行攻略，你翻着照片越看越想走。这趟要花 4 金币，翻到账户余额时，手终于停了下来。",
     ].join("\n\n"),
     chainId: "summer-vacation",
     stage: "act2",
@@ -77,8 +77,8 @@ export function createSummerVacationEvent(state: GameState): PendingEvent {
     id: `summer-vacation-y${state.year}-m${state.month}`,
     title: "暑假",
     description: [
-      "校园进入暑期，食堂窗口少开了几个。你端着餐盘绕了一圈，才发现常吃的那家也贴上了放假通知，实验楼的灯倒还照常亮着。",
-      "老师在群里说实验室照常开放，朋友发来出游邀请，家里也问你什么时候回来。手机接连响了几声，这个夏天一下子热闹起来。",
+      "暑期食堂少开了几个窗口。你端着餐盘绕一圈，常吃的那家也放假了，实验楼的灯倒还照常亮着。",
+      "老师在群里说实验室照常开放，朋友邀你出游，家里问你何时回来。手机接连响起，这个夏天一下子热闹起来。",
     ].join("\n\n"),
     chainId: "summer-vacation",
     choices: [
@@ -112,11 +112,11 @@ export function resolveSummerVacationFixedEvent(
           month: state.month,
           title: "暑假 ➜ 暑假计划 ➜ 新学期将至",
           description: [
-            "你回到家，把闹钟往后调了调。白天帮家里做些琐事，晚上出门散步，吃饭时总算不用一边嚼一边惦记实验结果。",
-            "研究笔记还在包里，想起来也会翻两页。刚看到一半，厨房里又喊你尝尝咸淡；你合上本子过去，发现今天最急的事原来是别让汤煮干。",
+            "回家后，你把闹钟调晚，白天帮忙做琐事，晚上散步，吃饭总算不用一边嚼一边惦记实验结果。",
+            "偶尔翻两页研究笔记，厨房又喊你尝咸淡。你合上本子过去，发现今天最急的事原来是别让汤煮干。",
           ].join("\n\n"),
           outcome: `SAN +${sanRecovery}。`,
-          settlement: `SAN +${sanRecovery}`,
+          settlement: `结果：SAN +${sanRecovery}`,
           effects: sanRecovery === 0 ? {} : { san: sanRecovery },
         })],
       };
@@ -131,11 +131,11 @@ export function resolveSummerVacationFixedEvent(
           month: state.month,
           title: "暑假 ➜ 暑假计划 ➜ 学术进步",
           description: [
-            "你留在学校，把文献、实验记录和没想明白的问题摊在桌上。周围安静下来，你终于有空沿着一个疑问慢慢查，而不是读到一半又赶去做别的事。",
-            "几轮对照下来，笔记里总算不全是问号了。你把几个能接着试的思路圈出来，又在旁边补上理由，免得过几天只记得自己当时觉得很有道理。",
+            "你留校把文献、实验记录和疑问摊在桌上。周围安静下来，终于能沿着一个问题慢慢查，不用读到一半又赶去忙别的。",
+            "几轮对照，笔记总算不全是问号了。你圈出能接着试的思路，补上理由，免得过几天只记得自己当时觉得很有道理。",
           ].join("\n\n"),
           outcome: "下次想 idea 多 1 次，永久 idea +1 分。",
-          settlement: "下次想 idea +1 次｜永久 idea +1",
+          settlement: "结果：下次想 idea +1 次｜永久 idea +1",
           effects: {
             temporaryActionEffectUpdates: { idea: { extraActions: 1 } },
             ideaBonus: 1,
@@ -154,11 +154,11 @@ export function resolveSummerVacationFixedEvent(
           month: state.month,
           title: "暑假 ➜ 暑假计划 ➜ 难忘旅程",
           description: [
-            "你和朋友挑了个不远的城市，把行程排得很松。白天随处走走，晚上找小馆子吃饭，聊天内容从实验进度变成了明天去哪儿、哪家店好吃。",
-            "回程时，你翻着照片核对开销，发现拍得最多的还是吃的。待办清单一项没少，可这几天确实没怎么想起它，连返程车上都睡得挺沉。",
+            "你和朋友去邻近城市，行程排得很松。白天闲逛，晚上找小馆子，聊的从实验进度变成了明天去哪儿、哪家店好吃。",
+            "回程翻照片核对开销，拍得最多的还是吃的。待办清单一项没少，这几天却没怎么想起，连返程车上都睡得挺沉。",
           ].join("\n\n"),
           outcome: `花了 4 金币，SAN +${sanRecovery}。`,
-          settlement: `金币 -4｜SAN +${sanRecovery}`,
+          settlement: `结果：金币 -4｜SAN +${sanRecovery}`,
           effects: {
             money: -4,
             ...(sanRecovery === 0 ? {} : { san: sanRecovery }),

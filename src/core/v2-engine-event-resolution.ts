@@ -12,6 +12,8 @@ import { clampResearchToCap } from "./v2-research-cap-system";
 import { createRandomEventById } from "./v2-random-event-router";
 import { refreshPaperCompetitionEvent } from "./v2-paper-competition-preview";
 import { refreshPaperReviewEvent } from "./v2-publication-system";
+import { refreshScholarshipEvent } from "./v2-fixed-events-scholarship";
+import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import type {
   DeferredEventStatePatch,
   EventChoice,
@@ -307,8 +309,8 @@ function rebuildRandomEventFromCurrentState(
 }
 
 export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
-  return refreshOccupiedLoverEvent(state, refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state,
-    refreshRandomResultPreview(state, rebuildRandomEventFromCurrentState(state, queuedEvent)))));
+  return refreshScholarshipEvent(state, refreshOccupiedLoverEvent(state, refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state,
+    refreshRandomResultPreview(state, rebuildRandomEventFromCurrentState(state, queuedEvent))))));
 }
 
 function refreshOccupiedLoverEvent(state: GameState, event: EventQueueItem): EventQueueItem {
@@ -352,8 +354,8 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => (event.stage === "act2" || event.stage === "result")
-    && (event.randomReplay || event.chainId === "lover-development")
+  const eventQueue = state.eventQueue.map((event) => event.chainId === "scholarship" || ((event.stage === "act2" || event.stage === "result")
+    && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };
 }
@@ -364,6 +366,9 @@ export function applyQueuedEventEffects(
   choiceId: string | undefined,
   callbacks: EventResolutionCallbacks,
 ): GameState {
+  if (queuedEvent.chainId === "scholarship" && !state.eventQueue.some((event) => event.id === queuedEvent.id)) {
+    return state;
+  }
   const resolvedEvent = getResolvableQueuedEvent(state, queuedEvent);
   let choice = resolvedEvent.choices.find((item) => item.id === choiceId);
   if (!choice) {
@@ -375,7 +380,15 @@ export function applyQueuedEventEffects(
 
   choice = deferResearchChoiceEffects(resolvedEvent, choice);
 
-  const stateWithDeferredResolution = applyDeferredStatePatch(state, resolvedEvent.deferredStatePatch);
+  const scholarshipContext = resolvedEvent.scholarshipContext;
+  const blockScholarshipAward = resolvedEvent.chainId === "scholarship" && scholarshipContext?.success
+    && (hasScholarshipDisqualification(state)
+      || (state.scholarshipState.lastAwardYear ?? 0) >= scholarshipContext.year);
+  const pendingPatch = blockScholarshipAward
+    ? resolvedEvent.deferredStatePatch?.filter((change) => change.path[0] !== "scholarshipState"
+      && change.path.join(".") !== "player.money")
+    : resolvedEvent.deferredStatePatch;
+  const stateWithDeferredResolution = applyDeferredStatePatch(state, pendingPatch);
   const {
     nextState: resolvedState,
     resolvedOutcome,
@@ -469,6 +482,18 @@ export function applyQueuedEventEffects(
       resolvedHistory,
       resolvedOutcome,
     ), { eventHistoryId });
+    if (choice.effects.labProjectProgress) {
+      const previousLogIds = new Set(state.log.map((entry) => entry.id));
+      const [eventLog, ...remainingLogs] = nextState.log;
+      nextState = {
+        ...nextState,
+        log: [
+          ...remainingLogs.filter((entry) => !previousLogIds.has(entry.id)),
+          eventLog!,
+          ...remainingLogs.filter((entry) => previousLogIds.has(entry.id)),
+        ],
+      };
+    }
   }
   nextState = callbacks.evaluateImmediateEndings(nextState);
   if (nextState.phase !== "playing") return nextState;

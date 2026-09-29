@@ -324,27 +324,18 @@ describe("hidden paper competition lifecycle", () => {
     expect(getRoll).not.toHaveBeenCalled();
   });
 
-  it.each(COMPETITIONS)("debug $eventId remembers only one draw and wakes through the real research action", ({ eventId, field, sanCost }) => {
+  it.each(COMPETITIONS)("debug $eventId supplies a target and appears on the first click", ({ eventId, field }) => {
     const initial = makeState();
     const payload = { eventId: `random-${eventId}` };
-    const hidden = dispatchAction(initial, "debug-trigger-event", payload);
-    expect(hidden.papers).toEqual([]);
-    expect(hidden.eventQueue).toEqual([]);
-    expect(hidden.log).toEqual(initial.log);
-    expect(hidden.player).toEqual(initial.player);
-    expect(hidden.totalRandomEventCount).toBe(8);
-    expect(hidden.pendingPaperCompetitionEvents).toEqual([{ eventId, serial: 8 }]);
-    const duplicate = dispatchAction(hidden, "debug-trigger-event", payload);
-    expect(duplicate).toEqual(hidden);
-
-    const paper = makePaper(0, field === "experiment" ? { idea: 4 } : {});
-    const ready = { ...duplicate, papers: [paper], selectedPaperId: paper.id };
-    const awake = dispatchAction(ready, "research-paper", { paperId: paper.id, paperActionType: field });
+    const awake = dispatchAction(initial, "debug-trigger-event", payload);
+    expect(awake.papers).toHaveLength(1);
     expect(awake.papers[0]![field]).toBeGreaterThan(0);
-    expect(awake.player.san).toBe(20 - sanCost);
+    expect(awake.log).toEqual(initial.log);
+    expect(awake.player).toEqual(initial.player);
+    expect(awake.actionState).toEqual(initial.actionState);
     expect(awake.eventQueue).toHaveLength(1);
     expect(awake.eventQueue[0]).toMatchObject({
-      stage: "act1", paperCompetitionTargetId: paper.id, randomReplay: { eventId, serial: 8 },
+      stage: "act1", paperCompetitionTargetId: awake.papers[0]!.id, randomReplay: { eventId, serial: 8 },
     });
     expect(awake.totalRandomEventCount).toBe(8);
     expect(awake.pendingPaperCompetitionEvents).toEqual([]);
@@ -360,6 +351,16 @@ describe("hidden paper competition lifecycle", () => {
     expect(awake.eventQueue).toHaveLength(1);
     expect(awake.eventQueue[0]!.paperCompetitionTargetId).toBe(initial.papers[0]!.id);
     expect(awake.pendingPaperCompetitionEvents).toEqual([]);
+  });
+
+  it("keeps each replay bound to its own event when debug reveals both hidden competitions", () => {
+    const initial = rememberBoth(makeState());
+    const awake = dispatchAction(initial, "debug-trigger-event", { eventId: "random-17" });
+    expect(awake.eventQueue).toHaveLength(2);
+    for (const event of awake.eventQueue) {
+      expect(event.replayContext?.debugEventId).toBe(event.chainId);
+      expect(event.replayContext?.rootEvent.paperCompetitionTargetId).toBe(event.paperCompetitionTargetId);
+    }
   });
 
   it("protects both a revealed queued event and the other hidden type across an actual annual reset", () => {

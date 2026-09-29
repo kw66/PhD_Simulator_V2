@@ -3,7 +3,7 @@ import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { advanceFellowTask } from "../src/core/v2-fellow-actions";
-import { advanceFellowCooperation, settlePendingFellowHelp } from "../src/core/v2-fellow-cooperation";
+import { advanceFellowCooperation, advanceFellowCooperationWithLog, settlePendingFellowHelp } from "../src/core/v2-fellow-cooperation";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { advanceFellowResearch, ensureFellowPapers, getFellowCurrentPaper } from "../src/core/v2-fellow-research";
 import { addPaperCollaboration, getPaperScoreBreakdown } from "../src/core/v2-paper-collaboration";
@@ -36,6 +36,70 @@ function scores(paper: Paper): number[] {
 }
 
 afterEach(() => vi.restoreAllMocks());
+
+describe("fellow completion announcements", () => {
+  it("orders manual help above completion above the action and does not repeat on retry", () => {
+    const base = withPending(makeState("senior"), { taskProgress: 99 });
+    const next = advanceFellowTask({ ...base, log: [] }, base.fellowProgressState[0]!.id, () => 0);
+    expect(next.log.map((entry) => entry.text.split("：")[0])).toEqual([
+      "论文帮助", "论文帮助", "科研协作完成", "科研协作",
+    ]);
+    expect(next.log[2]!.text).toContain("林青，协作进度满100");
+    expect(next.log[1]!.text).toContain("idea+20");
+    expect(next.log[0]!.text).toContain("idea+10");
+    expect(new Set(next.log.map((entry) => entry.id)).size).toBe(4);
+    expect(settlePendingFellowHelp(next, () => 0)).toBe(next);
+    expect(advanceFellowTask(next, base.fellowProgressState[0]!.id, () => 0)).toBe(next);
+  });
+
+  it("announces multiple wraps once without replacing either pending snapshot or consuming randomness", () => {
+    const base = withPending(makeState(), { taskProgress: 99, pendingHelpToPlayer: 7, pendingHelpToFellow: 8 });
+    const state = { ...base, log: [], papers: [], fellowPapers: [] };
+    const random = vi.spyOn(Math, "random");
+    const completed = advanceFellowCooperationWithLog(state, base.fellowProgressState[0]!.id, 205);
+    expect(completed.log).toHaveLength(1);
+    expect(completed.log[0]!.text).toContain("协作进度满100（3次）");
+    expect(completed.log[0]!.text).toContain("待生效（7分），不叠加");
+    expect(completed.log[0]!.text).toContain("待生效（8分），不叠加");
+    expect(completed.fellowProgressState[0]).toMatchObject({ taskProgress: 4, pendingHelpToPlayer: 7, pendingHelpToFellow: 8 });
+    expect(settlePendingFellowHelp(completed)).toBe(completed);
+    expect(random).not.toHaveBeenCalled();
+    expect(state.log).toEqual([]);
+  });
+
+  it("announces saved amounts only when blocked help actually settles later", () => {
+    const base = withPending(makeState("senior"), { taskProgress: 99 });
+    const completed = advanceFellowCooperationWithLog({ ...base, papers: [], fellowPapers: [], log: [] }, base.fellowProgressState[0]!.id, 1);
+    expect(completed.log).toHaveLength(1);
+    expect(settlePendingFellowHelp(completed, () => 0)).toBe(completed);
+    const ready = { ...completed, papers: base.papers, fellowPapers: base.fellowPapers,
+      player: { ...completed.player, research: 1 },
+      fellowProgressState: completed.fellowProgressState.map((profile) => ({ ...profile, research: 1 })),
+    };
+    const random = vi.spyOn(Math, "random");
+    const settled = settlePendingFellowHelp(ready, () => 0);
+    expect(settled.log).toHaveLength(3);
+    expect(settled.log[0]!.text).toContain("idea+10");
+    expect(settled.log[1]!.text).toContain("idea+20");
+    expect(settled.log[2]).toEqual(completed.log[0]);
+    expect(settlePendingFellowHelp(settled, () => 0)).toBe(settled);
+    expect(random).not.toHaveBeenCalled();
+  });
+
+  it("keeps monthly completion and actual help in the engine log without routine cooperation spam", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const base = withPending(makeState("senior"), { taskProgress: 99 });
+    const next = dispatchAction({ ...base, log: [] }, "next-month");
+    const relevant = next.log.filter((entry) => /^(科研协作完成|论文帮助)：/.test(entry.text));
+    expect(relevant.map((entry) => entry.text.split("：")[0])).toEqual(["论文帮助", "论文帮助", "科研协作完成"]);
+    expect(relevant.every((entry) => entry.month === 2)).toBe(true);
+    expect(advanceFellowResearch(next, () => 0)).toBe(next);
+    const ordinary = advanceFellowResearch({ ...next, totalMonths: 3, month: 3 }, () => 0);
+    expect(ordinary.log.filter((entry) => entry.text.startsWith("科研协作"))).toEqual(
+      next.log.filter((entry) => entry.text.startsWith("科研协作")),
+    );
+  });
+});
 
 describe("fellow cooperation completion", () => {
   it.each([false, true])("immediately settles a junior unlocked by senior help regardless of card order (%s)", (seniorFirst) => {

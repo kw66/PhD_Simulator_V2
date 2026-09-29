@@ -6,7 +6,7 @@ import { evaluateCoreEndings, finishTrainingIfReady, quitGame } from "./v2-endin
 import { applyQueuedEventEffects, refreshPendingEventDecisions } from "./v2-engine-event-resolution";
 import { hasManualBlockingEvents, settleLinearEvents } from "./v2-event-auto-resolution";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "./v2-development-flags";
-import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
+import { pushLog, pushMilestoneLog, pushNoOpLog } from "./v2-engine-helpers";
 import { createInitialState as buildInitialState } from "./v2-engine-state-factory";
 import { enqueueMonthlyEventsForMonth } from "./v2-event-scheduler";
 import {
@@ -22,6 +22,7 @@ import { yearlyResetRandomEventState } from "./v2-random-event-rules";
 import { activatePendingRandomEvents } from "./v2-paper-competition-waiting";
 import { refreshPaperCompetitionEvents } from "./v2-paper-competition-preview";
 import { applyMonthlyEffects, applyMonthStartSubscriptions, resolveMonthlyEffects } from "./v2-monthly-effects";
+import { getInternshipStatus } from "./v2-internship-system";
 import { applyReadPaperActions, getManualReadPaperCount } from "./v2-reading-system";
 import { applyResearchOperation, createResearchPaper } from "./v2-research-operation";
 import { applyPartTimeWork } from "./v2-part-time-work";
@@ -65,6 +66,7 @@ function buildMonthStartSettlementLog(
   resolution: ReturnType<typeof applyMonthlyEffects>["resolution"],
 ): string {
   const details = resolution.items.flatMap((item) => {
+    if (item.id === "internship-monthly") return [];
     const changes = (Object.keys(MONTHLY_LOG_STAT_LABELS) as Array<keyof PlayerStats>).flatMap((statId) => {
       const value = item.appliedStats[statId] ?? 0;
       const preserveZero = (statId === "san" || statId === "money") && Object.hasOwn(item.appliedStats, statId);
@@ -76,6 +78,33 @@ function buildMonthStartSettlementLog(
     return item.note ? [`${item.name} ${item.note}`] : [];
   });
   return details.length > 0 ? `\n月初结算：${details.join("｜")}` : "";
+}
+
+function buildInternshipSettlementLog(
+  resolution: ReturnType<typeof applyMonthlyEffects>["resolution"],
+): string {
+  const item = resolution.items.find((entry) => entry.id === "internship-monthly");
+  if (!item) return "";
+  const stats = (Object.keys(MONTHLY_LOG_STAT_LABELS) as Array<keyof PlayerStats>)
+    .flatMap((statId) => {
+      const value = item.appliedStats[statId] ?? 0;
+      return value === 0 && statId !== "san" && statId !== "money"
+        ? [] : [`${MONTHLY_LOG_STAT_LABELS[statId]} ${formatSignedValue(value)}`];
+    });
+  return `${item.name}结算：${stats.join("、")}${item.note ? `（${item.note}）` : ""}`;
+}
+
+function buildInternshipLifecycleLogs(before: GameState, after: GameState): string[] {
+  const previous = getInternshipStatus(before);
+  const current = getInternshipStatus(after);
+  const logs: string[] = [];
+  if (previous.pending && current.active) {
+    logs.push(`${current.kind === "remote3" ? "远程实习" : "大厂实习"}开始：本月起生效。`);
+  }
+  if (previous.active && !current.active) {
+    logs.push(`${previous.kind === "remote3" ? "远程实习" : "大厂实习"}结束：本次实习已完成。`);
+  }
+  return logs;
 }
 
 function buildMonthAdvanceLog(
@@ -198,7 +227,13 @@ function createAdvancedCalendarState(state: GameState): GameState {
   }
   const monthlyEffects = applyMonthlyEffects(journalResolution.state);
   const monthLog = buildMonthAdvanceLog(calendar.year, calendar.month, monthlyEffects.resolution);
-  const monthlyState = evaluateCoreEndings(pushLog(monthlyEffects.nextState, monthLog));
+  let monthlyLoggedState = pushLog(monthlyEffects.nextState, monthLog);
+  const internshipSettlement = buildInternshipSettlementLog(monthlyEffects.resolution);
+  if (internshipSettlement) monthlyLoggedState = pushMilestoneLog(monthlyLoggedState, internshipSettlement, "internship-settlement");
+  for (const lifecycleLog of buildInternshipLifecycleLogs(state, monthlyEffects.nextState)) {
+    monthlyLoggedState = pushMilestoneLog(monthlyLoggedState, lifecycleLog, "internship-lifecycle");
+  }
+  const monthlyState = evaluateCoreEndings(monthlyLoggedState);
   if (monthlyState.phase !== "playing") return monthlyState;
   const fellowResearchState = advanceFellowResearch(resolveReadyJournalPapers(monthlyState).state);
   const settledJournalState = attendFellowConferences(resolveReadyJournalPapers(fellowResearchState).state);

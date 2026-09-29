@@ -258,6 +258,30 @@ function addPublicationEffects(effects: Map<string, AccumulatedEffect>, buff: Bu
 }
 
 function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): void {
+  if (buff.scholarshipDisqualified === true) {
+    addEffect(effects, {
+      id: `${buff.timing}:rule:scholarship-disqualified`,
+      timing: buff.timing,
+      operation: "max",
+      value: 1,
+      source: getSourceText(buff),
+      isCost: true,
+      category: "publication",
+      renderLabel: () => "图片误用",
+    });
+  }
+  if (buff.labExperimentMoneyDelta !== undefined) {
+    addEffect(effects, {
+      id: `${buff.timing}:rule:lab-experiment-money-delta`,
+      timing: buff.timing,
+      operation: "sum",
+      value: buff.labExperimentMoneyDelta,
+      source: `${getSourceText(buff)} · 玩家与同学共享；优先导师经费，不足玩家自付，同学不足转横向`,
+      isCost: true,
+      category: "money",
+      renderLabel: (value) => `实验金币${formatSignedNumber(value)}`,
+    });
+  }
   if (buff.activeOperationSanMultiplier !== undefined) {
     addEffect(effects, {
       id: `${buff.timing}:rule:active-operation-san-multiplier`,

@@ -36,7 +36,7 @@ function getTalentCard(html: string, id: string): string {
 
 describe("v2 publication growth transparency", () => {
   it.each([false, true])("preserves every publication talent icon while showing completed status %s in its badge", (completed) => {
-    const state = createStartedGameState("normal");
+    const state = { ...createStartedGameState("normal"), month: 1, totalMonths: 1 };
     if (completed) {
       const bestPaper = publishedPaper("A", "Best Paper");
       state.externalPublications = [
@@ -90,7 +90,7 @@ describe("v2 publication growth transparency", () => {
   });
 
   it("renders the publication talent checklist in its own tab", () => {
-    const state = createStartedGameState("normal");
+    const state = { ...createStartedGameState("normal"), month: 1, totalMonths: 1 };
     const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "talent", activeTalentTab: "publication" });
     const publicationList = html;
 
@@ -115,7 +115,7 @@ describe("v2 publication growth transparency", () => {
   });
 
   it("allows one first-author A Best Paper to complete every matching checklist item", () => {
-    const state = createStartedGameState("normal");
+    const state = { ...createStartedGameState("normal"), month: 1, totalMonths: 1 };
     state.externalPublications = [publishedPaper("A", "Best Paper")];
 
     const completedIds = getPublicationTalentChecklist(state)

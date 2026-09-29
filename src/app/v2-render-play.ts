@@ -1,5 +1,5 @@
 import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
-import { getActiveOperationAllowance, getAiCollaborationStatus } from "../core/v2-ai-shop";
+import { getActiveOperationAllowance, getAiCollaborationStatus, hasAiReimbursement } from "../core/v2-ai-shop";
 import { PAPER_SLOT_RESEARCH_THRESHOLDS, SCORE_BY_TARGET } from "../core/v2-content";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getCitationStats } from "../core/v2-citation-stats";
@@ -23,7 +23,7 @@ import { getFellowName, getFellowResearchTopic, getFellowRoleLabel, getFellowsIn
 import { getFellowDiscussionSanCost } from "../core/v2-fellow-actions";
 import { getFellowCurrentPaper } from "../core/v2-fellow-research";
 import { getFellowAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
-import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverRouteCost, getLoverRouteGain, getLoverRouteProgress } from "../core/v2-lover-progression";
+import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverPassiveGains, getLoverRouteCost, getLoverRouteGain, getLoverRouteProgress } from "../core/v2-lover-progression";
 import { previewPartTimeWork } from "../core/v2-part-time-work";
 import { getLoverName } from "../core/v2-lover-system";
 import { getLoverGiftCount } from "../core/v2-lover-gift";
@@ -404,7 +404,7 @@ function getAttrTierTooltip(kind: AttrTierId, value: number, illnessProbability 
     return `当前疾病概率 ${illnessProbability}%｜月末结算 ${signedChange}%`;
   }
   if (kind === "research") {
-    return `科研增减有${currentChance}%概率无效\n事件科研任务 SAN 减免 ${RESEARCH_CHORE_SAN_DISCOUNT[tier]}`;
+    return `科研增减有${currentChance}%概率无效\n事件中的科研任务 SAN 减免 ${RESEARCH_CHORE_SAN_DISCOUNT[tier]}`;
   }
   const label = kind === "social" ? "社交" : "好感";
   return `${label}增减有${currentChance}%概率无效`;
@@ -586,8 +586,8 @@ function buildEffectBuckets(state: GameState): {
   if (coffeeBonus > 0) {
     upsertBucketItem(monthly, "monthly", `冰美式额外 SAN+${coffeeBonus}`, "咖啡机");
   }
-  if (state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths) {
-    upsertBucketItem(monthly, "monthly", "AI 使用费 0 金币", "导师经费");
+  if (hasAiReimbursement(state)) {
+    upsertBucketItem(monthly, "monthly-ai-reimbursement", "AI报销", "导师经费", false, "money");
   }
   const entitlementCountText = (count: number) => count > 1 ? ` ×${count}` : "";
   const loverGiftCount = getLoverGiftCount(state);
@@ -800,7 +800,7 @@ const EVENT_EMOJI_THEMES: readonly [string, readonly [string, string, string]][]
   ["数据找回", ["💾", "🧰", "✅"]],
   ["留下隐患", ["💾", "⚠️", "😬"]],
   ["被抢发idea", ["💡", "🛡️", "🧩"]],
-  ["新SOTA", ["📈", "🧪", "🚀"]],
+  ["新sota", ["📈", "🧪", "🚀"]],
   ["联合培养", ["🤝", "🌐", "🧳"]],
   ["毕业论文", ["🎓", "📚", "✅"]],
   ["临时事务", ["📝", "📋", "✅"]],
@@ -982,7 +982,8 @@ function renderEventDescriptionHtml(
 }
 
 function isEventSettlementCondition(value: string): boolean {
-  if (/[<>≥≤]/u.test(value) || /第\s*\d+\s*档/u.test(value)) return true;
+  if (/[<>≥≤]/u.test(value) || /第\s*\d+\s*档/u.test(value)
+    || /[（(](?:概率\s*)?\d+(?:\.\d+)?%[）)]/u.test(value)) return true;
   return /^(?:达到科研分门槛|获胜|落败|无本金|押注|导师请客|AA 聚餐|重装成功|重装失败|维修成功|维修翻车|导师到场|导师缺席|有熟悉的|无熟悉的|获得审稿灵感|未获得审稿灵感|对方考研进组|对方毕业|互挂成功|互挂未成|没有后续波澜|转而专注自身研究)/u.test(value);
 }
 
@@ -1015,24 +1016,25 @@ function splitEventSettlementRows(items: string[]): { conditions: string[]; resu
   for (const item of items) {
     const normalized = item.trim();
     if (!normalized) continue;
-    if (normalized.startsWith("条件：")) {
-      conditions.push(...splitEventSettlementItems(normalized.slice(3)));
-      continue;
-    }
-    if (normalized.startsWith("结果：")) {
-      addResults(splitEventSettlementItems(normalized.slice(3)));
-      continue;
-    }
-
-    for (const part of splitEventSettlementItems(normalized)) {
-      if (isEventSettlementCondition(part)) {
-        conditions.push(part);
+    let section: "condition" | "result" | null = null;
+    for (const segment of normalized.split(/(条件：|结果：)/u)) {
+      if (segment === "条件：") {
+        section = "condition";
+      } else if (segment === "结果：") {
+        section = "result";
       } else {
-        addResults([part]);
+        for (const part of splitEventSettlementItems(segment)) {
+          if (section === "condition" || (section === null && isEventSettlementCondition(part))) {
+            conditions.push(part);
+          } else {
+            addResults([part]);
+          }
+        }
       }
     }
   }
 
+  if (conditions.length > 0 && results.length === 0) results.push("无事发生");
   return { conditions, results };
 }
 
@@ -2219,7 +2221,7 @@ function getFellowCooperationHint(state: GameState, profile: FellowProgressProfi
   const research = Math.max(0, Math.floor(state.player.research));
   const role = getFellowRoleLabel(profile.type, profile.gender);
   const target = profile.type === "senior" ? "idea" : profile.type === "peer" ? "随机项" : "实验";
-  return `科研协作：⌊你的科研⌋+随机0～5，即${research}～${research + 5}\n满100：${role}帮你论文${target}+${Math.floor(profile.research)}分，你帮对方论文最低项+${research}分`;
+  return `科研协作：⌊你的科研⌋+随机0～5，即${research}～${research + 5}\n每月${role}自动推进：默契＝${Math.floor(profile.affinity)}\n满100：${role}帮你论文${target}+${Math.floor(profile.research)}分，你帮对方论文最低项+${research}分`;
 }
 
 function getFellowInheritanceHint(state: GameState, profile: FellowProgressProfile): string {
@@ -2306,7 +2308,10 @@ function renderAdvisorStatus(state: GameState): string {
           const research = Math.max(0, Math.floor(state.player.research));
           const reward = projectType === "horizontal" ? `经费+${ADVISOR_HORIZONTAL_REWARD}、你的劳务费+5`
             : "科研积累+10%（下取整），你和每位同学各获论文写作协作+10";
-          const hint = `${label}：⌊你的科研⌋+随机0～5，即${research}～${research + 5}\n满100：${reward}`;
+          const advisorProgress = projectType === "horizontal"
+            ? "导师每月与纵向交替，轮到横向且经费>0时自动+10"
+            : "导师每月与横向交替，轮到纵向时自动+10";
+          const hint = `${label}：⌊你的科研⌋+随机0～5，即${research}～${research + 5}\n${advisorProgress}\n同学参与项目时：⌊同学科研⌋+随机0～5\n满100：${reward}`;
           return `<div class="rel-advisor-project-row" data-advisor-project="${projectType}">
             <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icon)}${label}</span>
             <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${PROJECT_PROGRESS_MAX}" aria-valuenow="${Math.min(progress, PROJECT_PROGRESS_MAX)}">
@@ -2324,6 +2329,8 @@ function renderAdvisorStatus(state: GameState): string {
 
 function renderLoverRoutes(state: GameState): string {
   const identity = `person:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`;
+  const passiveGains = getLoverPassiveGains(state);
+  const loverTypeLabel = state.loverState.type === "beautiful" ? "活泼恋人" : "聪慧恋人";
   const icons = { play: "🎡", study: "📖", shopping: "🛍️" };
   const labels = { play: "玩耍", study: "学习", shopping: "购物" };
   const used = state.loverProgressState.taskUsedThisMonth
@@ -2341,7 +2348,10 @@ function renderLoverRoutes(state: GameState): string {
       const gain = getLoverRouteGain(state, route);
       const formula = route === "play" ? "⌊(亲密+你的社交)/2⌋" : route === "study" ? "⌊(你的科研+恋人科研)/2⌋" : "⌊亲密/2⌋+10";
       const reward = getLoverNextReward(state, route).replace("永久idea、实验、写作各+1分", "论文三项分数永久+1");
-      const hint = `${label}：${formula}＝${gain}\n下次满100：${reward}`;
+      const passiveFormula = (state.loverState.type === "beautiful" && route === "play")
+        || (state.loverState.type === "smart" && route === "study") ? "亲密" : "⌊亲密/2⌋";
+      const passiveHint = route === "shopping" ? "" : `\n${loverTypeLabel}每月自动推进：${passiveFormula}＝${passiveGains[route]}`;
+      const hint = `${label}：${formula}＝${gain}${passiveHint}\n下次满100：${reward}`;
       return `<div class="rel-lover-route" data-lover-route="${route}">
         <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icons[route])}${label}</span>
         <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
@@ -2702,8 +2712,8 @@ function renderResearchPromotionActions(state: GameState, paper: Paper): string 
   };
   const promotionIcons: Record<PaperPromotionId, string> = {
     arxiv: "▤",
-    github: "⌘",
-    xiaohongshu: "✦",
+    github: '<i data-lucide="git-fork" aria-hidden="true"></i>',
+    xiaohongshu: '<i data-lucide="book-open" aria-hidden="true"></i>',
     quantum: "◇",
   };
   const promotionEffects: Record<PaperPromotionId, string> = {
@@ -3115,7 +3125,7 @@ function buildInternshipTalentItem(state: GameState, requestedPage = 0): TalentP
   const pending = status.pending && remote;
   const metrics = remote
     ? [
-        { label: "线上实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-3" }, { label: "每月金币", value: "+1" },
+        { label: "线上实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-2" }, { label: "每月金币", value: "+1" },
         { label: "实验金币", value: "-1" }, { label: "实验", value: "+4" }, { label: "实验", value: "×1.0" },
       ]
     : [
@@ -3726,6 +3736,9 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
   const getTabActiveClass = (tabId: PlayTabId): string => activePlayTab === tabId ? " active" : "";
   const getTabAriaPressed = (tabId: PlayTabId): string => activePlayTab === tabId ? "true" : "false";
   const getTabPanelHidden = (tabId: PlayTabId): string => activePlayTab === tabId ? "" : " hidden";
+  const lockedModule = isGameplayModuleLocked(state)
+    ? '<div class="section-empty play-module-lock-state">入学后开放</div>'
+    : null;
 
   const renderTabBadge = (count: number, tone: "blocking" | "available", label: string): string => (
     count > 0
@@ -3779,15 +3792,15 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("workstation")}" data-tab-panel="workstation"${getTabPanelHidden("workstation")}>
-            ${renderEnhancedWorkstationSection(state)}
+            ${lockedModule ?? renderEnhancedWorkstationSection(state)}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("relationship")}" data-tab-panel="relationship"${getTabPanelHidden("relationship")}>
-            ${renderRelationshipSection(state, uiState)}
+            ${lockedModule ?? renderRelationshipSection(state, uiState)}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("shop")}" data-tab-panel="shop"${getTabPanelHidden("shop")}>
-            ${renderInteractiveShopSection(
+            ${lockedModule ?? renderInteractiveShopSection(
               state,
               uiState.activeShopTab,
               uiState.selectedChairUpgradeId,
@@ -3797,11 +3810,11 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("research")}" data-tab-panel="research"${getTabPanelHidden("research")}>
-            ${renderResearchSection(state, uiState)}
+            ${lockedModule ?? renderResearchSection(state, uiState)}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("talent")}" data-tab-panel="talent"${getTabPanelHidden("talent")}>
-            ${renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.loverRewardPage, uiState.internshipPage)}
+            ${lockedModule ?? renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.loverRewardPage, uiState.internshipPage)}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("settings")}" data-tab-panel="settings"${getTabPanelHidden("settings")}>
@@ -3961,7 +3974,7 @@ function getLogEntryClassName(text: string): string {
   ].filter(Boolean).join(" ");
 }
 
-const LOG_VALUE_CHANGE_PATTERN = /(?:(?:SAN\s*(?:值|上限)?)|金币|导师好感(?:度)?|好感(?:度)?|默契度|亲密度|亲和度|社交(?:能力)?|科研(?:能力|积累|经费|上限|分)?|生病概率|每月实验次数|参加次数|idea|实验|写作|引用)\s*[+＋\-−]\s*\d+(?:\.\d+)?%?/giu;
+const LOG_VALUE_CHANGE_PATTERN = /(?:(?:SAN\s*(?:值|上限)?)|金币|导师好感(?:度)?|好感(?:度)?|默契(?:度)?|亲密(?:度)?|亲和度|社交(?:能力)?|科研(?:能力|积累|经费|上限|分)?|生病概率|每月实验次数|参加次数|(?:论文)?(?:idea|实验|写作)协作|(?:横向|纵向|协作)进度|idea|实验|写作|引用)\s*[+＋\-−]\s*\d+(?:\.\d+)?%?/giu;
 
 function renderLogLineHtml(text: string): string {
   let cursor = 0;

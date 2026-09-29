@@ -17,6 +17,7 @@ import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
 import { collectThesisEventForMonth } from "../src/core/v2-monthly-thesis-events";
 import { createFundingCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
 import { createAdvisorTalkRandomEvent } from "../src/core/v2-random-events-lab-advisor-talk";
+import { activatePendingRandomEvents } from "../src/core/v2-paper-competition-waiting";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import type { EventChoice, PendingEvent } from "../src/core/v2-types";
 
@@ -48,17 +49,22 @@ describe("v2 event scheduler", () => {
     { research: 6, favor: 6 },
   ])("keeps advisor preparation and familiarity hints independent at $research/$favor", ({ research, favor }) => {
     const initial = createInitialState();
-    const event = createAdvisorTalkRandomEvent({ ...initial, player: { ...initial.player, research, favor } }, () => 0.99);
+    const event = createAdvisorTalkRandomEvent({ ...initial, totalResearchScore: 2, player: { ...initial.player, research, favor } }, () => 0.99);
     const decision = event.choices[0]!.effects.enqueueEvents![0]!;
     const paragraphs = decision.description.split(/\n\s*\n/u);
 
     expect(paragraphs).toHaveLength(2);
-    expect(paragraphs[0]).toContain(research >= 6 ? "依据都能一一对上" : "对照也没补齐");
-    expect(paragraphs[1]).toContain(favor >= 6 ? "记得你上次卡住的地方" : "还在核对你的课题和进度");
+    expect(paragraphs[0]).toContain(research >= 6 ? "依据都能对上" : "对照也没补齐");
+    expect(paragraphs[1]).toContain(favor >= 6 ? "记得你上次卡住的地方" : "还在问课题何时做完");
     expect(paragraphs[0]!.length).toBeLessThanOrEqual(90);
     expect(paragraphs[1]!.length).toBeLessThanOrEqual(130);
     expect(decision.description).not.toMatch(/科研\s*[≥<]|好感\s*[≥<]|\d+%/u);
-    expect(decision.choices.every((choice) => !/[≥<]|\d+%/u.test(choice.outcome))).toBe(true);
+    expect(decision.choices[0]!.outcome).toContain(research >= 6 ? "科研 ≥ 6" : "科研 < 6");
+    expect(decision.choices[1]!.outcome).toContain(favor >= 6 ? "导师好感 ≥ 6" : "导师好感 < 6");
+    expect(decision.choices[2]!.outcome).toContain("科研分 ≥ 2");
+    for (const choice of decision.choices.slice(1, 3)) {
+      expect(choice.effects.enqueueEvents!.at(-1)!.description).toContain(choice.outcome);
+    }
     expect(decision.choices[0]!.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(research >= 6 ? 6 : undefined);
     expect(decision.choices[0]!.effects.favor).toBe(research < 6 ? -1 : undefined);
     expect(decision.choices[1]!.effects.research).toBe(favor >= 6 ? 1 : undefined);
@@ -67,7 +73,7 @@ describe("v2 event scheduler", () => {
 
   it.each([5, 6, 18])("keeps advisor talk narrative within two natural paragraphs at favor %i", (favor) => {
     const initial = createInitialState();
-    const event = createAdvisorTalkRandomEvent({ ...initial, player: { ...initial.player, favor, research: favor } }, () => 0.99);
+    const event = createAdvisorTalkRandomEvent({ ...initial, totalResearchScore: 2, player: { ...initial.player, favor, research: favor } }, () => 0.99);
     const decision = event.choices[0]!.effects.enqueueEvents![0]!;
     expect(event.description).toContain("群");
     expect(event.description).toContain("PPT");
@@ -82,7 +88,7 @@ describe("v2 event scheduler", () => {
       expect(story).not.toMatch(/SAN|倍率|金币|科研\s*[≥<]|好感\s*[≥<]/u);
     }
     const confirmation = results[2]!.choices[0]!.effects;
-    expect(Boolean(confirmation.internshipStateUpdates)).toBe(favor >= 6);
+    expect(Boolean(confirmation.internshipStateUpdates)).toBe(true);
     expect(confirmation.temporaryActionEffectUpdates).toBeUndefined();
     expect(confirmation.san).toBeUndefined();
     expect(confirmation.money).toBeUndefined();
@@ -130,7 +136,7 @@ describe("v2 event scheduler", () => {
       const choiceEvent = event.choices[0]?.effects.enqueueEvents?.[0];
       expect(event.description).toContain("导师在群里回了句“谢谢大家”");
       expect(event.description).not.toContain("好感等级");
-      expect(choiceEvent?.description).toContain("聊天记录往上翻");
+      expect(choiceEvent?.description).toContain("聊天记录几乎全是“收到”");
       expect(choiceEvent?.description).not.toContain("万一导师正好有事找我帮忙");
       expect(choiceEvent?.description).not.toContain("不会显得空手");
       expect(choiceEvent?.description).not.toContain("不会显得敷衍");
@@ -193,7 +199,7 @@ describe("v2 event scheduler", () => {
     expect(gains).toEqual([0, 1, 2]);
   });
 
-  it("omits the settlement block when a Teacher's Day result changes no values", () => {
+  it("keeps the resolved condition when a Teacher's Day result changes no values", () => {
     const lowFavorState = {
       ...createInitialState(),
       phase: "playing" as const,
@@ -218,9 +224,9 @@ describe("v2 event scheduler", () => {
       () => 0.99,
     );
 
-    expect(lowFavorResult.enqueueEvents?.[0]?.description).not.toContain("机制结算");
+    expect(lowFavorResult.enqueueEvents?.[0]?.description).toContain("导师好感 < 6");
     expect(lowFavorResult.enqueueEvents?.[0]?.description).not.toContain("无直接数值变化");
-    expect(highFavorResult.enqueueEvents?.[0]?.description).not.toContain("机制结算");
+    expect(highFavorResult.enqueueEvents?.[0]?.description).toContain("导师好感 ≥ 6");
     expect(highFavorResult.enqueueEvents?.[0]?.description).not.toContain("无直接数值变化");
   });
 
@@ -243,10 +249,12 @@ describe("v2 event scheduler", () => {
     expect(result.nextState.player.san).toBe(17);
     expect(result.nextState.player.favor).toBe(2);
     expect(result.outcome).toContain("SAN -3，导师好感+1");
-    expect(result.enqueueEvents?.[0]?.description).toContain("SAN -3\n导师好感+1");
+    expect(result.enqueueEvents?.[0]?.description).toContain("SAN -3");
+    expect(result.enqueueEvents?.[0]?.description).toContain("导师好感+1");
     expect(result.enqueueEvents?.[0]?.completionLog).toContain("SAN -3，导师好感+1");
     expect(result.outcome).toContain("报销跑腿");
-    expect(result.enqueueEvents?.[0]?.description).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
+    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[0]).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
+    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("导师好感 < 6");
   });
 
   it("hints at Teacher's Day branches through familiarity without numerical odds", () => {
@@ -262,19 +270,20 @@ describe("v2 event scheduler", () => {
     const choiceEvent = createTeachersDayEvent(state, () => 0).choices[0]?.effects.enqueueEvents?.[0];
     expect(choiceEvent?.description).toContain("聊得熟了");
     expect(choiceEvent?.description).toContain("研究想法");
-    expect(choiceEvent?.description).toContain("也可能只来得及回一句谢谢");
+    expect(choiceEvent?.description).toContain("忙起来可能只回一句谢谢");
     expect(choiceEvent?.description.split(/\n\s*\n/u)).toHaveLength(2);
     expect(choiceEvent?.description).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
     const result = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => 0);
     expect(result.outcome).toContain("导师顺势分享了一个想法");
     expect(result.outcome).toContain("下次想 idea +3");
     expect(result.outcome).not.toMatch(/\d+%/u);
-    expect(result.enqueueEvents?.[0]?.description).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
+    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[0]).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
+    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("导师好感 ≥ 6");
     const lowFavorState = { ...state, player: { ...state.player, favor: 5 } };
     const lowFavorChoice = createTeachersDayEvent(lowFavorState, () => 0).choices[0]?.effects.enqueueEvents?.[0];
-    expect(lowFavorChoice?.description).toContain("还不算熟");
+    expect(lowFavorChoice?.description).toContain("还不熟");
     expect(lowFavorChoice?.description).toContain("报销");
-    expect(lowFavorChoice?.description).toContain("客气的回复");
+    expect(lowFavorChoice?.description).toContain("也可能只回一句谢谢");
     expect(lowFavorChoice?.description).toContain("1 金币");
     expect(lowFavorChoice?.description).toContain("3 金币");
     expect(lowFavorChoice?.description.split(/\n\s*\n/u)).toHaveLength(2);
@@ -524,10 +533,10 @@ describe("v2 event scheduler", () => {
 
     expect(`${intro}\n${decision}`).toContain("深度学习论文");
     expect(intro).toContain("公式一路排到附录");
-    expect(intro).toContain("有两步怎么也没找到解释");
+    expect(intro).toContain("有两步怎么也找不到解释");
     expect(decision).not.toContain("篇幅长、信息密");
     expect(intro).not.toContain("认真审能学到些东西");
-    expect(decision).toContain("核对清楚");
+    expect(decision).toContain("核清这几步");
     expect(decision).toContain("参考文献");
   });
 
@@ -565,8 +574,8 @@ describe("v2 event scheduler", () => {
     expect(familiarChoice?.effects.social).toBe(-1);
     expect(unfamiliarDecision?.description).not.toMatch(/社交.*\d/);
     expect(familiarDecision?.description).not.toMatch(/社交.*\d/);
-    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("无熟悉的师弟/师妹");
-    expect(familiarChoice?.effects.enqueueEvents?.[0]?.description).toContain("师弟");
+    expect(unfamiliarChoice?.outcome).toContain("师弟师妹人数 = 0");
+    expect(familiarChoice?.outcome).toContain("师弟师妹人数 > 0");
   });
 
   it("uses familiar junior status rather than social level for peer-review delegation copy", () => {
@@ -603,8 +612,8 @@ describe("v2 event scheduler", () => {
     expect(familiarChoice?.effects.social).toBe(-1);
     expect(unfamiliarDecision?.description).not.toMatch(/社交.*\d/);
     expect(familiarDecision?.description).not.toMatch(/社交.*\d/);
-    expect(unfamiliarChoice?.effects.enqueueEvents?.[0]?.description).toContain("无熟悉的师弟/师妹");
-    expect(familiarChoice?.effects.enqueueEvents?.[0]?.description).toContain("师妹");
+    expect(unfamiliarChoice?.outcome).toContain("师弟师妹人数 = 0");
+    expect(familiarChoice?.outcome).toContain("师弟师妹人数 > 0");
   });
 
   it("applies seasonal SAN modifiers to mentoring and review choices", () => {
@@ -696,7 +705,7 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-1);
   });
 
-  it("builds the real event 5 choices with research and favor thresholds", () => {
+  it("builds the real event 5 choices with research, favor and publication-score thresholds", () => {
     const initial = createInitialState();
     const baseState = {
       ...initial,
@@ -704,6 +713,7 @@ describe("v2 event scheduler", () => {
       year: 2,
       month: 5,
       totalMonths: 17,
+      totalResearchScore: 2,
       player: { ...initial.player, research: 6, favor: 6 },
       availableRandomEvents: [5],
       usedRandomEvents: [],
@@ -794,6 +804,7 @@ describe("v2 event scheduler", () => {
       month: 5,
       totalMonths: 17,
       player: { ...initial.player, research: 12, favor: 12 },
+      advisorProgressState: { ...initial.advisorProgressState, funding: 21 },
       availableRandomEvents: [8],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
@@ -817,12 +828,46 @@ describe("v2 event scheduler", () => {
     const fundedTwice = applyChoiceEffectsToState(funded, choices[2]!).nextState;
     expect(fundedTwice.shopState.entitlements.workstationTransaction).toBe(2);
     expect(choices[3]?.outcome).toContain("AI");
-    expect(choices[3]?.effects.addBuffs).toBeUndefined();
+    expect(choices[3]?.effects.addBuffs).toEqual([expect.objectContaining({
+      id: "ai-reimbursement",
+      name: "AI报销",
+      timing: "monthly",
+      remainingMonths: 1,
+      shopEffects: { aiCostsCovered: true },
+    })]);
     expect(choices[3]?.effects.eventSupportUpdates).toEqual({ aiCostsCoveredUntilTotalMonths: 17 });
+    const aiFunded = applyChoiceEffectsToState(baseState, choices[3]!).nextState;
+    expect(aiFunded.buffs).toContainEqual(expect.objectContaining({ id: "ai-reimbursement", name: "AI报销" }));
     const aiResult = choices[3]?.effects.enqueueEvents?.at(-1);
     expect(aiResult?.title).toContain("报销 AI 费用");
     expect(aiResult?.description).toContain("本月的费用");
-    expect(aiResult?.description).toContain("本月商店中的 AI 使用费用为 0");
+    expect(aiResult?.description).toContain("AI 报销：本月使用费为 0");
+  });
+
+  it("waits for advisor funding above the shared project threshold before showing event 8", () => {
+    const initial = createInitialState();
+    const state = {
+      ...initial,
+      phase: "playing" as const,
+      year: 2,
+      month: 5,
+      totalMonths: 17,
+      advisorProgressState: { ...initial.advisorProgressState, funding: 20 },
+      availableRandomEvents: [8],
+      usedRandomEvents: [],
+      totalRandomEventCount: 0,
+    };
+
+    const waiting = collectRandomEventsForMonth(state, fromRolls([0.7, 0]));
+    expect(waiting.events).toEqual([]);
+    expect(waiting.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId: 8, serial: 1 }]);
+
+    const activated = activatePendingRandomEvents({
+      ...waiting.nextState,
+      advisorProgressState: { ...waiting.nextState.advisorProgressState, funding: 21 },
+    }, () => 0);
+    expect(activated.pendingPaperCompetitionEvents).toEqual([]);
+    expect(activated.eventQueue.some((event) => event.chainId === "random-8")).toBe(true);
   });
 
   it("maps all four advisor-favor tiers to the new funding salary values", () => {
@@ -862,7 +907,7 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-2);
 
     const rejectResult = getDecisionChoices(result.events[0])[2]?.effects.enqueueEvents?.at(-1);
-    expect(rejectResult?.completionLog).toBe("婉拒合作：没有后续波澜｜无事发生。");
+    expect(rejectResult?.completionLog).toBe("婉拒合作：条件：无额外收益（50%）｜结果：无事发生。");
   });
 
   it("builds the real event 11 choices with one-shot action effects", () => {
@@ -922,8 +967,8 @@ describe("v2 event scheduler", () => {
     };
     const highFavorResult = collectRandomEventsForMonth(highFavorState, fromRolls([0.7, 0]));
     const highFavorChoices = getDecisionChoices(highFavorResult.events[0]);
-    expect(highFavorChoices[0]?.outcome).toBe("无事发生。");
-    expect(highFavorChoices[2]?.outcome).toBe("无事发生。");
+    expect(highFavorChoices[0]?.outcome).toBe("导师好感 ≥ 6｜无事发生。");
+    expect(highFavorChoices[2]?.outcome).toBe("导师好感 ≥ 6｜无事发生。");
     const complainResult = highFavorChoices[0]?.effects.enqueueEvents?.at(-1);
     expect(complainResult?.description.split("机制结算")[0]).toContain("一作按原来的安排");
     expect(complainResult?.description.split("机制结算")[1]).not.toContain("安抚");
@@ -938,6 +983,7 @@ describe("v2 event scheduler", () => {
       year: 2,
       month: 10,
       totalMonths: 22,
+      totalResearchScore: 2,
       player: { ...initial.player, research: 6, favor: 6 },
       availableRandomEvents: [5],
       usedRandomEvents: [],
@@ -992,7 +1038,7 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(collectThesisEventForMonth(spring).event ?? undefined)[1]?.effects.san).toBe(-1);
   });
 
-  it("builds the real event 13 choices with persistent and temporary experiment effects", () => {
+  it("builds the real event 13 choices with a shared six-month rental surcharge", () => {
     const baseState = {
       ...createInitialState(),
       phase: "playing" as const,
@@ -1008,13 +1054,16 @@ describe("v2 event scheduler", () => {
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("显卡故障");
     expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["催导师修", "举报挖矿", "自己重装", "淘宝找人"]);
-    expect(getDecisionChoices(result.events[0])[0]?.effects.experimentBonus).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.experimentBonus).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[0]?.effects.addBuffs).toMatchObject([{ labExperimentMoneyDelta: 1, remainingMonths: 6 }]);
     expect(getDecisionChoices(result.events[0])[1]?.effects.social).toBe(-2);
     expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-3);
     expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(-1);
-    expect(getDecisionChoices(result.events[0])[2]?.effects.temporaryActionEffectUpdates?.experiment?.multiplier).toBe(0.25);
-    expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBe(-4);
-    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.temporaryActionEffectUpdates).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[2]?.effects.addBuffs).toMatchObject([{ labExperimentMoneyDelta: 1, remainingMonths: 6 }]);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[3]?.effects.addBuffs).toMatchObject([{ labExperimentMoneyDelta: 1, remainingMonths: 6 }]);
 
     const serverDecision = result.events[0]?.choices[0]?.effects.enqueueEvents?.[0];
     const serverCopy = [
@@ -1023,7 +1072,9 @@ describe("v2 event scheduler", () => {
       ...(serverDecision?.choices.flatMap((choice) => choice.effects.enqueueEvents?.map((event) => event.description) ?? []) ?? []),
     ].join("\n");
     expect(serverCopy).toContain("显卡");
-    expect(serverCopy).not.toMatch(/数据丢失|备份|文件受损|进度受损|目录/);
+    expect(serverCopy).toContain("Linux");
+    expect(serverCopy).toContain("租卡");
+    expect(serverCopy).toContain("硬盘也格式化了");
   });
 
   it("builds the real event 14 choices with mentorship hooks", () => {
@@ -1078,7 +1129,7 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("游戏放松");
-    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["玩泰拉瑞亚", "玩魔塔50层", "玩研究生模拟器", "打王者荣耀"]);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["玩泰拉瑞亚", "玩魔塔50层", "玩研究生模拟器", "玩洛克王国世界"]);
     expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-3);
     expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-5);
     expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(2);
@@ -1122,9 +1173,9 @@ describe("v2 event scheduler", () => {
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("数据丢失");
     expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["熬夜补数据", "从头再来", "花钱恢复", "伪造数据"]);
-    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-6);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-5);
     expect(getDecisionChoices(result.events[0])[1]?.effects.clearDraftProgress).toBe(true);
-    expect(getDecisionChoices(result.events[0])[2]?.effects.money).toBe(-4);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.money).toBe(-3);
     expect(getDecisionChoices(result.events[0])[3]?.effects.draftCitationDebuffMultiplier).toBe(0.5);
     expect(getDecisionChoices(result.events[0])[3]?.effects).not.toHaveProperty("otherCitationPenaltyMultiplier");
 
@@ -1134,7 +1185,8 @@ describe("v2 event scheduler", () => {
       dataLossDecision?.description,
       ...(dataLossDecision?.choices.flatMap((choice) => choice.effects.enqueueEvents?.map((event) => event.description) ?? []) ?? []),
     ].join("\n");
-    expect(dataLossCopy).toContain("**自己的电脑**");
+    expect(dataLossCopy).toContain("自己的电脑");
+    expect(dataLossCopy).not.toContain("**自己的电脑**");
     expect(dataLossCopy).not.toContain("服务器");
   });
 
@@ -1172,7 +1224,7 @@ describe("v2 event scheduler", () => {
     };
 
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0]));
-    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-5);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(-4);
   });
 
   it("hides event 16 when there is no recoverable draft progress", () => {

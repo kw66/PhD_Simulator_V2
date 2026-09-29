@@ -15,6 +15,16 @@ function startGame() {
   return dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
 }
 
+function admitGame(state = startGame()) {
+  let next = state;
+  for (const choiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
+    const event = next.eventQueue.find((entry) => entry.chainId === "before-grad-school");
+    if (!event) break;
+    next = dispatchAction(next, "resolve-event", { eventId: event.id, eventChoiceId: choiceId });
+  }
+  return dispatchAction(next, "next-month");
+}
+
 function resolveCurrent(state: ReturnType<typeof startGame>) {
   const event = state.eventQueue[0];
   const choice = event?.choices[0];
@@ -206,7 +216,7 @@ describe("minimal game engine", () => {
   });
 
   it("cleans event-only state without applying discarded event outcomes", () => {
-    const base = dispatchAction(startGame(), "create-paper", { paperSlotIndex: 0 });
+    const base = dispatchAction(admitGame(), "create-paper", { paperSlotIndex: 0 });
     const paperId = base.papers[0].id;
     const state = {
       ...base,
@@ -268,20 +278,20 @@ describe("minimal game engine", () => {
     expect(secondRead).toEqual(firstRead);
   });
 
-  it("keeps paper topic and discard actions available in the pre-enrollment preview", () => {
-    const created = dispatchAction(startGame(), "create-paper", { paperSlotIndex: 0 });
-    const paper = created.papers[0];
-    if (!paper) throw new Error("preview paper is missing");
+  it("keeps paper topic and discard actions locked before enrollment", () => {
+    const initial = startGame();
+    expect(dispatchAction(initial, "create-paper", { paperSlotIndex: 0 })).toEqual(initial);
+    const paper = createDraftPaper(0, 0, () => 0);
+    const created = { ...initial, papers: [paper] };
 
     const rerolled = dispatchAction(created, "reroll-paper-topic", { paperId: paper.id });
-    expect(rerolled).not.toBe(created);
-    expect(rerolled.papers[0]?.id).toBe(paper.id);
+    expect(rerolled).toEqual(created);
 
     const discarded = dispatchAction(rerolled, "discard-paper", { paperId: paper.id });
-    expect(discarded.papers.some((entry) => entry.id === paper.id)).toBe(false);
+    expect(discarded).toEqual(created);
 
-    const rested = dispatchAction(startGame(), "rest");
-    expect(rested.actionState.used).toBe(1);
+    const rested = dispatchAction(created, "rest");
+    expect(rested).toEqual(created);
   });
 
   it("runs tiered part-time work through the shared action and SAN settlement", () => {
@@ -775,7 +785,7 @@ describe("minimal game engine", () => {
       "玩泰拉瑞亚",
       "玩魔塔50层",
       "玩研究生模拟器",
-      "打王者荣耀",
+      "玩洛克王国世界",
     ]);
 
     const gradSimChoice = decision?.choices.find((choice) => choice.label === "玩研究生模拟器");

@@ -1,6 +1,6 @@
 import { getRelationshipSanCost } from "./v2-buffs";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
-import { advanceFellowCooperation, settlePendingFellowHelp } from "./v2-fellow-cooperation";
+import { advanceFellowCooperationWithLog, settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { getFellowName, getFellowTaskSanCost } from "./v2-fellow-progression";
 import type { FellowProgressProfile, GameState } from "./v2-types";
 
@@ -22,9 +22,7 @@ export function advanceFellowTask(state: GameState, fellowId: string, random: ()
       ? { ...fellow, taskUsedThisMonth: true } : fellow),
   };
   const settledState = settlePendingFellowHelp(paidState, random);
-  const progressedState = { ...settledState, fellowProgressState: settledState.fellowProgressState.map((fellow) => fellow.id === fellowId
-    ? advanceFellowCooperation(fellow, progress, state.player.research) : fellow) };
-  const completed = Math.floor((profile.taskProgress + progress) / profile.taskMax);
-  return settlePendingFellowHelp(pushLog(progressedState,
-    `科研协作：${getFellowName(profile)}，协作进度+${progress}${sanCost > 0 ? `，SAN-${sanCost}` : ""}${completed > 0 ? "；已完成协作，双方自动帮助" : ""}`), random);
+  const actionState = pushLog(settledState,
+    `科研协作：${getFellowName(profile)}，协作进度+${progress}${sanCost > 0 ? `，SAN-${sanCost}` : ""}`);
+  return settlePendingFellowHelp(advanceFellowCooperationWithLog(actionState, fellowId, progress), random);
 }

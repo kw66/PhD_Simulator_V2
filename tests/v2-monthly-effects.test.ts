@@ -261,7 +261,7 @@ describe("monthly effects", () => {
         expect(state).toEqual(before);
         const item = firstPreview.items.find((entry) => entry.id === "internship-monthly");
         const effective = totalMonths <= 14;
-        expect(item?.stats).toEqual(effective ? { san: -3, money: 1 } : undefined);
+        expect(item?.stats).toEqual(effective ? { san: -2, money: 1 } : undefined);
         sanTotal += item?.stats.san ?? 0;
         moneyTotal += item?.stats.money ?? 0;
         state = dispatchAction({ ...state, eventQueue: [] }, "next-month");
@@ -275,7 +275,7 @@ describe("monthly effects", () => {
     } finally {
       random.mockRestore();
     }
-    expect({ sanTotal, moneyTotal }).toEqual({ sanTotal: -9, moneyTotal: 3 });
+    expect({ sanTotal, moneyTotal }).toEqual({ sanTotal: -6, moneyTotal: 3 });
     expect(state.internshipState).toEqual(createInternshipState());
   });
 

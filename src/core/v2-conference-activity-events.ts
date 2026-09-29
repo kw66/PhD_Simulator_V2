@@ -18,6 +18,29 @@ function createDiscardPaperUpdates(context: ConferenceActivityContext) {
   return (context.paperIds ?? []).map((id) => ({ id, conferenceHandled: true }));
 }
 
+function getActivityConditions(option: ConferenceActivityOptionDefinition): string[] {
+  const conditions: string[] = [];
+  const encounterUpdates = option.effects.conferenceEncounterUpdates;
+  const addCountCondition = (label: string, nextCount: number | undefined): void => {
+    if (nextCount !== undefined) {
+      conditions.push(`条件：${label} ${nextCount} ${nextCount >= 2 ? "≥" : "<"}2`);
+    }
+  };
+
+  switch (option.id) {
+    case "big-bull-joint-training":
+      addCountCondition("深入合作次数", encounterUpdates?.bigBullDeepCount);
+      break;
+    case "beautiful-lover-development":
+      addCountCondition("活泼学者交流次数", encounterUpdates?.beautifulCount);
+      break;
+    case "smart-lover-development":
+      addCountCondition("聪慧学者交流次数", encounterUpdates?.smartCount);
+      break;
+  }
+  return conditions;
+}
+
 function getActivityDecisionHint(option: ConferenceActivityOptionDefinition, state: ConferenceActivityBuildState): string {
   switch (option.id) {
     case "enterprise-networking":
@@ -61,8 +84,9 @@ export function createConferenceActivityResult(
       option.resultDescription,
       "回程时，你把胸牌塞进会务袋。下次再挂上它，又不知道会在哪座城市了。",
       "机制结算",
-      activitySummary,
-      ...getConferencePaperPresentationResults(context),
+      ...getActivityConditions(option),
+      `结果：${activitySummary}`,
+      ...getConferencePaperPresentationResults(context).map((result) => `结果：${result}`),
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -101,9 +125,9 @@ export function createConferenceActivityDecisionEvent(
     title: "会场活动 ➜ 选择安排",
     description: [
       `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，先前圈过的几项恰好撞了时间。` + (context.paperCount >= 2
-        ? `忙完 ${context.paperCount} 篇论文的展示，你不想再来回赶场，准备挑一项好好参加。`
-        : "展示已经忙完，你把讲稿收进包里，准备挑一项好好参加。"),
-      "你把讲稿收进包里，终于有空看看周围。" + (selectedOptions.map((option) => getActivityDecisionHint(option, state)).filter(Boolean).join("")
+        ? `忙完 ${context.paperCount} 篇论文的展示，你不想再赶场，只想好好参加一项。`
+        : "展示忙完了，你准备挑一项参加。"),
+      "收好讲稿，你看看周围。" + (selectedOptions.map((option) => getActivityDecisionHint(option, state)).filter(Boolean).join("")
         || "茶歇区还在聊刚才的报告，门外也透着阳光。忙了这么久，出去走走同样让人心动。"),
       ...(getConferencePaperPresentationResults(context).length > 0
         ? ["机制结算", ...getConferencePaperPresentationResults(context)]

@@ -5,7 +5,6 @@
   getActualResearchMiscSanChange,
   formatActualSanChange,
   getActualSanChange,
-  getResearchMiscSanNarrative,
   getTierResistedNarrative,
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
@@ -24,10 +23,13 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   const usedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
   const isLowSocial = state.player.social < 6;
   const canAddPeer = canAddRelationship(state.relationshipState, "peer");
+  const fellowCapacity = Math.max(0, state.relationshipState.unlockedSlots - 1);
+  const peerSlotCondition = canAddPeer
+    ? `同学槽位 ${state.relationshipState.occupiedSlots} < ${fellowCapacity}`
+    : `同学槽位 ${state.relationshipState.occupiedSlots} ≥ ${fellowCapacity}`;
   const exchangeSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
   const fullSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const fullSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
-  const fullSanNarrative = getResearchMiscSanNarrative(-2, state.player.research);
   const mutualSuccess = getRoll() < 0.5;
   const targetRoll = getRoll();
   const mutualTarget = targetRoll < 0.2 ? "A" : targetRoll < 0.5 ? "B" : "C";
@@ -53,8 +55,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-exchange-${serial}`,
         label: "\u5b66\u672f\u4ea4\u6d41",
         outcome: isLowSocial
-          ? `${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}｜下次想 idea +${ideaBonus}。`
-          : `下次想 idea +${ideaBonus}。`,
+          ? `社交 < 6｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}｜下次想 idea +${ideaBonus}。`
+          : `社交 ≥ 6｜下次想 idea +${ideaBonus}。`,
         effects: {
           ...(isLowSocial ? { san: exchangeSanChange } : {}),
           temporaryActionEffectUpdates: { idea: { bonus: ideaBonus } },
@@ -64,8 +66,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-mutual-${serial}`,
         label: "\u4e92\u6302\u8bba\u6587",
         outcome: mutualSuccess
-          ? `互挂成功｜生成一篇非一作 ${mutualTarget} 类论文，仅计引用。`
-          : "互挂未成｜无事发生。",
+          ? `互挂成功（50%）｜条件：${mutualTarget}类（成功后${mutualTarget === "A" ? 20 : mutualTarget === "B" ? 30 : 50}%）｜结果：非一作 ${mutualTarget} 类论文 +1，仅计引用。`
+          : "互挂未成（50%）｜无事发生。",
         effects: mutualSuccess
           ? { grantedPublication: { target: mutualTarget, acceptedScore: mutualTarget === "A" ? 4 : mutualTarget === "B" ? 2 : 1, nonFirstAuthor: true } }
           : {},
@@ -74,8 +76,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-reject-${serial}`,
         label: "\u5a49\u62d2\u5408\u4f5c",
         outcome: rejectSuccess
-          ? "没有后续波澜｜无事发生。"
-          : `转而专注自身研究｜下次想 idea +${rejectIdeaBonus}｜下次写作 +${rejectWritingBonus}。`,
+          ? "条件：无额外收益（50%）｜结果：无事发生。"
+          : `条件：获得灵感（50%）｜结果：下次想 idea +${rejectIdeaBonus}｜下次写作 +${rejectWritingBonus}。`,
         effects: rejectSuccess
           ? {}
           : { temporaryActionEffectUpdates: { idea: { bonus: rejectIdeaBonus }, writing: { bonus: rejectWritingBonus } } },
@@ -84,8 +86,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         id: `random-10-full-${serial}`,
         label: "\u5168\u9762\u5408\u4f5c",
         outcome: isLowSocial
-          ? `${fullSanSummary}｜下次想 idea 额外 1 次｜下次写作额外 1 次。`
-          : `${fullSanSummary}${canAddPeer ? "｜新增同门" : "｜关系栏已满，暂不新增同门"}｜下次想 idea 额外 1 次｜下次写作额外 1 次。`,
+          ? `社交 < 6｜${fullSanSummary}｜下次想 idea 额外 1 次｜下次写作额外 1 次。`
+          : `社交 ≥ 6｜${fullSanSummary}｜${peerSlotCondition}${canAddPeer ? "｜同门 +1" : "｜暂不新增同门"}｜下次想 idea 额外 1 次｜下次写作额外 1 次。`,
         effects: {
           san: fullSanChange,
           ...(!isLowSocial && canAddPeer ? { fellowAdditions: [peerAddition] } : {}),
@@ -105,8 +107,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      `白板上列出实验、写作和投稿，负责人却还空着。${isLowSocial ? `你和${peerName}还不太会接彼此的话，解释一组实验就绕了几圈。一起做完眼前的事还行，往后能不能一直配合，你心里没底。` : `你和${peerName}越聊越顺，几句话就分清了各自擅长的部分。对方翻出下个月的日程，已经在问以后什么时候一起讨论。`}`,
-      `若只互相补点工作、挂个名字，得等对方确认排期，口头约好也未必落得下来。真要全面合作，你自己的实验也还在排队；婉拒倒不至于闹僵，刚记下的几个点子还能带回去想想。${!isLowSocial && !canAddPeer ? "普通关系栏已满，全面合作仍可获得本次合作收益，但不会新增同门；你可以现在选择退出。" : ""}`,
+      `白板列了实验、写作和投稿，负责人还空着。${isLowSocial ? `你和${peerName}接话还不顺，解释一组实验就绕了几圈。眼前的事能做，往后能否一直配合，你没底。` : `你和${peerName}越聊越顺，很快分清各自擅长的部分。对方翻出下月日程，问起以后讨论的时间。`}`,
+      `互相补点工作、挂个名字，也得确认排期，口头约好未必落得下来。全面合作会挤占自己的实验；婉拒不至于闹僵，刚记的点子还能带回去想。${!isLowSocial && !canAddPeer ? "普通关系栏已满，全面合作仍有本次收益，但不新增同门；你可以现在退出。" : ""}`,
     ].join("\n\n"),
     results: {
       [`random-10-exchange-${serial}`]: {
@@ -117,16 +119,16 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
               "几个箭头擦了又画，总算对上了意思。散场时你有些疲惫，还是认真拍下白板：下次想方案，至少不用再对着空白页发呆。",
             ].join("\n\n")
           : [
-              `你们决定先聊思路。${peerName}提醒你别漏掉一组对照，你也替${peerPronoun}补上了实验设计里没交代清楚的一步。`,
-              "聊到白板快写不下，你才发现原本绕不出来的问题，换个人接着问几句就有了新方向。临走拍好照片，下次构思方案时正好拿出来用。",
+              `先聊思路，${peerName}提醒你别漏一组对照，你也替${peerPronoun}补清实验设计里的一步。`,
+              "聊到白板快写不下，原本绕不出的问题，换个人问几句就有了新方向。临走拍好照片，下次构思方案正好用。",
             ].join("\n\n"),
       },
       [`random-10-mutual-${serial}`]: {
         title: "互补合作",
         description: mutualSuccess
           ? [
-              "你们谈好各自承担的部分和署名顺序，由对方主导这篇论文。你接下补充实验，把设置和结果一起整理过去，省得临交稿还要翻聊天记录。",
-              `${peerName}发来录用消息时，你把作者列表看了两遍。不是一作，名字却实实在在印在上面；那几张反复核对的表格，总算有了去处。`,
+              "谈好分工和署名，由对方主导论文。你接下补充实验，把设置和结果一起发过去，省得临交稿还翻聊天记录。",
+              `${peerName}发来录用消息，你把作者列表看了两遍。不是一作，名字却印在上面；反复核对的表格，总算有了去处。`,
             ].join("\n\n")
           : [
               "你们把各自能补的实验和署名谈了一遍，打开日历才发现，能一起开工的时间怎么也对不上。口头上的分工很齐，排期里却没有位置。",
@@ -146,17 +148,15 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
         title: isLowSocial ? "合作受阻" : canAddPeer ? "新增同门" : "继续合作",
         description: isLowSocial
           ? [
-              "共享文档很快建好，分工却只写了个大概。等你们各自忙完一轮，才发现两个人都以为那组对照是对方在做。",
-              "你们对着记录重新分了工，把选题拆成两条备选，也把写作提纲先列在文档里。这回先做到这里，下次继续时不用再从白板上的第一个箭头开始。",
-              ...(fullSanNarrative ? [fullSanNarrative] : []),
+              "共享文档建好了，分工却只写个大概。各忙一轮，才发现两人都以为那组对照是对方在做。",
+              "你们重新分工，列好两条备选和写作提纲。这回先到这里，下次不用再从白板上的第一个箭头开始。",
             ].join("\n\n")
           : [
-              `你和${peerName}把分工逐项写进共享文档，连什么时候碰头都定了下来。页面不算好看，至少每项任务后面都有个明确的人名。`,
-              "共享文档里留下了选题提纲、实验分工和两条备选方案。下次再打开它，你至少知道该从哪一页接着做。",
+              `你和${peerName}把分工、碰头时间写进共享文档。页面不好看，至少每项任务后都有个明确的人名。`,
+              "选题提纲、实验分工和两条备选都留下了，下次打开，知道从哪页接着做。",
               canAddPeer
-                ? "临走前，你们约好下次继续。以后遇到问题，总算有个知道前情、可以直接接着聊的同门。"
-                : "你们收好这次的讨论记录，没再约固定合作。眼下要顾的同伴已经够多，再添一位，怕是连碰头的时间都凑不齐。",
-              ...(fullSanNarrative ? [fullSanNarrative] : []),
+                ? "临走约好下次继续。以后有问题，总算有个知道前情、能接着聊的同门。"
+                : "你们收好记录，没再约固定合作。要顾的同伴已够多，再添一位，怕是连碰头时间都凑不齐。",
             ].join("\n\n"),
       },
     },
@@ -176,14 +176,13 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   const lightIdeaBonus = drawInclusiveInt(6, 10, getRoll);
   const deepSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const deepSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
-  const deepSanNarrative = getResearchMiscSanNarrative(-2, state.player.research);
   const mentorSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const mentorSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
-  const mentorSanNarrative = getResearchMiscSanNarrative(-4, state.player.research);
   const deepResearchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
   const deepResearchChange = deepResearchResult.effectiveChange;
   const deepResearchNarrative = getTierResistedNarrative("科研", 1, deepResearchResult);
   const canAddSenior = canAddRelationship(state.relationshipState, "senior");
+  const fellowCapacity = Math.max(0, state.relationshipState.unlockedSlots - 1);
   const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender, usedNames, getRoll);
 
   const event: PendingEvent = {
@@ -215,7 +214,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
       {
         id: `random-11-deep-${serial}`,
         label: "\u6df1\u5165\u5408\u4f5c",
-        outcome: `${deepSanSummary}；${formatTierResistedOutcome("科研", 1, deepResearchResult)}${canAddSenior ? `；新增${roleText}` : "；关系栏已满，暂不新增"}`,
+        outcome: `${deepSanSummary}；${formatTierResistedOutcome("科研", 1, deepResearchResult)}；${canAddSenior ? `同学槽位 ${state.relationshipState.occupiedSlots} < ${fellowCapacity}；新增${roleText}` : `同学槽位 ${state.relationshipState.occupiedSlots} ≥ ${fellowCapacity}；暂不新增`}`,
         effects: {
           ...(deepResearchChange > 0 ? { research: deepResearchChange } : {}),
           san: deepSanChange,
@@ -225,7 +224,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
       {
         id: `random-11-mentor-${serial}`,
         label: "\u62dc\u5165\u95e8\u4e0b",
-        outcome: `${mentorSanSummary}；永久写作 +4${canAddSenior ? `；新增${roleText}` : "；关系栏已满，暂不新增"}。`,
+        outcome: `${mentorSanSummary}；永久写作 +4；${canAddSenior ? `同学槽位 ${state.relationshipState.occupiedSlots} < ${fellowCapacity}；新增${roleText}` : `同学槽位 ${state.relationshipState.occupiedSlots} ≥ ${fellowCapacity}；暂不新增`}。`,
         effects: {
           writingBonus: 4,
           san: mentorSanChange,
@@ -242,8 +241,8 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      `${roleText}把接下来要做的实验一项项圈出来。你指着两处追问，听到解释才发现，之前卡住的地方还有这样的做法。翻到写作那页，密密麻麻的批注又让你坐直了些，这些写法要是学会，以后自己动笔也用得上。`,
-      `想学的东西一下多起来，真跟着做也得花时间。${canAddSenior ? "对方说可以把分工定下来，往后固定找时间讨论。你翻出自己的日程，盘算着从哪一块开始。" : "你手头的合作已经排满，再答应长期讨论，怕是谁也顾不好。普通关系栏已满，本次仍可获得收益，但不会新增师兄或师姐；你可以现在选择退出。"}`,
+      `${roleText}圈出接下来的实验。你追问两处，才发现之前卡住的地方还有这样的做法。翻到写作页，密密麻麻的批注让你坐直了些：学会这些，以后自己动笔也用得上。`,
+      `想学的东西多了，跟着做也得花时间。${canAddSenior ? "对方提议定好分工，固定讨论。你翻出日程，盘算从哪块开始。" : "手头合作已排满，再约长期讨论，怕是谁也顾不好。普通关系栏已满，本次仍有收益，但不新增师兄或师姐；你可以现在退出。"}`,
     ].join("\n\n"),
     results: {
       [`random-11-watch-${serial}`]: {
@@ -266,18 +265,16 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
           `你跟着${roleText}把选题、实验和写作过了一遍。记录里几行轻描淡写的“调整设置”，摊开讲竟占了大半页笔记。`,
           "你把每一步为什么这样做补在旁边，又回头核对了一轮。讨论结束，桌上的水早就凉了，你把这次用到的方法单独标出来，留着以后对照。",
           ...(deepResearchNarrative ? [deepResearchNarrative] : []),
-          ...(deepSanNarrative ? [deepSanNarrative] : []),
         ].join("\n\n"),
       },
       [`random-11-mentor-${serial}`]: {
         title: "拜入门下",
         description: [
-          `你请${roleText}多教些写作，把刚讨论的思路写成一段练习。对方从论证顺序到句子衔接逐处批注，你原以为挺清楚的一段，旁边多了好几个问号。`,
-          "照着改过几轮，你慢慢认出了自己总爱含糊带过的地方。这套写法逐句练过，以后动笔也用得上。",
+          `你请${roleText}多教些写作，把思路写成练习。对方从论证到衔接逐处批注，原以为挺清楚的一段，旁边多了好几个问号。`,
+          "改过几轮，你认出了自己总爱含糊带过的地方。逐句练过，以后动笔也用得上。",
           canAddSenior
-            ? `${roleText}答应以后继续帮你看写作：“先自己改一遍，再拿来聊。”你点点头，把这页批注仔细收好。`
-            : "你收好这次的批注，没有再约固定讨论。已有的合作还要照顾，这套写法先留给自己慢慢练熟。",
-          ...(mentorSanNarrative ? [mentorSanNarrative] : []),
+            ? `${roleText}答应继续帮你看：“先自己改一遍，再拿来聊。”你点头，仔细收好批注。`
+            : "你收好批注，没再约固定讨论。已有的合作还要顾，这套写法先自己慢慢练熟。",
         ].join("\n\n"),
       },
     },

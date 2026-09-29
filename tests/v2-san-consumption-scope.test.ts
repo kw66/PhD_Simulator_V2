@@ -110,6 +110,7 @@ describe("event SAN scope", () => {
 
   it.each([1, 6, 12, 18])("defers remote internship costs to monthly settlement at research %i", (research) => {
     const state = stateForMonth(11);
+    state.totalResearchScore = 2;
     state.player.research = research;
     state.buffs = [modifierBuff({ activeOperationSanMultiplier: 1.5, activeOperationSanDelta: -1, relationshipOperationSanDelta: -10 })];
     const event = createRandomEventById(5, state, () => 0).event!;
@@ -118,8 +119,8 @@ describe("event SAN scope", () => {
     const approval = choice.effects.enqueueEvents!.at(-1)!.choices[0]!.effects.internshipStateUpdates!;
     expect(approval).toMatchObject({ remainingMonths: 3, kind: "remote3", startTotalMonths: 12, endTotalMonths: 14 });
     const monthly = resolveMonthlyEffects({ ...state, totalMonths: 12, month: 12, internshipState: { ...state.internshipState, ...approval } });
-    expect(monthly.items.find((item) => item.id === "internship-monthly")?.appliedStats).toEqual({ san: -3, money: 1 });
-    expect(choice.outcome).toContain("SAN -3");
+    expect(monthly.items.find((item) => item.id === "internship-monthly")?.appliedStats).toEqual({ san: -2, money: 1 });
+    expect(choice.outcome).toContain("SAN -2");
   });
 
   it("shows and settles an event cost exactly once with all global modifiers", () => {
@@ -146,9 +147,10 @@ describe("event SAN scope", () => {
     state.buffs = [modifierBuff({ activeOperationSanMultiplier: 1.5, activeOperationSanDelta: -1 })];
     const paper = { ...createDraftPaper(1, 0), idea: 40, experiment: 40 };
     state.papers = [paper];
-    const resolution = { paperId: paper.id, field, multiplier: 1.25, sanCost: 6 };
-    expect(previewPaperCompetitionResolution(state, resolution).resolvedOutcome).toContain("SAN -4");
-    expect(applyPaperCompetitionResolution(state, resolution).nextState.player.san).toBe(16);
+    const resolution = { paperId: paper.id, field, multiplier: 1.25, sanCost: field === "idea" ? 4 : 6 };
+    const expectedCost = field === "idea" ? 1 : 4;
+    expect(previewPaperCompetitionResolution(state, resolution).resolvedOutcome).toContain(`SAN -${expectedCost}`);
+    expect(applyPaperCompetitionResolution(state, resolution).nextState.player.san).toBe(20 - expectedCost);
     const free = { ...resolution, multiplier: 0.25, sanCost: 0 };
     expect(applyPaperCompetitionResolution({ ...state, month: 11 }, free).nextState.player.san).toBe(20);
   });

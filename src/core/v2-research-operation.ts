@@ -8,6 +8,7 @@ import { getShopExperimentMoneyDiscount, getShopPaperActionModifier } from "./v2
 import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
 import { combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { getInternshipExperimentEffect } from "./v2-internship-system";
+import { getLabExperimentMoneyCost } from "./v2-lab-compute";
 import type { GameState, PaperActionType } from "./v2-types";
 
 export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
@@ -16,15 +17,15 @@ export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
   writing: 4,
 };
 
-export const RESEARCH_EXPERIMENT_MONEY_COST = 3;
+export { RESEARCH_EXPERIMENT_MONEY_COST } from "./v2-lab-compute";
 
-export function getResearchExperimentMoneyCost(state: Pick<GameState, "shopState" | "internshipState" | "totalMonths">): number {
-  return Math.max(0, RESEARCH_EXPERIMENT_MONEY_COST
+export function getResearchExperimentMoneyCost(state: Pick<GameState, "shopState" | "internshipState" | "totalMonths" | "buffs">): number {
+  return Math.max(0, getLabExperimentMoneyCost(state)
     - getShopExperimentMoneyDiscount(state.shopState)
     - getInternshipExperimentEffect(state).moneyDiscount);
 }
 
-export function getResearchExperimentCostBreakdown(state: Pick<GameState, "shopState" | "advisorProgressState" | "internshipState" | "totalMonths">): {
+export function getResearchExperimentCostBreakdown(state: Pick<GameState, "shopState" | "advisorProgressState" | "internshipState" | "totalMonths" | "buffs">): {
   total: number;
   advisorFunding: number;
   playerMoney: number;

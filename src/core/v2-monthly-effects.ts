@@ -16,6 +16,7 @@ import {
   AI_SLOT_IDS,
   createAiBuffs,
   getAiRenewalPrice,
+  hasAiReimbursement,
   renewAiSubscriptionSlot,
   type AiModelOffer,
 } from "./v2-ai-shop";
@@ -314,7 +315,7 @@ export function applyMonthStartSubscriptions(
     player: { ...state.player },
   },
 ): AppliedMonthlyEffects {
-  const reimbursement = state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths;
+  const reimbursement = hasAiReimbursement(state);
   const renewalTargets: Array<
     | { kind: "ai"; slot: typeof AI_SLOT_IDS[number]; price: number; order: number }
     | { kind: "coffee"; price: number; order: number }

@@ -89,10 +89,10 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
     id: "joint-training-act2",
     title: "联合培养 ➜ 联培抉择",
     description: [
-      "你把方案拿去和导师商量，对方能提供的设备和研究支持让你圈出好几处。" + (context.pendingCitationCapBonus > 1
-        ? "对方提到同行读过你的论文，还想让你试试几个更难的问题。你翻回自己的成果列表，头一回觉得那些引用不只是数字。"
-        : "对方对你的工作还不太熟悉，打算先从眼前的课题合作起。你把一直缺条件验证的那套方案翻出来，准备再仔细讲讲。"),
-      "兴奋过后，你又翻回合作安排，想到以后要和两边讨论进展，还是有点紧张。" + (context.rejectedBigBullCoopCount === 0
+      "你拿方案和导师商量，圈出几处想要的设备和研究支持。" + (context.pendingCitationCapBonus > 1
+        ? "对方提到同行读过你的论文，想请你挑战更难的问题。头一回，你觉得那些引用不只是数字。"
+        : "对方还不太熟悉你的工作，想先合作眼前的课题。你翻出那套一直缺条件验证的方案，准备细讲。"),
+      "想到往后要和两边讨论进展，兴奋里又添了点紧张。" + (context.rejectedBigBullCoopCount === 0
         ? "对方说不必急着答复，之后有合适的时间还可以再谈。"
         : "这份邀请已经为你留过一回，对方也要排下一轮计划，再推辞就不好一直让人等着了。"),
     ].join("\n\n"),

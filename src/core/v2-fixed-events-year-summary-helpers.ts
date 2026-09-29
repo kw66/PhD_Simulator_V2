@@ -63,7 +63,7 @@ export function resolveYearSummaryChoice(
             "你趁任务间隙留出时间，晚上把手机放到枕头够不着的地方。起初还伸手摸了两次，后来就睡着了。再醒来时，窗帘缝里透着光，你在床上多躺了一会儿，才慢慢起身去吃饭。",
           ].join("\n\n"),
           outcome: "SAN +5。",
-          settlement: "SAN +5",
+          settlement: "结果：SAN +5",
           effects: { san: 5 },
         })],
       };
@@ -79,11 +79,11 @@ export function resolveYearSummaryChoice(
           year: state.year,
           month: state.month,
           description: [
-            "你抽空参加了校内活动，试着和其他课题组的同学搭话。从实验聊到食堂，你发现不用先准备一份汇报，也能把话接下去。散场时，你和聊得来的同学互道了再见。",
+            "校内活动上，你试着和其他课题组的同学搭话，从实验聊到食堂。不用先准备一份汇报，也能把话接下去。散场时，和聊得来的同学道了再见。",
             ...(socialNarrative ? [socialNarrative] : []),
-          ].join("\n\n"),
+          ].join(""),
           outcome: formatTierResistedOutcome("社交", 1, socialResult),
-          settlement: formatTierResistedOutcome("社交", 1, socialResult),
+          settlement: `结果：${formatTierResistedOutcome("社交", 1, socialResult)}`,
           effects: socialGain > 0 ? { social: socialGain } : {},
         })],
       };
@@ -100,11 +100,11 @@ export function resolveYearSummaryChoice(
           year: state.year,
           month: state.month,
           description: [
-            "你帮组里整理年度材料，逐项核对附件，把几个名字几乎一样的文件分清楚。导师问起时，你总算能直接指出该打开哪一份，不用跟着鼠标一起在文件夹里迷路。",
+            "你帮组里核对年度材料，分清几个名字几乎一样的附件。导师问起时，总算能指出该打开哪份，不用跟着鼠标在文件夹里迷路。",
             ...(favorNarrative ? [favorNarrative] : []),
-          ].join("\n\n"),
+          ].join(""),
           outcome: formatTierResistedOutcome("导师好感", 1, favorResult),
-          settlement: formatTierResistedOutcome("导师好感", 1, favorResult),
+          settlement: `结果：${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
           effects: favorGain > 0 ? { favor: favorGain } : {},
         })],
       };
@@ -122,7 +122,7 @@ export function resolveYearSummaryChoice(
             "你在课题空档接了份短期兼职，按约完成工作后收到了报酬。钱不算多，你还是反复看了几眼到账通知：这次打开手机，总算不是催你交材料的消息。",
           ].join("\n\n"),
           outcome: `金币 +${moneyGain}。`,
-          settlement: `金币 +${moneyGain}`,
+          settlement: `结果：金币 +${moneyGain}`,
           effects: { money: moneyGain },
         })],
       };

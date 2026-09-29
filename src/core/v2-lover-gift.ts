@@ -1,4 +1,4 @@
-import { AI_SLOT_IDS, getAiModelForTotalMonths } from "./v2-ai-shop";
+import { AI_SLOT_IDS, getAiModelForTotalMonths, hasAiReimbursement } from "./v2-ai-shop";
 import { getNextBikeTierDefinition } from "./v2-bike-system";
 import { COFFEE_MACHINE_PRICE, COFFEE_MACHINE_UPGRADE_DEFINITIONS, getAvailableCoffeeMachineUpgrades, getCoffeeBuyPrice } from "./v2-coffee-system";
 import { canBuyShopItem, getAvailableShopUpgrades } from "./v2-shop-items-ownership-status";
@@ -48,7 +48,7 @@ export function getShopActionBasePrice(state: GameState, actionId: ShopPurchaseA
     return upgrade ? entitlements.workstationTransaction > 0 ? 0 : upgrade.price : null;
   }
   if (actionId === "buy-ai-month" && payload.aiSlotId) {
-    return state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths
+    return hasAiReimbursement(state)
       ? 0 : getAiModelForTotalMonths(state.totalMonths, payload.aiSlotId).price;
   }
   if (actionId === "buy-support-item" && payload.supportItemId) return getSupportItemDefinition(payload.supportItemId).price;

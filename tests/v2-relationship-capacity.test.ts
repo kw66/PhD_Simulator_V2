@@ -57,7 +57,7 @@ describe("v2 relationship capacity", () => {
     const decision = getDecisionEvent(event);
 
     expect(decision.description).toContain("普通关系栏已满");
-    expect(decision.description).toContain("选择退出");
+    expect(decision.description).toContain("可以现在退出");
   });
 
   it("shows the no-op result when mentor-assignment slots are full", () => {

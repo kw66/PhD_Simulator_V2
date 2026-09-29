@@ -57,8 +57,14 @@ function isValidResolution(resolution: PaperCompetitionResolution): boolean {
     && (
       (resolution.multiplier === 0.25 && resolution.sanCost === 0)
       || (resolution.multiplier === 0.5 && resolution.sanCost === 1)
-      || (resolution.multiplier === 0.75 && resolution.sanCost === 3)
-      || (resolution.multiplier === 1.25 && resolution.sanCost === 6)
+      || (resolution.field === "idea" && (
+        (resolution.multiplier === 1 && resolution.sanCost === 2)
+        || (resolution.multiplier === 1.25 && resolution.sanCost === 4)
+      ))
+      || (resolution.field === "experiment" && (
+        (resolution.multiplier === 0.75 && resolution.sanCost === 3)
+        || (resolution.multiplier === 1.25 && resolution.sanCost === 6)
+      ))
     );
 }
 
@@ -70,6 +76,7 @@ export function formatPaperCompetitionOutcome(paper: Paper, resolution: PaperCom
   const fieldLabel = resolution.field === "idea" ? "idea" : "实验";
   const score = getAdjustedScore(paper, resolution);
   const sanOutcome = resolution.sanCost > 0 ? `${sanSummary}｜` : "";
+  if (resolution.multiplier === 1) return `${sanOutcome}${fieldLabel}保留`;
   return `${sanOutcome}${fieldLabel}×${resolution.multiplier}（${paper[resolution.field]}→${score}）`;
 }
 
@@ -90,7 +97,10 @@ export function previewPaperCompetitionResolution(
       resolvedOutcome: !paper ? "目标论文已丢弃，本次不作处理"
         : paper.status === "published" ? "目标论文已录用，本次不受影响"
           : paper.status === "journal-reviewing" ? "目标论文已进入期刊修改，本次不受影响"
-            : "目标论文已不符合条件，本次不作处理",
+            : paper.nonFirstAuthor === true ? "条件：目标论文为非一作｜结果：本次不作处理"
+              : !Number.isFinite(paper[resolution.field]) ? `条件：目标论文${resolution.field === "idea" ? "idea" : "实验"}不是有限数值｜结果：本次不作处理`
+                : paper[resolution.field] <= 0 ? `条件：目标论文${resolution.field === "idea" ? "idea" : "实验"} ≤ 0｜结果：本次不作处理`
+                  : "条件：目标论文不在当前草稿或在审论文中｜结果：本次不作处理",
     };
   }
 

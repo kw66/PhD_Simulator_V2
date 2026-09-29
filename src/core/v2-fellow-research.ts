@@ -1,6 +1,6 @@
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo } from "./v2-conference-catalog";
-import { advanceFellowCooperation, settlePendingFellowHelp } from "./v2-fellow-cooperation";
+import { advanceFellowCooperationWithLog, settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { getFellowName, getFellowResearchTopic, getFellowsInCardOrder } from "./v2-fellow-progression";
 import { settleLabResearchGrowth } from "./v2-lab-talent";
 import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
@@ -8,9 +8,10 @@ import { createDraftPaper, decayUnpublishedPaper, prepareConferenceSubmission, r
 import { attachPaperPublication, recordPaperAcceptances } from "./v2-publication-rules";
 import { advancePaperReviewDeadline, applyRejectedPaperReview, CONFERENCE_PUBLICATION_DELAY_MONTHS, settlePaperCitationMonth } from "./v2-publication-system";
 import { applyPublicationTalentRewards } from "./v2-publication-talent";
-import { generateResearchScore, RESEARCH_EXPERIMENT_MONEY_COST } from "./v2-research-operation";
+import { generateResearchScore } from "./v2-research-operation";
+import { getLabExperimentMoneyCost } from "./v2-lab-compute";
 import { syncRelationshipState } from "./v2-relationship-rules";
-import { advanceSharedLabProject } from "./v2-lab-projects";
+import { advanceSharedLabProject, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import type { GameState, Paper, PaperActionType, PaperTarget } from "./v2-types";
 
@@ -82,7 +83,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
   if (state.fellowProgressState.length === 0 && !state.fellowPapers?.length) return state;
   state = settleLabResearchGrowth(state);
   let nextState = ensureFellowPapers(state, random);
-  const monthlyProjectType = state.advisorProgressState.funding >= 20 ? "vertical" : "horizontal";
+  const monthlyProjectType = state.advisorProgressState.funding >= LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD ? "vertical" : "horizontal";
   const profiles = new Map(state.fellowProgressState.map((profile) => [profile.id, profile]));
   const canAdvancePaper = (paper: Paper): boolean => {
     const profile = profiles.get(paper.leadAuthorId ?? "");
@@ -158,8 +159,9 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     && state.totalMonths > (profile.lastAdvancedTotalMonths ?? profile.startTotalMonths)
   ));
   for (const profile of activeProfiles) {
+    nextState = advanceFellowCooperationWithLog(nextState, profile.id, profile.affinity);
     nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id
-      ? { ...advanceFellowCooperation(fellow, profile.affinity, state.player.research), taskUsedThisMonth: false, lastAdvancedTotalMonths: state.totalMonths } : fellow) };
+      ? { ...fellow, taskUsedThisMonth: false, lastAdvancedTotalMonths: state.totalMonths } : fellow) };
   }
   nextState = settlePendingFellowHelp(nextState, random);
   const advanceProject = (profile: typeof state.fellowProgressState[number], forceHorizontal = false): void => {
@@ -181,7 +183,8 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
       continue;
     }
     const field = getFellowResearchAction(paper);
-    if (field === "experiment" && nextState.advisorProgressState.funding < RESEARCH_EXPERIMENT_MONEY_COST) {
+    const experimentCost = getLabExperimentMoneyCost(nextState);
+    if (field === "experiment" && nextState.advisorProgressState.funding < experimentCost) {
       advanceProject(profile, true);
       continue;
     }
@@ -190,7 +193,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
         ...nextState,
         advisorProgressState: {
           ...nextState.advisorProgressState,
-          funding: nextState.advisorProgressState.funding - RESEARCH_EXPERIMENT_MONEY_COST,
+          funding: nextState.advisorProgressState.funding - experimentCost,
         },
       };
     }
@@ -199,7 +202,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     ));
     const gain = updated[field] - paper[field];
     const label = field === "idea" ? "idea" : field === "experiment" ? "实验" : "写作";
-    addActivity(profile.id, `${paper.createdTotalMonths === state.totalMonths ? "新稿" : "论文"}${label}+${gain}${field === "experiment" ? `（经费-${RESEARCH_EXPERIMENT_MONEY_COST}）` : ""}`);
+    addActivity(profile.id, `${paper.createdTotalMonths === state.totalMonths ? "新稿" : "论文"}${label}+${gain}${field === "experiment" ? `（经费-${experimentCost}）` : ""}`);
     nextState = {
       ...nextState,
       fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? updated : entry),

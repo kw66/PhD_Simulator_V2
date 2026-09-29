@@ -43,7 +43,7 @@ function createThesisChoices(state: GameState): {
       label: option.text,
       outcome: result.progressGain > 0
         ? `大论文推进 +${result.progressGain}，${sanChange < 0 ? formatActualSanChange(-result.sanCost, state.month, state.eventSupport, state.buffs) : "SAN 不变"}。`
-        : "当前方案没有带来明显进展。",
+        : `大论文进度 +0${sanChange < 0 ? `｜${formatActualSanChange(-result.sanCost, state.month, state.eventSupport, state.buffs)}` : ""}。`,
       effects: {
         san: sanChange,
         thesisProgress: result.progressGain,
@@ -115,8 +115,8 @@ function createThesisEvent(state: GameState): { nextState: GameState; event: Pen
       ].join("\n\n"),
       decisionTitle: "本月安排",
       decisionDescription: [
-        "你翻出能用上的已发表论文，把研究笔记也放到文档旁。很多内容亲手做过，写起来总算有底；只是要把这些东西理顺，还是得踏踏实实坐下来写。",
-        "目录旁有几处你早就想补，一直拖到现在。你往下翻了两页，又拉回原处，心里有些着急。这个月真想多写一点，就得留出不被打断的时间和精力。",
+        "你翻出已发表论文和研究笔记。很多内容亲手做过，写起来有底，可要理顺，还是得踏踏实实坐下来写。",
+        "目录旁几处空缺拖到现在，你翻了两页又拉回原处。这个月想多写一点，就得留出不被打断的时间和精力。",
       ].join("\n\n"),
       results,
     }),

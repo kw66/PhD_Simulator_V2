@@ -155,7 +155,7 @@ describe("paper collaboration scores", () => {
 
   it("applies increases and decreases to collaboration when an event scales the whole score", () => {
     const paper = makePaper({ idea: 40, collaborationScores: { idea: 20 } });
-    const next = applyPaperCompetitionResolution(makeState(paper), { paperId: paper.id, field: "idea", multiplier: 1.25, sanCost: 6 }).nextState.papers[0]!;
+    const next = applyPaperCompetitionResolution(makeState(paper), { paperId: paper.id, field: "idea", multiplier: 1.25, sanCost: 4 }).nextState.papers[0]!;
     expect(getPaperScoreBreakdown(next, "idea")).toEqual({ own: 25, collaboration: 25, total: 50 });
     expect(getPaperScoreBreakdown(setPaperTotalScore(next, "idea", 0), "idea")).toEqual({ own: 0, collaboration: 0, total: 0 });
   });

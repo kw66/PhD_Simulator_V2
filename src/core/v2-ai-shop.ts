@@ -1,5 +1,6 @@
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "./v2-calendar";
 import { getCalendarForTotalMonths } from "./v2-progression";
+import { hasActiveAiCostCoverage } from "./v2-buffs";
 import type { ActiveOperationType, Buff, GameState, Paper, PaperActionType, ReadingEffect } from "./v2-types";
 import type { AiShopState, AiSlotId, AiSubscriptionState } from "./v2-types-economy";
 
@@ -27,6 +28,11 @@ export interface AiModelOffer {
 export const AI_SLOT_IDS: readonly AiSlotId[] = ["gpt", "claude", "gemini", "deepseek", "doubao", "kimi"];
 
 const RESEARCH_ACTIONS: readonly PaperActionType[] = ["idea", "experiment", "writing"];
+
+export function hasAiReimbursement(state: Pick<GameState, "eventSupport" | "buffs" | "totalMonths">): boolean {
+  return state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths
+    || hasActiveAiCostCoverage(state.buffs);
+}
 
 /* Models advance at the start of each academic year. */
 const AI_MODEL_TIMELINE: readonly AiModelOffer[] = [

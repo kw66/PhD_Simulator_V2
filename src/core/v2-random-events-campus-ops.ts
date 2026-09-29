@@ -1,4 +1,5 @@
-﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
+import { createLabGpuFailureBuff } from "./v2-lab-compute";
 import {
   createThreeStageRandomEvent,
   type RandomRollProvider,
@@ -8,20 +9,22 @@ import type { GameState, PendingEvent } from "./v2-types";
 export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
   const reinstallSanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
-  const taobaoFailureSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
   const reinstallSuccess = getRoll() < 0.5;
   const taobaoSuccess = getRoll() < 0.5;
   const reportSocialResult = applyTierResist(-2, state.player.social, getRoll);
   const reportSocialChange = reportSocialResult.effectiveChange;
-  const reportSocialNarrative = getTierResistedNarrative("社交", -2, reportSocialResult);
   const reinstallSocialResult = applyTierResist(-1, state.player.social, getRoll);
   const reinstallSocialChange = reinstallSocialResult.effectiveChange;
-  const reinstallSocialNarrative = getTierResistedNarrative("社交", -1, reinstallSocialResult);
+  const rentalOutcome = "持续6个月，实验金币 +1";
+  const introDescription = [
+    "昨晚排上的实验，到早上才挪了一点进度，日志里还冒出几串看不懂的报错。你对 Linux 也不太懂，盯着终端看了半天，分不清是驱动、环境，还是又碰上了什么奇怪的 bug。",
+    "实验室的显卡本来就不多，不够用时只能租卡，做实验的金币就是这么花出去的。现在仅剩的几张卡也接连出了故障，大家只好租更多的卡顶着。你刷新了一下进度，感觉连报错都比实验跑得快。",
+  ].join("\n\n");
 
   const event: PendingEvent = {
     id: `random-13-y${state.year}-m${state.month}-n${serial}`,
     title: "显卡故障",
-    description: "实验室服务器突然离线，几张显卡接连报错💥。组群里的“你们还能连上吗”一条接一条，排队的任务全停在原地。",
+    description: introDescription,
     source: "random",
     blocking: true,
     deadlineMonths: 0,
@@ -31,9 +34,9 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
       {
         id: `random-13-advisor-${serial}`,
         label: "催导师修",
-        outcome: "永久实验 -2。",
+        outcome: `${rentalOutcome}。`,
         effects: {
-          experimentBonus: -2,
+          addBuffs: [createLabGpuFailureBuff()],
         },
       },
       {
@@ -46,80 +49,73 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
         id: `random-13-reinstall-${serial}`,
         label: "自己重装",
         outcome: reinstallSuccess
-          ? `重装成功｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。`
-          : `重装失败｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("社交", -1, reinstallSocialResult)}｜下次实验 ×0.25`,
+          ? `条件：重装成功（50%）｜结果：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。`
+          : `条件：重装失败（50%）｜结果：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("社交", -1, reinstallSocialResult)}｜${rentalOutcome}。`,
         effects: reinstallSuccess
           ? { san: reinstallSanChange }
           : {
             san: reinstallSanChange,
             ...(reinstallSocialChange < 0 ? { social: reinstallSocialChange } : {}),
-            temporaryActionEffectUpdates: {
-              experiment: { multiplier: 0.25 },
-            },
+            addBuffs: [createLabGpuFailureBuff()],
           },
       },
       {
         id: `random-13-taobao-${serial}`,
         label: "淘宝找人",
         outcome: taobaoSuccess
-          ? "维修成功｜金币 -2。"
-          : `维修翻车｜金币 -4｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。`,
+          ? "条件：维修成功（50%）｜结果：金币 -2。"
+          : `条件：维修翻车（50%）｜结果：${rentalOutcome}。`,
         effects: taobaoSuccess
           ? { money: -2 }
-          : { money: -4, san: taobaoFailureSanChange },
+          : { addBuffs: [createLabGpuFailureBuff()] },
       },
     ],
   };
 
   return createThreeStageRandomEvent(event, {
-    introDescription: [
-      "凌晨跑到一半的实验突然中断，日志里显卡反复报错。组群里的“你们还能连上吗”一条接一条，排队的任务全卡住了。",
-      "掉线前还有几项来路不明的占用。机箱风扇照常转着，同门凑过来看日志，等你说说情况。",
-    ].join("\n\n"),
+    introDescription,
     decisionTitle: "你的选择",
     decisionDescription: [
-      "你截好报错，停在给导师的聊天框前。老师要是直接停掉这块卡，以后大家就得挤着剩下的算力跑。那几条异常占用也还在，上报能把挖矿的事查清，可抬头全是每天见面的同门，这句话发出去就收不回来了。",
-      "重装教程和淘宝维修页面各开在一边。自己动手省钱，弄坏公共环境却得挨个帮人补依赖。客服报了 2 金币，翻到一条差评，却有人说钱收了两遍还没修好。群里又问：“修好了吗？”你看了眼教程的滚动条，离底还早。",
+      "你截好报错，想起导师上次说的“我找人看看”，到现在还没下文。另一张截图上，没人在跑实验，显卡却一直满载，组里又传起了有人挖矿的说法。上报能请管理员查清楚，只是查到熟人头上，往后难免尴尬。",
+      "你又打开重装教程和淘宝维修页。自己动手省钱，可服务器的盘里还放着大家的资料，看错一步就麻烦了。客服说可以远程修，修好收 2 金币，语气比你看得懂的教程还简短。",
     ].join("\n\n"),
     results: {
       [`random-13-advisor-${serial}`]: {
         title: "找导师",
         description: [
-          "你把报错截图发给导师，导师安排同门逐张排查。坏卡被停用，剩下的卡总算能接着跑任务。",
-          "空出的卡位没补上。你把原本打算并行跑的实验拆开，以后都得按这点算力安排了。",
+          "你把截图发给导师，收到一句“我联系一下”。隔几天再问，变成了“还在走流程”；再过一阵，老师开始问你论文跑得怎么样了。",
+          "卡没修好，实验可不能跟着等。组里只好把更多任务搬到租来的机器上，这半年的租卡账单又厚了一点。你也学会了：老师说的“一下”，和程序里的时间单位不太一样。",
         ].join("\n\n"),
       },
       [`random-13-report-${serial}`]: {
         title: "举报挖矿",
         description: [
-          "你把异常进程和显卡报错一并上报，查出有人长期占着显卡挖矿，故障卡随后送去检修。",
-          "举报的事很快传开。你回工位拿水杯，旁边聊这件事的人停了话头；你接完水坐下，打开还没看完的日志。",
-          ...(reportSocialNarrative ? [reportSocialNarrative] : []),
+          "你把截图交给管理员，检查后果然揪出了一位拿公用显卡挖矿的同门。清掉挖矿进程、修复驱动后，实验终于恢复正常，风扇也不再像随时准备起飞。",
+          "被收回账号的同门找来，问你怎么不先私下说一声。你看着自己停了几天的任务，一时也不知道怎么接。后来再找他问脚本，消息就没以前回得快了。",
         ].join("\n\n"),
       },
       [`random-13-reinstall-${serial}`]: {
         title: "自己重装",
         description: reinstallSuccess
           ? [
-              "你关机重新插拔显卡，重装驱动和 CUDA。核对完版本，测试程序终于认出了所有显卡。",
-              "熬到深夜，实验总算启动。你在组群里发了句“可以用了”，收好东西，才想起回宿舍还得爬楼。",
+              "你照着教程一点点核对驱动和 CUDA 版本，遇到看不懂的命令就先查清楚再敲。折腾到深夜，测试程序终于认出了显卡，速度也恢复了。",
+              "你在群里发了句“可以跑了”，同学们纷纷把任务重新排上队。你保存好这次的步骤，合上电脑才发现，脖子比服务器还需要检修。",
             ].join("\n\n")
           : [
-              "重装后显卡仍在掉线，公共环境又多了版本冲突。同门发来报错，你只能先回一句“我再看看”。",
-              "折腾半天，日志反而更长了。接下来那轮实验得先补环境、查依赖，能正式跑数据的时间没剩多少。",
-              ...(reinstallSocialNarrative ? [reinstallSocialNarrative] : []),
+              "你跟着教程重装，选盘时没看仔细，把同学存资料的硬盘也格式化了。系统倒是干净了，显卡却仍在报错，群里已经有人问自己的实验记录怎么没了。",
+              "你挨个解释、道歉，越说声音越小。这下谁也不敢再让你试，机器只能等人来修。接下来半年，大家多租卡跑实验，租金涨了，你在群里说话也没那么有底气了。",
             ].join("\n\n"),
       },
       [`random-13-taobao-${serial}`]: {
         title: taobaoSuccess ? "淘宝维修" : "淘宝翻车",
         description: taobaoSuccess
           ? [
-              "你在机房门口接到淘宝约的工程师。对方逐项检查，重新插好显卡，处理了供电故障。",
-              "机器当天恢复。测试跑过一轮，你付清维修费，还了机房钥匙；总算不用反复刷新远程连接了。",
+              "你给淘宝客服开好远程连接，看着对方在终端里检查驱动、重装依赖。那些你盯了半天的报错，被几行命令逐个处理掉了。",
+              "测试速度恢复正常，你付了 2 金币维修费，顺手保存下处理步骤。原来服务器不一定需要换卡，有时只是需要一个比你更懂 Linux 的人。",
             ].join("\n\n")
           : [
-              "报价便宜，来人却只会反复拆装试错🧰。折腾几天没找准故障，聊天框里倒先发来了追加费用。",
-              "你争了半天，还是多付了钱，只好请组里重新安排检修。回到工位，远程连接依旧报错，维修聊天还挂在旁边。",
+              "远程连上后，客服来回换了几个驱动版本，报错从这一串变成了另一串。最后对方说情况太复杂，这单修不了，结束了远程连接。",
+              "维修窗口关了，故障还在。你把任务迁到租来的机器上，组里其他人也陆续跟上。接下来半年只能多租卡顶着，原本想省下一点折腾，最后还是多了一笔租金。",
             ].join("\n\n"),
       },
     },

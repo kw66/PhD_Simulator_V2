@@ -8,6 +8,7 @@ import {
 } from "./v2-fixed-events-ccig-shared";
 import { createCcigActivityEvent } from "./v2-fixed-events-ccig-activity-events";
 import type { GameState, PendingEvent } from "./v2-types";
+import { getTierResistChance } from "./v2-sanity-rules";
 
 export function createCcigDecisionEvent(state: GameState): PendingEvent {
   const { hasMeetingExperience, discount, actualCost } = getCcigSelfPayCost(state);
@@ -15,15 +16,15 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
       ? `凭之前攒下的会务经验，自费能省 ${discount} 金币。`
     : "";
   const advisorHint = state.player.favor >= 6
-    ? "你把几场想听的报告圈了出来，越看越想去。报销能办下来，只是要麻烦老师；好在平时的交情在，这点开销未必会让老师介意。"
-    : "日程上有好几场你想听的报告。报销能办下来，只是你和老师还不熟，这次让老师承担开销，难免欠下一点人情。";
+    ? "你圈出想听的报告，越看越想去。报销能办，只是得麻烦老师；好在平时有交情，这点开销老师未必介意。"
+    : "日程上好几场报告都想听。报销能办，但你和老师还不熟，让老师承担开销，难免欠点人情。";
   const selfPayHint = state.player.favor >= 6
     ? actualCost === 0
-      ? "预算算到最后，自费也不用花金币。你一下轻松了，刚才还在盘算的开销终于可以划掉。"
-      : `自费要 ${actualCost} 金币。你对着这个数又算了一遍生活费，刚才看报告日程的兴奋里，添了一点心疼。`
+      ? "算完预算，自费也不用花金币。你一下轻松了，这笔开销终于可以划掉。"
+      : `自费要 ${actualCost} 金币。你又算了一遍生活费，看报告日程的兴奋里，添了一点心疼。`
     : actualCost === 0
-      ? "再核对预算，自费居然也不用花金币。你松了口气，刚才琢磨半天的那句报销申请终于用不上了。"
-      : `自费要 ${actualCost} 金币。你在余额和聊天框之间切了两回：钱花出去心疼，申请报销这几个字也真难开口。`;
+      ? "自费居然也不用花金币。你松了口气，琢磨半天的报销申请终于用不上了。"
+      : `自费要 ${actualCost} 金币。你在余额和聊天框间切了两回：花钱心疼，报销也真难开口。`;
 
   return createFixedEvent({
     id: `ccig-decision-act2-y${state.year}-m${state.month}`,
@@ -83,12 +84,13 @@ export function createCcigAttendResultEvent(
     id: `ccig-attend-result-y${state.year}-m${state.month}-${mode}`,
     title: "年会 ➜ 参会决定 ➜ 参会确认",
     description: [
-      `参会方式定下来后，你订好前往${location}参加 CCIG ${realYear} 的车票和住宿，又核对了一遍日期。`,
-      "几位同学在群里约好到时碰面。你把电脑、充电器和证件装进包，拉上拉链后又打开看了一眼——充电器确实带了，这才放心。",
-      ...(narrative ? [narrative] : []),
-      ...(gearNarrative ? [gearNarrative] : []),
+      `你订好去${location}参加 CCIG ${realYear} 的车票和住宿，又核对了一遍日期。`,
+      `和同学约好碰面后，你把电脑、充电器和证件装进包，拉上拉链又打开——充电器带了，这才放心。${narrative}${gearNarrative}`,
       "机制结算",
-      ...settlementItems,
+      mode === "advisor"
+        ? `条件：导师好感 ${state.player.favor}（抵抗概率 ${getTierResistChance(state.player.favor) * 100}%）`
+        : `条件：参会次数 ${state.eventCounters.meetingCount} ${hasMeetingExperience ? "≥" : "<"} 4`,
+      ...settlementItems.slice(1).map((item) => `结果：${item}`),
     ].join("\n\n"),
     chainId: getCcigChainId(state),
     stage: "act3",

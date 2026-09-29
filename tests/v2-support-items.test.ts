@@ -5,7 +5,7 @@ import { SUPPORT_ITEM_DEFINITIONS, getSupportItemDefinition, getSupportItemSellP
 describe("v2 support items", () => {
   it("exposes the audited support item prices", () => {
     expect(SUPPORT_ITEM_DEFINITIONS.map((item) => [item.id, item.price])).toEqual([
-      ["badminton_racket", 6],
+      ["badminton_racket", 8],
       ["parasol", 10],
     ]);
     expect(getSupportItemDefinition("parasol").name).toBe("遮阳伞");

@@ -1,10 +1,11 @@
-import { isTransientUiHintLog, pushLog } from "./v2-engine-helpers";
+import { isTransientUiHintLog, pushLog, pushMilestoneLog } from "./v2-engine-helpers";
 import { getShopEmergencySan } from "./v2-shop-items-effects";
 import type { EndingId, GameState } from "./v2-types";
 
 function finishWithCause(state: GameState, ending: EndingId, message: string): GameState {
   if (state.phase !== "playing") return state;
-  const cause = state.log.find((entry) => entry.text.trim() && !isTransientUiHintLog(entry.text));
+  const cause = state.log.find((entry) => entry.text.trim() && !isTransientUiHintLog(entry.text)
+    && !entry.id.startsWith("chair-emergency-"));
   return pushLog({
     ...state,
     phase: "finished",
@@ -18,14 +19,14 @@ export function evaluateCoreEndings(state: GameState): GameState {
   const protectedSan = getShopEmergencySan(state.shopState, state.player.san);
   const protectedState = protectedSan === state.player.san
     ? state
-    : {
+    : pushMilestoneLog({
         ...state,
         player: { ...state.player, san: protectedSan },
         shopState: {
           ...state.shopState,
           chairSanRecovered: Math.max(0, state.shopState.chairSanRecovered ?? 0) + protectedSan - state.player.san,
         },
-      };
+      }, `锥刺股椅触发：SAN +${protectedSan - state.player.san}（${state.player.san}→${protectedSan}）`, "chair-emergency");
   if (protectedState.player.san < 0) return finishWithCause(protectedState, "burnout", "SAN 已跌破 0，本轮提前结束。");
   if (protectedState.player.money < 0) return finishWithCause(protectedState, "poor", "金币已跌破 0，本轮提前结束。");
   if (protectedState.player.favor < 0) return finishWithCause(protectedState, "expelled", "导师好感已跌破 0，本轮提前结束。");

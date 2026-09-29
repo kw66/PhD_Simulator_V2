@@ -12,15 +12,23 @@ import type { GameState, Paper, PendingEvent } from "../src/core/v2-types";
 
 const COMPETITIONS = [
   { eventId: 17, title: "被抢发idea", field: "idea", secondChoice: "狡辩二者不同" },
-  { eventId: 18, title: "新SOTA", field: "experiment", secondChoice: "选择性对比" },
+  { eventId: 18, title: "新sota", field: "experiment", secondChoice: "选择性对比" },
 ] as const;
 
-const RESPONSES = [
-  { choiceIndex: 0, multiplier: 0.25, sanCost: 0 },
-  { choiceIndex: 1, multiplier: 0.5, sanCost: 1 },
-  { choiceIndex: 2, multiplier: 0.75, sanCost: 3 },
-  { choiceIndex: 3, multiplier: 1.25, sanCost: 6 },
-] as const;
+const RESPONSES: Record<"idea" | "experiment", readonly { choiceIndex: number; multiplier: number; sanCost: number }[]> = {
+  idea: [
+    { choiceIndex: 0, multiplier: 0.25, sanCost: 0 },
+    { choiceIndex: 1, multiplier: 0.5, sanCost: 1 },
+    { choiceIndex: 2, multiplier: 1, sanCost: 2 },
+    { choiceIndex: 3, multiplier: 1.25, sanCost: 4 },
+  ],
+  experiment: [
+    { choiceIndex: 0, multiplier: 0.25, sanCost: 0 },
+    { choiceIndex: 1, multiplier: 0.5, sanCost: 1 },
+    { choiceIndex: 2, multiplier: 0.75, sanCost: 3 },
+    { choiceIndex: 3, multiplier: 1.25, sanCost: 6 },
+  ],
+} as const;
 
 function makePaper(index: number, overrides: Partial<Paper> = {}): Paper {
   return {
@@ -111,7 +119,7 @@ describe.each(COMPETITIONS)("paper competition $eventId: $field", ({ eventId, ti
     expect(decision.choices.map((choice) => choice.label)).toEqual([
       "装作不知道", secondChoice, "小幅修改", "大幅修改",
     ]);
-    for (const response of RESPONSES) {
+    for (const response of RESPONSES[field]) {
       const choice = decision.choices[response.choiceIndex]!;
       expect(choice.disabledReason).toBeUndefined();
       expect(Object.keys(choice.effects)).toEqual(["enqueueEvents"]);
@@ -173,7 +181,7 @@ describe.each(COMPETITIONS)("paper competition $eventId: $field", ({ eventId, ti
   });
 
   describe.each(["draft", "reviewing"] as const)("%s settlement", (status) => {
-    it.each(RESPONSES)("applies x$multiplier and SAN -$sanCost exactly once on confirmation", ({ choiceIndex, multiplier, sanCost }) => {
+    it.each(RESPONSES[field])("applies x$multiplier and SAN -$sanCost exactly once on confirmation", ({ choiceIndex, multiplier, sanCost }) => {
       const target = makePaper(0, {
         status,
         ...(status === "reviewing" ? {

@@ -1,7 +1,7 @@
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "./v2-calendar";
 import { getAccumulatedPayment } from "./v2-numeric-modifiers";
 import { ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
-import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
+import { pushLog, pushMilestoneLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getJournalDefinition } from "./v2-journal-system";
 import type { AdvisorGrantApplication, AdvisorGrantId, AdvisorProgressState, Degree, GameState, Paper } from "./v2-types";
 import { createAdvisorGrantResultEvent, type AdvisorGrantResultContext } from "./v2-advisor-grant-events";
@@ -165,17 +165,18 @@ export function advanceAdvisorProject(
   if (state.advisorProgressState.lastPlayerProjectTotalMonths === state.totalMonths) return pushNoOpLog(state, "科研项目：本月已推进，下月恢复");
   const sanCost = getAdvisorTaskSanCost(state, projectType);
   if (state.player.san < sanCost) return pushNoOpLog(state, `科研项目：SAN不足，需要${sanCost}`);
-  const result = advanceSharedLabProject(state, projectType, Math.floor(state.player.research) + Math.floor(random() * 6), random);
-  return pushLog({
-    ...result.state,
-    player: { ...result.state.player, san: state.player.san - sanCost },
+  const progress = Math.floor(state.player.research) + Math.floor(random() * 6);
+  const paidState = pushMilestoneLog({
+    ...state,
+    player: { ...state.player, san: state.player.san - sanCost },
     advisorProgressState: {
-      ...result.state.advisorProgressState,
+      ...state.advisorProgressState,
       lastPlayerProjectTotalMonths: state.totalMonths,
       lastProjectTotalMonths: state.totalMonths,
       ...(projectType === "horizontal" ? { lastHorizontalTotalMonths: state.totalMonths } : {}),
     },
-  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN-${sanCost}，进度+${result.gain}`);
+  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN-${sanCost}，进度+${progress}`, "advisor-project-action");
+  return advanceSharedLabProject(paidState, projectType, progress, random).state;
 }
 
 export function advanceAdvisorHorizontal(state: GameState, random: () => number = Math.random): GameState {

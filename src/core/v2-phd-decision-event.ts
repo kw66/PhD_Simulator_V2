@@ -57,7 +57,7 @@ export function createPhdDecisionEvent(state: GameState, requestedYear = state.y
     choices.push({
       id: "transfer-phd",
       label: "转为博士",
-      outcome: `达到科研分门槛（${currentScore}/${requiredScore}）｜转为博士｜毕业要求：科研分 ${ADVISOR_REQUIREMENTS.phdGrad}｜获得永久效果“读博压力”：每月 SAN -1。`,
+      outcome: `科研分 ${currentScore} ≥ ${requiredScore}｜转为博士｜毕业要求：科研分 ${ADVISOR_REQUIREMENTS.phdGrad}｜获得永久效果“读博压力”：每月 SAN -1。`,
       effects: {
         transferToPhd: true,
         addBuffs: [{

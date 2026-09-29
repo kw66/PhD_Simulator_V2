@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import {
-  advanceLoverDate, advanceLoverMonth, createLoverProgressState, getLoverDateFailure,
+  activateLoverMonthlyDiscount, advanceLoverDate, advanceLoverMonth, createLoverProgressState, getLoverDateFailure,
   getLoverPassiveGains, getLoverRouteCost, getLoverRouteGain, LOVER_ROUTES, LOVER_TASK_MAX,
   settlePendingLoverHelp,
 } from "../src/core/v2-lover-progression";
@@ -45,6 +45,85 @@ function nextDateMonth(state: GameState): GameState {
 }
 
 afterEach(() => vi.restoreAllMocks());
+
+describe("lover completion announcements", () => {
+  it("retains the play rewards when SAN and intimacy are already capped", () => {
+    const base = withRoute(makeState(), "play", 99);
+    base.player.san = 20;
+    base.loverProgressState.intimacy = 20;
+    const next = advanceLoverDate(base, "play");
+    const effects = next.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
+    expect(effects).toContain("SAN+6（20→20）");
+    expect(effects).toContain("亲密+1（20→20）");
+    expect(next.player.san).toBe(20);
+    expect(next.loverProgressState.intimacy).toBe(20);
+  });
+
+  it("keeps one manual completion record between the action and its actual paper help", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const base = withRoute(makeState(), "study", 99);
+    const next = advanceLoverDate({ ...base, papers: [makePaper()], log: [] }, "study");
+    expect(next.log).toHaveLength(3);
+    expect(next.log[0]!.text).toContain("恋人帮助：林青");
+    expect(next.log[1]!.eventHistoryId).toBeTruthy();
+    expect(next.log[2]!.text).toContain("约会·学习：进度+");
+    const record = next.eventHistory.find((entry) => entry.id === next.log[1]!.eventHistoryId)!;
+    expect(record.stages[0]!.talentTrigger!.reason).toBe("约会·学习进度满100，第1次");
+    expect(next.loverProgressState.intimacy).toBe(6);
+    expect(settlePendingLoverHelp(next)).toBe(next);
+  });
+
+  it("preserves both monthly route completions in engine logs without duplicate talent records", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const base = withRoute(withRoute(makeState(), "play", 99), "study", 99);
+    const next = nextMonth({ ...base, papers: [makePaper()], log: [] });
+    const completions = next.log.filter((entry) => entry.eventHistoryId?.startsWith("talent:lover:"));
+    expect(completions).toHaveLength(2);
+    const reasons = completions.map((entry) => next.eventHistory.find((record) => record.id === entry.eventHistoryId)!.stages[0]!.talentTrigger!.reason);
+    expect(reasons).toEqual(["每月相处·学习进度满100，第1次", "每月相处·玩耍进度满100，第1次"]);
+    expect(next.log.findIndex((entry) => entry.text.startsWith("恋人帮助："))).toBeLessThan(next.log.indexOf(completions[0]!));
+    expect(next.loverProgressState.intimacy).toBe(7);
+    expect(next.eventHistory.filter((record) => record.id.startsWith("talent:lover:"))).toHaveLength(2);
+    expect(advanceLoverMonth(next)).toBe(next);
+    const ordinary = advanceLoverMonth({ ...next, totalMonths: 10, month: 10 });
+    expect(ordinary.log).toEqual(next.log);
+  });
+
+  it("reports pending help as stored and reports the original amount once when it settles", () => {
+    const first = advanceLoverDate(withRoute({ ...makeState(), log: [] }, "study", 99), "study");
+    expect(first.log.some((entry) => entry.text.startsWith("恋人帮助："))).toBe(false);
+    expect(first.log[0]!.text).toContain("论文帮助已就绪");
+    const repeated = advanceLoverDate(withRoute(nextDateMonth(first), "study", 99, 3), "study");
+    expect(repeated.log[0]!.text).toContain("待生效（10分），不叠加");
+    expect(repeated.loverProgressState.pendingPaperHelp).toEqual(first.loverProgressState.pendingPaperHelp);
+    const ready = { ...repeated, papers: [makePaper()], loverProgressState: { ...repeated.loverProgressState, research: 1 } };
+    const random = vi.spyOn(Math, "random");
+    const settled = settlePendingLoverHelp(ready, () => 0);
+    expect(settled.log[0]!.text).toContain("idea+10");
+    expect(settled.log.filter((entry) => entry.text.startsWith("恋人帮助："))).toHaveLength(1);
+    expect(settlePendingLoverHelp(settled, () => 0)).toBe(settled);
+    expect(random).not.toHaveBeenCalled();
+  });
+
+  it("announces discount activation once in its effective month without changing preview or RNG", () => {
+    const reward = advanceLoverDate(withRoute(makeState(), "play", 99, 2), "play");
+    expect(reward.log.some((entry) => entry.text.startsWith("约会余韵生效："))).toBe(false);
+    const ready = { ...reward, totalMonths: 9, month: 9 };
+    const random = vi.spyOn(Math, "random");
+    const active = activateLoverMonthlyDiscount(ready);
+    expect(active.log[0]!.text).toContain("本月SAN消耗-1");
+    expect(active.log[0]!.month).toBe(9);
+    expect(activateLoverMonthlyDiscount(active).log).toEqual(active.log);
+    expect(advanceLoverMonth(active).log).toEqual(active.log);
+    expect(random).not.toHaveBeenCalled();
+    random.mockReturnValue(0.5);
+    const snapshot = structuredClone(reward);
+    previewNextMonthEffects(reward);
+    expect(reward).toEqual(snapshot);
+    const next = nextMonth(reward);
+    expect(next.log.filter((entry) => entry.text.startsWith("约会余韵生效："))).toHaveLength(1);
+  });
+});
 
 describe("lover initialization and monthly progression", () => {
   it("initializes inactive routes without consuming randomness", () => {

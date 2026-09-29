@@ -169,7 +169,7 @@ function createBeforeGradSchoolResultEvent(advisorName: string): PendingEvent {
     id: "before-grad-school-admission",
     title: "读研之始 ➜ 导师信息 ➜ 正式录取",
     description: [
-      `好在你和${advisorName}老师都没有变卦，大四上便确定了去向。到了${ENROLLMENT_CALENDAR_YEAR}年夏天，录取通知书寄到了。你小心拆开信封，找了个光线好的地方拍照。朋友圈里的祝贺一条条冒出来🎉，亲戚已经开始叫你“研究生”了。`,
+      `你和${advisorName}老师都没有变卦，大四上便定了去向。${ENROLLMENT_CALENDAR_YEAR}年夏天，录取通知书寄到，你拆开信封拍照。朋友圈祝贺不断🎉，亲戚已经叫你“研究生”了。`,
       "你想做点有趣的研究，多发几篇论文，也参加几次学术会议。眼下连实验室的门朝哪开都还不知道🤔，你却已经对未来充满了期待🤩。",
     ].join("\n\n"),
     chainId: "before-grad-school",
@@ -206,8 +206,8 @@ export function createBeforeGradSchoolAct1Event(
     id: "before-grad-school-qualification",
     title: "读研之始",
     description: [
-      `你叫${candidateName}，是人工智能专业学生🤖。大三下，你还没想清楚是否喜欢科研，收藏夹里倒是先攒了不少保研攻略📚。看着身边忙着准备的同学，你也打算随大流继续读研。你翻出做过的课程项目，写进个人陈述，准备夏令营和预推免面试。讲了几轮项目经历，到了大四上，总算拿到心仪学校的预录取🎉。`,
-      "联系导师时，保研群里有人答应入组后去了别处，也有人等到最后，才被告知老师没了名额🫠。你给心仪的老师写好邮件，表明想加入课题组的意愿，又检查了一遍称呼和附件，才按下发送。",
+      `你叫${candidateName}，是人工智能专业学生🤖。大三下，还没想清楚是否喜欢科研，收藏夹倒先攒了不少保研攻略📚。看着忙碌的同学，你也打算随大流继续读研，把课程项目写进个人陈述，参加夏令营和预推免面试。讲了几轮项目，大四上总算拿到心仪学校的预录取🎉。`,
+      "联系导师时，群里有人答应入组后去了别处，也有人等到最后才得知老师没了名额🫠。你写好入组意愿邮件，检查过称呼和附件，才按下发送。",
       `小提示：换个姓名只会刷新称呼，对游戏数值没有影响。`,
     ].join("\n\n"),
     chainId: "before-grad-school",

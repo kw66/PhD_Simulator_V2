@@ -39,7 +39,11 @@ describe("advisor guidance", () => {
     expect(after.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
     expect(after.fellowProgressState[0]?.pendingGuidanceFromAdvisor).toBeNull();
     expect(settleAdvisorGuidance(after, () => 0)).toBe(after);
-    expect(after.log).toEqual(before.log);
+    expect(after.log).toHaveLength(before.log.length + 2);
+    expect(after.log.map((entry) => entry.text)).toEqual([
+      `导师指导：同学的《${before.fellowPapers![0]!.title}》，论文写作协作 +10`,
+      `导师指导：你的《${before.papers[0]!.title}》，论文写作协作 +10`,
+    ]);
   });
 
   it.each([0, 0.999])("randomly selects one eligible paper independently for the player and every fellow (roll=%s)", (roll) => {

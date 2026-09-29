@@ -265,6 +265,7 @@ export function withdrawPaper(state: GameState, paperId: string): GameState {
     const journalName = paper.journalTarget ? getJournalDefinition(paper.journalTarget).name : "期刊";
     const restoredPaper: Paper = {
       ...paper,
+      ...(paper.imageMisusePending ? { imageMisusePending: false } : {}),
       idea: paper.submittedIdea ?? paper.idea,
       experiment: paper.submittedExperiment ?? paper.experiment,
       writing: paper.submittedWriting ?? paper.writing,
@@ -296,6 +297,7 @@ export function withdrawPaper(state: GameState, paperId: string): GameState {
   const target = paper.target;
   const withdrawnPaper: Paper = {
     ...paper,
+    ...(paper.imageMisusePending ? { imageMisusePending: false } : {}),
     acceptedTotalMonths: undefined,
     acceptedOrder: undefined,
     status: "draft",

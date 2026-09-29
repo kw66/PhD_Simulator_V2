@@ -50,20 +50,58 @@ describe("talent trigger history", () => {
       .toContain("科研+2（2→4）");
   });
 
-  it("records each publication talent separately using capped actual changes", () => {
+  it("records nominal publication rewards alongside capped actual changes", () => {
     const base = state();
     base.player.san = 19;
     base.player.research = 20;
     base.externalPublications = [attachPaperPublication({ ...createDraftPaper(1, 0, () => 0), status: "published", target: "A" }, 1, "Best Paper")];
     const next = applyPublicationTalentRewards(base);
     expect(triggers(next).map((trigger) => trigger.name)).toEqual(["研究之始", "初露锋芒", "最佳之作"]);
-    expect(triggers(next)[0]!.effects).toContain("SAN+1（19→20）");
-    expect(triggers(next)[1]!.effects).toContain("SAN已达上限（20）");
+    expect(triggers(next)[0]!.effects).toContain("SAN+2（19→20）");
+    expect(triggers(next)[1]!.effects).toContain("SAN+4（20→20）");
+    expect(triggers(next)[2]!.effects).toContain("SAN+8（20→20）");
     expect(next.player.research).toBe(21);
-    expect(triggers(next).flatMap((trigger) => trigger.effects).filter((effect) => effect.startsWith("科研+")).length).toBe(1);
+    expect(triggers(next).flatMap((trigger) => trigger.effects).filter((effect) => effect.startsWith("科研+")).length).toBe(3);
     expect(triggers(next)[2]!.effects).toContain("科研上限+1（20→21）");
     expect(applyPublicationTalentRewards(next)).toBe(next);
     expect(next.eventQueue).toBe(base.eventQueue);
+  });
+
+  it("retains capped favor and social rewards", () => {
+    const base = state();
+    base.player.favor = 20;
+    base.player.social = 20;
+    base.externalPublications = [false, true].map((nonFirstAuthor, index) => attachPaperPublication({
+      ...createDraftPaper(1, index, () => 0), status: "published", target: "C", nonFirstAuthor,
+    }));
+    const next = applyPublicationTalentRewards(base);
+    expect(triggers(next).find((trigger) => trigger.name === "研究之始")!.effects).toContain("好感+1（20→20）");
+    expect(triggers(next).find((trigger) => trigger.name === "携手启程")!.effects).toContain("社交+1（20→20）");
+    expect(next.player.favor).toBe(20);
+    expect(next.player.social).toBe(20);
+  });
+
+  it.each([19, 20])("retains inheritance rewards at research %i", (research) => {
+    const base = state();
+    base.player.research = 25;
+    base.fellowProgressState = [research, 20, 20].map((value, index) => ({
+      ...createCustomFellowProgressProfile({ type: "peer", gender: "female", research: value, affinity: 1, startTotalMonths: 1 }),
+      id: `fellow-${index}`,
+    }));
+    const next = settleLabResearchGrowth(base);
+    expect(triggers(next)[0]!.effects).toEqual([research === 19 ? "科研+2（19→20）" : "科研+1（20→20）"]);
+    expect(next.fellowProgressState[0]!.research).toBe(20);
+  });
+
+  it.each([19, 20])("retains two coauthorship rewards at affinity %i", (affinity) => {
+    const base = state();
+    const fellow = createCustomFellowProgressProfile({ type: "peer", gender: "female", research: 2, affinity, startTotalMonths: 1 });
+    const papers = [0, 1].map((index) => ({ ...createDraftPaper(1, index, () => 0),
+      status: "published" as const, leadAuthorId: fellow.id, collaborators: [{ id: "player", name: "林青" }],
+    }));
+    const next = settleFellowCoauthoredPapers({ ...base, fellowProgressState: [fellow], fellowPapers: papers });
+    expect(triggers(next)[0]!.effects).toEqual([`默契+2（${affinity}→20）`]);
+    expect(next.fellowProgressState[0]!.affinity).toBe(20);
   });
 
   it("identifies each fellow's annual research change and records capped anniversaries", () => {
@@ -75,7 +113,7 @@ describe("talent trigger history", () => {
     const next = settleLabResearchGrowth(base);
     expect(triggers(next).map((trigger) => trigger.recipient)).toEqual(["同学0", "同学1", "同学2"]);
     expect(triggers(next)[0]!.effects).toEqual(["科研+2（2→4）"]);
-    expect(triggers(next)[2]!.effects).toEqual(["科研已达上限20"]);
+    expect(triggers(next)[2]!.effects).toEqual(["科研0（20→20）"]);
     expect(settleLabResearchGrowth(next)).toBe(next);
   });
 

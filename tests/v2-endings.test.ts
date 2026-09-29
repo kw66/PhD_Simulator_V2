@@ -3,6 +3,7 @@ import { GAME_ACTION_IDS } from "../src/core/v2-action-ids";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
+import { evaluateCoreEndings } from "../src/core/v2-ending-system";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createLoverProgressState } from "../src/core/v2-lover-progression";
 import { activateLover } from "../src/core/v2-lover-system";
@@ -103,10 +104,58 @@ describe("ending failure boundaries", () => {
     expect(next.advisorProgressState.funding).toBe(state.advisorProgressState.funding);
     expect(next.shopState.chairSanRecovered).toBe(3);
     expect(next.phase).toBe("playing");
-    expect(dispatchAction(next, "advisor-horizontal").shopState.chairSanRecovered).toBe(3);
+    expect(next.log.filter((entry) => entry.id.startsWith("chair-emergency-")).map((entry) => entry.text))
+      .toEqual(["锥刺股椅触发：SAN +3（0→3）"]);
+    const repeated = dispatchAction(next, "advisor-horizontal");
+    expect(repeated.shopState.chairSanRecovered).toBe(3);
+    expect(repeated.log.filter((entry) => entry.id.startsWith("chair-emergency-"))).toHaveLength(1);
     const failed = resolveEvent({ ...next, eventQueue: [makeEvent("双重损失", { san: -20, money: -100 })] }, "双重损失");
     expect(failed.player.san).toBe(3);
     expect(failed.ending).toBe("poor");
+    expect(failed.log.filter((entry) => entry.id.startsWith("chair-emergency-")).map((entry) => entry.text))
+      .toEqual(["锥刺股椅触发：SAN +20（-17→3）", "锥刺股椅触发：SAN +3（0→3）"]);
+    expect(failed.endingCause?.text).toBe("双重损失：事件结算");
+  });
+
+  it.each([0, -2])("logs actual spike-chair recovery once at SAN %s without consuming random rolls", (san) => {
+    const state = makeState();
+    state.player.san = san;
+    state.shopState = { ...state.shopState, chairOwned: true, chairUpgrade: "spike" };
+    const original = structuredClone(state);
+    const random = vi.spyOn(Math, "random");
+    const next = evaluateCoreEndings(state);
+    expect(next.log[0]?.text).toBe(`锥刺股椅触发：SAN +${3 - san}（${san}→3）`);
+    expect(next.shopState.chairSanRecovered).toBe(3 - san);
+    expect(evaluateCoreEndings(next)).toBe(next);
+    expect(state).toEqual(original);
+    expect(random).not.toHaveBeenCalled();
+  });
+
+  it("logs spike-chair recovery only after the final event confirmation", () => {
+    const state = makeState();
+    state.player.san = 2;
+    state.shopState = { ...state.shopState, chairOwned: true, chairUpgrade: "spike" };
+    const result = makeEvent("chair-result", {}, { chainId: "chair-event" });
+    state.eventQueue = [makeEvent("chair-decision", { san: -5, enqueueEvents: [result] }, { chainId: "chair-event", stage: "act2" })];
+    const pending = resolveEvent(state, "chair-decision");
+    expect(pending.player.san).toBe(2);
+    expect(pending.log.some((entry) => entry.id.startsWith("chair-emergency-"))).toBe(false);
+    const settled = resolveEvent(pending, "chair-result");
+    expect(settled.player.san).toBe(3);
+    expect(settled.log.filter((entry) => entry.id.startsWith("chair-emergency-")).map((entry) => entry.text))
+      .toEqual(["锥刺股椅触发：SAN +6（-3→3）"]);
+    expect(settled.log.findIndex((entry) => entry.id.startsWith("chair-emergency-")))
+      .toBeLessThan(settled.log.findIndex((entry) => entry.text.startsWith("chair-decision：")));
+  });
+
+  it("does not trigger spike recovery or its log through debug stat adjustments", () => {
+    const state = makeState();
+    state.player.san = 2;
+    state.shopState = { ...state.shopState, chairOwned: true, chairUpgrade: "spike" };
+    const adjusted = dispatchAction(state, "debug-adjust-stat", { debugStatId: "san", delta: -2 });
+    expect(adjusted.player.san).toBe(0);
+    expect(adjusted.shopState.chairSanRecovered).toBe(0);
+    expect(adjusted.log.some((entry) => entry.id.startsWith("chair-emergency-"))).toBe(false);
   });
 
   it("keeps deferred effects and failures pending until the result is confirmed", () => {
@@ -129,8 +178,11 @@ describe("ending failure boundaries", () => {
     state.buffs = [{ id: "monthly-loss", name: "月度压力", source: "测试", timing: "permanent", remainingMonths: null, monthlyStats: { san: -4 } }];
     const survived = dispatchAction(state, "next-month");
     expect(survived).toMatchObject({ phase: "playing", player: { san: 3 }, shopState: { chairSanRecovered: 5 } });
+    expect(survived.log.filter((entry) => entry.text.includes("锥刺股椅"))).toHaveLength(1);
+    expect(survived.log.find((entry) => entry.text.includes("锥刺股椅"))?.text).toContain("锥刺股椅 SAN +5");
     const failed = dispatchAction({ ...state, buffs: [{ ...state.buffs[0]!, monthlyStats: { san: -4, money: -100 } }] }, "next-month");
     expect(failed).toMatchObject({ phase: "finished", ending: "poor", player: { san: 3 }, shopState: { chairSanRecovered: 5 } });
+    expect(failed.log.filter((entry) => entry.text.includes("锥刺股椅"))).toHaveLength(1);
   });
 
   it("does not let a pending publication reward rescue a fatal event", () => {

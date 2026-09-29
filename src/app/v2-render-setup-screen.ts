@@ -322,20 +322,20 @@ function renderGrowthProgress(
             <span class="lobby-growth-inline-label">等级</span>
             <strong class="lobby-growth-inline-value" ${animationNumberAttributes(`role:${viewModel.role.id}:growth:level`, pointSummary.level)}>${pointSummary.level}</strong>
           </span>
-          <span class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}，每局增加科研分✖经验倍率的经验。" data-tooltip="每局增加科研分✖经验倍率的经验。">
+          <span class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}，所有加经验的都乘以这个倍率。" data-tooltip="所有加经验的都乘以这个倍率。">
             <span class="lobby-growth-inline-label">经验倍率</span>
             <strong class="lobby-growth-inline-value">${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}</strong>
           </span>
         </div>
         <div class="lobby-growth-exp-detail-row">
           <div class="lobby-talent-allocation-meta">
-            <span>天赋点 <strong class="lobby-talent-points-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</strong></span>
+            <span class="lobby-talent-points-hint" role="note" tabindex="0" aria-label="天赋点${pointSummary.availablePoints}，每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点。" data-tooltip="每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点，用于解锁天赋。">天赋点 <strong class="lobby-talent-points-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</strong></span>
             <button class="lobby-talent-reset-button" type="button" disabled title="重置天赋点"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span></button>
           </div>
         </div>
       </div>
       <div class="lobby-growth-exp-row">
-        <span class="lobby-growth-inline-label">经验</span>
+        <span class="lobby-growth-inline-label lobby-growth-exp-label" role="note" tabindex="0" aria-label="经验，每局增加科研分乘经验倍率的经验。" data-tooltip="每局增加科研分✖经验倍率的经验。">经验</span>
         <div class="lobby-growth-exp-bar" aria-hidden="true">
           <span ${animationBarAttribute(`role:${viewModel.role.id}:growth:experience`)} style="width:${expProgressPercent}%;"></span>
         </div>
@@ -416,12 +416,12 @@ const NORMAL_TALENT_NODES = [
   { id: "breakthrough", name: "突破极限", icon: "rocket", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 3, effect: "属性溢出时上限+1，最多+10", prerequisiteIds: ["self-determination"] },
   { id: "burning-life-alpha", name: "燃烧生命α", icon: "heart-crack", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 3, effect: "转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限", prerequisiteIds: ["diligence"] },
   { id: "burning-life-beta", name: "燃烧生命β", icon: "heart-pulse", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "转博后每月SAN不足仍可免SAN消耗行动1次，消耗1点SAN上限", prerequisiteIds: ["diligence"] },
-  { id: "burnout", name: "燃尽", icon: "flame", tier: 3, column: "4", row: "2 / 4", maxLevel: 1, cost: 3, effect: "SAN上限首次低于10时恢复到20", prerequisiteIds: ["burning-life-alpha", "burning-life-beta"] },
-  { id: "epiphany", name: "顿悟", icon: "sparkles", tier: 3, column: "4", row: "1", maxLevel: 2, cost: 3, effect: "转博后每年科研、社交、导师好感+1/级", prerequisiteIds: ["breakthrough"] },
+  { id: "burnout", name: "求生本能", icon: "flame", tier: 3, column: "4", row: "2 / 4", maxLevel: 1, cost: 3, effect: "SAN上限首次低于10时恢复到20", prerequisiteIds: ["burning-life-alpha", "burning-life-beta"] },
+  { id: "epiphany", name: "厚积薄发", icon: "sparkles", tier: 3, column: "4", row: "1", maxLevel: 2, cost: 3, effect: "转博后每年科研、社交、导师好感+1/级", prerequisiteIds: ["breakthrough"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const RICH_TALENT_NODES = [
-  { id: "red-envelope", name: "红包拿来", icon: "gift", tier: 0, column: "1", row: "1", maxLevel: 4, cost: 1, effect: "压岁钱+1/级", prerequisiteIds: [] },
+  { id: "red-envelope", name: "红包拿来", icon: "gift", tier: 0, column: "1", row: "1", maxLevel: 4, cost: 1, effect: "寒假事件中压岁钱+1/级", prerequisiteIds: [] },
   { id: "heiress", name: "千金小姐", icon: "wallet", tier: 0, column: "1", row: "3", maxLevel: 4, cost: 1, effect: "初始金币+2/级", prerequisiteIds: [] },
   { id: "bring-funding", name: "带资进组", icon: "hand-coins", tier: 1, column: "2", row: "2", maxLevel: 4, cost: 1, effect: "导师科研经费+5/级", prerequisiteIds: ["red-envelope", "heiress"] },
   // Preview rule for later activation: both transfer bonuses use the pre-transfer state, so paper rewards do not compound the coin bonus.
@@ -438,12 +438,48 @@ const GENIUS_TALENT_NODES = [
   { id: "innate-insight", name: "生而知之", icon: "brain", tier: 0, column: "1", row: "1", maxLevel: 5, cost: 1, effect: "初始科研能力+1/级", prerequisiteIds: [] },
   { id: "idea-insight", name: "灵光乍现", icon: "lightbulb", tier: 0, column: "1", row: "3", maxLevel: 5, cost: 1, effect: "永久想idea+1分/级", prerequisiteIds: [] },
   { id: "tireless-scholar", name: "学而不倦", icon: "calendar-days", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 3, effect: "科研能力每年+1", prerequisiteIds: ["innate-insight"] },
+  { id: "thirst-for-knowledge", name: "求知若渴", icon: "book-open", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 1, effect: "不断学习事件出现概率+100%/级", prerequisiteIds: ["innate-insight"] },
   { id: "experiment-practice", name: "躬行求真", icon: "flask-conical", tier: 1, column: "2", row: "3", maxLevel: 5, cost: 1, effect: "永久做实验+1分/级", prerequisiteIds: ["idea-insight"] },
   { id: "proven-by-papers", name: "以文证道", icon: "file-text", tier: 2, column: "3", row: "1", maxLevel: 3, cost: 2, effect: "转博时每篇一作A类论文，科研能力+1/级", prerequisiteIds: ["tireless-scholar"] },
-  { id: "boundless-study", name: "学无止境", icon: "infinity", tier: 2, column: "3", row: "2", maxLevel: 5, cost: 1, effect: "转博时每篇一作A类论文，科研上限+1/级", prerequisiteIds: ["tireless-scholar"] },
+  { id: "boundless-study", name: "学无止境", icon: "infinity", tier: 2, column: "3", row: "2", maxLevel: 5, cost: 1, effect: "转博时每篇一作A类论文，科研上限+1/级", prerequisiteIds: ["thirst-for-knowledge"] },
   { id: "writing-mastery", name: "妙笔成章", icon: "notebook-pen", tier: 2, column: "3", row: "3", maxLevel: 5, cost: 1, effect: "永久写论文+1分/级", prerequisiteIds: ["experiment-practice"] },
   { id: "rise-together", name: "共攀高峰", icon: "users", tier: 3, column: "4", row: "1", maxLevel: 3, cost: 2, effect: "转博后同学的科研能力+1/级", prerequisiteIds: ["proven-by-papers", "boundless-study"] },
   { id: "lasting-work", name: "历久弥新", icon: "hourglass", tier: 3, column: "4", row: "3", maxLevel: 3, cost: 2, effect: "转博后论文分数每月衰减率减少5个百分点/级", prerequisiteIds: ["writing-mastery"] },
+] as const satisfies readonly DesignedTalentNode[];
+
+const TEACHER_CHILD_TALENT_NODES = [
+  { id: "near-the-source", name: "近水楼台", icon: "house", tier: 0, column: "1", row: "1 / 4", maxLevel: 5, cost: 1, effect: "初始导师好感+1/级", prerequisiteIds: [] },
+  { id: "growing-familiarity", name: "朝夕相处", icon: "calendar-days", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 3, effect: "导师好感每年+1", prerequisiteIds: ["near-the-source"] },
+  { id: "family-host", name: "长辈买单", icon: "hand-coins", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 1, effect: "组内团建事件中聚餐必定由导师请客", prerequisiteIds: ["near-the-source"] },
+  { id: "family-patronage", name: "长辈提携", icon: "files", tier: 1, column: "2", row: "3", maxLevel: 2, cost: 3, effect: "转博时每6点导师好感赠送1篇一作C类论文/级", prerequisiteIds: ["near-the-source"] },
+  { id: "computing-support", name: "算力后盾", icon: "cpu", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 4, effect: "转博时获得1次显卡报销/级", prerequisiteIds: ["growing-familiarity"] },
+  { id: "workspace-renewal", name: "工位焕新", icon: "monitor", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 4, effect: "转博时获得1次工位报销/级", prerequisiteIds: ["growing-familiarity"] },
+  { id: "mentor-insight", name: "名师点拨", icon: "book-open", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 2, effect: "导师协作分+50%/级", prerequisiteIds: ["family-patronage"] },
+  { id: "learning-by-osmosis", name: "耳濡目染", icon: "graduation-cap", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 6, effect: "转博后科研能力全局取科研能力与导师好感的较大值", prerequisiteIds: ["mentor-insight"] },
+] as const satisfies readonly DesignedTalentNode[];
+
+const CHOSEN_TALENT_NODES = [
+  { id: "favored-by-fate", name: "天命所眷", icon: "star", tier: 0, column: "1", row: "1", maxLevel: 2, cost: 3, effect: "初始科研、社交、导师好感、金币+1/级", prerequisiteIds: [] },
+  { id: "athletic-prodigy", name: "运动健将", icon: "dumbbell", tier: 0, column: "1", row: "2", maxLevel: 2, cost: 1, effect: "组内团建事件中羽毛球实力+20/级", prerequisiteIds: [] },
+  { id: "lasting-fortune", name: "福运绵长", icon: "calendar-days", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 4, effect: "每2年科研、社交、导师好感、金币+1", prerequisiteIds: ["favored-by-fate"] },
+  { id: "lucky-hand", name: "牌运亨通", icon: "gem", tier: 0, column: "1", row: "3", maxLevel: 2, cost: 1, effect: "组内团建事件中打牌胜率+20%/级", prerequisiteIds: [] },
+  { id: "rare-color-fate", name: "异色之缘", icon: "gamepad-2", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 1, effect: "游戏放松事件中游玩洛克王国必定捉到异色", prerequisiteIds: ["athletic-prodigy", "lucky-hand"] },
+  { id: "effortless-reinstall", name: "手到擒来", icon: "cpu", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 1, effect: "显卡故障事件中自己重装必定成功", prerequisiteIds: ["athletic-prodigy", "lucky-hand"] },
+  { id: "fortunate-health", name: "吉人天相", icon: "shield", tier: 2, column: "3", row: "2 / 4", maxLevel: 4, cost: 1, effect: "每月疾病概率-1%/级", prerequisiteIds: ["rare-color-fate", "effortless-reinstall"] },
+  { id: "complete-potential", name: "查缺补漏", icon: "chart-no-axes-combined", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 8, effect: "转博时科研、社交、导师好感补齐至三者最大值", prerequisiteIds: ["lasting-fortune"] },
+  { id: "balanced-growth", name: "齐头并进", icon: "sprout", tier: 3, column: "4", row: "1", maxLevel: 2, cost: 2, effect: "转博后科研、社交、导师好感中的最低项每年+1/级", prerequisiteIds: ["complete-potential"] },
+  { id: "misfortune-to-fortune", name: "否极泰来", icon: "sunrise", tier: 3, column: "4", row: "2 / 4", maxLevel: 3, cost: 2, effect: "疾病概率可为负数，每满-100%，全属性+1/级", prerequisiteIds: ["fortunate-health"] },
+] as const satisfies readonly DesignedTalentNode[];
+
+const SOCIAL_TALENT_NODES = [
+  { id: "natural-charisma", name: "八面玲珑", icon: "smile", tier: 0, column: "1", row: "1", maxLevel: 5, cost: 1, effect: "初始社交+1/级", prerequisiteIds: [] },
+  { id: "supporting-juniors", name: "提携后进", icon: "user-round", tier: 0, column: "1", row: "3", maxLevel: 1, cost: 2, effect: "指导师弟师妹事件出现概率+100%", prerequisiteIds: [] },
+  { id: "growing-connections", name: "左右逢源", icon: "calendar-days", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 3, effect: "社交每年+1", prerequisiteIds: ["natural-charisma"] },
+  { id: "peer-camaraderie", name: "同窗共进", icon: "handshake", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 2, effect: "同门合作事件出现概率+100%", prerequisiteIds: ["supporting-juniors"] },
+  { id: "circle-of-friends", name: "高朋满座", icon: "users", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 3, effect: "转博时人际栏每位同学使社交+1/级、社交上限+1/级", prerequisiteIds: ["growing-connections"] },
+  { id: "senior-mentorship", name: "师友相助", icon: "graduation-cap", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "师兄师姐指导事件出现概率+100%", prerequisiteIds: ["peer-camaraderie"] },
+  { id: "kindly-reviewed", name: "人缘加持", icon: "heart", tier: 3, column: "4", row: "1", maxLevel: 5, cost: 2, effect: "转博时心软审稿人概率+社交×1%/级，其余类型保持相对比例", prerequisiteIds: ["circle-of-friends"] },
+  { id: "collective-wisdom", name: "群策群力", icon: "network", tier: 3, column: "4", row: "3", maxLevel: 2, cost: 3, effect: "同学协作分+50%/级", prerequisiteIds: ["senior-mentorship"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const DESIGNED_TALENT_TREES = {
@@ -472,8 +508,38 @@ const DESIGNED_TALENT_TREES = {
     viewBoxHeight: 192,
     paths: [
       "M75 32 H225", "M75 160 H225",
-      "M225 32 H375", "M225 32 C295 32 305 96 375 96", "M225 160 H375",
+      "M75 32 C145 32 155 96 225 96",
+      "M225 32 H375", "M225 96 H375", "M225 160 H375",
       "M375 32 H525", "M375 96 C445 96 455 32 525 32", "M375 160 H525",
+    ],
+  },
+  "teacher-child": {
+    nodes: TEACHER_CHILD_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 96 C145 96 155 32 225 32", "M75 96 C145 96 155 160 225 160",
+      "M75 96 H225",
+      "M225 32 H375", "M225 32 C295 32 305 96 375 96",
+      "M225 160 H375", "M375 160 H525",
+    ],
+  },
+  chosen: {
+    nodes: CHOSEN_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 32 H225", "M225 32 H375", "M375 32 H525",
+      "M75 96 H225", "M75 160 H225",
+      "M75 96 C145 96 155 160 225 160", "M75 160 C145 160 155 96 225 96",
+      "M225 96 C295 96 305 128 375 128", "M225 160 C295 160 305 128 375 128",
+      "M375 128 H525",
+    ],
+  },
+  social: {
+    nodes: SOCIAL_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 32 H225", "M225 32 H375", "M375 32 H525",
+      "M75 160 H225", "M225 160 H375", "M375 160 H525",
     ],
   },
 } as const;
@@ -624,7 +690,7 @@ function renderSelectedRoleDetail(
             </div>
             ${renderProfileInfoPanel(viewModel)}
           </section>
-          ${selectedRoleId === "normal" || selectedRoleId === "rich" || selectedRoleId === "genius"
+          ${selectedRoleId === "normal" || selectedRoleId === "rich" || selectedRoleId === "genius" || selectedRoleId === "teacher-child" || selectedRoleId === "chosen" || selectedRoleId === "social"
             ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0)
             : renderGrowthBoard(talentTreePageIndex, talentTreeSelectedNodeByPage)}
         </div>

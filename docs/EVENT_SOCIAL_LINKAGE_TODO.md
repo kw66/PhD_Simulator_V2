@@ -52,7 +52,7 @@
 | --- | --- | --- | --- | --- |
 | [x] E08 | 导师项目 `random-4` | 牵头横向或纵向使对应共享进度+100，复用条满奖励；事件SAN享受科研任务减免，额外好感+1，纵向另科研+1 | 第三幕确认结算；拒绝与分担保留原属性影响，不增加项目进度；规则见 [导师科研与经费](ADVISOR_SYSTEM.md) | [createAdvisorProjectRandomEvent](../src/core/v2-random-events-lab-advisor-project.ts) |
 | [ ] E09 | 显卡故障 `random-13` | 叙事是实验室共用服务器故障，实际永久实验-2或下次实验倍率等只作用于玩家，同学自动实验不受影响 | 若升级为实验室公共设备状态，确定涉及哪些同学、是否暂停实验、谁负责恢复；避免永久叠加扣分。此类是客观故障，不应自动改成“等出现合适论文再发作” | [createOpsCampusRandomEvent](../src/core/v2-random-events-campus-ops.ts) |
-| [ ] E10 | 被抢发idea / 新SOTA `random-17/18` | 已支持选定玩家论文、协作分同比例调整与冻结审稿快照；目标池只读玩家 `papers`，不含 `fellowPapers` | 是否让同学论文也遭遇竞争，谁选择应对、谁承担成本，需另定；若扩展仍只选一篇，不批量打击整个实验室，不擅自扩大期刊修改稿范围 | [getPaperCompetitionCandidates](../src/core/v2-paper-competition.ts)、[事件定义](../src/core/v2-random-events-paper-competition.ts) |
+| [ ] E10 | 被抢发idea / 新sota `random-17/18` | 已支持选定玩家论文、协作分同比例调整与冻结审稿快照；目标池只读玩家 `papers`，不含 `fellowPapers` | 是否让同学论文也遭遇竞争，谁选择应对、谁承担成本，需另定；若扩展仍只选一篇，不批量打击整个实验室，不擅自扩大期刊修改稿范围 | [getPaperCompetitionCandidates](../src/core/v2-paper-competition.ts)、[事件定义](../src/core/v2-random-events-paper-competition.ts) |
 
 “数据丢失” `random-16` 明确发生在玩家自己的电脑，现有清零与引用惩罚按玩家草稿处理，协作分已同步清零、历史协作者保留。暂不列为必改，也不因同学存在而扩大到全组；是否加入协作者提供备份的补救分支，可后续讨论。
 
