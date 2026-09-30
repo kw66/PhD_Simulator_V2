@@ -49,7 +49,7 @@ const SHOP_PAGES: Record<ShopTabId, readonly PlayHelpPage[]> = {
   rest: [{
     title: "休息设备",
     summary: "",
-    body: "<p>办公椅可升级为不同休息路线，<b>选定后不能直接换路线</b>；出售并重新购买后可重新选择。</p><p>吊床将休息收益从<b>SAN+2提升为SAN+5</b>。</p>",
+    body: "<p>办公椅可升级为不同休息路线，<b>选定后不能直接换路线</b>；出售并重新购买后可重新选择。</p><p>吊床使休息效果<b>+3</b>，即休息时恢复SAN+5。</p>",
   }],
   coffee: [{
     title: "咖啡与续费",

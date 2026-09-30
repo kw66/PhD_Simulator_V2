@@ -12,7 +12,7 @@ export const BASE_COFFEE_PRICE = 2;
 
 export const COFFEE_MACHINE_UPGRADE_DEFINITIONS: CoffeeMachineUpgradeDefinition[] = [
   { id: "manual", name: "手动咖啡机", description: "冰美式价格降低 1 金币", price: 12 },
-  { id: "automatic", name: "自动咖啡机", description: "每月初额外生产一杯冰美式，金币 -2，SAN +3", price: 16 },
+  { id: "automatic", name: "自动咖啡机", description: "每月初额外生产一杯冰美式，金币 -2", price: 16 },
   { id: "advanced", name: "高级咖啡机", description: "每累计生产 10 杯冰美式，效果提升 1（最多 +5）", price: 18 },
   { id: "unlimited", name: "无限咖啡机", description: "每月可无限生产冰美式，价格按 2/3/4... 递增", price: 16 },
 ];

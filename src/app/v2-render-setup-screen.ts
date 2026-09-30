@@ -407,6 +407,8 @@ interface DesignedTalentNode {
   cost: number;
   effect: string;
   prerequisiteIds: readonly string[];
+  initialLevel?: number;
+  fixed?: boolean;
 }
 
 const NORMAL_TALENT_NODES = [
@@ -416,7 +418,7 @@ const NORMAL_TALENT_NODES = [
   { id: "breakthrough", name: "突破极限", icon: "rocket", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 3, effect: "属性溢出时上限+1，最多+10", prerequisiteIds: ["self-determination"] },
   { id: "burning-life-alpha", name: "燃烧生命α", icon: "heart-crack", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 3, effect: "转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限", prerequisiteIds: ["diligence"] },
   { id: "burning-life-beta", name: "燃烧生命β", icon: "heart-pulse", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "转博后每月SAN不足仍可免SAN消耗行动1次，消耗1点SAN上限", prerequisiteIds: ["diligence"] },
-  { id: "burnout", name: "求生本能", icon: "flame", tier: 3, column: "4", row: "2 / 4", maxLevel: 1, cost: 3, effect: "SAN上限首次低于10时恢复到20", prerequisiteIds: ["burning-life-alpha", "burning-life-beta"] },
+  { id: "burnout", name: "触底反弹", icon: "flame", tier: 3, column: "4", row: "2 / 4", maxLevel: 1, cost: 3, effect: "每月初SAN上限低于8时，SAN上限+1", prerequisiteIds: ["burning-life-alpha", "burning-life-beta"] },
   { id: "epiphany", name: "厚积薄发", icon: "sparkles", tier: 3, column: "4", row: "1", maxLevel: 2, cost: 3, effect: "转博后每年科研、社交、导师好感+1/级", prerequisiteIds: ["breakthrough"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
@@ -482,6 +484,19 @@ const SOCIAL_TALENT_NODES = [
   { id: "collective-wisdom", name: "群策群力", icon: "network", tier: 3, column: "4", row: "3", maxLevel: 2, cost: 3, effect: "同学协作分+50%/级", prerequisiteIds: ["senior-mentorship"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
+const NORMAL_REVERSED_TALENT_NODES = [
+  { id: "sloth-core", name: "懒骨天成", icon: "flame", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "SAN消耗×2；转博后SAN消耗×3（全部扣除均生效）", prerequisiteIds: [], initialLevel: 1, fixed: true },
+  { id: "monthly-san-recovery", name: "养精蓄锐", icon: "heart-pulse", tier: 1, column: "2", row: "1", maxLevel: 3, cost: 1, effect: "每月SAN回复+1/级", prerequisiteIds: ["sloth-core"] },
+  { id: "sloth-head-start", name: "根基渐稳", icon: "sparkles", tier: 1, column: "2", row: "2", maxLevel: 5, cost: 1, effect: "初始全属性+1/级", prerequisiteIds: ["sloth-core"] },
+  { id: "restful-idle", name: "以逸待劳", icon: "hourglass", tier: 1, column: "2", row: "3", maxLevel: 3, cost: 1, effect: "休息效果+1/级", prerequisiteIds: ["sloth-core"] },
+  { id: "post-phd-recovery", name: "生生不息", icon: "heart-plus", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 1, effect: "转博后每月SAN+已损SAN的10%/级", prerequisiteIds: ["monthly-san-recovery"] },
+  { id: "post-phd-growth", name: "后来居上", icon: "trending-up", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 1, effect: "转博时全属性+50%/级", prerequisiteIds: ["sloth-head-start"] },
+  { id: "coffee-lifeline", name: "提神醒脑", icon: "coffee", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 1, effect: "冰美式效果提升1/级", prerequisiteIds: ["restful-idle"] },
+  { id: "san-cap-reserve", name: "游刃有余", icon: "shield", tier: 3, column: "4", row: "1", maxLevel: 2, cost: 1, effect: "转博后SAN上限+30%/级", prerequisiteIds: ["post-phd-recovery"] },
+  { id: "summer-recovery", name: "长夏偷闲", icon: "sunrise", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 1, effect: "暑假事件中休息会回满SAN", prerequisiteIds: ["coffee-lifeline"] },
+  { id: "year-summary-recovery", name: "岁末小憩", icon: "calendar-days", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 1, effect: "学年总结事件中休息会回满SAN", prerequisiteIds: ["coffee-lifeline"] },
+] as const satisfies readonly DesignedTalentNode[];
+
 const DESIGNED_TALENT_TREES = {
   normal: {
     nodes: NORMAL_TALENT_NODES,
@@ -542,10 +557,21 @@ const DESIGNED_TALENT_TREES = {
       "M75 160 H225", "M225 160 H375", "M375 160 H525",
     ],
   },
+  "normal-reversed": {
+    nodes: NORMAL_REVERSED_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
+      "M225 32 H375", "M225 96 H375", "M225 160 H375",
+      "M375 32 H525", "M375 160 C445 160 455 96 525 96", "M375 160 H525",
+    ],
+  },
 } as const;
 
 function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, selectedNodeIndex: number): string {
-  const { nodes, paths, viewBoxHeight } = DESIGNED_TALENT_TREES[roleId];
+  const tree = DESIGNED_TALENT_TREES[roleId];
+  const nodes: readonly DesignedTalentNode[] = tree.nodes;
+  const { paths, viewBoxHeight } = tree;
   const activeIndex = Number.isInteger(selectedNodeIndex) && selectedNodeIndex >= 0 && selectedNodeIndex < nodes.length
     ? selectedNodeIndex : 0;
   return `
@@ -557,16 +583,16 @@ function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, s
               ${paths.map((path) => `<path d="${path}" />`).join("")}
             </svg>
             ${nodes.map((node, index) => `
-              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.tier}" aria-label="${escapeHtml(`${node.name}：${node.effect}，${node.cost}天赋点，仅预览`)}" title="${node.name}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}">
+              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}${node.fixed ? " is-fixed" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.tier}" data-fixed="${node.fixed ? "true" : "false"}" aria-label="${escapeHtml(`${node.name}：${node.effect}${node.fixed ? "，固定生效" : `，${node.cost}天赋点`}，仅预览`)}" title="${node.name}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-initial-level="${node.initialLevel ?? 0}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}">
                 <span class="lobby-talent-tree-node-ring"><i data-lucide="${node.icon}" aria-hidden="true"></i></span>
-                <span class="lobby-normal-tree-node-level">0/${node.maxLevel}</span>
+                <span class="lobby-normal-tree-node-level">${node.initialLevel ?? 0}/${node.maxLevel}</span>
               </button>
             `).join("")}
             <div class="lobby-normal-tree-details" aria-live="polite">
               ${nodes.map((node, index) => `
                 <div class="lobby-normal-tree-detail" data-detail-index="${index}"${index === activeIndex ? "" : " hidden"}>
                   <div class="lobby-normal-tree-detail-heading"><strong>${node.name}</strong></div>
-                  <p>${node.effect}<span class="lobby-normal-tree-detail-cost">${node.cost}天赋点</span></p>
+                  <p>${node.effect}<span class="lobby-normal-tree-detail-cost">${node.fixed ? "固定生效" : `${node.cost}天赋点`}</span></p>
                 </div>
               `).join("")}
             </div>
@@ -690,7 +716,7 @@ function renderSelectedRoleDetail(
             </div>
             ${renderProfileInfoPanel(viewModel)}
           </section>
-          ${selectedRoleId === "normal" || selectedRoleId === "rich" || selectedRoleId === "genius" || selectedRoleId === "teacher-child" || selectedRoleId === "chosen" || selectedRoleId === "social"
+          ${selectedRoleId === "normal" || selectedRoleId === "normal-reversed" || selectedRoleId === "rich" || selectedRoleId === "genius" || selectedRoleId === "teacher-child" || selectedRoleId === "chosen" || selectedRoleId === "social"
             ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0)
             : renderGrowthBoard(talentTreePageIndex, talentTreeSelectedNodeByPage)}
         </div>

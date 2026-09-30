@@ -901,7 +901,7 @@ describe("v2 render lobby shell", () => {
     expect((tree.match(/data-tree-page="\d"/g) ?? []).length).toBe(1);
     expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(8);
     expect(tree).not.toContain('data-ui-talent-tree-page-delta');
-    for (const name of ["满怀干劲", "我命由我", "勤能补拙", "突破极限", "燃烧生命α", "燃烧生命β", "求生本能", "厚积薄发"]) {
+    for (const name of ["满怀干劲", "我命由我", "勤能补拙", "突破极限", "燃烧生命α", "燃烧生命β", "触底反弹", "厚积薄发"]) {
       expect(tree).toContain(name);
     }
     expect(tree).not.toMatch(/破釜沉舟|绝处逢生|顿悟|燃尽/);
@@ -911,7 +911,7 @@ describe("v2 render lobby shell", () => {
     expect(tree).toContain("属性溢出时上限+1，最多+10");
     expect(tree).toContain("转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限");
     expect(tree).toContain("转博后每月SAN不足仍可免SAN消耗行动1次，消耗1点SAN上限");
-    expect(tree).toContain("SAN上限首次低于10时恢复到20");
+    expect(tree).toContain("每月初SAN上限低于8时，SAN上限+1");
     expect(tree).toContain("转博后每年科研、社交、导师好感+1/级");
     for (const icon of ["heart-plus", "sunrise", "footprints", "rocket", "heart-crack", "heart-pulse", "flame", "sparkles"]) {
       expect(tree).toContain(`data-lucide="${icon}"`);
@@ -936,6 +936,31 @@ describe("v2 render lobby shell", () => {
     expect(tree).not.toMatch(/<p>[^<]*。<\/p>/);
     expect(tree).not.toContain("lobby-normal-tree-node-cost");
     expect(tree).not.toContain("lobby-normal-tree-node-caption");
+  });
+
+  it("previews the sloth reversed talent tree with a fixed negative starting talent", () => {
+    const account = createDefaultAccountProfile();
+    account.selectedLobbyRoleId = "normal-reversed";
+
+    const html = renderApp(createInitialState(), account);
+    const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-normal-reversed-tree" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
+
+    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(10);
+    expect((tree.match(/<path d=/g) ?? []).length).toBe(9);
+    expect(tree).toContain("懒骨天成");
+    expect(tree).toContain("SAN消耗×2；转博后SAN消耗×3（全部扣除均生效）");
+    expect(tree).toContain('data-talent-id="sloth-core"');
+    expect(tree).toContain('data-fixed="true"');
+    expect(tree).toContain('data-initial-level="1"');
+    expect(tree).toContain('class="lobby-talent-tree-node is-selected is-fixed"');
+    expect(tree).toContain("1/1");
+    expect(tree).toContain("固定生效");
+    for (const icon of ["flame", "heart-pulse", "sparkles", "hourglass", "heart-plus", "trending-up", "coffee", "shield", "sunrise", "calendar-days"]) {
+      expect(tree).toContain(`data-lucide="${icon}"`);
+    }
+    for (const name of ["养精蓄锐", "根基渐稳", "以逸待劳", "生生不息", "后来居上", "提神醒脑", "游刃有余", "长夏偷闲", "岁末小憩"]) {
+      expect(tree).toContain(name);
+    }
   });
 
   it("keeps the six original achievements and mirrors unlock achievements onto target roles", () => {
@@ -1043,8 +1068,8 @@ describe("v2 render lobby shell", () => {
       expect(tree).toContain(effect);
       expect(tree).toContain(`data-lucide="${icon}"`);
     }
-    expect(tree).toContain('data-talent-id="bring-funding" data-tier="1" aria-label="带资进组：导师科研经费+5/级，1天赋点，仅预览" title="带资进组" aria-pressed="false" style="grid-column:2;grid-row:2"');
-    expect(tree).toContain('data-talent-id="knowledge-is-wealth" data-tier="1" aria-label="书中自有黄金屋：转博时每篇一作论文奖励1金币/级，2天赋点，仅预览" title="书中自有黄金屋" aria-pressed="false" style="grid-column:2;grid-row:3"');
+    expect(tree).toContain('data-talent-id="bring-funding" data-tier="1" data-fixed="false" aria-label="带资进组：导师科研经费+5/级，1天赋点，仅预览" title="带资进组" aria-pressed="false" style="grid-column:2;grid-row:2" data-cost="1" data-initial-level="0"');
+    expect(tree).toContain('data-talent-id="knowledge-is-wealth" data-tier="1" data-fixed="false" aria-label="书中自有黄金屋：转博时每篇一作论文奖励1金币/级，2天赋点，仅预览" title="书中自有黄金屋" aria-pressed="false" style="grid-column:2;grid-row:3" data-cost="2" data-initial-level="0"');
     expect(tree).toMatch(/data-talent-id="bring-funding"[^>]*data-prerequisite-ids="red-envelope heiress"/);
     expect(tree).toMatch(/data-talent-id="gold-power-alpha"[^>]*data-prerequisite-ids="work-pays-off"/);
     expect(tree).toMatch(/data-talent-id="gold-power-beta"[^>]*data-prerequisite-ids="bring-funding"/);
@@ -1966,7 +1991,7 @@ describe("v2 render lobby shell", () => {
 
     const unownedHtml = renderApp(state, createDefaultAccountProfile(), { activeShopTab: "coffee" });
     const unownedMachineCard = getShopCardHtml(unownedHtml, "咖啡机");
-    expect(unownedMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式 SAN+2提升为+3，可升级");
+    expect(unownedMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式效果提升 1");
     expect((unownedHtml.match(/data-shop-upgrade-option-id=/g) ?? [])).toHaveLength(4);
     expect((unownedHtml.match(/class="shop-item-row[^\"]*is-upgrade-option/g) ?? [])).toHaveLength(4);
     expect((unownedHtml.match(/shop-upgrade-check/g) ?? [])).toHaveLength(4);
@@ -2066,7 +2091,7 @@ describe("v2 render lobby shell", () => {
     expect(automaticHtml).toContain('data-action="toggle-coffee-subscription"');
     expect(automaticHtml).toContain('aria-label="关闭冰美式自动续费"');
     expect(automaticMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain(
-      "每月初额外生产一杯冰美式，金币 -2，SAN +3",
+      "每月初额外生产一杯冰美式，金币 -2",
     );
 
     const manualHtml = renderApp({

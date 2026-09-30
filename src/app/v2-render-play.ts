@@ -3319,8 +3319,8 @@ function getChairTalentItem(state: GameState): TalentPanelItem | null {
       icon: "🪑",
       name: "吊床",
       active: true,
-      description: "效果：休息动作从 SAN +2 提升为 SAN +5。",
-      metrics: recoveryMetrics("休息 +5"),
+      description: "效果：休息效果 +3。",
+      metrics: recoveryMetrics("休息效果 +3"),
     };
   }
 

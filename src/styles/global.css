@@ -3188,7 +3188,8 @@ button.pager-arrow:disabled {
 .is-genius-tree .lobby-talent-tree-page,
 .is-teacher-child-tree .lobby-talent-tree-page,
 .is-chosen-tree .lobby-talent-tree-page,
-.is-social-tree .lobby-talent-tree-page {
+.is-social-tree .lobby-talent-tree-page,
+.is-normal-reversed-tree .lobby-talent-tree-page {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(3, 64px) minmax(0, 1fr);
   width: min(94%, 560px);
@@ -3223,6 +3224,10 @@ button.pager-arrow:disabled {
   height: 192px;
 }
 
+.is-normal-reversed-tree .lobby-normal-tree-connections {
+  height: 192px;
+}
+
 .is-designed-tree .lobby-talent-tree-node {
   position: relative;
   z-index: 1;
@@ -3235,59 +3240,76 @@ button.pager-arrow:disabled {
   height: 72px;
 }
 
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="first-month-drive"] { --tree-tone: #bb718a; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="self-determination"] { --tree-tone: #b48b38; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="diligence"] { --tree-tone: #4d8c73; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="breakthrough"] { --tree-tone: #bd9445; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="burning-life-alpha"] { --tree-tone: #a9607c; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="burning-life-beta"] { --tree-tone: #bd8197; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="burnout"] { --tree-tone: #b96f80; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="epiphany"] { --tree-tone: #b89b4c; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="red-envelope"] { --tree-tone: #ba6b64; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="heiress"] { --tree-tone: #b18a54; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="bring-funding"] { --tree-tone: #638c7b; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="wealth-growth"] { --tree-tone: #b79a4d; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="knowledge-is-wealth"] { --tree-tone: #5d8790; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="investment-savvy"] { --tree-tone: #739375; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="work-pays-off"] { --tree-tone: #6686a0; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-alpha"] { --tree-tone: #ba9146; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-beta"] { --tree-tone: #b7965e; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-gamma"] { --tree-tone: #ad9845; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="innate-insight"] { --tree-tone: #8b779c; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="idea-insight"] { --tree-tone: #b49b54; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="tireless-scholar"] { --tree-tone: #548d82; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="experiment-practice"] { --tree-tone: #6594a2; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="proven-by-papers"] { --tree-tone: #688bac; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="boundless-study"] { --tree-tone: #ac8e50; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="writing-mastery"] { --tree-tone: #9c83a3; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-work"] { --tree-tone: #a1738f; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="rise-together"] { --tree-tone: #6c9379; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="near-the-source"] { --tree-tone: #b18a54; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-familiarity"] { --tree-tone: #bb718a; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-host"] { --tree-tone: #bd9445; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-patronage"] { --tree-tone: #688bac; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="computing-support"] { --tree-tone: #6594a2; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="workspace-renewal"] { --tree-tone: #6c9379; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="mentor-insight"] { --tree-tone: #ac8e50; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="learning-by-osmosis"] { --tree-tone: #8b779c; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="favored-by-fate"] { --tree-tone: #bd9445; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="athletic-prodigy"] { --tree-tone: #6594a2; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-fortune"] { --tree-tone: #b18a54; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="lucky-hand"] { --tree-tone: #a9607c; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="rare-color-fate"] { --tree-tone: #9c83a3; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="effortless-reinstall"] { --tree-tone: #688bac; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="fortunate-health"] { --tree-tone: #6c9379; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="complete-potential"] { --tree-tone: #b49b54; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="balanced-growth"] { --tree-tone: #6c9379; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="misfortune-to-fortune"] { --tree-tone: #b18a54; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="natural-charisma"] { --tree-tone: #bb718a; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="supporting-juniors"] { --tree-tone: #6594a2; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-connections"] { --tree-tone: #b18a54; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="peer-camaraderie"] { --tree-tone: #6c9379; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="circle-of-friends"] { --tree-tone: #8b779c; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="senior-mentorship"] { --tree-tone: #688bac; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="kindly-reviewed"] { --tree-tone: #a9607c; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="collective-wisdom"] { --tree-tone: #6c9379; }
+/* Talent colors describe effect category, not role or tree tier. */
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="first-month-drive"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="burning-life-alpha"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="burning-life-beta"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="burnout"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="fortunate-health"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="misfortune-to-fortune"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="monthly-san-recovery"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="restful-idle"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-recovery"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="san-cap-reserve"] { --tree-tone: #168c8c; }
+
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="diligence"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="innate-insight"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="idea-insight"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="tireless-scholar"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="experiment-practice"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="proven-by-papers"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="boundless-study"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="writing-mastery"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-work"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="rise-together"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-patronage"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="learning-by-osmosis"] { --tree-tone: #3d72b8; }
+
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="near-the-source"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-familiarity"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="mentor-insight"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="natural-charisma"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-connections"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="peer-camaraderie"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="circle-of-friends"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="senior-mentorship"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="collective-wisdom"] { --tree-tone: #c45b89; }
+
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="self-determination"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="breakthrough"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="epiphany"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="wealth-growth"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="favored-by-fate"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-fortune"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="complete-potential"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="balanced-growth"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="sloth-head-start"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-growth"] { --tree-tone: #d09a1e; }
+
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="red-envelope"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="heiress"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="bring-funding"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="knowledge-is-wealth"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="investment-savvy"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="work-pays-off"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-alpha"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-beta"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-gamma"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="computing-support"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="workspace-renewal"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="effortless-reinstall"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="coffee-lifeline"] { --tree-tone: #c45a24; }
+
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-host"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="athletic-prodigy"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="lucky-hand"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="rare-color-fate"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="supporting-juniors"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="kindly-reviewed"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="summer-recovery"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="year-summary-recovery"] { --tree-tone: #7652a6; }
+
+.is-designed-tree .lobby-talent-tree-node.is-fixed { --tree-tone: #8e3042; }
 
 .is-designed-tree .lobby-talent-tree-node-ring {
   flex: 0 0 auto;
@@ -3322,7 +3344,8 @@ button.pager-arrow:disabled {
 .is-genius-tree .lobby-talent-tree-node,
 .is-teacher-child-tree .lobby-talent-tree-node,
 .is-chosen-tree .lobby-talent-tree-node,
-.is-social-tree .lobby-talent-tree-node {
+.is-social-tree .lobby-talent-tree-node,
+.is-normal-reversed-tree .lobby-talent-tree-node {
   height: 58px;
 }
 
@@ -3345,7 +3368,8 @@ button.pager-arrow:disabled {
 .is-genius-tree .lobby-normal-tree-details,
 .is-teacher-child-tree .lobby-normal-tree-details,
 .is-chosen-tree .lobby-normal-tree-details,
-.is-social-tree .lobby-normal-tree-details {
+.is-social-tree .lobby-normal-tree-details,
+.is-normal-reversed-tree .lobby-normal-tree-details {
   grid-row: 4;
 }
 
@@ -4103,7 +4127,8 @@ button.pager-arrow:disabled {
   .is-genius-tree .lobby-talent-tree-page,
   .is-teacher-child-tree .lobby-talent-tree-page,
   .is-chosen-tree .lobby-talent-tree-page,
-  .is-social-tree .lobby-talent-tree-page {
+  .is-social-tree .lobby-talent-tree-page,
+  .is-normal-reversed-tree .lobby-talent-tree-page {
     grid-template-rows: repeat(3, 64px) minmax(0, 1fr);
   }
 

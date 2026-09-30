@@ -656,7 +656,7 @@ function renderCoffeeRows(
     ? COFFEE_MACHINE_UPGRADE_DEFINITIONS.find((upgrade) => upgrade.id === currentUpgrade) ?? null
     : null;
   const machineDescription = !state.coffeeState.machineOwned
-    ? "冰美式 SAN+2提升为+3，可升级"
+    ? "冰美式效果提升 1"
     : currentDefinition?.description ?? "冰美式 SAN+3，每月1杯";
 
   const availableUpgradeIds = new Set(machineUpgrades.map((upgrade) => upgrade.id));

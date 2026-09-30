@@ -359,7 +359,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(gear).toMatch(/冬季（公历12–2月）.*每月SAN-1，羽绒服可免除/);
     expect(rest).toContain("选定后不能直接换路线");
     expect(rest).toContain("出售并重新购买后可重新选择");
-    expect(rest).toContain("SAN+2提升为SAN+5");
+    expect(rest).toContain("休息效果+3");
   });
 
   it("keeps citation rules in results help and statistics in the main panel", () => {
@@ -410,8 +410,8 @@ describe("v2 research rule details and publication metrics", () => {
     state.shopState.chairUpgrade = "hammock";
     const talentHtml = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "talent", activeTalentTab: "equip" });
 
-    expect(shopHtml.replace(/<[^>]*>/g, "")).toContain("休息动作从 SAN +2 提升为 SAN +5");
-    expect(talentHtml).toContain("休息动作从 SAN +2 提升为 SAN +5");
+    expect(shopHtml.replace(/<[^>]*>/g, "")).toContain("休息效果 +3");
+    expect(talentHtml).toContain("休息效果 +3");
     expect(talentHtml).not.toContain("休息动作改为 SAN +5");
   });
 });
