@@ -34,7 +34,7 @@ function createBackend() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("V2 visit statistics", () => {
-  it.each(["burnout", "poor", "expelled", "isolated", "delay", "quit", "master", "phd"] as const)("records the real %s ending once through store updates", async (ending) => {
+  it.each(["burnout", "poor", "expelled", "isolated", "overthinking", "delay", "quit", "master", "phd"] as const)("records the real %s ending once through store updates", async (ending) => {
     const backend = createBackend();
     const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
     const store = createStore();
@@ -51,6 +51,7 @@ describe("V2 visit statistics", () => {
     if (ending === "poor") state.player.money = -1;
     if (ending === "expelled") state.player.favor = -1;
     if (ending === "isolated") state.player.social = -1;
+    if (ending === "overthinking") state.player.research = -1;
     if (ending === "master" || ending === "phd" || ending === "delay") {
       state.degree = ending === "phd" ? "phd" : "master";
       state.totalMonths = state.maxMonths;

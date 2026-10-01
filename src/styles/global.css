@@ -22,6 +22,7 @@
   --upright-accent: #b88b3a;
   --reversed-accent: #7b57bc;
   --special-accent: #3d78c8;
+  --cursed-accent: #963f45;
   --success: #2f7a58;
   --danger: #96524a;
   --tooltip-border: #ff9a2e;
@@ -2038,6 +2039,10 @@ p {
   --role-card-accent: var(--special-accent);
 }
 
+.lobby-role-card.tone-cursed {
+  --role-card-accent: var(--cursed-accent);
+}
+
 .lobby-role-card:hover {
   transform: translateY(-1px);
   border-color: rgba(39, 68, 58, 0.34);
@@ -3272,9 +3277,12 @@ button.pager-arrow:disabled {
 .is-teacher-child-tree .lobby-talent-tree-page,
 .is-chosen-tree .lobby-talent-tree-page,
 .is-social-tree .lobby-talent-tree-page,
+.is-chosen-reversed-tree .lobby-talent-tree-page,
 .is-normal-reversed-tree .lobby-talent-tree-page,
 .is-rich-reversed-tree .lobby-talent-tree-page,
-.is-genius-reversed-tree .lobby-talent-tree-page {
+.is-genius-reversed-tree .lobby-talent-tree-page,
+.is-teacher-child-reversed-tree .lobby-talent-tree-page,
+.is-social-reversed-tree .lobby-talent-tree-page {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(3, calc(var(--lobby-talent-node-height) / 3)) minmax(0, 1fr);
   width: min(96%, 600px);
@@ -3369,6 +3377,12 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="complete-potential"] { --tree-tone: #b49b54; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="balanced-growth"] { --tree-tone: #6c9379; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="misfortune-to-fortune"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="attribute-swap"] { --tree-tone: #8b779c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="san-money-swap"] { --tree-tone: #bd9445; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-swap"] { --tree-tone: #a9607c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="group-event-focus"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="game-event-focus"] { --tree-tone: #6c9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="swap-breaks-cap"] { --tree-tone: #b18a54; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="natural-charisma"] { --tree-tone: #bb718a; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="supporting-juniors"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-connections"] { --tree-tone: #b18a54; }
@@ -3409,6 +3423,29 @@ button.pager-arrow:disabled {
 
 .is-designed-tree .lobby-talent-tree-node.is-fixed { --tree-tone: #a65f67; }
 
+
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="favor-reset"] { --tree-tone: #bb718a; }
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="advisor-meeting-focus"] { --tree-tone: #6c9379; }
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="group-meeting-focus"] { --tree-tone: #6594a2; }
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="lower-favor-reset"] { --tree-tone: #8b779c; }
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="favor-reset-decrease"] { --tree-tone: #b18a54; }
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="reset-research"],
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="reset-research-cap"] { --tree-tone: #6594a2; }
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="reset-social"],
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="reset-social-cap"] { --tree-tone: #a9607c; }
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="end-of-grace"] { --tree-tone: #765b86; }
+
+.is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="reset-coins"] { --tree-tone: #bd9445; }
+
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="social-to-san"] { --tree-tone: #bb718a; }
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="social-loss-coins"] { --tree-tone: #bd9445; }
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="fellow-add-social"],
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="fellow-remove-social"] { --tree-tone: #6c9379; }
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="peer-event-focus"],
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="junior-event-focus"],
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="senior-event-focus"] { --tree-tone: #6594a2; }
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="affinity-conversion"] { --tree-tone: #8b779c; }
+
 .is-designed-tree .lobby-talent-tree-node-ring {
   flex: 0 0 auto;
   width: 40px;
@@ -3445,9 +3482,12 @@ button.pager-arrow:disabled {
 .is-teacher-child-tree .lobby-talent-tree-node,
 .is-chosen-tree .lobby-talent-tree-node,
 .is-social-tree .lobby-talent-tree-node,
+.is-chosen-reversed-tree .lobby-talent-tree-node,
 .is-normal-reversed-tree .lobby-talent-tree-node,
 .is-rich-reversed-tree .lobby-talent-tree-node,
-.is-genius-reversed-tree .lobby-talent-tree-node {
+.is-genius-reversed-tree .lobby-talent-tree-node,
+.is-teacher-child-reversed-tree .lobby-talent-tree-node,
+.is-social-reversed-tree .lobby-talent-tree-node {
   height: 58px;
 }
 

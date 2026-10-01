@@ -40,6 +40,9 @@ tools/
 # Keep only the optimized role portraits used by the game. Original artwork
 # remains available locally without making the public repository unnecessarily large.
 /art/*
+!/art/placeholders/
+/art/placeholders/*
+!/art/placeholders/role_placeholder.svg
 !/art/final_roles/
 /art/final_roles/*
 !/art/final_roles/set_20260329_v2/

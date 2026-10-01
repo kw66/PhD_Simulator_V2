@@ -30,6 +30,11 @@ const ENDINGS: Record<Exclude<EndingId, null>, EndingPresentation> = {
     story: ["你已经很久没有踏实休息过了。实验、修改和接连而来的任务挤满日程，连合上电脑以后，脑子里也还在赶进度。", "这一次，你没能再撑下去。研究计划停在了半途，你决定离开工位，先把自己的生活慢慢找回来。"],
     closing: "这回，先让自己好好歇一歇",
   },
+  overthinking: {
+    title: "用脑过度", icon: "🧠", label: "提前离校", tone: "failure",
+    story: ["你盯着自己写的代码看了很久，注释里的每个字都认识，合在一起却不知道在做什么。昨天还能讲清楚的公式，今天推到第二行就断了，草稿纸上只剩越画越大的问号。", "你又打开那份入门笔记，想从头捋一遍，才发现同一页已经看了一个下午。实验还在排队，你却再也想不起要验证什么。这次只好停下研究，先让一直超负荷的大脑歇一歇。"],
+    closing: "服务器还能重启，你也该给自己留点休息的时间",
+  },
   poor: {
     title: "穷困潦倒", icon: "💸", label: "提前离校", tone: "failure",
     story: ["你又核对了一遍余额，把最近的支出从头翻到尾。那些平时分散在各处的小数目，加在一起，已经超出了你能承担的范围。", "你不得不中断学业，收拾东西离开实验室。手头还没做完的研究，只能先停在这里。"],
@@ -62,7 +67,7 @@ function escapeHtml(text: string): string {
 }
 
 export function isEndingSystemLog(text: string): boolean {
-  return /^(?:SAN|金币|导师好感|社交能力)\s*已跌破\s*0，本轮提前结束。?$/u.test(text.trim())
+  return /^(?:SAN|金币|导师好感|社交能力|科研能力)\s*已跌破\s*0，本轮提前结束。?$/u.test(text.trim())
     || text.trim() === "你选择了退学，本轮结束。"
     || /^(?:硕士毕业|博士毕业|延期毕业)：科研分\s/u.test(text.trim());
 }
@@ -99,7 +104,7 @@ function renderEndingSummary(state: GameState): string {
   const relationshipCount = state.relationshipState.advisorCount + state.fellowProgressState.length + Number(state.loverState.active);
   const attributes = [
     ["san", "🧠 SAN", `${state.player.san}/${state.sanCap}`, state.ending === "burnout"],
-    ["research", "💡 科研", `${state.player.research}/${getResearchCap(state.researchCapacityState)}`, false],
+    ["research", "💡 科研", `${state.player.research}/${getResearchCap(state.researchCapacityState)}`, state.ending === "overthinking"],
     ["social", "🤝 社交", state.player.social, state.ending === "isolated"],
     ["favor", "🎓 导师好感", state.player.favor, state.ending === "expelled"],
     ["money", "💰 金币", state.player.money, state.ending === "poor"],
@@ -120,7 +125,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
   const graduated = ending === "master" || ending === "phd";
   const degree = state.degree === "phd" ? "博士" : "硕士";
   const target = state.graduationScoreTarget;
-  const failureStats = { burnout: ["SAN", state.player.san], poor: ["金币", state.player.money], expelled: ["导师好感", state.player.favor], isolated: ["社交", state.player.social] } as const;
+  const failureStats = { burnout: ["SAN", state.player.san], poor: ["金币", state.player.money], expelled: ["导师好感", state.player.favor], isolated: ["社交", state.player.social], overthinking: ["科研能力", state.player.research] } as const;
   const failedStat = ending && ending in failureStats ? failureStats[ending as keyof typeof failureStats] : null;
   const reason = failedStat ? `${failedStat[0]} ${failedStat[1]}，低于0，无法继续学业`
     : ending === "quit" ? "你选择结束本轮学业"

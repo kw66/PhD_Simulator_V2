@@ -15,5 +15,5 @@ export function getResearchCap(state: ResearchCapacityState): number {
 }
 
 export function clampResearchToCap(value: number, state: ResearchCapacityState): number {
-  return Math.max(0, Math.min(getResearchCap(state), value));
+  return Math.min(getResearchCap(state), value);
 }

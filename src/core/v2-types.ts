@@ -51,12 +51,16 @@ export type RoleId =
   | "social-reversed"
   | "rich-reversed"
   | "teacher-child-reversed"
-  | "chosen-reversed";
+  | "chosen-reversed"
+  | "special-dandan"
+  | "special-daji"
+  | "cursed-frail"
+  | "cursed-debt";
 export type RoleGrowthStatId = DebugStatId;
 export type GamePhase = "setup" | "playing" | "finished";
 export type Degree = "master" | "phd";
 export type DateDisplayMode = "academic" | "calendar";
-export type EndingId = "master" | "phd" | "delay" | "burnout" | "poor" | "expelled" | "isolated" | "quit" | null;
+export type EndingId = "master" | "phd" | "delay" | "burnout" | "poor" | "expelled" | "isolated" | "overthinking" | "quit" | null;
 export type PaperTarget = "C" | "B" | "A";
 export type JournalTarget = "nature" | "nmi" | "pami";
 export type PaperStatus = "draft" | "reviewing" | "journal-reviewing" | "published";

@@ -17,7 +17,11 @@ import { renderLobbyMasthead, renderLobbyMessageRailView } from "./v2-render-com
 import { renderLobbyAnnouncementRailView } from "./v2-render-announcements";
 import type { RoleRailViewId } from "./v2-render-types";
 
-const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain"]);
+const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain", "special-dandan", "special-daji"]);
+const CURSED_ROLE_IDS = new Set<RoleId>(["cursed-frail", "cursed-debt"]);
+function hasDesignedTalentTree(roleId: RoleId): roleId is keyof typeof DESIGNED_TALENT_TREES {
+  return Object.hasOwn(DESIGNED_TALENT_TREES, roleId);
+}
 
 type TalentPointSummary = {
   level: number;
@@ -40,6 +44,10 @@ function getRoleToneClass(roleId: RoleId): string {
     return " tone-special";
   }
 
+  if (CURSED_ROLE_IDS.has(roleId)) {
+    return " tone-cursed";
+  }
+
   return getRoleDefinition(roleId).mode === "reversed" ? " tone-reversed" : " tone-upright";
 }
 
@@ -48,12 +56,20 @@ function getRoleModeLabel(roleId: RoleId): string {
     return "特殊";
   }
 
+  if (CURSED_ROLE_IDS.has(roleId)) {
+    return "诅咒";
+  }
+
   return getRoleDefinition(roleId).mode === "reversed" ? "逆位" : "正位";
 }
 
 function getRoleModeClass(roleId: RoleId): string {
   if (SPECIAL_ROLE_IDS.has(roleId)) {
     return "is-special";
+  }
+
+  if (CURSED_ROLE_IDS.has(roleId)) {
+    return "is-cursed";
   }
 
   return getRoleDefinition(roleId).mode === "reversed" ? "is-reversed" : "is-upright";
@@ -449,6 +465,16 @@ const CHOSEN_TALENT_NODES = [
   { id: "misfortune-to-fortune", name: "否极泰来", icon: "sunrise", tier: 3, column: "4", row: "2 / 4", maxLevel: 3, cost: 2, effect: "疾病概率可为负数，每满-100%，全属性+1/级", prerequisiteIds: ["fortunate-health"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
+const CHOSEN_REVERSED_TALENT_NODES = [
+  { id: "fate-curse", name: "命运反噬", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "SAN、金币、科研、社交、导师好感轮流在月初-1", prerequisiteIds: [], initialLevel: 1, fixed: true },
+  { id: "attribute-swap", name: "乾坤错位", icon: "network", tier: 0, column: "1", row: "1", maxLevel: 1, cost: 2, effect: "每月科研、社交、导师好感随机交换", prerequisiteIds: [] },
+  { id: "san-money-swap", name: "祸福相依", icon: "network", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 2, effect: "每月SAN、金币随机交换", prerequisiteIds: [] },
+  { id: "post-phd-swap", name: "万象更迭", icon: "rotate-ccw", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 3, effect: "转博后每月科研、社交、导师好感、SAN、金币全部随机交换", prerequisiteIds: ["attribute-swap", "san-money-swap"] },
+  { id: "group-event-focus", name: "人声鼎沸", icon: "users", tier: 2, column: "3", row: "1", maxLevel: 4, cost: 2, effect: "组内团建事件出现概率+100%/级", prerequisiteIds: ["post-phd-swap"] },
+  { id: "game-event-focus", name: "幻境游踪", icon: "gamepad-2", tier: 2, column: "3", row: "2", maxLevel: 4, cost: 2, effect: "游戏放松事件出现概率+100%/级", prerequisiteIds: ["post-phd-swap"] },
+  { id: "swap-breaks-cap", name: "无界轮转", icon: "infinity", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 4, effect: "属性交换可突破上限", prerequisiteIds: ["group-event-focus", "game-event-focus"] },
+] as const satisfies readonly DesignedTalentNode[];
+
 const SOCIAL_TALENT_NODES = [
   { id: "natural-charisma", name: "八面玲珑", icon: "smile", tier: 0, column: "1", row: "1", maxLevel: 5, cost: 1, effect: "初始社交+1/级", prerequisiteIds: [] },
   { id: "supporting-juniors", name: "提携后进", icon: "user-round", tier: 0, column: "1", row: "3", maxLevel: 1, cost: 2, effect: "指导师弟师妹事件出现概率+100%", prerequisiteIds: [] },
@@ -482,7 +508,7 @@ const RICH_REVERSED_TALENT_NODES = [
   { id: "money-growth", name: "聚沙成塔", icon: "coins", tier: 0, column: "1", row: "1", maxLevel: 3, cost: 2, effect: "每月金币+1/级", prerequisiteIds: [] },
   { id: "loss-to-money", name: "因祸得财", icon: "badge-dollar-sign", tier: 0, column: "1", row: "3", maxLevel: 1, cost: 2, effect: "属性减少转为金钱", prerequisiteIds: [] },
   { id: "spend-to-break-curse", name: "破财消灾", icon: "shield-plus", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 3, effect: "每消耗100金币，金钱诅咒重置值+1", prerequisiteIds: ["money-growth"] },
-  { id: "post-phd-money-conversion", name: "钱能通神", icon: "circle-dollar-sign", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 2, effect: "转博后每枚金币从SAN、三项属性及三项属性上限中随机转化一种", prerequisiteIds: ["money-growth", "loss-to-money"] },
+  { id: "post-phd-money-conversion", name: "钱能通神", icon: "circle-dollar-sign", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 2, effect: "转博后每枚金币消耗随机转化提升SAN、三项属性及三项属性上限", prerequisiteIds: ["money-growth", "loss-to-money"] },
   { id: "finance-master", name: "理财能手", icon: "piggy-bank", tier: 2, column: "3", row: "2", maxLevel: 3, cost: 2, effect: "每次投资5金币，12个月后获得利息+1/级", prerequisiteIds: ["post-phd-money-conversion"] },
   { id: "coin-game", name: "金币游戏", icon: "coins", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 3, effect: "每次属性减少1点，进行一次判定：50%金币×1.5，50%金币×0.4", prerequisiteIds: ["loss-to-money"] },
   { id: "investment-acceleration", name: "快速周转", icon: "clock-3", tier: 3, column: "4", row: "2", maxLevel: 8, cost: 1, effect: "投资回报周期-1个月/级", prerequisiteIds: ["finance-master"] },
@@ -491,16 +517,43 @@ const RICH_REVERSED_TALENT_NODES = [
 
 const GENIUS_REVERSED_TALENT_NODES = [
   { id: "research-curse", name: "学术失语", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "科研视为0", prerequisiteIds: [], initialLevel: 1, fixed: true },
-  { id: "paper-opening", name: "笔下藏锋", icon: "file-plus-2", tier: 0, column: "1", row: "2", maxLevel: 3, cost: 1, effect: "开局解锁论文卡片+1/级", prerequisiteIds: [] },
+  { id: "paper-opening", name: "笔下藏锋", icon: "file-plus-2", tier: 0, column: "1", row: "1", maxLevel: 3, cost: 1, effect: "开局解锁论文卡片+1/级", prerequisiteIds: [] },
   { id: "knowledge-monetization", name: "以文谋生", icon: "coins", tier: 1, column: "2", row: "1", maxLevel: 2, cost: 1, effect: "科研提升→金币+2/级", prerequisiteIds: ["paper-opening"] },
-  { id: "work-life-balance", name: "忍辱负重", icon: "heart-pulse", tier: 1, column: "2", row: "2", maxLevel: 2, cost: 1, effect: "科研提升→SAN+2/级", prerequisiteIds: ["paper-opening"] },
-  { id: "research-network", name: "正名之路", icon: "handshake", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 1, effect: "科研提升→社交/好感+1", prerequisiteIds: ["paper-opening"] },
-  { id: "research-wellness", name: "百折不挠", icon: "shield-plus", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 1, effect: "转博后科研提升→SAN上限+1", prerequisiteIds: ["work-life-balance"] },
-  { id: "reputation-growth", name: "导师力挺", icon: "heart-plus", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 1, effect: "转博后科研提升→好感上限+1", prerequisiteIds: ["research-network"] },
-  { id: "social-growth", name: "学界声援", icon: "users", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 1, effect: "转博后科研提升→社交上限+1", prerequisiteIds: ["research-network"] },
-  { id: "break-research-curse", name: "拨云见日", icon: "sunrise", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 1, effect: "科研达到20时破除视为0诅咒", prerequisiteIds: ["research-wellness", "reputation-growth", "social-growth"] },
-  { id: "learning-from-rejection", name: "屡败屡研", icon: "rotate-ccw", tier: 0, column: "1", row: "1", maxLevel: 1, cost: 3, effect: "转博前每篇一作论文首次被拒后，科研能力+1", prerequisiteIds: [] },
+  { id: "work-life-balance", name: "忍辱负重", icon: "heart-pulse", tier: 1, column: "2", row: "2", maxLevel: 2, cost: 1, effect: "科研提升→SAN+2/级", prerequisiteIds: ["learning-from-rejection"] },
+  { id: "research-network", name: "正名之路", icon: "handshake", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 3, effect: "科研提升→社交/好感+1", prerequisiteIds: ["papers-to-insight"] },
+  { id: "research-wellness", name: "百折不挠", icon: "shield-plus", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 3, effect: "转博后科研提升→SAN上限+1", prerequisiteIds: ["work-life-balance"] },
+  { id: "reputation-growth", name: "导师力挺", icon: "heart-plus", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 3, effect: "转博后科研提升→好感上限+1", prerequisiteIds: ["research-network"] },
+  { id: "social-growth", name: "学界声援", icon: "users", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 3, effect: "转博后科研提升→社交上限+1", prerequisiteIds: ["research-network"] },
+  { id: "break-research-curse", name: "拨云见日", icon: "sunrise", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 3, effect: "科研达到20时破除视为0诅咒", prerequisiteIds: ["research-wellness", "reputation-growth", "social-growth"] },
+  { id: "learning-from-rejection", name: "屡败屡研", icon: "rotate-ccw", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 3, effect: "转博前每篇一作论文首次被拒后，科研能力+1", prerequisiteIds: [] },
   { id: "papers-to-insight", name: "积稿成学", icon: "files", tier: 0, column: "1", row: "3", maxLevel: 1, cost: 3, effect: "转博时每篇一作论文，科研能力+1", prerequisiteIds: [] },
+] as const satisfies readonly DesignedTalentNode[];
+
+const TEACHER_CHILD_REVERSED_TALENT_NODES = [
+  { id: "favor-burden", name: "恩荫成枷", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "科研、社交视为减少导师好感上限，最低为0", prerequisiteIds: [], initialLevel: 1, fixed: true },
+  { id: "advisor-meeting-focus", name: "耳提面命", icon: "message-circle", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 1, effect: "导师约谈事件出现概率+100%", prerequisiteIds: [] },
+  { id: "favor-reset", name: "无限包容", icon: "rotate-ccw", tier: 0, column: "1", row: "1", maxLevel: 1, cost: 2, effect: "导师好感低于0时重置为上限", prerequisiteIds: [] },
+  { id: "group-meeting-focus", name: "特别关注", icon: "presentation", tier: 0, column: "1", row: "3", maxLevel: 1, cost: 1, effect: "组会汇报事件出现概率+100%", prerequisiteIds: [] },
+  { id: "reset-research", name: "歪打正着", icon: "brain", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 2, effect: "导师好感重置时科研+1", prerequisiteIds: ["group-meeting-focus"] },
+  { id: "reset-social", name: "没大没小", icon: "users", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 2, effect: "导师好感重置时社交+1", prerequisiteIds: ["favor-reset"] },
+  { id: "reset-coins", name: "伸手就有", icon: "coins", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 2, effect: "导师好感重置时金币补充到3", prerequisiteIds: ["advisor-meeting-focus"] },
+  { id: "favor-reset-decrease", name: "得寸进尺", icon: "trending-up", tier: 3, column: "4", row: "2", maxLevel: 8, cost: 1, effect: "导师好感重置值-1/级", prerequisiteIds: ["lower-favor-reset"] },
+  { id: "lower-favor-reset", name: "恃宠而骄", icon: "heart-crack", tier: 2, column: "3", row: "2", maxLevel: 3, cost: 3, effect: "导师好感下降幅度+1/级", prerequisiteIds: ["reset-research", "reset-social", "reset-coins"] },
+  { id: "reset-research-cap", name: "离经叛道", icon: "shield-plus", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "导师好感重置时科研上限+1", prerequisiteIds: ["reset-research"] },
+  { id: "reset-social-cap", name: "横行无忌", icon: "heart-handshake", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 2, effect: "导师好感重置时社交上限+1", prerequisiteIds: ["reset-social"] },
+  { id: "end-of-grace", name: "恩断义绝", icon: "shield-plus", tier: 3, column: "4", row: "3", maxLevel: 2, cost: 3, effect: "导师好感上限下降幅度+1/级", prerequisiteIds: ["lower-favor-reset"] },
+] as const satisfies readonly DesignedTalentNode[];
+
+const SOCIAL_REVERSED_TALENT_NODES = [
+  { id: "social-stagnation", name: "患得患失", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "本月社交未发生变化，下月初科研或导师好感随机-1", prerequisiteIds: [], initialLevel: 1, fixed: true },
+  { id: "social-to-san", name: "人前春风", icon: "heart-handshake", tier: 0, column: "1", row: "1", maxLevel: 3, cost: 1, effect: "社交每提升1点，SAN+1/级", prerequisiteIds: [] },
+  { id: "fellow-add-social", name: "呼朋引伴", icon: "users", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 3, effect: "人际栏添加同学，社交+1", prerequisiteIds: [] },
+  { id: "social-loss-coins", name: "人走茶凉", icon: "coins", tier: 1, column: "2", row: "1", maxLevel: 3, cost: 1, effect: "社交每降低1点，金币+1/级", prerequisiteIds: ["social-to-san"] },
+  { id: "fellow-remove-social", name: "割席断交", icon: "heart-crack", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 3, effect: "人际栏放弃同学，社交-1", prerequisiteIds: ["fellow-add-social"] },
+  { id: "peer-event-focus", name: "暗中较劲", icon: "handshake", tier: 2, column: "3", row: "1", maxLevel: 4, cost: 2, effect: "同门合作事件出现概率+100%/级", prerequisiteIds: ["fellow-remove-social"] },
+  { id: "junior-event-focus", name: "后生可畏", icon: "users", tier: 2, column: "3", row: "2", maxLevel: 4, cost: 2, effect: "指导师弟师妹事件出现概率+100%/级", prerequisiteIds: ["fellow-remove-social"] },
+  { id: "senior-event-focus", name: "望其项背", icon: "presentation", tier: 2, column: "3", row: "3", maxLevel: 4, cost: 2, effect: "师兄师姐指导事件出现概率+100%/级", prerequisiteIds: ["fellow-remove-social"] },
+  { id: "affinity-conversion", name: "过河拆桥", icon: "rotate-ccw", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 4, effect: "放弃同学时，每点默契依次转为导师好感、科研、SAN上限、好感上限、科研上限+1，循环分配", prerequisiteIds: ["peer-event-focus", "junior-event-focus", "senior-event-focus"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const DESIGNED_TALENT_TREES = {
@@ -556,6 +609,15 @@ const DESIGNED_TALENT_TREES = {
       "M375 128 H525",
     ],
   },
+  "chosen-reversed": {
+    nodes: CHOSEN_REVERSED_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 32 C145 32 155 96 225 96", "M75 96 H225",
+      "M225 96 C295 96 305 32 375 32", "M225 96 H375",
+      "M375 32 C445 32 455 96 525 96", "M375 96 H525",
+    ],
+  },
   social: {
     nodes: SOCIAL_TALENT_NODES,
     viewBoxHeight: 192,
@@ -588,8 +650,27 @@ const DESIGNED_TALENT_TREES = {
     nodes: GENIUS_REVERSED_TALENT_NODES,
     viewBoxHeight: 192,
     paths: [
-      "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
+      "M75 32 H225", "M75 96 H225", "M75 160 H225",
       "M225 96 C295 96 305 32 375 32", "M225 160 C295 160 305 96 375 96", "M225 160 H375",
+      "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
+    ],
+  },
+  "teacher-child-reversed": {
+    nodes: TEACHER_CHILD_REVERSED_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 32 H225", "M75 96 H225", "M75 160 H225",
+      "M225 160 H375", "M225 32 H375",
+      "M225 32 C285 32 315 96 375 96", "M225 96 H375", "M225 160 C285 160 315 96 375 96",
+      "M375 96 H525", "M375 96 C445 96 455 160 525 160",
+    ],
+  },
+  "social-reversed": {
+    nodes: SOCIAL_REVERSED_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 32 H225", "M75 96 H225",
+      "M225 96 C295 96 305 32 375 32", "M225 96 H375", "M225 96 C295 96 305 160 375 160",
       "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
     ],
   },
@@ -630,80 +711,6 @@ function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, s
   `;
 }
 
-const TALENT_TREE_PREVIEW_PAGES = [
-  [
-    { column: 2, row: 1, icon: "lightbulb", tier: 0 },
-    { column: 4, row: 1, icon: "shield", tier: 1 },
-    { column: 2, row: 2, icon: "flask-conical", tier: 1 },
-    { column: 4, row: 2, icon: "target", tier: 3 },
-    { column: 2, row: 3, icon: "file-text", tier: 2 },
-    { column: 4, row: 3, icon: "heart-pulse", tier: 4 },
-  ],
-  [
-    { column: 1, row: 1, icon: "microscope", tier: 0 },
-    { column: 2, row: 1, icon: "brain", tier: 1 },
-    { column: 3, row: 1, icon: "database", tier: 2 },
-    { column: 5, row: 1, icon: "zap", tier: 4 },
-    { column: 2, row: 2, icon: "book-open", tier: 1 },
-    { column: 3, row: 2, icon: "network", tier: 2 },
-    { column: 4, row: 2, icon: "sparkles", tier: 3 },
-    { column: 1, row: 3, icon: "notebook-pen", tier: 0 },
-    { column: 2, row: 3, icon: "chart-no-axes-combined", tier: 1 },
-    { column: 3, row: 3, icon: "presentation", tier: 2 },
-    { column: 5, row: 3, icon: "award", tier: 4 },
-  ],
-  [
-    { column: 1, row: 1, icon: "message-circle", tier: 0 },
-    { column: 3, row: 1, icon: "users", tier: 2 },
-    { column: 4, row: 1, icon: "handshake", tier: 3 },
-    { column: 2, row: 2, icon: "coffee", tier: 1 },
-    { column: 3, row: 2, icon: "heart", tier: 2 },
-    { column: 4, row: 2, icon: "smile", tier: 3 },
-    { column: 5, row: 2, icon: "star", tier: 4 },
-    { column: 1, row: 3, icon: "calendar-days", tier: 0 },
-    { column: 2, row: 3, icon: "dumbbell", tier: 1 },
-    { column: 3, row: 3, icon: "activity", tier: 2 },
-    { column: 5, row: 3, icon: "medal", tier: 4 },
-  ],
-  [
-    { column: 1, row: 1, icon: "laptop", tier: 0 },
-    { column: 3, row: 1, icon: "graduation-cap", tier: 2 },
-    { column: 5, row: 1, icon: "crown", tier: 4 },
-    { column: 2, row: 2, icon: "briefcase", tier: 1 },
-    { column: 4, row: 2, icon: "gem", tier: 3 },
-    { column: 1, row: 3, icon: "feather", tier: 0 },
-    { column: 3, row: 3, icon: "badge-check", tier: 2 },
-    { column: 5, row: 3, icon: "trophy", tier: 4 },
-  ],
-] as const;
-
-function renderGrowthBoard(pageIndex: number, selectedNodeByPage: readonly number[]): string {
-  const activePage = Number.isInteger(pageIndex) && pageIndex >= 0 && pageIndex < TALENT_TREE_PREVIEW_PAGES.length ? pageIndex : 0;
-  const selectedNodeIndices = TALENT_TREE_PREVIEW_PAGES.map((_, index) => selectedNodeByPage[index] ?? (index === 0 ? 0 : -1));
-  return `
-    <section class="lobby-profile-growth-card lobby-profile-section">
-      <div class="lobby-talent-tree" role="group" aria-label="天赋树预览" data-active-page="${activePage}" data-direction="forward">
-        <div class="lobby-talent-tree-controls">
-          <button class="lobby-talent-tree-page-button pager-arrow" type="button" data-ui-talent-tree-page-delta="-1" aria-label="上一页" ${activePage === 0 ? "disabled" : ""}><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-          <span class="lobby-talent-tree-crest" aria-hidden="true"><i data-lucide="sparkles"></i></span>
-          <button class="lobby-talent-tree-page-button pager-arrow" type="button" data-ui-talent-tree-page-delta="1" aria-label="下一页" ${activePage === TALENT_TREE_PREVIEW_PAGES.length - 1 ? "disabled" : ""}><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-        </div>
-        <div class="lobby-talent-tree-pages">
-          ${TALENT_TREE_PREVIEW_PAGES.map((nodes, pageIndex) => `
-            <div class="lobby-talent-tree-page${pageIndex === activePage ? " is-active" : ""}" data-tree-page="${pageIndex}"${pageIndex === activePage ? "" : " hidden"}>
-              ${nodes.map((node, nodeIndex) => `
-                <button class="lobby-talent-tree-node${nodeIndex === selectedNodeIndices[pageIndex] ? " is-selected" : ""}" type="button" data-ui-talent-tree-node="${pageIndex}-${nodeIndex}" data-tier="${node.tier}" aria-label="第${pageIndex + 1}页技能节点${nodeIndex + 1}，仅预览" aria-pressed="${nodeIndex === selectedNodeIndices[pageIndex]}" style="grid-column:${node.column};grid-row:${node.row}">
-                  <span class="lobby-talent-tree-node-ring"><i data-lucide="${node.icon}" aria-hidden="true"></i></span>
-                </button>
-              `).join("")}
-            </div>
-          `).join("")}
-        </div>
-        <div class="lobby-talent-tree-page-dots" aria-hidden="true">${TALENT_TREE_PREVIEW_PAGES.map((_, index) => `<span class="${index === activePage ? "is-active" : ""}"></span>`).join("")}</div>
-      </div>
-    </section>
-  `;
-}
 
 export function renderRoleRail(accountProfile: AccountProfile, selectedRoleId: RoleId, activeRoleRailView: RoleRailViewId, announcementPageIndex = 0): string {
   return `<aside class="lobby-profile-achievement-rail${activeRoleRailView === "messages" ? " is-message-view" : activeRoleRailView === "announcements" ? " is-announcement-view" : ""}">
@@ -718,7 +725,7 @@ function renderSelectedRoleDetail(
   accountProfile: AccountProfile,
   selectedRoleId: RoleId,
   activeRoleRailView: RoleRailViewId,
-  talentTreePageIndex: number,
+  _talentTreePageIndex: number,
   talentTreeSelectedNodeByPage: readonly number[],
   announcementPageIndex: number,
 ): string {
@@ -743,9 +750,9 @@ function renderSelectedRoleDetail(
             </div>
             ${renderProfileInfoPanel(viewModel)}
           </section>
-          ${selectedRoleId === "normal" || selectedRoleId === "normal-reversed" || selectedRoleId === "rich" || selectedRoleId === "rich-reversed" || selectedRoleId === "genius" || selectedRoleId === "genius-reversed" || selectedRoleId === "teacher-child" || selectedRoleId === "chosen" || selectedRoleId === "social"
+          ${hasDesignedTalentTree(selectedRoleId)
             ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0)
-            : renderGrowthBoard(talentTreePageIndex, talentTreeSelectedNodeByPage)}
+            : ""}
         </div>
         ${renderRoleRail(accountProfile, selectedRoleId, activeRoleRailView, announcementPageIndex)}
       </section>

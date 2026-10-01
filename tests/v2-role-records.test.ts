@@ -21,7 +21,7 @@ describe("role history and run statistics", () => {
     expect(view.statistics.map((stat) => stat.value)).toEqual(["4", "9", "--", "--", "--"]);
   });
 
-  it.each(["master", "phd", "quit", "burnout", "poor", "expelled", "isolated", "delay"] as const)("records the %s result once and persists it without counting starts", (ending) => {
+  it.each(["master", "phd", "quit", "burnout", "poor", "expelled", "isolated", "overthinking", "delay"] as const)("records the %s result once and persists it without counting starts", (ending) => {
     const storage = createStorage();
     const store = createStore({ storage });
     store.dispatch("start-game", { roleId: "normal" });
@@ -34,6 +34,7 @@ describe("role history and run statistics", () => {
     if (ending === "poor") state.player.money = -1;
     if (ending === "expelled") state.player.favor = -1;
     if (ending === "isolated") state.player.social = -1;
+    if (ending === "overthinking") state.player.research = -1;
     if (ending === "master" || ending === "phd" || ending === "delay") {
       state.degree = ending === "phd" ? "phd" : "master";
       state.totalMonths = state.maxMonths;

@@ -77,6 +77,10 @@ const ROLE_PROFILE_SUMMARIES: Record<RoleId, string> = {
   "rich-reversed": "财富本该让人安心，你却继承了它背后的诅咒。每到月初，精神与能力都会被命运收走，只有金币在黑暗里留下回声。越接近一无所有，你越听得见那枚硬币召唤出的力量。",
   "teacher-child-reversed": "你本该站在庇护之下，却看见那把伞的影子正在反过来遮住自己。恩赐与审判只隔一线，血缘能替你打开门，也会在门后留下回声。",
   "chosen-reversed": "幸运在你这里拐了个弯，变成一座只在梦里出现的迷宫。你总能看见命运递来的门，却分不清哪一扇通往未来，哪一扇只是幻象留下的回光。",
+  "special-dandan": "角色描述待补充。",
+  "special-daji": "角色描述待补充。",
+  "cursed-frail": "角色描述待补充。",
+  "cursed-debt": "角色描述待补充。",
 };
 
 const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplate[]> = {
@@ -137,6 +141,10 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
   "rich-reversed": [],
   "teacher-child-reversed": [],
   "chosen-reversed": [],
+  "special-dandan": [],
+  "special-daji": [],
+  "cursed-frail": [],
+  "cursed-debt": [],
 };
 
 export function getRoleProfileSummary(roleId: RoleId): string {

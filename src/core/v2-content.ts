@@ -120,6 +120,38 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
     icon: "🌀",
     startingStats: { ...BASE_ROLE_STARTING_STATS },
   },
+  {
+    id: "special-dandan",
+    mode: "upright",
+    gender: "male",
+    name: "百变旦旦",
+    icon: "🎭",
+    startingStats: { ...BASE_ROLE_STARTING_STATS },
+  },
+  {
+    id: "special-daji",
+    mode: "upright",
+    gender: "female",
+    name: "魅力妲己",
+    icon: "💃",
+    startingStats: { ...BASE_ROLE_STARTING_STATS },
+  },
+  {
+    id: "cursed-frail",
+    mode: "reversed",
+    gender: "male",
+    name: "体弱多病",
+    icon: "🩹",
+    startingStats: { ...BASE_ROLE_STARTING_STATS },
+  },
+  {
+    id: "cursed-debt",
+    mode: "reversed",
+    gender: "male",
+    name: "负债累累",
+    icon: "🧾",
+    startingStats: { ...BASE_ROLE_STARTING_STATS },
+  },
 ];
 
 export const ADVISOR_REQUIREMENTS: AdvisorRequirements = {

@@ -294,7 +294,7 @@ function applyDebugStatChange(state: GameState, statId: DebugStatId, delta: numb
       nextValue = clampSan(current + delta, state.sanCap);
       break;
     case "research":
-      nextValue = clampResearchToCap(current + delta, state.researchCapacityState);
+      nextValue = Math.max(0, clampResearchToCap(current + delta, state.researchCapacityState));
       break;
     case "social":
     case "favor":

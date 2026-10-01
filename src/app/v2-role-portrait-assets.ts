@@ -15,6 +15,10 @@ const ROLE_CARD_PORTRAIT_URLS: Record<RoleId, string> = {
   "rich-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/04_rich_reversed_final_card.webp", import.meta.url).href,
   "teacher-child-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/05_teacher_child_reversed_final_card.webp", import.meta.url).href,
   "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/06_chosen_reversed_final_card.webp", import.meta.url).href,
+  "special-dandan": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-dandan`,
+  "special-daji": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-daji`,
+  "cursed-frail": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#cursed-frail`,
+  "cursed-debt": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#cursed-debt`,
 };
 
 const ROLE_DETAIL_PORTRAIT_URLS: Record<RoleId, string> = {
@@ -32,6 +36,10 @@ const ROLE_DETAIL_PORTRAIT_URLS: Record<RoleId, string> = {
   "rich-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/04_rich_reversed_final_detail.webp", import.meta.url).href,
   "teacher-child-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/05_teacher_child_reversed_final_detail.webp", import.meta.url).href,
   "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/06_chosen_reversed_final_detail.webp", import.meta.url).href,
+  "special-dandan": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-dandan-detail`,
+  "special-daji": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-daji-detail`,
+  "cursed-frail": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#cursed-frail-detail`,
+  "cursed-debt": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#cursed-debt-detail`,
 };
 
 const WARMED_DETAIL_PORTRAITS = new Set<RoleId>();

@@ -10,6 +10,18 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-10-02",
+    title: "逆位路线与角色图鉴扩充",
+    changes: [
+      { category: "更新", title: "玩世天赋预览", description: "新增玩世·导师子女路线，围绕导师好感重置与属性成长展开，加入导师约谈、组会汇报的概率天赋。" },
+      { category: "更新", title: "嫉妒天赋预览", description: "新增嫉妒·社交达人路线，社交增减分别关联SAN与金币，加入同学进出、事件概率和默契转化天赋。" },
+      { category: "更新", title: "空想天赋预览", description: "新增空想·天选之人路线，包括月度随机交换、交换突破上限、团建与游戏事件概率，以及轮流扣除属性的诅咒。以上新路线均仅供预览。" },
+      { category: "优化", title: "天赋树整理", description: "调整愚钝路线点数与玩世分支连线，多前置任一达到1级即可解锁。六个待设计角色移除占位树，天赋加点与局内效果待后续开放。" },
+      { category: "更新", title: "用脑过度结局", description: "科研能力低于0时触发“用脑过度”，等于0仍可继续。结局可关闭和回看，并计入正常游玩记录。" },
+      { category: "更新", title: "四张新角色卡片", description: "图鉴增至18位：特殊角色百变旦旦、魅力妲己，诅咒角色体弱多病、负债累累。图片与介绍暂为占位；诅咒采用暗红色，逆位紫色、特殊蓝色。" },
+    ],
+  },
+  {
     date: "2026-10-01",
     title: "逆位天赋与角色记录",
     changes: [

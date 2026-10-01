@@ -537,7 +537,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-stage"');
     expect(html).toContain('class="lobby-stage-scale"');
     expect(html).toContain("角色图鉴");
-    expect(html).toContain("已收录 1 / 14");
+    expect(html).toContain("已收录 1 / 18");
     expect(html).toContain("大多数");
     expect(html).toContain("院士转世");
     expect(html).toContain("怠惰·大多数");
@@ -954,14 +954,18 @@ describe("v2 render lobby shell", () => {
     ["genius", 10],
     ["genius-reversed", 11],
     ["teacher-child", 9],
+    ["teacher-child-reversed", 12],
     ["chosen", 10],
+    ["chosen-reversed", 7],
     ["social", 12],
+    ["social-reversed", 9],
   ] as const)("shows only the selected bottom explanation for %s without a side panel or allocation changes", (roleId, count) => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = roleId;
     const before = JSON.stringify(account);
     const html = renderApp(createInitialState(), account);
     expect(html).not.toContain("lobby-talent-effects");
+    expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
     expect(html).not.toContain("lobby-talent-layout");
     expect(html).not.toContain("data-ui-talent-effect-page-delta");
     expect(html.match(/data-detail-index=/g)).toHaveLength(count);
@@ -987,11 +991,138 @@ describe("v2 render lobby shell", () => {
 
   it("does not invent effects for placeholder talent trees", () => {
     const account = createDefaultAccountProfile();
-    account.selectedLobbyRoleId = "teacher-child-reversed";
+    account.selectedLobbyRoleId = "rewinder";
     const html = renderApp(createInitialState(), account);
     expect(html).not.toContain("lobby-talent-effects");
     expect(html).not.toContain("lobby-normal-tree-detail");
     expect(html).not.toContain("data-ui-talent-effect-page-delta");
+  });
+
+  it.each(["rewinder", "research-captain", "special-dandan", "special-daji", "cursed-frail", "cursed-debt"] as const)("does not render a talent-tree placeholder for %s", (roleId) => {
+    const account = createDefaultAccountProfile();
+    account.selectedLobbyRoleId = roleId;
+    const html = renderApp(createInitialState(), account);
+    expect(html).not.toContain('class="lobby-profile-growth-card');
+    expect(html).not.toContain('data-ui-talent-tree-node=');
+  });
+
+  it("previews the chosen reversed tree with OR unlocks and its fixed curse", () => {
+    const account = createDefaultAccountProfile();
+    account.selectedLobbyRoleId = "chosen-reversed";
+    const state = createInitialState();
+    const before = JSON.stringify({ account, state });
+    const html = renderApp(state, account);
+    expect(html).toContain("is-chosen-reversed-tree");
+    expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
+    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(7);
+    expect(html.match(/<path d=/g)).toHaveLength(6);
+    for (const [id, row, column, cost, level, effect, prerequisites, icon] of [
+      ["attribute-swap", 1, 1, 2, 1, "每月科研、社交、导师好感随机交换", "", "network"],
+      ["san-money-swap", 2, 1, 2, 1, "每月SAN、金币随机交换", "", "network"],
+      ["post-phd-swap", 2, 2, 3, 1, "转博后每月科研、社交、导师好感、SAN、金币全部随机交换", "attribute-swap san-money-swap", "rotate-ccw"],
+      ["group-event-focus", 1, 3, 2, 4, "组内团建事件出现概率+100%/级", "post-phd-swap", "users"],
+      ["game-event-focus", 2, 3, 2, 4, "游戏放松事件出现概率+100%/级", "post-phd-swap", "gamepad-2"],
+      ["swap-breaks-cap", 2, 4, 4, 1, "属性交换可突破上限", "group-event-focus game-event-focus", "infinity"],
+    ] as const) {
+      const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
+      expect(node).toContain(`style="grid-column:${column};grid-row:${row}"`);
+      expect(node).toContain(`data-prerequisite-ids="${prerequisites}"`);
+      expect(node).toContain(`data-cost="${cost}"`);
+      expect(node).toContain(`data-lucide="${icon}"`);
+      expect(node).toContain(`class="lobby-normal-tree-node-level">0/${level}</span>`);
+      expect(node).toContain(effect);
+    }
+    const curse = html.split("<button").find((markup) => markup.includes('data-talent-id="fate-curse"'))?.split("</button>")[0] ?? "";
+    expect(curse).toContain('data-lucide="skull"');
+    expect(curse).toContain("SAN、金币、科研、社交、导师好感轮流在月初-1");
+    expect(curse).not.toContain("lobby-normal-tree-node-level");
+    expect(JSON.stringify({ account, state })).toBe(before);
+  });
+
+  it("previews the jealousy tree with OR unlocks and matching connections without applying effects", () => {
+    const account = createDefaultAccountProfile();
+    account.selectedLobbyRoleId = "social-reversed";
+    const state = createInitialState();
+    const before = JSON.stringify({ account, state });
+    const html = renderApp(state, account);
+    expect(html).toContain("is-social-reversed-tree");
+    expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
+    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(9);
+    expect(html.match(/<path d=/g)).toHaveLength(8);
+    for (const path of [
+      "M75 32 H225", "M75 96 H225",
+      "M225 96 C295 96 305 32 375 32", "M225 96 H375", "M225 96 C295 96 305 160 375 160",
+      "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
+    ]) expect(html).toContain(`<path d="${path}" />`);
+    for (const [id, row, column, cost, level, effect, prerequisites] of [
+      ["social-to-san", 1, 1, 1, 3, "社交每提升1点，SAN+1/级", ""],
+      ["fellow-add-social", 2, 1, 3, 1, "人际栏添加同学，社交+1", ""],
+      ["social-loss-coins", 1, 2, 1, 3, "社交每降低1点，金币+1/级", "social-to-san"],
+      ["fellow-remove-social", 2, 2, 3, 1, "人际栏放弃同学，社交-1", "fellow-add-social"],
+      ["peer-event-focus", 1, 3, 2, 4, "同门合作事件出现概率+100%/级", "fellow-remove-social"],
+      ["junior-event-focus", 2, 3, 2, 4, "指导师弟师妹事件出现概率+100%/级", "fellow-remove-social"],
+      ["senior-event-focus", 3, 3, 2, 4, "师兄师姐指导事件出现概率+100%/级", "fellow-remove-social"],
+      ["affinity-conversion", 2, 4, 4, 1, "放弃同学时，每点默契依次转为导师好感、科研、SAN上限、好感上限、科研上限+1，循环分配", "peer-event-focus junior-event-focus senior-event-focus"],
+    ] as const) {
+      const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
+      expect(node).toContain(`style="grid-column:${column};grid-row:${row}"`);
+      expect(node).toContain(`data-prerequisite-ids="${prerequisites}"`);
+      expect(node).toContain(`data-cost="${cost}"`);
+      expect(node).toContain(`class="lobby-normal-tree-node-level">0/${level}</span>`);
+      expect(node).toContain(effect);
+    }
+    const curse = html.split("<button").find((markup) => markup.includes('data-talent-id="social-stagnation"'))?.split("</button>")[0] ?? "";
+    expect(curse).toContain('data-lucide="skull"');
+    expect(curse).toContain('style="grid-column:4;grid-row:1"');
+    expect(curse).toContain('data-prerequisite-ids=""');
+    expect(curse).not.toContain("lobby-normal-tree-node-level");
+    expect(JSON.stringify({ account, state })).toBe(before);
+  });
+
+  it("previews the teacher child reversed reset branches without applying effects", () => {
+    const account = createDefaultAccountProfile();
+    account.selectedLobbyRoleId = "teacher-child-reversed";
+    const state = createInitialState();
+    const before = JSON.stringify({ account, state });
+    const html = renderApp(state, account);
+    expect(html).toContain("is-teacher-child-reversed-tree");
+    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(12);
+    expect(html.match(/<path d=/g)).toHaveLength(10);
+    for (const path of [
+      "M75 32 H225", "M75 96 H225", "M75 160 H225",
+      "M225 160 H375", "M225 32 H375",
+      "M225 32 C285 32 315 96 375 96", "M225 96 H375", "M225 160 C285 160 315 96 375 96",
+      "M375 96 H525", "M375 96 C445 96 455 160 525 160",
+    ]) expect(html).toContain(`<path d="${path}" />`);
+    expect(html).not.toContain("M300 32 V160");
+    expect(html).toContain('title="耳提面命"');
+    expect(html).toContain('title="特别关注"');
+    for (const [id, row, column, cost, level, effect, prerequisites] of [
+      ["advisor-meeting-focus", 2, 1, 1, 1, "导师约谈事件出现概率+100%", ""],
+      ["favor-reset", 1, 1, 2, 1, "导师好感低于0时重置为上限", ""],
+      ["group-meeting-focus", 3, 1, 1, 1, "组会汇报事件出现概率+100%", ""],
+      ["reset-research", 3, 2, 2, 1, "导师好感重置时科研+1", "group-meeting-focus"],
+      ["reset-social", 1, 2, 2, 1, "导师好感重置时社交+1", "favor-reset"],
+      ["reset-coins", 2, 2, 2, 1, "导师好感重置时金币补充到3", "advisor-meeting-focus"],
+      ["favor-reset-decrease", 2, 4, 1, 8, "导师好感重置值-1/级", "lower-favor-reset"],
+      ["lower-favor-reset", 2, 3, 3, 3, "导师好感下降幅度+1/级", "reset-research reset-social reset-coins"],
+      ["reset-research-cap", 3, 3, 2, 1, "导师好感重置时科研上限+1", "reset-research"],
+      ["reset-social-cap", 1, 3, 2, 1, "导师好感重置时社交上限+1", "reset-social"],
+      ["end-of-grace", 3, 4, 3, 2, "导师好感上限下降幅度+1/级", "lower-favor-reset"],
+    ] as const) {
+      const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
+      expect(node).toContain(`style="grid-column:${column};grid-row:${row}"`);
+      expect(node).toContain(`data-prerequisite-ids="${prerequisites}"`);
+      expect(node).toContain(`data-cost="${cost}"`);
+      expect(node).toContain(`class="lobby-normal-tree-node-level">0/${level}</span>`);
+      expect(node).toContain(effect);
+    }
+    const curse = html.split("<button").find((markup) => markup.includes('data-talent-id="favor-burden"'))?.split("</button>")[0] ?? "";
+    expect(curse).toContain('data-lucide="skull"');
+    expect(curse).toContain("科研、社交视为减少导师好感上限，最低为0");
+    expect(curse).not.toContain("lobby-normal-tree-node-level");
+    expect(html).toContain('data-prerequisite-mode="any"');
+    expect(JSON.stringify({ account, state })).toBe(before);
   });
 
   it("previews the genius reversed talent tree with a research curse", () => {
@@ -1008,12 +1139,12 @@ describe("v2 render lobby shell", () => {
     expect(tree).toMatch(/data-talent-id="research-curse"[^>]*data-tier="fixed"[^>]*style="grid-column:4;grid-row:1"/);
     expect(tree).toContain("科研视为0");
     for (const [id, name, tier, row, maxLevel, effect, icon, prerequisite] of [
-      ["paper-opening", "笔下藏锋", 0, 2, 3, "开局解锁论文卡片+1/级", "file-plus-2", ""],
-      ["learning-from-rejection", "屡败屡研", 0, 1, 1, "转博前每篇一作论文首次被拒后，科研能力+1", "rotate-ccw", ""],
+      ["paper-opening", "笔下藏锋", 0, 1, 3, "开局解锁论文卡片+1/级", "file-plus-2", ""],
+      ["learning-from-rejection", "屡败屡研", 0, 2, 1, "转博前每篇一作论文首次被拒后，科研能力+1", "rotate-ccw", ""],
       ["papers-to-insight", "积稿成学", 0, 3, 1, "转博时每篇一作论文，科研能力+1", "files", ""],
       ["knowledge-monetization", "以文谋生", 1, 1, 2, "科研提升→金币+2/级", "coins", "paper-opening"],
-      ["work-life-balance", "忍辱负重", 1, 2, 2, "科研提升→SAN+2/级", "heart-pulse", "paper-opening"],
-      ["research-network", "正名之路", 1, 3, 1, "科研提升→社交/好感+1", "handshake", "paper-opening"],
+      ["work-life-balance", "忍辱负重", 1, 2, 2, "科研提升→SAN+2/级", "heart-pulse", "learning-from-rejection"],
+      ["research-network", "正名之路", 1, 3, 1, "科研提升→社交/好感+1", "handshake", "papers-to-insight"],
       ["research-wellness", "百折不挠", 2, 1, 1, "转博后科研提升→SAN上限+1", "shield-plus", "work-life-balance"],
       ["reputation-growth", "导师力挺", 2, 2, 1, "转博后科研提升→好感上限+1", "heart-plus", "research-network"],
       ["social-growth", "学界声援", 2, 3, 1, "转博后科研提升→社交上限+1", "users", "research-network"],
@@ -1023,14 +1154,14 @@ describe("v2 render lobby shell", () => {
       expect(node).toContain(`data-tier="${tier}"`);
       expect(node).toContain(`style="grid-column:${tier + 1};grid-row:${row}"`);
       expect(node).toContain(`data-prerequisite-ids="${prerequisite}"`);
-      expect(node).toContain(`data-cost="${id === "learning-from-rejection" || id === "papers-to-insight" ? 3 : 1}"`);
+      expect(node).toContain(`data-cost="${["learning-from-rejection", "papers-to-insight", "research-network", "research-wellness", "reputation-growth", "social-growth", "break-research-curse"].includes(id) ? 3 : 1}"`);
       expect(node).toContain(`class="lobby-normal-tree-node-level">0/${maxLevel}</span>`);
       expect(node).toContain(name);
       expect(node).toContain(effect);
       expect(node).toContain(`data-lucide="${icon}"`);
     }
     for (const path of [
-      "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
+      "M75 32 H225", "M75 96 H225", "M75 160 H225",
       "M225 96 C295 96 305 32 375 32", "M225 160 C295 160 305 96 375 96", "M225 160 H375",
       "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
     ]) expect(tree).toContain(`<path d="${path}" />`);
@@ -1069,7 +1200,7 @@ describe("v2 render lobby shell", () => {
     }
     expect(tree).toContain("每次投资5金币，12个月后获得利息+1/级");
     expect(tree).toContain("投资回报周期-1个月/级");
-    expect(tree).toContain("转博后每枚金币从SAN、三项属性及三项属性上限中随机转化一种");
+    expect(tree).toContain("转博后每枚金币消耗随机转化提升SAN、三项属性及三项属性上限");
     expect(tree).toContain("每次属性减少1点，进行一次判定：50%金币×1.5，50%金币×0.4");
     expect(tree).toContain("金币游戏失败后的倍率+0.05/级");
     const comeback = tree.split("<button").find((markup) => markup.includes('data-talent-id="coin-game-comeback"'))?.split("</button>")[0] ?? "";
@@ -1461,16 +1592,16 @@ describe("v2 render lobby shell", () => {
 
   it("keeps the selected talent-tree page and node across setup renders", () => {
     const account = createDefaultAccountProfile();
-    account.selectedLobbyRoleId = "social-reversed";
+    account.selectedLobbyRoleId = "normal";
     const html = renderApp(createInitialState(), account, {
       activeRoleRailView: "messages",
       talentTreePageIndex: 1,
-      talentTreeSelectedNodeByPage: [0, 2],
+      talentTreeSelectedNodeByPage: [2],
     });
 
-    expect(html).toContain('class="lobby-talent-tree" role="group" aria-label="天赋树预览" data-active-page="1"');
-    expect(html).toContain('class="lobby-talent-tree-page is-active" data-tree-page="1"');
-    expect(html).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="1-2"');
+    expect(html).toContain('class="lobby-talent-tree is-designed-tree is-normal-tree" role="group" aria-label="天赋树预览" data-active-page="0"');
+    expect(html).toContain('class="lobby-talent-tree-page is-active is-designed-page" data-tree-page="0"');
+    expect(html).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-2"');
     expect(html).not.toContain('class="lobby-talent-tree-page is-active is-entering"');
   });
 
@@ -1502,8 +1633,14 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('aria-label="第2页"');
     expect(html).toContain('aria-current="page" disabled');
     expect(html).toContain("天选之人");
-    expect((html.match(/data-action="select-role"/g) ?? []).length).toBe(4);
-    expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-action="select-role"/g) ?? []).length).toBe(8);
+    expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(4);
+    expect(html).toContain("百变旦旦");
+    expect(html).toContain("魅力妲己");
+    expect(html).toContain("体弱多病");
+    expect(html).toContain("负债累累");
+    expect(html).toContain('class="lobby-role-card-mode-band is-special"');
+    expect(html).toContain("诅咒");
   });
 
   it("renders the unified desktop workbench shell after enrollment", () => {

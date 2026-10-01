@@ -15,7 +15,11 @@ describe("v2 progression", () => {
     expect(getRoleDefinition("research-captain").name).toBe("统御者");
     expect(getRoleDefinition("genius-reversed").name).toBe("愚钝·院士转世");
     expect(getRoleDefinition("social-reversed").name).toBe("嫉妒·社交达人");
-    expect(getRoleOptions()).toHaveLength(14);
+    expect(getRoleOptions()).toHaveLength(18);
+    expect(getRoleDefinition("special-dandan").name).toBe("百变旦旦");
+    expect(getRoleDefinition("special-daji").name).toBe("魅力妲己");
+    expect(getRoleDefinition("cursed-frail").name).toBe("体弱多病");
+    expect(getRoleDefinition("cursed-debt").name).toBe("负债累累");
   });
 
   it.each(getRoleOptions())("所有角色统一白板开局：$id", (role) => {

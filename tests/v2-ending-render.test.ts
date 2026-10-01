@@ -50,6 +50,7 @@ function publishedPaper(id: string, patch: Partial<Paper> = {}): Paper {
 describe("basic ending presentation", () => {
   it.each([
     ["burnout", "不堪重负"], ["poor", "穷困潦倒"], ["expelled", "逐出师门"], ["isolated", "被孤立"],
+    ["overthinking", "用脑过度"],
     ["delay", "延毕"], ["quit", "主动退学"], ["master", "硕士毕业"], ["phd", "博士毕业"],
   ] as const)("shows %s on its own ending timeline page within the read-only shell", (ending, title) => {
     const html = renderApp(finishedState(ending));
@@ -91,6 +92,15 @@ describe("basic ending presentation", () => {
     expect(actions).toContain('data-action="restart-game"');
     expect(actions).toContain('data-action="reset-game"');
     expect(card).not.toContain('data-action="quit-game"');
+  });
+
+  it("highlights negative research in the overthinking ending", () => {
+    const state = finishedState("overthinking");
+    state.player.research = -1;
+    const card = endingCard(renderApp(state));
+    expect(card).toContain("科研能力 -1，低于0");
+    expect(card).toContain('data-ending-stat="research" class="is-failed"');
+    expectEndingStat(card, "research", "-1/20");
   });
 
   it("shows the actual failed value and safely escapes the final cause and player name", () => {
@@ -203,6 +213,7 @@ describe("basic ending presentation", () => {
 
   it.each([
     ["burnout", "不堪重负"], ["poor", "穷困潦倒"], ["expelled", "逐出师门"], ["isolated", "被孤立"],
+    ["overthinking", "用脑过度"],
     ["delay", "延毕"], ["quit", "主动退学"], ["master", "硕士毕业"], ["phd", "博士毕业"],
   ] as const)("collapses %s to a clickable ending log on the same timeline page and reopens its stats", (ending, title) => {
     const state = finishedState(ending);
@@ -241,6 +252,7 @@ describe("basic ending presentation", () => {
     ["poor", "金币已跌破 0，本轮提前结束。"],
     ["expelled", "导师好感已跌破 0，本轮提前结束。"],
     ["isolated", "社交能力已跌破 0，本轮提前结束。"],
+    ["overthinking", "科研能力已跌破 0，本轮提前结束。"],
   ] as const)("hides the generic %s warning from monthly logs while preserving its cause", (ending, warning) => {
     const cause = "组内团建：AA聚餐，金币 -3。";
     const variants = [warning, warning.replace(/\s/g, "").replace(/。$/, ""), `  ${warning.replace("0", "  0")}  `];

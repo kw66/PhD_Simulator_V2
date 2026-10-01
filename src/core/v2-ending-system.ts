@@ -31,6 +31,7 @@ export function evaluateCoreEndings(state: GameState): GameState {
   if (protectedState.player.money < 0) return finishWithCause(protectedState, "poor", "金币已跌破 0，本轮提前结束。");
   if (protectedState.player.favor < 0) return finishWithCause(protectedState, "expelled", "导师好感已跌破 0，本轮提前结束。");
   if (protectedState.player.social < 0) return finishWithCause(protectedState, "isolated", "社交能力已跌破 0，本轮提前结束。");
+  if (protectedState.player.research < 0) return finishWithCause(protectedState, "overthinking", "科研能力已跌破 0，本轮提前结束。");
   return protectedState;
 }
 

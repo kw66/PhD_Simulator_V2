@@ -69,7 +69,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("ending failure boundaries", () => {
   it.each([
-    ["san", "burnout"], ["money", "poor"], ["favor", "expelled"], ["social", "isolated"],
+    ["san", "burnout"], ["money", "poor"], ["favor", "expelled"], ["social", "isolated"], ["research", "overthinking"],
   ] as const)("ends only below zero for %s and preserves the event cause", (stat, ending) => {
     const state = makeState();
     state.player[stat] = 0;
@@ -88,6 +88,7 @@ describe("ending failure boundaries", () => {
     [{ san: 0, money: -1, favor: -1, social: -1 }, "poor"],
     [{ san: 0, money: 0, favor: -1, social: -1 }, "expelled"],
     [{ san: 0, money: 0, favor: 0, social: -1 }, "isolated"],
+    [{ san: 0, money: 0, favor: 0, social: 0, research: -1 }, "overthinking"],
   ] as const)("prioritizes failures before graduation: %j", (stats, ending) => {
     const state = makeState(68);
     const next = dispatchAction({ ...state, totalResearchScore: 10, player: { ...state.player, ...stats } }, "next-month");
@@ -168,6 +169,28 @@ describe("ending failure boundaries", () => {
     const finished = resolveEvent(pending, "result");
     expect(finished).toMatchObject({ phase: "finished", player: { money: -1 }, ending: "poor" });
     expect(finished.endingCause?.text).toContain("decision");
+  });
+
+  it("preserves a negative research value through month-start settlement and freezes subsequent months", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const state = makeState(9);
+    state.player.research = 0;
+    state.buffs = [{ id: "research-loss", name: "科研损失", source: "测试", timing: "permanent", remainingMonths: null, monthlyStats: { research: -1 } }];
+    const finished = dispatchAction(state, "next-month");
+    expect(finished).toMatchObject({ phase: "finished", ending: "overthinking", player: { research: -1 } });
+    expect(dispatchAction(finished, "next-month")).toEqual(finished);
+  });
+
+  it("applies research loss only after confirming the third act", () => {
+    const state = makeState();
+    state.player.research = 0;
+    const result = makeEvent("research-result", {}, { chainId: "research-deferred" });
+    state.eventQueue = [makeEvent("research-choice", { research: -1, enqueueEvents: [result] }, { chainId: "research-deferred", stage: "act2" })];
+    const pending = resolveEvent(state, "research-choice");
+    expect(pending).toMatchObject({ phase: "playing", ending: null, player: { research: 0 } });
+    const finished = resolveEvent(pending, "research-result");
+    expect(finished).toMatchObject({ phase: "finished", ending: "overthinking", player: { research: -1 } });
+    expect(finished.endingCause?.text).toContain("research-choice");
   });
 
   it("honors monthly spike protection before other failures without double counting recovery", () => {
