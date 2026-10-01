@@ -39,7 +39,9 @@ describe("V2 visit statistics", () => {
     const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
     const store = createStore();
     const records: Promise<void>[] = [];
-    store.subscribe((state) => records.push(stats.trackGamePhase(state.phase)));
+    store.subscribe((state) => records.push(stats.trackGamePhase(state.phase, {
+      roleId: state.selectedRoleId, ending: state.ending, disqualifiedByDebug: store.getLobbyState().lastRunExperience?.disqualifiedByDebug,
+    })));
     store.dispatch("start-game", { roleId: "normal" });
     const state = store.getState();
     state.eventQueue = [];
@@ -65,6 +67,60 @@ describe("V2 visit statistics", () => {
     expect(stats.getDisplayValues().games).toBe("1（1）");
     expect(backend.counters.get(`${PREFIX}_games_total`)).toBe(1);
     expect(backend.counters.get(`${PREFIX}_games_${DAY}`)).toBe(1);
+    expect(stats.getRoleDisplayValues("normal")).toEqual({
+      "global-completed-runs": ending === "master" || ending === "phd" ? "1" : "0",
+      "global-played-runs": "1",
+      "phd-rate": ending === "phd" ? "100.0%" : "0.0%",
+    });
+  });
+
+  it("separates roles, computes doctoral graduation rate, and restores cached statistics", async () => {
+    const backend = createBackend();
+    const storage = createStorage();
+    const stats = createVisitStats({ recordVisit: true, storage, fetch: backend.fetch, now: () => TODAY });
+    for (const ending of ["master", "phd", "quit"] as const) {
+      await stats.trackGamePhase("playing");
+      await stats.trackGamePhase("finished", { roleId: "normal", ending });
+      await stats.trackGamePhase("finished", { roleId: "normal", ending });
+    }
+    await stats.trackGamePhase("playing");
+    await stats.trackGamePhase("finished", { roleId: "rich", ending: "phd" });
+    expect(stats.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "2", "global-played-runs": "3", "phd-rate": "33.3%" });
+    expect(stats.getRoleDisplayValues("rich")).toEqual({ "global-completed-runs": "1", "global-played-runs": "1", "phd-rate": "100.0%" });
+    expect(stats.getRoleDisplayValues("chosen")).toEqual({ "global-completed-runs": "0", "global-played-runs": "0", "phd-rate": "--" });
+    const cached = createVisitStats({ recordVisit: false, storage, fetch: backend.fetch, now: () => TODAY });
+    expect(cached.getRoleDisplayValues("normal")).toEqual(stats.getRoleDisplayValues("normal"));
+  });
+
+  it("does not publish debug-run counters and keeps unavailable statistics distinct from zero", async () => {
+    const backend = createBackend();
+    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
+    await stats.trackGamePhase("playing");
+    await stats.trackGamePhase("finished", { roleId: "normal", ending: "phd", disqualifiedByDebug: true });
+    expect(backend.fetch).not.toHaveBeenCalled();
+    expect(stats.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "--", "global-played-runs": "--", "phd-rate": "--" });
+    backend.fetch.mockRejectedValue(new Error("offline"));
+    await stats.load();
+    expect(stats.getRoleDisplayValues("normal")["global-played-runs"]).toBe("--");
+  });
+
+  it("renders each role into its own statistics cells and does not divide by zero", async () => {
+    const backend = createBackend();
+    backend.counters.set(`${PREFIX}_role_normal_games_total`, 8);
+    backend.counters.set(`${PREFIX}_role_normal_clears_total`, 4);
+    backend.counters.set(`${PREFIX}_role_normal_phd_total`, 2);
+    const stats = createVisitStats({ recordVisit: false, storage: null, fetch: backend.fetch, now: () => TODAY });
+    await stats.load();
+    const cells = new Map<string, { textContent: string }>();
+    const root = { querySelectorAll: (selector: string) => {
+      const cell = { textContent: "" };
+      cells.set(selector, cell);
+      return [cell];
+    } } as unknown as ParentNode;
+    stats.render(root);
+    expect(cells.get('[data-role-stat="global-played-runs"][data-role-id="normal"]')?.textContent).toBe("8");
+    expect(cells.get('[data-role-stat="phd-rate"][data-role-id="normal"]')?.textContent).toBe("25.0%");
+    expect(cells.get('[data-role-stat="phd-rate"][data-role-id="rich"]')?.textContent).toBe("--");
   });
 
   it("counts a page once and keeps visitor totals independent from the homepage", async () => {

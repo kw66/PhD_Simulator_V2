@@ -30,7 +30,9 @@ import {
   Eye,
   Feather,
   Files,
+  FileHeart,
   FileText,
+  FilePlus2,
   Flame,
   FlaskConical,
   Footprints,
@@ -40,9 +42,11 @@ import {
   GitFork,
   GraduationCap,
   HandCoins,
+  HandHelping,
   Handshake,
   Heart,
   HeartCrack,
+  HeartHandshake,
   HeartPlus,
   HeartPulse,
   House,
@@ -69,6 +73,8 @@ import {
   Send,
   Settings,
   Shield,
+  ShieldPlus,
+  Skull,
   Smile,
   Sparkles,
   Sprout,
@@ -80,6 +86,7 @@ import {
   TrendingUp,
   Users,
   UserRound,
+  UserRoundPlus,
   Wallet,
   X,
   Zap,
@@ -1018,7 +1025,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
         Eye,
         Feather,
         Files,
+        FileHeart,
         FileText,
+        FilePlus2,
         Flame,
         FlaskConical,
         Footprints,
@@ -1028,9 +1037,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
         GitFork,
         GraduationCap,
         HandCoins,
+        HandHelping,
         Handshake,
         Heart,
         HeartCrack,
+        HeartHandshake,
         HeartPlus,
         HeartPulse,
         House,
@@ -1057,6 +1068,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
         Send,
         Settings,
         Shield,
+        ShieldPlus,
+        Skull,
         Smile,
         Sparkles,
         Sprout,
@@ -1068,6 +1081,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         TrendingUp,
         Users,
         UserRound,
+        UserRoundPlus,
         Wallet,
         X,
         Zap,
@@ -1189,7 +1203,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
   store.subscribe((state) => {
     debugWindow.update();
     render();
-    void visitStats.trackGamePhase(state.phase).then(() => {
+    void visitStats.trackGamePhase(state.phase, {
+      roleId: state.selectedRoleId,
+      ending: state.ending,
+      disqualifiedByDebug: store.getLobbyState().lastRunExperience?.disqualifiedByDebug,
+    }).then(() => {
       visitStats.render(root);
       scheduleAllFixedStageScales();
     });

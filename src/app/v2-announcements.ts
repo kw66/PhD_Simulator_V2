@@ -10,6 +10,18 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-10-01",
+    title: "逆位天赋与角色记录",
+    changes: [
+      { category: "更新", title: "逆位路线预览", description: "完善怠惰、贪求与愚钝的专属天赋树，更新角色介绍、节点名称与成长路线。天赋仍仅供预览，尚未开放加点和局内效果。" },
+      { category: "更新", title: "贪求财富路线", description: "新增破财消灾、金币游戏与败局翻盘；败局翻盘最高5级。钱能通神改为金币消耗换取SAN、属性或属性上限，金钱诅咒重置值调整为0，均为预览设计。" },
+      { category: "更新", title: "愚钝科研路线", description: "新增屡败屡研与积稿成学，分别预览转博前首次拒稿、转博时一作论文带来的科研成长；三项上限奖励限定转博后，科研成长与附加奖励并存。" },
+      { category: "优化", title: "投资天赋预览", description: "理财能手改为每次投入5金币，12个月后返还本息；贪求新增快速周转，逐级缩短回报周期。投资按钮和结算暂未接入。" },
+      { category: "更新", title: "角色历史与统计", description: "角色页以历史和统计替换开局属性预览，新增h指数、本地与全球游玩及通关数据、博士率。结局记录保存到本地，测试局不计入统计。" },
+      { category: "修复", title: "天赋树显示", description: "修正分支连线与缺失图标，调整节点配色、上下间距和面板布局；等级显示在节点下方，选中天赋的说明统一放在底部。" },
+    ],
+  },
+  {
     date: "2026-09-30",
     title: "角色天赋与事件反馈",
     changes: [

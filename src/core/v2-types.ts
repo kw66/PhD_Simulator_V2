@@ -285,6 +285,7 @@ export interface RoleMetaProgress {
   level: number;
   exp: number;
   completedRuns: number;
+  playedRuns: number;
   unlockedAchievementIds: string[];
   historyBest: RoleHistoryBest;
   unlocked: boolean;
@@ -302,6 +303,7 @@ export interface RoleExperienceAward {
 export interface RoleHistoryBest {
   researchScore: number;
   totalCitations: number;
+  hIndex: number;
   natureCount: number;
   representativeCitations: number;
   representativeScore: number;
@@ -334,9 +336,16 @@ export interface LobbySelectedRoleStatViewModel {
 }
 
 export interface LobbySelectedRoleHistoryStatViewModel {
-  id: "research-score" | "total-citations" | "nature-count" | "representative" | "completed-runs";
+  id: "research-score" | "total-citations" | "h-index" | "nature-count" | "representative";
   label: string;
   value: string;
+}
+
+export interface LobbySelectedRoleStatisticsViewModel {
+  id: "completed-runs" | "played-runs" | "global-completed-runs" | "global-played-runs" | "phd-rate";
+  label: string;
+  value: string;
+  tooltip: string;
 }
 
 export interface RoleAchievementDefinition {
@@ -360,6 +369,7 @@ export interface LobbySelectedRoleViewModel {
   unlockState: RoleUnlockState;
   stats: LobbySelectedRoleStatViewModel[];
   historyStats: LobbySelectedRoleHistoryStatViewModel[];
+  statistics: LobbySelectedRoleStatisticsViewModel[];
   roleAchievements: LobbySelectedRoleAchievementViewModel[];
 }
 

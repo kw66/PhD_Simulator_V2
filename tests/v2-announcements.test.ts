@@ -12,7 +12,7 @@ describe("game announcements", () => {
     const preview = announcement!.changes.find((change) => change.title === "角色路线预览");
     expect(preview?.description).toContain("目前仅供预览");
     expect(preview?.description).toContain("尚未开放加点和局内效果");
-    expect(renderAnnouncementPage(0)).toContain("否极泰来");
+    expect(renderAnnouncementPage(GAME_ANNOUNCEMENTS.indexOf(announcement!))).toContain("否极泰来");
   });
 
   it("adds a third lobby tab without replacing the selected role or start button", () => {

@@ -1,4 +1,5 @@
-import type { GamePhase } from "../core/v2-types";
+import { getRoleOptions } from "../core/v2-progression";
+import type { EndingId, GamePhase, RoleId } from "../core/v2-types";
 
 const COUNTER_PREFIX = "phd_simulator_v2";
 const STATS_URL = "https://ypefmpeekfucmarbbdov.supabase.co/rest/v1/rpc";
@@ -7,6 +8,27 @@ const VISITOR_KEY = `${COUNTER_PREFIX}_visitor_seen`;
 const DAILY_VISITOR_KEY = `${COUNTER_PREFIX}_visitor_day`;
 const TOTAL_VISITOR_DAY_KEY = `${COUNTER_PREFIX}_visitor_total_day`;
 const SNAPSHOT_KEY = `${COUNTER_PREFIX}_stats_snapshot`;
+const ROLE_IDS = getRoleOptions().map((role) => role.id);
+
+interface RoleCounters {
+  games: number;
+  clears: number;
+  phd: number;
+}
+
+interface RoleRunResult {
+  roleId: RoleId;
+  ending: EndingId;
+  disqualifiedByDebug?: boolean;
+}
+
+function getRoleCounterIds(roleId: RoleId) {
+  return {
+    games: `${COUNTER_PREFIX}_role_${roleId}_games_total`,
+    clears: `${COUNTER_PREFIX}_role_${roleId}_clears_total`,
+    phd: `${COUNTER_PREFIX}_role_${roleId}_phd_total`,
+  };
+}
 
 interface VisitSnapshot {
   day: string;
@@ -16,6 +38,7 @@ interface VisitSnapshot {
   todayViews: number;
   games: number | null;
   todayGames: number | null;
+  roles: Partial<Record<RoleId, RoleCounters>>;
 }
 
 interface VisitStatsOptions {
@@ -43,6 +66,23 @@ function parseCounter(value: unknown): number {
     throw new Error("Invalid visit counter");
   }
   return number;
+}
+
+function readRoleCounters(value: unknown): Partial<Record<RoleId, RoleCounters>> {
+  if (!value || typeof value !== "object") return {};
+  const records = value as Record<string, unknown>;
+  const roles: Partial<Record<RoleId, RoleCounters>> = {};
+  for (const roleId of ROLE_IDS) {
+    const record = records[roleId];
+    if (!record || typeof record !== "object") continue;
+    try {
+      const counters = record as Record<string, unknown>;
+      roles[roleId] = { games: parseCounter(counters.games), clears: parseCounter(counters.clears), phd: parseCounter(counters.phd) };
+    } catch {
+      continue;
+    }
+  }
+  return roles;
 }
 
 export function createVisitStats(options: VisitStatsOptions) {
@@ -83,6 +123,7 @@ export function createVisitStats(options: VisitStatsOptions) {
         todayViews: parseCounter(cached.todayViews),
         games: cached.games == null ? null : parseCounter(cached.games),
         todayGames: cached.todayGames == null ? null : parseCounter(cached.todayGames),
+        roles: readRoleCounters(cached.roles),
       };
     }
   } catch {
@@ -105,9 +146,10 @@ export function createVisitStats(options: VisitStatsOptions) {
     return text ? JSON.parse(text) : null;
   };
 
-  const refresh = async (recordVisit: boolean, completedDay?: string): Promise<boolean> => {
+  const refresh = async (recordVisit: boolean, completedDay?: string, result?: RoleRunResult): Promise<boolean> => {
     const day = getBeijingDay(now());
-    const ids = [`${COUNTER_PREFIX}_uv_total`, `${COUNTER_PREFIX}_pv_total`, `${COUNTER_PREFIX}_uv_${day}`, `${COUNTER_PREFIX}_pv_${day}`, `${COUNTER_PREFIX}_games_total`, `${COUNTER_PREFIX}_games_${day}`];
+    const ids = [`${COUNTER_PREFIX}_uv_total`, `${COUNTER_PREFIX}_pv_total`, `${COUNTER_PREFIX}_uv_${day}`, `${COUNTER_PREFIX}_pv_${day}`, `${COUNTER_PREFIX}_games_total`, `${COUNTER_PREFIX}_games_${day}`,
+      ...ROLE_IDS.flatMap((roleId) => Object.values(getRoleCounterIds(roleId)))];
     const increment = (id: string): Promise<unknown> => rpc("increment_counter", { counter_id: id });
     if (recordVisit) {
       const recordVisitor = async (): Promise<void> => {
@@ -130,7 +172,14 @@ export function createVisitStats(options: VisitStatsOptions) {
       await Promise.allSettled([increment(ids[1]), increment(ids[3]), visitorTask]);
     }
     if (completedDay) {
-      await Promise.allSettled([increment(ids[4]), increment(`${COUNTER_PREFIX}_games_${completedDay}`)]);
+      const records = [increment(ids[4]), increment(`${COUNTER_PREFIX}_games_${completedDay}`)];
+      if (result?.ending && ROLE_IDS.includes(result.roleId)) {
+        const roleIds = getRoleCounterIds(result.roleId);
+        records.push(increment(roleIds.games));
+        if (result.ending === "master" || result.ending === "phd") records.push(increment(roleIds.clears));
+        if (result.ending === "phd") records.push(increment(roleIds.phd));
+      }
+      await Promise.allSettled(records);
     }
     try {
       const rows = await rpc("get_counters", { counter_ids: ids });
@@ -147,6 +196,10 @@ export function createVisitStats(options: VisitStatsOptions) {
         todayViews: counters.get(ids[3]) ?? 0,
         games: counters.get(ids[4]) ?? 0,
         todayGames: counters.get(ids[5]) ?? 0,
+        roles: Object.fromEntries(ROLE_IDS.map((roleId) => {
+          const roleIds = getRoleCounterIds(roleId);
+          return [roleId, { games: counters.get(roleIds.games) ?? 0, clears: counters.get(roleIds.clears) ?? 0, phd: counters.get(roleIds.phd) ?? 0 }];
+        })),
       };
       writeStorage(SNAPSHOT_KEY, JSON.stringify(snapshot));
       return true;
@@ -178,28 +231,47 @@ export function createVisitStats(options: VisitStatsOptions) {
     return pendingLoad;
   };
 
+  const getRoleDisplayValues = (roleId: RoleId): Record<"global-completed-runs" | "global-played-runs" | "phd-rate", string> => {
+    const counters = snapshot?.roles[roleId];
+    if (!counters) return { "global-completed-runs": "--", "global-played-runs": "--", "phd-rate": "--" };
+    const validRate = counters.games > 0 && counters.phd <= counters.clears && counters.clears <= counters.games;
+    return {
+      "global-completed-runs": String(counters.clears),
+      "global-played-runs": String(counters.games),
+      "phd-rate": validRate ? `${(counters.phd / counters.games * 100).toFixed(1)}%` : "--",
+    };
+  };
+
   const renderValues = (root: ParentNode): void => {
     for (const [metric, value] of Object.entries(getDisplayValues())) {
       root.querySelectorAll(`[data-community-stat="${metric}"]`).forEach((target) => {
         target.textContent = value;
       });
     }
+    for (const roleId of ROLE_IDS) {
+      for (const [metric, value] of Object.entries(getRoleDisplayValues(roleId))) {
+        root.querySelectorAll(`[data-role-stat="${metric}"][data-role-id="${roleId}"]`).forEach((target) => {
+          target.textContent = value;
+        });
+      }
+    }
   };
 
   return {
     load,
-    trackGamePhase(phase: GamePhase): Promise<void> {
+    trackGamePhase(phase: GamePhase, result?: RoleRunResult): Promise<void> {
       const completed = previousPhase === "playing" && phase === "finished";
       previousPhase = phase;
-      if (!completed || !options.recordVisit) return Promise.resolve();
+      if (!completed || !options.recordVisit || result?.disqualifiedByDebug) return Promise.resolve();
       const day = getBeijingDay(now());
       pendingGameRecords = pendingGameRecords.then(async () => {
         await load();
-        await refresh(false, day);
+        await refresh(false, day, result);
       });
       return pendingGameRecords;
     },
     getDisplayValues,
+    getRoleDisplayValues,
     render(root: ParentNode): void {
       renderValues(root);
       if (loadedDay !== getBeijingDay(now()) && !pendingLoad && now() - lastLoadAttempt >= 60_000) {

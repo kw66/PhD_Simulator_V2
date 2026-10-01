@@ -7,10 +7,8 @@ import {
   LOBBY_ROLE_PAGE_ROW_COUNT,
   ROLE_ACHIEVEMENT_PAGE_SIZE,
 } from "../core/v2-lobby";
-import { MAX_SAN } from "../core/v2-content";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
-import { BASE_RESEARCH_CAP } from "../core/v2-research-cap-system";
 import { getRoleLobbyAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
@@ -26,21 +24,6 @@ type TalentPointSummary = {
   currentExp: number;
   nextExp: number | null;
   availablePoints: number;
-};
-
-const DOSSIER_STAT_LABELS = {
-  san: "SAN",
-  research: "科研能力",
-  social: "社交能力",
-  favor: "导师好感",
-  money: "金币",
-} as const;
-
-const LOBBY_STARTING_STAT_CAPS: Partial<Record<keyof typeof DOSSIER_STAT_LABELS, number>> = {
-  san: MAX_SAN,
-  research: BASE_RESEARCH_CAP,
-  social: 20,
-  favor: 20,
 };
 
 function escapeHtml(value: string): string {
@@ -290,10 +273,6 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
   `;
 }
 
-function getDossierStatLabel(statId: string, fallback: string): string {
-  return DOSSIER_STAT_LABELS[statId as keyof typeof DOSSIER_STAT_LABELS] ?? fallback;
-}
-
 function buildTalentPointSummary(viewModel: LobbySelectedRoleViewModel): TalentPointSummary {
   const nextExp = getNextRoleLevelExperience(viewModel.progress.level);
 
@@ -364,23 +343,23 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
       <p class="lobby-profile-summary">${escapeHtml(viewModel.lobby.summary)}</p>
       <div class="lobby-profile-stat-columns">
         <section class="lobby-profile-stat-column">
-          <h2 class="lobby-profile-stat-column-title">开局属性</h2>
-          <div class="lobby-profile-stat-stack">
-            ${viewModel.stats.map((stat) => `
-              <div class="lobby-profile-stat-row">
-                <span>${escapeHtml(getDossierStatLabel(stat.id, stat.label))}</span>
-                <strong>${escapeHtml(formatLobbyStartingStatValue(stat.id, stat.total))}</strong>
-              </div>
-            `).join("")}
-          </div>
-        </section>
-        <section class="lobby-profile-stat-column is-history">
-          <h2 class="lobby-profile-stat-column-title">历史最高</h2>
+          <h2 class="lobby-profile-stat-column-title">历史</h2>
           <div class="lobby-profile-stat-stack lobby-profile-history-stack">
             ${viewModel.historyStats.map((stat) => `
               <div class="lobby-profile-stat-row">
                 <span>${escapeHtml(stat.label)}</span>
-                <strong>${stat.id === "representative" ? renderAnimatedNumber(`role:${viewModel.role.id}:history:representative:score`, viewModel.progress.historyBest.representativeScore) : Number.isFinite(Number(stat.value)) && stat.value.trim() !== "" ? renderAnimatedNumber(`role:${viewModel.role.id}:history:${stat.id}`, Number(stat.value), stat.value) : escapeHtml(stat.value)}</strong>
+                <strong>${renderAnimatedNumber(`role:${viewModel.role.id}:history:${stat.id === "representative" ? "representative:score" : stat.id}`, Number(stat.value), stat.value)}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </section>
+        <section class="lobby-profile-stat-column is-statistics">
+          <h2 class="lobby-profile-stat-column-title">统计</h2>
+          <div class="lobby-profile-stat-stack lobby-profile-history-stack">
+            ${viewModel.statistics.map((stat) => `
+              <div class="lobby-profile-stat-row">
+                <span class="play-tooltip" role="note" tabindex="0" data-tooltip="${escapeHtml(stat.tooltip)}">${escapeHtml(stat.label)}</span>
+                <strong data-role-stat="${stat.id}" data-role-id="${viewModel.role.id}">${Number.isFinite(Number(stat.value)) ? renderAnimatedNumber(`role:${viewModel.role.id}:statistics:${stat.id}`, Number(stat.value), stat.value) : escapeHtml(stat.value)}</strong>
               </div>
             `).join("")}
           </div>
@@ -389,11 +368,6 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
       ${renderGrowthProgress(viewModel, pointSummary)}
     </section>
   `;
-}
-
-function formatLobbyStartingStatValue(statId: string, value: number): string {
-  const cap = LOBBY_STARTING_STAT_CAPS[statId as keyof typeof LOBBY_STARTING_STAT_CAPS];
-  return typeof cap === "number" ? `${value}/${cap}` : `${value}`;
 }
 
 interface DesignedTalentNode {
@@ -412,12 +386,13 @@ interface DesignedTalentNode {
 }
 
 const NORMAL_TALENT_NODES = [
-  { id: "first-month-drive", name: "满怀干劲", icon: "heart-plus", tier: 0, column: "1", row: "1 / 4", maxLevel: 6, cost: 1, effect: "首月结束后，下月初SAN回复+1/级", prerequisiteIds: [] },
+  { id: "first-month-drive", name: "满怀干劲", icon: "heart-plus", tier: 0, column: "1", row: "1 / 4", maxLevel: 3, cost: 1, effect: "首月结束后，下月初SAN回复+2/级", prerequisiteIds: [] },
   { id: "self-determination", name: "我命由我", icon: "sunrise", tier: 1, column: "2", row: "1", maxLevel: 10, cost: 1, effect: "转博时科研、社交、导师好感提升10%/级，向上取整", prerequisiteIds: ["first-month-drive"] },
-  { id: "diligence", name: "勤能补拙", icon: "footprints", tier: 1, column: "2", row: "2 / 4", maxLevel: 10, cost: 1, effect: "转博后每月行动+0.1次/级，余数逐月累积", prerequisiteIds: ["first-month-drive"] },
+  { id: "diligence", name: "勤能补拙", icon: "footprints", tier: 1, column: "2", row: "2", maxLevel: 10, cost: 1, effect: "转博后每月行动+0.1次/级，余数逐月累积", prerequisiteIds: ["first-month-drive"] },
+  { id: "first-month-drive-plus", name: "满怀干劲+", icon: "zap", tier: 1, column: "2", row: "3", maxLevel: 5, cost: 1, effect: "除入学以外，每学期初SAN回复+1/级", prerequisiteIds: ["first-month-drive"] },
   { id: "breakthrough", name: "突破极限", icon: "rocket", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 3, effect: "属性溢出时上限+1，最多+10", prerequisiteIds: ["self-determination"] },
   { id: "burning-life-alpha", name: "燃烧生命α", icon: "heart-crack", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 3, effect: "转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限", prerequisiteIds: ["diligence"] },
-  { id: "burning-life-beta", name: "燃烧生命β", icon: "heart-pulse", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "转博后每月SAN不足仍可免SAN消耗行动1次，消耗1点SAN上限", prerequisiteIds: ["diligence"] },
+  { id: "burning-life-beta", name: "燃烧生命β", icon: "heart-pulse", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "转博后每月SAN不足时，免除1次SAN消耗，消耗1点SAN上限", prerequisiteIds: ["first-month-drive-plus"] },
   { id: "burnout", name: "触底反弹", icon: "flame", tier: 3, column: "4", row: "2 / 4", maxLevel: 1, cost: 3, effect: "每月初SAN上限低于8时，SAN上限+1", prerequisiteIds: ["burning-life-alpha", "burning-life-beta"] },
   { id: "epiphany", name: "厚积薄发", icon: "sparkles", tier: 3, column: "4", row: "1", maxLevel: 2, cost: 3, effect: "转博后每年科研、社交、导师好感+1/级", prerequisiteIds: ["breakthrough"] },
 ] as const satisfies readonly DesignedTalentNode[];
@@ -429,24 +404,24 @@ const RICH_TALENT_NODES = [
   // Preview rule for later activation: both transfer bonuses use the pre-transfer state, so paper rewards do not compound the coin bonus.
   { id: "wealth-growth", name: "财富倍增", icon: "trending-up", tier: 1, column: "2", row: "1", maxLevel: 8, cost: 1, effect: "转博时金币增加25%/级，向上取整", prerequisiteIds: ["red-envelope"] },
   { id: "knowledge-is-wealth", name: "书中自有黄金屋", icon: "book-open", tier: 1, column: "2", row: "3", maxLevel: 5, cost: 2, effect: "转博时每篇一作论文奖励1金币/级", prerequisiteIds: ["heiress"] },
-  { id: "investment-savvy", name: "理财能手", icon: "piggy-bank", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 3, effect: "每12个月获得金币20%/级的利息，向上取整", prerequisiteIds: ["wealth-growth"] },
-  { id: "work-pays-off", name: "身价不菲", icon: "briefcase-business", tier: 2, column: "3", row: "3", maxLevel: 3, cost: 2, effect: "实习收入+33%/级，向上取整", prerequisiteIds: ["knowledge-is-wealth"] },
+  { id: "investment-savvy", name: "理财能手", icon: "piggy-bank", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 3, effect: "每次投资5金币，12个月后获得利息+1/级", prerequisiteIds: ["wealth-growth"] },
+  { id: "work-pays-off", name: "薪满意足", icon: "briefcase-business", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 3, effect: "实习收入+50%/级，向上取整", prerequisiteIds: ["knowledge-is-wealth"] },
   { id: "gold-power-alpha", name: "金之力α", icon: "circle-dollar-sign", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 2, effect: "金币达到50时，每点SAN消耗转为1金币", prerequisiteIds: ["work-pays-off"] },
-  { id: "gold-power-beta", name: "金之力β", icon: "badge-dollar-sign", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "金币达到50时，每点导师好感消耗转为消耗2金币", prerequisiteIds: ["bring-funding"] },
-  { id: "gold-power-gamma", name: "金之力γ", icon: "coins", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 2, effect: "金币达到50时，每点社交能力消耗转为2金币", prerequisiteIds: ["investment-savvy"] },
+  { id: "gold-power-beta", name: "金之力β", icon: "badge-dollar-sign", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "金币达到50时，导师好感降低转为金币-2/级", prerequisiteIds: ["bring-funding"] },
+  { id: "gold-power-gamma", name: "金之力γ", icon: "coins", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 2, effect: "金币达到50时，社交能力降低转为金币-2/级", prerequisiteIds: ["investment-savvy"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const GENIUS_TALENT_NODES = [
   { id: "innate-insight", name: "生而知之", icon: "brain", tier: 0, column: "1", row: "1", maxLevel: 5, cost: 1, effect: "初始科研能力+1/级", prerequisiteIds: [] },
-  { id: "idea-insight", name: "灵光乍现", icon: "lightbulb", tier: 0, column: "1", row: "3", maxLevel: 5, cost: 1, effect: "永久想idea+1分/级", prerequisiteIds: [] },
+  { id: "idea-insight", name: "灵光乍现", icon: "lightbulb", tier: 0, column: "1", row: "3", maxLevel: 3, cost: 1, effect: "永久想idea+2分/级", prerequisiteIds: [] },
   { id: "tireless-scholar", name: "学而不倦", icon: "calendar-days", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 3, effect: "科研能力每年+1", prerequisiteIds: ["innate-insight"] },
-  { id: "thirst-for-knowledge", name: "求知若渴", icon: "book-open", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 1, effect: "不断学习事件出现概率+100%/级", prerequisiteIds: ["innate-insight"] },
-  { id: "experiment-practice", name: "躬行求真", icon: "flask-conical", tier: 1, column: "2", row: "3", maxLevel: 5, cost: 1, effect: "永久做实验+1分/级", prerequisiteIds: ["idea-insight"] },
+  { id: "thirst-for-knowledge", name: "求知若渴", icon: "book-open", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 1, effect: "不断学习事件出现概率+100%", prerequisiteIds: ["innate-insight"] },
+  { id: "experiment-practice", name: "躬行求真", icon: "flask-conical", tier: 1, column: "2", row: "3", maxLevel: 3, cost: 1, effect: "永久做实验+2分/级", prerequisiteIds: ["idea-insight"] },
   { id: "proven-by-papers", name: "以文证道", icon: "file-text", tier: 2, column: "3", row: "1", maxLevel: 3, cost: 2, effect: "转博时每篇一作A类论文，科研能力+1/级", prerequisiteIds: ["tireless-scholar"] },
   { id: "boundless-study", name: "学无止境", icon: "infinity", tier: 2, column: "3", row: "2", maxLevel: 5, cost: 1, effect: "转博时每篇一作A类论文，科研上限+1/级", prerequisiteIds: ["thirst-for-knowledge"] },
-  { id: "writing-mastery", name: "妙笔成章", icon: "notebook-pen", tier: 2, column: "3", row: "3", maxLevel: 5, cost: 1, effect: "永久写论文+1分/级", prerequisiteIds: ["experiment-practice"] },
-  { id: "rise-together", name: "共攀高峰", icon: "users", tier: 3, column: "4", row: "1", maxLevel: 3, cost: 2, effect: "转博后同学的科研能力+1/级", prerequisiteIds: ["proven-by-papers", "boundless-study"] },
-  { id: "lasting-work", name: "历久弥新", icon: "hourglass", tier: 3, column: "4", row: "3", maxLevel: 3, cost: 2, effect: "转博后论文分数每月衰减率减少5个百分点/级", prerequisiteIds: ["writing-mastery"] },
+  { id: "writing-mastery", name: "妙笔成章", icon: "notebook-pen", tier: 2, column: "3", row: "3", maxLevel: 3, cost: 1, effect: "永久写论文+2分/级", prerequisiteIds: ["experiment-practice"] },
+  { id: "rise-together", name: "共攀高峰", icon: "users", tier: 3, column: "4", row: "1", maxLevel: 4, cost: 1, effect: "转博后同学的科研能力+1/级", prerequisiteIds: ["proven-by-papers", "boundless-study"] },
+  { id: "lasting-work", name: "历久弥新", icon: "hourglass", tier: 3, column: "4", row: "3", maxLevel: 5, cost: 1, effect: "转博后论文分数每月衰减率减少3个百分点/级", prerequisiteIds: ["writing-mastery"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const TEACHER_CHILD_TALENT_NODES = [
@@ -457,7 +432,8 @@ const TEACHER_CHILD_TALENT_NODES = [
   { id: "computing-support", name: "算力后盾", icon: "cpu", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 4, effect: "转博时获得1次显卡报销/级", prerequisiteIds: ["growing-familiarity"] },
   { id: "workspace-renewal", name: "工位焕新", icon: "monitor", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 4, effect: "转博时获得1次工位报销/级", prerequisiteIds: ["growing-familiarity"] },
   { id: "mentor-insight", name: "名师点拨", icon: "book-open", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 2, effect: "导师协作分+50%/级", prerequisiteIds: ["family-patronage"] },
-  { id: "learning-by-osmosis", name: "耳濡目染", icon: "graduation-cap", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 6, effect: "转博后科研能力全局取科研能力与导师好感的较大值", prerequisiteIds: ["mentor-insight"] },
+  { id: "funding-shield", name: "经费护航", icon: "store", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 4, effect: "商店购买AI优先扣除科研经费", prerequisiteIds: ["computing-support", "workspace-renewal"] },
+  { id: "learning-by-osmosis", name: "耳濡目染", icon: "graduation-cap", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 6, effect: "转博后科研能力视为科研能力与导师好感的较大值", prerequisiteIds: ["mentor-insight"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const CHOSEN_TALENT_NODES = [
@@ -481,20 +457,50 @@ const SOCIAL_TALENT_NODES = [
   { id: "circle-of-friends", name: "高朋满座", icon: "users", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 3, effect: "转博时人际栏每位同学使社交+1/级、社交上限+1/级", prerequisiteIds: ["growing-connections"] },
   { id: "senior-mentorship", name: "师友相助", icon: "graduation-cap", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "师兄师姐指导事件出现概率+100%", prerequisiteIds: ["peer-camaraderie"] },
   { id: "kindly-reviewed", name: "人缘加持", icon: "heart", tier: 3, column: "4", row: "1", maxLevel: 5, cost: 2, effect: "转博时心软审稿人概率+社交×1%/级，其余类型保持相对比例", prerequisiteIds: ["circle-of-friends"] },
-  { id: "collective-wisdom", name: "群策群力", icon: "network", tier: 3, column: "4", row: "3", maxLevel: 2, cost: 3, effect: "同学协作分+50%/级", prerequisiteIds: ["senior-mentorship"] },
+  { id: "collective-wisdom", name: "群策群力", icon: "network", tier: 3, column: "4", row: "3", maxLevel: 2, cost: 2, effect: "同学协作分+50%/级", prerequisiteIds: ["senior-mentorship"] },
+  { id: "junior-delegation", name: "借力后进", icon: "hand-helping", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 2, effect: "麻烦师弟师妹不扣社交", prerequisiteIds: [] },
+  { id: "junior-bond", name: "投桃报李", icon: "heart-handshake", tier: 1, column: "2", row: "2", maxLevel: 3, cost: 1, effect: "麻烦师弟师妹默契+1/级", prerequisiteIds: ["junior-delegation"] },
+  { id: "paper-camaraderie", name: "珠联璧合", icon: "file-heart", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 2, effect: "合作发表论文提升的默契+1/级", prerequisiteIds: ["junior-bond"] },
+  { id: "overflow-social", name: "人多势众", icon: "user-round-plus", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "人际栏同学溢出转为社交+1", prerequisiteIds: ["senior-mentorship"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const NORMAL_REVERSED_TALENT_NODES = [
-  { id: "sloth-core", name: "懒骨天成", icon: "flame", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "SAN消耗×2；转博后SAN消耗×3（全部扣除均生效）", prerequisiteIds: [], initialLevel: 1, fixed: true },
-  { id: "monthly-san-recovery", name: "养精蓄锐", icon: "heart-pulse", tier: 1, column: "2", row: "1", maxLevel: 3, cost: 1, effect: "每月SAN回复+1/级", prerequisiteIds: ["sloth-core"] },
-  { id: "sloth-head-start", name: "根基渐稳", icon: "sparkles", tier: 1, column: "2", row: "2", maxLevel: 5, cost: 1, effect: "初始全属性+1/级", prerequisiteIds: ["sloth-core"] },
-  { id: "restful-idle", name: "以逸待劳", icon: "hourglass", tier: 1, column: "2", row: "3", maxLevel: 3, cost: 1, effect: "休息效果+1/级", prerequisiteIds: ["sloth-core"] },
-  { id: "post-phd-recovery", name: "生生不息", icon: "heart-plus", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 1, effect: "转博后每月SAN+已损SAN的10%/级", prerequisiteIds: ["monthly-san-recovery"] },
-  { id: "post-phd-growth", name: "后来居上", icon: "trending-up", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 1, effect: "转博时全属性+50%/级", prerequisiteIds: ["sloth-head-start"] },
-  { id: "coffee-lifeline", name: "提神醒脑", icon: "coffee", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 1, effect: "冰美式效果提升1/级", prerequisiteIds: ["restful-idle"] },
-  { id: "san-cap-reserve", name: "游刃有余", icon: "shield", tier: 3, column: "4", row: "1", maxLevel: 2, cost: 1, effect: "转博后SAN上限+30%/级", prerequisiteIds: ["post-phd-recovery"] },
-  { id: "summer-recovery", name: "长夏偷闲", icon: "sunrise", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 1, effect: "暑假事件中休息会回满SAN", prerequisiteIds: ["coffee-lifeline"] },
-  { id: "year-summary-recovery", name: "岁末小憩", icon: "calendar-days", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 1, effect: "学年总结事件中休息会回满SAN", prerequisiteIds: ["coffee-lifeline"] },
+  { id: "sloth-core", name: "极致怠惰", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "SAN消耗×2；转博后SAN消耗×3", prerequisiteIds: [], initialLevel: 1, fixed: true },
+  { id: "monthly-san-recovery", name: "松弛人生", icon: "heart-pulse", tier: 0, column: "1", row: "1", maxLevel: 3, cost: 2, effect: "每月SAN回复+1/级", prerequisiteIds: [] },
+  { id: "sloth-head-start", name: "天纵不羁", icon: "sparkles", tier: 1, column: "2", row: "2", maxLevel: 5, cost: 2, effect: "初始全属性+1/级", prerequisiteIds: ["monthly-san-recovery"] },
+  { id: "restful-idle", name: "睡得好香", icon: "hourglass", tier: 0, column: "1", row: "3", maxLevel: 3, cost: 2, effect: "休息效果+1/级", prerequisiteIds: [] },
+  { id: "post-phd-recovery", name: "无所事事", icon: "heart-plus", tier: 1, column: "2", row: "1", maxLevel: 2, cost: 2, effect: "转博后每月SAN+已损SAN的10%/级", prerequisiteIds: ["monthly-san-recovery"] },
+  { id: "post-phd-growth", name: "天生我材", icon: "trending-up", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 2, effect: "转博时全属性+50%/级", prerequisiteIds: ["sloth-head-start"] },
+  { id: "coffee-lifeline", name: "困睡醒科", icon: "brain", tier: 1, column: "2", row: "3", maxLevel: 2, cost: 2, effect: "休息后下次想idea、做实验、写论文+3", prerequisiteIds: ["restful-idle"] },
+  { id: "san-cap-reserve", name: "日渐圆润", icon: "shield", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 2, effect: "浪费的行动点转为SAN上限", prerequisiteIds: ["post-phd-recovery"] },
+  { id: "year-summary-recovery", name: "忙里偷闲", icon: "calendar-days", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "学年总结事件中休息会回满SAN", prerequisiteIds: ["coffee-lifeline"] },
+  { id: "full-san-research", name: "满血状态", icon: "brain", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "SAN为满时科研能力视为+5", prerequisiteIds: ["post-phd-growth"] },
+] as const satisfies readonly DesignedTalentNode[];
+
+const RICH_REVERSED_TALENT_NODES = [
+  { id: "money-curse", name: "金钱诅咒", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "每月SAN/属性重置为0", prerequisiteIds: [], initialLevel: 1, fixed: true },
+  { id: "money-growth", name: "聚沙成塔", icon: "coins", tier: 0, column: "1", row: "1", maxLevel: 3, cost: 2, effect: "每月金币+1/级", prerequisiteIds: [] },
+  { id: "loss-to-money", name: "因祸得财", icon: "badge-dollar-sign", tier: 0, column: "1", row: "3", maxLevel: 1, cost: 2, effect: "属性减少转为金钱", prerequisiteIds: [] },
+  { id: "spend-to-break-curse", name: "破财消灾", icon: "shield-plus", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 3, effect: "每消耗100金币，金钱诅咒重置值+1", prerequisiteIds: ["money-growth"] },
+  { id: "post-phd-money-conversion", name: "钱能通神", icon: "circle-dollar-sign", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 2, effect: "转博后每枚金币从SAN、三项属性及三项属性上限中随机转化一种", prerequisiteIds: ["money-growth", "loss-to-money"] },
+  { id: "finance-master", name: "理财能手", icon: "piggy-bank", tier: 2, column: "3", row: "2", maxLevel: 3, cost: 2, effect: "每次投资5金币，12个月后获得利息+1/级", prerequisiteIds: ["post-phd-money-conversion"] },
+  { id: "coin-game", name: "金币游戏", icon: "coins", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 3, effect: "每次属性减少1点，进行一次判定：50%金币×1.5，50%金币×0.4", prerequisiteIds: ["loss-to-money"] },
+  { id: "investment-acceleration", name: "快速周转", icon: "clock-3", tier: 3, column: "4", row: "2", maxLevel: 8, cost: 1, effect: "投资回报周期-1个月/级", prerequisiteIds: ["finance-master"] },
+  { id: "coin-game-comeback", name: "败局翻盘", icon: "rotate-ccw", tier: 2, column: "3", row: "3", maxLevel: 5, cost: 1, effect: "金币游戏失败后的倍率+0.05/级", prerequisiteIds: ["coin-game"] },
+] as const satisfies readonly DesignedTalentNode[];
+
+const GENIUS_REVERSED_TALENT_NODES = [
+  { id: "research-curse", name: "学术失语", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "科研视为0", prerequisiteIds: [], initialLevel: 1, fixed: true },
+  { id: "paper-opening", name: "笔下藏锋", icon: "file-plus-2", tier: 0, column: "1", row: "2", maxLevel: 3, cost: 1, effect: "开局解锁论文卡片+1/级", prerequisiteIds: [] },
+  { id: "knowledge-monetization", name: "以文谋生", icon: "coins", tier: 1, column: "2", row: "1", maxLevel: 2, cost: 1, effect: "科研提升→金币+2/级", prerequisiteIds: ["paper-opening"] },
+  { id: "work-life-balance", name: "忍辱负重", icon: "heart-pulse", tier: 1, column: "2", row: "2", maxLevel: 2, cost: 1, effect: "科研提升→SAN+2/级", prerequisiteIds: ["paper-opening"] },
+  { id: "research-network", name: "正名之路", icon: "handshake", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 1, effect: "科研提升→社交/好感+1", prerequisiteIds: ["paper-opening"] },
+  { id: "research-wellness", name: "百折不挠", icon: "shield-plus", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 1, effect: "转博后科研提升→SAN上限+1", prerequisiteIds: ["work-life-balance"] },
+  { id: "reputation-growth", name: "导师力挺", icon: "heart-plus", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 1, effect: "转博后科研提升→好感上限+1", prerequisiteIds: ["research-network"] },
+  { id: "social-growth", name: "学界声援", icon: "users", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 1, effect: "转博后科研提升→社交上限+1", prerequisiteIds: ["research-network"] },
+  { id: "break-research-curse", name: "拨云见日", icon: "sunrise", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 1, effect: "科研达到20时破除视为0诅咒", prerequisiteIds: ["research-wellness", "reputation-growth", "social-growth"] },
+  { id: "learning-from-rejection", name: "屡败屡研", icon: "rotate-ccw", tier: 0, column: "1", row: "1", maxLevel: 1, cost: 3, effect: "转博前每篇一作论文首次被拒后，科研能力+1", prerequisiteIds: [] },
+  { id: "papers-to-insight", name: "积稿成学", icon: "files", tier: 0, column: "1", row: "3", maxLevel: 1, cost: 3, effect: "转博时每篇一作论文，科研能力+1", prerequisiteIds: [] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const DESIGNED_TALENT_TREES = {
@@ -502,9 +508,9 @@ const DESIGNED_TALENT_TREES = {
     nodes: NORMAL_TALENT_NODES,
     viewBoxHeight: 192,
     paths: [
-      "M75 96 C145 96 155 32 225 32", "M75 96 C145 96 155 128 225 128",
+      "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
       "M225 32 H375", "M375 32 H525",
-      "M225 128 C295 128 305 96 375 96", "M225 128 C295 128 305 160 375 160",
+      "M225 96 H375", "M225 160 H375",
       "M375 96 C445 96 455 128 525 128", "M375 160 C445 160 455 128 525 128",
     ],
   },
@@ -536,6 +542,7 @@ const DESIGNED_TALENT_TREES = {
       "M75 96 H225",
       "M225 32 H375", "M225 32 C295 32 305 96 375 96",
       "M225 160 H375", "M375 160 H525",
+      "M375 32 H525", "M375 96 C445 96 455 32 525 32",
     ],
   },
   chosen: {
@@ -555,15 +562,35 @@ const DESIGNED_TALENT_TREES = {
     paths: [
       "M75 32 H225", "M225 32 H375", "M375 32 H525",
       "M75 160 H225", "M225 160 H375", "M375 160 H525",
+      "M75 96 H225", "M225 96 H375",
+      "M375 160 C445 160 455 96 525 96",
     ],
   },
   "normal-reversed": {
     nodes: NORMAL_REVERSED_TALENT_NODES,
     viewBoxHeight: 192,
     paths: [
-      "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
+      "M75 32 H225", "M75 32 C145 32 155 96 225 96", "M75 160 H225",
       "M225 32 H375", "M225 96 H375", "M225 160 H375",
-      "M375 32 H525", "M375 160 C445 160 455 96 525 96", "M375 160 H525",
+      "M375 96 H525",
+    ],
+  },
+  "rich-reversed": {
+    nodes: RICH_REVERSED_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 32 H225", "M75 160 C145 160 155 96 225 96",
+      "M75 32 C145 32 155 96 225 96", "M75 160 H225",
+      "M225 96 H375", "M375 96 H525", "M225 160 H375",
+    ],
+  },
+  "genius-reversed": {
+    nodes: GENIUS_REVERSED_TALENT_NODES,
+    viewBoxHeight: 192,
+    paths: [
+      "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
+      "M225 96 C295 96 305 32 375 32", "M225 160 C295 160 305 96 375 96", "M225 160 H375",
+      "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
     ],
   },
 } as const;
@@ -576,23 +603,23 @@ function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, s
     ? selectedNodeIndex : 0;
   return `
     <section class="lobby-profile-growth-card lobby-profile-section is-designed-growth-card">
-      <div class="lobby-talent-tree is-designed-tree is-${roleId}-tree" role="group" aria-label="天赋树预览" data-active-page="0" data-prerequisite-mode="any" data-prerequisite-min-level="1">
+      <div class="lobby-talent-tree is-designed-tree is-${roleId}-tree${nodes.some((node) => node.fixed) ? " is-fixed-tree" : ""}" role="group" aria-label="天赋树预览" data-active-page="0" data-prerequisite-mode="any" data-prerequisite-min-level="1">
         <div class="lobby-talent-tree-pages">
           <div class="lobby-talent-tree-page is-active is-designed-page" data-tree-page="0">
             <svg class="lobby-normal-tree-connections" viewBox="0 0 600 ${viewBoxHeight}" preserveAspectRatio="none" aria-hidden="true">
               ${paths.map((path) => `<path d="${path}" />`).join("")}
             </svg>
             ${nodes.map((node, index) => `
-              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}${node.fixed ? " is-fixed" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.tier}" data-fixed="${node.fixed ? "true" : "false"}" aria-label="${escapeHtml(`${node.name}：${node.effect}${node.fixed ? "，固定生效" : `，${node.cost}天赋点`}，仅预览`)}" title="${node.name}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-initial-level="${node.initialLevel ?? 0}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}">
+              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}${node.fixed ? " is-fixed" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.fixed ? "fixed" : node.tier}" data-fixed="${node.fixed ? "true" : "false"}" aria-label="${escapeHtml(`${node.name}：${node.effect}${node.fixed ? "，固定生效" : `，${node.cost}天赋点`}，仅预览`)}" title="${node.name}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-initial-level="${node.initialLevel ?? 0}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}">
                 <span class="lobby-talent-tree-node-ring"><i data-lucide="${node.icon}" aria-hidden="true"></i></span>
-                <span class="lobby-normal-tree-node-level">${node.initialLevel ?? 0}/${node.maxLevel}</span>
+                ${node.fixed ? "" : `<span class="lobby-normal-tree-node-level">${node.initialLevel ?? 0}/${node.maxLevel}</span>`}
               </button>
             `).join("")}
             <div class="lobby-normal-tree-details" aria-live="polite">
               ${nodes.map((node, index) => `
                 <div class="lobby-normal-tree-detail" data-detail-index="${index}"${index === activeIndex ? "" : " hidden"}>
-                  <div class="lobby-normal-tree-detail-heading"><strong>${node.name}</strong></div>
-                  <p>${node.effect}<span class="lobby-normal-tree-detail-cost">${node.fixed ? "固定生效" : `${node.cost}天赋点`}</span></p>
+                  <div class="lobby-normal-tree-detail-heading"><strong>${escapeHtml(node.name)}</strong></div>
+                  <p>${escapeHtml(node.effect)}<span class="lobby-normal-tree-detail-cost">${node.fixed ? "固定生效" : `${node.cost}天赋点`}</span></p>
                 </div>
               `).join("")}
             </div>
@@ -716,7 +743,7 @@ function renderSelectedRoleDetail(
             </div>
             ${renderProfileInfoPanel(viewModel)}
           </section>
-          ${selectedRoleId === "normal" || selectedRoleId === "normal-reversed" || selectedRoleId === "rich" || selectedRoleId === "genius" || selectedRoleId === "teacher-child" || selectedRoleId === "chosen" || selectedRoleId === "social"
+          ${selectedRoleId === "normal" || selectedRoleId === "normal-reversed" || selectedRoleId === "rich" || selectedRoleId === "rich-reversed" || selectedRoleId === "genius" || selectedRoleId === "genius-reversed" || selectedRoleId === "teacher-child" || selectedRoleId === "chosen" || selectedRoleId === "social"
             ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0)
             : renderGrowthBoard(talentTreePageIndex, talentTreeSelectedNodeByPage)}
         </div>

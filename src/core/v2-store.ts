@@ -10,6 +10,7 @@ import { createInitialState, dispatchAction } from "./v2-engine";
 import { pushNoOpLog } from "./v2-engine-helpers";
 import { achievementRecordsChanged, loadRoleAchievementRecords, recordNewAchievementDates, saveRoleAchievementRecords } from "./v2-achievement-records";
 import { awardRoleExperience, getNextRoleLevelExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
+import { loadRoleRecords, recordRoleResult, saveRoleRecords } from "./v2-role-records";
 import type { AccountProfile, DispatchPayload, GameActionId, GameState, RoleId } from "./v2-types";
 
 type Listener = (state: GameState) => void;
@@ -74,7 +75,7 @@ function syncSetupSelection(state: GameState, selectedLobbyRoleId: DispatchPaylo
 
 export function createStore(options: { storage?: ExperienceStorage | null } = {}) {
   const storage = options.storage === undefined ? getBrowserStorage() : options.storage;
-  let accountProfile = loadRoleAchievementRecords(loadRoleExperience(createDefaultAccountProfile(), storage), storage);
+  let accountProfile = loadRoleAchievementRecords(loadRoleRecords(loadRoleExperience(createDefaultAccountProfile(), storage), storage), storage);
   let state = syncSetupSelection(createInitialState(), accountProfile.selectedLobbyRoleId);
   let runUsedDebugPanel = false;
   const listeners = new Set<Listener>();
@@ -108,7 +109,9 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
             exp: award.progress.exp,
           },
         };
+        nextAccountProfile = recordRoleResult(nextAccountProfile, nextState);
         saveRoleExperience(nextAccountProfile, storage);
+        saveRoleRecords(nextAccountProfile, storage);
       }
     }
     nextAccountProfile = recordNewAchievementDates(accountProfile, nextAccountProfile);

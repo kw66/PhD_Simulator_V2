@@ -2472,8 +2472,9 @@ button.pager-arrow:disabled {
 }
 
 .lobby-profile-main {
+  --lobby-portrait-column-width: 248px;
   display: grid;
-  gap: 10px;
+  gap: 2px;
   align-content: start;
   align-self: start;
 }
@@ -2481,7 +2482,7 @@ button.pager-arrow:disabled {
 .lobby-profile-top {
   position: relative;
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: var(--lobby-portrait-column-width) minmax(0, 1fr);
   gap: 6px;
   align-items: start;
   padding: 12px 0 18px;
@@ -2618,7 +2619,7 @@ button.pager-arrow:disabled {
   min-width: 0;
 }
 
-.lobby-profile-stat-row span {
+.lobby-profile-stat-row > span {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--setup-label-color);
@@ -2641,7 +2642,7 @@ button.pager-arrow:disabled {
   text-align: right;
 }
 
-.lobby-profile-history-stack .lobby-profile-stat-row span {
+.lobby-profile-history-stack .lobby-profile-stat-row > span {
   font-size: var(--setup-label-size);
   letter-spacing: 0;
   line-height: 1.32;
@@ -2821,6 +2822,85 @@ button.pager-arrow:disabled {
 .lobby-profile-growth-card {
   gap: 8px;
   padding: 6px 22px 10px;
+}
+
+.lobby-normal-tree-details {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  align-self: stretch;
+  justify-self: stretch;
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 10px 6px;
+  text-align: center;
+}
+
+.is-designed-tree .lobby-normal-tree-details {
+  position: absolute;
+  z-index: 0;
+  inset: auto 0 0;
+  width: 100%;
+  height: var(--lobby-talent-detail-height);
+  box-sizing: border-box;
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.lobby-normal-tree-detail {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  font-family: var(--ui-font-cjk);
+}
+
+.lobby-normal-tree-detail[hidden] {
+  display: none;
+}
+
+.lobby-normal-tree-detail-heading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.lobby-normal-tree-detail-heading::before,
+.lobby-normal-tree-detail-heading::after {
+  content: "";
+  flex: 1 1 0;
+  max-width: 140px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(145, 108, 49, 0.48));
+}
+
+.lobby-normal-tree-detail-heading::after {
+  transform: rotate(180deg);
+}
+
+.lobby-normal-tree-detail-heading strong {
+  color: var(--setup-title-color);
+  font-size: 0.88rem;
+  font-weight: 790;
+  white-space: nowrap;
+}
+
+.lobby-normal-tree-detail p {
+  margin: 0;
+  padding: 7px 8px;
+  background: linear-gradient(90deg, transparent 0%, rgba(193, 151, 76, 0.06) 20%, rgba(193, 151, 76, 0.18) 42%, rgba(193, 151, 76, 0.18) 58%, rgba(193, 151, 76, 0.06) 80%, transparent 100%);
+  color: var(--setup-body-color);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.lobby-normal-tree-detail-cost {
+  display: inline-block;
+  margin-left: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .lobby-growth-summary-row,
@@ -3124,6 +3204,7 @@ button.pager-arrow:disabled {
     0 0 11px 2px color-mix(in srgb, var(--tree-tone) 40%, transparent);
 }
 
+
 .lobby-talent-tree-node-ring::before {
   content: "";
   position: absolute;
@@ -3164,11 +3245,13 @@ button.pager-arrow:disabled {
 
 .lobby-page[data-scale-mode="fixed"] .lobby-profile-growth-card.is-designed-growth-card,
 .lobby-profile-growth-card.is-designed-growth-card {
-  padding: 8px 6px 12px;
+  padding: 0 6px 2px;
 }
 
 .lobby-talent-tree.is-designed-tree {
-  height: 285px;
+  --lobby-talent-node-height: 228px;
+  --lobby-talent-detail-height: 72px;
+  height: calc(var(--lobby-talent-node-height) + var(--lobby-talent-detail-height));
 }
 
 .is-designed-tree .lobby-talent-tree-pages {
@@ -3177,7 +3260,7 @@ button.pager-arrow:disabled {
 
 .is-designed-tree .lobby-talent-tree-page {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(2, 100px) minmax(0, 1fr);
+  grid-template-rows: repeat(3, calc(var(--lobby-talent-node-height) / 3)) minmax(0, 1fr);
   align-content: stretch;
   align-items: center;
   width: min(82%, 500px);
@@ -3189,10 +3272,12 @@ button.pager-arrow:disabled {
 .is-teacher-child-tree .lobby-talent-tree-page,
 .is-chosen-tree .lobby-talent-tree-page,
 .is-social-tree .lobby-talent-tree-page,
-.is-normal-reversed-tree .lobby-talent-tree-page {
+.is-normal-reversed-tree .lobby-talent-tree-page,
+.is-rich-reversed-tree .lobby-talent-tree-page,
+.is-genius-reversed-tree .lobby-talent-tree-page {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(3, 64px) minmax(0, 1fr);
-  width: min(94%, 560px);
+  grid-template-rows: repeat(3, calc(var(--lobby-talent-node-height) / 3)) minmax(0, 1fr);
+  width: min(96%, 600px);
 }
 
 .lobby-normal-tree-connections {
@@ -3200,7 +3285,7 @@ button.pager-arrow:disabled {
   top: 0;
   left: 0;
   width: 100%;
-  height: 200px;
+  height: var(--lobby-talent-node-height);
   overflow: visible;
   pointer-events: none;
 }
@@ -3215,19 +3300,6 @@ button.pager-arrow:disabled {
   vector-effect: non-scaling-stroke;
 }
 
-.is-normal-tree .lobby-normal-tree-connections,
-.is-rich-tree .lobby-normal-tree-connections,
-.is-genius-tree .lobby-normal-tree-connections,
-.is-teacher-child-tree .lobby-normal-tree-connections,
-.is-chosen-tree .lobby-normal-tree-connections,
-.is-social-tree .lobby-normal-tree-connections {
-  height: 192px;
-}
-
-.is-normal-reversed-tree .lobby-normal-tree-connections {
-  height: 192px;
-}
-
 .is-designed-tree .lobby-talent-tree-node {
   position: relative;
   z-index: 1;
@@ -3237,79 +3309,105 @@ button.pager-arrow:disabled {
   justify-content: center;
   gap: 0;
   width: min(60px, 100%);
-  height: 72px;
+  height: 68px;
 }
 
-/* Talent colors describe effect category, not role or tree tier. */
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="first-month-drive"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="burning-life-alpha"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="burning-life-beta"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="burnout"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="fortunate-health"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="misfortune-to-fortune"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="monthly-san-recovery"],
+@media (min-width: 821px) {
+  .is-designed-tree .lobby-normal-tree-connections,
+  .is-designed-tree .lobby-talent-tree-node {
+    transform: translateY(-6px);
+  }
+}
+
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="first-month-drive"] {
+  --tree-tone: #bb718a;
+}
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="self-determination"] { --tree-tone: #b48b38; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="diligence"] { --tree-tone: #4d8c73; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="first-month-drive-plus"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="breakthrough"] { --tree-tone: #bd9445; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="burning-life-alpha"] { --tree-tone: #a9607c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="burning-life-beta"] { --tree-tone: #a9607c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="burnout"] { --tree-tone: #b96f80; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="epiphany"] { --tree-tone: #b89b4c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="red-envelope"] { --tree-tone: #ba6b64; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="heiress"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="bring-funding"] { --tree-tone: #638c7b; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="wealth-growth"] { --tree-tone: #b79a4d; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="knowledge-is-wealth"] { --tree-tone: #5d8790; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="investment-savvy"] { --tree-tone: #739375; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="work-pays-off"] { --tree-tone: #6686a0; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-alpha"] { --tree-tone: #ba9146; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-beta"] { --tree-tone: #ba9146; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-gamma"] { --tree-tone: #ba9146; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="innate-insight"] { --tree-tone: #8b779c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="idea-insight"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="tireless-scholar"] { --tree-tone: #548d82; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="thirst-for-knowledge"] { --tree-tone: #a1738f; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="experiment-practice"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="proven-by-papers"] { --tree-tone: #688bac; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="boundless-study"] { --tree-tone: #688bac; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="writing-mastery"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-work"] { --tree-tone: #a1738f; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="rise-together"] { --tree-tone: #6c9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="near-the-source"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-familiarity"] { --tree-tone: #bb718a; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-host"] { --tree-tone: #bd9445; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-patronage"] { --tree-tone: #688bac; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="computing-support"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="workspace-renewal"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="mentor-insight"] { --tree-tone: #ac8e50; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="funding-shield"] { --tree-tone: #739375; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="learning-by-osmosis"] { --tree-tone: #8b779c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="favored-by-fate"] { --tree-tone: #bd9445; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="athletic-prodigy"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-fortune"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="lucky-hand"] { --tree-tone: #a9607c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="rare-color-fate"] { --tree-tone: #9c83a3; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="effortless-reinstall"] { --tree-tone: #9c83a3; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="fortunate-health"] { --tree-tone: #6c9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="complete-potential"] { --tree-tone: #b49b54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="balanced-growth"] { --tree-tone: #6c9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="misfortune-to-fortune"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="natural-charisma"] { --tree-tone: #bb718a; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="supporting-juniors"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-connections"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="peer-camaraderie"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="circle-of-friends"] { --tree-tone: #8b779c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="senior-mentorship"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="kindly-reviewed"] { --tree-tone: #a9607c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="collective-wisdom"] { --tree-tone: #6c9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="sloth-core"] { --tree-tone: #765b86; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="monthly-san-recovery"] { --tree-tone: #668e83; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="sloth-head-start"] { --tree-tone: #b18a54; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="restful-idle"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-recovery"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="san-cap-reserve"] { --tree-tone: #168c8c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="coffee-lifeline"] { --tree-tone: #6e8fa0; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-recovery"] { --tree-tone: #7b9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-growth"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="san-cap-reserve"] { --tree-tone: #8b779c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="summer-recovery"] { --tree-tone: #a67a65; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="year-summary-recovery"] { --tree-tone: #a67a65; }
 
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="diligence"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="innate-insight"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="idea-insight"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="tireless-scholar"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="experiment-practice"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="proven-by-papers"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="boundless-study"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="writing-mastery"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-work"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="rise-together"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-patronage"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="learning-by-osmosis"] { --tree-tone: #3d72b8; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="paper-opening"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="learning-from-rejection"] { --tree-tone: #a1738f; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="papers-to-insight"] { --tree-tone: #b89b4c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="knowledge-monetization"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="work-life-balance"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="research-wellness"] { --tree-tone: #7b9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="research-network"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="reputation-growth"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="social-growth"] { --tree-tone: #a9607c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="break-research-curse"] { --tree-tone: #b89b4c; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="money-growth"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="loss-to-money"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="spend-to-break-curse"] { --tree-tone: #a67a65; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-money-conversion"] { --tree-tone: #c26d45; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="finance-master"] { --tree-tone: #6f8c76; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="investment-acceleration"] { --tree-tone: #8d6f91; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="coin-game"] { --tree-tone: #b56b66; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="coin-game-comeback"] { --tree-tone: #9c83a3; }
 
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="near-the-source"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-familiarity"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="mentor-insight"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="natural-charisma"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-connections"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="peer-camaraderie"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="circle-of-friends"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="senior-mentorship"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="collective-wisdom"] { --tree-tone: #c45b89; }
-
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="self-determination"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="breakthrough"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="epiphany"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="wealth-growth"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="favored-by-fate"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-fortune"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="complete-potential"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="balanced-growth"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="sloth-head-start"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-growth"] { --tree-tone: #d09a1e; }
-
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="red-envelope"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="heiress"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="bring-funding"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="knowledge-is-wealth"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="investment-savvy"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="work-pays-off"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-alpha"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-beta"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-gamma"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="computing-support"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="workspace-renewal"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="effortless-reinstall"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="coffee-lifeline"] { --tree-tone: #c45a24; }
-
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-host"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="athletic-prodigy"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="lucky-hand"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="rare-color-fate"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="supporting-juniors"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="kindly-reviewed"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="summer-recovery"],
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="year-summary-recovery"] { --tree-tone: #7652a6; }
-
-.is-designed-tree .lobby-talent-tree-node.is-fixed { --tree-tone: #8e3042; }
+.is-designed-tree .lobby-talent-tree-node.is-fixed { --tree-tone: #a65f67; }
 
 .is-designed-tree .lobby-talent-tree-node-ring {
   flex: 0 0 auto;
@@ -3327,8 +3425,10 @@ button.pager-arrow:disabled {
 
 .lobby-normal-tree-node-level {
   position: absolute;
-  top: calc(50% + 10px);
-  left: calc(50% + 23px);
+  top: calc(50% + 27px);
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
   color: var(--setup-title-color);
   font-family: var(--ui-font-cjk);
   font-size: 0.78rem;
@@ -3345,88 +3445,10 @@ button.pager-arrow:disabled {
 .is-teacher-child-tree .lobby-talent-tree-node,
 .is-chosen-tree .lobby-talent-tree-node,
 .is-social-tree .lobby-talent-tree-node,
-.is-normal-reversed-tree .lobby-talent-tree-node {
+.is-normal-reversed-tree .lobby-talent-tree-node,
+.is-rich-reversed-tree .lobby-talent-tree-node,
+.is-genius-reversed-tree .lobby-talent-tree-node {
   height: 58px;
-}
-
-.lobby-normal-tree-details {
-  grid-column: 1 / -1;
-  grid-row: 3;
-  align-self: stretch;
-  justify-self: stretch;
-  display: grid;
-  align-items: center;
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  padding: 7px 16px 5px;
-  text-align: center;
-}
-
-.is-normal-tree .lobby-normal-tree-details,
-.is-rich-tree .lobby-normal-tree-details,
-.is-genius-tree .lobby-normal-tree-details,
-.is-teacher-child-tree .lobby-normal-tree-details,
-.is-chosen-tree .lobby-normal-tree-details,
-.is-social-tree .lobby-normal-tree-details,
-.is-normal-reversed-tree .lobby-normal-tree-details {
-  grid-row: 4;
-}
-
-.lobby-normal-tree-detail {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.lobby-normal-tree-detail[hidden] {
-  display: none;
-}
-
-.lobby-normal-tree-detail-heading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  font-family: var(--ui-font-cjk);
-}
-
-.lobby-normal-tree-detail-heading::before,
-.lobby-normal-tree-detail-heading::after {
-  content: "";
-  flex: 1 1 0;
-  max-width: 140px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(145, 108, 49, 0.48));
-}
-
-.lobby-normal-tree-detail-heading::after {
-  transform: rotate(180deg);
-}
-
-.lobby-normal-tree-detail-heading strong {
-  color: var(--setup-title-color);
-  font-size: 0.88rem;
-  font-weight: 790;
-  white-space: nowrap;
-}
-
-.lobby-normal-tree-detail p {
-  margin: 0;
-  padding: 7px 8px;
-  background: linear-gradient(90deg, transparent 0%, rgba(193, 151, 76, 0.06) 20%, rgba(193, 151, 76, 0.18) 42%, rgba(193, 151, 76, 0.18) 58%, rgba(193, 151, 76, 0.06) 80%, transparent 100%);
-  color: var(--setup-body-color);
-  font-family: var(--ui-font-cjk);
-  font-size: 0.78rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.lobby-normal-tree-detail-cost {
-  display: inline-block;
-  margin-left: 12px;
-  opacity: 0.78;
-  white-space: nowrap;
 }
 
 .lobby-talent-tree-page-dots {
@@ -4024,7 +4046,7 @@ button.pager-arrow:disabled {
     content: none;
   }
 
-  .lobby-profile-stat-column.is-history {
+  .lobby-profile-stat-column.is-statistics {
     padding-left: 0;
     border-left: 0;
     box-shadow: none;
@@ -4112,24 +4134,6 @@ button.pager-arrow:disabled {
   .lobby-talent-tree-node-ring .lucide {
     width: 18px;
     height: 18px;
-  }
-
-  .lobby-talent-tree.is-designed-tree {
-    height: 315px;
-  }
-
-  .is-designed-tree .lobby-talent-tree-page {
-    grid-template-rows: repeat(2, 100px) minmax(0, 1fr);
-  }
-
-  .is-normal-tree .lobby-talent-tree-page,
-  .is-rich-tree .lobby-talent-tree-page,
-  .is-genius-tree .lobby-talent-tree-page,
-  .is-teacher-child-tree .lobby-talent-tree-page,
-  .is-chosen-tree .lobby-talent-tree-page,
-  .is-social-tree .lobby-talent-tree-page,
-  .is-normal-reversed-tree .lobby-talent-tree-page {
-    grid-template-rows: repeat(3, 64px) minmax(0, 1fr);
   }
 
   .is-designed-tree .lobby-talent-tree-node-ring {
@@ -4254,8 +4258,8 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 }
 
 .lobby-page[data-scale-mode="fixed"] .lobby-stage {
-  height: var(--setup-stage-height);
-  min-height: 0;
+  height: auto;
+  min-height: var(--setup-stage-height);
 }
 
 .lobby-page[data-scale-mode="fixed"] .lobby-role-rail {
@@ -4281,7 +4285,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 }
 
 .lobby-page[data-scale-mode="fixed"] .lobby-profile-top {
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: var(--lobby-portrait-column-width) minmax(0, 1fr);
   gap: 6px;
 }
 
@@ -4382,7 +4386,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 .play-workbench {
   min-height: inherit;
   display: block;
-  padding: 20px 0 22px;
+  padding: 10px 0 32px;
 }
 
 .play-workbench-body {
@@ -4403,7 +4407,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   display: grid;
   align-content: start;
   gap: 10px;
-  padding: 12px 18px 0;
+  padding: 6px 18px 0;
   border-right: var(--play-divider-strong);
   box-shadow: 1px 0 0 var(--setup-divider-highlight);
 }
@@ -4416,7 +4420,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   display: grid;
   align-content: start;
   gap: 0;
-  padding: 12px 18px 0;
+  padding: 6px 18px 0;
 }
 
 .play-center-artwork {
@@ -4494,7 +4498,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   display: grid;
   align-content: start;
   gap: 10px;
-  padding: 12px 18px 0;
+  padding: 6px 18px 0;
   border-left: var(--play-divider-strong);
   box-shadow: inset 1px 0 0 var(--setup-divider-highlight);
 }

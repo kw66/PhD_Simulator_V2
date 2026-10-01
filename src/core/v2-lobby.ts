@@ -7,6 +7,7 @@ import {
 import type {
   AccountProfile,
   LobbySelectedRoleHistoryStatViewModel,
+  LobbySelectedRoleStatisticsViewModel,
   LobbySelectedRoleAchievementViewModel,
   LobbySelectedRoleStatViewModel,
   LobbySelectedRoleViewModel,
@@ -37,6 +38,7 @@ function createZeroHistoryBest(): RoleHistoryBest {
   return {
     researchScore: 0,
     totalCitations: 0,
+    hIndex: 0,
     natureCount: 0,
     representativeCitations: 0,
     representativeScore: 0,
@@ -64,6 +66,7 @@ export function createDefaultRoleMetaProgress(roleId: RoleId): RoleMetaProgress 
     level: 0,
     exp: 0,
     completedRuns: 0,
+    playedRuns: 0,
     unlockedAchievementIds: [],
     historyBest: createZeroHistoryBest(),
     unlocked,
@@ -191,13 +194,23 @@ function buildRoleHistoryStatsViewModel(progress: RoleMetaProgress): LobbySelect
   return [
     { id: "research-score", label: "科研分", value: String(progress.historyBest.researchScore) },
     { id: "total-citations", label: "引用", value: String(progress.historyBest.totalCitations) },
+    { id: "h-index", label: "h 指数", value: String(progress.historyBest.hIndex) },
     { id: "nature-count", label: "Nature", value: String(progress.historyBest.natureCount) },
     {
       id: "representative",
       label: "代表作（分）",
       value: String(progress.historyBest.representativeScore),
     },
-    { id: "completed-runs", label: "通关次数", value: String(progress.completedRuns) },
+  ];
+}
+
+function buildRoleStatisticsViewModel(progress: RoleMetaProgress): LobbySelectedRoleStatisticsViewModel[] {
+  return [
+    { id: "completed-runs", label: "通关", value: String(progress.completedRuns), tooltip: "当前角色在本设备硕士或博士毕业的局数" },
+    { id: "played-runs", label: "游玩", value: String(progress.playedRuns), tooltip: "当前角色在本设备已达成结局的局数" },
+    { id: "global-completed-runs", label: "全球通关", value: "--", tooltip: "当前角色全球硕士或博士毕业的局数" },
+    { id: "global-played-runs", label: "全球游玩", value: "--", tooltip: "当前角色全球已达成结局的局数" },
+    { id: "phd-rate", label: "博士率", value: "--", tooltip: "全球博士毕业局数 ÷ 全球游玩局数" },
   ];
 }
 
@@ -223,6 +236,7 @@ export function buildLobbySelectedRoleViewModel(account: AccountProfile, roleId:
     unlockState: buildRoleUnlockState(account, roleId),
     stats: buildRoleStatsViewModel(roleId),
     historyStats: buildRoleHistoryStatsViewModel(progress),
+    statistics: buildRoleStatisticsViewModel(progress),
     roleAchievements: buildRoleAchievementsViewModel(roleId, progress),
   };
 }
