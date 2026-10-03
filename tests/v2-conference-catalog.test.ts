@@ -64,6 +64,15 @@ describe("v2 conference catalog", () => {
     expect(["北京", "上海", "深圳", "杭州", "南京", "广州"]).toContain(location.city);
   });
 
+  it("holds MMAsia only in Asia-Pacific or domestic cities", () => {
+    for (let seed = 0; seed < 200; seed += 1) {
+      for (const year of [1, 2, 3, 4, 5, 6]) {
+        expect(["asia", "domestic"]).toContain(getConferenceLocation(2, "C", year, seed * 7919).region);
+      }
+    }
+    expect(getConferenceInfo(2, "C", 1).name).toBe("MMAsia");
+  });
+
   it("pins a conference location to the run seed", () => {
     const first = getConferenceLocation(3, "A", 1, 123456);
     const repeat = getConferenceLocation(3, "A", 1, 123456);

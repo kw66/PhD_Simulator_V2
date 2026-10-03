@@ -252,7 +252,7 @@ function addPublicationEffects(effects: Map<string, AccumulatedEffect>, buff: Bu
       operation: "multiplier",
       value,
       source,
-      renderLabel: (total) => `${label}×${formatNumber(total)}`,
+      renderLabel: (total) => `${label} ×${formatNumber(total)}`,
     });
   }
 }
@@ -279,7 +279,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       source: `${getSourceText(buff)} · 玩家与同学共享；优先导师经费，不足玩家自付，同学不足转横向`,
       isCost: true,
       category: "money",
-      renderLabel: (value) => `实验金币${formatSignedNumber(value)}`,
+      renderLabel: (value) => `实验金币 ${formatSignedNumber(value)}`,
     });
   }
   if (buff.activeOperationSanMultiplier !== undefined) {

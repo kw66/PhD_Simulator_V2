@@ -1,11 +1,11 @@
-﻿import { applyTierResist, formatEventSanChange, withoutIllnessSanBuffs, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import { applyTierResist, formatEventSanChange, withoutIllnessSanBuffs, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel, getFellowPronoun, getPlayerHonorific } from "./v2-fellow-progression";
 import { getActiveAiModels } from "./v2-ai-shop";
 import { getRoleDefinition } from "./v2-progression";
 import { canAddRelationship } from "./v2-relationship-rules";
-import { previewReadPaperActions } from "./v2-reading-system";
+import { formatReadingResearchOutcome, previewReadPaperActions } from "./v2-reading-system";
 import {
-  createThreeStageRandomEvent,
+  createThreeStageEvent,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -66,7 +66,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
         id: `random-1-self-${serial}`,
         label: "亲自指导",
         outcome: staysForGradSchool
-          ? `对方考研进组（50%）｜${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1（${mentorshipJuniorLabel}科研+1，${mentorshipJuniorLabel}默契+1）` : `｜师弟师妹人数 ${state.relationshipState.juniorCount}，槽位已满；暂不新增`}`
+          ? `对方考研进组（50%）｜${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1（${mentorshipJuniorLabel}科研 +1，${mentorshipJuniorLabel}默契 +1）` : `｜师弟师妹人数 ${state.relationshipState.juniorCount}，槽位已满；暂不新增`}`
           : `对方毕业（50%）｜${mentoringSanSummary}`,
         effects: becomesJunior
           ? {
@@ -86,7 +86,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
       `导师把本科生${mentorshipJuniorName}的毕设进展发给你，安排你接手其中的实验核对。已有结果还缺关键对照，答辩时间也已经排进日程。`,
       `你翻到实验部分，结论写得很有把握，对照结果却还没补齐。导师在消息里标出几处需要补上的表格，让你先从最关键的一组开始。`,
@@ -167,13 +167,20 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
   const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw, delegateSocialResult);
   const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 211, undefined, [], getRoll);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
+  const reviewReadRolls: number[] = [];
   const reviewReadPreview = previewReadPaperActions(state, 2, {
     consumeMonthlyAction: false,
     allowSanOverdraw: true,
+    random: () => {
+      const roll = getRoll();
+      reviewReadRolls.push(roll);
+      return roll;
+    },
   });
   const healthyReadPreview = previewReadPaperActions({ ...state, buffs: withoutIllnessSanBuffs(state.buffs) }, 2, {
     consumeMonthlyAction: false,
     allowSanOverdraw: true,
+    random: () => 1,
   });
   const reviewIllnessIncrease = Math.max(0, reviewReadPreview.totalSanCost - healthyReadPreview.totalSanCost);
   const activeKimi = getActiveAiModels(state.aiShopState).find((model) => model.slot === "kimi");
@@ -193,7 +200,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
     `看论文 ${reviewReadPreview.appliedCount} 次`,
     reviewReadPreview.totalSanCost > 0 ? formatEventSanChange(-reviewReadPreview.totalSanCost, reviewIllnessIncrease) : "",
     `下次想 idea +${reviewReadPreview.totalIdeaBonus}分`,
-    reviewReadPreview.researchGain > 0 ? `科研 +${reviewReadPreview.researchGain}` : "",
+    formatReadingResearchOutcome(reviewReadPreview),
   ].filter(Boolean).join("｜");
 
   const event: PendingEvent = {
@@ -218,6 +225,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
         outcome: reviewOutcome,
         effects: {
           readPaperActions: 2,
+          ...(reviewReadRolls.length > 0 ? { readPaperRolls: reviewReadRolls } : {}),
         },
       },
       {
@@ -229,7 +237,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
       "导师把你和几位同学拉进审稿群：“每人一篇，写好意见，截止前发给我。”论文和对应名字一条条刷出来，你也在其中。",
       "分到的深度学习论文，公式一路排到附录。对着实验表翻回前文，推导有两步怎么也找不到解释。群里的截止日期倒写得清清楚楚。",
@@ -302,14 +310,14 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   const shortTermSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
   const shortTermSocialResult = applyTierResist(1, state.player.social, getRoll);
   const shortTermSocialGain = shortTermSocialResult.effectiveChange;
-  const shortTermSocialNarrative = getTierResistedNarrative("社交", 1, shortTermSocialResult);
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
   const juniorAddition = createGeneratedFellowProfileAddition("junior", serial, juniorGender, usedNames, getRoll);
+  const juniorIntro = `${roleText}${juniorAddition.name ?? ""}`;
 
   const event: PendingEvent = {
     id: `random-14-y${state.year}-m${state.month}-n${serial}`,
     title: eventTitle,
-    description: `新入组的${roleText}抱着电脑来请教，实验还没跑起来，报错倒已经存了好几张截图。你把旁边的椅子往外挪了挪。`,
+    description: `新入组的${juniorIntro}抱着电脑来请教，实验还没跑起来，报错倒已经存了好几张截图。你把旁边的椅子往外挪了挪。`,
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -359,15 +367,15 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   };
 
   const pronounText = getFellowPronoun(juniorGender);
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
-      `新入组的${roleText}抱着电脑来到工位旁，说环境已经配好，实验却一直跑不起来。${pronounText}打开终端，屏幕上还停着一长串报错。`,
+      `新入组的${juniorIntro}抱着电脑来到工位旁，说环境已经配好，实验却一直跑不起来。${pronounText}打开终端，屏幕上还停着一长串报错。`,
       `旁边的笔记记着几个试过的版本号，最后一行画了个问号。${roleText}把椅子轻轻拉过来，问你能不能帮忙看一眼。`,
     ].join("\n\n"),
     decisionTitle: "如何抉择",
     decisionDescription: [
-      `${!canAddJunior ? "普通关系栏已满，合作不新增师弟师妹；你可以现在退出。" : ""}对着报错无从下手的样子，像极了你刚进组时。如今轮到别人问你，你屏幕上的问题也还在等答案。`,
-      `${pronounText}翻开笔记，等你看反复报错的位置。帮一次还能挤时间，一起讲清问题也能熟络些；长期带下去，每月都得留精力，带上一年才有共同署名的成果。${canAddJunior ? "" : "可连下次固定讨论都排不进去，长期约定只能先放下。"}`,
+      "对着报错无从下手的样子，像极了你刚进组时。如今轮到别人问你，你屏幕上的问题也还在等答案。",
+      `${pronounText}翻开笔记，等你看反复报错的位置。帮一次能解决眼前的问题，一起讲清楚则要挤出更多时间；如果长期合作，之后每个月都得为这段关系留出位置。`,
     ].join("\n\n"),
     results: {
       [`random-14-decline-${serial}`]: {
@@ -381,8 +389,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
         title: "短期合作",
         description: [
           `你和${roleText}从报错查到实验设置，画出一个能先试的小方案。才发现习惯了的步骤，解释起来也得重新捋。`,
-          `几天后，${pronounText}拿来跑通的结果，笔记里的问号终于划掉。你嗓子发干，还欠着自己的活，看着那张图却忍不住多点了两下头。`,
-          ...(shortTermSocialNarrative ? [shortTermSocialNarrative] : []),
+          `几天后，${pronounText}带着新整理的实验记录回来，原先反复报错的地方已经有了清楚的排查顺序。你嗓子发干，自己的活也还欠着，看着那页记录却忍不住点了两下头。`,
         ].join("\n\n"),
       },
       [`random-14-long-term-${serial}`]: {
@@ -415,4 +422,3 @@ export function createMentoringLabRandomEventById(
   }
   return null;
 }
-

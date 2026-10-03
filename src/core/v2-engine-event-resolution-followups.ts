@@ -7,6 +7,21 @@ import type {
   ResolvedEventStage,
 } from "./v2-types";
 
+export function assignAvailableContinuationId(event: PendingEvent, eventQueue: GameState["eventQueue"]): PendingEvent {
+  let available = event;
+  let suffix = 1;
+  while (eventQueue.some((queued) => queued.id === available.id
+    || (available.stage === "act1" && !available.history?.length
+      && queued.replayContext?.rootEvent.id === available.id))) {
+    available = {
+      ...available,
+      id: `${event.id}~followup-${suffix++}`,
+      continuationSourceId: event.continuationSourceId ?? event.id,
+    };
+  }
+  return available;
+}
+
 export function enqueueResolvedEventFollowUps(
   state: GameState,
   choice: EventChoice,
@@ -26,7 +41,7 @@ export function enqueueResolvedEventFollowUps(
     const shouldAttachDeferredPatch = !attachedDeferredPatch
       && deferredStatePatch !== undefined
       && event.chainId === resolvedChainId;
-    const eventWithHistory = event.chainId === resolvedChainId
+    let eventWithHistory = event.chainId === resolvedChainId
       ? {
           ...event,
           history: resolvedHistory,
@@ -39,16 +54,17 @@ export function enqueueResolvedEventFollowUps(
           ...(shouldAttachDeferredPatch ? { deferredStatePatch } : {}),
         }
       : event;
-    if (shouldAttachDeferredPatch) {
-      attachedDeferredPatch = true;
-    }
     const stateBeforeEnqueue = nextState;
+    if (event.chainId === resolvedChainId) {
+      eventWithHistory = assignAvailableContinuationId(eventWithHistory, nextState.eventQueue);
+    }
     nextState = enqueueEventQueueItem(nextState, eventWithHistory);
     if (
       event.chainId === resolvedChainId
       && nextState.eventQueue.length > stateBeforeEnqueue.eventQueue.length
     ) {
       hasSameChainFollowUp = true;
+      if (shouldAttachDeferredPatch) attachedDeferredPatch = true;
     }
   }
 

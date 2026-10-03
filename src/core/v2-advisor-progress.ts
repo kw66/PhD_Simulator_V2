@@ -13,8 +13,6 @@ import { advanceSharedLabProject } from "./v2-lab-projects";
 
 export const ADVISOR_HORIZONTAL_SAN_COST = 5;
 export const ADVISOR_VERTICAL_SAN_COST = 4;
-/** Kept as the default horizontal cost for callers that do not choose a project. */
-export const ADVISOR_TASK_SAN_COST = ADVISOR_HORIZONTAL_SAN_COST;
 export { ADVISOR_HORIZONTAL_REWARD, PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
 
 export interface AdvisorGrantDefinition {
@@ -175,12 +173,8 @@ export function advanceAdvisorProject(
       lastProjectTotalMonths: state.totalMonths,
       ...(projectType === "horizontal" ? { lastHorizontalTotalMonths: state.totalMonths } : {}),
     },
-  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN-${sanCost}，进度+${progress}`, "advisor-project-action");
+  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN -${sanCost}，进度 +${progress}`, "advisor-project-action");
   return advanceSharedLabProject(paidState, projectType, progress, random).state;
-}
-
-export function advanceAdvisorHorizontal(state: GameState, random: () => number = Math.random): GameState {
-  return advanceAdvisorProject(state, "horizontal", random);
 }
 
 export function getAdvisorGrantResultContext(state: GameState, application: AdvisorGrantApplication): AdvisorGrantResultContext {
@@ -230,7 +224,7 @@ export function settleAdvisorGrantResult(state: GameState, application: AdvisorG
   return context.salary > context.previousSalary
     ? recordTalentTrigger(nextState, `advisor-salary:${grant.id}:${application.calendarYear}`, {
       name: "导师晋升", recipient: "你", reason: `导师晋升${context.rank}`,
-      effects: [`每月补助+${context.salary - context.previousSalary}（${context.previousSalary}→${context.salary}金币）`],
+      effects: [`每月补助 +${context.salary - context.previousSalary}（${context.previousSalary}→${context.salary}金币）`],
       details: ["下次月初起按新标准发放"],
     })
     : nextState;
@@ -262,7 +256,7 @@ export function settleAdvisorMonth(state: GameState, random: () => number = Math
         nextProject: projectType === "horizontal" ? "vertical" : "horizontal",
         lastAdvisorProjectTotalMonths: state.totalMonths,
         lastProjectTotalMonths: state.totalMonths,
-        monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度+10${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导论文" : "（项目完成）" : ""}`,
+        monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度 +10${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导论文" : "（项目完成）" : ""}`,
       };
     }
   }

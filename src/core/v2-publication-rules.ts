@@ -1,8 +1,13 @@
 import type { Buff, GameState, GrantedPublicationEffect, JournalTarget, Paper, PaperPublicationState, PaperPromotionState } from "./v2-types";
 import { getActualSanChange, getSanConsumptionCost } from "./v2-sanity-rules";
-import { getJournalRevisionScore } from "./v2-journal-score";
 
 export const HIGHLY_CITED_CITATION_FACTOR = 200;
+
+/** First-author publications, which gate events and the transfer decision. */
+export function getPublishedPaperCount(state: Pick<GameState, "papers" | "externalPublications">): number {
+  return [...state.papers, ...state.externalPublications]
+    .filter((paper) => paper.status === "published" && paper.nonFirstAuthor !== true).length;
+}
 
 export function recordPaperAcceptances(papers: readonly Paper[], totalMonths: number, history: readonly Paper[]): Paper[] {
   let order = [...history, ...papers].reduce((highest, paper) => paper.acceptedTotalMonths === totalMonths
@@ -22,7 +27,8 @@ export function getHighlyCitedThreshold(heatMultiplier: number): number {
 
 export function getAcceptedPaperScore(paper: Pick<Paper, "idea" | "experiment" | "writing" | "submittedIdea" | "submittedExperiment" | "submittedWriting"> & { journalTarget?: JournalTarget | null }): number {
   if (paper.journalTarget) {
-    return getJournalRevisionScore(paper);
+    // Journals accept the current revision total (see getJournalScore).
+    return paper.idea + paper.experiment + paper.writing;
   }
   const idea = paper.submittedIdea ?? paper.idea;
   const experiment = paper.submittedExperiment ?? paper.experiment;

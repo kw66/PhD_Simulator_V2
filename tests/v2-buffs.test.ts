@@ -572,7 +572,7 @@ describe("generic buffs", () => {
     };
 
     expect(buildBuffDisplayBuckets([buff]).permanent).toEqual([expect.objectContaining({
-      label: "引用×0.75",
+      label: "引用 ×0.75",
       isDebuff: true,
     })]);
   });

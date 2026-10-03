@@ -102,7 +102,7 @@ describe("v2 core regression boundaries", () => {
     });
     const result = state.eventQueue[0];
     expect(result?.title).toMatch(/师弟|师妹/);
-    expect(result?.description).toMatch(/师弟\+1|师妹\+1/);
+    expect(result?.description).toMatch(/师弟 \+1|师妹 \+1/);
     state = dispatchAction(state, "resolve-event", {
       eventId: result?.id,
       eventChoiceId: result?.choices[0]?.id,

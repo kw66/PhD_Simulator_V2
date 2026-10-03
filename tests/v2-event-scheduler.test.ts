@@ -248,10 +248,10 @@ describe("v2 event scheduler", () => {
 
     expect(result.nextState.player.san).toBe(17);
     expect(result.nextState.player.favor).toBe(2);
-    expect(result.outcome).toContain("SAN -3，导师好感+1");
+    expect(result.outcome).toContain("SAN -3，导师好感 +1");
     expect(result.enqueueEvents?.[0]?.description).toContain("SAN -3");
-    expect(result.enqueueEvents?.[0]?.description).toContain("导师好感+1");
-    expect(result.enqueueEvents?.[0]?.completionLog).toContain("SAN -3，导师好感+1");
+    expect(result.enqueueEvents?.[0]?.description).toContain("导师好感 +1");
+    expect(result.enqueueEvents?.[0]?.completionLog).toContain("SAN -3，导师好感 +1");
     expect(result.outcome).toContain("报销跑腿");
     expect(result.enqueueEvents?.[0]?.description.split("机制结算")[0]).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
     expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("导师好感 < 6");
@@ -490,6 +490,37 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[1]?.outcome).toContain("下次想 idea +2分");
     expect(getDecisionChoices(result.events[0])[1]?.outcome).not.toContain("审稿灵感");
     expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(-2);
+  });
+
+  it("settles the review reading research with the same rolls its preview showed", () => {
+    const initial = createInitialState();
+    const state = {
+      ...initial,
+      phase: "playing" as const,
+      year: 2,
+      month: 1,
+      totalMonths: 13,
+      readingState: { ...initial.readingState, readCount: 9 },
+      player: { ...initial.player, research: 12, san: 10 },
+      availableRandomEvents: [2],
+      usedRandomEvents: [],
+      totalRandomEventCount: 0,
+    };
+    // Only the first roll picks the event; every later roll is 0, so the 50% research tier resists.
+    const result = collectRandomEventsForMonth(state, fromRolls([0.7]));
+    const choice = getDecisionChoices(result.events[0])[1]!;
+    expect(choice.outcome).toContain("科研 +0（抵抗1）");
+    expect(choice.effects.readPaperRolls).toEqual([0]);
+
+    const realRandom = Math.random;
+    Math.random = () => 0.99;
+    try {
+      const resolved = applyChoiceEffectsToState(state, choice).nextState;
+      expect(resolved.readingState.readCount).toBe(11);
+      expect(resolved.player.research).toBe(12);
+    } finally {
+      Math.random = realRandom;
+    }
   });
 
   it("uses the shared reading cost without research-chore discounts", () => {
@@ -860,13 +891,13 @@ describe("v2 event scheduler", () => {
 
     const waiting = collectRandomEventsForMonth(state, fromRolls([0.7, 0]));
     expect(waiting.events).toEqual([]);
-    expect(waiting.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId: 8, serial: 1 }]);
+    expect(waiting.nextState.pendingRandomEvents).toEqual([{ eventId: 8, serial: 1 }]);
 
     const activated = activatePendingRandomEvents({
       ...waiting.nextState,
       advisorProgressState: { ...waiting.nextState.advisorProgressState, funding: 21 },
     }, () => 0);
-    expect(activated.pendingPaperCompetitionEvents).toEqual([]);
+    expect(activated.pendingRandomEvents).toEqual([]);
     expect(activated.eventQueue.some((event) => event.chainId === "random-8")).toBe(true);
   });
 
@@ -970,7 +1001,7 @@ describe("v2 event scheduler", () => {
     expect(highFavorChoices[0]?.outcome).toBe("导师好感 ≥ 6｜无事发生。");
     expect(highFavorChoices[2]?.outcome).toBe("导师好感 ≥ 6｜无事发生。");
     const complainResult = highFavorChoices[0]?.effects.enqueueEvents?.at(-1);
-    expect(complainResult?.description.split("机制结算")[0]).toContain("一作按原来的安排");
+    expect(complainResult?.description.split("机制结算")[0]).toContain("按原来的分工重新核对");
     expect(complainResult?.description.split("机制结算")[1]).not.toContain("安抚");
   });
 
@@ -1265,7 +1296,7 @@ describe("v2 event scheduler", () => {
     expect(result.nextState.availableRandomEvents).toEqual([]);
     expect(result.nextState.usedRandomEvents).toEqual([]);
     expect(result.nextState.totalRandomEventCount).toBe(1);
-    expect(result.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId: 16, serial: 1 }]);
+    expect(result.nextState.pendingRandomEvents).toEqual([{ eventId: 16, serial: 1 }]);
   });
 
   it("does not queue a disease event from the ordinary random pool", () => {

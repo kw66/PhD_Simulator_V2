@@ -215,7 +215,8 @@ describe("v2 research rule details and publication metrics", () => {
     funded.player.money = 0;
     const fundedHtml = renderApp(funded, createDefaultAccountProfile(), { activePlayTab: "workstation" });
     const fundedButton = fundedHtml.match(/<button[^>]*data-paper-action-type="experiment"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-    expect(fundedButton.replace(/<[^>]*>/g, "")).toContain("SAN-3 · 金币-0");
+    expect(fundedButton.replace(/<[^>]*>/g, "")).toContain("SAN-3");
+    expect(fundedButton.replace(/<[^>]*>/g, "")).not.toContain("金币-");
     expect(fundedButton).toContain('data-card-tooltip data-tooltip="消耗3导师经费"');
     expect(fundedButton).not.toContain("经费-");
     expect(fundedButton).toContain('data-animate-number="3"');
@@ -256,7 +257,8 @@ describe("v2 research rule details and publication metrics", () => {
     const html = renderApp(state);
     const button = html.match(/<button[^>]*workstation-paper-action-btn is-experiment[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
     expect(button).toContain(`消耗${cost}导师经费`);
-    expect(button.replace(/<[^>]*>/g, "")).toContain("SAN-3 · 金币-0");
+    expect(button.replace(/<[^>]*>/g, "")).toContain("SAN-3");
+    expect(button.replace(/<[^>]*>/g, "")).not.toContain("金币-");
   });
 
   it.each([[0, 8], [50, 51]])("matches the documented score formula for current score %s", (currentScore, expectedScore) => {

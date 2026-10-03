@@ -1,7 +1,7 @@
 import { getAttributeTier } from "./v2-random-event-rules";
 import { BADMINTON_VICTORY_THRESHOLD, getBadmintonStrength, getPokerWinRate } from "./v2-growth-system";
 import {
-  createThreeStageRandomEvent,
+  createThreeStageEvent,
   drawInclusiveInt,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
@@ -119,7 +119,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         "输球不等于白来，来回跑动让你出了身汗。你和同门约好下次再来，运动把身体练起来，生病概率也会下降。",
       ].join("\n\n");
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
       "论文、实验和日志把实验室压得安静了好几天，导师的一条团建通知突然把群聊炸开了锅。打球、打牌、唱歌和聚餐的提议一条接一条，大家像终于从繁杂科研里挣脱出来。",
       "有人确认要不要带电脑，导师回了句“不用汇报”😌。你把装到一半的电源适配器放回桌上，群里的活动投票也发出来了。",
@@ -129,7 +129,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
       `羽毛球刚多一票，就有人约双打搭子。${badmintonChampion ? "掂掂球拍，想起最近练熟的几招，你真想上场比一比。" : "你挥了两下，身体还没活动开。想打赢，平时的练习、今天的精神和手里的球拍，都不能只靠临场发挥。"}同门的下一条语音已经在选 KTV 曲目了。`,
       (pokerStake === 0
         ? "打牌的同门也在招呼人。你说没有本金，对方回道：“只用筹码记输赢，一样玩。”"
-        : `打牌这次押注 ${pokerStake} 金币。想起上次那手看着稳赢的牌，你还是摸了摸钱包。`) + "聚餐菜单也来了，导师没说请客，AA 每人得出 2 金币。歌还没选好，菜倒先看饿了。",
+        : `打牌这次押注 ${pokerStake} 金币。想起上次那手看着稳赢的牌，你还是摸了摸钱包。`) + "聚餐菜单也来了，大家还在等导师最后确认是否请客；如果各自结账，每人得出 2 金币。歌还没选好，菜倒先看饿了。",
     ].join("\n\n"),
     results: {
       [`random-7-badminton-${serial}`]: {
@@ -239,14 +239,14 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
       "组会快结束时，导师又打开了项目经费表：一个项目临近结项，还剩一笔预算必须用完。刚合上的电脑又被打开，导师让大家各报一项学习或科研相关的开支。",
       "白板上陆续写下显卡、劳务费、工位设备和 AI 费用。导师对着表格核了一遍：“先选一项，别把同一笔预算报两遍。”",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      `你接过笔，显卡报价还开着，椅子往后一靠又吱呀响；同门小声说，发劳务费也挺好。${favorTier >= 2 ? "导师提起你这阵子的工作，说选劳务费会多安排些。" : favorTier >= 1 ? "导师翻翻你的工作记录，说劳务费可以再添一点。" : "你和导师还不太熟，老师按惯常标准填了劳务费。"}`,
+      `你接过笔，显卡报价还开着，椅子往后一靠又吱呀响；同门小声说，发劳务费也挺好。${favorTier >= 2 ? "导师提起你这阵子的工作，说选劳务费会多安排些。" : favorTier >= 1 ? "导师翻翻你的工作记录，说劳务费可以再添一点。" : "你和导师还不太熟，选劳务费的话，大概只能按惯常标准发。"}`,
       "报销范围圈好了：下次购买或升级显卡、一次工位设备购买或升级，还有本月的 AI 费用。平时舍不得花的钱，这会儿全想起来了。导师看着圈满的清单，等你选一项打勾。",
     ].join("\n\n"),
     results: {
@@ -258,7 +258,7 @@ export function createFundingCampusRandomEvent(state: GameState, _getRoll: Rando
         ].join("\n\n"),
       },
       [`random-8-salary-${serial}`]: {
-        title: "涨工资",
+        title: "领劳务费",
         description: salaryGain === 3
           ? [
               "“劳务费啊……”导师看了看经费表，在劳务那一栏填了个数：“这次先发这些。”你凑过去确认了金额。",

@@ -258,7 +258,7 @@ export function resolveTeachersDayFixedEvent(
             resultTitle: "导师请求",
             description: [
               "你发微信：“老师，教师节快乐！”导师回复：“谢谢。正好有份报销材料，下午帮我送到财务处吧。”",
-              "你拿齐材料，在财务处排了快一个小时，回来向导师报了受理情况。茶已经凉了。只是发了句祝福，怎么半个下午也跟着送出去了。" + favorNarrative,
+              "你拿齐材料，在财务处排了快一个小时，回来向导师报了受理情况。窗外的天已经暗下来了。只是发了句祝福，怎么半个下午也跟着送出去了。" + favorNarrative,
             ].join("\n\n"),
             settlement: [
               "条件：导师好感 < 6；报销跑腿（50%）",

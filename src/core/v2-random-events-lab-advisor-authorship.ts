@@ -1,5 +1,5 @@
-﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
-import { createThreeStageRandomEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
+import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
@@ -59,7 +59,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
       "导师发来一版署名安排。你把名单从头读了一遍，又读了一遍，自己的名字确实往后挪了一位。",
       "你往上翻聊天记录，找到当时确认的分工：一作原本说好给你。两份安排并排开在屏幕上，连课题名称都没变。",
@@ -69,8 +69,8 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
       [
         "你删掉聊天框里的半句话，截好分工记录：说好的事，怎么就改了？",
         lowFavor
-          ? "平时和导师说不上几句，这回免不了解释。只诉苦，委屈怕会搅乱研究思绪；逐项讲道理能守住署名，却也得耗一番心力。"
-          : "你和导师平时沟通顺畅，也谈过分工。说清难处或摊开记录，都有希望平和地把署名改回来。",
+          ? "平时和导师说不上几句，这回免不了把分工从头讲一遍。你可以先说自己的难处，也可以把记录逐项摊开；无论哪种方式，都得承受谈话变长的风险。"
+          : "你和导师平时沟通顺畅，也谈过分工。说清难处或摊开记录，至少能让这次改动有据可查。",
       ].join(""),
       "把别人的名字往后挪能解眼前的难，可每天在实验室碰面，难免尴尬。拿后续工作施压，连劳务费一起谈清也行，只是话说重了，和导师就难再像从前那样自在。",
     ].join("\n\n"),
@@ -80,18 +80,18 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
         description: !lowFavor
           ? [
               "你递过分工记录，还是没忍住补了一句：“这篇我真的想守住一作。”",
-              "导师翻了翻记录：“一作按原来的安排，我挂通讯。”你准备的一大段话都省了，收到名单又核对了一遍，总算不用盯着那行字发愣。",
+              "导师翻了翻记录，说会按原来的分工重新核对。你把待确认的名单收好，原本准备的一大段话只说了一半。",
             ].join("\n\n")
           : [
-              "你找出原先的约定，尽量平静地讲难处，同一句话却解释了两遍。导师同意改回一作，提醒你以后早点确认。",
+              "你找出原先的约定，尽量平静地讲难处，同一句话却解释了两遍。导师让你先回去等核对结果，也提醒你以后尽早把分工留成文字。",
               "你存好名单，回工位想新方案，脑子里却还在重播刚才的对话。光标闪了半天，你只删掉了一个句号。",
             ].join("\n\n"),
       },
       [`random-12-transfer-${serial}`]: {
         title: "转移目标",
         description: [
-          "你绕开了自己的名字，提议把另一位同门往后排。导师照着改了名单，你的一作位置保住了。",
-          "名单发回群里，那位同门问了一句是谁提的调整。你看着输入框，一时不知道该从哪句解释起。",
+          "你绕开自己的名字，提议把另一位同门往后排。导师听完没有马上改名单，只说会把每个人做过的部分重新对一遍。",
+          "名单暂时没有发回群里。那位同门问起进展，你看着输入框，先回了一句“老师还在核对”。",
           ...(transferSocialNarrative ? [transferSocialNarrative] : []),
         ].join("\n\n"),
       },
@@ -100,20 +100,20 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
         description: !lowFavor
           ? [
               "你打开分工记录，把已经做的事和后续由谁负责逐项对齐。准备这份说明，比你预计的还要仔细。",
-              "导师听完点了头：“可以，一作按规范给你。”名单当面改了回来，你低头收电脑，才发现水杯一直没顾上碰。",
+              "导师听完点了头，说会按规范重新核对署名。你低头收电脑，才发现水杯一直没顾上碰。",
             ].join("\n\n")
           : [
               "你把分工记录和署名规范放在一起，对方问到哪一项，你就翻到哪一项。那几页材料来回切换了好几轮。",
-              "导师终于同意恢复原来的安排。你收起电脑走到门外，才发现手心全是汗，刚才拧开的水杯也忘了拿。",
+              "导师让你把分工记录留在案头，之后按实际贡献确认。你收起电脑走到门外，才发现手心全是汗，刚才拧开的水杯也忘了拿。",
             ].join("\n\n"),
       },
       [`random-12-pressure-${serial}`]: {
         title: "极端施压",
         description: [
           "你把话说得很直：署名不按约定调整，后面的工作就没法继续承担。办公室安静下来，只剩电脑风扇的声音。",
-          "僵持了一会儿，导师同意保留你的一作，并支付这项工作的 2 金币劳务费。你把两件事都确认了一遍。",
+          "僵持了一会儿，导师答应把署名争议和这项工作的 2 金币劳务费一起核对结算。你把两件事都确认了一遍。",
           pressureFavorChange < 0
-            ? "名单和劳务费都有了着落，告别时却只剩一句干巴巴的“老师再见”。你轻轻带上门，在走廊站了一会儿。"
+            ? "劳务费有了着落，署名却还要等核对。告别时只剩一句干巴巴的“老师再见”，你轻轻带上门，在走廊站了一会儿。"
             : "收到确认后，你收起材料，说了声“老师，那我先回去了”。这回没有再绕回刚才的争执。",
           ...(pressureFavorNarrative ? [pressureFavorNarrative] : []),
         ].join("\n\n"),

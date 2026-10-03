@@ -430,7 +430,7 @@ describe("engine and research lifecycle retries", () => {
     expect(next.ending).not.toBe("delay");
   });
 
-  it("settles pending journal help before graduation when resolving the final event", () => {
+  it("settles pending journal help on the final event and graduates only at month-end", () => {
     const base = withPending(makeState("senior"), { pendingHelpToPlayer: 20 });
     const paper = { ...makePaper(0, 40, 40, 40), status: "journal-reviewing" as const,
       journalTarget: "pami" as const, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40,
@@ -444,6 +444,8 @@ describe("engine and research lifecycle retries", () => {
       papers: [paper], eventQueue: [event],
     }, "resolve-event", { eventId: event.id, eventChoiceId: "finish" });
     expect(next.externalPublications.find((entry) => entry.id === paper.id)?.status).toBe("published");
-    expect(next.ending).toBe("master");
+    expect(next.phase).toBe("playing");
+    expect(next.ending).toBeNull();
+    expect(dispatchAction(next, "next-month").ending).toBe("master");
   });
 });

@@ -29,9 +29,10 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
     return {
       addition,
       label,
+      prose: `${roleLabel}${addition.name ?? ""}`,
       description,
       outcome: canAddJunior
-        ? `${roleLabel}+1`
+        ? `${roleLabel} +1`
         : "无事发生",
       choiceId: `mentor-assign-select-${index + 1}-y${state.year}-m${state.month}`,
     };
@@ -70,7 +71,7 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
     results: Object.fromEntries(candidates.map((candidate) => [candidate.choiceId, {
       title: candidate.label,
       description: canAddJunior
-        ? `你和${candidate.label}约好在实验室见面，发去门牌号，又补了句“找不到就发消息”。原来现在也轮到你给别人指路了。`
+        ? `你和${candidate.prose}约好在实验室见面，发去门牌号，又补了句“找不到就发消息”。原来现在也轮到你给别人指路了。`
         : "你看完材料，还是没接下这次指导。眼下已有的合作还要顾，新生的安排只能请导师另找人选。",
     }])),
   });

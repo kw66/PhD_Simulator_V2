@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createCcigActivityEvent } from "../src/core/v2-fixed-events-ccig-activity-events";
 import { createCcigAttendResultEvent } from "../src/core/v2-fixed-events-ccig-decision-events";
-import { createCcigEvent } from "../src/core/v2-fixed-events-ccig";
+import { createCcigEvent } from "../src/core/v2-fixed-events-ccig-decision-events";
 import { resolveCcigFixedEvent } from "../src/core/v2-fixed-events-ccig-resolution";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolution-state";

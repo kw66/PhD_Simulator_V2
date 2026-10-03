@@ -11,6 +11,9 @@ import {
 } from "../src/core/v2-publication-talent";
 import type { Paper, PaperAcceptType, PaperTarget } from "../src/core/v2-types";
 
+/** Rolls above every resist chance, so rewards land at their nominal values. */
+const noResist = () => 0.99;
+
 function publishedPaper(target: PaperTarget, acceptType: PaperAcceptType, nonFirstAuthor = false): Paper {
   return attachPaperPublication({
     ...createDraftPaper(1, 0, () => 0),
@@ -66,7 +69,7 @@ describe("v2 publication growth transparency", () => {
     state.player.san = 0;
     const paper = { ...(venue === "journal" ? publishedJournal("pami") : publishedPaper("C", "Poster")), rejectionCount: 3 };
     state.externalPublications = [{ ...paper, rejectionCount: 2 }];
-    const before = applyPublicationTalentRewards(state);
+    const before = applyPublicationTalentRewards(state, noResist);
     const claimedBefore = before.publicationTalentState!.claimedIds;
     expect(claimedBefore).not.toContain("perseverance");
     const completed = applyPublicationTalentRewards({ ...before, externalPublications: [paper] });
@@ -174,22 +177,22 @@ describe("v2 publication growth transparency", () => {
     const initialPlayer = { ...state.player };
     const initialCapBonus = state.researchCapacityState.otherCapBonus;
 
-    const afterPublication = applyPublicationTalentRewards(state);
+    const afterPublication = applyPublicationTalentRewards(state, noResist);
     expect(afterPublication.player.san).toBe(Math.min(state.sanCap, initialPlayer.san + 14));
     expect(afterPublication.player.favor).toBe(initialPlayer.favor + 4);
     expect(afterPublication.player.research).toBe(initialPlayer.research + 3);
     expect(afterPublication.researchCapacityState.otherCapBonus).toBe(initialCapBonus + 1);
-    expect(applyPublicationTalentRewards(afterPublication)).toEqual(afterPublication);
+    expect(applyPublicationTalentRewards(afterPublication, noResist)).toEqual(afterPublication);
 
-    const at100 = applyPublicationTalentRewards({ ...afterPublication, totalCitations: 100 });
+    const at100 = applyPublicationTalentRewards({ ...afterPublication, totalCitations: 100 }, noResist);
     expect(at100.player.san).toBe(Math.min(at100.sanCap, afterPublication.player.san + 2));
     expect(at100.player.research).toBe(afterPublication.player.research + 1);
 
-    const at1000 = applyPublicationTalentRewards({ ...at100, totalCitations: 1000 });
+    const at1000 = applyPublicationTalentRewards({ ...at100, totalCitations: 1000 }, noResist);
     expect(at1000.player.san).toBe(Math.min(at1000.sanCap, at100.player.san + 4));
     expect(at1000.player.research).toBe(at100.player.research + 1);
 
-    const at10000 = applyPublicationTalentRewards({ ...at1000, totalCitations: 10000 });
+    const at10000 = applyPublicationTalentRewards({ ...at1000, totalCitations: 10000 }, noResist);
     expect(at10000.player.san).toBe(Math.min(at10000.sanCap, at1000.player.san + 8));
     expect(at10000.player.research).toBe(at1000.player.research + 1);
     expect(at10000.researchCapacityState.otherCapBonus).toBe(at1000.researchCapacityState.otherCapBonus + 1);

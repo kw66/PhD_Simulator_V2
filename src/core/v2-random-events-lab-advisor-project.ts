@@ -1,9 +1,9 @@
-﻿import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import { PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import {
-  createThreeStageRandomEvent,
+  createThreeStageEvent,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -95,7 +95,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription,
     decisionTitle: "你的选择",
     decisionDescription: [

@@ -182,7 +182,7 @@ describe("shared lab rental costs", () => {
     } else {
       expect(next.advisorProgressState.funding).toBe(funding - 4);
       expect(getFellowCurrentPaper(next, "fellow-0")!.experiment).toBeGreaterThan(0);
-      expect(next.fellowProgressState[0]!.monthlyActivity).toContain("经费-4");
+      expect(next.fellowProgressState[0]!.monthlyActivity).toContain("经费 -4");
     }
   });
 

@@ -1,11 +1,8 @@
 import { consumeNextPublicationBuffs, getPublicationBuffEffect } from "./v2-buffs";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { attachPaperPublication, recordPaperAcceptances } from "./v2-publication-rules";
-import { getInitialJournalScore, getJournalRevisionScore } from "./v2-journal-score";
 import type { GameState, JournalTarget, Paper } from "./v2-types";
 import { applyPublicationTalentRewards } from "./v2-publication-talent";
-
-export { getJournalRevisionScore } from "./v2-journal-score";
 
 export interface JournalDefinition {
   id: JournalTarget;
@@ -48,8 +45,9 @@ export function getJournalDefinition(target: JournalTarget): JournalDefinition {
   return JOURNAL_DEFINITIONS[target];
 }
 
+/** Submission, revision and acceptance all use the current total, including collaboration. */
 export function getJournalScore(paper: Pick<Paper, "idea" | "experiment" | "writing">): number {
-  return getInitialJournalScore(paper);
+  return paper.idea + paper.experiment + paper.writing;
 }
 
 export function getJournalSubmissionFailure(
@@ -136,7 +134,7 @@ export function resolveReadyJournalPapers(state: GameState): JournalResolution {
     }
 
     const journal = getJournalDefinition(paper.journalTarget);
-    const score = getJournalRevisionScore(paper);
+    const score = getJournalScore(paper);
     if (score < journal.acceptanceScore) {
       activePapers.push(paper);
       continue;

@@ -163,7 +163,7 @@ export function formatTierResistedOutcome(
   if (result.resistedCount > 0) details.push(`抵抗${result.resistedCount}`);
   if (result.cappedCount && rawChange > 0) details.push("上限");
   const detailText = details.length > 0 ? `（${details.join("；")}）` : "";
-  return `${label}${signedActual}${detailText}`;
+  return `${label} ${signedActual}${detailText}`;
 }
 
 export function applyTierResist(
@@ -176,35 +176,28 @@ export function applyTierResist(
     return { effectiveChange: 0, resistedCount: 0 };
   }
 
-  const resistChance = getTierResistChance(currentValue);
-  if (resistChance === 0) {
-    const cappedCount = rawChange > 0
-      ? Math.max(0, rawChange - Math.max(0, Math.floor(maximumValue - currentValue)))
-      : 0;
-    return {
-      effectiveChange: rawChange - cappedCount,
-      resistedCount: 0,
-      ...(cappedCount > 0 ? { cappedCount } : {}),
-    };
-  }
-
+  // Each point reads the tier of the value left by the previous point, so a
+  // batch that crosses 6 / 12 / 18 changes resist chance mid-way (both ways).
   const absChange = Math.abs(rawChange);
   const sign = rawChange > 0 ? 1 : -1;
-  let effectiveCount = 0;
+  let value = currentValue;
+  let resistedCount = 0;
+  let cappedCount = 0;
   for (let index = 0; index < absChange; index += 1) {
-    if (getRoll() >= resistChance) {
-      effectiveCount += 1;
+    const resistChance = getTierResistChance(value);
+    if (resistChance > 0 && getRoll() < resistChance) {
+      resistedCount += 1;
+    } else if (sign > 0 && value + 1 > maximumValue) {
+      cappedCount += 1;
+    } else {
+      value += sign;
     }
   }
 
-  const cappedCount = sign > 0
-    ? Math.max(0, effectiveCount - Math.max(0, Math.floor(maximumValue - currentValue)))
-    : 0;
-  const finalCount = effectiveCount - cappedCount;
-
+  const finalCount = absChange - resistedCount - cappedCount;
   return {
     effectiveChange: finalCount === 0 ? 0 : finalCount * sign,
-    resistedCount: absChange - effectiveCount,
+    resistedCount,
     ...(cappedCount > 0 ? { cappedCount } : {}),
   };
 }
@@ -230,38 +223,8 @@ export function getTierResistedNarrative(
   rawChange: number,
   result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount" | "cappedCount">,
 ): string {
-  if (result.cappedCount && rawChange > 0) {
-    return result.effectiveChange > 0
-      ? `${label}提升后已达到上限，剩余的积累暂时无法带来增长。`
-      : `${label}已达到当前上限，这次积累暂时无法带来增长。`;
-  }
-  if (result.resistedCount === 0) return "";
-  if (label === "导师好感") {
-    if (rawChange < 0) {
-      return result.effectiveChange === 0
-        ? "你和导师已经有些熟悉，这点不愉快没有继续扩大。"
-        : "你和导师已经有些熟悉，这次不愉快只让关系稍微冷了一点。";
-    }
-    return result.effectiveChange === 0
-      ? "导师对你的态度已经比较稳定，想再进一步也没那么容易。"
-      : "导师对你多了些认可，关系也拉近了一点。";
-  }
-  if (label === "社交") {
-    if (rawChange < 0) {
-      return result.effectiveChange === 0
-        ? "好在平时积累的交情还在，这点摩擦没有让关系继续变僵。"
-        : "平时积累的交情缓和了些不满，但这次摩擦还是让相处生疏了一点。";
-    }
-    return result.effectiveChange === 0
-      ? "你已经积累了不少交往经验，这次相处没有带来明显的提升。"
-      : "这次相处仍有收获，只是已有经验较多，提升没有那么明显。";
-  }
-  if (rawChange < 0) {
-    return result.effectiveChange === 0
-      ? "以往积累的基础还在，这次波折没有造成进一步的退步。"
-      : "以往的积累抵消了一部分影响，但还是受到了一些打击。";
-  }
-  return result.effectiveChange === 0
-    ? "已有的基础比较扎实，这次学习没有带来明显的提升。"
-    : "这次仍学到了一些东西，只是基础已经比较扎实，提升没有那么明显。";
+  void label;
+  void rawChange;
+  void result;
+  return "";
 }

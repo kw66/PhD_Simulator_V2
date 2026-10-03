@@ -84,13 +84,6 @@ export function createThreeStageEvent(
   };
 }
 
-export function createThreeStageRandomEvent(
-  event: PendingEvent,
-  copy: ThreeStageRandomEventCopy,
-): PendingEvent {
-  return createThreeStageEvent(event, copy);
-}
-
 export function hasRecoverableDraftPaper(state: GameState): boolean {
   return state.papers.some((paper) =>
     paper.status === "draft" && (paper.idea > 0 || paper.experiment > 0 || paper.writing > 0)

@@ -2,7 +2,8 @@ import {
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
-import { createCcigEvent, resolveCcigFixedEvent } from "./v2-fixed-events-ccig";
+import { createCcigEvent } from "./v2-fixed-events-ccig-decision-events";
+import { resolveCcigFixedEvent } from "./v2-fixed-events-ccig-resolution";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
 import { createScholarshipEvent } from "./v2-fixed-events-scholarship";

@@ -407,55 +407,17 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     );
   }
   if (effects.readPaperActions) {
+    const rolls = [...(effects.readPaperRolls ?? [])];
     resolvedState = applyReadPaperActions(resolvedState, effects.readPaperActions, {
       consumeMonthlyAction: false,
       allowSanOverdraw: true,
       writeLog: false,
       source: buffSource,
+      random: () => rolls.shift() ?? Math.random(),
     }).nextState;
   }
   if (!effects.readingCount) return resolvedState;
   return applyReadingCountProgress(resolvedState, effects.readingCount).nextState;
-}
-
-function mergeFixedCoreState(base: GameState, resolved: GameState): GameState {
-  const relationshipState = syncRelationshipState(resolved.relationshipState, resolved.player.social);
-  return {
-    ...base,
-    player: { ...resolved.player },
-    playerName: resolved.playerName,
-    sanCap: resolved.sanCap,
-    selectedAdvisorName: resolved.selectedAdvisorName,
-    phdStartYear: resolved.phdStartYear,
-    graduationScoreTarget: resolved.graduationScoreTarget,
-    relationshipState,
-    advisorProgressState: { ...resolved.advisorProgressState },
-    researchCapacityState: { ...resolved.researchCapacityState },
-    fellowProgressState: resolved.fellowProgressState.map((profile) => ({ ...profile })),
-    eventSupport: { ...resolved.eventSupport },
-    illnessProbability: resolved.illnessProbability,
-    eventCounters: { ...resolved.eventCounters },
-    scholarshipState: {
-      ...resolved.scholarshipState,
-      claimedPaperIds: [...resolved.scholarshipState.claimedPaperIds],
-    },
-    buffs: resolved.buffs.map((buff) => ({
-      ...buff,
-      monthlyStats: buff.monthlyStats ? { ...buff.monthlyStats } : undefined,
-      activeOperationSanMultiplier: buff.activeOperationSanMultiplier,
-      actionEffects: buff.actionEffects
-        ? Object.fromEntries(Object.entries(buff.actionEffects).map(([action, effect]) => [action, effect ? { ...effect } : effect]))
-        : undefined,
-      paperPolishEffects: buff.paperPolishEffects ? { ...buff.paperPolishEffects } : undefined,
-      readingEffect: buff.readingEffect ? { ...buff.readingEffect } : undefined,
-      relationshipOperationSanDelta: buff.relationshipOperationSanDelta,
-      publicationEffects: buff.publicationEffects ? { ...buff.publicationEffects } : undefined,
-      scheduledPublication: buff.scheduledPublication
-        ? { ...buff.scheduledPublication, targetWeights: { ...buff.scheduledPublication.targetWeights } }
-        : undefined,
-    })),
-    eventQueue: resolved.eventQueue,
-  };
 }
 
 export function applyChoiceEffectsToState(
@@ -528,7 +490,10 @@ export function applyChoiceEffectsToState(
 
   if (choice.effects.fixedEventResolution) {
     const result = applyFixedEventResolution(nextState, choice.effects.fixedEventResolution);
-    nextState = mergeFixedCoreState(nextState, result.nextState);
+    nextState = {
+      ...result.nextState,
+      relationshipState: syncRelationshipState(result.nextState.relationshipState, result.nextState.player.social),
+    };
     resolvedOutcome = result.outcome;
     resolvedEnqueueEvents = result.enqueueEvents ?? [];
   }

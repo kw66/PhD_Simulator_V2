@@ -3,11 +3,34 @@ import { renderEventLayoutSamples } from "../src/app/v2-render-play";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { collectRandomEventsForMonth } from "../src/core/v2-event-scheduler";
+import { createRandomEventById, getRandomEventAppearanceCondition } from "../src/core/v2-random-event-router";
 import { createMentorAssignEvent } from "../src/core/v2-fixed-events-mentor-assign";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
-import type { Paper } from "../src/core/v2-types";
+import type { GameState, Paper } from "../src/core/v2-types";
 
 describe("event candidate eligibility and presentation", () => {
+  it("shows the actual appearance condition in the first scene of every deferred random event", () => {
+    const base = { ...createInitialState(), phase: "playing" as const };
+    const scoredDraft = { ...createDraftPaper(1, 1), idea: 1 };
+    const cases: Array<[number, GameState]> = [
+      [8, { ...base, advisorProgressState: { ...base.advisorProgressState, funding: 21 } }],
+      [11, { ...base, player: { ...base.player, research: 6 } }],
+      [12, { ...base, papers: [scoredDraft] }],
+      [14, { ...base, papers: [{ ...scoredDraft, status: "published" as const }] }],
+      [16, { ...base, papers: [scoredDraft] }],
+      [17, { ...base, papers: [scoredDraft] }],
+      [18, { ...base, papers: [{ ...scoredDraft, experiment: 1 }] }],
+    ];
+
+    for (const [eventId, state] of cases) {
+      const condition = getRandomEventAppearanceCondition(eventId);
+      const event = createRandomEventById(eventId, state, () => 0.25).event;
+      expect(condition).not.toBeNull();
+      expect(event?.stage).toBe("act1");
+      expect(event?.description).toContain(`备注：出现条件：${condition}`);
+    }
+  });
+
   it.each([
     ["no paper", [], false],
     ["empty draft", [createDraftPaper(1, 1)], false],
@@ -27,7 +50,7 @@ describe("event candidate eligibility and presentation", () => {
     expect(result.nextState.usedRandomEvents.includes(12)).toBe(eligible);
     if (!eligible) {
       expect(result.nextState.availableRandomEvents).not.toContain(12);
-      expect(result.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId: 12, serial: 1 }]);
+      expect(result.nextState.pendingRandomEvents).toEqual([{ eventId: 12, serial: 1 }]);
       expect(result.nextState.usedRandomEvents).not.toContain(12);
     }
   });
@@ -42,7 +65,7 @@ describe("event candidate eligibility and presentation", () => {
     };
     const hidden = collectRandomEventsForMonth(initial, () => 0.7);
     expect(hidden.events).toHaveLength(0);
-    expect(hidden.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId: 12, serial: 1 }]);
+    expect(hidden.nextState.pendingRandomEvents).toEqual([{ eventId: 12, serial: 1 }]);
     expect(hidden.nextState.usedRandomEvents).not.toContain(12);
 
     const eligible = {
@@ -52,7 +75,7 @@ describe("event candidate eligibility and presentation", () => {
     const revealed = dispatchAction(eligible, "select-paper", { paperId: eligible.papers[0]!.id });
     expect(revealed.eventQueue.some((event) => event.chainId === "random-12")).toBe(true);
     expect(revealed.usedRandomEvents).toContain(12);
-    expect(revealed.pendingPaperCompetitionEvents).toEqual([]);
+    expect(revealed.pendingRandomEvents).toEqual([]);
   });
 
   it("keeps candidate attributes and cards through selection and history replay", () => {
@@ -67,7 +90,7 @@ describe("event candidate eligibility and presentation", () => {
       const candidate = choice.fellowCandidate!;
       expect(candidate.description).toContain(descriptions[candidate.research]);
       expect(choice.effects.fellowAdditions?.[0]).toMatchObject({ research: candidate.research, affinity: candidate.affinity });
-      expect(choice.outcome).toMatch(/^师[弟妹]\+1$/);
+      expect(choice.outcome).toMatch(/^师[弟妹] \+1$/);
       const result = choice.effects.enqueueEvents![0]!;
       expect(result.description.split("机制结算\n")[1]).toContain(choice.outcome);
     }

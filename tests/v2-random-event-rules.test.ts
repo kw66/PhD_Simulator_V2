@@ -46,7 +46,7 @@ describe("v2 random event rules", () => {
     expect(calculateRandomEventCount(0.99, { totalMonths: 59, maxMonths: 68 })).toBe(3);
   });
 
-  it("initializes and yearly resets the pool using published paper state", () => {
+  it("initializes and yearly resets the full ordinary pool", () => {
     const initialState = createInitialRandomEventState();
     expect(initialState.availableRandomEvents).toEqual([...BASE_RANDOM_EVENT_IDS]);
     expect(initialState.availableRandomEvents).toContain(14);
@@ -59,7 +59,6 @@ describe("v2 random event rules", () => {
         usedRandomEvents: [1, 3],
         totalRandomEventCount: 4,
       },
-      1,
     );
 
     expect(resetState.availableRandomEvents).toContain(14);
@@ -80,13 +79,13 @@ describe("v2 random event rules", () => {
 
   it("does not change the ordinary pool when prerequisites become available", () => {
     const gameMonthSeven = buildWeightedRandomEventPool({
-      ...createInitialRandomEventState(1),
+      ...createInitialRandomEventState(),
       social: 6,
     });
     expect(gameMonthSeven.candidateEventIds).toEqual([...BASE_RANDOM_EVENT_IDS]);
 
     const gameMonthEleven = buildWeightedRandomEventPool({
-      ...createInitialRandomEventState(1),
+      ...createInitialRandomEventState(),
       social: 6,
     });
     expect(gameMonthEleven.candidateEventIds).not.toContain(3);

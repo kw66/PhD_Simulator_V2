@@ -223,7 +223,7 @@ describe("v2 research operations", () => {
   it("retains remote and GPT effects across extra executions while consuming next-action effects once", () => {
     const created = dispatchAction(admittedState(), "create-paper", { paperSlotIndex: 0 });
     const aiShopState = structuredClone(created.aiShopState);
-    aiShopState.subscriptions.gpt = { ...aiShopState.subscriptions.gpt, active: true, modelId: "gpt-6" };
+    aiShopState.subscriptions.gpt = { ...aiShopState.subscriptions.gpt, active: true, modelId: "gpt-7" };
     aiShopState.subscriptions.deepseek = { ...aiShopState.subscriptions.deepseek, active: true, modelId: "deepseek-v2" };
     const state: GameState = { ...created, aiShopState, internshipState: activateRemoteInternship(created.totalMonths - 1),
       papers: created.papers.map((paper) => ({ ...paper, idea: 1 })),
@@ -286,7 +286,7 @@ describe("v2 research operations", () => {
     const expected = settleAdvisorGuidance(base, () => 0.5);
     for (const internshipState of [activateRemoteInternship(base.totalMonths - 1), activateInternship()]) {
       const aiShopState = structuredClone(base.aiShopState);
-      aiShopState.subscriptions.gpt = { ...aiShopState.subscriptions.gpt, active: true, modelId: "gpt-6" };
+      aiShopState.subscriptions.gpt = { ...aiShopState.subscriptions.gpt, active: true, modelId: "gpt-7" };
       const actual = settleAdvisorGuidance({ ...base, internshipState, aiShopState, buffs: createAiBuffs(aiShopState) }, () => 0.5);
       expect(actual.papers).toEqual(expected.papers);
       expect(actual.papers[0]).toMatchObject({

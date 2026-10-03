@@ -6,9 +6,16 @@ import {
   startThesisIfAvailable,
 } from "./v2-thesis-rules";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
-import { getPublishedPaperCount } from "./v2-monthly-event-shared";
+import { getPublishedPaperCount } from "./v2-publication-rules";
 import { createThreeStageEvent, type RandomEventResultCopy } from "./v2-random-events-core-shared";
 import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
+
+/** Opening line per effort level, so the three writing results read differently. */
+const THESIS_EFFORT_LEAD: Record<string, string> = {
+  light: "你趁实验跑着的空档写了几段。",
+  normal: "这个月你留出整块时间坐下来写。",
+  "all-in": "这个月你几乎住在了文档里，饭是对着屏幕吃的，觉也睡得断断续续。",
+};
 
 function createThesisChoices(state: GameState): {
   nextState: GameState;
@@ -28,14 +35,14 @@ function createThesisChoices(state: GameState): {
       title: "推进结果",
       description: result.progressGain > 0
         ? [
-            "你按目录理顺材料，把几处“这里再补”换成了正文。有一段写的时候觉得挺明白，回头读却连自己也绕进去，只好拆开重写。",
-            `总进度从 ${nextThesis.progress}% 提升到 ${result.nextThesis.progress}%，当前阶段来到「${getThesisStage(result.nextThesis.progress).name}」。`,
-            "保存，再备份。你又往下翻了翻，这回确实多了些自己写下的东西。",
+            `${THESIS_EFFORT_LEAD[option.id] ?? ""}你按目录理顺材料，把几处“这里再补”换成了正文。有一段写的时候觉得挺明白，回头读却连自己也绕进去，只好拆开重写。`,
+            `总进度从 ${nextThesis.progress}% 提升到 ${result.nextThesis.progress}%，${getThesisStage(result.nextThesis.progress).name === getThesisStage(nextThesis.progress).name
+              ? `当前阶段仍是「${getThesisStage(nextThesis.progress).name}」`
+              : `进入「${getThesisStage(result.nextThesis.progress).name}」阶段`}。保存，再备份；你又往下翻了翻，这回确实多了些自己写下的东西。`,
           ].join("\n\n")
         : [
             "你打开毕业论文文档，光标在原处闪了一会儿，最后还是关掉了窗口。这个月先搁置，正文没有多出一个字。",
-            `总进度保持在 ${nextThesis.progress}%，当前阶段仍是「${getThesisStage(nextThesis.progress).name}」。`,
-            "关窗口时倒很利索，下回点开，却还是得接着面对这一页。",
+            `总进度保持在 ${nextThesis.progress}%，当前阶段仍是「${getThesisStage(nextThesis.progress).name}」。关窗口时倒很利索，下回点开，却还是得接着面对这一页。`,
           ].join("\n\n"),
     };
     return {

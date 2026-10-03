@@ -24,7 +24,7 @@ function describePublishedPapers(state: GameState): string {
     .filter((target) => targetCounts[target] > 0)
     .map((target) => `${target} 类 ${targetCounts[target]} 篇`)
     .join("、");
-  return `你已经发表 ${paperCount} 篇论文（${categoryText}），科研分是 ${state.totalResearchScore}。这里列的是可计分的第一作者论文。`;
+  return `你已经发表 ${paperCount} 篇可计分的一作论文（${categoryText}），科研分是 ${state.totalResearchScore}。`;
 }
 
 export function createPhdDecisionEvent(state: GameState, requestedYear = state.year): PendingEvent {
@@ -99,8 +99,7 @@ export function createPhdDecisionEvent(state: GameState, requestedYear = state.y
     : decisionYear === 2
       ? [
           describePublishedPapers(state),
-          `今年转博需要达到 ${requiredScore} 分，你的成果还不够。同届同门在核对材料，你低头看看记录，几处工作还没做完。`,
-          "今年暂时不能转博，明年还有一次机会。你翻回课题记录，盘算着接下来先往哪处使劲。",
+          `今年转博需要达到 ${requiredScore} 分，你的成果还不够。同届同门在核对材料，你低头看看记录，几处工作还没做完，只能盘算着接下来先往哪处使劲。`,
         ].join("\n\n")
       : [
           describePublishedPapers(state),

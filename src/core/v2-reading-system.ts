@@ -1,6 +1,7 @@
 import { addOrReplaceBuffs, getActiveOperationSanCostForState, getActiveOperationSanMultiplier, getReadingEffect } from "./v2-buffs";
 import { pushLog } from "./v2-engine-helpers";
-import { clampResearchToCap } from "./v2-research-cap-system";
+import { getResearchCap } from "./v2-research-cap-system";
+import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
 import { getShopReadSanDiscount } from "./v2-shop-items-effects";
 import type { Buff, GameState, ReadingState } from "./v2-types";
 
@@ -10,6 +11,8 @@ export interface ReadPaperActionOptions {
   allowSanOverdraw?: boolean;
   writeLog?: boolean;
   source?: string;
+  /** Roll source for the research tier resist on every 10th read. */
+  random?: () => number;
 }
 
 export interface ReadPaperActionResolution {
@@ -19,6 +22,9 @@ export interface ReadPaperActionResolution {
   totalSanCost: number;
   totalIdeaBonus: number;
   researchGain: number;
+  /** Every 10th read that tried to add research, and how many of those points the tier resisted. */
+  researchMilestones: number;
+  researchResisted: number;
   monthlyActionsUsed: number;
   blockedReason: "none" | "action-limit" | "insufficient-san";
 }
@@ -97,7 +103,16 @@ export function previewReadPaperAction(state: GameState): ReadPaperActionPreview
   };
 }
 
-export function applyReadingCountProgress(state: GameState, requestedCount: number): ReadingCountProgress {
+/** Research gained from reading milestones is a normal increase: tier resist, then the research cap. */
+function resistReadingResearch(state: GameState, milestones: number, random: () => number) {
+  return applyTierResist(milestones, state.player.research, random, getResearchCap(state.researchCapacityState));
+}
+
+export function applyReadingCountProgress(
+  state: GameState,
+  requestedCount: number,
+  random: () => number = Math.random,
+): ReadingCountProgress {
   const appliedCount = Math.max(0, Math.floor(requestedCount));
   if (appliedCount === 0) {
     return { nextState: state, appliedCount: 0, researchGain: 0 };
@@ -106,14 +121,13 @@ export function applyReadingCountProgress(state: GameState, requestedCount: numb
   const previousReadCount = state.readingState.readCount;
   const readCount = previousReadCount + appliedCount;
   const crossedMilestones = Math.floor(readCount / 10) - Math.floor(previousReadCount / 10);
-  const research = clampResearchToCap(state.player.research + crossedMilestones, state.researchCapacityState);
-  const researchGain = research - state.player.research;
+  const researchGain = resistReadingResearch(state, crossedMilestones, random).effectiveChange;
 
   return {
     nextState: {
       ...state,
       readingState: { ...state.readingState, readCount },
-      player: { ...state.player, research },
+      player: { ...state.player, research: state.player.research + researchGain },
     },
     appliedCount,
     researchGain,
@@ -140,11 +154,14 @@ export function applyReadPaperActions(
   const allowSanOverdraw = options.allowSanOverdraw ?? false;
   const consumeMonthlyActionOnce = options.consumeMonthlyActionOnce ?? false;
   const source = options.source?.trim() || "看论文";
+  const random = options.random ?? Math.random;
   let nextState = state;
   let appliedCount = 0;
   let totalSanCost = 0;
   let totalIdeaBonus = 0;
   let researchGain = 0;
+  let researchMilestones = 0;
+  let researchResisted = 0;
   let monthlyActionsUsed = 0;
   let blockedReason: ReadPaperActionResolution["blockedReason"] = "none";
 
@@ -161,6 +178,8 @@ export function applyReadPaperActions(
       totalSanCost: 0,
       totalIdeaBonus: 0,
       researchGain: 0,
+      researchMilestones: 0,
+      researchResisted: 0,
       monthlyActionsUsed: 0,
       blockedReason: "insufficient-san",
     };
@@ -183,10 +202,9 @@ export function applyReadPaperActions(
     const readCount = nextState.readingState.readCount + 1;
     const ideaBonus = getReadingIdeaBonus(readCount);
     const reachesResearchMilestone = readCount > 0 && readCount % 10 === 0;
-    const nextResearch = reachesResearchMilestone
-      ? clampResearchToCap(nextState.player.research + 1, nextState.researchCapacityState)
-      : nextState.player.research;
-    const appliedResearchGain = nextResearch - nextState.player.research;
+    const researchResult = reachesResearchMilestone ? resistReadingResearch(nextState, 1, random) : null;
+    const appliedResearchGain = researchResult?.effectiveChange ?? 0;
+    const nextResearch = nextState.player.research + appliedResearchGain;
 
     nextState = {
       ...nextState,
@@ -209,6 +227,8 @@ export function applyReadPaperActions(
     totalSanCost += sanCost;
     totalIdeaBonus += ideaBonus;
     researchGain += appliedResearchGain;
+    researchMilestones += reachesResearchMilestone ? 1 : 0;
+    researchResisted += researchResult?.resistedCount ?? 0;
     monthlyActionsUsed += consumesActionThisRead ? 1 : 0;
   }
 
@@ -217,7 +237,7 @@ export function applyReadPaperActions(
       `看论文 ${appliedCount} 次`,
       `SAN -${totalSanCost}`,
       `下次想 idea +${totalIdeaBonus}`,
-      researchGain > 0 ? `科研 +${researchGain}` : "",
+      formatReadingResearchOutcome({ researchGain, researchMilestones, researchResisted }),
     ].filter(Boolean);
     nextState = pushLog(nextState, `${source}：${parts.join("｜")}`);
   }
@@ -229,9 +249,22 @@ export function applyReadPaperActions(
     totalSanCost,
     totalIdeaBonus,
     researchGain,
+    researchMilestones,
+    researchResisted,
     monthlyActionsUsed,
     blockedReason,
   };
+}
+
+/** "科研 +1" / "科研 +0（抵抗1）" for reading milestones; empty when nothing was gained or resisted. */
+export function formatReadingResearchOutcome(
+  result: Pick<ReadPaperActionResolution, "researchGain" | "researchMilestones" | "researchResisted">,
+): string {
+  if (result.researchGain <= 0 && result.researchResisted <= 0) return "";
+  return formatTierResistedOutcome("科研", result.researchMilestones, {
+    effectiveChange: result.researchGain,
+    resistedCount: result.researchResisted,
+  });
 }
 
 export function previewReadPaperActions(

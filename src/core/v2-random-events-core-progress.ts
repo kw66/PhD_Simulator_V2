@@ -1,5 +1,5 @@
 import {
-  createThreeStageRandomEvent,
+  createThreeStageEvent,
   drawInclusiveInt,
   hasRecoverableDraftPaper,
   type RandomRollProvider,
@@ -9,7 +9,6 @@ import {
   formatResearchMiscSanChange,
   formatTierResistedOutcome,
   getActualResearchMiscSanChange,
-  getTierResistedNarrative,
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -34,10 +33,19 @@ const LEARNING_CODE_PROJECTS = [
 const LEARNING_THEORY_TOPICS = [
   { title: "PAC-Bayes 泛化界", detail: "把先验、后验和 KL 散度放进同一条界里讨论泛化" },
   { title: "Neural Tangent Kernel", detail: "在无限宽网络极限里看梯度下降怎样变成核回归" },
-  { title: "最优传输与 Schrödinger Bridge", detail: "从 Wasserstein 距离到熵正则化路径，理解分布之间的运输" },
+  { title: "最优传输与 Schrödinger Bridge", detail: "分布之间怎样运输：从 Wasserstein 距离一直讲到熵正则化路径" },
   { title: "Conformal Prediction", detail: "不依赖具体分布假设地构造预测区间" },
   { title: "信息瓶颈与表示学习", detail: "在保留任务信息和压缩输入之间做取舍" },
 ] as const;
+
+const LATIN_EDGE = /[A-Za-z0-9]/u;
+
+/** Inserts a term into Chinese prose, adding a space only on a side that meets Latin text. */
+function spaced(term: string, side: "both" | "before" | "after" = "both"): string {
+  const before = side !== "after" && LATIN_EDGE.test(term[0] ?? "") ? " " : "";
+  const after = side !== "before" && LATIN_EDGE.test(term.at(-1) ?? "") ? " " : "";
+  return `${before}${term}${after}`;
+}
 
 export function createDataLossRandomEvent(state: GameState): { nextState: GameState; event: PendingEvent | null } {
   if (!hasRecoverableDraftPaper(state)) {
@@ -93,7 +101,7 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
       {
         id: `random-16-fake-${serial}`,
         label: "伪造数据",
-        outcome: "论文进度保留；涉事论文引用 ×0.5；代价？",
+        outcome: "论文进度保留；符合条件的未投稿一作论文引用 ×0.5；图片误用。",
         effects: {
           draftCitationDebuffMultiplier: 0.5,
           markDraftImageMisuse: true,
@@ -101,7 +109,7 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
       },
     ],
   };
-  const stagedEvent = createThreeStageRandomEvent(event, {
+  const stagedEvent = createThreeStageEvent(event, {
     introDescription,
     decisionTitle: "如何应对",
     decisionDescription: [
@@ -168,7 +176,7 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
   const event: PendingEvent = {
     id: `random-9-y${state.year}-m${state.month}-n${serial}`,
     title: "不断学习",
-    description: "一篇论文刚投出去，想 idea、做实验、写论文、投稿的循环暂时停了一格。难得有点空闲，你想静下心学一会儿，却发现自己已经很久没有完整读完一段材料了😅。",
+    description: "手头的论文刚忙完一轮，想 idea、做实验、写论文、投稿的循环暂时停了一格。难得有点空闲，你想静下心学一会儿，却发现自己已经很久没有完整读完一段材料了😅。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -214,21 +222,15 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
     ],
   };
 
-  const basicResearchNarrative = basicResearchResult
-    ? getTierResistedNarrative("科研", 1, basicResearchResult)
-    : "";
-
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
-      "论文投出去，你本想休息一晚，却盯着收藏夹发起了呆。想 idea、做实验、写论文、投稿，日子被这四步推着走；上次静下心学习，已经不记得是什么时候了。",
+      "手头的实验刚告一段落，你本想休息一晚，却盯着收藏夹发起了呆。想 idea、做实验、写论文、投稿，日子被这四步推着走；上次静下心学习，已经不记得是什么时候了。",
       "你决定今晚先不赶进度。B站的《跟李沐学 AI》、arXiv 论文、开源项目和总没啃懂的理论摆在眼前，至少先看完一样。",
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
-      basicGain > 0
-        ? "你把《跟李沐学 AI》点开，从线性回归和反向传播的视频重新看起。老师把公式和代码拆开讲，你暂停视频，把每一步写在纸上；不是内容突然变难，而是自己很久没有把基础完整推一遍了。"
-        : "你把《跟李沐学 AI》点开，回看一个从损失到梯度的推导。结论已经用过不少次，自己却未必能从头讲清；这次不追进度，先把眼前这步重新理顺。",
-      `${codeProject.name} 的源码还开着，${theoryTopic.title} 的推导只读到一半，arXiv 上的 ${latestTopic.title} 也没看完。想学的越摆越多，你把手机翻面，先弄懂一样。`,
+      `收藏夹里同时开着《跟李沐学 AI》、${codeProject.name} 的源码、${spaced(theoryTopic.title, "after")}的推导和一篇关于${spaced(latestTopic.title)}的最新 arXiv 论文。每一样都像是“再看一会儿就能懂”，可今晚只能选一个。`,
+      "你把手机翻面，先看着这些页面发了会儿呆。基础、最新技术、代码和理论各有各的吸引力，也各有一处让你不敢轻易跳过。",
     ].join("\n\n"),
     results: {
       [`random-9-basic-${serial}`]: {
@@ -241,27 +243,26 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
           : [
               "你继续看《跟李沐学 AI》，回看一个从损失到梯度的推导。大部分步骤已经熟悉，笔尖仍在几处条件上停了停：熟悉结论，和能从头讲清，终究不是一回事。",
               "暂停视频，你把推导理由和代码里的对应位置记在笔记上。下次再遇到这一步，就不用只凭印象往下讲了。",
-              ...(basicResearchNarrative ? [basicResearchNarrative] : []),
             ].join("\n\n"),
       },
       [`random-9-tech-${serial}`]: {
         title: "技术深挖",
         description: [
-          `你在 arXiv 翻开几篇关于“${latestTopic.title}”的最新论文，从摘要读到方法和消融实验。${latestTopic.detail}。原本只想看个摘要，最后连作者放出的实现也一起翻了起来。`,
+          `你在 arXiv 翻开几篇关于“${latestTopic.title}”的最新论文，从摘要读到方法和消融实验，${latestTopic.detail}。原本只想看个摘要，最后连作者放出的实现也一起翻了起来。`,
           "几种方法摆在一起，你终于看出还能从哪里试一试。你把疑问和改法记下来，这回收藏夹之外，总算留下了自己的想法。",
         ].join("\n\n"),
       },
       [`random-9-code-${serial}`]: {
         title: "读源码",
         description: [
-          `你打开 ${codeProject.name} 的公开源码，顺着 ${codeProject.detail} 往下读。那个以前见了就想复制去搜索的报错，这次终于看懂了来处。`,
+          `你打开 ${codeProject.name} 的公开源码，顺着${spaced(codeProject.detail)}往下读。那个以前见了就想复制去搜索的报错，这次终于看懂了来处。`,
           "顺手把重复操作整理成脚本，容易填错的参数也加了检查。下一次做实验，至少不用再靠多按几遍运行碰运气。",
         ].join("\n\n"),
       },
       [`random-9-theory-${serial}`]: {
         title: "理论推导",
         description: [
-          `你挑出 ${theoryTopic.title}，从符号定义开始逐行推。${theoryTopic.detail}；草稿纸铺了半张桌子，才发现前面有个下标一直看反了。`,
+          `你挑出${spaced(theoryTopic.title, "before")}，从符号定义开始逐行推。它讲的是${theoryTopic.detail}。草稿纸铺了半张桌子，你才发现前面有个下标一直看反了。`,
           "推到第三遍，几行公式终于连上了。你试着用自己的话写下推导理由，这次不必再靠一句“由此可知”含糊带过。",
         ].join("\n\n"),
       },

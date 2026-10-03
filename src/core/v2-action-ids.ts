@@ -29,7 +29,6 @@ export const GAME_ACTION_IDS = [
   "resolve-event",
   "end-relationship",
   "relationship-task",
-  "advisor-horizontal",
   "advisor-project",
   "lover-play",
   "lover-study",

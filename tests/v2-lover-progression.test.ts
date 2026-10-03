@@ -53,8 +53,8 @@ describe("lover completion announcements", () => {
     base.loverProgressState.intimacy = 20;
     const next = advanceLoverDate(base, "play");
     const effects = next.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
-    expect(effects).toContain("SAN+6（20→20）");
-    expect(effects).toContain("亲密+1（20→20）");
+    expect(effects).toContain("SAN +6（20→20）");
+    expect(effects).toContain("亲密 +1（20→20）");
     expect(next.player.san).toBe(20);
     expect(next.loverProgressState.intimacy).toBe(20);
   });
@@ -66,7 +66,7 @@ describe("lover completion announcements", () => {
     expect(next.log).toHaveLength(3);
     expect(next.log[0]!.text).toContain("恋人帮助：林青");
     expect(next.log[1]!.eventHistoryId).toBeTruthy();
-    expect(next.log[2]!.text).toContain("约会·学习：进度+");
+    expect(next.log[2]!.text).toContain("约会·学习：进度 +");
     const record = next.eventHistory.find((entry) => entry.id === next.log[1]!.eventHistoryId)!;
     expect(record.stages[0]!.talentTrigger!.reason).toBe("约会·学习进度满100，第1次");
     expect(next.loverProgressState.intimacy).toBe(6);
@@ -99,7 +99,7 @@ describe("lover completion announcements", () => {
     const ready = { ...repeated, papers: [makePaper()], loverProgressState: { ...repeated.loverProgressState, research: 1 } };
     const random = vi.spyOn(Math, "random");
     const settled = settlePendingLoverHelp(ready, () => 0);
-    expect(settled.log[0]!.text).toContain("idea+10");
+    expect(settled.log[0]!.text).toContain("idea +10");
     expect(settled.log.filter((entry) => entry.text.startsWith("恋人帮助："))).toHaveLength(1);
     expect(settlePendingLoverHelp(settled, () => 0)).toBe(settled);
     expect(random).not.toHaveBeenCalled();
@@ -111,7 +111,7 @@ describe("lover completion announcements", () => {
     const ready = { ...reward, totalMonths: 9, month: 9 };
     const random = vi.spyOn(Math, "random");
     const active = activateLoverMonthlyDiscount(ready);
-    expect(active.log[0]!.text).toContain("本月SAN消耗-1");
+    expect(active.log[0]!.text).toContain("本月SAN消耗 -1");
     expect(active.log[0]!.month).toBe(9);
     expect(activateLoverMonthlyDiscount(active).log).toEqual(active.log);
     expect(advanceLoverMonth(active).log).toEqual(active.log);
@@ -162,7 +162,7 @@ describe("lover initialization and monthly progression", () => {
       shopping: { progress: 0, completed: 0 },
     });
     expect(next.loverProgressState).toMatchObject({ intimacy: 7, lastAdvancedTotalMonths: 8, pendingPaperHelp: { amount: 10 } });
-    expect(next.loverProgressState.monthlyActivity).toBe(type === "beautiful" ? "玩耍进度+5，学习进度+2" : "玩耍进度+2，学习进度+5");
+    expect(next.loverProgressState.monthlyActivity).toBe(type === "beautiful" ? "玩耍进度 +5，学习进度 +2" : "玩耍进度 +2，学习进度 +5");
     expect(advanceLoverDate(next, "study").loverProgressState.monthlyActivity).toBe(next.loverProgressState.monthlyActivity);
     expect(next.player).toEqual({ ...state.player, san: 16 });
     expect(advanceLoverMonth(next)).toBe(next);
@@ -320,6 +320,21 @@ describe("lover route reward cycles", () => {
     expect(getLoverRouteCost(later, "study").san).toBe(4);
   });
 
+  it("runs the lower-research study reward through the player's research tier resist", () => {
+    const thirdStudy = withRoute(makeState(), "study", 99, 2);
+    const effectsOf = (state: GameState) => state.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
+
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const resisted = advanceLoverDate(thirdStudy, "study");
+    expect(resisted.player.research).toBe(8);
+    expect(effectsOf(resisted)).toContain("你的科研 +0（8→8，抵抗1）");
+
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const applied = advanceLoverDate(thirdStudy, "study");
+    expect(applied.player.research).toBe(9);
+    expect(effectsOf(applied)).toContain("你的科研 +1（8→9）");
+  });
+
   it("stacks permanent study score bonuses without extra operations", () => {
     const first = advanceLoverDate(withRoute(makeState(), "study", 99, 1), "study");
     const second = advanceLoverDate(withRoute(nextDateMonth(first), "study", 99, 4), "study");
@@ -373,6 +388,7 @@ describe("lover route reward cycles", () => {
     [8, 10, 8, 8, 10], [19, 20, 25, 20, 20], [20, 21, 25, 20, 21],
     [21, 20, 25, 21, 20], [19, 18, 20, 19, 19],
   ])("raises only the lower research with player=%s lover=%s cap=%s", (player, lover, cap, expectedPlayer, expectedLover) => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
     const state = withRoute(makeState(), "study", 99, 2);
     state.player.research = player;
     state.loverProgressState.research = lover;

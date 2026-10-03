@@ -14,6 +14,7 @@ import { refreshPaperCompetitionEvent } from "./v2-paper-competition-preview";
 import { refreshPaperReviewEvent } from "./v2-publication-system";
 import { refreshScholarshipEvent } from "./v2-fixed-events-scholarship";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
+import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
 import type {
   DeferredEventStatePatch,
   EventChoice,
@@ -295,6 +296,7 @@ function rebuildRandomEventFromCurrentState(
   return {
     ...rebuiltWithStableIds,
     id: queuedEvent.id,
+    continuationSourceId: queuedEvent.continuationSourceId,
     queueOrder: queuedEvent.queueOrder,
     history: queuedEvent.history,
     randomReplay: replay,
@@ -316,10 +318,21 @@ export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQue
 function refreshOccupiedLoverEvent(state: GameState, event: EventQueueItem): EventQueueItem {
   if (event.chainId !== "lover-development" || !(state.loverState.active || state.relationshipState.loverCount > 0)) return event;
   if (event.stage === "act2") {
-    return { ...event, choices: event.choices.map((choice) => choice.id === "accept"
-      ? { ...choice, disabledReason: "已有恋人，无法开始新的恋爱关系。" } : choice) };
+    // The confession may have been queued before the player found a lover:
+    // swap "尝试在一起" for the no-penalty "暂时放下" instead of disabling it.
+    const accept = event.choices.find((choice) => choice.id === "accept");
+    const type = accept?.effects.activateLoverProgress;
+    const startTotalMonths = accept?.effects.loverStateUpdates?.startTotalMonths;
+    if (!type || typeof startTotalMonths !== "number") return event;
+    const [confession] = event.description.split("\n\n");
+    return {
+      ...event,
+      description: [confession, LOVER_OCCUPIED_TEXT].join("\n\n"),
+      choices: event.choices.map((choice) => choice.id === "accept" ? createLoverSetAsideChoice(type, startTotalMonths) : choice),
+    };
   }
-  if (event.stage !== "result" || event.history?.at(-1)?.selectedChoiceId !== "accept") return event;
+  if (event.stage !== "result" || event.history?.at(-1)?.selectedChoiceId !== "accept"
+    || !event.id.startsWith("lover-development-result-accept-")) return event;
   return {
     ...event,
     description: "你已经有了恋人，决定放下这段尚未确认的关系。\n\n机制结算\n已有恋人，本次不新增关系。",
@@ -349,8 +362,11 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
     evaluateImmediateEndings: (nextState) => nextState,
     runPostQueuePipeline: (nextState) => nextState,
   });
-  const result = preview.eventQueue.find((item) => item.id === event.id);
-  return result ? { ...result, queueOrder: event.queueOrder } : event;
+  const result = preview.eventQueue.find((item) => item.chainId === event.chainId
+    && !state.eventQueue.some((existing) => existing.id !== event.id && existing.id === item.id)
+    && (item.id === event.id || item.id === event.continuationSourceId
+      || (event.continuationSourceId !== undefined && item.continuationSourceId === event.continuationSourceId)));
+  return result ? { ...result, id: event.id, continuationSourceId: event.continuationSourceId, queueOrder: event.queueOrder } : event;
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {

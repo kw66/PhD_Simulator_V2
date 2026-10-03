@@ -1,10 +1,10 @@
 import { drawInclusiveInt, type FixedResolutionResult, type RandomRollProvider } from "./v2-fixed-events-shared";
 import {
-  createCcigActivityResultEvent,
   createCcigAttendResultEvent,
   createCcigDecisionEvent,
   createCcigSkipResultEvent,
-} from "./v2-fixed-events-ccig-events";
+} from "./v2-fixed-events-ccig-decision-events";
+import { createCcigActivityResultEvent } from "./v2-fixed-events-ccig-activity-events";
 import { getCcigLocation, getCcigSelfPayCost } from "./v2-fixed-events-ccig-shared";
 import { combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative, getTierResistChance } from "./v2-sanity-rules";

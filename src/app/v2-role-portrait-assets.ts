@@ -17,6 +17,8 @@ const ROLE_CARD_PORTRAIT_URLS: Record<RoleId, string> = {
   "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/06_chosen_reversed_final_card.webp", import.meta.url).href,
   "special-dandan": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-dandan`,
   "special-daji": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-daji`,
+  "special-finite-life": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-finite-life`,
+  "special-fading-genius": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-fading-genius`,
   "cursed-frail": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#cursed-frail`,
   "cursed-debt": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#cursed-debt`,
 };
@@ -38,6 +40,8 @@ const ROLE_DETAIL_PORTRAIT_URLS: Record<RoleId, string> = {
   "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/06_chosen_reversed_final_detail.webp", import.meta.url).href,
   "special-dandan": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-dandan-detail`,
   "special-daji": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-daji-detail`,
+  "special-finite-life": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-finite-life-detail`,
+  "special-fading-genius": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#special-fading-genius-detail`,
   "cursed-frail": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#cursed-frail-detail`,
   "cursed-debt": `${new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href}#cursed-debt-detail`,
 };

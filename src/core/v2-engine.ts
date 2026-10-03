@@ -17,7 +17,6 @@ import {
   hasBlockingQueueEvent,
 } from "./v2-event-queue";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
-import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { yearlyResetRandomEventState } from "./v2-random-event-rules";
 import { activatePendingRandomEvents } from "./v2-paper-competition-waiting";
 import { refreshPaperCompetitionEvents } from "./v2-paper-competition-preview";
@@ -115,42 +114,6 @@ function buildMonthAdvanceLog(
   return `进入第 ${year} 年 ${month} 月。${buildMonthStartSettlementLog(resolution)}`;
 }
 
-function preserveExistingRelationships(before: GameState, after: GameState): GameState {
-  const beforeFellows = before.fellowProgressState;
-  const afterFellowIds = new Set(after.fellowProgressState.map((profile) => profile.id));
-  const missingFellows = beforeFellows.filter((profile) => !afterFellowIds.has(profile.id));
-  const fellowProgressState = missingFellows.length > 0
-    ? [...after.fellowProgressState, ...missingFellows]
-    : after.fellowProgressState;
-  const fellowCountMinimums = {
-    seniorCount: before.relationshipState.seniorCount,
-    juniorCount: before.relationshipState.juniorCount,
-    peerCount: before.relationshipState.peerCount,
-  };
-  const relationshipState = {
-    ...after.relationshipState,
-    seniorCount: Math.max(after.relationshipState.seniorCount, fellowCountMinimums.seniorCount),
-    juniorCount: Math.max(after.relationshipState.juniorCount, fellowCountMinimums.juniorCount),
-    peerCount: Math.max(after.relationshipState.peerCount, fellowCountMinimums.peerCount),
-    occupiedSlots: Math.max(after.relationshipState.occupiedSlots, before.relationshipState.occupiedSlots),
-    advisorCount: Math.max(after.relationshipState.advisorCount, before.relationshipState.advisorCount),
-    loverCount: Math.max(after.relationshipState.loverCount, before.relationshipState.loverCount),
-  };
-  const loverWasActive = before.loverState.active || before.loverProgressState.active || before.relationshipState.loverCount > 0;
-  const loverWasCleared = loverWasActive && (!after.loverState.active || !after.loverProgressState.active);
-  return {
-    ...after,
-    fellowProgressState,
-    relationshipState,
-    ...(loverWasCleared ? {
-      loverState: before.loverState,
-      loverProgressState: before.loverProgressState,
-    } : {}),
-    ...(before.selectedAdvisorName && !after.selectedAdvisorName
-      ? { selectedAdvisorName: before.selectedAdvisorName } : {}),
-  };
-}
-
 function takeRest(state: GameState): GameState {
   if (state.phase !== "playing" || (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)) return state;
   const sanGain = getShopRestSanGain(state.shopState);
@@ -183,10 +146,8 @@ function resolveQueuedEvent(state: GameState, eventId: string | undefined, choic
 function createAdvancedCalendarState(state: GameState): GameState {
   const nextTotalMonths = state.totalMonths + 1;
   const calendar = getCalendarForTotalMonths(nextTotalMonths, state.degree);
-  const publishedPaperCount = state.papers.filter((paper) => paper.status === "published" && paper.nonFirstAuthor !== true).length
-    + state.externalPublications.filter((paper) => paper.status === "published" && paper.nonFirstAuthor !== true).length;
   const randomState = calendar.month === 1 && calendar.year > state.year
-    ? yearlyResetRandomEventState(state, publishedPaperCount, hasRecoverableDraftPaper(state))
+    ? yearlyResetRandomEventState(state)
     : state;
   if (randomState !== state) {
     const queuedRandomIds = new Set(state.eventQueue.flatMap((event) => (
@@ -235,10 +196,23 @@ function createAdvancedCalendarState(state: GameState): GameState {
   }
   const monthlyState = evaluateCoreEndings(monthlyLoggedState);
   if (monthlyState.phase !== "playing") return monthlyState;
-  const fellowResearchState = advanceFellowResearch(resolveReadyJournalPapers(monthlyState).state);
-  const settledJournalState = attendFellowConferences(resolveReadyJournalPapers(fellowResearchState).state);
-  return settleAdvisorMonth(resolveReadyJournalPapers(advanceLoverMonth(settledJournalState)).state);
+  return MONTH_START_RELATIONSHIP_STEPS.reduce((current, step) => step(current), monthlyState);
 }
+
+/** A journal revision that reaches its acceptance line is published before a later step can still add help to it. */
+function settleReadyJournals(state: GameState): GameState {
+  return resolveReadyJournalPapers(state).state;
+}
+
+/** Month-start order after the player's own settlement; applyMonthlyEffects has already settled journals. */
+const MONTH_START_RELATIONSHIP_STEPS: ReadonlyArray<(state: GameState) => GameState> = [
+  advanceFellowResearch,
+  settleReadyJournals,
+  attendFellowConferences,
+  advanceLoverMonth,
+  settleReadyJournals,
+  settleAdvisorMonth,
+];
 
 function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
   if (state.phase !== "playing") return state;
@@ -347,10 +321,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
     if (checkedState.phase !== "playing") return checkedState;
     state = checkedState;
   }
-  const nextStateRaw = dispatchGameAction(ensureFellowPapers(state), actionId, payload);
-  const nextState = actionId === "resolve-event"
-    ? preserveExistingRelationships(state, nextStateRaw)
-    : nextStateRaw;
+  const nextState = dispatchGameAction(ensureFellowPapers(state), actionId, payload);
   if (nextState.phase !== "playing") return nextState;
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
@@ -362,7 +333,10 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   if (debugAction) return refreshed;
   const evaluated = evaluateCoreEndings(refreshed);
   if (evaluated.phase !== "playing") return evaluated;
-  return finishTrainingIfReady(recordTalentTransitions(state, evaluated));
+  const recorded = recordTalentTransitions(state, evaluated);
+  return (actionId === "next-month" || actionId === "force-next-month") && state.totalMonths >= state.maxMonths
+    ? finishTrainingIfReady(recorded)
+    : recorded;
 }
 
 function dispatchGameAction(state: GameState, actionId: GameActionId, payload: DispatchPayload): GameState {
@@ -438,7 +412,6 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
     case "relationship-task":
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return payload.relationshipId ? resolveReadyJournalPapers(advanceFellowTask(state, payload.relationshipId)).state : state;
-    case "advisor-horizontal":
     case "advisor-project":
       if (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT) return state;
       return advanceAdvisorProject(state, payload.projectType ?? "horizontal");

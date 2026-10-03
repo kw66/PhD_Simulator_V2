@@ -61,7 +61,7 @@ describe("image misuse follows the affected paper", () => {
     let state = resolve({ ...initial, eventQueue: [createEventQueueItem(event, 1)] });
     state = resolve(state, 3);
     expect(state.eventQueue[0]!.description).toContain("PS");
-    expect(state.eventQueue[0]!.description).toContain("代价？");
+    expect(state.eventQueue[0]!.description).toContain("符合条件的未投稿一作论文引用 ×0.5");
     expect(state.eventQueue[0]!.description).not.toContain("复现");
     expect(state.papers[0]!.imageMisusePending).toBeUndefined();
     expect(state.buffs).toEqual([]);

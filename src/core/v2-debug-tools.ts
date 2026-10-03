@@ -5,13 +5,14 @@ import { SCORE_BY_TARGET } from "./v2-content";
 import type { CareerType } from "./v2-career-rules";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyQueuedEventEffects, rebaseGeneratedEventIds } from "./v2-engine-event-resolution";
+import { assignAvailableContinuationId } from "./v2-engine-event-resolution-followups";
 import { addOrReplaceBuffs } from "./v2-buffs";
 import { createLabGpuFailureBuff } from "./v2-lab-compute";
 import { createImageMisuseBuff } from "./v2-academic-integrity";
 import { createAiBuffs, createAiShopState, getAiModelById } from "./v2-ai-shop";
 import { clampSan, pushLog } from "./v2-engine-helpers";
 import { createBeforeGradSchoolAct1Event } from "./v2-fixed-events-before-grad-school";
-import { createCcigEvent } from "./v2-fixed-events-ccig";
+import { createCcigEvent } from "./v2-fixed-events-ccig-decision-events";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { createScholarshipEvent } from "./v2-fixed-events-scholarship";
 import { createSummerVacationEvent } from "./v2-fixed-events-summer";
@@ -42,7 +43,7 @@ import { createLoverProgressState } from "./v2-lover-progression";
 import { activateLover } from "./v2-lover-system";
 import { pickRandomAdvisorName } from "./v2-random-name";
 import { getPaperCompetitionCandidates, isPaperCompetitionEventId } from "./v2-paper-competition";
-import { activatePendingPaperCompetitionEvents, rememberPendingPaperCompetitionEvent } from "./v2-paper-competition-waiting";
+import { activatePendingRandomEvents, rememberPendingRandomEvent } from "./v2-paper-competition-waiting";
 import { getCurrentEvent, getQueuedPaperTargetIds } from "./v2-event-queue";
 import type {
   Buff,
@@ -60,7 +61,7 @@ import type {
 /** Representative fixtures use the same source labels as their gameplay counterparts. */
 export function createDebugBuffs(): Buff[] {
   const aiBuffs = [
-    ["ai-debug-gpt", "gpt-5.6-sol"],
+    ["ai-debug-gpt", "gpt-6-astra"],
     ["ai-debug-claude", "claude-fable-5"],
     ["ai-debug-gemini", "gemini-3"],
     ["ai-debug-deepseek", "deepseek-v4"],
@@ -185,6 +186,8 @@ export const DEBUG_COMPLETED_EVENT_IDS = [
   "before-grad-school",
   "random-1",
   "random-2",
+  "random-4",
+  "random-5",
   "illness-stomach",
   "illness-flu",
   "illness-fever",
@@ -546,6 +549,7 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
     }
     nextContext = { ...context, rootEvent };
   }
+  targetEvent = assignAvailableContinuationId(targetEvent, baseState.eventQueue.filter((event) => event.id !== currentEvent.id));
   const replayedState: GameState = {
     ...baseState,
     eventQueue: baseState.eventQueue.map((event) => event.id !== currentEvent.id ? event : {
@@ -762,8 +766,8 @@ function triggerDebugEvent(state: GameState, eventId: string): GameState {
       };
       readyState = { ...readyState, papers: [...readyState.papers, draft], selectedPaperId: draft.id };
     }
-    const pendingState = rememberPendingPaperCompetitionEvent(readyState, randomId, readyState.totalRandomEventCount + 1);
-    const triggeredState = activatePendingPaperCompetitionEvents(pendingState === readyState ? readyState : {
+    const pendingState = rememberPendingRandomEvent(readyState, randomId, readyState.totalRandomEventCount + 1);
+    const triggeredState = activatePendingRandomEvents(pendingState === readyState ? readyState : {
       ...pendingState,
       totalRandomEventCount: readyState.totalRandomEventCount + 1,
     });

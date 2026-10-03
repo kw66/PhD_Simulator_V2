@@ -585,8 +585,8 @@ export function getAvailablePaperSlotCount(
 }
 
 /**
- * Resolve active papers to workstation slots while keeping older saves, which
- * predate paperSlotIndex, aligned by their existing array order.
+ * Resolve active papers to workstation slots. Drafts created without an
+ * explicit slot (debug tools) fill the free slots in array order.
  */
 export function getWorkstationPaperSlotMap(papers: readonly Paper[]): Map<number, Paper> {
   const papersBySlot = new Map<number, Paper>();

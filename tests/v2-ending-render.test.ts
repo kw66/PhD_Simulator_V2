@@ -173,7 +173,7 @@ describe("basic ending presentation", () => {
       loverState: activateLover("smart", 1, "male"),
     };
     const card = endingCard(renderApp(state));
-    for (const [stat, value] of Object.entries({ san: "-3/25", research: "24/27", social: 12, favor: 9, money: 18, relationships: 4 })) {
+    for (const [stat, value] of Object.entries({ san: "-3/25", research: "24/27", social: "12/20", favor: "9/20", money: 18, relationships: 4 })) {
       expectEndingStat(card, stat, value);
     }
   });

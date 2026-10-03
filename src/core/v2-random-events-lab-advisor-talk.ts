@@ -1,10 +1,10 @@
-﻿import {
+import {
   applyTierResist,
   formatTierResistedOutcome,
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import { activateRemoteInternship, hasOngoingInternship, hasRemoteInternshipScore } from "./v2-internship-system";
-import { createThreeStageRandomEvent, drawInclusiveInt, type RandomRollProvider } from "./v2-random-events-core-shared";
+import { createThreeStageEvent, drawInclusiveInt, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
@@ -73,7 +73,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
     ],
   };
 
-  const stagedEvent = createThreeStageRandomEvent(event, {
+  const stagedEvent = createThreeStageEvent(event, {
     introDescription: [
       "导师在在读学生群里通知大家准备好 PPT，这几天逐个找他聊聊。群里很快安静下来，你盯着消息，重新翻起最近几个月的记录。",
       "办公室门口已经坐着几位同学。你又点开 PPT，总觉得那张结果图没讲清楚，连昨晚练熟的开场白也忘了半句。听见导师叫你，你赶紧抱起电脑。",

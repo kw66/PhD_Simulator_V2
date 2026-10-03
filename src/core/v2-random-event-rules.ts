@@ -3,14 +3,14 @@ import {
   buildWeightedPool,
   type RandomEventCategory,
 } from "./v2-random-event-pool-builder";
-import { type PendingPaperCompetitionEvent } from "./v2-paper-competition";
+import { type PendingRandomEvent } from "./v2-paper-competition";
 
 export interface RandomEventState {
   availableRandomEvents: number[];
   usedRandomEvents: number[];
   illnessProbability: number;
   totalRandomEventCount: number;
-  pendingPaperCompetitionEvents?: PendingPaperCompetitionEvent[];
+  pendingRandomEvents?: PendingRandomEvent[];
 }
 
 export interface RandomEventPoolContext extends RandomEventState {
@@ -42,8 +42,8 @@ function cloneRandomEventState(state: RandomEventState): RandomEventState {
   return {
     availableRandomEvents: [...state.availableRandomEvents],
     usedRandomEvents: [...state.usedRandomEvents],
-    ...(state.pendingPaperCompetitionEvents ? {
-      pendingPaperCompetitionEvents: state.pendingPaperCompetitionEvents.map((event) => ({ ...event })),
+    ...(state.pendingRandomEvents ? {
+      pendingRandomEvents: state.pendingRandomEvents.map((event) => ({ ...event })),
     } : {}),
     illnessProbability: typeof state.illnessProbability === "number" && Number.isFinite(state.illnessProbability)
       ? Math.max(0, Math.min(100, Math.floor(state.illnessProbability)))
@@ -83,27 +83,24 @@ export function calculateRandomEventCount(roll: number, protectionWindow?: Rando
   return 3;
 }
 
-export function createRandomEventPool(_publishedPaperCount = 0, _hasRecoverableDraftPaper = false): number[] {
+export function createRandomEventPool(): number[] {
   return [...BASE_RANDOM_EVENT_IDS];
 }
 
-export function createInitialRandomEventState(publishedPaperCount = 0): RandomEventState {
+export function createInitialRandomEventState(): RandomEventState {
   return {
-    availableRandomEvents: createRandomEventPool(publishedPaperCount),
+    availableRandomEvents: createRandomEventPool(),
     usedRandomEvents: [],
     illnessProbability: 0,
     totalRandomEventCount: 0,
   };
 }
 
-export function yearlyResetRandomEventState(
-  state: RandomEventState,
-  publishedPaperCount: number,
-  hasRecoverableDraftPaper = false,
-): RandomEventState {
+/** Each academic year refills the whole pool; conditional events are checked when drawn. */
+export function yearlyResetRandomEventState(state: RandomEventState): RandomEventState {
   const nextState = cloneRandomEventState(state);
-  const pendingIds = new Set<number>((nextState.pendingPaperCompetitionEvents ?? []).map((event) => event.eventId));
-  nextState.availableRandomEvents = createRandomEventPool(publishedPaperCount, hasRecoverableDraftPaper)
+  const pendingIds = new Set<number>((nextState.pendingRandomEvents ?? []).map((event) => event.eventId));
+  nextState.availableRandomEvents = createRandomEventPool()
     .filter((eventId) => !pendingIds.has(eventId));
   nextState.usedRandomEvents = [];
   return nextState;

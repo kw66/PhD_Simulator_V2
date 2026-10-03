@@ -14,6 +14,7 @@ import {
   CONFERENCE_LOCATIONS,
   MAINLAND_LOCATIONS,
   MAINLAND_ONLY_CONFERENCES,
+  REGION_BOUND_CONFERENCES,
   type ConferenceInfo,
   type ConferenceLocation,
 } from "./v2-conference-catalog-data";
@@ -145,6 +146,13 @@ export function getConferenceInfo(gameMonth: number, target: PaperTarget, gameYe
   return createConferenceInfo(conference.name, conference.fullName ?? conference.name, conference.field, realYear, target, year);
 }
 
+function getConferenceName(gameMonth: number, target: PaperTarget, gameYear: number): string | null {
+  const conference = CONFERENCES[gameMonth]?.[target] ?? CONFERENCES[gameMonth]?.C;
+  if (!conference) return null;
+  if (!conference.alternates) return conference.name;
+  return getRealConferenceYear(gameYear, gameMonth) % 2 === 1 ? conference.alternates.odd.name : conference.alternates.even.name;
+}
+
 export function getConferenceLocation(
   gameMonth: number,
   target: PaperTarget,
@@ -154,6 +162,11 @@ export function getConferenceLocation(
   const month = Number(gameMonth || 1);
   const year = Number(gameYear || 1);
   const isMainlandOnly = MAINLAND_ONLY_CONFERENCES[month]?.includes(target) === true;
-  const pool = isMainlandOnly ? MAINLAND_LOCATIONS : CONFERENCE_LOCATIONS;
+  const boundRegions = REGION_BOUND_CONFERENCES[getConferenceName(month, target, year) ?? ""];
+  const pool = isMainlandOnly
+    ? MAINLAND_LOCATIONS
+    : boundRegions
+      ? CONFERENCE_LOCATIONS.filter((location) => boundRegions.includes(location.region))
+      : CONFERENCE_LOCATIONS;
   return getDeterministicLocation(pool, month, year, target, locationSeed);
 }

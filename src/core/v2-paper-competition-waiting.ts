@@ -7,27 +7,24 @@ export function rememberPendingRandomEvent(
   eventId: number,
   serial: number,
 ): GameState {
-  const pending = state.pendingPaperCompetitionEvents ?? [];
+  const pending = state.pendingRandomEvents ?? [];
   if (pending.some((event) => event.eventId === eventId)
     || state.eventQueue.some((event) => event.chainId === `random-${eventId}`)) return state;
   return {
     ...state,
-    pendingPaperCompetitionEvents: [...pending, { eventId, serial }],
+    pendingRandomEvents: [...pending, { eventId, serial }],
     availableRandomEvents: state.availableRandomEvents.filter((id) => id !== eventId),
     usedRandomEvents: state.usedRandomEvents.filter((id) => id !== eventId),
   };
 }
 
-/** Compatibility export for older callers and saved test fixtures. */
-export const rememberPendingPaperCompetitionEvent = rememberPendingRandomEvent;
-
 export function activatePendingRandomEvents(
   state: GameState,
   getRoll: () => number = Math.random,
 ): GameState {
-  if (state.phase !== "playing" || !state.pendingPaperCompetitionEvents?.length) return state;
+  if (state.phase !== "playing" || !state.pendingRandomEvents?.length) return state;
   let nextState = state;
-  for (const pending of state.pendingPaperCompetitionEvents) {
+  for (const pending of state.pendingRandomEvents) {
     if (nextState.eventQueue.some((event) => event.chainId === `random-${pending.eventId}`)) continue;
     if (!isRandomEventEligible(nextState, pending.eventId)) continue;
     const rolls: number[] = [];
@@ -48,7 +45,7 @@ export function activatePendingRandomEvents(
     if (enqueued.queuedEvents.length === 0) continue;
     nextState = {
       ...enqueued.nextState,
-      pendingPaperCompetitionEvents: (nextState.pendingPaperCompetitionEvents ?? [])
+      pendingRandomEvents: (nextState.pendingRandomEvents ?? [])
         .filter((item) => item.eventId !== pending.eventId),
       availableRandomEvents: nextState.availableRandomEvents.filter((id) => id !== pending.eventId),
       usedRandomEvents: [...new Set([...nextState.usedRandomEvents, pending.eventId])],
@@ -56,6 +53,3 @@ export function activatePendingRandomEvents(
   }
   return nextState;
 }
-
-/** Compatibility export for callers that still use the old paper-specific name. */
-export const activatePendingPaperCompetitionEvents = activatePendingRandomEvents;

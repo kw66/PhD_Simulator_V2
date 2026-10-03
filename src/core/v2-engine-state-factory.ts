@@ -1,7 +1,6 @@
 import { MAX_SAN } from "./v2-content";
 import { createAdvisorProgressState } from "./v2-advisor-progress";
-import { createConferenceCareerState } from "./v2-conference-career";
-import { createConferenceEncounterState } from "./v2-conference-encounters";
+import { createConferenceCareerState, createConferenceEncounterState } from "./v2-conference-encounters";
 import { clonePlayer, createLogEntry } from "./v2-engine-helpers";
 import { createEventCounters } from "./v2-event-counters";
 import { createCoffeeState } from "./v2-coffee-system";

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createConferenceActivityEvent, createConferenceActivityResult } from "../src/core/v2-conference-activity-events";
-import { createConferenceCareerState } from "../src/core/v2-conference-career";
-import { createConferenceEncounterState } from "../src/core/v2-conference-encounters";
+import { createConferenceCareerState, createConferenceEncounterState } from "../src/core/v2-conference-encounters";
 import { createInternshipState } from "../src/core/v2-internship-system";
 import { createJointTrainingAct1 } from "../src/core/v2-joint-training-events";
 import { createLoverState } from "../src/core/v2-lover-system";

@@ -1,7 +1,7 @@
-﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
+import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 import { createLabGpuFailureBuff } from "./v2-lab-compute";
 import {
-  createThreeStageRandomEvent,
+  createThreeStageEvent,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -72,7 +72,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription,
     decisionTitle: "你的选择",
     decisionDescription: [

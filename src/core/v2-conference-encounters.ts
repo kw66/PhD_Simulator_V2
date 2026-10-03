@@ -1,5 +1,6 @@
-import type { ConferenceEncounterState } from "./v2-types";
+import type { ConferenceCareerState, ConferenceEncounterState } from "./v2-types";
 
+/** Follow-up state created by conference activities: people met and enterprise contacts. */
 export function createConferenceEncounterState(): ConferenceEncounterState {
   return {
     metBigBullCoop: false,
@@ -16,5 +17,13 @@ export function createConferenceEncounterState(): ConferenceEncounterState {
     smartCount: 0,
     rejectedSmartLoverCount: 0,
     permanentlyBlockedSmartLover: false,
+  };
+}
+
+export function createConferenceCareerState(): ConferenceCareerState {
+  return {
+    enterpriseCount: 0,
+    rejectedInternshipCount: 0,
+    permanentlyBlockedInternship: false,
   };
 }

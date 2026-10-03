@@ -1,5 +1,5 @@
-import { activateLover } from "./v2-lover-system";
-import type { ConferenceEncounterState, Gender, LoverTypeId, PendingEvent } from "./v2-types";
+import { activateLover, getLoverName } from "./v2-lover-system";
+import type { ConferenceEncounterState, EventChoice, Gender, LoverTypeId, PendingEvent } from "./v2-types";
 import { getOppositeGender } from "./v2-lover-system";
 
 export interface LoverDevelopmentContext {
@@ -38,26 +38,71 @@ function getTypeName(type: LoverTypeId): string {
 function getIntroText(type: LoverTypeId): string {
   return type === "beautiful"
     ? "你和那位开朗的同行渐渐熟了。起初互发论文链接，后来连食堂出了什么新菜，也要拍张照片给对方看。"
-    : "你和那位思路清楚的同行又聊起论文。一个问题讨论到深夜，聊天记录里夹着公式、草图，还有一句互相提醒的‘早点睡’。";
+    : "你和那位思路清楚的同行又聊起论文。一个问题讨论到深夜，聊天记录里夹着公式、草图，还有一句互相提醒的“早点睡”。";
 }
 
 function getSceneText(type: LoverTypeId): string {
   return type === "beautiful"
     ? "手机亮起来，你看一眼名字就忍不住笑。旁边的同学探头问是不是中稿了，你赶紧把屏幕扣下。"
-    : "后来，论文讲完了，话题还没结束。对方问你今天过得怎么样，你打了句‘实验还行’，想了想，又多写了几句。";
+    : "后来，论文讲完了，话题还没结束。对方问你今天过得怎么样，你打了句“实验还行”，想了想，又多写了几句。";
+}
+
+function getCandidateName(context: LoverDevelopmentContext): string {
+  return getLoverName({ type: context.type, gender: context.loverGender, startTotalMonths: context.totalMonths });
+}
+
+/** The other person speaks first; the player's feelings stay in narration rather than dialogue. */
+function getConfessionText(context: LoverDevelopmentContext): string {
+  const name = getCandidateName(context);
+  return context.type === "beautiful"
+    ? `这次见面，${name}比平时安静，憋了半天才开口：“我挺喜欢和你待在一起的，要不要试试在一起？”`
+    : `这次见面，${name}把论文合上，认真地看着你：“不聊论文的时候，我们好像也有说不完的话。你愿意试试在一起吗？”`;
 }
 
 function getThoughtText(context: LoverDevelopmentContext): string {
   const pronoun = context.loverGender === "male" ? "他" : "她";
   return context.type === "beautiful"
-    ? `“我好像真的有点喜欢${pronoun}。只是读研已经够忙了，谈恋爱以后还得留出时间陪${pronoun}。”`
-    : "“不聊论文的时候，我们也有话说。我想和对方再靠近一些，又怕只是自己想多了。”";
+    ? `你心里一热，才发现自己也早就喜欢上${pronoun}了。只是读研已经够忙，真在一起，日程里还得给${pronoun}留出位置。`
+    : `你想起那些聊到深夜的晚上，原来不止你一个人舍不得结束话题。可答应下来，组会和实验之间，就得再挤出一块时间。`;
 }
+
+function createLoverSetAsideResult(type: LoverTypeId, totalMonths: number): PendingEvent {
+  return {
+    id: `lover-development-result-set-aside-${type}-${totalMonths}`,
+    title: "发展关系 ➜ 你的心意 ➜ 暂时放下",
+    description: [
+      "你如实说了自己已经有恋人。对方愣了一下，随即笑着摆摆手：“明白，是我唐突了。”",
+      "你们仍会交流论文，只是那天谁也没再提这件事。回去的路上，你给恋人发了条消息，问晚上要不要一起吃饭。",
+      "机制结算",
+      "条件：已有恋人",
+      "结果：不新增关系，不计拒绝次数",
+    ].join("\n\n"),
+    source: "fixed",
+    blocking: true,
+    deadlineMonths: 0,
+    chainId: "lover-development",
+    stage: "result",
+    completionLog: "已有恋人，这次没有开始新的关系。",
+    choices: [{ id: "close", label: "继续", outcome: "继续当前生活。", effects: {} }],
+  };
+}
+
+/** Replaces "尝试在一起" while the player already has a lover; does not count as a rejection. */
+export function createLoverSetAsideChoice(type: LoverTypeId, totalMonths: number): EventChoice {
+  return {
+    id: "accept",
+    label: "暂时放下",
+    outcome: "已有恋人｜不新增关系，不计拒绝次数。",
+    effects: { enqueueEvents: [createLoverSetAsideResult(type, totalMonths)] },
+  };
+}
+
+export const LOVER_OCCUPIED_TEXT = "可你已经有了恋人。你把差点说出口的话咽了回去，这份心意只能先放下。";
 
 function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEvent {
   const nextRejectCount = context.rejectCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
-  const condition = `条件：本次拒绝后，${getTypeName(context.type)}学者关系线拒绝次数 ${context.rejectCount} + 1 = ${nextRejectCount} ${permanentlyBlocked ? "≥" : "<"}2`;
+  const condition = `条件：本次拒绝后，${getTypeName(context.type)}学者关系线拒绝次数 ${context.rejectCount} + 1 = ${nextRejectCount} ${permanentlyBlocked ? "≥" : "<"} 2`;
   const result = `结果：关系线拒绝计数 +1（当前 ${nextRejectCount}/2）；${permanentlyBlocked ? "永久关闭该关系线" : "保留后续关系机会"}`;
 
   return {
@@ -65,15 +110,15 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
     title: "发展关系 ➜ 你的心意 ➜ 暂缓关系",
     description: permanentlyBlocked
       ? [
-          "你删掉打了几遍的‘再看看’，认真说明自己想做普通朋友。对方过了一会儿，回了句‘明白了’。",
+          "你删掉打了几遍的“再看看”，认真说明自己想做普通朋友。对方过了一会儿，回了句“明白了”。",
           "你们仍可以交流论文，只是聊完正事，便各自道别。下一次见面的安排没有再提。",
           "机制结算",
           condition,
           result,
         ].join("\n\n")
       : [
-          "你说自己还没想好，想先保持现在的关系。发出去以后，聊天框安静了一会儿，对方回了句‘好，不着急’。",
-          "你们又聊了几句近况。关掉手机时，你没有再补一句‘等我忙完’，毕竟研究生什么时候能忙完，自己也说不准。",
+          "你说自己还没想好，想先保持现在的关系。发出去以后，聊天框安静了一会儿，对方回了句“好，不着急”。",
+          "你们又聊了几句近况。关掉手机时，你没有再补一句“等我忙完”，毕竟研究生什么时候能忙完，自己也说不准。",
           "机制结算",
           condition,
           result,
@@ -128,18 +173,17 @@ function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent
 function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEvent {
   const nextRejectCount = context.rejectCount + 1;
   const typeName = getTypeName(context.type);
+  const occupied = context.canAddRelationship === false;
   const warningText = context.rejectCount === 0
-    ? "你还可以先缓一缓，等更确定时再回应这份心意。"
+    ? "你还可以先缓一缓，等想清楚了再回应。"
     : `这已不是你第一次犹豫，再拒绝一次，就只和这位${typeName}学者做普通同行了。`;
 
   return {
     id: `lover-development-act2-${context.type}-${context.totalMonths}`,
     title: "发展关系 ➜ 你的心意",
     description: [
-      "聊到下次见面时，对方问起了你的想法。" + getThoughtText(context),
-      (context.canAddRelationship === false
-        ? "你想起已有的恋人，把刚要说出口的话收了回去。这份心意，眼下只能先放在一边。"
-        : "对方把话说得很认真，说愿意试着一起走下去，现在只等你的回答。") + warningText,
+      getConfessionText(context),
+      occupied ? LOVER_OCCUPIED_TEXT : `${getThoughtText(context)}${warningText}`,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -164,11 +208,11 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
           enqueueEvents: [createLoverDeclineResult(context)],
         },
       },
-      {
+      occupied ? createLoverSetAsideChoice(context.type, context.totalMonths) : {
         id: "accept",
-        label: context.canAddRelationship === false ? "暂时放下" : "尝试在一起",
-        outcome: context.canAddRelationship === false ? "恋人数量 = 1｜不增加拒绝次数。" : "恋人数量 = 0｜确认关系，恋人 +1。",
-        effects: context.canAddRelationship === false ? {} : {
+        label: "尝试在一起",
+        outcome: "恋人数量 = 0｜确认关系，恋人 +1。",
+        effects: {
           loverStateUpdates: activateLover(context.type, context.totalMonths, context.playerGender),
           activateLoverProgress: context.type,
           relationshipAdditions: ["lover"],

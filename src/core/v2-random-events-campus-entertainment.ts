@@ -1,6 +1,6 @@
-﻿import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
+import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
-import { createThreeStageRandomEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
+import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
@@ -67,7 +67,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription,
     decisionTitle: "选择游戏",
     decisionDescription: [

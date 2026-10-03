@@ -113,7 +113,7 @@ describe("shared lab project lifecycle", () => {
     } });
     const after = nextMonth(before);
     expect(after.advisorProgressState).toMatchObject({ horizontalProgress: 30, verticalProgress: 30, funding, researchAccumulation: 20 });
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain(type === "horizontal" ? "横向进度+10" : "纵向进度+10");
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain(type === "horizontal" ? "横向进度 +10" : "纵向进度 +10");
     expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 0, writing: 0 });
     expect(collaborationTotal(after.papers[0]!)).toBe(0);
     expect(collaborationTotal(after.fellowPapers![0]!)).toBe(0);
@@ -188,13 +188,13 @@ describe("monthly fellow experiment funding", () => {
     const after = nextMonth(before);
     expect(after.advisorProgressState.funding).toBe(7);
     expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 10, writing: 0 });
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验+10（经费-3）");
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +10（经费 -3）");
     expect(after.player.money).toBe(before.player.money + 1);
     expect(after.player.san).toBe(20);
     expect(after.actionState.used).toBe(0);
     const selected = dispatchAction(after, "select-paper", { paperId: after.papers[0]!.id });
     expect(selected.advisorProgressState.funding).toBe(7);
-    expect(selected.fellowProgressState[0]?.monthlyActivity).toContain("经费-3");
+    expect(selected.fellowProgressState[0]?.monthlyActivity).toContain("经费 -3");
   });
 
   it("switches an experiment to shared horizontal work at funding 2 without charging the player", () => {
@@ -206,7 +206,7 @@ describe("monthly fellow experiment funding", () => {
     const after = nextMonth(before);
     expect(after.advisorProgressState).toMatchObject({ funding: 2, horizontalProgress: 30, verticalProgress: 10 });
     expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 0, writing: 0 });
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("经费不足，横向进度+10");
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("经费不足，横向进度 +10");
     expect(after.player.money).toBe(before.player.money + 1);
     expect(after.player.san).toBe(20);
     expect(after.actionState.used).toBe(0);
@@ -226,8 +226,8 @@ describe("monthly fellow experiment funding", () => {
     const after = nextMonth(before);
     expect(after.advisorProgressState).toMatchObject({ funding: 0, horizontalProgress: 32, verticalProgress: 10 });
     expect(after.fellowPapers?.map((paper) => paper.experiment)).toEqual([10, 0]);
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验+10（经费-3）");
-    expect(after.fellowProgressState[1]?.monthlyActivity).toContain("经费不足，横向进度+12");
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +10（经费 -3）");
+    expect(after.fellowProgressState[1]?.monthlyActivity).toContain("经费不足，横向进度 +12");
     expect(after.player.money).toBe(before.player.money + 1);
     expect(after.player.san).toBe(20);
     expect(after.actionState.used).toBe(0);
@@ -266,7 +266,7 @@ describe("vertical completion guidance across actions", () => {
     expect(collaborationTotal(completerPaper)).toBe(0);
     expect(researcherPaper.experiment).toBeGreaterThan(0);
     expect(after.fellowProgressState.find((profile) => profile.id === researcher.id)?.monthlyActivity)
-      .toMatch(/论文实验\+\d+（经费-3）/);
+      .toMatch(/论文实验 \+\d+（经费 -3）/);
     expect(after.fellowProgressState.find((profile) => profile.id === researcher.id)?.pendingGuidanceFromAdvisor).toBeNull();
     expect(after.fellowProgressState.find((profile) => profile.id === "fellow-one")?.pendingGuidanceFromAdvisor).toBe(10);
     const settled = settleAdvisorGuidance(after);

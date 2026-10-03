@@ -33,7 +33,7 @@ describe("lab GPU failure Buff display", () => {
     expect(buckets.permanent).toEqual([]);
     expect(buckets.nextAction).toEqual([]);
     expect(buckets.monthly).toEqual([expect.objectContaining({
-      label: "实验金币+1",
+      label: "实验金币 +1",
       category: "money",
       isDebuff: true,
       sources: [expect.stringContaining("显卡故障 · 剩余 6 月")],
@@ -43,8 +43,8 @@ describe("lab GPU failure Buff display", () => {
   });
 
   it.each([
-    { delta: 2, label: "实验金币+2", isDebuff: true },
-    { delta: -1, label: "实验金币-1", isDebuff: false },
+    { delta: 2, label: "实验金币 +2", isDebuff: true },
+    { delta: -1, label: "实验金币 -1", isDebuff: false },
   ])("renders the numeric field independently of the Buff identity: $delta", ({ delta, label, isDebuff }) => {
     const buff: Buff = {
       ...createLabGpuFailureBuff(),
@@ -71,20 +71,20 @@ describe("lab GPU failure Buff display", () => {
     for (let elapsed = 0; elapsed < 6; elapsed += 1) {
       const duration = `剩余 ${6 - elapsed} 月`;
       expect(buildBuffDisplayBuckets(buffs).monthly[0]!.sources[0]).toContain(duration);
-      const chip = getEffectChip(renderBuffSidebar(createPlayingState(buffs)), "实验金币+1");
+      const chip = getEffectChip(renderBuffSidebar(createPlayingState(buffs)), "实验金币 +1");
       expect(chip).toContain(duration);
       buffs = advanceBuffDurations(buffs);
     }
 
     expect(buildBuffDisplayBuckets(buffs).monthly).toEqual([]);
-    expect(renderBuffSidebar(createPlayingState(buffs))).not.toContain("实验金币+1");
+    expect(renderBuffSidebar(createPlayingState(buffs))).not.toContain("实验金币 +1");
   });
 
   it.each([0, -1])("hides an expired Buff with %i remaining months from both display paths", (remainingMonths) => {
     const buffs = [{ ...createLabGpuFailureBuff(), remainingMonths }];
     expect(buildBuffDisplayBuckets(buffs).monthly).toEqual([]);
     const sidebar = renderBuffSidebar(createPlayingState(buffs));
-    expect(sidebar).not.toContain("实验金币+1");
+    expect(sidebar).not.toContain("实验金币 +1");
     expect(sidebar).not.toContain("显卡故障");
   });
 
@@ -93,21 +93,21 @@ describe("lab GPU failure Buff display", () => {
     state.shopState.gpuLevel = 8;
     state.internshipState = activateRemoteInternship(state.totalMonths - 1);
     const sidebar = renderBuffSidebar(state);
-    const surcharge = getEffectChip(sidebar, "实验金币+1");
+    const surcharge = getEffectChip(sidebar, "实验金币 +1");
 
     expect(surcharge).toContain('class="effect-chip is-money is-debuff"');
     expect(surcharge).toContain("玩家与同学共享");
     expect(surcharge).toContain("优先导师经费，不足玩家自付，同学不足转横向");
-    expect(getEffectChip(sidebar, "实验金币-2")).toContain('class="effect-chip is-money"');
-    expect(getEffectChip(sidebar, "实验金币-2")).toContain("个人显卡");
-    expect(getEffectChip(sidebar, "实验金币-1")).toContain('class="effect-chip is-money"');
-    expect(getEffectChip(sidebar, "实验金币-1")).toContain("远程实习 · 剩余 3 月");
+    expect(getEffectChip(sidebar, "实验金币 -2")).toContain('class="effect-chip is-money"');
+    expect(getEffectChip(sidebar, "实验金币 -2")).toContain("个人显卡");
+    expect(getEffectChip(sidebar, "实验金币 -1")).toContain('class="effect-chip is-money"');
+    expect(getEffectChip(sidebar, "实验金币 -1")).toContain("远程实习 · 剩余 3 月");
 
     state.buffs = [{ ...createLabGpuFailureBuff(), remainingMonths: 0 }];
     const expiredSidebar = renderBuffSidebar(state);
-    expect(expiredSidebar).not.toContain("实验金币+1");
-    getEffectChip(expiredSidebar, "实验金币-2");
-    getEffectChip(expiredSidebar, "实验金币-1");
+    expect(expiredSidebar).not.toContain("实验金币 +1");
+    getEffectChip(expiredSidebar, "实验金币 -2");
+    getEffectChip(expiredSidebar, "实验金币 -1");
   });
 
   it.each(["workstation", "relationship"] as const)("explains shared costs and personal discounts in the existing %s help", (activePlayTab) => {

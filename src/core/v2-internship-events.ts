@@ -5,6 +5,8 @@ export interface InternshipInviteContext {
   totalMonths: number;
   rejectedInternshipCount: number;
   currentMonthlyIncome: number;
+  /** First-author A papers; the offer letter only cites one when it exists. */
+  publishedAPaperCount?: number;
   unavailable: boolean;
   origin?: string;
 }
@@ -16,6 +18,7 @@ export function buildInternshipInviteContext(
     totalMonths: state.totalMonths,
     rejectedInternshipCount: state.conferenceCareerState.rejectedInternshipCount,
     currentMonthlyIncome: getInternshipMonthlyIncome(getPublishedAPaperCount(state)),
+    publishedAPaperCount: getPublishedAPaperCount(state),
     unavailable: hasOngoingInternship(state) || state.conferenceCareerState.permanentlyBlockedInternship,
   };
 }
@@ -23,11 +26,11 @@ export function buildInternshipInviteContext(
 function createInternshipDeclineResult(context: InternshipInviteContext): PendingEvent {
   const nextRejectCount = context.rejectedInternshipCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
-  const condition = `条件：本次拒绝后，实习拒绝次数 ${context.rejectedInternshipCount} + 1 = ${nextRejectCount} ${permanentlyBlocked ? "≥" : "<"}2`;
+  const condition = `条件：本次拒绝后，实习拒绝次数 ${context.rejectedInternshipCount} + 1 = ${nextRejectCount} ${permanentlyBlocked ? "≥" : "<"} 2`;
   const result = `结果：实习拒绝计数 +1（当前 ${nextRejectCount}/2）；${permanentlyBlocked ? "永久关闭实习机会" : "保留后续邀请机会"}`;
   const description = permanentlyBlocked
     ? [
-        "你再次婉拒了实习邀请，说明目前还是顾不过来。回复写到最后，你删掉了‘下次一定’，免得又给对方一个含糊的答复。",
+        "你再次婉拒了实习邀请，说明目前还是顾不过来。回复写到最后，你删掉了“下次一定”，免得又给对方一个含糊的答复。",
         "这回你也把话说清楚了，之后不再考虑这类实习。关掉邮件时有点可惜，不过桌上没整理完的实验记录还等着你。",
         "机制结算",
         condition,
@@ -67,8 +70,8 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
     id: `internship-invite-result-accept-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择 ➜ 实习已确认",
     description: [
-      "你确认了远程实习安排，把每周交付记进日历。公司的工作群很快发来欢迎消息，你刚回完‘请多指教’，就收到了第一份任务文档。",
-      "课题还得继续，项目也要交差。你把两边的待办放到一起，才发现最难安排的不是工作地点，而是晚上几点能合上电脑。",
+      "你确认了实习安排，把每周交付记进日历。公司的工作群很快发来欢迎消息，你刚回完“请多指教”，就收到了第一份任务文档。",
+      "课题还得继续，项目也要交差。你把两边的待办放到一起，才发现最难排的不是哪天去公司，而是晚上几点能合上电脑。",
       "机制结算",
       "结果：实习周期：6 个月",
       "结果：实习期间：做实验分数 ×1.25",
@@ -80,7 +83,7 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
     deadlineMonths: 0,
     chainId: "internship-invite",
     stage: "result",
-    completionLog: `你接受了 6 个月远程实习，每月金币 +${context.currentMonthlyIncome}、SAN -2。`,
+    completionLog: `你接受了 6 个月大厂实习，每月金币 +${context.currentMonthlyIncome}、SAN -2。`,
     choices: [{
       id: "close",
       label: "继续",
@@ -101,8 +104,8 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
     id: `internship-invite-act2-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择",
     description: [
-      `对方参考你的一作A类论文，为六个月的远程实习开出每月 ${context.currentMonthlyIncome} 金币。熟悉的方法真用到公司业务里又是另一回事，你有点跃跃欲试。`,
-      "再看组会日期，你又有些心虚。远程省了搬家，每周交付却照样要做。" + (context.unavailable
+      `${(context.publishedAPaperCount ?? 0) > 0 ? "对方看过你的一作 A 类论文" : "对方看过你在会上的展示"}，为六个月的大厂实习开出每月 ${context.currentMonthlyIncome} 金币。熟悉的方法真用到公司业务里又是另一回事，你有点跃跃欲试。`,
+      "再看组会日期，你又有些心虚。实习每周都要交付，课题这边也停不下来。" + (context.unavailable
         ? "可先前的安排还摆在那里，这回实在接不下来。"
         : "你在日历上找了又找，想挪出几个完整的晚上。") + warningText,
     ].join("\n\n"),
@@ -127,7 +130,7 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
       {
         id: "accept",
         label: "接受这份实习",
-        outcome: `接受 6 个月远程实习；期间做实验 ×1.25，每月 SAN -2；按当前成果每月金币 +${context.currentMonthlyIncome}。`,
+        outcome: `接受 6 个月大厂实习；期间做实验 ×1.25，每月 SAN -2；按当前成果每月金币 +${context.currentMonthlyIncome}。`,
         ...(context.unavailable ? { disabledReason: "已有实习安排或大厂实习机会已关闭。" } : {}),
         effects: {
           enqueueEvents: [createInternshipAcceptResult(context)],
@@ -142,7 +145,7 @@ export function createInternshipInviteAct1(context: InternshipInviteContext): Pe
     id: `internship-invite-act1-${context.totalMonths}`,
     title: "实习邀请",
     description: [
-      `${context.origin ? `${context.origin}结束后` : "会后"}，你收到企业代表发来的远程实习邀请。附件里列着项目任务，正好用得上你现在做课题的方法。`,
+      `${context.origin ? `${context.origin}结束后` : "会后"}，你收到企业代表发来的实习邀请。附件里列着项目任务，正好用得上你现在做课题的方法。`,
       "你往下翻到报酬那一栏，停了几秒，又往上翻回工作要求。对方希望尽快答复，邮件末尾还附了联系人和入职流程。",
     ].join("\n\n"),
     source: "fixed",

@@ -67,6 +67,24 @@ describe("v2 sanity rules", () => {
     expect(applyTierResist(-4, 18, () => 0.99)).toEqual({ effectiveChange: -4, resistedCount: 0 });
   });
 
+  it("re-reads the tier after every applied point, for gains and losses alike", () => {
+    const replay = (rolls: number[]) => {
+      let index = 0;
+      return () => rolls[index++] ?? 0;
+    };
+
+    // 11 → 12 at 25%, then the next two points face 50%.
+    expect(applyTierResist(3, 11, replay([0.3, 0.3, 0.3]))).toEqual({ effectiveChange: 1, resistedCount: 2 });
+    // 12 → 11 at 50%, then the lower tier only resists 25%.
+    expect(applyTierResist(-3, 12, replay([0.6, 0.3, 0.3]))).toEqual({ effectiveChange: -3, resistedCount: 0 });
+    // Tier 0 does not roll; the second point already sits at 6.
+    expect(applyTierResist(2, 5, () => 0)).toEqual({ effectiveChange: 1, resistedCount: 1 });
+    // A resisted point leaves the value, and so the tier, unchanged.
+    expect(applyTierResist(2, 11, replay([0.1, 0.3]))).toEqual({ effectiveChange: 1, resistedCount: 1 });
+    // Points past the cap are reported as capped, not resisted.
+    expect(applyTierResist(3, 7, () => 0.99, 8)).toEqual({ effectiveChange: 1, resistedCount: 0, cappedCount: 2 });
+  });
+
   it("resolves every point of a two-point favor gain independently", () => {
     const resolve = (rolls: number[]) => {
       let index = 0;
@@ -80,15 +98,15 @@ describe("v2 sanity rules", () => {
     expect(fullyResisted).toEqual({ effectiveChange: 0, resistedCount: 2 });
     expect(partlyResisted).toEqual({ effectiveChange: 1, resistedCount: 1 });
     expect(fullyApplied).toEqual({ effectiveChange: 2, resistedCount: 0 });
-    expect(getTierResistedNarrative("导师好感", 2, fullyResisted)).toContain("没那么容易");
-    expect(getTierResistedNarrative("导师好感", 2, partlyResisted)).toContain("拉近了一点");
+    expect(getTierResistedNarrative("导师好感", 2, fullyResisted)).toBe("");
+    expect(getTierResistedNarrative("导师好感", 2, partlyResisted)).toBe("");
     expect(getTierResistedNarrative("导师好感", 2, fullyApplied)).toBe("");
   });
 
   it("formats resisted outcomes as compact final values", () => {
-    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 1 })).toBe("科研+0（抵抗1）");
-    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 1, resistedCount: 0 })).toBe("科研+1");
-    expect(formatTierResistedOutcome("导师好感", -1, { effectiveChange: -1, resistedCount: 0 })).toBe("导师好感-1");
-    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 0, cappedCount: 1 })).toBe("科研+0（上限）");
+    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 1 })).toBe("科研 +0（抵抗1）");
+    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 1, resistedCount: 0 })).toBe("科研 +1");
+    expect(formatTierResistedOutcome("导师好感", -1, { effectiveChange: -1, resistedCount: 0 })).toBe("导师好感 -1");
+    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 0, cappedCount: 1 })).toBe("科研 +0（上限）");
   });
 });

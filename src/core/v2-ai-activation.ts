@@ -1,5 +1,5 @@
 import { polishUnsubmittedPapers, type AiModelOffer } from "./v2-ai-shop";
-import { applyReadPaperActions } from "./v2-reading-system";
+import { formatReadingResearchOutcome, applyReadPaperActions } from "./v2-reading-system";
 import type { GameState } from "./v2-types";
 
 export interface AiActivationEffectsResolution {
@@ -42,7 +42,8 @@ export function applyAiActivationEffects(
       ? `自动看论文 ${reading.appliedCount}/${requestedReads} 次`
       : `自动看论文 ${reading.appliedCount} 次`;
     const sanText = `SAN -${reading.totalSanCost}`;
-    readingDetails.push(`${model.name} ${completion}，${sanText}，下次想 idea +${reading.totalIdeaBonus}${reading.researchGain > 0 ? `，科研 +${reading.researchGain}` : ""}`);
+    const researchText = formatReadingResearchOutcome(reading);
+    readingDetails.push(`${model.name} ${completion}，${sanText}，下次想 idea +${reading.totalIdeaBonus}${researchText ? `，${researchText}` : ""}`);
   }
 
   return { nextState, polishDetails, readingDetails };

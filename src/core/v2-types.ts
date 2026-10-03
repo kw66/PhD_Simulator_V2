@@ -3,7 +3,7 @@ import type { DebugRelationshipType, DebugStatId } from "./v2-action-ids";
 import type { PaperCompetitionResolution } from "./v2-paper-competition";
 import type { RandomEventState } from "./v2-random-event-rules";
 import type { ThesisState } from "./v2-thesis-rules";
-import type { EventCounters } from "./v2-event-state";
+import type { EventCounters } from "./v2-event-counters";
 import type {
   AiShopState,
   AiSlotId,
@@ -29,7 +29,7 @@ import type {
   ResearchCapacityState,
 } from "./v2-types-relationship";
 
-export * from "./v2-event-state";
+export type { EventCounters } from "./v2-event-counters";
 export * from "./v2-types-economy";
 export * from "./v2-types-fixed-events";
 export * from "./v2-types-relationship";
@@ -54,6 +54,8 @@ export type RoleId =
   | "chosen-reversed"
   | "special-dandan"
   | "special-daji"
+  | "special-finite-life"
+  | "special-fading-genius"
   | "cursed-frail"
   | "cursed-debt";
 export type RoleGrowthStatId = DebugStatId;
@@ -388,7 +390,7 @@ export interface Paper {
   id: string;
   acceptedTotalMonths?: number;
   acceptedOrder?: number;
-  /** Workstation slot identity; omitted on legacy papers and assigned by fallback order. */
+  /** Workstation slot chosen at creation; drafts added by debug tools omit it and fill free slots in order. */
   paperSlotIndex?: number;
   title: string;
   topicId: string;
@@ -529,6 +531,8 @@ export interface EventChoice {
     paperCompetitionResolution?: PaperCompetitionResolution;
     /** Execute shared reading actions without consuming this month's action points. */
     readPaperActions?: number;
+    /** Rolls drawn when the event previewed `readPaperActions`, replayed so the research resist matches the shown result. */
+    readPaperRolls?: number[];
     /** Execute one normal rest action, including its SAN gain and action-point cost. */
     restAction?: boolean;
     readingCount?: number;
@@ -563,6 +567,7 @@ export interface ResolvedEventRecord {
 
 export interface PendingEvent {
   id: string;
+  continuationSourceId?: string;
   title: string;
   description: string;
   source: EventSource;
@@ -703,5 +708,3 @@ export interface DispatchPayload {
   aiSlotId?: AiSlotId | undefined;
   supportItemId?: SupportItemId | undefined;
 }
-/** Legacy field retained for old test fixtures and state migration. */
-export type BikeUpgradeId = "road" | "ebike" | null;

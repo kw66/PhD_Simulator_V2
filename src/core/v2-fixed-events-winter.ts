@@ -11,7 +11,7 @@ import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 function createWinterVacationDescription(branchDescription: string, moneyGain: number): string {
   return [
     branchDescription,
-    `长辈给的红包共${moneyGain}金币。你嘴上说着“都这么大了”，还是仔细收好；家里人又往碗里添了菜，催你趁热吃。`,
+    `长辈给的红包共 ${moneyGain} 金币。你嘴上说着“都这么大了”，还是仔细收好；家里人又往碗里添了菜，催你趁热吃。`,
   ].join("\n\n");
 }
 
@@ -53,9 +53,9 @@ function createWinterVacationPlanEvent(state: GameState): PendingEvent {
     description: [
       "你点开闹钟，想关掉，又怕睡到中午，为没干活心虚。可电脑都一路背回来了，也不差今晚这一会儿。",
       [
-        "家里说留了红包，等你回去吃年夜饭。",
+        "家里说红包早就备好了，就等年夜饭上再给。",
         state.loverState.active
-          ? "听说恋人也会来拜年，长辈又问了一遍名字，说红包可不能只备你一份。"
+          ? "听说你要带恋人回来拜年，长辈又问了一遍名字，说红包可不能只备你一份。"
           : "亲戚已经问起有没有对象，饭桌上恐怕还得想办法接话。",
         "你先把闹钟关了，串门和亲戚问话都留到明天。",
       ].join(""),

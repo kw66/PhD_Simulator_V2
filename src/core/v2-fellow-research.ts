@@ -173,7 +173,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
       fellowProgressState: result.state.fellowProgressState.map((fellow) => fellow.id === profile.id
         ? { ...fellow, lastProjectTotalMonths: state.totalMonths, nextMonthlyAction: "research" } : fellow),
     };
-    addActivity(profile.id, `${forceHorizontal ? "经费不足，" : ""}${type === "horizontal" ? "横向" : "纵向"}进度+${result.gain}${result.completed > 0 ? type === "vertical" ? "（完成并指导论文）" : "（项目完成）" : ""}`);
+    addActivity(profile.id, `${forceHorizontal ? "经费不足，" : ""}${type === "horizontal" ? "横向" : "纵向"}进度 +${result.gain}${result.completed > 0 ? type === "vertical" ? "（完成并指导论文）" : "（项目完成）" : ""}`);
   };
   for (const active of activeProfiles) {
     const profile = nextState.fellowProgressState.find((fellow) => fellow.id === active.id)!;
@@ -202,7 +202,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     ));
     const gain = updated[field] - paper[field];
     const label = field === "idea" ? "idea" : field === "experiment" ? "实验" : "写作";
-    addActivity(profile.id, `${paper.createdTotalMonths === state.totalMonths ? "新稿" : "论文"}${label}+${gain}${field === "experiment" ? `（经费-${experimentCost}）` : ""}`);
+    addActivity(profile.id, `${paper.createdTotalMonths === state.totalMonths ? "新稿" : "论文"}${label} +${gain}${field === "experiment" ? `（经费 -${experimentCost}）` : ""}`);
     nextState = {
       ...nextState,
       fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? updated : entry),
@@ -229,6 +229,6 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     )),
   };
   if (publications.length === 0) return nextState;
-  const rewardedState = applyPublicationTalentRewards(nextState);
+  const rewardedState = applyPublicationTalentRewards(nextState, random);
   return { ...rewardedState, relationshipState: syncRelationshipState(rewardedState.relationshipState, rewardedState.player.social) };
 }

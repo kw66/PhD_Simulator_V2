@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildConferenceDecisionEventsForAcceptedPapers, createConferenceDecisionAct1 } from "../src/core/v2-conference-events";
-import { createConferenceCareerState } from "../src/core/v2-conference-career";
-import { createConferenceEncounterState } from "../src/core/v2-conference-encounters";
+import { createConferenceCareerState, createConferenceEncounterState } from "../src/core/v2-conference-encounters";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventCounters } from "../src/core/v2-event-counters";
 import { createEventQueueItem } from "../src/core/v2-event-queue";

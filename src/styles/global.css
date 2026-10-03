@@ -7,7 +7,6 @@
   --ui-font-cjk: "Noto Sans SC", "Source Han Sans SC", "Source Han Sans CN", "HarmonyOS Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
   font-family: var(--ui-font-cjk);
   --display-font-cjk: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
-  --mono-font-cjk: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", "Consolas", "Noto Sans SC", monospace;
   line-height: 1.54;
   font-weight: 400;
   --paper: #f4eee0;
@@ -1162,7 +1161,7 @@ p {
   min-width: 0;
   max-width: 100%;
   color: var(--accent-deep);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
   font-size: 0.78rem;
   font-weight: 760;
   font-variant-numeric: tabular-nums;
@@ -1262,7 +1261,8 @@ p {
   right: 9px;
   transform: translateY(-50%);
   color: var(--ink-soft);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
   font-size: 0.62rem;
   pointer-events: none;
 }
@@ -1285,7 +1285,8 @@ p {
   right: 23px;
   bottom: 8px;
   color: var(--ink-soft);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
   font-size: 0.66rem;
   pointer-events: none;
 }
@@ -1832,7 +1833,8 @@ p {
 
 .community-pagination span {
   color: var(--ink-soft);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
   font-size: 0.72rem;
 }
 
@@ -2392,7 +2394,7 @@ button.pager-arrow:disabled {
 .compact-pagination .pagination-count {
   min-width: 3em;
   color: var(--ink-soft);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
   font-size: 0.72rem;
   font-weight: 600;
   line-height: 1;
@@ -3282,6 +3284,10 @@ button.pager-arrow:disabled {
 .is-rich-reversed-tree .lobby-talent-tree-page,
 .is-genius-reversed-tree .lobby-talent-tree-page,
 .is-teacher-child-reversed-tree .lobby-talent-tree-page,
+.is-cursed-frail-tree .lobby-talent-tree-page,
+.is-special-fading-genius-tree .lobby-talent-tree-page,
+.is-special-finite-life-tree .lobby-talent-tree-page,
+.is-cursed-debt-tree .lobby-talent-tree-page,
 .is-social-reversed-tree .lobby-talent-tree-page {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(3, calc(var(--lobby-talent-node-height) / 3)) minmax(0, 1fr);
@@ -3423,6 +3429,48 @@ button.pager-arrow:disabled {
 
 .is-designed-tree .lobby-talent-tree-node.is-fixed { --tree-tone: #a65f67; }
 
+.is-cursed-frail-tree .lobby-talent-tree-node,
+.is-special-fading-genius-tree .lobby-talent-tree-node,
+.is-special-finite-life-tree .lobby-talent-tree-node,
+.is-cursed-choice-tree .lobby-talent-tree-node { --tree-tone: #a65f67; }
+
+.is-cursed-choice-tree .lobby-talent-tree-node[data-tier="1"] { --tree-tone: #a25560; }
+.is-cursed-choice-tree .lobby-talent-tree-node[data-tier="2"] { --tree-tone: #ad4c58; }
+.is-cursed-choice-tree .lobby-talent-tree-node[data-tier="3"] { --tree-tone: #ba424e; }
+
+.is-cursed-choice-tree .lobby-talent-tree-node[data-tier="1"] .lobby-talent-tree-node-ring {
+  box-shadow:
+    inset 0 1px 2px rgba(255, 252, 240, 0.38),
+    inset 0 -3px 5px rgba(40, 37, 40, 0.2),
+    0 2px 5px rgba(67, 58, 48, 0.19),
+    0 0 14px 3px color-mix(in srgb, var(--tree-tone) 48%, transparent);
+}
+
+.is-cursed-choice-tree .lobby-talent-tree-node[data-tier="2"] .lobby-talent-tree-node-ring {
+  box-shadow:
+    inset 0 1px 2px rgba(255, 252, 240, 0.38),
+    inset 0 -3px 5px rgba(40, 37, 40, 0.2),
+    0 2px 5px rgba(67, 58, 48, 0.19),
+    0 0 17px 4px color-mix(in srgb, var(--tree-tone) 56%, transparent);
+}
+
+.is-cursed-choice-tree .lobby-talent-tree-node[data-tier="3"] .lobby-talent-tree-node-ring {
+  box-shadow:
+    inset 0 1px 2px rgba(255, 252, 240, 0.38),
+    inset 0 -3px 5px rgba(40, 37, 40, 0.2),
+    0 2px 5px rgba(67, 58, 48, 0.19),
+    0 0 21px 5px color-mix(in srgb, var(--tree-tone) 64%, transparent);
+}
+
+.is-cursed-choice-tree .lobby-talent-tree-node[data-tier="2"] .lobby-talent-tree-node-ring::before {
+  inset: -6px;
+}
+
+.is-cursed-choice-tree .lobby-talent-tree-node[data-tier="3"] .lobby-talent-tree-node-ring::before {
+  inset: -7px;
+  border-width: 2px;
+}
+
 
 .is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="favor-reset"] { --tree-tone: #bb718a; }
 .is-teacher-child-reversed-tree .lobby-talent-tree-node[data-talent-id="advisor-meeting-focus"] { --tree-tone: #6c9379; }
@@ -3487,6 +3535,10 @@ button.pager-arrow:disabled {
 .is-rich-reversed-tree .lobby-talent-tree-node,
 .is-genius-reversed-tree .lobby-talent-tree-node,
 .is-teacher-child-reversed-tree .lobby-talent-tree-node,
+.is-cursed-frail-tree .lobby-talent-tree-node,
+.is-special-fading-genius-tree .lobby-talent-tree-node,
+.is-special-finite-life-tree .lobby-talent-tree-node,
+.is-cursed-debt-tree .lobby-talent-tree-node,
 .is-social-reversed-tree .lobby-talent-tree-node {
   height: 58px;
 }
@@ -4664,7 +4716,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 .new-currency-value {
   position: relative;
   display: inline-block;
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
   font-size: 0.84rem;
   font-weight: 600;
   letter-spacing: 0;
@@ -5606,7 +5658,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 
 .workstation-action-points strong {
   color: var(--ink);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
   font-size: var(--workstation-font-emphasis);
   font-variant-numeric: tabular-nums;
 }
@@ -5795,7 +5847,8 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   place-items: center;
   border: 1px solid currentColor;
   border-radius: 50%;
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
   font-size: var(--workstation-font-small);
   font-weight: 700;
   line-height: 1;
@@ -6916,7 +6969,7 @@ button[data-card-icon-action]:focus-visible {
 }
 
 .center-tab-badge {
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
   min-width: 21px;
   min-height: 21px;
   padding: 0 6px;
@@ -10389,7 +10442,7 @@ button[data-card-icon-action]:focus-visible {
 .paper-review-overview-grid > span + span { border-left: var(--play-divider-thin); }
 .paper-review-overview-grid small,
 .paper-review-total-score small { color: var(--setup-label-color); font-size: var(--workstation-font-small); }
-.paper-review-overview-grid strong { font-size: var(--workstation-font-main); font-family: var(--mono-font-cjk); }
+.paper-review-overview-grid strong { font-size: var(--workstation-font-main); font-family: var(--ui-font-cjk); font-variant-numeric: tabular-nums; }
 
 .paper-reviewer-grid {
   display: grid;
@@ -10423,7 +10476,8 @@ button[data-card-icon-action]:focus-visible {
 
 .paper-reviewer-number {
   color: var(--accent-deep);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
   font-size: var(--workstation-font-small);
   font-weight: 700;
 }
@@ -10493,7 +10547,7 @@ button[data-card-icon-action]:focus-visible {
 .paper-review-decision-head > div > span { color: var(--setup-label-color); font-size: var(--workstation-font-small); }
 .paper-review-decision-head strong { color: var(--review-tone); font-size: var(--type-body); }
 .paper-review-total-score { justify-self: end; text-align: center; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--review-tone) 40%, transparent); border-radius: 4px; }
-.paper-review-total-score strong { font-family: var(--mono-font-cjk); font-size: 1rem; }
+.paper-review-total-score strong { font-family: var(--ui-font-cjk); font-size: 1rem; font-variant-numeric: tabular-nums; }
 
 .paper-review-votes { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; font-size: var(--workstation-font-small); }
 .paper-review-votes > span:not(.paper-review-decision-rule) { padding: 2px 8px; background: var(--research-card-footer); border-radius: 4px; }
@@ -11332,7 +11386,8 @@ button[data-card-icon-action]:focus-visible {
 
 .research-paper-row-stat strong {
   color: var(--ink);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
   font-size: 0.79rem;
   font-weight: 800;
 }
@@ -11383,7 +11438,8 @@ button[data-card-icon-action]:focus-visible {
 
 .research-section .research-metric-item > strong {
   color: var(--ink);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
   font-size: 0.94rem;
   font-weight: 800;
 }
@@ -12359,7 +12415,8 @@ button:disabled {
 }
 
 .research-paper-authors {
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
 }
 
 .research-paper-author.is-player {
@@ -12392,7 +12449,7 @@ button:disabled {
 
 .research-paper-row-stat strong {
   color: var(--ink);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
   font-size: 0.76rem;
   font-variant-numeric: tabular-nums;
 }
@@ -13032,7 +13089,7 @@ button[aria-disabled="true"][title] {
 
 .research-section .research-global-summary .citation-venue-cell strong {
   color: var(--ink);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
@@ -13314,7 +13371,8 @@ button[aria-disabled="true"][title] {
 
 .research-pagination span {
   color: var(--setup-label-color);
-  font-family: var(--mono-font-cjk);
+  font-family: var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
   font-size: 0.64rem;
   white-space: nowrap;
 }

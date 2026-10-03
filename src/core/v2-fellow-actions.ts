@@ -23,6 +23,6 @@ export function advanceFellowTask(state: GameState, fellowId: string, random: ()
   };
   const settledState = settlePendingFellowHelp(paidState, random);
   const actionState = pushLog(settledState,
-    `科研协作：${getFellowName(profile)}，协作进度+${progress}${sanCost > 0 ? `，SAN-${sanCost}` : ""}`);
+    `科研协作：${getFellowName(profile)}，协作进度 +${progress}${sanCost > 0 ? `，SAN -${sanCost}` : ""}`);
   return settlePendingFellowHelp(advanceFellowCooperationWithLog(actionState, fellowId, progress), random);
 }

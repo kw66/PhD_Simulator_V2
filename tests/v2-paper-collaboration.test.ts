@@ -10,7 +10,7 @@ import { applyPrepublicationPaperDecay, createDraftPaper, submitPaper, withdrawP
 import { applyResearchOperation } from "../src/core/v2-research-operation";
 import { applyPaperCompetitionResolution } from "../src/core/v2-paper-competition";
 import { getAcceptedPaperScore } from "../src/core/v2-publication-rules";
-import { getJournalRevisionScore, submitJournalPaper } from "../src/core/v2-journal-system";
+import { getJournalScore, submitJournalPaper } from "../src/core/v2-journal-system";
 import { getAiModelForTotalMonths, polishUnsubmittedPapers } from "../src/core/v2-ai-shop";
 import { endRelationship } from "../src/core/v2-relationship-actions";
 import { activateLover } from "../src/core/v2-lover-system";
@@ -176,9 +176,9 @@ describe("paper collaboration scores", () => {
     const paper = makePaper({ idea: 40, experiment: 40, writing: 40, collaborationScores: { idea: 10, experiment: 10, writing: 10 } });
     const submitted = submitJournalPaper(makeState(paper), paper.id, "nmi");
     const helped = addPaperCollaboration(submitted.papers[0]!, assistance(paper, { idea: 10 }));
-    expect(getJournalRevisionScore(helped)).toBe(130);
+    expect(getJournalScore(helped)).toBe(130);
     const researched = applyResearchOperation({ ...submitted, papers: [helped] }, paper.id, "idea", () => 0);
-    expect(getJournalRevisionScore(researched.papers[0]!)).toBe(131);
+    expect(getJournalScore(researched.papers[0]!)).toBe(131);
     const decayed = applyPrepublicationPaperDecay(researched);
     expect(decayed.papers[0]).toEqual(researched.papers[0]);
     const withdrawn = withdrawPaper(decayed, paper.id).papers[0]!;

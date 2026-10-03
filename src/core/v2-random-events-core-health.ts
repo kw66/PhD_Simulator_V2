@@ -1,6 +1,6 @@
 import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
-import { createThreeStageRandomEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
+import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { Buff, EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type IllnessType = "stomach" | "flu" | "fever";
@@ -181,7 +181,7 @@ export function createIllnessRandomEvent(
         id: `illness-${illnessType}-rest-${serial}`,
         label: "休息",
         ...(state.actionState.used >= state.actionState.limit ? { disabledReason: "本月行动点已用尽，无法休息" } : {}),
-        outcome: `${formatActualSanChange(-ILLNESS_REST_BASE_SAN_COST, state.month, state.eventSupport, illnessBuffs)}｜休息（SAN+${restSanGain}｜行动点-1）｜生病概率 ×0.5｜${clearIllnessOutcome}`,
+        outcome: `${formatActualSanChange(-ILLNESS_REST_BASE_SAN_COST, state.month, state.eventSupport, illnessBuffs)}｜休息（SAN +${restSanGain}｜行动点 -1）｜生病概率 ×0.5｜${clearIllnessOutcome}`,
         effects: { san: restSan, illnessProbabilityMultiplier: 0.5, restAction: true, removeBuffIds: [pendingBuffId] },
       },
     ],
@@ -198,7 +198,7 @@ export function createIllnessRandomEvent(
     return copy.results[resultKey].join("\n\n");
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: copy.intro.join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: copy.decision.join("\n\n"),

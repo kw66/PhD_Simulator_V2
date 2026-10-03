@@ -1,4 +1,9 @@
-import type { EventCounters } from "./v2-types";
+export interface EventCounters {
+  badmintonCount: number;
+  pokerCount: number;
+  pokerProfit: number;
+  meetingCount: number;
+}
 
 export function createEventCounters(): EventCounters {
   return {

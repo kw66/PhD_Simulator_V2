@@ -100,7 +100,7 @@ describe("event SAN scope", () => {
     const rest = decision.choices.find((entry) => entry.label === "休息")!;
     expect(medicine.effects.san).toBe(-1);
     expect(rest.effects.san).toBe(-5);
-    expect(rest.outcome).toContain("休息（SAN+2");
+    expect(rest.outcome).toContain("休息（SAN +2");
     state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: rest.id });
     const result = state.eventQueue[0]!;
     state = dispatchAction(state, "resolve-event", { eventId: result.id, eventChoiceId: result.choices[0]!.id });

@@ -137,7 +137,10 @@ describe.each(COMPETITIONS)("paper competition $eventId: $field", ({ eventId, ti
       });
     }
     const routed = createRandomEventById(eventId, state, () => 0);
-    expect(routed.event).toEqual(event);
+    expect(routed.event).toEqual({
+      ...event,
+      description: `${event.description}\n\n备注：出现条件：存在一作论文，且${field === "idea" ? " idea " : "实验"}分数 > 0（草稿或审稿中）`,
+    });
     expect(routed.nextState).toEqual(state);
     expect(state).toEqual(snapshot);
   });

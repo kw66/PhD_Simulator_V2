@@ -69,11 +69,11 @@ function getReviewRewardText(settlement: PaperReviewSettlement): string {
       const amount = settlement.reports.reduce((sum, report) => sum
         + (report.improvements?.[field as "idea" | "experiment" | "writing"] ?? 0)
         + (report.improvementAction === field ? report.improvementAmount ?? 0 : 0), 0);
-      return amount > 0 ? `${field === "idea" ? "idea" : field === "experiment" ? "实验" : "写作"}+${amount}` : "";
+      return amount > 0 ? `${field === "idea" ? "idea" : field === "experiment" ? "实验" : "写作"} +${amount}` : "";
     }).filter(Boolean);
     return `论文退回草稿；${gains.length ? `修改反馈：${gains.join(" · ")}` : "本轮无分数提升"}${sanText}`;
   }
-  return `科研分+${settlement.scoreGain}${sanText}`;
+  return `科研分 +${settlement.scoreGain}${sanText}`;
 }
 
 function resolveReviewerSan(state: GameState, settlement: PaperReviewSettlement): PaperReviewSettlement {

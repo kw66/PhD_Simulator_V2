@@ -16,7 +16,7 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
     ? "眼前的字又有点发花，最想补的其实是一场好觉。"
     : state.player.san < 12
       ? "你打个哈欠。这阵子每天要按掉好几遍闹钟，连补觉都欠着，写总结也提不起劲。"
-      : "这一年倒没把精神熬垮。可不用定闹钟、醒了不急着出门，还是很向往。";
+      : "这一年倒没把精神熬垮，只是一想到不用定闹钟、醒了不急着出门的日子，还是忍不住向往。";
   const socialHint = socialCapped
     ? "聚餐时记下的笑话又让你乐了，那帮人该再约一次。"
     : state.player.social < 6

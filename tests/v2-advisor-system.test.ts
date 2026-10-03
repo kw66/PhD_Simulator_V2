@@ -22,7 +22,7 @@ function makeState(): GameState {
 describe("advisor engine integration", () => {
   it("routes both project buttons through the monthly player limit", () => {
     const initial = makeState();
-    const horizontal = dispatchAction(initial, "advisor-horizontal");
+    const horizontal = dispatchAction(initial, "advisor-project", { projectType: "horizontal" });
     expect(horizontal.advisorProgressState.horizontalProgress).toBeGreaterThanOrEqual(20);
     expect(horizontal.advisorProgressState.horizontalProgress).toBeLessThanOrEqual(25);
     const repeated = dispatchAction(horizontal, "advisor-project", { projectType: "vertical" });
@@ -42,7 +42,7 @@ describe("advisor engine integration", () => {
 
   it("does not consume action points for mentor projects", () => {
     const initial = makeState();
-    const next = dispatchAction(initial, "advisor-horizontal");
+    const next = dispatchAction(initial, "advisor-project", { projectType: "horizontal" });
     expect(next.actionState).toEqual(initial.actionState);
   });
 

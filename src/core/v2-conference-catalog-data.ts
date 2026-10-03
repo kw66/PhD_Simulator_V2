@@ -195,3 +195,8 @@ export const MAINLAND_LOCATIONS = CONFERENCE_LOCATIONS.filter(
 export const MAINLAND_ONLY_CONFERENCES: Partial<Record<number, PaperTarget[]>> = {
   10: ["C"],
 };
+
+/** Venues whose name ties them to a region are only held in that region's cities. */
+export const REGION_BOUND_CONFERENCES: Readonly<Record<string, readonly ConferenceRegionId[]>> = {
+  MMAsia: ["asia", "domestic"],
+};

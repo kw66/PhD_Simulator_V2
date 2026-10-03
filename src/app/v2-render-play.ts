@@ -64,7 +64,7 @@ import {
   previewReadPaperAction,
 } from "../core/v2-reading-system";
 import { getResearchExperimentCostBreakdown, previewResearchOperation, RESEARCH_OPERATION_SAN_COST } from "../core/v2-research-operation";
-import { getJournalDefinition, getJournalRevisionScore, getJournalSubmissionFailure } from "../core/v2-journal-system";
+import { getJournalDefinition, getJournalScore, getJournalSubmissionFailure } from "../core/v2-journal-system";
 import {
   RANDOM_ADVISOR_GIVEN_CHARS,
   RANDOM_ADVISOR_NAMES,
@@ -571,20 +571,20 @@ function buildEffectBuckets(state: GameState): {
   }
   const experimentMoneyDiscount = getShopExperimentMoneyDiscount(state.shopState);
   if (experimentMoneyDiscount > 0) {
-    upsertBucketItem(permanent, "gpu-experiment-money", `实验金币-${experimentMoneyDiscount}`,
+    upsertBucketItem(permanent, "gpu-experiment-money", `实验金币 -${experimentMoneyDiscount}`,
       "个人显卡 · 先减实验费用，再使用导师经费", false, "money");
   }
   if (writingModifier.bonus > 0) {
     upsertBucketItem(permanent, "permanent", `论文 +${writingModifier.bonus}分`, "机械键盘");
   }
   if (writingModifier.sanDiscount > 0) {
-    upsertBucketItem(permanent, "permanent", `论文 SAN-${writingModifier.sanDiscount}`, "机械键盘");
+    upsertBucketItem(permanent, "permanent", `论文 SAN -${writingModifier.sanDiscount}`, "机械键盘");
   }
   if (readSanDiscount > 0) {
-    upsertBucketItem(permanent, "permanent", `看论文 SAN-${readSanDiscount}`, "显示器");
+    upsertBucketItem(permanent, "permanent", `看论文 SAN -${readSanDiscount}`, "显示器");
   }
   if (coffeeBonus > 0) {
-    upsertBucketItem(monthly, "monthly", `冰美式额外 SAN+${coffeeBonus}`, "咖啡机");
+    upsertBucketItem(monthly, "monthly", `冰美式额外 SAN +${coffeeBonus}`, "咖啡机");
   }
   if (hasAiReimbursement(state)) {
     upsertBucketItem(monthly, "monthly-ai-reimbursement", "AI报销", "导师经费", false, "money");
@@ -621,7 +621,7 @@ function buildEffectBuckets(state: GameState): {
     actionEffects: { experiment: { bonus: internshipEffect.bonus, multiplier: internshipEffect.multiplier } },
   }] : state.buffs);
   if (internshipEffect.moneyDiscount > 0) {
-    upsertBucketItem(monthly, "internship-experiment-money", `实验金币-${internshipEffect.moneyDiscount}`,
+    upsertBucketItem(monthly, "internship-experiment-money", `实验金币 -${internshipEffect.moneyDiscount}`,
       `${internshipSource} · 剩余 ${internship.remainingMonths} 月 · 先减实验费用，再使用导师经费`, false, "money");
   }
   for (const [timing, target] of [["permanent", permanent], ["monthly", monthly], ["next-action", single]] as const) {
@@ -763,7 +763,7 @@ const EVENT_EMOJI_THEMES: readonly [string, readonly [string, string, string]][]
   ["导师基金结果", ["📝", "📨", "📣"]],
   ["导师增选结果", ["📝", "📨", "🏅"]],
   ["显卡采购", ["🖥️", "💳", "✅"]],
-  ["涨工资", ["💰", "🧾", "😊"]],
+  ["领劳务费", ["💰", "🧾", "😊"]],
   ["布置工位", ["🪑", "🛠️", "✨"]],
   ["报销 AI 费用", ["🤖", "🧾", "💡"]],
   ["不断学习", ["📚", "💡", "🧠"]],
@@ -817,9 +817,20 @@ const EVENT_EMOJI_THEMES: readonly [string, readonly [string, string, string]][]
   ["招聘", ["💼", "📄", "🎉"]],
 ];
 
+function findEventEmojiTheme(text: string): readonly [string, string, string] | undefined {
+  let best: readonly [string, readonly [string, string, string]] | undefined;
+  for (const entry of EVENT_EMOJI_THEMES) {
+    if (text.includes(entry[0]) && (!best || entry[0].length > best[0].length)) best = entry;
+  }
+  return best?.[1];
+}
+
 function getEventEmoji(title: string, stage: EventStage = "act1"): string {
-  const root = getEventRootTitle(title);
-  const theme = EVENT_EMOJI_THEMES.find(([keyword]) => root.includes(keyword))?.[1]
+  // Branch-specific themes (e.g. 据理力争) are keyed by the current scene name;
+  // the event root title is the fallback. The longest keyword wins so that
+  // 年会活动 is not swallowed by 年会.
+  const scene = normalizeGameDisplayText(title.split("➜").at(-1)?.trim() ?? "");
+  const theme = findEventEmojiTheme(scene) ?? findEventEmojiTheme(getEventRootTitle(title))
     ?? ["📌", "🧭", "✅"] as const;
   return stage === "act2" ? theme[1] : stage === "act3" || stage === "act4" || stage === "result" ? theme[2] : theme[0];
 }
@@ -967,13 +978,13 @@ function renderEventDescriptionHtml(
       const displayText = paragraph.replace(/^备注：/u, "小提示：");
       const className = isTip ? ' class="event-description-note"' : isNarrative ? ' class="event-description-story"' : "";
       const renderedText = renderEventInlineHtml(displayText);
-      const inlineEmoji = index === 0 && eventEmoji && !/^\s*\p{Extended_Pictographic}/u.test(displayText)
+      // The scene emoji leads the opening paragraph instead of being wedged
+      // after its first sentence, where it read as part of the next sentence.
+      const leadingEmoji = index === 0 && eventEmoji && /[。！？!?]/u.test(displayText)
+        && !/^\s*\p{Extended_Pictographic}/u.test(displayText)
         ? `<span class="event-description-emoji" aria-hidden="true">${eventEmoji}</span>`
         : "";
-      const body = inlineEmoji
-        ? renderedText.replace(/([。！？!?])/u, `$1${inlineEmoji}`)
-        : renderedText;
-      return `<p${className}>${isTip ? '<span aria-hidden="true">💡</span> ' : ""}${body}</p>`;
+      return `<p${className}>${isTip ? '<span aria-hidden="true">💡</span> ' : ""}${leadingEmoji}${renderedText}</p>`;
     })
     .join("");
   const settlementHtml = renderEventSettlementSummary(settlementItems);
@@ -1438,7 +1449,7 @@ function getJournalRevisionMonths(state: Pick<GameState, "year" | "month">, pape
 function renderPaperJournalHeader(state: GameState, paper: Paper, selected: boolean): string {
   if (paper.status !== "journal-reviewing" || !paper.journalTarget) return "";
   const journal = getJournalDefinition(paper.journalTarget);
-  const score = getJournalRevisionScore(paper);
+  const score = getJournalScore(paper);
   const revisedMonths = getJournalRevisionMonths(state, paper);
   return `
     <div class="paper-card-header paper-review-card-header">
@@ -1622,7 +1633,9 @@ function renderWorkstationPaperResearchActions(
             : type === "experiment" && state.player.money < experimentCost.playerMoney ? `金币不足，需要 ${experimentCost.playerMoney}` : "";
     const aiClass = preview.usesAiResearchBonus ? " is-ai-bonus" : "";
     const prerequisiteClass = paper !== null && !prerequisiteMet ? " is-prerequisite-locked" : "";
-    const moneyText = type === "experiment"
+    // The button shows only the player's own coins; advisor funding stays in
+    // the tooltip. A fully covered experiment shows no coin cost, not "金币-0".
+    const moneyText = type === "experiment" && experimentCost.playerMoney > 0
       ? ` · 金币-${experimentCost.playerMoney}`
       : "";
     const effectText = `SAN-${paper ? renderAnimatedNumber(`paper:${paper.id}:action:${type}:san-cost`, preview.sanCost) : preview.sanCost}${moneyText}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
@@ -1970,8 +1983,8 @@ function getRenderedLoverType(type: LoverTypeId | null): string {
 function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard | null> {
   const cards: Array<RelationshipRenderCard | null> = Array.from({ length: 6 }, () => null);
 
-  // The selected advisor is immutable once confirmed.  Keep the card visible
-  // from the stored name even if an older save has a stale advisor counter.
+  // The selected advisor is immutable once confirmed, so the stored name alone
+  // decides whether the advisor card is shown.
   if (state.selectedAdvisorName) {
     cards[0] = {
       relationshipId: "advisor",
@@ -2318,7 +2331,7 @@ function renderAdvisorStatus(state: GameState): string {
               <div class="rel-progress-fill project-${projectType}" ${animationBarAttribute(`person:advisor:${projectType}:progress`)} style="width:${clampPercent(progress / PROJECT_PROGRESS_MAX * 100)}%"></div>
             </div>
             <span class="rel-progress-val">${renderAnimatedNumber(`person:advisor:${projectType}:progress`, progress)}/${PROJECT_PROGRESS_MAX}</span>
-            <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="${projectType === "horizontal" ? "advisor-horizontal" : "advisor-project"}" data-project-type="${projectType}" title="不消耗行动点，每月二选一"${blocked ? ` disabled aria-disabled="true" aria-label="推进项目：${escapeHtml(blocked)}"` : ""}>
+            <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="advisor-project" data-project-type="${projectType}" title="不消耗行动点，每月二选一"${blocked ? ` disabled aria-disabled="true" aria-label="推进项目：${escapeHtml(blocked)}"` : ""}>
               <span class="rel-action-label">${renderRelationshipIcon(icon)}${projectType === "vertical" ? "做纵向" : "做横向"}</span>${advisor.lastPlayerProjectTotalMonths === state.totalMonths ? "" : `<span class="rel-action-cost">SAN-${renderAnimatedNumber(`person:advisor:${projectType}:san-cost`, projectSanCost)}</span>`}
             </button>
           </div>`;
@@ -4072,7 +4085,7 @@ function getEventLogPresentation(
   }
   return {
     title: visibleChoices.length > 0
-      ? `${monthAdvancePresentation.title} - ${visibleChoices.join(" · ")}`
+      ? `${monthAdvancePresentation.title}：${visibleChoices.join(" · ")}`
       : monthAdvancePresentation.title,
     result,
   };

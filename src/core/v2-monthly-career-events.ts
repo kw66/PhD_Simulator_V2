@@ -6,40 +6,52 @@ import {
   type CareerType,
 } from "./v2-career-rules";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
-import { getPublishedPaperCount } from "./v2-monthly-event-shared";
+import { getPublishedPaperCount } from "./v2-publication-rules";
 import { createThreeStageEvent, type RandomEventResultCopy } from "./v2-random-events-core-shared";
 import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 
 const CAREER_COPY: Record<CareerType, {
   intro: string;
   currentWork: string;
+  decision: string;
   result: string;
   followup: string;
 }> = {
   internet: {
     intro: "你在工位上点开校招群的岗位表。都叫算法工程师，细看却像在招几种不同的人。",
     currentWork: "你把简历拖到旁边。组会上能讲半天的经历，放进这一页纸里，居然只剩几行技术名词。",
+    decision: "你对着岗位描述逐项核技术栈，又把项目里真正做过的部分列出来。写得太满，面试时容易被追问；写得太少，又像什么都没做。",
     result: "你对照岗位要求，把“参与项目”拆成具体做法。平时觉得没什么的细节，倒比那串技术名词更好解释。",
     followup: "你试着照这一版讲了讲经历，总算不必每说两句，就补一句“这个得从头说起”。",
   },
   stateOwned: {
     intro: "学校就业网转来了央国企招聘公告。单位名字都很熟，岗位地点、专业要求和材料清单，却得从头认一遍。",
     currentWork: "你把岗位表和学籍信息并排打开。读了这么久的专业，核对全称时，还是老老实实多看了一眼。",
+    decision: "公告里的专业全称、学历要求和附件清单一项都不能错。你把学籍信息和报名材料放在一起，光是确认每个文件该放哪一栏，就够占掉一晚。",
     result: "你对照公告核过专业全称、学历和联系方式，给拿不准的要求做了标记。刚才挤成一团的申请材料，总算各有了去处。",
     followup: "录用还没影，好在重新打开材料目录时，已经不用挨个猜附件里装了什么。",
   },
   civilService: {
     intro: "公务员招录的职位表挂出来了。你在工位上筛过专业和学历，刚才还很长的表格，已经没剩多少行。",
     currentWork: "旁边开着行测题和申论资料。每个字都认识，轮到限时作答，你却迟迟没选下第一个答案。",
+    decision: "行测要在限时里做取舍，申论又不能只堆漂亮话。你可以先刷题找手感，也可以坐下来整理一篇完整的申论提纲，时间只够顾好一边。",
     result: "你核过报考条件，又理了一遍行测和申论笔记。对答案时觉得很明白的几道题，遮住解析，才发现还卡在同一步。",
     followup: "你把卡住的地方圈了出来。笔记上总算有了自己的笔迹，下回就从这里接着练。",
   },
   academic: {
     intro: "你在工位上翻起高校招聘页面。都写着“诚聘英才”，点开各学院的附件，才知道有没有自己能报的方向。",
     currentWork: "简历停在“未来研究计划”一栏。组会上熟悉的“下一步工作”，到了这里，忽然要多想几年。",
+    decision: "招聘页面要求提交研究计划。你把眼前课题的下一步往后推了几年，又删掉几句听起来很大的目标，试着写出别人能据此判断的具体问题。",
     result: "你梳理了研究经历，把后续设想写得具体一些。简历里几句很气派的话，念出来连自己也接不住，只好删掉重写。",
     followup: "再看这一版，总算能顺着每段讲下去了。你对照旁边的招聘页面，又看了看自己与岗位是否合适。",
   },
+};
+
+/** Opening line per effort level, so the three effort results read differently. */
+const CAREER_EFFORT_LEAD: Record<string, string> = {
+  light: "你只在组会和实验的空档里挤出几个晚上。",
+  normal: "这个月你专门留出整段时间准备求职。",
+  "all-in": "这个月你几乎把能挪的时间都给了求职，实验进度表上空了好几格。",
 };
 
 function createCareerChoices(state: GameState, careerType: CareerType): {
@@ -67,8 +79,10 @@ function createCareerChoices(state: GameState, careerType: CareerType): {
       title: "本月结果",
       description: progressGain > 0
         ? [
-            copy.result,
-            `「${definition.name}」准备进度从 ${oldProgress} 提升到 ${newProgress}，当前求职评估为「${getCareerLevel(careerType, newProgress).name}」。`,
+            `${CAREER_EFFORT_LEAD[option.id] ?? ""}${copy.result}`,
+            `「${definition.name}」准备进度从 ${oldProgress} 提升到 ${newProgress}，${getCareerLevel(careerType, newProgress).name === getCareerLevel(careerType, oldProgress).name
+              ? `求职评估仍是「${getCareerLevel(careerType, oldProgress).name}」`
+              : `求职评估升到「${getCareerLevel(careerType, newProgress).name}」`}。`,
             copy.followup,
           ].join("\n\n")
         : [
@@ -138,8 +152,8 @@ function createCareerEvent(state: GameState, careerType: CareerType): PendingEve
     ].join("\n\n"),
     decisionTitle: "本月安排",
     decisionDescription: [
-      "你在日历上标好组会和实验。刚看招聘还心热，回到日程表却发了愁：这个月已经排了这么多事。",
-      "你圈出几项求职待办。认真准备得留出整段时间和精力；想把去处落实，又舍不得把这个月排得太满。",
+      copy.decision,
+      "你在日历上标好组会和实验，再圈出几项求职待办。认真准备得留出整段时间和精力；想把去处落实，又舍不得把这个月排得太满。",
     ].join("\n\n"),
     results,
   });

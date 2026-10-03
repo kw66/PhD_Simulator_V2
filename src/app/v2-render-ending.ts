@@ -22,7 +22,7 @@ const ENDINGS: Record<Exclude<EndingId, null>, EndingPresentation> = {
   },
   phd: {
     title: "博士毕业", icon: "🎓", label: "学业完成", tone: "success",
-    story: ["离开实验室前，你把研究文件又备份了一遍。目录里那些标着‘最终版’的稿件，一个也没舍得删，每个后缀都让你想起一段赶工的日子。", "你完成了博士阶段的科研要求。关电脑前，还有同学来问一个实验问题，你照常讲了半天，才想起明天不用再来这个工位了。"],
+    story: ["离开实验室前，你把研究文件又备份了一遍。目录里那些标着“最终版”的稿件，一个也没舍得删，每个后缀都让你想起一段赶工的日子。", "你完成了博士阶段的科研要求。关电脑前，还有同学来问一个实验问题，你照常讲了半天，才想起明天不用再来这个工位了。"],
     closing: "学位有终点，探索没有",
   },
   burnout: {
@@ -102,11 +102,12 @@ function renderEndingSummary(state: GameState): string {
     return `<span data-ending-stat="${venue}">${label}<strong>${count}</strong></span>`;
   });
   const relationshipCount = state.relationshipState.advisorCount + state.fellowProgressState.length + Number(state.loverState.active);
+  // Same value/cap format as the left attribute rail; money and headcount have no cap.
   const attributes = [
     ["san", "🧠 SAN", `${state.player.san}/${state.sanCap}`, state.ending === "burnout"],
     ["research", "💡 科研", `${state.player.research}/${getResearchCap(state.researchCapacityState)}`, state.ending === "overthinking"],
-    ["social", "🤝 社交", state.player.social, state.ending === "isolated"],
-    ["favor", "🎓 导师好感", state.player.favor, state.ending === "expelled"],
+    ["social", "🤝 社交", `${state.player.social}/20`, state.ending === "isolated"],
+    ["favor", "🎓 导师好感", `${state.player.favor}/20`, state.ending === "expelled"],
     ["money", "💰 金币", state.player.money, state.ending === "poor"],
     ["relationships", "👥 关系人数", relationshipCount, false],
   ] as const;

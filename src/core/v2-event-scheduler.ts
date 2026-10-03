@@ -10,7 +10,7 @@ import { getRandomEventCategory, type RandomEventCategory } from "./v2-random-ev
 import { createIllnessRandomEvent } from "./v2-random-events-core-health";
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { rememberPendingRandomEvent } from "./v2-paper-competition-waiting";
-import { getPublishedPaperCount } from "./v2-monthly-event-shared";
+import { getPublishedPaperCount } from "./v2-publication-rules";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -60,7 +60,7 @@ export function collectRandomEventsForMonth(
         usedRandomEvents: nextState.usedRandomEvents,
         illnessProbability: nextState.illnessProbability,
         totalRandomEventCount: nextState.totalRandomEventCount,
-        pendingPaperCompetitionEvents: nextState.pendingPaperCompetitionEvents,
+        pendingRandomEvents: nextState.pendingRandomEvents,
         social: nextState.player.social,
         research: nextState.player.research,
         publishedPaperCount: getPublishedPaperCount(nextState),

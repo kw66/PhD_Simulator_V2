@@ -1,8 +1,7 @@
 import { AI_SLOT_IDS, getAiModelForTotalMonths, hasAiReimbursement } from "./v2-ai-shop";
 import { getNextBikeTierDefinition } from "./v2-bike-system";
 import { COFFEE_MACHINE_PRICE, COFFEE_MACHINE_UPGRADE_DEFINITIONS, getAvailableCoffeeMachineUpgrades, getCoffeeBuyPrice } from "./v2-coffee-system";
-import { canBuyShopItem, getAvailableShopUpgrades } from "./v2-shop-items-ownership-status";
-import { getShopItemSellPrice } from "./v2-shop-items-ownership-display";
+import { canBuyShopItem, getAvailableShopUpgrades, getShopItemSellPrice } from "./v2-shop-items-ownership";
 import { SHOP_ITEM_DEFINITIONS, getNextGpuPrice, getShopItemDefinition, getShopUpgradeDefinition } from "./v2-shop-items-shared";
 import { SUPPORT_ITEM_DEFINITIONS, getSupportItemDefinition, getSupportItemSellPrice, isSupportItemOwned } from "./v2-support-items";
 import type { DispatchPayload, GameState, ShopItemId, ShopUpgradeId, SupportItemId } from "./v2-types";

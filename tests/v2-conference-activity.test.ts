@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { createConferenceActivityDecisionEvent, selectConferenceActivityOptions } from "../src/core/v2-conference-activity";
-import { createConferenceCareerState } from "../src/core/v2-conference-career";
-import { createConferenceEncounterState } from "../src/core/v2-conference-encounters";
+import { createConferenceActivityDecisionEvent } from "../src/core/v2-conference-activity-events";
+import { selectConferenceActivityOptions } from "../src/core/v2-conference-activity-options";
+import { createConferenceCareerState, createConferenceEncounterState } from "../src/core/v2-conference-encounters";
 import { activateInternship, activateRemoteInternship, createInternshipState } from "../src/core/v2-internship-system";
 import { createLoverState } from "../src/core/v2-lover-system";
 import { createRelationshipState } from "../src/core/v2-relationship-rules";

@@ -43,7 +43,7 @@ function makeState(papers: Paper[] = []): GameState {
     selectedPaperId: papers[0]?.id ?? null,
     availableRandomEvents: [17, 18],
     usedRandomEvents: [11, 14, 16],
-    pendingPaperCompetitionEvents: [],
+    pendingRandomEvents: [],
     totalRandomEventCount: 7,
     illnessProbability: 0,
     buffs: [],
@@ -121,7 +121,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
       stage: "act1", randomReplay: { eventId, serial: 8 },
     });
     expectRootTarget(queued, eventId, target.id);
-    expect(queued.pendingPaperCompetitionEvents).toEqual([]);
+    expect(queued.pendingRandomEvents).toEqual([]);
     expect(queued.totalRandomEventCount).toBe(8);
     expectDebugResourcesUnchanged(queued, snapshot);
     expect(initial).toEqual(snapshot);
@@ -150,7 +150,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
       expect(target.nonFirstAuthor).not.toBe(true);
       expect(target[field]).toBeGreaterThan(0);
       expect(queued.eventQueue).toHaveLength(1);
-      expect(queued.pendingPaperCompetitionEvents).toEqual([]);
+      expect(queued.pendingRandomEvents).toEqual([]);
       expect(queued.totalRandomEventCount).toBe(8);
       expectDebugResourcesUnchanged(queued, snapshot);
       expect(initial).toEqual(snapshot);
@@ -223,7 +223,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
       expect(completed.relationshipState).toEqual(snapshot.relationshipState);
       expect(completed.externalPublications).toEqual(snapshot.externalPublications);
       expect(completed.eventQueue).toEqual([]);
-      expect(completed.pendingPaperCompetitionEvents).toEqual([]);
+      expect(completed.pendingRandomEvents).toEqual([]);
       expect(completed.totalRandomEventCount).toBe(8);
       expect(completed.eventHistory).toHaveLength(1);
       expect(completed.eventHistory[0]!.stages).toHaveLength(3);
@@ -237,7 +237,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
   it.each(["empty", "eligible", "hidden"] as const)("keeps repeated clicks idempotent throughout every act from %s", (source) => {
     const initial = makeState(source === "eligible" ? [makePaper(0)] : []);
     if (source === "hidden") {
-      initial.pendingPaperCompetitionEvents = [{ eventId, serial: 6 }];
+      initial.pendingRandomEvents = [{ eventId, serial: 6 }];
       initial.availableRandomEvents = [otherEventId];
     }
     let state = triggerCompetition(initial, eventId);
@@ -272,7 +272,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
 
   it.each(["both", "other-only"] as const)("activates coexisting hidden opportunities once with consistent root targets: %s", (hidden) => {
     const initial = makeState();
-    initial.pendingPaperCompetitionEvents = hidden === "both"
+    initial.pendingRandomEvents = hidden === "both"
       ? [{ eventId, serial: 6 }, { eventId: otherEventId, serial: 7 }]
       : [{ eventId: otherEventId, serial: 7 }];
     initial.availableRandomEvents = hidden === "both" ? [] : [eventId];
@@ -288,7 +288,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
     expect(awake.papers[0]![otherField]).toBeGreaterThan(0);
     expect(awake.papers).toHaveLength(1);
     expect(awake.eventQueue).toHaveLength(2);
-    expect(awake.pendingPaperCompetitionEvents).toEqual([]);
+    expect(awake.pendingRandomEvents).toEqual([]);
     expect(awake.totalRandomEventCount).toBe(expectedCount);
     expect(getCompetition(awake, otherEventId).randomReplay?.serial).toBe(7);
 
@@ -310,7 +310,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
     expect(drawn.events).toEqual([]);
     expect(drawn.nextState.papers).toEqual([]);
     expect(drawn.nextState.eventQueue).toEqual([]);
-    expect(drawn.nextState.pendingPaperCompetitionEvents).toEqual([{ eventId, serial: 8 }]);
+    expect(drawn.nextState.pendingRandomEvents).toEqual([{ eventId, serial: 8 }]);
     expect(drawn.nextState.totalRandomEventCount).toBe(8);
     expectDebugResourcesUnchanged(drawn.nextState, snapshot);
 
@@ -318,7 +318,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
     expect(getCompetition(queued, eventId).randomReplay?.serial).toBe(8);
     expect(getTarget(queued, eventId)[field]).toBeGreaterThan(0);
     expect(queued.papers).toHaveLength(1);
-    expect(queued.pendingPaperCompetitionEvents).toEqual([]);
+    expect(queued.pendingRandomEvents).toEqual([]);
     expect(queued.totalRandomEventCount).toBe(8);
     expectDebugResourcesUnchanged(queued, snapshot);
     expect(initial).toEqual(snapshot);

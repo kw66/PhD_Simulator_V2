@@ -29,9 +29,20 @@ export function recordTalentTrigger(state: GameState, key: string, trigger: Tale
 
 export function describeTalentChange(label: string, before: number, after: number): string {
   const delta = after - before;
-  return `${label}${delta > 0 ? "+" : ""}${delta}（${before}→${after}）`;
+  return `${label} ${delta > 0 ? "+" : ""}${delta}（${before}→${after}）`;
 }
 
 export function describeTalentReward(label: string, reward: number, before: number, after: number): string {
-  return `${label}${reward > 0 ? "+" : ""}${reward}（${before}→${after}）`;
+  return `${label} ${reward > 0 ? "+" : ""}${reward}（${before}→${after}）`;
+}
+
+/** A tier-resisted reward shows what actually landed: "科研 +0（8→8，抵抗1）". */
+export function describeResistedTalentReward(
+  label: string,
+  before: number,
+  result: { effectiveChange: number; resistedCount: number; cappedCount?: number },
+): string {
+  const gain = result.effectiveChange;
+  const notes = [result.resistedCount > 0 ? `抵抗${result.resistedCount}` : "", result.cappedCount ? "上限" : ""].filter(Boolean);
+  return `${label} ${gain >= 0 ? "+" : ""}${gain}（${before}→${before + gain}${notes.map((note) => `，${note}`).join("")}）`;
 }

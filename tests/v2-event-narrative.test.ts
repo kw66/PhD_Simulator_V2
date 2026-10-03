@@ -47,4 +47,15 @@ describe("event narrative hints", () => {
     expect(decisions[0]!.choices[1]!.effects.favor).toBe(-1);
     expect(decisions[2]!.choices[1]!.effects.research).toBe(1);
   });
+
+  it("keeps group meeting scenes focused on paper reading", () => {
+    const event = createRandomEventById(6, makeState(8, 8), () => 0.25).event!;
+    const copy = collectCopy(event).join("\n");
+
+    expect(copy).toContain("论文");
+    expect(copy).not.toContain("实验图");
+    expect(copy).not.toContain("汇报自己的实验");
+    expect(copy).toContain("方法");
+    expect(copy).toContain("几篇串成系列比较");
+  });
 });

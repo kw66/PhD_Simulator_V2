@@ -6,7 +6,7 @@ import {
 } from "./v2-paper-competition";
 import {
   createRandomEventSkeleton,
-  createThreeStageRandomEvent,
+  createThreeStageEvent,
   drawInclusiveInt,
   type RandomEventResultCopy,
 } from "./v2-random-events-core-shared";
@@ -92,7 +92,7 @@ const PAPER_COMPETITION_COPY: Record<PaperCompetitionEventId, PaperCompetitionCo
     introButton: "核对结果",
     introDescription: (title) => [
       `你整理《${title}》的实验结果时，刷到一篇刷新性能纪录的新论文。你先看数据划分，再看评价指标和测试设置，来回翻了几遍，对方的结果确实更好。`,
-      "新数字填进对照表，原来的加粗就得挪位置了。你把光标停在那一格，桌上的水已经凉了。",
+      "新数字填进对照表，原来的加粗就得挪位置了。你把光标停在那一格，迟迟没按下删除键。",
     ].join("\n\n"),
     decisionDescription: [
       "你放大表格，找自己占优的数字，翻了一屏才停住。目光绕开落后的几列，刚写好的“显著优于”却尤其扎眼。",
@@ -183,7 +183,7 @@ export function createPaperCompetitionRandomEvent(
       };
     }),
   };
-  const stagedEvent = createThreeStageRandomEvent(event, {
+  const stagedEvent = createThreeStageEvent(event, {
     introDescription: copy.introDescription(paper.title),
     decisionTitle: "如何应对",
     decisionDescription: `${copy.decisionDescription}\n\n涉及论文：**《${paper.title}》**`,

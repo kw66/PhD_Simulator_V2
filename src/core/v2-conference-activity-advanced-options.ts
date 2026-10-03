@@ -19,7 +19,7 @@ export function createAdvancedConferenceActivityOptions(
   if (encounter.bigBullCooperation) {
     options.push({
       id: "big-bull-coop",
-      label: "🎓 找大牛合作（借联培继续深挖）",
+      label: "找大牛合作（借联培继续深挖）",
       outcome: "社交 +1，下次写论文 +8，科研上限 +1。",
       resultDescription: "有了联培合作的基础，这次见面直接从草稿聊起。对方在几处结论后面打上问号，你们顺着证据逐一推敲。聊完，稿子短了几行，论证倒比原先扎实了。",
       effects: {
@@ -38,7 +38,7 @@ export function createAdvancedConferenceActivityOptions(
   } else if (!encounter.metBigBullCoop) {
     options.push({
       id: "big-bull-coop",
-      label: "🎓 找大牛合作（主动争取一次机会）",
+      label: "找大牛合作（主动争取一次机会）",
       outcome: "社交 +1，下次写论文 +8。",
       resultDescription: "报告结束后，你等主讲人稍微空下来，拿出自己的论文，说明想合作的问题。对方指出论证里最该补清楚的部分，又留下联系方式；你赶紧记下，免得转头只记得自己紧张。",
       effects: {
@@ -56,7 +56,7 @@ export function createAdvancedConferenceActivityOptions(
   if (!encounter.metBeautiful && !encounter.permanentlyBlockedBeautifulLover && !hasLover) {
     options.push({
       id: "beautiful-scholar",
-      label: "💕 和活泼学者交流",
+      label: "和活泼学者交流",
       outcome: "SAN +5，社交 +1。",
       resultDescription: "你和邻座从刚才的报告聊到各自课题组。对方讲起把旧版 PPT 带去组会的经历，你笑着承认，自己也干过差不多的事。散场前交换联系方式时，已经不用再看胸牌认名字了。",
       effects: {
@@ -73,7 +73,7 @@ export function createAdvancedConferenceActivityOptions(
   if (!encounter.metSmart && !encounter.permanentlyBlockedSmartLover && !hasLover) {
     options.push({
       id: "smart-scholar",
-      label: "🧠 和聪慧学者交流（深聊研究）",
+      label: "和聪慧学者交流（深聊研究）",
       outcome: "SAN +1，社交 +1，下次想 idea 多 2 次。",
       resultDescription: "你们对着同一篇论文讨论了很久。对方在草稿上改了一个假设，你接着往下推，又冒出两种值得试的办法。直到下一场报告开始，才发现手边的咖啡已经凉了。",
       effects: {
@@ -99,7 +99,7 @@ export function createAdvancedConferenceActivityOptions(
     const nextDeepCount = encounter.bigBullDeepCount + 1;
     options.push({
       id: "big-bull-joint-training",
-      label: "🌟 和上次那位大牛深入合作",
+      label: "和上次那位大牛深入合作",
       outcome: nextDeepCount >= 2
         ? "下次写论文 +8，收到联合培养邀请。"
         : "下次写论文 +8。",
@@ -122,7 +122,7 @@ export function createAdvancedConferenceActivityOptions(
     const nextBeautifulCount = encounter.beautifulCount + 1;
     options.push({
       id: "beautiful-lover-development",
-      label: "💕 和上次那位活泼学者继续交流",
+      label: "和上次那位活泼学者继续交流",
       outcome: nextBeautifulCount >= 2
         ? "SAN +8，SAN 上限 +3，触发关系事件。"
         : "SAN +8，SAN 上限 +3。",
@@ -144,7 +144,7 @@ export function createAdvancedConferenceActivityOptions(
     const nextSmartCount = encounter.smartCount + 1;
     options.push({
       id: "smart-lover-development",
-      label: "🧠 和上次那位聪慧学者继续交流",
+      label: "和上次那位聪慧学者继续交流",
       outcome: nextSmartCount >= 2
         ? "SAN +1，科研 +1，触发关系事件。"
         : "SAN +1，科研 +1。",

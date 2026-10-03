@@ -32,6 +32,7 @@ const LOBBY_ROLE_ROWS: ReadonlyArray<ReadonlyArray<RoleId>> = [
   ["chosen", "chosen-reversed"],
   ["research-captain", "rewinder"],
   ["special-dandan", "special-daji"],
+  ["special-finite-life", "special-fading-genius"],
   ["cursed-frail", "cursed-debt"],
 ];
 const GROWTH_STAT_IDS: RoleGrowthStatId[] = ["san", "research", "social", "favor", "money"];

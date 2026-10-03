@@ -1,17 +1,16 @@
-﻿import {
+import {
   applyTierResist,
   formatResearchMiscSanChange,
   formatTierResistedOutcome,
   getActualResearchMiscSanChange,
   formatActualSanChange,
   getActualSanChange,
-  getTierResistedNarrative,
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import { canAddRelationship } from "./v2-relationship-rules";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowPronoun, getFellowRoleLabel } from "./v2-fellow-progression";
 import {
-  createThreeStageRandomEvent,
+  createThreeStageEvent,
   drawInclusiveInt,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
@@ -100,7 +99,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
       `同级同门${peerName}在实验室门口叫住你，递来一页画满箭头的草图。纸角有点卷，最中间的那个问题倒是圈得很用力。`,
       `“我觉得这个方向可以试试，你要不要一起做？”${peerName}指着其中一条线讲起来。你们站着说了几句，索性找间空教室，借块白板慢慢画。`,
@@ -108,7 +107,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
     decisionTitle: "你的选择",
     decisionDescription: [
       `白板列了实验、写作和投稿，负责人还空着。${isLowSocial ? `你和${peerName}接话还不顺，解释一组实验就绕了几圈。眼前的事能做，往后能否一直配合，你没底。` : `你和${peerName}越聊越顺，很快分清各自擅长的部分。对方翻出下月日程，问起以后讨论的时间。`}`,
-      `互相补点工作、挂个名字，也得确认排期，口头约好未必落得下来。全面合作会挤占自己的实验；婉拒不至于闹僵，刚记的点子还能带回去想。${!isLowSocial && !canAddPeer ? "普通关系栏已满，全面合作仍有本次收益，但不新增同门；你可以现在退出。" : ""}`,
+      "互相补点工作、挂个名字，也得确认排期，口头约好未必落得下来。全面合作会挤占自己的实验；婉拒不至于闹僵，刚记的点子还能带回去想。",
     ].join("\n\n"),
     results: {
       [`random-10-exchange-${serial}`]: {
@@ -180,15 +179,15 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   const mentorSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const deepResearchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
   const deepResearchChange = deepResearchResult.effectiveChange;
-  const deepResearchNarrative = getTierResistedNarrative("科研", 1, deepResearchResult);
   const canAddSenior = canAddRelationship(state.relationshipState, "senior");
   const fellowCapacity = Math.max(0, state.relationshipState.unlockedSlots - 1);
   const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender, usedNames, getRoll);
+  const seniorIntro = `${roleText}${seniorAddition.name ?? ""}`;
 
   const event: PendingEvent = {
     id: `random-11-y${state.year}-m${state.month}-n${serial}`,
     title: eventTitle,
-    description: `${roleText}带着项目记录来找你，问你要不要一起做。你接过材料，先翻到实验那页，发现有几处正是自己想弄明白的问题。`,
+    description: `${seniorIntro}带着项目记录来找你，问你要不要一起做。你接过材料，先翻到实验那页，发现有几处正是自己想弄明白的问题。`,
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -234,15 +233,15 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
     ],
   };
 
-  return createThreeStageRandomEvent(event, {
+  return createThreeStageEvent(event, {
     introDescription: [
-      `${roleText}搬了把椅子坐到你旁边，说手上的项目缺个人一起做。项目记录摊开好几页，有张图改过几次，旧线条还隐约留在纸上。`,
+      `同组的${seniorIntro}搬了把椅子坐到你旁边，说手上的项目缺个人一起做。项目记录摊开好几页，有张图改过几次，旧线条还隐约留在纸上。`,
       `你接过材料，翻到实验那页停了下来。${roleText}见你看得认真，把椅子又往近处挪了一点：“这块我从头给你讲讲。”`,
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
       `${roleText}圈出接下来的实验。你追问两处，才发现之前卡住的地方还有这样的做法。翻到写作页，密密麻麻的批注让你坐直了些：学会这些，以后自己动笔也用得上。`,
-      `想学的东西多了，跟着做也得花时间。${canAddSenior ? "对方提议定好分工，固定讨论。你翻出日程，盘算从哪块开始。" : "手头合作已排满，再约长期讨论，怕是谁也顾不好。普通关系栏已满，本次仍有收益，但不新增师兄或师姐；你可以现在退出。"}`,
+      "想学的东西多了，跟着做也得花时间。对方提议定好分工、固定讨论，你翻出日程，盘算从哪块开始。",
     ].join("\n\n"),
     results: {
       [`random-11-watch-${serial}`]: {
@@ -263,8 +262,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
         title: "深合作",
         description: [
           `你跟着${roleText}把选题、实验和写作过了一遍。记录里几行轻描淡写的“调整设置”，摊开讲竟占了大半页笔记。`,
-          "你把每一步为什么这样做补在旁边，又回头核对了一轮。讨论结束，桌上的水早就凉了，你把这次用到的方法单独标出来，留着以后对照。",
-          ...(deepResearchNarrative ? [deepResearchNarrative] : []),
+          "你把每一步为什么这样做补在旁边，又回头核对了一轮。讨论结束时笔记本已经翻过好几页，你把这次用到的方法单独标出来，留着以后对照。",
         ].join("\n\n"),
       },
       [`random-11-mentor-${serial}`]: {
@@ -294,4 +292,3 @@ export function createRelationshipRandomEventById(
   }
   return null;
 }
-

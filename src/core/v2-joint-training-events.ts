@@ -25,7 +25,7 @@ function createJointTrainingDeclineResult(context: JointTrainingContext): Pendin
     title: "联合培养 ➜ 联培抉择 ➜ 暂不接受",
     description: permanentlyBlocked
       ? [
-          "你和导师谈过，还是决定不参加联培。这次回信没有再写‘以后有机会’，而是认真谢过对方，说明今后也不考虑了。",
+          "你和导师谈过，还是决定不参加联培。这次回信没有再写“以后有机会”，而是认真谢过对方，说明今后也不考虑了。",
           "邮件发出，你把联培材料归进文件夹，打开原来的实验记录。屏幕上还是那几个没解决的问题，至少接下来该忙什么，已经定了。",
           "机制结算",
           `联培拒绝计数 +1（当前 ${nextRejectCount}/2）`,
@@ -33,7 +33,7 @@ function createJointTrainingDeclineResult(context: JointTrainingContext): Pendin
         ].join("\n\n")
       : [
           "你和导师商量后，回信婉拒了这次联培。附件里的条件确实让人心动，只是手头的课题还没理顺，你想先把这一头做好。",
-          "对方回了句‘以后有机会再聊’。你把邮件留在收件箱里，暂时不再往日历上添新安排。",
+          "对方回了句“以后有机会再聊”。你把邮件留在收件箱里，暂时不再往日历上添新安排。",
           "机制结算",
           `联培拒绝计数 +1（当前 ${nextRejectCount}/2）`,
           "继续深入合作还有一次机会。",
@@ -140,7 +140,7 @@ export function createJointTrainingAct1(context: JointTrainingContext): PendingE
     title: "联合培养",
     description: [
       `${context.origin ? `${context.origin}结束后` : "会后"}，之前一起讨论课题的那位学者发来联培邀请，也把方案抄送给了你的导师。`,
-      "你点开附件，设备、课题和合作安排列了好几页。原以为会场上的‘以后多联系’是句客气话，对方连方案都写好了。",
+      "你点开附件，设备、课题和合作安排列了好几页。原以为会场上的“以后多联系”是句客气话，对方连方案都写好了。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

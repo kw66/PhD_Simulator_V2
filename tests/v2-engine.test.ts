@@ -439,7 +439,7 @@ describe("minimal game engine", () => {
 
     state = resolveCurrent(state);
     expect(state.eventQueue[0]?.stage).toBe("act2");
-    expect(state.eventQueue[0]?.description).toContain("已经发表 1 篇论文（B 类 1 篇），科研分是 2");
+    expect(state.eventQueue[0]?.description).toContain("已经发表 1 篇可计分的一作论文（B 类 1 篇），科研分是 2");
     expect(state.eventQueue[0]?.description).toContain("今年转博需要达到 2 分");
     expect(state.eventQueue[0]?.description).toContain("同届同门");
     expect(state.eventQueue[0]?.description).toContain("读博压力");
@@ -876,7 +876,7 @@ describe("minimal game engine", () => {
     const decision = state.eventQueue[0];
     const rest = decision?.choices.find((choice) => choice.label === "休息");
     if (!decision || !rest) throw new Error("illness rest choice is missing");
-    expect(rest.outcome).toContain("休息（SAN+2｜行动点-1）");
+    expect(rest.outcome).toContain("休息（SAN +2｜行动点 -1）");
     expect(rest.outcome).not.toContain("普通休息");
     state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: rest.id });
     expect(state.player.san).toBe(10);

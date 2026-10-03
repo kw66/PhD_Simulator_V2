@@ -3,7 +3,8 @@ import { pushLog, pushMilestoneLog, pushNoOpLog } from "./v2-engine-helpers";
 import { addPaperCollaboration } from "./v2-paper-collaboration";
 import { getLoverName } from "./v2-lover-system";
 import { getResearchCap } from "./v2-research-cap-system";
-import { describeTalentReward, recordTalentTrigger } from "./v2-talent-history";
+import { applyTierResist } from "./v2-sanity-rules";
+import { describeResistedTalentReward, describeTalentReward, recordTalentTrigger } from "./v2-talent-history";
 import type { GameState, LoverProgressState, LoverTypeId } from "./v2-types";
 
 const LOVER_RELATION_MAX = 40;
@@ -69,11 +70,11 @@ export function getLoverPassiveGains(state: GameState): { play: number; study: n
 }
 
 export function getLoverNextReward(state: GameState, route: LoverRoute): string {
-  if (route === "shopping") return "下次购物免单、亲密+2";
+  if (route === "shopping") return "下次购物免单、亲密 +2";
   const cycle = getRoute(state, route).completed % 3;
   return (route === "play"
-    ? ["SAN+6", "SAN上限+1", "下月SAN消耗-1"]
-    : [`论文最低项+${state.loverProgressState.research}分`, "永久idea、实验、写作各+1分", "双方科研较低者+1，相同不提升"])[cycle]! + "、亲密+1";
+    ? ["SAN +6", "SAN上限 +1", "下月SAN消耗 -1"]
+    : [`论文最低项 +${state.loverProgressState.research}分`, "永久idea、实验、写作各 +1分", "双方科研较低者 +1，相同不提升"])[cycle]! + "、亲密 +1";
 }
 
 export function settlePendingLoverHelp(state: GameState, random: () => number = Math.random): GameState {
@@ -92,10 +93,16 @@ export function settlePendingLoverHelp(state: GameState, random: () => number = 
   return pushMilestoneLog({ ...state,
     papers: state.papers.map((entry) => entry.id === paper.id ? paper : entry),
     loverProgressState: { ...state.loverProgressState, pendingPaperHelp: null },
-  }, `恋人帮助：${help.name}帮你完善《${paper.title}》，${{ idea: "idea", experiment: "实验", writing: "写作" }[target.field]}+${help.amount}`, "lover-help");
+  }, `恋人帮助：${help.name}帮你完善《${paper.title}》，${{ idea: "idea", experiment: "实验", writing: "写作" }[target.field]} +${help.amount}`, "lover-help");
 }
 
-function advanceRoute(state: GameState, route: LoverRoute, gain: number, source = "约会"): GameState {
+function advanceRoute(
+  state: GameState,
+  route: LoverRoute,
+  gain: number,
+  source = "约会",
+  random: () => number = Math.random,
+): GameState {
   const original = getRoute(state, route);
   const total = original.progress + gain;
   const completions = Math.floor(total / LOVER_TASK_MAX);
@@ -117,21 +124,21 @@ function advanceRoute(state: GameState, route: LoverRoute, gain: number, source 
         nextState = { ...nextState, player: { ...nextState.player, san } };
       } else if (cycle === 1) {
         nextState = { ...nextState, sanCap: nextState.sanCap + 1 };
-        effects.push("SAN上限+1");
+        effects.push("SAN上限 +1");
       } else {
         const month = state.totalMonths + 1;
         nextState.loverProgressState.sanDiscountMonths = [...new Set([...(lover.sanDiscountMonths ?? []), month])];
-        effects.push("下月SAN消耗-1，最低为0");
+        effects.push("下月SAN消耗 -1，最低为0");
       }
     } else if (route === "shopping") {
       nextState.loverProgressState.giftCoupons = (lover.giftCoupons ?? 0) + 1;
-      effects.push("购物免单+1");
+      effects.push("购物免单 +1");
     } else if (cycle === 0) {
       const stored = lover.pendingPaperHelp;
       nextState.loverProgressState.pendingPaperHelp = stored ?? { amount: lover.research,
         collaboratorId: `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`, name: getLoverName(state.loverState) };
       effects.push(stored ? `已有一次论文帮助待生效（${stored.amount}分），不叠加`
-        : `论文帮助已就绪（最低项+${lover.research}分）`);
+        : `论文帮助已就绪（最低项 +${lover.research}分）`);
     } else if (cycle === 1) {
       const previous = nextState.buffs.find((buff) => buff.id === "lover-study-score");
       const bonus = (previous?.actionEffects?.idea?.bonus ?? 0) + 1;
@@ -139,16 +146,17 @@ function advanceRoute(state: GameState, route: LoverRoute, gain: number, source 
         id: "lover-study-score", name: "共同学习", source: "恋人学习", timing: "permanent", remainingMonths: null,
         actionEffects: { idea: { bonus }, experiment: { bonus }, writing: { bonus } },
       }]) };
-      effects.push(`永久idea、实验、写作各+1分（累计+${bonus}）`);
+      effects.push(`永久idea、实验、写作各 +1分（累计 +${bonus}）`);
     } else if (lover.research < nextState.player.research) {
       const research = Math.min(20, lover.research + 1);
       nextState.loverProgressState.research = research;
       effects.push(describeTalentReward("恋人科研", 1, lover.research, research));
     } else if (nextState.player.research < lover.research) {
-      const research = Math.min(20, getResearchCap(nextState.researchCapacityState), nextState.player.research + 1);
-      const gain = Math.max(0, research - nextState.player.research);
-      effects.push(describeTalentReward("你的科研", 1, nextState.player.research, nextState.player.research + gain));
-      nextState = { ...nextState, player: { ...nextState.player, research: nextState.player.research + gain } };
+      const before = nextState.player.research;
+      const result = applyTierResist(1, before, random, Math.min(20, getResearchCap(nextState.researchCapacityState)));
+      const gain = result.effectiveChange;
+      effects.push(describeResistedTalentReward("你的科研", before, result));
+      nextState = { ...nextState, player: { ...nextState.player, research: before + gain } };
     } else effects.push("双方科研相同，本次不提升科研");
     nextState = recordTalentTrigger(nextState, `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}:${route}:${count}`, {
       name: "恋人", recipient: `你与${getLoverName(state.loverState)}`, reason: `${source}·${ROUTE_LABELS[route]}进度满100，第${count}次`, effects,
@@ -165,7 +173,7 @@ export function advanceLoverDate(state: GameState, route: LoverRoute): GameState
   const paid = { ...state, player: { ...state.player, san: state.player.san - cost.san, money: state.player.money - cost.money },
     loverProgressState: { ...state.loverProgressState, lastDateTotalMonths: state.totalMonths, taskUsedThisMonth: true } };
   return settlePendingLoverHelp(advanceRoute(pushLog(paid,
-    `约会·${ROUTE_LABELS[route]}：进度+${gain}${cost.money ? `，金币-${cost.money}` : ""}${cost.san ? `，SAN-${cost.san}` : ""}`), route, gain));
+    `约会·${ROUTE_LABELS[route]}：进度 +${gain}${cost.money ? `，金币 -${cost.money}` : ""}${cost.san ? `，SAN -${cost.san}` : ""}`), route, gain));
 }
 
 export function activateLoverMonthlyDiscount(state: GameState): GameState {
@@ -175,7 +183,7 @@ export function activateLoverMonthlyDiscount(state: GameState): GameState {
     id: "lover-play-discount", name: "约会余韵", source: "恋人玩耍", timing: "monthly", remainingMonths: 1, activeOperationSanDelta: -1,
   }]) };
   return alreadyActive ? nextState : pushMilestoneLog(nextState,
-    `约会余韵生效：你与${getLoverName(state.loverState)}的玩耍奖励，本月SAN消耗-1，最低为0`, "lover-discount");
+    `约会余韵生效：你与${getLoverName(state.loverState)}的玩耍奖励，本月SAN消耗 -1，最低为0`, "lover-discount");
 }
 
 export function advanceLoverMonth(state: GameState): GameState {
@@ -185,7 +193,7 @@ export function advanceLoverMonth(state: GameState): GameState {
     || state.totalMonths <= (lover.lastAdvancedTotalMonths ?? -1)) return state;
   const gains = getLoverPassiveGains(state);
   let nextState: GameState = { ...activateLoverMonthlyDiscount(state), loverProgressState: { ...lover, taskUsedThisMonth: false, lastAdvancedTotalMonths: state.totalMonths,
-    monthlyActivity: `玩耍进度+${gains.play}，学习进度+${gains.study}`,
+    monthlyActivity: `玩耍进度 +${gains.play}，学习进度 +${gains.study}`,
     sanDiscountMonths: (lover.sanDiscountMonths ?? []).filter((month) => month > state.totalMonths) } };
   nextState = advanceRoute(nextState, "play", gains.play, "每月相处");
   nextState = advanceRoute(nextState, "study", gains.study, "每月相处");

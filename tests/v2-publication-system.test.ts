@@ -149,7 +149,7 @@ describe("v2 publication loop", () => {
     expect(confirmed.publicationTalentState?.claimedIds).toEqual(["first-paper"]);
     expect(confirmed.log.some((entry) => entry.text.includes("C类会议接收"))).toBe(true);
     expect(confirmed.eventHistory.flatMap((entry) => entry.stages).find((stage) => stage.talentTrigger?.name === "研究之始")?.talentTrigger)
-      .toMatchObject({ recipient: "你", effects: ["SAN+2（10→12）", "好感+1（1→2）", "科研+1（1→2）"] });
+      .toMatchObject({ recipient: "你", effects: ["SAN +2（10→12）", "好感 +1（1→2）", "科研 +1（1→2）"] });
   });
 
   it("releases a review-result chain back to a draft when force-advancing", () => {
@@ -344,7 +344,7 @@ describe("v2 publication loop", () => {
     const advanced = advanceReviewToPc(result.state);
     const confirmed = confirmReview(result.state);
     expect(advanced.finalEvent.description).not.toContain("同级或更高等级");
-    expect(advanced.finalEvent.description).toContain("科研分+1");
+    expect(advanced.finalEvent.description).toContain("科研分 +1");
     expect(advanced.finalEvent.description).not.toMatch(/SAN\s*\+|好感\s*\+|奖励递减/);
     expect(confirmed.player.san).toBe(10);
     expect(confirmed.player.favor).toBe(state.player.favor);

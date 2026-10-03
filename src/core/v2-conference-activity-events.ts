@@ -23,7 +23,7 @@ function getActivityConditions(option: ConferenceActivityOptionDefinition): stri
   const encounterUpdates = option.effects.conferenceEncounterUpdates;
   const addCountCondition = (label: string, nextCount: number | undefined): void => {
     if (nextCount !== undefined) {
-      conditions.push(`条件：${label} ${nextCount} ${nextCount >= 2 ? "≥" : "<"}2`);
+      conditions.push(`条件：${label} ${nextCount} ${nextCount >= 2 ? "≥" : "<"} 2`);
     }
   };
 

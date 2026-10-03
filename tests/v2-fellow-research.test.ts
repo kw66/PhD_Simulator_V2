@@ -350,7 +350,7 @@ describe("fellow reciprocal cooperation", () => {
     expect(next.fellowProgressState[0]?.nextMonthlyAction).toBe("project");
     const projectMonth = dispatchAction({ ...next, eventQueue: [] }, "next-month");
     expect(projectMonth.fellowPapers![0]).toEqual(decayUnpublishedPaper(next.fellowPapers![0]!));
-    expect(projectMonth.fellowProgressState[0]?.monthlyActivity).toMatch(/[横纵]向进度\+/);
+    expect(projectMonth.fellowProgressState[0]?.monthlyActivity).toMatch(/[横纵]向进度 \+/);
   });
 
   it("waits until the month after attending to earn citations, matching the player conference timeline", () => {

@@ -90,6 +90,39 @@ describe("v2 reading system", () => {
     expect(normalRead.researchGain).toBe(1);
   });
 
+  it("runs the 10th-reading research through the research tier resist", () => {
+    const initial = createInitialState();
+    const state = {
+      ...initial,
+      readingState: { ...initial.readingState, readCount: 9 },
+      player: { ...initial.player, research: 6, san: 10 },
+    };
+    const options = { consumeMonthlyAction: false, allowSanOverdraw: true, source: "看论文" };
+
+    const resisted = applyReadPaperActions(state, 1, { ...options, random: () => 0 });
+    expect(resisted).toMatchObject({ researchGain: 0, researchMilestones: 1, researchResisted: 1 });
+    expect(resisted.nextState.player.research).toBe(6);
+    expect(resisted.nextState.log[0]?.text).toContain("科研 +0（抵抗1）");
+
+    const applied = applyReadPaperActions(state, 1, { ...options, random: () => 0.99 });
+    expect(applied).toMatchObject({ researchGain: 1, researchResisted: 0 });
+    expect(applied.nextState.player.research).toBe(7);
+
+    expect(applyReadingCountProgress(state, 1, () => 0).nextState.player.research).toBe(6);
+    expect(applyReadingCountProgress(state, 1, () => 0.99).nextState.player.research).toBe(7);
+  });
+
+  it("never lowers research that already sits above the cap", () => {
+    const initial = createInitialState();
+    const state = {
+      ...initial,
+      readingState: { ...initial.readingState, readCount: 9 },
+      researchCapacityState: { ...initial.researchCapacityState, baseCap: 4, jointTrainingCitationCapBonus: 0, otherCapBonus: 0 },
+      player: { ...initial.player, research: 5, san: 10 },
+    };
+    expect(applyReadingCountProgress(state, 1, () => 0.99).nextState.player.research).toBe(5);
+  });
+
   it("settles multiple manual reads as one monthly action", () => {
     const initial = createInitialState();
     const state = {

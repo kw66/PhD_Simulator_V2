@@ -8,8 +8,7 @@ import { applyResearchOperation } from "../src/core/v2-research-operation";
 import {
   getJournalScore,
   getJournalSubmissionFailure,
-  getJournalRevisionScore,
-  JOURNAL_DEFINITIONS,
+    JOURNAL_DEFINITIONS,
   resolveReadyJournalPapers,
   submitJournalPaper,
 } from "../src/core/v2-journal-system";
@@ -56,11 +55,10 @@ describe("v2 journal system", () => {
   });
 
   it("uses the current total for existing revisions rather than a submission-based floor", () => {
-    expect(getJournalRevisionScore({ idea: 10, experiment: 100, writing: 15,
-      submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40 })).toBe(125);
     const base = playingState();
     const paper = { ...createDraftPaper(1, 0), status: "journal-reviewing" as const, journalTarget: "pami" as const,
       idea: 10, experiment: 100, writing: 15, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40 };
+    expect(getJournalScore(paper)).toBe(125);
     const next = resolveReadyJournalPapers({ ...base, papers: [paper] }).state;
     expect(next.externalPublications[0]?.publication?.effectiveScore).toBe(125);
   });
@@ -100,13 +98,10 @@ describe("v2 journal system", () => {
 
     const researched = applyResearchOperation(decayed, paper.id, "idea", () => 0);
     expect(researched.papers[0]?.idea).toBeGreaterThan(40);
-    expect(getJournalRevisionScore({
-      idea: researched.papers[0]?.idea ?? 40,
+    expect(getJournalScore({
+      ...researched.papers[0]!,
       experiment: 45,
       writing: 42,
-      submittedIdea: 40,
-      submittedExperiment: 40,
-      submittedWriting: 40,
     })).toBe(getJournalScore(paper) + (researched.papers[0]?.idea ?? 40) - 40 + 5 + 2);
   });
 

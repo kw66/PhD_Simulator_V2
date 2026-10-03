@@ -1,4 +1,5 @@
-import { createConferenceActivityEvent, type ConferenceActivityBuildState, type ConferenceActivityContext } from "./v2-conference-activity";
+import { createConferenceActivityEvent } from "./v2-conference-activity-events";
+import type { ConferenceActivityBuildState, ConferenceActivityContext } from "./v2-conference-activity-shared";
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
 import { getPaperConferencePromotionMultiplier } from "./v2-publication-system";
 import { getConferencePaperPresentationResults } from "./v2-conference-activity-shared";
@@ -49,12 +50,12 @@ function createPaperHandledUpdates(context: ConferenceEventContext) {
 function getPaymentResistanceCondition(label: string, value: number): string {
   const resistanceChance = getTierResistChance(value);
   const threshold = resistanceChance === 0
-    ? `${label} <6`
+    ? `${label} < 6`
     : resistanceChance === 0.25
-      ? `6 ≤${label} <12`
+      ? `6 ≤ ${label} < 12`
       : resistanceChance === 0.5
-        ? `12 ≤${label} <18`
-        : `${label} ≥18`;
+        ? `12 ≤ ${label} < 18`
+        : `${label} ≥ 18`;
   return `条件：${threshold}（抵抗概率 ${resistanceChance * 100}%）`;
 }
 
@@ -93,7 +94,7 @@ function createConferenceDecisionAct3(
     title: "论文参会 ➜ 参会方式 ➜ 参会确认",
     description: [
       decision.mode === "proxy"
-        ? "你把展示材料和时间表发给同学，附上几条可能被问到的问题。消息发出后，又补了一句‘辛苦了’，这回真得靠对方帮忙。"
+        ? "你把展示材料和时间表发给同学，附上几条可能被问到的问题。消息发出后，又补了一句“辛苦了”，这回真得靠对方帮忙。"
         : "参会方式定下来了，你照着会务邮件准备材料。电脑里存了一份，邮箱里再留一份，毕竟会场的网速还没见识过。",
       "录用时以为终于忙完了，眼下才发现，会务邮件也能攒出一份待办清单。你挨个打上勾，总算把这趟安排妥当。",
       ...(decision.resistanceNarrative ? [decision.resistanceNarrative] : []),
@@ -207,7 +208,7 @@ export function createConferenceDecisionAct1(
     id: `${context.id}-act1`,
     title: "论文参会",
     description: [
-      `会议临近，会务邮件催你确认展示安排。这次是 ${context.conferenceName} ${context.conferenceYear}，地点在 ${context.city}，${context.country}。`,
+      `会议临近，会务邮件催你确认展示安排。这次是 ${context.conferenceName} ${context.conferenceYear}，地点在${context.city}，${context.country}。`,
       context.paperCount >= 2
         ? `同一场会议有 ${context.paperCount} 篇论文要展示，你在日历上挨个标好。平时看着挺空的几格，忽然写得密密麻麻。`
         : "这次有一篇论文要展示。你把自己的名字从日程里找出来，又核了一遍时间，才把那封长长的会务邮件往下翻。",

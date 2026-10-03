@@ -40,7 +40,7 @@ describe("paper review presentation", () => {
     const { state } = fixture(true);
     const decision = advance(advance(state));
     const html = content(decision);
-    expect(html).toContain("科研分+4");
+    expect(html).toContain("科研分 +4");
     expect(html).not.toContain("paper-review-talents");
     expect(decision.eventHistory).toHaveLength(0);
     expect(html).toContain("审稿影响 SAN -2");
@@ -65,7 +65,7 @@ describe("paper review presentation", () => {
     expect(content(reviewers)).toContain("审稿影响");
     const decision = advance(reviewers);
     const html = content(decision);
-    expect(html).toContain("修改反馈：idea+5");
+    expect(html).toContain("修改反馈：idea +5");
     expect(html).toContain("审稿影响 SAN -2");
     expect(html).not.toContain("paper-review-talent-row");
     expect(advance(decision).papers[0]?.rejectionCount).toBe(4);

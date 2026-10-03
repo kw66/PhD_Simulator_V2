@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
+import { getResolvableQueuedEvent } from "../src/core/v2-engine-event-resolution";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "../src/core/v2-lover-events";
 import {
@@ -76,5 +77,40 @@ describe("v2 lover system", () => {
     expect(progressed.totalMonths).toBe(7);
     expect(progressed.loverState.name).toBe(expectedLover.name);
     expect(getLoverName(progressed.loverState)).toBe(expectedLover.name);
+  });
+
+  it.each(["beautiful", "smart"] as const)("lets a player who already has a lover set the %s confession aside without a rejection", (type) => {
+    const started = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
+    const existingLover = activateLover("smart", 2, "male");
+    // The confession was generated before the player found a lover.
+    const context = buildLoverDevelopmentContext({
+      conferenceEncounterState: started.conferenceEncounterState, type, totalMonths: 6, playerGender: "male",
+    });
+    let state: GameState = {
+      ...started, year: 1, month: 6, totalMonths: 6, availableRandomEvents: [],
+      loverState: existingLover,
+      relationshipState: { ...started.relationshipState, loverCount: 1 },
+      eventQueue: [createEventQueueItem(createLoverDevelopmentAct1(context), 1)],
+    };
+    state = dispatchAction(state, "resolve-event", { eventId: state.eventQueue[0]!.id, eventChoiceId: "continue" });
+
+    const act2 = getResolvableQueuedEvent(state, state.eventQueue[0]!);
+    const setAside = act2.choices.find((choice) => choice.id === "accept")!;
+    expect(setAside).toMatchObject({ label: "暂时放下" });
+    expect(setAside.disabledReason).toBeUndefined();
+    expect(act2.description).toContain("可你已经有了恋人");
+    expect(act2.description).not.toMatch(/“我好像真的有点喜欢/u);
+
+    state = dispatchAction(state, "resolve-event", { eventId: act2.id, eventChoiceId: "accept" });
+    const result = getResolvableQueuedEvent(state, state.eventQueue[0]!);
+    expect(result.title).toContain("暂时放下");
+    expect(result.description).toContain("不计拒绝次数");
+    state = dispatchAction(state, "resolve-event", { eventId: result.id, eventChoiceId: "close" });
+
+    expect(state.eventQueue.filter((event) => event.chainId === "lover-development")).toHaveLength(0);
+    expect(state.loverState).toEqual(existingLover);
+    expect(state.relationshipState.loverCount).toBe(1);
+    expect(state.conferenceEncounterState.rejectedBeautifulLoverCount).toBe(0);
+    expect(state.conferenceEncounterState.rejectedSmartLoverCount).toBe(0);
   });
 });

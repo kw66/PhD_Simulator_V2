@@ -11,9 +11,6 @@ export interface PendingRandomEvent {
   serial: number;
 }
 
-/** Compatibility alias for states and callers created before generic pending events. */
-export type PendingPaperCompetitionEvent = PendingRandomEvent;
-
 export interface PaperCompetitionResolution {
   paperId: string;
   field: "idea" | "experiment";
@@ -72,7 +69,7 @@ function getAdjustedScore(paper: Paper, resolution: PaperCompetitionResolution):
   return Math.max(1, Math.round(paper[resolution.field] * resolution.multiplier));
 }
 
-export function formatPaperCompetitionOutcome(paper: Paper, resolution: PaperCompetitionResolution, sanCost = resolution.sanCost, sanSummary = `SAN-${sanCost}`): string {
+export function formatPaperCompetitionOutcome(paper: Paper, resolution: PaperCompetitionResolution, sanCost = resolution.sanCost, sanSummary = `SAN -${sanCost}`): string {
   const fieldLabel = resolution.field === "idea" ? "idea" : "实验";
   const score = getAdjustedScore(paper, resolution);
   const sanOutcome = resolution.sanCost > 0 ? `${sanSummary}｜` : "";
