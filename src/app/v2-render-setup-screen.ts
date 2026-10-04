@@ -744,7 +744,7 @@ function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, s
             ${nodes.map((node, index) => `
               <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}${node.fixed ? " is-fixed" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.fixed ? "fixed" : node.tier}" data-fixed="${node.fixed ? "true" : "false"}" aria-label="${escapeHtml(`${node.name}：${node.effect}，${nodeLabel(node)}，仅预览`)}" title="${node.name}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-initial-level="${node.initialLevel ?? 0}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}">
                 <span class="lobby-talent-tree-node-ring"><i data-lucide="${node.icon}" aria-hidden="true"></i></span>
-                ${node.fixed ? "" : `<span class="lobby-normal-tree-node-level">${node.challenge ? `第${["一", "二", "三", "四"][node.tier]}档` : `${node.initialLevel ?? 0}/${node.maxLevel}`}</span>`}
+                ${node.fixed ? "" : `<span class="lobby-normal-tree-node-level">${node.challenge ? ["简单", "中等", "困难", "地狱"][node.tier] : `${node.initialLevel ?? 0}/${node.maxLevel}`}</span>`}
               </button>
             `).join("")}
             <div class="lobby-normal-tree-details" aria-live="polite">
