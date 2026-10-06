@@ -10,6 +10,18 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-10-07",
+    title: "固定事件与结果显示修复",
+    changes: [
+      { category: "优化", title: "国奖评选分幕整理", description: "国奖评选调整为第一幕通知、第二幕选择申报或暂不申报、第三幕显示结果；第二幕明确显示奖金，评奖科研分会随待确认期间的成果变化而更新。" },
+      { category: "修复", title: "寒假结算刷新", description: "寒假红包固定为2金币，居家休息40%、同学重逢30%、家庭聚餐30%；确认前恋人状态、SAN和社交变化会同步刷新，最终按钮统一为“确定”。" },
+      { category: "修复", title: "论文相关事件动态结算", description: "修复教师节、年会、论文参会、转博和指导新生沿用旧状态的问题；待确认结果会按当前条件更新，不重复抽签、不提前扣除资源。" },
+      { category: "优化", title: "论文相关调试入口", description: "调试栏“开会相关”更名为“论文相关”，新增独立的“年会活动”入口，并标记寒假、指导新生、基金结果等已审阅事件。" },
+      { category: "修复", title: "图片误用提示", description: "数据丢失后的伪造数据结果进一步精简；涉事论文发表前在Buff栏显示“举报风险（待生效）”，发表后国奖结果显示被举报，剧情补充用于评奖的论文存在图片误用。" },
+      { category: "优化", title: "条件与结果文字", description: "结果条件统一使用“评奖科研分”等简短表述，去除“xx分支”“概率”等冗余文字，通用属性抵抗不再单独显示为事件条件。" },
+    ],
+  },
+  {
     date: "2026-10-04",
     title: "诅咒挑战与角色介绍",
     changes: [
@@ -74,7 +86,7 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
     title: "事件完善与调试优化",
     changes: [
       { category: "优化", title: "剧情与入学", description: "润色学习、团建、游戏放松等剧情，精简长段落；“读研之始”确认后直接入学。" },
-      { category: "更新", title: "论文事件", description: "调整抢发idea与数据恢复的处理消耗。伪造数据仍使涉事论文引用减半，正式发表后才触发“图片误用”，国奖入选会被取消。" },
+      { category: "更新", title: "论文事件", description: "调整抢发idea与数据恢复的处理消耗。伪造数据仍使涉事论文引用减半，正式发表后才触发“举报风险”，国奖入选会被取消。" },
       { category: "更新", title: "实验室机制", description: "显卡故障改为全组6个月实验费用+1；导师经费超过20才触发报销事件。项目完成、导师指导和互助满条分别记录日志。" },
       { category: "平衡", title: "日常开支", description: "远程实习每月SAN消耗降为2，羽毛球拍价格调整为8金币。" },
       { category: "优化", title: "提示与效果显示", description: "精简小提示，统一深色橙框悬浮提示；补齐AI报销等Buff显示，事件结果明确展示条件和实际效果。" },

@@ -73,10 +73,9 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
       "你确认了实习安排，把每周交付记进日历。公司的工作群很快发来欢迎消息，你刚回完“请多指教”，就收到了第一份任务文档。",
       "课题还得继续，项目也要交差。你把两边的待办放到一起，才发现最难排的不是哪天去公司，而是晚上几点能合上电脑。",
       "机制结算",
-      "结果：实习周期：6 个月",
-      "结果：实习期间：做实验分数 ×1.25",
-      `结果：每月收益：金币 +${context.currentMonthlyIncome}`,
-      "结果：每月压力：SAN -2",
+      "结果：SAN -2（每月，持续6个月）",
+      `结果：金币 +${context.currentMonthlyIncome}（每月，持续6个月）`,
+      "结果：实验 ×1.25（持续6个月）",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -130,7 +129,7 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
       {
         id: "accept",
         label: "接受这份实习",
-        outcome: `接受 6 个月大厂实习；期间做实验 ×1.25，每月 SAN -2；按当前成果每月金币 +${context.currentMonthlyIncome}。`,
+        outcome: `SAN -2（每月，持续6个月）｜金币 +${context.currentMonthlyIncome}（每月，持续6个月）｜实验 ×1.25（持续6个月）`,
         ...(context.unavailable ? { disabledReason: "已有实习安排或大厂实习机会已关闭。" } : {}),
         effects: {
           enqueueEvents: [createInternshipAcceptResult(context)],

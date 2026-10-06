@@ -8,7 +8,7 @@ import {
 } from "./v2-fixed-events-ccig-shared";
 import { createCcigActivityEvent } from "./v2-fixed-events-ccig-activity-events";
 import type { GameState, PendingEvent } from "./v2-types";
-import { getTierResistChance } from "./v2-sanity-rules";
+import { getRegionalMeetingDiscount } from "./v2-meeting-system";
 
 export function createCcigDecisionEvent(state: GameState): PendingEvent {
   const { hasMeetingExperience, discount, actualCost } = getCcigSelfPayCost(state);
@@ -74,6 +74,11 @@ export function createCcigAttendResultEvent(
   const location = getCcigLocation(state.year);
   const realYear = getCcigRealYear(state.year, state.month);
   const { hasMeetingExperience, actualCost } = getCcigSelfPayCost(state);
+  const currentDomesticCount = state.eventCounters.domesticMeetingCount ?? 0;
+  const nextDomesticCounters = { ...state.eventCounters, domesticMeetingCount: currentDomesticCount + 1 };
+  const currentDomesticDiscount = getRegionalMeetingDiscount(state.eventCounters, "domestic", 2);
+  const nextDomesticDiscount = getRegionalMeetingDiscount(nextDomesticCounters, "domestic", 2);
+  const meetingGrowth = nextDomesticDiscount > currentDomesticDiscount ? `费用减免 ${currentDomesticDiscount}→${nextDomesticDiscount}金币` : `国内参会 ${currentDomesticCount}→${currentDomesticCount + 1}次`;
   const gearNarrative = mode === "self" && hasMeetingExperience
     ? actualCost === 0
       ? "会务经验帮你免掉了这次参会费用。"
@@ -87,14 +92,13 @@ export function createCcigAttendResultEvent(
       `你订好去${location}参加 CCIG ${realYear} 的车票和住宿，又核对了一遍日期。`,
       `和同学约好碰面后，你把电脑、充电器和证件装进包，拉上拉链又打开——充电器带了，这才放心。${narrative}${gearNarrative}`,
       "机制结算",
-      mode === "advisor"
-        ? `条件：导师好感 ${state.player.favor}（抵抗概率 ${getTierResistChance(state.player.favor) * 100}%）`
-        : `条件：参会次数 ${state.eventCounters.meetingCount} ${hasMeetingExperience ? "≥" : "<"} 4`,
+      ...(mode === "self" ? [`条件：国内参会次数 ${state.eventCounters.domesticMeetingCount ?? 0} ${hasMeetingExperience ? "≥" : "<"} 3`] : []),
       ...settlementItems.slice(1).map((item) => `结果：${item}`),
+      meetingGrowth,
     ].join("\n\n"),
     chainId: getCcigChainId(state),
     stage: "act3",
-    completionLog: `${settlementItems.join("，")}；年会参会已确认`,
+    completionLog: `${settlementItems.join("，")}；${meetingGrowth}；年会参会已确认`,
     choices: [
       {
         id: `ccig-enter-venue-y${state.year}-m${state.month}-${mode}`,
@@ -102,7 +106,11 @@ export function createCcigAttendResultEvent(
         outcome: "进入行程安排。",
         effects: {
           ...deferredEffects,
-          counterDeltas: { ...(deferredEffects.counterDeltas ?? {}), meetingCount: 1 },
+          counterDeltas: {
+            ...(deferredEffects.counterDeltas ?? {}),
+            meetingCount: 1,
+            domesticMeetingCount: 1,
+          },
           enqueueEvents: [createCcigActivityEvent(state, mode, settlementItems)],
         },
       },

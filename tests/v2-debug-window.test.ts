@@ -67,7 +67,16 @@ describe("independent debug window", () => {
     expect(html).toContain('data-action="debug-adjust-action-points" data-delta="-1"');
     expect(html).toContain('data-action="debug-adjust-action-points" data-delta="1"');
     expect(html).toContain("读研之始 ✓");
+    expect(html).toContain("教师节 ✓");
+    expect(html).toContain("导师经费 ✓");
+    expect(html).toContain("游戏放松 ✓");
+    expect(html).toContain("数据丢失 ✓");
+    expect(html).toContain("被抢发idea ✓");
+    expect(html).toContain("新sota ✓");
+    expect(html).toContain("显卡故障 ✓");
+    expect(html).toContain("署名风波 ✓");
     expect(renderDebugPanel({ ...state, eventHistory: [] }, true)).toContain("读研之始 ✓");
+    expect(renderDebugPanel({ ...state, eventHistory: [] }, true)).toContain("教师节 ✓");
   });
 
   it("separates attributes and papers with action points under other tools", () => {
@@ -258,6 +267,41 @@ describe("independent debug window", () => {
     expect(root.innerHTML).toContain("已连接主游戏");
     handlers.get("message")!({ ...message, data: { ...message.data, hostId: "second", state: { ...state, player: { ...state.player, money: 1 } } } });
     expect(root.innerHTML).toContain('data-debug-value="money">1</b>');
+  });
+
+  it("preserves the event replay switch across reconnect and resynchronizes the host", () => {
+    const { root, host, handlers, rootHandlers } = createPopupFixture();
+    class ToggleButton {
+      dataset = { action: "debug-toggle-event-replay", debugEventReplayEnabled: "true" };
+      closest(selector: string) { return selector === "button[data-action]" ? this : null; }
+      matches() { return false; }
+    }
+    vi.stubGlobal("Element", ToggleButton);
+    bootstrapDebugWindow(root as unknown as HTMLDivElement, "channel");
+    const state = createStartedGameState("normal");
+    handlers.get("message")!({
+      source: host,
+      origin: "https://example.test",
+      data: { channel: "channel", type: "debug-state", state, revision: 0, hostId: "first" },
+    });
+    rootHandlers.get("click")!({ target: new ToggleButton() });
+    expect(host.postMessage).toHaveBeenLastCalledWith({
+      channel: "channel",
+      type: "debug-action",
+      data: { action: "debug-toggle-event-replay", debugEventReplayEnabled: "true" },
+    }, "https://example.test");
+    handlers.get("message")!({ ...state, source: host, origin: "https://example.test", data: { channel: "channel", type: "debug-disconnected" } });
+    handlers.get("message")!({
+      source: host,
+      origin: "https://example.test",
+      data: { channel: "channel", type: "debug-state", state: { ...state, debugEventReplayEnabled: false }, revision: 1, hostId: "second" },
+    });
+    expect(root.innerHTML).toContain("事件回退 <b>开启</b>");
+    expect(host.postMessage).toHaveBeenLastCalledWith({
+      channel: "channel",
+      type: "debug-action",
+      data: { action: "debug-toggle-event-replay", debugEventReplayEnabled: "true" },
+    }, "https://example.test");
   });
 
   it("allows manual retry while disabled and resumes the heartbeat after page restoration", () => {

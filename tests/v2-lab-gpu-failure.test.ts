@@ -64,12 +64,16 @@ describe("GPU failure event", () => {
   it.each([
     ["advisor", 0, 0, 0, 0, true], ["report", 0, 0, 0, -2, false],
     ["reinstall", 0.499, -3, 0, 0, false], ["reinstall", 0.5, -3, 0, -1, true],
-    ["taobao", 0.499, 0, -2, 0, false], ["taobao", 0.5, 0, 0, 0, true],
+    ["taobao", 0.499, 0, -2, 0, false], ["taobao", 0.5, 0, -2, 0, true],
   ] as const)("settles %s at roll %s only on confirmation", (branch, roll, san, money, social, surcharge) => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     const initial = makeState();
     const event = makeEvent(initial, roll);
     const choice = choiceFor(event, branch);
+    if (branch === "taobao") {
+      expect(choice.outcome).toContain("结果：金币 -2");
+      expect(choice.effects.enqueueEvents![0]!.description).toContain("结果：金币 -2");
+    }
     expect(choice.effects.experimentBonus).toBeUndefined();
     expect(choice.effects.temporaryActionEffectUpdates).toBeUndefined();
     let state = { ...initial, eventQueue: [createEventQueueItem(event, 1)] };
@@ -83,6 +87,10 @@ describe("GPU failure event", () => {
     expect(state.player).toMatchObject({ san: 20 + san, money: 10 + money, social: 5 + social });
     expect(state.advisorProgressState.funding).toBe(10);
     expect(state.buffs).toEqual(surcharge ? [createLabGpuFailureBuff()] : []);
+    if (surcharge) {
+      expect(result.description).toContain("实验金币 +1（持续6个月）");
+      expect(result.description).not.toContain("持续6个月，");
+    }
     expect(getResearchExperimentMoneyCost(state)).toBe(surcharge ? 4 : 3);
     expect(previewResearchOperation(state, "experiment", 3)).toMatchObject({ scoreBonus: 0, scoreMultiplier: 1 });
     const repeated = dispatchAction(state, "resolve-event", { eventId: result.id, eventChoiceId: result.choices[0]!.id });

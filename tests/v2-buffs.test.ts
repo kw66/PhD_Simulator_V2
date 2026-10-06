@@ -351,25 +351,6 @@ describe("generic buffs", () => {
     expect(buckets.permanent).toEqual([]);
   });
 
-  it("keeps mentoring settlement details out of the generic Buff list", () => {
-    const buckets = buildBuffDisplayBuckets([{
-      id: "long-mentoring",
-      name: "长期带教",
-      source: "指导师弟师妹",
-      timing: "monthly",
-      remainingMonths: null,
-      monthlyStats: { san: -2 },
-      scheduledPublication: {
-        intervalMonths: 12,
-        nonFirstAuthor: true,
-        targetWeights: { A: 0.2, B: 0.3, C: 0.5 },
-      },
-    }]);
-
-    expect(buckets.monthly).toEqual([]);
-    expect(buckets.permanent).toEqual([]);
-  });
-
   it("turns event action effects into readable, executable Buffs", () => {
     const state = createInitialState();
     const resolved = applyChoiceEffectsToState(state, {

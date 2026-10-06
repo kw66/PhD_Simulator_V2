@@ -23,7 +23,7 @@ describe("v2 conference system", () => {
         hasBadmintonRacket: false,
         hasStrongBodyTalent: false,
       },
-      eventCounters: { ...createEventCounters(), meetingCount: 4 },
+      eventCounters: { ...createEventCounters(), meetingCount: 4, westMeetingCount: 3 },
     };
 
     const selfPay = resolveConferenceDecisionCost({ ...input, mode: "self" });
@@ -46,7 +46,7 @@ describe("v2 conference system", () => {
         hasBadmintonRacket: false,
         hasStrongBodyTalent: false,
       },
-      eventCounters: { ...createEventCounters(), meetingCount: 7 },
+      eventCounters: { ...createEventCounters(), meetingCount: 7, asiaMeetingCount: 3 },
     };
 
     const advisor = resolveConferenceDecisionCost({ ...input, mode: "advisor" }, () => 0.99);

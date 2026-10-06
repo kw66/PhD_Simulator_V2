@@ -38,7 +38,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
   const guidedJunior = {
     ...mentorshipJunior,
     research: Math.min(20, mentorshipJunior.research + 1),
-    affinity: Math.min(20, mentorshipJunior.affinity + 1),
+    affinity: Math.min(20, mentorshipJunior.affinity + 2),
   };
   const mentorshipJuniorName = mentorshipJunior.name ?? "这名本科生";
   const mentorshipJuniorLabel = getFellowRoleLabel(mentorshipJunior.type, mentorshipJunior.gender);
@@ -66,7 +66,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
         id: `random-1-self-${serial}`,
         label: "亲自指导",
         outcome: staysForGradSchool
-          ? `对方考研进组（50%）｜${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1（${mentorshipJuniorLabel}科研 +1，${mentorshipJuniorLabel}默契 +1）` : `｜师弟师妹人数 ${state.relationshipState.juniorCount}，槽位已满；暂不新增`}`
+          ? `对方考研进组（50%）｜${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1（${mentorshipJuniorLabel}科研 +1，${mentorshipJuniorLabel}默契 +2）` : `｜师弟师妹人数 ${state.relationshipState.juniorCount}，槽位已满；暂不新增`}`
           : `对方毕业（50%）｜${mentoringSanSummary}`,
         effects: becomesJunior
           ? {
@@ -113,7 +113,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
           ? [
               `你陪${mentorshipJuniorName}补对照、改草稿，一张表讲了几遍，水早凉了。等${mentorshipJuniorPronoun}能自己解释结果，你的任务却还停在原处。`,
               canAddJunior
-                ? `${mentorshipJuniorPronoun}决定考研进组：“谢谢${playerHonorific}，以后还得多请教。”辅导让${mentorshipJuniorLabel}科研 +1、与你的默契 +1；目前科研 ${guidedJunior.research}、默契 ${guidedJunior.affinity}。你多了一位${mentorshipJuniorLabel}，笔记里已有自己整理的问题。`
+                ? `${mentorshipJuniorPronoun}决定考研进组：“谢谢${playerHonorific}，以后还得多请教。”辅导让${mentorshipJuniorLabel}科研 +1、与你的默契 +2；目前科研 ${guidedJunior.research}、默契 ${guidedJunior.affinity}。你多了一位${mentorshipJuniorLabel}，笔记里已有自己整理的问题。`
                 : `${mentorshipJuniorPronoun}决定考研进组，但关系栏已满，暂未记入人际栏。你整理好资料发回去，之后仍得各忙各的。`,
             ].join("\n\n")
           : [
@@ -308,8 +308,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   const eventTitle = roleText === "师弟" ? "指导师弟" : "指导师妹";
   const shortTermSan = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
   const shortTermSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
-  const shortTermSocialResult = applyTierResist(1, state.player.social, getRoll);
-  const shortTermSocialGain = shortTermSocialResult.effectiveChange;
+  const dinnerSocialResult = applyTierResist(1, state.player.social, getRoll);
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
   const juniorAddition = createGeneratedFellowProfileAddition("junior", serial, juniorGender, usedNames, getRoll);
   const juniorIntro = `${roleText}${juniorAddition.name ?? ""}`;
@@ -326,41 +325,36 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
     choices: [
       {
         id: `random-14-decline-${serial}`,
-        label: "精力有限，委婉拒绝",
+        label: "委婉拒绝",
         outcome: "无事发生。",
         effects: {},
       },
       {
-        id: `random-14-idea-${serial}`,
-        label: "短期合作，分享idea",
-         outcome: `${shortTermSanSummary}；${formatTierResistedOutcome("社交", 1, shortTermSocialResult)}${canAddJunior ? `；师弟师妹人数 ${state.relationshipState.juniorCount} → ${state.relationshipState.juniorCount + 1}` : `；师弟师妹人数 ${state.relationshipState.juniorCount}，槽位已满`}`,
+        id: `random-14-dinner-${serial}`,
+        label: "请客吃饭",
+        outcome: `金币 -2｜${formatTierResistedOutcome("社交", 1, dinnerSocialResult)}`,
         effects: {
-          san: shortTermSan,
-          ...(shortTermSocialGain > 0 ? { social: shortTermSocialGain } : {}),
-          ...(canAddJunior ? { fellowAdditions: [juniorAddition] } : {}),
+          money: -2,
+          ...(dinnerSocialResult.effectiveChange > 0 ? { social: dinnerSocialResult.effectiveChange } : {}),
         },
       },
       {
-        id: `random-14-long-term-${serial}`,
-        label: "长期合作，共同成长",
-         outcome: canAddJunior
-           ? "新增师弟师妹｜每月 SAN -2｜每 12 个月新增一篇非一作论文。"
-           : `师弟师妹人数 ${state.relationshipState.juniorCount}，槽位已满。`,
-         effects: canAddJunior ? {
+        id: `random-14-idea-${serial}`,
+        label: "认真指导",
+        outcome: canAddJunior ? `${shortTermSanSummary}；${roleText} +1` : "条件：人际栏已满｜结果：无事发生。",
+        effects: canAddJunior ? {
+          san: shortTermSan,
           fellowAdditions: [juniorAddition],
-          addBuffs: [{
-            id: `random-14-long-term-${serial}-monthly`,
-            name: "持续指导",
-            source: "指导师弟师妹",
-            timing: "monthly",
-            remainingMonths: null,
-            monthlyStats: { san: -2 },
-            scheduledPublication: {
-              intervalMonths: 12,
-              nonFirstAuthor: true,
-              targetWeights: { A: 0.2, B: 0.3, C: 0.5 },
-            },
-          }],
+        } : {},
+      },
+      {
+        id: `random-14-long-term-${serial}`,
+        label: "长期合作",
+        outcome: canAddJunior
+          ? `${roleText} +1｜SAN -1（每月）｜协作自动推进 +1次（每月）`
+          : "条件：人际栏已满｜结果：无事发生。",
+        effects: canAddJunior ? {
+          fellowAdditions: [{ ...juniorAddition, longTermMentoring: true }],
         } : {},
       },
     ],
@@ -375,9 +369,16 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
     decisionTitle: "如何抉择",
     decisionDescription: [
       "对着报错无从下手的样子，像极了你刚进组时。如今轮到别人问你，你屏幕上的问题也还在等答案。",
-      `${pronounText}翻开笔记，等你看反复报错的位置。帮一次能解决眼前的问题，一起讲清楚则要挤出更多时间；如果长期合作，之后每个月都得为这段关系留出位置。`,
+      `${pronounText}翻开笔记，等你看报错。认真指导得挤出时间，长期合作则要每月留出精力。${canAddJunior ? "" : "人际栏已满，无精力新增。"}腾不出手带科研，也可以请${roleText}吃顿饭，聊聊刚进组的生活。`,
     ].join("\n\n"),
     results: {
+      [`random-14-dinner-${serial}`]: {
+        title: "请客吃饭",
+        description: [
+          `你看了眼时间，招呼${roleText}先去吃饭。校门口的小馆子刚腾出一桌，你点了两道菜，说这顿自己请。`,
+          `聊起刚进组时踩过的坑，${pronounText}终于不再一口一个“打扰了”。临走你付了账，两人一路聊回学校，话题早已从报错变成了哪家夜宵好吃。`,
+        ].join("\n\n"),
+      },
       [`random-14-decline-${serial}`]: {
         title: "婉拒指导",
         description: [
@@ -386,19 +387,22 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
         ].join("\n\n"),
       },
       [`random-14-idea-${serial}`]: {
-        title: "短期合作",
-        description: [
+        title: canAddJunior ? "认真指导" : "暂缓指导",
+        description: canAddJunior ? [
           `你和${roleText}从报错查到实验设置，画出一个能先试的小方案。才发现习惯了的步骤，解释起来也得重新捋。`,
           `几天后，${pronounText}带着新整理的实验记录回来，原先反复报错的地方已经有了清楚的排查顺序。你嗓子发干，自己的活也还欠着，看着那页记录却忍不住点了两下头。`,
+        ].join("\n\n") : [
+          `你看了眼${roleText}的报错，又翻了翻自己的安排。已有合作都还顾不过来，现在实在留不出认真带一遍的时间。`,
+          `你说明情况，建议${pronounText}先问问其他同门。${roleText}合上电脑道了声谢，这次没有再约指导时间。`,
         ].join("\n\n"),
       },
       [`random-14-long-term-${serial}`]: {
-        title: canAddJunior ? "持续指导" : "放弃指导",
+        title: canAddJunior ? "长期合作" : "暂缓合作",
         description: canAddJunior ? [
           `你和${roleText}约好定期看代码和实验记录。${pronounText}很快带来整理好的问题，白板刚擦干净的一角又写满了。`,
-          "日程多了固定安排，每月都得为指导留精力。头次讨论结束，你收起白板笔，才发现吃饭的时间又短了些。",
+          `每月多一次讨论，你得留出精力，${pronounText}也渐渐能帮你核对实验、补上遗漏。头次讨论结束，你收起白板笔，才发现吃饭的时间又短了些。`,
         ].join("\n\n") : [
-          "日程往后翻，已有合作挤在一起，实在留不出长期指导的时间。到嘴边的“以后一起做”，还是收了回去。",
+          "日程往后翻，已有合作挤在一起，实在留不出长期合作的时间。到嘴边的“以后一起做”，还是收了回去。",
           "你说明情况，建议问问其他同门。对方抱电脑离开，你合上日程；没约下一场讨论，也没再添一份惦记。",
         ].join("\n\n"),
       },

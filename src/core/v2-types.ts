@@ -14,6 +14,7 @@ import type {
   ShopState,
 } from "./v2-types-economy";
 import type { FixedEventResolution } from "./v2-types-fixed-events";
+import type { ConferenceEventContext } from "./v2-conference-events";
 import type {
   AdvisorGrantApplication,
   AdvisorProgressState,
@@ -262,18 +263,12 @@ export interface Buff {
   /** Shop cost exemptions supplied by temporary events. */
   shopEffects?: {
     aiCostsCovered?: boolean;
+    aiCostsCoveredAtTotalMonths?: number;
   };
   /** Publication multipliers consumed by publication and citation settlement. */
   publicationEffects?: {
     nextPromotionMultiplier?: number;
     citationDebuffMultiplier?: number;
-  };
-  /** Background publication schedule owned by the relationship progression UI. */
-  scheduledPublication?: {
-    intervalMonths: number;
-    nonFirstAuthor: boolean;
-    targetWeights: { A: number; B: number; C: number };
-    elapsedMonths?: number;
   };
   description?: string;
 }
@@ -462,7 +457,6 @@ export interface EventChoice {
   id: string;
   label: string;
   outcome: string;
-  fellowCandidate?: { description: string; research: number; affinity: number };
   disabledReason?: string;
   cosmetic?: boolean;
   effects: {
@@ -547,7 +541,7 @@ export interface ResolvedEventStage {
   description: string;
   paperReviewPresentation?: PaperReviewEventPresentation;
   talentTrigger?: import("./v2-talent-history").TalentTriggerRecord;
-  choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason" | "fellowCandidate">[];
+  choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason">[];
   selectedChoiceId: string;
   /** Scene source retained only while its chain is pending. */
   replayEvent?: PendingEvent;
@@ -580,6 +574,22 @@ export interface PendingEvent {
   completionLog?: string;
   history?: ResolvedEventStage[];
   deferredStatePatch?: DeferredEventStatePatch;
+  fixedResultPreview?: {
+    resolution: FixedEventResolution;
+    rolls: number[];
+  };
+  fixedTreePreview?: {
+    kind: "mentor-assign" | "phd-decision";
+    year: number;
+    month: number;
+    totalMonths: number;
+    rolls: number[];
+  };
+  conferencePreview?: {
+    context: ConferenceEventContext;
+    rolls: number[];
+    mode?: "self" | "advisor" | "proxy";
+  };
   randomReplay?: {
     eventId: number;
     serial: number;

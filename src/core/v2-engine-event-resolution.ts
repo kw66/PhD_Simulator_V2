@@ -13,6 +13,12 @@ import { createRandomEventById } from "./v2-random-event-router";
 import { refreshPaperCompetitionEvent } from "./v2-paper-competition-preview";
 import { refreshPaperReviewEvent } from "./v2-publication-system";
 import { refreshScholarshipEvent } from "./v2-fixed-events-scholarship";
+import { refreshSummerVacationEvent } from "./v2-fixed-events-summer";
+import { applyFixedEventResolution } from "./v2-fixed-events";
+import { refreshWinterVacationPlan } from "./v2-fixed-events-winter";
+import { createPhdDecisionEvent } from "./v2-phd-decision-event";
+import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
+import { refreshConferenceDecision } from "./v2-conference-events";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
 import type {
@@ -248,10 +254,20 @@ export function rebaseGeneratedEventIds<T>(value: T, generatedEventId: string, q
   ) as T;
 }
 
-function rebuildRandomEventFromCurrentState(
+function rebuildEventFromCurrentState(
   state: GameState,
   queuedEvent: EventQueueItem,
 ): EventQueueItem {
+  if (queuedEvent.fixedTreePreview && (queuedEvent.stage === "act1" || queuedEvent.stage === "act2")) {
+    const context = queuedEvent.fixedTreePreview;
+    const current = { ...state, year: context.year, month: context.month, totalMonths: context.totalMonths };
+    let rollIndex = 0;
+    let rebuilt = context.kind === "phd-decision"
+      ? createPhdDecisionEvent(current, context.year)
+      : createMentorAssignEvent(current, () => context.rolls[rollIndex++] ?? 0);
+    if (queuedEvent.stage === "act2") rebuilt = rebuilt.choices[0]!.effects.enqueueEvents![0]!;
+    return { ...queuedEvent, title: rebuilt.title, description: rebuilt.description, choices: rebuilt.choices };
+  }
   const replay = queuedEvent.randomReplay;
   if (!replay || queuedEvent.source !== "random" || (queuedEvent.stage !== "act1" && queuedEvent.stage !== "act2")) {
     return queuedEvent;
@@ -311,8 +327,23 @@ function rebuildRandomEventFromCurrentState(
 }
 
 export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
-  return refreshScholarshipEvent(state, refreshOccupiedLoverEvent(state, refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state,
-    refreshRandomResultPreview(state, rebuildRandomEventFromCurrentState(state, queuedEvent))))));
+  if (queuedEvent.fixedResultPreview) {
+    const context = queuedEvent.fixedResultPreview;
+    let rollIndex = 0;
+    const resolved = applyFixedEventResolution(state, context.resolution, () => context.rolls[rollIndex++] ?? context.rolls.at(-1)!);
+    const result = resolved.enqueueEvents?.find((entry) => entry.stage === queuedEvent.stage);
+    if (result) return {
+      ...queuedEvent,
+      title: result.title,
+      description: result.description,
+      completionLog: result.completionLog,
+      choices: result.choices.map((choice, index) => ({ ...choice, id: queuedEvent.choices[index]?.id ?? choice.id })),
+      deferredStatePatch: createDeferredStatePatch(state, resolved.nextState),
+    };
+  }
+  queuedEvent = refreshConferenceDecision(state, refreshWinterVacationPlan(state, queuedEvent));
+  return refreshSummerVacationEvent(state, refreshScholarshipEvent(state, refreshOccupiedLoverEvent(state, refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state,
+    refreshRandomResultPreview(state, rebuildEventFromCurrentState(state, queuedEvent)))))));
 }
 
 function refreshOccupiedLoverEvent(state: GameState, event: EventQueueItem): EventQueueItem {
@@ -344,13 +375,14 @@ function refreshOccupiedLoverEvent(state: GameState, event: EventQueueItem): Eve
 function refreshRandomResultPreview(state: GameState, event: EventQueueItem): EventQueueItem {
   const previousScene = event.history?.at(-1);
   const source = previousScene?.replayEvent;
-  if (event.stage !== "result" || !event.randomReplay || !source || source.stage !== "act2") return event;
+  if (event.stage !== "result" || !(event.randomReplay || event.fixedTreePreview) || !source || source.stage !== "act2") return event;
   const decision: EventQueueItem = {
     ...source,
     queueOrder: event.queueOrder,
     history: event.history?.slice(0, -1),
     replayContext: event.replayContext,
     randomReplay: event.randomReplay,
+    fixedTreePreview: event.fixedTreePreview,
   };
   // Recalculate the pending preview from today's relationships/modifiers.
   // applyQueuedEventEffects defers every same-chain effect, so this never
@@ -370,7 +402,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => event.chainId === "scholarship" || ((event.stage === "act2" || event.stage === "result")
+  const eventQueue = state.eventQueue.map((event) => event.fixedResultPreview || event.fixedTreePreview || event.conferencePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
     && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };
@@ -453,7 +485,7 @@ export function applyQueuedEventEffects(
       title: recordedEvent.title,
       description: recordedEvent.description,
       paperReviewPresentation: resolvedEvent.paperReviewPresentation,
-      choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason, fellowCandidate }) => ({ id, label, outcome, disabledReason, fellowCandidate })),
+      choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason }) => ({ id, label, outcome, disabledReason })),
       selectedChoiceId: choice.id,
       replayEvent: sceneSource,
     },

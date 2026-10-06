@@ -15,7 +15,7 @@ const workstationPurchases = [
 function playingState(): GameState {
   const initial = createInitialState();
   return { ...initial, phase: "playing", year: 1, month: 2, totalMonths: 2,
-    player: { ...initial.player, money: 0, san: 20 }, eventQueue: [] };
+    player: { ...initial.player, money: 0, san: 20, favor: 18 }, eventQueue: [] };
 }
 
 function claimFunding(state: GameState, label: string): GameState {

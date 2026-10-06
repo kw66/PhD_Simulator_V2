@@ -61,7 +61,7 @@ describe("image misuse follows the affected paper", () => {
     let state = resolve({ ...initial, eventQueue: [createEventQueueItem(event, 1)] });
     state = resolve(state, 3);
     expect(state.eventQueue[0]!.description).toContain("PS");
-    expect(state.eventQueue[0]!.description).toContain("符合条件的未投稿一作论文引用 ×0.5");
+    expect(state.eventQueue[0]!.description).toContain("涉事论文引用 ×0.5");
     expect(state.eventQueue[0]!.description).not.toContain("复现");
     expect(state.papers[0]!.imageMisusePending).toBeUndefined();
     expect(state.buffs).toEqual([]);
@@ -70,6 +70,8 @@ describe("image misuse follows the affected paper", () => {
     expect(state.buffs).toEqual([]);
     expect(hasScholarshipDisqualification(state)).toBe(false);
     expect(settlePublishedImageMisuse(state)).toBe(state);
+    expect(renderApp(state)).toContain("举报风险（待生效）");
+    expect(renderApp(state)).toContain("发表前丢弃或撤稿可避免生效");
   });
 
   it("activates the permanent penalty only when conference publication is confirmed", () => {
@@ -85,6 +87,7 @@ describe("image misuse follows the affected paper", () => {
     const result = reviewed.eventQueue[0]!;
     const published = resolve(reviewed);
     expect(published.buffs).toContainEqual(createImageMisuseBuff());
+    expect(renderApp(published)).not.toContain("举报风险（待生效）");
     expect(published.externalPublications[0]!.publication!.citationDebuffMultiplier).toBe(0.5);
     expect(advanceBuffDurations(published.buffs)).toContainEqual(createImageMisuseBuff());
     const repeated = dispatchAction(published, "resolve-event", { eventId: result.id, eventChoiceId: result.choices[0]!.id });
@@ -125,6 +128,7 @@ describe("image misuse follows the affected paper", () => {
       : submitJournalPaper(state, "affected", "pami");
     const withdrawn = withdrawPaper(submitted, "affected");
     expect(withdrawn.papers[0]).toMatchObject({ status: "draft", imageMisusePending: false, citationDebuffMultiplierOnPublish: 0.5 });
+    expect(renderApp(withdrawn)).not.toContain("举报风险（待生效）");
     const published = publishConference(withdrawn);
     expect(hasScholarshipDisqualification(published)).toBe(false);
     expect(published.externalPublications[0]!.publication!.citationDebuffMultiplier).toBe(0.5);
@@ -171,11 +175,11 @@ describe("image misuse follows the affected paper", () => {
   it("shows the named permanent Buff and includes it in debug effects", () => {
     const buff = createImageMisuseBuff();
     expect(createDebugBuffs()).toContainEqual(buff);
-    const item = buildBuffDisplayBuckets([buff]).permanent.find((entry) => entry.label === "图片误用");
+    const item = buildBuffDisplayBuckets([buff]).permanent.find((entry) => entry.label === "举报风险");
     expect(item).toMatchObject({ isDebuff: true, category: "publication" });
     expect(item!.sources.join("")).toContain("国奖入选后会被举报取消");
     const html = renderApp({ ...makeState(), buffs: [buff] });
-    expect(html).toContain("图片误用");
+    expect(html).toContain("举报风险");
     expect(buildBuffDisplayBuckets([{ ...buff, remainingMonths: 0 }]).permanent).toEqual([]);
   });
 

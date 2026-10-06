@@ -13,6 +13,7 @@ import { createAiBuffs, createAiShopState, getAiModelById } from "./v2-ai-shop";
 import { clampSan, pushLog } from "./v2-engine-helpers";
 import { createBeforeGradSchoolAct1Event } from "./v2-fixed-events-before-grad-school";
 import { createCcigEvent } from "./v2-fixed-events-ccig-decision-events";
+import { createCcigActivityEvent } from "./v2-fixed-events-ccig-activity-events";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { createScholarshipEvent } from "./v2-fixed-events-scholarship";
 import { createSummerVacationEvent } from "./v2-fixed-events-summer";
@@ -184,10 +185,30 @@ export const DEBUG_MONTH_DELTAS = [-12, -1, 1, 12] as const;
 /** Manual cross-run audit checklist. Add an id here after the user confirms that the event has been checked. */
 export const DEBUG_COMPLETED_EVENT_IDS = [
   "before-grad-school",
+  "mentor-assign",
+  "teachers-day",
+  "winter-vacation",
+  "summer-vacation",
+  "advisor-grant-success",
+  "advisor-grant-failure",
   "random-1",
   "random-2",
   "random-4",
   "random-5",
+  "random-6",
+  "random-7",
+  "random-8",
+  "random-9",
+  "random-10",
+  "random-11",
+  "random-12",
+  "random-13",
+  "random-14",
+  "random-15",
+  "random-16",
+  "random-17",
+  "random-18",
+  "year-summary",
   "illness-stomach",
   "illness-flu",
   "illness-fever",
@@ -202,6 +223,8 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
       { id: "winter-vacation", label: "寒假" },
       { id: "summer-vacation", label: "暑假" },
       { id: "year-summary", label: "学年总结" },
+      { id: "ccig", label: "年会" },
+      { id: "ccig-activity", label: "年会活动" },
       { id: "before-grad-school", label: "读研之始" },
       { id: "phd-choice", label: "转博抉择" },
       { id: "mentor-assign", label: "指导新生" },
@@ -235,9 +258,8 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
     ],
   },
   {
-    title: "开会相关",
+    title: "论文相关",
     buttons: [
-      { id: "ccig", label: "年会" },
       { id: "conference", label: "论文参会" },
       { id: "review-result", label: "论文结果" },
       { id: "thesis-progress", label: "论文推进" },
@@ -615,6 +637,8 @@ function buildDebugEvent(
       return { nextState: state, event: createYearSummaryEvent(state) };
     case "ccig":
       return { nextState: state, event: createCcigEvent(state) };
+    case "ccig-activity":
+      return { nextState: state, event: createCcigActivityEvent(state, "self", []) };
     case "mentor-assign":
       return { nextState: state, event: createMentorAssignEvent(state) };
     case "advisor-grant-success":
@@ -628,6 +652,7 @@ function buildDebugEvent(
         id: grant.id,
         calendarYear: getAcademicCalendarYear(state.year, Math.max(1, state.month)),
         researchSnapshot: success ? Math.max(grant.threshold, advisor.researchAccumulation) : grant.threshold - 1,
+        resultRoll: success ? 0 : 0.999999999999,
       };
       const nextState = {
         ...state,

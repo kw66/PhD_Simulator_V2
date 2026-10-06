@@ -3,6 +3,7 @@ import { createFixedEvent } from "./v2-fixed-events-shared";
 import { createThreeStageEvent } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 import { canAddRelationship } from "./v2-relationship-rules";
+import { attachFixedTreePreview } from "./v2-fixed-event-preview";
 
 const CANDIDATE_DESCRIPTIONS = [
   "刚接触科研，读论文和跑实验都要从头学起。",
@@ -12,6 +13,12 @@ const CANDIDATE_DESCRIPTIONS = [
 ] as const;
 
 export function createMentorAssignEvent(state: GameState, getNameRoll: () => number = Math.random): PendingEvent {
+  const rolls: number[] = [];
+  const recordRoll = () => {
+    const roll = getNameRoll();
+    rolls.push(roll);
+    return roll;
+  };
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
   const generatedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
   const candidates = Array.from({ length: 4 }, (_, index) => {
@@ -20,7 +27,7 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
       state.totalMonths * 1000 + state.year * 10 + state.month + (index + 1) * 97,
       undefined,
       generatedNames,
-      getNameRoll,
+      recordRoll,
     );
     generatedNames.push(addition.name ?? "");
     const roleLabel = getFellowRoleLabel(addition.type, addition.gender);
@@ -47,11 +54,6 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
       id: candidate.choiceId,
       label: candidate.label,
       outcome: candidate.outcome,
-      fellowCandidate: {
-        description: candidate.description,
-        research: candidate.addition.research,
-        affinity: candidate.addition.affinity,
-      },
       effects: canAddJunior ? { fellowAdditions: [candidate.addition] } : {},
     })),
   });
@@ -63,24 +65,24 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
     ].join("\n\n"),
     decisionTitle: "选择一位新生",
     decisionDescription: [
-      "四份材料里，有人做过小课题，有人还跟着教程跑代码。想起入门时踩过的坑，你很想教新生少走弯路。可想到以后有人追着问“这个报错怎么办”，成就感里又添了点紧张。",
+      "你翻开四位新生的材料，看看各自的研究经历，盘算从哪里开始带。",
+      candidates.map((candidate) => `**${candidate.label}**：${candidate.description}`).join("\n"),
       canAddJunior
-        ? "你翻过现有的合作安排，还能接下一位新生。材料里写着各自的研究基础，相处是否投缘，也值得一起看看。"
+        ? "还能接下一位新生，你决定先约其中一位聊聊。"
         : "再看现有的合作安排，你已经顾不过来了。材料可以继续看，这次却接不下任何一位，只能请导师另作安排。",
     ].join("\n\n"),
     results: Object.fromEntries(candidates.map((candidate) => [candidate.choiceId, {
       title: candidate.label,
       description: canAddJunior
-        ? `你和${candidate.prose}约好在实验室见面，发去门牌号，又补了句“找不到就发消息”。原来现在也轮到你给别人指路了。`
+        ? `你和${candidate.prose}约好在实验室见面，发去门牌号，又补了句“找不到就发消息”。原来现在也轮到你给别人指路了。\n\n${candidate.prose}：科研能力 ${candidate.addition.research}/20，默契度 ${candidate.addition.affinity}/20。`
         : "你看完材料，还是没接下这次指导。眼下已有的合作还要顾，新生的安排只能请导师另找人选。",
     }])),
   });
-  const fellowCapacity = Math.max(0, state.relationshipState.unlockedSlots - 1);
-  const condition = `条件：合作人数 ${state.relationshipState.occupiedSlots} ${canAddJunior ? "<" : "≥"} ${fellowCapacity}`;
+  const condition = `条件：${canAddJunior ? "人际栏有空位" : "人际栏已满"}`;
   for (const choice of stagedEvent.choices[0]?.effects.enqueueEvents?.[0]?.choices ?? []) {
     for (const result of choice.effects.enqueueEvents ?? []) {
       result.description = result.description.replace("机制结算\n", `机制结算\n${condition}\n结果：`);
     }
   }
-  return stagedEvent;
+  return attachFixedTreePreview(stagedEvent, { kind: "mentor-assign", year: state.year, month: state.month, totalMonths: state.totalMonths, rolls });
 }

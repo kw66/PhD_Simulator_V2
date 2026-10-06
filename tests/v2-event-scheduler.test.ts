@@ -17,6 +17,9 @@ import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
 import { collectThesisEventForMonth } from "../src/core/v2-monthly-thesis-events";
 import { createFundingCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
 import { createAdvisorTalkRandomEvent } from "../src/core/v2-random-events-lab-advisor-talk";
+import { createAdvisorMeetingRandomEvent } from "../src/core/v2-random-events-lab-advisor-meeting";
+import { createAdvisorAuthorshipRandomEvent } from "../src/core/v2-random-events-lab-advisor-authorship";
+import { ADVISOR_GRANTS } from "../src/core/v2-advisor-progress";
 import { activatePendingRandomEvents } from "../src/core/v2-paper-competition-waiting";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import type { EventChoice, PendingEvent } from "../src/core/v2-types";
@@ -65,7 +68,7 @@ describe("v2 event scheduler", () => {
     for (const choice of decision.choices.slice(1, 3)) {
       expect(choice.effects.enqueueEvents!.at(-1)!.description).toContain(choice.outcome);
     }
-    expect(decision.choices[0]!.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(research >= 6 ? 6 : undefined);
+    expect(decision.choices[0]!.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(research >= 6 ? 5 : undefined);
     expect(decision.choices[0]!.effects.favor).toBe(research < 6 ? -1 : undefined);
     expect(decision.choices[1]!.effects.research).toBe(favor >= 6 ? 1 : undefined);
     expect(decision.choices[1]!.effects.favor).toBe(favor < 6 ? -1 : undefined);
@@ -224,9 +227,9 @@ describe("v2 event scheduler", () => {
       () => 0.99,
     );
 
-    expect(lowFavorResult.enqueueEvents?.[0]?.description).toContain("导师好感 < 6");
+    expect(lowFavorResult.enqueueEvents?.[0]?.description).toContain("条件：导师好感 < 6；普通回复（60%）");
     expect(lowFavorResult.enqueueEvents?.[0]?.description).not.toContain("无直接数值变化");
-    expect(highFavorResult.enqueueEvents?.[0]?.description).toContain("导师好感 ≥ 6");
+    expect(highFavorResult.enqueueEvents?.[0]?.description).toContain("条件：导师好感 ≥ 6；普通回复（50%）");
     expect(highFavorResult.enqueueEvents?.[0]?.description).not.toContain("无直接数值变化");
   });
 
@@ -254,7 +257,36 @@ describe("v2 event scheduler", () => {
     expect(result.enqueueEvents?.[0]?.completionLog).toContain("SAN -3，导师好感 +1");
     expect(result.outcome).toContain("报销跑腿");
     expect(result.enqueueEvents?.[0]?.description.split("机制结算")[0]).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
-    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("导师好感 < 6");
+    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("条件：导师好感 < 6；报销跑腿（40%）");
+  });
+
+  it.each([0, 1, 2, 3, 4, 5, 6, 9])("uses completed errands to set Teacher's Day odds after %i errands", (count) => {
+    const initial = createInitialState();
+    const state = {
+      ...initial,
+      player: { ...initial.player, favor: 1 },
+      eventCounters: { ...initial.eventCounters, teachersDayErrandCount: count },
+    };
+    const percent = Math.min(100, 40 + count * 10);
+    const errand = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => percent / 100 - 0.000001);
+    expect(errand.enqueueEvents?.[0]?.description).toContain(`报销跑腿（${percent}%）`);
+    expect(errand.nextState.eventCounters.teachersDayErrandCount).toBe(count + 1);
+    expect(state.eventCounters.teachersDayErrandCount).toBe(count);
+    if (percent < 100) {
+      expect(errand.enqueueEvents?.[0]?.description).toContain(`报销跑腿 ${percent}%→${percent + 10}%`);
+      const reply = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => percent / 100);
+      expect(reply.enqueueEvents?.[0]?.description).toContain(`普通回复（${100 - percent}%）`);
+      expect(reply.nextState.eventCounters.teachersDayErrandCount).toBe(count);
+    }
+    const gift = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-gift", teachersDayGift: "tea" }, () => 0);
+    expect(gift.nextState.eventCounters.teachersDayErrandCount).toBe(count);
+    const familiar = resolveTeachersDayFixedEvent({ ...state, player: { ...state.player, favor: 6 } }, { kind: "teachers-day-message" }, () => 0);
+    expect(familiar.enqueueEvents?.[0]?.description).toContain("分享想法（50%）");
+    expect(familiar.nextState.eventCounters.teachersDayErrandCount).toBe(count);
+    expect(familiar.nextState.buffs.at(-1)?.actionEffects?.idea?.bonus).toBe(4);
+    const familiarReply = resolveTeachersDayFixedEvent({ ...state, player: { ...state.player, favor: 6 } }, { kind: "teachers-day-message" }, () => 0.5);
+    expect(familiarReply.enqueueEvents?.[0]?.description).toContain("普通回复（50%）");
+    expect(familiarReply.nextState.eventCounters.teachersDayErrandCount).toBe(count);
   });
 
   it("hints at Teacher's Day branches through familiarity without numerical odds", () => {
@@ -268,20 +300,19 @@ describe("v2 event scheduler", () => {
       player: { ...base.player, favor: 6 },
     };
     const choiceEvent = createTeachersDayEvent(state, () => 0).choices[0]?.effects.enqueueEvents?.[0];
-    expect(choiceEvent?.description).toContain("聊得熟了");
+    expect(choiceEvent?.description).not.toContain("报销");
     expect(choiceEvent?.description).toContain("研究想法");
     expect(choiceEvent?.description).toContain("忙起来可能只回一句谢谢");
     expect(choiceEvent?.description.split(/\n\s*\n/u)).toHaveLength(2);
     expect(choiceEvent?.description).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
     const result = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => 0);
-    expect(result.outcome).toContain("导师顺势分享了一个想法");
-    expect(result.outcome).toContain("下次想 idea +3");
+    expect(result.outcome).toContain("分享了一个想法");
+    expect(result.outcome).toContain("下次想 idea +4");
     expect(result.outcome).not.toMatch(/\d+%/u);
     expect(result.enqueueEvents?.[0]?.description.split("机制结算")[0]).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
-    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("导师好感 ≥ 6");
+    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("条件：导师好感 ≥ 6；分享想法（50%）");
     const lowFavorState = { ...state, player: { ...state.player, favor: 5 } };
     const lowFavorChoice = createTeachersDayEvent(lowFavorState, () => 0).choices[0]?.effects.enqueueEvents?.[0];
-    expect(lowFavorChoice?.description).toContain("还不熟");
     expect(lowFavorChoice?.description).toContain("报销");
     expect(lowFavorChoice?.description).toContain("也可能只回一句谢谢");
     expect(lowFavorChoice?.description).toContain("1 金币");
@@ -422,7 +453,8 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBeUndefined();
     const selfGuidanceChoice = getDecisionChoices(result.events[0])[1];
     const newJunior = selfGuidanceChoice?.effects.fellowAdditions?.[0];
-    expect(newJunior).toMatchObject({ type: "junior" });
+    expect(newJunior).toMatchObject({ type: "junior", research: 2, affinity: 3 });
+    expect(selfGuidanceChoice?.outcome).toContain("默契 +2");
     expect(newJunior?.name).toBeTruthy();
     const selfGuidanceResult = selfGuidanceChoice?.effects.enqueueEvents?.at(-1);
     expect(selfGuidanceResult?.description).toContain(newJunior?.name ?? "");
@@ -755,7 +787,7 @@ describe("v2 event scheduler", () => {
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("导师约谈");
     expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["认真汇报", "请教推进方法", "提出远程实习"]);
-    expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(4);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(5);
     expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(1);
     expect(getDecisionChoices(result.events[0])[2]?.effects.internshipStateUpdates).toBeUndefined();
     expect(getDecisionChoices(result.events[0])[2]?.effects.enqueueEvents?.at(-1)?.choices[0]?.effects.internshipStateUpdates).toMatchObject({
@@ -768,6 +800,33 @@ describe("v2 event scheduler", () => {
       experimentBonus: 4,
       experimentMoneyDiscount: 1,
     });
+  });
+
+  it.each([60, 50, 40, 30, 20, 10])("uses the advisor rank's %i percent attendance for every meeting option", (percent) => {
+    const initial = createInitialState();
+    const rank = (60 - percent) / 10;
+    const grant = ADVISOR_GRANTS[rank - 1];
+    const state = {
+      ...initial,
+      player: { ...initial.player, research: 1, favor: 1 },
+      advisorProgressState: {
+        ...initial.advisorProgressState,
+        awards: grant ? [{ id: grant.id, awardedYear: 2023, startYear: 2024, endYear: 2025 }] : [],
+      },
+    };
+    for (const present of [true, false]) {
+      const threshold = percent / 100;
+      const roll = present ? threshold - 0.000001 : threshold;
+      const event = createAdvisorMeetingRandomEvent(state, () => roll);
+      const choices = getDecisionChoices(event);
+      expect(choices).toHaveLength(3);
+      for (const [index, choice] of choices.entries()) {
+        const probability = present ? `导师到场（${percent}%）` : `导师缺席（${100 - percent}%）`;
+        expect(choice.outcome).toContain(probability);
+        expect(choice.effects.enqueueEvents?.[0]?.description).toContain(probability);
+        expect(choice.effects.favor ?? 0).toBe(present ? index === 2 ? -1 : 1 : 0);
+      }
+    }
   });
 
   it("builds the real event 6 choices with research threshold and meeting attendance rolls", () => {
@@ -822,8 +881,8 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[1]?.effects.money).toBe(5);
     expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(1);
     expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(5);
-    expect(getDecisionChoices(result.events[0])[3]?.effects.favor).toBeUndefined();
-    expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.favor).toBe(1);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBeUndefined();
   });
 
   it("builds the real event 8 choices with gpu, salary and renovate routes", () => {
@@ -847,6 +906,9 @@ describe("v2 event scheduler", () => {
     const choices = getDecisionChoices(result.events[0]);
     expect(choices.map((choice) => choice.label)).toEqual(["买显卡", "发劳务费", "装修工位", "报销 AI 费用"]);
     expect(choices[0]?.effects.shopEntitlementDeltas).toEqual({ gpuTransaction: 1 });
+    expect(choices[0]?.outcome).toContain("结果：显卡报销：");
+    expect(choices[2]?.outcome).toContain("结果：工位报销：");
+    expect(choices[2]?.outcome).not.toContain("+1");
     expect(choices[1]?.effects.money).toBe(7);
     expect(choices[2]?.effects.shopEntitlementDeltas).toEqual({
       workstationTransaction: 1,
@@ -860,19 +922,19 @@ describe("v2 event scheduler", () => {
     expect(fundedTwice.shopState.entitlements.workstationTransaction).toBe(2);
     expect(choices[3]?.outcome).toContain("AI");
     expect(choices[3]?.effects.addBuffs).toEqual([expect.objectContaining({
-      id: "ai-reimbursement",
+      id: "ai-reimbursement-18",
       name: "AI报销",
       timing: "monthly",
-      remainingMonths: 1,
-      shopEffects: { aiCostsCovered: true },
+      remainingMonths: 2,
+      shopEffects: { aiCostsCovered: true, aiCostsCoveredAtTotalMonths: 18 },
     })]);
-    expect(choices[3]?.effects.eventSupportUpdates).toEqual({ aiCostsCoveredUntilTotalMonths: 17 });
+    expect(choices[3]?.effects.eventSupportUpdates).toBeUndefined();
     const aiFunded = applyChoiceEffectsToState(baseState, choices[3]!).nextState;
-    expect(aiFunded.buffs).toContainEqual(expect.objectContaining({ id: "ai-reimbursement", name: "AI报销" }));
+    expect(aiFunded.buffs).toContainEqual(expect.objectContaining({ id: "ai-reimbursement-18", name: "AI报销" }));
     const aiResult = choices[3]?.effects.enqueueEvents?.at(-1);
     expect(aiResult?.title).toContain("报销 AI 费用");
-    expect(aiResult?.description).toContain("本月的费用");
-    expect(aiResult?.description).toContain("AI 报销：本月使用费为 0");
+    expect(aiResult?.description).toContain("下个月的费用");
+    expect(aiResult?.description).toContain("AI报销：下月免费");
   });
 
   it("waits for advisor funding above the shared project threshold before showing event 8", () => {
@@ -912,7 +974,7 @@ describe("v2 event scheduler", () => {
     }
   });
 
-  it("builds the real event 10 choices with publication and one-shot effects", () => {
+  it("builds peer cooperation with discussion and real fellow additions", () => {
     const initial = createInitialState();
     const baseState = {
       ...initial,
@@ -920,7 +982,7 @@ describe("v2 event scheduler", () => {
       year: 2,
       month: 5,
       totalMonths: 17,
-      player: { ...initial.player, social: 5 },
+      player: { ...initial.player, social: 6 },
       availableRandomEvents: [10],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
@@ -929,16 +991,18 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("\u540c\u95e8\u5408\u4f5c");
-    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["\u5b66\u672f\u4ea4\u6d41", "\u4e92\u6302\u8bba\u6587", "\u5a49\u62d2\u5408\u4f5c", "\u5168\u9762\u5408\u4f5c"]);
-    expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea).toEqual({ bonus: 4 });
-    expect(getDecisionChoices(result.events[0])[1]?.effects.grantedPublication?.nonFirstAuthor).toBe(true);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["委婉拒绝", "学术交流", "尝试合作", "长期合作"]);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.temporaryActionEffectUpdates?.idea).toEqual({ bonus: 5 });
+    expect(getDecisionChoices(result.events[0]).every((choice) => choice.effects.grantedPublication === undefined)).toBe(true);
     expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBeUndefined();
-    expect(getDecisionChoices(result.events[0])[3]?.effects.temporaryActionEffectUpdates?.idea?.extraActions).toBe(1);
-    expect(getDecisionChoices(result.events[0])[3]?.effects.temporaryActionEffectUpdates?.writing?.extraActions).toBe(1);
-    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-5);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.fellowAdditions?.[0]).toMatchObject({ type: "peer", affinity: 1 });
+    expect(getDecisionChoices(result.events[0])[3]?.effects.temporaryActionEffectUpdates).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[3]?.effects.fellowAdditions?.[0]).toMatchObject({ type: "peer", longTermMentoring: true });
 
-    const rejectResult = getDecisionChoices(result.events[0])[2]?.effects.enqueueEvents?.at(-1);
-    expect(rejectResult?.completionLog).toBe("婉拒合作：条件：无额外收益（50%）｜结果：无事发生。");
+    const rejectResult = getDecisionChoices(result.events[0])[0]?.effects.enqueueEvents?.at(-1);
+    expect(rejectResult?.completionLog).toBe("委婉拒绝：无事发生。");
   });
 
   it("builds the real event 11 choices with one-shot action effects", () => {
@@ -951,17 +1015,19 @@ describe("v2 event scheduler", () => {
       availableRandomEvents: [11],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
-      player: { ...createInitialState().player, social: 6 },
+      player: { ...createInitialState().player, research: 6 },
     };
 
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("\u5e08\u5144\u6307\u5bfc");
-    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["\u5148\u89c2\u671b", "\u6d45\u6d45\u5408\u4f5c", "\u6df1\u5165\u5408\u4f5c", "\u62dc\u5165\u95e8\u4e0b"]);
-    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBe(3);
-    expect(getDecisionChoices(result.events[0])[1]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(6);
-    expect(getDecisionChoices(result.events[0])[2]?.effects.research).toBe(1);
-    expect(getDecisionChoices(result.events[0])[3]?.effects.writingBonus).toBe(4);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["委婉拒绝", "学术交流", "尝试合作", "长期合作"]);
+    expect(getDecisionChoices(result.events[0])[0]?.effects.san).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[1]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(8);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.research).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-4);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.writingBonus).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[3]?.effects.fellowAdditions?.[0]).toMatchObject({ type: "senior", longTermMentoring: true });
     expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBeUndefined();
   });
 
@@ -983,12 +1049,12 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("署名风波");
-    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["向导师诉苦", "转移到别人", "据理力争", "极端施压"]);
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["向导师诉苦", "转移到师弟师妹", "据理力争", "极端反抗"]);
     expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(-5);
-    expect(getDecisionChoices(result.events[0])[1]?.effects.social).toBe(-1);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.social).toBe(-2);
     expect(getDecisionChoices(result.events[0])[1]?.effects.score).toBeUndefined();
     expect(getDecisionChoices(result.events[0])[1]?.effects.grantedPublication).toBeUndefined();
-    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-2);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-3);
     expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBe(2);
     expect(getDecisionChoices(result.events[0])[3]?.effects.favor).toBe(-2);
 
@@ -1051,7 +1117,37 @@ describe("v2 event scheduler", () => {
       totalRandomEventCount: 0,
     };
     const authorshipResult = collectRandomEventsForMonth(authorshipState, fromRolls([0.7, 0]));
-    expect(getDecisionChoices(authorshipResult.events[0])[2]?.effects.san).toBe(-3);
+    expect(getDecisionChoices(authorshipResult.events[0])[2]?.effects.san).toBe(-4);
+  });
+
+  it.each(["none", "peer", "junior"] as const)("uses the actual %s relationship for authorship transfer", (type) => {
+    const initial = createInitialState();
+    const profile = createCustomFellowProgressProfile({ type: type === "none" ? "peer" : type, gender: "female", research: 3, affinity: 1, startTotalMonths: 1, name: "林晓" });
+    const state = { ...initial, month: 6, totalMonths: 6, player: { ...initial.player, social: 5 }, fellowProgressState: type === "none" ? [] : [profile] };
+    const transfer = getDecisionChoices(createAdvisorAuthorshipRandomEvent(state, () => 0.99))[1]!;
+    expect(transfer.effects.social).toBe(type === "junior" ? -1 : -2);
+    expect(transfer.outcome).toContain(type === "junior" ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0");
+    const story = transfer.effects.enqueueEvents![0]!.description.split("机制结算")[0]!;
+    expect(story).toContain("另一篇论文");
+    expect(story).toContain("毕业、找工作");
+    if (type === "junior") expect(story).toContain("林晓");
+    const resisted = getDecisionChoices(createAdvisorAuthorshipRandomEvent({ ...state, player: { ...state.player, social: 18 } }, () => 0))[1]!;
+    expect(resisted.effects.social).toBeUndefined();
+    expect(resisted.outcome).toContain(`社交 -0（抵抗${type === "junior" ? 1 : 2}）`);
+  });
+
+  it("uses three base SAN for arguing and a calming stipend for resistance", () => {
+    const initial = createInitialState();
+    for (const [month, cost] of [[6, 3], [7, 2], [10, 4]]) {
+      const state = { ...initial, month: month!, player: { ...initial.player, favor: 1 } };
+      const choices = getDecisionChoices(createAdvisorAuthorshipRandomEvent(state, () => 0.99));
+      expect(choices[2]!.effects.san).toBe(-cost!);
+      expect(choices[3]!.label).toBe("极端反抗");
+      expect(choices[3]!.effects).toMatchObject({ money: 2, favor: -2 });
+      const story = choices[3]!.effects.enqueueEvents![0]!.description.split("\n\n机制结算")[0]!;
+      expect(story).toContain("找个由头安抚你");
+      expect(story.split("\n\n")).toHaveLength(2);
+    }
   });
 
   it("applies seasonal SAN changes to every event operation with a direct SAN cost", () => {
@@ -1064,7 +1160,7 @@ describe("v2 event scheduler", () => {
       totalMonths: 32,
     };
 
-    expect(createScholarshipEvent(spring, () => 0).choices[0]?.effects.san).toBe(-1);
+    expect(getDecisionChoices(createScholarshipEvent(spring, () => 0))[0]?.effects.san).toBe(-1);
     expect(getDecisionChoices(createCareerEventForType(spring, "academic"))[1]?.effects.san).toBe(-2);
     expect(getDecisionChoices(collectThesisEventForMonth(spring).event ?? undefined)[1]?.effects.san).toBe(-1);
   });
@@ -1092,7 +1188,7 @@ describe("v2 event scheduler", () => {
     expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBe(-1);
     expect(getDecisionChoices(result.events[0])[2]?.effects.temporaryActionEffectUpdates).toBeUndefined();
     expect(getDecisionChoices(result.events[0])[2]?.effects.addBuffs).toMatchObject([{ labExperimentMoneyDelta: 1, remainingMonths: 6 }]);
-    expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[3]?.effects.money).toBe(-2);
     expect(getDecisionChoices(result.events[0])[3]?.effects.san).toBeUndefined();
     expect(getDecisionChoices(result.events[0])[3]?.effects.addBuffs).toMatchObject([{ labExperimentMoneyDelta: 1, remainingMonths: 6 }]);
 
@@ -1124,23 +1220,21 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0, 0]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("\u6307\u5bfc\u5e08\u5f1f");
-    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["精力有限，委婉拒绝", "短期合作，分享idea", "长期合作，共同成长"]);
-    expect(getDecisionChoices(result.events[0])[1]?.effects.social).toBe(1);
-    expect(getDecisionChoices(result.events[0])[1]?.effects.fellowAdditions?.[0]).toMatchObject({
-      type: "junior",
-      gender: "male",
-    });
-    expect(getDecisionChoices(result.events[0])[1]?.effects.san).toBe(-5);
-    expect(getDecisionChoices(result.events[0])[2]?.effects.mentorshipStacks).toBeUndefined();
-    expect(getDecisionChoices(result.events[0])[2]?.effects.addBuffs?.[0]?.monthlyStats).toEqual({ san: -2 });
-    expect(getDecisionChoices(result.events[0])[2]?.effects.addBuffs?.[0]?.scheduledPublication).toEqual({
-      intervalMonths: 12,
-      nonFirstAuthor: true,
-      targetWeights: { A: 0.2, B: 0.3, C: 0.5 },
-    });
+    expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["委婉拒绝", "请客吃饭", "认真指导", "长期合作"]);
+    expect(getDecisionChoices(result.events[0])[2]?.effects.social).toBeUndefined();
     expect(getDecisionChoices(result.events[0])[2]?.effects.fellowAdditions?.[0]).toMatchObject({
       type: "junior",
       gender: "male",
+    });
+    expect(getDecisionChoices(result.events[0])[2]?.effects.san).toBe(-5);
+    expect(getDecisionChoices(result.events[0])[3]?.effects.mentorshipStacks).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[3]?.effects.addBuffs).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[3]?.effects.social).toBeUndefined();
+    expect(getDecisionChoices(result.events[0])[1]?.effects).toMatchObject({ money: -2, social: 1 });
+    expect(getDecisionChoices(result.events[0])[3]?.effects.fellowAdditions?.[0]).toMatchObject({
+      type: "junior",
+      gender: "male",
+      longTermMentoring: true,
     });
   });
 

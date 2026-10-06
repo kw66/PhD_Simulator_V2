@@ -87,7 +87,7 @@ describe("data loss narrative and choices", () => {
     ["stay-up", "SAN -5；论文进度保留。"],
     ["restart", "论文进度清0。"],
     ["pay", "金币 -3；论文进度保留。"],
-    ["fake", "论文进度保留；符合条件的未投稿一作论文引用 ×0.5；图片误用。"],
+    ["fake", "论文进度保留；涉事论文引用 ×0.5；举报风险。"],
   ] as const)("uses a short, consistent result for %s", (branch, outcome) => {
     const state = makeState();
     expect(getChoice(makeEvent(state), branch).outcome).toBe(outcome);
@@ -98,7 +98,7 @@ describe("data loss narrative and choices", () => {
     expect(html).toContain(branch === "restart" ? "论文进度清0" : "论文进度保留");
     expect(html).not.toContain("所有未投稿论文进度清零");
     expect(html).not.toContain("当前未投稿且已有进度的论文");
-    if (branch === "fake") expect(html).toContain("符合条件的未投稿一作论文引用 ×0.5");
+    if (branch === "fake") expect(html).toContain("涉事论文引用 ×0.5");
   });
 
   it.each([

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { activateInternship, activateRemoteInternship, createInternshipState, getInternshipStatus } from "../src/core/v2-internship-system";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
+import { createGrantedPublishedPaper } from "../src/core/v2-publication-rules";
 import { applyResearchOperation, getResearchExperimentMoneyCost, previewResearchOperation } from "../src/core/v2-research-operation";
 import { createLoverProgressState } from "../src/core/v2-lover-progression";
 import { activateLover } from "../src/core/v2-lover-system";
@@ -355,23 +356,13 @@ describe("monthly effects", () => {
     expect(nextState.actionState).toEqual({ used: 0, limit: 1, aiResearchBonusUsed: false });
   });
 
-  it("starts a scheduled paper's citation age after its publication month", () => {
+  it("starts a granted paper's citation age after its publication month", () => {
     const state = createPlayingMonth(1, 1);
-    state.buffs = [{
-      id: "scheduled-paper",
-      name: "长期带教",
-      source: "指导师弟师妹",
-      timing: "monthly",
-      remainingMonths: null,
-      scheduledPublication: {
-        intervalMonths: 12,
-        nonFirstAuthor: true,
-        targetWeights: { A: 1, B: 0, C: 0 },
-        elapsedMonths: 11,
-      },
-    }];
+    state.externalPublications = [createGrantedPublishedPaper(state.totalMonths, 0, {
+      title: "合作论文", target: "A", acceptedScore: 4, nonFirstAuthor: true,
+    })];
 
-    const publicationMonth = applyMonthlyEffects(state).nextState;
+    const publicationMonth = state;
     expect(publicationMonth.externalPublications[0]?.publication).toMatchObject({ effectiveScore: 4, citations: 0 });
     expect(publicationMonth.externalPublications[0]?.publication?.monthsSincePublish).toBeUndefined();
 

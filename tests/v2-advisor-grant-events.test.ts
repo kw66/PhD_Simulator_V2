@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ADVISOR_GRANTS, getAdvisorGrantResultContext, getAdvisorMonthlySalary, settleAdvisorGrantResult, settleAdvisorMonth } from "../src/core/v2-advisor-progress";
+import { ADVISOR_GRANTS, getAdvisorGrantResultContext, getAdvisorGrantSuccessChance, getAdvisorMonthlySalary, settleAdvisorGrantResult, settleAdvisorMonth } from "../src/core/v2-advisor-progress";
 import { createAdvisorGrantResultEvent } from "../src/core/v2-advisor-grant-events";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { enqueueEventQueueItem } from "../src/core/v2-event-queue";
@@ -22,7 +22,7 @@ function playing(month = 12): GameState {
 
 function queued(snapshot = 25): GameState {
   const state = playing();
-  const application: AdvisorGrantApplication = { id: "youth", calendarYear: 2024, researchSnapshot: snapshot };
+  const application: AdvisorGrantApplication = { id: "youth", calendarYear: 2024, researchSnapshot: snapshot, resultRoll: 0.99 };
   state.advisorProgressState.pendingApplication = application;
   return enqueueEventQueueItem(state, createAdvisorGrantResultEvent(getAdvisorGrantResultContext(state, application)));
 }
@@ -33,6 +33,47 @@ function nextScene(state: GameState): GameState {
 }
 
 describe("advisor grant result events", () => {
+  it.each(ADVISOR_GRANTS)("scales %s funding odds from zero at 80 percent to certain at 100 percent", (grant) => {
+    for (const [ratio, chance] of [[0, 0], [0.79, 0], [0.8, 0], [0.9, 0.5], [1, 1], [1.5, 1]]) {
+      expect(getAdvisorGrantSuccessChance(grant.threshold * ratio!, grant)).toBeCloseTo(chance!);
+    }
+  });
+
+  it.each([[19, 0, false], [20, 0, false], [22.5, 0.499, true], [22.5, 0.5, false], [25, 0.999, true]] as const)(
+    "submits accumulation %i and preserves roll %f through the result (success %s)",
+    (accumulation, roll, success) => {
+      const initial = playing(7);
+      initial.advisorProgressState.researchAccumulation = accumulation;
+      const random = vi.fn(() => roll);
+      const march = settleAdvisorMonth(initial, random);
+      expect(random).toHaveBeenCalledTimes(1);
+      expect(march.advisorProgressState.pendingApplication).toEqual({
+        id: "youth", calendarYear: 2024, researchSnapshot: accumulation, resultRoll: roll,
+      });
+      expect(settleAdvisorMonth(march, random)).toBe(march);
+      expect(random).toHaveBeenCalledTimes(1);
+      const restored = JSON.parse(JSON.stringify(march)) as GameState;
+      restored.advisorProgressState.researchAccumulation = 1000;
+      const noRoll = () => { throw new Error("Grant result must not reroll"); };
+      const august = settleAdvisorMonth({ ...restored, month: 12, totalMonths: 12 }, noRoll);
+      const application = august.advisorProgressState.pendingApplication!;
+      expect(getAdvisorGrantResultContext(august, application).success).toBe(success);
+      const third = nextScene(nextScene(august));
+      expect(third.advisorProgressState.awards).toHaveLength(0);
+      const final = nextScene(third);
+      expect(final.advisorProgressState.awards).toHaveLength(success ? 1 : 0);
+      expect(final.advisorProgressState.funding).toBe(success ? 20 : 10);
+      expect(final.advisorProgressState.pendingApplication).toBeNull();
+      if (!success) {
+        const retry = settleAdvisorMonth({ ...final, year: 2, month: 7, totalMonths: 19,
+          advisorProgressState: { ...final.advisorProgressState, researchAccumulation: 25 },
+        }, () => 0.99);
+        expect(retry.advisorProgressState.pendingApplication?.id).toBe("youth");
+        expect(getAdvisorGrantResultContext(retry, retry.advisorProgressState.pendingApplication!).success).toBe(true);
+      }
+    },
+  );
+
   it("queues only an actual March application in August and does not settle twice", () => {
     const initial = playing(7);
     initial.advisorProgressState.researchAccumulation = 25;
@@ -45,7 +86,7 @@ describe("advisor grant result events", () => {
     expect(august.advisorProgressState.awards).toHaveLength(0);
     expect(august.advisorProgressState.funding).toBe(initial.advisorProgressState.funding);
     expect(august.eventQueue).toHaveLength(1);
-    expect(august.eventQueue[0]).toMatchObject({ title: "导师基金结果", stage: "act1", deadlineMonths: 0 });
+    expect(august.eventQueue[0]).toMatchObject({ title: "基金结果", stage: "act1", deadlineMonths: 0 });
     expect(settleAdvisorMonth(august)).toBe(august);
     expect(settleAdvisorMonth(playing()).eventQueue).toHaveLength(0);
   });
@@ -77,7 +118,7 @@ describe("advisor grant result events", () => {
     state.advisorProgressState.researchAccumulation = 400;
     state = nextScene(nextScene(state));
     expect(state.eventQueue[0]?.description).toContain("听组里的同学说起");
-    expect(state.eventQueue[0]?.description).toContain("机制结算\n无事发生");
+    expect(state.eventQueue[0]?.description).toContain("未获批（20%）\n结果：无事发生");
     const final = nextScene(state);
     expect(final.advisorProgressState).toMatchObject({ funding: 10, awards: [], pendingApplication: null });
     expect(final.eventHistory.some((entry) => entry.id.startsWith("talent:advisor-salary"))).toBe(false);
@@ -114,7 +155,7 @@ describe("advisor grant result events", () => {
   it.each(ADVISOR_GRANTS)("grants %s once with correct funding and no immediate player cash", (grant) => {
     const state = playing();
     if (grant.id === "academician") state.advisorProgressState.awards = [{ id: "distinguished", awardedYear: 2023, startYear: 2024, endYear: 2028 }];
-    const application = { id: grant.id, calendarYear: 2024, researchSnapshot: grant.threshold };
+    const application = { id: grant.id, calendarYear: 2024, researchSnapshot: grant.threshold, resultRoll: 0.99 };
     state.advisorProgressState.pendingApplication = application;
     const event = createAdvisorGrantResultEvent(getAdvisorGrantResultContext(state, application));
     const final = nextScene(nextScene(nextScene(enqueueEventQueueItem(state, event))));
@@ -139,7 +180,7 @@ describe("advisor grant result events", () => {
 
   it("uses the old salary in August and the promoted salary from September", () => {
     const state = playing(11);
-    state.advisorProgressState.pendingApplication = { id: "youth", calendarYear: 2024, researchSnapshot: 25 };
+    state.advisorProgressState.pendingApplication = { id: "youth", calendarYear: 2024, researchSnapshot: 25, resultRoll: 0.99 };
     const random = vi.spyOn(Math, "random").mockReturnValue(0.99);
     try {
       const august = dispatchAction(state, "next-month");
@@ -171,7 +212,7 @@ describe("advisor grant result events", () => {
     state = nextScene(state);
     state = dispatchAction(state, "debug-trigger-event", { eventId: "advisor-grant-failure" });
     expect(state.eventQueue.filter((event) => event.chainId?.startsWith("advisor-grant-"))).toHaveLength(1);
-    expect(state.eventQueue[0]).toMatchObject({ title: "导师基金结果", stage: "act1" });
+    expect(state.eventQueue[0]).toMatchObject({ title: "基金结果", stage: "act1" });
     const failed = nextScene(nextScene(nextScene(state)));
     expect(failed.advisorProgressState.funding).toBe(10);
     const retried = dispatchAction(failed, "debug-trigger-event", { eventId: "advisor-grant-success" });
@@ -181,12 +222,12 @@ describe("advisor grant result events", () => {
 
   it("previews the August result and shows it as announced when waiting for confirmation", () => {
     const state = playing(10);
-    state.advisorProgressState.pendingApplication = { id: "youth", calendarYear: 2024, researchSnapshot: 25 };
-    expect(buildFutureTodoPreviewItems(state)).toContainEqual(expect.objectContaining({ title: "导师基金结果", monthsLater: 2 }));
+    state.advisorProgressState.pendingApplication = { id: "youth", calendarYear: 2024, researchSnapshot: 25, resultRoll: 0.99 };
+    expect(buildFutureTodoPreviewItems(state)).toContainEqual(expect.objectContaining({ title: "基金结果", monthsLater: 2 }));
     const august = settleAdvisorMonth({ ...state, totalMonths: 12, month: 12 });
     const html = renderApp(august, undefined, { activePlayTab: "relationship" });
     expect(html).toContain("青基结果已公布");
     expect(html).not.toContain("青基申请·12月后公布");
-    expect(buildFutureTodoPreviewItems(nextScene(nextScene(nextScene(august))))).not.toContainEqual(expect.objectContaining({ title: "导师基金结果" }));
+    expect(buildFutureTodoPreviewItems(nextScene(nextScene(nextScene(august))))).not.toContainEqual(expect.objectContaining({ title: "基金结果" }));
   });
 });

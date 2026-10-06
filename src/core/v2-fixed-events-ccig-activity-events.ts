@@ -28,8 +28,7 @@ export function createCcigActivityEvent(
     description: [
       arrivalText,
       `你在手册上圈出想听的报告，又看了看海报区的位置。${posterPaper ? `手头那篇 A 类论文《${posterPaper.title}》也能做成海报，趁这次和同行聊聊。` : ""}`,
-      "机制结算",
-      `参会确认：${attendanceSettlementItems.join("，")}`,
+      ...(attendanceSettlementItems.length > 0 ? ["机制结算", `参会确认：${attendanceSettlementItems.join("，")}`] : []),
     ].join("\n\n"),
     chainId: activityChainId,
     stage: "act1",
@@ -62,8 +61,7 @@ export function createCcigActivityDecisionEvent(
       posterPaper
         ? `海报区也能展示《${posterPaper.title}》。想到同行会来听，你兴奋地默念了一遍开场白；总不能只让论文躺在网上，等别人碰巧翻到。`
         : "海报区贴着一排 A 类论文，你手头还没有适合这次展示的稿子。你把日程折好，准备先去听听同行都在做些什么。",
-      "机制结算",
-      `参会确认：${attendanceSummary}`,
+      ...(attendanceSummary ? ["机制结算", `参会确认：${attendanceSummary}`] : []),
     ].filter(Boolean).join("\n\n"),
     chainId: activityChainId,
     stage: "act2",

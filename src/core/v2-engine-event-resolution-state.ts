@@ -235,6 +235,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
           startTotalMonths: state.totalMonths,
           research: addition.research,
           affinity: addition.affinity,
+          longTermMentoring: addition.longTermMentoring,
           ...(addition.name ? { name: addition.name } : {}),
           ...(addition.taskType ? { taskType: addition.taskType } : {}),
           usedNames: usedFellowNames,
@@ -489,13 +490,25 @@ export function applyChoiceEffectsToState(
   }
 
   if (choice.effects.fixedEventResolution) {
-    const result = applyFixedEventResolution(nextState, choice.effects.fixedEventResolution);
+    const rolls: number[] = [];
+    const result = applyFixedEventResolution(nextState, choice.effects.fixedEventResolution, () => {
+      const roll = Math.random();
+      rolls.push(roll);
+      return roll;
+    });
     nextState = {
       ...result.nextState,
       relationshipState: syncRelationshipState(result.nextState.relationshipState, result.nextState.player.social),
     };
     resolvedOutcome = result.outcome;
     resolvedEnqueueEvents = result.enqueueEvents ?? [];
+    if (resolvedEnqueueEvents.some((event) => event.chainId !== "before-grad-school" && (event.stage === "result" || event.stage === "act3"))) {
+      while (rolls.length < 8) rolls.push(Math.random());
+      resolvedEnqueueEvents = resolvedEnqueueEvents.map((event) => event.stage === "result" || event.stage === "act3" ? {
+        ...event,
+        fixedResultPreview: { resolution: choice.effects.fixedEventResolution!, rolls },
+      } : event);
+    }
   }
 
   resolvedEnqueueEvents = [

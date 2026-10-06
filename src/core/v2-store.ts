@@ -174,7 +174,11 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
       }
 
       if (actionId === "restart-game") {
-        const nextState = dispatchAction({ ...createInitialState(), blockLinearEvents: state.blockLinearEvents }, "start-game", {
+        const nextState = dispatchAction({
+          ...createInitialState(),
+          blockLinearEvents: state.blockLinearEvents,
+          debugEventReplayEnabled: state.debugEventReplayEnabled,
+        }, "start-game", {
           roleId: state.selectedRoleId,
         });
         runUsedDebugPanel = false;

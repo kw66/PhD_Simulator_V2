@@ -149,6 +149,7 @@ export function createCustomFellowProgressProfile(input: {
   name?: string;
   taskType?: FellowTaskType;
   usedNames?: readonly string[];
+  longTermMentoring?: boolean;
 }): FellowProgressProfile {
   const config = FELLOW_CONFIG[input.type];
   const id = createFellowProgressProfileId(input.type, input.startTotalMonths);
@@ -168,5 +169,6 @@ export function createCustomFellowProgressProfile(input: {
     startTotalMonths: input.startTotalMonths,
     nextMonthlyAction: "research",
     affinityRewardedPaperIds: [],
+    longTermMentoring: input.longTermMentoring === true,
   };
 }

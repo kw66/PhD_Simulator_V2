@@ -1,7 +1,6 @@
 import {
   appendMechanismSettlement,
   createFixedEvent,
-  drawInclusiveInt,
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
@@ -26,12 +25,11 @@ export function createYearSummaryResultEvent(params: {
   settlement: string;
   effects: PendingEvent["choices"][number]["effects"];
 }): PendingEvent {
-  const yearLabel = getYearSummaryLabel(params.year);
   return createFixedEvent({
     id: `year-summary-${params.idSuffix}-result-y${params.year}-m${params.month}`,
-    title: "学年总结 ➜ 年度总结 ➜ 新学年",
+    title: "学年总结 ➜ 年初的目标 ➜ 划掉一项",
     description: appendMechanismSettlement([
-      `${yearLabel}的总结写到了最后一页。${params.description}`,
+      params.description,
       params.closing,
     ].join("\n\n"), params.settlement),
     chainId: "year-summary",
@@ -56,15 +54,15 @@ export function resolveYearSummaryChoice(
     case "year-summary-sleep":
       return {
         nextState: state,
-        outcome: "你先停下来喘口气。SAN +5。",
+        outcome: "你划掉了日历上的“休养生息”。SAN +5。",
         enqueueEvents: [createYearSummaryResultEvent({
           idSuffix: "sleep",
           year: state.year,
           month: state.month,
           description: [
-            "你趁任务间隙留出时间，晚上把手机放到枕头够不着的地方。起初还伸手摸了两次，后来就睡着了。再醒来时，窗帘缝里透着光，你在床上多躺了一会儿，才慢慢起身去吃饭。",
+            "日历上有几天空着，没记任务，也没记进度。你却记得，那几个周末把手机扔到枕头够不着的地方，睡醒了慢悠悠去吃饭，回来还有精神绕校园走一圈。原来空白的日子，也不是白过的。",
           ].join("\n\n"),
-          closing: "你在总结末尾写下“先睡够”，又在后面画了个圈。这一条，倒是今年最容易做到的。",
+          closing: "你划掉“休养生息”，肩膀也跟着松下来。能在这一堆截止日期里把自己照顾好，也算完成了一件正经事。",
           outcome: "SAN +5。",
           settlement: "结果：SAN +5",
           effects: { san: 5 },
@@ -82,10 +80,10 @@ export function resolveYearSummaryChoice(
           year: state.year,
           month: state.month,
           description: [
-            "校内活动上，你试着和其他课题组的同学搭话，从实验聊到食堂。不用先准备一份汇报，也能把话接下去。散场时，和聊得来的同学道了再见。",
+            "翻到夹着活动票根的那页，你想起这一年认识的人。有的是校内活动上聊熟的，有的是参会时加的好友，从实验聊到家乡，后来偶尔互发论文，也互发离谱的审稿意见。",
             ...(socialNarrative ? [socialNarrative] : []),
           ].join(""),
-          closing: "回到宿舍，你在总结末尾添了几个新名字。月历上的下个月，第一次不全是组会和截止日期。",
+          closing: "你划掉“广交朋友”，顺手给朋友发了条消息。对方很快回了个表情包，和第一次拘谨地交换姓名时判若两人。",
           outcome: formatTierResistedOutcome("社交", 1, socialResult),
           settlement: `结果：${formatTierResistedOutcome("社交", 1, socialResult)}`,
           effects: socialGain > 0 ? { social: socialGain } : {},
@@ -104,10 +102,10 @@ export function resolveYearSummaryChoice(
           year: state.year,
           month: state.month,
           description: [
-            "你帮组里核对年度材料，分清几个名字几乎一样的附件。导师问起时，总算能指出该打开哪份，不用跟着鼠标在文件夹里迷路。",
+            "日历上圈着几次交材料的日期。你想起替导师核对附件、补齐遗漏的那几个下午，从一开始反复确认，到后来能自己办妥再回一句“老师，已经弄好了”。文件名里的“最终版”还在变，你倒是熟练多了。",
             ...(favorNarrative ? [favorNarrative] : []),
           ].join(""),
-          closing: "你把整理好的文件夹发给导师，顺手在总结末尾记下明年要接手的事。清单有点长，好在每一项都知道从哪开始。",
+          closing: "你在“取得导师信任”上划了一道。比起年初见面只会点头，如今老师交代事情时，已经少了几句不放心的叮嘱。",
           outcome: formatTierResistedOutcome("导师好感", 1, favorResult),
           settlement: `结果：${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
           effects: favorGain > 0 ? { favor: favorGain } : {},
@@ -115,7 +113,7 @@ export function resolveYearSummaryChoice(
       };
     }
     case "year-summary-part-time": {
-      const moneyGain = drawInclusiveInt(2, 3, getRoll);
+      const moneyGain = 3;
       return {
         nextState: state,
         outcome: `兼职攒下一笔钱，金币 +${moneyGain}。`,
@@ -124,9 +122,9 @@ export function resolveYearSummaryChoice(
           year: state.year,
           month: state.month,
           description: [
-            "你在课题空档接了份短期兼职，按约完成工作后收到了报酬。钱不算多，你还是反复看了几眼到账通知：这次打开手机，总算不是催你交材料的消息。",
+            "日历页角记着几次兼职的时间。备课、答疑、改代码，都是从课题空档里挤出来的。你又翻了翻到账记录，钱不算多，每次收到时却总要多看两眼：总算不是催交材料的消息。",
           ].join("\n\n"),
-          closing: "你在总结的开销那页划掉一行赤字，又补了句“下学期少点外卖”。写完自己都不太信，还是留在了那里。",
+          closing: "你划掉“兼职挣钱”，在旁边补了句“下学年少点外卖”。写完自己都不太信，还是留在了那里。",
           outcome: `金币 +${moneyGain}。`,
           settlement: `结果：金币 +${moneyGain}`,
           effects: { money: moneyGain },

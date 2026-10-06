@@ -57,13 +57,13 @@ describe("v2 relationship capacity", () => {
     const decision = getDecisionEvent(event);
 
     expect(decision.description).not.toContain("普通关系栏已满");
-    expect(decision.choices.some((choice) => /槽位已满|暂不新增/u.test(choice.outcome))).toBe(true);
+    expect(decision.choices.some((choice) => /槽位已满|暂不新增|条件：人际栏已满/u.test(choice.outcome))).toBe(true);
   });
 
   it("shows the no-op result when mentor-assignment slots are full", () => {
     const decision = getDecisionEvent(createMentorAssignEvent(createFullFellowState()));
 
-    expect(decision.description).toContain("四份材料");
+    expect(decision.description).toContain("四位新生的材料");
     expect(decision.description).not.toContain("没有负面结果");
     expect(decision.choices[0]?.effects.enqueueEvents?.[0]?.description).toContain("无事发生");
   });
@@ -116,7 +116,10 @@ describe("v2 relationship capacity", () => {
     const next = dispatchAction(state, "end-relationship", { relationshipId: profile.id });
     expect(next.fellowProgressState).toHaveLength(0);
     expect(next.relationshipState.occupiedSlots).toBe(3);
-    expect(next.eventQueue).toEqual(state.eventQueue);
+    expect(next.eventQueue.map((event) => event.id)).toEqual(state.eventQueue.map((event) => event.id));
+    const decision = next.eventQueue[0]!.choices[0]!.effects.enqueueEvents![0]!;
+    expect(decision.choices.every((choice) => choice.effects.fellowAdditions?.length === 1)).toBe(true);
+    expect(decision.description).toContain("还能接下一位新生");
     expect(next.player).toEqual(state.player);
     const finished = { ...state, phase: "finished" as const };
     expect(dispatchAction(finished, "end-relationship", { relationshipId: profile.id })).toEqual(finished);

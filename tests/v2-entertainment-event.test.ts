@@ -66,6 +66,11 @@ describe("game relaxation event", () => {
     const tower = decisionChoice(event, "magic-tower");
     expect(terraria.effects).toMatchObject({ social: 1, san: -4 });
     expect(tower.effects).toMatchObject({ research: 1, san: -6 });
+    expect(terraria.outcome).toContain("基础SAN消耗 4→3");
+    expect(tower.outcome).toContain("基础SAN消耗 6→5");
+    for (const branch of ["terraria", "magic-tower", "kings"] as const) {
+      expect(decisionChoice(event, branch).outcome).not.toMatch(/\d+→\d+次/u);
+    }
     const terrariaStory = terraria.effects.enqueueEvents![0]!.description;
     const towerStory = tower.effects.enqueueEvents![0]!.description;
     expect(terrariaStory).toMatch(/骷髅王[\s\S]*三百颗够吗[\s\S]*通宵/u);
@@ -82,7 +87,7 @@ describe("game relaxation event", () => {
     expect(simulation.effects.enqueueEvents![0]!.description).toContain(`研究生模拟器 ${version}`);
     expect(wolf.effects).toMatchObject({ san: -5, money: roll < 0.5 ? 4 : 2 });
     expect(wolf.outcome).toContain(`${roll < 0.5 ? "抓到异色" : "未抓到异色"}（50%）`);
-    expect(wolf.effects.enqueueEvents![0]!.title).toContain(roll < 0.5 ? "异色到手" : "抓狼收工");
+    expect(wolf.effects.enqueueEvents![0]!.title).toContain(roll < 0.5 ? "捕获异色" : "完成抓捕委托");
   });
 
   it.each([
@@ -128,6 +133,7 @@ describe("game relaxation event", () => {
     expect(state.player).toEqual(initial.player);
     state = resolve(state, branch);
     expect(state.player).toEqual(initial.player);
+    expect(state.eventCounters).toEqual(initial.eventCounters);
     const result = state.eventQueue[0]!;
     expect(result.stage).toBe("result");
     state = resolve(state);
@@ -135,12 +141,71 @@ describe("game relaxation event", () => {
     expect(state.player.money).toBe(initial.player.money + money);
     expect(state.player.social).toBe(branch === "terraria" ? 1 : 0);
     expect(state.player.research).toBe(branch === "magic-tower" ? 1 : 0);
+    expect(state.eventCounters).toMatchObject({
+      terrariaCount: branch === "terraria" ? 1 : 0,
+      magicTowerCount: branch === "magic-tower" ? 1 : 0,
+      rocoCount: branch === "kings" ? 1 : 0,
+    });
     expect(state.eventQueue).toHaveLength(0);
     expect(state.eventHistory.at(-1)!.stages.at(-1)!.description).toBe(result.description);
     expect(state.log.some((entry) => entry.text.includes(result.completionLog!))).toBe(true);
     const repeated = dispatchAction(state, "resolve-event", { eventId: result.id, eventChoiceId: result.choices[0]!.id });
     expect(repeated.player).toEqual(state.player);
     expect(repeated.eventHistory).toEqual(state.eventHistory);
+    expect(repeated.eventCounters).toEqual(state.eventCounters);
+  });
+
+  it.each([0, 1, 4, 5, 8])("increases shiny odds after %i completed Roco sessions", (count) => {
+    const state = makeState();
+    state.eventCounters.rocoCount = count;
+    const percent = Math.min(100, 50 + count * 10);
+    const caught = decisionChoice(makeEvent(state, 0, percent / 100 - 0.000001), "kings");
+    expect(caught.effects.money).toBe(4);
+    expect(caught.outcome).toContain(`抓到异色（${percent}%）`);
+    if (percent < 100) {
+      const missed = decisionChoice(makeEvent(state, 0, percent / 100), "kings");
+      expect(missed.effects.money).toBe(2);
+      expect(missed.outcome).toContain(`未抓到异色（${100 - percent}%）`);
+      expect(missed.effects.counterDeltas).toEqual({ rocoCount: 1 });
+    }
+    expect(decisionChoice(makeEvent(state), "terraria").effects.san).toBe(-4);
+  });
+
+  it.each([0, 1, 3, 4, 5, 6, 10])("reduces each game's base fatigue after %i sessions with a zero floor", (count) => {
+    const state = makeState();
+    state.eventCounters.terrariaCount = count;
+    state.eventCounters.magicTowerCount = count;
+    const event = makeEvent(state);
+    expect(decisionChoice(event, "terraria").effects.san).toBeCloseTo(-Math.max(0, 4 - count));
+    expect(decisionChoice(event, "magic-tower").effects.san).toBeCloseTo(-Math.max(0, 6 - count));
+    expect(decisionChoice(event, "grad-sim").effects.san).toBe(2);
+    expect(decisionChoice(event, "kings").effects.san).toBe(-5);
+  });
+
+  it("applies season and illness modifiers after gaming familiarity", () => {
+    const state = makeState();
+    state.month = 11;
+    state.eventCounters.terrariaCount = 3;
+    state.eventCounters.magicTowerCount = 6;
+    state.buffs = [{ id: "illness", name: "Illness", source: "test", timing: "monthly", remainingMonths: 1, activeOperationSanMultiplier: 2 }];
+    const event = makeEvent(state);
+    expect(decisionChoice(event, "terraria").effects.san).toBe(-3);
+    expect(decisionChoice(event, "magic-tower").effects.san).toBe(0);
+  });
+
+  it("does not gain familiarity from replaying a result or switching to another game", () => {
+    const initial = makeState();
+    let state: GameState = { ...initial, debugEventReplayEnabled: true, eventQueue: [createEventQueueItem(makeEvent(initial), 1)] };
+    state = resolve(resolve(state), "kings");
+    expect(state.eventCounters.rocoCount).toBe(0);
+    const result = state.eventQueue[0]!;
+    state = dispatchAction(state, "debug-replay-event", { eventId: result.id, eventHistoryIndex: 1 });
+    state = resolve(state, "terraria");
+    state = resolve(state);
+    expect(state.eventCounters).toMatchObject({ terrariaCount: 1, magicTowerCount: 0, rocoCount: 0 });
+    const saved = JSON.parse(JSON.stringify(state)) as GameState;
+    expect(decisionChoice(makeEvent(saved), "terraria").effects.san).toBe(-3);
+    expect(decisionChoice(makeEvent(saved), "magic-tower").effects.san).toBe(-6);
   });
 
   it.each(["grad-sim", "kings"] as const)("preserves %s rolls across saves, deferral and attribute tier changes", (branch) => {

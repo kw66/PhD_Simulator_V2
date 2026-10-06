@@ -1,3 +1,4 @@
+import { appendFixedEventHint } from "./v2-fixed-event-hints";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type RandomRollProvider = () => number;
@@ -69,7 +70,9 @@ export function createThreeStageEvent(
 
   return {
     ...event,
-    description: copy.introDescription,
+    description: event.source === "fixed"
+      ? appendFixedEventHint(event.chainId, "act1", copy.introDescription)
+      : copy.introDescription,
     stage: "act1",
     choices: [
       {

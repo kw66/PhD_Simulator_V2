@@ -79,6 +79,8 @@ describe("campus result conditions", () => {
     const { choice } = getBranch(state, 7, "打羽毛球");
     expect(choice.outcome).toContain(`羽毛球实力 ${condition}`);
     expect(choice.outcome).toContain(wins ? "获胜" : "落败");
+    expect(choice.outcome).toContain("胜率提升");
+    expect(choice.outcome).not.toContain("SAN倍率");
     expect(choice.effects.eventSupportUpdates).toEqual(wins ? { hasStrongBodyTalent: true } : {});
     expect(choice.effects.illnessProbabilityDelta).toBe(-10);
   });
@@ -94,20 +96,26 @@ describe("campus result conditions", () => {
       const { choice } = getBranch(state, 7, "打德州扑克", roll);
       expect(choice.outcome).toContain(`${label}（${probability}%）`);
       expect(choice.outcome).toContain(money === 0 ? "本金 0" : `押注 ${Math.min(money, 5)} 金币`);
+      const currentWinRate = Math.min(100, 40 + count * 10);
+      expect(choice.outcome).not.toMatch(/\d+→\d+次/u);
+      if (currentWinRate < 100) expect(choice.outcome).toContain(`胜率 ${currentWinRate}%→${Math.min(100, currentWinRate + 10)}%`);
+      else expect(choice.outcome).not.toContain("100%→100%");
+      expect(choice.outcome).toContain("｜结果：");
       expect(choice.effects.money ?? 0).toBe(money === 0 ? 0 : (label === "获胜" ? 1 : -1) * Math.min(money, 5));
     }
   });
 
-  it.each([0.499, 0.5])("keeps 50 percent branches and saved results aligned at roll %s", (roll) => {
+  it.each([0.499, 0.5])("keeps attendance-based dinner branches and saved results aligned at roll %s", (roll) => {
     vi.spyOn(Math, "random").mockReturnValue(roll);
     for (const [eventId, label, outcomeLabel] of [
-      [7, "聚餐", roll < 0.5 ? "AA 聚餐" : "导师请客"],
+      [7, "聚餐", "导师请客"],
       [13, "自己重装", roll < 0.5 ? "重装成功" : "重装失败"],
       [13, "淘宝找人", roll < 0.5 ? "维修成功" : "维修翻车"],
     ] as const) {
       const state = makeState();
       const { event, choice, result } = getBranch(state, eventId, label, roll);
-      expect(choice.outcome).toContain(`条件：${outcomeLabel}（50%）`);
+      const expectedProbability = eventId === 7 ? 60 : 50;
+      expect(choice.outcome).toContain(`条件：${outcomeLabel}（${expectedProbability}%）`);
       expect(choice.outcome).toContain("｜结果：");
       const completed = finishEvent(state, event, label);
       expect(completed.eventHistory.at(-1)!.stages.at(-1)!.description).toBe(result.description);

@@ -4,7 +4,7 @@ import {
 } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import { activateRemoteInternship, hasOngoingInternship, hasRemoteInternshipScore } from "./v2-internship-system";
-import { createThreeStageEvent, drawInclusiveInt, type RandomRollProvider } from "./v2-random-events-core-shared";
+import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
@@ -13,7 +13,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
   const isHighFavor = state.player.favor >= 6;
   const hasInternshipScore = hasRemoteInternshipScore(state);
   const internshipUnavailable = hasOngoingInternship(state);
-  const ideaBonus = drawInclusiveInt(4, 6, getRoll);
+  const ideaBonus = 5;
   const reportFavorResult = applyTierResist(-1, state.player.favor, getRoll);
   const reportFavorChange = reportFavorResult.effectiveChange;
   const askFavorResult = applyTierResist(-1, state.player.favor, getRoll);
@@ -64,7 +64,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
         outcome: internshipUnavailable
           ? "已有实习安排，本次不重复申请。"
           : hasInternshipScore
-          ? "科研分 ≥ 2｜下三个月 SAN -2、金币 +1、实验金币 -1、实验 +4。"
+          ? "科研分 ≥ 2｜SAN -2（下月起每月，持续3个月）｜金币 +1（下月起每月，持续3个月）｜实验金币 -1（下月起，持续3个月）｜实验 +4（下月起每月，持续3个月）。"
           : `科研分 < 2｜${formatTierResistedOutcome("导师好感", -1, internFavorResult)}`,
         effects: hasInternshipScore || internshipUnavailable
           ? {}

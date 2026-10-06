@@ -37,6 +37,7 @@ describe("event layout samples", () => {
       const samples = renderEventLayoutSamples(current, null, state);
       const html = samples.map((sample) => sample.html).join("");
       expect(html).toContain(favor >= 6 ? "导师来电" : "导师请求");
+      expect(html).not.toContain(favor >= 6 ? "导师请求" : "导师来电");
       expect(html).toContain("简单祝福");
       expect(html).toContain("礼物送达");
       expect(html).toContain("邮票送达");

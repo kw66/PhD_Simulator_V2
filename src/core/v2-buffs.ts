@@ -39,9 +39,6 @@ function cloneBuff(buff: Buff): Buff {
     readingEffect: buff.readingEffect ? { ...buff.readingEffect } : undefined,
     shopEffects: buff.shopEffects ? { ...buff.shopEffects } : undefined,
     publicationEffects: buff.publicationEffects ? { ...buff.publicationEffects } : undefined,
-    scheduledPublication: buff.scheduledPublication
-      ? { ...buff.scheduledPublication, targetWeights: { ...buff.scheduledPublication.targetWeights } }
-      : undefined,
   };
 }
 
@@ -60,9 +57,6 @@ function hasRemainingBuffEffects(buff: Buff): boolean {
     && Object.values(buff.readingEffect).some((value) => Number.isFinite(value));
   const hasPublicationEffect = buff.publicationEffects !== undefined
     && Object.values(buff.publicationEffects).some((value) => Number.isFinite(value));
-  const hasScheduledPublication = buff.scheduledPublication !== undefined
-    && Number.isFinite(buff.scheduledPublication.intervalMonths)
-    && buff.scheduledPublication.intervalMonths > 0;
 
   return hasNumericRecordValue(buff.monthlyStats as Record<string, unknown> | undefined)
     || Number.isFinite(buff.activeOperationSanMultiplier)
@@ -73,8 +67,7 @@ function hasRemainingBuffEffects(buff: Buff): boolean {
     || hasActionEffect
     || hasNumericRecordValue(buff.paperPolishEffects as Record<string, unknown> | undefined)
     || hasReadingEffect
-    || hasPublicationEffect
-    || hasScheduledPublication;
+    || hasPublicationEffect;
 }
 
 export function getActiveOperationSanMultiplier(
@@ -240,8 +233,9 @@ export function getActiveBuffs(
   return buffs.filter((buff) => isActiveBuff(buff) && (!timing || buff.timing === timing)).map(cloneBuff);
 }
 
-export function hasActiveAiCostCoverage(buffs: readonly Buff[]): boolean {
-  return buffs.some((buff) => isActiveBuff(buff) && buff.shopEffects?.aiCostsCovered === true);
+export function hasActiveAiCostCoverage(buffs: readonly Buff[], totalMonths: number): boolean {
+  return buffs.some((buff) => isActiveBuff(buff) && buff.shopEffects?.aiCostsCovered === true
+    && (buff.shopEffects.aiCostsCoveredAtTotalMonths === undefined || buff.shopEffects.aiCostsCoveredAtTotalMonths === totalMonths));
 }
 
 export function getPublicationBuffEffect(

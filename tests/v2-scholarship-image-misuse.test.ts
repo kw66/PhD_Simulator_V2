@@ -64,10 +64,13 @@ describe("image misuse scholarship disqualification", () => {
     const original = playingState({ buffs: [createImageMisuseBuff()] });
     const roll = vi.fn(() => 0.99);
     const queued = queueScholarship(original, roll);
-    expect(currentEvent(queued).choices[0]!.effects.san).toBe(-2);
+    expect(currentEvent(queued).choices).toHaveLength(1);
+    expect(currentEvent(queued).choices[0]!.effects.san).toBeUndefined();
     expect(currentEvent(queued).description).not.toMatch(/举报|资格取消|分数线/u);
     const scored = resolve(queued);
     expect(currentEvent(scored).stage).toBe("act2");
+    expect(currentEvent(scored).choices.map((choice) => choice.label)).toEqual(["准备材料并申报", "暂不申报"]);
+    expect(currentEvent(scored).choices[0]!.effects.san).toBe(-2);
     expect(currentEvent(scored).description).not.toMatch(/举报|资格取消|分数线/u);
     expect(scored.player.san).toBe(original.player.san);
     expectUnclaimed(scored, original);
@@ -76,6 +79,9 @@ describe("image misuse scholarship disqualification", () => {
     const result = currentEvent(preview);
     expect(result.title.split(" ➜ ").at(-1)).toBe("资格取消");
     expect(result.description).toMatch(/公示.*举报.*图片误用/u);
+    expect(result.description).toContain("举报你用于评奖的论文存在图片误用");
+    expect(result.description).toContain("；被举报");
+    expect(result.description).not.toContain("举报风险");
     expect(result.description).toContain("4 ≥ 分数线 4");
     expect(result.choices[0]!.effects.money ?? 0).toBe(0);
     expect(result.choices[0]!.effects.scholarshipAward).toBeUndefined();
@@ -93,7 +99,8 @@ describe("image misuse scholarship disqualification", () => {
     const history = completed.eventHistory.at(-1)!;
     expect(history.stages).toHaveLength(3);
     for (const scene of history.stages) {
-      const paragraphs = scene.description.split("机制结算")[0]!.trim().split(/\n\n/u);
+      const paragraphs = scene.description.split("机制结算")[0]!.trim().split(/\n\n/u)
+        .filter((paragraph) => !paragraph.startsWith("小提示："));
       expect(paragraphs.length).toBeGreaterThanOrEqual(1);
       expect(paragraphs.length).toBeLessThanOrEqual(2);
     }
@@ -112,7 +119,7 @@ describe("image misuse scholarship disqualification", () => {
     expect(JSON.stringify(completed.eventHistory)).not.toContain("举报");
   });
 
-  it.each([3, 4])("preserves normal success and consumes only the snapshot for year %i", (year) => {
+  it.each([3, 4])("preserves normal success and consumes the eligible results for year %i", (year) => {
     const original = playingState({ year, totalMonths: (year - 1) * 12 + 2, totalResearchScore: 12 });
     const queued = queueScholarship(original);
     const snapshot = currentEvent(queued).scholarshipContext!;
@@ -194,13 +201,62 @@ describe("image misuse scholarship disqualification", () => {
       buffs: [createImageMisuseBuff()],
     };
     const refreshed = refreshPendingEventDecisions(changed);
-    expect(currentEvent(refreshed).scholarshipContext).toEqual(snapshot);
-    expect(currentEvent(refreshed).description).toContain("科研积分 4 分，分数线 4 分");
+    expect(currentEvent(refreshed).scholarshipContext).toMatchObject({ score: 7, requirement: snapshot!.requirement });
+    expect(currentEvent(refreshed).scholarshipContext!.eligiblePaperIds).toEqual(changed.externalPublications.map((paper) => paper.id));
+    expect(currentEvent(refreshed).description).toContain("评奖科研分 7 ≥ 分数线 4");
     const completed = resolve(refreshed);
     expectUnclaimed(completed, changed);
     expect(completed.player.san).toBe(7);
     expect(completed.externalPublications).toEqual(changed.externalPublications);
     expect(roll).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["act1", "act2", "result"] as const)("refreshes current achievements during %s while retaining the drawn cutoff", (stage) => {
+    const original = playingState({
+      totalResearchScore: 3,
+      publicationTalentState: { claimedIds: ["first-paper", "first-a-or-journal", "first-coauthor-paper", "first-coauthor-a"] },
+    });
+    const roll = vi.fn(() => 0.99);
+    let state = queueScholarship(original, roll);
+    if (stage !== "act1") state = resolve(state);
+    if (stage === "result") state = resolve(state);
+    const newPaper = createGrantedPublishedPaper(26, 1, { target: "A", acceptedScore: 4 });
+    const nonFirst = createGrantedPublishedPaper(26, 2, { target: "A", acceptedScore: 4, nonFirstAuthor: true });
+    state = refreshPendingEventDecisions({
+      ...state,
+      totalResearchScore: 7,
+      externalPublications: [...state.externalPublications, newPaper, nonFirst],
+    });
+    expect(currentEvent(state).scholarshipContext).toMatchObject({ score: 5, requirement: 4, success: true });
+    expect(currentEvent(state).scholarshipContext!.eligiblePaperIds).toContain(newPaper.id);
+    expect(currentEvent(state).scholarshipContext!.eligiblePaperIds).not.toContain(nonFirst.id);
+    if (stage === "act2") {
+      expect(currentEvent(state).description).toContain("这次能计入 5 分");
+      expect(currentEvent(state).description).toContain("**6金币**");
+    }
+    if (stage === "result") expect(currentEvent(state).title).toContain("获得奖学金");
+    expectUnclaimed(state, { ...original, totalResearchScore: 7 });
+    while (currentEvent(state).stage !== "result") state = resolve(state);
+    state = resolve(state);
+    expect(state.player.money).toBe(original.player.money + 6);
+    expect(state.player.san).toBe(8);
+    expect(state.scholarshipState.scoreBaseline).toBe(7);
+    expect(state.scholarshipState.claimedPaperIds).toContain(newPaper.id);
+    expect(state.scholarshipState.claimedPaperIds).not.toContain(nonFirst.id);
+    expect(roll).toHaveBeenCalledTimes(1);
+  });
+
+  it("rechecks gains and losses at confirmation even with the previous result's button id", () => {
+    for (const [beforeScore, afterScore, awarded] of [[3, 7, true], [7, 3, false]] as const) {
+      const original = playingState({ totalResearchScore: beforeScore });
+      const preview = resultPreview(queueScholarship(original, () => 0.99));
+      const choiceId = currentEvent(preview).choices[0]!.id;
+      const completed = resolve({ ...preview, totalResearchScore: afterScore }, choiceId);
+      expect(completed.player.money).toBe(original.player.money + (awarded ? 6 : 0));
+      expect(completed.player.san).toBe(8);
+      expect(completed.eventHistory.at(-1)!.stages.at(-1)!.title).toContain(awarded ? "获得奖学金" : "遗憾落选");
+      expect(completed.scholarshipState.scoreBaseline).toBe(awarded ? afterScore : original.scholarshipState.scoreBaseline);
+    }
   });
 
   it.each([false, true])("does not settle twice when a result is replayed (disqualified: %s)", (disqualified) => {
@@ -331,10 +387,15 @@ describe("image misuse scholarship disqualification", () => {
   it("allows skipping without SAN loss, award consumption or a report", () => {
     const original = playingState({ buffs: [createImageMisuseBuff()] });
     const queued = queueScholarship(original);
-    const completed = resolve(queued, currentEvent(queued).choices[1]!.id);
+    const decision = resolve(queued);
+    const preview = resolve(decision, currentEvent(decision).choices[1]!.id);
+    expect(currentEvent(preview).stage).toBe("result");
+    expect(currentEvent(preview).description).toContain("结果：无事发生");
+    expectUnclaimed(preview, original);
+    const completed = resolve(preview);
     expectUnclaimed(completed, original);
     expect(completed.player.san).toBe(original.player.san);
-    expect(completed.eventHistory.at(-1)!.stages).toHaveLength(1);
+    expect(completed.eventHistory.at(-1)!.stages).toHaveLength(3);
     expect(JSON.stringify(completed.eventHistory)).not.toContain("举报");
   });
 });

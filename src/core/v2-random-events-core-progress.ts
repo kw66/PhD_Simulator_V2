@@ -101,7 +101,7 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
       {
         id: `random-16-fake-${serial}`,
         label: "伪造数据",
-        outcome: "论文进度保留；符合条件的未投稿一作论文引用 ×0.5；图片误用。",
+        outcome: "论文进度保留；涉事论文引用 ×0.5；举报风险。",
         effects: {
           draftCitationDebuffMultiplier: 0.5,
           markDraftImageMisuse: true,
@@ -158,11 +158,11 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
   const serial = state.totalRandomEventCount;
   const basicGain = state.player.research < 6 ? 1 : 0;
   const basicResearchResult = basicGain > 0
-    ? null
-    : applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
+    ? applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState))
+    : null;
   const basicOutcome = basicGain > 0
-    ? "科研 < 6｜科研上限 +1。"
-    : `科研 ≥ 6｜${formatTierResistedOutcome("科研", 1, basicResearchResult!)}。`;
+    ? `科研 < 6｜${formatTierResistedOutcome("科研", 1, basicResearchResult!)}。`
+    : "科研 ≥ 6｜科研上限 +1。";
   const latestTopic = LEARNING_LATEST_TOPICS[
     drawInclusiveInt(0, LEARNING_LATEST_TOPICS.length - 1, getRoll)
   ]!;
@@ -189,10 +189,10 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
         outcome: basicOutcome,
         effects: {
           ...(basicGain > 0
-            ? { researchCapacityStateDeltas: { baseCap: 1 } }
-            : basicResearchResult && basicResearchResult.effectiveChange > 0
+            ? basicResearchResult && basicResearchResult.effectiveChange > 0
               ? { research: basicResearchResult.effectiveChange }
-              : {}),
+              : {}
+            : { researchCapacityStateDeltas: { baseCap: 1 } }),
         },
       },
       {

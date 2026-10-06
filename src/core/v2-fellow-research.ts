@@ -159,7 +159,10 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     && state.totalMonths > (profile.lastAdvancedTotalMonths ?? profile.startTotalMonths)
   ));
   for (const profile of activeProfiles) {
-    nextState = advanceFellowCooperationWithLog(nextState, profile.id, profile.affinity);
+    const cooperationCount = profile.longTermMentoring ? 2 : 1;
+    const cooperationGain = Math.floor(profile.affinity) * cooperationCount;
+    nextState = advanceFellowCooperationWithLog(nextState, profile.id, cooperationGain);
+    addActivity(profile.id, `协作进度 +${cooperationGain}${profile.longTermMentoring ? "（长期合作，推进2次）" : ""}`);
     nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id
       ? { ...fellow, taskUsedThisMonth: false, lastAdvancedTotalMonths: state.totalMonths } : fellow) };
   }

@@ -115,7 +115,7 @@ describe("random event replay", () => {
     expect(badminton?.outcome).toContain("落败");
     expect(badminton?.outcome).toContain("羽毛球实力 60 < 100");
     expect(poker?.outcome).toContain("落败");
-    expect(poker?.outcome).not.toContain("胜率");
+    expect(poker?.outcome).toContain("胜率 40%→50%");
   });
 
   it("shows numerical odds for resolved branches and preserves buff effects", () => {
@@ -123,9 +123,9 @@ describe("random event replay", () => {
     const getChoices = (eventId: number, roll = 0.5) => createRandomEventById(eventId, state, () => roll)
       .event?.choices[0]?.effects.enqueueEvents?.[0]?.choices ?? [];
 
-    expect(getChoices(6).every((choice) => choice.outcome.includes("导师缺席（50%）"))).toBe(true);
-    expect(getChoices(7, 0.4).find((choice) => choice.label === "聚餐")?.outcome).toContain("AA 聚餐（50%）");
-    expect(getChoices(10).find((choice) => choice.label === "互挂论文")?.outcome).toContain("互挂未成（50%）");
+    expect(getChoices(6, 0.6).every((choice) => choice.outcome.includes("导师缺席（40%）"))).toBe(true);
+    expect(getChoices(7, 0.4).find((choice) => choice.label === "聚餐")?.outcome).toContain("导师请客（60%）");
+    expect(getChoices(10).find((choice) => choice.label === "委婉拒绝")?.outcome).toBe("无事发生。");
     expect(getChoices(13).find((choice) => choice.label === "自己重装")?.outcome).toContain("重装失败（50%）");
     expect(getChoices(13).find((choice) => choice.label === "淘宝找人")?.outcome).toContain("维修翻车（50%）");
     expect(getChoices(1).find((choice) => choice.label === "亲自指导")?.outcome).toContain("对方毕业（50%）");
@@ -180,7 +180,7 @@ describe("random event replay", () => {
       expect(getBadmintonStrength(san, participations, false)).toBe(strength);
       expect(badminton?.outcome).toContain(wins ? "获胜" : "落败");
       expect(badminton?.outcome).toContain(`羽毛球实力 ${strength} ${wins ? "≥" : "<"} 100`);
-      expect(badminton?.outcome.includes("每周锻炼，强身健体；每月 SAN +1")).toBe(wins);
+      expect(badminton?.outcome.includes("每月 SAN +1")).toBe(wins);
       expect(badminton?.effects.illnessProbabilityDelta).toBe(-10);
       expect(badminton?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
       expect(badminton?.effects.eventSupportUpdates).toEqual(wins ? { hasStrongBodyTalent: true } : {});
@@ -197,7 +197,7 @@ describe("random event replay", () => {
     const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
 
     expect(badminton?.outcome).toContain("获胜");
-    expect(badminton?.outcome).toContain("每周锻炼，强身健体；每月 SAN +1");
+    expect(badminton?.outcome).toContain("每月 SAN +1");
     expect(badminton?.effects.eventSupportUpdates).toEqual({ hasStrongBodyTalent: true });
   });
 
@@ -211,23 +211,23 @@ describe("random event replay", () => {
     const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
 
     expect(badminton?.outcome).toContain("获胜");
-    expect(badminton?.outcome).not.toContain("每周锻炼，强身健体；每月 SAN +1");
+    expect(badminton?.outcome).not.toContain("每月 SAN +1");
     expect(badminton?.effects.illnessProbabilityDelta).toBe(-10);
     expect(badminton?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
     expect(badminton?.effects.eventSupportUpdates).toEqual({});
   });
 
-  it("applies the research-chore discount to long-term senior mentorship", () => {
+  it("applies the research-chore discount to trying senior cooperation", () => {
     const state = createReplayReadyState();
     const event = createRandomEventById(11, state, () => 0.5).event;
     const choiceEvent = event?.choices[0]?.effects.enqueueEvents?.[0];
-    const mentorship = choiceEvent?.choices.find((choice) => choice.label === "拜入门下");
+    const mentorship = choiceEvent?.choices.find((choice) => choice.label === "尝试合作");
 
-    expect(mentorship?.outcome).toContain("SAN -3（减免1）");
+    expect(mentorship?.outcome).toContain("SAN -4（减免1）");
     expect(mentorship?.outcome).not.toContain("任务量");
     expect(mentorship?.outcome).not.toContain("科研达到");
     expect(mentorship?.outcome).not.toContain("最终 SAN");
-    expect(mentorship?.effects.san).toBe(-3);
+    expect(mentorship?.effects.san).toBe(-4);
   });
 
   it("applies research-chore discounts to the confirmed research-related event work", () => {
@@ -239,10 +239,10 @@ describe("random event replay", () => {
 
     expect(getChoices(5).find((choice) => choice.label === "提出远程实习")?.effects.san).toBeUndefined();
     expect(getChoices(5).find((choice) => choice.label === "提出远程实习")?.effects.enqueueEvents?.at(-1)?.choices[0]?.effects.internshipStateUpdates?.remainingMonths).toBe(3);
-    expect(getChoices(10).find((choice) => choice.label === "全面合作")?.effects.san).toBe(0);
-    expect(getChoices(11).find((choice) => choice.label === "深入合作")?.effects.san).toBe(0);
-    expect(getChoices(11).find((choice) => choice.label === "拜入门下")?.effects.san).toBe(-1);
-    expect(getChoices(14).find((choice) => choice.label === "短期合作，分享idea")?.effects.san).toBe(-2);
+    expect(getChoices(10).find((choice) => choice.label === "尝试合作")?.effects.san).toBe(-2);
+    expect(getChoices(11).find((choice) => choice.label === "尝试合作")?.effects.san).toBe(-2);
+    expect(getChoices(11).find((choice) => choice.label === "长期合作")?.effects.san).toBeUndefined();
+    expect(getChoices(14).find((choice) => choice.label === "认真指导")?.effects.san).toBe(-2);
     expect(getChoices(16).find((choice) => choice.label === "熬夜补数据")?.effects.san).toBe(-2);
   });
 

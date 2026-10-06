@@ -5,7 +5,7 @@ import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
 import { clampResearchToCap } from "./v2-research-cap-system";
-import { createGrantedPublishedPaper } from "./v2-publication-rules";
+import { getFellowName } from "./v2-fellow-progression";
 import { syncRelationshipState } from "./v2-relationship-rules";
 import { getMonthlySeasonSanModifier, getSeasonByMonth } from "./v2-sanity-rules";
 import { getBikeMonthlySanCost, getBikeSanCapLimit } from "./v2-bike-system";
@@ -79,6 +79,16 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
       name: "导师工资",
       source: "导师待遇",
       stats: { money: getAdvisorSalaryPayment(state.advisorProgressState, state.degree).payment },
+    });
+  }
+
+  for (const fellow of state.fellowProgressState) {
+    if (!fellow.longTermMentoring || state.totalMonths <= fellow.startTotalMonths) continue;
+    effects.push({
+      id: `fellow-mentoring-${fellow.id}`,
+      name: "长期合作",
+      source: getFellowName(fellow),
+      stats: { san: -1 },
     });
   }
 
@@ -400,7 +410,7 @@ export function applyMonthStartSubscriptions(
       const note = item.reason === "model-updated"
         ? "模型已更新，自动续费已关闭"
         : item.reason === "insufficient-money" ? "金币不足，本月暂停"
-          : usesGift ? "恋人赠礼，本次免费" : undefined;
+          : usesGift ? "恋人赠礼，本次免费" : reimbursement ? "导师经费报销" : undefined;
       appendMonthlyEffect(nextState, resolution, {
         id: `ai-renewal-${item.slot}`,
         name: `${item.model.name}续费`,
@@ -454,35 +464,6 @@ export function applyMonthStartSubscriptions(
 
 export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
   const resolution = resolveMonthlyEffects(state);
-  let externalPublications = [...state.externalPublications];
-  const buffs = state.buffs.map((buff) => {
-    const schedule = buff.scheduledPublication;
-    if (!schedule || (buff.remainingMonths !== null && buff.remainingMonths <= 0)) return buff;
-    const elapsedMonths = (schedule.elapsedMonths ?? 0) + 1;
-    if (elapsedMonths < schedule.intervalMonths) {
-      return { ...buff, scheduledPublication: { ...schedule, elapsedMonths } };
-    }
-    const roll = Math.random();
-    const target = roll < schedule.targetWeights.A
-      ? "A"
-      : roll < schedule.targetWeights.A + schedule.targetWeights.B ? "B" : "C";
-    const acceptedScore = target === "A" ? 4 : target === "B" ? 2 : 1;
-    externalPublications.push(createGrantedPublishedPaper(state.totalMonths, externalPublications.length, {
-      title: `持续指导合作论文 ${externalPublications.length + 1}`,
-      target,
-      acceptedScore,
-      nonFirstAuthor: schedule.nonFirstAuthor,
-    }, [...state.papers, ...externalPublications, ...(state.fellowPapers ?? [])]));
-    resolution.items.push({
-      id: `${buff.id}-publication-${state.totalMonths}`,
-      name: "持续指导论文",
-      source: buff.source,
-      stats: {},
-      appliedStats: {},
-      note: `新增一篇非一作 ${target} 类论文`,
-    });
-    return { ...buff, scheduledPublication: { ...schedule, elapsedMonths: 0 } };
-  });
   const internshipState = advanceInternshipMonth(state);
   if (resolution.items.some((item) => item.id === "internship-monthly")) {
     internshipState.salaryRemainder = getInternshipSalaryPayment(state).remainder;
@@ -514,7 +495,6 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
   const monthStartState: GameState = {
     ...state,
     player: { ...resolution.player },
-    externalPublications,
     shopState: {
       ...state.shopState,
       chairSanRecovered,
@@ -528,21 +508,13 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     },
     actionState: { ...state.actionState, used: 0, aiResearchBonusUsed: false },
     internshipState,
-    buffs: advanceBuffDurations(buffs),
+    buffs: advanceBuffDurations(state.buffs),
   };
   const automaticCoffeeState = applyAutomaticCoffeeMachineEffect(activateLoverMonthlyDiscount(monthStartState), resolution);
   const subscriptionSettlement = applyMonthStartSubscriptions(automaticCoffeeState, resolution);
-  const existingPublicationIds = new Set([
-    ...state.papers.filter((paper) => paper.status === "published").map((paper) => paper.id),
-    ...state.externalPublications.filter((paper) => paper.status === "published").map((paper) => paper.id),
-  ]);
-  const newPublicationIds = new Set(
-    externalPublications.filter((paper) => !existingPublicationIds.has(paper.id)).map((paper) => paper.id),
-  );
   const citationSettlement = settlePublishedPaperCitations(
     subscriptionSettlement.nextState,
-    externalPublications,
-    newPublicationIds,
+    state.externalPublications,
   );
   if (citationSettlement.changes.length > 0) {
     const citationGain = citationSettlement.changes.reduce((total, change) => total + change.amount, 0);

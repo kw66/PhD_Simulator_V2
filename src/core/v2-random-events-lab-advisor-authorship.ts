@@ -1,14 +1,17 @@
 import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
+import { getFellowName } from "./v2-fellow-progression";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
   const lowFavor = state.player.favor < 6;
-  const argueSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
-  const transferSocialResult = applyTierResist(-1, state.player.social, getRoll);
+  const argueSanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
+  const familiarJunior = state.fellowProgressState.find((profile) => profile.type === "junior");
+  const hasJunior = familiarJunior !== undefined;
+  const transferSocialRaw = hasJunior ? -1 : -2;
+  const transferSocialResult = applyTierResist(transferSocialRaw, state.player.social, getRoll);
   const transferSocialChange = transferSocialResult.effectiveChange;
-  const transferSocialNarrative = getTierResistedNarrative("社交", -1, transferSocialResult);
   const pressureFavorResult = applyTierResist(-2, state.player.favor, getRoll);
   const pressureFavorChange = pressureFavorResult.effectiveChange;
   const pressureFavorNarrative = getTierResistedNarrative("导师好感", -2, pressureFavorResult);
@@ -37,19 +40,19 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
       },
       {
         id: `random-12-transfer-${serial}`,
-        label: "转移到别人",
-        outcome: formatTierResistedOutcome("社交", -1, transferSocialResult),
+        label: "转移到师弟师妹",
+        outcome: `条件：${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜结果：${formatTierResistedOutcome("社交", transferSocialRaw, transferSocialResult)}`,
         effects: transferSocialChange < 0 ? { social: transferSocialChange } : {},
       },
       {
         id: `random-12-argue-${serial}`,
         label: "据理力争",
-        outcome: lowFavor ? `导师好感 < 6｜${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}。` : "导师好感 ≥ 6｜无事发生。",
+        outcome: lowFavor ? `导师好感 < 6｜${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。` : "导师好感 ≥ 6｜无事发生。",
         effects: lowFavor ? { san: argueSanChange } : {},
       },
       {
         id: `random-12-pressure-${serial}`,
-        label: "极端施压",
+        label: "极端反抗",
         outcome: `金币 +2，${formatTierResistedOutcome("导师好感", -2, pressureFavorResult)}`,
         effects: {
           money: 2,
@@ -72,7 +75,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
           ? "平时和导师说不上几句，这回免不了把分工从头讲一遍。你可以先说自己的难处，也可以把记录逐项摊开；无论哪种方式，都得承受谈话变长的风险。"
           : "你和导师平时沟通顺畅，也谈过分工。说清难处或摊开记录，至少能让这次改动有据可查。",
       ].join(""),
-      "把别人的名字往后挪能解眼前的难，可每天在实验室碰面，难免尴尬。拿后续工作施压，连劳务费一起谈清也行，只是话说重了，和导师就难再像从前那样自在。",
+      `这篇论文还要用来毕业、找工作，你想请导师把让出一作的安排转到师弟师妹的另一篇论文上，毕竟对方离毕业还久。${hasJunior ? "有熟悉的师弟师妹，至少能当面解释，但这话终究不好开口。" : "偏偏没有熟悉的师弟师妹，贸然提起，难免让人觉得你在把麻烦往外推。"}若干脆把不满全说出来，办公室里恐怕就没那么好收场了。`,
     ].join("\n\n"),
     results: {
       [`random-12-complain-${serial}`]: {
@@ -88,11 +91,14 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
             ].join("\n\n"),
       },
       [`random-12-transfer-${serial}`]: {
-        title: "转移目标",
+        title: "转移到师弟师妹",
         description: [
-          "你绕开自己的名字，提议把另一位同门往后排。导师听完没有马上改名单，只说会把每个人做过的部分重新对一遍。",
-          "名单暂时没有发回群里。那位同门问起进展，你看着输入框，先回了一句“老师还在核对”。",
-          ...(transferSocialNarrative ? [transferSocialNarrative] : []),
+          `你解释自己要靠这篇论文毕业、找工作，请导师保留原先的一作安排，把让出一作的要求转到${familiarJunior ? `${getFellowName(familiarJunior)}的另一篇论文` : "一位不太熟的师弟师妹的另一篇论文"}上：“对方离毕业还久，后面还有时间做新的工作。”导师说会再找对方谈谈。`,
+          transferSocialChange < 0
+            ? hasJunior
+              ? "对方来问你为什么替自己作主。你解释了半天自己的难处，才发现每句话都在说自己有多着急。原本能随口聊的实验进展，这回谁也没再提。"
+              : "消息传过去，对方托人问你：“离毕业远，就该我让吗？”你们本来就没说过几句话，这下还没熟起来，先有了芥蒂。"
+            : "对方听完并没有答应让出一作，只让你别替自己作主。你认真道了歉，答应接下来当面把各自的安排说清楚，谈话总算没有变成争吵。",
         ].join("\n\n"),
       },
       [`random-12-argue-${serial}`]: {
@@ -108,14 +114,10 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
             ].join("\n\n"),
       },
       [`random-12-pressure-${serial}`]: {
-        title: "极端施压",
+        title: "极端反抗",
         description: [
           "你把话说得很直：署名不按约定调整，后面的工作就没法继续承担。办公室安静下来，只剩电脑风扇的声音。",
-          "僵持了一会儿，导师答应把署名争议和这项工作的 2 金币劳务费一起核对结算。你把两件事都确认了一遍。",
-          pressureFavorChange < 0
-            ? "劳务费有了着落，署名却还要等核对。告别时只剩一句干巴巴的“老师再见”，你轻轻带上门，在走廊站了一会儿。"
-            : "收到确认后，你收起材料，说了声“老师，那我先回去了”。这回没有再绕回刚才的争执。",
-          ...(pressureFavorNarrative ? [pressureFavorNarrative] : []),
+          ["僵持了一会儿，导师放缓语气，说最近整理实验材料辛苦了，给你发 2 金币劳务费。你听得出这是找个由头安抚你，署名的事却还没说定。", pressureFavorChange < 0 ? "钱到账了，刚才说重的话却收不回来。你收起手机，告别时只剩一句干巴巴的“老师再见”。" : "你收起手机，没再继续争吵，双方约好之后再谈。", pressureFavorNarrative].filter(Boolean).join(""),
         ].join("\n\n"),
       },
     },

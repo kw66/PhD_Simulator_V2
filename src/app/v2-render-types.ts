@@ -35,6 +35,7 @@ export interface PlayRenderUiState {
   advisorSalaryStartIndex?: number | null;
   loverRewardPage?: number;
   internshipPage?: number;
+  gameGrowthPage?: number;
   currentResearchPaperIndex?: number | null;
   researchSortMode?: ResearchSortMode;
   researchAuthorshipFilter?: ResearchAuthorshipFilter;

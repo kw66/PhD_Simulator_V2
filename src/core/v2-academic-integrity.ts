@@ -4,7 +4,7 @@ import type { Buff, GameState } from "./v2-types";
 export function createImageMisuseBuff(): Buff {
   return {
     id: "image-misuse",
-    name: "图片误用",
+    name: "举报风险",
     source: "数据丢失",
     timing: "permanent",
     remainingMonths: null,

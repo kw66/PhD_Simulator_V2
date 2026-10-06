@@ -142,7 +142,7 @@ describe("advisor publication credit and grants", () => {
     expect(september.advisorProgressState.funding).toBe(210);
     const repeatedAugust = settleAdvisorMonth(atMonth({ ...september,
       advisorProgressState: { ...september.advisorProgressState,
-        pendingApplication: { id: "academician", calendarYear: 2025, researchSnapshot: 1000 } },
+        pendingApplication: { id: "academician", calendarYear: 2025, researchSnapshot: 1000, resultRoll: 0.99 } },
     }, 24));
     expect(repeatedAugust.advisorProgressState.funding).toBe(210);
   });
@@ -162,7 +162,7 @@ describe("advisor publication credit and grants", () => {
     expect(credited.log).toEqual(state.log);
   });
 
-  it.each([[24, null], [25, "youth"], [50, "general"], [150, "excellent"], [400, "distinguished"]] as const)(
+  it.each([[0, "youth"], [20, "youth"], [24, "youth"], [25, "youth"], [50, "general"], [150, "excellent"], [400, "distinguished"]] as const)(
     "selects the highest eligible grant at accumulation %i",
     (researchAccumulation, expected) => {
       const grant = getEligibleAdvisorGrant({ ...createAdvisorProgressState(), researchAccumulation }, 2024);
@@ -172,11 +172,27 @@ describe("advisor publication credit and grants", () => {
 
   it("submits the March application and awards it in August without spending accumulation", () => {
     const march = settleAdvisorMonth(atMonth(makeState({ researchAccumulation: 25 }), 7));
-    expect(march.advisorProgressState.pendingApplication).toEqual({ id: "youth", calendarYear: 2024, researchSnapshot: 25 });
+    expect(march.advisorProgressState.pendingApplication).toMatchObject({ id: "youth", calendarYear: 2024, researchSnapshot: 25, resultRoll: expect.any(Number) });
     const august = finishGrantEvent(settleAdvisorMonth(atMonth(march, 12)));
     expect(august.advisorProgressState.awards).toEqual([{ id: "youth", awardedYear: 2024, startYear: 2025, endYear: 2027 }]);
     expect(august.advisorProgressState.researchAccumulation).toBe(25);
     expect(august.advisorProgressState.funding).toBe(20);
     expect(getActiveAdvisorGrants(august.advisorProgressState, 2024)).toHaveLength(1);
+  });
+
+  it("tries the next grant below its target but respects project limits and academician prerequisites", () => {
+    const advisor = { ...createAdvisorProgressState(), researchAccumulation: 42,
+      awards: [{ id: "youth" as const, awardedYear: 2023, startYear: 2024, endYear: 2026 }],
+    };
+    expect(getEligibleAdvisorGrant(advisor, 2024)?.id).toBe("general");
+    const limited = { ...advisor, awards: [...advisor.awards,
+      { id: "general" as const, awardedYear: 2023, startYear: 2024, endYear: 2027 }],
+    };
+    expect(getEligibleAdvisorGrant(limited, 2024)).toBeNull();
+    expect(getEligibleAdvisorGrant({ ...createAdvisorProgressState(), researchAccumulation: 1000 }, 2024)?.id).toBe("distinguished");
+    const distinguished = { ...limited, awards: [...limited.awards,
+      { id: "distinguished" as const, awardedYear: 2023, startYear: 2024, endYear: 2028 }],
+    };
+    expect(getEligibleAdvisorGrant(distinguished, 2024)?.id).toBe("academician");
   });
 });

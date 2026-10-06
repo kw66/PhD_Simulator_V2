@@ -3,8 +3,9 @@ import { createInitialState } from "../src/core/v2-engine";
 import { renderApp } from "../src/app/v2-render";
 import { createScholarshipEvent } from "../src/core/v2-fixed-events-scholarship";
 import { createMentorAssignEvent } from "../src/core/v2-fixed-events-mentor-assign";
-import { resolveSummerVacationFixedEvent } from "../src/core/v2-fixed-events-summer";
+import { refreshSummerVacationEvent, resolveSummerVacationFixedEvent } from "../src/core/v2-fixed-events-summer";
 import { resolveTeachersDayFixedEvent } from "../src/core/v2-fixed-events-teachers-day";
+import { resolveWinterVacationFixedEvent } from "../src/core/v2-fixed-events-winter";
 import { resolveCcigFixedEvent } from "../src/core/v2-fixed-events-ccig-resolution";
 import { createGrantedPublishedPaper } from "../src/core/v2-publication-rules";
 import { createAdvancedConferenceActivityOptions } from "../src/core/v2-conference-activity-advanced-options";
@@ -29,9 +30,10 @@ describe("fixed result conditions", () => {
     const root = createScholarshipEvent({ ...initial, year: 3, month: 2, totalResearchScore: score }, roll);
     const decision = decisionOf(root);
     const result = decisionOf(decision);
-    expect(root.description + decision.description).not.toMatch(/条件：|分数线\s*2/u);
+    expect(root.description).toContain("小提示：出现条件：第2学年起，每年10月");
+    expect(root.description.replace(/小提示：出现条件：[^\n]+/u, "") + decision.description).not.toMatch(/条件：|分数线\s*2/u);
     expect(decision.choices[0]!.outcome).not.toMatch(/条件：|≥|</u);
-    expect(settlementOf(result)).toContain(`条件：本次可用科研积分 ${score} ${score >= 2 ? "≥" : "<"} 分数线 2`);
+    expect(settlementOf(result)).toContain(`条件：评奖科研分 ${score} ${score >= 2 ? "≥" : "<"} 分数线 2`);
     expect(result.choices[0]!.effects.money ?? 0).toBe(score >= 2 ? 6 : 0);
     expect(roll).toHaveBeenCalledTimes(1);
   });
@@ -43,28 +45,97 @@ describe("fixed result conditions", () => {
       relationshipState: { ...initial.relationshipState, unlockedSlots: 5, occupiedSlots },
     }, () => 0);
     const decision = decisionOf(root);
-    expect(root.description + decision.description).not.toContain("条件：");
+    expect(root.description).toContain("小提示：出现条件：转博后的首个9月");
+    expect(root.description.replace(/小提示：出现条件：[^\n]+/u, "") + decision.description).not.toContain("条件：");
     for (const choice of decision.choices) {
       expect(choice.outcome).not.toContain("条件：");
       const result = choice.effects.enqueueEvents![0]!;
-      expect(settlementOf(result)).toContain(`条件：合作人数 ${occupiedSlots} ${occupiedSlots < 4 ? "<" : "≥"} 4`);
+      expect(settlementOf(result)).toContain(`条件：${occupiedSlots < 4 ? "人际栏有空位" : "人际栏已满"}`);
+      expect(settlementOf(result)).not.toContain("合作人数");
       expect(choice.effects.fellowAdditions?.length ?? 0).toBe(occupiedSlots < 4 ? 1 : 0);
     }
   });
 
-  it.each([0, 1, 7])("reports rounded summer recovery for SAN gap %i", (gap) => {
+  it.each([0, 1, 3, 4, 5, 7, 15, 20])("reports rounded summer recovery for SAN gap %i", (gap) => {
     const initial = createInitialState();
     const state = { ...initial, player: { ...initial.player, san: initial.sanCap - gap } };
-    for (const [kind, ratio] of [["summer-vacation-home", 0.25], ["summer-vacation-travel", 0.5]] as const) {
+    for (const [kind, ratio] of [["summer-vacation-home", 0.3], ["summer-vacation-travel", 0.5]] as const) {
       const roll = vi.fn(() => 0);
       const resolution = resolveSummerVacationFixedEvent(state, { kind }, roll)!;
       const result = resolution.enqueueEvents![0]!;
-      expect(settlementOf(result)).not.toContain("条件：");
-      expect(settlementOf(result)).toContain(`SAN +${Math.ceil(gap * ratio)}`);
-      expect(result.choices[0]!.effects.san ?? 0).toBe(Math.ceil(gap * ratio));
+      if (kind === "summer-vacation-home") expect(settlementOf(result)).not.toContain("条件：");
+      expect(settlementOf(result)).toContain(`SAN +${Math.floor(gap * ratio)}（已损SAN${ratio * 100}%）`);
+      expect(result.choices[0]!.effects.san ?? 0).toBe(Math.floor(gap * ratio));
       expect(resolution.nextState).toBe(state);
       expect(roll).not.toHaveBeenCalled();
     }
+  });
+
+  it.each([0, 1, 4, 5, 7, 10, 15, 20])("floors winter recovery at twenty percent for SAN gap %i in every branch", (gap) => {
+    const initial = createInitialState();
+    for (const branch of [0, 0.4, 0.8]) {
+      for (const active of [false, true]) {
+        const state = { ...initial, player: { ...initial.player, san: initial.sanCap - gap }, loverState: { ...initial.loverState, active } };
+        const rolls = [branch, 0.99];
+        const resolution = resolveWinterVacationFixedEvent(state, { kind: "winter-vacation-rest" }, () => rolls.shift() ?? 0.99)!;
+        const result = resolution.enqueueEvents![0]!;
+        expect(result.choices[0]!.effects.san ?? 0).toBe(Math.floor(gap * 0.2));
+        expect(settlementOf(result)).toContain(`SAN +${Math.floor(gap * 0.2)}（已损SAN20%）`);
+        expect(resolution.nextState).toBe(state);
+      }
+    }
+  });
+
+  it("refreshes summer travel recovery and effect text after SAN changes", () => {
+    const initial = createInitialState();
+    const beforeTravel = { ...initial, player: { ...initial.player, san: initial.sanCap - 7 } };
+    const result = resolveSummerVacationFixedEvent(beforeTravel, { kind: "summer-vacation-travel" }, () => 0)!.enqueueEvents![0]!;
+    expect(result.description).toContain("SAN +3（已损SAN50%）");
+    const refreshed = refreshSummerVacationEvent(
+      { ...initial, player: { ...initial.player, san: initial.sanCap } },
+      { ...result, queueOrder: 1 },
+    );
+    expect(refreshed.description).toContain("结果：金币 -4\n结果：SAN +0（已损SAN50%）");
+    expect(refreshed.description).not.toContain("旅行放松");
+    expect(refreshed.choices[0]!.effects.san).toBeUndefined();
+  });
+
+  it("adds travel social growth and the full-SAN-cap reward", () => {
+    const initial = createInitialState();
+    const state = {
+      ...initial,
+      player: { ...initial.player, san: 18, social: 0 },
+    };
+    const result = resolveSummerVacationFixedEvent(state, { kind: "summer-vacation-travel" }, () => 0.99)!.enqueueEvents![0]!;
+    const choice = result.choices[0]!;
+    expect(choice.effects.social).toBe(1);
+    expect(choice.effects.sanCapDelta).toBe(1);
+    expect(choice.effects.san).toBe(1);
+    expect(result.description).toContain("结果：社交 +1");
+    expect(result.description).toContain("额外：条件：SAN ≥ 18｜结果：SAN上限 +1");
+    expect(result.description).toContain("结果：SAN上限 +1");
+    const html = renderApp({
+      ...state,
+      phase: "playing",
+      month: 11,
+      totalMonths: 11,
+      eventQueue: [{ ...result, queueOrder: 1 }],
+    }, undefined, { activePlayTab: "events", activeEventId: result.id, isEventContentOpen: true });
+    const rows = html.match(/<div class="event-settlement-row[^>]*>[\s\S]*?<\/div>/g)!;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain("金币 -4");
+    expect(rows[0]).toContain("已损SAN50%");
+    expect(rows[0]).toContain("社交 +1");
+    expect(rows[0]).not.toContain("SAN上限");
+    expect(rows[0]).not.toContain("≥");
+    expect(rows[1]).not.toContain("额外");
+    expect(rows[1]).toContain("条件</span>");
+    expect(rows[1]).toContain("SAN ≥ 18");
+    expect(rows[1]).toContain("结果</span>");
+    expect(rows[1]).toContain("SAN上限 +1");
+    const belowThreshold = refreshSummerVacationEvent({ ...state, player: { ...state.player, san: 17 } }, result);
+    expect(belowThreshold.description).not.toContain("额外：");
+    expect(belowThreshold.choices[0]!.effects.sanCapDelta).toBeUndefined();
   });
 
   it.each([5, 6])("reports the selected teachers-day probability at favor %i", (favor) => {
@@ -75,12 +146,11 @@ describe("fixed result conditions", () => {
       const resolution = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, roll);
       const result = resolution.enqueueEvents![0]!;
       expect(settlementOf(result)).toContain("条件：");
-      const branch = rollValue >= 0.5 ? "普通回复" : favor < 6 ? "报销跑腿" : "分享想法";
-      expect(settlementOf(result)).toContain(`；${branch}（50%）`);
-      expect(result.id).toContain(favor < 6
-        ? rollValue < 0.5 ? "message-errand" : "message-plain"
-        : rollValue < 0.5 ? "message-idea" : "message-reply");
-      expect(roll).toHaveBeenCalledTimes(favor >= 6 && rollValue < 0.5 ? 2 : 1);
+      const branch = rollValue >= 0.5 ? "普通回复" : favor >= 6 ? "分享想法" : "报销跑腿";
+      const percent = favor >= 6 ? 50 : rollValue >= 0.5 ? 60 : 40;
+      expect(settlementOf(result)).toContain(`条件：导师好感 ${favor >= 6 ? "≥" : "<"} 6；${branch}（${percent}%）`);
+      expect(result.id).toContain(rollValue < 0.5 ? favor >= 6 ? "message-idea" : "message-errand" : "message-plain");
+      expect(roll).toHaveBeenCalledTimes(1);
     }
   });
 
@@ -91,7 +161,7 @@ describe("fixed result conditions", () => {
       const resolution = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => rollValue);
       const result = resolution.enqueueEvents![0]!;
       expect(resolution.nextState).toBe(state);
-      expect(settlementOf(result).trim()).toBe(`条件：导师好感 ${favor < 6 ? "<" : "≥"} 6；普通回复（50%）\n结果：无事发生`);
+      expect(settlementOf(result).trim()).toBe(`条件：导师好感 ${favor >= 6 ? "≥" : "<"} 6；普通回复（${favor >= 6 ? 50 : 60}%）\n结果：无事发生`);
       expect(result.completionLog).toContain("无事发生");
       const html = renderApp({
         ...state,
@@ -101,21 +171,21 @@ describe("fixed result conditions", () => {
         eventQueue: [{ ...result, queueOrder: 1 }],
       }, undefined, { activePlayTab: "events", activeEventId: result.id, isEventContentOpen: true });
       expect(html).toContain('<span class="event-settlement-item">无事发生</span>');
-      expect(html).toContain('<span class="event-settlement-item">普通回复（50%）</span>');
+      expect(html).toContain(`<span class="event-settlement-item">普通回复（${favor >= 6 ? 50 : 60}%）</span>`);
       expect(html).not.toContain("数值变化 0");
       expect(html).not.toContain("仅回复祝福概率");
     }
   });
 
-  it.each([0, 0.34, 0.67])("reports CCIG's selected draw without rerolling at %f", (rollValue) => {
+  it.each([0, 0.34, 0.67])("uses a fixed CCIG idea reward regardless of roll %f", (rollValue) => {
     const state = createInitialState();
     const roll = vi.fn(() => rollValue);
     const resolution = resolveCcigFixedEvent(state, { kind: "ccig-activity-listen" }, roll);
     const result = resolution.enqueueEvents![0]!;
     expect(settlementOf(result)).not.toContain("条件：");
-    expect(result.choices[0]!.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(4 + Math.floor(rollValue * 3));
+    expect(result.choices[0]!.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(5);
     expect(resolution.nextState).toBe(state);
-    expect(roll).toHaveBeenCalledTimes(1);
+    expect(roll).not.toHaveBeenCalled();
   });
 
   it("marks CCIG poster percentage as an effect, with the paper requirement separate", () => {

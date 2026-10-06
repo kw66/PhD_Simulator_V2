@@ -1,4 +1,4 @@
-import { drawInclusiveInt, type FixedResolutionResult, type RandomRollProvider } from "./v2-fixed-events-shared";
+import { type FixedResolutionResult, type RandomRollProvider } from "./v2-fixed-events-shared";
 import {
   createCcigAttendResultEvent,
   createCcigDecisionEvent,
@@ -7,7 +7,7 @@ import {
 import { createCcigActivityResultEvent } from "./v2-fixed-events-ccig-activity-events";
 import { getCcigLocation, getCcigSelfPayCost } from "./v2-fixed-events-ccig-shared";
 import { combineEffectMultipliers } from "./v2-numeric-modifiers";
-import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative, getTierResistChance } from "./v2-sanity-rules";
+import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState } from "./v2-types";
 
 export function resolveCcigFixedEvent(
@@ -51,7 +51,7 @@ export function resolveCcigFixedEvent(
       };
     }
     case "ccig-activity-listen": {
-      const tempBonus = drawInclusiveInt(4, 6, getRoll);
+      const tempBonus = 5;
       const activityOutcome = `下次想 idea +${tempBonus}，永久 idea +1`;
       const completionLog = [resolution.ccigAttendanceSummary, activityOutcome].filter(Boolean).join("；");
       return {
@@ -173,7 +173,6 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "food",
-          condition: `社交 ${state.player.social}（抵抗概率 ${getTierResistChance(state.player.social) * 100}%）`,
           title: "年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你约了几位同学去吃${location}当地菜：${food}。`,

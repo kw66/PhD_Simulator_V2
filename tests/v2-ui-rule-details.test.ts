@@ -133,7 +133,9 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("同学经费不足当次实验费用时改做横向");
     expect(help).toContain("导师、同学和你共同推进卡片上的两条项目进度");
     expect(help).not.toContain("每月为玩家和每位同学各提供一次论文指导");
-    expect(help).toContain("每年按科研积累申请");
+    expect(help).toContain("每年3月不限项即申请");
+    expect(help).toContain("申请时积累≤该值80%，成功率0%");
+    expect(help).toContain("从80%到100%线性升至必过");
     expect(help).toContain("讲师限1项，晋升后限2项");
     expect(help).toContain("项目到期释放名额");
     expect(help).toContain("院士需先获得杰青");

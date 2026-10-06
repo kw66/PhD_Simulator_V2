@@ -31,14 +31,22 @@ export function dispatchSetupAction(
       if (!roleId) {
         return pushNoOpLog(state, "请先选择角色。");
       }
-      const startedState = { ...createStartedGameState(roleId), blockLinearEvents: state.blockLinearEvents };
+      const startedState = {
+        ...createStartedGameState(roleId),
+        blockLinearEvents: state.blockLinearEvents,
+        debugEventReplayEnabled: state.debugEventReplayEnabled,
+      };
       return enqueueEventQueueItem(
         startedState,
         createBeforeGradSchoolAct1Event(startedState),
       );
     }
     case "reset-game":
-      return { ...createInitialState(), blockLinearEvents: state.blockLinearEvents };
+      return {
+        ...createInitialState(),
+        blockLinearEvents: state.blockLinearEvents,
+        debugEventReplayEnabled: state.debugEventReplayEnabled,
+      };
     default:
       return null;
   }

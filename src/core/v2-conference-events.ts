@@ -3,10 +3,10 @@ import type { ConferenceActivityBuildState, ConferenceActivityContext } from "./
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
 import { getPaperConferencePromotionMultiplier } from "./v2-publication-system";
 import { getConferencePaperPresentationResults } from "./v2-conference-activity-shared";
-import type { EventCounters, EventSupportState, PaperAcceptType, PendingEvent, PaperTarget, ShopState } from "./v2-types";
+import type { EventCounters, EventSupportState, GameState, PaperAcceptType, PendingEvent, PaperTarget, ShopState } from "./v2-types";
 import type { ConferenceDecisionMode, ConferenceRegionId } from "./v2-conference-system";
 import { getConferenceBaseCosts, resolveConferenceDecisionCost } from "./v2-conference-system";
-import { getTierResistChance } from "./v2-sanity-rules";
+import { getRegionalMeetingDiscount } from "./v2-meeting-system";
 
 export interface ConferenceAcceptedPaperCandidate {
   id: string;
@@ -47,18 +47,6 @@ function createPaperHandledUpdates(context: ConferenceEventContext) {
   return context.paperIds.map((id) => ({ id, conferenceHandled: true }));
 }
 
-function getPaymentResistanceCondition(label: string, value: number): string {
-  const resistanceChance = getTierResistChance(value);
-  const threshold = resistanceChance === 0
-    ? `${label} < 6`
-    : resistanceChance === 0.25
-      ? `6 ≤ ${label} < 12`
-      : resistanceChance === 0.5
-        ? `12 ≤ ${label} < 18`
-        : `${label} ≥ 18`;
-  return `条件：${threshold}（抵抗概率 ${resistanceChance * 100}%）`;
-}
-
 function createConferenceDecisionAct3(
   context: ConferenceEventContext,
   state: ConferenceEventBuilderState,
@@ -79,14 +67,19 @@ function createConferenceDecisionAct3(
   const settlementSummary = settlementItems.join("，");
   const presentationResults = getConferencePaperPresentationResults(context);
   const baseCosts = getConferenceBaseCosts(context.region);
-  const resistanceCondition = decision.mode === "advisor"
-    ? getPaymentResistanceCondition("导师好感", state.favor)
-    : decision.mode === "proxy" && baseCosts.proxyCost > 0
-      ? getPaymentResistanceCondition("社交", state.social)
-      : "";
+  const regionName = getRegionName(context.region);
+  const regionCounterKey = context.region === "domestic" ? "domesticMeetingCount" : context.region === "asia" ? "asiaMeetingCount" : "westMeetingCount";
+  const currentRegionCount = state.eventCounters[regionCounterKey] ?? 0;
+  const nextRegionCounters = { ...state.eventCounters, [regionCounterKey]: currentRegionCount + 1 };
+  const currentDiscount = getRegionalMeetingDiscount(state.eventCounters, context.region, baseCosts.selfPay);
+  const nextDiscount = getRegionalMeetingDiscount(nextRegionCounters, context.region, baseCosts.selfPay);
+  const meetingGrowth = decision.countsAsMeeting
+    ? nextDiscount > currentDiscount ? `费用减免 ${currentDiscount}→${nextDiscount}金币` : `${regionName}参会 ${currentRegionCount}→${currentRegionCount + 1}次`
+    : "";
   const resultItems = [
     `结果：${settlementSummary}`,
     ...presentationResults.map((result) => `结果：${result}`),
+    ...(meetingGrowth ? [meetingGrowth] : []),
   ];
 
   return {
@@ -99,7 +92,6 @@ function createConferenceDecisionAct3(
       "录用时以为终于忙完了，眼下才发现，会务邮件也能攒出一份待办清单。你挨个打上勾，总算把这趟安排妥当。",
       ...(decision.resistanceNarrative ? [decision.resistanceNarrative] : []),
       "机制结算",
-      ...(resistanceCondition ? [resistanceCondition] : []),
       ...resultItems,
     ].join("\n\n"),
     source: "fixed",
@@ -109,7 +101,7 @@ function createConferenceDecisionAct3(
     stage: "act3",
     discardPaperUpdates: createPaperHandledUpdates(context),
     completionLog: decision.countsAsMeeting
-      ? [settlementSummary, ...presentationResults, "论文展示已完成"].join("；")
+      ? [settlementSummary, ...presentationResults, meetingGrowth, "论文展示已完成"].join("；")
       : [settlementSummary, ...presentationResults, "论文参会已处理"].join("；"),
     choices: decision.countsAsMeeting
       ? [{
@@ -119,7 +111,10 @@ function createConferenceDecisionAct3(
           effects: {
             ...(decision.resource === "money" && decision.actualCost > 0 ? { money: -decision.actualCost } : {}),
             ...(decision.resource === "favor" && decision.actualCost > 0 ? { favor: -decision.actualCost } : {}),
-            counterDeltas: { meetingCount: 1 },
+            counterDeltas: {
+              meetingCount: 1,
+              ...(context.region === "domestic" ? { domesticMeetingCount: 1 } : context.region === "asia" ? { asiaMeetingCount: 1 } : { westMeetingCount: 1 }),
+            },
             enqueueEvents: [createConferenceActivityEvent(context, state, settlementItems, getRoll)],
           },
         }]
@@ -200,6 +195,68 @@ function createConferenceDecisionAct2(
 }
 
 export function createConferenceDecisionAct1(
+  context: ConferenceEventContext,
+  state: ConferenceEventBuilderState,
+  getRoll: () => number = Math.random,
+): PendingEvent {
+  const rolls: number[] = [];
+  const root = buildConferenceDecisionAct1(context, state, () => {
+    const roll = getRoll();
+    rolls.push(roll);
+    return roll;
+  });
+  while (rolls.length < 16) rolls.push(getRoll());
+  const attach = (event: PendingEvent, mode?: ConferenceDecisionMode): PendingEvent => event.chainId !== context.id ? event : {
+    ...event,
+    conferencePreview: { context, rolls, mode },
+    choices: event.choices.map((choice) => ({
+      ...choice,
+      effects: {
+        ...choice.effects,
+        ...(choice.effects.enqueueEvents ? {
+          enqueueEvents: choice.effects.enqueueEvents.map((next) => attach(next,
+            choice.id === "self" || choice.id === "advisor" || choice.id === "proxy" ? choice.id : mode)),
+        } : {}),
+      },
+    })),
+  };
+  return attach(root);
+}
+
+export function refreshConferenceDecision<Event extends PendingEvent>(state: GameState, event: Event): Event {
+  const preview = event.conferencePreview;
+  if (!preview) return event;
+  let rollIndex = 0;
+  let rebuilt = buildConferenceDecisionAct1(preview.context, {
+    ...state, research: state.player.research, social: state.player.social, favor: state.player.favor,
+  }, () => preview.rolls[rollIndex++] ?? preview.rolls.at(-1)!);
+  if (event.stage === "act2" || event.stage === "act3") rebuilt = rebuilt.choices[0]!.effects.enqueueEvents![0]!;
+  if (event.stage === "act3") {
+    const result = rebuilt.choices.find((choice) => choice.id === preview.mode)?.effects.enqueueEvents?.[0];
+    if (!result) return event;
+    rebuilt = result;
+  }
+  const merge = (current: PendingEvent, fresh: PendingEvent): PendingEvent => ({
+    ...current,
+    title: fresh.title, description: fresh.description, completionLog: fresh.completionLog,
+    choices: fresh.choices.map((choice, index) => ({
+      ...choice,
+      id: current.choices[index]?.id ?? choice.id,
+      effects: {
+        ...choice.effects,
+        ...(choice.effects.enqueueEvents ? {
+          enqueueEvents: choice.effects.enqueueEvents.map((next, nextIndex) => {
+            const previous = current.choices[index]?.effects.enqueueEvents?.[nextIndex];
+            return previous?.conferencePreview ? merge(previous, next) : next;
+          }),
+        } : {}),
+      },
+    })),
+  });
+  return merge(event, rebuilt) as Event;
+}
+
+function buildConferenceDecisionAct1(
   context: ConferenceEventContext,
   state: ConferenceEventBuilderState,
   getRoll: () => number = Math.random,

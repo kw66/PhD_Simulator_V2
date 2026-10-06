@@ -49,6 +49,19 @@ describe("session store", () => {
     expect(store.getState().phase).toBe("setup");
   });
 
+  it("keeps the debug event replay switch when restarting or resetting", () => {
+    const store = createStore();
+    store.dispatch("start-game", { roleId: "normal" });
+    store.dispatch("debug-toggle-event-replay", { debugEventReplayEnabled: true });
+    expect(store.getState().debugEventReplayEnabled).toBe(true);
+
+    store.dispatch("restart-game");
+    expect(store.getState().debugEventReplayEnabled).toBe(true);
+
+    store.dispatch("reset-game");
+    expect(store.getState().debugEventReplayEnabled).toBe(true);
+  });
+
   it("awards final research score once and restores role experience in a new store", () => {
     const values = new Map<string, string>();
     const storage = {

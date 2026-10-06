@@ -1,11 +1,10 @@
 import {
   appendMechanismSettlement,
   createFixedEvent,
-  drawInclusiveInt,
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
-import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative, getTierResistChance } from "./v2-sanity-rules";
+import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 function createWinterVacationDescription(branchDescription: string, moneyGain: number): string {
@@ -34,7 +33,7 @@ function createWinterVacationResultEvent(params: {
     choices: [
       {
         id: `winter-vacation-finish-y${params.year}-m${params.month}`,
-        label: "继续",
+        label: "确定",
         outcome: params.outcome,
         effects: {
           ...(params.moneyGain !== 0 ? { money: params.moneyGain } : {}),
@@ -107,22 +106,19 @@ export function resolveWinterVacationFixedEvent(
   }
 
   const missingSan = Math.max(0, state.sanCap - state.player.san);
-  const sanRecovery = Math.ceil(missingSan * 0.1);
-  const redEnvelope = drawInclusiveInt(1, 3, getRoll);
-  const branch = drawInclusiveInt(1, 3, getRoll);
+  const sanRecovery = Math.floor(missingSan * 0.2);
+  const sanSummary = `SAN +${sanRecovery}（已损SAN20%）`;
+  const redEnvelope = 2;
+  const branchRoll = getRoll();
 
-  if (branch === 1) {
+  if (branchRoll < 0.3) {
     const socialResult = applyTierResist(1, state.player.social, getRoll);
     const socialChange = socialResult.effectiveChange;
     const socialText = formatTierResistedOutcome("社交", 1, socialResult);
     const socialNarrative = getTierResistedNarrative("社交", 1, socialResult);
-    const socialThreshold = state.player.social < 6 ? "社交 < 6"
-      : state.player.social < 12 ? "6 ≤ 社交 < 12"
-        : state.player.social < 18 ? "12 ≤ 社交 < 18" : "社交 ≥ 18";
-    const resistancePercent = getTierResistChance(state.player.social) * 100;
     return {
       nextState: state,
-      outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}，${socialText}。`,
+      outcome: `金币 +${redEnvelope}，${sanSummary}，${socialText}。`,
       enqueueEvents: [createWinterVacationResultEvent({
         year: state.year,
         month: state.month,
@@ -130,12 +126,11 @@ export function resolveWinterVacationFixedEvent(
           "逛街碰到高中同学，问起近况，你刚报出课题名，对方就一脸迷茫，只好改聊实验室日常。说到吃饭和作息，你们又像课间趴在走廊上那样有话说了。",
           ...(socialNarrative ? [socialNarrative] : []),
         ].join(""), redEnvelope),
-        outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}，${socialText}。`,
+        outcome: `金币 +${redEnvelope}，${sanSummary}，${socialText}。`,
         settlement: [
-          "条件：同学重逢分支概率 1/3",
-          `条件：${socialThreshold}（抵抗概率 ${resistancePercent}%）`,
+          "条件：同学重逢（30%）",
           `结果：金币 +${redEnvelope}`,
-          `结果：SAN +${sanRecovery}`,
+          `结果：${sanSummary}`,
           `结果：${socialText}`,
         ].join("\n"),
         moneyGain: redEnvelope,
@@ -145,23 +140,23 @@ export function resolveWinterVacationFixedEvent(
     };
   }
 
-  if (branch === 2) {
+  if (branchRoll < 0.6) {
     if (state.loverState.active) {
       const doubledEnvelope = redEnvelope * 2;
       return {
         nextState: state,
-        outcome: `金币 +${doubledEnvelope}，SAN +${sanRecovery}。`,
+        outcome: `金币 +${doubledEnvelope}，${sanSummary}。`,
         enqueueEvents: [createWinterVacationResultEvent({
           year: state.year,
           month: state.month,
           description: createWinterVacationDescription([
             "你带恋人回家吃饭，父母从学校生活问到以后打算。你们低头夹菜，长辈笑着打住，多包了一份红包。离席后对视一眼：光顾着夹菜，谁都没吃几口。",
           ].join("\n\n"), doubledEnvelope),
-          outcome: `金币 +${doubledEnvelope}，SAN +${sanRecovery}。`,
+          outcome: `金币 +${doubledEnvelope}，${sanSummary}。`,
           settlement: [
-            "条件：家庭聚餐（概率 1/3）；有恋人",
+            "条件：家庭聚餐（30%）；有恋人",
             `结果：金币 +${doubledEnvelope}`,
-            `结果：SAN +${sanRecovery}`,
+            `结果：${sanSummary}`,
           ].join("\n"),
           moneyGain: doubledEnvelope,
           sanRecovery,
@@ -172,18 +167,18 @@ export function resolveWinterVacationFixedEvent(
 
     return {
       nextState: state,
-      outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}。`,
+      outcome: `金币 +${redEnvelope}，${sanSummary}。`,
       enqueueEvents: [createWinterVacationResultEvent({
         year: state.year,
         month: state.month,
         description: createWinterVacationDescription([
           "家里聚餐吃到一半，亲戚从课题问到对象，又问毕业后想去哪。你用“最近忙实验，还没想好”应付过去，趁话题转向别处赶紧夹菜：这顿饭比组会还考验临场发挥。",
         ].join("\n\n"), redEnvelope),
-        outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}。`,
+        outcome: `金币 +${redEnvelope}，${sanSummary}。`,
         settlement: [
-          "条件：家庭聚餐（概率 1/3）；无恋人",
+          "条件：家庭聚餐（30%）；无恋人",
           `结果：金币 +${redEnvelope}`,
-          `结果：SAN +${sanRecovery}`,
+          `结果：${sanSummary}`,
         ].join("\n"),
         moneyGain: redEnvelope,
         sanRecovery,
@@ -194,22 +189,38 @@ export function resolveWinterVacationFixedEvent(
 
   return {
     nextState: state,
-    outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}。`,
+    outcome: `金币 +${redEnvelope}，${sanSummary}。`,
     enqueueEvents: [createWinterVacationResultEvent({
       year: state.year,
       month: state.month,
       description: createWinterVacationDescription([
         "这个假期，你没安排远行。睡醒时家里人已经买菜回来，电视里放着你小时候看过的剧。你窝在沙发上剥橘子，明明知道下一句台词，还是跟着看了下去。",
       ].join("\n\n"), redEnvelope),
-      outcome: `金币 +${redEnvelope}，SAN +${sanRecovery}。`,
+      outcome: `金币 +${redEnvelope}，${sanSummary}。`,
       settlement: [
-        "条件：居家休息分支概率 1/3",
+        "条件：居家休息（40%）",
         `结果：金币 +${redEnvelope}`,
-        `结果：SAN +${sanRecovery}`,
+        `结果：${sanSummary}`,
       ].join("\n"),
       moneyGain: redEnvelope,
       sanRecovery,
       socialChange: 0,
     })],
+  };
+}
+
+export function refreshWinterVacationPlan<Event extends PendingEvent>(state: GameState, event: Event): Event {
+  if (event.chainId !== "winter-vacation") return event;
+  if (event.stage === "act2") return { ...event, description: createWinterVacationPlanEvent(state).description };
+  if (event.stage !== "act1") return event;
+  return {
+    ...event,
+    choices: event.choices.map((choice) => ({
+      ...choice,
+      effects: {
+        ...choice.effects,
+        enqueueEvents: choice.effects.enqueueEvents?.map((followUp) => refreshWinterVacationPlan(state, followUp)),
+      },
+    })),
   };
 }

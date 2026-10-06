@@ -13,29 +13,29 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
   const socialCapped = state.player.social >= 20;
   const favorCapped = state.player.favor >= 20;
   const sleepHint = state.player.san < 6
-    ? "眼前的字又有点发花，最想补的其实是一场好觉。"
+    ? "翻到“休养生息”，眼前的字又有点发花，才想起这一年难得睡饱的那几个周末。"
     : state.player.san < 12
-      ? "你打个哈欠。这阵子每天要按掉好几遍闹钟，连补觉都欠着，写总结也提不起劲。"
-      : "这一年倒没把精神熬垮，只是一想到不用定闹钟、醒了不急着出门的日子，还是忍不住向往。";
+      ? "“休养生息”旁记着几次睡到自然醒的周末。你打个哈欠，那几天可真舒服。"
+      : "看着“休养生息”，你想起那些按时关电脑的晚上。这一年倒没把精神熬垮。";
   const socialHint = socialCapped
-    ? "聚餐时记下的笑话又让你乐了，那帮人该再约一次。"
+    ? "“广交朋友”旁挤满了名字，几张活动票根都快夹不住了。"
     : state.player.social < 6
-      ? "月历上除了实验室就是宿舍，这一年居然没认识几个新朋友。"
-      : "月历里夹着活动票根，那天聊得很开心。一忙起来，又只剩同组几张脸。";
+      ? "“广交朋友”下面只记了几个名字，好在不再每顿饭都一个人吃。"
+      : "“广交朋友”旁夹着活动票根，那天从研究方向聊到各自家乡，散场了还舍不得走。";
   const favorHint = favorCapped
-    ? "组里的事已熟，老师交代也放心。还有一摞材料没整理，你把它记在页边。"
+    ? "“取得导师信任”这一项，你想起老师那句“交给你我放心”，笔尖停了停。"
     : state.player.favor < 6
-      ? "写到导师，平时该聊些什么仍答不上来。见老师居然还是这么拘谨。"
-      : "组里还有材料待整理，老师没少操心，你也想把手边的事接过来一些。";
+      ? "“取得导师信任”旁记着几件替老师办的小事。见老师居然还是这么拘谨，不过总算不只会回“收到”了。"
+      : "“取得导师信任”让你想起几次替老师分担杂事的下午。如今老师有事，也渐渐愿意交给你办。";
   const partTimeHint = state.player.money < 3
-    ? "余额提醒又亮了。你叹口气，补上“找份兼职”，这事拖不下去了。"
-    : "写到开销，又添上“找份兼职”。多攒点钱，花起来也踏实。";
+    ? "“兼职挣钱”旁记着几笔报酬，钱早花了，到账时的高兴还记得。"
+    : "“兼职挣钱”旁记着几笔报酬，数额不大，却实实在在替你付过几顿饭钱。";
 
   return createFixedEvent({
     id: `year-summary-choice-y${state.year}-m${state.month}`,
-    title: "学年总结 ➜ 年度总结",
+    title: "学年总结 ➜ 年初的目标",
     description: [
-      `总结写了半页，你发现自己一直在写“忙”。忙了一整年，惦记的事却没顾上。${sleepHint}${socialHint}`,
+      `${sleepHint}${socialHint}`,
       `${favorHint}${partTimeHint}`,
     ].join("\n\n"),
     chainId: "year-summary",
@@ -43,32 +43,32 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
     choices: [
       {
         id: `year-summary-sleep-y${state.year}-m${state.month}`,
-        label: "休息调整",
-        outcome: "先把状态养回来。",
+        label: "休养生息",
+        outcome: "回想这一年留给自己的休息时间。",
         effects: {
           fixedEventResolution: { kind: "year-summary-sleep" },
         },
       },
       {
         id: `year-summary-social-y${state.year}-m${state.month}`,
-        label: "经营社交",
-        outcome: "抽空参加活动，和同学聊聊。",
+        label: "广交朋友",
+        outcome: "回想这一年结识的朋友。",
         effects: {
           fixedEventResolution: { kind: "year-summary-social" },
         },
       },
       {
         id: `year-summary-favor-y${state.year}-m${state.month}`,
-        label: "服务导师",
-        outcome: "多承担些组里的事。",
+        label: "取得导师信任",
+        outcome: "回想这一年替导师分担的事。",
         effects: {
           fixedEventResolution: { kind: "year-summary-favor" },
         },
       },
       {
         id: `year-summary-part-time-y${state.year}-m${state.month}`,
-        label: "兼职打工",
-        outcome: "做份兼职，顺便攒点钱。",
+        label: "兼职挣钱",
+        outcome: "回想这一年靠兼职挣来的钱。",
         effects: {
           fixedEventResolution: { kind: "year-summary-part-time" },
         },
@@ -83,8 +83,8 @@ export function createYearSummaryEvent(state: GameState): PendingEvent {
     id: `year-summary-y${state.year}-m${state.month}`,
     title: "学年总结",
     description: [
-      `${yearLabel}接近尾声，你翻开月历，准备给这一学年写个总结。组会日期、任务节点和随手记的备忘挤在一起，当时嫌忙，回头看却有些记不清了。`,
-      "几页纸翻过去，连某天忘带钥匙都记着，正经的学年总结却还只写了个标题。你重新摆好本子，把笔帽拔下来。",
+      `${yearLabel}接近尾声，你把桌上的日历翻回学年初。第一页还写着当时给自己定下的目标：休养生息、广交朋友、取得导师信任、兼职挣钱。字写得很用力，仿佛写下来就已经完成了一半。`,
+      "往后翻，组会、截稿和随手记的备忘挤满了格子，连某天忘带钥匙都记着。你拿起笔，对照这一年的经历，准备把完成的目标一项项划掉。",
     ].join("\n\n"),
     chainId: "year-summary",
     choices: [
@@ -109,7 +109,7 @@ export function resolveYearSummaryFixedEvent(
     case "year-summary-open":
       return {
         nextState: state,
-        outcome: "回顾这一年，想想眼下先顾哪一头。",
+        outcome: "翻看日历，回顾年初定下的目标。",
         enqueueEvents: [createYearSummaryChoiceEvent(state)],
       };
     case "year-summary-sleep":

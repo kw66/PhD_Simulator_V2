@@ -1,6 +1,6 @@
 import { applyTierResist, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { EventCounters, EventSupportState, ShopState } from "./v2-types";
-import { getMeetingSelfPayDiscount } from "./v2-meeting-system";
+import { getRegionalMeetingDiscount } from "./v2-meeting-system";
 
 export type ConferenceRegionId = "domestic" | "asia" | "west";
 export type ConferenceDecisionMode = "self" | "advisor" | "proxy";
@@ -46,7 +46,7 @@ export function resolveConferenceDecisionCost(
   getRoll: () => number = Math.random,
 ): ConferenceDecisionCost {
   const baseCosts = getConferenceBaseCosts(input.region);
-  const meetingDiscount = getMeetingSelfPayDiscount(input.eventCounters.meetingCount, baseCosts.selfPay);
+  const meetingDiscount = getRegionalMeetingDiscount(input.eventCounters, input.region, baseCosts.selfPay);
 
   if (input.mode === "self") {
     return {

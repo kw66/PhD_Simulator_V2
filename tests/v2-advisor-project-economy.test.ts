@@ -56,7 +56,7 @@ describe("new advisor project economy", () => {
     const researched = advanceFellowResearch({ ...before, totalMonths: 2, month: 2 }, () => 0);
     const after = advanceFellowResearch({ ...researched, totalMonths: 3, month: 3 }, () => 0);
     expect(after.advisorProgressState.verticalProgress).toBe(10);
-    expect(after.fellowProgressState[0]?.monthlyActivity).toBe("纵向进度 +10");
+    expect(after.fellowProgressState[0]?.monthlyActivity).toBe("协作进度 +1，纵向进度 +10");
     expect(after.advisorProgressState.funding).toBe(20);
   });
 

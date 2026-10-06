@@ -4,6 +4,7 @@ import {
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
+import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 function createSummerVacationResultEvent(params: {
@@ -33,13 +34,18 @@ function createSummerVacationResultEvent(params: {
   });
 }
 
+function formatSummerSanRecovery(missingSan: number, ratio: 0.3 | 0.5): string {
+  const sanRecovery = Math.floor(missingSan * ratio);
+  return `SAN +${sanRecovery}（已损SAN${ratio * 100}%）`;
+}
+
 function createSummerVacationPlanEvent(state: GameState): PendingEvent {
   return createFixedEvent({
     id: `summer-vacation-plan-y${state.year}-m${state.month}`,
     title: "暑假 ➜ 暑假计划",
     description: [
-      "家里问哪天到站，你切到车票页面，惦记起家里的饭菜。桌上文献还标着几个问号；实验室难得安静，放下又有点舍不得。",
-      "朋友偏偏发来旅行攻略，你翻着照片越看越想走。这趟要花 4 金币，翻到账户余额时，手终于停了下来。",
+      "家里发来消息，问你暑假回不回家、准备什么时候动身。你盯着聊天框想了想：实验室规定的假期只有二十多天，回去一趟也不能拖到开学前才回来。",
+      "朋友又发来旅行攻略，照片里的街道和小店让人心动。留校、回家，还是趁这段短假出去走走，你把三种安排在脑子里排了一遍。",
     ].join("\n\n"),
     chainId: "summer-vacation",
     stage: "act2",
@@ -77,8 +83,8 @@ export function createSummerVacationEvent(state: GameState): PendingEvent {
     id: `summer-vacation-y${state.year}-m${state.month}`,
     title: "暑假",
     description: [
-      "暑期食堂少开了几个窗口。你端着餐盘绕一圈，常吃的那家也放假了，实验楼的灯倒还照常亮着。",
-      "老师在群里说实验室照常开放，朋友邀你出游，家里问你何时回来。手机接连响起，这个夏天一下子热闹起来。",
+      "这一学年终于熬到了尾声。暑期食堂少开了几个窗口，你端着餐盘绕一圈，常吃的那家也放假了，实验楼的灯倒还照常亮着。",
+      "本科生或许能放上两个月，研究生却没有这么长的暑假：实验室规定只休二十多天。你把电脑合上，第一次认真想起，这段短暂的空档该留给什么。",
     ].join("\n\n"),
     chainId: "summer-vacation",
     choices: [
@@ -97,26 +103,28 @@ export function createSummerVacationEvent(state: GameState): PendingEvent {
 export function resolveSummerVacationFixedEvent(
   state: GameState,
   resolution: FixedEventResolution,
-  _getRoll: RandomRollProvider,
+  getRoll: RandomRollProvider,
+  preservedTravelSocialResult?: ReturnType<typeof applyTierResist>,
 ): FixedResolutionResult | null {
   switch (resolution.kind) {
     case "summer-vacation-home": {
       const missingSan = Math.max(0, state.sanCap - state.player.san);
-      const sanRecovery = Math.ceil(missingSan * 0.25);
+      const sanRecovery = Math.floor(missingSan * 0.3);
+      const sanSummary = formatSummerSanRecovery(missingSan, 0.3);
       return {
         nextState: state,
-        outcome: `SAN +${sanRecovery}。`,
+        outcome: `${sanSummary}。`,
         enqueueEvents: [createSummerVacationResultEvent({
           idSuffix: "home",
           year: state.year,
           month: state.month,
           title: "暑假 ➜ 暑假计划 ➜ 新学期将至",
           description: [
-            "回家后，你把闹钟调晚，白天帮忙做琐事，晚上散步，吃饭总算不用一边嚼一边惦记实验结果。",
-            "偶尔翻两页研究笔记，厨房又喊你尝咸淡。你合上本子过去，发现今天最急的事原来是别让汤煮干。",
+            "回家后，你干脆关掉闹钟，睡到中午才慢吞吞地下楼。下午陪家人逛街，顺路买些零碎东西，晚饭也不用对着电脑边吃边看实验日志。",
+            "几天过去，脑子里那根绷紧的弦终于松了。你偶尔想起论文，却没有立刻打开电脑；这次休息得更充分些，新学期再把状态慢慢接回来。",
           ].join("\n\n"),
-          outcome: `SAN +${sanRecovery}。`,
-          settlement: `结果：SAN +${sanRecovery}`,
+          outcome: `${sanSummary}。`,
+          settlement: `结果：${sanSummary}`,
           effects: sanRecovery === 0 ? {} : { san: sanRecovery },
         })],
       };
@@ -129,10 +137,10 @@ export function resolveSummerVacationFixedEvent(
           idSuffix: "research",
           year: state.year,
           month: state.month,
-          title: "暑假 ➜ 暑假计划 ➜ 学术进步",
+          title: "暑假 ➜ 暑假计划 ➜ 留校的夏天",
           description: [
-            "你留校把文献、实验记录和疑问摊在桌上。周围安静下来，终于能沿着一个问题慢慢查，不用读到一半又赶去忙别的。",
-            "几轮对照，笔记总算不全是问号了。你圈出能接着试的思路，补上理由，免得过几天只记得自己当时觉得很有道理。",
+            "你留在校园，白天去图书馆和实验楼之间来回。树上的蝉叫得响，空荡荡的教学楼里却凉快，傍晚还能绕到操场走一圈，看留校的人慢慢多起来。",
+            "晚上回到实验室，你才把文献、实验记录和疑问摊开，沿着一个问题慢慢查。没有人催你立刻给出结果，几轮对照后，笔记里终于多了一条能继续试的思路。",
           ].join("\n\n"),
           outcome: "下次想 idea 多 1 次，永久 idea +1 分。",
           settlement: "结果：下次想 idea +1 次｜永久 idea +1",
@@ -144,23 +152,34 @@ export function resolveSummerVacationFixedEvent(
       };
     case "summer-vacation-travel": {
       const missingSan = Math.max(0, state.sanCap - state.player.san);
-      const sanRecovery = Math.ceil(missingSan * 0.5);
+      const sanRecovery = Math.floor(missingSan * 0.5);
+      const sanSummary = formatSummerSanRecovery(missingSan, 0.5);
+      const socialResult = preservedTravelSocialResult ?? applyTierResist(1, state.player.social, getRoll);
+      const socialText = formatTierResistedOutcome("社交", 1, socialResult);
+      const fullSanTier = state.player.san >= 18;
       return {
         nextState: state,
-        outcome: `金币 -4，SAN +${sanRecovery}。`,
+        outcome: `金币 -4，${sanSummary}，${socialText}${fullSanTier ? "，SAN上限 +1" : ""}。`,
         enqueueEvents: [createSummerVacationResultEvent({
           idSuffix: "travel",
           year: state.year,
           month: state.month,
           title: "暑假 ➜ 暑假计划 ➜ 难忘旅程",
           description: [
-            "你和朋友去邻近城市，行程排得很松。白天闲逛，晚上找小馆子，聊的从实验进度变成了明天去哪儿、哪家店好吃。",
-            "回程翻照片核对开销，拍得最多的还是吃的。待办清单一项没少，这几天却没怎么想起，连返程车上都睡得挺沉。",
+            "你和朋友去邻近城市，行程排得很松。白天闲逛，晚上找小馆子，聊的从实验进度变成了明天去哪儿、哪家店好吃，话题终于不只围着课题转。",
+            "回程翻照片核对开销，拍得最多的还是吃的。你们约好下次再见；这趟花了钱，心情和熟络程度也确实往前走了一点。",
           ].join("\n\n"),
-          outcome: `花了 4 金币，SAN +${sanRecovery}。`,
-          settlement: `结果：金币 -4｜SAN +${sanRecovery}`,
+          outcome: `金币 -4，${sanSummary}。`,
+          settlement: [
+            "结果：金币 -4",
+            `结果：${sanSummary}`,
+            `结果：${socialText}`,
+            ...(fullSanTier ? ["额外：条件：SAN ≥ 18｜结果：SAN上限 +1"] : []),
+          ].join("\n"),
           effects: {
             money: -4,
+            social: socialResult.effectiveChange,
+            ...(fullSanTier ? { sanCapDelta: 1 } : {}),
             ...(sanRecovery === 0 ? {} : { san: sanRecovery }),
           },
         })],
@@ -169,4 +188,35 @@ export function resolveSummerVacationFixedEvent(
     default:
       return null;
   }
+}
+
+export function refreshSummerVacationEvent<Event extends PendingEvent>(state: GameState, event: Event): Event {
+  if (event.chainId !== "summer-vacation" || event.stage !== "result") return event;
+
+  const kind = event.id.includes("-home-result-")
+    ? "summer-vacation-home"
+    : event.id.includes("-research-result-")
+      ? "summer-vacation-research"
+      : event.id.includes("-travel-result-")
+        ? "summer-vacation-travel"
+        : null;
+  if (!kind) return event;
+
+  const existingChoice = event.choices[0];
+  const preservedTravelSocialResult = kind === "summer-vacation-travel" && existingChoice
+    ? {
+        effectiveChange: existingChoice.effects.social ?? 0,
+        resistedCount: existingChoice.effects.social === 1 ? 0 : 1,
+        ...(existingChoice.effects.social === 0 && state.player.social >= 20 ? { cappedCount: 1 } : {}),
+      }
+    : undefined;
+  const resolution = resolveSummerVacationFixedEvent(state, { kind }, () => 0, preservedTravelSocialResult);
+  const refreshed = resolution?.enqueueEvents?.[0];
+  if (!refreshed) return event;
+  return {
+    ...event,
+    title: refreshed.title,
+    description: refreshed.description,
+    choices: refreshed.choices,
+  };
 }

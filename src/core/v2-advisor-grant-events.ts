@@ -6,6 +6,7 @@ export interface AdvisorGrantResultContext {
   grantName: string;
   funding: number;
   success: boolean;
+  successChance: number;
   rank: string;
   previousSalary: number;
   salary: number;
@@ -14,28 +15,34 @@ export interface AdvisorGrantResultContext {
 export function createAdvisorGrantResultEvent(context: AdvisorGrantResultContext): PendingEvent {
   const { application, grantName, success, funding, rank, previousSalary, salary } = context;
   const academician = application.id === "academician";
-  const title = academician ? "导师增选结果" : "导师基金结果";
+  const title = academician ? "导师增选结果" : "基金结果";
   const chainId = `advisor-grant-${application.calendarYear}-${application.id}`;
   const salaryGain = salary - previousSalary;
+  const resultPercent = Number(((success ? context.successChance : 1 - context.successChance) * 100).toFixed(1));
+  const condition = `条件：科研积累 ${application.researchSnapshot}；${success ? "获批" : "未获批"}（${resultPercent}%）`;
   const settlement = success
-    ? [`科研经费 +${funding}`, `导师晋升${rank}`, ...(salaryGain > 0 ? [`每月补助 +${salaryGain}（${previousSalary}→${salary}金币，下月起）`] : [])].join("；")
+    ? [`科研经费 +${funding}`, `导师晋升${rank}`, ...(salaryGain > 0 ? [`每月补助 +${salaryGain}`] : [])].join("；")
     : "无事发生";
   const result = createFixedEvent({
     id: `${chainId}-result`,
-    title: `${title} ➜ 等待消息 ➜ ${success ? academician ? "当选院士" : "好消息" : "没有上榜"}`,
+    title: `${title} ➜ 等待消息 ➜ ${success ? academician ? "当选院士" : "获批资助" : academician ? "未能当选" : "未获资助"}`,
     chainId,
     stage: "result",
     description: appendMechanismSettlement(success
       ? [
           academician
             ? "组会还没开始，导师先把手机放到桌上，笑着说：“名单出了，我当选了。”你跟着大家鼓掌，忽然觉得前阵子反复核对的那几页成果清单，终于有了点分量。"
-            : `组会刚坐下，导师就笑着宣布：“今年的${grantName}中了，大家这阵子辛苦了。”你愣了一下才跟着鼓掌，脑子里先闪过的不是项目名称，而是那张改到看不出第一版模样的技术路线图。`,
-          `导师接着说，${rank}的手续也办好了，下个月按新标准发补助。经费到账后，实验室总算宽裕了一些。你和旁边的同学对视一眼：横向的活，暂时可以少赶一点了。`,
+            : `组会刚坐下，导师就笑着宣布：“系统里查到结果了，今年的${grantName}中了，大家这阵子辛苦了。”你跟着鼓掌，脑子里先闪过的不是项目名称，而是那张改到看不出第一版模样的技术路线图。`,
+          `导师接着说，${academician ? "下个月按新标准发补助" : `自己也评上了${rank}，下个月按新标准发补助`}。经费到账后，实验室总算宽裕了一些。你和旁边的同学对视一眼：横向的活，暂时可以少赶一点了。`,
         ].join("\n\n")
       : [
-          `你是听组里的同学说起，才知道${academician ? "这轮增选" : `今年的${grantName}`}没上榜。组会上导师照常翻开进度表，问实验跑到哪了，谁也没主动提那份名单。`,
-          "你把申请材料收进文件夹，没删，兴许明年还用得上。桌边的横向项目交付表倒是不用收，原定周五的截止日期，一天也没往后挪。",
-        ].join("\n\n"), settlement),
+          academician
+            ? "你是听组里的同学说起，才知道导师这轮没能当选院士。组会上导师照常翻开进度表，问实验跑到哪了，谁也没主动提增选的事。"
+            : `你是听组里的同学说起，才知道今年的${grantName}没获资助，导师已经收到了不予资助通知和评审意见。组会上却没人提这件事，导师照常问实验跑到哪了。`,
+          academician
+            ? "你把整理过的成果材料收好，没删。桌边的横向项目交付表倒是不用收，原定周五的截止日期，一天也没往后挪。"
+            : "后来，导师发来几处需要补强的论证，你又打开了那份以为可以封存的本子。横向项目交付表也还在桌边，原定周五的截止日期，一天都没往后挪。",
+        ].join("\n\n"), `${condition}\n结果：${settlement}`),
     completionLog: success ? `${academician ? "导师当选院士" : `${grantName}获批`}；${settlement}` : `${grantName}${academician ? "增选未通过" : "未获批"}；无事发生`,
     choices: [{
       id: `${chainId}-finish`,
@@ -53,9 +60,9 @@ export function createAdvisorGrantResultEvent(context: AdvisorGrantResultContext
       academician
         ? "你翻出当时核对的成果清单，文章标题、年份、作者顺序，一项项查得眼睛发酸。材料交上去之后，这件事就从大家的待办里消失了，却没从心里消失。"
         : `三月赶${grantName}申请，你们补实验、查文献，导师反复改“研究内容”和“关键问题”。文件名从“终稿”变成“终稿_再改”，真正提交的那版，名字反而最朴素。`,
-      success
-        ? "本子里最有底气的图，都是大家攒下的成果。这回能成，租卡和设备就有了着落，补助或许也能涨。不过消息没落地，先别把下个月的饭钱都算进去。"
-        : "你想起交材料前还在补的那组实验，总觉得前期依据薄了点。可名单没确认，谁也说不准。你把手机扣在桌上，决定先别追着导师问——这几天导师回消息，比平时还简短。",
+      academician
+        ? "同学私下议论着增选的消息，谁也没有准信。你把手机扣在桌上，决定先别追着导师问，手上的实验还等着往下做。"
+        : "同学聊起函评的A、B、C，又有人问“上会是不是就稳了”。导师之前说过，进了会评也还得等最后的资助决定。你点开课题组群，最新一条仍是催大家交周报。",
     ].join("\n\n"),
     choices: [{ id: `${chainId}-wait`, label: "继续", outcome: "留意组里的消息。", effects: { enqueueEvents: [result] } }],
   });

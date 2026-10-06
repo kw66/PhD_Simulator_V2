@@ -7956,7 +7956,7 @@ button[data-card-icon-action]:focus-visible {
 .talent-panel .talent-items-list {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  max-height: 500px;
+  max-height: calc(var(--play-stage-height) - 170px);
   margin-top: 0;
   padding: 2px 5px 7px 2px;
   overflow-x: hidden;
@@ -8342,6 +8342,8 @@ button[data-card-icon-action]:focus-visible {
 }
 
 .talent-panel .talent-item-row[data-talent-item-id="reading-growth"] .talent-item-metrics,
+.talent-panel .talent-item-row[data-talent-item-id="errand-growth"] .talent-item-metrics,
+.talent-panel .talent-item-row[data-talent-item-id="game-growth"] .talent-item-metrics,
 .talent-panel .talent-item-row[data-talent-item-id="badminton-growth"] .talent-item-metrics,
 .talent-panel .talent-item-row[data-talent-item-id="poker-growth"] .talent-item-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -8487,7 +8489,6 @@ button[data-card-icon-action]:focus-visible {
 }
 
 .talent-panel .talent-item-row[data-talent-item-id="advisor"] .talent-item-metric:nth-child(n + 4) {
-  grid-column: span 3;
   border-top: var(--talent-table-divider);
 }
 
@@ -10120,6 +10121,10 @@ button[data-card-icon-action]:focus-visible {
   text-align: left;
 }
 
+.event-settlement-row.is-extra {
+  flex-basis: 100%;
+}
+
 .event-settlement-row.is-condition .event-settlement-label {
   color: rgba(125, 83, 20, 0.78);
 }
@@ -10336,53 +10341,6 @@ button[data-card-icon-action]:focus-visible {
 
 .event-panel.showing-content .event-content-box {
   display: grid;
-}
-
-.event-content-buttons.event-candidate-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.event-candidate-grid .event-choice-btn.event-candidate-card {
-  position: relative;
-  width: 100%;
-  max-width: none;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 12px 8px;
-}
-
-.event-candidate-grid .event-candidate-card > span {
-  font-size: var(--workstation-font-main);
-  line-height: 1.5;
-}
-
-.event-candidate-grid .event-candidate-card > .event-candidate-stats,
-.event-candidate-grid .event-candidate-card > .event-candidate-description {
-  font-weight: 400;
-}
-
-.event-candidate-grid .event-candidate-stats strong {
-  font-weight: 800;
-}
-
-.event-candidate-grid .event-candidate-card > .event-candidate-description {
-  text-align: left;
-}
-
-.event-candidate-grid .event-candidate-card.is-selected > svg,
-.event-candidate-grid .event-candidate-card.is-selected > [data-lucide="check"] {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-}
-
-@media (max-width: 600px) {
-  .event-content-buttons.event-candidate-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 .event-content-box.is-paper-review-result .event-content-body {
@@ -11929,7 +11887,7 @@ button:disabled {
 .event-timeline-marker {
   position: relative;
   min-width: 112px;
-  flex: 1 0 112px;
+  flex: 1 1 112px;
   display: grid;
   justify-items: center;
   align-content: start;
@@ -11940,7 +11898,7 @@ button:disabled {
   color: var(--setup-label-color);
   font: inherit;
   cursor: pointer;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .event-timeline-marker::before {

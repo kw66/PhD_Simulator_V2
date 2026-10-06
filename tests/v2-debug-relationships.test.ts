@@ -293,7 +293,7 @@ describe("v2 debug relationship additions", () => {
 
 describe("v2 natural relationship names", () => {
   it.each([
-    { eventId: 10, type: "peer", choice: "full" },
+    { eventId: 10, type: "peer", choice: "short-term" },
     { eventId: 11, type: "senior", choice: "deep" },
     { eventId: 14, type: "junior", choice: "idea" },
   ] as const)("stores the generated $type name only when its natural event is confirmed", ({ eventId, type, choice }) => {

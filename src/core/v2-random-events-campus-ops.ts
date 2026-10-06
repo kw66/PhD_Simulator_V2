@@ -15,7 +15,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
   const reportSocialChange = reportSocialResult.effectiveChange;
   const reinstallSocialResult = applyTierResist(-1, state.player.social, getRoll);
   const reinstallSocialChange = reinstallSocialResult.effectiveChange;
-  const rentalOutcome = "持续6个月，实验金币 +1";
+  const rentalOutcome = "实验金币 +1（持续6个月）";
   const introDescription = [
     "昨晚排上的实验，到早上才挪了一点进度，日志里还冒出几串看不懂的报错。你对 Linux 也不太懂，盯着终端看了半天，分不清是驱动、环境，还是又碰上了什么奇怪的 bug。",
     "实验室的显卡本来就不多，不够用时只能租卡，做实验的金币就是这么花出去的。现在仅剩的几张卡也接连出了故障，大家只好租更多的卡顶着。你刷新了一下进度，感觉连报错都比实验跑得快。",
@@ -64,10 +64,11 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
         label: "淘宝找人",
         outcome: taobaoSuccess
           ? "条件：维修成功（50%）｜结果：金币 -2。"
-          : `条件：维修翻车（50%）｜结果：${rentalOutcome}。`,
-        effects: taobaoSuccess
-          ? { money: -2 }
-          : { addBuffs: [createLabGpuFailureBuff()] },
+          : `条件：维修翻车（50%）｜结果：金币 -2｜${rentalOutcome}。`,
+        effects: {
+          money: -2,
+          ...(!taobaoSuccess ? { addBuffs: [createLabGpuFailureBuff()] } : {}),
+        },
       },
     ],
   };
@@ -77,7 +78,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
     decisionTitle: "你的选择",
     decisionDescription: [
       "你截好报错，想起导师上次说的“我找人看看”，到现在还没下文。另一张截图上，没人在跑实验，显卡却一直满载，组里又传起了有人挖矿的说法。上报能请管理员查清楚，只是查到熟人头上，往后难免尴尬。",
-      "你又打开重装教程和淘宝维修页。自己动手省钱，可服务器的盘里还放着大家的资料，看错一步就麻烦了。客服说可以远程修，修好收 2 金币，语气比你看得懂的教程还简短。",
+      "你又打开重装教程和淘宝维修页。自己动手省钱，可服务器的盘里还放着大家的资料，看错一步就麻烦了。客服说远程维修收 2 金币，修不好也不退，语气比你看得懂的教程还简短。",
     ].join("\n\n"),
     results: {
       [`random-13-advisor-${serial}`]: {
@@ -114,7 +115,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
               "测试速度恢复正常，你付了 2 金币维修费，顺手保存下处理步骤。原来服务器不一定需要换卡，有时只是需要一个比你更懂 Linux 的人。",
             ].join("\n\n")
           : [
-              "远程连上后，客服来回换了几个驱动版本，报错从这一串变成了另一串。最后对方说情况太复杂，这单修不了，结束了远程连接。",
+              "付了 2 金币，远程连上后，客服来回换了几个驱动版本，报错从这一串变成了另一串。最后对方说情况太复杂，这单修不了，钱也不退，就结束了远程连接。",
               "维修窗口关了，故障还在。你把任务迁到租来的机器上，组里其他人也陆续跟上。接下来半年只能多租卡顶着，原本想省下一点折腾，最后还是多了一笔租金。",
             ].join("\n\n"),
       },

@@ -305,7 +305,11 @@ function settlePendingPaperHelp(state: GameState): GameState {
 
 export function dispatchAction(state: GameState, actionId: GameActionId, payload: DispatchPayload = {}): GameState {
   if (actionId === "restart-game") {
-    return dispatchAction({ ...createInitialState(), blockLinearEvents: state.blockLinearEvents }, "start-game", {
+    return dispatchAction({
+      ...createInitialState(),
+      blockLinearEvents: state.blockLinearEvents,
+      debugEventReplayEnabled: state.debugEventReplayEnabled,
+    }, "start-game", {
       roleId: state.selectedRoleId,
     });
   }

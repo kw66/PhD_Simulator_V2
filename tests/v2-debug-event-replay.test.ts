@@ -19,6 +19,26 @@ function resolveFirstChoice(state: ReturnType<typeof startGame>, chainId = "teac
 }
 
 describe("debug event scene replay", () => {
+  it("counts Teacher's Day errands only on confirmation and not on replay previews", () => {
+    const roll = vi.spyOn(Math, "random").mockReturnValue(0);
+    try {
+      const initial = startGame();
+      let state = dispatchAction({ ...initial, eventQueue: [], player: { ...initial.player, favor: 1, san: 20 } }, "debug-trigger-event", { eventId: "teachers-day" });
+      state = dispatchAction(state, "debug-toggle-event-replay", { debugEventReplayEnabled: true });
+      state = resolveFirstChoice(resolveFirstChoice(state));
+      expect(state.eventCounters.teachersDayErrandCount).toBe(0);
+      const result = state.eventQueue.find((event) => event.chainId === "teachers-day")!;
+      state = dispatchAction(state, "debug-replay-event", { eventId: result.id, eventHistoryIndex: 1 });
+      expect(state.eventCounters.teachersDayErrandCount).toBe(0);
+      state = resolveFirstChoice(state);
+      expect(state.eventCounters.teachersDayErrandCount).toBe(0);
+      state = resolveFirstChoice(state);
+      expect(state.eventCounters.teachersDayErrandCount).toBe(1);
+    } finally {
+      roll.mockRestore();
+    }
+  });
+
   describe.each([false, true])("illness branch replay with spike chair %s", (spike) => {
     it.each(["stomach", "flu", "fever"] as const)("preserves %s branch identities after later random events change the counter", (illness) => {
       const initial = startGame();
@@ -79,14 +99,14 @@ describe("debug event scene replay", () => {
     const random = vi.spyOn(Math, "random");
     random.mockReturnValue(0.01);
 
-    state = dispatchAction(state, "debug-trigger-event", { eventId: "random-10" });
-    const intro = state.eventQueue.find((event) => event.chainId === "random-10");
+    state = dispatchAction(state, "debug-trigger-event", { eventId: "random-15" });
+    const intro = state.eventQueue.find((event) => event.chainId === "random-15");
     if (!intro) throw new Error("debug random event is missing");
     state = dispatchAction(state, "resolve-event", {
       eventId: intro.id,
       eventChoiceId: intro.choices[0]?.id,
     });
-    const originalDecision = state.eventQueue.find((event) => event.chainId === "random-10");
+    const originalDecision = state.eventQueue.find((event) => event.chainId === "random-15");
     if (!originalDecision) throw new Error("original random decision is missing");
     const originalOutcomes = originalDecision.choices.map((choice) => choice.outcome);
 
@@ -94,12 +114,12 @@ describe("debug event scene replay", () => {
       eventId: originalDecision.id,
       eventChoiceId: originalDecision.choices[0]?.id,
     });
-    const result = state.eventQueue.find((event) => event.chainId === "random-10");
+    const result = state.eventQueue.find((event) => event.chainId === "random-15");
     if (!result) throw new Error("random result is missing");
 
     random.mockReturnValue(0.99);
     const replayed = dispatchAction(state, "debug-replay-event", { eventId: result.id, eventHistoryIndex: 1 });
-    const rerolledDecision = replayed.eventQueue.find((event) => event.chainId === "random-10");
+    const rerolledDecision = replayed.eventQueue.find((event) => event.chainId === "random-15");
     expect(rerolledDecision?.choices.map((choice) => choice.outcome)).not.toEqual(originalOutcomes);
     random.mockRestore();
   });

@@ -380,6 +380,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let advisorSalaryStartIndex: number | null = null;
   let loverRewardPage = 0;
   let internshipPage = 0;
+  let gameGrowthPage = 0;
   let advisorSalaryContext = "";
   let isEventContentOpen = false;
   let isEndingContentOpen = true;
@@ -835,7 +836,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeRelationshipIndex = Math.min(Math.max(activeRelationshipIndex, 0), 4);
   };
 
-  const renderRelationCardPage = (cardId: "advisor" | "lover" | "internship", button: HTMLButtonElement): void => {
+  const renderRelationCardPage = (cardId: "advisor" | "lover" | "internship" | "game-growth", button: HTMLButtonElement): void => {
     const card = button.closest<HTMLElement>(`[data-talent-item-id="${cardId}"]`);
     if (!card) return;
     const buttons = [...card.querySelectorAll<HTMLButtonElement>(".research-pagination button")];
@@ -845,6 +846,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       advisorSalaryStartIndex,
       loverRewardPage,
       internshipPage,
+      gameGrowthPage,
     });
     const updatedCard = template.content.firstElementChild;
     if (!updatedCard) return;
@@ -873,6 +875,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       isEndingContentOpen = true;
       loverRewardPage = 0;
       internshipPage = 0;
+      gameGrowthPage = 0;
       helpPageByContext = {};
       isHelpOpen = false;
       if (state.phase === "playing") {
@@ -955,6 +958,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       advisorSalaryStartIndex,
       loverRewardPage,
       internshipPage,
+      gameGrowthPage,
       researchSortMode,
       researchAuthorshipFilter,
     });
@@ -1556,6 +1560,16 @@ export function bootstrapApp(root: HTMLDivElement): void {
       if (Number.isInteger(page) && page >= 0 && page < 2) {
         internshipPage = page;
         renderRelationCardPage("internship", internshipPageButton);
+      }
+      return;
+    }
+
+    const gameGrowthButton = target.closest<HTMLButtonElement>("button[data-ui-game-growth-page]");
+    if (gameGrowthButton && !gameGrowthButton.disabled) {
+      const page = Number(gameGrowthButton.dataset.uiGameGrowthPage);
+      if (Number.isInteger(page) && page >= 0 && page < 3) {
+        gameGrowthPage = page;
+        renderRelationCardPage("game-growth", gameGrowthButton);
       }
       return;
     }

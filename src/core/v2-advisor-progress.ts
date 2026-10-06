@@ -57,6 +57,10 @@ export function getAdvisorRankLabel(advisor: AdvisorProgressState): string {
   return ["讲师", "副教授", "教授·四级", "教授·三级", "教授·二级", "教授·一级"][getHighestAdvisorAwardIndex(advisor) + 1]!;
 }
 
+export function getAdvisorMeetingAttendancePercent(advisor: AdvisorProgressState): number {
+  return 60 - (getHighestAdvisorAwardIndex(advisor) + 1) * 10;
+}
+
 export function getAdvisorMonthlySalary(advisor: AdvisorProgressState, degree: Degree): number {
   const rankIndex = getHighestAdvisorAwardIndex(advisor) + 1;
   return ADVISOR_SALARY[degree] + rankIndex * (degree === "phd" ? 0.5 : 0.25);
@@ -81,12 +85,18 @@ export function getActiveAdvisorGrants(advisor: AdvisorProgressState, calendarYe
 export function getEligibleAdvisorGrant(advisor: AdvisorProgressState, calendarYear: number): AdvisorGrantDefinition | null {
   const highest = getHighestAdvisorAwardIndex(advisor);
   const hasProjectSlot = getActiveAdvisorGrants(advisor, calendarYear).length < getAdvisorGrantLimit(advisor);
-  return [...ADVISOR_GRANTS].reverse().find((grant) => {
-    if (ADVISOR_GRANTS.indexOf(grant) <= highest || advisor.researchAccumulation < grant.threshold) return false;
+  const candidates = ADVISOR_GRANTS.filter((grant, index) => {
+    if (index <= highest) return false;
     return grant.id === "academician"
       ? advisor.awards.some((award) => award.id === "distinguished")
       : hasProjectSlot;
-  }) ?? null;
+  });
+  return [...candidates].reverse().find((grant) => advisor.researchAccumulation >= grant.threshold)
+    ?? candidates[0] ?? null;
+}
+
+export function getAdvisorGrantSuccessChance(researchSnapshot: number, grant: AdvisorGrantDefinition): number {
+  return Math.max(0, Math.min(1, (researchSnapshot - grant.threshold * 0.8) / (grant.threshold * 0.2)));
 }
 
 export function getAdvisorApplicationSummary(state: GameState): string {
@@ -104,7 +114,7 @@ export function getAdvisorApplicationSummary(state: GameState): string {
   const year = getAcademicCalendarYear(state.year, state.month);
   const applicationYear = year + (getAcademicCalendarMonth(state.month) >= 3 ? 1 : 0);
   const eligible = getEligibleAdvisorGrant(advisor, applicationYear);
-  if (eligible) return `下次3月申请${eligible.name} · 门槛${eligible.threshold}`;
+  if (eligible) return `下次3月申请${eligible.name} · 稳获批积累${eligible.threshold}`;
   if (getActiveAdvisorGrants(advisor, applicationYear).length >= getAdvisorGrantLimit(advisor) && highest < 3) {
     return "下次3月限项 · 等待项目名额释放";
   }
@@ -180,8 +190,9 @@ export function advanceAdvisorProject(
 export function getAdvisorGrantResultContext(state: GameState, application: AdvisorGrantApplication): AdvisorGrantResultContext {
   const grant = ADVISOR_GRANTS.find((definition) => definition.id === application.id)!;
   const advisor = state.advisorProgressState;
-  const success = application.researchSnapshot >= grant.threshold
-    && (grant.id !== "academician" || advisor.awards.some((award) => award.id === "distinguished"));
+  const successChance = grant.id !== "academician" || advisor.awards.some((award) => award.id === "distinguished")
+    ? getAdvisorGrantSuccessChance(application.researchSnapshot, grant) : 0;
+  const success = successChance >= 1 || application.resultRoll < successChance;
   const awardedAdvisor = success ? {
     ...advisor,
     awards: [...advisor.awards, {
@@ -192,7 +203,7 @@ export function getAdvisorGrantResultContext(state: GameState, application: Advi
     }],
   } : advisor;
   return {
-    application: { ...application }, grantName: grant.name, funding: grant.funding, success,
+    application: { ...application }, grantName: grant.name, funding: grant.funding, success, successChance,
     rank: getAdvisorRankLabel(awardedAdvisor),
     previousSalary: getAdvisorMonthlySalary(advisor, state.degree),
     salary: getAdvisorMonthlySalary(awardedAdvisor, state.degree),
@@ -203,7 +214,7 @@ export function settleAdvisorGrantResult(state: GameState, application: AdvisorG
   const advisor = state.advisorProgressState;
   const pending = advisor.pendingApplication;
   if (!pending || pending.id !== application.id || pending.calendarYear !== application.calendarYear
-    || pending.researchSnapshot !== application.researchSnapshot) return state;
+    || pending.researchSnapshot !== application.researchSnapshot || pending.resultRoll !== application.resultRoll) return state;
   let nextState = { ...state, advisorProgressState: { ...advisor, pendingApplication: null } };
   if (advisor.awards.some((award) => award.id === application.id)) return nextState;
   const context = getAdvisorGrantResultContext(state, application);
@@ -275,10 +286,13 @@ export function settleAdvisorMonth(state: GameState, random: () => number = Math
   if (calendarMonth === 3 && advisor.pendingApplication === null) {
     const grant = getEligibleAdvisorGrant(advisor, calendarYear);
     if (grant) {
-      advisor = { ...advisor, pendingApplication: { id: grant.id, calendarYear, researchSnapshot: advisor.researchAccumulation } };
+      advisor = { ...advisor, pendingApplication: {
+        id: grant.id, calendarYear, researchSnapshot: advisor.researchAccumulation,
+        resultRoll: Math.max(0, Math.min(0.999999999999, random())),
+      } };
       nextState = pushLog(nextState, `年度申请：导师提交${grant.name}申请，科研积累${advisor.researchAccumulation}，8月公布`);
     } else if (getHighestAdvisorAwardIndex(advisor) < ADVISOR_GRANTS.length - 1) {
-      nextState = pushLog(nextState, "年度申请：尚无符合门槛且不限项的新项目，本年不申请");
+      nextState = pushLog(nextState, "年度申请：导师暂无不限项的新项目，本年不申请");
     }
   }
   return settleAdvisorGuidance({ ...nextState, advisorProgressState: advisor }, random);

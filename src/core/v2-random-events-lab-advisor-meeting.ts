@@ -4,13 +4,23 @@ import {
 } from "./v2-random-events-core-shared";
 import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
+import { getAdvisorMeetingAttendancePercent } from "./v2-advisor-progress";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
-  const advisorPresentForPrepared = getRoll() < 0.5;
-  const advisorPresentForSeries = getRoll() < 0.5;
-  const advisorPresentForSlack = getRoll() < 0.5;
+  const attendancePercent = getAdvisorMeetingAttendancePercent(state.advisorProgressState);
+  const absencePercent = 100 - attendancePercent;
+  const attendanceHint = attendancePercent >= 60
+    ? "导师平时来得勤，常亲自追问论文里的细节，你也不敢指望明天能蒙混过去。"
+    : attendancePercent >= 40
+      ? "导师晋升后，出差和评审渐渐多了，偶尔让师兄师姐主持，不过来了还是会追问几句。"
+      : attendancePercent >= 20
+        ? "导师如今事务繁忙，组会常由师兄师姐主持，平时也较少过问这些细节。"
+        : "导师如今很少露面，组会基本交给师兄师姐，群里偶尔才见一句“你们先讨论”。";
+  const advisorPresentForPrepared = getRoll() < attendancePercent / 100;
+  const advisorPresentForSeries = getRoll() < attendancePercent / 100;
+  const advisorPresentForSlack = getRoll() < attendancePercent / 100;
   const preparedSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const preparedSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
   const seriesSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
@@ -38,8 +48,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-deep-${serial}`,
         label: "认真准备",
         outcome: advisorPresentForPrepared
-          ? `导师到场（50%）｜${preparedSanSummary}；${formatTierResistedOutcome("导师好感", 1, preparedFavorResult)}`
-          : `导师缺席（50%）｜${preparedSanSummary}`,
+          ? `导师到场（${attendancePercent}%）｜${preparedSanSummary}；${formatTierResistedOutcome("导师好感", 1, preparedFavorResult)}`
+          : `导师缺席（${absencePercent}%）｜${preparedSanSummary}`,
         effects: advisorPresentForPrepared
           ? { san: preparedSanChange, favor: preparedFavorChange }
           : { san: preparedSanChange },
@@ -48,8 +58,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-series-${serial}`,
         label: "讲系列论文",
         outcome: advisorPresentForSeries
-          ? `导师到场（50%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}；${formatTierResistedOutcome("导师好感", 1, seriesFavorResult)}`
-          : `导师缺席（50%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}`,
+          ? `导师到场（${attendancePercent}%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}；${formatTierResistedOutcome("导师好感", 1, seriesFavorResult)}`
+          : `导师缺席（${absencePercent}%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}`,
         effects: advisorPresentForSeries
           ? { san: seriesSanChange, research: researchChange, favor: seriesFavorChange }
           : { san: seriesSanChange, research: researchChange },
@@ -58,8 +68,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         id: `random-6-slack-${serial}`,
         label: "随便水一下",
         outcome: advisorPresentForSlack
-          ? `导师到场（50%）｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
-          : "导师缺席（50%）｜无事发生。",
+          ? `导师到场（${attendancePercent}%）｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
+          : `导师缺席（${absencePercent}%）｜无事发生。`,
         effects: advisorPresentForSlack && slackFavorChange < 0 ? { favor: slackFavorChange } : {},
       },
     ],
@@ -68,12 +78,12 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   return createThreeStageEvent(event, {
     introDescription: [
       "课题组群发来明天的安排：这次轮到你做 paper reading。你重新打开那几篇论文，题目和结论都眼熟，核心方法却还没有真正讲明白。",
-      "工位旁的人已经收包去吃饭了，你还在论文之间来回切换，试着找出它们各自解决什么问题、整体怎么做、创新到底落在哪里。有人问明天导师来不来，群里暂时没人回复。",
+      `工位旁的人已经收包去吃饭了，你还在几篇论文之间来回切换。有人问明天导师来不来，群里暂时没人回复。${attendanceHint}`,
     ].join("\n\n"),
     decisionTitle: "你的选择",
     decisionDescription: [
       "几篇论文摊在桌上，各自的动机和方法都还缺一块。你可以把一篇讲透，也可以把几篇串成系列比较；前者更稳，后者更费时间，却可能让大家看出一个方向怎样变化。",
-      "离明天只剩一点时间，PPT 里还留着几处空白。导师是否到场没人说准，但只贴摘要和结果，台下的提问仍然会落到那些没读懂的细节上。",
+      "离明天只剩一点时间，PPT 里还留着几处空白。只贴摘要和结果倒是省事，可不论导师来不来，台下的提问仍可能落到那些没读懂的细节上。",
     ].join("\n\n"),
     results: {
       [`random-6-deep-${serial}`]: {

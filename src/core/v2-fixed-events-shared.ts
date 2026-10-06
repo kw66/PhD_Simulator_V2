@@ -1,5 +1,6 @@
 import { addOrReplaceBuffs } from "./v2-buffs";
 import { syncRelationshipState } from "./v2-relationship-rules";
+import { appendFixedEventHint } from "./v2-fixed-event-hints";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type RandomRollProvider = () => number;
@@ -40,7 +41,7 @@ export function createFixedEvent(params: {
   return {
     id: params.id,
     title: params.title,
-    description: params.description,
+    description: appendFixedEventHint(params.chainId, params.stage ?? "act1", params.description),
     source: "fixed",
     blocking: true,
     deadlineMonths: params.deadlineMonths ?? 0,

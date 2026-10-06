@@ -455,6 +455,7 @@ describe("v2 explicit render animation markers", () => {
     state.readingState.readCount = 13;
     state.partTimeWorkCount = 10;
     state.eventCounters.meetingCount = 5;
+    state.eventCounters.domesticMeetingCount = 3;
     state.eventCounters.badmintonCount = 2;
     state.eventCounters.pokerCount = 3;
     state.eventCounters.pokerProfit = profit;
@@ -733,7 +734,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("下次金币");
     expect(html).toContain("下次 SAN");
     expect(html).toContain("升档进度");
-    expect(html).toContain("每 4 次参会，参会减免 +1 金币（最多半价）");
+    expect(html).toContain("每类地区每 3 次参会，减免 +1 金币（最多半价）");
     expect(html).toContain("国内");
     expect(html).toContain("亚太");
     expect(html).toContain("欧美");
@@ -3515,6 +3516,32 @@ describe("v2 render lobby shell", () => {
   });
 
   it.each([
+    ["报销跑腿 40%→50%", "is-general"],
+    ["基础SAN消耗 4→3", "is-san"],
+    ["异色 50%→60%", "is-general"],
+    ["德州扑克 0→1次", "is-general"],
+    ["胜率 40%→50%", "is-general"],
+    ["国内参会 2→3次", "is-general"],
+    ["费用减免 0→1金币", "is-money"],
+    ["实验金币 +1（持续6个月）", "is-money"],
+    ["SAN -2（每月，持续6个月）", "is-san"],
+    ["金币 +1（每月，持续6个月）", "is-money"],
+    ["实验 ×1.25（持续6个月）", "is-research"],
+    ["实验 +4（下月起每月，持续3个月）", "is-research"],
+  ])("keeps compact growth %s together in the result row", (effect, tone) => {
+    const event = createEventQueueItem({
+      id: "compact-growth", title: "事件结果", source: "random", blocking: true, deadlineMonths: 0,
+      chainId: "compact-growth", stage: "result", choices: [],
+      description: `事情有了结果。\n\n机制结算\n条件：获胜（40%）｜结果：${effect}`,
+    }, 1);
+    const state = { ...createEnrolledTestState(), eventQueue: [event] };
+    const html = renderApp(state, undefined, { isEventContentOpen: true, activeEventId: event.id });
+    const results = html.split('class="event-settlement-row is-result"')[1]?.split('</div>')[0] ?? "";
+    expect(results).toContain(`<span class="event-settlement-effect ${tone}">${effect}</span>`);
+    expect(results).not.toMatch(/成长：|推进：|后续|当前/u);
+  });
+
+  it.each([
     { settlement: "科研 < 6｜导师好感 -1", condition: "科研 &lt; 6", effect: "导师好感 -1" },
     { settlement: "条件：导师好感 ≥ 6；分享想法（50%）｜结果：下次想 idea +3", condition: "导师好感 ≥ 6", effect: "下次想 idea +3" },
     { settlement: "条件：羽毛球实力 60 < 100｜结果：生病概率 -10%", condition: "羽毛球实力 60 &lt; 100", effect: "生病概率 -10%" },
@@ -3573,14 +3600,14 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('<span class="event-settlement-label">结果</span>');
   });
 
-  it("omits an empty settlement box for a pure no-op result", () => {
+  it.each(["无事发生。", "结果：无变化。", "没有额外数值变化。", "社交 未变化。"])("shows an explicit result for %s", (settlement) => {
     let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
     state = {
       ...state,
       eventQueue: [createEventQueueItem({
         id: "pure-no-op-result",
         title: "同门合作 ➜ 你的选择 ➜ 拒绝合作",
-        description: "这次没有继续合作。\n\n机制结算\n无事发生。",
+        description: `这次没有继续合作。\n\n机制结算\n${settlement}`,
         source: "random",
         blocking: true,
         deadlineMonths: 0,
@@ -3594,7 +3621,9 @@ describe("v2 render lobby shell", () => {
       isEventContentOpen: true,
       activeEventId: "pure-no-op-result",
     });
-    expect(html).not.toContain('class="event-settlement-summary"');
+    expect(html).toContain('<span class="event-settlement-label">结果</span>');
+    expect(html).toContain('<span class="event-settlement-item">无事发生</span>');
+    expect(html).not.toContain('<span class="event-settlement-label">条件</span>');
   });
 
   it("renders event emphasis, emoji, and standalone dividers", () => {
@@ -4697,7 +4726,7 @@ describe("v2 render lobby shell", () => {
     const next = dispatchAction(state, "debug-add-all-buffs");
     expect(next.buffs).toContainEqual(earnedBuff);
     expect(next.buffs).toHaveLength(createDebugBuffs().length + 1);
-    expect(next.buffs.some((buff) => buff.name === "旧调试效果" || buff.scheduledPublication)).toBe(false);
+    expect(next.buffs.some((buff) => buff.name === "旧调试效果")).toBe(false);
     expect(dispatchAction(next, "debug-add-all-buffs")).toEqual(next);
   });
 
@@ -4922,7 +4951,7 @@ describe("v2 render lobby shell", () => {
       { id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2026 },
       { id: "general", awardedYear: 2024, startYear: 2025, endYear: 2028 },
     ];
-    state.advisorProgressState.pendingApplication = { id: "excellent", calendarYear: 2026, researchSnapshot: 150 };
+    state.advisorProgressState.pendingApplication = { id: "excellent", calendarYear: 2026, researchSnapshot: 150, resultRoll: 0.99 };
     const card = getRelationshipCardHtml(renderApp(state), "advisor");
     expect(card).toContain("优青申请·5月后公布");
     expect(card).toContain("在研基金<strong>1/2</strong>");
@@ -5699,6 +5728,30 @@ describe("v2 render lobby shell", () => {
     expect(help).not.toContain("由谈薪确定");
   });
 
+  it("shows rank-specific meeting attendance and shared event growth values", () => {
+    const state = createEnrolledTestState();
+    state.eventCounters = { ...state.eventCounters, terrariaCount: 2, magicTowerCount: 9, rocoCount: 3, teachersDayErrandCount: 2 };
+    for (let page = 0; page < 6; page += 1) {
+      const advisor = renderRelationTalentCard(state, "advisor", { advisorSalaryStartIndex: page });
+      expect(advisor).toContain("组会/团建到场");
+      expect(advisor).toContain(`${60 - page * 10}%`);
+      expect(advisor.match(/class="talent-item-metric"/g)).toHaveLength(6);
+    }
+    for (const [page, name, value] of [[0, "泰拉瑞亚", "-2"], [1, "魔塔50层", "-0"], [2, "洛克王国世界", "80%"]] as const) {
+      const ui = { activePlayTab: "talent", activeTalentTab: "growth", gameGrowthPage: page } as const;
+      const full = renderAppWithAnimations(state, undefined, ui);
+      const card = renderRelationTalentCard(state, "game-growth", ui);
+      expect(card.trim()).toBe(getTalentCardHtml(full, "game-growth"));
+      expect(card).toContain(name);
+      expect(card).toContain(`<strong>${value}</strong>`);
+      expect(card).toContain("data-ui-game-growth-page");
+      const errand = getTalentCardHtml(full, "errand-growth");
+      expect(errand).toContain("60%");
+      expect(errand).toContain("2 次");
+      expect(errand).toContain("导师好感&lt;6");
+    }
+  });
+
   it("renders each relationship talent page identically in isolation and in the full panel", () => {
     const state = createEnrolledTestState();
     const before = structuredClone(state);
@@ -5781,7 +5834,7 @@ describe("v2 render lobby shell", () => {
     const center = html.slice(html.indexOf('class="play-center-column'), html.indexOf('<aside class="play-right-rail'));
 
     expect(context.key).toBe(key);
-    if (ui.activePlayTab === "settings" || (ui.activePlayTab === "talent" && ui.activeTalentTab !== "publication" && ui.activeTalentTab !== "relation")) {
+    if (ui.activePlayTab === "settings" || (ui.activePlayTab === "talent" && ui.activeTalentTab !== "publication" && ui.activeTalentTab !== "relation" && ui.activeTalentTab !== "growth")) {
       expect(context.pages).toHaveLength(0);
       expect(html).not.toMatch(/class="play-help-(?:area|panel|toggle)/);
       return;

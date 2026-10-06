@@ -68,19 +68,6 @@ function getSourceText(buff: Buff): string {
   return `${source} · ${getDurationText(buff)}${description ? `：${description}` : ""}`;
 }
 
-/**
- * Relationship progression owns the long-term mentoring card. Keep its
- * underlying month-start cost out of the generic Buff list so the same
- * relationship is not shown twice; the next-month preview still exposes the
- * actual SAN settlement.
- */
-function isRelationshipManagedMentoring(buff: Buff): boolean {
-  // Scheduled publications are owned by the relationship progression panel;
-  // keep their settlement details out of the generic Buff list regardless of
-  // the relationship label used by a future event.
-  return buff.scheduledPublication !== undefined;
-}
-
 function appendUnique(target: string[], value: string): void {
   if (!target.includes(value)) target.push(value);
 }
@@ -218,7 +205,6 @@ function addMonthlyStats(effects: Map<string, AccumulatedEffect>, buff: Buff): v
   // This matches month-start settlement: finite monthly Buffs also apply their
   // monthly stats, while next-action Buffs do not.
   if (buff.timing === "next-action") return;
-  if (isRelationshipManagedMentoring(buff)) return;
   const source = getSourceText(buff);
   for (const [stat, value] of Object.entries(buff.monthlyStats ?? {})) {
     if (value === undefined) continue;
@@ -267,7 +253,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       source: getSourceText(buff),
       isCost: true,
       category: "publication",
-      renderLabel: () => "图片误用",
+      renderLabel: () => "举报风险",
     });
   }
   if (buff.labExperimentMoneyDelta !== undefined) {

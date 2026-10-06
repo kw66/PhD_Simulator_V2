@@ -305,7 +305,7 @@ describe("v2 internship system", () => {
     const initial = playingState();
     const event = createInternshipInviteAct1(buildInternshipInviteContext(initial));
     let state = resolveFirst(queueEvent(initial, event));
-    expect(state.eventQueue[0]!.choices.find((choice) => choice.id === "accept")?.outcome).toContain("6 个月");
+    expect(state.eventQueue[0]!.choices.find((choice) => choice.id === "accept")?.outcome).toContain("（持续6个月）");
     state = resolveFirst(state, "accept");
     expect(state.internshipState.active).toBe(false);
     expect(resolveFirst(state).internshipState).toEqual(activateInternship());

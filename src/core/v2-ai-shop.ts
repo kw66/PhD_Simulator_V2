@@ -31,7 +31,7 @@ const RESEARCH_ACTIONS: readonly PaperActionType[] = ["idea", "experiment", "wri
 
 export function hasAiReimbursement(state: Pick<GameState, "eventSupport" | "buffs" | "totalMonths">): boolean {
   return state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths
-    || hasActiveAiCostCoverage(state.buffs);
+    || hasActiveAiCostCoverage(state.buffs, state.totalMonths);
 }
 
 /* Models advance at the start of each academic year. */

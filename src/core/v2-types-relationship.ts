@@ -80,6 +80,7 @@ export interface AdvisorGrantApplication {
   id: AdvisorGrantId;
   calendarYear: number;
   researchSnapshot: number;
+  resultRoll: number;
 }
 
 export interface AdvisorProgressState {
@@ -146,6 +147,7 @@ export interface FellowProgressProfile {
   helpedPlayerCount?: number;
   helpedFellowCount?: number;
   annualResearchGrowthTotal?: number;
+  longTermMentoring?: boolean;
 }
 
 export interface FellowProfileAddition {
@@ -155,6 +157,7 @@ export interface FellowProfileAddition {
   affinity: number;
   name?: string;
   taskType?: FellowTaskType;
+  longTermMentoring?: boolean;
 }
 
 export interface EventSupportState {
