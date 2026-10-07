@@ -446,6 +446,9 @@ describe("engine and research lifecycle retries", () => {
     expect(next.externalPublications.find((entry) => entry.id === paper.id)?.status).toBe("published");
     expect(next.phase).toBe("playing");
     expect(next.ending).toBeNull();
-    expect(dispatchAction(next, "next-month").ending).toBe("master");
+    expect(dispatchAction(next, "next-month").ending).toBeNull();
+    const fee = next.eventQueue.find((entry) => entry.journalFeePaperId === paper.id)!;
+    const paid = dispatchAction(next, "resolve-event", { eventId: fee.id, eventChoiceId: "self" });
+    expect(dispatchAction(paid, "next-month").ending).toBe("master");
   });
 });

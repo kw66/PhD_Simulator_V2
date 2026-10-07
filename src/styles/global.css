@@ -7122,6 +7122,17 @@ button[data-card-icon-action]:focus-visible {
   min-width: 0;
 }
 
+.rel-fellow-academic-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--setup-divider);
+  font-size: var(--workstation-font-main);
+}
+
 .rel-card-header {
   display: flex;
   align-items: center;
@@ -7209,6 +7220,27 @@ button[data-card-icon-action]:focus-visible {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.rel-lover-trait {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid rgba(198, 68, 115, 0.22);
+  border-radius: 4px;
+  color: #9a2c54;
+  font-size: var(--workstation-font-small);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rel-card-lover .rel-card-header {
+  flex-wrap: wrap;
+}
+
+.rel-card-lover .rel-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .rel-detail-row {
@@ -7406,6 +7438,60 @@ button[data-card-icon-action]:focus-visible {
 .rel-card-compact > * {
   flex-shrink: 0;
   min-width: 0;
+}
+
+.rel-card.filled.rel-card-fellow {
+  display: grid;
+  grid-template-rows: auto auto minmax(62px, 1fr) 28px 26px;
+  grid-auto-rows: 26px;
+  gap: 2px;
+}
+
+.rel-card-fellow > .rel-fellow-academic-row {
+  padding-block: 3px;
+  row-gap: 2px;
+}
+
+.rel-card-fellow > .rel-paper-section {
+  min-height: 62px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.rel-card-fellow > .rel-monthly-activity {
+  height: 26px;
+  margin-top: 0;
+  box-sizing: border-box;
+}
+
+.rel-card-fellow > .rel-monthly-activity > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rel-card.filled.rel-card-lover {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) 26px;
+  grid-auto-rows: 26px;
+  gap: 2px;
+}
+
+.rel-card-lover > .rel-lover-routes {
+  min-height: 0;
+  overflow: auto;
+}
+
+.rel-card-lover > .rel-monthly-activity {
+  height: 26px;
+  margin-top: 0;
+  box-sizing: border-box;
+}
+
+.rel-card-lover > .rel-monthly-activity > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rel-lover-routes {
@@ -7841,7 +7927,7 @@ button[data-card-icon-action]:focus-visible {
 }
 
 .rel-card-grid {
-  --rel-card-height: 176px;
+  --rel-card-height: 250px;
   --rel-progress-columns: 5.5em minmax(0, 1fr) 6ch 118px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
@@ -9806,6 +9892,21 @@ button[data-card-icon-action]:focus-visible {
   display: none;
 }
 
+@media (max-width: 760px) {
+  .rel-card-grid > .rel-card {
+    height: auto;
+    min-height: 280px;
+  }
+
+  .rel-card.filled.rel-card-fellow {
+    grid-template-rows: auto auto minmax(80px, 1fr) 28px 26px;
+  }
+
+  .rel-card-fellow > .rel-paper-section {
+    min-height: 80px;
+  }
+}
+
 @media (max-width: 680px) {
   .rel-card-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -9814,7 +9915,7 @@ button[data-card-icon-action]:focus-visible {
 
 @media (min-width: 681px) and (max-width: 760px) {
   .rel-card-grid {
-    --rel-card-height: 208px;
+    --rel-card-height: 250px;
   }
 
   .rel-paper-section {
@@ -9824,7 +9925,7 @@ button[data-card-icon-action]:focus-visible {
 
 @media (max-width: 480px) {
   .rel-card-grid {
-    --rel-card-height: 196px;
+    --rel-card-height: 250px;
   }
 
   .rel-advisor-thresholds {
@@ -9853,7 +9954,7 @@ button[data-card-icon-action]:focus-visible {
 
 @media (max-width: 380px) {
   .rel-card-grid {
-    --rel-card-height: 216px;
+    --rel-card-height: 250px;
   }
 
   .rel-advisor-status,

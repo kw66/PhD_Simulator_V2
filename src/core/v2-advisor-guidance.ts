@@ -1,6 +1,7 @@
 import { addPaperCollaboration } from "./v2-paper-collaboration";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
+import { recordFellowMonthlySupport } from "./v2-fellow-monthly-support";
 import type { GameState, Paper } from "./v2-types";
 
 const GUIDANCE_AMOUNT = 10;
@@ -66,11 +67,13 @@ export function settleAdvisorGuidance(state: GameState, random: () => number = M
       random,
     );
     if (!paper) continue;
+    const previousWriting = nextState.fellowPapers?.find((entry) => entry.id === paper.id)?.writing ?? 0;
     nextState = {
       ...nextState,
       fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? paper : entry),
       fellowProgressState: nextState.fellowProgressState.map((entry) => entry.id === profile.id
-        ? { ...entry, pendingGuidanceFromAdvisor: null } : entry),
+        ? recordFellowMonthlySupport({ ...entry, pendingGuidanceFromAdvisor: null }, state.totalMonths,
+          `获得导师指导《${paper.title}》：写作 +${paper.writing - previousWriting}`) : entry),
     };
     nextState = pushMilestoneLog(nextState,
       `导师指导：${getFellowName(profile)}的《${paper.title}》，论文写作协作 +${profile.pendingGuidanceFromAdvisor}`,

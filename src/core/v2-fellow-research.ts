@@ -2,7 +2,6 @@ import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo } from "./v2-conference-catalog";
 import { advanceFellowCooperationWithLog, settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { getFellowName, getFellowResearchTopic, getFellowsInCardOrder } from "./v2-fellow-progression";
-import { settleLabResearchGrowth } from "./v2-lab-talent";
 import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
 import { createDraftPaper, decayUnpublishedPaper, prepareConferenceSubmission, resolvePaperReview } from "./v2-paper-rules";
 import { attachPaperPublication, recordPaperAcceptances } from "./v2-publication-rules";
@@ -13,6 +12,7 @@ import { getLabExperimentMoneyCost } from "./v2-lab-compute";
 import { syncRelationshipState } from "./v2-relationship-rules";
 import { advanceSharedLabProject, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
+import { settleFellowConferenceFees } from "./v2-lab-publication-costs";
 import type { GameState, Paper, PaperActionType, PaperTarget } from "./v2-types";
 
 export const FELLOW_PAPER_FIELDS = ["idea", "experiment", "writing"] as const;
@@ -71,17 +71,12 @@ export function getFellowSubmissionTarget(state: GameState, paper: Paper): Paper
 }
 
 export function attendFellowConferences(state: GameState): GameState {
-  const attend = (paper: Paper): Paper => paper.leadAuthorId && paper.status === "published"
-    && paper.conferenceHandled === false && (paper.conferenceAvailableAtTotalMonths ?? Infinity) <= state.totalMonths
-    ? { ...paper, conferenceHandled: true }
-    : paper;
-  return { ...state, fellowPapers: state.fellowPapers?.map(attend), externalPublications: state.externalPublications.map(attend) };
+  return settleFellowConferenceFees(state);
 }
 
 export function advanceFellowResearch(state: GameState, random: () => number = Math.random): GameState {
   if (state.phase !== "playing" || state.fellowResearchLastTotalMonths === state.totalMonths) return state;
   if (state.fellowProgressState.length === 0 && !state.fellowPapers?.length) return state;
-  state = settleLabResearchGrowth(state);
   let nextState = ensureFellowPapers(state, random);
   const monthlyProjectType = state.advisorProgressState.funding >= LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD ? "vertical" : "horizontal";
   const profiles = new Map(state.fellowProgressState.map((profile) => [profile.id, profile]));
@@ -123,7 +118,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
         }
         return [applyRejectedPaperReview(paper, result.nextPaper.lastReview!)];
       }
-      if (profile) addActivity(profile.id, "论文中稿");
+      if (profile) addActivity(profile.id, `论文中稿${result.nextPaper.collaborators?.some((person) => person.id === "player") ? "（与你合作）" : ""}`);
       const conference = getConferenceInfo(paper.submittedMonth!, paper.target!, paper.submittedYear!);
       const accepted = attachPaperPublication({
         ...result.nextPaper,
@@ -179,6 +174,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     addActivity(profile.id, `${forceHorizontal ? "经费不足，" : ""}${type === "horizontal" ? "横向" : "纵向"}进度 +${result.gain}${result.completed > 0 ? type === "vertical" ? "（完成并指导论文）" : "（项目完成）" : ""}`);
   };
   for (const active of activeProfiles) {
+    if (nextState.selectedAdvisorName && nextState.advisorProgressState.funding <= 0) break;
     const profile = nextState.fellowProgressState.find((fellow) => fellow.id === active.id)!;
     const paper = getFellowCurrentPaper(nextState, profile.id);
     if (!paper || paper.status !== "draft" || profile.nextMonthlyAction === "project") {
@@ -220,7 +216,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     const target = getFellowSubmissionTarget(nextState, paper);
     if (!target) return paper;
     const conference = getConferenceInfo(state.month, target, state.year);
-    if (paper.leadAuthorId) monthlyActivities.set(paper.leadAuthorId, `${monthlyActivities.get(paper.leadAuthorId) ?? ""}，投稿${conference.name}${conference.year}`);
+    if (paper.leadAuthorId) addActivity(paper.leadAuthorId, `投稿${conference.name}${conference.year}`);
     return prepareConferenceSubmission(paper, target, state.month, state.year);
   }) };
   nextState = {

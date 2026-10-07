@@ -143,8 +143,8 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
 function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent {
   const typeLabel = context.type === "beautiful" ? "活泼恋人" : "聪慧恋人";
   const effectText = context.type === "beautiful"
-    ? "科研3～6、亲密9～12；每月自动推进玩耍，学习获得一半进度。"
-    : "科研9～12、亲密3～6；每月自动推进学习，玩耍获得一半进度。";
+    ? "科研按同届年级生成，亲密6～9；每月自动推进玩耍，学习获得一半进度。"
+    : "科研按同届年级生成，初始额外+4，亲密3～6；每月自动推进学习，玩耍获得一半进度。";
 
   return {
     id: `lover-development-result-accept-${context.type}-${context.totalMonths}`,

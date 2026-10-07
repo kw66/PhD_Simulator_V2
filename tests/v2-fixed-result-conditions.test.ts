@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createInitialState } from "../src/core/v2-engine";
 import { renderApp } from "../src/app/v2-render";
-import { createScholarshipEvent } from "../src/core/v2-fixed-events-scholarship";
+import { createScholarshipEvent, resolveScholarshipApplication } from "../src/core/v2-fixed-events-scholarship";
 import { createMentorAssignEvent } from "../src/core/v2-fixed-events-mentor-assign";
 import { refreshSummerVacationEvent, resolveSummerVacationFixedEvent } from "../src/core/v2-fixed-events-summer";
 import { resolveTeachersDayFixedEvent } from "../src/core/v2-fixed-events-teachers-day";
@@ -27,11 +27,14 @@ describe("fixed result conditions", () => {
   it.each([1, 2, 3])("shows the sampled scholarship cutoff only in the result for score %i", (score) => {
     const initial = createInitialState();
     const roll = vi.fn(() => 0);
-    const root = createScholarshipEvent({ ...initial, year: 3, month: 2, totalResearchScore: score }, roll);
+    const state = { ...initial, year: 3, month: 2, totalResearchScore: score };
+    const root = createScholarshipEvent(state, roll);
     const decision = decisionOf(root);
-    const result = decisionOf(decision);
+    expect(roll).not.toHaveBeenCalled();
+    expect(decision.description).toContain("往年同年级的分数线在2～4分");
+    const result = resolveScholarshipApplication(state, decision.choices[0]!.effects.fixedEventResolution!, roll).enqueueEvents![0]!;
     expect(root.description).toContain("小提示：出现条件：第2学年起，每年10月");
-    expect(root.description.replace(/小提示：出现条件：[^\n]+/u, "") + decision.description).not.toMatch(/条件：|分数线\s*2/u);
+    expect(root.description.replace(/小提示：出现条件：[^\n]+/u, "") + decision.description).not.toMatch(/条件：|分数线为/u);
     expect(decision.choices[0]!.outcome).not.toMatch(/条件：|≥|</u);
     expect(settlementOf(result)).toContain(`条件：评奖科研分 ${score} ${score >= 2 ? "≥" : "<"} 分数线 2`);
     expect(result.choices[0]!.effects.money ?? 0).toBe(score >= 2 ? 6 : 0);

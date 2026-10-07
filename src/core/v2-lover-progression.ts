@@ -3,6 +3,7 @@ import { pushLog, pushMilestoneLog, pushNoOpLog } from "./v2-engine-helpers";
 import { addPaperCollaboration } from "./v2-paper-collaboration";
 import { getLoverName } from "./v2-lover-system";
 import { getResearchCap } from "./v2-research-cap-system";
+import { generateRelationshipResearch } from "./v2-relationship-research";
 import { applyTierResist } from "./v2-sanity-rules";
 import { describeResistedTalentReward, describeTalentReward, recordTalentTrigger } from "./v2-talent-history";
 import type { GameState, LoverProgressState, LoverTypeId } from "./v2-types";
@@ -14,11 +15,11 @@ export const LOVER_ROUTES = ["play", "study", "shopping"] as const;
 export type LoverRoute = typeof LOVER_ROUTES[number];
 const ROUTE_LABELS = { play: "玩耍", study: "学习", shopping: "购物" };
 
-export function createLoverProgressState(type?: LoverTypeId, random: () => number = Math.random): LoverProgressState {
+export function createLoverProgressState(type?: LoverTypeId, random: () => number = Math.random, academicYear = 1): LoverProgressState {
   return {
     active: Boolean(type),
-    research: type ? (type === "smart" ? 9 : 3) + Math.floor(random() * 4) : 0,
-    intimacy: type ? (type === "beautiful" ? 9 : 3) + Math.floor(random() * 4) : 0,
+    research: type ? generateRelationshipResearch(academicYear, random, type === "smart" ? 4 : 0) : 0,
+    intimacy: type ? 3 + Math.floor(random() * 4) + (type === "beautiful" ? 3 : 0) : 0,
     taskProgress: 0,
     taskMax: LOVER_TASK_MAX,
     relationProgress: 0,
@@ -114,6 +115,7 @@ function advanceRoute(
     const count = original.completed + completion + 1;
     const cycle = (count - 1) % 3;
     const lover = nextState.loverProgressState;
+    const playerResearch = nextState.player.research;
     const intimacy = Math.min(20, lover.intimacy + (route === "shopping" ? 2 : 1));
     const effects = [describeTalentReward("亲密", route === "shopping" ? 2 : 1, lover.intimacy, intimacy)];
     nextState = { ...nextState, loverProgressState: { ...lover, intimacy } };
@@ -147,13 +149,13 @@ function advanceRoute(
         actionEffects: { idea: { bonus }, experiment: { bonus }, writing: { bonus } },
       }]) };
       effects.push(`永久idea、实验、写作各 +1分（累计 +${bonus}）`);
-    } else if (lover.research < nextState.player.research) {
-      const research = Math.min(20, lover.research + 1);
-      nextState.loverProgressState.research = research;
-      effects.push(describeTalentReward("恋人科研", 1, lover.research, research));
-    } else if (nextState.player.research < lover.research) {
-      const before = nextState.player.research;
-      const result = applyTierResist(1, before, random, Math.min(20, getResearchCap(nextState.researchCapacityState)));
+    } else if (lover.research < playerResearch) {
+      const result = applyTierResist(1, lover.research, random, 20);
+      nextState.loverProgressState.research = lover.research + result.effectiveChange;
+      effects.push(describeResistedTalentReward("恋人科研", lover.research, result));
+    } else if (playerResearch < lover.research) {
+      const before = playerResearch;
+      const result = applyTierResist(1, before, random, getResearchCap(nextState.researchCapacityState));
       const gain = result.effectiveChange;
       effects.push(describeResistedTalentReward("你的科研", before, result));
       nextState = { ...nextState, player: { ...nextState.player, research: before + gain } };
@@ -197,5 +199,12 @@ export function advanceLoverMonth(state: GameState): GameState {
     sanDiscountMonths: (lover.sanDiscountMonths ?? []).filter((month) => month > state.totalMonths) } };
   nextState = advanceRoute(nextState, "play", gains.play, "每月相处");
   nextState = advanceRoute(nextState, "study", gains.study, "每月相处");
+  const rewardDetails = nextState.eventHistory.slice(state.eventHistory.length)
+    .flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.name === "恋人"
+      ? stage.talentTrigger.effects : []));
+  if (rewardDetails.length > 0) {
+    nextState = { ...nextState, loverProgressState: { ...nextState.loverProgressState,
+      monthlyActivity: `${nextState.loverProgressState.monthlyActivity}；${rewardDetails.join("；")}` } };
+  }
   return settlePendingLoverHelp(nextState);
 }

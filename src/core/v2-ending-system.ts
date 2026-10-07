@@ -16,6 +16,9 @@ function finishWithCause(state: GameState, ending: EndingId, message: string): G
 
 export function evaluateCoreEndings(state: GameState): GameState {
   if (state.phase !== "playing") return state;
+  if (state.selectedAdvisorName && state.totalMonths > 0 && state.advisorProgressState.funding <= 0) {
+    return finishWithCause(state, "lab-bankrupt", "实验室科研经费已耗尽，本轮提前结束。");
+  }
   const protectedSan = getShopEmergencySan(state.shopState, state.player.san);
   const protectedState = protectedSan === state.player.san
     ? state

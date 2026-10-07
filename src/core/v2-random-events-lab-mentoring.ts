@@ -9,8 +9,9 @@ import {
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
+import type { RecruitmentCalendar } from "./v2-recruitment-eligibility";
 
-function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): PendingEvent {
+function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recruitmentCalendar: RecruitmentCalendar): PendingEvent {
   const serial = state.totalRandomEventCount;
   const usedNames = [
     ...state.fellowProgressState.map((profile) => getFellowName(profile)),
@@ -24,6 +25,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
   const familiarJuniorName = familiarJunior ? getFellowName(familiarJunior) : familiarJuniorLabel;
   const playerHonorific = getPlayerHonorific(getRoleDefinition(state.selectedRoleId).gender);
   const staysForGradSchool = getRoll() < 0.5;
+  const recruitmentSeed = `random-1:${serial}:${getRoll()}`;
   const becomesJunior = staysForGradSchool && canAddJunior;
   const refuseFavorResult = applyTierResist(-1, state.player.favor, getRoll);
   const refuseFavorChange = refuseFavorResult.effectiveChange;
@@ -34,7 +36,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider): Pend
   const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw, delegateSocialResult);
   const mentoringSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const mentoringSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
-  const mentorshipJunior = createGeneratedFellowProfileAddition("junior", serial, undefined, usedNames, getRoll);
+  const mentorshipJunior = createGeneratedFellowProfileAddition("junior", serial, undefined, usedNames, undefined, { ...recruitmentCalendar, fixedYear: 0 }, recruitmentSeed);
   const guidedJunior = {
     ...mentorshipJunior,
     research: Math.min(20, mentorshipJunior.research + 1),
@@ -296,9 +298,10 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
   });
 }
 
-function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): PendingEvent {
+function createRandomEvent14(state: GameState, getRoll: RandomRollProvider, recruitmentCalendar: RecruitmentCalendar): PendingEvent {
   const serial = state.totalRandomEventCount;
   const juniorGender = getRoll() < 0.5 ? "male" : "female";
+  const recruitmentSeed = `random-14:${serial}:${getRoll()}`;
   const usedNames = [
     ...state.fellowProgressState.map((profile) => getFellowName(profile)),
     state.selectedAdvisorName ?? "",
@@ -310,7 +313,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider): Pen
   const shortTermSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
   const dinnerSocialResult = applyTierResist(1, state.player.social, getRoll);
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
-  const juniorAddition = createGeneratedFellowProfileAddition("junior", serial, juniorGender, usedNames, getRoll);
+  const juniorAddition = createGeneratedFellowProfileAddition("junior", serial, juniorGender, usedNames, undefined, recruitmentCalendar, recruitmentSeed);
   const juniorIntro = `${roleText}${juniorAddition.name ?? ""}`;
 
   const event: PendingEvent = {
@@ -414,15 +417,16 @@ export function createMentoringLabRandomEventById(
   eventId: number,
   state: GameState,
   getRoll: RandomRollProvider,
+  recruitmentCalendar: RecruitmentCalendar = state,
 ): PendingEvent | null {
   if (eventId === 1) {
-    return createRandomEvent1(state, getRoll);
+    return createRandomEvent1(state, getRoll, recruitmentCalendar);
   }
   if (eventId === 2) {
     return createRandomEvent2(state, getRoll);
   }
   if (eventId === 14) {
-    return createRandomEvent14(state, getRoll);
+    return createRandomEvent14(state, getRoll, recruitmentCalendar);
   }
   return null;
 }

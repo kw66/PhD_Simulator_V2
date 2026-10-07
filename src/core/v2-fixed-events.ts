@@ -6,7 +6,7 @@ import { createCcigEvent } from "./v2-fixed-events-ccig-decision-events";
 import { resolveCcigFixedEvent } from "./v2-fixed-events-ccig-resolution";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
-import { createScholarshipEvent } from "./v2-fixed-events-scholarship";
+import { createScholarshipEvent, resolveScholarshipApplication } from "./v2-fixed-events-scholarship";
 import {
   createSummerVacationEvent,
   createWinterVacationEvent,
@@ -29,6 +29,8 @@ export function applyFixedEventResolution(
   getRoll: RandomRollProvider = Math.random,
 ): FixedResolutionResult {
   switch (resolution.kind) {
+    case "scholarship-apply":
+      return resolveScholarshipApplication(state, resolution, getRoll);
     case "student-name-confirm":
       return resolveStudentNameConfirmation(state, resolution);
     case "student-name-reroll":

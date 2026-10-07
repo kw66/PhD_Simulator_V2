@@ -1,6 +1,5 @@
 import { applyTierResist, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { EventCounters, EventSupportState, ShopState } from "./v2-types";
-import { getRegionalMeetingDiscount } from "./v2-meeting-system";
 
 export type ConferenceRegionId = "domestic" | "asia" | "west";
 export type ConferenceDecisionMode = "self" | "advisor" | "proxy";
@@ -20,12 +19,15 @@ export interface ConferenceDecisionInput {
   shopState: ShopState;
   eventSupport: EventSupportState;
   eventCounters: EventCounters;
+  paperCount?: number;
+  travelAlreadyPaid?: boolean;
 }
 
 export interface ConferenceDecisionCost {
   mode: ConferenceDecisionMode;
   resource: ConferenceCostResource;
   actualCost: number;
+  fundingCost: number;
   meetingDiscount: number;
   countsAsMeeting: boolean;
   resistanceNarrative?: string;
@@ -46,14 +48,16 @@ export function resolveConferenceDecisionCost(
   getRoll: () => number = Math.random,
 ): ConferenceDecisionCost {
   const baseCosts = getConferenceBaseCosts(input.region);
-  const meetingDiscount = getRegionalMeetingDiscount(input.eventCounters, input.region, baseCosts.selfPay);
+  const registrationCost = Math.max(0, Math.floor(input.paperCount ?? 1));
+  const attendanceCost = registrationCost + (input.travelAlreadyPaid ? 0 : baseCosts.selfPay - 1);
 
   if (input.mode === "self") {
     return {
       mode: input.mode,
       resource: "money",
-      actualCost: Math.max(0, baseCosts.selfPay - meetingDiscount),
-      meetingDiscount,
+      actualCost: attendanceCost,
+      fundingCost: 0,
+      meetingDiscount: 0,
       countsAsMeeting: true,
     };
   }
@@ -65,30 +69,19 @@ export function resolveConferenceDecisionCost(
       mode: input.mode,
       resource: "favor",
       actualCost,
+      fundingCost: attendanceCost,
       meetingDiscount: 0,
       countsAsMeeting: true,
       resistanceNarrative: getTierResistedNarrative("导师好感", -baseCosts.advisorCost, favorResult),
     };
   }
 
-  if (baseCosts.proxyCost === 0) {
-    return {
-      mode: input.mode,
-      resource: "money",
-      actualCost: 0,
-      meetingDiscount: 0,
-      countsAsMeeting: false,
-    };
-  }
-
-  const socialResult = applyTierResist(-baseCosts.proxyCost, input.social, getRoll);
-  const actualCost = Math.max(0, -socialResult.effectiveChange);
   return {
     mode: input.mode,
     resource: "money",
-    actualCost,
-      meetingDiscount: 0,
+    actualCost: registrationCost + baseCosts.proxyCost,
+    fundingCost: 0,
+    meetingDiscount: 0,
     countsAsMeeting: false,
-    resistanceNarrative: getTierResistedNarrative("社交", -baseCosts.proxyCost, socialResult),
   };
 }

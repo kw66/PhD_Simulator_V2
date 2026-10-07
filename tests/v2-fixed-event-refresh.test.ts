@@ -73,7 +73,7 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     expect(state.buffs.filter((buff) => buff.actionEffects?.idea?.bonus === 4)).toHaveLength(1);
   });
 
-  it("updates annual social reward and CCIG cost after tier and attendance changes", () => {
+  it("updates annual social reward but keeps CCIG fees fixed after attendance changes", () => {
     let state = choose(start("year-summary", 0.1));
     state = choose(state, "-social-");
     state = refreshPendingEventDecisions({ ...state, player: { ...state.player, social: 6 } });
@@ -83,9 +83,9 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     state = choose(state, "-self-");
     expect(state.eventQueue[0]!.description).toContain("金币 -2");
     state = refreshPendingEventDecisions({ ...state, eventCounters: { ...state.eventCounters, domesticMeetingCount: 3 } });
-    expect(state.eventQueue[0]!.description).toContain("金币 -1");
+    expect(state.eventQueue[0]!.description).toContain("金币 -2");
     state = choose(state);
-    expect(state.player.money).toBe(19);
+    expect(state.player.money).toBe(18);
     expect(state.eventCounters.domesticMeetingCount).toBe(4);
   });
 
@@ -133,7 +133,7 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     random.mockClear();
     state = refreshPendingEventDecisions({ ...state, eventCounters: { ...state.eventCounters, domesticMeetingCount: 3 } });
     const newCost = -(state.eventQueue[0]!.choices[0]!.effects.money ?? 0);
-    expect(newCost).toBe(oldCost - 1);
+    expect(newCost).toBe(oldCost);
     expect(state.player.money).toBe(20);
     expect(random).not.toHaveBeenCalled();
     state = choose(state);

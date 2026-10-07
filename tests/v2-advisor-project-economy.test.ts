@@ -23,8 +23,8 @@ function state(overrides: Partial<GameState> = {}): GameState {
 }
 
 describe("new advisor project economy", () => {
-  it("starts with 20 accumulation and 10 funding without a cap", () => {
-    expect(createAdvisorProgressState()).toMatchObject({ researchAccumulation: 20, funding: 10 });
+  it("starts with 20 accumulation and 30 funding without a cap", () => {
+    expect(createAdvisorProgressState()).toMatchObject({ researchAccumulation: 20, funding: 30 });
   });
 
   it("settles the advisor project by 10 once per month", () => {
@@ -36,7 +36,7 @@ describe("new advisor project economy", () => {
   it("pays horizontal rewards only when the 100-point project completes", () => {
     const before = state({ advisorProgressState: { ...createAdvisorProgressState(), horizontalProgress: 99 } });
     const next = advanceAdvisorProject(before, "horizontal", () => 0);
-    expect(next.advisorProgressState.funding).toBe(30);
+    expect(next.advisorProgressState.funding).toBe(85);
     expect(next.player.money).toBe(5);
     expect(next.advisorProgressState.horizontalProgress).toBe(19);
   });
@@ -49,15 +49,15 @@ describe("new advisor project economy", () => {
     expect(next.player.money).toBe(0);
   });
 
-  it("lets fellows start vertical projects once shared funding reaches 20", () => {
+  it("lets fellows start vertical projects once shared funding reaches 60", () => {
     const profile = createCustomFellowProgressProfile({ type: "peer", gender: "female", research: 10, affinity: 1, startTotalMonths: 1, name: "Test fellow" });
-    const initial = state({ totalMonths: 1, month: 1, advisorProgressState: { ...createAdvisorProgressState(), funding: 20 }, fellowProgressState: [profile], fellowPapers: [] });
+    const initial = state({ totalMonths: 1, month: 1, advisorProgressState: { ...createAdvisorProgressState(), funding: 60 }, fellowProgressState: [profile], fellowPapers: [] });
     const before = ensureFellowPapers(initial, () => 0);
     const researched = advanceFellowResearch({ ...before, totalMonths: 2, month: 2 }, () => 0);
     const after = advanceFellowResearch({ ...researched, totalMonths: 3, month: 3 }, () => 0);
     expect(after.advisorProgressState.verticalProgress).toBe(10);
     expect(after.fellowProgressState[0]?.monthlyActivity).toBe("协作进度 +1，纵向进度 +10");
-    expect(after.advisorProgressState.funding).toBe(20);
+    expect(after.advisorProgressState.funding).toBe(60);
   });
 
   it("shares fellow project progress with the advisor card and guides only on vertical completion", () => {
@@ -65,7 +65,7 @@ describe("new advisor project economy", () => {
     const initial = state({
       totalMonths: 1,
       month: 1,
-      advisorProgressState: { ...createAdvisorProgressState(), verticalProgress: 99, funding: 20 },
+      advisorProgressState: { ...createAdvisorProgressState(), verticalProgress: 99, funding: 60 },
       fellowProgressState: [profile],
       fellowPapers: [],
     });

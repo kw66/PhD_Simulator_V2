@@ -44,6 +44,9 @@ import { endRelationship } from "./v2-relationship-actions";
 import { advanceFellowTask } from "./v2-fellow-actions";
 import { settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { advanceFellowResearch, attendFellowConferences, ensureFellowPapers } from "./v2-fellow-research";
+import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
+import { settleLabResearchGrowth } from "./v2-lab-talent";
+import { settleJournalPublicationFees } from "./v2-lab-publication-costs";
 import { advanceAdvisorProject, settleAdvisorMonth, syncAdvisorResearchAccumulation } from "./v2-advisor-progress";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { advanceLoverDate, advanceLoverMonth, settlePendingLoverHelp } from "./v2-lover-progression";
@@ -196,7 +199,8 @@ function createAdvancedCalendarState(state: GameState): GameState {
   }
   const monthlyState = evaluateCoreEndings(monthlyLoggedState);
   if (monthlyState.phase !== "playing") return monthlyState;
-  return MONTH_START_RELATIONSHIP_STEPS.reduce((current, step) => step(current), monthlyState);
+  return MONTH_START_RELATIONSHIP_STEPS.reduce((current, step) => current.phase === "playing"
+    ? evaluateCoreEndings(step(current)) : current, monthlyState);
 }
 
 /** A journal revision that reaches its acceptance line is published before a later step can still add help to it. */
@@ -237,6 +241,7 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
   if (candidates.length === 0) return state;
   const result = enqueuePendingEvents(state, buildConferenceDecisionEventsForAcceptedPapers(candidates, {
     favor: state.player.favor,
+    advisorProgressState: state.advisorProgressState,
     social: state.player.social,
     research: state.player.research,
     shopState: state.shopState,
@@ -253,6 +258,8 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
 }
 
 function advanceMonth(state: GameState): GameState {
+  if (state.phase !== "playing") return state;
+  state = evaluateCoreEndings(settleJournalPublicationFees(state));
   if (state.phase !== "playing") return state;
   if (hasManualBlockingEvents(state)) return pushNoOpLog(state, "必须先处理待办事件。");
   state = settleLinearEvents(state, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
@@ -282,7 +289,15 @@ function advanceMonth(state: GameState): GameState {
     return settleLinearEvents(queued.nextState, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
   }
 
-  if (state.totalMonths >= state.maxMonths) return state;
+  if (state.totalMonths >= state.maxMonths && state.eventQueue.some((event) => event.deadlineMonths <= 0)) return state;
+
+  if (state.month === 10 || state.totalMonths >= state.maxMonths) {
+    state = evaluateCoreEndings(settleReadyJournals(settlePendingPaperHelp(state)));
+  }
+  if (state.phase !== "playing") return state;
+  if (hasManualBlockingEvents(state)) return state;
+  state = settleLabResearchGrowth(settleFellowAcademicYear(state));
+  if (state.totalMonths >= state.maxMonths) return finishTrainingIfReady(syncAdvisorResearchAccumulation(state));
 
   const nextState = evaluateCoreEndings(enqueueAcceptedPaperConferenceEvents(createAdvancedCalendarState(state)));
   if (nextState.phase !== "playing") return nextState;
@@ -338,9 +353,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   const evaluated = evaluateCoreEndings(refreshed);
   if (evaluated.phase !== "playing") return evaluated;
   const recorded = recordTalentTransitions(state, evaluated);
-  return (actionId === "next-month" || actionId === "force-next-month") && state.totalMonths >= state.maxMonths
-    ? finishTrainingIfReady(recorded)
-    : recorded;
+  return recorded;
 }
 
 function dispatchGameAction(state: GameState, actionId: GameActionId, payload: DispatchPayload): GameState {

@@ -41,6 +41,7 @@ import { canAddRelationship, syncRelationshipState } from "./v2-relationship-rul
 import { DEBUG_RELATIONSHIP_TYPES } from "./v2-action-ids";
 import { createCustomFellowProgressProfile, createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import { createLoverProgressState } from "./v2-lover-progression";
+import { getRecruitmentAcademicYears } from "./v2-recruitment-eligibility";
 import { activateLover } from "./v2-lover-system";
 import { pickRandomAdvisorName } from "./v2-random-name";
 import { getPaperCompetitionCandidates, isPaperCompetitionEventId } from "./v2-paper-competition";
@@ -993,12 +994,15 @@ function addDebugRelationship(state: GameState, type: DebugRelationshipType): Ga
         ...activateLover("smart", state.totalMonths, getRoleDefinition(state.selectedRoleId).gender),
         name: pickRandomAdvisorName(),
       },
-      loverProgressState: createLoverProgressState("smart"),
+      loverProgressState: createLoverProgressState("smart", Math.random, state.year),
     }, "测试：已新增恋人，不触发恋爱奖励");
   }
 
   if (state.fellowProgressState.length >= 4) {
     return pushLog(state, "测试：已有 4 位同学，未继续添加");
+  }
+  if (getRecruitmentAcademicYears(type, state).length === 0) {
+    return pushLog(state, "测试：当前没有可招募的在校同学");
   }
   const seed = Math.floor(Math.random() * 0x100000000);
   const usedNames = [
@@ -1007,7 +1011,7 @@ function addDebugRelationship(state: GameState, type: DebugRelationshipType): Ga
     state.loverState.name ?? "",
   ];
   const profile = createCustomFellowProgressProfile({
-    ...createGeneratedFellowProfileAddition(type, seed, undefined, usedNames, Math.random),
+    ...createGeneratedFellowProfileAddition(type, seed, undefined, usedNames, Math.random, { year: state.year, month: state.month }),
     startTotalMonths: state.totalMonths,
     usedNames,
   });

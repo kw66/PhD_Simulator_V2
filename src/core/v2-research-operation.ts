@@ -31,8 +31,7 @@ export function getResearchExperimentCostBreakdown(state: Pick<GameState, "shopS
   playerMoney: number;
 } {
   const total = getResearchExperimentMoneyCost(state);
-  const advisorFunding = Math.min(Math.max(0, state.advisorProgressState.funding), total);
-  return { total, advisorFunding, playerMoney: total - advisorFunding };
+  return { total, advisorFunding: total, playerMoney: 0 };
 }
 
 export function getResearchActionEffect(state: GameState, actionType: PaperActionType, includeNextAction = true) {
@@ -197,6 +196,9 @@ export function applyResearchOperation(
     : { total: 0, advisorFunding: 0, playerMoney: 0 };
   const advisorFundingUsed = experimentCost.advisorFunding;
   const playerMoneyCost = experimentCost.playerMoney;
+  if (state.advisorProgressState.funding < advisorFundingUsed) {
+    return pushNoOpLog(state, `做实验：科研经费不足，需要 ${advisorFundingUsed}`);
+  }
   if (state.player.money < playerMoneyCost) {
     return pushNoOpLog(state, `${RESEARCH_OPERATION_LABEL[actionType]}：金币不足，需要 ${playerMoneyCost}`);
   }

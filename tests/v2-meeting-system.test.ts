@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { getMeetingSelfPayDiscount, hasFullGear } from "../src/core/v2-meeting-system";
+import { getMeetingSelfPayDiscount, getRegionalMeetingDiscount, hasFullGear } from "../src/core/v2-meeting-system";
+import { getMeetingExperienceDiscount } from "../src/core/v2-growth-system";
 import { createShopState } from "../src/core/v2-shop-items";
 
 describe("v2 meeting system", () => {
@@ -16,11 +17,15 @@ describe("v2 meeting system", () => {
     )).toBe(true);
   });
 
-  it("grows self-pay discount with attended meetings and caps at half", () => {
+  it("never discounts fees through any meeting experience entry point", () => {
     expect(getMeetingSelfPayDiscount(0, 6)).toBe(0);
     expect(getMeetingSelfPayDiscount(3, 6)).toBe(0);
-    expect(getMeetingSelfPayDiscount(4, 6)).toBe(1);
-    expect(getMeetingSelfPayDiscount(16, 6)).toBe(3);
-    expect(getMeetingSelfPayDiscount(40, 6)).toBe(3);
+    expect(getMeetingSelfPayDiscount(4, 6)).toBe(0);
+    expect(getMeetingSelfPayDiscount(16, 6)).toBe(0);
+    expect(getMeetingSelfPayDiscount(40, 6)).toBe(0);
+    expect(getMeetingExperienceDiscount(40, 6)).toBe(0);
+    for (const region of ["domestic", "asia", "west"] as const) {
+      expect(getRegionalMeetingDiscount({ domesticMeetingCount: 40, asiaMeetingCount: 40, westMeetingCount: 40 }, region, 6)).toBe(0);
+    }
   });
 });

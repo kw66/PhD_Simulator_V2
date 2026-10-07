@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { MASTER_TOTAL_MONTHS, PHD_TOTAL_MONTHS } from "../src/core/v2-content";
+import { getAcademicCalendarMonth } from "../src/core/v2-calendar";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 
 import {
@@ -35,16 +37,30 @@ describe("v2 progression", () => {
     expect(state.researchCapacityState).toEqual(createStartedGameState("normal").researchCapacityState);
   });
 
-  it("统一处理 68 个月培养周期的日历口径", () => {
+  it("按学位分别在第三年和第六年六月结束培养", () => {
+    expect(MASTER_TOTAL_MONTHS).toBe(34);
+    expect(PHD_TOTAL_MONTHS).toBe(70);
+    expect(getMonthLimitByDegree("master")).toBe(34);
+    expect(getMonthLimitByDegree("phd")).toBe(70);
+    expect(getAcademicCalendarMonth(10)).toBe(6);
+  });
+
+  it.each(["master", "phd"] as const)("保留 %s 的绝对日历映射，不按硕士毕业月截断", (degree) => {
+    expect(getCalendarForTotalMonths(-1, degree)).toEqual({ year: 1, month: 0 });
+    expect(getCalendarForTotalMonths(0, degree)).toEqual({ year: 1, month: 0 });
     expect(getCalendarForTotalMonths(1)).toEqual({ year: 1, month: 1 });
     expect(getCalendarForTotalMonths(21)).toEqual({ year: 2, month: 9 });
-    expect(getCalendarForTotalMonths(34, "master")).toEqual({ year: 3, month: 10 });
-    expect(getCalendarForTotalMonths(35, "phd")).toEqual({ year: 3, month: 11 });
-    expect(getCalendarForTotalMonths(58, "phd")).toEqual({ year: 5, month: 10 });
-    expect(getCalendarForTotalMonths(68, "master")).toEqual({ year: 6, month: 8 });
-    expect(getCalendarForTotalMonths(68, "phd")).toEqual({ year: 6, month: 8 });
-    expect(getMonthLimitByDegree("master")).toBe(68);
-    expect(getMonthLimitByDegree("phd")).toBe(68);
+    expect(getCalendarForTotalMonths(22, degree)).toEqual({ year: 2, month: 10 });
+    expect(getCalendarForTotalMonths(34, degree)).toEqual({ year: 3, month: 10 });
+    expect(getCalendarForTotalMonths(35, degree)).toEqual({ year: 3, month: 11 });
+    expect(getCalendarForTotalMonths(36, degree)).toEqual({ year: 3, month: 12 });
+    expect(getCalendarForTotalMonths(37, degree)).toEqual({ year: 4, month: 1 });
+    expect(getCalendarForTotalMonths(58, degree)).toEqual({ year: 5, month: 10 });
+    expect(getCalendarForTotalMonths(68, degree)).toEqual({ year: 6, month: 8 });
+    expect(getCalendarForTotalMonths(69, degree)).toEqual({ year: 6, month: 9 });
+    expect(getCalendarForTotalMonths(70, degree)).toEqual({ year: 6, month: 10 });
+    expect(getCalendarForTotalMonths(71, degree)).toEqual({ year: 6, month: 10 });
+    expect(getCalendarForTotalMonths(100, degree)).toEqual({ year: 6, month: 10 });
   });
 
   it("统一给出毕业线和转博线", () => {

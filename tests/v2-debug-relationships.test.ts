@@ -102,7 +102,7 @@ describe("v2 debug relationship additions", () => {
       });
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: type });
 
-      expect(generator).toHaveBeenLastCalledWith(type, expect.any(Number), undefined, expect.any(Array), expect.any(Function));
+      expect(generator).toHaveBeenLastCalledWith(type, expect.any(Number), undefined, expect.any(Array), expect.any(Function), { year: state.year, month: state.month });
       expect(next).toEqual({
         ...before,
         fellowProgressState: [...before.fellowProgressState, { ...expectedProfile, id: expect.any(String), researchTopic: fellowProgression.getFellowResearchTopic({ ...next.fellowProgressState.at(-1)!, researchTopic: undefined }) }],
@@ -297,6 +297,7 @@ describe("v2 natural relationship names", () => {
     { eventId: 11, type: "senior", choice: "deep" },
     { eventId: 14, type: "junior", choice: "idea" },
   ] as const)("stores the generated $type name only when its natural event is confirmed", ({ eventId, type, choice }) => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     const initial = admittedState();
     for (const roll of [0.25, 0.75]) {
       const serial = 23;
@@ -307,7 +308,8 @@ describe("v2 natural relationship names", () => {
         totalRandomEventCount: serial,
         eventQueue: [],
         availableRandomEvents: [],
-        player: { ...initial.player, social: 8 },
+        pendingRandomEvents: [],
+        player: { ...initial.player, research: 8, social: 8, san: 20 },
         relationshipState: { ...initial.relationshipState, unlockedSlots: 5 },
       };
       const event = createRandomEventById(eventId, state, () => roll).event;

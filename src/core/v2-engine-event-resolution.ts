@@ -19,8 +19,10 @@ import { refreshWinterVacationPlan } from "./v2-fixed-events-winter";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { refreshConferenceDecision } from "./v2-conference-events";
+import { refreshJournalFeeEvent } from "./v2-journal-fee-events";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
+import { hasRecruitLeft } from "./v2-recruitment-eligibility";
 import type {
   DeferredEventStatePatch,
   EventChoice,
@@ -279,6 +281,10 @@ function rebuildEventFromCurrentState(
     rollIndex += 1;
     return roll;
   };
+  const rootEvent = queuedEvent.replayContext?.rootEvent ?? queuedEvent;
+  const recruitmentCalendar = [1, 10, 11, 14].includes(replay.eventId)
+    ? /-y(\d+)-m(\d+)-n/u.exec(rootEvent.id)
+    : undefined;
   const rebuilt = createRandomEventById(
     replay.eventId,
     {
@@ -289,6 +295,7 @@ function rebuildEventFromCurrentState(
       } : {}),
     },
     getReplayRoll,
+    recruitmentCalendar ? { year: Number(recruitmentCalendar[1]), month: Number(recruitmentCalendar[2]) } : undefined,
   ).event;
   if (!rebuilt) {
     return queuedEvent;
@@ -326,7 +333,37 @@ function rebuildEventFromCurrentState(
   };
 }
 
+function suppressDepartedRecruitment<Event extends PendingEvent>(state: GameState, event: Event): Event {
+  const outcome = "条件：同学已离校｜结果：无事发生。";
+  const clearResult = (result: PendingEvent): PendingEvent => ({
+    ...result,
+    description: `对方已经结束学业离校，这次不再开始新的合作。\n\n机制结算\n${outcome}`,
+    completionLog: "同学已离校，无事发生。",
+    deferredStatePatch: undefined,
+    choices: result.choices.map((choice) => ({ ...choice, outcome, effects: {} })),
+  });
+  const choices = event.choices.map((choice) => {
+      if (choice.effects.fellowAdditions?.some((candidate) => hasRecruitLeft(state, candidate))) {
+        return {
+          ...choice, outcome,
+          effects: { enqueueEvents: choice.effects.enqueueEvents?.map(clearResult) },
+        };
+      }
+      const followUps = choice.effects.enqueueEvents;
+      if (!followUps) return choice;
+      const updated = followUps.map((next) => suppressDepartedRecruitment(state, next));
+      return updated.every((next, index) => next === followUps[index]) ? choice
+        : { ...choice, effects: { ...choice.effects, enqueueEvents: updated } };
+    });
+  return choices.every((choice, index) => choice === event.choices[index]) ? event : { ...event, choices };
+}
+
 export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
+  return suppressDepartedRecruitment(state, resolveQueuedEventPreview(state, queuedEvent));
+}
+
+function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
+  if (queuedEvent.journalFeePaperId) return refreshJournalFeeEvent(state, queuedEvent);
   if (queuedEvent.fixedResultPreview) {
     const context = queuedEvent.fixedResultPreview;
     let rollIndex = 0;
@@ -402,7 +439,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => event.fixedResultPreview || event.fixedTreePreview || event.conferencePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
+  const eventQueue = state.eventQueue.map((event) => event.journalFeePaperId || event.fixedResultPreview || event.fixedTreePreview || event.conferencePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
     && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };

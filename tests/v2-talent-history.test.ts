@@ -4,6 +4,7 @@ import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { settleFellowCoauthoredPapers, settleLabResearchGrowth } from "../src/core/v2-lab-talent";
+import { advanceFellowResearch } from "../src/core/v2-fellow-research";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { applyPublicationTalentRewards } from "../src/core/v2-publication-talent";
@@ -26,7 +27,7 @@ describe("talent trigger history", () => {
     const base = state();
     const random = vi.spyOn(Math, "random");
     const next = recordTalentTrigger(base, "test", {
-      name: "实验室传承", recipient: '<同学> & "姓名"', reason: "认识12个月",
+      name: "实验室传承", recipient: '<同学> & "姓名"', reason: "第2学年开始，结算实验室传承",
       effects: ["科研 +2（2→4）"], details: ["<script>unsafe</script>"],
     });
     expect(random).not.toHaveBeenCalled();
@@ -40,7 +41,7 @@ describe("talent trigger history", () => {
     expect(html).not.toContain('data-ui-open-event-history-id="talent:test"');
     expect(html).not.toContain('event-history-log-entry');
     expect(html).not.toContain('event-panel showing-content');
-    expect(html).toContain("认识12个月");
+    expect(html).toContain("第2学年开始，结算实验室传承");
     expect(html).toContain("&lt;script&gt;unsafe&lt;/script&gt;");
     expect(html.replace(/<[^>]*>/g, "")).toContain("科研 +2（2→4）");
     expect(html).toContain("&lt;同学&gt; &amp; &quot;姓名&quot;");
@@ -103,17 +104,72 @@ describe("talent trigger history", () => {
     expect(applied.player).toMatchObject({ favor: 12, social: 7, research: 11 });
   });
 
-  it.each([19, 20])("retains inheritance rewards at research %i", (research) => {
-    const base = state();
+  it.each([19, 20])("preserves the original combined annual reward display at research cap %i", (research) => {
+    const base = { ...state(), totalMonths: 12, year: 1, month: 12 };
     base.player.research = 25;
     base.fellowProgressState = [research, 20, 20].map((value, index) => ({
       ...createCustomFellowProgressProfile({ type: "peer", gender: "female", research: value, affinity: 1, startTotalMonths: 1 }),
       id: `fellow-${index}`,
     }));
-    const next = settleLabResearchGrowth(base);
-    expect(triggers(next)[0]!.effects).toEqual([research === 19 ? "科研 +2（19→20）" : "科研 +1（20→20）"]);
+    const next = settleLabResearchGrowth(base, () => 0.99);
+    expect(triggers(next)[0]!.effects).toEqual([research === 19 ? "科研 +4（19→20）" : "科研 +3（20→20）"]);
+    expect(triggers(next)[0]!.details).toEqual([
+      `原始奖励：自然成长 +2，实验室传承 +${research === 19 ? 2 : 1}，合计 +${research === 19 ? 4 : 3}；合并后逐点抵抗并受科研上限限制`,
+    ]);
+    expect(next.fellowProgressState[0]!.annualResearchGrowthTotal ?? 0).toBe(20 - research);
     expect(next.fellowProgressState[0]!.research).toBe(20);
   });
+
+  it.each([8, 9])("preserves the player's original inheritance reward display at their own cap from %i", (research) => {
+    const base = { ...state(), totalMonths: 12, year: 1, month: 12 };
+    base.player.research = research;
+    base.researchCapacityState.baseCap = 9;
+    base.fellowProgressState = [10, 10, 10].map((value, index) => ({
+      ...createCustomFellowProgressProfile({ type: "peer", gender: "female", research: value, affinity: 1, startTotalMonths: 1 }),
+      id: `fellow-${index}`,
+    }));
+    const next = settleLabResearchGrowth(base, () => 0.99);
+    expect(triggers(next).find((trigger) => trigger.recipient === "你·林青")).toMatchObject({
+      effects: [`科研 +2（${research}→9）`],
+      details: ["原始奖励：实验室传承 +2；逐点抵抗并受科研上限限制"],
+    });
+    expect(next.player.research).toBe(9);
+    expect(settleLabResearchGrowth(next, () => 0.99)).toBe(next);
+  });
+
+  it.each(["fellow", "player", "lover"] as const)
+    ("distinguishes mixed cap and resistance from fully resisted rewards for %s", (recipient) => {
+      let base = { ...state(), totalMonths: 12, year: 1, month: 12 };
+      base.player.research = 20;
+      base.fellowProgressState = [20, 21, 21, 21].map((research, index) => ({
+        ...createCustomFellowProgressProfile({ type: "peer", gender: "female", research, affinity: 1, startTotalMonths: 1 }),
+        id: `fellow-${index}`, name: `同学${index}`,
+        lastAnnualGrowthTotalMonths: recipient === "fellow" && index === 0 ? undefined : 12,
+      }));
+      if (recipient !== "player") base = recordTalentTrigger(base, "inheritance:player:12", {
+        name: "实验室传承", recipient: "你·林青", reason: "已结算", effects: [],
+      });
+      base.loverState = { ...base.loverState, active: recipient === "lover", name: "周明", startTotalMonths: 12 };
+      base.loverProgressState = { ...base.loverProgressState, active: recipient === "lover", research: 20 };
+      const reward = recipient === "fellow" ? 4 : 2;
+      const target = recipient === "fellow" ? "同学0" : recipient === "player" ? "你·林青" : "周明";
+      const random = vi.fn().mockReturnValueOnce(0).mockReturnValue(0.99);
+      const capped = settleLabResearchGrowth(base, random);
+      const cappedTrigger = triggers(capped).find((trigger) => trigger.recipient === target)!;
+      expect(cappedTrigger.effects).toEqual([`科研 +${reward}（20→20）`]);
+      expect(cappedTrigger.details).toContain(`档位抵抗 1 点，上限限制 ${reward - 1} 点`);
+      expect(random).toHaveBeenCalledTimes(reward);
+      const resisted = settleLabResearchGrowth(base, () => 0);
+      expect(triggers(resisted).find((trigger) => trigger.recipient === target)!.effects)
+        .toEqual([`科研 +0（20→20，抵抗${reward}）`]);
+      for (const next of [capped, resisted]) {
+        expect(next.player.research).toBe(20);
+        expect(next.fellowProgressState[0]!.research).toBe(20);
+        expect(next.fellowProgressState[0]!.annualResearchGrowthTotal ?? 0).toBe(0);
+        expect(next.loverProgressState.research).toBe(20);
+        expect(settleLabResearchGrowth(next, () => 0.99)).toBe(next);
+      }
+    });
 
   it.each([19, 20])("retains two coauthorship rewards at affinity %i", (affinity) => {
     const base = state();
@@ -126,17 +182,65 @@ describe("talent trigger history", () => {
     expect(next.fellowProgressState[0]!.affinity).toBe(20);
   });
 
-  it("identifies each fellow's annual research change and records capped anniversaries", () => {
-    const base = state();
+  it("records August year-end inheritance for the player and fellows including August joiners", () => {
+    const base = { ...state(), totalMonths: 12, year: 1, month: 12 };
     base.fellowProgressState = [2, 6, 20].map((research, index) => ({
+      ...createCustomFellowProgressProfile({ type: "peer", gender: "female", research, affinity: 1, startTotalMonths: [1, 6, 12][index]! }),
+      id: `fellow-${index}`, name: `同学${index}`,
+    }));
+    const next = settleLabResearchGrowth(base, () => 0.99);
+    expect(triggers(next).map((trigger) => trigger.recipient)).toEqual(["同学0", "同学1", "同学2", "你·林青", "第1学年末"]);
+    expect(triggers(next)[0]!.effects).toEqual(["科研 +4（2→6）"]);
+    expect(triggers(next)[1]!.effects).toEqual(["科研 +3（6→9）"]);
+    expect(triggers(next)[2]!.effects).toEqual(["科研 +2（20→20）"]);
+    expect(triggers(next)[3]!.effects).toEqual(["科研 +1（10→11）"]);
+    expect(triggers(next).every((trigger) => trigger.reason === "第1学年结束，结算年度科研成长")).toBe(true);
+    expect(next.eventHistory.filter((entry) => entry.id.startsWith("talent:inheritance:")))
+      .toEqual(Array.from({ length: 4 }, () => expect.objectContaining({ completedAtTotalMonths: 12, completedAtMonth: 12, completedAtYear: 1 })));
+    expect(next.log).toHaveLength(base.log.length + 1);
+    expect(next.log[0]).toMatchObject({ id: "talent:annual-research:group:12", month: 12, eventHistoryId: "talent:annual-research:group:12" });
+    expect(triggers(next)[4]!.effects).toEqual([
+      "同学0：科研 +4（2→6）", "同学1：科研 +3（6→9）", "同学2：科研 +2（20→20）", "你·林青：科研 +1（10→11）",
+    ]);
+    expect(settleLabResearchGrowth(next, () => 0.99)).toBe(next);
+    const october = { ...base, totalMonths: 14, month: 2 };
+    expect(settleLabResearchGrowth(october, () => 0.99)).toBe(october);
+    const html = renderApp(next, undefined, { activePlayTab: "events" }).replace(/<[^>]*>/g, "");
+    expect(html).toContain("第1学年结束，结算年度科研成长");
+    expect(html).toContain("科研 +3（6→9）");
+    expect(html).toContain("自然成长 +2，实验室传承 +1，合计 +3");
+  });
+
+  it("shows pointwise inheritance resistance when a gain crosses a research tier", () => {
+    const base = { ...state(), totalMonths: 12, year: 1, month: 12 };
+    base.player.research = 5;
+    base.fellowProgressState = [5, 10, 10, 10].map((research, index) => ({
       ...createCustomFellowProgressProfile({ type: "peer", gender: "female", research, affinity: 1, startTotalMonths: 1 }),
       id: `fellow-${index}`, name: `同学${index}`,
     }));
-    const next = settleLabResearchGrowth(base);
-    expect(triggers(next).map((trigger) => trigger.recipient)).toEqual(["同学0", "同学1", "同学2"]);
-    expect(triggers(next)[0]!.effects).toEqual(["科研 +2（2→4）"]);
-    expect(triggers(next)[2]!.effects).toEqual(["科研 0（20→20）"]);
-    expect(settleLabResearchGrowth(next)).toBe(next);
+    const next = settleLabResearchGrowth(base, () => 0.1);
+    expect(triggers(next)[0]!.effects).toEqual(["科研 +1（5→6，抵抗3）"]);
+    expect(triggers(next).find((trigger) => trigger.recipient === "你·林青")!.effects).toEqual(["科研 +1（5→6，抵抗1）"]);
+    expect(next.fellowProgressState[0]!.research).toBe(6);
+    const html = renderApp(next, undefined, { activePlayTab: "events" }).replace(/<[^>]*>/g, "");
+    expect(html).toContain("科研 +1（5→6，抵抗1）");
+  });
+
+  it.each([1, 2, 4, 7, 11, 16])("does not grant research or milestone history for %i fellow publications", (count) => {
+    const base = state();
+    const fellow = createCustomFellowProgressProfile({ type: "peer", gender: "female", research: 6, affinity: 1, startTotalMonths: 1, name: "周明" });
+    base.fellowProgressState = [fellow];
+    base.fellowPapers = Array.from({ length: count }, (_, index) => ({
+      ...createDraftPaper(1, index, () => 0), status: "published" as const, leadAuthorId: fellow.id,
+    }));
+    base.externalPublications = [...base.fellowPapers];
+    for (const roll of [0, 0.99]) {
+      const next = advanceFellowResearch(base, () => roll);
+      expect(next.fellowProgressState[0]!.research).toBe(6);
+      expect(triggers(next).some((trigger) => trigger.name === "发表积累")).toBe(false);
+      expect(next.eventHistory.some((entry) => entry.id.startsWith("talent:fellow-publication:"))).toBe(false);
+      expect(advanceFellowResearch(next, () => 0.99)).toBe(next);
+    }
   });
 
   it("records collaboration rapport with the person's name and deduplicated paper titles", () => {
@@ -180,9 +284,10 @@ describe("talent trigger history", () => {
     const after = { ...before, eventCounters: { ...before.eventCounters, badmintonCount: 1, pokerCount: 1, meetingCount: 4, domesticMeetingCount: 3 },
       eventSupport: { ...before.eventSupport, hasStrongBodyTalent: true } };
     const next = recordTalentTransitions(before, after);
-    expect(triggers(next).map((trigger) => trigger.name)).toEqual(["会议经验", "羽毛球水平", "牌局策略"]);
-    expect(triggers(next)[1]!.effects).toContain("首次获胜，每月SAN +1");
-    expect(triggers(next)[1]!.effects).toContain("胜率提升");
+    expect(triggers(next).map((trigger) => trigger.name)).toEqual(["羽毛球水平", "牌局策略"]);
+    expect(triggers(next)[0]!.effects).toContain("首次获胜，每月SAN +1");
+    expect(triggers(next)[0]!.effects).toContain("胜率提升");
+    expect(triggers(next)[1]!.effects).toEqual(["胜率 40%→50%"]);
     expect(next.eventCounters).toBe(after.eventCounters);
     expect(next.player).toBe(after.player);
   });

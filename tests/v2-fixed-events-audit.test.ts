@@ -12,6 +12,7 @@ import {
   createScholarshipEvent,
   getScholarshipRequirement,
   getScholarshipReward,
+  resolveScholarshipApplication,
 } from "../src/core/v2-fixed-events-scholarship";
 import {
   createYearSummaryEvent,
@@ -54,10 +55,12 @@ describe("audited fixed-event rules", () => {
     const scoreEvent = event.choices[0]?.effects.enqueueEvents?.[0];
     expect(scoreEvent?.title).toContain("申报决定");
     expect(scoreEvent?.choices.map((choice) => choice.label)).toEqual(["准备材料并申报", "暂不申报"]);
-    expect(scoreEvent?.choices[0]?.effects.san).toBe(-2);
+    expect(scoreEvent?.choices[0]?.outcome).toContain("SAN -2");
+    expect(scoreEvent?.choices[0]?.effects.fixedEventResolution?.kind).toBe("scholarship-apply");
     expect(scoreEvent?.description).not.toMatch(/已提交|提交成功|回执/u);
     expect(scoreEvent?.description).toContain("这次能计入 0 分");
     expect(scoreEvent?.description).toContain("本年度国奖奖金为 **6金币**");
+    expect(scoreEvent?.description).not.toContain("SAN");
   });
 
   it("resets scholarship accumulation only after an award", () => {
@@ -73,10 +76,10 @@ describe("audited fixed-event rules", () => {
     });
     const application = createScholarshipEvent(state, () => 0);
     const applied = applyChoiceEffectsToState(state, application.choices[0]!.effects.enqueueEvents![0]!.choices[0]!).nextState;
-    expect(applied.player.san).toBe(8);
+    expect(applied.player.san).toBe(10);
 
     const scoreEvent = application.choices[0]?.effects.enqueueEvents?.[0];
-    const resultEvent = scoreEvent?.choices[0]?.effects.enqueueEvents?.[0];
+    const resultEvent = resolveScholarshipApplication(state, scoreEvent!.choices[0]!.effects.fixedEventResolution!, () => 0).enqueueEvents![0]!;
     const claim = resultEvent?.choices[0];
     expect(claim?.effects.scholarshipAward?.scoreBaseline).toBe(4);
     const awarded = applyChoiceEffectsToState(applied, claim!).nextState;
@@ -118,7 +121,7 @@ describe("audited fixed-event rules", () => {
       externalPublications: [firstPaper, secondPaper],
     }, () => 0);
     const thirdScoreEvent = thirdApplication.choices[0]?.effects.enqueueEvents?.[0];
-    const thirdResultEvent = thirdScoreEvent?.choices[0]?.effects.enqueueEvents?.[0];
+    const thirdResultEvent = resolveScholarshipApplication({ ...secondAwardState, year: 5, totalResearchScore: 8 }, thirdScoreEvent!.choices[0]!.effects.fixedEventResolution!, () => 0).enqueueEvents![0]!;
     expect(thirdScoreEvent?.description).toContain("这次能计入 2 分");
     expect(thirdResultEvent?.choices[0]?.effects.scholarshipAward).toBeUndefined();
   });
@@ -138,7 +141,7 @@ describe("audited fixed-event rules", () => {
       externalPublications: [firstAuthor, nonFirstAuthor],
     }), () => 0);
     const scoreEvent = event.choices[0]?.effects.enqueueEvents?.[0];
-    const resultEvent = scoreEvent?.choices[0]?.effects.enqueueEvents?.[0];
+    const resultEvent = resolveScholarshipApplication(playingState({ year: 2, month: 2, totalResearchScore: 2, externalPublications: [firstAuthor, nonFirstAuthor] }), scoreEvent!.choices[0]!.effects.fixedEventResolution!, () => 0).enqueueEvents![0]!;
     const award = resultEvent?.choices[0]?.effects.scholarshipAward;
     expect(award?.paperIds).toEqual([firstAuthor.id]);
     expect(award?.paperIds).not.toContain(nonFirstAuthor.id);

@@ -11,7 +11,7 @@ describe("v2 conference system", () => {
     expect(getConferenceBaseCosts("west")).toEqual({ selfPay: 6, advisorCost: 3, proxyCost: 1 });
   });
 
-  it("applies meeting-experience discount only to self-pay", () => {
+  it("keeps attendance fees fixed regardless of meeting experience", () => {
     const input = {
       region: "west" as const,
       favor: 12,
@@ -29,12 +29,12 @@ describe("v2 conference system", () => {
     const selfPay = resolveConferenceDecisionCost({ ...input, mode: "self" });
     const advisor = resolveConferenceDecisionCost({ ...input, mode: "advisor" }, () => 0.99);
 
-    expect(selfPay.meetingDiscount).toBe(1);
-    expect(selfPay.actualCost).toBe(5);
+    expect(selfPay.meetingDiscount).toBe(0);
+    expect(selfPay.actualCost).toBe(6);
     expect(advisor.meetingDiscount).toBe(0);
   });
 
-  it("uses tier resist for advisor and proxy, and proxy does not count as attendance", () => {
+  it("resists only advisor favor and never applies social resistance to proxy fees", () => {
     const input = {
       region: "asia" as const,
       favor: 12,
@@ -51,17 +51,22 @@ describe("v2 conference system", () => {
 
     const advisor = resolveConferenceDecisionCost({ ...input, mode: "advisor" }, () => 0.99);
     const proxy = resolveConferenceDecisionCost({ ...input, mode: "proxy" }, () => 0.0);
+    const resistedAdvisor = resolveConferenceDecisionCost({ ...input, mode: "advisor", paperCount: 3 }, () => 0);
 
     expect(advisor.resource).toBe("favor");
     expect(advisor.actualCost).toBe(2);
+    expect(advisor.fundingCost).toBe(4);
     expect(advisor.countsAsMeeting).toBe(true);
+    expect(resistedAdvisor.actualCost).toBe(0);
+    expect(resistedAdvisor.fundingCost).toBe(6);
 
     expect(proxy.resource).toBe("money");
-    expect(proxy.actualCost).toBe(0);
+    expect(proxy.actualCost).toBe(2);
+    expect(proxy.resistanceNarrative).toBeUndefined();
     expect(proxy.countsAsMeeting).toBe(false);
   });
 
-  it("keeps domestic proxy free", () => {
+  it("charges domestic proxy registration without a service fee", () => {
     const proxy = resolveConferenceDecisionCost({
       mode: "proxy",
       region: "domestic",
@@ -77,7 +82,7 @@ describe("v2 conference system", () => {
       eventCounters: createEventCounters(),
     });
 
-    expect(proxy.actualCost).toBe(0);
+    expect(proxy.actualCost).toBe(1);
     expect(proxy.countsAsMeeting).toBe(false);
   });
 });

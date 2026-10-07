@@ -136,13 +136,14 @@ describe("GPU failure event", () => {
 });
 
 describe("shared lab rental costs", () => {
-  it.each([0, 2, 4, 10])("uses funding %s first and charges only the remainder to the player", (funding) => {
+  it.each([0, 2, 4, 10])("uses funding %s and blocks experiments the lab cannot afford", (funding) => {
     const initial = makeState();
     const state = { ...initial, buffs: [createLabGpuFailureBuff()], advisorProgressState: { ...initial.advisorProgressState, funding } };
-    expect(getResearchExperimentCostBreakdown(state)).toEqual({ total: 4, advisorFunding: Math.min(funding, 4), playerMoney: Math.max(0, 4 - funding) });
+    expect(getResearchExperimentCostBreakdown(state)).toEqual({ total: 4, advisorFunding: 4, playerMoney: 0 });
     const next = applyResearchOperation(state, "player-paper", "experiment", () => 0);
-    expect(next.player.money).toBe(10 - Math.max(0, 4 - funding));
-    expect(next.advisorProgressState.funding).toBe(Math.max(0, funding - 4));
+    expect(next.player.money).toBe(10);
+    expect(next.advisorProgressState.funding).toBe(funding < 4 ? funding : funding - 4);
+    if (funding < 4) expect(next.papers).toEqual(state.papers);
     expect(next.buffs).toEqual(state.buffs);
   });
 

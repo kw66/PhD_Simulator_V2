@@ -15,6 +15,11 @@ interface EndingPresentation {
 }
 
 const ENDINGS: Record<Exclude<EndingId, null>, EndingPresentation> = {
+  "lab-bankrupt": {
+    title: "实验室破产", icon: "🏚️", label: "提前离校", tone: "failure",
+    story: ["导师把经费表翻到最后，余额已经归零。服务器租用、学生工资和论文费用还排在清单上，再也没有可以挪用的预算。", "课题组的研究停了下来。你备份好实验记录，把没有完成的论文留在电脑里，开始为接下来的去向奔走。"],
+    closing: "经费表清零了，研究也只好暂时停在这里",
+  },
   master: {
     title: "硕士毕业", icon: "🎓", label: "学业完成", tone: "success",
     story: ["离校手续终于办完，你开始收拾工位。插线板底下竟然还压着一张刚入学时的便签，上面的待办早已做完，只是一直没扔。", "你完成了硕士阶段的科研要求，把电脑和笔记装进包。平时总嫌椅子坐着不舒服，真要搬走时，倒又在上面坐了一会儿。"],
@@ -129,6 +134,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
   const failureStats = { burnout: ["SAN", state.player.san], poor: ["金币", state.player.money], expelled: ["导师好感", state.player.favor], isolated: ["社交", state.player.social], overthinking: ["科研能力", state.player.research] } as const;
   const failedStat = ending && ending in failureStats ? failureStats[ending as keyof typeof failureStats] : null;
   const reason = failedStat ? `${failedStat[0]} ${failedStat[1]}，低于0，无法继续学业`
+    : ending === "lab-bankrupt" ? "科研经费已耗尽，实验室无法继续运转"
     : ending === "quit" ? "你选择结束本轮学业"
     : ending === "delay" ? `培养期已满${state.maxMonths}个月，${target === null ? "毕业要求尚未确定" : `科研分${state.totalResearchScore}/${target}，尚未达标`}`
     : graduated ? `${degree}毕业要求已达成：科研分 ${state.totalResearchScore}/${target ?? "—"}` : "本轮已结束";

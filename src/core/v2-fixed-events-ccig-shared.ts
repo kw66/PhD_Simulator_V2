@@ -1,5 +1,4 @@
 import { getAcademicCalendarYear } from "./v2-calendar";
-import { getRegionalMeetingDiscount } from "./v2-meeting-system";
 import type { GameState, Paper } from "./v2-types";
 
 const CCIG_LOCATIONS = ["合肥", "成都", "苏州", "西安", "重庆"] as const;
@@ -37,8 +36,6 @@ export function getCcigRealYear(gameYear: number, gameMonth: number): number {
   return getAcademicCalendarYear(gameYear, gameMonth);
 }
 
-export function getCcigSelfPayCost(state: GameState): { hasMeetingExperience: boolean; discount: number; actualCost: number } {
-  const discount = getRegionalMeetingDiscount(state.eventCounters, "domestic", 2);
-  const actualCost = Math.max(0, 2 - discount);
-  return { hasMeetingExperience: discount > 0, discount, actualCost };
+export function getCcigSelfPayCost(_state: GameState): { hasMeetingExperience: boolean; discount: number; actualCost: number } {
+  return { hasMeetingExperience: false, discount: 0, actualCost: 2 };
 }

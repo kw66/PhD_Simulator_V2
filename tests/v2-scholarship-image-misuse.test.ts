@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createImageMisuseBuff } from "../src/core/v2-academic-integrity";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -32,8 +32,11 @@ function playingState(overrides: Partial<GameState> = {}): GameState {
 }
 
 function queueScholarship(state: GameState, roll: () => number = () => 0): GameState {
+  vi.spyOn(Math, "random").mockImplementation(roll);
   return { ...state, eventQueue: [createEventQueueItem(createScholarshipEvent(state, roll), 1)] };
 }
+
+afterEach(() => vi.restoreAllMocks());
 
 function currentEvent(state: GameState) {
   const event = state.eventQueue.find((item) => item.chainId === "scholarship");
@@ -60,6 +63,42 @@ function expectUnclaimed(state: GameState, original: GameState): void {
 }
 
 describe("image misuse scholarship disqualification", () => {
+  it.each([[2, "1分"], [3, "2～4分"], [4, "5～8分"], [5, "8～12分"]] as const)(
+    "shows only past cutoffs before applying in year %s", (year, range) => {
+      const initial = playingState({ year });
+      const earlyRoll = vi.fn(() => 0);
+      const lateRoll = vi.fn(() => 0.99);
+      const early = createScholarshipEvent(initial, earlyRoll);
+      const late = createScholarshipEvent(initial, lateRoll);
+      expect(early).toEqual(late);
+      expect(earlyRoll).not.toHaveBeenCalled();
+      expect(lateRoll).not.toHaveBeenCalled();
+      const decision = early.choices[0]!.effects.enqueueEvents![0]!;
+      expect(decision.description).toContain(`往年同年级的分数线在${range}`);
+      expect(decision.scholarshipContext!.requirement).toBeNull();
+      expect(decision.choices[0]!.effects.enqueueEvents).toBeUndefined();
+    },
+  );
+
+  it("draws the cutoff on application, preserves it on refresh, and refreshes the displayed SAN cost", () => {
+    let state = queueScholarship(playingState(), () => 0);
+    state = resolve(state);
+    const random = vi.mocked(Math.random).mockReturnValue(0.99);
+    state = resolve(state);
+    expect(currentEvent(state).scholarshipContext!.requirement).toBe(4);
+    expect(currentEvent(state).description).toContain("结果：SAN -2");
+    random.mockClear();
+    state = refreshPendingEventDecisions({ ...state, month: 8 });
+    expect(currentEvent(state).description).toContain("结果：SAN -1");
+    expect(currentEvent(state).choices[0]!.effects.san).toBe(-1);
+    state = refreshPendingEventDecisions(JSON.parse(JSON.stringify(state)));
+    expect(currentEvent(state).scholarshipContext!.requirement).toBe(4);
+    expect(random).not.toHaveBeenCalled();
+    state = resolve(state);
+    expect(state.player.san).toBe(9);
+    expect(state.log[0]!.text).toContain("SAN -1");
+  });
+
   it("keeps application and scoring normal, then cancels a qualifying award only at confirmation", () => {
     const original = playingState({ buffs: [createImageMisuseBuff()] });
     const roll = vi.fn(() => 0.99);
@@ -70,8 +109,10 @@ describe("image misuse scholarship disqualification", () => {
     const scored = resolve(queued);
     expect(currentEvent(scored).stage).toBe("act2");
     expect(currentEvent(scored).choices.map((choice) => choice.label)).toEqual(["准备材料并申报", "暂不申报"]);
-    expect(currentEvent(scored).choices[0]!.effects.san).toBe(-2);
-    expect(currentEvent(scored).description).not.toMatch(/举报|资格取消|分数线/u);
+    expect(currentEvent(scored).choices[0]!.effects.san).toBeUndefined();
+    expect(currentEvent(scored).description).not.toMatch(/举报|资格取消/u);
+    expect(currentEvent(scored).description).toContain("往年同年级的分数线在2～4分");
+    expect(roll).not.toHaveBeenCalled();
     expect(scored.player.san).toBe(original.player.san);
     expectUnclaimed(scored, original);
     expect(scored.eventHistory).toEqual(original.eventHistory);
@@ -85,12 +126,13 @@ describe("image misuse scholarship disqualification", () => {
     expect(result.description).toContain("4 ≥ 分数线 4");
     expect(result.choices[0]!.effects.money ?? 0).toBe(0);
     expect(result.choices[0]!.effects.scholarshipAward).toBeUndefined();
-    expect(result.deferredStatePatch).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: ["player", "san"], value: 8 }),
-    ]));
+    expect(result.choices[0]!.effects.san).toBe(-2);
+    expect(result.description).toContain("结果：SAN -2");
+    expect(result.deferredStatePatch).toBeUndefined();
     expect(preview.player.san).toBe(original.player.san);
     expectUnclaimed(preview, original);
     expect(preview.log).toEqual(original.log);
+    expect(roll).toHaveBeenCalledTimes(1);
     const completed = resolve(preview);
     expect(completed.player.san).toBe(8);
     expectUnclaimed(completed, original);
@@ -104,8 +146,8 @@ describe("image misuse scholarship disqualification", () => {
       expect(paragraphs.length).toBeGreaterThanOrEqual(1);
       expect(paragraphs.length).toBeLessThanOrEqual(2);
     }
-    expect(JSON.stringify(completed.log)).toContain("国奖评选：国奖资格取消，金币 +0。");
-    expect(roll).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(completed.log)).toContain("国奖评选：SAN -2；国奖资格取消，金币 +0。");
+    expect(roll).toHaveBeenCalledTimes(2);
   });
 
   it("does not report image misuse when the score misses the cutoff", () => {
@@ -156,9 +198,9 @@ describe("image misuse scholarship disqualification", () => {
     const original = playingState();
     const roll = vi.fn(() => 0.67);
     let state = queueScholarship(original, roll);
-    const snapshot = structuredClone(currentEvent(state).scholarshipContext);
     if (stage !== "act1") state = resolve(state);
     if (stage === "result") state = resolve(state);
+    const snapshot = structuredClone(currentEvent(state).scholarshipContext);
     const staleChoiceId = currentEvent(state).choices[0]!.id;
     const originalPatch = structuredClone(currentEvent(state).deferredStatePatch);
     state = { ...state, buffs: [...state.buffs, createImageMisuseBuff()] };
@@ -175,7 +217,7 @@ describe("image misuse scholarship disqualification", () => {
     expectUnclaimed(state, original);
     expect(state.player.san).toBe(8);
     expect(state.eventHistory.at(-1)!.stages.at(-1)!.description).toContain("举报");
-    expect(roll).toHaveBeenCalledTimes(1);
+    expect(roll).toHaveBeenCalledTimes(2);
   });
 
   it("checks a stale claim id at final confirmation without a prior refresh", () => {
@@ -208,7 +250,7 @@ describe("image misuse scholarship disqualification", () => {
     expectUnclaimed(completed, changed);
     expect(completed.player.san).toBe(7);
     expect(completed.externalPublications).toEqual(changed.externalPublications);
-    expect(roll).toHaveBeenCalledTimes(1);
+    expect(roll).toHaveBeenCalledTimes(2);
   });
 
   it.each(["act1", "act2", "result"] as const)("refreshes current achievements during %s while retaining the drawn cutoff", (stage) => {
@@ -227,7 +269,7 @@ describe("image misuse scholarship disqualification", () => {
       totalResearchScore: 7,
       externalPublications: [...state.externalPublications, newPaper, nonFirst],
     });
-    expect(currentEvent(state).scholarshipContext).toMatchObject({ score: 5, requirement: 4, success: true });
+    expect(currentEvent(state).scholarshipContext).toMatchObject({ score: 5, requirement: stage === "result" ? 4 : null, success: stage === "result" });
     expect(currentEvent(state).scholarshipContext!.eligiblePaperIds).toContain(newPaper.id);
     expect(currentEvent(state).scholarshipContext!.eligiblePaperIds).not.toContain(nonFirst.id);
     if (stage === "act2") {
@@ -243,7 +285,7 @@ describe("image misuse scholarship disqualification", () => {
     expect(state.scholarshipState.scoreBaseline).toBe(7);
     expect(state.scholarshipState.claimedPaperIds).toContain(newPaper.id);
     expect(state.scholarshipState.claimedPaperIds).not.toContain(nonFirst.id);
-    expect(roll).toHaveBeenCalledTimes(1);
+    expect(roll).toHaveBeenCalledTimes(2);
   });
 
   it("rechecks gains and losses at confirmation even with the previous result's button id", () => {
@@ -272,17 +314,13 @@ describe("image misuse scholarship disqualification", () => {
       evaluateImmediateEndings: (state) => state,
       runPostQueuePipeline: (state) => state,
     })).toBe(completed);
-    const rawReplay = applyChoiceEffectsToState(completed, choice).nextState;
-    expect(rawReplay.player).toEqual(completed.player);
-    expect(rawReplay.scholarshipState).toEqual(completed.scholarshipState);
   });
 
   it("rejects the final claim choice before the result scene is queued", () => {
     const original = playingState({ buffs: [createImageMisuseBuff()] });
     const queued = queueScholarship(original);
     const root = currentEvent(queued);
-    const score = root.choices[0]!.effects.enqueueEvents![0]!;
-    const claimId = score.choices[0]!.effects.enqueueEvents![0]!.choices[0]!.id;
+    const claimId = `scholarship-claim-y${root.scholarshipContext!.year}-m${root.scholarshipContext!.month}`;
     for (const state of [queued, resolve(queued)]) {
       const attempted = resolve(state, claimId);
       expectUnclaimed(attempted, original);
@@ -347,7 +385,7 @@ describe("image misuse scholarship disqualification", () => {
       eventQueue: [{
         ...result,
         deferredStatePatch: [
-          ...result.deferredStatePatch!,
+          ...(result.deferredStatePatch ?? []),
           { path: ["player", "money"], previousValue: original.player.money, value: original.player.money + 6 },
           { path: ["scholarshipState", "lastAwardYear"], previousValue: 2, value: award.year },
           { path: ["scholarshipState", "scoreBaseline"], previousValue: 2, value: award.scoreBaseline },
@@ -388,7 +426,10 @@ describe("image misuse scholarship disqualification", () => {
     const original = playingState({ buffs: [createImageMisuseBuff()] });
     const queued = queueScholarship(original);
     const decision = resolve(queued);
+    const random = vi.mocked(Math.random);
+    random.mockClear();
     const preview = resolve(decision, currentEvent(decision).choices[1]!.id);
+    expect(random).not.toHaveBeenCalled();
     expect(currentEvent(preview).stage).toBe("result");
     expect(currentEvent(preview).description).toContain("结果：无事发生");
     expectUnclaimed(preview, original);

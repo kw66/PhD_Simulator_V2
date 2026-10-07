@@ -24,17 +24,17 @@ export interface AdvisorGrantDefinition {
 }
 
 export const ADVISOR_GRANTS: readonly AdvisorGrantDefinition[] = [
-  { id: "youth", name: "青基", threshold: 25, funding: 10, durationYears: 3 },
-  { id: "general", name: "面上", threshold: 50, funding: 20, durationYears: 4 },
-  { id: "excellent", name: "优青", threshold: 150, funding: 50, durationYears: 3 },
-  { id: "distinguished", name: "杰青", threshold: 400, funding: 100, durationYears: 5 },
-  { id: "academician", name: "院士", threshold: 1000, funding: 200, durationYears: 0 },
+  { id: "youth", name: "青基", threshold: 25, funding: 30, durationYears: 3 },
+  { id: "general", name: "面上", threshold: 50, funding: 60, durationYears: 4 },
+  { id: "excellent", name: "优青", threshold: 150, funding: 150, durationYears: 3 },
+  { id: "distinguished", name: "杰青", threshold: 400, funding: 300, durationYears: 5 },
+  { id: "academician", name: "院士", threshold: 1000, funding: 600, durationYears: 0 },
 ];
 
 export function createAdvisorProgressState(): AdvisorProgressState {
   return {
     researchAccumulation: 20,
-    funding: 10,
+    funding: 30,
     horizontalProgress: 0,
     verticalProgress: 0,
     nextProject: "horizontal",
@@ -251,25 +251,15 @@ export function settleAdvisorMonth(state: GameState, random: () => number = Math
   };
   if (state.totalMonths > 0 && advisor.lastAdvisorProjectTotalMonths !== state.totalMonths) {
     const projectType = advisor.nextProject ?? "horizontal";
-    if (projectType === "horizontal" && advisor.funding <= 0) {
-      advisor = {
-        ...advisor,
-        nextProject: "vertical",
-        lastAdvisorProjectTotalMonths: state.totalMonths,
-        lastProjectTotalMonths: state.totalMonths,
-        monthlyActivity: "横向项目暂停（科研经费不足）",
-      };
-    } else {
-      const result = advanceSharedLabProject({ ...nextState, advisorProgressState: advisor }, projectType, 10, random);
-      nextState = result.state;
-      advisor = {
-        ...nextState.advisorProgressState,
-        nextProject: projectType === "horizontal" ? "vertical" : "horizontal",
-        lastAdvisorProjectTotalMonths: state.totalMonths,
-        lastProjectTotalMonths: state.totalMonths,
-        monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度 +10${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导论文" : "（项目完成）" : ""}`,
-      };
-    }
+    const result = advanceSharedLabProject({ ...nextState, advisorProgressState: advisor }, projectType, 10, random);
+    nextState = result.state;
+    advisor = {
+      ...nextState.advisorProgressState,
+      nextProject: projectType === "horizontal" ? "vertical" : "horizontal",
+      lastAdvisorProjectTotalMonths: state.totalMonths,
+      lastProjectTotalMonths: state.totalMonths,
+      monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度 +10${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导论文" : "（项目完成）" : ""}`,
+    };
   }
   const calendarMonth = getAcademicCalendarMonth(state.month);
   const calendarYear = getAcademicCalendarYear(state.year, state.month);

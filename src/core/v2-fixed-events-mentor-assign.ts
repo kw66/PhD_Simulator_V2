@@ -27,12 +27,14 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
       state.totalMonths * 1000 + state.year * 10 + state.month + (index + 1) * 97,
       undefined,
       generatedNames,
-      recordRoll,
+      undefined,
+      { year: state.year, month: state.month, fixedYear: 1 },
+      `mentor-assign:${state.totalMonths}:${index}:${recordRoll()}`,
     );
     generatedNames.push(addition.name ?? "");
     const roleLabel = getFellowRoleLabel(addition.type, addition.gender);
     const label = `${roleLabel} ${addition.name ?? "新生"}`;
-    const description = CANDIDATE_DESCRIPTIONS[addition.research]!;
+    const description = CANDIDATE_DESCRIPTIONS[Math.max(0, Math.min(3, addition.research - 2))]!;
     return {
       addition,
       label,

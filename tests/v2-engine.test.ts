@@ -362,7 +362,7 @@ describe("minimal game engine", () => {
     expect(advanced.buffs).toEqual([]);
     expect(advanced.log[0]?.text).toBe([
       "进入第 1 年 2 月。",
-      "月初结算：自动恢复 SAN +1｜导师工资 金币 +1｜秋季 SAN +1｜每月补贴 金币 +2",
+      "月初结算：自动恢复 SAN +1｜学生工资 金币 +1（实验室学生工资经费 -1）｜秋季 SAN +1｜每月补贴 金币 +2",
     ].join("\n"));
   });
 
@@ -458,7 +458,7 @@ describe("minimal game engine", () => {
     state = resolveCurrent(state);
     expect(state.degree).toBe("phd");
     expect(state.phdStartYear).toBe(3);
-    expect(state.maxMonths).toBe(68);
+    expect(state.maxMonths).toBe(70);
     expect(state.graduationScoreTarget).toBe(7);
     expect(state.eventQueue).toHaveLength(0);
     expect(state.eventHistory.at(-1)?.stages).toHaveLength(3);

@@ -226,6 +226,7 @@ describe("deferred-system event content", () => {
 
   it.each(["beautiful", "smart"] as const)("initializes %s only on result acceptance without start bonuses", (type) => {
     const base: GameState = { ...createInitialState(), phase: "playing", totalMonths: 5 };
+    expect(base.year).toBe(1);
     const event = createLoverDevelopmentAct1(buildLoverDevelopmentContext({
       conferenceEncounterState: base.conferenceEncounterState, totalMonths: base.totalMonths, type, playerGender: "female",
     }));
@@ -234,10 +235,10 @@ describe("deferred-system event content", () => {
     expect(chosen.loverProgressState.active).toBe(false);
     const accepted = resolve(chosen, "close");
     expect(accepted.loverState).toMatchObject({ active: true, type, gender: "male", startTotalMonths: 5 });
-    expect(accepted.loverProgressState.research).toBeGreaterThanOrEqual(type === "smart" ? 9 : 3);
-    expect(accepted.loverProgressState.research).toBeLessThanOrEqual(type === "smart" ? 12 : 6);
-    expect(accepted.loverProgressState.intimacy).toBeGreaterThanOrEqual(type === "beautiful" ? 9 : 3);
-    expect(accepted.loverProgressState.intimacy).toBeLessThanOrEqual(type === "beautiful" ? 12 : 6);
+    expect(accepted.loverProgressState.research).toBeGreaterThanOrEqual(type === "smart" ? 6 : 2);
+    expect(accepted.loverProgressState.research).toBeLessThanOrEqual(type === "smart" ? 9 : 5);
+    expect(accepted.loverProgressState.intimacy).toBeGreaterThanOrEqual(type === "beautiful" ? 6 : 3);
+    expect(accepted.loverProgressState.intimacy).toBeLessThanOrEqual(type === "beautiful" ? 9 : 6);
     expect(accepted.loverProgressState.routes).toEqual({
       play: { progress: 0, completed: 0 }, study: { progress: 0, completed: 0 }, shopping: { progress: 0, completed: 0 },
     });
@@ -291,7 +292,7 @@ describe("deferred-system event content", () => {
     const selfActivity = selfConfirmation?.choices[0]?.effects.enqueueEvents?.[0];
     expect(selfActivity?.title).toBe("会场活动");
     expect(selfActivity?.description).toContain("自费参会");
-    expect(selfActivity?.description).toContain("金币 -6");
+    expect(selfActivity?.description).toContain("金币 -7");
     expect(selfActivity?.chainId).toBe(`${event.chainId}-activity`);
 
     const grouped = buildConferenceDecisionEventsForAcceptedPapers([
@@ -402,7 +403,7 @@ describe("deferred-system event content", () => {
     state = resolve(state, "continue");
     state = resolve(state, "proxy");
     expect(state.eventQueue[0]?.title).toContain("参会确认");
-    expect(state.eventQueue[0]?.description).toContain("代参会费用 0");
+    expect(state.eventQueue[0]?.description).toContain("金币 -1");
     state = resolve(state, "proxy-finish");
 
     expect(state.eventQueue).toHaveLength(0);
@@ -410,6 +411,6 @@ describe("deferred-system event content", () => {
     expect(state.eventHistory[0]?.stages).toHaveLength(3);
     expect(state.eventHistory[0]?.stages.some((stage) => stage.title.includes("会场安排"))).toBe(false);
     expect(state.eventCounters.meetingCount).toBe(0);
-    expect(state.log.some((entry) => entry.text.includes("同学代参会") && entry.text.includes("论文参会已处理"))).toBe(true);
+    expect(state.log.some((entry) => entry.text.includes("线上代参会") && entry.text.includes("论文参会已处理"))).toBe(true);
   });
 });

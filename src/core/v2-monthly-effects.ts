@@ -1,6 +1,9 @@
 import { addOrReplaceBuffs, advanceBuffDurations, getActiveBuffs, removeBuffs } from "./v2-buffs";
 import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipSalaryPayment, getInternshipStatus } from "./v2-internship-system";
 import { getAdvisorSalaryPayment } from "./v2-advisor-progress";
+import { getLabPayroll, settleLabPayroll } from "./v2-lab-payroll";
+import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
+import { reconcileLabAiReimbursements } from "./v2-lab-reimbursements";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
@@ -76,9 +79,10 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
   if (state.selectedAdvisorName) {
     effects.push({
       id: "advisor-salary",
-      name: "导师工资",
+      name: "学生工资",
       source: "导师待遇",
       stats: { money: getAdvisorSalaryPayment(state.advisorProgressState, state.degree).payment },
+      note: `实验室学生工资经费 -${getLabPayroll(state).total}`,
     });
   }
 
@@ -463,6 +467,7 @@ export function applyMonthStartSubscriptions(
 }
 
 export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
+  state = reconcileLabAiReimbursements(state, state.totalMonths - 1);
   const resolution = resolveMonthlyEffects(state);
   const internshipState = advanceInternshipMonth(state);
   if (resolution.items.some((item) => item.id === "internship-monthly")) {
@@ -492,8 +497,9 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
       note: `SAN 上限 +${bikeCapGain}`,
     });
   }
+  const payrollState = settleLabPayroll(state);
   const monthStartState: GameState = {
-    ...state,
+    ...payrollState,
     player: { ...resolution.player },
     shopState: {
       ...state.shopState,
@@ -548,6 +554,9 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
 }
 
 export function previewNextMonthEffects(state: GameState): MonthlyEffectResolution {
+  if (state.phase === "finished" || state.totalMonths >= state.maxMonths) {
+    return { items: [], totals: emptyTotals(), player: { ...state.player } };
+  }
   const hasMonthStartBuff = state.buffs.some((buff) => (
     buff.timing !== "next-action"
     && (buff.remainingMonths === null || buff.remainingMonths > 0)
@@ -563,7 +572,7 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
   const nextTotalMonths = state.totalMonths + 1;
   const calendar = getCalendarForTotalMonths(nextTotalMonths, state.degree);
   const nextMonthState = {
-    ...state,
+    ...settleFellowAcademicYear(state),
     totalMonths: nextTotalMonths,
     year: calendar.year,
     month: calendar.month,

@@ -130,13 +130,13 @@ describe("event candidate eligibility and presentation", () => {
     const intro = createMentorAssignEvent(base);
     const decision = intro.choices[0]!.effects.enqueueEvents![0]!;
     const candidates = decision.choices.map((choice) => choice.effects.fellowAdditions![0]!);
-    expect(candidates.map((candidate) => candidate.research).sort()).toEqual([0, 1, 2, 3]);
+    expect(candidates.every((candidate) => candidate.academicYear === 1 && candidate.research >= 2 && candidate.research <= 5)).toBe(true);
     expect(new Set(decision.choices.map((choice) => choice.label)).size).toBe(4);
     const descriptions = ["从头学起", "尝试复现", "基础实验", "独立复现实验"];
     for (const choice of decision.choices) {
       const candidate = choice.effects.fellowAdditions![0]!;
       expect(decision.description).toContain(`**${choice.label}**`);
-      expect(decision.description).toContain(descriptions[candidate.research]);
+      expect(decision.description).toContain(descriptions[candidate.research - 2]);
       expect(choice.effects.fellowAdditions?.[0]).toMatchObject({ research: candidate.research, affinity: candidate.affinity });
       expect(choice.outcome).toMatch(/^师[弟妹] \+1$/);
       const result = choice.effects.enqueueEvents![0]!;

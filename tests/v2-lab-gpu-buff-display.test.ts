@@ -39,7 +39,9 @@ describe("lab GPU failure Buff display", () => {
       sources: [expect.stringContaining("显卡故障 · 剩余 6 月")],
     })]);
     expect(buckets.monthly[0]!.sources[0]).toContain("玩家与同学共享");
-    expect(buckets.monthly[0]!.sources[0]).toContain("优先导师经费，不足玩家自付，同学不足转横向");
+    expect(buckets.monthly[0]!.sources[0]).toContain("由实验室经费支付");
+    expect(buckets.monthly[0]!.sources[0]).toContain("经费不足时玩家暂停实验、同学改做横向");
+    expect(buckets.monthly[0]!.sources[0]).not.toMatch(/玩家自付|自费/);
   });
 
   it.each([
@@ -97,7 +99,9 @@ describe("lab GPU failure Buff display", () => {
 
     expect(surcharge).toContain('class="effect-chip is-money is-debuff"');
     expect(surcharge).toContain("玩家与同学共享");
-    expect(surcharge).toContain("优先导师经费，不足玩家自付，同学不足转横向");
+    expect(surcharge).toContain("由实验室经费支付");
+    expect(surcharge).toContain("经费不足时玩家暂停实验、同学改做横向");
+    expect(surcharge).not.toMatch(/玩家自付|自费/);
     expect(getEffectChip(sidebar, "实验金币 -2")).toContain('class="effect-chip is-money"');
     expect(getEffectChip(sidebar, "实验金币 -2")).toContain("个人显卡");
     expect(getEffectChip(sidebar, "实验金币 -1")).toContain('class="effect-chip is-money"');
@@ -116,9 +120,14 @@ describe("lab GPU failure Buff display", () => {
 
     expect(help).toContain("算力短缺持续6个月，玩家与同学每次实验费用+1");
     expect(help).toContain("减免仅限玩家");
-    expect(help).toContain("先算共享涨价与个人减免，再");
+    expect(help).toContain("先算共享涨价与个人减免");
+    expect(help).not.toMatch(/不足部分自付|最后扣你的金币|自费租卡/);
     if (activePlayTab === "relationship") {
+      expect(help).toContain("经费不足时不开展实验");
       expect(help).toContain("同学经费不足当次实验费用时改做横向");
+    } else {
+      expect(help).toContain("费用由实验室支付，不足时暂停实验");
+      expect(help).toContain("悬浮实验按钮查看实际经费消耗");
     }
   });
 

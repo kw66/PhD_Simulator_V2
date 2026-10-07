@@ -48,6 +48,29 @@ function finishEvent(state: GameState, event: PendingEvent, label: string): Game
 afterEach(() => vi.restoreAllMocks());
 
 describe("campus result conditions", () => {
+  it("keeps dinner attendance and KTV song fixed when resistance tiers change", () => {
+    const build = (social: number, favor: number) => {
+      const state = makeState();
+      state.player = { ...state.player, social, favor };
+      const rolls = [0.2, 0.9, 0.1, 0.9, 0.7];
+      let index = 0;
+      const event = createCampusRandomEventById(7, state, () => rolls[index++] ?? 0)!;
+      const choices = event.choices[0]!.effects.enqueueEvents![0]!.choices;
+      return { dinner: choices.find((choice) => choice.label === "聚餐")!,
+        song: choices.find((choice) => choice.label === "KTV 唱歌")! };
+    };
+    const baseline = build(5, 5);
+    expect(baseline.song).toBeDefined();
+    expect(baseline.dinner.outcome).toContain("导师请客");
+    for (const [social, favor] of [[6, 5], [5, 6], [18, 18]]) {
+      const changed = build(social!, favor!);
+      expect(changed.dinner.outcome).toContain("导师请客");
+      expect(changed.dinner.effects.money).toEqual(baseline.dinner.effects.money);
+      expect(changed.song.effects.enqueueEvents![0]!.description.split("机制结算")[0])
+        .toEqual(baseline.song.effects.enqueueEvents![0]!.description.split("机制结算")[0]);
+    }
+  });
+
   it.each([
     [5, "导师好感 < 6", 3],
     [6, "6 ≤ 导师好感 < 12", 5],
@@ -60,8 +83,8 @@ describe("campus result conditions", () => {
     const state = makeState();
     state.player.favor = favor;
     const { event, choice, result } = getBranch(state, 8, "发劳务费");
-    expect(choice.outcome).toBe(`${condition}｜金币 +${gain}。`);
-    expect(choice.effects.money).toBe(gain);
+    expect(choice.outcome).toBe(`${condition}｜金币 +${gain}；实验室经费 -${gain}。`);
+    expect(result.choices[0]?.effects.money).toBe(gain);
     const completed = finishEvent(state, event, "发劳务费");
     expect(completed.player.money).toBe(state.player.money + gain);
     expect(completed.eventHistory.at(-1)!.stages.at(-1)!.description).toBe(result.description);

@@ -227,7 +227,7 @@ describe("fellow research lifecycle", () => {
   it("uses shared exposure, citation fractions, promotion and decay without crediting unrelated papers to the player", () => {
     const state = makeState();
     const paper = attachPaperPublication({ ...prepareConferenceSubmission({ ...state.fellowPapers![0]!, idea: 100, experiment: 100, writing: 100 }, "A", 1, 1), status: "published", conferenceHandled: false, conferenceAvailableAtTotalMonths: 5 }, 1, "Oral", 1.2);
-    const before = { ...state, totalMonths: 4, month: 4, fellowPapers: [paper] };
+    const before = { ...state, selectedAdvisorName: "Advisor", totalMonths: 4, month: 4, fellowPapers: [paper] };
     expect(settlePaperCitationMonth(before, paper).amount).toBe(0);
     let next = advanceFellowResearch(attendFellowConferences({ ...before, totalMonths: 5, month: 5 }), () => 0);
     const expected = settlePaperCitationMonth(next, { ...paper, conferenceHandled: true });
@@ -257,7 +257,8 @@ describe("fellow research lifecycle", () => {
     expect(next.publicationTalentState?.claimedIds).toContain("first-coauthor-paper");
     expect(next.publicationTalentState?.claimedIds).not.toContain("first-paper");
     expect(next.relationshipState.unlockedSlots).toBe(3);
-    const atConference = attendFellowConferences({ ...next, totalMonths: 5, month: 5 });
+    const atConference = attendFellowConferences({ ...next, selectedAdvisorName: "Advisor", totalMonths: 5, month: 5 });
+    expect(atConference.externalPublications[0]?.conferenceHandled).toBe(true);
     const settled = settlePublishedPaperCitations(atConference).state;
     expect(settled.totalCitations).toBe(settled.externalPublications[0]!.publication!.citations);
     expect(settled.totalCitations).toBeGreaterThan(0);
@@ -359,10 +360,14 @@ describe("fellow reciprocal cooperation", () => {
       ...prepareConferenceSubmission({ ...base.fellowPapers![0]!, idea: 100, experiment: 100, writing: 100 }, "A", 1, 1),
       status: "published", conferenceHandled: false, conferenceAvailableAtTotalMonths: 5,
     }, 1, "Oral", 1.2);
-    const state = { ...base, totalMonths: 4, month: 4, fellowPapers: [{ ...paper, publication: { ...paper.publication!, monthsSincePublish: 2 } }] };
+    const state = { ...base, selectedAdvisorName: "Advisor", totalMonths: 4, month: 4,
+      advisorProgressState: { ...base.advisorProgressState, funding: 100 },
+      fellowPapers: [{ ...paper, publication: { ...paper.publication!, monthsSincePublish: 2 } }] };
     const atConference = dispatchAction(state, "next-month");
+    expect(atConference.phase).toBe("playing");
     expect(atConference.fellowPapers![0]).toMatchObject({ conferenceHandled: true, publication: { citations: 0 } });
     const afterConference = dispatchAction({ ...atConference, eventQueue: [] }, "next-month");
+    expect(afterConference.phase).toBe("playing");
     expect(afterConference.fellowPapers![0]!.publication!.citations).toBeGreaterThan(0);
     expect(afterConference.totalCitations).toBe(0);
   });

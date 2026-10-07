@@ -29,15 +29,20 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigSkipResultEvent(state)],
       };
     case "ccig-advisor": {
+      const { actualCost } = getCcigSelfPayCost(state);
       const favorResult = applyTierResist(-1, state.player.favor, getRoll);
       const favorChange = favorResult.effectiveChange;
       const favorNarrative = getTierResistedNarrative("导师好感", -1, favorResult);
       const nextState = state;
       const settlement = formatTierResistedOutcome("导师好感", -1, favorResult);
+      const fundingSettlement = `实验室经费 -${actualCost}`;
       return {
         nextState,
-        outcome: `${settlement}，报销通过。`,
-        enqueueEvents: [createCcigAttendResultEvent(state, "advisor", ["导师报销", settlement], favorNarrative, favorChange < 0 ? { favor: favorChange } : {})],
+        outcome: state.advisorProgressState.funding < actualCost ? `实验室经费不足，需要 ${actualCost} 金币。` : `${settlement}，${fundingSettlement}，报销通过。`,
+        enqueueEvents: [createCcigAttendResultEvent(state, "advisor", ["导师报销", settlement, fundingSettlement], favorNarrative, {
+          ...(favorChange < 0 ? { favor: favorChange } : {}),
+          advisorProgressStateDeltas: { funding: -actualCost },
+        })],
       };
     }
     case "ccig-self": {

@@ -1,6 +1,6 @@
 import { getAiCollaborationStatus } from "./v2-ai-shop";
 import { getCurrentCoffeeBonus } from "./v2-coffee-system";
-import { getRegionalMeetingDiscount, hasFullGear, hasPerfectWorkstation } from "./v2-meeting-system";
+import { hasFullGear, hasPerfectWorkstation } from "./v2-meeting-system";
 import { addOrReplaceBuffs } from "./v2-buffs";
 import { getReadingIdeaBonus } from "./v2-reading-system";
 import { getResearchCap } from "./v2-research-cap-system";
@@ -30,13 +30,6 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
   if (workGrowth > 0) add("part-time-growth", "熟练打工", `累计打工${after.partTimeWorkCount}次`, [
     `打工金币收入 +${workGrowth}`, `打工基础SAN消耗 +${workGrowth}`,
   ]);
-  const meetingEffects = [2, 4, 6].flatMap((cost, index) => {
-    const region = ["domestic", "asia", "west"][index] as "domestic" | "asia" | "west";
-    const old = getRegionalMeetingDiscount(before.eventCounters, region, cost);
-    const current = getRegionalMeetingDiscount(after.eventCounters, region, cost);
-    return current > old ? [`${["国内", "亚太", "欧美"][index]}参会减免 ${old}→${current}金币`] : [];
-  });
-  if (meetingEffects.length) add("meeting-experience", "会议经验", `累计参会${after.eventCounters.meetingCount}次`, meetingEffects);
   if (after.eventCounters.badmintonCount > before.eventCounters.badmintonCount) {
     const effects = ["胜率提升"];
     if (!before.eventSupport.hasStrongBodyTalent && after.eventSupport.hasStrongBodyTalent) effects.push("首次获胜，每月SAN +1");

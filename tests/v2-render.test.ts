@@ -191,13 +191,13 @@ function readAnimationNumbers(html: string): Map<string, number> {
 }
 
 describe("v2 explicit render animation markers", () => {
-  it("shows academician funding as a one-time 200 reward in cards and help", () => {
+  it("shows academician funding as a one-time 600 reward in cards and help", () => {
     const state = createRelationshipCardTestState();
     state.advisorProgressState.awards = [{ id: "academician", awardedYear: 2024, startYear: null, endYear: null }];
     const relationship = renderApp(state, undefined, { activePlayTab: "relationship" });
-    expect(relationship).toContain("一次性科研经费+200");
+    expect(relationship).toContain("一次性科研经费+600");
     expect(relationship).not.toContain("每月经费+1");
-    expect(getHelpText({ activePlayTab: "relationship" })).toContain("当选时一次性经费+200");
+    expect(getHelpText({ activePlayTab: "relationship" })).toContain("当选时一次性经费+600");
   });
 
   it.each([0, 3, 4, 7, 8])("keeps GPU level %i cost buffs and funding tooltips in sync", (gpuLevel) => {
@@ -208,15 +208,20 @@ describe("v2 explicit render animation markers", () => {
     for (const internshipActive of [false, true]) {
       if (internshipActive) state.internshipState = activateRemoteInternship(state.totalMonths - 1);
       const total = Math.max(0, 3 - discount - Number(internshipActive));
-      for (const funding of [0, 1, 10]) {
+      for (const funding of [...new Set([0, 1, total, 10])]) {
         state.advisorProgressState.funding = funding;
         const html = renderApp(state, undefined, { activePlayTab: "workstation" });
         const experimentButton = html.match(/<button[^>]*class="[^"]*workstation-paper-action-btn is-experiment[^"]*"[\s\S]*?<\/button>/)?.[0] ?? "";
-        const funded = Math.min(total, funding);
-        const paid = total - funded;
-        if (paid > 0) expect(experimentButton).toContain(`金币-${paid}`);
-        expect(experimentButton).not.toContain("金币-0");
-        expect(experimentButton).toContain(paid === 0 || funded > 0 ? `消耗${funded}导师经费` : `自费租卡：金币-${paid}`);
+        expect(experimentButton).not.toMatch(/金币-|自费租卡/);
+        expect(experimentButton).toContain(`消耗${total}导师经费`);
+        if (funding < total) {
+          expect(experimentButton).toContain(`科研经费不足，需要 ${total}`);
+          expect(experimentButton).toContain('disabled aria-disabled="true"');
+          expect(experimentButton).not.toContain('data-action="research-paper"');
+        } else {
+          expect(experimentButton).toContain('data-action="research-paper"');
+          expect(experimentButton).not.toContain("disabled");
+        }
         if (discount > 0) {
           expect(html).toContain(`实验金币 -${discount}`);
           expect(html).toContain("个人显卡 · 先减实验费用，再使用导师经费");
@@ -316,10 +321,13 @@ describe("v2 explicit render animation markers", () => {
     expect(advisor).toContain(`<span class="rel-action-label">${icon("🛠️")}做横向</span>`);
     for (const card of [fellow, lover]) {
       expect(card).toContain(`<span class="rel-detail-label">${icon("💡")}科研</span>`);
-      expect(card).toContain('class="rel-known-time"');
-      expect(card).toContain(`${icon("🗓️")}认识<strong`);
       expect(card).toContain('data-animate-number="7">7</span>/20');
     }
+    expect(fellow).not.toContain('class="rel-known-time"');
+    expect(fellow).toContain('class="rel-fellow-academic-row"');
+    expect(fellow).toContain(icon("🎓"));
+    expect(lover).toContain('class="rel-known-time"');
+    expect(lover).toContain(`${icon("🗓️")}认识<strong`);
     expect(fellow).toContain(`<span class="rel-detail-label">${icon("🤝")}默契</span>`);
     expect(fellow).toContain(`${icon("🤝")}协作进度</span>`);
     expect(fellow).toContain(`<span class="rel-action-label">${icon("🤝")}科研协作</span>`);
@@ -461,10 +469,12 @@ describe("v2 explicit render animation markers", () => {
     state.eventCounters.pokerProfit = profit;
     const html = renderAppWithAnimations(state, createDefaultAccountProfile(), { activeTalentTab: "growth" });
     const numbers = readAnimationNumbers(html);
-    for (const id of ["reading-growth", "part-time-growth", "meeting-experience", "badminton-growth", "poker-growth"]) {
+    for (const id of ["reading-growth", "part-time-growth", "badminton-growth", "poker-growth"]) {
       expect(html).toContain(`data-animate-bar="talent:${id}:progress"`);
       expect(numbers.has(`talent:${id}:progress:value`)).toBe(true);
     }
+    expect(html).not.toContain('data-talent-item-id="meeting-experience"');
+    expect(html).not.toContain('data-animate-bar="talent:meeting-experience:progress"');
     expect(numbers.get("talent:reading-growth:progress:value")).toBe(3);
     expect(numbers.get("talent:poker-growth:metric:赚取金币:profit")).toBe(profit);
     expect(html).toContain(renderAnimatedNumber("talent:poker-growth:metric:赚取金币:profit", profit, `${profit >= 0 ? "+" : "-"}${Math.abs(profit)}`));
@@ -734,10 +744,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("下次金币");
     expect(html).toContain("下次 SAN");
     expect(html).toContain("升档进度");
-    expect(html).toContain("每类地区每 3 次参会，减免 +1 金币（最多半价）");
-    expect(html).toContain("国内");
-    expect(html).toContain("亚太");
-    expect(html).toContain("欧美");
+    expect(html).not.toContain('data-talent-item-id="meeting-experience"');
+    expect(html).not.toContain("每类地区每 3 次参会，减免 +1 金币（最多半价）");
     expect(html).toContain("羽毛球水平");
     expect(html).toContain("牌局策略");
     const badmintonCard = getTalentCardHtml(html, "badminton-growth");
@@ -1462,7 +1470,7 @@ describe("v2 render lobby shell", () => {
       ["computing-support", "算力后盾", "转博时获得1次显卡报销/级", 4, 2, "growing-familiarity"],
       ["workspace-renewal", "工位焕新", "转博时获得1次工位报销/级", 4, 2, "growing-familiarity"],
       ["mentor-insight", "名师点拨", "导师协作分+50%/级", 2, 2, "family-patronage"],
-      ["funding-shield", "经费护航", "科研经费≥20且足够支付时，购买AI优先使用经费", 3, 1, "computing-support workspace-renewal"],
+      ["funding-shield", "经费护航", "科研经费≥60且足够支付时，购买AI优先使用经费", 3, 1, "computing-support workspace-renewal"],
       ["learning-by-osmosis", "耳濡目染", "转博后科研能力视为科研能力与导师好感的较大值", 6, 1, "mentor-insight"],
     ] as const) {
       const node = tree.match(new RegExp('<button[^>]*data-talent-id="' + id + '"[\\s\\S]*?<\\/button>'))?.[0] ?? "";
@@ -4040,8 +4048,8 @@ describe("v2 render lobby shell", () => {
     expect(advisorTalent).toContain('<span>硕士工资</span>');
     expect(advisorTalent).toContain('<span>博士工资</span>');
     const salaryRows = [
-      ["讲师", "—", "10", 1, 3], ["副教授", "青基", "10", 1.25, 3.5], ["教授·四级", "面上", "20", 1.5, 4],
-      ["教授·三级", "优青", "50", 1.75, 4.5], ["教授·二级", "杰青", "100", 2, 5], ["教授·一级", "院士", "200", 2.25, 5.5],
+      ["讲师", "—", "30", 1, 3], ["副教授", "青基", "30", 1.25, 3.5], ["教授·四级", "面上", "60", 1.5, 4],
+      ["教授·三级", "优青", "150", 1.75, 4.5], ["教授·二级", "杰青", "300", 2, 5], ["教授·一级", "院士", "600", 2.25, 5.5],
     ];
     for (let startIndex = 0; startIndex < 6; startIndex += 1) {
       const page = getTalentCardHtml(renderApp(state, createDefaultAccountProfile(), {
@@ -4049,6 +4057,7 @@ describe("v2 render lobby shell", () => {
       }), "advisor");
       const [rank, condition, funding, master, phd] = salaryRows[startIndex]!;
       expect(page).not.toContain("周期");
+      if (startIndex === 0) expect(page).toContain("初始职称，科研启动经费30");
       if (startIndex > 0) expect(page).toContain(`科研积累${[25, 50, 150, 400, 1000][startIndex - 1]}可晋升`);
       for (const [label, value] of [["职称", rank], ["条件", condition], ["经费", `+${funding}`], ["硕士工资", `${master}金币`], ["博士工资", `${phd}金币`]] as const) {
         expect(page).toContain(`<span>${label}</span>`);
@@ -4062,7 +4071,14 @@ describe("v2 render lobby shell", () => {
     expect(relationHtml).not.toContain("实验室互帮互助");
     expect(relationHtml).toContain('data-talent-item-id="lab-mutual-growth"');
     expect(relationHtml).not.toContain('data-talent-item-id="fellow-publication-growth"');
-    expect(relationHtml).toContain("n为实验室科研高于他的人数");
+    const inheritance = getTalentCardHtml(relationHtml, "lab-mutual-growth");
+    expect(inheritance).toContain("每学年末（8月），你和同学科研+⌊n/2⌋");
+    expect(inheritance).toContain('data-relationship-tooltip data-tooltip="n为结算前科研更高的其他成员人数，导师计1人，恋人不计');
+    expect(inheritance).toContain("你的当前奖励");
+    expect(inheritance).toContain("当前同学累计");
+    expect(inheritance).toContain("包含自然成长与传承；同学离校或停止合作后不再计入");
+    expect(inheritance).toContain("玩家只获传承；同学另有自然成长+2，合并后逐点抵抗");
+    expect(inheritance).not.toMatch(/发表积累|累计一作|每学年9月/);
     expect(relationHtml).toContain('data-talent-item-id="lover"');
 
     const equipHtml = renderApp(state, createDefaultAccountProfile(), { activeTalentTab: "equip" });
@@ -4189,7 +4205,7 @@ describe("v2 render lobby shell", () => {
       year: 3,
       month: 8,
       totalMonths: 32,
-      maxMonths: 68,
+      maxMonths: 70,
       eventQueue: [],
     };
     const firstPage = renderApp(state, createDefaultAccountProfile(), { activePendingPage: 0 });
@@ -4819,7 +4835,7 @@ describe("v2 render lobby shell", () => {
     state.month = 1;
     const card = getRelationshipCardHtml(renderApp(state), "advisor");
     expect(card).toContain('aria-label="科研积累" aria-valuemin="0" aria-valuemax="25" aria-valuenow="20"');
-    expect(card).toContain('<strong class="rel-progress-val" aria-label="科研经费">10</strong>');
+    expect(card).toContain('<strong class="rel-progress-val" aria-label="科研经费">30</strong>');
     expect(card).toContain('20/25青基');
     expect(card).toContain('6月后可申请青基');
     expect(card).toContain('玩家和同学发表论文按科研分计入，同篇去重');
@@ -4831,6 +4847,56 @@ describe("v2 render lobby shell", () => {
     expect(card).not.toContain('role="progressbar" aria-label="科研经费"');
     expect(card.indexOf('aria-label="科研积累"')).toBeLessThan(card.indexOf('data-action="advisor-project" data-project-type="horizontal"'));
     expect(card).not.toMatch(/科研资源|信任度|rel-known-time|rel-card-meta/);
+  });
+
+  it("shows student payroll and pending fellow conference fees in the advisor row", () => {
+    const state = createRelationshipCardTestState();
+    state.eventQueue = [];
+    state.fellowProgressState[0]!.degree = "phd";
+    const paper = {
+      ...createPublishedPaper(0, "同学参会论文", "C", 20, 0),
+      leadAuthorId: state.fellowProgressState[0]!.id,
+      submittedMonth: 1, submittedYear: 1, conferenceHandled: false,
+    };
+    state.fellowPapers = [paper];
+    state.externalPublications = [paper];
+    const region = getConferenceLocation(1, "C", 1, state.conferenceLocationSeed).region;
+    const fee = { domestic: 2, asia: 4, west: 6 }[region];
+    const card = getRelationshipCardHtml(renderApp(state), "advisor");
+    const row = card.match(/<div class="rel-fellow-academic-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const rowText = row.replace(/<[^>]*>/g, "");
+    expect(rowText).toMatch(/学生月薪\s+6\b/);
+    expect(row).toContain("小数各自累计，实际月初支出见下月提示");
+    expect(rowText).toMatch(new RegExp(`同学待付\\s+${fee}\\b`));
+    expect(row).toContain("同学已录用论文的注册与差旅费用，离开人际栏后仍需支付");
+    expect(rowText).toMatch(/报销预留\s+0\b/);
+    expect(row).not.toContain("导师工资");
+    state.fellowPapers = [{ ...paper, conferenceHandled: true }];
+    state.externalPublications = state.fellowPapers;
+    expect(getRelationshipCardHtml(renderApp(state), "advisor").replace(/<[^>]*>/g, "")).toMatch(/同学待付\s+0\b/);
+  });
+
+  it.each([
+    { degree: "master", academicYear: 3, label: "第三年硕士", target: 1 },
+    { degree: "phd", academicYear: 6, label: "第六年博士", target: 7 },
+  ] as const)("shows $label and its publication score alongside research and rapport", ({ degree, academicYear, label, target }) => {
+    const state = createRelationshipCardTestState();
+    const fellow = state.fellowProgressState[0]!;
+    fellow.degree = degree;
+    fellow.academicYear = academicYear;
+    fellow.initialResearchScore = 2;
+    const paper = { ...createPublishedPaper(0, "学业成果", "C", 20, 0), leadAuthorId: fellow.id };
+    state.fellowPapers = [paper];
+    state.externalPublications = [paper];
+    const card = getRelationshipCardHtml(renderApp(state), "senior");
+    const row = card.match(/<div class="rel-fellow-academic-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    expect(row).toContain(label);
+    expect(row).toContain(`科研分 <strong class="rel-detail-value">3/${target}</strong>`);
+    expect(row).toContain('<span class="rel-detail-label">科研</span> <strong class="rel-detail-value">7/20</strong>');
+    expect(row).toContain('<span class="rel-detail-label">默契</span> <strong class="rel-detail-value">4/20</strong>');
+    expect(row).not.toMatch(/累计一作|篇时科研/);
+    expect(row).toContain("每学年末（8月），同学科研原始+2+⌊n/2⌋");
+    expect(card).not.toContain('class="rel-known-time"');
   });
 
   it.each([
@@ -4977,8 +5043,8 @@ describe("v2 render lobby shell", () => {
     const fellow = state.fellowProgressState.find((profile) => profile.type === expected.type);
     const meta = card.match(/<div class="rel-card-meta">([\s\S]*?)<\/div>/)?.[1] ?? "";
     const headerMain = card.match(/<div class="rel-header-main">([\s\S]*?)<\/div>/)?.[1] ?? "";
-    const attributes = headerMain;
-    const attributePairs = attributes.match(/<span class="rel-detail-item">[\s\S]*?<\/strong>\s*<\/span>/g) ?? [];
+    const attributes = fellow ? card.match(/<div class="rel-fellow-academic-row">([\s\S]*?)<\/div>/)?.[1] ?? "" : headerMain;
+    const attributePairs = attributes.match(/<span class="rel-detail-item">\s*<span class="rel-detail-label">[\s\S]*?<\/strong>\s*<\/span>/g) ?? [];
     const headers = card.match(/<div class="rel-progress-header">[\s\S]*?<\/div>/g) ?? [];
     const notes = [...card.matchAll(/<div class="rel-progress-note"[^>]*>([^<]*)<\/div>/g)].map((match) => match[1]);
     const buttons = card.match(/<button class="btn-sm rel-action-btn[^>]*>[\s\S]*?<\/button>/g) ?? [];
@@ -4996,27 +5062,30 @@ describe("v2 render lobby shell", () => {
     expect(card).toContain(`<strong class="rel-name">${expected.name}</strong>`);
     expect(card).not.toContain("rel-card-alert");
     if (expected.type !== "advisor") {
-      expect(meta).toContain('class="rel-known-time"');
-      expect(meta).toContain(`认识<strong class="rel-detail-value">${expected.months}</strong>月</span>`);
+      expect(meta).not.toContain('class="rel-known-time"');
+      expect(card).not.toMatch(/认识<strong|known-months/);
+      expect(attributes).toMatch(/第[一二三四五六\d]+年(?:硕士|博士)/);
+      expect(attributes).toContain(`科研分 <strong class="rel-detail-value">0/${fellow?.degree === "phd" ? 7 : 1}</strong>`);
+      expect(headerMain).not.toContain('class="rel-detail-item"');
       expect(headerMain).toContain(`<strong class="rel-name">${expected.name}</strong>`);
       expect(headerMain).toContain(`data-rel-type-pill="${expected.type}">${expected.role}</span>`);
       expect(meta).toContain('data-action="end-relationship"');
       expect(attributes).not.toContain("rel-known-time");
       expect(attributes).not.toContain('data-action="end-relationship"');
       expect(card.indexOf(headerMain)).toBeLessThan(card.indexOf(meta));
-      expect(meta).toMatch(new RegExp(`月</span>\\s*<button class="rel-end-compact"[^>]*><span aria-hidden="true">${fellow ? "✂️" : "💔"}</span></button>\\s*$`));
+      expect(meta).toMatch(/^\s*<button class="rel-end-compact"[^>]*><span aria-hidden="true">✂️<\/span><\/button>\s*$/);
       expect(meta).toContain(`title="${fellow ? "停止合作" : "分手"}" aria-label="${fellow ? "停止合作" : "分手"}"`);
     } else {
       expect(card).not.toContain('class="rel-card-meta"');
     }
-    expect(card.match(/class="rel-known-time"/g) ?? []).toHaveLength(expected.type === "advisor" ? 0 : 1);
+    expect(card.match(/class="rel-known-time"/g) ?? []).toHaveLength(0);
     expect(attributes).not.toContain("认识时间");
     expect(attributePairs).toHaveLength(expected.type === "advisor" ? 0 : 2);
     if (expected.type !== "advisor") {
       expect(attributePairs[0]).toMatch(new RegExp(`^<span class="rel-detail-item">\\s*<span class="rel-detail-label">${resourceLabel}</span>\\s*<strong class="rel-detail-value">7/20</strong>\\s*</span>$`));
       expect(attributePairs[1]).toMatch(new RegExp(`^<span class="rel-detail-item">\\s*<span class="rel-detail-label">${affinityLabel}</span>\\s*<strong class="rel-detail-value">4/20</strong>\\s*</span>$`));
       expect(attributes.match(/class="rel-detail-label"/g) ?? []).toHaveLength(2);
-      expect(attributes.match(/class="rel-detail-value"/g) ?? []).toHaveLength(2);
+      expect(attributes.match(/class="rel-detail-value"/g) ?? []).toHaveLength(3);
     }
 
     expect(notes).toEqual([]);
@@ -5181,6 +5250,30 @@ describe("v2 render lobby shell", () => {
     }
   });
 
+  it.each(["senior", "peer", "junior", "lover"] as const)("keeps the %s annual result separate from September activity", (type) => {
+    const state = createRelationshipCardTestState();
+    state.year = 2;
+    state.month = 1;
+    state.totalMonths = 13;
+    const profile = type === "lover" ? state.loverProgressState : state.fellowProgressState.find((fellow) => fellow.type === type)!;
+    profile.monthlyActivity = "九月项目进度 +10";
+    profile.annualResearchActivity = "第1学年末：科研 +0（抵抗2）<记录>；原始奖励：自然成长 +2";
+    const before = structuredClone(state);
+    const card = getRelationshipCardHtml(renderApp(state), type);
+    expect(card).toContain("本月</strong><span>");
+    expect(card).toContain("九月项目进度 +10");
+    const annualRow = card.match(/<div class="rel-monthly-activity rel-annual-activity">[\s\S]*?<\/div>/)?.[0] ?? "";
+    expect(annualRow).toContain('data-relationship-tooltip');
+    expect(annualRow).toContain('tabindex="0"');
+    expect(annualRow).toContain('原始奖励：自然成长 +2');
+    expect(annualRow).toContain('>成长</strong><span>第1学年末：科研 +0（抵抗2）&lt;记录&gt;</span>');
+    expect(annualRow).not.toContain('<记录>');
+    expect(getRelationshipCardHtml(renderApp(state), "advisor")).not.toContain("rel-annual-activity");
+    expect(state).toEqual(before);
+    delete profile.annualResearchActivity;
+    expect(getRelationshipCardHtml(renderApp(state), type)).not.toContain("rel-annual-activity");
+  });
+
   it("shows the mentor's monthly activity in the card footer", () => {
     const state = createRelationshipCardTestState();
     state.advisorProgressState.monthlyActivity = "推进纵向项目 +10";
@@ -5188,9 +5281,68 @@ describe("v2 render lobby shell", () => {
     const card = getRelationshipCardHtml(renderApp(state), "advisor");
     expect(card).toContain('<div class="rel-monthly-activity"><strong>本月</strong><span>导师：推进纵向项目 +10</span></div>');
     expect(card).not.toContain('rel-card-footnote');
-    expect(card).toContain('满100：经费+20、你的劳务费+5');
+    expect(card).toContain('满100：经费+60，支付劳务费经费-5，你的金币+5');
     expect(card).toContain('科研积累+10%（下取整）');
     expect(card.indexOf('class="rel-monthly-activity"')).toBeGreaterThan(card.indexOf('data-action="advisor-project"'));
+    expect(state).toEqual(before);
+  });
+
+  it("keeps long lover automatic rewards compact with their complete effects in a tooltip", () => {
+    const state = createRelationshipCardTestState();
+    const activity = "玩耍进度 +9，学习进度 +4；" + "条满奖励：亲密 +1、SAN +6、论文帮助已就绪；".repeat(4);
+    state.loverProgressState.monthlyActivity = activity;
+    const card = getRelationshipCardHtml(renderApp(state), "lover");
+    const row = card.match(/<div class="rel-monthly-activity">[\s\S]*?<\/div>/)?.[0] ?? "";
+    expect(row).toContain(`data-tooltip="恋人：${activity}"`);
+    expect(row).toContain('tabindex="0"');
+    expect(row).toContain(`>恋人：${Array.from(activity).slice(0, 48).join("")}…</span>`);
+    expect(state.loverProgressState.monthlyActivity).toBe(activity);
+  });
+
+  it.each([0, 2])("shows actual salary %s only in its payment month without another footer row", (amount) => {
+    const state = createRelationshipCardTestState();
+    const fellow = state.fellowProgressState.find((profile) => profile.type === "peer")!;
+    fellow.monthlySalaryPaid = amount;
+    fellow.lastSalaryTotalMonths = state.totalMonths;
+    const card = getRelationshipCardHtml(renderApp(state), "peer");
+    expect(card).toContain(`本月领薪${amount}金币`);
+    expect(card).toContain(`>同学：本月领薪${amount}金币；`);
+    expect(card.match(/class="rel-monthly-activity"/g)).toHaveLength(1);
+    fellow.lastSalaryTotalMonths = state.totalMonths - 1;
+    expect(getRelationshipCardHtml(renderApp(state), "peer")).not.toContain("本月领薪");
+  });
+
+  it("adds current-month paper support details to the existing fellow activity row", () => {
+    const state = createRelationshipCardTestState();
+    const fellow = state.fellowProgressState.find((profile) => profile.type === "peer")!;
+    fellow.monthlyActivity = "论文实验 +3";
+    fellow.monthlySupportActivity = "获得导师指导《论文》：写作 +10；帮助你完善论文：idea +5";
+    fellow.lastSupportTotalMonths = state.totalMonths;
+    const card = getRelationshipCardHtml(renderApp(state), "peer");
+    expect(card).toContain("同学：论文实验 +3；论文帮助</span>");
+    expect(card).toContain('data-tooltip="同学：论文实验 +3\n获得导师指导《论文》：写作 +10；帮助你完善论文：idea +5"');
+    expect(card.match(/class="rel-monthly-activity"/g)).toHaveLength(1);
+    fellow.lastSupportTotalMonths = state.totalMonths - 1;
+    const later = getRelationshipCardHtml(renderApp(state), "peer");
+    expect(later).not.toContain("获得导师指导《论文》");
+    expect(later).not.toContain("；论文帮助</span>");
+  });
+
+  it.each([
+    { cap: 4, reward: 0 },
+    { cap: 5, reward: 1 },
+    { cap: 20, reward: 2 },
+  ])("caps the player's inheritance preview at their own research limit $cap", ({ cap, reward }) => {
+    const state = createRelationshipCardTestState();
+    state.player.research = 4;
+    state.researchCapacityState = { baseCap: cap, jointTrainingCitationCapBonus: 0, otherCapBonus: 0 };
+    state.fellowProgressState = state.fellowProgressState.map((profile) => ({ ...profile, research: 7 }));
+    const before = structuredClone(state);
+    const card = getTalentCardHtml(renderApp(state, createDefaultAccountProfile(), {
+      activePlayTab: "talent", activeTalentTab: "relation",
+    }), "lab-mutual-growth");
+    expect(card).toContain(`<strong>最多+${reward}</strong>`);
+    expect(card).toContain("当前奖励实际受抵抗影响");
     expect(state).toEqual(before);
   });
 
@@ -5207,11 +5359,16 @@ describe("v2 render lobby shell", () => {
     expect(card).toContain('data-relationship-tooltip data-tooltip="科研协作：');
     expect(card).toContain(`每月${getFellowRoleLabel(fellow.type, fellow.gender)}自动推进：默契＝4`);
     expect(bar).not.toContain('title=');
-    const known = card.match(/<span class="rel-known-time"[^>]*>/)?.[0] ?? "";
-    expect(known).toContain('实验室传承：每12个月，同学科研+⌊n/2⌋，上限20');
-    expect(known).toContain('导师计1人');
-    expect(known).toContain('当前预计+0');
-    expect(known).toContain('data-tooltip-align="right"');
+    const academic = card.match(/<div class="rel-fellow-academic-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    expect(academic).toContain('每学年末（8月），同学科研原始+2+⌊n/2⌋');
+    expect(academic).toContain('导师计1人');
+    expect(academic).toContain('恋人不计');
+    expect(academic).toContain('n为结算前科研更高的其他成员人数');
+    expect(academic).toContain('合并后逐点抵抗，上限20');
+    expect(academic).toContain('2为自然成长');
+    expect(academic).not.toMatch(/累计一作|篇时科研/);
+    expect(academic).toContain('data-tooltip-align="left"');
+    expect(card).not.toContain('class="rel-known-time"');
     expect(card).not.toContain('与你共同署名的论文中稿，默契+1（上限20）');
     expect(card).toContain('data-action="relationship-task"');
     expect(card).not.toContain('rel-card-footnote');
@@ -5221,6 +5378,8 @@ describe("v2 render lobby shell", () => {
 
   it("keeps each project bar and its action bound to the same project", () => {
     const state = createRelationshipCardTestState();
+    state.advisorProgressState.funding = 0;
+    state.eventQueue = [];
     state.advisorProgressState.horizontalProgress = 37;
     state.advisorProgressState.verticalProgress = 82;
     const card = getRelationshipCardHtml(renderAppWithAnimations(state), "advisor");
@@ -5232,11 +5391,12 @@ describe("v2 render lobby shell", () => {
       expect(row).toContain('data-relationship-tooltip data-tooltip=');
       expect(row).toContain(`${type === "horizontal" ? "横向项目" : "纵向项目"}：⌊你的科研⌋+随机0～5`);
       expect(row).toContain(type === "horizontal"
-        ? '导师每月与纵向交替，轮到横向且经费&gt;0时自动+10'
+        ? '导师每月与纵向交替，轮到横向时自动+10'
         : '导师每月与横向交替，轮到纵向时自动+10');
       expect(row).toContain('同学参与项目时：⌊同学科研⌋+随机0～5');
-      expect(row).not.toContain('横向需经费');
-      expect(row).toContain(type === "horizontal" ? '满100：经费+20、你的劳务费+5' : '满100：科研积累+10%（下取整）');
+      expect(row).not.toMatch(/横向需经费|经费&gt;0/);
+      expect(row).not.toContain('disabled aria-disabled="true"');
+      expect(row).toContain(type === "horizontal" ? '满100：经费+60，支付劳务费经费-5，你的金币+5' : '满100：科研积累+10%（下取整）');
     }
   });
 
@@ -5613,7 +5773,12 @@ describe("v2 render lobby shell", () => {
       const meta = card.match(/<div class="rel-card-meta">([\s\S]*?)<\/div>/)?.[1] ?? "";
       const attributes = card.match(/<div class="rel-detail-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
       if (type === "advisor") expect(card).not.toMatch(/rel-known-time|rel-card-meta/);
-      else expect(meta).toContain('认识<strong class="rel-detail-value">0</strong>月</span>');
+      else if (type === "lover") expect(meta).toContain('认识<strong class="rel-detail-value">0</strong>月</span>');
+      else {
+        expect(card).not.toContain('class="rel-known-time"');
+        expect(card).toContain('class="rel-fellow-academic-row"');
+        expect(meta).toContain('aria-label="停止合作"');
+      }
       expect(attributes).not.toContain("rel-known-time");
       expect(attributes).not.toContain("认识时间");
       expect(card).not.toContain("rel-card-alert");
@@ -5639,11 +5804,11 @@ describe("v2 render lobby shell", () => {
     });
   });
 
-  it.each(["beautiful", "smart"] as const)("shows the %s lover type in its badge and a persistent real name in the heading", (type) => {
+  it.each(["beautiful", "smart"] as const)("separates the %s lover trait from its relationship badge and persistent name", (type) => {
     const state = createRelationshipCardTestState();
     state.loverState = activateLover(type, 4, "male");
     const expectedName = state.loverState.name;
-    const badge = type === "beautiful" ? "活泼恋人" : "聪慧恋人";
+    const trait = type === "beautiful" ? "活泼" : "聪慧";
     const before = structuredClone(state);
     const account = createDefaultAccountProfile();
     const random = vi.spyOn(Math, "random");
@@ -5651,10 +5816,18 @@ describe("v2 render lobby shell", () => {
     try {
       for (let repaint = 0; repaint < 3; repaint += 1) {
         const card = getRelationshipCardHtml(renderApp(state, account, { activePlayTab: "relationship" }), "lover");
-        expect(card).toContain(`data-rel-type-pill="lover">${badge}</span>`);
+        expect(card).toContain('data-rel-type-pill="lover">恋人</span>');
+        const traitTag = card.match(/<span class="rel-lover-trait"[\s\S]*?<\/span>/)?.[0] ?? "";
+        expect(traitTag).toContain(`>${trait}</span>`);
+        expect(traitTag).toContain('data-relationship-tooltip');
+        expect(traitTag).toContain('tabindex="0"');
+        expect(traitTag).not.toMatch(/<button|data-action|role="button"/);
+        expect(traitTag).toContain(type === "beautiful" ? "初始亲密额外+3，亲密6～9" : "初始科研原始增量额外+4，与基础合并后抵抗");
+        expect(traitTag).not.toMatch(/年级×2|初始亲密基础|自然成长|实验室传承/);
+        expect(traitTag).toContain(type === "beautiful" ? "每月玩耍+亲密、学习+⌊亲密/2⌋" : "每月学习+亲密、玩耍+⌊亲密/2⌋");
         expect(card).toContain(`<strong class="rel-name">${expectedName}</strong>`);
-        expect(card).not.toContain(`<strong class="rel-name">${badge}</strong>`);
-        expect(card).not.toContain('data-rel-type-pill="lover">恋人</span>');
+        expect(card).not.toContain(`<strong class="rel-name">${trait}</strong>`);
+        expect(card).not.toContain(`data-rel-type-pill="lover">${trait}恋人</span>`);
       }
       expect(state).toEqual(before);
       expect(random).not.toHaveBeenCalled();
@@ -5681,7 +5854,8 @@ describe("v2 render lobby shell", () => {
         }
         const loverCard = getRelationshipCardHtml(html, "lover");
         expect(loverCard).toContain(`<strong class="rel-name">${getLoverName(state.loverState)}</strong>`);
-        expect(loverCard).toContain('data-rel-type-pill="lover">聪慧恋人</span>');
+        expect(loverCard).toContain('data-rel-type-pill="lover">恋人</span>');
+        expect(loverCard).toContain('>聪慧</span>');
       }
       expect(state).toEqual(before);
       expect(random).not.toHaveBeenCalled();
@@ -5748,7 +5922,9 @@ describe("v2 render lobby shell", () => {
       const errand = getTalentCardHtml(full, "errand-growth");
       expect(errand).toContain("60%");
       expect(errand).toContain("2 次");
-      expect(errand).toContain("导师好感&lt;6");
+      expect(errand).toContain("每次跑腿，概率+10个百分点，最高100%");
+      expect(errand).toContain("熟练度");
+      expect(errand).not.toContain("教师节发祝福且导师好感&lt;6时生效");
     }
   });
 
@@ -5953,11 +6129,11 @@ describe("v2 render lobby shell", () => {
       { id: "new", month: base.totalMonths, text: "科研：在论文槽 1 开启旧题目" },
       { id: "discard", month: base.totalMonths, text: "丢弃论文：旧题目" },
       { id: "decay", month: base.totalMonths, text: "论文时效：旧题目：idea -1" },
-      { id: "monthly", month: base.totalMonths, text: "月初结算：自动恢复 SAN +1｜导师工资 金币 +1｜冬季 SAN -1" },
+      { id: "monthly", month: base.totalMonths, text: "月初结算：自动恢复 SAN +1｜学生工资 金币 +1｜冬季 SAN -1" },
     ] });
     const log = html.split('id="log-content"')[1]!.split('</section>')[0]!;
     expect(log).not.toContain("旧题目");
-    for (const source of ["月初结算", "自动恢复", "导师工资", "冬季", "SAN +1", "金币 +1", "SAN -1"]) {
+    for (const source of ["月初结算", "自动恢复", "学生工资", "冬季", "SAN +1", "金币 +1", "SAN -1"]) {
       expect(log).toContain(source);
     }
   });

@@ -1,5 +1,6 @@
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
+import { recordFellowMonthlySupport } from "./v2-fellow-monthly-support";
 import { addPaperCollaboration } from "./v2-paper-collaboration";
 import type { FellowProgressProfile, GameState, Paper, PaperActionType } from "./v2-types";
 
@@ -73,6 +74,8 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
         });
         if (paper !== target.paper) {
           profile = { ...profile, pendingHelpToPlayer: null, helpedPlayerCount: (profile.helpedPlayerCount ?? 0) + 1 };
+          profile = recordFellowMonthlySupport(profile, state.totalMonths,
+            `帮助你完善《${paper.title}》：${SCORE_LABELS[target.field]} +${paper[target.field] - target.paper[target.field]}`);
           nextState = pushMilestoneLog({ ...nextState, papers: nextState.papers.map((entry) => entry.id === paper.id ? paper : entry) },
             `论文帮助：${getFellowName(profile)}帮你完善《${paper.title}》，${SCORE_LABELS[target.field]}+${amount}`, "fellow-help");
         }
@@ -92,6 +95,8 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
         });
         if (paper !== target.paper) {
           profile = { ...profile, pendingHelpToFellow: null, helpedFellowCount: (profile.helpedFellowCount ?? 0) + 1 };
+          profile = recordFellowMonthlySupport(profile, state.totalMonths,
+            `获得你的帮助《${paper.title}》：${SCORE_LABELS[target.field]} +${paper[target.field] - target.paper[target.field]}`);
           nextState = pushMilestoneLog({ ...nextState, fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? paper : entry) },
             `论文帮助：你帮${getFellowName(profile)}完善《${paper.title}》，${SCORE_LABELS[target.field]}+${amount}`, "fellow-help");
         }

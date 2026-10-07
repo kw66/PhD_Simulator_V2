@@ -11,7 +11,7 @@ export function createLabGpuFailureBuff(): Buff {
     timing: "monthly",
     remainingMonths: 6,
     labExperimentMoneyDelta: 1,
-    description: "你和同学每次做实验费用+1，优先使用科研经费。",
+    description: "你和同学每次做实验费用+1，由实验室经费支付。",
   };
 }
 

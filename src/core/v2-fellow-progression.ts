@@ -1,8 +1,11 @@
-import type { FellowProfileAddition, FellowProgressProfile, FellowTaskType, FellowTypeId, Gender } from "./v2-types";
+import type { Degree, FellowProfileAddition, FellowProgressProfile, FellowTaskType, FellowTypeId, Gender } from "./v2-types";
 import { pickRandomAdvisorName, pickStableRandomName } from "./v2-random-name";
 import { generatePaperTopic, type FixedPaperTopic } from "./v2-paper-topics";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { getCalendarForTotalMonths } from "./v2-progression";
+import { generateRelationshipResearch } from "./v2-relationship-research";
+import { createRecruitmentRandom } from "./v2-recruitment-random";
+import { getRecruitmentAcademicYears } from "./v2-recruitment-eligibility";
 
 const FELLOW_TASK_MAX = 100;
 
@@ -77,31 +80,45 @@ export function getUniqueFellowName(candidate: string, usedNames: readonly strin
   return pickStableRandomName(`fellow:unique:${seed}:fallback`);
 }
 
+function createFellowResearchRandom(seed: number): () => number {
+  let state = 2166136261;
+  for (const character of `fellow:research:${seed}`) {
+    state = Math.imul(state ^ character.charCodeAt(0), 16777619);
+  }
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), state | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export function createGeneratedFellowProfileAddition(
   type: FellowTypeId,
   seed: number,
   gender?: Gender,
   usedNames: readonly string[] = [],
   getNameRoll?: () => number,
+  academicContext?: { year: number; month?: number; fixedYear?: number },
+  recruitmentSeed?: string,
 ): FellowProfileAddition {
   const normalizedSeed = Math.abs(Math.floor(seed));
-  const resolvedGender = gender ?? (getNameRoll
-    ? (getNameRoll() < 0.5 ? "male" : "female")
+  const genderRoll = recruitmentSeed === undefined ? getNameRoll : createRecruitmentRandom(recruitmentSeed, "gender");
+  const nameRoll = recruitmentSeed === undefined ? getNameRoll : createRecruitmentRandom(recruitmentSeed, "name");
+  const researchRoll = recruitmentSeed === undefined
+    ? getNameRoll ?? createFellowResearchRandom(normalizedSeed)
+    : createRecruitmentRandom(recruitmentSeed, "research");
+  const resolvedGender = gender ?? (genderRoll
+    ? (genderRoll() < 0.5 ? "male" : "female")
     : getStableGeneratedGender(seed));
-  const profileBase = type === "senior"
-    ? { research: 6 + normalizedSeed % 4, affinity: 1 }
-    : type === "peer"
-      ? { research: 3 + normalizedSeed % 4, affinity: 1 }
-      : { research: normalizedSeed % 4, affinity: 1 };
-
   const occupied = new Set(usedNames.map((name) => name.trim()).filter(Boolean));
-  let name = getNameRoll
-    ? pickRandomAdvisorName(getNameRoll)
+  let name = nameRoll
+    ? pickRandomAdvisorName(nameRoll)
     : getStableGeneratedFellowName(seed, resolvedGender);
   if (occupied.has(name)) {
-    if (getNameRoll) {
+    if (nameRoll) {
       for (let attempt = 1; attempt <= 32; attempt += 1) {
-        const candidate = pickRandomAdvisorName(getNameRoll);
+        const candidate = pickRandomAdvisorName(nameRoll);
         if (!occupied.has(candidate)) {
           name = candidate;
           break;
@@ -120,11 +137,27 @@ export function createGeneratedFellowProfileAddition(
       name = getUniqueFellowName(name, usedNames, `random:${seed}`);
     }
   }
-  return { type, gender: resolvedGender, name, ...profileBase };
+  const playerYear = Math.max(1, Math.min(6, academicContext?.year ?? 1));
+  const candidateYears = academicContext ? getRecruitmentAcademicYears(type, academicContext) : [];
+  if (academicContext && academicContext.fixedYear === undefined && candidateYears.length === 0) {
+    throw new Error("No eligible recruitment cohort");
+  }
+  const academicYear = academicContext?.fixedYear ?? (!academicContext
+    ? (type === "peer" ? 1 : type === "junior" ? 0 : 2)
+    : candidateYears[normalizedSeed % candidateYears.length]!);
+  const degree: Degree = academicYear >= 4 ? "phd" : "master";
+  const initialResearchScore = [0, 0, 0, 1, 2, 3, 7][academicYear] ?? 0;
+  return { type, gender: resolvedGender, name, affinity: 1,
+    research: generateRelationshipResearch(academicYear, researchRoll),
+    academicYear, degree, initialResearchScore,
+    ...(academicContext ? { academicStartTotalMonths: (playerYear - 1) * 12 + 1 } : {}) };
 }
 
-function createFellowProgressProfileId(type: FellowTypeId, startTotalMonths: number): string {
-  return `${type}-${startTotalMonths}-${Math.random().toString(36).slice(2, 8)}`;
+function createFellowProgressProfileId(type: FellowTypeId, startTotalMonths: number, identitySeed?: string): string {
+  if (identitySeed === undefined) return `${type}-${startTotalMonths}-${Math.random().toString(36).slice(2, 8)}`;
+  const random = createRecruitmentRandom(identitySeed, "identity");
+  const suffix = Array.from({ length: 2 }, () => Math.floor(random() * 4294967296).toString(36)).join("-");
+  return `${type}-${startTotalMonths}-${suffix}`;
 }
 
 export function getFellowResearchTopic(profile: Pick<FellowProgressProfile, "id" | "startTotalMonths" | "researchTopic">): FixedPaperTopic {
@@ -150,9 +183,14 @@ export function createCustomFellowProgressProfile(input: {
   taskType?: FellowTaskType;
   usedNames?: readonly string[];
   longTermMentoring?: boolean;
+  academicYear?: number;
+  academicStartTotalMonths?: number;
+  degree?: Degree;
+  initialResearchScore?: number;
+  identitySeed?: string;
 }): FellowProgressProfile {
   const config = FELLOW_CONFIG[input.type];
-  const id = createFellowProgressProfileId(input.type, input.startTotalMonths);
+  const id = createFellowProgressProfileId(input.type, input.startTotalMonths, input.identitySeed);
   const generatedName = input.name?.trim() || pickStableRandomName(`fellow:${id}`);
   return {
     id,
@@ -167,6 +205,11 @@ export function createCustomFellowProgressProfile(input: {
     taskMax: FELLOW_TASK_MAX,
     taskUsedThisMonth: false,
     startTotalMonths: input.startTotalMonths,
+    academicYear: input.academicYear ?? 1,
+    academicStartTotalMonths: input.academicStartTotalMonths ?? input.startTotalMonths,
+    degree: input.degree ?? "master",
+    initialResearchScore: input.initialResearchScore ?? 0,
+    salaryRemainder: 0,
     nextMonthlyAction: "research",
     affinityRewardedPaperIds: [],
     longTermMentoring: input.longTermMentoring === true,

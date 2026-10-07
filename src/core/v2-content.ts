@@ -1,7 +1,7 @@
 import type { AdvisorRequirements, PaperTarget, RoleDefinition } from "./v2-types";
 
-export const MASTER_TOTAL_MONTHS = 68;
-export const PHD_TOTAL_MONTHS = 68;
+export const MASTER_TOTAL_MONTHS = 34;
+export const PHD_TOTAL_MONTHS = 70;
 export const PAPER_SLOT_LIMIT = 4;
 export const MAX_SAN = 20;
 

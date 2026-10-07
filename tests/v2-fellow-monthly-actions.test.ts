@@ -135,10 +135,10 @@ describe("fellow monthly action state", () => {
   });
 
   it.each([2, 3])("honors an explicit project action at month %s independently of join parity", (totalMonths) => {
-    const before = withPaper(makeState({ fellows: [makeFellow("fellow", { nextMonthlyAction: "project" })], funding: 20 }), { idea: 10 });
+    const before = withPaper(makeState({ fellows: [makeFellow("fellow", { nextMonthlyAction: "project" })], funding: 60 }), { idea: 10 });
     const after = advanceTo(before, totalMonths);
     expect(scores(currentPaper(after))).toEqual([9, 0, 0]);
-    expect(after.advisorProgressState).toMatchObject({ funding: 20, verticalProgress: 20, horizontalProgress: 0 });
+    expect(after.advisorProgressState).toMatchObject({ funding: 60, verticalProgress: 20, horizontalProgress: 0 });
     expect(fellow(after).nextMonthlyAction).toBe("research");
     expect(fellow(after).lastProjectTotalMonths).toBe(totalMonths);
   });
@@ -209,7 +209,7 @@ describe("research selection and funding retries", () => {
     expect(next.advisorProgressState.funding).toBe(7);
   });
 
-  it.each([0, 2])("retries an underfunded experiment every month at funding %s without using player money", (funding) => {
+  it.each([1, 2])("retries an underfunded experiment every month at funding %s without using player money", (funding) => {
     let state = withPaper(makeState({ funding }), { idea: 10 });
     for (const horizontalProgress of [20, 40]) {
       state = nextMonth(state);
@@ -227,19 +227,19 @@ describe("research selection and funding retries", () => {
   });
 
   it("keeps retrying through horizontal completion but waits until next month to spend its own reward", () => {
-    let state = withPaper(makeState({ funding: 0 }), { idea: 10 });
+    let state = withPaper(makeState({ funding: 1 }), { idea: 10 });
     for (let attempt = 1; attempt <= 5; attempt += 1) {
       state = nextMonth(state);
       expect(currentPaper(state).experiment).toBe(0);
       expect(fellow(state).nextMonthlyAction).toBe("research");
       expect(state.advisorProgressState).toMatchObject({
-        horizontalProgress: attempt * 20 % 100, funding: attempt === 5 ? 20 : 0,
+        horizontalProgress: attempt * 20 % 100, funding: attempt === 5 ? 56 : 1,
       });
       expect(state.player.money).toBe(attempt === 5 ? 25 : 20);
     }
     const retried = nextMonth(state);
     expect(currentPaper(retried).experiment).toBe(10);
-    expect(retried.advisorProgressState).toMatchObject({ funding: 17, horizontalProgress: 0, verticalProgress: 0 });
+    expect(retried.advisorProgressState).toMatchObject({ funding: 53, horizontalProgress: 0, verticalProgress: 0 });
     expect(retried.player.money).toBe(25);
     expect(fellow(retried).nextMonthlyAction).toBe("project");
   });
@@ -266,12 +266,12 @@ describe("research selection and funding retries", () => {
 });
 
 describe("entry funding and sequential card order", () => {
-  it.each([false, true])("uses entry funding 19 for every project even after a reward crosses 20 (reversed papers=%s)", (reversed) => {
+  it.each([false, true])("uses entry funding 59 for every project even after a reward crosses 60 (reversed papers=%s)", (reversed) => {
     const profiles = [makeFellow("first", { research: 10, nextMonthlyAction: "project" }), makeFellow("second", { research: 10, nextMonthlyAction: "project" })];
-    const before = makeState({ fellows: profiles, funding: 19, horizontalProgress: 90 });
+    const before = makeState({ fellows: profiles, funding: 59, horizontalProgress: 90 });
     if (reversed) before.fellowPapers!.reverse();
     const next = nextMonth(before);
-    expect(next.advisorProgressState).toMatchObject({ funding: 39, horizontalProgress: 10, verticalProgress: 0 });
+    expect(next.advisorProgressState).toMatchObject({ funding: 114, horizontalProgress: 10, verticalProgress: 0 });
     expect(next.player.money).toBe(25);
     for (const profile of profiles) {
       expect(scores(currentPaper(next, profile.id))).toEqual([0, 0, 0]);
@@ -279,15 +279,15 @@ describe("entry funding and sequential card order", () => {
     }
   });
 
-  it.each([false, true])("uses entry funding 20 for a later project after an earlier experiment spends three (reversed papers=%s)", (reversed) => {
+  it.each([false, true])("uses entry funding 60 for a later project after an earlier experiment spends three (reversed papers=%s)", (reversed) => {
     const before = withPaper(makeState({
       fellows: [makeFellow("project", { startTotalMonths: 2, nextMonthlyAction: "project" }), makeFellow("research", { nextMonthlyAction: "research" })],
-      totalMonths: 2, funding: 20,
+      totalMonths: 2, funding: 60,
     }), { idea: 10 }, "research");
     if (reversed) before.fellowPapers!.reverse();
     const next = nextMonth(before);
     expect(currentPaper(next, "research").experiment).toBe(10);
-    expect(next.advisorProgressState).toMatchObject({ funding: 17, horizontalProgress: 0, verticalProgress: 20 });
+    expect(next.advisorProgressState).toMatchObject({ funding: 57, horizontalProgress: 0, verticalProgress: 20 });
     expect(fellow(next, "research").nextMonthlyAction).toBe("project");
     expect(fellow(next, "project").nextMonthlyAction).toBe("research");
   });
@@ -313,19 +313,19 @@ describe("entry funding and sequential card order", () => {
       expect(currentPaper(next, profile.id).experiment).toBe(profile.id === winner ? 10 : 0);
       expect(fellow(next, profile.id).nextMonthlyAction).toBe(profile.id === winner ? "project" : "research");
     }
-    expect(next.advisorProgressState).toMatchObject({ funding: 0, horizontalProgress: 20, verticalProgress: 0 });
+    expect(next.advisorProgressState).toMatchObject({ funding: 0, horizontalProgress: 0, verticalProgress: 0 });
     expect(next.player.money).toBe(20);
     expect(before).toEqual(snapshot);
   });
 
   it.each([false, true])("lets horizontal completion fund a later card's experiment in the same month (reversed papers=%s)", (reversed) => {
     const profiles = [makeFellow("research", { startTotalMonths: 2 }), makeFellow("project", { research: 10, nextMonthlyAction: "project" })];
-    const before = withPaper(makeState({ fellows: profiles, totalMonths: 2, funding: 0, horizontalProgress: 90 }), { idea: 10 }, "research");
+    const before = withPaper(makeState({ fellows: profiles, totalMonths: 2, funding: 1, horizontalProgress: 90 }), { idea: 10 }, "research");
     if (reversed) before.fellowPapers!.reverse();
     const next = nextMonth(before);
     expect(scores(currentPaper(next, "project"))).toEqual([0, 0, 0]);
     expect(currentPaper(next, "research").experiment).toBe(10);
-    expect(next.advisorProgressState).toMatchObject({ funding: 17, horizontalProgress: 0, verticalProgress: 0 });
+    expect(next.advisorProgressState).toMatchObject({ funding: 53, horizontalProgress: 0, verticalProgress: 0 });
     expect(next.player.money).toBe(25);
     expect(fellow(next, "project").nextMonthlyAction).toBe("research");
     expect(fellow(next, "research").nextMonthlyAction).toBe("project");
@@ -333,17 +333,59 @@ describe("entry funding and sequential card order", () => {
 
   it("does not revisit an earlier blocked researcher after a later card earns funding", () => {
     const profiles = [makeFellow("project", { startTotalMonths: 2, research: 10, nextMonthlyAction: "project" }), makeFellow("research")];
-    const before = withPaper(makeState({ fellows: profiles, totalMonths: 2, funding: 0, horizontalProgress: 70 }), { idea: 10 }, "research");
+    const before = withPaper(makeState({ fellows: profiles, totalMonths: 2, funding: 1, horizontalProgress: 70 }), { idea: 10 }, "research");
     const next = nextMonth(before);
     expect(currentPaper(next, "research").experiment).toBe(0);
-    expect(next.advisorProgressState).toMatchObject({ funding: 20, horizontalProgress: 0, verticalProgress: 0 });
+    expect(next.advisorProgressState).toMatchObject({ funding: 56, horizontalProgress: 0, verticalProgress: 0 });
     expect(next.player.money).toBe(25);
     expect(fellow(next, "research").nextMonthlyAction).toBe("research");
   });
 });
 
+describe("depleted lab funding stops fellow actions", () => {
+  it.each([0, -1])("does not start research or complete a horizontal project at entry funding %s", (funding) => {
+    const before = withPaper(makeState({
+      funding, horizontalProgress: 90,
+      fellows: [makeFellow("research"), makeFellow("project", { research: 10, nextMonthlyAction: "project" })],
+    }), { idea: 10 }, "research");
+    const next = nextMonth(before);
+
+    expect(scores(currentPaper(next, "research"))).toEqual([9, 0, 0]);
+    expect(scores(currentPaper(next, "project"))).toEqual([0, 0, 0]);
+    expect(next.advisorProgressState).toMatchObject({ funding, horizontalProgress: 90, verticalProgress: 0 });
+    expect(next.player.money).toBe(20);
+    expect(fellow(next, "research").nextMonthlyAction).toBe("research");
+    expect(fellow(next, "project").nextMonthlyAction).toBe("project");
+    expect(fellow(next, "project").lastProjectTotalMonths).toBe(fellow(before, "project").lastProjectTotalMonths);
+  });
+
+  it.each([3, 4])("allows a later horizontal completion only if the first experiment leaves positive funding (entry=%s)", (funding) => {
+    const before = withPaper(makeState({
+      funding, totalMonths: 2, horizontalProgress: 90,
+      fellows: [
+        makeFellow("project", { startTotalMonths: 2, research: 10, nextMonthlyAction: "project" }),
+        makeFellow("research"),
+      ],
+    }), { idea: 10 }, "research");
+    const next = nextMonth(before);
+
+    expect(currentPaper(next, "research").experiment).toBe(10);
+    expect(fellow(next, "research").nextMonthlyAction).toBe("project");
+    expect(next.advisorProgressState).toMatchObject({
+      funding: funding === 3 ? 0 : 56,
+      horizontalProgress: funding === 3 ? 90 : 0,
+      verticalProgress: 0,
+    });
+    expect(next.player.money).toBe(funding === 3 ? 20 : 25);
+    expect(fellow(next, "project").nextMonthlyAction).toBe(funding === 3 ? "project" : "research");
+    expect(fellow(next, "project").lastProjectTotalMonths)
+      .toBe(funding === 3 ? fellow(before, "project").lastProjectTotalMonths : 3);
+    expect(scores(currentPaper(next, "project"))).toEqual([0, 0, 0]);
+  });
+});
+
 describe("reviews settle before monthly own actions", () => {
-  it.each([19, 20])("does a project every month while reviewing at entry funding %s", (funding) => {
+  it.each([59, 60])("does a project every month while reviewing at entry funding %s", (funding) => {
     const before = withReview(makeState({ funding }), "fellow", 100, 3);
     const submitted = currentPaper(before);
     let state = before;
@@ -355,7 +397,7 @@ describe("reviews settle before monthly own actions", () => {
       });
       const progress = (3 - reviewMonthsLeft) * 20;
       expect(state.advisorProgressState).toMatchObject({
-        funding, horizontalProgress: funding < 20 ? progress : 0, verticalProgress: funding >= 20 ? progress : 0,
+        funding, horizontalProgress: funding < 60 ? progress : 0, verticalProgress: funding >= 60 ? progress : 0,
       });
     }
     expect(state.player).toEqual(before.player);

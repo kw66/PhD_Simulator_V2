@@ -10,7 +10,7 @@ import {
 } from "../src/core/v2-event-scheduler";
 import { createInitialState } from "../src/core/v2-engine";
 import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolution-state";
-import { createScholarshipEvent } from "../src/core/v2-fixed-events-scholarship";
+import { createScholarshipEvent, resolveScholarshipApplication } from "../src/core/v2-fixed-events-scholarship";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "../src/core/v2-fixed-events-teachers-day";
 import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
@@ -894,7 +894,7 @@ describe("v2 event scheduler", () => {
       month: 5,
       totalMonths: 17,
       player: { ...initial.player, research: 12, favor: 12 },
-      advisorProgressState: { ...initial.advisorProgressState, funding: 21 },
+      advisorProgressState: { ...initial.advisorProgressState, funding: 61 },
       availableRandomEvents: [8],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
@@ -903,13 +903,21 @@ describe("v2 event scheduler", () => {
     const result = collectRandomEventsForMonth(baseState, fromRolls([0.7, 0, 0, 0, 0, 0.9]));
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.title).toBe("导师经费");
-    const choices = getDecisionChoices(result.events[0]);
+    const decisions = getDecisionChoices(result.events[0]);
+    const choices = decisions.map((choice) => ({
+      ...choice,
+      effects: { ...choice.effects, ...choice.effects.enqueueEvents![0]!.choices[0]!.effects },
+    }));
+    expect(decisions[0]?.effects.shopEntitlementDeltas).toBeUndefined();
+    expect(decisions[2]?.effects.shopEntitlementDeltas).toBeUndefined();
+    expect(decisions[3]?.effects.addBuffs).toBeUndefined();
     expect(choices.map((choice) => choice.label)).toEqual(["买显卡", "发劳务费", "装修工位", "报销 AI 费用"]);
     expect(choices[0]?.effects.shopEntitlementDeltas).toEqual({ gpuTransaction: 1 });
     expect(choices[0]?.outcome).toContain("结果：显卡报销：");
     expect(choices[2]?.outcome).toContain("结果：工位报销：");
     expect(choices[2]?.outcome).not.toContain("+1");
     expect(choices[1]?.effects.money).toBe(7);
+    expect(choices[1]?.effects.advisorProgressStateDeltas).toEqual({ funding: -7 });
     expect(choices[2]?.effects.shopEntitlementDeltas).toEqual({
       workstationTransaction: 1,
     });
@@ -945,7 +953,7 @@ describe("v2 event scheduler", () => {
       year: 2,
       month: 5,
       totalMonths: 17,
-      advisorProgressState: { ...initial.advisorProgressState, funding: 20 },
+      advisorProgressState: { ...initial.advisorProgressState, funding: 60 },
       availableRandomEvents: [8],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
@@ -957,7 +965,7 @@ describe("v2 event scheduler", () => {
 
     const activated = activatePendingRandomEvents({
       ...waiting.nextState,
-      advisorProgressState: { ...waiting.nextState.advisorProgressState, funding: 21 },
+      advisorProgressState: { ...waiting.nextState.advisorProgressState, funding: 61 },
     }, () => 0);
     expect(activated.pendingRandomEvents).toEqual([]);
     expect(activated.eventQueue.some((event) => event.chainId === "random-8")).toBe(true);
@@ -970,7 +978,7 @@ describe("v2 event scheduler", () => {
         ...initial,
         player: { ...initial.player, favor },
       }, () => 0);
-      expect(getDecisionChoices(event)[1]?.effects.money).toBe(expectedMoney);
+      expect(getDecisionChoices(event)[1]?.effects.enqueueEvents![0]!.choices[0]!.effects.money).toBe(expectedMoney);
     }
   });
 
@@ -1160,7 +1168,9 @@ describe("v2 event scheduler", () => {
       totalMonths: 32,
     };
 
-    expect(getDecisionChoices(createScholarshipEvent(spring, () => 0))[0]?.effects.san).toBe(-1);
+    const scholarshipDecision = createScholarshipEvent(spring, () => 0).choices[0]!.effects.enqueueEvents![0]!;
+    const scholarshipResult = resolveScholarshipApplication(spring, scholarshipDecision.choices[0]!.effects.fixedEventResolution!, () => 0).enqueueEvents![0]!;
+    expect(scholarshipResult.choices[0]?.effects.san).toBe(-1);
     expect(getDecisionChoices(createCareerEventForType(spring, "academic"))[1]?.effects.san).toBe(-2);
     expect(getDecisionChoices(collectThesisEventForMonth(spring).event ?? undefined)[1]?.effects.san).toBe(-1);
   });

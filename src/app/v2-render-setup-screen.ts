@@ -8,6 +8,7 @@ import {
   ROLE_ACHIEVEMENT_PAGE_SIZE,
 } from "../core/v2-lobby";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
+import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "../core/v2-lab-projects";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
 import { getRoleLobbyAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
@@ -449,7 +450,7 @@ const TEACHER_CHILD_TALENT_NODES = [
   { id: "computing-support", name: "算力后盾", icon: "cpu", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 4, effect: "转博时获得1次显卡报销/级", prerequisiteIds: ["growing-familiarity"] },
   { id: "workspace-renewal", name: "工位焕新", icon: "monitor", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 4, effect: "转博时获得1次工位报销/级", prerequisiteIds: ["growing-familiarity"] },
   { id: "mentor-insight", name: "名师点拨", icon: "book-open", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 2, effect: "导师协作分+50%/级", prerequisiteIds: ["family-patronage"] },
-  { id: "funding-shield", name: "经费护航", icon: "store", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 3, effect: "科研经费≥20且足够支付时，购买AI优先使用经费", prerequisiteIds: ["computing-support", "workspace-renewal"] },
+  { id: "funding-shield", name: "经费护航", icon: "store", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 3, effect: `科研经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}且足够支付时，购买AI优先使用经费`, prerequisiteIds: ["computing-support", "workspace-renewal"] },
   { id: "learning-by-osmosis", name: "耳濡目染", icon: "graduation-cap", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 6, effect: "转博后科研能力视为科研能力与导师好感的较大值", prerequisiteIds: ["mentor-insight"] },
 ] as const satisfies readonly DesignedTalentNode[];
 

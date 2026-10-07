@@ -168,7 +168,7 @@ describe("v2 research operations", () => {
     const researched = applyResearchOperation(state, state.papers[0]!.id, "experiment", () => 0);
     expect(researched.papers[0]?.experiment).toBe(6);
     expect(researched.player.money).toBe(state.player.money);
-    expect(researched.advisorProgressState.funding).toBe(8);
+    expect(researched.advisorProgressState.funding).toBe(state.advisorProgressState.funding - 2);
   });
 
   it("gives GPT-7 and GPT-8 the persistent high-tier multiplier at five coins", () => {
@@ -190,14 +190,15 @@ describe("v2 research operations", () => {
         shopState: { ...initial.shopState, gpuLevel },
         advisorProgressState: { ...initial.advisorProgressState, funding } };
       expect(getResearchExperimentCostBreakdown(state)).toEqual({
-        total: cost, advisorFunding: Math.min(funding, cost), playerMoney: Math.max(0, cost - funding),
+        total: cost, advisorFunding: cost, playerMoney: 0,
       });
-      const created = dispatchAction(state, "create-paper", { paperSlotIndex: 0 });
+      const created = { ...state, papers: dispatchAction(initial, "create-paper", { paperSlotIndex: 0 }).papers };
       created.papers[0]!.idea = 1;
       created.player.money = 10;
       const researched = applyResearchOperation(created, created.papers[0]!.id, "experiment", () => 0);
-      expect(researched.player.money).toBe(10 - Math.max(0, cost - funding));
-      expect(researched.advisorProgressState.funding).toBe(Math.max(0, funding - cost));
+      expect(researched.player.money).toBe(10);
+      expect(researched.advisorProgressState.funding).toBe(funding < cost ? funding : funding - cost);
+      if (funding < cost) expect(researched.papers).toEqual(created.papers);
       expect(getResearchExperimentMoneyCost({ ...state, totalMonths: initial.totalMonths + 3 })).toBe(cost + 1);
       expect(getResearchExperimentMoneyCost({ ...state, internshipState: activateInternship() })).toBe(cost + 1);
     }

@@ -63,7 +63,7 @@ export type RoleGrowthStatId = DebugStatId;
 export type GamePhase = "setup" | "playing" | "finished";
 export type Degree = "master" | "phd";
 export type DateDisplayMode = "academic" | "calendar";
-export type EndingId = "master" | "phd" | "delay" | "burnout" | "poor" | "expelled" | "isolated" | "overthinking" | "quit" | null;
+export type EndingId = "master" | "phd" | "delay" | "burnout" | "poor" | "expelled" | "isolated" | "overthinking" | "lab-bankrupt" | "quit" | null;
 export type PaperTarget = "C" | "B" | "A";
 export type JournalTarget = "nature" | "nmi" | "pami";
 export type PaperStatus = "draft" | "reviewing" | "journal-reviewing" | "published";
@@ -500,6 +500,9 @@ export interface EventChoice {
     activateLoverProgress?: LoverTypeId;
     researchCapacityStateDeltas?: Partial<Record<keyof ResearchCapacityState, number>>;
     advisorProgressStateDeltas?: Partial<Pick<AdvisorProgressState, "researchAccumulation" | "funding">>;
+    recordPlayerConferenceTrip?: string;
+    journalFeePayment?: { paperId: string; payer: "self" | "lab" };
+    labReimbursementReservation?: "gpu" | "workstation" | "ai" | { kind: "labor"; amount: number };
     advisorGrantResult?: AdvisorGrantApplication;
     labProjectProgress?: {
       type: "horizontal" | "vertical";
@@ -560,6 +563,7 @@ export interface ResolvedEventRecord {
 }
 
 export interface PendingEvent {
+  journalFeePaperId?: string;
   id: string;
   continuationSourceId?: string;
   title: string;
@@ -601,7 +605,7 @@ export interface PendingEvent {
     year: number;
     month: number;
     score: number;
-    requirement: number;
+    requirement: number | null;
     reward: number;
     scoreBaseline: number;
     eligiblePaperIds: string[];

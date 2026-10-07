@@ -11,10 +11,12 @@ import {
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
+import type { RecruitmentCalendar } from "./v2-recruitment-eligibility";
 
-function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): PendingEvent {
+function createRandomEvent10(state: GameState, getRoll: RandomRollProvider, recruitmentCalendar: RecruitmentCalendar): PendingEvent {
   const serial = state.totalRandomEventCount;
   const peerGender = getRoll() < 0.5 ? "male" : "female";
+  const recruitmentSeed = `random-10:${serial}:${getRoll()}`;
   const usedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
   const isLowSocial = state.player.social < 6;
   const canAddPeer = canAddRelationship(state.relationshipState, "peer");
@@ -22,7 +24,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   const shortSanChange = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
   const shortSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
   const ideaBonus = 5;
-  const peerAddition = createGeneratedFellowProfileAddition("peer", serial, peerGender, usedNames, getRoll);
+  const peerAddition = createGeneratedFellowProfileAddition("peer", serial, peerGender, usedNames, undefined, recruitmentCalendar, recruitmentSeed);
   const peerName = peerAddition.name ?? "同门";
   const peerPronoun = getFellowPronoun(peerGender);
 
@@ -127,9 +129,10 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider): Pen
   });
 }
 
-function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): PendingEvent {
+function createRandomEvent11(state: GameState, getRoll: RandomRollProvider, recruitmentCalendar: RecruitmentCalendar): PendingEvent {
   const serial = state.totalRandomEventCount;
   const seniorGender = getRoll() < 0.5 ? "male" : "female";
+  const recruitmentSeed = `random-11:${serial}:${getRoll()}`;
   const roleText = getFellowRoleLabel("senior", seniorGender);
   const usedNames = [
     ...state.fellowProgressState.map((profile) => getFellowName(profile)),
@@ -141,7 +144,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider): Pen
   const deepSanChange = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
   const deepSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
   const canAddSenior = canAddRelationship(state.relationshipState, "senior");
-  const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender, usedNames, getRoll);
+  const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender, usedNames, undefined, recruitmentCalendar, recruitmentSeed);
   const seniorIntro = `${roleText}${seniorAddition.name ?? ""}`;
 
   const event: PendingEvent = {
@@ -243,12 +246,13 @@ export function createRelationshipRandomEventById(
   eventId: number,
   state: GameState,
   getRoll: RandomRollProvider,
+  recruitmentCalendar: RecruitmentCalendar = state,
 ): PendingEvent | null {
   if (eventId === 10) {
-    return createRandomEvent10(state, getRoll);
+    return createRandomEvent10(state, getRoll, recruitmentCalendar);
   }
   if (eventId === 11) {
-    return createRandomEvent11(state, getRoll);
+    return createRandomEvent11(state, getRoll, recruitmentCalendar);
   }
   return null;
 }

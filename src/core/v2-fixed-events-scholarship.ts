@@ -2,11 +2,12 @@ import {
   appendMechanismSettlement,
   createFixedEvent,
   drawInclusiveInt,
+  type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
 import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
-import type { GameState, PendingEvent } from "./v2-types";
+import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 type ScholarshipOutcomeContext = NonNullable<PendingEvent["scholarshipContext"]>;
 
@@ -44,7 +45,23 @@ function getEligiblePublishedPaperIds(state: GameState): string[] {
     .map((paper) => paper.id);
 }
 
-function buildScholarshipResultEvent(context: ScholarshipOutcomeContext, disqualified = false): PendingEvent {
+function buildScholarshipResultEvent(state: GameState, context: ScholarshipOutcomeContext): PendingEvent {
+  const result = buildScholarshipAwardEvent(context, hasScholarshipDisqualification(state));
+  const san = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
+  const sanSummary = formatActualSanChange(-2, state.month, state.eventSupport, state.buffs);
+  return {
+    ...result,
+    description: result.description.replace("\n结果：", `\n结果：${sanSummary}\n结果：`),
+    choices: result.choices.map((choice) => ({
+      ...choice,
+      outcome: `${sanSummary}；${choice.outcome}`,
+      effects: { ...choice.effects, san },
+    })),
+  };
+}
+
+function buildScholarshipAwardEvent(context: ScholarshipOutcomeContext, disqualified = false): PendingEvent {
+  if (context.requirement === null) throw new Error("国奖分数线须在申报后抽取");
   if (context.success && disqualified) {
     return createScholarshipScene(context, {
       id: `scholarship-result-y${context.year}-m${context.month}`,
@@ -125,16 +142,7 @@ function buildScholarshipResultEvent(context: ScholarshipOutcomeContext, disqual
 }
 
 function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOutcomeContext): PendingEvent {
-  const diff = context.score - context.requirement;
-  const thoughts = diff >= 3
-    ? "对照往年的获奖材料，成果充实不少，心里总算有了底。"
-    : diff >= 1
-      ? "对照往年的获奖材料，你觉得有些把握，又确认了一遍没有重复申报。"
-      : diff === 0
-        ? "对照往年的获奖材料，像是刚好够得着，没多少余裕。"
-        : diff >= -2
-          ? "对照往年的获奖材料，总觉得还差一点，你又查了遍有没有漏填。"
-          : "比起往年的获奖材料，积累仍显单薄，这回恐怕不太乐观。";
+  const range = context.year <= 2 ? "1分" : context.year === 3 ? "2～4分" : context.year === 4 ? "5～8分" : "8～12分";
   const skipped = createFixedEvent({
     id: `scholarship-skip-result-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 申报决定 ➜ 暂不申报",
@@ -151,8 +159,8 @@ function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOut
     id: `scholarship-decision-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 申报决定",
     description: [
-      `你翻出论文和证明材料，先给自己估了个分：这次能计入 ${context.score} 分。${thoughts}`,
-      `本年度国奖奖金为 **${context.reward}金币**。申报表还空着几栏，整理附件也得花些精力。你已经在心里列起购物清单，刚到第二件就赶紧叫停：材料还没交，钱倒先花上了。`,
+      `你翻出论文和证明材料，先给自己估了个分：这次能计入 ${context.score} 分。往年同年级的分数线在${range}，今年还要看大家提交的成果。`,
+      `本年度国奖奖金为 **${context.reward}金币**。整理证明材料、准备答辩PPT，再上台讲清自己的成果，少不了一番忙碌。你刚在心里列起购物清单，又赶紧叫停：答辩还没准备，钱倒先花上了。`,
     ].join("\n\n"),
     chainId: "scholarship",
     stage: "act2",
@@ -160,10 +168,9 @@ function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOut
       {
         id: `scholarship-apply-y${context.year}-m${context.month}`,
         label: "准备材料并申报",
-        outcome: `准备申报材料，${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}；入选后金币 +${context.reward}。`,
+        outcome: `准备材料与答辩，${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}；入选后金币 +${context.reward}。`,
         effects: {
-          san: getActualSanChange(-2, state.month, state.eventSupport, state.buffs),
-          enqueueEvents: [buildScholarshipResultEvent(context, hasScholarshipDisqualification(state))],
+          fixedEventResolution: { kind: "scholarship-apply", scholarshipYear: context.year, scholarshipMonth: context.month },
         },
       },
       {
@@ -176,8 +183,7 @@ function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOut
   });
 }
 
-export function createScholarshipEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
-  const requirement = getScholarshipRequirement(state.year, getRoll);
+export function createScholarshipEvent(state: GameState, _getRoll: RandomRollProvider): PendingEvent {
   const reward = getScholarshipReward(state.year);
   const scoreBaseline = state.scholarshipState.scoreBaseline;
   const eligiblePaperIds = getEligiblePublishedPaperIds(state);
@@ -186,13 +192,26 @@ export function createScholarshipEvent(state: GameState, getRoll: RandomRollProv
     year: state.year,
     month: state.month,
     score,
-    requirement,
+    requirement: null,
     reward,
     scoreBaseline,
     eligiblePaperIds,
-    success: score >= requirement,
+    success: false,
   };
   return buildScholarshipIntroEvent(state, context);
+}
+
+export function resolveScholarshipApplication(state: GameState, resolution: FixedEventResolution, getRoll: RandomRollProvider): FixedResolutionResult {
+  const year = resolution.scholarshipYear ?? state.year;
+  const requirement = getScholarshipRequirement(year, getRoll);
+  const scoreBaseline = state.scholarshipState.scoreBaseline;
+  const score = Math.max(0, state.totalResearchScore - scoreBaseline);
+  const result = buildScholarshipResultEvent(state, {
+    year, month: resolution.scholarshipMonth ?? state.month, requirement,
+    reward: getScholarshipReward(year), score, scoreBaseline,
+    eligiblePaperIds: getEligiblePublishedPaperIds(state), success: score >= requirement,
+  });
+  return { nextState: state, outcome: "材料和答辩已完成，查看评选结果。", enqueueEvents: [result] };
 }
 
 function buildScholarshipIntroEvent(state: GameState, context: ScholarshipOutcomeContext): PendingEvent {
@@ -229,10 +248,10 @@ export function refreshScholarshipEvent<T extends PendingEvent>(state: GameState
     score,
     scoreBaseline,
     eligiblePaperIds: getEligiblePublishedPaperIds(state),
-    success: score >= context.requirement,
+    success: context.requirement !== null && score >= context.requirement,
   };
   const rebuilt = event.stage === "result"
-    ? buildScholarshipResultEvent(currentContext, hasScholarshipDisqualification(state))
+    ? buildScholarshipResultEvent(state, currentContext)
     : event.stage === "act2"
       ? buildScholarshipDecisionEvent(state, currentContext)
       : buildScholarshipIntroEvent(state, currentContext);

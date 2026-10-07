@@ -70,7 +70,7 @@ describe("v2 research rule details and publication metrics", () => {
       ...(["character", "relation", "equip", "growth", "publication"] as const).map((activeTalentTab) => ({ activePlayTab: "talent" as const, activeTalentTab })),
     ];
     for (const context of contexts) {
-      expect(getHelpText(context)).not.toMatch(/旧版|新版|不再|实现细节|走同一事件流程|仅同学自主科研间隔|三项合计分快照/);
+      expect(getHelpText(context)).not.toMatch(/旧版|新版|实现细节|走同一事件流程|仅同学自主科研间隔|三项合计分快照/);
     }
   });
 
@@ -87,14 +87,17 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("购物只靠手动约会");
     expect(help).toContain("恋爱次月起");
     expect(help).toContain("恋人有活泼和聪慧两种类型");
-    expect(help).toContain("初始属性：活泼恋人科研3～6、亲密9～12；聪慧恋人科研9～12、亲密3～6");
+    expect(help).toContain("恋人与你同届，初始科研基础=年级×2+独立随机0～3；聪慧额外+4，合并后从0逐点抵抗，上限20");
+    expect(help).toContain("初始亲密基础=3+独立随机0～3；活泼额外+3，亲密6～9；聪慧亲密3～6");
+    expect(help).toContain("恋人科研自然成长原始+2，逐点抵抗，上限20；不参与实验室传承");
+    expect(help).not.toMatch(/科研3～6|科研9～12|亲密9～12/);
     expect(help).not.toMatch(/没有一次性奖励|不再每月自动扣费|固定每月金币奖励/);
   });
 
   it("explains separate three-cycle lover rewards and gift purchase priority", () => {
     const context = getPlayHelpContext({ activePlayTab: "relationship" });
     const pages = context.pages.filter((page) => page.title.startsWith("恋人"));
-    expect(pages).toHaveLength(2);
+    expect(pages).toHaveLength(3);
     const help = getHelpText({ activePlayTab: "relationship" });
     expect(help).toContain("SAN+6");
     expect(help).toContain("论文三项分数永久+1");
@@ -114,9 +117,67 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).not.toContain("仅同学自主科研间隔2个月");
     expect(help).toContain("每位同学每月可主动协作一次");
     expect(help).toContain("默契每月推进协作进度");
-    expect(help).toContain("同学科研+⌊n/2⌋，上限20");
-    expect(help).toContain("再加导师1人，恋人不计");
+    expect(help).toContain("每学年末（8月），你和同学科研+⌊n/2⌋");
+    expect(help).toContain("按结算前科研统一比较；同学自然成长+2，与传承合并为2+⌊n/2⌋后逐点抵抗");
+    expect(help).toContain("玩家只获传承，不含自然成长");
+    expect(help).toContain("初始科研原始增量=年级×2+独立随机0～3，从0逐点抵抗，上限20");
+    expect(help).toContain("你的科研遵循自身上限，同学上限20");
+    expect(help).toContain("第一学年末起结算，与认识月数无关");
+    expect(help).toContain("导师计1人，恋人不计");
+    expect(help).not.toMatch(/发表积累|累计一作|每学年9月/);
     expect(help).toContain("双方主导的合作论文均可触发");
+  });
+
+  it("keeps talent inheritance help aligned with the shared August settlement", () => {
+    const help = getHelpText({ activePlayTab: "talent", activeTalentTab: "relation" });
+    expect(help).toContain("每学年末（8月），你和同学科研+⌊n/2⌋");
+    expect(help).toContain("n为科研更高的其他实验室成员人数，导师计1人，恋人不计");
+    expect(help).toContain("按结算前科研统一比较；同学自然成长+2，与传承合并为2+⌊n/2⌋后逐点抵抗");
+    expect(help).toContain("当前人际栏同学自然成长与传承的实际提升；离校或停止合作后不再计入");
+    expect(help).toContain("玩家只获传承，不含自然成长");
+    expect(help).toContain("恋人科研自然成长原始+2，逐点抵抗，上限20；不参与实验室传承");
+    expect(help).toContain("你的科研遵循自身上限，同学上限20");
+    expect(help).toContain("第一学年末起结算，与认识月数无关");
+    expect(help).not.toMatch(/发表积累|累计一作|每学年9月/);
+  });
+
+  it("explains playable June and player graduation after events and transfer decisions", () => {
+    const help = getHelpText({ activePlayTab: "events" });
+    expect(help).toContain("硕士培养期34个月（第三年6月），博士70个月（第六年6月）");
+    expect(help).toContain("6月可完整操作");
+    expect(help).toContain("处理完到期事件（含非阻塞结果）和转博决定后，点击下一月才结算毕业");
+    expect(help).toContain("仍为硕士需科研分≥1，博士需≥7；未达标为延毕");
+    expect(help).toContain("转博成功则继续博士学业，毕业结算不额外推进月份");
+    const fellows = getHelpText({ activePlayTab: "relationship" });
+    expect(fellows).toContain("每年6月结束时，第二/三年硕士科研分达到2/3先转博，再判定离校");
+    expect(fellows).toContain("第三年仍为硕士需1分，第六年博士需7分");
+    expect(fellows).toContain("达标毕业，未达标退学，不设延毕");
+  });
+
+  it("explains journal payment choices and keeps fellow fees automatic", () => {
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("PAMI/NMI/Nature版面费分别5/10/20");
+    expect(help).toContain("玩家一作选择个人金币或实验室经费支付；自费需足额金币，不足时禁用");
+    expect(help).toContain("实验室选项仅在没有导师时禁用");
+    expect(help).toContain("经费不足或恰好用尽仍可确认，但支付后经费≤0则破产");
+    expect(help).toContain("同学一作由实验室自动支付");
+    expect(help).toContain("需手动选择，不自动扣款");
+    expect(help).toContain("仍须缴费后才能推进月份或毕业");
+    expect(help).toContain("打工赚金币或推进横向项目补经费，再回来缴费");
+    expect(help).not.toContain("版面费分别5/10/20，由实验室支付");
+    expect(getHelpText({ activePlayTab: "workstation" })).toContain("一作版面费在待办中选择个人金币或实验室经费支付");
+  });
+
+  it("points to separate monthly actions, annual results and academic logs", () => {
+    const events = getHelpText({ activePlayTab: "events" });
+    expect(events).toContain("关系自动行动按月汇总日志");
+    expect(events).toContain("个人科研、项目、协作和帮助在对应人物卡片查看");
+    expect(events).toContain("同学转博、毕业或退学后，学业记录仍可在日志回看");
+    for (const ui of [{ activePlayTab: "relationship" }, { activePlayTab: "talent", activeTalentTab: "relation" }] as const) {
+      const help = getHelpText(ui);
+      expect(help).toContain("个人卡片“成长”保留最近学年实际变化");
+      expect(help).toContain("次月“本月”行动不覆盖成长记录");
+    }
   });
 
   it("documents mentor funding, paper contributions and the annual grant timeline", () => {
@@ -125,9 +186,11 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("项目进度满100才结算");
     expect(help).toContain("对应进度+100。满条奖励单独记入项目完成日志");
     expect(help).toContain("横向基础SAN-8、纵向基础SAN-6，享受科研档位减免");
-    expect(help).toContain("横向完成后科研经费+20");
-    expect(help).toContain("纵向完成后导师科研积累增加当前值的10%");
-    expect(help).toContain("实验基础花费3金币");
+    expect(help).toContain("横向科研经费+60，再支付你的劳务费5金币，经费净增55");
+    expect(help).toContain("横向不设最低经费要求");
+    expect(help).toContain("纵向导师科研积累增加当前值的10%");
+    expect(help).toContain("实验基础花费3经费");
+    expect(help).toContain("经费不足时不开展实验");
     expect(help).toContain("纵向项目满100时，导师为玩家和每位同学各随机选择一篇论文，写作协作+10");
     expect(help).toContain("玩家与同学每次实验费用+1");
     expect(help).toContain("同学经费不足当次实验费用时改做横向");
@@ -140,7 +203,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("项目到期释放名额");
     expect(help).toContain("院士需先获得杰青");
     expect(help).toContain("院士");
-    for (const [threshold, funding, duration] of [[25, 10, 3], [50, 20, 4], [150, 50, 3], [400, 100, 5]]) {
+    for (const [threshold, funding, duration] of [[25, 30, 3], [50, 60, 4], [150, 150, 3], [400, 300, 5]]) {
       expect(help).toContain(`${threshold}+${funding}${duration}年`);
     }
     expect(help).not.toMatch(/科研资源|信任度/);
@@ -160,13 +223,17 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("×1.5算+0.5，×0.8算−0.2");
     expect(help).toContain("两个×1.5合并为×2");
     expect(help).toContain("不额外扣行动点或SAN");
-    expect(help).toContain("实验基础费用3金币");
-    expect(help).toContain("优先用导师经费，不足部分自付；按钮显示你实际承担的金币");
+    expect(help).toContain("实验基础费用3经费");
+    expect(help).toContain("费用由实验室支付，不足时暂停实验");
+    expect(help).toContain("悬浮实验按钮查看实际经费消耗");
+    expect(help).toContain("经费不足时不会扣SAN或行动点");
+    expect(help).not.toMatch(/不足部分自付|最后扣你的金币|自费租卡/);
     expect(help).toContain("算力短缺持续6个月，玩家与同学每次实验费用+1");
-    expect(help).toContain("实验金币也只收一次");
-    expect(help).toContain("个人显卡RTX4090起每次实验减1金币，H20起减2");
+    expect(help).toContain("实验经费也只收一次");
+    expect(help).toContain("个人显卡RTX4090起每次实验减1经费，H20起减2");
     expect(help).toContain("远程实习期间再减1，最低0");
-    expect(help).toContain("减免仅限玩家，不影响同学；先算共享涨价与个人减免，再扣导师经费，最后扣你的金币");
+    expect(help).toContain("减免仅限玩家，不影响同学");
+    expect(help).toContain("先算共享涨价与个人减免");
     expect(help).toContain("每遍都重新生成分数");
     expect(help).toContain("每遍与上一遍自身分+1取最大值");
     expect(help).toContain("总次数=1+⌊n⌋，n为额外次数之和，至少执行1次");
@@ -210,7 +277,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(html).toContain('data-help-context="workstation"');
   });
 
-  it("shows only the player's experiment cost and blocks only their unpaid remainder", () => {
+  it("shows full lab experiment costs and blocks insufficient funding regardless of personal money", () => {
     const funded = createResearchState();
     funded.papers[0] = { ...funded.papers[0]!, idea: 1 };
     funded.advisorProgressState.funding = 3;
@@ -223,33 +290,24 @@ describe("v2 research rule details and publication metrics", () => {
     expect(fundedButton).not.toContain("经费-");
     expect(fundedButton).toContain('data-animate-number="3"');
     expect(fundedButton).toContain('data-action="research-paper"');
+    expect(fundedButton).not.toContain("disabled");
 
-    for (const [funding, gpuLevel, playerCost] of [[2, 0, 1], [1, 4, 1], [0, 8, 1]] as const) {
+    for (const [funding, gpuLevel, labCost] of [[2, 0, 3], [1, 4, 2], [0, 8, 1]] as const) {
       const partial = {
         ...funded,
         advisorProgressState: { ...funded.advisorProgressState, funding },
         shopState: { ...funded.shopState, gpuLevel },
-        player: { ...funded.player, money: 1 },
+        player: { ...funded.player, money: 100 },
       };
       const html = renderApp(partial, createDefaultAccountProfile(), { activePlayTab: "workstation" });
-      const button = html.match(/<button[^>]*data-paper-action-type="experiment"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-      expect(button.replace(/<[^>]*>/g, "")).toContain(`SAN-3 · 金币-${playerCost}`);
-      expect(button).toContain("导师经费不足");
-      expect(button).toContain(`自费租卡：金币-${playerCost}`);
-      if (funding > 0) expect(button).toContain(`消耗${funding}导师经费`);
-      expect(button).not.toContain("经费-");
-      expect(button).toContain('data-action="research-paper"');
-      expect(button).not.toContain("disabled");
+      const button = html.match(/<button[^>]*workstation-paper-action-btn is-experiment[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+      expect(button.replace(/<[^>]*>/g, "")).toContain("SAN-3");
+      expect(button).toContain(`科研经费不足，需要 ${labCost}`);
+      expect(button).toContain(`消耗${labCost}导师经费`);
+      expect(button).not.toMatch(/金币-|自费租卡/);
+      expect(button).not.toContain('data-action="research-paper"');
+      expect(button).toContain('disabled aria-disabled="true"');
     }
-
-    const selfPaid = { ...funded, advisorProgressState: { ...funded.advisorProgressState, funding: 0 }, player: { ...funded.player, money: 2 } };
-    const selfPaidHtml = renderApp(selfPaid, createDefaultAccountProfile(), { activePlayTab: "workstation" });
-    const selfPaidButton = selfPaidHtml.match(/<button[^>]*workstation-paper-action-btn is-experiment[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-    expect(selfPaidButton.replace(/<[^>]*>/g, "")).toContain("SAN-3 · 金币-3");
-    expect(selfPaidButton).toContain("导师经费不足，自费租卡：金币-3");
-    expect(selfPaidButton).toContain('data-animate-number="3"');
-    expect(selfPaidButton).toContain("金币不足，需要 3");
-    expect(selfPaidButton).toContain("disabled aria-disabled=\"true\"");
   });
 
   it.each([[4, 2], [8, 1]])("uses the actual funding cost after GPU upgrade %s", (gpuLevel, cost) => {

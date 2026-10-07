@@ -56,7 +56,7 @@ export function collectRandomEventsForMonth(
   for (let index = 0; index < randomEventCount; index += 1) {
     const drawResult = drawRandomEvent(
       {
-        availableRandomEvents: nextState.availableRandomEvents,
+        availableRandomEvents: nextState.availableRandomEvents.filter((id) => id !== 11 || nextState.year < 6),
         usedRandomEvents: nextState.usedRandomEvents,
         illnessProbability: nextState.illnessProbability,
         totalRandomEventCount: nextState.totalRandomEventCount,

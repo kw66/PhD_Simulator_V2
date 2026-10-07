@@ -23,6 +23,7 @@ function relationshipIds(state: GameState): string[] {
 function sustain(state: GameState): GameState {
   return {
     ...state,
+    advisorProgressState: { ...state.advisorProgressState, funding: Math.max(100, state.advisorProgressState.funding) },
     player: {
       ...state.player,
       san: state.sanCap,

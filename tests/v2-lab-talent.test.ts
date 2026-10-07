@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { getFellowAnnualResearchGrowth, getFellowPublicationTotals, settleFellowCoauthoredPapers, settleLabResearchGrowth } from "../src/core/v2-lab-talent";
+import { getFellowAnnualResearchGrowth, getFellowPublicationTotals, getPlayerAnnualResearchGrowth, settleFellowCoauthoredPapers, settleLabResearchGrowth } from "../src/core/v2-lab-talent";
 import { applyPublicationTalentRewards } from "../src/core/v2-publication-talent";
 import { submitJournalPaper } from "../src/core/v2-journal-system";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -14,7 +14,7 @@ import type { GameState, Paper, PaperTarget } from "../src/core/v2-types";
 function makeState(research = [2, 6, 9], starts = [1, 1, 1]): GameState {
   const base = createStartedGameState("normal");
   return {
-    ...base, totalMonths: 13, month: 1, year: 2, eventQueue: [],
+    ...base, totalMonths: 12, month: 12, year: 1, eventQueue: [],
     player: { ...base.player, research: 8 },
     fellowProgressState: research.map((value, index) => ({
       ...createCustomFellowProgressProfile({ type: "peer", gender: "female", research: value, affinity: 1, startTotalMonths: starts[index] ?? 1 }),
@@ -31,9 +31,9 @@ describe("lab annual growth", () => {
   it("caps inherited research at twenty and preserves it in later years", () => {
     const state = makeState([19, 20, 20, 20]);
     state.player.research = 30;
-    const next = settleLabResearchGrowth(state);
+    const next = settleLabResearchGrowth(state, () => 0.99);
     expect(next.fellowProgressState.map((profile) => profile.research)).toEqual([20, 20, 20, 20]);
-    expect(settleLabResearchGrowth({ ...next, totalMonths: 25 }).fellowProgressState.map((profile) => profile.research)).toEqual([20, 20, 20, 20]);
+    expect(settleLabResearchGrowth({ ...next, totalMonths: 24, year: 2 }, () => 0.99).fellowProgressState.map((profile) => profile.research)).toEqual([20, 20, 20, 20]);
   });
 
   it("counts the mentor once plus strictly stronger player and fellows, excluding the lover", () => {
@@ -41,51 +41,217 @@ describe("lab annual growth", () => {
     state.loverProgressState.research = 100;
     state.loverState.active = true;
     expect(state.fellowProgressState.map((profile) => getFellowAnnualResearchGrowth(state, profile))).toEqual([2, 1, 0, 2]);
+    expect(getPlayerAnnualResearchGrowth(state)).toBe(1);
     state.player.research = 2;
     expect(getFellowAnnualResearchGrowth(state, state.fellowProgressState[0]!)).toBe(1);
+    expect(getPlayerAnnualResearchGrowth(state)).toBe(1);
+    state.player.research = 9;
+    expect(getPlayerAnnualResearchGrowth(state)).toBe(0);
   });
 
-  it("is active without a senior/junior pair and does not grow the player or mentor", () => {
+  it("is active without a senior/junior pair and leaves the mentor unchanged", () => {
     const state = makeState([2]);
     const next = settleLabResearchGrowth(state);
-    expect(next.fellowProgressState[0]!.research).toBe(3);
+    expect(next.fellowProgressState[0]!.research).toBe(5);
     expect(next.player).toEqual(state.player);
     expect(next.advisorProgressState).toEqual(state.advisorProgressState);
   });
 
-  it.each([1, 12, 14, 24])("does not grow outside each personal anniversary at month %s", (totalMonths) => {
-    const state = { ...makeState(), totalMonths };
+  it.each([1, 11, 13, 14, 23, 25])("does not grow outside the end of an academic year at month %s", (totalMonths) => {
+    const state = { ...makeState(), totalMonths, month: (totalMonths - 1) % 12 + 1, year: Math.floor((totalMonths - 1) / 12) + 1 };
     expect(settleLabResearchGrowth(state)).toBe(state);
   });
 
-  it("settles staggered anniversaries and never repeats within a month, including zero growth", () => {
-    const state = makeState([2, 6, 9], [1, 2, 1]);
-    const next = settleLabResearchGrowth(state);
-    expect(next.fellowProgressState.map((profile) => profile.research)).toEqual([4, 6, 9]);
-    expect(next.fellowProgressState[2]!.lastAnnualGrowthTotalMonths).toBe(13);
+  it("does not settle before play or at a nonpositive elapsed month", () => {
+    for (const state of [{ ...makeState(), phase: "finished" as const }, { ...makeState(), totalMonths: 0 }, { ...makeState(), totalMonths: -12 }]) {
+      const random = vi.fn(() => 0.99);
+      expect(settleLabResearchGrowth(state, random)).toBe(state);
+      expect(random).not.toHaveBeenCalled();
+    }
+  });
+
+  it("settles the school year for all fellows and never repeats within a month", () => {
+    const state = makeState([2, 6, 9], [1, 12, 1]);
+    const next = settleLabResearchGrowth(state, () => 0.99);
+    expect(next.fellowProgressState.map((profile) => profile.research)).toEqual([6, 9, 11]);
+    expect(next.player.research).toBe(9);
+    expect(next.fellowProgressState.every((profile) => profile.lastAnnualGrowthTotalMonths === 12)).toBe(true);
+    expect(next.eventHistory.find((entry) => entry.id === "talent:inheritance:player:12"))
+      .toMatchObject({ completedAtTotalMonths: 12, completedAtYear: 1, completedAtMonth: 12 });
     expect(settleLabResearchGrowth(next)).toBe(next);
-    const later = settleLabResearchGrowth({ ...next, totalMonths: 14 });
-    expect(later.fellowProgressState.map((profile) => profile.research)).toEqual([4, 7, 9]);
-    expect(settleLabResearchGrowth({ ...later, totalMonths: 25 }).fellowProgressState[0]!.research).toBe(6);
+    const later = settleLabResearchGrowth({ ...next, totalMonths: 14, month: 2 });
+    expect(later.fellowProgressState.map((profile) => profile.research)).toEqual([6, 9, 11]);
+    expect(settleLabResearchGrowth({ ...later, totalMonths: 24, year: 2, month: 12 }, () => 0.99).fellowProgressState[0]!.research).toBe(10);
+    const restored = JSON.parse(JSON.stringify(next)) as GameState;
+    const random = vi.fn(() => 0.99);
+    expect(settleLabResearchGrowth(restored, random)).toBe(restored);
+    expect(random).not.toHaveBeenCalled();
   });
 
   it("uses simultaneous values so reversing the roster cannot change growth", () => {
     const state = makeState([2, 2, 9]);
-    state.player.research = 1;
-    const forward = settleLabResearchGrowth(state);
-    const reversed = settleLabResearchGrowth({ ...state, fellowProgressState: [...state.fellowProgressState].reverse() });
-    expect(forward.fellowProgressState.map((profile) => profile.research)).toEqual([3, 3, 9]);
+    state.player.research = 2;
+    const forward = settleLabResearchGrowth(state, () => 0.99);
+    const reversed = settleLabResearchGrowth({ ...state, fellowProgressState: [...state.fellowProgressState].reverse() }, () => 0.99);
+    expect(forward.fellowProgressState.map((profile) => profile.research)).toEqual([5, 5, 11]);
+    expect(forward.player.research).toBe(3);
+    expect(reversed.player).toEqual(forward.player);
     expect(reversed.fellowProgressState.reverse()).toEqual(forward.fellowProgressState);
+    expect(state.player.research).toBe(2);
+    expect(state.fellowProgressState.map((profile) => profile.research)).toEqual([2, 2, 9]);
   });
 
-  it("uses the annual growth in this month's research and new help snapshots", () => {
+  it("resists each recipient point by point using their own tier", () => {
+    const state = makeState([5, 10, 10, 2]);
+    state.player.research = 5;
+    const next = settleLabResearchGrowth(state, () => 0.1);
+    expect(next.player.research).toBe(6);
+    expect(next.fellowProgressState.map((profile) => profile.research)).toEqual([6, 10, 10, 6]);
+    expect(next.fellowProgressState.map((profile) => profile.annualResearchGrowthTotal ?? 0)).toEqual([1, 0, 0, 4]);
+  });
+
+  it("uses the player's own research cap for previews and settlement", () => {
+    const state = makeState([10, 10, 10]);
+    state.player.research = 8;
+    state.researchCapacityState.baseCap = 8;
+    state.researchCapacityState.otherCapBonus = 1;
+    expect(getPlayerAnnualResearchGrowth(state)).toBe(1);
+    const next = settleLabResearchGrowth(state, () => 0.99);
+    expect(next.player.research).toBe(9);
+    expect(getPlayerAnnualResearchGrowth(next)).toBe(0);
+  });
+
+  it("combines natural and inheritance rewards before crossing a resistance tier", () => {
+    const state = makeState([5]);
+    const next = settleLabResearchGrowth(state, () => 0.1);
+    expect(getFellowAnnualResearchGrowth(state, state.fellowProgressState[0]!)).toBe(1);
+    expect(next.fellowProgressState[0]).toMatchObject({ research: 6, annualResearchGrowthTotal: 1 });
+    expect(next.fellowProgressState[0]!.annualResearchActivity)
+      .toBe("第1学年末：科研 +1（5→6，抵抗2）；原始奖励：自然成长 +2、传承 +1");
+    expect(next.player.research).toBe(8);
+    const records = next.eventHistory.filter((entry) => entry.id === "talent:inheritance:fellow-0:12");
+    expect(records).toHaveLength(1);
+    expect(records[0]!.stages[0]!.talentTrigger).toMatchObject({
+      effects: ["科研 +1（5→6，抵抗2）"],
+      details: ["原始奖励：自然成长 +2，实验室传承 +1，合计 +3；合并后逐点抵抗并受科研上限限制"],
+    });
+  });
+
+  it.each([[5, 0.1, 6], [6, 0, 6], [19, 0.99, 20], [20, 0.99, 20]])
+    ("settles lover natural growth from %s with roll %s to %s exactly once", (research, roll, expected) => {
+      const state = makeState([10, 10, 10]);
+      state.loverState = { ...state.loverState, active: true, name: "周明", startTotalMonths: 12 };
+      state.loverProgressState = { ...state.loverProgressState, active: true, research };
+      const next = settleLabResearchGrowth(state, () => roll);
+      expect(next.loverProgressState).toMatchObject({ research: expected, lastAnnualGrowthTotalMonths: 12 });
+      const history = next.eventHistory.filter((entry) => entry.id.startsWith("talent:annual-research:lover:"));
+      expect(history).toHaveLength(1);
+      expect(history[0]).toMatchObject({ completedAtTotalMonths: 12, completedAtMonth: 12, completedAtYear: 1 });
+      expect(history[0]!.stages[0]!.talentTrigger).toMatchObject({
+        name: "年度科研成长", recipient: "周明", details: ["原始奖励：自然成长 +2；逐点抵抗并受科研上限限制"],
+        effects: [research >= 19 ? `科研 +2（${research}→20）`
+          : research === 5 ? "科研 +1（5→6，抵抗1）" : "科研 +0（6→6，抵抗2）"],
+      });
+      const restored = JSON.parse(JSON.stringify(next)) as GameState;
+      const random = vi.fn(() => 0.99);
+      expect(settleLabResearchGrowth(restored, random)).toBe(restored);
+      expect(random).not.toHaveBeenCalled();
+      const nextYear = settleLabResearchGrowth({ ...next, year: 2, totalMonths: 24 }, () => 0.99);
+      expect(nextYear.loverProgressState).toMatchObject({ research: Math.min(20, expected + 2), lastAnnualGrowthTotalMonths: 24 });
+    });
+
+  it("gives the lover only natural growth and excludes them from every inheritance count", () => {
+    const state = makeState([6, 10]);
+    state.player.research = 6;
+    const baseline = settleLabResearchGrowth(state, () => 0.99);
+    expect(baseline.loverProgressState).toBe(state.loverProgressState);
+    for (const research of [1, 19]) {
+      const next = settleLabResearchGrowth({ ...state,
+        loverState: { ...state.loverState, active: true, startTotalMonths: 12 },
+        loverProgressState: { ...state.loverProgressState, active: true, research },
+      }, () => 0.99);
+      expect(next.player).toEqual(baseline.player);
+      expect(next.fellowProgressState).toEqual(baseline.fellowProgressState);
+      expect(next.loverProgressState.research).toBe(Math.min(20, research + 2));
+    }
+  });
+
+  it("uses the lover marker even when only the lover remains to settle", () => {
+    const settled = settleLabResearchGrowth(makeState([]), () => 0.99);
+    const joined = { ...settled,
+      loverState: { ...settled.loverState, active: true, startTotalMonths: 12 },
+      loverProgressState: { ...settled.loverProgressState, active: true, research: 3 },
+    };
+    const next = settleLabResearchGrowth(joined, () => 0.99);
+    expect(next.loverProgressState.research).toBe(5);
+    expect(next.log.filter((entry) => entry.id === "talent:annual-research:group:12")).toHaveLength(1);
+    expect(next.eventHistory.filter((entry) => entry.id === "talent:annual-research:group:12")).toHaveLength(1);
+    expect(next.eventHistory.find((entry) => entry.id === "talent:annual-research:group:12")!.stages[0]!.talentTrigger!.effects).toHaveLength(2);
+    const withoutHistory = { ...next, eventHistory: next.eventHistory.filter((entry) => !entry.id.startsWith("talent:annual-research:lover:")) };
+    expect(settleLabResearchGrowth(withoutHistory, () => 0.99)).toBe(withoutHistory);
+  });
+
+  it.each([[false, false], [true, false], [false, true]])
+    ("does not grow a lover with relationship active %s and progress active %s", (relationshipActive, progressActive) => {
+      const settled = settleLabResearchGrowth(makeState([]), () => 0.99);
+      const state = { ...settled,
+        loverState: { ...settled.loverState, active: relationshipActive, startTotalMonths: 12 },
+        loverProgressState: { ...settled.loverProgressState, active: progressActive, research: 3 },
+      };
+      const random = vi.fn(() => 0.99);
+      expect(settleLabResearchGrowth(state, random)).toBe(state);
+      expect(random).not.toHaveBeenCalled();
+      expect(state.loverProgressState.lastAnnualGrowthTotalMonths).toBeUndefined();
+      expect(state.eventHistory.some((entry) => entry.id.startsWith("talent:annual-research:lover:"))).toBe(false);
+    });
+
+  it("keeps actual capped activity separate from nominal group rewards and replaces it next year", () => {
+    const state = makeState([20]);
+    state.player.research = 20;
+    state.log = [{ id: "existing", month: 12, text: "已有日志" }];
+    state.loverState = { ...state.loverState, active: true, name: "周明", startTotalMonths: 12 };
+    state.loverProgressState = { ...state.loverProgressState, active: true, research: 20 };
+    let draw = 0;
+    const next = settleLabResearchGrowth(state, () => draw++ % 2 === 0 ? 0 : 0.99);
+    const activity = "第1学年末：科研 +0（20→20，抵抗1，上限）；原始奖励：自然成长 +2";
+    expect(next.fellowProgressState[0]!.annualResearchActivity).toBe(`${activity}、传承 +0`);
+    expect(next.loverProgressState.annualResearchActivity).toBe(activity);
+    expect(next.log).toHaveLength(2);
+    expect(next.log[1]).toBe(state.log[0]);
+    expect(next.log[0]!.text).toContain("同学0：科研 +2（20→20）");
+    expect(next.log[0]!.text).toContain("周明：科研 +2（20→20）");
+    const restored = JSON.parse(JSON.stringify(next)) as GameState;
+    expect(settleLabResearchGrowth(restored, () => 0.99)).toBe(restored);
+    const later = settleLabResearchGrowth({ ...next, year: 2, totalMonths: 24 }, () => 0.99);
+    expect(later.log.filter((entry) => entry.id.startsWith("talent:annual-research:group:"))).toHaveLength(2);
+    expect(later.fellowProgressState[0]!.annualResearchActivity).toBe("第2学年末：科研 +0（20→20，上限）；原始奖励：自然成长 +2、传承 +0");
+    expect(later.loverProgressState.annualResearchActivity).toBe("第2学年末：科研 +0（20→20，上限）；原始奖励：自然成长 +2");
+  });
+
+  it("claims zero and fully resisted player rewards once without needing any fellow reward", () => {
+    for (const state of [makeState([]), makeState([10])]) {
+      state.fellowProgressState = state.fellowProgressState.map((profile) => ({ ...profile, lastAnnualGrowthTotalMonths: 12 }));
+      const next = settleLabResearchGrowth(state, () => 0);
+      expect(next.player.research).toBe(8);
+      expect(next.eventHistory.some((entry) => entry.id === "talent:inheritance:player:12")).toBe(true);
+      const random = vi.fn(() => 0.99);
+      expect(settleLabResearchGrowth(next, random)).toBe(next);
+      expect(random).not.toHaveBeenCalled();
+    }
+  });
+
+  it("leaves annual settlement to the engine after monthly research and help", () => {
     const state = makeState([2]);
     const fellow = { ...state.fellowProgressState[0]!, taskProgress: 99 };
     const draft = { ...createDraftPaper(1, 0, () => 0), leadAuthorId: fellow.id, createdTotalMonths: 1 };
     const next = advanceFellowResearch({ ...state, fellowProgressState: [fellow], fellowPapers: [draft] }, () => 0);
-    expect(next.fellowProgressState[0]).toMatchObject({ research: 3, pendingHelpToPlayer: 3, lastAnnualGrowthTotalMonths: 13 });
-    expect(next.fellowPapers![0]).toMatchObject({ idea: 8, experiment: 2 });
+    expect(next.fellowProgressState[0]).toMatchObject({ research: 2, pendingHelpToPlayer: 2 });
+    expect(next.fellowProgressState[0]!.lastAnnualGrowthTotalMonths).toBeUndefined();
+    expect(next.fellowPapers![0]).toMatchObject({ idea: 8, experiment: 1 });
     expect(advanceFellowResearch(next, () => 0)).toBe(next);
+    const settled = settleLabResearchGrowth(next, () => 0.99);
+    expect(settled.fellowProgressState[0]).toMatchObject({ research: 5, pendingHelpToPlayer: 2, lastAnnualGrowthTotalMonths: 12 });
+    expect(settled.fellowPapers).toBe(next.fellowPapers);
   });
 
   it("no longer grants a team-size bonus to player research operations", () => {
@@ -248,9 +414,8 @@ describe("coauthored paper talent", () => {
     }
     expect(panel).not.toContain("同学成长");
     expect(panel).not.toContain("认识周期");
-    expect(panel).toContain("认识每12个月");
-    expect(panel).toMatch(/同学科研<\/span>\s*<strong>\+x<\/strong>/);
-    expect(panel).toContain("认识每12个月，同学科研+⌊n/2⌋，n为实验室科研高于他的人数");
+    expect(panel).toContain("每学年");
+    expect(panel).toContain("⌊n/2⌋");
     const lover = panel.split('data-talent-item-id="lover"')[1]!.split("</article>")[0]!;
     expect(lover).toContain("恋人");
     expect(lover).toContain('<strong class="talent-item-title">恋人</strong>');

@@ -4,17 +4,20 @@ import { appendAcademicYearLog } from "../src/core/v2-academic-year-log";
 import { getAiModelForTotalMonths } from "../src/core/v2-ai-shop";
 import { getAcademicCalendarMonth } from "../src/core/v2-calendar";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
-import { getCalendarForTotalMonths } from "../src/core/v2-progression";
+import { getCalendarForTotalMonths, getMonthLimitByDegree } from "../src/core/v2-progression";
 import type { GameState } from "../src/core/v2-types";
 import { renderApp } from "../src/app/v2-render";
 
 function playingState(totalMonths: number): GameState {
   const initial = createInitialState();
+  const degree = totalMonths > getMonthLimitByDegree("master") ? "phd" : "master";
   return {
     ...initial,
     phase: "playing",
     ...getCalendarForTotalMonths(totalMonths),
     totalMonths,
+    degree,
+    maxMonths: getMonthLimitByDegree(degree),
     selectedAdvisorName: "测试导师",
     player: { san: 20, research: 5, social: 5, favor: 5, money: 100 },
     availableRandomEvents: [],

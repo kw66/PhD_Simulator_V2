@@ -15,6 +15,7 @@ export type FixedEventResolutionKind =
   | "year-summary-social"
   | "year-summary-favor"
   | "year-summary-part-time"
+  | "scholarship-apply"
   | "ccig-open"
   | "ccig-skip"
   | "ccig-advisor"
@@ -50,4 +51,6 @@ export interface FixedEventResolution {
   teachersDayGift?: TeachersDayGiftId;
   advisorCandidate?: FixedEventAdvisorCandidate;
   advisorIntel?: FixedEventAdvisorIntel;
+  scholarshipYear?: number;
+  scholarshipMonth?: number;
 }

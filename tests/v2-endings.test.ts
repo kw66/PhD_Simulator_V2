@@ -41,6 +41,17 @@ function resolveEvent(state: GameState, eventId: string): GameState {
   return dispatchAction(state, "resolve-event", { eventId, eventChoiceId: "confirm" });
 }
 
+function resolveDueEvents(state: GameState): GameState {
+  let current = state;
+  for (let count = 0; count < 30; count += 1) {
+    const event = current.eventQueue.find((entry) => entry.deadlineMonths <= 0);
+    if (!event) return current;
+    const choice = event.choices.find((entry) => entry.id === "continue-master") ?? event.choices[0]!;
+    current = dispatchAction(current, "resolve-event", { eventId: event.id, eventChoiceId: choice.id });
+  }
+  throw new Error("Due events did not finish");
+}
+
 function withPendingJournalHelp(state: GameState, helper: "lover" | "fellow"): GameState {
   const paper = {
     ...createDraftPaper(1, 0, () => 0), idea: 40, experiment: 40, writing: 40,
@@ -90,10 +101,10 @@ describe("ending failure boundaries", () => {
     [{ san: 0, money: 0, favor: 0, social: -1 }, "isolated"],
     [{ san: 0, money: 0, favor: 0, social: 0, research: -1 }, "overthinking"],
   ] as const)("prioritizes failures before graduation: %j", (stats, ending) => {
-    const state = makeState(68);
+    const state = makeState(getMonthLimitByDegree("master"));
     const next = dispatchAction({ ...state, totalResearchScore: 10, player: { ...state.player, ...stats } }, "next-month");
     expect(next.ending).toBe(ending);
-    expect(next.totalMonths).toBe(68);
+    expect(next.totalMonths).toBe(34);
   });
 
   it("applies spike protection centrally after advisor work and counts recovery once", () => {
@@ -245,75 +256,78 @@ describe("ending failure boundaries", () => {
   });
 });
 
-describe("graduation settlement", () => {
-  it.each(["next-month", "force-next-month"] as const)("keeps month 68 playable until %s is pressed again", (actionId) => {
+describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) => {
+  const limit = degree === "master" ? 34 : 70;
+
+  it.each(["next-month", "force-next-month"] as const)("keeps final June playable until %s is pressed again", (actionId) => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const state = makeState(67);
-    state.totalResearchScore = 1;
+    const state = makeState(limit - 1, degree);
+    state.totalResearchScore = state.graduationScoreTarget!;
     state.player.san = 10;
     const advanced = dispatchAction(state, actionId);
-    expect(advanced.eventQueue).toHaveLength(0);
-    expect(advanced).toMatchObject({ phase: "playing", ending: null, totalMonths: 68 });
-    const rested = dispatchAction(advanced, "rest");
-    expect(rested).toMatchObject({ phase: "playing", ending: null, totalMonths: 68 });
+    const ready = resolveDueEvents(advanced);
+    expect(ready.eventQueue).toHaveLength(0);
+    expect(advanced).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, year: degree === "master" ? 3 : 6, month: 10 });
+    const rested = dispatchAction(ready, "rest");
+    expect(rested).toMatchObject({ phase: "playing", ending: null, totalMonths: limit });
     expect(rested.player.san).toBeGreaterThan(advanced.player.san);
     expect(rested.actionState.used).toBe(advanced.actionState.used + 1);
     const finished = dispatchAction(rested, actionId);
-    expect(finished).toMatchObject({ phase: "finished", ending: "master", totalMonths: 68 });
+    expect(finished).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit });
     expect(finished.player).toEqual(rested.player);
     expect(finished.actionState).toEqual(rested.actionState);
   });
 
-  it.each(["master", "phd"] as const)("keeps the %s limit at 68 and checks the current target", (degree) => {
-    const state = makeState(68, degree);
-    expect(state.maxMonths).toBe(68);
+  it("checks the degree-specific limit and current target", () => {
+    const state = makeState(limit, degree);
+    expect(state.maxMonths).toBe(limit);
     expect(state.graduationScoreTarget).toBe(degree === "master" ? 1 : 7);
     for (const offset of [-1, 0, 1]) {
       const finished = dispatchAction({ ...state, totalResearchScore: state.graduationScoreTarget! + offset }, "next-month");
       expect(finished.ending).toBe(offset < 0 ? "delay" : degree);
-      expect(finished.totalMonths).toBe(68);
+      expect(finished.totalMonths).toBe(limit);
       expect(dispatchAction(finished, "next-month")).toBe(finished);
     }
   });
 
-  it("allows paper research in month 68 before settling a delayed graduation", () => {
+  it("allows paper research in final June before settling a delayed graduation", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const state = makeState(68);
+    const state = makeState(limit, degree);
     const paper = createDraftPaper(1, 0, () => 0);
     state.papers = [paper];
     const researched = dispatchAction(state, "research-paper", { paperId: paper.id, paperActionType: "idea" });
-    expect(researched).toMatchObject({ phase: "playing", ending: null, totalMonths: 68 });
+    expect(researched).toMatchObject({ phase: "playing", ending: null, totalMonths: limit });
     expect(researched.papers[0]!.idea).toBeGreaterThan(paper.idea);
     expect(researched.actionState.used).toBe(state.actionState.used + 1);
-    expect(dispatchAction(researched, "force-next-month")).toMatchObject({ phase: "finished", ending: "delay", totalMonths: 68 });
+    expect(dispatchAction(researched, "force-next-month")).toMatchObject({ phase: "finished", ending: "delay", totalMonths: limit });
   });
 
-  it("settles month 68 without adding a month or ending before due choices", () => {
+  it("settles final June without adding a month or ending before due choices", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const state = makeState(67);
-    state.eventQueue = [makeEvent("last-choice", { score: 1 }, { deadlineMonths: 1 })];
+    const state = makeState(limit - 1, degree);
+    state.eventQueue = [makeEvent("last-choice", { score: state.graduationScoreTarget! }, { deadlineMonths: 1 })];
     const advanced = dispatchAction(state, "next-month");
-    expect(advanced).toMatchObject({ phase: "playing", totalMonths: 68 });
+    expect(advanced).toMatchObject({ phase: "playing", totalMonths: limit });
     expect(advanced.eventQueue.find((event) => event.id === "last-choice")?.deadlineMonths).toBe(0);
     let current = advanced;
     for (let count = 0; count < 30 && current.phase === "playing" && current.eventQueue.some((event) => event.deadlineMonths <= 0); count += 1) {
       const event = current.eventQueue.find((entry) => entry.deadlineMonths <= 0)!;
       current = dispatchAction(current, "resolve-event", { eventId: event.id, eventChoiceId: event.choices[0]!.id });
     }
-    expect(current).toMatchObject({ phase: "playing", ending: null, totalMonths: 68 });
+    expect(current).toMatchObject({ phase: "playing", ending: null, totalMonths: limit });
     expect(current.eventQueue.some((event) => event.deadlineMonths <= 0)).toBe(false);
-    expect(dispatchAction(current, "next-month")).toMatchObject({ phase: "finished", ending: "master", totalMonths: 68 });
+    expect(dispatchAction(current, "next-month")).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit });
   });
 
   it.each(["next-month", "force-next-month"] as const)("%s waits for due nonblocking results but ignores unreachable future events", (actionId) => {
-    const state = makeState(68);
-    state.eventQueue = [makeEvent("due-result", { score: 1 }, { blocking: false }), makeEvent("future", { money: -100 }, { deadlineMonths: 1 })];
+    const state = makeState(limit, degree);
+    state.eventQueue = [makeEvent("due-result", { score: state.graduationScoreTarget! }, { blocking: false }), makeEvent("future", { money: -100 }, { deadlineMonths: 1 })];
     const blocked = dispatchAction(state, actionId);
-    expect(blocked).toMatchObject({ phase: "playing", ending: null, totalMonths: 68 });
+    expect(blocked).toMatchObject({ phase: "playing", ending: null, totalMonths: limit });
     const resolved = resolveEvent(blocked, "due-result");
-    expect(resolved).toMatchObject({ phase: "playing", ending: null, totalMonths: 68, totalResearchScore: 1 });
+    expect(resolved).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, totalResearchScore: state.graduationScoreTarget! });
     const finished = dispatchAction(resolved, actionId);
-    expect(finished).toMatchObject({ phase: "finished", ending: "master", totalMonths: 68 });
+    expect(finished).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit });
     expect(finished.player.money).toBe(20);
     expect(finished.eventQueue.map((event) => event.id)).toEqual(["future"]);
     expect(dispatchAction({ ...state, blockLinearEvents: false, eventQueue: [makeEvent("future", {}, { deadlineMonths: 1 })] }, "next-month").ending).toBe("delay");
@@ -321,59 +335,69 @@ describe("graduation settlement", () => {
 
   it.each(["lover", "fellow"] as const)("credits %s journal help on both final-event and final-month routes", (helper) => {
     vi.spyOn(Math, "random").mockReturnValue(0);
-    const state = withPendingJournalHelp(makeState(68, "phd"), helper);
-    state.totalResearchScore = 2;
+    const state = withPendingJournalHelp(makeState(limit, degree), helper);
+    state.totalResearchScore = Math.max(0, state.graduationScoreTarget! - 5);
     for (const route of ["event", "month"] as const) {
       let current = state;
       if (route === "event") {
         current = resolveEvent({ ...state, eventQueue: [makeEvent("last-result")] }, "last-result");
-        expect(current).toMatchObject({ phase: "playing", ending: null, totalMonths: 68, totalResearchScore: 7 });
+        expect(current).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
         expect(current.externalPublications).toHaveLength(1);
+        if (helper === "fellow") expect(current.fellowProgressState[0]?.pendingHelpToPlayer).toBeNull();
       }
       for (const actionId of ["next-month", "force-next-month"] as const) {
-        const next = dispatchAction(current, actionId);
-        expect(next).toMatchObject({ phase: "finished", ending: "phd", totalMonths: 68, totalResearchScore: 7 });
+        const awaitingPayment = dispatchAction(current, actionId);
+        expect(awaitingPayment.phase).toBe("playing");
+        expect(awaitingPayment.eventQueue.some((event) => event.journalFeePaperId)).toBe(true);
+        const next = dispatchAction(resolveDueEvents(awaitingPayment), actionId);
+        expect(next).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
         expect(next.externalPublications).toHaveLength(1);
+        expect(next.externalPublications[0]).toMatchObject({ id: state.papers[0]!.id, status: "published", journalTarget: "pami" });
+        expect(next.papers).toHaveLength(0);
+        if (helper === "lover") expect(next.loverProgressState.pendingPaperHelp).toBeNull();
+        else expect(next.fellowProgressState).toHaveLength(0);
+        expect(dispatchAction(next, actionId)).toBe(next);
       }
     }
   });
 
   it("waits for month-end after action-triggered journal publication", () => {
-    const state = withPendingJournalHelp(makeState(68, "phd"), "lover");
-    const next = dispatchAction({ ...state, totalResearchScore: 2 }, "select-paper", { paperId: state.papers[0]!.id });
-    expect(next).toMatchObject({ phase: "playing", ending: null, totalMonths: 68, totalResearchScore: 7 });
+    const state = withPendingJournalHelp(makeState(limit, degree), "lover");
+    const next = dispatchAction({ ...state, totalResearchScore: Math.max(0, state.graduationScoreTarget! - 5) }, "select-paper", { paperId: state.papers[0]!.id });
+    expect(next).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
     expect(next.externalPublications).toHaveLength(1);
-    expect(dispatchAction(next, "next-month")).toMatchObject({ phase: "finished", ending: "phd", totalMonths: 68, totalResearchScore: 7 });
+    expect(dispatchAction(next, "next-month").phase).toBe("playing");
+    expect(dispatchAction(resolveDueEvents(next), "next-month")).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
   });
 
   it.each([
     ["san", "burnout"], ["money", "poor"], ["favor", "expelled"], ["social", "isolated"], ["research", "overthinking"],
-  ] as const)("still ends immediately when a month-68 event drops %s below zero", (stat, ending) => {
-    const state = makeState(68);
+  ] as const)("still ends immediately when a final-June event drops %s below zero", (stat, ending) => {
+    const state = makeState(limit, degree);
     state.totalResearchScore = 10;
     state.player[stat] = 0;
     state.eventQueue = [makeEvent("fatal", { [stat]: -1 })];
-    expect(resolveEvent(state, "fatal")).toMatchObject({ phase: "finished", ending, totalMonths: 68, player: { [stat]: -1 } });
+    expect(resolveEvent(state, "fatal")).toMatchObject({ phase: "finished", ending, totalMonths: limit, player: { [stat]: -1 } });
   });
 
-  it("still checks failures before an ordinary month-68 action", () => {
-    const state = makeState(68);
+  it("still checks failures before an ordinary final-June action", () => {
+    const state = makeState(limit, degree);
     state.totalResearchScore = 10;
     state.player.san = -1;
-    expect(dispatchAction(state, "rest")).toMatchObject({ phase: "finished", ending: "burnout", totalMonths: 68, player: { san: -1 } });
+    expect(dispatchAction(state, "rest")).toMatchObject({ phase: "finished", ending: "burnout", totalMonths: limit, player: { san: -1 } });
   });
 
   it("settles due automatic events before checking graduation at month-end", () => {
-    const state = makeState(68);
+    const state = makeState(limit, degree);
     state.blockLinearEvents = false;
-    state.eventQueue = [makeEvent("automatic-result", { score: 1 })];
+    state.eventQueue = [makeEvent("automatic-result", { score: state.graduationScoreTarget! })];
     const finished = dispatchAction(state, "next-month");
-    expect(finished).toMatchObject({ phase: "finished", ending: "master", totalMonths: 68, totalResearchScore: 1 });
+    expect(finished).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit, totalResearchScore: state.graduationScoreTarget! });
     expect(finished.eventQueue).toHaveLength(0);
   });
 
   it("does not award graduation with an undetermined target", () => {
-    expect(dispatchAction({ ...makeState(68), graduationScoreTarget: null, totalResearchScore: 100 }, "next-month").ending).toBe("delay");
+    expect(dispatchAction({ ...makeState(limit, degree), graduationScoreTarget: null, totalResearchScore: 100 }, "next-month").ending).toBe("delay");
   });
 });
 
@@ -394,7 +418,7 @@ describe("terminal state and quitting", () => {
   });
 
   it.each(["quit", "failure", "graduation"])("rejects all gameplay dispatches after %s, including queued events and debug actions", (reason) => {
-    const state = makeState(68);
+    const state = makeState(getMonthLimitByDegree("master"));
     state.eventQueue = [makeEvent("reward", { money: 10 })];
     const finished = reason === "quit" ? dispatchAction(state, "quit-game")
       : reason === "failure" ? resolveEvent({ ...state, eventQueue: [makeEvent("fatal", { san: -100 }), ...state.eventQueue] }, "fatal")

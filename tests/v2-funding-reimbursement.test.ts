@@ -14,6 +14,7 @@ import type { GameState } from "../src/core/v2-types";
 function makeState(favor = 1): GameState {
   const state = createStartedGameState("normal");
   return { ...state, month: 6, totalMonths: 6, eventQueue: [], eventHistory: [], log: [], buffs: [],
+    advisorProgressState: { ...state.advisorProgressState, funding: 100 },
     player: { ...state.player, san: 10, money: 50, favor } };
 }
 
@@ -24,7 +25,10 @@ function makeEvent(state: GameState, rolls = [0, 0, 0]) {
 }
 
 function choices(state: GameState, rolls = [0, 0, 0]) {
-  return makeEvent(state, rolls).choices[0]!.effects.enqueueEvents![0]!.choices;
+  return makeEvent(state, rolls).choices[0]!.effects.enqueueEvents![0]!.choices.map((choice) => ({
+    ...choice,
+    effects: { ...choice.effects, ...choice.effects.enqueueEvents![0]!.choices[0]!.effects },
+  }));
 }
 
 function resolve(state: GameState, choiceIndex = 0) {
@@ -40,7 +44,7 @@ describe("advisor funding reimbursements", () => {
       for (const roll of [0, percent / 100 - 0.000001, Math.min(0.999999, percent / 100)]) {
         const branches = choices(makeState(favor), [roll, roll, roll]);
         const approved = roll < percent / 100;
-        expect(branches[1]!.effects.money).toBe(money);
+        expect(branches[1]!.effects).toMatchObject({ money, advisorProgressStateDeltas: { funding: -money } });
         for (const index of [0, 2, 3]) {
           const choice = branches[index]!;
           expect(choice.outcome).toContain(`${approved ? "同意报销" : "未获同意"}（${approved ? percent : 100 - percent}%）`);

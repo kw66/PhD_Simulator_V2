@@ -53,9 +53,9 @@ function finishGrantEvent(state: GameState): GameState {
 }
 
 describe("advisor project economy", () => {
-  it("starts at 20 accumulation and 10 uncapped funding", () => {
+  it("starts at 20 accumulation and 30 uncapped funding", () => {
     const state = createAdvisorProgressState();
-    expect(state).toMatchObject({ researchAccumulation: 20, funding: 10, awards: [], pendingApplication: null });
+    expect(state).toMatchObject({ researchAccumulation: 20, funding: 30, awards: [], pendingApplication: null });
     expect(getAdvisorRankLabel(state)).toBe("讲师");
     expect(getAdvisorGrantLimit(state)).toBe(1);
   });
@@ -84,10 +84,10 @@ describe("advisor project economy", () => {
   it("keeps horizontal project rewards uncapped and pays player labor", () => {
     const before = makeState({ funding: 100, horizontalProgress: 99 });
     const after = advanceAdvisorProject(before, "horizontal", () => 0);
-    expect(after.advisorProgressState).toMatchObject({ funding: 120, horizontalProgress: 19 });
+    expect(after.advisorProgressState).toMatchObject({ funding: 155, horizontalProgress: 19 });
     expect(after.player.money).toBe(25);
     expect(after.log[1]?.text).toBe("推进横向项目：SAN -5，进度 +20");
-    expect(after.log[0]?.text).toBe("横向项目完成：科研经费 +20；金币 +5");
+    expect(after.log[0]?.text).toBe("横向项目完成：科研经费 +60，劳务费经费 -5；金币 +5");
   });
 
   it("adds ten percent of current accumulation when vertical project completes", () => {
@@ -110,11 +110,12 @@ describe("advisor project economy", () => {
     expect(second.advisorProgressState).toMatchObject({ verticalProgress: 10, nextProject: "horizontal" });
   });
 
-  it("skips an automatic horizontal project when funding is zero", () => {
+  it("advances an automatic horizontal project even when funding is zero", () => {
     const state = makeState({ funding: 0, nextProject: "horizontal" });
     const next = settleAdvisorMonth(state);
-    expect(next.advisorProgressState).toMatchObject({ horizontalProgress: 0, nextProject: "vertical" });
-    expect(next.advisorProgressState.monthlyActivity).toContain("经费不足");
+    expect(next.advisorProgressState).toMatchObject({ funding: 0, horizontalProgress: 10, nextProject: "vertical" });
+    expect(next.advisorProgressState.monthlyActivity).toBe("横向进度 +10");
+    expect(next.phase).toBe("playing");
     expect(settleAdvisorMonth(atMonth(next, 3)).advisorProgressState.verticalProgress).toBe(10);
   });
 
@@ -125,26 +126,26 @@ describe("advisor project economy", () => {
 });
 
 describe("advisor publication credit and grants", () => {
-  it("awards 200 funding once for academician and has no monthly funding income", () => {
+  it("awards 600 funding once for academician and has no monthly funding income", () => {
     const march = settleAdvisorMonth(atMonth(makeState({
       researchAccumulation: 1000,
       awards: [{ id: "distinguished", awardedYear: 2023, startYear: 2024, endYear: 2028 }],
     }), 7));
     expect(march.advisorProgressState.pendingApplication?.id).toBe("academician");
     const august = finishGrantEvent(settleAdvisorMonth(atMonth(march, 12)));
-    expect(august.advisorProgressState.funding).toBe(210);
+    expect(august.advisorProgressState.funding).toBe(630);
     expect(august.advisorProgressState.awards.at(-1)).toEqual({
       id: "academician", awardedYear: 2024, startYear: null, endYear: null,
     });
-    expect(august.log.some((entry) => entry.text.includes("导师当选院士") && entry.text.includes("科研经费 +200"))).toBe(true);
-    expect(settleAdvisorMonth(august).advisorProgressState.funding).toBe(210);
+    expect(august.log.some((entry) => entry.text.includes("导师当选院士") && entry.text.includes("科研经费 +600"))).toBe(true);
+    expect(settleAdvisorMonth(august).advisorProgressState.funding).toBe(630);
     const september = settleAdvisorMonth(atMonth(august, 13));
-    expect(september.advisorProgressState.funding).toBe(210);
+    expect(september.advisorProgressState.funding).toBe(630);
     const repeatedAugust = settleAdvisorMonth(atMonth({ ...september,
       advisorProgressState: { ...september.advisorProgressState,
         pendingApplication: { id: "academician", calendarYear: 2025, researchSnapshot: 1000, resultRoll: 0.99 } },
     }, 24));
-    expect(repeatedAugust.advisorProgressState.funding).toBe(210);
+    expect(repeatedAugust.advisorProgressState.funding).toBe(630);
   });
 
   it("counts each published paper once, including fellow papers", () => {
@@ -176,7 +177,7 @@ describe("advisor publication credit and grants", () => {
     const august = finishGrantEvent(settleAdvisorMonth(atMonth(march, 12)));
     expect(august.advisorProgressState.awards).toEqual([{ id: "youth", awardedYear: 2024, startYear: 2025, endYear: 2027 }]);
     expect(august.advisorProgressState.researchAccumulation).toBe(25);
-    expect(august.advisorProgressState.funding).toBe(20);
+    expect(august.advisorProgressState.funding).toBe(60);
     expect(getActiveAdvisorGrants(august.advisorProgressState, 2024)).toHaveLength(1);
   });
 

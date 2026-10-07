@@ -3,9 +3,9 @@ import { pushMilestoneLog } from "./v2-engine-helpers";
 import type { GameState } from "./v2-types";
 
 export const PROJECT_PROGRESS_MAX = 100;
-export const ADVISOR_HORIZONTAL_REWARD = 20;
+export const ADVISOR_HORIZONTAL_REWARD = 60;
 export const PROJECT_LABOR_REWARD = 5;
-export const LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD = 20;
+export const LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD = 60;
 export type LabProjectType = "horizontal" | "vertical";
 
 export function advanceSharedLabProject(
@@ -31,10 +31,10 @@ export function advanceSharedLabProject(
         player: { ...nextState.player, money: nextState.player.money + PROJECT_LABOR_REWARD },
         advisorProgressState: {
           ...nextState.advisorProgressState,
-          funding: nextState.advisorProgressState.funding + ADVISOR_HORIZONTAL_REWARD,
+          funding: nextState.advisorProgressState.funding + ADVISOR_HORIZONTAL_REWARD - PROJECT_LABOR_REWARD,
         },
       };
-      completionSummary = `科研经费 +${ADVISOR_HORIZONTAL_REWARD}；金币 +${PROJECT_LABOR_REWARD}`;
+      completionSummary = `科研经费 +${ADVISOR_HORIZONTAL_REWARD}，劳务费经费 -${PROJECT_LABOR_REWARD}；金币 +${PROJECT_LABOR_REWARD}`;
     } else {
       nextState = settleAdvisorGuidance(nextState, random);
       const accumulation = nextState.advisorProgressState.researchAccumulation;

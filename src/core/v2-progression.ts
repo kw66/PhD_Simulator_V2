@@ -30,7 +30,7 @@ function getCalendarForMaxYears(totalMonths: number, maxYears: number): { year: 
 
   return {
     year: maxYears,
-    month: Math.min(Math.max(remainingMonths, 1), 8),
+    month: Math.min(Math.max(remainingMonths, 1), 10),
   };
 }
 

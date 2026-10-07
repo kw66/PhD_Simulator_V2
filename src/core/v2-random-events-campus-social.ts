@@ -7,6 +7,7 @@ import {
 } from "./v2-random-events-core-shared";
 import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
 import { getAdvisorMeetingAttendancePercent } from "./v2-advisor-progress";
+import { getLabReimbursementQuote } from "./v2-lab-reimbursements";
 import type { GameState, PendingEvent } from "./v2-types";
 
 const KTV_SONGS = [
@@ -33,13 +34,15 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
   const nextPokerRate = getPokerWinRate(nextPokerCount);
   const pokerGrowth = nextPokerRate > currentPokerRate ? `胜率 ${currentPokerRate}%→${nextPokerRate}%` : "";
 
-  const ktvSocialResult = applyTierResist(1, state.player.social, getRoll);
+  const ktvSocialRoll = getRoll();
+  const ktvSocialResult = applyTierResist(1, state.player.social, () => ktvSocialRoll);
   const ktvSocialGain = ktvSocialResult.effectiveChange;
   const ktvSocialNarrative = getTierResistedNarrative("社交", 1, ktvSocialResult);
 
   const attendancePercent = getAdvisorMeetingAttendancePercent(state.advisorProgressState);
   const dinnerAdvisorTreat = getRoll() < attendancePercent / 100;
-  const dinnerFavorResult = dinnerAdvisorTreat ? applyTierResist(1, state.player.favor, getRoll) : null;
+  const dinnerFavorRoll = getRoll();
+  const dinnerFavorResult = dinnerAdvisorTreat ? applyTierResist(1, state.player.favor, () => dinnerFavorRoll) : null;
   const dinnerFavorGain = dinnerFavorResult?.effectiveChange ?? 0;
   const dinnerFavorNarrative = dinnerFavorResult
     ? getTierResistedNarrative("导师好感", 1, dinnerFavorResult)
@@ -212,15 +215,18 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
         label: "买显卡",
         outcome: reimbursementOutcome(gpuApproved, "显卡报销：下次购买或升级显卡免费"),
         effects: gpuApproved ? {
+          labReimbursementReservation: "gpu",
           shopEntitlementDeltas: { gpuTransaction: 1 },
         } : {},
       },
       {
         id: `random-8-salary-${serial}`,
         label: "发劳务费",
-        outcome: `${["导师好感 < 6", "6 ≤ 导师好感 < 12", "12 ≤ 导师好感 < 18", "导师好感 ≥ 18"][favorTier]}｜金币 +${salaryGain}。`,
+        outcome: `${["导师好感 < 6", "6 ≤ 导师好感 < 12", "12 ≤ 导师好感 < 18", "导师好感 ≥ 18"][favorTier]}｜金币 +${salaryGain}；实验室经费 -${salaryGain}。`,
         effects: {
+          labReimbursementReservation: { kind: "labor", amount: salaryGain },
           money: salaryGain,
+          advisorProgressStateDeltas: { funding: -salaryGain },
         },
       },
       {
@@ -228,6 +234,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
         label: "装修工位",
         outcome: reimbursementOutcome(workstationApproved, "工位报销：设备购买或椅子、咖啡机升级任选一次免单"),
         effects: workstationApproved ? {
+          labReimbursementReservation: "workstation",
           shopEntitlementDeltas: {
             workstationTransaction: 1,
           },
@@ -238,6 +245,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
         label: "报销 AI 费用",
         outcome: reimbursementOutcome(aiApproved, "AI报销：下月免费"),
         effects: aiApproved ? {
+          labReimbursementReservation: "ai",
           addBuffs: [{
             id: `ai-reimbursement-${state.totalMonths + 1}`,
             name: "AI报销",
@@ -252,7 +260,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
     ],
   };
 
-  return createThreeStageEvent(event, {
+  const stagedEvent = createThreeStageEvent(event, {
     introDescription: [
       "组会快结束时，导师又打开了项目经费表：一个项目临近结项，还剩一笔预算必须用完。刚合上的电脑又被打开，导师让大家各报一项学习或科研相关的开支。",
       "白板上陆续写下显卡、劳务费、工位设备和 AI 费用。导师对着表格核了一遍：“先提一项，设备和软件还得看看是否合适，别把同一笔预算报两遍。”",
@@ -312,4 +320,26 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
       },
     },
   });
+  for (const decision of stagedEvent.choices[0]!.effects.enqueueEvents![0]!.choices) {
+    const reservation = decision.effects.labReimbursementReservation;
+    if (!reservation) continue;
+    const { enqueueEvents, ...rewards } = decision.effects;
+    decision.effects = { enqueueEvents };
+    const result = enqueueEvents![0]!;
+    const confirmation = result.choices[0]!;
+    confirmation.effects = rewards;
+    const quote = getLabReimbursementQuote(state, reservation);
+    confirmation.disabledReason = quote.disabledReason;
+    const isLabor = typeof reservation === "object";
+    confirmation.outcome = isLabor ? decision.outcome : `实验室经费预留 ${quote.amount} 金币。`;
+    if (!quote.affordable) {
+      result.choices.push({
+        id: `${confirmation.id}-cancel`,
+        label: isLabor ? "暂不发放" : "暂不报销",
+        outcome: `经费不足，${isLabor ? "暂不发放劳务费" : "暂不报销"}，未扣除经费。`,
+        effects: {},
+      });
+    }
+  }
+  return stagedEvent;
 }

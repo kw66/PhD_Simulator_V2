@@ -8,16 +8,111 @@ import {
   getStableGeneratedFellowName,
 } from "../src/core/v2-fellow-progression";
 import { pickStableRandomName } from "../src/core/v2-random-name";
+import { createStartedGameState } from "../src/core/v2-engine-state-factory";
+import { getResolvableQueuedEvent } from "../src/core/v2-engine-event-resolution";
+import { createEventQueueItem } from "../src/core/v2-event-queue";
+import { createMentorAssignEvent } from "../src/core/v2-fixed-events-mentor-assign";
+import { createRandomEventById } from "../src/core/v2-random-event-router";
+import type { FellowProfileAddition, PendingEvent } from "../src/core/v2-types";
+
+function getGeneratedFellows(event: PendingEvent): FellowProfileAddition[] {
+  return event.choices.flatMap((choice) => [
+    ...(choice.effects.fellowAdditions ?? []),
+    ...(choice.effects.enqueueEvents ?? []).flatMap(getGeneratedFellows),
+  ]);
+}
 
 afterEach(() => vi.restoreAllMocks());
 
 describe("v2 fellow progression", () => {
   it.each([
-    ["senior", 6], ["peer", 3], ["junior", 0],
-  ] as const)("generates %s research across four values with initial rapport one", (type, minimum) => {
-    const values = Array.from({ length: 12 }, (_, seed) => createGeneratedFellowProfileAddition(type, seed));
-    expect([...new Set(values.map((profile) => profile.research))]).toEqual([minimum, minimum + 1, minimum + 2, minimum + 3]);
-    expect(values.every((profile) => profile.affinity === 1)).toBe(true);
+    ["senior", 2], ["peer", 1], ["junior", 0],
+  ] as const)("uses the unified default academic year for %s", (type, academicYear) => {
+    for (const offset of [0, 1, 2, 3]) {
+      const random = vi.fn(() => 0.99);
+      for (let draw = 0; draw < 4; draw += 1) random.mockReturnValueOnce(0);
+      random.mockReturnValueOnce((offset + 0.5) / 4);
+      const profile = createGeneratedFellowProfileAddition(type, 0, "male", [], random);
+      expect(profile).toMatchObject({ research: academicYear * 2 + offset, academicYear, affinity: 1, degree: "master" });
+    }
+  });
+
+  it.each([0, 1, 2, 3, 4, 5, 6])("generates research from academic year %s rather than the preceding year", (academicYear) => {
+    for (const offset of [0, 1, 2, 3]) {
+      const random = vi.fn(() => 0.99);
+      for (let draw = 0; draw < 4; draw += 1) random.mockReturnValueOnce(0);
+      random.mockReturnValueOnce((offset + 0.5) / 4);
+      const profile = createGeneratedFellowProfileAddition("peer", 0, "male", [], random, { year: 6, fixedYear: academicYear });
+      expect(profile).toMatchObject({ research: academicYear * 2 + offset, academicYear, affinity: 1,
+        degree: academicYear >= 4 ? "phd" : "master", initialResearchScore: [0, 0, 0, 1, 2, 3, 7][academicYear] });
+    }
+  });
+
+  it("resists initial research pointwise from zero and rereads tiers after each gain", () => {
+    const random = vi.fn(() => 0.3);
+    for (let draw = 0; draw < 4; draw += 1) random.mockReturnValueOnce(0);
+    random.mockReturnValueOnce(0.99);
+    const profile = createGeneratedFellowProfileAddition("peer", 0, "male", [], random, { year: 6 });
+    expect(profile.research).toBe(12);
+    expect(random).toHaveBeenCalledTimes(14);
+  });
+
+  it("keeps research stable without a supplied stream even when name collisions change", () => {
+    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Unexpected global randomness"); });
+    for (const seed of [0, 1, 7, 23, 100, -4.2]) {
+      const profile = createGeneratedFellowProfileAddition("senior", seed, "female", [], undefined, { year: 3 });
+      expect(createGeneratedFellowProfileAddition("senior", seed, "female", [], undefined, { year: 3 })).toEqual(profile);
+      const renamed = createGeneratedFellowProfileAddition("senior", seed, "female", [profile.name!], undefined, { year: 3 });
+      expect(renamed.name).not.toBe(profile.name);
+      expect(renamed.research).toBe(profile.research);
+      expect(renamed.academicYear).toBe(profile.academicYear);
+    }
+    expect(random).not.toHaveBeenCalled();
+  });
+
+  it("does not tie the individual difference to the seed's academic-year remainder", () => {
+    const offsetsByYear = Array.from({ length: 4 }, () => new Set<number>());
+    for (let seed = 0; seed < 512; seed += 1) {
+      const profile = createGeneratedFellowProfileAddition("junior", seed, "male", [], undefined, { year: 6 });
+      const offset = createGeneratedFellowProfileAddition("junior", seed, "male", [], undefined, { year: 6, fixedYear: 0 }).research;
+      offsetsByYear[profile.academicYear!]!.add(offset);
+    }
+    for (const offsets of offsetsByYear) expect([...offsets].sort()).toEqual([0, 1, 2, 3]);
+  });
+
+  it.each([10, 11, 14])("replays generated fellows for random event %s without rerolling research", (eventId) => {
+    const base = createStartedGameState("normal");
+    const state = { ...base, year: 4, month: 8, totalMonths: 44, eventQueue: [], fellowProgressState: [] };
+    const rolls: number[] = [];
+    const root = createRandomEventById(eventId, state, () => {
+      const roll = ((rolls.length * 37 + 11) % 100) / 100;
+      rolls.push(roll);
+      return roll;
+    }).event!;
+    const queued = createEventQueueItem({ ...root, randomReplay: { eventId, serial: state.totalRandomEventCount, rolls } }, 0);
+    const fellows = getGeneratedFellows(queued);
+    expect(fellows.length).toBeGreaterThan(0);
+    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Unexpected preview randomness"); });
+    const refreshed = getResolvableQueuedEvent({ ...state, player: { ...state.player, san: 0 } }, JSON.parse(JSON.stringify(queued)));
+    expect(getGeneratedFellows(refreshed)).toEqual(fellows);
+    expect(getGeneratedFellows(getResolvableQueuedEvent(state, refreshed))).toEqual(fellows);
+    expect(random).not.toHaveBeenCalled();
+  });
+
+  it("replays all four mentor assignment candidates from recorded generation rolls", () => {
+    const base = createStartedGameState("normal");
+    const state = { ...base, year: 4, month: 7, totalMonths: 43, fellowProgressState: [] };
+    let rollIndex = 0;
+    const root = createMentorAssignEvent(state, () => ((rollIndex++ * 37 + 11) % 100) / 100);
+    const queued = createEventQueueItem(root, 0);
+    const fellows = getGeneratedFellows(queued);
+    expect(new Set(fellows.map((fellow) => fellow.name)).size).toBe(4);
+    expect(fellows.every((fellow) => fellow.academicYear === 1 && fellow.research >= 2 && fellow.research <= 5)).toBe(true);
+    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Unexpected preview randomness"); });
+    const refreshed = getResolvableQueuedEvent(state, JSON.parse(JSON.stringify(queued)));
+    expect(getGeneratedFellows(refreshed)).toEqual(fellows);
+    expect(getGeneratedFellows(getResolvableQueuedEvent(state, refreshed))).toEqual(fellows);
+    expect(random).not.toHaveBeenCalled();
   });
   it("assigns a stable research direction per random person id without rerolling on reads", () => {
     const profiles = Array.from({ length: 30 }, (_, index) => ({ id: `fellow-${index}`, startTotalMonths: 1 }));

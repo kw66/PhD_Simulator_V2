@@ -5,13 +5,16 @@ import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { activateLover } from "../src/core/v2-lover-system";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
+import { getCalendarForTotalMonths, getMonthLimitByDegree } from "../src/core/v2-progression";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import type { PlayTabId } from "../src/app/v2-render-types";
 import type { EndingId, GameState, Paper } from "../src/core/v2-types";
 
 function finishedState(ending: EndingId): GameState {
   const base = createStartedGameState("normal");
-  return { ...base, phase: "finished", ending, degree: ending === "phd" ? "phd" : "master", playerName: "林青", totalMonths: 68, year: 6, month: 8,
+  const degree = ending === "phd" ? "phd" : "master";
+  const totalMonths = getMonthLimitByDegree(degree);
+  return { ...base, ...getCalendarForTotalMonths(totalMonths, degree), phase: "finished", ending, degree, playerName: "林青", totalMonths, maxMonths: totalMonths,
     graduationScoreTarget: ending === "phd" ? 7 : 1, totalResearchScore: ending === "phd" ? 9 : 2 };
 }
 
@@ -53,14 +56,15 @@ describe("basic ending presentation", () => {
     ["overthinking", "用脑过度"],
     ["delay", "延毕"], ["quit", "主动退学"], ["master", "硕士毕业"], ["phd", "博士毕业"],
   ] as const)("shows %s on its own ending timeline page within the read-only shell", (ending, title) => {
-    const html = renderApp(finishedState(ending));
+    const state = finishedState(ending);
+    const html = renderApp(state);
     const card = endingCard(html);
     expect(card).toContain(`<h2 id="ending-title">${title}</h2>`);
     expect(card).not.toContain("<h1");
     expect(card).toContain(`data-ending="${ending}"`);
     expect(card).toContain("林青");
     expect(card).toContain("大多数");
-    expect(card).toContain("68");
+    expect(card).toContain(`${state.totalMonths}个月`);
     expect(html).toContain("play-left-rail");
     expect(html).toContain("play-right-rail");
     expect(html).toContain('data-ui-play-tab="events"');
@@ -81,7 +85,7 @@ describe("basic ending presentation", () => {
     expect(card).toContain("data-ui-close-ending-content");
     const endingMarker = timelineMarkers(html).filter((marker) => marker.includes("data-ui-ending-page"));
     expect(endingMarker).toHaveLength(1);
-    expect(endingMarker[0]).toContain('data-ui-log-page-index="69"');
+    expect(endingMarker[0]).toContain(`data-ui-log-page-index="${state.totalMonths + 1}"`);
     expect(endingMarker[0]).toContain('aria-pressed="true"');
     expect(endingMarker[0]).toMatch(/>结局<\/span>/);
     expect(card).toMatch(/class="ending-story">\s*<p>[^<]+<\/p>/);
@@ -106,7 +110,7 @@ describe("basic ending presentation", () => {
   it("shows the actual failed value and safely escapes the final cause and player name", () => {
     const base = finishedState("poor");
     const html = renderApp({ ...base, playerName: "<script>name</script>", player: { ...base.player, money: -2 },
-      endingCause: { text: '组内团建：AA聚餐，金币-3\n<script>alert(1)</script>', totalMonths: 68 } });
+      endingCause: { text: '组内团建：AA聚餐，金币-3\n<script>alert(1)</script>', totalMonths: base.totalMonths } });
     const card = endingCard(html);
     expect(card).toContain("金币 -2，低于0");
     expect(card).toContain("最后发生的事");
@@ -178,7 +182,7 @@ describe("basic ending presentation", () => {
     }
   });
 
-  it.each([0, 10, 68])("appends exactly one ending page after unchanged monthly pages at month %s", (totalMonths) => {
+  it.each([0, 10, 34, 70])("appends exactly one ending page after unchanged monthly pages at month %s", (totalMonths) => {
     const state = { ...finishedState("quit"), totalMonths, log: [{ id: "last-month", month: totalMonths, text: "最后一个真实月份的日志" }] };
     const playing = renderApp({ ...state, phase: "playing", ending: null }, undefined, { activeLogPage: totalMonths });
     const finished = renderApp(state);
@@ -223,7 +227,7 @@ describe("basic ending presentation", () => {
     expect(opened).not.toContain('id="log-content"');
     for (const activePlayTab of ["events", "research", "events"] as const) {
       const closed = renderApp(state, undefined, { activePlayTab, isEndingContentOpen: false });
-      expect(closed).toContain('data-log-page-index="69"');
+      expect(closed).toContain(`data-log-page-index="${state.totalMonths + 1}"`);
       const marker = timelineMarkers(closed).find((entry) => entry.includes("data-ui-ending-page"));
       expect(marker).toContain('aria-pressed="true"');
       expect(closed.match(/id="log-content"/g)).toHaveLength(1);
@@ -238,12 +242,12 @@ describe("basic ending presentation", () => {
       expect(closed.indexOf(buttons[0]!)).toBeGreaterThan(closed.indexOf('id="log-content"'));
       expectFrozenCalendar(closed);
     }
-    const reopened = renderApp(state, undefined, { activePlayTab: "events", activeLogPage: 69, isEndingContentOpen: true });
+    const reopened = renderApp(state, undefined, { activePlayTab: "events", activeLogPage: state.totalMonths + 1, isEndingContentOpen: true });
     expect(endingCard(reopened)).toContain(`<h2 id="ending-title">${title}</h2>`);
     expectEndingStat(endingCard(reopened), "research-score", state.totalResearchScore);
     expect(reopened).not.toContain('id="log-content"');
     expect(reopened).not.toContain("data-ui-open-ending-content");
-    expect(reopened).toContain('data-log-page-index="69"');
+    expect(reopened).toContain(`data-log-page-index="${state.totalMonths + 1}"`);
     expect(state).toEqual(snapshot);
   });
 
@@ -256,12 +260,13 @@ describe("basic ending presentation", () => {
   ] as const)("hides the generic %s warning from monthly logs while preserving its cause", (ending, warning) => {
     const cause = "组内团建：AA聚餐，金币 -3。";
     const variants = [warning, warning.replace(/\s/g, "").replace(/。$/, ""), `  ${warning.replace("0", "  0")}  `];
-    const state: GameState = { ...finishedState(ending), endingCause: { text: cause, totalMonths: 68 },
-      log: [...variants.map((text, index) => ({ id: `warning-${index}`, month: 68, text })), { id: "cause", month: 68, text: cause }],
+    const base = finishedState(ending);
+    const state: GameState = { ...base, endingCause: { text: cause, totalMonths: base.totalMonths },
+      log: [...variants.map((text, index) => ({ id: `warning-${index}`, month: base.totalMonths, text })), { id: "cause", month: base.totalMonths, text: cause }],
     };
     const snapshot = structuredClone(state);
     for (const isEndingContentOpen of [false, true]) {
-      const monthly = renderApp(state, undefined, { activeLogPage: 68, isEndingContentOpen });
+      const monthly = renderApp(state, undefined, { activeLogPage: state.totalMonths, isEndingContentOpen });
       const text = monthly.replace(/<[^>]*>/g, "").replace(/\s/g, "");
       expect(text).not.toContain(warning.replace(/\s/g, "").replace(/。$/, ""));
       expect(monthly).toContain('id="log-content"');
@@ -280,12 +285,13 @@ describe("basic ending presentation", () => {
     ["delay", "延期毕业：科研分 0/1。"],
     ["delay", "延期毕业：科研分 0，毕业要求尚未确定。"],
   ] as const)("filters the synthetic %s summary without deleting ordinary monthly logs: %s", (ending, summary) => {
-    const state: GameState = { ...finishedState(ending), log: [
-      { id: "summary", month: 68, text: summary },
-      { id: "ordinary", month: 68, text: "导师讨论：完成了最后一次组会汇报。" },
+    const base = finishedState(ending);
+    const state: GameState = { ...base, log: [
+      { id: "summary", month: base.totalMonths, text: summary },
+      { id: "ordinary", month: base.totalMonths, text: "导师讨论：完成了最后一次组会汇报。" },
     ] };
     const snapshot = structuredClone(state);
-    const monthly = renderApp(state, undefined, { activeLogPage: 68 });
+    const monthly = renderApp(state, undefined, { activeLogPage: state.totalMonths });
     const text = monthly.replace(/<[^>]*>/g, "").replace(/\s/g, "");
     expect(text).not.toContain(summary.replace(/\s/g, ""));
     expect(monthly).toContain("完成了最后一次组会汇报");
@@ -294,7 +300,7 @@ describe("basic ending presentation", () => {
 
   it("uses current degree requirements for graduation and delay without requiring thesis or job progress", () => {
     expect(endingCard(renderApp(finishedState("phd")))).toContain("博士毕业要求已达成：科研分 9/7");
-    expect(endingCard(renderApp({ ...finishedState("delay"), totalResearchScore: 0 }))).toContain("培养期已满68个月，科研分0/1，尚未达标");
+    expect(endingCard(renderApp({ ...finishedState("delay"), totalResearchScore: 0 }))).toContain("培养期已满34个月，科研分0/1，尚未达标");
   });
 
   it.each<PlayTabId>(["events", "research", "workstation", "relationship", "shop", "talent", "settings"])("honors explicit %s browsing after finishing", (activePlayTab) => {
@@ -319,13 +325,13 @@ describe("basic ending presentation", () => {
     const descriptions = ["历史事件第一幕内容", "历史事件第二幕内容"];
     state.eventHistory = [{
       id: "ending-history", chainId: "ending-history-chain", source: "fixed",
-      completedAtTotalMonths: 68, completedAtYear: 6, completedAtMonth: 8,
+      completedAtTotalMonths: state.totalMonths, completedAtYear: state.year, completedAtMonth: state.month,
       stages: descriptions.map((description, index) => ({
         title: `历史事件第${index + 1}幕`, description,
         choices: [{ id: "confirm", label: "已完成的选择", outcome: "已结算" }], selectedChoiceId: "confirm",
       })),
     }];
-    state.log = [{ id: "ending-history-log", month: 68, text: "历史事件已完成", eventHistoryId: "ending-history" }];
+    state.log = [{ id: "ending-history-log", month: state.totalMonths, text: "历史事件已完成", eventHistoryId: "ending-history" }];
     const snapshot = structuredClone(state);
     const html = renderApp(state, undefined, {
       activePlayTab: "events", isEventContentOpen: true, activeEventHistoryId: "ending-history", activeEventHistoryIndex,

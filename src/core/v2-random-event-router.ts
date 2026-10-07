@@ -9,6 +9,7 @@ import { createRandomEventSkeleton, hasRecoverableDraftPaper } from "./v2-random
 import { getPublishedPaperCount } from "./v2-publication-rules";
 import { getPaperCompetitionCandidates } from "./v2-paper-competition";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
+import { getRecruitmentAcademicYears, type RecruitmentCalendar } from "./v2-recruitment-eligibility";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -50,11 +51,11 @@ function appendRandomEventAppearanceCondition(
 export function getRandomEventAppearanceCondition(eventId: number): string | null {
   switch (eventId) {
     case 8:
-      return "科研经费 > 20";
+      return `科研经费 > ${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}`;
     case 10:
       return "社交能力 ≥ 6";
     case 11:
-      return "科研能力 ≥ 6";
+      return "前五学年，科研能力 ≥ 6";
     case 12:
     case 16:
       return "存在分数非 0 且未投稿的论文";
@@ -73,16 +74,21 @@ export function createRandomEventById(
   eventId: number,
   state: GameState,
   getRoll: RandomRollProvider,
+  recruitmentCalendar: RecruitmentCalendar = state,
 ): { nextState: GameState; event: PendingEvent | null } {
+  if ((eventId === 10 || eventId === 11)
+    && getRecruitmentAcademicYears(eventId === 10 ? "peer" : "senior", recruitmentCalendar).length === 0) {
+    return { nextState: state, event: null };
+  }
   if (isPaperCompetitionEventId(eventId)) {
     const event = createPaperCompetitionRandomEvent(eventId, state, getRoll);
     return { nextState: state, event: event ? appendRandomEventAppearanceCondition(eventId, event) : null };
   }
 
   // Each category module maps its own event ids; ids never overlap.
-  const categorizedEvent = createMentoringLabRandomEventById(eventId, state, getRoll)
+  const categorizedEvent = createMentoringLabRandomEventById(eventId, state, getRoll, recruitmentCalendar)
     ?? createAdvisorLabRandomEventById(eventId, state, getRoll)
-    ?? createRelationshipRandomEventById(eventId, state, getRoll)
+    ?? createRelationshipRandomEventById(eventId, state, getRoll, recruitmentCalendar)
     ?? createCampusRandomEventById(eventId, state, getRoll);
   if (categorizedEvent) {
     return { nextState: state, event: appendRandomEventAppearanceCondition(eventId, categorizedEvent) };
@@ -106,9 +112,9 @@ export function isRandomEventEligible(state: GameState, eventId: number): boolea
     case 8:
       return state.advisorProgressState.funding > LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD;
     case 10:
-      return state.player.social >= 6;
+      return state.player.social >= 6 && getRecruitmentAcademicYears("peer", state).length > 0;
     case 11:
-      return state.player.research >= 6;
+      return state.player.research >= 6 && getRecruitmentAcademicYears("senior", state).length > 0;
     case 12:
       return state.papers.some((paper) => paper.status === "draft" && paper.idea + paper.experiment + paper.writing > 0);
     case 14:

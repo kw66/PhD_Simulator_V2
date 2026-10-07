@@ -293,7 +293,7 @@ describe("v2 before grad school events", () => {
     expect(resolved.nextState.relationshipState.advisorCount).toBe(1);
     expect(resolved.nextState.advisorProgressState).toEqual({
       researchAccumulation: 20,
-      funding: 10,
+      funding: 30,
       horizontalProgress: 0,
       verticalProgress: 0,
       nextProject: "horizontal",

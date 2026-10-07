@@ -1,5 +1,6 @@
 import type { FixedPaperTopic } from "./v2-paper-topics";
 import type {
+  Degree,
   FellowTaskType,
   FellowTypeId,
   Gender,
@@ -83,7 +84,14 @@ export interface AdvisorGrantApplication {
   resultRoll: number;
 }
 
+export interface LabReimbursementReservation {
+  kind: "gpu" | "workstation" | "ai";
+  amount: number;
+  coveredTotalMonths: number | null;
+}
+
 export interface AdvisorProgressState {
+  labReimbursements?: LabReimbursementReservation[];
   researchAccumulation: number;
   funding: number;
   horizontalProgress?: number;
@@ -100,6 +108,10 @@ export interface AdvisorProgressState {
   pendingGuidanceToPlayer?: number | null;
   monthlyActivity?: string;
   salaryRemainder?: number;
+  paidJournalPaperIds?: string[];
+  paidFellowConferencePaperIds?: string[];
+  paidFellowConferenceTrips?: string[];
+  paidPlayerConferenceTrips?: string[];
 }
 
 export interface LoverProgressState {
@@ -118,6 +130,8 @@ export interface LoverProgressState {
   pendingPaperHelp?: { amount: number; collaboratorId: string; name: string } | null;
   lastDateTotalMonths?: number;
   lastAdvancedTotalMonths?: number;
+  lastAnnualGrowthTotalMonths?: number;
+  annualResearchActivity?: string;
   sanDiscountMonths?: number[];
   monthlyActivity?: string;
 }
@@ -135,16 +149,26 @@ export interface FellowProgressProfile {
   taskMax: number;
   taskUsedThisMonth: boolean;
   startTotalMonths: number;
+  academicYear?: number;
+  academicStartTotalMonths?: number;
+  degree?: Degree;
+  initialResearchScore?: number;
+  salaryRemainder?: number;
+  monthlySalaryPaid?: number;
+  lastSalaryTotalMonths?: number;
   pendingHelpToPlayer?: number | null;
   pendingHelpToFellow?: number | null;
   lastAdvancedTotalMonths?: number;
   nextMonthlyAction?: "research" | "project";
   lastAnnualGrowthTotalMonths?: number;
+  annualResearchActivity?: string;
   lastProjectTotalMonths?: number;
   monthlyActivity?: string;
   pendingGuidanceFromAdvisor?: number | null;
   affinityRewardedPaperIds?: string[];
   helpedPlayerCount?: number;
+  monthlySupportActivity?: string;
+  lastSupportTotalMonths?: number;
   helpedFellowCount?: number;
   annualResearchGrowthTotal?: number;
   longTermMentoring?: boolean;
@@ -157,6 +181,10 @@ export interface FellowProfileAddition {
   affinity: number;
   name?: string;
   taskType?: FellowTaskType;
+  academicYear?: number;
+  academicStartTotalMonths?: number;
+  degree?: Degree;
+  initialResearchScore?: number;
   longTermMentoring?: boolean;
 }
 

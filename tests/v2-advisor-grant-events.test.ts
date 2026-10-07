@@ -62,7 +62,7 @@ describe("advisor grant result events", () => {
       expect(third.advisorProgressState.awards).toHaveLength(0);
       const final = nextScene(third);
       expect(final.advisorProgressState.awards).toHaveLength(success ? 1 : 0);
-      expect(final.advisorProgressState.funding).toBe(success ? 20 : 10);
+      expect(final.advisorProgressState.funding).toBe(success ? 60 : 30);
       expect(final.advisorProgressState.pendingApplication).toBeNull();
       if (!success) {
         const retry = settleAdvisorMonth({ ...final, year: 2, month: 7, totalMonths: 19,
@@ -102,14 +102,14 @@ describe("advisor grant result events", () => {
     const pendingResult = third.eventQueue[0]!;
     const beforeFinish = { ...third, advisorProgressState: { ...third.advisorProgressState, funding: 7, horizontalProgress: 42 } };
     const final = nextScene(beforeFinish);
-    expect(final.advisorProgressState).toMatchObject({ funding: 17, horizontalProgress: 42, pendingApplication: null });
+    expect(final.advisorProgressState).toMatchObject({ funding: 37, horizontalProgress: 42, pendingApplication: null });
     expect(final.player.money).toBe(initial.player.money);
     expect(getAdvisorMonthlySalary(final.advisorProgressState, "master")).toBe(1.25);
     expect(final.eventHistory.find((entry) => entry.chainId === "advisor-grant-2024-youth")?.stages).toHaveLength(3);
     expect(final.eventHistory.filter((entry) => entry.id === "talent:advisor-salary:youth:2024")).toHaveLength(1);
     expect(final.log.some((entry) => entry.text.includes("青基获批") && entry.eventHistoryId)).toBe(true);
     const repeated = dispatchAction(final, "resolve-event", { eventId: pendingResult.id, eventChoiceId: pendingResult.choices[0]!.id });
-    expect(repeated.advisorProgressState.funding).toBe(17);
+    expect(repeated.advisorProgressState.funding).toBe(37);
     expect(settleAdvisorGrantResult(final, initial.advisorProgressState.pendingApplication!)).toBe(final);
   });
 
@@ -120,7 +120,7 @@ describe("advisor grant result events", () => {
     expect(state.eventQueue[0]?.description).toContain("听组里的同学说起");
     expect(state.eventQueue[0]?.description).toContain("未获批（20%）\n结果：无事发生");
     const final = nextScene(state);
-    expect(final.advisorProgressState).toMatchObject({ funding: 10, awards: [], pendingApplication: null });
+    expect(final.advisorProgressState).toMatchObject({ funding: 30, awards: [], pendingApplication: null });
     expect(final.eventHistory.some((entry) => entry.id.startsWith("talent:advisor-salary"))).toBe(false);
   });
 
@@ -153,13 +153,15 @@ describe("advisor grant result events", () => {
   });
 
   it.each(ADVISOR_GRANTS)("grants %s once with correct funding and no immediate player cash", (grant) => {
+    const expectedFunding = { youth: 30, general: 60, excellent: 150, distinguished: 300, academician: 600 }[grant.id];
+    expect(grant.funding).toBe(expectedFunding);
     const state = playing();
     if (grant.id === "academician") state.advisorProgressState.awards = [{ id: "distinguished", awardedYear: 2023, startYear: 2024, endYear: 2028 }];
     const application = { id: grant.id, calendarYear: 2024, researchSnapshot: grant.threshold, resultRoll: 0.99 };
     state.advisorProgressState.pendingApplication = application;
     const event = createAdvisorGrantResultEvent(getAdvisorGrantResultContext(state, application));
     const final = nextScene(nextScene(nextScene(enqueueEventQueueItem(state, event))));
-    expect(final.advisorProgressState.funding).toBe(10 + grant.funding);
+    expect(final.advisorProgressState.funding).toBe(30 + expectedFunding);
     expect(final.advisorProgressState.awards.at(-1)).toMatchObject({ id: grant.id, awardedYear: 2024 });
     expect(final.player.money).toBe(state.player.money);
     if (grant.id === "academician") {
@@ -204,7 +206,7 @@ describe("advisor grant result events", () => {
     expect(triggered.log).toEqual(initial.log);
     expect(triggered.eventQueue[0]?.stage).toBe("act1");
     const final = nextScene(nextScene(nextScene(triggered)));
-    expect(final.advisorProgressState.funding).toBe(outcome === "success" ? 20 : 10);
+    expect(final.advisorProgressState.funding).toBe(outcome === "success" ? 60 : 30);
   });
 
   it("switches debug outcomes within the same event without leaving a stale pending result", () => {
@@ -214,10 +216,10 @@ describe("advisor grant result events", () => {
     expect(state.eventQueue.filter((event) => event.chainId?.startsWith("advisor-grant-"))).toHaveLength(1);
     expect(state.eventQueue[0]).toMatchObject({ title: "基金结果", stage: "act1" });
     const failed = nextScene(nextScene(nextScene(state)));
-    expect(failed.advisorProgressState.funding).toBe(10);
+    expect(failed.advisorProgressState.funding).toBe(30);
     const retried = dispatchAction(failed, "debug-trigger-event", { eventId: "advisor-grant-success" });
     const accepted = nextScene(nextScene(nextScene(retried)));
-    expect(accepted.advisorProgressState.funding).toBe(20);
+    expect(accepted.advisorProgressState.funding).toBe(60);
   });
 
   it("previews the August result and shows it as announced when waiting for confirmation", () => {

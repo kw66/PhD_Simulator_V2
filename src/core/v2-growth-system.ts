@@ -21,9 +21,8 @@ export function getMeetingExperienceLevel(attendedMeetingCount: number): number 
   return Math.max(0, Math.floor(Math.max(0, attendedMeetingCount) / MEETING_EXPERIENCE_INTERVAL));
 }
 
-export function getMeetingExperienceDiscount(attendedMeetingCount: number, selfPayCost: number): number {
-  const halfCost = Math.floor(Math.max(0, selfPayCost) * 0.5);
-  return Math.min(halfCost, getMeetingExperienceLevel(attendedMeetingCount));
+export function getMeetingExperienceDiscount(_attendedMeetingCount: number, _selfPayCost: number): number {
+  return 0;
 }
 
 export function getReadingGrowthProgress(readCount: number): { completed: number; nextAt: number } {

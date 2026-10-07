@@ -262,7 +262,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       timing: buff.timing,
       operation: "sum",
       value: buff.labExperimentMoneyDelta,
-      source: `${getSourceText(buff)} · 玩家与同学共享；优先导师经费，不足玩家自付，同学不足转横向`,
+      source: `${getSourceText(buff)} · 玩家与同学共享；由实验室经费支付，经费不足时玩家暂停实验、同学改做横向`,
       isCost: true,
       category: "money",
       renderLabel: (value) => `实验金币 ${formatSignedNumber(value)}`,

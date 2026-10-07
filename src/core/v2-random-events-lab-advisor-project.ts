@@ -40,7 +40,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const guidanceRolls = Array.from({ length: (state.fellowProgressState.length + 1) * 2 }, () => getRoll());
   const introDescription = [
-    "导师叫你去办公室，先说起组里的开销：“GPU服务器要租，每次实验得花3科研经费。不够的部分，就得自己掏钱了。”你默默看了眼还没跑完的实验列表。",
+    "导师叫你去办公室，先说起组里的开销：“GPU服务器要租，每次实验得花3科研经费。经费不够，实验就得先停一停。”你默默看了眼还没跑完的实验列表。",
     "“项目得大家分担，实验室才能正常运转。”平时同学们各做一部分，这次导师想让你牵头，其他人配合。你把电脑往回挪了挪，看来今天不只是来讲论文进度的。",
   ].join("\n\n");
 

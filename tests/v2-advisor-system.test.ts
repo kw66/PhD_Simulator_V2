@@ -37,7 +37,7 @@ describe("advisor engine integration", () => {
     const initial = makeState();
     const reset = dispatchAction({ ...initial, advisorProgressState: { ...initial.advisorProgressState, funding: 99 } }, "reset-game");
     const restarted = dispatchAction(reset, "start-game", { roleId: "normal" });
-    expect(restarted.advisorProgressState).toMatchObject({ researchAccumulation: 20, funding: 10, awards: [], pendingApplication: null });
+    expect(restarted.advisorProgressState).toMatchObject({ researchAccumulation: 20, funding: 30, awards: [], pendingApplication: null });
   });
 
   it("does not consume action points for mentor projects", () => {
@@ -47,6 +47,6 @@ describe("advisor engine integration", () => {
   });
 
   it("keeps the initial state factory aligned with the advisor economy", () => {
-    expect(createInitialState().advisorProgressState).toMatchObject({ researchAccumulation: 20, funding: 10 });
+    expect(createInitialState().advisorProgressState).toMatchObject({ researchAccumulation: 20, funding: 30 });
   });
 });

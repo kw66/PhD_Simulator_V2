@@ -74,7 +74,7 @@ export function createPhdDecisionEvent(state: GameState, requestedYear = state.y
     });
     results["transfer-phd"] = {
       title: "转博结果",
-      description: `你点头确认了转博的决定。老师把话题转到后续研究上，你翻开记录本，本来留给近期安排的几行空白，很快就写到了页脚。\n\n回到工位，椅子还是那把椅子，待解决的问题却像是忽然排远了。你往后翻了一页继续记，心里有点发怵，也有点想看看自己到底能做到哪一步。\n\n培养安排：总培养期仍为 68 个月，博士毕业要求调整为科研分 ${ADVISOR_REQUIREMENTS.phdGrad}。基础的每月 SAN +1 仍会生效，但读博压力也会使每月 SAN -1。`,
+      description: `你点头确认了转博的决定。老师把话题转到后续研究上，你翻开记录本，本来留给近期安排的几行空白，很快就写到了页脚。\n\n回到工位，椅子还是那把椅子，待解决的问题却像是忽然排远了。你往后翻了一页继续记，心里有点发怵，也有点想看看自己到底能做到哪一步。\n\n培养安排：入学起第六年6月结束时判断博士毕业，共70个月，毕业要求调整为科研分 ${ADVISOR_REQUIREMENTS.phdGrad}。基础的每月 SAN +1 仍会生效，但读博压力也会使每月 SAN -1。`,
       buttonLabel: "开始博士阶段",
     };
   } else if (state.degree === "master") {
