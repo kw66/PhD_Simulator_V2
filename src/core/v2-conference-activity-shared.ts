@@ -29,11 +29,15 @@ export interface ConferenceActivityContext {
 }
 
 export function getConferencePaperPresentationResults(context: ConferenceActivityContext): string[] {
-  return (context.paperPresentations ?? []).map((paper) => {
-    const increase = Math.round((paper.citationPromotionMultiplier - 1) * 100);
-    const increaseText = increase > 0 ? `（+${increase}%）` : "";
-    return `《${paper.title}》：${paper.acceptType} 展示，会后引用倍率 ×${paper.citationPromotionMultiplier.toFixed(2)}${increaseText}`;
+  return (context.paperPresentations ?? []).map((paper, index) => {
+    const multiplierText = paper.citationPromotionMultiplier === 1
+      ? "" : `，会后引用倍率 ×${paper.citationPromotionMultiplier.toFixed(2)}`;
+    return `论文${index + 1}：${paper.acceptType} 展示完成${multiplierText}`;
   });
+}
+
+export function getConferencePaperPresentationTitles(context: ConferenceActivityContext): string[] {
+  return (context.paperPresentations ?? []).map((paper, index) => `论文${index + 1}：《${paper.title}》（${paper.acceptType}）`);
 }
 
 export function getConferenceActivityChainId(context: Pick<ConferenceActivityContext, "id">): string {

@@ -133,7 +133,7 @@ export function createIllnessRandomEvent(
   const illnessBuffs = [...state.buffs.filter((buff) => buff.id !== pendingBuffId), illnessBuff];
   const medicineSan = getActualSanChange(-severity, state.month, state.eventSupport, illnessBuffs);
   const restSan = getActualSanChange(-ILLNESS_REST_BASE_SAN_COST, state.month, state.eventSupport, illnessBuffs);
-  const clearIllnessOutcome = `清除本月 SAN 消耗 ×${activeOperationSanMultiplier}`;
+  const clearIllnessOutcome = "清除本月疾病加成";
   const medicineSettlement = [
     `金币 ${medicineMoney}`,
     medicineSan !== 0 ? formatActualSanChange(-severity, state.month, state.eventSupport, illnessBuffs) : "",
@@ -181,7 +181,7 @@ export function createIllnessRandomEvent(
         id: `illness-${illnessType}-rest-${serial}`,
         label: "休息",
         ...(state.actionState.used >= state.actionState.limit ? { disabledReason: "本月行动点已用尽，无法休息" } : {}),
-        outcome: `${formatActualSanChange(-ILLNESS_REST_BASE_SAN_COST, state.month, state.eventSupport, illnessBuffs)}｜休息（SAN +${restSanGain}｜行动点 -1）｜生病概率 ×0.5｜${clearIllnessOutcome}`,
+        outcome: `${formatActualSanChange(-ILLNESS_REST_BASE_SAN_COST, state.month, state.eventSupport, illnessBuffs)}｜SAN +${restSanGain}｜行动点 -1｜生病概率 ×0.5｜${clearIllnessOutcome}`,
         effects: { san: restSan, illnessProbabilityMultiplier: 0.5, restAction: true, removeBuffIds: [pendingBuffId] },
       },
     ],

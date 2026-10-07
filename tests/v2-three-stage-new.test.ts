@@ -31,7 +31,7 @@ describe("new multi-stage event shape", () => {
       enqueueEvents: [result],
     });
     expect(result?.description).toContain("科研上限 +3");
-    expect(result?.description).toContain("永久：想 idea +5 分、写论文 +5 分");
+    expect(result?.description).toContain("idea +5（永久）｜写作 +5（永久）");
     expect(result?.description).not.toContain("导师科研资源");
     expect(result?.completionLog).toBe("你接受了联合培养，科研上限 +3。");
     expect(result?.choices[0]?.effects).toEqual({});

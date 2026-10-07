@@ -19,7 +19,6 @@ import { refreshWinterVacationPlan } from "./v2-fixed-events-winter";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { refreshConferenceDecision } from "./v2-conference-events";
-import { refreshJournalFeeEvent } from "./v2-journal-fee-events";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
 import { hasRecruitLeft } from "./v2-recruitment-eligibility";
@@ -363,7 +362,6 @@ export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQue
 }
 
 function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
-  if (queuedEvent.journalFeePaperId) return refreshJournalFeeEvent(state, queuedEvent);
   if (queuedEvent.fixedResultPreview) {
     const context = queuedEvent.fixedResultPreview;
     let rollIndex = 0;
@@ -439,7 +437,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => event.journalFeePaperId || event.fixedResultPreview || event.fixedTreePreview || event.conferencePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
+  const eventQueue = state.eventQueue.map((event) => event.fixedResultPreview || event.fixedTreePreview || event.conferencePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
     && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };

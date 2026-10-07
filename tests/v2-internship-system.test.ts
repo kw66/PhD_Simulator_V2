@@ -43,13 +43,46 @@ describe("v2 internship system", () => {
 
     expect(state).toEqual({
       active: true,
-      salaryRemainder: 0,
       kind: "conference6",
       remainingMonths: 6,
       experimentMultiplier: 1.25,
       experimentBonus: 0,
       experimentMoneyDiscount: 0,
     });
+  });
+
+  it.each([0, 1])("keeps the remaining invitation state after rejection %s", (rejectedInternshipCount) => {
+    const context = { ...buildInternshipInviteContext(playingState()), rejectedInternshipCount };
+    const decision = createInternshipInviteAct1(context).choices[0]!.effects.enqueueEvents![0]!;
+    const decline = decision.choices.find((choice) => choice.id === "decline")!;
+    const result = decline.effects.enqueueEvents![0]!;
+    expect(decline.effects.conferenceCareerUpdates).toMatchObject({
+      rejectedInternshipCount: rejectedInternshipCount + 1,
+      permanentlyBlockedInternship: rejectedInternshipCount === 1,
+    });
+    expect(result.description.split("机制结算")[1]?.trim()).toBe(
+      rejectedInternshipCount === 0 ? "结果：大厂实习机会剩余1次" : "结果：大厂实习机会永久关闭",
+    );
+  });
+
+  it("shows a shared internship duration while distinguishing monthly settlement from each experiment", () => {
+    const state = playingState();
+    const remoteDecision = createAdvisorTalkRandomEvent(state, () => 0).choices[0]!.effects.enqueueEvents![0]!;
+    const remote = remoteDecision.choices.find((choice) => choice.label === "提出远程实习")!;
+    expect(remote.outcome.match(/持续3个月/gu)).toHaveLength(1);
+    expect(remote.outcome).toContain("远程实习（下月起，持续3个月）");
+    expect(remote.outcome).toContain("SAN -2（每月）｜金币 +1（每月）");
+    expect(remote.outcome).toContain("个人实验费用 -1（每次）");
+    expect(remote.outcome).toContain("实验 +4（每次）");
+    expect(getInternshipExperimentEffect({ ...state, totalMonths: state.totalMonths + 1,
+      internshipState: activateRemoteInternship(state.totalMonths) })).toEqual({ bonus: 4, multiplier: 1, moneyDiscount: 1 });
+    const decision = createInternshipInviteAct1(buildInternshipInviteContext(state)).choices[0]!.effects.enqueueEvents![0]!;
+    const result = decision.choices.find((choice) => choice.id === "accept")!.effects.enqueueEvents![0]!;
+    expect(result.description.match(/持续6个月/gu)).toHaveLength(1);
+    expect(result.description).toContain("SAN -2（每月）");
+    expect(result.description).toContain("金币 +1（每月）");
+    expect(result.description).toContain("实验 ×1.25（每次）");
+    expect(result.choices[0]!.effects.internshipStateUpdates).toEqual(activateInternship());
   });
 
   it("grows active internship multiplier by 0.05 per enterprise follow-up", () => {
@@ -83,14 +116,13 @@ describe("v2 internship system", () => {
     }
   });
 
-  it.each(["remote3", "conference6"] as const)("preserves unpaid salary when accepting a new %s placement", (kind) => {
-    const initial = { ...playingState(), internshipState: createInternshipState(0.5) };
+  it.each(["remote3", "conference6"] as const)("pays a new %s placement directly without a fractional wage accumulator", (kind) => {
+    const initial = { ...playingState(), internshipState: createInternshipState() };
     const next = applyChoiceEffectsToState(initial, { id: "internship", label: "实习", outcome: "", effects: {
       internshipStateUpdates: kind === "remote3" ? activateRemoteInternship(initial.totalMonths) : activateInternship(),
     } }).nextState;
-    expect(next.internshipState.salaryRemainder).toBe(0.5);
     const effective = { ...next, totalMonths: next.totalMonths + 1 };
-    expect(getInternshipSalaryPayment(effective)).toEqual({ payment: 1, remainder: 0.5 });
+    expect(getInternshipSalaryPayment(effective)).toEqual({ payment: 1 });
   });
 
   it("records remote internship arrangement, start, and monthly settlement separately", () => {

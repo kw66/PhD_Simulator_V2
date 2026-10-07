@@ -4,6 +4,7 @@ import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { advanceFellowResearch, ensureFellowPapers } from "../src/core/v2-fellow-research";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
+import { getPaperScoreBreakdown } from "../src/core/v2-paper-collaboration";
 import type { GameState } from "../src/core/v2-types";
 
 function state(overrides: Partial<GameState> = {}): GameState {
@@ -92,9 +93,10 @@ describe("new advisor project economy", () => {
       fellowPapers: [{ ...createDraftPaper(1, 0, () => 0), leadAuthorId: profile.id, idea: 10, experiment: 0, writing: 0 }],
     });
     const after = advanceFellowResearch(initial, () => 0);
-    expect(after.fellowPapers?.[0]?.experiment).toBeGreaterThan(0);
+    expect(getPaperScoreBreakdown(after.fellowPapers![0]!, "experiment")).toEqual({ own: 6, collaboration: 0, total: 6 });
     expect(after.advisorProgressState.funding).toBe(7);
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +5（经费 -3）");
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +6（经费 -3）");
+    expect(after.fellowFinanceAccounts?.[profile.id]?.aiSlot).toBe("doubao");
   });
 
 });

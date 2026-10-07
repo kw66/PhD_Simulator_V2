@@ -28,15 +28,13 @@ function createJointTrainingDeclineResult(context: JointTrainingContext): Pendin
           "你和导师谈过，还是决定不参加联培。这次回信没有再写“以后有机会”，而是认真谢过对方，说明今后也不考虑了。",
           "邮件发出，你把联培材料归进文件夹，打开原来的实验记录。屏幕上还是那几个没解决的问题，至少接下来该忙什么，已经定了。",
           "机制结算",
-          `联培拒绝计数 +1（当前 ${nextRejectCount}/2）`,
-          "达到 2 次后，联培机会永久关闭。",
+          "结果：联培机会永久关闭",
         ].join("\n\n")
       : [
           "你和导师商量后，回信婉拒了这次联培。附件里的条件确实让人心动，只是手头的课题还没理顺，你想先把这一头做好。",
           "对方回了句“以后有机会再聊”。你把邮件留在收件箱里，暂时不再往日历上添新安排。",
           "机制结算",
-          `联培拒绝计数 +1（当前 ${nextRejectCount}/2）`,
-          "继续深入合作还有一次机会。",
+          "结果：联培机会剩余1次",
         ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -64,7 +62,7 @@ function createJointTrainingAcceptResult(context: JointTrainingContext): Pending
       "你把合作笔记放进课题文件夹，准备先核清后续实验的设置。新的条件总算落实了，实验该重跑的还是得重跑。",
       "机制结算",
       `科研上限 +${context.pendingCitationCapBonus}`,
-      "永久：想 idea +5 分、写论文 +5 分",
+      "idea +5（永久）｜写作 +5（永久）",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -105,7 +103,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
       {
         id: "decline",
         label: "暂不接受",
-        outcome: permanentlyBlocked ? "合作线关闭。" : "以后还会收到一次邀请。",
+        outcome: permanentlyBlocked ? "联培机会永久关闭。" : "联培机会剩余1次。",
         effects: {
           conferenceEncounterUpdates: {
             rejectedBigBullCoopCount: nextRejectCount,
@@ -117,7 +115,7 @@ function createJointTrainingAct2(context: JointTrainingContext): PendingEvent {
       {
         id: "accept",
         label: "接受联培",
-        outcome: `科研上限 +${context.pendingCitationCapBonus}；永久想 idea +5、写论文 +5。`,
+        outcome: `科研上限 +${context.pendingCitationCapBonus}｜idea +5（永久）｜写作 +5（永久）。`,
         effects: {
           conferenceEncounterUpdates: {
             bigBullCooperation: true,

@@ -2,11 +2,12 @@ import { ADVISOR_REQUIREMENTS } from "./v2-content";
 import { getFellowAcademicYear, getFellowResearchScore } from "./v2-fellow-academic";
 import { getFellowName } from "./v2-fellow-progression";
 import { pushMilestoneLog } from "./v2-engine-helpers";
+import { ensureFellowFinanceAccounts } from "./v2-fellow-finance";
 import type { GameState } from "./v2-types";
 
 export function settleFellowAcademicYear(state: GameState): GameState {
   if (state.phase !== "playing" || state.month !== 10) return state;
-  let nextState = state;
+  let nextState = ensureFellowFinanceAccounts(state);
   for (const original of state.fellowProgressState) {
     const year = getFellowAcademicYear(state, original);
     const score = getFellowResearchScore(state, original);

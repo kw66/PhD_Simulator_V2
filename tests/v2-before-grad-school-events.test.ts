@@ -328,12 +328,12 @@ describe("v2 before grad school events", () => {
     expect(admissionEvent?.description).not.toContain("第一次组会");
     expect(admissionEvent?.description).not.toContain("第一篇投稿");
     expect(admissionEvent?.completionLog).toBe(
-      "加入李旭旭讲师课题组和实验室群｜待遇 硕士1/博士3金币/月｜科研分 C+1/B+2/A+4｜毕业 硕士1/博士7分｜转博 第2年2/第3年3分",
+      "加入李旭旭讲师课题组和实验室群",
     );
     expect(admissionEvent?.choices[0]?.label).toBe("准备报到");
   });
 
-  it("records all enrollment requirements in one completion log", () => {
+  it("keeps enrollment requirements in the advisor card and only logs joining the group", () => {
     let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
     state = dispatchAction(state, "resolve-event", {
       eventChoiceId: "before-grad-school-open-advisor-info",
@@ -341,6 +341,8 @@ describe("v2 before grad school events", () => {
     const advisorName = state.eventQueue[0]?.choices.find((choice) => (
       choice.effects.fixedEventResolution?.kind === "advisor-confirm"
     ))?.effects.fixedEventResolution?.advisorCandidate?.advisorName;
+    expect(state.eventQueue[0]?.description).toContain("毕业：硕士 1 分｜博士 7 分");
+    expect(state.eventQueue[0]?.description).toContain("转博士：第 2 年 2 分｜第 3 年 3 分");
     state = dispatchAction(state, "resolve-event", {
       eventChoiceId: "before-grad-school-confirm",
     });
@@ -352,7 +354,7 @@ describe("v2 before grad school events", () => {
 
     expect(state.log).toHaveLength(1);
     expect(state.log[0]?.text).toBe(
-      `读研之始：加入${advisorName}讲师课题组和实验室群｜待遇 硕士1/博士3金币/月｜科研分 C+1/B+2/A+4｜毕业 硕士1/博士7分｜转博 第2年2/第3年3分`,
+      `读研之始：加入${advisorName}讲师课题组和实验室群`,
     );
   });
 

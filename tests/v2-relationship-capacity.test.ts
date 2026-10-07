@@ -68,6 +68,17 @@ describe("v2 relationship capacity", () => {
     expect(decision.choices[0]?.effects.enqueueEvents?.[0]?.description).toContain("无事发生");
   });
 
+  it("keeps mentoring capacity in the condition and the SAN cost in the result", () => {
+    const event = createRandomEventById(1, createFullFellowState(), () => 0).event;
+    const choice = getDecisionEvent(event).choices.find((entry) => entry.label === "亲自指导")!;
+    const [condition, result] = choice.outcome.split("｜结果：");
+    expect(condition).toContain("人际栏已满");
+    expect(result).toContain("SAN");
+    expect(result).toContain("未新增关系");
+    expect(result).not.toMatch(/人数|已满/u);
+    expect(choice.effects.fellowAdditions).toBeUndefined();
+  });
+
   it("ends fellow cooperation while preserving unrelated state and releasing one slot", () => {
     const initial = createFullFellowState();
     const profile = createCustomFellowProgressProfile({

@@ -5,8 +5,8 @@ import { createEventCounters } from "../src/core/v2-event-counters";
 import { createShopState } from "../src/core/v2-shop-items";
 
 describe("v2 conference system", () => {
-  it("matches old region base costs", () => {
-    expect(getConferenceBaseCosts("domestic")).toEqual({ selfPay: 2, advisorCost: 1, proxyCost: 0 });
+  it("charges regional travel and a fixed stranger proxy fee", () => {
+    expect(getConferenceBaseCosts("domestic")).toEqual({ selfPay: 2, advisorCost: 1, proxyCost: 1 });
     expect(getConferenceBaseCosts("asia")).toEqual({ selfPay: 4, advisorCost: 2, proxyCost: 1 });
     expect(getConferenceBaseCosts("west")).toEqual({ selfPay: 6, advisorCost: 3, proxyCost: 1 });
   });
@@ -58,15 +58,15 @@ describe("v2 conference system", () => {
     expect(advisor.fundingCost).toBe(4);
     expect(advisor.countsAsMeeting).toBe(true);
     expect(resistedAdvisor.actualCost).toBe(0);
-    expect(resistedAdvisor.fundingCost).toBe(6);
+    expect(resistedAdvisor.fundingCost).toBe(4);
 
     expect(proxy.resource).toBe("money");
-    expect(proxy.actualCost).toBe(2);
+    expect(proxy.actualCost).toBe(1);
     expect(proxy.resistanceNarrative).toBeUndefined();
     expect(proxy.countsAsMeeting).toBe(false);
   });
 
-  it("charges domestic proxy registration without a service fee", () => {
+  it("charges a domestic stranger proxy without registration", () => {
     const proxy = resolveConferenceDecisionCost({
       mode: "proxy",
       region: "domestic",
@@ -84,5 +84,18 @@ describe("v2 conference system", () => {
 
     expect(proxy.actualCost).toBe(1);
     expect(proxy.countsAsMeeting).toBe(false);
+  });
+
+  it.each(["domestic", "asia", "west"] as const)("ignores paper count and region for a current fellow's proxy in %s", (region) => {
+    for (const paperCount of [1, 3, 10]) {
+      const input = {
+        mode: "proxy" as const, region, paperCount, favor: 12, social: 12,
+        shopState: createShopState(), eventCounters: createEventCounters(),
+        eventSupport: { hasParasol: false, hasDownJacket: false, hasBadmintonRacket: false, hasStrongBodyTalent: false },
+      };
+      expect(resolveConferenceDecisionCost({ ...input, hasFellowAtConference: true }).actualCost).toBe(0);
+      expect(resolveConferenceDecisionCost({ ...input, hasFellowAtConference: false }).actualCost).toBe(1);
+      expect(resolveConferenceDecisionCost({ ...input, hasFellowAtConference: true }).fundingCost).toBe(0);
+    }
   });
 });

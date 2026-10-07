@@ -106,6 +106,8 @@ describe("v2 debug relationship additions", () => {
       expect(next).toEqual({
         ...before,
         fellowProgressState: [...before.fellowProgressState, { ...expectedProfile, id: expect.any(String), researchTopic: fellowProgression.getFellowResearchTopic({ ...next.fellowProgressState.at(-1)!, researchTopic: undefined }) }],
+        fellowFinanceAccounts: { ...before.fellowFinanceAccounts,
+          [next.fellowProgressState.at(-1)!.id]: { name: expectedProfile.name, money: 0 } },
         fellowPapers: [...(before.fellowPapers ?? []), expect.objectContaining({
           leadAuthorId: next.fellowProgressState.at(-1)!.id,
           leadAuthorName: expectedProfile.name,
@@ -142,6 +144,8 @@ describe("v2 debug relationship additions", () => {
       expect(next).toEqual({
         ...before,
         fellowProgressState: [...before.fellowProgressState, expect.objectContaining({ type })],
+        fellowFinanceAccounts: { ...before.fellowFinanceAccounts,
+          [next.fellowProgressState.at(-1)!.id]: { name: next.fellowProgressState.at(-1)!.name, money: 0 } },
         fellowPapers: [...(before.fellowPapers ?? []), expect.objectContaining({
           leadAuthorId: next.fellowProgressState.at(-1)!.id,
           status: "draft", idea: 0, experiment: 0, writing: 0,

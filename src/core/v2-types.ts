@@ -21,6 +21,7 @@ import type {
   ConferenceCareerState,
   ConferenceEncounterState,
   EventSupportState,
+  FellowFinanceAccount,
   FellowProfileAddition,
   FellowProgressProfile,
   InternshipState,
@@ -408,6 +409,7 @@ export interface Paper {
   submittedMonth?: number | null;
   submittedYear?: number | null;
   conferenceHandled?: boolean;
+  conferenceHandledAtTotalMonths?: number;
   /** Earliest month in which the post-acceptance conference event may appear. */
   conferenceAvailableAtTotalMonths?: number;
   publication?: PaperPublicationState | null;
@@ -501,8 +503,6 @@ export interface EventChoice {
     researchCapacityStateDeltas?: Partial<Record<keyof ResearchCapacityState, number>>;
     advisorProgressStateDeltas?: Partial<Pick<AdvisorProgressState, "researchAccumulation" | "funding">>;
     recordPlayerConferenceTrip?: string;
-    journalFeePayment?: { paperId: string; payer: "self" | "lab" };
-    labReimbursementReservation?: "gpu" | "workstation" | "ai" | { kind: "labor"; amount: number };
     advisorGrantResult?: AdvisorGrantApplication;
     labProjectProgress?: {
       type: "horizontal" | "vertical";
@@ -563,7 +563,6 @@ export interface ResolvedEventRecord {
 }
 
 export interface PendingEvent {
-  journalFeePaperId?: string;
   id: string;
   continuationSourceId?: string;
   title: string;
@@ -670,6 +669,7 @@ export interface GameState extends RandomEventState {
   loverState: LoverState;
   loverProgressState: LoverProgressState;
   fellowProgressState: FellowProgressProfile[];
+  fellowFinanceAccounts?: Record<string, FellowFinanceAccount>;
   fellowPapers?: Paper[];
   fellowResearchLastTotalMonths?: number;
   researchCapacityState: ResearchCapacityState;

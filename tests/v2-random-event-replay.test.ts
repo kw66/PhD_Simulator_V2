@@ -180,7 +180,7 @@ describe("random event replay", () => {
       expect(getBadmintonStrength(san, participations, false)).toBe(strength);
       expect(badminton?.outcome).toContain(wins ? "获胜" : "落败");
       expect(badminton?.outcome).toContain(`羽毛球实力 ${strength} ${wins ? "≥" : "<"} 100`);
-      expect(badminton?.outcome.includes("每月 SAN +1")).toBe(wins);
+      expect(badminton?.outcome.includes("SAN +1（每月）")).toBe(wins);
       expect(badminton?.effects.illnessProbabilityDelta).toBe(-10);
       expect(badminton?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
       expect(badminton?.effects.eventSupportUpdates).toEqual(wins ? { hasStrongBodyTalent: true } : {});
@@ -197,7 +197,7 @@ describe("random event replay", () => {
     const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
 
     expect(badminton?.outcome).toContain("获胜");
-    expect(badminton?.outcome).toContain("每月 SAN +1");
+    expect(badminton?.outcome).toContain("SAN +1（每月）");
     expect(badminton?.effects.eventSupportUpdates).toEqual({ hasStrongBodyTalent: true });
   });
 
@@ -211,7 +211,7 @@ describe("random event replay", () => {
     const badminton = choiceEvent?.choices.find((choice) => choice.id.includes("-badminton-"));
 
     expect(badminton?.outcome).toContain("获胜");
-    expect(badminton?.outcome).not.toContain("每月 SAN +1");
+    expect(badminton?.outcome).not.toContain("SAN +1（每月）");
     expect(badminton?.effects.illnessProbabilityDelta).toBe(-10);
     expect(badminton?.effects.counterDeltas).toEqual({ badmintonCount: 1 });
     expect(badminton?.effects.eventSupportUpdates).toEqual({});

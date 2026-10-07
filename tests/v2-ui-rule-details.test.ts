@@ -154,18 +154,51 @@ describe("v2 research rule details and publication metrics", () => {
     expect(fellows).toContain("达标毕业，未达标退学，不设延毕");
   });
 
-  it("explains journal payment choices and keeps fellow fees automatic", () => {
+  it("explains automatic journal OA funding without personal payment or a payment todo", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain("PAMI/NMI/Nature版面费分别5/10/20");
-    expect(help).toContain("玩家一作选择个人金币或实验室经费支付；自费需足额金币，不足时禁用");
-    expect(help).toContain("实验室选项仅在没有导师时禁用");
-    expect(help).toContain("经费不足或恰好用尽仍可确认，但支付后经费≤0则破产");
-    expect(help).toContain("同学一作由实验室自动支付");
-    expect(help).toContain("需手动选择，不自动扣款");
-    expect(help).toContain("仍须缴费后才能推进月份或毕业");
-    expect(help).toContain("打工赚金币或推进横向项目补经费，再回来缴费");
-    expect(help).not.toContain("版面费分别5/10/20，由实验室支付");
-    expect(getHelpText({ activePlayTab: "workstation" })).toContain("一作版面费在待办中选择个人金币或实验室经费支付");
+    expect(help).toContain("PAMI/NMI/Nature的OA版面费分别5/10/20");
+    expect(help).toContain("玩家与同学一作均在发表时立即自动扣科研经费，不允许自费，不等待3个月");
+    expect(help).toContain("不生成期刊缴费待办，无需手动选择付款方式");
+    expect(help).toContain("合作署名不向玩家重复收费");
+    expect(help).toContain("必须支付的OA费用不因余额不足而暂停；扣款后经费为0仍可继续，低于0则破产");
+    expect(help).not.toMatch(/需手动选择，不自动扣款|仍须缴费后才能推进月份或毕业|再回来缴费|不足差额由该同学钱包承担/);
+    const workstation = getHelpText({ activePlayTab: "workstation" });
+    expect(workstation).toContain("PAMI/NMI/Nature的OA版面费分别5/10/20，发表时立即自动扣科研经费");
+    expect(workstation).toContain("不允许自费，也不生成期刊缴费待办");
+  });
+
+  it("separates mandatory registration from grouped conference travel and poster delegation", () => {
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("会议注册费每篇1金币，统一自动扣科研经费，不允许自费");
+    expect(help).toContain("注册与差旅均在录用3个月后支付，录用时不扣款");
+    expect(help).toContain("玩家同一届会议多篇论文合并为一个参会事件，只选择差旅方式");
+    expect(help).toContain("国内/亚太/欧美自费分别2/4/6金币");
+    expect(help).toContain("导师报销分别扣2/4/6科研经费，基础导师好感消耗1/2/3，经过档位抵抗");
+    expect(help).toContain("当前人际栏有同学中同一届会议则免费，否则个人金币-1");
+    expect(help).toContain("代贴费不分地区或论文篇数，注册费仍按篇自动扣科研经费");
+    expect(help).toContain("同一届会议多位同学、多篇论文合计只收一次差旅，国内/亚太/欧美分别扣2/4/6科研经费");
+    expect(help).toContain("注册仍按篇扣科研经费，不扣同学钱包，离校后已有论文责任保留");
+    expect(help).toContain("可选差旅余额不足时不扣款；必须支付的注册费不因差旅方式或余额不足而免除");
+    expect(help).toContain("领域年会VALSE免注册费，不论有无论文均只需差旅2");
+    expect(help).not.toMatch(/分别1\/3\/5|差旅1金币|不使用实验室同学/);
+    const research = getHelpText({ activePlayTab: "research" });
+    expect(research).toContain("会议注册与差旅均在录用3个月后支付");
+    expect(research).toContain("注册每篇1金币自动扣科研经费");
+    expect(research).toContain("期刊OA在发表时立即自动扣科研经费，无自费缴费待办");
+  });
+
+  it("explains actual wages, fellow AI reserves and zero-funding survival", () => {
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("金额四舍五入到两位，直接发放");
+    expect(help).toContain("经费为0仍可继续，低于0才破产");
+    expect(help).toContain("导师经费”事件另有结项资金，奖励不扣实验室经费");
+    expect(help).toContain("同学初始金币为0");
+    expect(help).toContain("同学钱包仅用于实验经费不足的差额和购买AI，不承担论文费用");
+    expect(help).toContain("只预留一次实验费用，不预留论文费");
+    expect(help).toContain("GPT、DeepSeek、豆包、Claude中择优订阅");
+    expect(help).toContain("AI仅影响同学自己的论文，不改变协作");
+    expect(help).toContain("不再发工资或购买AI");
+    expect(help).not.toMatch(/报销预留|小数累计|经费净增55|经费≤0/);
   });
 
   it("points to separate monthly actions, annual results and academic logs", () => {
@@ -175,7 +208,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(events).toContain("同学转博、毕业或退学后，学业记录仍可在日志回看");
     for (const ui of [{ activePlayTab: "relationship" }, { activePlayTab: "talent", activeTalentTab: "relation" }] as const) {
       const help = getHelpText(ui);
-      expect(help).toContain("个人卡片“成长”保留最近学年实际变化");
+      expect(help).toContain("个人卡片“本月”栏悬浮显示最近年度成长，保留学年与实际变化");
       expect(help).toContain("次月“本月”行动不覆盖成长记录");
     }
   });
@@ -186,14 +219,14 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("项目进度满100才结算");
     expect(help).toContain("对应进度+100。满条奖励单独记入项目完成日志");
     expect(help).toContain("横向基础SAN-8、纵向基础SAN-6，享受科研档位减免");
-    expect(help).toContain("横向科研经费+60，再支付你的劳务费5金币，经费净增55");
+    expect(help).toContain("横向科研经费+60，再支付你和本项目每位参与同学各5金币，已离校参与者也领取");
     expect(help).toContain("横向不设最低经费要求");
     expect(help).toContain("纵向导师科研积累增加当前值的10%");
     expect(help).toContain("实验基础花费3经费");
-    expect(help).toContain("经费不足时不开展实验");
+    expect(help).toContain("玩家经费不足时暂停实验，同学先用经费、不足差额自付");
     expect(help).toContain("纵向项目满100时，导师为玩家和每位同学各随机选择一篇论文，写作协作+10");
     expect(help).toContain("玩家与同学每次实验费用+1");
-    expect(help).toContain("同学经费不足当次实验费用时改做横向");
+    expect(help).toContain("同学经费与个人金币合计不足当次实验费用时改做横向");
     expect(help).toContain("导师、同学和你共同推进卡片上的两条项目进度");
     expect(help).not.toContain("每月为玩家和每位同学各提供一次论文指导");
     expect(help).toContain("每年3月不限项即申请");
@@ -224,9 +257,9 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("两个×1.5合并为×2");
     expect(help).toContain("不额外扣行动点或SAN");
     expect(help).toContain("实验基础费用3经费");
-    expect(help).toContain("费用由实验室支付，不足时暂停实验");
+    expect(help).toContain("玩家费用由实验室支付，不足时暂停实验；同学不足差额由自己的钱包支付");
     expect(help).toContain("悬浮实验按钮查看实际经费消耗");
-    expect(help).toContain("经费不足时不会扣SAN或行动点");
+    expect(help).toContain("玩家经费不足时不会扣SAN或行动点");
     expect(help).not.toMatch(/不足部分自付|最后扣你的金币|自费租卡/);
     expect(help).toContain("算力短缺持续6个月，玩家与同学每次实验费用+1");
     expect(help).toContain("实验经费也只收一次");

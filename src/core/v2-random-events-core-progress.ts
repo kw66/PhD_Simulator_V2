@@ -198,7 +198,7 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
       {
         id: `random-9-tech-${serial}`,
         label: "最新技术",
-        outcome: "永久想 idea +1。",
+        outcome: "idea +1（永久）。",
         effects: {
           ideaBonus: 1,
         },
@@ -206,7 +206,7 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
       {
         id: `random-9-code-${serial}`,
         label: "代码知识",
-        outcome: "永久实验 +1。",
+        outcome: "实验 +1（永久）。",
         effects: {
           experimentBonus: 1,
         },
@@ -214,7 +214,7 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
       {
         id: `random-9-theory-${serial}`,
         label: "深奥理论",
-        outcome: "永久写作 +1。",
+        outcome: "写作 +1（永久）。",
         effects: {
           writingBonus: 1,
         },

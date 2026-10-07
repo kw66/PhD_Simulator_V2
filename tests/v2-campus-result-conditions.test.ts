@@ -83,7 +83,7 @@ describe("campus result conditions", () => {
     const state = makeState();
     state.player.favor = favor;
     const { event, choice, result } = getBranch(state, 8, "发劳务费");
-    expect(choice.outcome).toBe(`${condition}｜金币 +${gain}；实验室经费 -${gain}。`);
+    expect(choice.outcome).toBe(`${condition}｜金币 +${gain}。`);
     expect(result.choices[0]?.effects.money).toBe(gain);
     const completed = finishEvent(state, event, "发劳务费");
     expect(completed.player.money).toBe(state.player.money + gain);

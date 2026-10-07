@@ -92,7 +92,7 @@ describe("shared lab project lifecycle", () => {
     expect(idle.fellowPapers).toEqual(before.fellowPapers);
 
     const after = nextMonth(before);
-    expect(after.advisorProgressState).toMatchObject({ horizontalProgress: 10, verticalProgress: 0, funding: 83, researchAccumulation: 20 });
+    expect(after.advisorProgressState).toMatchObject({ horizontalProgress: 10, verticalProgress: 0, funding: 78, researchAccumulation: 20 });
     expect(after.player.money).toBe(26);
     expect(after.papers[0]).toMatchObject({ idea: 9, experiment: 9, writing: 0 });
     expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 0, writing: 0 });
@@ -119,7 +119,7 @@ describe("shared lab project lifecycle", () => {
     expect(collaborationTotal(after.fellowPapers![0]!)).toBe(0);
   });
 
-  it.each(["player", "advisor", "fellow"] as const)("nets funding 55 and player money 5 before monthly wages when the %s completes horizontal work", (contributor) => {
+  it.each(["player", "advisor", "fellow"] as const)("pays labor to the player and participating fellow when the %s completes horizontal work", (contributor) => {
     const base = makeState();
     const before = {
       ...base,
@@ -132,7 +132,7 @@ describe("shared lab project lifecycle", () => {
       : nextMonth(contributor === "advisor"
         ? { ...before, advisorProgressState: { ...before.advisorProgressState, nextProject: "horizontal" } }
         : before);
-    expect(after.advisorProgressState.funding).toBe(contributor === "player" ? 85 : contributor === "advisor" ? 84 : 83);
+    expect(after.advisorProgressState.funding).toBe(contributor === "player" ? 85 : contributor === "advisor" ? 84 : 78);
     expect(after.player.money).toBe(before.player.money + 5 + (contributor === "player" ? 0 : 1));
     expect(after.advisorProgressState.horizontalProgress).toBe(contributor === "player" ? 10 : 0);
     expect(after.advisorProgressState.researchAccumulation).toBe(20);
@@ -187,8 +187,8 @@ describe("monthly fellow experiment funding", () => {
     const before = makeState({ totalMonths: 4, month: 4, fellowProgressState: [makeFellow()] });
     const after = nextMonth(before);
     expect(after.advisorProgressState.funding).toBe(25);
-    expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 10, writing: 0 });
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +10（经费 -3）");
+    expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 11, writing: 0 });
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +11（经费 -3）");
     expect(after.player.money).toBe(before.player.money + 1);
     expect(after.player.san).toBe(20);
     expect(after.actionState.used).toBe(0);
@@ -197,22 +197,23 @@ describe("monthly fellow experiment funding", () => {
     expect(selected.fellowProgressState[0]?.monthlyActivity).toContain("经费 -3");
   });
 
-  it("switches an experiment to shared horizontal work at funding 2 after monthly wages without charging the player", () => {
+  it("uses the fellow's salary to cover an experiment shortfall without charging the player", () => {
     const before = makeState({
       totalMonths: 4, month: 4,
       fellowProgressState: [makeFellow()],
       advisorProgressState: { ...createAdvisorProgressState(), funding: 4, horizontalProgress: 20, nextProject: "vertical" },
     });
     const after = nextMonth(before);
-    expect(after.advisorProgressState).toMatchObject({ funding: 2, horizontalProgress: 30, verticalProgress: 10 });
-    expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 0, writing: 0 });
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("经费不足，横向进度 +10");
+    expect(after.advisorProgressState).toMatchObject({ funding: 0, horizontalProgress: 20, verticalProgress: 10 });
+    expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 11, writing: 0 });
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("经费 -2，自费 -1");
+    expect(after.fellowFinanceAccounts?.[after.fellowProgressState[0]!.id]?.money).toBe(0);
     expect(after.player.money).toBe(before.player.money + 1);
     expect(after.player.san).toBe(20);
     expect(after.actionState.used).toBe(0);
   });
 
-  it.each([false, true])("lets only one of two fellows spend the remaining 3 funding after wages, then ends in bankruptcy (reversed=%s)", (reversed) => {
+  it.each([false, true])("lets one fellow use remaining funds and the other do horizontal work without bankruptcy (reversed=%s)", (reversed) => {
     const base = makeState({ fellowProgressState: [makeFellow()] });
     const second = makeFellow("fellow-two");
     const profiles = [...base.fellowProgressState, second];
@@ -226,14 +227,14 @@ describe("monthly fellow experiment funding", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const after = dispatchAction(before, "next-month");
     expect(after.totalMonths).toBe(5);
-    expect(after.phase).toBe("finished");
-    expect(after.ending).toBe("lab-bankrupt");
-    expect(after.advisorProgressState).toMatchObject({ funding: 0, horizontalProgress: 20, verticalProgress: 0 });
-    expect(after.fellowPapers?.map((paper) => paper.experiment)).toEqual([5, 0]);
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +5（经费 -3）");
-    expect(after.fellowProgressState[1]?.monthlyActivity).toBe("协作进度 +1");
+    expect(after.phase).toBe("playing");
+    expect(after.ending).toBeNull();
+    expect(after.advisorProgressState).toMatchObject({ funding: 0, horizontalProgress: 30, verticalProgress: 10 });
+    expect(after.fellowPapers?.map((paper) => paper.experiment)).toEqual([6, 0]);
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +6（经费 -3）");
+    expect(after.fellowProgressState[1]?.monthlyActivity).toContain("横向进度 +10");
     expect(after.fellowProgressState[1]?.nextMonthlyAction).toBe("research");
-    expect(after.fellowProgressState[1]?.lastProjectTotalMonths).toBe(before.fellowProgressState[1]?.lastProjectTotalMonths);
+    expect(after.fellowProgressState[1]?.lastProjectTotalMonths).toBe(after.totalMonths);
     expect(after.player.money).toBe(before.player.money + 1);
     expect(after.player.san).toBe(20);
     expect(after.actionState.used).toBe(0);

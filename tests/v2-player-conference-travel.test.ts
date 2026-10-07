@@ -39,7 +39,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("player conference travel across paper batches", () => {
   it.each([
-    ["domestic", 1], ["asia", 3], ["west", 5],
+    ["domestic", 2], ["asia", 4], ["west", 6],
   ] as const)("shares one %s trip across self and advisor payments", (region: ConferenceRegionId, travel) => {
     for (const firstMode of ["self", "advisor"] as const) {
       for (const secondMode of ["self", "advisor"] as const) {
@@ -52,11 +52,11 @@ describe("player conference travel across paper batches", () => {
         const pending = choose(decision, secondMode);
         expect(pending.player.money).toBe(first.player.money);
         expect(pending.advisorProgressState).toEqual(first.advisorProgressState);
-        const paymentText = secondMode === "advisor" ? "实验室经费 -2" : "金币 -2";
+        const paymentText = secondMode === "advisor" ? "导师好感" : "差旅费 0";
         expect(pending.eventQueue[0]!.description).toContain(paymentText);
         const paid = choose(pending);
-        expect(paid.player.money).toBe(100 - (firstMode === "self" ? 1 + travel : 0) - (secondMode === "self" ? 2 : 0));
-        expect(paid.advisorProgressState.funding).toBe(100 - (firstMode === "advisor" ? 1 + travel : 0) - (secondMode === "advisor" ? 2 : 0));
+        expect(paid.player.money).toBe(100 - (firstMode === "self" ? travel : 0));
+        expect(paid.advisorProgressState.funding).toBe(100 - (firstMode === "advisor" ? travel : 0));
         expect(paid.advisorProgressState.paidPlayerConferenceTrips).toEqual(first.advisorProgressState.paidPlayerConferenceTrips);
         expect(paid.player.favor).toBe(first.player.favor - (secondMode === "advisor" ? { domestic: 1, asia: 2, west: 3 }[region] : 0));
         expect(paid.log.some((entry) => entry.text.includes(paymentText))).toBe(true);
@@ -68,16 +68,16 @@ describe("player conference travel across paper batches", () => {
     }
   });
 
-  it.each(["self", "advisor"] as const)("does not consume a physical trip for proxy registration before %s attendance", (mode) => {
+  it.each(["self", "advisor"] as const)("does not consume a physical trip for proxy before %s attendance", (mode) => {
     const proxy = pay(queueBatch(makeState(), "proxy", { paperCount: 2, paperIds: ["proxy-1", "proxy-2"] }), "proxy");
-    expect(proxy.player.money).toBe(97);
+    expect(proxy.player.money).toBe(99);
     expect(proxy.advisorProgressState.paidPlayerConferenceTrips).toBeUndefined();
     const physical = pay(queueBatch(proxy, "physical"), mode);
-    expect(physical.player.money).toBe(mode === "self" ? 91 : 97);
+    expect(physical.player.money).toBe(mode === "self" ? 93 : 99);
     expect(physical.advisorProgressState.funding).toBe(mode === "advisor" ? 94 : 100);
     expect(physical.advisorProgressState.paidPlayerConferenceTrips).toHaveLength(1);
     const nextProxy = pay(queueBatch(physical, "next-proxy"), "proxy");
-    expect(nextProxy.player.money).toBe(physical.player.money - 2);
+    expect(nextProxy.player.money).toBe(physical.player.money - 1);
     expect(nextProxy.advisorProgressState).toEqual(physical.advisorProgressState);
   });
 
@@ -106,10 +106,10 @@ describe("player conference travel across paper batches", () => {
     const snapshot = structuredClone(restored);
     const refreshed = getResolvableQueuedEvent(restored, restored.eventQueue[0]!);
     expect(refreshed.choices[0]!.disabledReason).toBeUndefined();
-    expect(refreshed.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(-1);
+    expect(refreshed.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBeUndefined();
     expect(restored).toEqual(snapshot);
     const paid = choose(restored);
-    expect(paid.advisorProgressState.funding).toBe(1);
+    expect(paid.advisorProgressState.funding).toBe(2);
     expect(paid.advisorProgressState.paidPlayerConferenceTrips).toEqual(first.advisorProgressState.paidPlayerConferenceTrips);
   });
 
@@ -122,27 +122,25 @@ describe("player conference travel across paper batches", () => {
     expect(second.advisorProgressState.paidPlayerConferenceTrips).toHaveLength(2);
   });
 
-  it("uses the recorded trip when the engine schedules a later paper from the same conference", () => {
+  it("schedules one conference event for all papers accepted for the same conference", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     const initial = makeState();
-    let state: GameState = { ...initial, externalPublications: [5, 6].map((month, index) => ({
+    let state: GameState = { ...initial, externalPublications: [5, 5].map((month, index) => ({
       ...createGrantedPublishedPaper(1, index, { target: "A", acceptedScore: 4 }),
       id: `engine-paper-${index}`, submittedMonth: 3, submittedYear: 1,
       conferenceHandled: false, conferenceAvailableAtTotalMonths: month,
     })) };
     state = dispatchAction(state, "force-next-month");
     const firstEvent = state.eventQueue.find((event) => event.conferencePreview)!;
-    expect(firstEvent.conferencePreview!.context.paperIds).toEqual(["engine-paper-0"]);
-    const travel = { domestic: 1, asia: 3, west: 5 }[firstEvent.conferencePreview!.context.region];
+    expect(firstEvent.conferencePreview!.context.paperIds).toEqual(["engine-paper-0", "engine-paper-1"]);
+    const travel = { domestic: 2, asia: 4, west: 6 }[firstEvent.conferencePreview!.context.region];
     const firstMoney = state.player.money;
     state = pay(state, "self");
-    expect(state.player.money).toBe(firstMoney - 1 - travel);
+    expect(state.player.money).toBe(firstMoney - travel);
     state = dispatchAction(JSON.parse(JSON.stringify(state)), "force-next-month");
-    const secondEvent = state.eventQueue.find((event) => event.conferencePreview)!;
-    expect(secondEvent.conferencePreview!.context.paperIds).toEqual(["engine-paper-1"]);
-    const secondFunding = state.advisorProgressState.funding;
-    state = pay(state, "advisor");
-    expect(state.advisorProgressState.funding).toBe(secondFunding - 1);
+    expect(state.eventQueue.some((event) => event.conferencePreview)).toBe(false);
+    expect(state.externalPublications.find((paper) => paper.id === "engine-paper-1")?.conferenceHandled).toBe(true);
+    expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["engine-paper-0", "engine-paper-1"]);
     expect(state.advisorProgressState.paidPlayerConferenceTrips).toHaveLength(1);
   });
 });

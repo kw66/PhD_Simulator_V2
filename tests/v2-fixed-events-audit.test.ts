@@ -147,7 +147,7 @@ describe("audited fixed-event rules", () => {
     expect(award?.paperIds).not.toContain(nonFirstAuthor.id);
   });
 
-  it("fixes winter envelopes at two and CCIG ideas at five", () => {
+  it("fixes winter envelopes at two and VALSE ideas at five", () => {
     const state = playingState();
     const rolls = [0, 0.34, 0.67];
     const envelopes = rolls.map((roll) => resolveWinterVacationFixedEvent(
@@ -256,7 +256,7 @@ describe("audited fixed-event rules", () => {
     expect(yearSummary?.enqueueEvents?.[0]?.description).toContain("SAN +5");
   });
 
-  it("separates CCIG travel preparation from on-site activity choices", () => {
+  it("separates VALSE travel preparation from on-site activity choices", () => {
     const state = playingState();
     const settlementItems = ["导师报销", "导师好感 -1"];
     const confirmation = createCcigAttendResultEvent(state, "advisor", settlementItems);
@@ -267,10 +267,11 @@ describe("audited fixed-event rules", () => {
     expect(confirmation.description).not.toContain("分论坛");
     expect(activity.description).toContain("签到处");
     expect(activity.description).toContain("海报区");
-    expect(activity.title).toBe("年会活动");
+    expect(activity.title).toBe("领域年会活动");
     const activityDecision = activity.choices[0]?.effects.enqueueEvents?.[0];
-    expect(activityDecision?.description).toContain("导师报销");
-    expect(activityDecision?.description).toContain("导师好感 -1");
+    for (const event of [activity, activityDecision!]) {
+      expect(event.description).not.toMatch(/导师报销|导师好感 -1|机制结算|结果：/u);
+    }
     expect(activity.chainId).not.toBe(confirmation.chainId);
   });
 
@@ -303,7 +304,8 @@ describe("audited fixed-event rules", () => {
     const activityDecision = activity.choices[0]?.effects.enqueueEvents?.[0];
     const posterChoice = activityDecision?.choices.find((choice) => choice.label === "海报展示");
 
-    expect(posterChoice?.outcome).toContain("准备展示的 A 类论文");
+    expect(activityDecision?.description).toContain("准备展示的 A 类论文");
+    expect(posterChoice?.outcome).toContain("该论文宣传倍率 +50%");
     state = {
       ...state,
       eventQueue: [createEventQueueItem(activityDecision!, 1)],
@@ -352,7 +354,7 @@ describe("audited fixed-event rules", () => {
     expect(resolveCcigFixedEvent(state, resolution, () => 0.99).nextState.player.money).toBe(0);
   });
 
-  it("keeps one CCIG history record and repeats attendance settlement before activity", () => {
+  it("keeps separate VALSE histories without repeating attendance settlement in activities", () => {
     let state: GameState = {
       ...playingState({ year: 2, month: 9, totalMonths: 21 }),
       player: { ...createInitialState().player, san: 10, money: 10 },
@@ -372,12 +374,13 @@ describe("audited fixed-event rules", () => {
     expect(state.player.money).toBe(10);
 
     resolveByLabel("安排行程");
-    expect(state.eventQueue[0]?.title).toBe("年会活动");
-    expect(state.eventQueue[0]?.description).toContain("金币 -2");
+    expect(state.eventQueue[0]?.title).toBe("领域年会活动");
+    expect(state.eventQueue[0]?.description).not.toMatch(/金币 -2|机制结算|结果：/u);
     expect(state.player.money).toBe(8);
     expect(state.eventCounters.meetingCount).toBe(1);
 
     resolveByLabel("继续");
+    expect(state.eventQueue[0]?.description).not.toMatch(/金币 -2|机制结算|结果：/u);
     resolveByLabel("趁机旅游");
     expect(state.eventQueue[0]?.stage).toBe("result");
     expect(state.player.san).toBe(10);
@@ -391,7 +394,7 @@ describe("audited fixed-event rules", () => {
     expect(state.log.some((entry) => entry.text.includes("自费参会") && entry.text.includes("SAN +5"))).toBe(true);
   });
 
-  it("ends a skipped CCIG branch without creating an activity event", () => {
+  it("ends a skipped VALSE branch without creating an activity event", () => {
     let state: GameState = playingState({ year: 2, month: 9, totalMonths: 21 });
     state = { ...state, eventQueue: [createEventQueueItem(createCcigEvent(state), 1)] };
 

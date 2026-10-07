@@ -174,13 +174,7 @@ function createBeforeGradSchoolResultEvent(advisorName: string): PendingEvent {
     ].join("\n\n"),
     chainId: "before-grad-school",
     stage: "result",
-    completionLog: [
-      `加入${advisorName}讲师课题组和实验室群`,
-      `待遇 硕士${ADVISOR_SALARY.master}/博士${ADVISOR_SALARY.phd}金币/月`,
-      `科研分 C+${SCORE_BY_TARGET.C}/B+${SCORE_BY_TARGET.B}/A+${SCORE_BY_TARGET.A}`,
-      `毕业 硕士${ADVISOR_REQUIREMENTS.masterGrad}/博士${ADVISOR_REQUIREMENTS.phdGrad}分`,
-      `转博 第2年${ADVISOR_REQUIREMENTS.phdYear2}/第3年${ADVISOR_REQUIREMENTS.phdYear3}分`,
-    ].join("｜"),
+    completionLog: `加入${advisorName}讲师课题组和实验室群`,
     choices: [
       {
         id: "before-grad-school-finish",

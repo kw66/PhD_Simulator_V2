@@ -2,6 +2,7 @@ import { pushLog } from "./v2-engine-helpers";
 import { createLoverProgressState } from "./v2-lover-progression";
 import { createLoverState } from "./v2-lover-system";
 import { getFellowRoleLabel } from "./v2-fellow-progression";
+import { ensureFellowFinanceAccounts } from "./v2-fellow-finance";
 import type { GameState } from "./v2-types";
 
 function decrementFellowCount(state: GameState, type: "senior" | "junior" | "peer"): GameState["relationshipState"] {
@@ -32,6 +33,8 @@ export function endRelationship(state: GameState, relationshipId: string): GameS
 
   const profile = state.fellowProgressState.find((item) => item.id === relationshipId);
   if (!profile) return state;
+
+  state = ensureFellowFinanceAccounts(state);
 
   const nextState = {
     ...state,

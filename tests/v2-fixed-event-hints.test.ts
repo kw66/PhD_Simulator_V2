@@ -70,11 +70,11 @@ describe("fixed-event appearance hints and debug entry", () => {
     expect(state.log[0]!.text).toContain("转博失败");
   });
 
-  it("opens CCIG activities directly, settles only on confirmation, and supports replay", () => {
-    expect(DEBUG_EVENT_GROUPS.find((group) => group.title === "固定事件")!.buttons).toContainEqual({ id: "ccig-activity", label: "年会活动" });
+  it("opens VALSE activities directly, settles only on confirmation, and supports replay", () => {
+    expect(DEBUG_EVENT_GROUPS.find((group) => group.title === "固定事件")!.buttons).toContainEqual({ id: "ccig-activity", label: "领域年会活动" });
     const initial = playingState({ month: 9, totalMonths: 21, debugEventReplayEnabled: true });
     let state = dispatchAction(initial, "debug-trigger-event", { eventId: "ccig-activity" });
-    expect(state.eventQueue[0]!.description).toContain("每年5月，确认参加年会后");
+    expect(state.eventQueue[0]!.description).toContain("每年5月，确认参加领域年会后");
     expect(state.eventQueue[0]!.description).not.toContain("参会确认：");
     expect(state.player).toEqual(initial.player);
     state = resolveChoice(state);

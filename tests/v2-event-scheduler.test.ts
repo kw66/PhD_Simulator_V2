@@ -152,7 +152,7 @@ describe("v2 event scheduler", () => {
       const result = resolveTeachersDayFixedEvent(state, giftResolution, () => 0.99);
       expect(result.nextState.player.money).toBe(9);
       expect(result.nextState.player.favor).toBe(2);
-      expect(result.outcome).toContain(`送了${item.name}`);
+      expect(result.outcome).toBe(`送${item.name}：金币 -1｜导师好感 +1。`);
       expect(result.enqueueEvents?.[0]?.description).toContain(item.name);
     }
   });
@@ -173,7 +173,7 @@ describe("v2 event scheduler", () => {
     const result = resolveTeachersDayFixedEvent(state, stampResolution, () => 0.99);
     expect(result.nextState.player.money).toBe(7);
     expect(result.nextState.player.favor).toBe(3);
-    expect(result.outcome).toContain("送了邮票");
+    expect(result.outcome).toBe("送邮票：金币 -3｜导师好感 +2。");
     expect(result.outcome).not.toContain("连续");
   });
 
@@ -251,10 +251,10 @@ describe("v2 event scheduler", () => {
 
     expect(result.nextState.player.san).toBe(17);
     expect(result.nextState.player.favor).toBe(2);
-    expect(result.outcome).toContain("SAN -3，导师好感 +1");
+    expect(result.outcome).toBe("报销跑腿：SAN -3｜导师好感 +1。");
     expect(result.enqueueEvents?.[0]?.description).toContain("SAN -3");
     expect(result.enqueueEvents?.[0]?.description).toContain("导师好感 +1");
-    expect(result.enqueueEvents?.[0]?.completionLog).toContain("SAN -3，导师好感 +1");
+    expect(result.enqueueEvents?.[0]?.completionLog).toBe("报销跑腿：SAN -3｜导师好感 +1。");
     expect(result.outcome).toContain("报销跑腿");
     expect(result.enqueueEvents?.[0]?.description.split("机制结算")[0]).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
     expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("条件：导师好感 < 6；报销跑腿（40%）");
@@ -306,7 +306,7 @@ describe("v2 event scheduler", () => {
     expect(choiceEvent?.description.split(/\n\s*\n/u)).toHaveLength(2);
     expect(choiceEvent?.description).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
     const result = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => 0);
-    expect(result.outcome).toContain("分享了一个想法");
+    expect(result.outcome).toBe("教师节祝福：下次想 idea +4。");
     expect(result.outcome).toContain("下次想 idea +4");
     expect(result.outcome).not.toMatch(/\d+%/u);
     expect(result.enqueueEvents?.[0]?.description.split("机制结算")[0]).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
@@ -917,7 +917,10 @@ describe("v2 event scheduler", () => {
     expect(choices[2]?.outcome).toContain("结果：工位报销：");
     expect(choices[2]?.outcome).not.toContain("+1");
     expect(choices[1]?.effects.money).toBe(7);
-    expect(choices[1]?.effects.advisorProgressStateDeltas).toEqual({ funding: -7 });
+    expect(choices[1]?.effects.advisorProgressStateDeltas).toBeUndefined();
+    const salaryPaid = applyChoiceEffectsToState(baseState, choices[1]!).nextState;
+    expect(salaryPaid.player.money).toBe(baseState.player.money + 7);
+    expect(salaryPaid.advisorProgressState).toEqual(baseState.advisorProgressState);
     expect(choices[2]?.effects.shopEntitlementDeltas).toEqual({
       workstationTransaction: 1,
     });

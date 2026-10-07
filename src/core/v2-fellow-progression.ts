@@ -209,7 +209,6 @@ export function createCustomFellowProgressProfile(input: {
     academicStartTotalMonths: input.academicStartTotalMonths ?? input.startTotalMonths,
     degree: input.degree ?? "master",
     initialResearchScore: input.initialResearchScore ?? 0,
-    salaryRemainder: 0,
     nextMonthlyAction: "research",
     affinityRewardedPaperIds: [],
     longTermMentoring: input.longTermMentoring === true,

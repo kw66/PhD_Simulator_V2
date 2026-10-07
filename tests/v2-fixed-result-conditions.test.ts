@@ -228,7 +228,7 @@ describe("fixed result conditions", () => {
     }
   });
 
-  it.each([0, 1])("shows internship and lover rejection thresholds for prior count %i", (rejectCount) => {
+  it.each([0, 1])("shows remaining internship and lover opportunities after prior rejection count %i", (rejectCount) => {
     const initial = createInitialState();
     const roots = [
       createInternshipInviteAct1({ ...buildInternshipInviteContext(initial), rejectedInternshipCount: rejectCount }),
@@ -244,9 +244,8 @@ describe("fixed result conditions", () => {
       expect(root.description + decision.description).not.toContain("条件：");
       const decline = decision.choices.find((choice) => choice.id === "decline")!;
       const result = decline.effects.enqueueEvents![0]!;
-      expect(settlementOf(result)).toContain("条件：");
-      expect(settlementOf(result).replace(/\s/gu, "")).toContain(`${rejectCount + 1}${rejectCount >= 1 ? "≥" : "<"}2`);
-      expect(settlementOf(result)).toContain("结果：");
+      const opportunity = root.chainId === "internship-invite" ? "大厂实习机会" : "活泼恋人机会";
+      expect(settlementOf(result).trim()).toBe(`结果：${opportunity}${rejectCount >= 1 ? "永久关闭" : "剩余1次"}`);
       expect(decline.effects.conferenceCareerUpdates?.permanentlyBlockedInternship
         ?? decline.effects.conferenceEncounterUpdates?.permanentlyBlockedBeautifulLover).toBe(rejectCount >= 1);
     }

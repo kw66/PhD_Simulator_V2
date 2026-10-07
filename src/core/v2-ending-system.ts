@@ -1,5 +1,6 @@
 import { isTransientUiHintLog, pushLog, pushMilestoneLog } from "./v2-engine-helpers";
 import { getShopEmergencySan } from "./v2-shop-items-effects";
+import { normalizeGameMoney } from "./v2-money";
 import type { EndingId, GameState } from "./v2-types";
 
 function finishWithCause(state: GameState, ending: EndingId, message: string): GameState {
@@ -16,8 +17,9 @@ function finishWithCause(state: GameState, ending: EndingId, message: string): G
 
 export function evaluateCoreEndings(state: GameState): GameState {
   if (state.phase !== "playing") return state;
-  if (state.selectedAdvisorName && state.totalMonths > 0 && state.advisorProgressState.funding <= 0) {
-    return finishWithCause(state, "lab-bankrupt", "实验室科研经费已耗尽，本轮提前结束。");
+  state = normalizeGameMoney(state);
+  if (state.selectedAdvisorName && state.totalMonths > 0 && state.advisorProgressState.funding < 0) {
+    return finishWithCause(state, "lab-bankrupt", "实验室科研经费已跌破0，无法付清必要支出，本轮提前结束。");
   }
   const protectedSan = getShopEmergencySan(state.shopState, state.player.san);
   const protectedState = protectedSan === state.player.san

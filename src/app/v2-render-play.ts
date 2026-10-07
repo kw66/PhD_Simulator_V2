@@ -1,5 +1,5 @@
 import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
-import { getActiveOperationAllowance, getAiCollaborationStatus, hasAiReimbursement } from "../core/v2-ai-shop";
+import { getActiveOperationAllowance, getAiCollaborationStatus, getAiModelForTotalMonths, hasAiReimbursement } from "../core/v2-ai-shop";
 import { PAPER_SLOT_RESEARCH_THRESHOLDS, SCORE_BY_TARGET } from "../core/v2-content";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getCitationStats } from "../core/v2-citation-stats";
@@ -24,8 +24,9 @@ import { getFellowName, getFellowResearchTopic, getFellowRoleLabel, getFellowsIn
 import { getFellowDiscussionSanCost } from "../core/v2-fellow-actions";
 import { getFellowCurrentPaper } from "../core/v2-fellow-research";
 import { getFellowAcademicLabel, getFellowResearchScore } from "../core/v2-fellow-academic";
-import { getLabMonthlySalaryTotal } from "../core/v2-lab-payroll";
-import { getPendingFellowConferenceFees } from "../core/v2-lab-publication-costs";
+import { getNextMonthLabPayroll } from "../core/v2-lab-payroll";
+import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2-relationship-activity";
+import { formatMoney, roundMoney } from "../core/v2-money";
 import { getPlayerAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
 import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverPassiveGains, getLoverRouteCost, getLoverRouteGain, getLoverRouteProgress } from "../core/v2-lover-progression";
 import { previewPartTimeWork } from "../core/v2-part-time-work";
@@ -106,7 +107,7 @@ import { renderPlayHelpPanel } from "./v2-play-help";
 import { isEndingSystemLog, renderEndingLog, renderEndingScreen } from "./v2-render-ending";
 import type { EventLayoutSample } from "./v2-event-layout";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
-import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
+import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl, hasRoleCardPortrait } from "./v2-role-portrait-assets";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
 const RESEARCH_CHORE_SAN_DISCOUNT = [0, 1, 2, 3] as const;
@@ -118,7 +119,8 @@ const DEFERRED_GAMEPLAY_ACTION_ATTRIBUTES = 'disabled aria-disabled="true" data-
 
 function getMonthlySupportingPortraits(state: GameState): RoleId[] {
   const runSeed = state.conferenceLocationSeed ?? 0;
-  const candidates = getRoleOptions().map((role) => role.id).filter((id) => id !== state.selectedRoleId);
+  const candidates = getRoleOptions().map((role) => role.id)
+    .filter((id) => id !== state.selectedRoleId && hasRoleCardPortrait(id));
   let selected: RoleId[] = [];
   for (let month = 0; month <= Math.max(0, state.totalMonths); month += 1) {
     const ranked = [...candidates].sort((left, right) => getStableNameSeed(`${runSeed}:${month}:${left}`)
@@ -277,7 +279,7 @@ function formatSignedNumber(value: number): string {
 
 function normalizeGameDisplayText(value: string): string {
   return value
-    .replaceAll("领域年会", "年会")
+    .replace(/实验室经费(?=\s*[+＋\-−]\s*\d)/gu, "科研经费")
     .replaceAll("金钱", "金币")
     .replace(/KTV\s*唱歌/gu, "KTV 唱歌");
 }
@@ -520,14 +522,14 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
         || item.id === "debug-buff-advisor-salary"
         ? "每月"
         : normalizeGameDisplayText(item.name);
-      return [`${displaySource}：${displayName} ${formatSignedNumber(value)}${note}`];
+      return [`${displaySource}：${displayName} ${formatSignedNumber(statId === "money" ? roundMoney(value) : value)}${note}`];
     });
     const value = resolution.items.reduce((total, item) => total + (item.stats[statId] ?? 0), 0);
     const alwaysShow = statId === "san" || statId === "money";
     if (!alwaysShow && (sources.length === 0 || value === 0)) return [];
     return [{
       id: `next-month-${statId}`,
-      label: `${labels[statId]} ${formatSignedNumber(value)}`,
+      label: `${labels[statId]} ${formatSignedNumber(statId === "money" ? roundMoney(value) : value)}`,
       sources,
       isDebuff: value < 0,
       category: inferEffectCategory(`next-month-${statId}`, labels[statId]),
@@ -583,8 +585,8 @@ function buildEffectBuckets(state: GameState): {
   }
   const experimentMoneyDiscount = getShopExperimentMoneyDiscount(state.shopState);
   if (experimentMoneyDiscount > 0) {
-    upsertBucketItem(permanent, "gpu-experiment-money", `实验金币 -${experimentMoneyDiscount}`,
-      "个人显卡 · 先减实验费用，再使用导师经费", false, "money");
+    upsertBucketItem(permanent, "gpu-experiment-money", `自己实验费用 -${experimentMoneyDiscount}`,
+      "个人显卡 · 自己每次实验减费，再使用科研经费", false, "money");
   }
   if (writingModifier.bonus > 0) {
     upsertBucketItem(permanent, "permanent", `论文 +${writingModifier.bonus}分`, "机械键盘");
@@ -633,8 +635,8 @@ function buildEffectBuckets(state: GameState): {
     actionEffects: { experiment: { bonus: internshipEffect.bonus, multiplier: internshipEffect.multiplier } },
   }] : state.buffs);
   if (internshipEffect.moneyDiscount > 0) {
-    upsertBucketItem(monthly, "internship-experiment-money", `实验金币 -${internshipEffect.moneyDiscount}`,
-      `${internshipSource} · 剩余 ${internship.remainingMonths} 月 · 先减实验费用，再使用导师经费`, false, "money");
+    upsertBucketItem(monthly, "internship-experiment-money", `自己实验费用 -${internshipEffect.moneyDiscount}`,
+      `${internshipSource} · 剩余 ${internship.remainingMonths} 月 · 自己每次实验减费，再使用科研经费`, false, "money");
   }
   for (const [timing, target] of [["permanent", permanent], ["monthly", monthly], ["next-action", single]] as const) {
     const buffs = getActiveBuffs(state.buffs).filter((buff) => buff.timing === timing && buff.activeOperationSanDelta !== undefined);
@@ -694,10 +696,10 @@ function renderLeftRail(state: GameState): string {
         ${renderAttrItem("💡", "科研能力", state.player.research, Math.max(researchCap, 20), "research", "research")}
         ${renderAttrItem("🤝", "社交能力", state.player.social, 20, "social", "social")}
         ${renderAttrItem("👨‍🏫", "导师好感", state.player.favor, 20, "favor", "favor")}
-        <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${state.player.money}" aria-label="${escapeHtml(`${displayName}，金币 ${state.player.money}`)}">
+        <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${roundMoney(state.player.money)}" aria-label="${escapeHtml(`${displayName}，金币 ${formatMoney(state.player.money)}`)}">
           <div class="new-attr-header new-identity-money-header">
             <span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span>
-            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${state.player.money}</span>
+            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}</span>
           </div>
         </div>
       </div>
@@ -896,7 +898,7 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
     }
     if (calendar.month === 9) {
       addItem({
-        title: "年会",
+        title: "领域年会",
         monthsLater,
       });
     }
@@ -1022,17 +1024,24 @@ function splitEventSettlementItems(text: string): string[] {
   let start = 0;
   for (let index = 0; index < text.length; index += 1) {
     const character = text[index];
-    if (character === "（" || character === "(") depth += 1;
-    if (character === "）" || character === ")") depth = Math.max(0, depth - 1);
+    if (character === "（" || character === "(" || character === "《" || character === "“") depth += 1;
+    if (character === "）" || character === ")" || character === "》" || character === "”") depth = Math.max(0, depth - 1);
     const separatesEffect = character === "，"
-      && /^(?:SAN|金币|导师好感|好感|科研|社交|生病概率|下次|永久|新增|休息|每月|每年|未来引用|论文进度|所有未投稿)/u.test(text.slice(index + 1).trimStart());
+      && /^(?:SAN|金币|导师好感|导师经费|好感|科研|社交|生病概率|idea|实验|写作|下次|永久|新增|休息|每月|每年|未来引用|大?论文进度|所有未投稿|收到|触发|行动点|(?:恋人|师兄|师姐|师弟|师妹|同门|该同学)(?:科研|默契|亲密|\s*\+))/u.test(text.slice(index + 1).trimStart());
     if (depth === 0 && (character === "｜" || character === "；" || separatesEffect)) {
       parts.push(text.slice(start, index));
       start = index + 1;
     }
   }
   parts.push(text.slice(start));
-  return parts.map((part) => part.trim().replace(/[。.]+$/u, "")).filter(Boolean);
+  return parts.map((part) => part.trim().replace(/[。.]+$/u, "")).filter(Boolean).flatMap((part) => {
+    const rest = part.match(/^休息[（(](.+)[）)]$/u);
+    if (rest) return splitEventSettlementItems(rest[1]!);
+    const relationship = part.match(/^((?:新增\s*)?(恋人|师兄|师姐|师弟|师妹|同门)\s*\+\s*\d+)\s*[（(](.+)[）)]$/u);
+    if (!relationship) return [part];
+    const attributes = splitEventSettlementItems(relationship[3]!).flatMap((attribute) => attribute.split(/[，、](?=(?:科研|默契|亲密))/u));
+    return [relationship[1]!, ...attributes.map((attribute) => /^(?:科研|默契|亲密)/u.test(attribute) ? `${relationship[2]}${attribute}` : attribute)];
+  });
 }
 
 function splitEventSettlementRows(items: string[]): { conditions: string[]; results: string[] } {
@@ -1071,11 +1080,9 @@ function splitEventSettlementRows(items: string[]): { conditions: string[]; resu
   return { conditions, results };
 }
 
-const EVENT_SETTLEMENT_EFFECT_PATTERN = /(导师科研积累|科研积累|导师经费|科研经费|经费|每月补助|横向进度|纵向进度|论文写作协作|论文随机协作|论文随机一项协作分|实验金币|恋人科研|恋人亲密度|恋人亲密|师兄科研|师弟科研|师妹科研|同门科研|师兄默契|师弟默契|师妹默契|同门默契|科研分|科研上限|SAN\s*上限|(?:清除本月\s*)?SAN\s*消耗|SAN|金币|导师好感|生病概率|社交|亲密度|默契|科研|永久\s*(?:idea|实验|写作)|idea|实验|写作|论文进度|下次写论文|下次做实验|下次想 idea|行动点)(\s*)([+＋\-−]?\s*\d+(?:\.\d+)?(?:\s*(?:%|分|次|月))?|×\s*\d+(?:\.\d+)?)(?:（(?:减免|抵抗|疾病增加|已损SAN|持续|每月|下月起)[^（）]*）)*/gu;
-
 function getEventSettlementEffectTone(label: string): string {
   if (/SAN|生病概率/u.test(label)) return "is-san";
-  if (/金币/u.test(label)) return "is-money";
+  if (/金币|费用减免|实验费用|每月补助/u.test(label)) return "is-money";
   if (/导师科研积累|科研积累/u.test(label)) return "is-advisor-research";
   if (/经费/u.test(label)) return "is-advisor-funding";
   if (/科研分/u.test(label)) return "is-score";
@@ -1084,31 +1091,17 @@ function getEventSettlementEffectTone(label: string): string {
   if (/社交|好感|亲密/u.test(label)) return "is-relationship";
   if (/师兄默契|师弟默契|师妹默契|同门默契|默契/u.test(label)) return "is-relationship";
   if (/恋人/u.test(label)) return "is-lover";
-  if (/师兄|师弟|师妹|同门/u.test(label)) return "is-fellow";
+  if (/师兄|师姐|师弟|师妹|同门/u.test(label)) return "is-fellow";
   return "is-general";
 }
 
 function renderEventSettlementValue(value: string): string {
   const normalized = normalizeGameDisplayText(value).replace(/[。.]+$/u, "");
-  const transition = normalized.match(/^(报销跑腿|异色|胜率|基础SAN消耗|羽毛球|德州扑克|泰拉瑞亚|魔塔|洛克王国|(?:国内|亚太|欧美)参会|费用减免)\s+\d+(?:\.\d+)?%?→\d+(?:\.\d+)?(?:%|次|金币)?$/u);
-  if (transition) {
-    const tone = transition[1] === "费用减免" ? "is-money" : getEventSettlementEffectTone(transition[1]!);
-    return `<span class="event-settlement-item has-effects"><span class="event-settlement-effect ${tone}">${escapeHtml(normalized)}</span></span>`;
+  const tone = getEventSettlementEffectTone(normalized);
+  if (tone === "is-general" && !/[+＋\-−×→<>≥≤]/u.test(normalized)) {
+    return `<span class="event-settlement-item">${escapeHtml(normalized)}</span>`;
   }
-  let cursor = 0;
-  let hasEffect = false;
-  let html = "";
-  for (const match of normalized.matchAll(EVENT_SETTLEMENT_EFFECT_PATTERN)) {
-    const token = match[0] ?? "";
-    const label = match[1] ?? "";
-    const offset = match.index ?? cursor;
-    hasEffect = true;
-    html += escapeHtml(normalized.slice(cursor, offset));
-    html += `<span class="event-settlement-effect ${getEventSettlementEffectTone(label)}">${escapeHtml(token)}</span>`;
-    cursor = offset + token.length;
-  }
-  html += escapeHtml(normalized.slice(cursor));
-  return `<span class="event-settlement-item${hasEffect ? " has-effects" : ""}">${html}</span>`;
+  return `<span class="event-settlement-item has-effects"><span class="event-settlement-effect ${tone}">${escapeHtml(normalized)}</span></span>`;
 }
 
 function renderEventSettlementValues(values: string[]): string {
@@ -1664,16 +1657,17 @@ function renderWorkstationPaperResearchActions(
         : !preview.allowed
           ? "行动点和 AI行动均不可用"
           : state.player.san < preview.sanCost ? `需要 ${preview.sanCost} SAN`
-            : type === "experiment" && state.advisorProgressState.funding < experimentCost.advisorFunding ? `科研经费不足，需要 ${experimentCost.advisorFunding}` : "";
+            : type === "experiment" && state.player.money < experimentCost.playerMoney ? `金币不足，需自付 ${formatMoney(experimentCost.playerMoney)}`
+              : type === "experiment" && state.advisorProgressState.funding < experimentCost.advisorFunding ? `科研经费不足，需要 ${formatMoney(experimentCost.advisorFunding)}` : "";
     const aiClass = preview.usesAiResearchBonus ? " is-ai-bonus" : "";
     const prerequisiteClass = paper !== null && !prerequisiteMet ? " is-prerequisite-locked" : "";
     // The button shows only the player's own coins; advisor funding stays in
     // the tooltip. A fully covered experiment shows no coin cost, not "金币-0".
     const moneyText = type === "experiment" && experimentCost.playerMoney > 0
-      ? ` · 金币-${experimentCost.playerMoney}`
+      ? ` · 金币-${formatMoney(experimentCost.playerMoney)}`
       : "";
     const effectText = `SAN-${paper ? renderAnimatedNumber(`paper:${paper.id}:action:${type}:san-cost`, preview.sanCost) : preview.sanCost}${moneyText}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
-    const fundingHint = `消耗${experimentCost.advisorFunding}导师经费`;
+    const fundingHint = `消耗${formatMoney(experimentCost.advisorFunding)}导师经费${experimentCost.playerMoney > 0 ? `，差额自付${formatMoney(experimentCost.playerMoney)}金币` : ""}`;
     const experimentHint = [fundingHint, enabled ? "" : disabledReason].filter(Boolean).join("\n");
     return `
       <button
@@ -2353,7 +2347,7 @@ function renderAdvisorStatus(state: GameState): string {
           const projectSanCost = getAdvisorTaskSanCost(state, projectType);
           const blocked = baseBlocked || (state.player.san < projectSanCost ? `SAN不足，需要${projectSanCost}` : "");
           const research = Math.max(0, Math.floor(state.player.research));
-          const reward = projectType === "horizontal" ? `经费+${ADVISOR_HORIZONTAL_REWARD}，支付劳务费经费-5，你的金币+5`
+          const reward = projectType === "horizontal" ? `经费+${ADVISOR_HORIZONTAL_REWARD}，再支付你和本项目每位参与同学各5金币（含已离校同学）`
             : "科研积累+10%（下取整），你和每位同学各获论文写作协作+10";
           const advisorProgress = projectType === "horizontal"
             ? "导师每月与纵向交替，轮到横向时自动+10"
@@ -2417,21 +2411,36 @@ function renderRelationshipMonthlyActivity(state: GameState, card: RelationshipR
   const activity = fellow ? fellow.monthlyActivity : card.type === "advisor" ? state.advisorProgressState.monthlyActivity : state.loverProgressState.monthlyActivity;
   const annualActivity = fellow ? fellow.annualResearchActivity : card.type === "lover" ? state.loverProgressState.annualResearchActivity : undefined;
   const support = fellow?.lastSupportTotalMonths === state.totalMonths ? fellow.monthlySupportActivity : undefined;
-  const salary = fellow?.lastSalaryTotalMonths === state.totalMonths ? fellow.monthlySalaryPaid : undefined;
-  const actor = fellow ? "同学" : card.type === "advisor" ? "导师" : "恋人";
-  const activityCharacters = Array.from(activity ?? "暂无安排");
-  const compactActivity = activityCharacters.length > 48 ? `${activityCharacters.slice(0, 48).join("")}…` : activityCharacters.join("");
-  const salaryText = salary === undefined ? "" : `本月领薪${salary}金币；`;
-  const activityText = `${actor}：${salaryText}${compactActivity}${support ? "；论文帮助" : ""}`;
-  const fullActivity = `${actor}：${salaryText}${activity ?? "暂无安排"}${support ? `\n${support}` : ""}`;
-  return `<div class="rel-monthly-activity"><strong>本月</strong><span${support || activityCharacters.length > 48 ? ` ${relationshipTooltip(fullActivity)}` : ""}>${escapeHtml(activityText)}</span></div>${annualActivity ? `
-    <div class="rel-monthly-activity rel-annual-activity"><strong ${relationshipTooltip(annualActivity)}>成长</strong><span>${escapeHtml(annualActivity.split("；")[0]!)}</span></div>` : ""}`;
+  const costs = fellow?.monthlyPublicationCosts?.totalMonths === state.totalMonths ? fellow.monthlyPublicationCosts : undefined;
+  const feeParts = costs ? [
+    ...(costs.registration > 0 ? [`注册经费-${formatMoney(costs.registration)}`] : []),
+    ...(costs.journal > 0 ? [`OA经费-${formatMoney(costs.journal)}`] : []),
+    ...(costs.sharedTravel > 0 ? [`同会差旅-${formatMoney(costs.sharedTravel)}`] : []),
+  ] : [];
+  const parts = compactRelationshipActivity(activity ?? "暂无活动");
+  const actions = parts.filter((part) => !/^协作[+\-]/u.test(part));
+  const cooperation = parts.filter((part) => /^协作[+\-]/u.test(part));
+  const activityText = summarizeRelationshipActivity([...feeParts, ...actions, ...(support ? ["论文帮助"] : []), ...cooperation]);
+  const fullActivity = [activity ?? "暂无活动", ...feeParts,
+    ...(feeParts.length ? ["论文费用由科研经费支付；同会差旅为本届同学合计支出，不按人数重复扣款。"] : []),
+    ...(support ? [support] : []), ...(annualActivity ? [`最近年度成长：${annualActivity}`] : []),
+  ].join("\n");
+  return `<div class="rel-monthly-activity"><strong>本月</strong><span ${relationshipTooltip(fullActivity)}>${escapeHtml(activityText)}</span></div>`;
 }
 
 function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCard): string {
   const identity = card.type === "lover" ? `person:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}` : `person:${card.relationshipId}`;
   const fellow = state.fellowProgressState.find((profile) => profile.id === card.relationshipId);
   const advisor = card.type === "advisor";
+  const payroll = getNextMonthLabPayroll(state);
+  const payrollHint = [
+    "下月预计学生工资，随加入、离校和学位实时更新；6月先判断转博与离校。四舍五入到两位直接发放，不凑整。",
+    `你：${formatMoney(payroll.player.payment)}金币`,
+    ...payroll.fellows.map((payment) => `${getFellowName(state.fellowProgressState.find((profile) => profile.id === payment.id)!)}：${formatMoney(payment.payment)}金币`),
+  ].join("\n");
+  const finance = fellow ? state.fellowFinanceAccounts?.[fellow.id] : undefined;
+  const fellowAi = finance?.aiSlot && finance.aiSubscribedTotalMonths === state.totalMonths
+    ? getAiModelForTotalMonths(state.totalMonths, finance.aiSlot) : undefined;
   const knownHint = fellow ? getFellowInheritanceHint()
     : `相恋${card.knownMonths}个月\n${state.loverState.type === "beautiful" ? "活泼恋人更擅长推进玩耍，也会陪你学习" : "聪慧恋人更擅长推进学习，也会陪你玩耍"}`;
   const attributes: RelationshipRenderCard["detailItems"] = fellow
@@ -2448,18 +2457,18 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
             ${fellow?.longTermMentoring ? `<span class="rel-mentoring-mark" ${relationshipTooltip("长期合作：每月SAN-1，协作额外推进1次。", "left")} aria-label="长期合作">⭐</span>` : ""}<span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
             ${card.type === "lover" ? `<span class="rel-lover-trait" ${relationshipTooltip(getLoverTraitHint(state.loverState.type))}>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span>` : ""}
             <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
-            ${advisor ? `<div class="rel-advisor-funding-value"><span class="rel-detail-label">${renderRelationshipIcon("💰")}科研经费</span><strong class="rel-progress-val" aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", state.advisorProgressState.funding)}</strong></div>` : fellow ? "" : renderAttributes()}
+            ${fellow ? `<span class="rel-detail-item" ${relationshipTooltip(`同学金币：${formatMoney(finance?.money ?? 0)}\n工资和劳务费入个人钱包；仅用于实验差额和订阅AI；论文注册、差旅及OA由科研经费承担，离校责任保留。`)}>${renderRelationshipIcon("💰")}<strong>${formatMoney(finance?.money ?? 0)}</strong></span>${fellowAi ? `<span class="rel-type" ${relationshipTooltip(`当月AI：${fellowAi.name}\n每位同学同时使用一种AI，仅显示本月订阅。`)}>AI·${escapeHtml(fellowAi.name)}</span>` : ""}` : ""}
           </div>
           ${advisor ? renderAdvisorFundSummary(state) : `<div class="rel-card-meta">
-            ${fellow ? "" : `<span class="rel-known-time" ${relationshipTooltip(knownHint, "right")}>${renderRelationshipIcon("🗓️")}认识<strong class="rel-detail-value" ${animationNumberAttributes(`${identity}:known-months`, card.knownMonths)}>${card.knownMonths}</strong>月</span>`}
             <button class="rel-end-compact" data-card-icon-action type="button" title="${fellow ? "停止合作" : "分手"}" aria-label="${fellow ? "停止合作" : "分手"}" data-action="end-relationship" data-relationship-id="${escapeHtml(card.relationshipId)}"><span aria-hidden="true">${fellow ? "✂️" : "💔"}</span></button>
           </div>`}
         </div>
       </div>
-      ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip("当前在校学生月薪合计，包含本月加入者，不含入学前同学；小数各自累计，实际月初支出见下月提示。", "left")}>学生月薪 <strong>${getLabMonthlySalaryTotal(state)}</strong></span><span ${relationshipTooltip("同学已录用论文的注册与差旅费用，离开人际栏后仍需支付。")}>同学待付 <strong>${getPendingFellowConferenceFees(state)}</strong></span><span ${relationshipTooltip("报销已预留的经费，购买后退回差额；AI未使用部分在覆盖月份结束后退回。", "right")}>报销预留 <strong>${(state.advisorProgressState.labReimbursements ?? []).reduce((total, reservation) => total + reservation.amount, 0)}</strong></span></div>` : ""}
+      ${card.type === "lover" ? `<div class="rel-fellow-academic-row">${renderAttributes()}<span class="rel-known-time" ${relationshipTooltip(knownHint, "right")}>${renderRelationshipIcon("🗓️")}认识<strong class="rel-detail-value" ${animationNumberAttributes(`${identity}:known-months`, card.knownMonths)}>${card.knownMonths}</strong>月</span></div>` : ""}
+      ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip("实验室可用经费，0仍可继续，低于0时破产。", "left")}>科研经费 <strong aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", roundMoney(state.advisorProgressState.funding), formatMoney(state.advisorProgressState.funding))}</strong></span><span ${relationshipTooltip(payrollHint, "right")}>学生工资 <strong>${formatMoney(payroll.total)}</strong></span></div>` : ""}
       ${fellow ? `<div class="rel-fellow-academic-row">
         <span ${relationshipTooltip(knownHint, "left")}>${renderRelationshipIcon("🎓")}${escapeHtml(getFellowAcademicLabel(state, fellow))}</span>
-        <span class="rel-detail-item" ${relationshipTooltip(`科研分＝入组基础${fellow.initialResearchScore ?? 0}分＋加入后发表的一作科研分\n右侧为当前学位毕业要求；6月结束先转博，再判断毕业或退学`)}>科研分 <strong class="rel-detail-value">${getFellowResearchScore(state, fellow)}/${fellow.degree === "phd" ? 7 : 1}</strong></span>
+        <span class="rel-detail-item" ${relationshipTooltip(`科研分＝入组基础${fellow.initialResearchScore ?? 0}分＋加入后发表的一作科研分\n${fellow.degree === "phd" ? "博士第六年6月结束，科研分≥7才毕业" : "硕士第三年6月结束，未转博且科研分≥1才毕业"}；提前达标不会提前离校\n6月结束先转博，再判断毕业或退学`)}>科研分 <strong class="rel-detail-value">${getFellowResearchScore(state, fellow)}/${fellow.degree === "phd" ? 7 : 1}</strong></span>
         ${renderAttributes()}
       </div>${renderFellowPaper(state, fellow)}` : ""}
       ${advisor ? renderAdvisorStatus(state) : card.type === "lover" ? renderLoverRoutes(state) : `<div class="rel-progress-section rel-resource-row">
@@ -3191,11 +3200,11 @@ function buildInternshipTalentItem(state: GameState, requestedPage = 0): TalentP
   const metrics = remote
     ? [
         { label: "线上实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-2" }, { label: "每月金币", value: "+1" },
-        { label: "实验金币", value: "-1" }, { label: "实验", value: "+4" }, { label: "实验", value: "×1.0" },
+        { label: "自己实验费用", value: "-1" }, { label: "实验", value: "+4" }, { label: "实验", value: "×1.0" },
       ]
     : [
         { label: "线下实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-5" }, { label: "每月金币", value: `+${getInternshipMonthlyIncome(getPublishedAPaperCount(state))}` },
-        { label: "实验金币", value: "-2" }, { label: "实验", value: "+6" }, { label: "实验", value: "×1.25" },
+        { label: "自己实验费用", value: "-2" }, { label: "实验", value: "+6" }, { label: "实验", value: "×1.25" },
       ];
   const activation = remote ? "导师约谈事件激活" : "论文参会事件激活";
   return {
@@ -3562,7 +3571,7 @@ function buildGrowthTalentItems(state: GameState, gameGrowthPage = 0): TalentPan
       active: true,
       description: "胜率 = 40 + 参加次数 × 10%",
       metrics: [
-        { label: "赚取金币", value: `${pokerProfit >= 0 ? "+" : "-"}${Math.abs(pokerProfit)}`, animation: { template: "{profit}", values: { profit: pokerProfit }, displays: { profit: `${pokerProfit >= 0 ? "+" : "-"}${Math.abs(pokerProfit)}` } } },
+        { label: "赚取金币", value: formatSignedNumber(roundMoney(pokerProfit)), animation: { template: "{profit}", values: { profit: roundMoney(pokerProfit) }, displays: { profit: formatSignedNumber(roundMoney(pokerProfit)) } } },
         { label: "参加", value: `${pokerCount} 次`, animation: { template: "{count} 次", values: { count: pokerCount } } },
       ],
       progress: {

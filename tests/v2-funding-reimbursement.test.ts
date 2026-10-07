@@ -44,7 +44,8 @@ describe("advisor funding reimbursements", () => {
       for (const roll of [0, percent / 100 - 0.000001, Math.min(0.999999, percent / 100)]) {
         const branches = choices(makeState(favor), [roll, roll, roll]);
         const approved = roll < percent / 100;
-        expect(branches[1]!.effects).toMatchObject({ money, advisorProgressStateDeltas: { funding: -money } });
+        expect(branches[1]!.effects).toMatchObject({ money });
+        expect(branches[1]!.effects.advisorProgressStateDeltas).toBeUndefined();
         for (const index of [0, 2, 3]) {
           const choice = branches[index]!;
           expect(choice.outcome).toContain(`${approved ? "同意报销" : "未获同意"}（${approved ? percent : 100 - percent}%）`);

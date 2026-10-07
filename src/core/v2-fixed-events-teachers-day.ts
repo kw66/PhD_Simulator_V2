@@ -213,7 +213,7 @@ export function resolveTeachersDayFixedEvent(
       const branchRoll = getRoll();
       if (highFavor && branchRoll < 0.5) {
         const ideaBonus = 4;
-        const outcome = `你发了教师节祝福，导师分享了一个想法，下次想 idea +${ideaBonus}。`;
+        const outcome = `教师节祝福：下次想 idea +${ideaBonus}。`;
         return {
           nextState: applyStateMutation(state, { temporaryIdeaBonus: ideaBonus }, "教师节"),
           outcome,
@@ -244,7 +244,7 @@ export function resolveTeachersDayFixedEvent(
               teachersDayErrandCount: (state.eventCounters.teachersDayErrandCount ?? 0) + 1,
             },
           },
-          outcome: `你发去祝福后，导师顺手把报销跑腿交给了你，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+          outcome: `报销跑腿：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           enqueueEvents: [createTeachersDayResultEvent({
             state,
             resultId: "message-errand",
@@ -260,14 +260,14 @@ export function resolveTeachersDayFixedEvent(
               ...(errandPercent < 100 ? [`报销跑腿 ${errandPercent}%→${Math.min(100, errandPercent + 10)}%`] : []),
             ].join("\n"),
             buttonLabel: "认命",
-            outcome: `你发了教师节祝福，被叫去财务处跑腿，${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+            outcome: `报销跑腿：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           })],
         };
       }
 
       return {
         nextState: state,
-        outcome: "你发去节日祝福，导师简短回了一句“新学期加油”，这次无事发生。",
+        outcome: "教师节祝福：无事发生。",
         enqueueEvents: [createTeachersDayResultEvent({
           state,
           resultId: "message-plain",
@@ -278,7 +278,7 @@ export function resolveTeachersDayFixedEvent(
           ].join("\n\n"),
           settlement: `条件：导师好感 ${highFavor ? "≥" : "<"} 6；普通回复（${highFavor ? 50 : 100 - errandPercent}%）\n结果：无事发生`,
           buttonLabel: "继续",
-          outcome: "你发了教师节祝福，导师简短回复，无事发生。",
+          outcome: "教师节祝福：无事发生。",
         })],
       };
     }
@@ -298,7 +298,7 @@ export function resolveTeachersDayFixedEvent(
           favor: favorChange,
           money: -1,
         }),
-        outcome: `你送了${gift.name}，导师${favorChange > 0 ? "开心收下" : "收下"}，金币 -1，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+        outcome: `送${gift.name}：金币 -1｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
         enqueueEvents: [createTeachersDayResultEvent({
           state,
           resultId: `gift-${gift.id}`,
@@ -309,7 +309,7 @@ export function resolveTeachersDayFixedEvent(
             `结果：${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
           ].join("\n"),
           buttonLabel: "继续",
-          outcome: `你送了${gift.name}，导师${favorChange > 0 ? "开心收下" : "收下"}，金币 -1，${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+          outcome: `送${gift.name}：金币 -1｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
         })],
       };
     }
@@ -317,7 +317,7 @@ export function resolveTeachersDayFixedEvent(
       const favorResult = applyTierResist(2, state.player.favor, getRoll);
       const favorChange = favorResult.effectiveChange;
       const favorNarrative = getTierResistedNarrative("导师好感", 2, favorResult);
-      const outcome = `你送了邮票，导师${favorChange > 0 ? "开心收下" : "收下"}，金币 -3，${formatTierResistedOutcome("导师好感", 2, favorResult)}。`;
+      const outcome = `送邮票：金币 -3｜${formatTierResistedOutcome("导师好感", 2, favorResult)}。`;
       return {
         nextState: applyStateMutation(state, { favor: favorChange, money: -3 }),
         outcome,

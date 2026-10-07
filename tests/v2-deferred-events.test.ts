@@ -281,18 +281,23 @@ describe("deferred-system event content", () => {
         { id: "paper-c", title: "Best Paper 论文", acceptType: "Best Paper", citationPromotionMultiplier: 5 },
       ],
     }, context, () => 0.99);
-    expect(event.description).toContain("《Poster 论文》：Poster 展示，会后引用倍率 ×1.00");
-    expect(event.description).toContain("《Oral 论文》：Oral 展示，会后引用倍率 ×1.50（+50%）");
-    expect(event.description).toContain("《Best Paper 论文》：Best Paper 展示，会后引用倍率 ×5.00（+400%）");
+    expect(event.description).toContain("论文1：《Poster 论文》（Poster）");
+    expect(event.description).toContain("论文2：《Oral 论文》（Oral）");
+    expect(event.description).toContain("论文3：《Best Paper 论文》（Best Paper）");
+    expect(event.description).not.toContain("倍率");
     const act2 = event.choices[0]?.effects.enqueueEvents?.[0];
     expect(act2?.stage).toBe("act2");
     expect(act2?.title).toBe("论文参会 ➜ 参会方式");
     expect(act2?.choices.map((choice) => choice.id)).toEqual(["self", "advisor", "proxy"]);
     const selfConfirmation = act2?.choices.find((choice) => choice.id === "self")?.effects.enqueueEvents?.[0];
+    expect(selfConfirmation?.description).toContain("论文1：Poster 展示完成");
+    expect(selfConfirmation?.description).toContain("论文2：Oral 展示完成，会后引用倍率 ×1.50");
+    expect(selfConfirmation?.description).toContain("论文3：Best Paper 展示完成，会后引用倍率 ×5.00");
+    expect(selfConfirmation?.description).not.toContain("×1.00");
+    expect(selfConfirmation?.description).toContain("金币 -6");
     const selfActivity = selfConfirmation?.choices[0]?.effects.enqueueEvents?.[0];
     expect(selfActivity?.title).toBe("会场活动");
-    expect(selfActivity?.description).toContain("自费参会");
-    expect(selfActivity?.description).toContain("金币 -7");
+    expect(selfActivity?.description).not.toMatch(/自费参会|金币|引用倍率/u);
     expect(selfActivity?.chainId).toBe(`${event.chainId}-activity`);
 
     const grouped = buildConferenceDecisionEventsForAcceptedPapers([
@@ -349,7 +354,7 @@ describe("deferred-system event content", () => {
 
     state = resolve(state, "enter-venue");
     expect(state.eventQueue[0]?.title).toBe("会场活动");
-    expect(state.eventQueue[0]?.description).toContain("金币 -6");
+    expect(state.eventQueue[0]?.description).not.toContain("金币 -6");
     expect(state.player.money).toBe(4);
     expect(state.papers[0]?.conferenceHandled).toBe(false);
 
@@ -366,7 +371,8 @@ describe("deferred-system event content", () => {
     expect(state.eventHistory).toHaveLength(2);
     expect(state.eventHistory[0]?.stages).toHaveLength(3);
     expect(state.eventHistory[1]?.stages).toHaveLength(3);
-    expect(state.log.some((entry) => entry.text.includes("自费参会") && entry.text.includes("SAN +6"))).toBe(true);
+    expect(state.log.some((entry) => entry.text.includes("自费参会") && entry.text.includes("金币 -6"))).toBe(true);
+    expect(state.log.some((entry) => entry.text.includes("SAN +6") && !entry.text.includes("金币 -6"))).toBe(true);
   });
 
   it("ends a proxy conference branch without creating a venue activity", () => {
@@ -397,6 +403,7 @@ describe("deferred-system event content", () => {
     let state: GameState = {
       ...initial,
       phase: "playing",
+      player: { ...initial.player, money: 1 },
       eventQueue: [createEventQueueItem(root, 1)],
     };
 
@@ -411,6 +418,6 @@ describe("deferred-system event content", () => {
     expect(state.eventHistory[0]?.stages).toHaveLength(3);
     expect(state.eventHistory[0]?.stages.some((stage) => stage.title.includes("会场安排"))).toBe(false);
     expect(state.eventCounters.meetingCount).toBe(0);
-    expect(state.log.some((entry) => entry.text.includes("线上代参会") && entry.text.includes("论文参会已处理"))).toBe(true);
+    expect(state.log.some((entry) => entry.text.includes("陌生人代贴") && entry.text.includes("论文参会已处理"))).toBe(true);
   });
 });

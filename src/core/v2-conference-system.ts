@@ -1,4 +1,5 @@
 import { applyTierResist, getTierResistedNarrative } from "./v2-sanity-rules";
+import { CONFERENCE_TRAVEL_FEES } from "./v2-publication-fees";
 import type { EventCounters, EventSupportState, ShopState } from "./v2-types";
 
 export type ConferenceRegionId = "domestic" | "asia" | "west";
@@ -21,6 +22,7 @@ export interface ConferenceDecisionInput {
   eventCounters: EventCounters;
   paperCount?: number;
   travelAlreadyPaid?: boolean;
+  hasFellowAtConference?: boolean;
 }
 
 export interface ConferenceDecisionCost {
@@ -35,12 +37,12 @@ export interface ConferenceDecisionCost {
 
 export function getConferenceBaseCosts(region: ConferenceRegionId): ConferenceBaseCosts {
   if (region === "domestic") {
-    return { selfPay: 2, advisorCost: 1, proxyCost: 0 };
+    return { selfPay: CONFERENCE_TRAVEL_FEES.domestic, advisorCost: 1, proxyCost: 1 };
   }
   if (region === "asia") {
-    return { selfPay: 4, advisorCost: 2, proxyCost: 1 };
+    return { selfPay: CONFERENCE_TRAVEL_FEES.asia, advisorCost: 2, proxyCost: 1 };
   }
-  return { selfPay: 6, advisorCost: 3, proxyCost: 1 };
+  return { selfPay: CONFERENCE_TRAVEL_FEES.west, advisorCost: 3, proxyCost: 1 };
 }
 
 export function resolveConferenceDecisionCost(
@@ -48,8 +50,7 @@ export function resolveConferenceDecisionCost(
   getRoll: () => number = Math.random,
 ): ConferenceDecisionCost {
   const baseCosts = getConferenceBaseCosts(input.region);
-  const registrationCost = Math.max(0, Math.floor(input.paperCount ?? 1));
-  const attendanceCost = registrationCost + (input.travelAlreadyPaid ? 0 : baseCosts.selfPay - 1);
+  const attendanceCost = input.travelAlreadyPaid ? 0 : baseCosts.selfPay;
 
   if (input.mode === "self") {
     return {
@@ -79,7 +80,7 @@ export function resolveConferenceDecisionCost(
   return {
     mode: input.mode,
     resource: "money",
-    actualCost: registrationCost + baseCosts.proxyCost,
+    actualCost: input.hasFellowAtConference ? 0 : baseCosts.proxyCost,
     fundingCost: 0,
     meetingDiscount: 0,
     countsAsMeeting: false,

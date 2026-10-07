@@ -53,6 +53,11 @@ export function getRoleCardPortraitUrl(roleId: RoleId): string {
   return ROLE_CARD_PORTRAIT_URLS[roleId];
 }
 
+export function hasRoleCardPortrait(roleId: RoleId): boolean {
+  return ROLE_CARD_PORTRAIT_URLS[roleId].split("#")[0]
+    !== new URL("../../art/placeholders/role_placeholder.svg", import.meta.url).href;
+}
+
 export function getRoleDetailPortraitUrl(roleId: RoleId): string {
   return ROLE_DETAIL_PORTRAIT_URLS[roleId];
 }

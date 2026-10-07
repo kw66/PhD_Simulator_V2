@@ -26,21 +26,18 @@ export function buildInternshipInviteContext(
 function createInternshipDeclineResult(context: InternshipInviteContext): PendingEvent {
   const nextRejectCount = context.rejectedInternshipCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
-  const condition = `条件：本次拒绝后，实习拒绝次数 ${context.rejectedInternshipCount} + 1 = ${nextRejectCount} ${permanentlyBlocked ? "≥" : "<"} 2`;
-  const result = `结果：实习拒绝计数 +1（当前 ${nextRejectCount}/2）；${permanentlyBlocked ? "永久关闭实习机会" : "保留后续邀请机会"}`;
+  const result = `结果：${permanentlyBlocked ? "大厂实习机会永久关闭" : "大厂实习机会剩余1次"}`;
   const description = permanentlyBlocked
     ? [
         "你再次婉拒了实习邀请，说明目前还是顾不过来。回复写到最后，你删掉了“下次一定”，免得又给对方一个含糊的答复。",
         "这回你也把话说清楚了，之后不再考虑这类实习。关掉邮件时有点可惜，不过桌上没整理完的实验记录还等着你。",
         "机制结算",
-        condition,
         result,
       ].join("\n\n")
     : [
         "你把课题安排说明白，婉拒了这次实习。发送前又看了眼报酬那一栏，才把鼠标移回发送键。",
         "对方表示以后还可以联系。你关掉附件，继续整理实验记录，今晚的待办总算没有再多一份。",
         "机制结算",
-        condition,
         result,
       ].join("\n\n");
 
@@ -54,8 +51,8 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
     chainId: "internship-invite",
     stage: "result",
     completionLog: permanentlyBlocked
-      ? "你再次拒绝了实习，之后不再收到实习邀请。"
-      : "你暂不实习，之后仍有一次接受邀请的机会。",
+      ? "大厂实习机会永久关闭。"
+      : "大厂实习机会剩余1次。",
     choices: [{
       id: "close",
       label: "继续",
@@ -73,9 +70,10 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
       "你确认了实习安排，把每周交付记进日历。公司的工作群很快发来欢迎消息，你刚回完“请多指教”，就收到了第一份任务文档。",
       "课题还得继续，项目也要交差。你把两边的待办放到一起，才发现最难排的不是哪天去公司，而是晚上几点能合上电脑。",
       "机制结算",
-      "结果：SAN -2（每月，持续6个月）",
-      `结果：金币 +${context.currentMonthlyIncome}（每月，持续6个月）`,
-      "结果：实验 ×1.25（持续6个月）",
+      "结果：大厂实习（持续6个月）",
+      "结果：SAN -2（每月）",
+      `结果：金币 +${context.currentMonthlyIncome}（每月）`,
+      "结果：实验 ×1.25（每次）",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -95,7 +93,7 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
 function createInternshipInviteAct2(context: InternshipInviteContext): PendingEvent {
   const warningText = context.rejectedInternshipCount === 0
     ? "这次不接，以后仍有一次机会。"
-    : "若再次婉拒，之后就不再考虑实习了。";
+    : "若再次婉拒，之后就不再收到大厂实习邀请了。";
   const nextRejectCount = context.rejectedInternshipCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
 
@@ -117,7 +115,7 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
       {
         id: "decline",
         label: "先不去实习",
-        outcome: permanentlyBlocked ? "企业线关闭。" : "以后还会收到一次邀请。",
+        outcome: permanentlyBlocked ? "大厂实习机会永久关闭。" : "大厂实习机会剩余1次。",
         effects: {
           conferenceCareerUpdates: {
             rejectedInternshipCount: nextRejectCount,
@@ -129,7 +127,7 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
       {
         id: "accept",
         label: "接受这份实习",
-        outcome: `SAN -2（每月，持续6个月）｜金币 +${context.currentMonthlyIncome}（每月，持续6个月）｜实验 ×1.25（持续6个月）`,
+        outcome: `大厂实习（持续6个月）｜SAN -2（每月）｜金币 +${context.currentMonthlyIncome}（每月）｜实验 ×1.25（每次）`,
         ...(context.unavailable ? { disabledReason: "已有实习安排或大厂实习机会已关闭。" } : {}),
         effects: {
           enqueueEvents: [createInternshipAcceptResult(context)],

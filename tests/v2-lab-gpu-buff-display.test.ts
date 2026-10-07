@@ -33,20 +33,20 @@ describe("lab GPU failure Buff display", () => {
     expect(buckets.permanent).toEqual([]);
     expect(buckets.nextAction).toEqual([]);
     expect(buckets.monthly).toEqual([expect.objectContaining({
-      label: "实验金币 +1",
+      label: "实验费用 +1",
       category: "money",
       isDebuff: true,
       sources: [expect.stringContaining("显卡故障 · 剩余 6 月")],
     })]);
     expect(buckets.monthly[0]!.sources[0]).toContain("玩家与同学共享");
-    expect(buckets.monthly[0]!.sources[0]).toContain("由实验室经费支付");
-    expect(buckets.monthly[0]!.sources[0]).toContain("经费不足时玩家暂停实验、同学改做横向");
+    expect(buckets.monthly[0]!.sources[0]).toContain("玩家经费不足时暂停实验");
+    expect(buckets.monthly[0]!.sources[0]).toContain("同学先用经费、不足差额自付，合计不足改做横向");
     expect(buckets.monthly[0]!.sources[0]).not.toMatch(/玩家自付|自费/);
   });
 
   it.each([
-    { delta: 2, label: "实验金币 +2", isDebuff: true },
-    { delta: -1, label: "实验金币 -1", isDebuff: false },
+    { delta: 2, label: "实验费用 +2", isDebuff: true },
+    { delta: -1, label: "实验费用 -1", isDebuff: false },
   ])("renders the numeric field independently of the Buff identity: $delta", ({ delta, label, isDebuff }) => {
     const buff: Buff = {
       ...createLabGpuFailureBuff(),
@@ -73,20 +73,20 @@ describe("lab GPU failure Buff display", () => {
     for (let elapsed = 0; elapsed < 6; elapsed += 1) {
       const duration = `剩余 ${6 - elapsed} 月`;
       expect(buildBuffDisplayBuckets(buffs).monthly[0]!.sources[0]).toContain(duration);
-      const chip = getEffectChip(renderBuffSidebar(createPlayingState(buffs)), "实验金币 +1");
+      const chip = getEffectChip(renderBuffSidebar(createPlayingState(buffs)), "实验费用 +1");
       expect(chip).toContain(duration);
       buffs = advanceBuffDurations(buffs);
     }
 
     expect(buildBuffDisplayBuckets(buffs).monthly).toEqual([]);
-    expect(renderBuffSidebar(createPlayingState(buffs))).not.toContain("实验金币 +1");
+    expect(renderBuffSidebar(createPlayingState(buffs))).not.toContain("实验费用 +1");
   });
 
   it.each([0, -1])("hides an expired Buff with %i remaining months from both display paths", (remainingMonths) => {
     const buffs = [{ ...createLabGpuFailureBuff(), remainingMonths }];
     expect(buildBuffDisplayBuckets(buffs).monthly).toEqual([]);
     const sidebar = renderBuffSidebar(createPlayingState(buffs));
-    expect(sidebar).not.toContain("实验金币 +1");
+    expect(sidebar).not.toContain("实验费用 +1");
     expect(sidebar).not.toContain("显卡故障");
   });
 
@@ -95,23 +95,24 @@ describe("lab GPU failure Buff display", () => {
     state.shopState.gpuLevel = 8;
     state.internshipState = activateRemoteInternship(state.totalMonths - 1);
     const sidebar = renderBuffSidebar(state);
-    const surcharge = getEffectChip(sidebar, "实验金币 +1");
+    const surcharge = getEffectChip(sidebar, "实验费用 +1");
 
     expect(surcharge).toContain('class="effect-chip is-money is-debuff"');
     expect(surcharge).toContain("玩家与同学共享");
-    expect(surcharge).toContain("由实验室经费支付");
-    expect(surcharge).toContain("经费不足时玩家暂停实验、同学改做横向");
+    expect(surcharge).toContain("玩家经费不足时暂停实验");
+    expect(surcharge).toContain("同学先用经费、不足差额自付，合计不足改做横向");
     expect(surcharge).not.toMatch(/玩家自付|自费/);
-    expect(getEffectChip(sidebar, "实验金币 -2")).toContain('class="effect-chip is-money"');
-    expect(getEffectChip(sidebar, "实验金币 -2")).toContain("个人显卡");
-    expect(getEffectChip(sidebar, "实验金币 -1")).toContain('class="effect-chip is-money"');
-    expect(getEffectChip(sidebar, "实验金币 -1")).toContain("远程实习 · 剩余 3 月");
+    expect(getEffectChip(sidebar, "自己实验费用 -2")).toContain('class="effect-chip is-money"');
+    expect(getEffectChip(sidebar, "自己实验费用 -2")).toContain("个人显卡");
+    expect(getEffectChip(sidebar, "自己实验费用 -1")).toContain('class="effect-chip is-money"');
+    expect(getEffectChip(sidebar, "自己实验费用 -1")).toContain("远程实习 · 剩余 3 月");
+    expect(sidebar).not.toContain("实验金币");
 
     state.buffs = [{ ...createLabGpuFailureBuff(), remainingMonths: 0 }];
     const expiredSidebar = renderBuffSidebar(state);
-    expect(expiredSidebar).not.toContain("实验金币 +1");
-    getEffectChip(expiredSidebar, "实验金币 -2");
-    getEffectChip(expiredSidebar, "实验金币 -1");
+    expect(expiredSidebar).not.toContain("实验费用 +1");
+    getEffectChip(expiredSidebar, "自己实验费用 -2");
+    getEffectChip(expiredSidebar, "自己实验费用 -1");
   });
 
   it.each(["workstation", "relationship"] as const)("explains shared costs and personal discounts in the existing %s help", (activePlayTab) => {
@@ -121,10 +122,11 @@ describe("lab GPU failure Buff display", () => {
     expect(help).toContain("算力短缺持续6个月，玩家与同学每次实验费用+1");
     expect(help).toContain("减免仅限玩家");
     expect(help).toContain("先算共享涨价与个人减免");
+    expect(help).not.toContain("实验金币");
     expect(help).not.toMatch(/不足部分自付|最后扣你的金币|自费租卡/);
     if (activePlayTab === "relationship") {
-      expect(help).toContain("经费不足时不开展实验");
-      expect(help).toContain("同学经费不足当次实验费用时改做横向");
+      expect(help).toContain("玩家经费不足时暂停实验");
+      expect(help).toContain("同学经费与个人金币合计不足当次实验费用时改做横向");
     } else {
       expect(help).toContain("费用由实验室支付，不足时暂停实验");
       expect(help).toContain("悬浮实验按钮查看实际经费消耗");
@@ -135,5 +137,6 @@ describe("lab GPU failure Buff display", () => {
     const help = getPlayHelpContext({ activePlayTab: "shop", activeShopTab: "gear" });
     expect(help.pages).toHaveLength(1);
     expect(help.pages[0]!.body).toContain("个人显卡与实习的实验减免仅限玩家，不影响同学；算力短缺则使双方实验费用上涨");
+    expect(help.pages[0]!.body).toContain("“实验费用”表示每次实验的花费变化，不是个人金币余额变化");
   });
 });

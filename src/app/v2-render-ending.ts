@@ -2,6 +2,7 @@ import "../styles/event-ending.css";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getCalendarForTotalMonths, getRoleDefinition } from "../core/v2-progression";
 import { getResearchCap } from "../core/v2-research-cap-system";
+import { formatMoney } from "../core/v2-money";
 import { getNextRoleLevelExperience } from "../core/v2-role-experience";
 import type { EndingId, GameState, RoleExperienceAward } from "../core/v2-types";
 
@@ -17,8 +18,8 @@ interface EndingPresentation {
 const ENDINGS: Record<Exclude<EndingId, null>, EndingPresentation> = {
   "lab-bankrupt": {
     title: "实验室破产", icon: "🏚️", label: "提前离校", tone: "failure",
-    story: ["导师把经费表翻到最后，余额已经归零。服务器租用、学生工资和论文费用还排在清单上，再也没有可以挪用的预算。", "课题组的研究停了下来。你备份好实验记录，把没有完成的论文留在电脑里，开始为接下来的去向奔走。"],
-    closing: "经费表清零了，研究也只好暂时停在这里",
+    story: ["导师把经费表翻到最后，余额已经是负数。服务器租用、学生工资和论文费用还排在清单上，再也没有可以挪用的预算。", "课题组的研究停了下来。你备份好实验记录，把没有完成的论文留在电脑里，开始为接下来的去向奔走。"],
+    closing: "经费入不敷出，研究也只好暂时停在这里",
   },
   master: {
     title: "硕士毕业", icon: "🎓", label: "学业完成", tone: "success",
@@ -113,7 +114,7 @@ function renderEndingSummary(state: GameState): string {
     ["research", "💡 科研", `${state.player.research}/${getResearchCap(state.researchCapacityState)}`, state.ending === "overthinking"],
     ["social", "🤝 社交", `${state.player.social}/20`, state.ending === "isolated"],
     ["favor", "🎓 导师好感", `${state.player.favor}/20`, state.ending === "expelled"],
-    ["money", "💰 金币", state.player.money, state.ending === "poor"],
+    ["money", "💰 金币", formatMoney(state.player.money), state.ending === "poor"],
     ["relationships", "👥 关系人数", relationshipCount, false],
   ] as const;
   return `<section class="ending-summary" aria-label="本轮属性与成果">
@@ -133,8 +134,8 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
   const target = state.graduationScoreTarget;
   const failureStats = { burnout: ["SAN", state.player.san], poor: ["金币", state.player.money], expelled: ["导师好感", state.player.favor], isolated: ["社交", state.player.social], overthinking: ["科研能力", state.player.research] } as const;
   const failedStat = ending && ending in failureStats ? failureStats[ending as keyof typeof failureStats] : null;
-  const reason = failedStat ? `${failedStat[0]} ${failedStat[1]}，低于0，无法继续学业`
-    : ending === "lab-bankrupt" ? "科研经费已耗尽，实验室无法继续运转"
+  const reason = failedStat ? `${failedStat[0]} ${ending === "poor" ? formatMoney(failedStat[1]) : failedStat[1]}，低于0，无法继续学业`
+    : ending === "lab-bankrupt" ? `科研经费 ${formatMoney(state.advisorProgressState.funding)}，低于0，实验室无法继续运转`
     : ending === "quit" ? "你选择结束本轮学业"
     : ending === "delay" ? `培养期已满${state.maxMonths}个月，${target === null ? "毕业要求尚未确定" : `科研分${state.totalResearchScore}/${target}，尚未达标`}`
     : graduated ? `${degree}毕业要求已达成：科研分 ${state.totalResearchScore}/${target ?? "—"}` : "本轮已结束";

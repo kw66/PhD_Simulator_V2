@@ -60,6 +60,7 @@ export function createInitialState(): GameState {
     actionState: { used: 0, limit: 1, aiResearchBonusUsed: false },
     relationshipState: createRelationshipState(),
     fellowProgressState: [],
+    fellowFinanceAccounts: {},
     fellowPapers: [],
     conferenceEncounterState: createConferenceEncounterState(),
     conferenceLocationSeed: null,

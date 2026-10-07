@@ -2,7 +2,6 @@ import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { createCustomFellowProgressProfile, getFellowName, getUniqueFellowName } from "./v2-fellow-progression";
-import { reserveLabReimbursement, getLabReimbursementQuote } from "./v2-lab-reimbursements";
 import { applyFixedEventResolution } from "./v2-fixed-events";
 import { getGraduationScoreTarget, getMonthLimitByDegree, getRoleDefinition } from "./v2-progression";
 import { createGrantedPublishedPaper } from "./v2-publication-rules";
@@ -10,6 +9,7 @@ import { applyPaperReviewSettlement } from "./v2-publication-system";
 import { applyPaperCompetitionResolution } from "./v2-paper-competition";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { clampResearchToCap } from "./v2-research-cap-system";
+import { roundMoney } from "./v2-money";
 import { applyReadPaperActions, applyReadingCountProgress } from "./v2-reading-system";
 import { canAddRelationship, syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
@@ -17,7 +17,6 @@ import { activateInternship, activateRemoteInternship, hasOngoingInternship, has
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
 import { createLoverProgressState } from "./v2-lover-progression";
-import { settleJournalFeePayment } from "./v2-journal-fee-events";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { advanceSharedLabProject } from "./v2-lab-projects";
 import { settleAdvisorGrantResult } from "./v2-advisor-progress";
@@ -173,7 +172,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     research: clampResearchToCap(state.player.research + (effects.research ?? 0), state.researchCapacityState),
     social: Math.min(20, state.player.social + (effects.social ?? 0)),
     favor: Math.min(20, state.player.favor + (effects.favor ?? 0)),
-    money: state.player.money + (effects.money ?? 0),
+    money: roundMoney(state.player.money + roundMoney(effects.money ?? 0)),
   };
   if (effects.restoreSanToCap) player.san = sanCap;
 
@@ -275,10 +274,11 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   }
   for (const [key, value] of Object.entries(effects.advisorProgressStateDeltas ?? {})) {
     if (key === "researchAccumulation" || key === "funding") {
-      advisorProgressState[key] = Math.max(0, advisorProgressState[key] + (value ?? 0));
+      advisorProgressState[key] = key === "funding"
+        ? roundMoney(advisorProgressState[key] + roundMoney(value ?? 0))
+        : Math.max(0, advisorProgressState[key] + (value ?? 0));
     }
   }
-  advisorProgressState.funding = Math.max(0, advisorProgressState.funding);
 
   const thesisProgress = Math.min(100, state.thesis.progress + (effects.thesisProgress ?? 0));
   const thesis = effects.abandonThesis
@@ -350,9 +350,9 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       }
     } else if (!hasOngoingInternship(state)) {
       if (effects.internshipStateUpdates.kind === "remote3") {
-        if (hasRemoteInternshipScore(state)) internshipState = activateRemoteInternship(state.totalMonths, state.internshipState.salaryRemainder);
+        if (hasRemoteInternshipScore(state)) internshipState = activateRemoteInternship(state.totalMonths);
       } else if (!state.conferenceCareerState.permanentlyBlockedInternship) {
-        internshipState = activateInternship(state.internshipState.salaryRemainder);
+        internshipState = activateInternship();
       }
     }
   }
@@ -444,16 +444,6 @@ export function applyChoiceEffectsToState(
   buffSource = "事件",
   currentEvent?: PendingEvent,
 ): ResolvedEventChoiceState {
-  if (choice.effects.journalFeePayment) {
-    return {
-      nextState: settleJournalFeePayment(state, choice.effects.journalFeePayment),
-      resolvedOutcome: choice.outcome,
-      resolvedEnqueueEvents: [],
-    };
-  }
-  if (choice.effects.labReimbursementReservation && !getLabReimbursementQuote(state, choice.effects.labReimbursementReservation).affordable) {
-    return { nextState: state, resolvedOutcome: "科研经费不足，暂不报销。", resolvedEnqueueEvents: [] };
-  }
   const scholarshipAward = choice.effects.scholarshipAward;
   if (scholarshipAward) {
     const disqualified = hasScholarshipDisqualification(state);
@@ -474,9 +464,6 @@ export function applyChoiceEffectsToState(
     };
   }
   let nextState = applyDirectCoreEffects(state, choice, buffSource, currentEvent);
-  if (choice.effects.labReimbursementReservation && typeof choice.effects.labReimbursementReservation === "string") {
-    nextState = reserveLabReimbursement(nextState, choice.effects.labReimbursementReservation);
-  }
   if (choice.effects.labProjectProgress) {
     const { type, amount, guidanceRolls } = choice.effects.labProjectProgress;
     let rollIndex = 0;

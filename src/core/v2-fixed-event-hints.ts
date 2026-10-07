@@ -16,7 +16,7 @@ export function appendFixedEventHint(
     "phd-decision": "硕士第2、3年6月",
   };
   const condition = conditions[chainId]
-    ?? (/^ccig-y\d+-m\d+-activity$/u.test(chainId) ? "每年5月，确认参加年会后" : undefined)
+    ?? (/^ccig-y\d+-m\d+-activity$/u.test(chainId) ? "每年5月，确认参加领域年会后" : undefined)
     ?? (/^ccig-y\d+-m\d+$/u.test(chainId) ? "每年5月" : undefined)
     ?? (chainId.startsWith("advisor-grant-") ? "每年8月，导师有待公布结果的申请" : undefined);
   if (!condition) return description;

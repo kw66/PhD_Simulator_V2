@@ -191,8 +191,8 @@ describe("advisor grant result events", () => {
       expect(august.advisorProgressState.awards).toHaveLength(0);
       const completed = nextScene(nextScene(nextScene(august)));
       const september = dispatchAction({ ...completed, eventQueue: [] }, "next-month");
-      expect(september.advisorProgressState.salaryRemainder).toBe(0.25);
-      expect(resolveMonthlyEffects(september).items.find((entry) => entry.id === "advisor-salary")?.stats.money).toBe(1);
+      expect(september.player.money - completed.player.money).toBe(1.25);
+      expect(resolveMonthlyEffects(september).items.find((entry) => entry.id === "advisor-salary")?.stats.money).toBe(1.25);
     } finally {
       random.mockRestore();
     }

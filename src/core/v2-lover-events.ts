@@ -102,8 +102,7 @@ export const LOVER_OCCUPIED_TEXT = "可你已经有了恋人。你把差点说�
 function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEvent {
   const nextRejectCount = context.rejectCount + 1;
   const permanentlyBlocked = nextRejectCount >= 2;
-  const condition = `条件：本次拒绝后，${getTypeName(context.type)}学者关系线拒绝次数 ${context.rejectCount} + 1 = ${nextRejectCount} ${permanentlyBlocked ? "≥" : "<"} 2`;
-  const result = `结果：关系线拒绝计数 +1（当前 ${nextRejectCount}/2）；${permanentlyBlocked ? "永久关闭该关系线" : "保留后续关系机会"}`;
+  const result = `结果：${getTypeName(context.type)}恋人机会${permanentlyBlocked ? "永久关闭" : "剩余1次"}`;
 
   return {
     id: `lover-development-result-decline-${context.type}-${nextRejectCount}`,
@@ -113,14 +112,12 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
           "你删掉打了几遍的“再看看”，认真说明自己想做普通朋友。对方过了一会儿，回了句“明白了”。",
           "你们仍可以交流论文，只是聊完正事，便各自道别。下一次见面的安排没有再提。",
           "机制结算",
-          condition,
           result,
         ].join("\n\n")
       : [
           "你说自己还没想好，想先保持现在的关系。发出去以后，聊天框安静了一会儿，对方回了句“好，不着急”。",
           "你们又聊了几句近况。关掉手机时，你没有再补一句“等我忙完”，毕竟研究生什么时候能忙完，自己也说不准。",
           "机制结算",
-          condition,
           result,
         ].join("\n\n"),
     source: "fixed",
@@ -142,9 +139,6 @@ function createLoverDeclineResult(context: LoverDevelopmentContext): PendingEven
 
 function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent {
   const typeLabel = context.type === "beautiful" ? "活泼恋人" : "聪慧恋人";
-  const effectText = context.type === "beautiful"
-    ? "科研按同届年级生成，亲密6～9；每月自动推进玩耍，学习获得一半进度。"
-    : "科研按同届年级生成，初始额外+4，亲密3～6；每月自动推进学习，玩耍获得一半进度。";
 
   return {
     id: `lover-development-result-accept-${context.type}-${context.totalMonths}`,
@@ -153,7 +147,7 @@ function createLoverAcceptResult(context: LoverDevelopmentContext): PendingEvent
       "你把心意说了出来，也得到了明确的回应。确定开始交往以后，你们反倒有点不好意思，刚才想好的话一时都忘了。",
       "你们约好找时间一起吃顿饭。第一顿饭还没吃，聊天框里已经问起了忌口。你翻开日历，在组会和实验之间，认真圈出一个空着的晚上。",
       "机制结算",
-      `结果：恋人 +1；${typeLabel}：${effectText}`,
+      `结果：恋人 +1（${getTypeName(context.type)}）`,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -194,7 +188,7 @@ function createLoverDevelopmentAct2(context: LoverDevelopmentContext): PendingEv
       {
         id: "decline",
         label: "先保持距离",
-        outcome: nextRejectCount >= 2 ? "这段关系结束。" : "以后还有一次机会。",
+        outcome: `${typeName}恋人机会${nextRejectCount >= 2 ? "永久关闭" : "剩余1次"}。`,
         effects: {
           conferenceEncounterUpdates: context.type === "beautiful"
             ? {

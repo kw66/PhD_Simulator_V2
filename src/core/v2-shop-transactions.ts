@@ -5,7 +5,6 @@ import {
   hasAiReimbursement as hasAiReimbursementState,
 } from "./v2-ai-shop";
 import { applyAiActivationEffects } from "./v2-ai-activation";
-import { getLabReimbursementPurchaseQuote, settleLabReimbursementPurchase } from "./v2-lab-reimbursements";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import {
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
@@ -86,8 +85,6 @@ function buyShopItem(state: GameState, itemId: ShopItemId): GameState {
   if (!canBuyShopItem(view, itemId)) return fail(state, `${item.name} 当前无法购买。`);
   const basePrice = getShopActionBasePrice(state, "buy-shop-item", { shopItemId: itemId });
   if (basePrice === null) return fail(state, `${item.name} 当前无法购买。`);
-  const reimbursement = getLabReimbursementPurchaseQuote(state, "buy-shop-item", { shopItemId: itemId });
-  if (reimbursement?.disabledReason) return fail(state, reimbursement.disabledReason);
   const { price, usesGift } = getLoverGiftQuote(state, basePrice);
   if (state.player.money < price) return fail(state, `金币不足，购买${item.name}需要 ${price} 金币。`);
 
@@ -138,10 +135,10 @@ function buyShopItem(state: GameState, itemId: ShopItemId): GameState {
   }
 
   return pushLog({
-    ...payForPurchase(settleLabReimbursementPurchase(state, "buy-shop-item", { shopItemId: itemId }), price, usesGift),
+    ...payForPurchase(state, price, usesGift),
     shopState,
     eventSupport,
-  }, `商店：${transactionText}，${purchaseCostText(price, usesGift)}${reimbursement?.additionalFunding ? `；实验室经费补足差额 -${reimbursement.additionalFunding}` : ""}。`);
+  }, `商店：${transactionText}，${purchaseCostText(price, usesGift)}。`);
 }
 
 function sellShopItem(state: GameState, itemId: ShopItemId): GameState {
@@ -200,8 +197,6 @@ function upgradeShopItem(state: GameState, upgradeId: ShopUpgradeId): GameState 
   const itemId = getShopUpgradeItemId(upgradeId);
   const available = getAvailableShopUpgrades({ shopState: state.shopState }, itemId).some((entry) => entry.id === upgradeId);
   if (!available) return fail(state, `${upgrade.name} 当前无法升级。`);
-  const reimbursement = getLabReimbursementPurchaseQuote(state, "upgrade-shop-item", { shopUpgradeId: upgradeId });
-  if (reimbursement?.disabledReason) return fail(state, reimbursement.disabledReason);
   const { price, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "upgrade-shop-item", { shopUpgradeId: upgradeId })!);
   if (state.player.money < price) return fail(state, `金币不足，升级${upgrade.name}需要 ${price} 金币。`);
 
@@ -217,9 +212,9 @@ function upgradeShopItem(state: GameState, upgradeId: ShopUpgradeId): GameState 
     if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   }
   return pushLog({
-    ...payForPurchase(settleLabReimbursementPurchase(state, "upgrade-shop-item", { shopUpgradeId: upgradeId }), price, usesGift),
+    ...payForPurchase(state, price, usesGift),
     shopState,
-  }, `商店：升级${upgrade.name}，${purchaseCostText(price, usesGift)}${reimbursement?.additionalFunding ? `；实验室经费补足差额 -${reimbursement.additionalFunding}` : ""}。`);
+  }, `商店：升级${upgrade.name}，${purchaseCostText(price, usesGift)}。`);
 }
 
 function buyCoffee(state: GameState): GameState {
@@ -266,8 +261,6 @@ function sellCoffeeMachine(state: GameState): GameState {
 
 function buyCoffeeMachine(state: GameState): GameState {
   if (state.coffeeState.machineOwned) return fail(state, "你已经拥有咖啡机。 ");
-  const reimbursement = getLabReimbursementPurchaseQuote(state, "buy-coffee-machine", {});
-  if (reimbursement?.disabledReason) return fail(state, reimbursement.disabledReason);
   const { price, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "buy-coffee-machine", {})!);
   if (state.player.money < price) return fail(state, `金币不足，购买咖啡机需要 ${price} 金币。`);
   const shopState = {
@@ -276,21 +269,19 @@ function buyCoffeeMachine(state: GameState): GameState {
   };
   if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   return pushLog({
-    ...payForPurchase(settleLabReimbursementPurchase(state, "buy-coffee-machine", {}), price, usesGift),
+    ...payForPurchase(state, price, usesGift),
     shopState,
     coffeeState: {
       ...state.coffeeState,
       machineOwned: true,
       machineInvestment: price,
     },
-  }, `商店：购买咖啡机，${purchaseCostText(price, usesGift)}${reimbursement?.additionalFunding ? `；实验室经费补足差额 -${reimbursement.additionalFunding}` : ""}。`);
+  }, `商店：购买咖啡机，${purchaseCostText(price, usesGift)}。`);
 }
 
 function upgradeCoffeeMachine(state: GameState, upgradeId: CoffeeMachineUpgrade): GameState {
   const upgrade = getAvailableCoffeeMachineUpgrades(state.coffeeState).find((entry) => entry.id === upgradeId);
   if (!upgrade) return fail(state, "该咖啡机升级当前无法使用。 ");
-  const reimbursement = getLabReimbursementPurchaseQuote(state, "upgrade-coffee-machine", { shopUpgradeId: upgradeId });
-  if (reimbursement?.disabledReason) return fail(state, reimbursement.disabledReason);
   const { price, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "upgrade-coffee-machine", { shopUpgradeId: upgradeId })!);
   if (state.player.money < price) return fail(state, `金币不足，升级${upgrade.name}需要 ${price} 金币。`);
   const shopState = {
@@ -299,14 +290,14 @@ function upgradeCoffeeMachine(state: GameState, upgradeId: CoffeeMachineUpgrade)
   };
   if (shopState.entitlements.workstationTransaction > 0) shopState.entitlements.workstationTransaction -= 1;
   return pushLog({
-    ...payForPurchase(settleLabReimbursementPurchase(state, "upgrade-coffee-machine", { shopUpgradeId: upgradeId }), price, usesGift),
+    ...payForPurchase(state, price, usesGift),
     shopState,
     coffeeState: {
       ...state.coffeeState,
       machineUpgrade: upgrade.id,
       machineInvestment: state.coffeeState.machineInvestment + price,
     },
-  }, `商店：升级${upgrade.name}，${purchaseCostText(price, usesGift)}${reimbursement?.additionalFunding ? `；实验室经费补足差额 -${reimbursement.additionalFunding}` : ""}。`);
+  }, `商店：升级${upgrade.name}，${purchaseCostText(price, usesGift)}。`);
 }
 
 function toggleCoffeeSubscription(state: GameState): GameState {

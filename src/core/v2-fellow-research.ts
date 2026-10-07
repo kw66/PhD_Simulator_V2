@@ -2,13 +2,13 @@ import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo } from "./v2-conference-catalog";
 import { advanceFellowCooperationWithLog, settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { getFellowName, getFellowResearchTopic, getFellowsInCardOrder } from "./v2-fellow-progression";
-import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
 import { createDraftPaper, decayUnpublishedPaper, prepareConferenceSubmission, resolvePaperReview } from "./v2-paper-rules";
 import { attachPaperPublication, recordPaperAcceptances } from "./v2-publication-rules";
 import { advancePaperReviewDeadline, applyRejectedPaperReview, CONFERENCE_PUBLICATION_DELAY_MONTHS, settlePaperCitationMonth } from "./v2-publication-system";
 import { applyPublicationTalentRewards } from "./v2-publication-talent";
-import { generateResearchScore } from "./v2-research-operation";
+import { applyFellowAiResearch, subscribeFellowAi } from "./v2-fellow-ai";
 import { getLabExperimentMoneyCost } from "./v2-lab-compute";
+import { payFellowResearchCost } from "./v2-fellow-finance";
 import { syncRelationshipState } from "./v2-relationship-rules";
 import { advanceSharedLabProject, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
@@ -165,7 +165,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
   const advanceProject = (profile: typeof state.fellowProgressState[number], forceHorizontal = false): void => {
     const type = forceHorizontal ? "horizontal" : monthlyProjectType;
     const amount = Math.floor(profile.research) + Math.floor(random() * 6);
-    const result = advanceSharedLabProject(nextState, type, amount, random);
+    const result = advanceSharedLabProject(nextState, type, amount, random, profile.id);
     nextState = {
       ...result.state,
       fellowProgressState: result.state.fellowProgressState.map((fellow) => fellow.id === profile.id
@@ -174,34 +174,36 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     addActivity(profile.id, `${forceHorizontal ? "经费不足，" : ""}${type === "horizontal" ? "横向" : "纵向"}进度 +${result.gain}${result.completed > 0 ? type === "vertical" ? "（完成并指导论文）" : "（项目完成）" : ""}`);
   };
   for (const active of activeProfiles) {
-    if (nextState.selectedAdvisorName && nextState.advisorProgressState.funding <= 0) break;
+    if (nextState.selectedAdvisorName && nextState.advisorProgressState.funding < 0) break;
     const profile = nextState.fellowProgressState.find((fellow) => fellow.id === active.id)!;
-    const paper = getFellowCurrentPaper(nextState, profile.id);
+    let paper = getFellowCurrentPaper(nextState, profile.id);
     if (!paper || paper.status !== "draft" || profile.nextMonthlyAction === "project") {
       advanceProject(profile);
       continue;
     }
     const field = getFellowResearchAction(paper);
+    const subscription = subscribeFellowAi(nextState, profile.id, paper.id, field);
+    nextState = subscription.state;
+    paper = getFellowCurrentPaper(nextState, profile.id)!;
+    if (subscription.subscribed && subscription.model) {
+      const priceLabel = subscription.model.price === 0 ? "免费" : `自费 -${subscription.model.price}`;
+      addActivity(profile.id, `订阅${subscription.model.name}（${priceLabel}）${subscription.model.slot === "claude" ? "，论文打磨" : ""}`);
+    }
     const experimentCost = getLabExperimentMoneyCost(nextState);
-    if (field === "experiment" && nextState.advisorProgressState.funding < experimentCost) {
-      advanceProject(profile, true);
-      continue;
-    }
+    let experimentPayment = "";
     if (field === "experiment") {
-      nextState = {
-        ...nextState,
-        advisorProgressState: {
-          ...nextState.advisorProgressState,
-          funding: nextState.advisorProgressState.funding - experimentCost,
-        },
-      };
+      const payment = payFellowResearchCost(nextState, profile.id, experimentCost);
+      if (!payment.paid) {
+        advanceProject(profile, true);
+        continue;
+      }
+      nextState = payment.state;
+      experimentPayment = `（经费 -${payment.labCost}${payment.personalCost > 0 ? `，自费 -${payment.personalCost}` : ""}）`;
     }
-    const updated = setPaperOwnScore(paper, field, generateResearchScore(
-      profile.research, getPaperScoreBreakdown(paper, field).own, 1, 0, random,
-    ));
+    const updated = applyFellowAiResearch(paper, field, profile.research, subscription.model, random);
     const gain = updated[field] - paper[field];
     const label = field === "idea" ? "idea" : field === "experiment" ? "实验" : "写作";
-    addActivity(profile.id, `${paper.createdTotalMonths === state.totalMonths ? "新稿" : "论文"}${label} +${gain}${field === "experiment" ? `（经费 -${experimentCost}）` : ""}`);
+    addActivity(profile.id, `${paper.createdTotalMonths === state.totalMonths ? "新稿" : "论文"}${label} +${gain}${experimentPayment}`);
     nextState = {
       ...nextState,
       fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? updated : entry),

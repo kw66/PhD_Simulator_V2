@@ -35,7 +35,7 @@ export function resolveCcigFixedEvent(
       const favorNarrative = getTierResistedNarrative("导师好感", -1, favorResult);
       const nextState = state;
       const settlement = formatTierResistedOutcome("导师好感", -1, favorResult);
-      const fundingSettlement = `实验室经费 -${actualCost}`;
+      const fundingSettlement = `科研经费 -${actualCost}`;
       return {
         nextState,
         outcome: state.advisorProgressState.funding < actualCost ? `实验室经费不足，需要 ${actualCost} 金币。` : `${settlement}，${fundingSettlement}，报销通过。`,
@@ -65,10 +65,10 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "listen",
-          title: "年会活动 ➜ 选择安排 ➜ 活动结果",
+          title: "领域年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
-            "你挑了几场贴近课题的报告。笔记前半本是整齐的标题，后半本只剩箭头和问号，好在关键的图没漏。",
-            "茶歇时，你请教实验设计。讲者换个角度解释，你才发现把问题想窄了，赶紧在最大的问号旁补上答案。",
+            "你先听 Tutorial 理清方法脉络，再钻进贴近课题的 Workshop。台上讲者刚说完一个结论，台下就追问假设和适用范围，笔记前半本还很整齐，后半本只剩箭头和问号。",
+            "茶歇时，你拿自己的实验困惑请教讲者，对方换个角度解释，你才发现把问题想窄了。回去能试的新思路有了，判断问题的方法也学到一点；最大的问号旁总算补上了几行字。",
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
@@ -98,8 +98,8 @@ export function resolveCcigFixedEvent(
         1.5,
       ]);
       const sanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
-      const activityOutcome = `${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}；《${paper.title}》宣传倍率 +50%`;
-      const completionLog = [resolution.ccigAttendanceSummary, "海报展示", activityOutcome].filter(Boolean).join("；");
+      const activityOutcome = `${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}；该论文宣传倍率 +50%`;
+      const completionLog = [resolution.ccigAttendanceSummary, `海报展示《${paper.title}》`, activityOutcome].filter(Boolean).join("；");
       return {
         nextState: state,
         outcome: `展示《${paper.title}》。`,
@@ -107,7 +107,7 @@ export function resolveCcigFixedEvent(
           state,
           mode: "poster",
           condition: "展示论文为已发表的一作 A 类论文",
-          title: "年会活动 ➜ 选择安排 ➜ 活动结果",
+          title: "领域年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你贴好《${paper.title}》的海报，向同行介绍工作。有人追问基线和实验设置，你指着图解释，把疑问记在空白处。`,
             "收海报时，开场白已说得不用过脑子，嗓子也哑了。有同行拍照说回去细看，你赶紧指了指角落的论文链接。",
@@ -130,10 +130,8 @@ export function resolveCcigFixedEvent(
     case "ccig-activity-travel": {
       const location = getCcigLocation(state.year);
       const attraction = ({
-        合肥: "沿着包河慢慢散步，在树荫下坐了一会儿",
-        成都: "在宽窄巷子走走停停，找了家茶馆歇脚",
-        苏州: "逛了平江路，在河边慢慢走了一下午",
-        西安: "在大雁塔附近闲逛，坐在广场边歇了会儿",
+        珠海: "沿着情侣路慢慢走，在海边吹了会儿风",
+        武汉: "沿着江滩散步，看轮渡慢慢驶过江面",
         重庆: "坐轻轨穿过山城，又在洪崖洞看了夜景",
       } as Record<string, string>)[location] ?? "在附近的街巷随意走走";
       const activityOutcome = "SAN +5";
@@ -144,7 +142,7 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "travel",
-          title: "年会活动 ➜ 选择安排 ➜ 活动结果",
+          title: "领域年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             "你把会务袋放回酒店，留了些空当出门走走。今天不用给每段时间都排上正事。",
             `你${attraction}，路上没再反复琢磨那几个实验。回酒店时腿有点酸，脑子倒是松快了不少。`,
@@ -158,10 +156,8 @@ export function resolveCcigFixedEvent(
     case "ccig-activity-food": {
       const location = getCcigLocation(state.year);
       const food = ({
-        合肥: "庐州烤鸭、臭鳜鱼、三河米饺",
-        成都: "火锅、串串、担担面",
-        苏州: "松鼠鳜鱼、苏式汤面、桂花糖藕",
-        西安: "肉夹馍、羊肉泡馍、凉皮",
+        珠海: "白灼虾、清蒸鱼、蚝仔煎蛋",
+        武汉: "排骨藕汤、武昌鱼、豆皮",
         重庆: "重庆火锅、小面、酸辣粉",
       } as Record<string, string>)[location] ?? "当地特色美食";
       // The activity result is its own confirmation stage; defer the meal cost
@@ -178,7 +174,7 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigActivityResultEvent({
           state,
           mode: "food",
-          title: "年会活动 ➜ 选择安排 ➜ 活动结果",
+          title: "领域年会活动 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你约了几位同学去吃${location}当地菜：${food}。`,
             `大家从报告聊到没跑通的实验，越聊越熟悉。你买了单，约好回去继续交流；几个只认得胸牌的名字总算对上了人。${socialNarrative}`,
@@ -192,7 +188,7 @@ export function resolveCcigFixedEvent(
     default:
       return {
         nextState: state,
-        outcome: "CCIG 固定事件结算完成。",
+        outcome: "领域年会结算完成。",
       };
   }
 }

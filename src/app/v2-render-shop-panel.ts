@@ -1,3 +1,4 @@
+import { formatMoney, roundMoney } from "../core/v2-money";
 import {
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
   COFFEE_MACHINE_PRICE,
@@ -183,8 +184,9 @@ export function normalizeShopTab(value: string | undefined | null): ShopTabId {
 
 function renderActionButton(config: ActionButtonConfig): string {
   const variant = config.variant ?? "primary";
+  const displayedPrice = typeof config.price === "number" ? formatMoney(config.price) : config.price;
   const priceText = config.price !== undefined
-    ? `，${config.price} 金币`
+    ? `，${displayedPrice} 金币`
     : "";
   const attrs = [
     `class="shop-item-btn is-${variant}${config.price === 0 ? " has-free-price" : ""}"`,
@@ -212,7 +214,7 @@ function renderActionButton(config: ActionButtonConfig): string {
       ${config.price !== undefined ? `
         <span class="shop-item-btn-price is-${config.priceDirection ?? "cost"}">
           <span aria-hidden="true">💰</span>
-          <span${typeof config.price === "number" && config.action ? ` ${animationNumberAttributes(`shop:${config.itemId ?? config.supportItemId ?? config.aiSlotId ?? config.upgradeId ?? config.action}:${config.action}:price`, config.price)}` : ""}>${config.price}</span>
+          <span${typeof config.price === "number" && config.action ? ` ${animationNumberAttributes(`shop:${config.itemId ?? config.supportItemId ?? config.aiSlotId ?? config.upgradeId ?? config.action}:${config.action}:price`, roundMoney(config.price))}` : ""}>${displayedPrice}</span>
         </span>
       ` : ""}
     </button>

@@ -68,6 +68,9 @@ describe("v2 lover system", () => {
       state = dispatchAction(state, "resolve-event", { eventId, eventChoiceId });
     }
     expect(state.loverState.active).toBe(false);
+    expect(state.eventQueue[0]?.description.split("机制结算")[1]?.trim()).toBe(
+      `结果：恋人 +1（${type === "beautiful" ? "活泼" : "聪慧"}）`,
+    );
     state = dispatchAction(state, "resolve-event", { eventId: state.eventQueue[0]?.id, eventChoiceId: "close" });
 
     expect(state.loverState).toEqual(expectedLover);
@@ -77,6 +80,19 @@ describe("v2 lover system", () => {
     expect(progressed.totalMonths).toBe(7);
     expect(progressed.loverState.name).toBe(expectedLover.name);
     expect(getLoverName(progressed.loverState)).toBe(expectedLover.name);
+  });
+
+  it.each([
+    ["beautiful", 0], ["beautiful", 1], ["smart", 0], ["smart", 1],
+  ] as const)("retains the %s relationship closure rule after %s previous refusals", (type, rejectCount) => {
+    const event = createLoverDevelopmentAct1({ type, rejectCount, totalMonths: 6, playerGender: "male", loverGender: "female" });
+    const decline = event.choices[0]!.effects.enqueueEvents![0]!.choices.find((choice) => choice.id === "decline")!;
+    expect(decline.effects.conferenceEncounterUpdates).toEqual(type === "beautiful"
+      ? { rejectedBeautifulLoverCount: rejectCount + 1, permanentlyBlockedBeautifulLover: rejectCount === 1 }
+      : { rejectedSmartLoverCount: rejectCount + 1, permanentlyBlockedSmartLover: rejectCount === 1 });
+    expect(decline.effects.enqueueEvents![0]!.description.split("机制结算")[1]?.trim()).toBe(
+      `结果：${type === "beautiful" ? "活泼" : "聪慧"}恋人机会${rejectCount === 1 ? "永久关闭" : "剩余1次"}`,
+    );
   });
 
   it.each(["beautiful", "smart"] as const)("lets a player who already has a lover set the %s confession aside without a rejection", (type) => {

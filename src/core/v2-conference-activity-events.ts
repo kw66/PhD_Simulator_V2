@@ -3,7 +3,6 @@ import type { PendingEvent } from "./v2-types";
 import {
   getConferenceActivityChainId,
   getConferenceGradeLabel,
-  getConferencePaperPresentationResults,
   type ConferenceActivityBuildState,
   type ConferenceActivityContext,
   type ConferenceActivityOptionDefinition,
@@ -73,7 +72,7 @@ function getActivityDecisionHint(option: ConferenceActivityOptionDefinition, sta
 export function createConferenceActivityResult(
   context: ConferenceActivityContext,
   option: ConferenceActivityOptionDefinition,
-  attendanceSummary: string,
+  _attendanceSummary: string,
 ): PendingEvent {
   const activitySummary = trimOutcome(option.outcome);
   const activityChainId = getConferenceActivityChainId(context);
@@ -85,8 +84,7 @@ export function createConferenceActivityResult(
       "回程时，你把胸牌塞进会务袋。下次再挂上它，又不知道会在哪座城市了。",
       "机制结算",
       ...getActivityConditions(option),
-      `结果：${activitySummary}`,
-      ...getConferencePaperPresentationResults(context).map((result) => `结果：${result}`),
+      ...activitySummary.split("；").map((result) => `结果：${result}`),
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -94,7 +92,7 @@ export function createConferenceActivityResult(
     chainId: activityChainId,
     stage: "result",
     discardPaperUpdates: createDiscardPaperUpdates(context),
-    completionLog: [attendanceSummary, activitySummary].filter(Boolean).join("；"),
+    completionLog: activitySummary,
     choices: [{
       id: "close",
       label: "结束",
@@ -129,9 +127,6 @@ export function createConferenceActivityDecisionEvent(
         : "展示忙完了，你准备挑一项参加。"),
       "收好讲稿，你看看周围。" + (selectedOptions.map((option) => getActivityDecisionHint(option, state)).filter(Boolean).join("")
         || "茶歇区还在聊刚才的报告，门外也透着阳光。忙了这么久，出去走走同样让人心动。"),
-      ...(getConferencePaperPresentationResults(context).length > 0
-        ? ["机制结算", ...getConferencePaperPresentationResults(context)]
-        : []),
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -163,11 +158,9 @@ export function createConferenceActivityEvent(
     title: "会场活动",
     description: [
       `在${context.city}的会场，你按 ${context.conferenceName} 的安排完成了论文展示。走出展示区时，肩膀才慢慢松下来。`,
-      `参会安排：${attendanceSummary}`,
       context.paperCount >= 2
         ? `同会的 ${context.paperCount} 篇论文让你忙得够呛，记下的问题也攒了几页。你把材料收好，终于有空听听周围的人在聊什么。`
         : "你把记着问题的纸收好。茶歇区飘来咖啡味，邻近海报前还围着几个人，你终于有心思看看周围。",
-      ...getConferencePaperPresentationResults(context),
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

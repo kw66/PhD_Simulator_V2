@@ -88,7 +88,7 @@ describe("GPU failure event", () => {
     expect(state.advisorProgressState.funding).toBe(10);
     expect(state.buffs).toEqual(surcharge ? [createLabGpuFailureBuff()] : []);
     if (surcharge) {
-      expect(result.description).toContain("实验金币 +1（持续6个月）");
+      expect(result.description).toContain("全组实验费用 +1（每次，持续6个月）");
       expect(result.description).not.toContain("持续6个月，");
     }
     expect(getResearchExperimentMoneyCost(state)).toBe(surcharge ? 4 : 3);

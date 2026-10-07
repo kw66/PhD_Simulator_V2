@@ -35,7 +35,8 @@ import {
 import { applyPaperPromotion } from "./v2-publication-actions";
 import { advancePaperReviewDeadlines, refreshPaperReviewEvents, resolveDuePaperReviews } from "./v2-publication-system";
 import { resolveReadyJournalPapers, submitJournalPaper } from "./v2-journal-system";
-import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
+import { buildConferenceDecisionEventsForAcceptedPapers, createConferenceDecisionAct1, refreshConferenceDecision } from "./v2-conference-events";
+import { getConferenceTripId } from "./v2-conference-identity";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyShopAction } from "./v2-shop-transactions";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
@@ -44,9 +45,11 @@ import { endRelationship } from "./v2-relationship-actions";
 import { advanceFellowTask } from "./v2-fellow-actions";
 import { settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { advanceFellowResearch, attendFellowConferences, ensureFellowPapers } from "./v2-fellow-research";
+import { ensureFellowFinanceAccounts } from "./v2-fellow-finance";
+import { normalizeGameMoney } from "./v2-money";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { settleLabResearchGrowth } from "./v2-lab-talent";
-import { settleJournalPublicationFees } from "./v2-lab-publication-costs";
+import { settleConferenceRegistrationFees, settleJournalPublicationFees } from "./v2-lab-publication-costs";
 import { advanceAdvisorProject, settleAdvisorMonth, syncAdvisorResearchAccumulation } from "./v2-advisor-progress";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { advanceLoverDate, advanceLoverMonth, settlePendingLoverHelp } from "./v2-lover-progression";
@@ -210,6 +213,7 @@ function settleReadyJournals(state: GameState): GameState {
 
 /** Month-start order after the player's own settlement; applyMonthlyEffects has already settled journals. */
 const MONTH_START_RELATIONSHIP_STEPS: ReadonlyArray<(state: GameState) => GameState> = [
+  attendFellowConferences,
   advanceFellowResearch,
   settleReadyJournals,
   attendFellowConferences,
@@ -220,10 +224,14 @@ const MONTH_START_RELATIONSHIP_STEPS: ReadonlyArray<(state: GameState) => GameSt
 
 function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
   if (state.phase !== "playing") return state;
+  state = evaluateCoreEndings(settleConferenceRegistrationFees(state));
+  if (state.phase !== "playing") return state;
   const candidates = [...state.papers, ...state.externalPublications]
     .filter((paper): paper is typeof paper & { target: NonNullable<typeof paper.target>; submittedMonth: number; submittedYear: number } => (
       paper.status === "published"
-      && !paper.leadAuthorId
+      && (!paper.leadAuthorId || paper.leadAuthorId === "player")
+      && !paper.nonFirstAuthor
+      && !paper.journalTarget && !paper.publication?.journalTarget
       && paper.conferenceHandled !== true
       && (paper.conferenceAvailableAtTotalMonths === undefined || paper.conferenceAvailableAtTotalMonths <= state.totalMonths)
       && paper.target !== null
@@ -239,8 +247,9 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
       acceptType: paper.publication?.acceptType ?? "Poster",
     }));
   if (candidates.length === 0) return state;
-  const result = enqueuePendingEvents(state, buildConferenceDecisionEventsForAcceptedPapers(candidates, {
+  const builderState = {
     favor: state.player.favor,
+    money: state.player.money,
     advisorProgressState: state.advisorProgressState,
     social: state.player.social,
     research: state.player.research,
@@ -253,8 +262,34 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
     conferenceCareerState: state.conferenceCareerState,
     internshipState: state.internshipState,
     loverState: state.loverState,
-  }));
-  return result.nextState;
+    fellowProgressState: state.fellowProgressState,
+    fellowPapers: state.fellowPapers,
+    externalPublications: state.externalPublications,
+    papers: state.papers,
+  };
+  const grouped = buildConferenceDecisionEventsForAcceptedPapers(candidates, builderState, () => 0);
+  let nextState = state;
+  for (const group of grouped) {
+    const context = group.conferencePreview!.context;
+    const previous = nextState.eventQueue.find((event) => event.conferencePreview
+      && getConferenceTripId(event.conferencePreview.context) === getConferenceTripId(context));
+    if (!previous?.conferencePreview) {
+      nextState = enqueuePendingEvents(nextState, [createConferenceDecisionAct1(context, builderState)]).nextState;
+      continue;
+    }
+    const originalContext = previous.conferencePreview.context;
+    const paperIds = [...new Set([...originalContext.paperIds, ...context.paperIds])];
+    if (paperIds.length === originalContext.paperIds.length) continue;
+    const merged = { ...context, id: originalContext.id, paperIds, paperCount: paperIds.length,
+      paperPresentations: [...new Map([...(originalContext.paperPresentations ?? []), ...(context.paperPresentations ?? [])]
+        .map((paper) => [paper.id, paper])).values()],
+    };
+    const updated = refreshConferenceDecision(nextState, { ...previous,
+      conferencePreview: { ...previous.conferencePreview, context: merged },
+    });
+    nextState = { ...nextState, eventQueue: nextState.eventQueue.map((event) => event.id === previous.id ? updated : event) };
+  }
+  return nextState;
 }
 
 function advanceMonth(state: GameState): GameState {
@@ -319,6 +354,7 @@ function settlePendingPaperHelp(state: GameState): GameState {
 }
 
 export function dispatchAction(state: GameState, actionId: GameActionId, payload: DispatchPayload = {}): GameState {
+  state = normalizeGameMoney(state);
   if (actionId === "restart-game") {
     return dispatchAction({
       ...createInitialState(),
@@ -340,7 +376,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
     if (checkedState.phase !== "playing") return checkedState;
     state = checkedState;
   }
-  const nextState = dispatchGameAction(ensureFellowPapers(state), actionId, payload);
+  const nextState = normalizeGameMoney(ensureFellowFinanceAccounts(dispatchGameAction(ensureFellowPapers(state), actionId, payload)));
   if (nextState.phase !== "playing") return nextState;
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
@@ -353,7 +389,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   const evaluated = evaluateCoreEndings(refreshed);
   if (evaluated.phase !== "playing") return evaluated;
   const recorded = recordTalentTransitions(state, evaluated);
-  return recorded;
+  return normalizeGameMoney(recorded);
 }
 
 function dispatchGameAction(state: GameState, actionId: GameActionId, payload: DispatchPayload): GameState {

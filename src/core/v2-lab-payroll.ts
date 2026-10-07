@@ -1,36 +1,51 @@
 import { getAdvisorMonthlySalary } from "./v2-advisor-progress";
 import { getFellowAcademicYear } from "./v2-fellow-academic";
-import { getAccumulatedPayment } from "./v2-numeric-modifiers";
+import { creditFellowMoney } from "./v2-fellow-finance";
+import { roundMoney } from "./v2-money";
+import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
+import { getCalendarForTotalMonths } from "./v2-progression";
 import type { GameState } from "./v2-types";
 
 export function getLabMonthlySalaryTotal(state: GameState): number {
   if (!state.selectedAdvisorName) return 0;
-  return state.fellowProgressState.reduce((total, profile) => total + (getFellowAcademicYear(state, profile) > 0
+  return roundMoney(state.fellowProgressState.reduce((total, profile) => total + (getFellowAcademicYear(state, profile) > 0
     ? getAdvisorMonthlySalary(state.advisorProgressState, profile.degree ?? "master") : 0),
-  getAdvisorMonthlySalary(state.advisorProgressState, state.degree));
+  getAdvisorMonthlySalary(state.advisorProgressState, state.degree)));
 }
 
 export function getLabPayroll(state: GameState) {
-  const player = state.selectedAdvisorName
-    ? getAccumulatedPayment(getAdvisorMonthlySalary(state.advisorProgressState, state.degree), state.advisorProgressState.salaryRemainder)
-    : { payment: 0, remainder: state.advisorProgressState.salaryRemainder ?? 0 };
+  const player = { payment: state.selectedAdvisorName && state.totalMonths > 1
+    ? getAdvisorMonthlySalary(state.advisorProgressState, state.degree) : 0 };
   const fellows = state.fellowProgressState.map((profile) => ({ id: profile.id,
-    ...getAccumulatedPayment(state.selectedAdvisorName && getFellowAcademicYear(state, profile) > 0
+    payment: state.selectedAdvisorName && state.totalMonths > 1 && getFellowAcademicYear(state, profile) > 0
       && state.totalMonths > profile.startTotalMonths
-      ? getAdvisorMonthlySalary(state.advisorProgressState, profile.degree ?? "master") : 0, profile.salaryRemainder),
+      ? getAdvisorMonthlySalary(state.advisorProgressState, profile.degree ?? "master") : 0,
   }));
-  return { player, fellows, total: player.payment + fellows.reduce((sum, payment) => sum + payment.payment, 0) };
+  return { player, fellows, total: roundMoney(player.payment + fellows.reduce((sum, payment) => sum + payment.payment, 0)) };
+}
+
+export function getNextMonthLabPayroll(state: GameState): ReturnType<typeof getLabPayroll> {
+  if (state.phase !== "playing" || state.totalMonths >= state.maxMonths) {
+    return { player: { payment: 0 }, fellows: [], total: 0 };
+  }
+  const totalMonths = state.totalMonths + 1;
+  const calendar = getCalendarForTotalMonths(totalMonths, state.degree);
+  return getLabPayroll({ ...settleFellowAcademicYear(state), totalMonths, year: calendar.year, month: calendar.month });
 }
 
 export function settleLabPayroll(state: GameState): GameState {
   if (!state.selectedAdvisorName || state.totalMonths <= 1) return state;
   const payroll = getLabPayroll(state);
-  return { ...state,
+  let paidState = state;
+  for (const payment of payroll.fellows) {
+    if (payment.payment > 0) paidState = creditFellowMoney(paidState, payment.id, payment.payment);
+  }
+  return { ...paidState,
     advisorProgressState: { ...state.advisorProgressState,
-      funding: Math.max(0, state.advisorProgressState.funding - payroll.total), salaryRemainder: payroll.player.remainder },
+      funding: roundMoney(state.advisorProgressState.funding - payroll.total) },
     fellowProgressState: state.fellowProgressState.map((profile) => {
       const payment = payroll.fellows.find((entry) => entry.id === profile.id)!;
-      return { ...profile, salaryRemainder: payment.remainder,
+      return { ...profile,
         monthlySalaryPaid: payment.payment, lastSalaryTotalMonths: state.totalMonths };
     }),
   };

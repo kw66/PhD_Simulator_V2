@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { createConferenceActivityDecisionEvent } from "../src/core/v2-conference-activity-events";
+import { buildConferenceDecisionEventsForAcceptedPapers } from "../src/core/v2-conference-events";
+import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { selectConferenceActivityOptions } from "../src/core/v2-conference-activity-options";
 import { createConferenceCareerState, createConferenceEncounterState } from "../src/core/v2-conference-encounters";
 import { activateInternship, activateRemoteInternship, createInternshipState } from "../src/core/v2-internship-system";
@@ -53,6 +55,32 @@ describe("v2 conference activity", () => {
     expect(result?.description).toContain("街道");
     expect(result?.description).toContain("机制结算");
     expect(result?.description).toContain("SAN +6");
+    expect(result?.completionLog).not.toContain("金币");
+  });
+
+  it("shows long titles once with short result references and preserves real citation multipliers", () => {
+    const state = createStartedGameState("normal");
+    const titles = ["A very long paper title repeated for a detailed scientific presentation", "另一篇很长很长的论文标题用于检查多论文结算的信息对应关系"];
+    const root = buildConferenceDecisionEventsForAcceptedPapers(titles.map((title, index) => ({
+      id: `paper-${index}`, title, target: "A", submittedMonth: 3, submittedYear: 1,
+      acceptType: index === 0 ? "Oral" : "Poster",
+    })), { ...state, research: 0, social: 0, favor: 0 }, () => 0)[0]!;
+    expect(root.description).toContain(`论文1：《${titles[0]}》`);
+    expect(root.description).toContain(`论文2：《${titles[1]}》`);
+    expect(root.description).not.toContain("倍率");
+    const selection = root.choices[0]!.effects.enqueueEvents![0]!;
+    expect(selection.description).not.toContain("注册费");
+    const result = selection.choices.find((choice) => choice.id === "self")!.effects.enqueueEvents![0]!;
+    expect(result.description).toContain("论文1：Oral 展示完成，会后引用倍率 ×1.50");
+    expect(result.description).toContain("论文2：Poster 展示完成");
+    expect(result.description).not.toContain("×1.00");
+    for (const title of titles) expect(result.description).not.toContain(title);
+    const activityRoot = result.choices[0]!.effects.enqueueEvents![0]!;
+    const activityDecision = activityRoot.choices[0]!.effects.enqueueEvents![0]!;
+    for (const event of [activityRoot, activityDecision, ...activityDecision.choices.map((choice) => choice.effects.enqueueEvents![0]!)]) {
+      expect(event.description).not.toMatch(/金币|科研经费|引用倍率|论文[12]：/);
+      expect(event.completionLog ?? "").not.toMatch(/金币|科研经费|引用倍率/);
+    }
   });
 
   it("falls back to four base options for A-grade before follow-up lines are migrated", () => {
@@ -135,7 +163,6 @@ describe("v2 conference activity", () => {
       active: true,
       kind: "conference6",
       remainingMonths: 6,
-      salaryRemainder: 0,
       experimentMultiplier: 1.3,
       experimentBonus: 0,
       experimentMoneyDiscount: 0,
@@ -177,6 +204,7 @@ describe("v2 conference activity", () => {
       bigBullDeepCount: 2,
     });
     expect(jointTrainingChoice?.effects.triggerJointTrainingInvite).toBe(true);
+    expect(jointTrainingChoice?.outcome).toBe("下次写论文 +8；联培邀请：已收到。");
   });
 
   it("offers beautiful-lover follow-up after the audited second-threshold setup", () => {
@@ -200,6 +228,7 @@ describe("v2 conference activity", () => {
       beautifulCount: 2,
     });
     expect(loverChoice?.effects.triggerLoverDevelopment).toBe("beautiful");
+    expect(loverChoice?.outcome).toBe("SAN +8，SAN 上限 +3；关系邀请：已收到。");
   });
 
   it("offers smart-lover follow-up with the audited immediate SAN and research gain", () => {
@@ -223,6 +252,7 @@ describe("v2 conference activity", () => {
       smartCount: 2,
     });
     expect(loverChoice?.effects.triggerLoverDevelopment).toBe("smart");
+    expect(loverChoice?.outcome).toBe("SAN +1，科研 +1；关系邀请：已收到。");
   });
 
   it("offers post-joint-training big-bull cooperation with the audited cap gain", () => {

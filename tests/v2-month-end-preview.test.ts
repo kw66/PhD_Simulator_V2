@@ -21,7 +21,7 @@ describe("next-month preview at academic boundaries", () => {
     const random = vi.spyOn(Math, "random");
     const preview = previewNextMonthEffects(state);
     expect(preview.items.some((item) => item.id.startsWith("fellow-mentoring-"))).toBe(false);
-    expect(preview.items.find((item) => item.id === "advisor-salary")?.note).toBe("实验室学生工资经费 -1");
+    expect(preview.items.find((item) => item.id === "advisor-salary")?.note).toBe("学生工资：科研经费 -1");
     expect(state).toEqual(before);
     expect(random).not.toHaveBeenCalled();
     random.mockRestore();
@@ -30,7 +30,7 @@ describe("next-month preview at academic boundaries", () => {
   it("keeps successful transfer fellows and previews their new doctoral salary", () => {
     const preview = previewNextMonthEffects(juneState(3));
     expect(preview.items.some((item) => item.id.startsWith("fellow-mentoring-"))).toBe(true);
-    expect(preview.items.find((item) => item.id === "advisor-salary")?.note).toBe("实验室学生工资经费 -4");
+    expect(preview.items.find((item) => item.id === "advisor-salary")?.note).toBe("学生工资：科研经费 -4");
   });
 
   it.each([34, 70])("does not promise a month-start settlement beyond the final month %s", (limit) => {

@@ -1,7 +1,7 @@
 import { getAcademicCalendarYear } from "./v2-calendar";
 import type { GameState, Paper } from "./v2-types";
 
-const CCIG_LOCATIONS = ["合肥", "成都", "苏州", "西安", "重庆"] as const;
+const VALSE_LOCATIONS: Record<number, string> = { 2024: "重庆", 2025: "珠海", 2026: "武汉" };
 
 export type CcigParticipationMode = "skip" | "advisor" | "self";
 export type CcigActivityMode = "listen" | "poster" | "travel" | "food";
@@ -29,7 +29,7 @@ export function getCcigActivityChainId(state: Pick<GameState, "year" | "month">)
 }
 
 export function getCcigLocation(year: number): string {
-  return CCIG_LOCATIONS[(year - 1) % CCIG_LOCATIONS.length] ?? CCIG_LOCATIONS[0];
+  return VALSE_LOCATIONS[getAcademicCalendarYear(year, 9)] ?? "外地";
 }
 
 export function getCcigRealYear(gameYear: number, gameMonth: number): number {

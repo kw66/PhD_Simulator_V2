@@ -1,5 +1,6 @@
 import { getActiveBuffs } from "../core/v2-buffs";
 import { combineEffectMultipliers } from "../core/v2-numeric-modifiers";
+import { roundMoney } from "../core/v2-money";
 import type { Buff, BuffTiming, PaperActionType, PlayerStats } from "../core/v2-types";
 
 export interface BuffDisplayItem {
@@ -216,7 +217,7 @@ function addMonthlyStats(effects: Map<string, AccumulatedEffect>, buff: Buff): v
       value,
       source,
       showWhenZero: typedStat === "san" || typedStat === "money",
-      renderLabel: (total) => `每月 ${STAT_LABELS[typedStat]} ${formatSignedNumber(total)}`,
+      renderLabel: (total) => `每月 ${STAT_LABELS[typedStat]} ${formatSignedNumber(typedStat === "money" ? roundMoney(total) : total)}`,
     });
   }
 }
@@ -262,10 +263,10 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       timing: buff.timing,
       operation: "sum",
       value: buff.labExperimentMoneyDelta,
-      source: `${getSourceText(buff)} · 玩家与同学共享；由实验室经费支付，经费不足时玩家暂停实验、同学改做横向`,
+      source: `${getSourceText(buff)} · 玩家与同学共享；玩家经费不足时暂停实验，同学先用经费、不足差额自付，合计不足改做横向`,
       isCost: true,
       category: "money",
-      renderLabel: (value) => `实验金币 ${formatSignedNumber(value)}`,
+      renderLabel: (value) => `实验费用 ${formatSignedNumber(value)}`,
     });
   }
   if (buff.activeOperationSanMultiplier !== undefined) {

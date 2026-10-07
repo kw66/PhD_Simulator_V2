@@ -73,7 +73,7 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     expect(state.buffs.filter((buff) => buff.actionEffects?.idea?.bonus === 4)).toHaveLength(1);
   });
 
-  it("updates annual social reward but keeps CCIG fees fixed after attendance changes", () => {
+  it("updates annual social reward but keeps VALSE travel fixed after attendance changes", () => {
     let state = choose(start("year-summary", 0.1));
     state = choose(state, "-social-");
     state = refreshPendingEventDecisions({ ...state, player: { ...state.player, social: 6 } });

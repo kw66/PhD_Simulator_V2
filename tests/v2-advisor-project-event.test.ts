@@ -156,7 +156,7 @@ describe("advisor project random event effects", () => {
     const before = structuredClone(state);
     const after = applyChoiceEffectsToState(state, decisionChoice(makeEvent(state), "horizontal")).nextState;
 
-    expect(after.advisorProgressState).toEqual({ ...state.advisorProgressState, funding: 68 });
+    expect(after.advisorProgressState).toEqual({ ...state.advisorProgressState, funding: 68, horizontalContributorIds: [] });
     expect(after.player).toEqual({ ...state.player, money: 12, san: 92, favor: 4 });
     expect(after.papers).toEqual(state.papers);
     expect(after.fellowPapers).toEqual(state.fellowPapers);
@@ -420,7 +420,7 @@ describe("advisor project three-stage settlement", () => {
     const completionLogs = completed.log.filter((entry) => entry.text.startsWith(`${type === "horizontal" ? "横向" : "纵向"}项目完成：`));
     expect(completionLogs).toHaveLength(1);
     expect(completionLogs[0]!.text).toBe(type === "horizontal"
-      ? "横向项目完成：科研经费 +60，劳务费经费 -5；金币 +5"
+      ? "横向项目完成：科研经费 +60，科研经费 -5（劳务费）；金币 +5"
       : "纵向项目完成：科研积累 +2");
     const eventIndex = completed.log.findIndex((entry) => Boolean(entry.eventHistoryId));
     const projectIndex = completed.log.findIndex((entry) => entry.id === completionLogs[0]!.id);
@@ -527,9 +527,9 @@ describe("advisor project three-stage settlement", () => {
     expect(collaborationTotal(completed.externalPublications[0]!)).toBe(10);
     expect(completed.totalResearchScore).toBe(5);
     expect(completed.advisorProgressState).toMatchObject({
-      researchAccumulation: 36, funding: 13, verticalProgress: 64, countedPaperIds: ["journal-paper"],
+      researchAccumulation: 36, funding: 8, verticalProgress: 64, countedPaperIds: ["journal-paper"],
     });
-    expect(completed.eventQueue.some((event) => event.journalFeePaperId === "journal-paper")).toBe(true);
+    expect(completed.advisorProgressState.paidJournalPaperIds).toContain("journal-paper");
     const repeated = dispatchAction(completed, "resolve-event", {
       eventId: result.id, eventChoiceId: result.choices[0]!.id,
     });

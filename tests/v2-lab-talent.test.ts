@@ -7,6 +7,7 @@ import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { advanceFellowResearch } from "../src/core/v2-fellow-research";
 import { createDraftPaper, prepareConferenceSubmission } from "../src/core/v2-paper-rules";
+import { getPaperScoreBreakdown } from "../src/core/v2-paper-collaboration";
 import { previewResearchOperation } from "../src/core/v2-research-operation";
 import { renderApp } from "../src/app/v2-render";
 import type { GameState, Paper, PaperTarget } from "../src/core/v2-types";
@@ -247,7 +248,9 @@ describe("lab annual growth", () => {
     const next = advanceFellowResearch({ ...state, fellowProgressState: [fellow], fellowPapers: [draft] }, () => 0);
     expect(next.fellowProgressState[0]).toMatchObject({ research: 2, pendingHelpToPlayer: 2 });
     expect(next.fellowProgressState[0]!.lastAnnualGrowthTotalMonths).toBeUndefined();
-    expect(next.fellowPapers![0]).toMatchObject({ idea: 8, experiment: 1 });
+    expect(next.fellowPapers![0]).toMatchObject({ idea: 8, experiment: 2 });
+    expect(getPaperScoreBreakdown(next.fellowPapers![0]!, "idea")).toEqual({ own: 0, collaboration: 8, total: 8 });
+    expect(getPaperScoreBreakdown(next.fellowPapers![0]!, "experiment")).toEqual({ own: 2, collaboration: 0, total: 2 });
     expect(advanceFellowResearch(next, () => 0)).toBe(next);
     const settled = settleLabResearchGrowth(next, () => 0.99);
     expect(settled.fellowProgressState[0]).toMatchObject({ research: 5, pendingHelpToPlayer: 2, lastAnnualGrowthTotalMonths: 12 });

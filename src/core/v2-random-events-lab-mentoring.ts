@@ -68,7 +68,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
         id: `random-1-self-${serial}`,
         label: "亲自指导",
         outcome: staysForGradSchool
-          ? `对方考研进组（50%）｜${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1（${mentorshipJuniorLabel}科研 +1，${mentorshipJuniorLabel}默契 +2）` : `｜师弟师妹人数 ${state.relationshipState.juniorCount}，槽位已满；暂不新增`}`
+          ? `条件：对方考研进组（50%）${canAddJunior ? "" : `；师弟师妹人数 ${state.relationshipState.juniorCount}，人际栏已满`}｜结果：${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1｜${mentorshipJuniorLabel}科研 +1｜${mentorshipJuniorLabel}默契 +2` : "｜未新增关系"}`
           : `对方毕业（50%）｜${mentoringSanSummary}`,
         effects: becomesJunior
           ? {

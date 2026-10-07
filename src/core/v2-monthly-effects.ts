@@ -1,9 +1,8 @@
 import { addOrReplaceBuffs, advanceBuffDurations, getActiveBuffs, removeBuffs } from "./v2-buffs";
-import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipSalaryPayment, getInternshipStatus } from "./v2-internship-system";
-import { getAdvisorSalaryPayment } from "./v2-advisor-progress";
+import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipStatus } from "./v2-internship-system";
 import { getLabPayroll, settleLabPayroll } from "./v2-lab-payroll";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
-import { reconcileLabAiReimbursements } from "./v2-lab-reimbursements";
+import { roundMoney } from "./v2-money";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
@@ -60,7 +59,7 @@ function applyStats(state: GameState, player: PlayerStats, stats: Partial<Player
     research: clampResearchToCap(player.research + (stats.research ?? 0), state.researchCapacityState),
     social: Math.min(20, player.social + (stats.social ?? 0)),
     favor: Math.min(20, player.favor + (stats.favor ?? 0)),
-    money: player.money + (stats.money ?? 0),
+    money: roundMoney(player.money + roundMoney(stats.money ?? 0)),
   };
 }
 
@@ -76,13 +75,13 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
     stats: { san: 1 },
   });
 
-  if (state.selectedAdvisorName) {
+  if (state.selectedAdvisorName && state.totalMonths > 1) {
     effects.push({
       id: "advisor-salary",
       name: "学生工资",
       source: "导师待遇",
-      stats: { money: getAdvisorSalaryPayment(state.advisorProgressState, state.degree).payment },
-      note: `实验室学生工资经费 -${getLabPayroll(state).total}`,
+      stats: { money: getLabPayroll(state).player.payment },
+      note: `学生工资：科研经费 -${getLabPayroll(state).total}`,
     });
   }
 
@@ -197,16 +196,17 @@ export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution
     const appliedStats: Partial<PlayerStats> = {};
     for (const statId of PLAYER_STAT_IDS) {
       if (!Object.hasOwn(effect.stats, statId)) continue;
-      const delta = effect.stats[statId] ?? 0;
+      const delta = statId === "money" ? roundMoney(effect.stats[statId] ?? 0) : effect.stats[statId] ?? 0;
       appliedStats[statId] = delta;
       combinedStats[statId] += delta;
     }
-    return { ...effect, appliedStats };
+    return { ...effect, stats: { ...effect.stats, ...(Object.hasOwn(effect.stats, "money") ? { money: appliedStats.money } : {}) }, appliedStats };
   });
 
   let player = applyStats(state, startingPlayer, combinedStats);
   for (const statId of PLAYER_STAT_IDS) {
-    totals[statId] = player[statId] - startingPlayer[statId];
+    const delta = player[statId] - startingPlayer[statId];
+    totals[statId] = statId === "money" ? roundMoney(delta) : delta;
   }
 
   const emergencySan = getShopEmergencySan(state.shopState, player.san);
@@ -235,11 +235,13 @@ function appendMonthlyEffect(
   const player = applyStats(state, before, effect.stats);
   const appliedStats: Partial<PlayerStats> = {};
   for (const statId of PLAYER_STAT_IDS) {
-    const delta = player[statId] - before[statId];
+    const change = player[statId] - before[statId];
+    const delta = statId === "money" ? roundMoney(change) : change;
     const preserveZero = (statId === "san" || statId === "money") && Object.hasOwn(effect.stats, statId);
     if (delta === 0 && !preserveZero) continue;
     appliedStats[statId] = delta;
     resolution.totals[statId] += delta;
+    if (statId === "money") resolution.totals.money = roundMoney(resolution.totals.money);
   }
   resolution.player = player;
   resolution.items.push({ ...effect, appliedStats });
@@ -252,6 +254,7 @@ function appendObservedAiEffect(
 ): void {
   for (const statId of PLAYER_STAT_IDS) {
     resolution.totals[statId] += appliedStats[statId] ?? 0;
+    if (statId === "money") resolution.totals.money = roundMoney(resolution.totals.money);
   }
   resolution.items.push({ ...effect, appliedStats });
 }
@@ -467,12 +470,8 @@ export function applyMonthStartSubscriptions(
 }
 
 export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
-  state = reconcileLabAiReimbursements(state, state.totalMonths - 1);
   const resolution = resolveMonthlyEffects(state);
   const internshipState = advanceInternshipMonth(state);
-  if (resolution.items.some((item) => item.id === "internship-monthly")) {
-    internshipState.salaryRemainder = getInternshipSalaryPayment(state).remainder;
-  }
   const monthlyChairRecovery = getMonthlyChairRecoveryContribution(state, resolution);
   const emergencyChairRecovery = Math.max(0, resolution.items
     .find((item) => item.id === "chair-emergency")?.appliedStats.san ?? 0);
@@ -538,12 +537,6 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     resolution: subscriptionSettlement.resolution,
     nextState: {
       ...journalSettlement.state,
-      advisorProgressState: resolution.items.some((item) => item.id === "advisor-salary")
-        ? {
-          ...journalSettlement.state.advisorProgressState,
-          salaryRemainder: getAdvisorSalaryPayment(state.advisorProgressState, state.degree).remainder,
-        }
-        : journalSettlement.state.advisorProgressState,
       sanCap: state.sanCap + bikeCapGain,
       relationshipState: syncRelationshipState(
         state.relationshipState,

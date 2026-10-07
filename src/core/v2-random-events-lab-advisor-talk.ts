@@ -64,7 +64,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
         outcome: internshipUnavailable
           ? "已有实习安排，本次不重复申请。"
           : hasInternshipScore
-          ? "科研分 ≥ 2｜SAN -2（下月起每月，持续3个月）｜金币 +1（下月起每月，持续3个月）｜实验金币 -1（下月起，持续3个月）｜实验 +4（下月起每月，持续3个月）。"
+          ? "科研分 ≥ 2｜远程实习（下月起，持续3个月）｜SAN -2（每月）｜金币 +1（每月）｜个人实验费用 -1（每次）｜实验 +4（每次）。"
           : `科研分 < 2｜${formatTierResistedOutcome("导师好感", -1, internFavorResult)}`,
         effects: hasInternshipScore || internshipUnavailable
           ? {}

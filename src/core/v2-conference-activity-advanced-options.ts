@@ -101,7 +101,7 @@ export function createAdvancedConferenceActivityOptions(
       id: "big-bull-joint-training",
       label: "和上次那位大牛深入合作",
       outcome: nextDeepCount >= 2
-        ? "下次写论文 +8，收到联合培养邀请。"
+        ? "下次写论文 +8；联培邀请：已收到。"
         : "下次写论文 +8。",
       resultDescription: nextDeepCount >= 2
         ? "你们接着之前的讨论，把论文里还没说清楚的几处推理逐一理顺。临近散场，对方提起联合培养，愿意把合作做得更深入；你先记下邀请，准备和导师认真商量。"
@@ -124,7 +124,7 @@ export function createAdvancedConferenceActivityOptions(
       id: "beautiful-lover-development",
       label: "和上次那位活泼学者继续交流",
       outcome: nextBeautifulCount >= 2
-        ? "SAN +8，SAN 上限 +3，触发关系事件。"
+        ? "SAN +8，SAN 上限 +3；关系邀请：已收到。"
         : "SAN +8，SAN 上限 +3。",
       resultDescription: nextBeautifulCount >= 2
         ? "你们聊完报告，又说起最近各自忙些什么。分别时，对方问下次什么时候能见，你也认真翻了翻日程；走出一段才发现，自己还在回想刚才那句话。"
@@ -146,7 +146,7 @@ export function createAdvancedConferenceActivityOptions(
       id: "smart-lover-development",
       label: "和上次那位聪慧学者继续交流",
       outcome: nextSmartCount >= 2
-        ? "SAN +1，科研 +1，触发关系事件。"
+        ? "SAN +1，科研 +1；关系邀请：已收到。"
         : "SAN +1，科研 +1。",
       resultDescription: nextSmartCount >= 2
         ? "你们先对着方法图推敲实验，又聊到毕业后的打算。几个原本没想明白的地方终于通了，而对方说起想去的城市时，你发现自己听得比刚才还认真。"

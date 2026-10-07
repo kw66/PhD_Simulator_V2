@@ -362,7 +362,7 @@ describe("minimal game engine", () => {
     expect(advanced.buffs).toEqual([]);
     expect(advanced.log[0]?.text).toBe([
       "进入第 1 年 2 月。",
-      "月初结算：自动恢复 SAN +1｜学生工资 金币 +1（实验室学生工资经费 -1）｜秋季 SAN +1｜每月补贴 金币 +2",
+      "月初结算：自动恢复 SAN +1｜学生工资 金币 +1（学生工资：科研经费 -1）｜秋季 SAN +1｜每月补贴 金币 +2",
     ].join("\n"));
   });
 
@@ -446,7 +446,8 @@ describe("minimal game engine", () => {
 
     const decision = state.eventQueue[0];
     expect(decision?.choices.map((choice) => choice.id)).toContain("transfer-phd");
-    expect(decision?.choices.find((choice) => choice.id === "transfer-phd")?.outcome).toContain("读博压力");
+    expect(decision?.choices.find((choice) => choice.id === "transfer-phd")?.outcome).toContain("读博压力：SAN -1（每月，永久）");
+    expect(decision?.choices.find((choice) => choice.id === "transfer-phd")?.outcome).not.toContain("毕业要求");
     state = dispatchAction(state, "resolve-event", {
       eventId: decision?.id,
       eventChoiceId: "transfer-phd",
@@ -454,6 +455,7 @@ describe("minimal game engine", () => {
     expect(state.degree).toBe("master");
     expect(state.eventQueue[0]?.stage).toBe("result");
     expect(state.eventQueue[0]?.description).toContain("基础的每月 SAN +1 仍会生效");
+    expect(state.eventQueue[0]?.description).toContain("毕业要求调整为科研分 7");
 
     state = resolveCurrent(state);
     expect(state.degree).toBe("phd");
@@ -876,7 +878,7 @@ describe("minimal game engine", () => {
     const decision = state.eventQueue[0];
     const rest = decision?.choices.find((choice) => choice.label === "休息");
     if (!decision || !rest) throw new Error("illness rest choice is missing");
-    expect(rest.outcome).toContain("休息（SAN +2｜行动点 -1）");
+    expect(rest.outcome).toContain("SAN +2｜行动点 -1");
     expect(rest.outcome).not.toContain("普通休息");
     state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: rest.id });
     expect(state.player.san).toBe(10);

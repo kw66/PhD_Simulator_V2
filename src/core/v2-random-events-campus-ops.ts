@@ -15,7 +15,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
   const reportSocialChange = reportSocialResult.effectiveChange;
   const reinstallSocialResult = applyTierResist(-1, state.player.social, getRoll);
   const reinstallSocialChange = reinstallSocialResult.effectiveChange;
-  const rentalOutcome = "实验金币 +1（持续6个月）";
+  const rentalOutcome = "全组实验费用 +1（每次，持续6个月）";
   const introDescription = [
     "昨晚排上的实验，到早上才挪了一点进度，日志里还冒出几串看不懂的报错。你对 Linux 也不太懂，盯着终端看了半天，分不清是驱动、环境，还是又碰上了什么奇怪的 bug。",
     "实验室的显卡本来就不多，不够用时只能租卡，做实验的金币就是这么花出去的。现在仅剩的几张卡也接连出了故障，大家只好租更多的卡顶着。你刷新了一下进度，感觉连报错都比实验跑得快。",

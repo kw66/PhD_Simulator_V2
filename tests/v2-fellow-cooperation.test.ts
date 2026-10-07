@@ -387,8 +387,8 @@ describe("engine and research lifecycle retries", () => {
     const submitted = next.fellowPapers![0]!;
     expect(submitted.status).toBe("reviewing");
     expect(submitted.submittedCollaborationScores).toEqual({ idea: 10, experiment: 0, writing: 0 });
-    expect(getPaperScoreBreakdown(submitted, "idea")).toEqual({ own: 10, collaboration: 10, total: 20 });
-    expect(submitted.submittedIdea).toBe(20);
+    expect(getPaperScoreBreakdown(submitted, "idea")).toEqual({ own: 11, collaboration: 10, total: 21 });
+    expect(submitted.submittedIdea).toBe(21);
     expect(next.fellowProgressState[0]!.pendingHelpToFellow).toBeNull();
   });
 
@@ -397,7 +397,11 @@ describe("engine and research lifecycle retries", () => {
     const next = advanceFellowResearch({ ...base, totalMonths: 2, month: 2,
       fellowPapers: [{ ...base.fellowPapers![0]!, prepublicationDecayRate: 0 }],
     }, () => 0);
-    expect(next.fellowPapers![0]).toMatchObject({ idea: 10, experiment: nextMonthlyAction === "research" ? 10 : 0, writing: 0 });
+    expect(next.fellowPapers![0]).toMatchObject({ idea: 10, experiment: nextMonthlyAction === "research" ? 11 : 0, writing: 0 });
+    expect(getPaperScoreBreakdown(next.fellowPapers![0]!, "idea")).toEqual({ own: 0, collaboration: 10, total: 10 });
+    expect(getPaperScoreBreakdown(next.fellowPapers![0]!, "experiment")).toEqual({
+      own: nextMonthlyAction === "research" ? 11 : 0, collaboration: 0, total: nextMonthlyAction === "research" ? 11 : 0,
+    });
     expect(next.fellowProgressState[0]).toMatchObject({ taskProgress: 1, affinity: 2, pendingHelpToPlayer: null, pendingHelpToFellow: null });
     expect(advanceFellowResearch(next, () => 0).fellowPapers).toEqual(next.fellowPapers);
   });
@@ -440,15 +444,13 @@ describe("engine and research lifecycle retries", () => {
       deadlineMonths: 0, chainId: "final-cooperation", stage: "result",
       choices: [{ id: "finish", label: "完成", outcome: "", effects: {} }],
     }, 36);
-    const next = dispatchAction({ ...base, totalMonths: 36, maxMonths: 36, graduationScoreTarget: 5,
+    const next = dispatchAction({ ...base, selectedAdvisorName: "导师", totalMonths: 36, maxMonths: 36, graduationScoreTarget: 5,
       papers: [paper], eventQueue: [event],
     }, "resolve-event", { eventId: event.id, eventChoiceId: "finish" });
     expect(next.externalPublications.find((entry) => entry.id === paper.id)?.status).toBe("published");
     expect(next.phase).toBe("playing");
     expect(next.ending).toBeNull();
-    expect(dispatchAction(next, "next-month").ending).toBeNull();
-    const fee = next.eventQueue.find((entry) => entry.journalFeePaperId === paper.id)!;
-    const paid = dispatchAction(next, "resolve-event", { eventId: fee.id, eventChoiceId: "self" });
-    expect(dispatchAction(paid, "next-month").ending).toBe("master");
+    expect(next.advisorProgressState.paidJournalPaperIds).toContain(paper.id);
+    expect(dispatchAction(next, "next-month").ending).toBe("master");
   });
 });

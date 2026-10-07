@@ -1,40 +1,56 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { getLabPayroll, settleLabPayroll } from "../src/core/v2-lab-payroll";
-import { settleFellowConferenceFees, settleJournalPublicationFees, getPendingFellowConferenceFees } from "../src/core/v2-lab-publication-costs";
+import { settleConferenceRegistrationFees, settleFellowConferenceFees, settleJournalPublicationFees } from "../src/core/v2-lab-publication-costs";
+import { CONFERENCE_REGISTRATION_FEE, CONFERENCE_TRAVEL_FEES } from "../src/core/v2-publication-fees";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { getConferenceLocation } from "../src/core/v2-conference-catalog";
+import * as conferenceCatalog from "../src/core/v2-conference-catalog";
+import { getPaperConferenceTripId } from "../src/core/v2-conference-identity";
+import { applyPaperReviewSettlement } from "../src/core/v2-publication-system";
 import { evaluateCoreEndings } from "../src/core/v2-ending-system";
 import { endRelationship } from "../src/core/v2-relationship-actions";
 import { advanceFellowResearch } from "../src/core/v2-fellow-research";
-import type { GameState, JournalTarget } from "../src/core/v2-types";
+import { creditFellowMoney, getFellowFinanceAccount, payFellowResearchCost } from "../src/core/v2-fellow-finance";
+import { advanceSharedLabProject } from "../src/core/v2-lab-projects";
+import { settleFellowAcademicYear } from "../src/core/v2-fellow-lifecycle";
+import type { GameState, JournalTarget, Paper } from "../src/core/v2-types";
 
 function makeState(): GameState {
   const base = createStartedGameState("normal");
-  return { ...base, selectedAdvisorName: "导师", year: 1, month: 4, totalMonths: 4, eventQueue: [],
+  return { ...base, selectedAdvisorName: "导师", year: 1, month: 4, totalMonths: 4, eventQueue: [], conferenceLocationSeed: 0,
     advisorProgressState: { ...base.advisorProgressState, funding: 100 },
     fellowProgressState: [0, 1, 4].map((academicYear) => createCustomFellowProgressProfile({
       type: "peer", gender: "female", startTotalMonths: 1, academicYear,
+      identitySeed: String(academicYear),
       degree: academicYear === 4 ? "phd" : "master", research: 6, affinity: 1,
     })),
   };
 }
 
+function conferencePaper(id: string, leadAuthorId = "fellow-departed", patch: Partial<Paper> = {}): Paper {
+  return { ...createDraftPaper(1, 0, () => 0), id, leadAuthorId, leadAuthorName: leadAuthorId,
+    target: "C", status: "published", submittedMonth: 1, submittedYear: 1,
+    acceptedTotalMonths: 4, conferenceAvailableAtTotalMonths: 7, conferenceHandled: false, ...patch };
+}
+
+afterEach(() => vi.restoreAllMocks());
+
 describe("lab finances", () => {
-  it("pays students only, exempts pre-enrollment, and accumulates each student's fractional wages", () => {
+  it("pays exact fractional wages into separate student wallets and exempts pre-enrollment", () => {
     const state = makeState();
     state.advisorProgressState.awards = [{ id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2026 }];
-    expect(getLabPayroll(state)).toMatchObject({ player: { payment: 1, remainder: 0.25 }, total: 5 });
+    expect(getLabPayroll(state)).toMatchObject({ player: { payment: 1.25 }, total: 6 });
     let next = settleLabPayroll(state);
-    expect(next.advisorProgressState.funding).toBe(95);
-    expect(next.fellowProgressState.map((profile) => profile.salaryRemainder)).toEqual([0, 0.25, 0.5]);
+    expect(next.advisorProgressState.funding).toBe(94);
+    expect(next.fellowProgressState.map((profile) => getFellowFinanceAccount(next, profile.id).money)).toEqual([0, 1.25, 3.5]);
     next = settleLabPayroll({ ...next, totalMonths: 5, month: 5 });
-    expect(next.advisorProgressState.funding).toBe(89);
-    expect(next.fellowProgressState.map((profile) => profile.salaryRemainder)).toEqual([0, 0.5, 0]);
+    expect(next.advisorProgressState.funding).toBe(88);
+    expect(next.fellowProgressState.map((profile) => getFellowFinanceAccount(next, profile.id).money)).toEqual([0, 2.5, 7]);
   });
 
-  it("retains outgoing fellows' fees, charging registration per paper and travel once per author and venue", () => {
+  it("retains outgoing fellows' fees, charging registration per paper and travel once per venue", () => {
     const state = makeState();
     const fellow = state.fellowProgressState[1]!;
     const papers = [0, 1].map((index) => ({ ...createDraftPaper(1, index, () => 0),
@@ -46,27 +62,29 @@ describe("lab finances", () => {
     const departed = endRelationship(state, fellow.id);
     expect(settleFellowConferenceFees(departed)).toBe(departed);
     const region = getConferenceLocation(1, "C", 1, state.conferenceLocationSeed).region;
-    const total = 2 + ({ domestic: 1, asia: 3, west: 5 })[region];
-    expect(getPendingFellowConferenceFees(departed)).toBe(total);
+    const total = 2 + CONFERENCE_TRAVEL_FEES[region];
     const next = settleFellowConferenceFees({ ...departed, totalMonths: 5 });
     expect(next.advisorProgressState.funding).toBe(100 - total);
     expect(next.fellowPapers!.every((paper) => paper.conferenceHandled)).toBe(true);
     expect(next.externalPublications[0]!.conferenceHandled).toBe(true);
-    expect(getPendingFellowConferenceFees(next)).toBe(0);
+    expect(next.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(papers.map((paper) => paper.id));
+    expect(next.advisorProgressState.paidFellowConferencePaperIds).toEqual(papers.map((paper) => paper.id));
+    expect(next.advisorProgressState.paidFellowConferenceTrips).toHaveLength(1);
+    expect(next.fellowFinanceAccounts).toEqual(departed.fellowFinanceAccounts);
+    expect(next.player).toEqual(departed.player);
     expect(settleFellowConferenceFees(next)).toBe(next);
   });
 
-  it.each([["pami", 5], ["nmi", 10], ["nature", 20]] as const)("queues player %s publication fee %s without automatic lab payment", (journalTarget: JournalTarget, fee) => {
+  it.each([["pami", 5], ["nmi", 10], ["nature", 20]] as const)("automatically pays player %s publication fee %s without a pending event", (journalTarget: JournalTarget, fee) => {
     const state = makeState();
     const paper = { ...createDraftPaper(1, 0, () => 0), journalTarget, status: "published" as const };
     state.papers = [paper];
     state.externalPublications = [paper];
     const next = settleJournalPublicationFees(state);
-    expect(next.advisorProgressState.funding).toBe(100);
-    expect(next.eventQueue).toHaveLength(1);
-    expect(next.eventQueue[0]).toMatchObject({ title: "期刊版面费", blocking: true, deadlineMonths: 0 });
-    expect(next.eventQueue[0]!.description).toContain(`${fee} 金币`);
-    expect(next.advisorProgressState.paidJournalPaperIds).toBeUndefined();
+    expect(next.advisorProgressState.funding).toBe(100 - fee);
+    expect(next.eventQueue).toHaveLength(0);
+    expect(next.advisorProgressState.paidJournalPaperIds).toEqual([paper.id]);
+    expect(next.player).toEqual(state.player);
     expect(settleJournalPublicationFees(next)).toBe(next);
   });
 
@@ -84,16 +102,17 @@ describe("lab finances", () => {
     expect(settleJournalPublicationFees(next)).toBe(next);
   });
 
-  it("ends the run at zero funds without inventing unpaid salaries or charging the player's wallet", () => {
+  it("ends the run only when necessary salary payments leave negative funds", () => {
     const state = makeState();
-    state.advisorProgressState.funding = 5;
+    state.advisorProgressState.funding = 4;
     const next = evaluateCoreEndings(settleLabPayroll(state));
-    expect(next).toMatchObject({ phase: "finished", ending: "lab-bankrupt", advisorProgressState: { funding: 0 } });
+    expect(next).toMatchObject({ phase: "finished", ending: "lab-bankrupt", advisorProgressState: { funding: -1 } });
     expect(next.player.money).toBe(state.player.money);
     expect(evaluateCoreEndings({ ...state, advisorProgressState: { ...state.advisorProgressState, funding: 0.25 } }).phase).toBe("playing");
+    expect(evaluateCoreEndings({ ...state, advisorProgressState: { ...state.advisorProgressState, funding: 0 } }).phase).toBe("playing");
   });
 
-  it("does not let a later project rescue a balance already exhausted by an earlier experiment", () => {
+  it("allows horizontal work to refill funds after an experiment leaves zero", () => {
     const state = makeState();
     state.advisorProgressState.funding = 3;
     state.advisorProgressState.horizontalProgress = 99;
@@ -103,6 +122,285 @@ describe("lab finances", () => {
     state.fellowPapers = state.fellowProgressState.map((profile, index) => ({ ...createDraftPaper(1, index, () => 0),
       leadAuthorId: profile.id, createdTotalMonths: 1, idea: 5 }));
     const next = evaluateCoreEndings(advanceFellowResearch(state, () => 0.5));
-    expect(next).toMatchObject({ phase: "finished", ending: "lab-bankrupt", advisorProgressState: { funding: 0, horizontalProgress: 99 } });
+    expect(next.phase).toBe("playing");
+    expect(next.advisorProgressState.funding).toBe(50);
+  });
+
+  it("uses lab funding then personal money and does not partially pay an unaffordable experiment", () => {
+    let state = makeState();
+    const fellow = state.fellowProgressState[1]!;
+    state.advisorProgressState.funding = 1.25;
+    state = creditFellowMoney(state, fellow.id, 2.5);
+    const paid = payFellowResearchCost(state, fellow.id, 3);
+    expect(paid).toMatchObject({ paid: true, labCost: 1.25, personalCost: 1.75 });
+    expect(paid.state.advisorProgressState.funding).toBe(0);
+    expect(getFellowFinanceAccount(paid.state, fellow.id).money).toBe(0.75);
+    const unpaid = payFellowResearchCost(paid.state, fellow.id, 3);
+    expect(unpaid).toMatchObject({ paid: false, state: paid.state });
+    expect(unpaid.state).toBe(paid.state);
+    expect(unpaid).toMatchObject({ labCost: 0, personalCost: 0 });
+    expect(unpaid.state.advisorProgressState.funding).toBe(0);
+    expect(getFellowFinanceAccount(unpaid.state, fellow.id).money).toBe(0.75);
+    expect(evaluateCoreEndings(unpaid.state).phase).toBe("playing");
+  });
+
+  it("pays each horizontal contributor once including departed students and resets the next project", () => {
+    const initial = makeState();
+    const first = initial.fellowProgressState[1]!;
+    const second = initial.fellowProgressState[2]!;
+    let state = advanceSharedLabProject(initial, "horizontal", 40, () => 0, first.id).state;
+    state = advanceSharedLabProject(state, "horizontal", 20, () => 0, first.id).state;
+    state = endRelationship(state, first.id);
+    state = advanceSharedLabProject(state, "horizontal", 50, () => 0, second.id).state;
+    expect(state.advisorProgressState.funding).toBe(145);
+    expect(getFellowFinanceAccount(state, first.id).money).toBe(5);
+    expect(getFellowFinanceAccount(state, second.id).money).toBe(5);
+    expect(state.advisorProgressState.horizontalContributorIds).toEqual([second.id]);
+    state = advanceSharedLabProject(state, "horizontal", 90, () => 0).state;
+    expect(state.advisorProgressState.funding).toBe(195);
+    expect(getFellowFinanceAccount(state, first.id).money).toBe(5);
+    expect(getFellowFinanceAccount(state, second.id).money).toBe(10);
+    expect(state.advisorProgressState.horizontalContributorIds).toEqual([]);
+  });
+
+  it("switches an unaffordable experiment to horizontal work without partially spending either balance", () => {
+    let state = makeState();
+    const fellow = state.fellowProgressState[1]!;
+    state.fellowProgressState = [{ ...fellow, nextMonthlyAction: "research" }];
+    state.advisorProgressState.funding = 1.25;
+    state = creditFellowMoney(state, fellow.id, 1.5);
+    const paper = { ...createDraftPaper(1, 0, () => 0), leadAuthorId: fellow.id, createdTotalMonths: 1,
+      idea: 5, experiment: 0, writing: 0, prepublicationDecayRate: 0 };
+    state.fellowPapers = [paper];
+    const snapshot = structuredClone(state);
+    const next = advanceFellowResearch(state, () => 0);
+    expect(next.advisorProgressState.funding).toBe(1.25);
+    expect(getFellowFinanceAccount(next, fellow.id).money).toBe(1.5);
+    expect(next.advisorProgressState.horizontalProgress).toBe(fellow.research);
+    expect(next.fellowProgressState[0]!.monthlyActivity).toContain("经费不足，横向");
+    expect(next.fellowPapers![0]!.experiment).toBe(0);
+    expect(next.player).toEqual(state.player);
+    expect(evaluateCoreEndings(next).phase).toBe("playing");
+    expect(state).toEqual(snapshot);
+  });
+
+  it.each(["stop", "graduate"])("retains %s student savings and charges their later conference without new wages", (departure) => {
+    let state = makeState();
+    const fellow = state.fellowProgressState[1]!;
+    fellow.academicYear = 3;
+    fellow.initialResearchScore = 1;
+    state.month = 10;
+    state.totalMonths = 10;
+    state.advisorProgressState.funding = 100;
+    state = creditFellowMoney(state, fellow.id, 10);
+    state.fellowPapers = [{ ...createDraftPaper(1, 0, () => 0), leadAuthorId: fellow.id, target: "C", status: "published",
+      submittedMonth: 1, submittedYear: 1, conferenceHandled: false, conferenceAvailableAtTotalMonths: 11 }];
+    state = departure === "stop" ? endRelationship(state, fellow.id) : settleFellowAcademicYear(state);
+    expect(state.fellowProgressState.some((entry) => entry.id === fellow.id)).toBe(false);
+    const region = getConferenceLocation(1, "C", 1, state.conferenceLocationSeed).region;
+    const fee = 1 + CONFERENCE_TRAVEL_FEES[region];
+    expect(settleFellowConferenceFees(state)).toBe(state);
+    const paid = settleFellowConferenceFees({ ...state, totalMonths: 11, month: 11 });
+    expect(paid.advisorProgressState.funding).toBe(100 - fee);
+    expect(getFellowFinanceAccount(paid, fellow.id).money).toBe(10);
+    expect(paid.player).toEqual(state.player);
+    expect(settleFellowConferenceFees(paid)).toBe(paid);
+  });
+});
+
+describe("automatic conference registration and fellow travel", () => {
+  it("records each fellow's registration and shared travel in their monthly card without losing research activity", () => {
+    const state = makeState();
+    state.totalMonths = 7;
+    state.month = 7;
+    const first = state.fellowProgressState[1]!;
+    const second = state.fellowProgressState[2]!;
+    state.fellowPapers = [conferencePaper("one", first.id), conferencePaper("two", first.id), conferencePaper("three", second.id)];
+    const paid = settleFellowConferenceFees(state);
+    const travel = CONFERENCE_TRAVEL_FEES[getConferenceLocation(1, "C", 1, state.conferenceLocationSeed).region];
+    expect(paid.fellowProgressState.find((profile) => profile.id === first.id)!.monthlyPublicationCosts)
+      .toEqual({ totalMonths: 7, registration: 2, journal: 0, sharedTravel: travel });
+    expect(paid.fellowProgressState.find((profile) => profile.id === second.id)!.monthlyPublicationCosts)
+      .toEqual({ totalMonths: 7, registration: 1, journal: 0, sharedTravel: travel });
+    const acted = advanceFellowResearch(paid, () => 0.5);
+    expect(acted.fellowProgressState[1]!.monthlyPublicationCosts).toEqual(paid.fellowProgressState[1]!.monthlyPublicationCosts);
+    expect(acted.fellowProgressState[1]!.monthlyActivity).toBeTruthy();
+    expect(settleFellowConferenceFees(acted)).toBe(acted);
+  });
+
+  it("waits three months after acceptance, then charges each registration once even after attendance is handled", () => {
+    const initial = makeState();
+    initial.papers = [conferencePaper("accepted", "player", { status: "reviewing", conferenceAvailableAtTotalMonths: undefined })];
+    const accepted = applyPaperReviewSettlement(initial, {
+      paperId: "accepted", target: "C", accepted: true, acceptType: "Poster", submittedScore: 100,
+      totalReviewScore: 3, borderlineChance: null, venueInfluence: 1, reviewStrictnessMultiplier: 1,
+      scoreGain: 1, reviewerSanChange: 0, reports: [],
+    });
+    expect(accepted.externalPublications[0]!.conferenceAvailableAtTotalMonths).toBe(7);
+    expect(CONFERENCE_REGISTRATION_FEE).toBe(1);
+    for (const totalMonths of [4, 5, 6]) {
+      const early = { ...accepted, month: totalMonths, totalMonths };
+      expect(settleConferenceRegistrationFees(early)).toBe(early);
+    }
+    const due = { ...accepted, month: 7, totalMonths: 7,
+      externalPublications: accepted.externalPublications.map((paper) => ({ ...paper, conferenceHandled: true })) };
+    const snapshot = structuredClone(due);
+    const paid = settleConferenceRegistrationFees(due);
+    expect(paid.advisorProgressState).toMatchObject({ funding: 99, paidConferenceRegistrationPaperIds: ["accepted"] });
+    expect(paid.advisorProgressState.paidFellowConferencePaperIds ?? []).toEqual([]);
+    expect(paid.advisorProgressState.paidFellowConferenceTrips ?? []).toEqual([]);
+    expect(paid.player).toEqual(due.player);
+    expect(paid.eventQueue).toEqual(due.eventQueue);
+    expect(settleConferenceRegistrationFees(paid)).toBe(paid);
+    expect(due).toEqual(snapshot);
+  });
+
+  it.each([["domestic", 2], ["asia", 4], ["west", 6]] as const)("combines all fellows and papers into one %s trip costing %s", (region, travelFee) => {
+    vi.spyOn(conferenceCatalog, "getConferenceLocation").mockReturnValue({ region, city: "测试城市", country: "测试国家" });
+    const state = makeState();
+    const activeId = state.fellowProgressState[1]!.id;
+    state.totalMonths = 7;
+    state.month = 7;
+    state.fellowFinanceAccounts = { [activeId]: { name: "在校同学", money: 12 }, departed: { name: "离校同学", money: 20 } };
+    const papers = [conferencePaper("active-1", activeId), conferencePaper("active-2", activeId),
+      conferencePaper("departed", "departed", { nonFirstAuthor: true })];
+    state.papers = papers.map((paper) => ({ ...paper }));
+    state.fellowPapers = papers.map((paper) => ({ ...paper }));
+    state.externalPublications = papers.map((paper) => ({ ...paper }));
+    const snapshot = structuredClone(state);
+    const paid = settleFellowConferenceFees(state);
+    expect(CONFERENCE_TRAVEL_FEES[region]).toBe(travelFee);
+    expect(paid.advisorProgressState).toMatchObject({ funding: 100 - 3 - travelFee,
+      paidConferenceRegistrationPaperIds: papers.map((paper) => paper.id),
+      paidFellowConferencePaperIds: papers.map((paper) => paper.id),
+      paidFellowConferenceTrips: [getPaperConferenceTripId(papers[0]!, state.conferenceLocationSeed)],
+    });
+    for (const collection of [paid.papers, paid.fellowPapers!, paid.externalPublications]) {
+      expect(collection).toHaveLength(3);
+      expect(collection.every((paper) => paper.conferenceHandled && paper.conferenceHandledAtTotalMonths === 7)).toBe(true);
+    }
+    expect(paid.player).toEqual(state.player);
+    expect(paid.fellowFinanceAccounts).toEqual(state.fellowFinanceAccounts);
+    expect(paid.eventQueue).toEqual([]);
+    expect(settleFellowConferenceFees(paid)).toBe(paid);
+    expect(settleConferenceRegistrationFees(paid)).toBe(paid);
+    expect(state).toEqual(snapshot);
+  });
+
+  it("keeps registration and travel payments independent and adds later same-conference papers without another trip", () => {
+    let state = makeState();
+    state.totalMonths = 7;
+    state.externalPublications = [conferencePaper("first")];
+    const travelFee = CONFERENCE_TRAVEL_FEES[getConferenceLocation(1, "C", 1, state.conferenceLocationSeed).region];
+    const registered = settleConferenceRegistrationFees(state);
+    expect(registered.advisorProgressState.funding).toBe(99);
+    expect(registered.externalPublications[0]!.conferenceHandled).toBe(false);
+    const traveled = settleFellowConferenceFees(registered);
+    expect(traveled.advisorProgressState.funding).toBe(99 - travelFee);
+    state = JSON.parse(JSON.stringify(traveled)) as GameState;
+    state.totalMonths = 8;
+    state.month = 8;
+    state.externalPublications.push(conferencePaper("later", "other-departed", { acceptedTotalMonths: 5, conferenceAvailableAtTotalMonths: 8 }));
+    const later = settleFellowConferenceFees(state);
+    expect(later.advisorProgressState.funding).toBe(98 - travelFee);
+    expect(later.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["first", "later"]);
+    expect(later.advisorProgressState.paidFellowConferencePaperIds).toEqual(["first", "later"]);
+    expect(later.advisorProgressState.paidFellowConferenceTrips).toHaveLength(1);
+    expect(later.externalPublications[1]).toMatchObject({ conferenceHandled: true, conferenceHandledAtTotalMonths: 8 });
+    expect(settleFellowConferenceFees(later)).toBe(later);
+  });
+
+  it.each(["name", "year", "city"] as const)("charges a separate trip when the conference %s changes", (changedField) => {
+    const location = vi.spyOn(conferenceCatalog, "getConferenceLocation")
+      .mockReturnValue({ region: "domestic", city: "北京", country: "中国" });
+    const state = makeState();
+    state.totalMonths = 19;
+    state.externalPublications = [conferencePaper("first")];
+    const paid = settleFellowConferenceFees(state);
+    expect(paid.advisorProgressState.funding).toBe(97);
+    const changed = conferencePaper("different", "another-fellow", {
+      submittedMonth: changedField === "name" ? 2 : 1,
+      submittedYear: changedField === "year" ? 2 : 1,
+      conferenceAvailableAtTotalMonths: 20,
+    });
+    if (changedField === "city") location.mockReturnValue({ region: "domestic", city: "上海", country: "中国" });
+    const later = settleFellowConferenceFees({ ...paid, totalMonths: 20,
+      externalPublications: [...paid.externalPublications, changed] });
+    expect(later.advisorProgressState.funding).toBe(94);
+    expect(new Set(later.advisorProgressState.paidFellowConferenceTrips).size).toBe(2);
+    expect(later.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["first", "different"]);
+    expect(later.advisorProgressState.paidFellowConferencePaperIds).toEqual(["first", "different"]);
+  });
+
+  it("still charges unpaid registration when a fellow trip was already paid and handled", () => {
+    const state = makeState();
+    state.totalMonths = 7;
+    const paper = conferencePaper("travel-paid", "fellow-departed", { conferenceHandled: true });
+    state.externalPublications = [paper];
+    state.advisorProgressState.paidFellowConferencePaperIds = [paper.id];
+    state.advisorProgressState.paidFellowConferenceTrips = [getPaperConferenceTripId(paper, state.conferenceLocationSeed)!];
+    const paid = settleFellowConferenceFees(state);
+    expect(paid.advisorProgressState.funding).toBe(99);
+    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual([paper.id]);
+    expect(paid.advisorProgressState.paidFellowConferenceTrips).toEqual(state.advisorProgressState.paidFellowConferenceTrips);
+    expect(settleFellowConferenceFees(paid)).toBe(paid);
+  });
+
+  it("charges player and fellow registrations together while marking only fellow travel handled", () => {
+    const state = makeState();
+    state.totalMonths = 7;
+    state.externalPublications = [conferencePaper("player-paper", "player"), conferencePaper("fellow-paper")];
+    const paid = settleFellowConferenceFees(state);
+    const travelFee = CONFERENCE_TRAVEL_FEES[getConferenceLocation(1, "C", 1, state.conferenceLocationSeed).region];
+    expect(paid.advisorProgressState.funding).toBe(98 - travelFee);
+    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["player-paper", "fellow-paper"]);
+    expect(paid.advisorProgressState.paidFellowConferencePaperIds).toEqual(["fellow-paper"]);
+    expect(paid.externalPublications.map((paper) => paper.conferenceHandled)).toEqual([false, true]);
+    expect(paid.player).toEqual(state.player);
+  });
+
+  it.each([0, 0.99, 1])("settles registration at funding %s and only negative balances cause bankruptcy", (funding) => {
+    const state = makeState();
+    state.totalMonths = 7;
+    state.advisorProgressState.funding = funding;
+    state.externalPublications = [conferencePaper("registered", "player")];
+    const paid = settleConferenceRegistrationFees(state);
+    expect(paid.advisorProgressState.funding).toBe(Math.round((funding - 1) * 100) / 100);
+    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["registered"]);
+    expect(paid.player).toEqual(state.player);
+    expect(evaluateCoreEndings(paid)).toMatchObject(funding < 1
+      ? { phase: "finished", ending: "lab-bankrupt" } : { phase: "playing", ending: null });
+  });
+
+  it.each([0, 1, 2.99, 3])("settles registration before travel at funding %s without falling back to wallets", (funding) => {
+    vi.spyOn(conferenceCatalog, "getConferenceLocation").mockReturnValue({ region: "domestic", city: "北京", country: "中国" });
+    const state = makeState();
+    state.totalMonths = 7;
+    state.advisorProgressState.funding = funding;
+    state.fellowFinanceAccounts = { "fellow-departed": { name: "离校同学", money: 100 } };
+    state.externalPublications = [conferencePaper("fellow-paper")];
+    const paid = settleFellowConferenceFees(state);
+    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["fellow-paper"]);
+    expect(paid.advisorProgressState.funding).toBe(funding < 1 ? -1 : Math.round((funding - 3) * 100) / 100);
+    expect(paid.advisorProgressState.paidFellowConferencePaperIds ?? []).toEqual(funding < 1 ? [] : ["fellow-paper"]);
+    expect(paid.externalPublications[0]!.conferenceHandled).toBe(funding >= 1);
+    expect(paid.player).toEqual(state.player);
+    expect(paid.fellowFinanceAccounts).toEqual(state.fellowFinanceAccounts);
+    expect(evaluateCoreEndings(paid)).toMatchObject(funding < 3
+      ? { phase: "finished", ending: "lab-bankrupt" } : { phase: "playing", ending: null });
+    expect(settleFellowConferenceFees(paid)).toBe(paid);
+  });
+
+  it.each([
+    { status: "draft" }, { status: "reviewing" }, { journalTarget: "pami" },
+    { publication: { journalTarget: "nature", citations: 0, effectiveScore: 200, citationDebuffMultiplier: 1 } },
+    { leadAuthorId: "lover:1" }, { leadAuthorId: "player", nonFirstAuthor: true },
+    { leadAuthorId: undefined, nonFirstAuthor: true }, { target: null }, { submittedMonth: null },
+  ] satisfies Partial<Paper>[])("excludes ineligible conference publication %j", (patch) => {
+    const state = makeState();
+    state.totalMonths = 7;
+    state.externalPublications = [conferencePaper("ineligible", "fellow-departed", patch)];
+    expect(settleConferenceRegistrationFees(state)).toBe(state);
+    expect(settleFellowConferenceFees(state)).toBe(state);
   });
 });

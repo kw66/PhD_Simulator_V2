@@ -1,5 +1,5 @@
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "./v2-calendar";
-import { getAccumulatedPayment } from "./v2-numeric-modifiers";
+import { roundMoney } from "./v2-money";
 import { ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
 import { pushLog, pushMilestoneLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getJournalDefinition } from "./v2-journal-system";
@@ -63,7 +63,7 @@ export function getAdvisorMeetingAttendancePercent(advisor: AdvisorProgressState
 
 export function getAdvisorMonthlySalary(advisor: AdvisorProgressState, degree: Degree): number {
   const rankIndex = getHighestAdvisorAwardIndex(advisor) + 1;
-  return ADVISOR_SALARY[degree] + rankIndex * (degree === "phd" ? 0.5 : 0.25);
+  return roundMoney(ADVISOR_SALARY[degree] + rankIndex * (degree === "phd" ? 0.5 : 0.25));
 }
 
 export function getAdvisorNextSalaryIncrease(advisor: AdvisorProgressState, degree: Degree): number {
@@ -71,7 +71,7 @@ export function getAdvisorNextSalaryIncrease(advisor: AdvisorProgressState, degr
 }
 
 export function getAdvisorSalaryPayment(advisor: AdvisorProgressState, degree: Degree) {
-  return getAccumulatedPayment(getAdvisorMonthlySalary(advisor, degree), advisor.salaryRemainder);
+  return { payment: getAdvisorMonthlySalary(advisor, degree) };
 }
 
 export function getAdvisorGrantLimit(advisor: AdvisorProgressState): number {

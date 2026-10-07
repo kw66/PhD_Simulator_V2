@@ -28,10 +28,26 @@ function createPlayingMonth(month: number, totalMonths: number, san = 10) {
 }
 
 describe("monthly effects", () => {
+  it("rounds each monthly money effect before combining the month's total", () => {
+    const state = createPlayingMonth(8, 8);
+    state.player.money = 0.1;
+    state.buffs = [0.005, 0.005, -0.005].map((money, index) => ({
+      id: `money-${index}`, name: "金币结算", source: "测试", timing: "monthly" as const,
+      remainingMonths: 1, monthlyStats: { money },
+    }));
+    const result = applyMonthlyEffects(state);
+    expect(result.resolution.items.filter((item) => item.id.startsWith("money-"))
+      .map((item) => ({ raw: item.stats.money, actual: item.appliedStats.money })))
+      .toEqual([{ raw: 0.01, actual: 0.01 }, { raw: 0.01, actual: 0.01 }, { raw: -0.01, actual: -0.01 }]);
+    expect(result.resolution.totals.money).toBe(0.01);
+    expect(result.nextState.player.money).toBe(0.11);
+    expect(previewNextMonthEffects(state).player.money).toBe(0.11);
+  });
+
   it.each([
     [null, 1, 3], ["youth", 1.25, 3.5], ["general", 1.5, 4],
     ["excellent", 1.75, 4.5], ["distinguished", 2, 5], ["academician", 2.25, 5.5],
-  ] satisfies Array<[AdvisorGrantId | null, number, number]>)("accumulates fractional master and PhD salary for %s without funding", (award, master, phd) => {
+  ] satisfies Array<[AdvisorGrantId | null, number, number]>)("pays exact master and PhD salary for %s each month", (award, master, phd) => {
     const state = createPlayingMonth(2, 2);
     state.selectedAdvisorName = "林老师";
     state.advisorProgressState.awards = award ? [{ id: award, awardedYear: 2023, startYear: 2024, endYear: 2027 }] : [];
@@ -39,7 +55,7 @@ describe("monthly effects", () => {
     for (const [degree, salary] of [["master", master], ["phd", phd]] as const) {
       let current: GameState = { ...state, degree };
       for (let paymentIndex = 1; paymentIndex <= 4; paymentIndex += 1) {
-        const payment = Math.floor(salary * paymentIndex) - Math.floor(salary * (paymentIndex - 1));
+        const payment = salary;
         const before = structuredClone(current);
         for (let repeat = 0; repeat < 2; repeat += 1) {
           expect(previewNextMonthEffects(current).items.find((item) => item.id === "advisor-salary")?.stats.money).toBe(payment);
@@ -47,31 +63,27 @@ describe("monthly effects", () => {
         expect(current).toEqual(before);
         const settled = applyMonthlyEffects({ ...current, month: paymentIndex + 1, totalMonths: paymentIndex + 1 });
         expect(settled.resolution.items.find((item) => item.id === "advisor-salary")?.appliedStats.money).toBe(payment);
-        expect(settled.nextState.player.money).toBe(10 + Math.floor(salary * paymentIndex));
+        expect(settled.nextState.player.money).toBe(10 + salary * paymentIndex);
         current = settled.nextState;
       }
-      expect(current.advisorProgressState.salaryRemainder).toBe(0);
     }
   });
 
-  it("retains the fractional balance across promotion and conversion to PhD", () => {
+  it("switches to the exact new wage after promotion and conversion to PhD", () => {
     const state = createPlayingMonth(2, 2);
     state.selectedAdvisorName = "林老师";
     state.advisorProgressState.awards = [{ id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2027 }];
     const first = applyMonthlyEffects(state).nextState;
-    expect(first.advisorProgressState.salaryRemainder).toBe(0.25);
+    expect(first.player.money - state.player.money).toBe(1.25);
     const promoted = applyMonthlyEffects({ ...first, advisorProgressState: {
       ...first.advisorProgressState,
       awards: [{ id: "general", awardedYear: 2024, startYear: 2025, endYear: 2028 }],
     } }).nextState;
-    expect(promoted.player.money - first.player.money).toBe(1);
-    expect(promoted.advisorProgressState.salaryRemainder).toBe(0.75);
+    expect(promoted.player.money - first.player.money).toBe(1.5);
     const phd = applyMonthlyEffects({ ...promoted, degree: "phd" }).nextState;
     expect(phd.player.money - promoted.player.money).toBe(4);
-    expect(phd.advisorProgressState.salaryRemainder).toBe(0.75);
     const noAdvisor = applyMonthlyEffects({ ...phd, selectedAdvisorName: null }).nextState;
-    expect(noAdvisor.advisorProgressState.salaryRemainder).toBe(0.75);
-    expect(createInitialState().advisorProgressState.salaryRemainder ?? 0).toBe(0);
+    expect(noAdvisor.player.money).toBe(phd.player.money);
   });
 
   it("restores base SAN and applies autumn as a separate source", () => {
@@ -311,27 +323,26 @@ describe("monthly effects", () => {
       const settled = applyMonthlyEffects({ ...state, totalMonths: index + 3, month: index + 3 });
       expect(settled.resolution.items.find((item) => item.id === "internship-monthly")?.appliedStats.money).toBe(payment);
       expect(settled.resolution.items.find((item) => item.id === "advisor-salary")?.appliedStats.money)
-        .toBe(Math.floor(1.25 * (index + 1)) - Math.floor(1.25 * index));
+        .toBe(1.25);
       total += payment;
       state = settled.nextState;
-      expect(state.player.money).toBe(total + Math.floor(1.25 * (index + 1)));
-      expect(state.internshipState.salaryRemainder).toBe(0);
+      expect(state.player.money).toBe(total + 1.25 * (index + 1));
     }
     expect(state.internshipState.active).toBe(false);
     expect(total).toBe(12);
   });
 
-  it("retains internship salary fractions through a raise, expiry and months without internship", () => {
+  it("pays internship income directly through a raise and stops on expiry", () => {
     const initial = createPlayingMonth(2, 2, 20);
     const publication = { ...createDraftPaper(1, 0, () => 0), status: "published" as const, target: "A" as const };
-    let state = applyMonthlyEffects({ ...initial, papers: [publication], internshipState: { ...activateInternship(0.5), remainingMonths: 2 } }).nextState;
-    expect(state.internshipState.salaryRemainder).toBe(0.5);
+    let state = applyMonthlyEffects({ ...initial, papers: [publication], internshipState: { ...activateInternship(), remainingMonths: 2 } }).nextState;
+    expect(state.player.money).toBe(2);
     state.externalPublications = [{ ...publication, id: "another-first-author-a" }];
     const second = applyMonthlyEffects(state);
     expect(second.resolution.items.find((item) => item.id === "internship-monthly")?.stats.money).toBe(3);
-    expect(second.nextState.internshipState).toEqual(createInternshipState(0.5));
+    expect(second.nextState.internshipState).toEqual(createInternshipState());
     state = applyMonthlyEffects(second.nextState).nextState;
-    expect(state.internshipState).toEqual(createInternshipState(0.5));
+    expect(state.internshipState).toEqual(createInternshipState());
     expect(state.player.money).toBe(5);
   });
 

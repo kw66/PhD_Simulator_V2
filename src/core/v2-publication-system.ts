@@ -380,7 +380,7 @@ export function applyPaperReviewSettlement(state: GameState, settlement: PaperRe
     reviewMonthsLeft: 0,
     lastReview: reviewResult,
     conferenceHandled: false,
-    conferenceAvailableAtTotalMonths: state.totalMonths + CONFERENCE_PUBLICATION_DELAY_MONTHS,
+    conferenceAvailableAtTotalMonths: (paper.acceptedTotalMonths ?? state.totalMonths) + CONFERENCE_PUBLICATION_DELAY_MONTHS,
   }, citationPenaltyMultiplier, settlement.acceptType ?? "Poster", settlement.venueInfluence, promotionMultiplier);
   const papers = state.papers.filter((entry) => entry.id !== paper.id);
   const publishedPapers = [...state.externalPublications, ...recordPaperAcceptances([acceptedPaper], state.totalMonths,
@@ -547,7 +547,7 @@ export function settlePaperCitationMonth(state: GameState, paper: Paper): { pape
   // imported papers do not need the conference gate.
   const conferenceExposurePending = paper.target !== null
     && publication.preprintExposed !== true
-    && paper.conferenceHandled === false;
+    && (paper.conferenceHandled === false || paper.conferenceHandledAtTotalMonths === state.totalMonths);
   const delayedExposureMultiplier = conferenceExposurePending
     ? 0
     : 1;

@@ -132,8 +132,10 @@ describe("paper competition regression", () => {
     const html = renderApp(state, undefined, { activePlayTab: "events", activeEventId: event.id, isEventContentOpen: true });
     const results = html.match(/<div class="event-settlement-summary">[\s\S]*?<\/div>/)?.[0] ?? "";
     expect(results).toContain('class="event-settlement-effect is-san">SAN -1</span>');
-    const [effectLabel, effectDelta] = effect.split("（");
-    expect(results).toContain(`class="event-settlement-effect is-research">${effectLabel}</span>（${effectDelta}`);
+    expect(results).toContain(`class="event-settlement-effect is-research">${effect}</span>`);
+    expect(results.replace(/<span class="event-settlement-effect [^"]+">[^<]*<\/span>/gu, "")
+      .replace(/<span class="event-settlement-label">结果<\/span>/gu, "")
+      .replace(/<[^>]+>/gu, "").trim()).toBe("");
     expect(results).not.toContain(state.papers[0]!.title);
     expect(results).not.toContain("本轮审稿");
     expect(html).toContain('class="event-description-note"');

@@ -43,7 +43,6 @@ export interface ConferenceCareerState {
 
 export interface InternshipState {
   active: boolean;
-  salaryRemainder?: number;
   kind?: "remote3" | "conference6";
   startTotalMonths?: number;
   endTotalMonths?: number;
@@ -84,14 +83,8 @@ export interface AdvisorGrantApplication {
   resultRoll: number;
 }
 
-export interface LabReimbursementReservation {
-  kind: "gpu" | "workstation" | "ai";
-  amount: number;
-  coveredTotalMonths: number | null;
-}
-
 export interface AdvisorProgressState {
-  labReimbursements?: LabReimbursementReservation[];
+  horizontalContributorIds?: string[];
   researchAccumulation: number;
   funding: number;
   horizontalProgress?: number;
@@ -107,8 +100,8 @@ export interface AdvisorProgressState {
   lastPlayerProjectTotalMonths?: number | null;
   pendingGuidanceToPlayer?: number | null;
   monthlyActivity?: string;
-  salaryRemainder?: number;
   paidJournalPaperIds?: string[];
+  paidConferenceRegistrationPaperIds?: string[];
   paidFellowConferencePaperIds?: string[];
   paidFellowConferenceTrips?: string[];
   paidPlayerConferenceTrips?: string[];
@@ -153,7 +146,6 @@ export interface FellowProgressProfile {
   academicStartTotalMonths?: number;
   degree?: Degree;
   initialResearchScore?: number;
-  salaryRemainder?: number;
   monthlySalaryPaid?: number;
   lastSalaryTotalMonths?: number;
   pendingHelpToPlayer?: number | null;
@@ -165,6 +157,7 @@ export interface FellowProgressProfile {
   lastProjectTotalMonths?: number;
   monthlyActivity?: string;
   pendingGuidanceFromAdvisor?: number | null;
+  monthlyPublicationCosts?: { totalMonths: number; registration: number; journal: number; sharedTravel: number };
   affinityRewardedPaperIds?: string[];
   helpedPlayerCount?: number;
   monthlySupportActivity?: string;
@@ -172,6 +165,13 @@ export interface FellowProgressProfile {
   helpedFellowCount?: number;
   annualResearchGrowthTotal?: number;
   longTermMentoring?: boolean;
+}
+
+export interface FellowFinanceAccount {
+  name: string;
+  money: number;
+  aiSlot?: "gpt" | "deepseek" | "doubao" | "claude";
+  aiSubscribedTotalMonths?: number;
 }
 
 export interface FellowProfileAddition {

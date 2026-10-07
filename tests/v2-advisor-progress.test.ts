@@ -87,7 +87,7 @@ describe("advisor project economy", () => {
     expect(after.advisorProgressState).toMatchObject({ funding: 155, horizontalProgress: 19 });
     expect(after.player.money).toBe(25);
     expect(after.log[1]?.text).toBe("推进横向项目：SAN -5，进度 +20");
-    expect(after.log[0]?.text).toBe("横向项目完成：科研经费 +60，劳务费经费 -5；金币 +5");
+    expect(after.log[0]?.text).toBe("横向项目完成：科研经费 +60，科研经费 -5（劳务费）；金币 +5");
   });
 
   it("adds ten percent of current accumulation when vertical project completes", () => {
