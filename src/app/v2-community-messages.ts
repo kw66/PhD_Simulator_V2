@@ -388,12 +388,16 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     },
     openReply(id: number, source: MessageSource = "board"): void {
       if (submitting) return;
-      const target = messages.find((message) => message.id === id);
+      const target = [...messages, ...replies].find((message) => message.id === id);
       if (!target || target.is_deleted) return;
+      const parent = target.parent_id === null
+        ? target
+        : messages.find((message) => message.id === target.parent_id);
+      if (!parent || parent.is_deleted) return;
       if (replyTarget?.id === id && replyTarget.source === source) return;
       if (replyTarget) contents[replyTarget.source] = draftBeforeReply;
       draftBeforeReply = contents[source];
-      replyTarget = { id, nickname: target.nickname, content: target.content, source };
+      replyTarget = { id: parent.id, nickname: target.nickname, content: target.content, source };
       contents[source] = "";
       notice = "";
       notify();
@@ -491,29 +495,42 @@ function createMessageBody(message: CommunityMessage, state: CommunityMessageSta
     toggle.hidden = deleted;
     item.append(toggle);
   }
-  if (state.ownedMessageIds.has(message.id) && !deleted) {
+  const ownsMessage = state.ownedMessageIds.has(message.id) && !deleted;
+  const canReply = isReply && !deleted;
+  if (ownsMessage || canReply) {
     const actions = document.createElement("div");
     actions.className = "community-message-actions";
-    const edit = document.createElement("button");
-    edit.type = "button";
-    edit.className = "community-edit-button";
-    edit.dataset.communityEdit = String(message.id);
-    edit.textContent = "编辑";
-    edit.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null;
-    actions.append(edit);
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "community-delete-button";
-    remove.dataset.communityDelete = String(message.id);
-    remove.textContent = state.deletingMessageId === message.id ? "删除中…" : "删除";
-    remove.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null || state.deletingMessageId !== null;
-    actions.append(remove);
-    if (state.messageNotice?.id === message.id) {
-      const notice = document.createElement("span");
-      notice.className = "community-delete-notice";
-      notice.setAttribute("role", "status");
-      notice.textContent = state.messageNotice.text;
-      actions.append(notice);
+    if (ownsMessage) {
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "community-edit-button";
+      edit.dataset.communityEdit = String(message.id);
+      edit.textContent = "编辑";
+      edit.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null;
+      actions.append(edit);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "community-delete-button";
+      remove.dataset.communityDelete = String(message.id);
+      remove.textContent = state.deletingMessageId === message.id ? "删除中…" : "删除";
+      remove.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null || state.deletingMessageId !== null;
+      actions.append(remove);
+      if (state.messageNotice?.id === message.id) {
+        const notice = document.createElement("span");
+        notice.className = "community-delete-notice";
+        notice.setAttribute("role", "status");
+        notice.textContent = state.messageNotice.text;
+        actions.append(notice);
+      }
+    }
+    if (canReply) {
+      const reply = document.createElement("button");
+      reply.type = "button";
+      reply.className = "community-reply-to-button";
+      reply.dataset.communityReplyTo = String(message.id);
+      reply.textContent = "回复";
+      reply.disabled = state.submitting !== null || state.savingEdit || state.deletingMessageId !== null;
+      actions.append(reply);
     }
     header.append(actions);
   }

@@ -1469,15 +1469,16 @@ p {
 }
 
 .community-message-item-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
 .community-message-author {
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
   gap: 4px;
   min-width: 0;
 }
@@ -1493,7 +1494,7 @@ p {
 }
 
 .community-message-item-head time {
-  justify-self: center;
+  flex: 0 0 auto;
   color: var(--ink-soft);
   font-size: 0.64rem;
   white-space: nowrap;
@@ -1517,7 +1518,10 @@ p {
 .community-message-actions {
   display: flex;
   align-items: center;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   justify-self: end;
+  justify-content: flex-end;
   min-width: 0;
   gap: 4px;
 }
@@ -4525,6 +4529,37 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 .lobby-page[data-scale-mode="fixed"] .lobby-role-pagination {
   flex-wrap: nowrap;
   justify-content: flex-end;
+}
+
+@media (min-width: 1241px) {
+  .lobby-page[data-scale-mode="fixed"] .lobby-role-rail {
+    align-self: start;
+    height: var(--setup-stage-height);
+    max-height: var(--setup-stage-height);
+    overflow: hidden;
+  }
+
+  .lobby-page[data-scale-mode="fixed"] .lobby-detail-stage,
+  .lobby-page[data-scale-mode="fixed"] .lobby-profile-achievement-rail,
+  .lobby-page[data-scale-mode="fixed"] .lobby-message-rail-view {
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .lobby-page[data-scale-mode="fixed"] .lobby-detail-stage {
+    height: calc(var(--setup-stage-height) - 50px);
+  }
+
+  .lobby-page[data-scale-mode="fixed"] .lobby-message-rail-view .community-message-feed,
+  .lobby-page[data-scale-mode="fixed"] .lobby-message-rail-view .community-message-list {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .lobby-page[data-scale-mode="fixed"] .lobby-message-rail-view .community-message-list {
+    overflow-y: auto;
+  }
 }
 
 .lobby-page[data-scale-mode="fixed"] .lobby-profile-info-head {

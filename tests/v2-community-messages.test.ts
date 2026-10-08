@@ -389,6 +389,22 @@ describe("V2 message ownership and editing", () => {
     expect(community.snapshot()).toMatchObject({ editTarget: { id: 23 }, editContent: "回复草稿" });
   });
 
+  it("replies to an existing reply within its top-level thread", async () => {
+    const { community, request, setRows } = editingHarness();
+    setRows([
+      ownMessage,
+      { ...ownMessage, id: 22, nickname: "另一位玩家", content: "已有回复", parent_id: 21 },
+    ]);
+    await community.loadPage(0);
+    community.setNickname("同名玩家");
+    community.openReply(22);
+    community.setContent("board", "回复这条回复");
+    expect(await community.submit("board")).toBe(true);
+    const post = request.mock.calls.find(([, init]) => init?.method === "POST")!;
+    expect(JSON.parse(String(post[1]?.body))).toMatchObject({ parent_id: 21, content: "回复这条回复" });
+    expect(community.snapshot().replyTarget).toBeNull();
+  });
+
   it("rejects invalid or oversized Unicode while accepting exactly 2000 astral characters", async () => {
     const { community, request } = editingHarness();
     expect(countMessageCharacters("中😀e\u0301")).toBe(4);
