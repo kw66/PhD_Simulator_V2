@@ -1,6 +1,7 @@
 import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
+import { createConferenceActivityEvent } from "./v2-conference-activity-events";
 import { getAcademicCalendarYear } from "./v2-calendar";
-import { getConferenceInfo } from "./v2-conference-catalog";
+import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
 import { SCORE_BY_TARGET } from "./v2-content";
 import type { CareerType } from "./v2-career-rules";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
@@ -186,6 +187,7 @@ export const DEBUG_MONTH_DELTAS = [-12, -1, 1, 12] as const;
 /** Manual cross-run audit checklist. Add an id here after the user confirms that the event has been checked. */
 export const DEBUG_COMPLETED_EVENT_IDS = [
   "before-grad-school",
+  "phd-choice",
   "mentor-assign",
   "teachers-day",
   "scholarship",
@@ -226,7 +228,7 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
       { id: "summer-vacation", label: "暑假" },
       { id: "year-summary", label: "学年总结" },
       { id: "ccig", label: "领域年会" },
-      { id: "ccig-activity", label: "领域年会活动" },
+      { id: "ccig-activity", label: "年会活动" },
       { id: "before-grad-school", label: "读研之始" },
       { id: "phd-choice", label: "转博抉择" },
       { id: "mentor-assign", label: "指导新生" },
@@ -263,16 +265,17 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
     title: "论文相关",
     buttons: [
       { id: "conference", label: "论文参会" },
+      { id: "conference-activity", label: "会场活动" },
       { id: "review-result", label: "论文结果" },
-      { id: "thesis-progress", label: "论文推进" },
       { id: "joint-training-invite", label: "联合培养" },
       { id: "lover-beautiful", label: "活泼关系线" },
       { id: "lover-smart", label: "聪慧关系线" },
     ],
   },
   {
-    title: "招聘相关",
+    title: "毕业相关",
     buttons: [
+      { id: "thesis-progress", label: "论文推进" },
       { id: "career-internet", label: "互联网招聘" },
       { id: "career-state-owned", label: "央国企招聘" },
       { id: "career-civil-service", label: "公务员招聘" },
@@ -374,6 +377,7 @@ function buildConferenceDebugState(state: GameState) {
   return {
     favor: state.player.favor,
     research: state.player.research,
+    researchCapacityState: state.researchCapacityState,
     social: state.player.social,
     shopState: state.shopState,
     eventSupport: state.eventSupport,
@@ -469,34 +473,23 @@ function createDebugReviewPaper(state: GameState, paperIndex: number) {
 }
 
 function getDebugReviewPaperIndex(state: GameState): number {
-  const reviewingIndex = state.papers.findIndex((paper) => paper.status === "reviewing");
+  const reviewingIndex = state.papers.findIndex((paper) => paper.status === "reviewing"
+    && !state.eventQueue.some((event) => event.chainId === `paper-review-result-${paper.id}`));
   if (reviewingIndex >= 0) {
     return reviewingIndex;
   }
-  if (state.papers.length < state.paperSlotsUnlocked) {
-    return state.papers.length;
-  }
-  return state.papers.findIndex((paper) => paper.status !== "reviewing");
+  return state.papers.length;
 }
 
 function triggerReviewResultDebugEvent(state: GameState): GameState {
   const paperIndex = getDebugReviewPaperIndex(state);
-  if (paperIndex < 0) {
-    return pushLog(state, "测试触发：论文结果 当前没有可用论文槽。");
-  }
 
   let workingState = state;
   if (workingState.papers[paperIndex]?.status !== "reviewing") {
     const debugPaper = createDebugReviewPaper(workingState, paperIndex);
-    const nextPapers = [...workingState.papers];
-    if (paperIndex < nextPapers.length) {
-      nextPapers[paperIndex] = debugPaper;
-    } else {
-      nextPapers.push(debugPaper);
-    }
     workingState = {
       ...workingState,
-      papers: nextPapers,
+      papers: [...workingState.papers, debugPaper],
       selectedPaperId: debugPaper.id,
     };
   }
@@ -505,12 +498,21 @@ function triggerReviewResultDebugEvent(state: GameState): GameState {
     return pushLog(workingState, "测试触发：论文结果 失败，测试论文未能写入。");
   }
 
-  const reviewResolution = resolveDuePaperReviews(workingState);
+  const reviewResolution = resolveDuePaperReviews({
+    ...workingState,
+    papers: workingState.papers.map((paper, index) => ({
+      ...paper,
+      reviewMonthsLeft: index === paperIndex ? 0 : Math.max(1, paper.reviewMonthsLeft),
+    })),
+  });
   // Review resolution only calculates and queues the three-stage result event.
   // The paper is not published until the player confirms its PC decision; the
   // normal month pipeline will then schedule its conference flow after the
   // configured waiting period.
-  return reviewResolution.state;
+  return {
+    ...reviewResolution.state,
+    papers: workingState.papers.map((paper, index) => index === paperIndex ? reviewResolution.state.papers[index]! : paper),
+  };
 }
 
 function markTriggeredEventForReplay(before: GameState, after: GameState, debugEventId: string): GameState {
@@ -641,6 +643,25 @@ function buildDebugEvent(
       return { nextState: state, event: createCcigEvent(state) };
     case "ccig-activity":
       return { nextState: state, event: createCcigActivityEvent(state, "self", []) };
+    case "conference-activity": {
+      const month = Math.max(1, state.month);
+      const year = Math.max(1, state.year);
+      const conference = getConferenceInfo(month, "C", year);
+      const location = getConferenceLocation(month, "C", year, state.conferenceLocationSeed);
+      return {
+        nextState: state,
+        event: createConferenceActivityEvent({
+          id: `debug-conference-${year}-${month}-C-${location.city}`,
+          conferenceName: conference.name,
+          conferenceYear: conference.year,
+          city: location.city,
+          country: location.country,
+          grade: "C",
+          paperCount: 1,
+          paperIds: [],
+        }, buildConferenceDebugState(state), []),
+      };
+    }
     case "mentor-assign":
       return { nextState: state, event: createMentorAssignEvent(state) };
     case "advisor-grant-success":

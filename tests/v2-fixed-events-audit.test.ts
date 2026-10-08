@@ -268,7 +268,7 @@ describe("audited fixed-event rules", () => {
     expect(confirmation.description).not.toContain("分论坛");
     expect(activity.description).toContain("签到处");
     expect(activity.description).toContain("海报区");
-    expect(activity.title).toBe("领域年会活动");
+    expect(activity.title).toBe("VALSE参会");
     const activityDecision = activity.choices[0]?.effects.enqueueEvents?.[0];
     for (const event of [activity, activityDecision!]) {
       expect(event.description).not.toMatch(/导师报销|导师好感 -1|机制结算|结果：/u);
@@ -374,8 +374,8 @@ describe("audited fixed-event rules", () => {
     expect(state.eventQueue[0]?.description).toContain("金币 -2");
     expect(state.player.money).toBe(10);
 
-    resolveByLabel("安排行程");
-    expect(state.eventQueue[0]?.title).toBe("领域年会活动");
+    resolveByLabel("确定");
+    expect(state.eventQueue[0]?.title).toBe("VALSE参会");
     expect(state.eventQueue[0]?.description).not.toMatch(/金币 -2|机制结算|结果：/u);
     expect(state.player.money).toBe(8);
     expect(state.eventCounters.meetingCount).toBe(1);
@@ -385,7 +385,7 @@ describe("audited fixed-event rules", () => {
     resolveByLabel("趁机旅游");
     expect(state.eventQueue[0]?.stage).toBe("result");
     expect(state.player.san).toBe(10);
-    resolveByLabel("继续");
+    resolveByLabel("确定");
 
     expect(state.player.money).toBe(8);
     expect(state.player.san).toBe(15);
@@ -409,7 +409,7 @@ describe("audited fixed-event rules", () => {
     resolveByLabel("继续");
     resolveByLabel("不去参加");
     expect(state.eventQueue[0]?.title).toContain("暂不参会");
-    resolveByLabel("继续本月安排");
+    resolveByLabel("确定");
 
     expect(state.eventQueue).toHaveLength(0);
     expect(state.eventHistory).toHaveLength(1);

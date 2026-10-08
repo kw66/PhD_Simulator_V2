@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { DEBUG_EVENT_GROUPS } from "../src/core/v2-debug-tools";
+import { getConferenceInfo } from "../src/core/v2-conference-catalog";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { collectRandomEventsForMonth } from "../src/core/v2-event-scheduler";
 import { collectFixedEventsForState } from "../src/core/v2-fixed-events";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
-import { attachPaperPublication } from "../src/core/v2-publication-rules";
+import { resolveDuePaperReviews } from "../src/core/v2-publication-system";
 import { createPhdDecisionEvent } from "../src/core/v2-phd-decision-event";
 import { pushLog, pushNoOpLog } from "../src/core/v2-engine-helpers";
 import { previewNextMonthEffects } from "../src/core/v2-monthly-effects";
@@ -122,45 +123,58 @@ describe("minimal game engine", () => {
     expect(state.relationshipState).toMatchObject({ advisorCount: 1, juniorCount: 1, occupiedSlots: 1 });
   });
 
-  it("delays the conference event by three months after a confirmed publication", () => {
+  it("pays registration on acceptance confirmation and schedules attendance three months later without charging twice", () => {
     const base = admitGame();
-    const paper = attachPaperPublication({
+    const paper = {
       ...createDraftPaper(1, 0, () => 0),
-      status: "published" as const,
+      status: "reviewing" as const,
       target: "A" as const,
-      idea: 24,
-      experiment: 23,
-      writing: 23,
-      submittedIdea: 24,
-      submittedExperiment: 23,
-      submittedWriting: 23,
+      idea: 100,
+      experiment: 100,
+      writing: 100,
+      submittedIdea: 100,
+      submittedExperiment: 100,
+      submittedWriting: 100,
       submittedMonth: 1,
       submittedYear: 1,
-      conferenceHandled: false,
-      conferenceAvailableAtTotalMonths: 4,
-    }, 1, "Poster", 1);
+      reviewMonthsLeft: 0,
+    };
     let state: ReturnType<typeof startGame> = {
       ...base,
       year: 1,
-      month: 1,
-      totalMonths: 1,
+      month: 4,
+      totalMonths: 4,
       eventQueue: [],
       availableRandomEvents: [],
       usedRandomEvents: [],
-      externalPublications: [paper],
+      illnessProbability: 0,
+      advisorProgressState: { ...base.advisorProgressState, funding: 30 },
+      papers: [paper],
     };
-
-    state = dispatchAction(state, "next-month");
-    expect(state.totalMonths).toBe(2);
-    expect(state.eventQueue.some((event) => event.title === "论文参会")).toBe(false);
-    state = { ...state, eventQueue: [] };
-    state = dispatchAction(state, "next-month");
-    expect(state.totalMonths).toBe(3);
-    expect(state.eventQueue.some((event) => event.title === "论文参会")).toBe(false);
-    state = { ...state, eventQueue: [] };
-    state = dispatchAction(state, "next-month");
-    expect(state.totalMonths).toBe(4);
-    expect(state.eventQueue.some((event) => event.title === "论文参会")).toBe(true);
+    const venue = getConferenceInfo(1, "A", 1).name;
+    state = resolveDuePaperReviews(state, () => 0).state;
+    expect(state.eventQueue[0]?.title).toBe(`${venue}结果`);
+    state = resolveCurrent(resolveCurrent(state));
+    expect(state.eventQueue[0]?.stage).toBe("result");
+    expect(state.advisorProgressState.funding).toBe(30);
+    const moneyBeforeConfirmation = state.player.money;
+    state = resolveCurrent(state);
+    expect(state.advisorProgressState.funding).toBe(29);
+    expect(state.player.money).toBe(moneyBeforeConfirmation);
+    expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual([paper.id]);
+    expect(state.externalPublications.find((entry) => entry.id === paper.id)).toMatchObject({
+      acceptedTotalMonths: 4, conferenceAvailableAtTotalMonths: 7, conferenceHandled: false,
+    });
+    for (const totalMonths of [5, 6, 7]) {
+      const fundingBeforeMonth = state.advisorProgressState.funding;
+      state = dispatchAction({ ...state, eventQueue: [] }, "next-month");
+      expect(state.totalMonths).toBe(totalMonths);
+      expect(state.advisorProgressState.funding).toBe(fundingBeforeMonth - 1);
+      expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual([paper.id]);
+      const trips = state.eventQueue.filter((event) => event.conferencePreview);
+      expect(trips).toHaveLength(totalMonths === 7 ? 1 : 0);
+      if (totalMonths === 7) expect(trips[0]?.title).toBe(`${venue}安排`);
+    }
   });
 
   it("force advances through real month settlement after deleting only current blockers", () => {
@@ -620,20 +634,28 @@ describe("minimal game engine", () => {
     expect(state.log[0]?.text).not.toContain("档位变化");
   });
 
-  it("queues the PhD decision in months 22 and 34 for master's students", () => {
+  it("queues the PhD decision with VALSE in May months 21 and 33, never June", () => {
     const secondYear = {
       ...startGame(),
       selectedAdvisorName: "测试导师",
       year: 2,
-      month: 10,
-      totalMonths: 22,
+      month: 9,
+      totalMonths: 21,
       eventQueue: [],
     };
-    const thirdYear = { ...secondYear, year: 3, totalMonths: 34 };
+    const thirdYear = { ...secondYear, year: 3, totalMonths: 33 };
 
     expect(collectFixedEventsForState(secondYear, () => 0.5).map((event) => event.chainId)).toContain("phd-decision");
     expect(collectFixedEventsForState(thirdYear, () => 0.5).map((event) => event.chainId)).toContain("phd-decision");
     expect(collectFixedEventsForState({ ...thirdYear, degree: "phd" }, () => 0.5).map((event) => event.chainId)).not.toContain("phd-decision");
+    expect(collectFixedEventsForState({ ...secondYear, year: 1, totalMonths: 9 }, () => 0.5)
+      .some((event) => event.chainId === "phd-decision")).toBe(false);
+    for (const state of [secondYear, thirdYear]) {
+      expect(collectFixedEventsForState(state, () => 0.5).map((event) => event.chainId))
+        .toEqual([`ccig-y${state.year}-m9`, "phd-decision"]);
+      expect(collectFixedEventsForState({ ...state, month: 10, totalMonths: state.totalMonths + 1 }, () => 0.5)
+        .some((event) => event.chainId === "phd-decision")).toBe(false);
+    }
   });
 
   it("finishes at the training limit with graduation or delay", () => {

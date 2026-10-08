@@ -342,7 +342,7 @@ describe("basic ending presentation", () => {
     expect(html).toContain('data-ui-event-scene-index="0"');
     expect(html).toContain('data-ui-event-scene-index="1"');
     const choices = html.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
-    expect(choices).toContain("已完成的选择");
+    expect(choices).toContain(activeEventHistoryIndex === 0 ? ">继续</span>" : ">已完成的选择</span>");
     expect(choices).toContain('aria-disabled="true"');
     expect(choices).toContain("is-selected");
     expect(choices).not.toContain('data-action="resolve-event"');

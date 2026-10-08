@@ -15,18 +15,19 @@ export function resolveCcigFixedEvent(
   resolution: FixedEventResolution,
   getRoll: RandomRollProvider,
 ): FixedResolutionResult {
+  const eventState = resolution.ccigCalendar ? { ...state, ...resolution.ccigCalendar } : state;
   switch (resolution.kind) {
     case "ccig-open":
       return {
         nextState: state,
         outcome: "选择是否参会。",
-        enqueueEvents: [createCcigDecisionEvent(state)],
+        enqueueEvents: [createCcigDecisionEvent(eventState)],
       };
     case "ccig-skip":
       return {
         nextState: state,
         outcome: "本次不参会。",
-        enqueueEvents: [createCcigSkipResultEvent(state)],
+        enqueueEvents: [createCcigSkipResultEvent(eventState)],
       };
     case "ccig-advisor": {
       const { actualCost } = getCcigSelfPayCost(state);
@@ -38,8 +39,8 @@ export function resolveCcigFixedEvent(
       const fundingSettlement = `科研经费 -${actualCost}`;
       return {
         nextState,
-        outcome: state.advisorProgressState.funding < actualCost ? `实验室经费不足，需要 ${actualCost} 金币。` : `${settlement}，${fundingSettlement}，报销通过。`,
-        enqueueEvents: [createCcigAttendResultEvent(state, "advisor", ["导师报销", settlement, fundingSettlement], favorNarrative, {
+        outcome: `${settlement}，${fundingSettlement}，报销通过。`,
+        enqueueEvents: [createCcigAttendResultEvent(eventState, "advisor", ["导师报销", settlement, fundingSettlement], favorNarrative, {
           ...(favorChange < 0 ? { favor: favorChange } : {}),
           advisorProgressStateDeltas: { funding: -actualCost },
         })],
@@ -52,7 +53,7 @@ export function resolveCcigFixedEvent(
       return {
         nextState,
         outcome: `${costText}。`,
-        enqueueEvents: [createCcigAttendResultEvent(state, "self", ["自费参会", costText], "", actualCost > 0 ? { money: -actualCost } : {})],
+        enqueueEvents: [createCcigAttendResultEvent(eventState, "self", ["自费参会", costText], "", actualCost > 0 ? { money: -actualCost } : {})],
       };
     }
     case "ccig-activity-listen": {
@@ -63,9 +64,9 @@ export function resolveCcigFixedEvent(
         nextState: state,
         outcome: `下次想 idea +${tempBonus}，永久 idea +1。`,
         enqueueEvents: [createCcigActivityResultEvent({
-          state,
+          state: eventState,
           mode: "listen",
-          title: "领域年会活动 ➜ 选择安排 ➜ 活动结果",
+          title: "VALSE参会 ➜ 选择安排 ➜ 活动结果",
           description: [
             "你先听 Tutorial 理清方法脉络，再钻进贴近课题的 Workshop。台上讲者刚说完一个结论，台下就追问假设和适用范围，笔记前半本还很整齐，后半本只剩箭头和问号。",
             "茶歇时，你拿自己的实验困惑请教讲者，对方换个角度解释，你才发现把问题想窄了。回去能试的新思路有了，判断问题的方法也学到一点；最大的问号旁总算补上了几行字。",
@@ -104,10 +105,10 @@ export function resolveCcigFixedEvent(
         nextState: state,
         outcome: `展示《${paper.title}》。`,
         enqueueEvents: [createCcigActivityResultEvent({
-          state,
+          state: eventState,
           mode: "poster",
           condition: "展示论文为已发表的一作 A 类论文",
-          title: "领域年会活动 ➜ 选择安排 ➜ 活动结果",
+          title: "VALSE参会 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你贴好《${paper.title}》的海报，向同行介绍工作。有人追问基线和实验设置，你指着图解释，把疑问记在空白处。`,
             "收海报时，开场白已说得不用过脑子，嗓子也哑了。有同行拍照说回去细看，你赶紧指了指角落的论文链接。",
@@ -128,7 +129,7 @@ export function resolveCcigFixedEvent(
       };
     }
     case "ccig-activity-travel": {
-      const location = getCcigLocation(state.year);
+      const location = getCcigLocation(eventState.year);
       const attraction = ({
         珠海: "沿着情侣路慢慢走，在海边吹了会儿风",
         武汉: "沿着江滩散步，看轮渡慢慢驶过江面",
@@ -140,9 +141,9 @@ export function resolveCcigFixedEvent(
         nextState: state,
         outcome: "SAN +5。",
         enqueueEvents: [createCcigActivityResultEvent({
-          state,
+          state: eventState,
           mode: "travel",
-          title: "领域年会活动 ➜ 选择安排 ➜ 活动结果",
+          title: "VALSE参会 ➜ 选择安排 ➜ 活动结果",
           description: [
             "你把会务袋放回酒店，留了些空当出门走走。今天不用给每段时间都排上正事。",
             `你${attraction}，路上没再反复琢磨那几个实验。回酒店时腿有点酸，脑子倒是松快了不少。`,
@@ -154,7 +155,7 @@ export function resolveCcigFixedEvent(
       };
     }
     case "ccig-activity-food": {
-      const location = getCcigLocation(state.year);
+      const location = getCcigLocation(eventState.year);
       const food = ({
         珠海: "白灼虾、清蒸鱼、蚝仔煎蛋",
         武汉: "排骨藕汤、武昌鱼、豆皮",
@@ -172,9 +173,9 @@ export function resolveCcigFixedEvent(
         nextState,
         outcome: "金币 -2。",
         enqueueEvents: [createCcigActivityResultEvent({
-          state,
+          state: eventState,
           mode: "food",
-          title: "领域年会活动 ➜ 选择安排 ➜ 活动结果",
+          title: "VALSE参会 ➜ 选择安排 ➜ 活动结果",
           description: [
             `你约了几位同学去吃${location}当地菜：${food}。`,
             `大家从报告聊到没跑通的实验，越聊越熟悉。你买了单，约好回去继续交流；几个只认得胸牌的名字总算对上了人。${socialNarrative}`,

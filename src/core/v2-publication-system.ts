@@ -10,8 +10,9 @@ import { attachPaperPublication, getHighlyCitedThreshold, recordPaperAcceptances
 import { enqueueEventQueueItem } from "./v2-event-queue";
 import type { GameState, Paper, PaperAcceptType, PaperReviewResult, PaperReviewSettlement, PaperTarget, PendingEvent } from "./v2-types";
 import { getJournalDefinition } from "./v2-journal-system";
-import { applyPublicationTalentRewards } from "./v2-publication-talent";
+import { applyPublicationTalentRewards, projectPublicationTalentRewards } from "./v2-publication-talent";
 import { formatEventSanChange, getActualSanChange, getIllnessSanIncrease } from "./v2-sanity-rules";
+import { getConferenceRegistrationFee, projectConferenceRegistrationFees, settleConferenceRegistrationFees } from "./v2-lab-publication-costs";
 
 const DEFAULT_TARGET_INFLUENCE: Record<PaperTarget, number> = { A: 1.1, B: 0.6, C: 0.3 };
 export const CITATION_SETTLEMENT_INTERVAL_MONTHS = 1;
@@ -59,7 +60,7 @@ function getReviewerLines(settlement: PaperReviewSettlement): string[] {
   });
 }
 
-function getReviewRewardText(settlement: PaperReviewSettlement): string {
+function getReviewRewardText(settlement: PaperReviewSettlement, paper?: Paper): string {
   const illnessIncrease = settlement.reports.reduce((sum, report) => sum + (report.illnessSanIncrease ?? 0), 0);
   const sanText = settlement.reviewerSanChange !== 0
     ? `；审稿影响 ${formatEventSanChange(settlement.reviewerSanChange, illnessIncrease)}`
@@ -73,7 +74,8 @@ function getReviewRewardText(settlement: PaperReviewSettlement): string {
     }).filter(Boolean);
     return `论文退回草稿；${gains.length ? `修改反馈：${gains.join(" · ")}` : "本轮无分数提升"}${sanText}`;
   }
-  return `科研分 +${settlement.scoreGain}${sanText}`;
+  const registrationFee = paper ? getConferenceRegistrationFee(paper) : 0;
+  return `科研分 +${settlement.scoreGain}${registrationFee > 0 ? `；注册费：科研经费 -${registrationFee}（导师支付）` : ""}${sanText}`;
 }
 
 function resolveReviewerSan(state: GameState, settlement: PaperReviewSettlement): PaperReviewSettlement {
@@ -89,14 +91,14 @@ function resolveReviewerSan(state: GameState, settlement: PaperReviewSettlement)
   return { ...settlement, reports, reviewerSanChange: reports.reduce((sum, report) => sum + (report.sanChange ?? 0), 0) };
 }
 
-function getReviewResultDescription(settlement: PaperReviewSettlement): string {
+function getReviewResultDescription(settlement: PaperReviewSettlement, paper?: Paper): string {
   return [
     `PC 最终决定：${getReviewResultText(settlement)}。`,
     `总评 ${settlement.totalReviewScore >= 0 ? "+" : ""}${settlement.totalReviewScore}。`,
     ...(settlement.borderlineChance !== null
       ? [`边缘录用概率 ${(settlement.borderlineChance * 100).toFixed(1)}%。`] : []),
     "机制结算",
-    getReviewRewardText(settlement),
+    getReviewRewardText(settlement, paper),
   ].join("\n\n");
 }
 
@@ -124,6 +126,7 @@ export function refreshPaperReviewEvent<Event extends PendingEvent>(state: GameS
   const original = findReviewSettlement(event);
   if (!original) return event;
   const settlement = resolveReviewerSan(state, original);
+  const paper = [...state.papers, ...state.externalPublications].find((entry) => entry.id === settlement.paperId);
   if (JSON.stringify(settlement) === JSON.stringify(original)) return event;
   const refresh = <Entry extends PendingEvent>(entry: Entry): Entry => {
     const presentation = entry.paperReviewPresentation;
@@ -132,10 +135,10 @@ export function refreshPaperReviewEvent<Event extends PendingEvent>(state: GameS
     return {
       ...entry,
       ...(result ? {
-        description: getReviewResultDescription(settlement),
-        completionLog: `${getReviewResultText(settlement)}；${getReviewRewardText(settlement)}`,
+        description: getReviewResultDescription(settlement, paper),
+        completionLog: `${getReviewResultText(settlement)}；${getReviewRewardText(settlement, paper)}`,
       } : reviewers ? { description: getReviewerDescription(settlement) } : {}),
-      paperReviewPresentation: result ? { ...presentation, reports: settlement.reports, rewardText: getReviewRewardText(settlement) }
+      paperReviewPresentation: result ? { ...presentation, reports: settlement.reports, rewardText: getReviewRewardText(settlement, paper) }
         : reviewers ? { ...presentation, reports: settlement.reports } : presentation,
       choices: entry.choices.map((choice) => ({ ...choice, effects: {
         ...choice.effects,
@@ -187,13 +190,14 @@ export function createPaperReviewResultEvent(paper: Paper, settlement: PaperRevi
     ? getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear)
     : null;
   const resultText = getReviewResultText(settlement);
-  const rewardText = getReviewRewardText(settlement);
+  const rewardText = getReviewRewardText(settlement, paper);
+  const title = `${conference?.name ?? `${settlement.target}类会议`}结果`;
   const chainId = `paper-review-result-${paper.id}`;
-  const resultDescription = getReviewResultDescription(settlement);
+  const resultDescription = getReviewResultDescription(settlement, paper);
 
   const reviewerEvent: PendingEvent = {
     id: `paper-review-result-${paper.id}-reviewers`,
-    title: "论文结果 ➜ 你的三个审稿人",
+    title: `${title} ➜ 你的三个审稿人`,
     description: getReviewerDescription(settlement),
     source: "review",
     blocking: true,
@@ -215,7 +219,7 @@ export function createPaperReviewResultEvent(paper: Paper, settlement: PaperRevi
       effects: {
         enqueueEvents: [{
           id: `paper-review-result-${paper.id}-pc`,
-          title: "论文结果 ➜ 你的三个审稿人 ➜ PC 最终决定",
+          title: `${title} ➜ 你的三个审稿人 ➜ PC 最终决定`,
           description: resultDescription,
           source: "review",
           blocking: true,
@@ -251,7 +255,7 @@ export function createPaperReviewResultEvent(paper: Paper, settlement: PaperRevi
 
   return {
     id: `paper-review-result-${paper.id}`,
-    title: "论文结果",
+    title,
     description: [
       `邮箱弹出审稿通知，你把手头的窗口切到一边。${conference ? `${conference.name} ${conference.year} 的结果终于到了。` : "审稿结果终于到了。"}`,
       `本年会议概况：会议影响力 ${settlement.venueInfluence.toFixed(2)}，审稿标准 ×${settlement.reviewStrictnessMultiplier.toFixed(2)}。`,
@@ -343,7 +347,7 @@ export function applyRejectedPaperReview(paper: Paper, reviewResult: PaperReview
 }
 
 /** Apply the result only after the player confirms the review-result event. */
-export function applyPaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement): GameState {
+function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement): GameState {
   if (state.phase !== "playing") return state;
   const paperIndex = state.papers.findIndex((paper) => paper.id === settlement.paperId);
   if (paperIndex < 0) return state;
@@ -396,7 +400,19 @@ export function applyPaperReviewSettlement(state: GameState, settlement: PaperRe
       san: Math.min(state.sanCap, state.player.san + settlement.reviewerSanChange),
     },
   });
-  return applyPublicationTalentRewards(nextState);
+  return nextState;
+}
+
+export function projectPaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement): GameState {
+  const nextState = resolvePaperReviewSettlement(state, settlement);
+  if (nextState === state || !settlement.accepted) return nextState;
+  return projectPublicationTalentRewards(projectConferenceRegistrationFees(nextState, [settlement.paperId]));
+}
+
+export function applyPaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement): GameState {
+  const nextState = resolvePaperReviewSettlement(state, settlement);
+  if (nextState === state || !settlement.accepted) return nextState;
+  return applyPublicationTalentRewards(settleConferenceRegistrationFees(nextState, [settlement.paperId]));
 }
 
 export function resolveDuePaperReviews(

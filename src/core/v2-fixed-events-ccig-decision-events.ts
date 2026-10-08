@@ -1,5 +1,5 @@
-import { createFixedEvent } from "./v2-fixed-events-shared";
 import {
+  createCcigFixedEvent,
   getCcigChainId,
   getCcigLocation,
   getCcigRealYear,
@@ -18,7 +18,7 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
     ? `自费要 ${actualCost} 金币。你又算了一遍生活费，看报告日程的兴奋里，添了一点心疼。`
     : `自费要 ${actualCost} 金币。你在余额和聊天框间切了两回：花钱心疼，报销也真难开口。`;
 
-  const event = createFixedEvent({
+  const event = createCcigFixedEvent(state, {
     id: `ccig-decision-act2-y${state.year}-m${state.month}`,
     title: "领域年会 ➜ 参会决定",
     description: [
@@ -40,7 +40,6 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
         id: `ccig-advisor-y${state.year}-m${state.month}`,
         label: "请导师报销",
         outcome: "申请导师报销。",
-        disabledReason: state.advisorProgressState.funding < actualCost ? `实验室经费不足，需要 ${actualCost} 金币。` : undefined,
         effects: {
           fixedEventResolution: { kind: "ccig-advisor" },
         },
@@ -49,14 +48,13 @@ export function createCcigDecisionEvent(state: GameState): PendingEvent {
         id: `ccig-self-y${state.year}-m${state.month}`,
         label: "自费参会",
         outcome: `金币 -${actualCost}。`,
-        disabledReason: state.player.money < actualCost ? `金币不足，需要 ${actualCost} 金币。` : undefined,
         effects: {
           fixedEventResolution: { kind: "ccig-self" },
         },
       },
     ],
   });
-  return { ...event, fixedResultPreview: { resolution: { kind: "ccig-open" }, rolls: [] } };
+  return { ...event, fixedResultPreview: { resolution: { kind: "ccig-open", ccigCalendar: { year: state.year, month: state.month } }, rolls: [] } };
 }
 
 export function createCcigAttendResultEvent(
@@ -68,13 +66,8 @@ export function createCcigAttendResultEvent(
 ): PendingEvent {
   const location = getCcigLocation(state.year);
   const realYear = getCcigRealYear(state.year, state.month);
-  const { actualCost } = getCcigSelfPayCost(state);
-  const fundingInsufficient = mode === "advisor" && state.advisorProgressState.funding < actualCost;
-  const moneyInsufficient = mode === "self" && state.player.money < actualCost;
-  const disabledReason = fundingInsufficient ? `科研经费不足，需要 ${actualCost}。`
-    : moneyInsufficient ? `金币不足，需要 ${actualCost} 金币。` : undefined;
 
-  return createFixedEvent({
+  return createCcigFixedEvent(state, {
     id: `ccig-attend-result-y${state.year}-m${state.month}-${mode}`,
     title: "领域年会 ➜ 参会决定 ➜ 参会确认",
     description: [
@@ -89,9 +82,8 @@ export function createCcigAttendResultEvent(
     choices: [
       {
         id: `ccig-enter-venue-y${state.year}-m${state.month}-${mode}`,
-        label: "安排行程",
+        label: "确定",
         outcome: "进入行程安排。",
-        disabledReason,
         effects: {
           ...deferredEffects,
           counterDeltas: {
@@ -102,12 +94,6 @@ export function createCcigAttendResultEvent(
           enqueueEvents: [createCcigActivityEvent(state, mode, settlementItems)],
         },
       },
-      ...(disabledReason ? [{
-        id: `ccig-change-payment-y${state.year}-m${state.month}`,
-        label: "重新选择或取消参会",
-        outcome: fundingInsufficient ? "科研经费不足，重新选择自费或取消参会。" : "金币不足，重新选择报销或取消参会。",
-        effects: { fixedEventResolution: { kind: "ccig-open" as const } },
-      }] : []),
     ],
   });
 }
@@ -115,7 +101,7 @@ export function createCcigAttendResultEvent(
 export function createCcigSkipResultEvent(state: GameState): PendingEvent {
   const location = getCcigLocation(state.year);
   const realYear = getCcigRealYear(state.year, state.month);
-  return createFixedEvent({
+  return createCcigFixedEvent(state, {
     id: `ccig-skip-result-y${state.year}-m${state.month}`,
     title: "领域年会 ➜ 参会决定 ➜ 暂不参会",
     description: [
@@ -128,7 +114,7 @@ export function createCcigSkipResultEvent(state: GameState): PendingEvent {
     choices: [
       {
         id: `ccig-skip-finish-y${state.year}-m${state.month}`,
-        label: "继续本月安排",
+        label: "确定",
         outcome: "继续原来的安排。",
         effects: {},
       },
@@ -139,7 +125,7 @@ export function createCcigSkipResultEvent(state: GameState): PendingEvent {
 export function createCcigEvent(state: GameState): PendingEvent {
   const location = getCcigLocation(state.year);
   const realYear = getCcigRealYear(state.year, state.month);
-  return createFixedEvent({
+  return createCcigFixedEvent(state, {
     id: `ccig-y${state.year}-m${state.month}`,
     title: "领域年会",
     description: [

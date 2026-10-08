@@ -46,6 +46,22 @@ function createPopupFixture() {
 }
 
 describe("independent debug window", () => {
+  it("groups thesis progress with graduation and keeps separate conference shortcuts", () => {
+    const html = renderDebugPanel(createStartedGameState("normal"), true);
+    const paperGroup = html.match(/<h3>论文相关<\/h3>([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const graduationGroup = html.match(/<h3>毕业相关<\/h3>([\s\S]*?)<\/div>/)?.[1] ?? "";
+    for (const [id, label] of [["conference", "论文参会"], ["conference-activity", "会场活动"], ["review-result", "论文结果"]]) {
+      expect(paperGroup).toContain(`data-event-id="${id}"`);
+      expect(paperGroup).toContain(label);
+    }
+    expect(paperGroup).not.toContain('data-event-id="thesis-progress"');
+    expect(graduationGroup).toContain('data-event-id="thesis-progress"');
+    expect(graduationGroup).toContain("论文推进");
+    expect(graduationGroup).toContain('data-event-id="career-internet"');
+    expect(html).not.toContain("招聘相关");
+    expect(html).toContain("年会活动");
+  });
+
   it("includes every former debug control and displays current game attributes", () => {
     const state = createStartedGameState("normal");
     state.player.money = 42;

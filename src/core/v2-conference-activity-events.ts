@@ -78,7 +78,7 @@ export function createConferenceActivityResult(
   const activityChainId = getConferenceActivityChainId(context);
   return {
     id: `${activityChainId}-result-${option.id}`,
-    title: "会场活动 ➜ 选择安排 ➜ 活动结果",
+    title: `${context.conferenceName}参会 ➜ 选择安排 ➜ 活动结果`,
     description: [
       option.resultDescription,
       "回程时，你把胸牌塞进会务袋。下次再挂上它，又不知道会在哪座城市了。",
@@ -95,7 +95,7 @@ export function createConferenceActivityResult(
     completionLog: activitySummary,
     choices: [{
       id: "close",
-      label: "结束",
+      label: "确定",
       outcome: "本次会场活动结束。",
       effects: {
         ...option.effects,
@@ -120,7 +120,7 @@ export function createConferenceActivityDecisionEvent(
   const activityChainId = getConferenceActivityChainId(context);
   return {
     id: `${activityChainId}-act2`,
-    title: "会场活动 ➜ 选择安排",
+    title: `${context.conferenceName}参会 ➜ 选择安排`,
     description: [
       `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，先前圈过的几项恰好撞了时间。` + (context.paperCount >= 2
         ? `忙完 ${context.paperCount} 篇论文的展示，你不想再赶场，只想好好参加一项。`
@@ -155,7 +155,7 @@ export function createConferenceActivityEvent(
   const attendanceSummary = attendanceSettlementItems.join("，");
   return {
     id: `${activityChainId}-act1`,
-    title: "会场活动",
+    title: `${context.conferenceName}参会`,
     description: [
       `在${context.city}的会场，你按 ${context.conferenceName} 的安排完成了论文展示。走出展示区时，肩膀才慢慢松下来。`,
       context.paperCount >= 2

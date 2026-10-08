@@ -1,5 +1,5 @@
-import { createFixedEvent } from "./v2-fixed-events-shared";
 import {
+  createCcigFixedEvent,
   getCcigActivityChainId,
   getCcigLocation,
   getCcigPosterPaper,
@@ -22,9 +22,9 @@ export function createCcigActivityEvent(
   const arrivalText = participationMode === "advisor"
     ? `报销手续办妥后，你来到${location}参加 VALSE ${realYear}，在签到处出示凭证和证件，领到胸牌与手册。`
     : `行程安排妥当后，你来到${location}参加 VALSE ${realYear}，在签到处出示凭证和证件，领到胸牌与手册。`;
-  return createFixedEvent({
+  return createCcigFixedEvent(state, {
     id: `${activityChainId}-act1`,
-    title: "领域年会活动",
+    title: "VALSE参会",
     description: [
       arrivalText,
       `走廊里挤满了挂胸牌的人，海报区汇集着近年的顶会顶刊工作。你在手册上圈好想听的报告，抬头发现刚读过的论文作者就在旁边排队。${posterPaper ? `你带来的《${posterPaper.title}》也排进了展示，得找找自己的展板。` : ""}`,
@@ -34,7 +34,7 @@ export function createCcigActivityEvent(
     choices: [{
       id: `ccig-activity-open-y${state.year}-m${state.month}`,
       label: "继续",
-      outcome: "查看领域年会活动安排。",
+      outcome: "查看VALSE参会安排。",
       effects: {
         enqueueEvents: [createCcigActivityDecisionEvent(state, participationMode, attendanceSettlementItems)],
       },
@@ -52,9 +52,9 @@ export function createCcigActivityDecisionEvent(
   const realYear = getCcigRealYear(state.year, state.month);
   const posterPaper = getCcigPosterPaper(state);
   const attendanceSummary = attendanceSettlementItems.join("，");
-  return createFixedEvent({
+  return createCcigFixedEvent(state, {
     id: `${activityChainId}-act2`,
-    title: "领域年会活动 ➜ 选择安排",
+    title: "VALSE参会 ➜ 选择安排",
     description: [
       `你在${location}的 VALSE ${realYear} 会场对着日程找路：Tutorial 想补基础，Workshop 又有贴近课题的讨论。同学偏偏这时发来餐馆定位，人均 2 金币。报告题目和美食照片来回切换，你突然很佩服出发前那份排满的学习计划。`,
       posterPaper
@@ -114,9 +114,9 @@ export function createCcigActivityResultEvent(params: {
   condition?: string;
   effects: PendingEvent["choices"][number]["effects"];
 }): PendingEvent {
-  return createFixedEvent({
+  return createCcigFixedEvent(params.state, {
     id: `ccig-activity-result-y${params.state.year}-m${params.state.month}-${params.mode}`,
-    title: params.title.includes("➜") ? params.title : `领域年会活动 ➜ 选择安排 ➜ ${params.title}`,
+    title: params.title.includes("➜") ? params.title : `VALSE参会 ➜ 选择安排 ➜ ${params.title}`,
     description: [params.description, "机制结算", ...(params.condition ? [`条件：${params.condition}`] : []), `结果：${params.outcome}`].join("\n\n"),
     chainId: getCcigActivityChainId(params.state),
     stage: "result",
@@ -124,7 +124,7 @@ export function createCcigActivityResultEvent(params: {
     choices: [
       {
         id: `ccig-activity-finish-y${params.state.year}-m${params.state.month}-${params.mode}`,
-        label: "继续",
+        label: "确定",
         outcome: params.outcome,
         effects: params.effects,
       },

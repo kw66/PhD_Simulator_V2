@@ -3384,7 +3384,8 @@ describe("v2 render lobby shell", () => {
       const buttons = html.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
       expect(panel.match(/class="event-scene-tab(?: is-active)?"/g)).toHaveLength(scene);
       expect(panel.match(/aria-current="step"/g)).toHaveLength(1);
-      expect(buttons.match(/class="event-choice-btn event-action-btn"/g)).toHaveLength(scene === 1 ? 1 : 2);
+      expect(buttons.match(/class="event-choice-btn event-action-btn"/g)).toHaveLength(scene === 2 ? 2 : 1);
+      if (scene === 1) expect(buttons).toContain(">继续</span>");
       if (scene === 2) {
         expect(buttons).toContain('data-event-choice-id="self"');
         expect(buttons).toContain('data-event-choice-id="advisor"');
@@ -3392,7 +3393,8 @@ describe("v2 render lobby shell", () => {
       if (scene === 3) {
         expect(panel).toContain(`>${paymentMode === "self" ? "金币" : "科研经费"} -5</span>`);
         expect(buttons).toContain('data-event-choice-id="confirm"');
-        expect(buttons).toContain('data-event-choice-id="change-payment-method"');
+        expect(buttons).toContain(">确定</span>");
+        expect(buttons).not.toContain('data-event-choice-id="change-payment-method"');
       }
       expect(state).toEqual(before);
       expect(state.player.money).toBe(10);
@@ -3415,6 +3417,68 @@ describe("v2 render lobby shell", () => {
     expect(attributeName()).toBe("大多数");
     state = dispatchAction(state, "resolve-event", { eventChoiceId: "before-grad-school-finish" });
     expect(attributeName()).toBe(`大多数：${candidateName}`);
+  });
+
+  it.each([
+    { mode: "self", balance: 0, ending: "poor" },
+    { mode: "advisor", balance: 0, ending: "lab-bankrupt" },
+    { mode: "self", balance: 5, ending: null },
+    { mode: "advisor", balance: 5, ending: null },
+  ] as const)("keeps journal $mode payment clickable at balance $balance and settles only on confirmation", ({ mode, balance, ending }) => {
+    let state = createEnrolledTestState();
+    state.player.money = mode === "self" ? balance : 10;
+    state.advisorProgressState.funding = mode === "advisor" ? balance : 10;
+    const paper = attachPaperPublication({
+      ...createDraftPaper(1, 0), status: "published", target: null, journalTarget: "pami",
+    }, 1);
+    state.papers = [paper];
+    state.eventQueue = [createEventQueueItem(createJournalFeeEvent(state, paper)!, state.totalMonths)];
+    state = dispatchAction(state, "resolve-event", { eventId: state.eventQueue[0]!.id, eventChoiceId: "continue" });
+    for (const stage of ["act2", "act3"]) {
+      const event = state.eventQueue[0]!;
+      expect(event.stage).toBe(stage);
+      const before = structuredClone(state);
+      const html = renderApp(state, undefined, { isEventContentOpen: true, activeEventId: event.id });
+      const choiceId = stage === "act2" ? mode : "confirm";
+      const button = html.match(new RegExp(`<button\\b[^>]*data-event-choice-id="${choiceId}"[^>]*>[\\s\\S]*?</button>`))?.[0] ?? "";
+      expect(button).toContain('data-action="resolve-event"');
+      expect(button).not.toMatch(/\sdisabled(?:\s|>)/);
+      expect(button.includes('event-choice-risk is-certain')).toBe(balance < 5);
+      if (balance < 5) expect(button).toMatch(/class="event-choice-risk is-certain"[^>]*>[！!]<\/span>/);
+      expect(html).not.toContain('data-event-choice-id="change-payment-method"');
+      expect(state).toEqual(before);
+      expect(state.player.money).toBe(mode === "self" ? balance : 10);
+      expect(state.advisorProgressState.funding).toBe(mode === "advisor" ? balance : 10);
+      state = dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: choiceId });
+    }
+    expect(state.player.money).toBe(mode === "self" ? balance - 5 : 10);
+    expect(state.advisorProgressState.funding).toBe(mode === "advisor" ? balance - 5 : 10);
+    expect(state.advisorProgressState.paidJournalPaperIds).toContain(paper.id);
+    expect(state.phase).toBe(ending ? "finished" : "playing");
+    expect(state.ending).toBe(ending);
+  });
+
+  it("renders a possible-risk question mark without disabling or resolving the choice", () => {
+    const state = createEnrolledTestState();
+    state.month = 1;
+    state.player.san = 0;
+    state.player.favor = 0;
+    state.eventCounters.teachersDayErrandCount = 0;
+    const event = createEventQueueItem({
+      id: "teachers-day-risk", chainId: "teachers-day", title: "教师节", description: "给导师发祝福。",
+      source: "fixed", stage: "act2", blocking: true, deadlineMonths: 0,
+      choices: [{ id: "message", label: "发祝福", outcome: "等待回复", effects: {
+        fixedEventResolution: { kind: "teachers-day-message" },
+      } }],
+    }, state.totalMonths);
+    state.eventQueue = [event];
+    const before = structuredClone(state);
+    const html = renderApp(state, undefined, { isEventContentOpen: true, activeEventId: event.id });
+    const button = html.match(/<button\b[^>]*data-event-choice-id="message"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(button).toContain('data-action="resolve-event"');
+    expect(button).toMatch(/class="event-choice-risk is-possible"[^>]*>[？?]<\/span>/);
+    expect(button).not.toMatch(/\sdisabled(?:\s|>)/);
+    expect(state).toEqual(before);
   });
 
   it("highlights the advisor name in the advisor information event", () => {
@@ -3446,7 +3510,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain(`class="workstation-action-points-icon"`);
   });
 
-  it("renders unaffordable event choices as disabled buttons", () => {
+  it("preserves explicit disabled reasons on event choices", () => {
     const initial = createAdmittedTestState();
     const state = {
       ...initial,
@@ -4331,9 +4395,9 @@ describe("v2 render lobby shell", () => {
     expect(inheritance).toContain("当前同学累计");
     expect(inheritance).toContain("当前同学每学年科研成长的累计值");
     const inheritanceHelp = getHelpText({ activePlayTab: "talent", activeTalentTab: "relation" });
-    expect(inheritanceHelp).toContain("当前人际栏同学自然成长与传承的实际提升；离校或停止合作后不再计入");
-    expect(inheritanceHelp).toContain("玩家只获传承，不含自然成长");
-    expect(inheritanceHelp).toContain("同学自然成长+2，与传承合并为2+⌊n/2⌋后逐点抵抗");
+    expect(inheritanceHelp).toContain("“当前同学累计”只统计目前在组同学的年度实际提升");
+    expect(inheritanceHelp).toContain("玩家只获传承，受自身科研上限限制");
+    expect(inheritanceHelp).toContain("同学另有自然成长+2，与传承合并后逐点抵抗，上限20");
     expect(inheritance).not.toMatch(/发表积累|累计一作|每学年9月/);
     expect(relationHtml).toContain('data-talent-item-id="lover"');
 
@@ -4479,6 +4543,42 @@ describe("v2 render lobby shell", () => {
     expect(secondPage).toMatch(/id="pending-nav-prev"[^>]*disabled/);
     expect(secondPage).toMatch(/id="pending-nav-next"[^>]*disabled/);
     expect(secondPage).toContain("国奖评选");
+  });
+
+  it("previews venue-specific review results separately and merges accepted papers into one trip three months later", () => {
+    const state = createEnrolledTestState();
+    state.month = 6;
+    state.totalMonths = 6;
+    state.eventQueue = [];
+    const reviewing = {
+      ...createDraftPaper(3, 0), status: "reviewing" as const, target: "A" as const,
+      submittedMonth: 3, submittedYear: 1, reviewMonthsLeft: 2,
+    };
+    const accepted = attachPaperPublication({
+      ...reviewing, id: "accepted-one", status: "published", reviewMonthsLeft: 0,
+      acceptedTotalMonths: 6, conferenceAvailableAtTotalMonths: 9, conferenceHandled: false,
+    }, 1);
+    state.papers = [reviewing, { ...reviewing, id: "reviewing-two" }];
+    state.externalPublications = [
+      accepted, { ...accepted, id: "accepted-two" },
+      { ...accepted, id: "handled", conferenceHandled: true },
+      { ...accepted, id: "coauthored", nonFirstAuthor: true },
+    ];
+    const before = structuredClone(state);
+    const venue = getConferenceInfo(3, "A", 1).name;
+    const previews = buildFutureTodoPreviewItems(state);
+    expect(previews.filter((item) => item.title === `${venue}结果`)).toEqual([
+      expect.objectContaining({ monthsLater: 2, timeText: "2月后 发生" }),
+      expect.objectContaining({ monthsLater: 2, timeText: "2月后 发生" }),
+    ]);
+    expect(previews.filter((item) => item.title === `${venue}安排`)).toEqual([
+      expect.objectContaining({ monthsLater: 3, timeText: "3月后 发生" }),
+    ]);
+    expect(previews.map((item) => item.title)).not.toContain("论文结果");
+    expect(previews.map((item) => item.title)).not.toContain("论文参会");
+    expect(buildFutureTodoPreviewItems({ ...state, month: 9, totalMonths: 9 })
+      .some((item) => item.title === `${venue}安排`)).toBe(false);
+    expect(state).toEqual(before);
   });
 
   it("renders the shared next-month settlement preview", () => {
@@ -5716,7 +5816,10 @@ describe("v2 render lobby shell", () => {
     expect(footer).toMatch(/>注册经费-2｜/);
     expect(footer).not.toContain("同会差旅");
     expect(footer).not.toContain("同学会议只按");
-    expect(getHelpText({ activePlayTab: "relationship" })).toContain("同学会议只收每篇1金币注册费，自动扣科研经费，不收差旅费、不扣同学钱包");
+    const help = getHelpText({ activePlayTab: "relationship" });
+    expect(help).toContain("录用结果确认时，每篇一作注册费1金币，由导师经费支付");
+    expect(help).toContain("玩家与同学相同，3个月后不再扣注册费");
+    expect(help).toContain("同学默认免费代贴，无差旅");
     expect(card).toContain("订阅Claude 2（自费 -2）");
     expect(card).not.toContain("本月领薪");
     expect(card.match(/class="rel-monthly-activity"/g)).toHaveLength(1);
@@ -5759,9 +5862,9 @@ describe("v2 render lobby shell", () => {
     const academic = card.match(/<div class="rel-fellow-academic-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(academic).toContain('每学年末（8月）科研+2，并参与实验室传承');
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain('n为科研更高的其他实验室成员人数，导师计1人，恋人不计');
-    expect(help).toContain('同学自然成长+2，与传承合并为2+⌊n/2⌋后逐点抵抗');
-    expect(help).toContain('同学上限20');
+    expect(help).toContain('传承原始奖励为科研+⌊n/2⌋');
+    expect(help).toContain('n是科研比自己高的其他实验室成员人数，导师计1人，恋人不计');
+    expect(help).toContain('同学另有自然成长+2，与传承合并后逐点抵抗，上限20');
     expect(academic).not.toMatch(/累计一作|篇时科研/);
     expect(academic).toContain('data-tooltip-align="left"');
     expect(card).not.toContain('class="rel-known-time"');
@@ -5981,12 +6084,14 @@ describe("v2 render lobby shell", () => {
 
     expect(hint).toContain(rule);
     expect(hint).toContain("同学帮助方式");
-    expect(hint).toContain("加分均为帮助者科研");
+    expect(hint).toContain("加分为帮助者科研向下取整");
     expect(hint).toContain("每次只帮一篇的一项");
     expect(hint).toContain("双方分别结算");
     expect(hint).toContain("没有可修改论文时各保留一次");
     expect(hint).toContain("审稿时也可协作");
     expect(hint).toContain("审稿3个月");
+    expect(hint).toContain("自动协作使用实际默契，保留小数");
+    expect(hint).toContain("默契6.75，普通合作每月推进6.75，长期合作推进13.5");
     expect(card).toContain('role="progressbar" aria-label="协作进度"');
     expect(html).not.toContain("先选你的受助论文");
   });
@@ -6733,5 +6838,21 @@ describe("v2 render lobby shell", () => {
     expect(buildFutureTodoPreviewItems(base).map((item) => item.title)).toContain("指导新生");
     expect(buildFutureTodoPreviewItems({ ...base, year: 3, month: 12, totalMonths: 36 }).map((item) => item.title)).not.toContain("指导新生");
     expect(buildFutureTodoPreviewItems({ ...base, degree: "master", phdStartYear: null }).map((item) => item.title)).not.toContain("指导新生");
+  });
+
+  it.each([2, 3])("previews year %s transfer and VALSE together in May and removes transfer from June", (year) => {
+    const state = { ...createAdmittedTestState(), degree: "master" as const,
+      year, month: 8, totalMonths: (year - 1) * 12 + 8, eventQueue: [] };
+    const april = buildFutureTodoPreviewItems(state);
+    expect(april.filter((item) => item.title === "转博抉择")).toEqual([
+      expect.objectContaining({ monthsLater: 1 }),
+    ]);
+    expect(april.filter((item) => item.title === "领域年会")).toEqual([
+      expect.objectContaining({ monthsLater: 1 }),
+    ]);
+    const may = { ...state, month: 9, totalMonths: state.totalMonths + 1 };
+    expect(buildFutureTodoPreviewItems(may).some((item) => item.title === "转博抉择")).toBe(false);
+    expect(buildFutureTodoPreviewItems({ ...state, degree: "phd", maxMonths: 70 })
+      .some((item) => item.title === "转博抉择")).toBe(false);
   });
 });

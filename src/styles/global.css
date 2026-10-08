@@ -10530,6 +10530,14 @@ button[data-card-icon-action]:focus-visible {
   letter-spacing: 0;
 }
 
+.event-choice-risk.is-certain {
+  color: #a33838;
+}
+
+.event-choice-risk.is-possible {
+  color: #8b651c;
+}
+
 .event-content-buttons .event-choice-btn:disabled {
   cursor: default;
   opacity: 0.52;

@@ -120,7 +120,7 @@ export function settleLabResearchGrowth(state: GameState, random: () => number =
   });
 }
 
-export function settleFellowCoauthoredPapers(state: GameState): GameState {
+function resolveFellowCoauthoredPapers(state: GameState, recordLogs: boolean): GameState {
   const published = [...state.papers, ...state.externalPublications, ...(state.fellowPapers ?? [])]
     .filter((paper) => paper.status === "published");
   const triggers: Array<{ key: string; record: TalentTriggerRecord }> = [];
@@ -146,6 +146,16 @@ export function settleFellowCoauthoredPapers(state: GameState): GameState {
   });
   if (triggers.length === 0) return state;
   let nextState = { ...state, fellowProgressState };
-  for (const trigger of triggers) nextState = recordTalentTrigger(nextState, trigger.key, trigger.record);
+  if (recordLogs) {
+    for (const trigger of triggers) nextState = recordTalentTrigger(nextState, trigger.key, trigger.record);
+  }
   return nextState;
+}
+
+export function projectFellowCoauthoredPapers(state: GameState): GameState {
+  return resolveFellowCoauthoredPapers(state, false);
+}
+
+export function settleFellowCoauthoredPapers(state: GameState): GameState {
+  return resolveFellowCoauthoredPapers(state, true);
 }

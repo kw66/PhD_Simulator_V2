@@ -119,7 +119,7 @@ describe("v2 publication loop", () => {
     expect(state.papers[0]).toMatchObject({ idea: 8, experiment: 8, writing: 8 });
     const result = resolveDuePaperReviews(state, () => 0);
     expect(result.state.papers).toHaveLength(1);
-    expect(result.state.eventQueue[0]?.title).toBe("论文结果");
+    expect(result.state.eventQueue[0]?.title).toBe("WACV结果");
     expect(result.state.eventQueue[0]?.description).toContain("本年会议概况");
     expect(result.state.eventQueue[0]?.paperReviewPresentation).toMatchObject({
       kind: "overview",
@@ -177,7 +177,7 @@ describe("v2 publication loop", () => {
       selectedPaperId: paper.id,
     };
     const queued = resolveDuePaperReviews(state, () => 0).state;
-    expect(queued.eventQueue[0]?.title).toBe("论文结果");
+    expect(queued.eventQueue[0]?.title).toBe("WACV结果");
 
     const forced = dispatchAction(queued, "force-next-month");
     expect(forced.papers[0]).toMatchObject({

@@ -1,4 +1,4 @@
-import { settleFellowCoauthoredPapers } from "./v2-lab-talent";
+import { projectFellowCoauthoredPapers, settleFellowCoauthoredPapers } from "./v2-lab-talent";
 import { settlePublishedImageMisuse } from "./v2-academic-integrity";
 import { getResearchCap } from "./v2-research-cap-system";
 import { applyTierResist } from "./v2-sanity-rules";
@@ -79,12 +79,9 @@ export function getPublicationTalentChecklist(state: GameState): PublicationTale
  * previous point left. Settling item by item in order is the same as resisting
  * the merged batch point by point. Research cap bonuses land first.
  */
-export function applyPublicationTalentRewards(state: GameState, random: () => number = Math.random): GameState {
-  state = settlePublishedImageMisuse(state);
-  state = settleFellowCoauthoredPapers(state);
+function resolvePublicationTalentRewards(state: GameState, random: () => number) {
   const claimed = new Set(state.publicationTalentState?.claimedIds ?? []);
   const newlyCompleted = getPublicationTalentChecklist(state).filter((item) => item.completed && !claimed.has(item.id));
-  if (newlyCompleted.length === 0) return state;
 
   const researchCapacityState = {
     ...state.researchCapacityState,
@@ -117,7 +114,7 @@ export function applyPublicationTalentRewards(state: GameState, random: () => nu
     return { item, effects };
   });
 
-  let recordedState: GameState = {
+  const rewardedState: GameState = newlyCompleted.length === 0 ? state : {
     ...state,
     publicationTalentState: {
       claimedIds: [...claimed, ...newlyCompleted.map((item) => item.id)],
@@ -125,7 +122,17 @@ export function applyPublicationTalentRewards(state: GameState, random: () => nu
     researchCapacityState,
     player,
   };
-  for (const { item, effects } of records) {
+  return { state: rewardedState, records };
+}
+
+export function projectPublicationTalentRewards(state: GameState): GameState {
+  return resolvePublicationTalentRewards(projectFellowCoauthoredPapers(settlePublishedImageMisuse(state)), () => 0).state;
+}
+
+export function applyPublicationTalentRewards(state: GameState, random: () => number = Math.random): GameState {
+  const resolved = resolvePublicationTalentRewards(settleFellowCoauthoredPapers(settlePublishedImageMisuse(state)), random);
+  let recordedState = resolved.state;
+  for (const { item, effects } of resolved.records) {
     recordedState = recordTalentTrigger(recordedState, `publication:${item.id}`, {
       name: item.name, recipient: state.playerName ? `你·${state.playerName}` : "你", reason: item.description, effects,
     });

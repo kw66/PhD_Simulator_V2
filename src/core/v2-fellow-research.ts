@@ -12,7 +12,7 @@ import { payFellowResearchCost } from "./v2-fellow-finance";
 import { syncRelationshipState } from "./v2-relationship-rules";
 import { advanceSharedLabProject, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
-import { settleFellowConferenceFees } from "./v2-lab-publication-costs";
+import { settleConferenceRegistrationFees, settleFellowConferenceFees } from "./v2-lab-publication-costs";
 import type { GameState, Paper, PaperActionType, PaperTarget } from "./v2-types";
 
 export const FELLOW_PAPER_FIELDS = ["idea", "experiment", "writing"] as const;
@@ -148,6 +148,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     fellowResearchLastTotalMonths: state.totalMonths,
     externalPublications: [...nextState.externalPublications, ...publications.map((paper) => ({ ...paper, ...recordedPapers.get(paper.id), nonFirstAuthor: true }))],
   }, random);
+  nextState = settleConferenceRegistrationFees(nextState, acceptedPapers.map((paper) => paper.id));
   nextState = settleAdvisorGuidance(settlePendingFellowHelp(nextState, random), random);
   const activeProfiles = getFellowsInCardOrder(nextState.fellowProgressState).filter((profile) => (
     state.totalMonths > profile.startTotalMonths

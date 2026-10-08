@@ -18,10 +18,8 @@ function hasPaid(state: GameState, paperId: string): boolean {
   return state.advisorProgressState.paidJournalPaperIds?.includes(paperId) ?? false;
 }
 
-function getPaymentDisabledReason(state: GameState, mode: PaymentMode, fee: number): string | undefined {
-  if (mode === "advisor" && !state.selectedAdvisorName) return "尚未选择导师";
-  return (mode === "self" ? state.player.money : state.advisorProgressState.funding) < fee
-    ? `${mode === "self" ? "金币" : "科研经费"}不足，需要 ${fee}` : undefined;
+function getPaymentDisabledReason(state: GameState, mode: PaymentMode): string | undefined {
+  return mode === "advisor" && !state.selectedAdvisorName ? "尚未选择导师" : undefined;
 }
 
 function createFeeStage(paper: Paper, stage: FeeStage, title: string, description: string): PendingEvent {
@@ -34,7 +32,7 @@ function createFeeStage(paper: Paper, stage: FeeStage, title: string, descriptio
   };
 }
 
-function createPaymentConfirmation(state: GameState, paper: Paper, mode: PaymentMode, allowReturn: boolean): PendingEvent {
+function createPaymentConfirmation(state: GameState, paper: Paper, mode: PaymentMode): PendingEvent {
   const fee = JOURNAL_PUBLICATION_FEES[getJournalTarget(paper)!];
   const result = `${mode === "self" ? "金币" : "科研经费"} -${fee}`;
   const event = createFeeStage(paper, "act3", "期刊中稿 ➜ 缴费方式 ➜ 缴费确认", [
@@ -51,22 +49,18 @@ function createPaymentConfirmation(state: GameState, paper: Paper, mode: Payment
     journalFeePreview: { paperId: paper.id, stage: "act3", paymentMode: mode },
     choices: [
       {
-        id: "confirm", label: "确认缴费", outcome: result,
-        disabledReason: getPaymentDisabledReason(state, mode, fee),
+        id: "confirm", label: "确定", outcome: result,
+        disabledReason: getPaymentDisabledReason(state, mode),
         effects: {
           ...(mode === "self" ? { money: -fee } : { advisorProgressStateDeltas: { funding: -fee } }),
           recordJournalFeePayment: paper.id,
         },
       },
-      ...(allowReturn ? [{
-        id: "change-payment-method", label: "重新选择缴费方式", outcome: "重新选择缴费方式。",
-        effects: { enqueueEvents: [createPaymentDecision(state, paper, false)] },
-      }] : []),
     ],
   };
 }
 
-function createPaymentDecision(state: GameState, paper: Paper, allowReturn = true): PendingEvent {
+function createPaymentDecision(state: GameState, paper: Paper): PendingEvent {
   const fee = JOURNAL_PUBLICATION_FEES[getJournalTarget(paper)!];
   return {
     ...createFeeStage(paper, "act2", "期刊中稿 ➜ 缴费方式", [
@@ -76,8 +70,8 @@ function createPaymentDecision(state: GameState, paper: Paper, allowReturn = tru
     choices: (["self", "advisor"] as const).map((mode) => ({
       id: mode, label: mode === "self" ? "自费" : "导师经费",
       outcome: `${mode === "self" ? "金币" : "科研经费"} -${fee}`,
-      disabledReason: getPaymentDisabledReason(state, mode, fee),
-      effects: { enqueueEvents: [createPaymentConfirmation(state, paper, mode, allowReturn)] },
+      disabledReason: getPaymentDisabledReason(state, mode),
+      effects: { enqueueEvents: [createPaymentConfirmation(state, paper, mode)] },
     })),
   };
 }
@@ -120,7 +114,7 @@ export function refreshJournalFeeEvent<Event extends PendingEvent>(state: GameSt
   }
   const refreshed = preview.stage === "act1" ? createJournalFeeEvent(state, paper)!
     : preview.stage === "act2" ? createPaymentDecision(state, paper)
-      : createPaymentConfirmation(state, paper, preview.paymentMode ?? "self", true);
+      : createPaymentConfirmation(state, paper, preview.paymentMode ?? "self");
   return { ...event, title: refreshed.title, description: refreshed.description,
     completionLog: refreshed.completionLog, choices: refreshed.choices };
 }

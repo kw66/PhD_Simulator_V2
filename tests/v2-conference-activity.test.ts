@@ -68,15 +68,30 @@ describe("v2 conference activity", () => {
     expect(root.description).toContain(`论文1：《${titles[0]}》`);
     expect(root.description).toContain(`论文2：《${titles[1]}》`);
     expect(root.description).not.toContain("倍率");
+    const name = root.conferencePreview!.context.conferenceName;
+    expect(root.title).toBe(`${name}安排`);
+    expect(root.choices[0]!.label).toBe("继续");
     const selection = root.choices[0]!.effects.enqueueEvents![0]!;
-    expect(selection.description).toContain("注册费每篇 1 金币，本次需缴 2 篇，由导师科研经费支付");
+    expect(selection.description).not.toContain("注册费");
+    expect(selection.description).toContain("同一场会议只收一次");
     const result = selection.choices.find((choice) => choice.id === "self")!.effects.enqueueEvents![0]!;
+    expect(selection.title).toBe(`${name}安排 ➜ 参会方式`);
+    expect(result.title).toBe(`${name}安排 ➜ 参会方式 ➜ 参会确认`);
+    expect(result.choices[0]!.label).toBe("确定");
     expect(result.description).toContain("论文1：Oral 展示完成，会后引用倍率 ×1.50");
     expect(result.description).toContain("论文2：Poster 展示完成");
     expect(result.description).not.toContain("×1.00");
     for (const title of titles) expect(result.description).not.toContain(title);
     const activityRoot = result.choices[0]!.effects.enqueueEvents![0]!;
     const activityDecision = activityRoot.choices[0]!.effects.enqueueEvents![0]!;
+    expect(activityRoot.title).toBe(`${name}参会`);
+    expect(activityRoot.choices[0]!.label).toBe("继续");
+    expect(activityDecision.title).toBe(`${name}参会 ➜ 选择安排`);
+    for (const choice of activityDecision.choices) {
+      const final = choice.effects.enqueueEvents![0]!;
+      expect(final.title).toBe(`${name}参会 ➜ 选择安排 ➜ 活动结果`);
+      expect(final.choices[0]!.label).toBe("确定");
+    }
     for (const event of [activityRoot, activityDecision, ...activityDecision.choices.map((choice) => choice.effects.enqueueEvents![0]!)]) {
       expect(event.description).not.toMatch(/金币|科研经费|引用倍率|论文[12]：/);
       expect(event.completionLog ?? "").not.toMatch(/金币|科研经费|引用倍率/);

@@ -141,13 +141,18 @@ describe("automatic linear event resolution", () => {
     expect(next.eventQueue.some((item) => item.source === "review")).toBe(false);
   });
 
-  it("stops immediately on an ending instead of advancing the calendar or resolving later rewards", () => {
+  it("requires manual confirmation for lethal results even with automatic events enabled", () => {
     const initial = stateWith([event("fatal", { san: -30 }), event("recovery", { san: 20 })]);
     const next = dispatchAction(initial, "next-month");
-    expect(next.phase).toBe("finished");
-    expect(next.ending).toBe("burnout");
+    expect(next.phase).toBe("playing");
+    expect(next.ending).toBeNull();
     expect(next.totalMonths).toBe(4);
-    expect(next.eventHistory.map((item) => item.chainId)).toEqual(["fatal"]);
+    expect(next.eventHistory).toEqual([]);
+    expect(canAutoResolveLinearEvent(next, next.eventQueue[0]!)).toBe(false);
+    const confirmed = resolve(next, "fatal", "fatal-confirm");
+    expect(confirmed.phase).toBe("finished");
+    expect(confirmed.ending).toBe("burnout");
+    expect(confirmed.eventHistory.map((item) => item.chainId)).toEqual(["fatal"]);
   });
 
   it("keeps the setting across restarting and returning to the lobby", () => {

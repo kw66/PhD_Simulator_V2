@@ -97,7 +97,7 @@ export function collectFixedEventsForState(
   if (state.month === 9) {
     events.push(createCcigEvent(state));
   }
-  if (state.degree === "master" && state.month === 10 && (state.year === 2 || state.year === 3)) {
+  if (state.degree === "master" && state.month === 9 && (state.year === 2 || state.year === 3)) {
     events.push(createPhdDecisionEvent(state, state.year));
   }
   if (state.month === 11) {

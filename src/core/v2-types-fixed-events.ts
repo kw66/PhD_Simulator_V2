@@ -48,6 +48,7 @@ export interface FixedEventResolution {
   studentName?: string;
   ccigAttendanceSummary?: string;
   ccigPaperId?: string;
+  ccigCalendar?: { year: number; month: number };
   teachersDayGift?: TeachersDayGiftId;
   advisorCandidate?: FixedEventAdvisorCandidate;
   advisorIntel?: FixedEventAdvisorIntel;

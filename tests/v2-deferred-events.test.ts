@@ -287,7 +287,8 @@ describe("deferred-system event content", () => {
     expect(event.description).not.toContain("倍率");
     const act2 = event.choices[0]?.effects.enqueueEvents?.[0];
     expect(act2?.stage).toBe("act2");
-    expect(act2?.title).toBe("论文参会 ➜ 参会方式");
+    expect(event.title).toBe("ICML安排");
+    expect(act2?.title).toBe("ICML安排 ➜ 参会方式");
     expect(act2?.choices.map((choice) => choice.id)).toEqual(["self", "advisor", "proxy"]);
     const selfConfirmation = act2?.choices.find((choice) => choice.id === "self")?.effects.enqueueEvents?.[0];
     expect(selfConfirmation?.description).toContain("论文1：Poster 展示完成");
@@ -296,7 +297,7 @@ describe("deferred-system event content", () => {
     expect(selfConfirmation?.description).not.toContain("×1.00");
     expect(selfConfirmation?.description).toContain("金币 -6");
     const selfActivity = selfConfirmation?.choices[0]?.effects.enqueueEvents?.[0];
-    expect(selfActivity?.title).toBe("会场活动");
+    expect(selfActivity?.title).toBe("ICML参会");
     expect(selfActivity?.description).not.toMatch(/自费参会|金币|引用倍率/u);
     expect(selfActivity?.chainId).toBe(`${event.chainId}-activity`);
 
@@ -308,7 +309,7 @@ describe("deferred-system event content", () => {
     expect(grouped[0]?.description).toContain("2 篇论文");
   });
 
-  it("finishes an in-person conference as one history item with delayed combined settlement", () => {
+  it("finishes conference arrangements and activities as separate histories with travel-only settlement", () => {
     const initial = createInitialState();
     const conferencePaper = {
       ...createGrantedPublishedPaper(1, 0, { target: "C", acceptedScore: 24 }),
@@ -351,9 +352,12 @@ describe("deferred-system event content", () => {
     state = resolve(state, "self");
     expect(state.eventQueue[0]?.description).toContain("金币 -6");
     expect(state.player.money).toBe(10);
+    expect(state.eventQueue[0]?.choices[0]?.label).toBe("确定");
+    expect(state.eventQueue[0]?.choices[0]?.effects.advisorProgressStateDeltas).toBeUndefined();
+    expect(state.eventQueue[0]?.choices[0]?.effects.recordConferenceRegistrationPayment).toBeUndefined();
 
     state = resolve(state, "enter-venue");
-    expect(state.eventQueue[0]?.title).toBe("会场活动");
+    expect(state.eventQueue[0]?.title).toBe("WACV参会");
     expect(state.eventQueue[0]?.description).not.toContain("金币 -6");
     expect(state.player.money).toBe(4);
     expect(state.papers[0]?.conferenceHandled).toBe(true);
@@ -367,6 +371,8 @@ describe("deferred-system event content", () => {
 
     expect(state.player.money).toBe(4);
     expect(state.player.san).toBe(16);
+    expect(state.advisorProgressState.funding).toBe(initial.advisorProgressState.funding);
+    expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(initial.advisorProgressState.paidConferenceRegistrationPaperIds);
     expect(state.papers[0]?.conferenceHandled).toBe(true);
     expect(state.eventHistory).toHaveLength(2);
     expect(state.eventHistory[0]?.stages).toHaveLength(3);
@@ -409,8 +415,12 @@ describe("deferred-system event content", () => {
 
     state = resolve(state, "continue");
     state = resolve(state, "proxy");
-    expect(state.eventQueue[0]?.title).toContain("参会确认");
-    expect(state.eventQueue[0]?.description).toContain("科研经费 -1");
+    expect(state.eventQueue[0]?.title).toBe("CCF安排 ➜ 参会方式 ➜ 参会确认");
+    expect(state.eventQueue[0]?.description).toContain("无额外费用");
+    expect(state.eventQueue[0]?.choices[0]?.label).toBe("确定");
+    expect(state.eventQueue[0]?.choices[0]?.effects).toEqual({
+      paperUpdates: [{ id: "paper-proxy", conferenceHandled: true }],
+    });
     state = resolve(state, "proxy-finish");
 
     expect(state.eventQueue).toHaveLength(0);
@@ -418,6 +428,9 @@ describe("deferred-system event content", () => {
     expect(state.eventHistory[0]?.stages).toHaveLength(3);
     expect(state.eventHistory[0]?.stages.some((stage) => stage.title.includes("会场安排"))).toBe(false);
     expect(state.eventCounters.meetingCount).toBe(0);
+    expect(state.player.money).toBe(1);
+    expect(state.player.favor).toBe(initial.player.favor);
+    expect(state.advisorProgressState).toEqual(initial.advisorProgressState);
     expect(state.log.some((entry) => entry.text.includes("找人代贴") && entry.text.includes("论文参会已处理"))).toBe(true);
   });
 });

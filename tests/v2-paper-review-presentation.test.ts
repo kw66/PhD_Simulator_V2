@@ -41,6 +41,8 @@ describe("paper review presentation", () => {
     const decision = advance(advance(state));
     const html = content(decision);
     expect(html).toContain("科研分 +4");
+    expect(html).toContain("注册费：科研经费 -1（导师支付）");
+    expect(decision.advisorProgressState.funding).toBe(state.advisorProgressState.funding);
     expect(html).not.toContain("paper-review-talents");
     expect(decision.eventHistory).toHaveLength(0);
     expect(html).toContain("审稿影响 SAN -2");
@@ -66,6 +68,7 @@ describe("paper review presentation", () => {
     const decision = advance(reviewers);
     const html = content(decision);
     expect(html).toContain("修改反馈：idea +5");
+    expect(html).not.toContain("注册费");
     expect(html).toContain("审稿影响 SAN -2");
     expect(html).not.toContain("paper-review-talent-row");
     expect(advance(decision).papers[0]?.rejectionCount).toBe(4);

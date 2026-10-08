@@ -9,7 +9,7 @@ import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import type { GameState, Paper, PendingEvent } from "../src/core/v2-types";
 
 function decisionState(year: 2 | 3, score = 0): GameState {
-  return { ...createStartedGameState("normal"), year, month: 10, totalMonths: year === 2 ? 22 : 34,
+  return { ...createStartedGameState("normal"), year, month: 9, totalMonths: year === 2 ? 21 : 33,
     degree: "master", totalResearchScore: score, papers: [], externalPublications: [], eventQueue: [] };
 }
 
@@ -29,9 +29,9 @@ describe("PhD decision copy", () => {
     const before = structuredClone(state);
     const intro = createPhdDecisionEvent(state);
     expect(intro).toMatchObject({ stage: "act1", blocking: true, chainId: "phd-decision",
-      fixedTreePreview: { kind: "phd-decision", year, month: 10, totalMonths: year === 2 ? 22 : 34 } });
+      fixedTreePreview: { kind: "phd-decision", year, month: 9, totalMonths: year === 2 ? 21 : 33 } });
     expect(intro.choices.map((choice) => choice.label)).toEqual(["继续"]);
-    expect(intro.description).toContain(year === 2 ? "硕士第二年6月" : "硕士第三年6月");
+    expect(intro.description).toContain(year === 2 ? "硕士第二年5月" : "硕士第三年5月");
     expect(intro.description).toContain(year === 2 ? "问起你有没有继续读博的打算" : "最后一次申请机会");
     expect(intro.description).not.toMatch(/基础工资|劳务费|SAN|培养期|第六年|70个月/);
     expect(nextStage(intro).stage).toBe("act2");
@@ -127,7 +127,7 @@ describe("PhD decision copy", () => {
     const choice = decision.choices.find((entry) => entry.id === choiceId)!;
     const result = nextStage(decision, choiceId);
     expect(result.description).toContain("硕士毕业");
-    expect(result.description).toContain("能否按期毕业，还要看这个月结束时的成果");
+    expect(result.description).toContain("能否按期毕业，还要看6月结束时的成果");
     expect(result.description).not.toMatch(/继续按硕士路线毕业|仍按硕士路线毕业|硕士毕业成功|明年还有一次机会/);
     expect(choice.effects.transferToPhd).toBeUndefined();
     expect(choice.effects.addBuffs).toBeUndefined();

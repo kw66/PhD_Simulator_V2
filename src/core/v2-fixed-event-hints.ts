@@ -13,7 +13,7 @@ export function appendFixedEventHint(
     "winter-vacation": "每年1月",
     "summer-vacation": "每年7月",
     "year-summary": "每年7月",
-    "phd-decision": "硕士第2、3年6月",
+    "phd-decision": "硕士第2、3年5月",
   };
   const condition = conditions[chainId]
     ?? (/^ccig-y\d+-m\d+-activity$/u.test(chainId) ? "每年5月，确认参加领域年会后" : undefined)

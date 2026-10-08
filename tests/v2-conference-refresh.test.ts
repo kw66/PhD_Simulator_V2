@@ -35,8 +35,8 @@ function confirmation(event: PendingEvent, mode = "proxy") {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("conference registration and stable previews", () => {
-  it.each(["act1", "act2", "act3"] as const)("refreshes unpaid registration at %s without rerolling or changing travel charges", (stage) => {
+describe("conference travel and stable previews", () => {
+  it.each(["act1", "act2", "act3"] as const)("ignores registration records at %s without rerolling or changing travel charges", (stage) => {
     const { state, root } = fixture();
     const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("preview rerolled"); });
     for (const mode of ["self", "advisor", "proxy"]) {
@@ -55,15 +55,12 @@ describe("conference registration and stable previews", () => {
         pending = refreshConferenceDecision(current, pending);
         const final = stage === "act3" ? pending : confirmation(stage === "act1" ? decision(pending) : pending, mode);
         const narrative = stage === "act1" ? pending.description : final.description;
-        const paidCount = paidIds.includes("new-paper") ? 2 : paidIds.includes("player-paper") ? 1 : 0;
-        expect(narrative).toContain(`${2 - paidCount} 篇`);
+        expect(narrative).not.toContain("注册费");
         expect(final.description).not.toMatch(/已支付|自动支付|预扣/u);
         expect(final.completionLog).not.toContain("注册费");
         expect(final.choices[0]!.effects.money).toBe(originalConfirmation.choices[0]!.effects.money);
-        const travelFunding = mode === "advisor" ? -(originalConfirmation.choices[0]!.effects.advisorProgressStateDeltas!.funding!) - 1 : 0;
-        const fundingCost = 2 - paidCount + travelFunding;
-        expect(final.choices[0]!.effects.advisorProgressStateDeltas?.funding ?? 0).toBe(fundingCost === 0 ? 0 : -fundingCost);
-        expect(final.choices[0]!.effects.recordConferenceRegistrationPayment).toEqual(["player-paper", "new-paper"]);
+        expect(final.choices[0]!.effects.advisorProgressStateDeltas).toEqual(originalConfirmation.choices[0]!.effects.advisorProgressStateDeltas);
+        expect(final.choices[0]!.effects.recordConferenceRegistrationPayment).toBeUndefined();
         expect(final.choices[0]!.effects.favor).toBe(originalConfirmation.choices[0]!.effects.favor);
         expect(pending.conferencePreview!.rolls).toEqual(originalPreview.rolls);
         expect(final.conferencePreview!.rolls).toEqual(originalPreview.rolls);
@@ -104,7 +101,7 @@ describe("conference registration and stable previews", () => {
     const refreshed = refreshConferenceDecision(current, decision(root));
     expect(confirmation(refreshed).choices[0]!.effects.money).toBeUndefined();
     expect(confirmation(refreshed).choices[0]!.effects.favor).toBeUndefined();
-    expect(confirmation(refreshed).choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(-1);
+    expect(confirmation(refreshed).choices[0]!.effects.advisorProgressStateDeltas).toBeUndefined();
     expect(refreshed.description).toContain("免费代贴");
     expect(refreshed.description).toContain("实验室外");
   });
@@ -125,7 +122,7 @@ describe("conference registration and stable previews", () => {
     expect(random).not.toHaveBeenCalled();
   });
 
-  it("does not base proxy registration on fellow paper status, venue, year, or journal", () => {
+  it("does not base proxy costs on fellow paper status, venue, year, or journal", () => {
     const { state, paper, root } = fixture();
     const pending = confirmation(decision(root));
     for (const patch of [{ status: "reviewing" as const }, { submittedYear: 2 }, { submittedMonth: 7 }, { journalTarget: "pami" as const }]) {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { renderApp } from "../src/app/v2-render";
-import { getPlayHelpContext } from "../src/app/v2-play-help";
+import { getPlayHelpContext, renderPlayHelpPanel } from "../src/app/v2-play-help";
 import type { PlayRenderUiState } from "../src/app/v2-render-types";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
@@ -13,6 +13,12 @@ import type { Buff, GameState, Paper } from "../src/core/v2-types";
 function getHelpText(uiState: PlayRenderUiState): string {
   return getPlayHelpContext(uiState).pages.map((page) => page.summary + page.body).join("\n")
     .replace(/<[^>]*>/g, "").replace(/\s+/g, "").replace(/／/g, "/");
+}
+
+function getHelpPageText(uiState: PlayRenderUiState, title: string): string {
+  const page = getPlayHelpContext(uiState).pages.find((entry) => entry.title === title);
+  expect(page, title).toBeDefined();
+  return (page!.summary + page!.body).replace(/<[^>]*>/g, "").replace(/\s+/g, "").replace(/／/g, "/");
 }
 
 function createResearchState(): GameState {
@@ -43,11 +49,41 @@ function renderMetrics(paper: Paper): string {
 }
 
 describe("v2 research rule details and publication metrics", () => {
+  it.each([
+    { activePlayTab: "relationship" },
+    { activePlayTab: "talent", activeTalentTab: "relation" },
+  ] as const)("gives resistance, annual growth and wages separate concise pages in $activePlayTab", (uiState) => {
+    const context = getPlayHelpContext(uiState);
+    for (const title of ["属性与抵抗", "年度科研成长", "工资与生活费"]) {
+      const matches = context.pages.filter((page) => page.title === title);
+      expect(matches).toHaveLength(1);
+      const text = getHelpPageText(uiState, title);
+      expect(text.length).toBeLessThanOrEqual(360);
+      expect(text).not.toMatch(/快照|state\.|profile\.|去重|结算顺序/);
+      const index = context.pages.indexOf(matches[0]!);
+      const panel = renderPlayHelpPanel({ ...uiState, helpPageByContext: { [context.key]: index } });
+      expect(panel).toContain(`data-help-page-index="${index}"`);
+      expect(panel).toContain(matches[0]!.body);
+    }
+    expect(getHelpPageText(uiState, "年度科研成长")).not.toMatch(/工资|0%\/25%/);
+    expect(getHelpPageText(uiState, "工资与生活费")).not.toMatch(/科研\+⌊n\/2⌋|抵抗/);
+  });
+
+  it("explains fatal and risky choices without treating missing prerequisites as affordable risks", () => {
+    const events = { activePlayTab: "events" } as const;
+    const help = getHelpPageText(events, "危险选择");
+    expect(help).toContain("余额不足的危险事件仍可选择");
+    expect(help).toContain("！：悬浮显示“会暴毙”");
+    expect(help).toContain("？：悬浮显示“可能会暴毙”");
+    expect(help).not.toMatch(/确定死|可能死/);
+    expect(help).toContain("缺少目标、前置条件未满足或本月次数用尽等限制，仍会禁用选项");
+    expect(getHelpPageText(events, "处理事件")).toContain("危险事件不会自动结算，需手动确认");
+  });
+
   it("points players to current lover reward controls and the shop gift notice", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
     expect(help).toContain("悬浮标签分别显示主动推进、每月自动推进和下次奖励");
     expect(help).toContain("底部记录恋人本月推进");
-    expect(help).toContain("礼物券优先用于手动商店购买");
     expect(help).toContain("礼物券优先用于手动商店购买");
   });
 
@@ -85,15 +121,16 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("玩耍、学习每次各推进⌊亲密/2⌋");
     expect(help).toContain("活泼每月玩耍2次、学习1次；聪慧每月学习2次、玩耍1次");
     expect(help).toContain("购物自动推进为0，只靠主动约会");
-    expect(help).toContain("整个月的自动推进都按月初亲密计算并合计");
-    expect(help).toContain("当月条满获得的亲密不会改变本月其他次或其他路线的推进量");
-    expect(help).toContain("月初亲密7.5，每次推进3，擅长路线共6，另一条共3");
+    expect(help).toContain("每月推进按月初亲密计算");
+    expect(help).toContain("本月新增亲密下月才影响自动推进");
+    expect(help).toContain("亲密7.5，每次推进3，擅长路线共6，另一条共3");
     expect(help).toContain("恋爱次月起");
     expect(help).toContain("恋人有活泼和聪慧两种类型");
     expect(help).toContain("恋人与你同届，初始科研基础=年级×2+独立随机0～3；聪慧额外+3，合并后从0逐点抵抗，上限20");
     expect(help).toContain("初始亲密原始增量=3+独立随机0～3，活泼额外+3；合并后从0逐点抵抗");
-    expect(help).toContain("亲密增减同样按0/6/12/18档位抵抗0%/25%/50%/75%，对应初识/亲近/甜蜜/挚爱，内部保留小数");
-    expect(help).toContain("恋人科研自然成长原始+2，逐点抵抗，上限20；不参与实验室传承");
+    expect(help).toContain("亲密增减经过档位抵抗，四档为初识/亲近/甜蜜/挚爱");
+    expect(help).toContain("恋人科研自然成长原始+2，经过抵抗，上限20，不参与传承");
+    expect(help).toContain("年级、学位随你同步");
     expect(help).not.toMatch(/科研3～6|科研9～12|亲密9～12/);
     expect(help).not.toMatch(/没有一次性奖励|不再每月自动扣费|固定每月金币奖励/);
   });
@@ -118,44 +155,50 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("等待时每月做项目");
     expect(help).toContain("中稿当月开始新稿，退稿当月继续修改");
     expect(help).toContain("不足时改做横向，下月重新判断最低项并尝试科研");
-    expect(help).toContain("按卡片顺序扣经费");
+    expect(help).not.toContain("按卡片顺序扣经费");
     expect(help).toContain("审稿3个月");
     expect(help).not.toContain("仅同学自主科研间隔2个月");
     expect(help).toContain("每位同学每月可主动协作一次");
     expect(help).toContain("每月自动推进=默契，长期合作每月推进2次");
-    expect(help).toContain("每学年末（8月），你和同学科研+⌊n/2⌋");
-    expect(help).toContain("按结算前科研统一比较；同学自然成长+2，与传承合并为2+⌊n/2⌋后逐点抵抗");
-    expect(help).toContain("玩家只获传承，不含自然成长");
+    expect(help).toContain("每学年8月底结算，第一学年就有");
+    expect(help).toContain("同学另有自然成长+2，与传承合并后逐点抵抗，上限20");
+    expect(help).toContain("玩家只获传承，受自身科研上限限制");
     expect(help).toContain("初始科研原始增量=年级×2+独立随机0～3，从0逐点抵抗，上限20");
-    expect(help).toContain("你的科研遵循自身上限，同学上限20");
-    expect(help).toContain("第一学年末起结算，与认识月数无关");
+    expect(help).toContain("自动协作使用实际默契，保留小数");
+    expect(help).toContain("默契6.75，普通合作每月推进6.75，长期合作推进13.5");
     expect(help).toContain("导师计1人，恋人不计");
     expect(help).not.toMatch(/发表积累|累计一作|每学年9月/);
     expect(help).toContain("双方主导的合作论文均可触发");
     expect(help).toContain("主动推进=⌊你的科研⌋+随机0～5");
-    expect(help).toContain("默契增减按0/6/12/18档位抵抗0%/25%/50%/75%，对应生疏/熟悉/合拍/无间，内部保留小数");
+    expect(help).toContain("默契：生疏/熟悉/合拍/无间");
     expect(help).toContain("你帮同学论文最低项");
-    expect(help).toContain("加分均为帮助者科研");
+    expect(help).toContain("加分为帮助者科研向下取整");
+    expect(help).not.toMatch(/自动推进=⌊默契⌋|每次为⌊默契⌋/);
   });
 
   it("keeps talent inheritance help aligned with the shared August settlement", () => {
-    const help = getHelpText({ activePlayTab: "talent", activeTalentTab: "relation" });
-    expect(help).toContain("每学年末（8月），你和同学科研+⌊n/2⌋");
-    expect(help).toContain("n为科研更高的其他实验室成员人数，导师计1人，恋人不计");
-    expect(help).toContain("按结算前科研统一比较；同学自然成长+2，与传承合并为2+⌊n/2⌋后逐点抵抗");
-    expect(help).toContain("当前人际栏同学自然成长与传承的实际提升；离校或停止合作后不再计入");
-    expect(help).toContain("玩家只获传承，不含自然成长");
-    expect(help).toContain("恋人科研自然成长原始+2，逐点抵抗，上限20；不参与实验室传承");
-    expect(help).toContain("你的科研遵循自身上限，同学上限20");
-    expect(help).toContain("第一学年末起结算，与认识月数无关");
-    expect(help).not.toMatch(/发表积累|累计一作|每学年9月/);
+    const help = getHelpPageText({ activePlayTab: "talent", activeTalentTab: "relation" }, "年度科研成长");
+    expect(help).toBe(getHelpPageText({ activePlayTab: "relationship" }, "年度科研成长"));
+    expect(help).toContain("每学年8月底结算，第一学年就有");
+    expect(help).toContain("传承原始奖励为科研+⌊n/2⌋");
+    expect(help).toContain("n是科研比自己高的其他实验室成员人数，导师计1人，恋人不计");
+    expect(help).toContain("同批按成长前的科研比较，避免先后顺序影响结果");
+    expect(help).toContain("同学另有自然成长+2，与传承合并后逐点抵抗，上限20");
+    expect(help).toContain("玩家只获传承，受自身科研上限限制");
+    expect(help).toContain("恋人科研自然成长原始+2，经过抵抗，上限20，不参与传承");
+    expect(help).toContain("只统计目前在组同学的年度实际提升");
+    expect(help).not.toMatch(/发薪|快照|每学年9月/);
   });
 
   it("explains playable June and player graduation after events and transfer decisions", () => {
     const help = getHelpText({ activePlayTab: "events" });
     expect(help).toContain("硕士培养期34个月（第三年6月），博士70个月（第六年6月）");
     expect(help).toContain("6月可完整操作");
-    expect(help).toContain("处理完到期事件（含非阻塞结果）和转博决定后，点击下一月才结算毕业");
+    expect(help).toContain("玩家转博抉择在硕士第二、三年5月出现，申请分别需科研分2/3");
+    expect(help).not.toContain("内部第9月");
+    expect(help).toContain("与领域年会同月，须分别处理");
+    expect(help).toContain("5月确认转博后，6月起按博士标准发工资");
+    expect(help).toContain("未转博仍可完整进行6月；处理完到期事件（含非阻塞结果）后，点击下一月才结算毕业");
     expect(help).toContain("仍为硕士需科研分≥1，博士需≥7；未达标为延毕");
     expect(help).toContain("转博成功则继续博士学业，毕业结算不额外推进月份");
     const fellows = getHelpText({ activePlayTab: "relationship" });
@@ -169,8 +212,8 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("PAMI/NMI/Nature的OA版面费分别5/10/20");
     expect(help).toContain("玩家一作发表后进入期刊中稿→缴费方式→缴费确认三幕事件");
     expect(help).toContain("可选自费或导师经费，最终确认时才扣款");
-    expect(help).toContain("所选余额不足不能确认，可重新选择缴费方式");
-    expect(help).toContain("合作署名不向玩家重复收费");
+    expect(help).toContain("选定后不能返回重选");
+    expect(help).toContain("余额不足也可选择，请留意按钮的危险标记");
     expect(help).toContain("同学一作期刊仍在发表时自动扣科研经费，不扣同学钱包");
     expect(help).not.toMatch(/不生成期刊缴费待办|玩家与同学一作均在发表时立即自动扣/);
     const workstation = getHelpText({ activePlayTab: "workstation" });
@@ -179,43 +222,42 @@ describe("v2 research rule details and publication metrics", () => {
     expect(workstation).toContain("可选自费或导师经费，最终确认时扣款");
   });
 
-  it("separates mandatory registration from grouped conference travel and poster delegation", () => {
-    const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain("会议注册与差旅均在录用3个月后的参会确认时结算，此前不预扣");
-    expect(help).toContain("注册费按一作篇数×1金币计算，固定由导师经费支付");
-    expect(help).toContain("玩家只选择差旅付款方式");
-    expect(help).toContain("国内/亚太/欧美差旅分别2/4/6");
-    expect(help).toContain("自费时个人支付差旅、导师经费支付注册费");
-    expect(help).toContain("导师报销时注册费与差旅都扣导师经费，好感仅按差旅基础消耗1/2/3，经过档位抵抗，不按篇数增加");
-    expect(help).toContain("固定由会外联系人免费代贴，导师经费仅支付按一作篇数计算的注册费");
-    expect(help).toContain("个人金币与导师好感均不变，不进入参会活动，不依赖同学是否参会");
-    expect(help).toContain("同学会议只收每篇1金币注册费，自动扣科研经费，不收差旅费、不扣同学钱包");
-    expect(help).toContain("参会确认时按所选方式一并结算注册费与差旅，不重复收取注册费");
+  it("separates registration on acceptance from travel three months later", () => {
+    const help = getHelpPageText({ activePlayTab: "relationship" }, "会议费用");
+    expect(help).toContain("录用结果确认时，每篇一作注册费1金币，由导师经费支付");
+    expect(help).toContain("玩家与同学相同，3个月后不再扣注册费");
+    expect(help).toContain("3个月后，同一届会议统一安排差旅");
+    expect(help).toContain("国内/亚太/欧美为2/4/6金币");
+    expect(help).toContain("自费只扣个人金币；导师报销扣同额经费，好感基础消耗1/2/3，经过抵抗");
+    expect(help).toContain("会外联系人代参加免费，不扣差旅或好感，也不进入参会活动");
+    expect(help).toContain("同学默认免费代贴，无差旅");
     expect(help).toContain("领域年会VALSE免注册费，不论有无论文均只需差旅2");
     expect(help).not.toMatch(/同学中同一届会议则免费|否则个人金币-1|只收一次差旅|全部自费/);
     const research = getHelpText({ activePlayTab: "research" });
-    expect(research).toContain("会议注册与差旅均在录用3个月后的参会确认时结算，此前不预扣");
-    expect(research).toContain("注册费按一作篇数×1固定扣导师经费，玩家只选择差旅自费或导师报销");
-    expect(research).toContain("期刊中稿→缴费方式→缴费确认");
+    expect(research).toContain("会议录用结果确认时，导师支付每篇一作注册费1金币");
+    expect(research).toContain("3个月后只处理差旅，同学免费代贴");
+    expect(research).toContain("玩家期刊可选自费或导师支付，选定后不能返回重选");
   });
 
   it.each([
     { activePlayTab: "relationship" },
     { activePlayTab: "talent", activeTalentTab: "relation" },
   ] as const)("explains deterministic fractional resistance in $activePlayTab help", (uiState) => {
-    const help = getHelpText(uiState);
-    expect(help).toContain("科研、社交、导师好感、同学默契和恋人亲密的增减按档位确定性抵抗");
-    expect(help).toContain("低于6为0%，6至不足12为25%，12至不足18为50%，18起为75%");
-    expect(help).toContain("每点原始增减按当前抵抗率减免，更新属性后再处理下一点");
-    expect(help).toContain("人际卡片的科研、默契、亲密向下取整数显示，并标注档位；计算仍使用内部小数");
-    expect(help).toContain("玩家左栏科研、社交、导师好感同样向下取整数显示");
-    expect(help).not.toContain("概率无效");
+    const help = getHelpPageText(uiState, "属性与抵抗");
+    expect(help).toContain("科研、社交、导师好感、同学默契和恋人亲密的增减都受档位抵抗");
+    expect(help).toContain("0/6/12/18档位，抵抗0%/25%/50%/75%");
+    expect(help).toContain("每1点原始变化先按当前档位减免，再处理下一点");
+    expect(help).toContain("不足1点也按比例计算");
+    expect(help).toContain("科研5增加2点，先到6，再增加0.75，实际到6.75");
+    expect(help).toContain("界面向下取整数显示，内部保留小数");
+    expect(help).toContain("玩家科研、社交、好感和人际科研、默契、亲密都如此");
+    expect(help).not.toMatch(/概率无效|快照|科研.*随机失效/);
   });
 
   it("explains actual wages, fellow AI reserves and zero-funding survival", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
     expect(help).toContain("基本工资：硕士每月1金币，博士每月2.5金币");
-    expect(help).toContain("本次结算前科研经费≥60时，硕士额外+0.5、博士额外+1");
+    expect(help).toContain("发薪前科研经费≥60时，硕士额外+0.5、博士额外+1");
     expect(help).toContain("所有人统一按发薪前经费判断");
     expect(help).toContain("不随导师职称增加");
     expect(help).toContain("工资与生活费合并结算后再检查余额");
@@ -240,14 +282,12 @@ describe("v2 research rule details and publication metrics", () => {
     expect(events).toContain("关系自动行动按月汇总日志");
     expect(events).toContain("个人科研、项目、协作和帮助在对应人物卡片查看");
     expect(events).toContain("同学转博、毕业或退学后，学业记录仍可在日志回看");
-    expect(events).toContain("研0每月家里给1金币、生活费-1，家庭给钱不扣实验室经费");
-    expect(events).toContain("基本工资硕士1、博士2.5，不随导师职称增加");
-    expect(events).toContain("本次结算前科研经费≥60时，硕士额外+0.5、博士额外+1，所有人统一按发薪前经费判断");
-    expect(events).toContain("与工资合并结算后再检查余额，同学加入当月不额外扣费");
+    expect(events).toContain("工资、生活费和补贴见人际提示“工资与生活费”");
+    expect(events).not.toContain("基本工资硕士");
     for (const ui of [{ activePlayTab: "relationship" }, { activePlayTab: "talent", activeTalentTab: "relation" }] as const) {
       const help = getHelpText(ui);
-      expect(help).toContain("个人卡片“本月”栏悬浮显示最近年度成长，保留学年与实际变化");
-      expect(help).toContain("次月“本月”行动不覆盖成长记录");
+      expect(help).toContain("“本月”栏可回看最近一次年度结果");
+      expect(help).toContain("“当前同学累计”只统计目前在组同学的年度实际提升");
     }
   });
 

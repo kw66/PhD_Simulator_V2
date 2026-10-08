@@ -4,6 +4,8 @@ import { PAPER_SLOT_RESEARCH_THRESHOLDS, SCORE_BY_TARGET } from "../core/v2-cont
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getCitationStats } from "../core/v2-citation-stats";
 import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-catalog";
+import { getPaperConferenceTripId } from "../core/v2-conference-identity";
+import { getEventChoiceRisk } from "../core/v2-event-choice-risk";
 import type { ConferenceRegionId } from "../core/v2-conference-system";
 import { getCurrentEvent, getEventQueuePriority, getSortedEventQueue } from "../core/v2-event-queue";
 import { canAutoResolveLinearEvent, isEventBlocking, isLinearEvent } from "../core/v2-event-auto-resolution";
@@ -90,7 +92,7 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
-import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent, RoleId } from "../core/v2-types";
+import type { DateDisplayMode, EventChoice, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent, RoleId } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type PlayTabId,
@@ -849,6 +851,22 @@ function getEventEmoji(title: string, stage: EventStage = "act1"): string {
 export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[] {
   const items: TodoPreviewItem[] = [];
   const reviewingPapers = state.papers.filter((paper) => paper.status === "reviewing" && paper.reviewMonthsLeft > 0);
+  const pendingConferenceTrips = new Map<string, { title: string; monthsLater: number }>();
+  for (const paper of [...state.papers, ...state.externalPublications]) {
+    if (paper.status !== "published" || paper.nonFirstAuthor || (paper.leadAuthorId && paper.leadAuthorId !== "player")
+      || paper.conferenceHandled || paper.journalTarget || paper.publication?.journalTarget
+      || paper.conferenceAvailableAtTotalMonths === undefined || !paper.target
+      || paper.submittedMonth == null || paper.submittedYear == null) continue;
+    const tripId = getPaperConferenceTripId(paper, state.conferenceLocationSeed);
+    const monthsLater = paper.conferenceAvailableAtTotalMonths - state.totalMonths;
+    if (!tripId || monthsLater <= 0) continue;
+    const existing = pendingConferenceTrips.get(tripId);
+    if (!existing || monthsLater < existing.monthsLater) {
+      pendingConferenceTrips.set(tripId, {
+        title: `${getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear).name}安排`, monthsLater,
+      });
+    }
+  }
   let sortOrder = 0;
 
   const addItem = (params: {
@@ -872,8 +890,13 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
 
     for (const paper of reviewingPapers) {
       if (paper.reviewMonthsLeft === monthsLater) {
-        addItem({ title: "论文结果", monthsLater });
+        const venue = paper.target && paper.submittedMonth != null && paper.submittedYear != null
+          ? getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear).name : "论文";
+        addItem({ title: `${venue}结果`, monthsLater });
       }
+    }
+    for (const trip of pendingConferenceTrips.values()) {
+      if (trip.monthsLater === monthsLater) addItem(trip);
     }
 
     const calendar = getCalendarForTotalMonths(nextTotalMonths, state.degree);
@@ -912,7 +935,7 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
         monthsLater,
       });
     }
-    if (state.degree === "master" && calendar.month === 10 && (calendar.year === 2 || calendar.year === 3)) {
+    if (state.degree === "master" && calendar.month === 9 && (calendar.year === 2 || calendar.year === 3)) {
       addItem({
         title: "转博抉择",
         monthsLater,
@@ -1254,6 +1277,7 @@ function renderEventContentBox(
   completedEvent: GameState["eventHistory"][number] | null,
   activeHistoryIndex: number | null,
   debugEventReplayEnabled = false,
+  state?: GameState,
 ): string {
   if (!currentEvent && !completedEvent) {
     return `
@@ -1340,21 +1364,28 @@ function renderEventContentBox(
           ${displayEvent.choices.map((choice) => {
             const disabledReason = choice.disabledReason?.trim() ?? "";
             const secondary = isSecondaryEventChoice(choice);
+            const choiceLabel = !secondary && displayEvent.choices.filter((entry) => !isSecondaryEventChoice(entry)).length === 1
+              ? displayStage === "act1" ? "继续" : displayStage === "act3" || displayStage === "result" ? "确定" : choice.label
+              : choice.label;
+            const risk = state && currentEvent && !historicalPage && !disabledReason
+              ? getEventChoiceRisk(state, currentEvent, choice as EventChoice) : null;
+            const riskText = risk === "certain" ? "会暴毙" : risk === "possible" ? "可能会暴毙" : "";
             const canReplay = debugReplayable && disabledReason === "";
             const isDisabled = !canReplay && (historicalPage !== null || disabledReason !== "");
-            const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"` : "";
+            const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"`
+              : riskText ? ` title="${riskText}" data-tooltip="${riskText}"` : "";
             const buttonAttributes = canReplay
               ? `data-action="debug-replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
               : isDisabled
               ? `disabled aria-disabled="true"${titleAttribute}`
-              : `data-action="resolve-event" data-event-id="${escapeHtml(currentEventId)}" data-event-choice-id="${escapeHtml(choice.id)}"`;
+              : `data-action="resolve-event" data-event-id="${escapeHtml(currentEventId)}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`;
             return `
               <button
                 class="event-choice-btn event-action-btn${choice.id === selectedChoiceId ? " is-selected" : ""}"
                 type="button"
                 ${secondary ? "data-event-secondary" : ""}
                 ${buttonAttributes}
-              ><span>${escapeHtml(normalizeGameDisplayText(choice.label))}</span>${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
+              ><span>${escapeHtml(normalizeGameDisplayText(choiceLabel))}</span>${risk ? `<span class="event-choice-risk is-${risk}" aria-label="${riskText}">${risk === "certain" ? "！" : "？"}</span>` : ""}${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
             `;
           }).join("")}
         </div>
@@ -3862,7 +3893,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
                 state.eventHistory,
                 logPages,
                 openEvent || openHistoryEvent
-                  ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null, state.debugEventReplayEnabled === true)
+                  ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null, state.debugEventReplayEnabled === true, state)
                   : activeLogPage?.kind === "ending"
                     ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state, uiState.roleExperienceAward)
                     : "",

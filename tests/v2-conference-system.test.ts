@@ -31,7 +31,7 @@ describe("v2 conference system", () => {
 
     expect(selfPay.meetingDiscount).toBe(0);
     expect(selfPay.actualCost).toBe(6);
-    expect(selfPay.fundingCost).toBe(1);
+    expect(selfPay.fundingCost).toBe(0);
     expect(advisor.meetingDiscount).toBe(0);
   });
 
@@ -56,19 +56,19 @@ describe("v2 conference system", () => {
 
     expect(advisor.resource).toBe("favor");
     expect(advisor.actualCost).toBe(1.25);
-    expect(advisor.fundingCost).toBe(5);
+    expect(advisor.fundingCost).toBe(4);
     expect(advisor.countsAsMeeting).toBe(true);
     expect(resistedAdvisor.actualCost).toBe(1.25);
-    expect(resistedAdvisor.fundingCost).toBe(7);
+    expect(resistedAdvisor.fundingCost).toBe(4);
 
     expect(proxy.resource).toBe("money");
     expect(proxy.actualCost).toBe(0);
-    expect(proxy.fundingCost).toBe(1);
+    expect(proxy.fundingCost).toBe(0);
     expect(proxy.resistanceNarrative).toBeUndefined();
     expect(proxy.countsAsMeeting).toBe(false);
   });
 
-  it("charges only registration for free outside-lab proxy presentation", () => {
+  it("charges nothing for free outside-lab proxy presentation", () => {
     const proxy = resolveConferenceDecisionCost({
       mode: "proxy",
       region: "domestic",
@@ -85,23 +85,23 @@ describe("v2 conference system", () => {
     });
 
     expect(proxy.actualCost).toBe(0);
-    expect(proxy.fundingCost).toBe(1);
+    expect(proxy.fundingCost).toBe(0);
     expect(proxy.countsAsMeeting).toBe(false);
   });
 
-  it.each(["domestic", "asia", "west"] as const)("charges registration per unpaid paper and travel only for attendance in %s", (region) => {
+  it.each(["domestic", "asia", "west"] as const)("charges one trip independent of paper count in %s", (region) => {
     for (const paperCount of [0, 1, 3, 10]) {
       const input = {
         mode: "proxy" as const, region, paperCount, favor: 12, social: 12,
         shopState: createShopState(), eventCounters: createEventCounters(),
         eventSupport: { hasParasol: false, hasDownJacket: false, hasBadmintonRacket: false, hasStrongBodyTalent: false },
       };
-      expect(resolveConferenceDecisionCost(input)).toMatchObject({ actualCost: 0, fundingCost: paperCount, countsAsMeeting: false });
+      expect(resolveConferenceDecisionCost(input)).toMatchObject({ actualCost: 0, fundingCost: 0, countsAsMeeting: false });
       const travel = { domestic: 2, asia: 4, west: 6 }[region];
-      expect(resolveConferenceDecisionCost({ ...input, mode: "self" })).toMatchObject({ actualCost: travel, fundingCost: paperCount });
-      expect(resolveConferenceDecisionCost({ ...input, mode: "advisor" }).fundingCost).toBe(paperCount + travel);
-      expect(resolveConferenceDecisionCost({ ...input, mode: "self", travelAlreadyPaid: true })).toMatchObject({ actualCost: 0, fundingCost: paperCount });
-      expect(resolveConferenceDecisionCost({ ...input, mode: "advisor", travelAlreadyPaid: true }).fundingCost).toBe(paperCount);
+      expect(resolveConferenceDecisionCost({ ...input, mode: "self" })).toMatchObject({ actualCost: travel, fundingCost: 0 });
+      expect(resolveConferenceDecisionCost({ ...input, mode: "advisor" }).fundingCost).toBe(travel);
+      expect(resolveConferenceDecisionCost({ ...input, mode: "self", travelAlreadyPaid: true })).toMatchObject({ actualCost: 0, fundingCost: 0 });
+      expect(resolveConferenceDecisionCost({ ...input, mode: "advisor", travelAlreadyPaid: true }).fundingCost).toBe(0);
     }
   });
 });

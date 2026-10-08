@@ -25,7 +25,7 @@ function createSubmissionState(): GameState {
 }
 
 function reviewPreviews(state: GameState) {
-  return buildFutureTodoPreviewItems(state).filter((item) => item.title === "论文结果");
+  return buildFutureTodoPreviewItems(state).filter((item) => /^(WACV|ICRA|ICLR)结果$/u.test(item.title));
 }
 
 describe("paper review agenda previews", () => {
@@ -34,8 +34,8 @@ describe("paper review agenda previews", () => {
     const paperId = state.papers[0]!.id;
     expect(reviewPreviews(state)).toEqual([]);
     state = dispatchAction(state, "submit-paper", { paperId, paperTarget: "C" });
-    expect(reviewPreviews(state)).toMatchObject([{ title: "论文结果", monthsLater: 3, timeText: "3月后 发生" }]);
-    expect(renderApp(state)).toMatch(/todo-title">论文结果<\/strong>[\s\S]*?3月后 发生/);
+    expect(reviewPreviews(state)).toMatchObject([{ title: "WACV结果", monthsLater: 3, timeText: "3月后 发生" }]);
+    expect(renderApp(state)).toMatch(/todo-title">WACV结果<\/strong>[\s\S]*?3月后 发生/);
     expect(renderApp(state)).not.toContain('todo-title">论文结果 ·');
     for (const monthsLater of [2, 1]) {
       state = advancePaperReviewDeadlines(state);
@@ -55,16 +55,16 @@ describe("paper review agenda previews", () => {
     state = advancePaperReviewDeadlines(state);
     state = dispatchAction(state, "submit-paper", { paperId: secondPaperId, paperTarget: "B" });
     expect(reviewPreviews(state)).toMatchObject([
-      { title: "论文结果", monthsLater: 2 },
-      { title: "论文结果", monthsLater: 3 },
+      { title: "WACV结果", monthsLater: 2 },
+      { title: "ICRA结果", monthsLater: 3 },
     ]);
     state = dispatchAction(state, "withdraw-paper", { paperId: firstPaperId });
-    expect(reviewPreviews(state)).toMatchObject([{ title: "论文结果", monthsLater: 3 }]);
-    expect(renderApp(state).match(/todo-title">论文结果<\/strong>/g)).toHaveLength(1);
+    expect(reviewPreviews(state)).toMatchObject([{ title: "ICRA结果", monthsLater: 3 }]);
+    expect(renderApp(state).match(/todo-title">ICRA结果<\/strong>/g)).toHaveLength(1);
     state = dispatchAction(state, "submit-paper", { paperId: firstPaperId, paperTarget: "A" });
     expect(reviewPreviews(state)).toMatchObject([
-      { title: "论文结果", monthsLater: 3 },
-      { title: "论文结果", monthsLater: 3 },
+      { title: "ICLR结果", monthsLater: 3 },
+      { title: "ICRA结果", monthsLater: 3 },
     ]);
   });
 

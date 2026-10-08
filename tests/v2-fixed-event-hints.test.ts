@@ -54,9 +54,9 @@ describe("fixed-event appearance hints and debug entry", () => {
   });
 
   it.each([[2, 2], [3, 3]])("keeps year %s PhD applications visible below the %s-point threshold", (year, threshold) => {
-    let state = playingState({ year, month: 10, totalMonths: (year - 1) * 12 + 10, totalResearchScore: threshold - 1 });
+    let state = playingState({ year, month: 9, totalMonths: (year - 1) * 12 + 9, totalResearchScore: threshold - 1 });
     const event = collectFixedEventsForState(state).find((entry) => entry.chainId === "phd-decision")!;
-    expect(event.description).toContain("硕士第2、3年6月");
+    expect(event.description).toContain("硕士第2、3年5月");
     expect(event.description).not.toContain("转博要求");
     state = resolveChoice({ ...state, eventQueue: [createEventQueueItem(event, state.totalMonths)] });
     expect(state.eventQueue[0]!.choices.map((choice) => choice.id)).toContain("transfer-phd");
@@ -70,8 +70,16 @@ describe("fixed-event appearance hints and debug entry", () => {
     expect(state.log[0]!.text).toContain("转博失败");
   });
 
+  it("marks the reviewed PhD choice debug entry and opens its May narrative", () => {
+    expect(DEBUG_COMPLETED_EVENT_IDS).toContain("phd-choice");
+    const state = dispatchAction(playingState({ year: 3, month: 9, totalMonths: 33 }), "debug-trigger-event", { eventId: "phd-choice" });
+    expect(state.eventQueue[0]).toMatchObject({ chainId: "phd-decision", stage: "act1" });
+    expect(state.eventQueue[0]!.description).toContain("硕士第三年5月");
+    expect(state.eventQueue[0]!.description).toContain("硕士第2、3年5月");
+  });
+
   it("opens VALSE activities directly, settles only on confirmation, and supports replay", () => {
-    expect(DEBUG_EVENT_GROUPS.find((group) => group.title === "固定事件")!.buttons).toContainEqual({ id: "ccig-activity", label: "领域年会活动" });
+    expect(DEBUG_EVENT_GROUPS.find((group) => group.title === "固定事件")!.buttons).toContainEqual({ id: "ccig-activity", label: "年会活动" });
     const initial = playingState({ month: 9, totalMonths: 21, debugEventReplayEnabled: true });
     let state = dispatchAction(initial, "debug-trigger-event", { eventId: "ccig-activity" });
     expect(state.eventQueue[0]!.description).toContain("每年5月，确认参加领域年会后");

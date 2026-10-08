@@ -9,7 +9,7 @@ import type { GameState } from "../src/core/v2-types";
 function queuedState(year = 1): GameState {
   const initial = createInitialState();
   const state: GameState = {
-    ...initial, phase: "playing", year, month: 9, totalMonths: (year - 1) * 12 + 9,
+    ...initial, phase: "playing", degree: "phd", maxMonths: 70, year, month: 9, totalMonths: (year - 1) * 12 + 9,
     selectedAdvisorName: "测试导师",
     player: { ...initial.player, money: 2, favor: 6, san: 10 },
     advisorProgressState: { ...initial.advisorProgressState, funding: 2 },
@@ -17,7 +17,7 @@ function queuedState(year = 1): GameState {
   return { ...state, eventQueue: [createEventQueueItem(createCcigEvent(state), state.totalMonths)] };
 }
 
-function choose(state: GameState, label = "继续"): GameState {
+function choose(state: GameState, label = state.eventQueue[0]?.stage === "result" ? "确定" : "继续"): GameState {
   const event = state.eventQueue[0]!;
   const choice = event.choices.find((entry) => entry.label === label)!;
   expect(choice).toBeDefined();
@@ -31,6 +31,134 @@ function renderCurrentEvent(state: GameState): string {
 afterEach(() => vi.restoreAllMocks());
 
 describe("VALSE annual conference", () => {
+  it.each([
+    ["act1", 0], ["act1", 1], ["act1", 12],
+    ["act2", 1], ["act2", 12], ["act3", 1], ["act3", 12],
+  ] as const)("keeps the original conference chain through all three scenes after shifting %s by %i months", (stage, delta) => {
+    let state = queuedState(3);
+    const chainId = state.eventQueue[0]!.chainId;
+    if (stage !== "act1") state = choose(state);
+    if (stage === "act3") state = choose(state, "自费参会");
+    state = dispatchAction(state, "debug-shift-month", { delta });
+    const calendar = { year: state.year, month: state.month, totalMonths: state.totalMonths };
+    expect(state.totalMonths).toBe(33 + delta);
+    if (stage === "act1") state = choose(state);
+    if (stage !== "act3") {
+      expect(state.eventQueue[0]).toMatchObject({ chainId, stage: "act2" });
+      expect(state.eventHistory.filter((entry) => entry.chainId === chainId)).toHaveLength(0);
+      state = choose(state, "自费参会");
+    }
+    expect(state.eventQueue[0]).toMatchObject({ chainId, stage: "act3" });
+    expect(state.eventQueue[0]!.description).toContain("VALSE 2026");
+    expect(state.eventQueue[0]!.description).toContain("武汉");
+    expect(state.player.money).toBe(2);
+    expect(state.eventCounters.meetingCount).toBe(0);
+    expect(state.eventHistory.filter((entry) => entry.chainId === chainId)).toHaveLength(0);
+    state = choose(state, "确定");
+    expect(state).toMatchObject(calendar);
+    expect(state.player.money).toBe(0);
+    expect(state.advisorProgressState.funding).toBe(2);
+    expect(state.eventCounters.meetingCount).toBe(1);
+    const history = state.eventHistory.filter((entry) => entry.chainId === chainId);
+    expect(history).toHaveLength(1);
+    expect(history[0]!.stages).toHaveLength(3);
+    expect(state.eventQueue[0]).toMatchObject({ chainId: `${chainId}-activity`, stage: "act1" });
+    expect(state.eventQueue[0]!.description).toContain("VALSE 2026");
+    expect(state.eventQueue[0]!.description).toContain("武汉");
+  });
+
+  it.each([1, 12])("refreshes decision and final confirmation from live balances and favor after a %i-month shift", (delta) => {
+    let state = choose(queuedState(3));
+    const chainId = state.eventQueue[0]!.chainId;
+    state = dispatchAction(state, "debug-shift-month", { delta });
+    state = { ...state, player: { ...state.player, money: 0, favor: 5 },
+      advisorProgressState: { ...state.advisorProgressState, funding: 0 } };
+    const before = structuredClone(state);
+    const blocked = getResolvableQueuedEvent(state, state.eventQueue[0]!);
+    expect(blocked.chainId).toBe(chainId);
+    expect(blocked.choices.find((choice) => choice.label === "自费参会")?.disabledReason).toBeUndefined();
+    expect(blocked.choices.find((choice) => choice.label === "请导师报销")?.disabledReason).toBeUndefined();
+    expect(blocked.description).toContain("你和老师还不熟");
+    expect(state).toEqual(before);
+    state = { ...state, player: { ...state.player, money: 2, favor: 12 },
+      advisorProgressState: { ...state.advisorProgressState, funding: 2 } };
+    const available = getResolvableQueuedEvent(state, state.eventQueue[0]!);
+    expect(available.choices.find((choice) => choice.label === "自费参会")?.disabledReason).toBeUndefined();
+    expect(available.choices.find((choice) => choice.label === "请导师报销")?.disabledReason).toBeUndefined();
+    expect(available.description).toContain("平时有交情");
+    state = choose(state, "请导师报销");
+    expect(state.player.favor).toBe(12);
+    expect(state.advisorProgressState.funding).toBe(2);
+    state = { ...state, player: { ...state.player, favor: 6 },
+      advisorProgressState: { ...state.advisorProgressState, funding: 0 } };
+    const confirmation = getResolvableQueuedEvent(state, state.eventQueue[0]!);
+    expect(confirmation.choices.find((choice) => choice.label === "确定")?.disabledReason).toBeUndefined();
+    expect(confirmation.choices.map((choice) => choice.label)).toEqual(["确定"]);
+    expect(confirmation.description).toContain("导师好感 -0.75");
+    expect(confirmation.description).toContain("VALSE 2026");
+    expect(confirmation.description).toContain("武汉");
+    const bankrupt = choose(state, "确定");
+    expect(bankrupt.advisorProgressState.funding).toBe(-2);
+    expect(bankrupt.player.favor).toBe(5.25);
+    expect(bankrupt).toMatchObject({ phase: "finished", ending: "lab-bankrupt" });
+    state = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: 2 } };
+    state = choose(state, "确定");
+    expect(state.player).toMatchObject({ money: 2, favor: 5.25 });
+    expect(state.advisorProgressState.funding).toBe(0);
+    expect(state.eventCounters.meetingCount).toBe(1);
+    expect(state.eventHistory.find((entry) => entry.chainId === chainId)?.stages).toHaveLength(3);
+  });
+
+  it.each([1, 12])("retains the original activity chain and city after shifting another %i months", (delta) => {
+    let state = choose(choose(choose(queuedState(3)), "自费参会"), "确定");
+    const chainId = state.eventQueue[0]!.chainId;
+    state = dispatchAction(state, "debug-shift-month", { delta });
+    state = choose(state);
+    expect(state.eventQueue[0]).toMatchObject({ chainId, stage: "act2" });
+    state = choose(state, "趁机旅游");
+    expect(state.eventQueue[0]).toMatchObject({ chainId, stage: "result" });
+    expect(state.eventQueue[0]!.description).toContain("沿着江滩散步");
+    expect(state.player.money).toBe(0);
+    state = choose(state);
+    expect(state.player).toMatchObject({ money: 0, san: 15 });
+    expect(state.eventCounters.meetingCount).toBe(1);
+    expect(state.eventHistory.find((entry) => entry.chainId === chainId)?.stages).toHaveLength(3);
+  });
+
+  it.each([1, 12])("rechecks self-payment at final confirmation after a %i-month shift without charging twice", (delta) => {
+    let state = choose(choose(queuedState(3)), "自费参会");
+    state = dispatchAction(state, "debug-shift-month", { delta });
+    expect(state.totalMonths).toBe(33 + delta);
+    state = { ...state, player: { ...state.player, money: 1 } };
+    const confirmation = getResolvableQueuedEvent(state, state.eventQueue[0]!);
+    expect(confirmation).toMatchObject({ chainId: "ccig-y3-m9", stage: "act3" });
+    expect(confirmation.choices.find((choice) => choice.label === "确定")?.disabledReason).toBeUndefined();
+    const overdrawn = choose(state, "确定");
+    expect(overdrawn.player.money).toBe(-1);
+    expect(overdrawn).toMatchObject({ phase: "finished", ending: "poor" });
+    const ready = { ...state, player: { ...state.player, money: 2 } };
+    const paid = choose(ready, "确定");
+    expect(paid.player.money).toBe(0);
+    expect(paid.advisorProgressState.funding).toBe(2);
+    expect(paid.eventCounters.meetingCount).toBe(1);
+    const repeated = dispatchAction(paid, "resolve-event", { eventId: confirmation.id,
+      eventChoiceId: confirmation.choices.find((choice) => choice.label === "确定")!.id });
+    expect(repeated.player).toEqual(paid.player);
+    expect(repeated.eventCounters).toEqual(paid.eventCounters);
+  });
+
+  it("keeps the original skip-result city and three-scene history across years", () => {
+    const shifted = dispatchAction(queuedState(3), "debug-shift-month", { delta: 12 });
+    const skipped = choose(choose(shifted), "不去参加");
+    expect(skipped.eventQueue[0]).toMatchObject({ chainId: "ccig-y3-m9", stage: "act3" });
+    expect(skipped.eventQueue[0]!.description).toContain("武汉参加 VALSE 2026");
+    const completed = choose(skipped, "确定");
+    expect(completed.player).toEqual(shifted.player);
+    expect(completed.advisorProgressState).toEqual(shifted.advisorProgressState);
+    expect(completed.eventCounters.meetingCount).toBe(0);
+    expect(completed.eventHistory.find((entry) => entry.chainId === "ccig-y3-m9")?.stages).toHaveLength(3);
+  });
+
   it.each([
     [1, 2024, "重庆"], [2, 2025, "珠海"], [3, 2026, "武汉"],
     [4, 2027, "外地"], [6, 2029, "外地"],
@@ -46,25 +174,30 @@ describe("VALSE annual conference", () => {
     state = choose(state, "自费参会");
     expect(state.eventQueue[0]!.description).toContain(`VALSE ${realYear}`);
     expect(state.eventQueue[0]!.description).toContain(city);
-    state = choose(state, "安排行程");
+    state = choose(state, "确定");
     expect(state.eventQueue[0]!.description).toContain(`VALSE ${realYear}`);
     expect(state.eventQueue[0]!.description).toContain(city);
     if (year > 3) expect(state.eventQueue[0]!.description).not.toMatch(/重庆|珠海|武汉/u);
   });
 
-  it.each(["act2", "act3"])("blocks zero personal money at %s and accepts exactly two coins", (stage) => {
+  it.each(["act2", "act3"])("keeps zero-money choices clickable at %s and charges only on confirmation", (stage) => {
     let state = choose(queuedState());
     if (stage === "act3") state = choose(state, "自费参会");
-    const label = stage === "act2" ? "自费参会" : "安排行程";
+    const label = stage === "act2" ? "自费参会" : "确定";
     const empty = { ...state, player: { ...state.player, money: 0 } };
-    const blocked = choose(empty, label);
-    expect(blocked.eventQueue[0]!.id).toBe(empty.eventQueue[0]!.id);
-    expect(blocked.player).toEqual(empty.player);
-    expect(blocked.advisorProgressState).toEqual(empty.advisorProgressState);
-    expect(blocked.eventCounters.meetingCount).toBe(0);
+    const selected = choose(empty, label);
+    if (stage === "act2") {
+      expect(selected.eventQueue[0]!.stage).toBe("act3");
+      expect(selected.player).toEqual(empty.player);
+      expect(selected.advisorProgressState).toEqual(empty.advisorProgressState);
+      expect(selected.eventCounters.meetingCount).toBe(0);
+    }
+    const overdrawn = stage === "act2" ? choose(selected, "确定") : selected;
+    expect(overdrawn.player.money).toBe(-2);
+    expect(overdrawn).toMatchObject({ phase: "finished", ending: "poor" });
     if (stage === "act2") state = choose(state, "自费参会");
     expect(getResolvableQueuedEvent(state, state.eventQueue[0]!).choices[0]!.disabledReason).toBeUndefined();
-    expect(choose(state, "安排行程").player.money).toBe(0);
+    expect(choose(state, "确定").player.money).toBe(0);
   });
 
   it.each([
@@ -102,7 +235,7 @@ describe("VALSE annual conference", () => {
     expect(unstyled).toBe("");
     expect(confirmation.description).not.toMatch(/参会次数|(?:国内|亚太|欧美)参会\s*\d|实验室经费/u);
     expect(confirmation.completionLog).not.toMatch(/参会次数|(?:国内|亚太|欧美)参会\s*\d|实验室经费/u);
-    state = choose(state, "安排行程");
+    state = choose(state, "确定");
     const paidMoney = mode === "自费参会" ? 0 : 2;
     const paidFunding = mode === "请导师报销" ? 0 : 2;
     expect(state.player.money).toBe(paidMoney);
@@ -117,7 +250,7 @@ describe("VALSE annual conference", () => {
     expect(duplicate.eventCounters).toEqual(state.eventCounters);
     for (const stage of ["act1", "act2"]) {
       expect(state.eventQueue[0]!.stage).toBe(stage);
-      expect(state.eventQueue[0]!.title).toContain("领域年会活动");
+      expect(state.eventQueue[0]!.title).toContain("VALSE参会");
       expect(state.eventQueue[0]!.description).not.toMatch(/机制结算|结果：|金币 -2|科研经费 -2|导师好感|CCIG/u);
       expect(renderCurrentEvent(state)).not.toContain('class="event-settlement-row is-result"');
       state = choose(state, stage === "act1" ? "继续" : "趁机旅游");

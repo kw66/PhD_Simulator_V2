@@ -499,7 +499,7 @@ describe("reviews settle before monthly own actions", () => {
     if (accepted) {
       expect(scores(paper)).toEqual([10, 10, 0]);
       expect(getPaperScoreBreakdown(paper, "idea")).toEqual({ own: 0, collaboration: 10, total: 10 });
-      expect(next.advisorProgressState.funding).toBe(7);
+      expect(next.advisorProgressState.funding).toBe(10 - 1 - 3);
     } else {
       expect(paper.writing).toBe(10);
       expect(getPaperScoreBreakdown(paper, "experiment")).toEqual({ own: 1, collaboration: 10, total: 11 });

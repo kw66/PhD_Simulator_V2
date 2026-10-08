@@ -1,5 +1,6 @@
 import { getResolvableQueuedEvent } from "./v2-engine-event-resolution";
 import { getSortedEventQueue } from "./v2-event-queue";
+import { getEventChoiceRisk } from "./v2-event-choice-risk";
 import type { EventChoice, EventQueueItem, GameState, PendingEvent } from "./v2-types";
 
 function getLinearChoice(event: PendingEvent): EventChoice | null {
@@ -13,7 +14,7 @@ export function isLinearEvent(state: GameState, event: EventQueueItem): boolean 
   const visit = (current: PendingEvent): boolean => {
     if (visiting.has(current)) return false;
     const choice = getLinearChoice(current);
-    if (!choice) return false;
+    if (!choice || getEventChoiceRisk(state, current, choice)) return false;
     const resolution = choice.effects.fixedEventResolution?.kind;
     if (resolution === "year-summary-open" || resolution === "ccig-open"
       || resolution === "ccig-advisor" || resolution === "ccig-self") return false;

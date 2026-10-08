@@ -58,7 +58,9 @@ describe("lab finances", () => {
     }));
     state.fellowPapers = papers;
     state.externalPublications = [{ ...papers[0]!, nonFirstAuthor: true }];
-    const departed = endRelationship(state, fellow.id);
+    const registered = settleConferenceRegistrationFees(state);
+    expect(registered.advisorProgressState.funding).toBe(98);
+    const departed = endRelationship(registered, fellow.id);
     expect(settleFellowConferenceFees(departed)).toBe(departed);
     const total = 2;
     const next = settleFellowConferenceFees({ ...departed, totalMonths: 5 });
@@ -221,7 +223,7 @@ describe("lab finances", () => {
     expect(state).toEqual(snapshot);
   });
 
-  it.each(["stop", "graduate"])("retains %s student savings and charges their later conference without new wages", (departure) => {
+  it.each(["stop", "graduate"])("retains %s student savings and registration records with free later proxy", (departure) => {
     let state = makeState();
     const fellow = state.fellowProgressState[1]!;
     fellow.academicYear = 3;
@@ -232,6 +234,7 @@ describe("lab finances", () => {
     state = creditFellowMoney(state, fellow.id, 10);
     state.fellowPapers = [{ ...createDraftPaper(1, 0, () => 0), leadAuthorId: fellow.id, target: "C", status: "published",
       submittedMonth: 1, submittedYear: 1, conferenceHandled: false, conferenceAvailableAtTotalMonths: 11 }];
+    state = settleConferenceRegistrationFees(state);
     state = departure === "stop" ? endRelationship(state, fellow.id) : settleFellowAcademicYear(state);
     expect(state.fellowProgressState.some((entry) => entry.id === fellow.id)).toBe(false);
     const fee = 1;
@@ -247,23 +250,21 @@ describe("lab finances", () => {
 describe("automatic fellow conference registration", () => {
   it("records each fellow's registration without travel in their monthly card and preserves research activity", () => {
     const state = makeState();
-    state.totalMonths = 7;
-    state.month = 7;
     const first = state.fellowProgressState[1]!;
     const second = state.fellowProgressState[2]!;
     state.fellowPapers = [conferencePaper("one", first.id), conferencePaper("two", first.id), conferencePaper("three", second.id)];
-    const paid = settleFellowConferenceFees(state);
+    const paid = settleConferenceRegistrationFees(state);
     expect(paid.fellowProgressState.find((profile) => profile.id === first.id)!.monthlyPublicationCosts)
-      .toEqual({ totalMonths: 7, registration: 2, journal: 0, sharedTravel: 0 });
+      .toEqual({ totalMonths: 4, registration: 2, journal: 0, sharedTravel: 0 });
     expect(paid.fellowProgressState.find((profile) => profile.id === second.id)!.monthlyPublicationCosts)
-      .toEqual({ totalMonths: 7, registration: 1, journal: 0, sharedTravel: 0 });
+      .toEqual({ totalMonths: 4, registration: 1, journal: 0, sharedTravel: 0 });
     const acted = advanceFellowResearch(paid, () => 0.5);
     expect(acted.fellowProgressState[1]!.monthlyPublicationCosts).toEqual(paid.fellowProgressState[1]!.monthlyPublicationCosts);
     expect(acted.fellowProgressState[1]!.monthlyActivity).toBeTruthy();
     expect(settleFellowConferenceFees(acted)).toBe(acted);
   });
 
-  it("leaves player registration to the conference event even after its due date", () => {
+  it("pays player registration at acceptance and never repeats it at the conference due date", () => {
     const initial = makeState();
     initial.papers = [conferencePaper("accepted", "player", { status: "reviewing", conferenceAvailableAtTotalMonths: undefined })];
     const accepted = applyPaperReviewSettlement(initial, {
@@ -282,8 +283,8 @@ describe("automatic fellow conference registration", () => {
     const snapshot = structuredClone(due);
     const paid = settleConferenceRegistrationFees(due);
     expect(paid).toBe(due);
-    expect(paid.advisorProgressState.funding).toBe(100);
-    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds ?? []).toEqual([]);
+    expect(paid.advisorProgressState.funding).toBe(99);
+    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["accepted"]);
     expect(paid.advisorProgressState.paidFellowConferencePaperIds ?? []).toEqual([]);
     expect(paid.advisorProgressState.paidFellowConferenceTrips ?? []).toEqual([]);
     expect(paid.player).toEqual(due.player);
@@ -305,7 +306,8 @@ describe("automatic fellow conference registration", () => {
     state.fellowPapers = papers.map((paper) => ({ ...paper }));
     state.externalPublications = papers.map((paper) => ({ ...paper }));
     const snapshot = structuredClone(state);
-    const paid = settleFellowConferenceFees(state);
+    const registered = settleConferenceRegistrationFees(state);
+    const paid = settleFellowConferenceFees(registered);
     expect(CONFERENCE_TRAVEL_FEES[region]).toBe(travelFee);
     expect(paid.advisorProgressState).toMatchObject({ funding: 97,
       paidConferenceRegistrationPaperIds: papers.map((paper) => paper.id),
@@ -337,7 +339,7 @@ describe("automatic fellow conference registration", () => {
     state.totalMonths = 8;
     state.month = 8;
     state.externalPublications.push(conferencePaper("later", "other-departed", { acceptedTotalMonths: 5, conferenceAvailableAtTotalMonths: 8 }));
-    const later = settleFellowConferenceFees(state);
+    const later = settleFellowConferenceFees(settleConferenceRegistrationFees(state));
     expect(later.advisorProgressState.funding).toBe(98);
     expect(later.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["first", "later"]);
     expect(later.advisorProgressState.paidFellowConferencePaperIds).toEqual(["first", "later"]);
@@ -352,7 +354,7 @@ describe("automatic fellow conference registration", () => {
     const state = makeState();
     state.totalMonths = 19;
     state.externalPublications = [conferencePaper("first")];
-    const paid = settleFellowConferenceFees(state);
+    const paid = settleFellowConferenceFees(settleConferenceRegistrationFees(state));
     expect(paid.advisorProgressState.funding).toBe(99);
     const changed = conferencePaper("different", "another-fellow", {
       submittedMonth: changedField === "name" ? 2 : 1,
@@ -360,15 +362,15 @@ describe("automatic fellow conference registration", () => {
       conferenceAvailableAtTotalMonths: 20,
     });
     if (changedField === "city") location.mockReturnValue({ region: "domestic", city: "上海", country: "中国" });
-    const later = settleFellowConferenceFees({ ...paid, totalMonths: 20,
-      externalPublications: [...paid.externalPublications, changed] });
+    const later = settleFellowConferenceFees(settleConferenceRegistrationFees({ ...paid, totalMonths: 20,
+      externalPublications: [...paid.externalPublications, changed] }));
     expect(later.advisorProgressState.funding).toBe(98);
     expect(new Set(later.advisorProgressState.paidFellowConferenceTrips).size).toBe(2);
     expect(later.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["first", "different"]);
     expect(later.advisorProgressState.paidFellowConferencePaperIds).toEqual(["first", "different"]);
   });
 
-  it("still charges unpaid registration when a fellow trip was already paid and handled", () => {
+  it("does not retroactively charge registration in the free proxy handler", () => {
     const state = makeState();
     state.totalMonths = 7;
     const paper = conferencePaper("travel-paid", "fellow-departed", { conferenceHandled: true });
@@ -376,19 +378,20 @@ describe("automatic fellow conference registration", () => {
     state.advisorProgressState.paidFellowConferencePaperIds = [paper.id];
     state.advisorProgressState.paidFellowConferenceTrips = [getPaperConferenceTripId(paper, state.conferenceLocationSeed)!];
     const paid = settleFellowConferenceFees(state);
-    expect(paid.advisorProgressState.funding).toBe(99);
-    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual([paper.id]);
+    expect(paid.advisorProgressState.funding).toBe(100);
+    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toBeUndefined();
     expect(paid.advisorProgressState.paidFellowConferenceTrips).toEqual(state.advisorProgressState.paidFellowConferenceTrips);
     expect(settleFellowConferenceFees(paid)).toBe(paid);
   });
 
-  it("charges only fellow registration and leaves player payment and attendance pending", () => {
+  it("handles only fellow attendance after both registrations have been paid", () => {
     const state = makeState();
     state.totalMonths = 7;
     state.externalPublications = [conferencePaper("player-paper", "player"), conferencePaper("fellow-paper")];
-    const paid = settleFellowConferenceFees(state);
-    expect(paid.advisorProgressState.funding).toBe(99);
-    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["fellow-paper"]);
+    const registered = settleConferenceRegistrationFees(state);
+    const paid = settleFellowConferenceFees(registered);
+    expect(paid.advisorProgressState.funding).toBe(98);
+    expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["player-paper", "fellow-paper"]);
     expect(paid.advisorProgressState.paidFellowConferencePaperIds).toEqual(["fellow-paper"]);
     expect(paid.externalPublications.map((paper) => paper.conferenceHandled)).toEqual([false, true]);
     expect(paid.player).toEqual(state.player);
@@ -414,7 +417,7 @@ describe("automatic fellow conference registration", () => {
     state.advisorProgressState.funding = funding;
     state.fellowFinanceAccounts = { "fellow-departed": { name: "离校同学", money: 100 } };
     state.externalPublications = [conferencePaper("fellow-paper")];
-    const paid = settleFellowConferenceFees(state);
+    const paid = settleFellowConferenceFees(settleConferenceRegistrationFees(state));
     expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["fellow-paper"]);
     expect(paid.advisorProgressState.funding).toBe(Math.round((funding - 1) * 100) / 100);
     expect(paid.advisorProgressState.paidFellowConferencePaperIds ?? []).toEqual(funding < 1 ? [] : ["fellow-paper"]);

@@ -43,6 +43,7 @@ describe("player journal fee events", () => {
     expect(root).toMatchObject({ stage: "act1", blocking: true, deadlineMonths: 0,
       journalFeePreview: { paperId: "journal-paper", stage: "act1" } });
     expect(root.description.split("\n\n")).toHaveLength(2);
+    expect(root.choices.map(({ id, label }) => ({ id, label }))).toEqual([{ id: "continue", label: "继续" }]);
     const decision = follow(root, "continue");
     expect(decision).toMatchObject({ stage: "act2", chainId: root.chainId });
     expect(decision.choices.map((choice) => choice.id)).toEqual(["self", "advisor"]);
@@ -56,7 +57,8 @@ describe("player journal fee events", () => {
       expect(result.choices[0]!.effects).toEqual({ recordJournalFeePayment: "journal-paper",
         ...(mode === "self" ? { money: -fee } : { advisorProgressStateDeltas: { funding: -fee } }) });
       expect(result.choices[0]!.disabledReason).toBeUndefined();
-      expect(result.choices.some((choice) => choice.id === "change-payment-method")).toBe(true);
+      expect(result.choices.map(({ id, label }) => ({ id, label }))).toEqual([{ id: "confirm", label: "确定" }]);
+      expect(result.choices[0]!.effects.enqueueEvents).toBeUndefined();
       expect(decision.choices.find((choice) => choice.id === mode)!.effects).toEqual({ enqueueEvents: [result] });
     }
     expect(root.choices[0]!.effects).toEqual({ enqueueEvents: [decision] });
@@ -113,38 +115,36 @@ describe("player journal fee events", () => {
     expect(state.eventQueue).toEqual([]);
   });
 
-  it.each(["self", "advisor"] as const)("refreshes %s balance at decision and confirmation without rerolling", (mode) => {
+  it.each(["self", "advisor"] as const)("keeps %s payment selectable regardless of balance without charging or rerolling", (mode) => {
     const state = makeState();
     const root = createJournalFeeEvent(state, state.externalPublications[0]!)!;
     const decision = follow(root, "continue");
     const result = follow(decision, mode);
     const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Refresh rerolled"); });
-    for (const balance of [4.99, 5, 0, 5.25]) {
+    for (const balance of [4.99, 5, 0, 5.25, -1]) {
       if (mode === "self") state.player.money = balance;
       else state.advisorProgressState.funding = balance;
       const choice = refreshJournalFeeEvent(state, decision).choices.find((entry) => entry.id === mode)!;
       const refreshed = refreshJournalFeeEvent(state, result);
-      expect(Boolean(choice.disabledReason)).toBe(balance < 5);
-      expect(Boolean(refreshed.choices[0]!.disabledReason)).toBe(balance < 5);
-      expect(refreshed.choices.find((entry) => entry.id === "change-payment-method")!.disabledReason).toBeUndefined();
+      expect(choice.disabledReason).toBeUndefined();
+      expect(refreshed.choices[0]!.disabledReason).toBeUndefined();
+      expect(refreshed.choices.map((entry) => entry.id)).toEqual(["confirm"]);
       expect(mode === "self" ? state.player.money : state.advisorProgressState.funding).toBe(balance);
     }
     expect(random).not.toHaveBeenCalled();
   });
 
-  it("returns from an unaffordable confirmation to the other method after save/load", () => {
+  it("preserves the selected payment method after save/load without a return branch", () => {
     const state = makeState();
     let event = confirmation(state, "self");
     state.player.money = 0;
     event = refreshJournalFeeEvent(state, JSON.parse(JSON.stringify(event)));
-    expect(event.choices[0]!.disabledReason).toBeDefined();
-    const decision = refreshJournalFeeEvent(state, follow(event, "change-payment-method"));
-    event = refreshJournalFeeEvent(state, follow(decision, "advisor"));
-    expect(event.journalFeePreview?.paymentMode).toBe("advisor");
+    expect(event.journalFeePreview?.paymentMode).toBe("self");
     expect(event.choices[0]!.disabledReason).toBeUndefined();
-    expect(event.choices[0]!.effects.money).toBeUndefined();
-    expect(event.choices[0]!.effects.advisorProgressStateDeltas).toEqual({ funding: -5 });
-    expect(event.choices.some((choice) => choice.id === "change-payment-method")).toBe(true);
+    expect(event.choices[0]!.effects.money).toBe(-5);
+    expect(event.choices[0]!.effects.advisorProgressStateDeltas).toBeUndefined();
+    expect(event.choices.map((choice) => choice.id)).toEqual(["confirm"]);
+    expect(event.choices[0]!.effects.enqueueEvents).toBeUndefined();
     expect(state.player.money).toBe(0);
     expect(state.advisorProgressState.funding).toBe(30);
   });
@@ -156,7 +156,7 @@ describe("player journal fee events", () => {
     state.advisorProgressState.funding = 0;
     const next = refreshJournalFeeEvent(state, queued);
     expect(next).toMatchObject({ id: "queued-copy", queueOrder: 8, continuationSourceId: "source-event", history: [] });
-    expect(follow(next, "continue").choices.find((choice) => choice.id === "advisor")!.disabledReason).toBeDefined();
+    expect(follow(next, "continue").choices.find((choice) => choice.id === "advisor")!.disabledReason).toBeUndefined();
     expect(refreshJournalFeeEvent(state, next)).toEqual(next);
   });
 
@@ -198,6 +198,21 @@ describe("player journal fee events", () => {
     const decision = follow(event, "continue");
     expect(decision.choices.find((choice) => choice.id === "self")!.disabledReason).toBeUndefined();
     expect(decision.choices.find((choice) => choice.id === "advisor")!.disabledReason).toBe("尚未选择导师");
+    expect(follow(decision, "advisor").choices[0]!.disabledReason).toBe("尚未选择导师");
+    state.selectedAdvisorName = "已选择导师";
+    expect(refreshJournalFeeEvent(state, follow(decision, "advisor")).choices[0]!.disabledReason).toBeUndefined();
+  });
+
+  it.each(["act1", "act2", "act3"] as const)("closes already paid %s without payment or follow-ups", (stage) => {
+    const state = makeState();
+    const root = createJournalFeeEvent(state, state.externalPublications[0]!)!;
+    const decision = follow(root, "continue");
+    const event = stage === "act1" ? root : stage === "act2" ? decision : follow(decision, "advisor");
+    state.advisorProgressState.paidJournalPaperIds = ["journal-paper"];
+    const refreshed = refreshJournalFeeEvent(state, event);
+    expect(refreshed.choices).toEqual([{ id: "close", label: "确定", outcome: "版面费已缴清。", effects: {} }]);
+    expect(refreshJournalFeeEvent(state, refreshed)).toEqual(refreshed);
+    expect(createJournalFeeEvent(state, state.externalPublications[0]!)).toBeNull();
   });
 
   it.each(["missing", "non-first", "paid", "finished"] as const)("removes stale payment effects for %s confirmation", (condition) => {

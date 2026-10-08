@@ -3,6 +3,7 @@ import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { getCalendarForTotalMonths } from "../src/core/v2-progression";
+import { createEventQueueItem } from "../src/core/v2-event-queue";
 import type { GameState, JournalTarget } from "../src/core/v2-types";
 
 function readyState(target: JournalTarget = "pami", month = 8): GameState {
@@ -73,35 +74,89 @@ describe("journal payment through the engine", () => {
     }
   });
 
-  it.each(["self", "advisor"] as const)("refreshes %s affordability and allows repeated payment-source switching without charging", (mode) => {
+  it.each(["self", "advisor"] as const)("keeps %s stages moving forward without return choices or growing history on invalid actions", (mode) => {
     const published = submit(readyState());
-    const confirmation = choosePayment(choosePayment(published, "continue"), mode);
-    const depleted = withBalance(confirmation, mode, 4.99);
-    const blocked = choosePayment(depleted, "confirm");
-    expect(blocked.player).toEqual(depleted.player);
-    expect(blocked.advisorProgressState).toEqual(depleted.advisorProgressState);
-    expect(paymentEvent(blocked).choices.find((choice) => choice.id === "confirm")!.disabledReason).toBeTruthy();
-    const decision = choosePayment(blocked, "change-payment-method");
-    expect(paymentEvent(decision).stage).toBe("act2");
-    expect(paymentEvent(decision).choices.find((choice) => choice.id === mode)!.disabledReason).toBeTruthy();
-    const switched = choosePayment(decision, mode === "self" ? "advisor" : "self");
-    const returned = choosePayment(switched, "change-payment-method");
-    const restoredConfirmation = choosePayment(withBalance(returned, mode, 5), mode);
-    expect(paymentEvent(restoredConfirmation).journalFeePreview?.paymentMode).toBe(mode);
-    const paid = choosePayment(restoredConfirmation, "confirm");
-    expect(mode === "self" ? paid.player.money : paid.advisorProgressState.funding).toBe(0);
-    expect(mode === "self" ? paid.advisorProgressState.funding : paid.player.money).toBe(100);
-    expect(paid.player.favor).toBe(published.player.favor);
+    const decision = choosePayment(published, "continue");
+    let confirmation = choosePayment(decision, mode);
+    expect(paymentEvent(published).history ?? []).toHaveLength(0);
+    expect(paymentEvent(decision).history).toHaveLength(1);
+    expect(paymentEvent(confirmation).history).toHaveLength(2);
+    const preview = paymentEvent(confirmation).journalFeePreview;
+    const history = paymentEvent(confirmation).history;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      confirmation = choosePayment(JSON.parse(JSON.stringify(confirmation)) as GameState, "change-payment-method");
+      expect(paymentEvent(confirmation).journalFeePreview).toEqual(preview);
+      expect(paymentEvent(confirmation).choices.map((choice) => choice.id)).toEqual(["confirm"]);
+      expect(paymentEvent(confirmation).history).toEqual(history);
+      expect(confirmation.eventQueue.filter((event) => event.journalFeePreview)).toHaveLength(1);
+      expect(confirmation.player.money).toBe(100);
+      expect(confirmation.advisorProgressState.funding).toBe(100);
+    }
+    const paid = choosePayment(confirmation, "confirm");
+    expect(paid.eventQueue.some((event) => event.journalFeePreview)).toBe(false);
     expect(paid.advisorProgressState.paidJournalPaperIds).toEqual(["test-pami"]);
-    expect(paid.phase).toBe("playing");
   });
 
-  it.each(["self", "advisor"] as const)("refreshes an unaffordable %s confirmation when balance is restored", (mode) => {
+  it.each(["self", "advisor"] as const)("allows insufficient %s balance until one final payment triggers the corresponding ending", (mode) => {
+    for (const balance of [0, 4.99, 5]) {
+      const published = withBalance(submit(readyState()), mode, balance);
+      const decision = choosePayment(published, "continue");
+      expect(paymentEvent(decision).choices.find((choice) => choice.id === mode)!.disabledReason).toBeUndefined();
+      const confirmation = choosePayment(decision, mode);
+      expect(paymentEvent(confirmation).choices[0]!.disabledReason).toBeUndefined();
+      for (const pending of [decision, confirmation]) {
+        expect(pending).toMatchObject({ phase: "playing", ending: null });
+        expect(mode === "self" ? pending.player.money : pending.advisorProgressState.funding).toBe(balance);
+        expect(pending.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
+      }
+      const confirmedEventId = paymentEvent(confirmation).id;
+      const paid = choosePayment(JSON.parse(JSON.stringify(confirmation)) as GameState, "confirm");
+      expect(mode === "self" ? paid.player.money : paid.advisorProgressState.funding).toBeCloseTo(balance - 5);
+      expect(mode === "self" ? paid.advisorProgressState.funding : paid.player.money).toBe(100);
+      expect(paid.advisorProgressState.paidJournalPaperIds).toEqual(["test-pami"]);
+      expect(paid.phase).toBe(balance < 5 ? "finished" : "playing");
+      expect(paid.ending).toBe(balance < 5 ? mode === "self" ? "poor" : "lab-bankrupt" : null);
+      expect(paid.eventQueue.some((event) => event.journalFeePreview)).toBe(false);
+      const repeated = dispatchAction(paid, "resolve-event", { eventId: confirmedEventId, eventChoiceId: "confirm" });
+      expect(repeated.player).toEqual(paid.player);
+      expect(repeated.advisorProgressState).toEqual(paid.advisorProgressState);
+    }
+  });
+
+  it.each(["self", "advisor"] as const)("charges the current %s balance even when it falls after choosing the source", (mode) => {
     const confirmation = choosePayment(choosePayment(submit(readyState()), "continue"), mode);
-    const blocked = choosePayment(withBalance(confirmation, mode, 0), "confirm");
-    const paid = choosePayment(withBalance(blocked, mode, 5), "confirm");
+    const paid = choosePayment(withBalance(confirmation, mode, 4), "confirm");
+    expect(mode === "self" ? paid.player.money : paid.advisorProgressState.funding).toBe(-1);
+    expect(paid.ending).toBe(mode === "self" ? "poor" : "lab-bankrupt");
     expect(paid.advisorProgressState.paidJournalPaperIds).toEqual(["test-pami"]);
-    expect(mode === "self" ? paid.player.money : paid.advisorProgressState.funding).toBe(0);
+  });
+
+  it.each(["act1", "act2", "act3"] as const)("closes a stale paid %s queue entry without recharging or requeuing", (stage) => {
+    const published = submit(readyState());
+    const decision = choosePayment(published, "continue");
+    const confirmation = choosePayment(decision, "advisor");
+    const stale = paymentEvent(stage === "act1" ? published : stage === "act2" ? decision : confirmation);
+    const paid = choosePayment(confirmation, "confirm");
+    const reloaded = JSON.parse(JSON.stringify({ ...paid, eventQueue: [createEventQueueItem(stale, 0)] })) as GameState;
+    const closed = choosePayment(reloaded, "close");
+    expect(closed.player).toEqual(paid.player);
+    expect(closed.advisorProgressState).toEqual(paid.advisorProgressState);
+    expect(closed.eventQueue.some((event) => event.journalFeePreview)).toBe(false);
+    const checked = submit(closed);
+    expect(checked.eventQueue.some((event) => event.journalFeePreview)).toBe(false);
+    expect(checked.advisorProgressState.paidJournalPaperIds).toEqual(["test-pami"]);
+  });
+
+  it("blocks advisor payment structurally when no advisor is selected", () => {
+    const published = { ...submit(readyState()), selectedAdvisorName: null };
+    const decision = choosePayment(published, "continue");
+    const blocked = choosePayment(decision, "advisor");
+    expect(paymentEvent(blocked).stage).toBe("act2");
+    expect(paymentEvent(blocked).choices.find((choice) => choice.id === "advisor")!.disabledReason).toBe("尚未选择导师");
+    expect(blocked.advisorProgressState.funding).toBe(100);
+    const paid = choosePayment(choosePayment(blocked, "self"), "confirm");
+    expect(paid.player.money).toBe(95);
+    expect(paid.advisorProgressState.funding).toBe(100);
   });
 
   it("preserves the payment stage and requires final payment before graduation through next-month", () => {
