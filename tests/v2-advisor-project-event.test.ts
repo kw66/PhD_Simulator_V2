@@ -156,8 +156,8 @@ describe("advisor project random event effects", () => {
     const before = structuredClone(state);
     const after = applyChoiceEffectsToState(state, decisionChoice(makeEvent(state), "horizontal")).nextState;
 
-    expect(after.advisorProgressState).toEqual({ ...state.advisorProgressState, funding: 68, horizontalContributorIds: [] });
-    expect(after.player).toEqual({ ...state.player, money: 12, san: 92, favor: 4 });
+    expect(after.advisorProgressState).toEqual({ ...state.advisorProgressState, funding: 53 });
+    expect(after.player).toEqual({ ...state.player, money: 9.5, san: 92, favor: 4 });
     expect(after.papers).toEqual(state.papers);
     expect(after.fellowPapers).toEqual(state.fellowPapers);
     expect(after.fellowProgressState).toEqual(state.fellowProgressState);
@@ -200,8 +200,8 @@ describe("advisor project random event effects", () => {
 
     expect(after.advisorProgressState[type === "horizontal" ? "horizontalProgress" : "verticalProgress"]).toBe(87);
     expect(after.log.filter((entry) => entry.text.startsWith(`${type === "horizontal" ? "横向" : "纵向"}项目完成：`))).toHaveLength(2);
-    expect(after.advisorProgressState.funding).toBe(type === "horizontal" ? 123 : 13);
-    expect(after.player.money).toBe(type === "horizontal" ? 17 : 7);
+    expect(after.advisorProgressState.funding).toBe(type === "horizontal" ? 93 : 13);
+    expect(after.player.money).toBe(type === "horizontal" ? 12 : 7);
     expect(after.advisorProgressState.researchAccumulation).toBe(type === "vertical" ? 34 : 29);
     for (const paper of [...after.papers, ...after.fellowPapers!]) {
       expect(collaborationTotal(paper)).toBe(type === "vertical" ? 20 : 0);
@@ -314,8 +314,8 @@ describe("advisor project SAN and attribute rules", () => {
 
   it.each([
     { value: 3, roll: 0, gain: 1 },
-    { value: 12, roll: 0, gain: 0 },
-    { value: 12, roll: 0.999, gain: 1 },
+    { value: 12, roll: 0, gain: 0.5 },
+    { value: 12, roll: 0.999, gain: 0.5 },
     { value: 20, roll: 0.999, gain: 0 },
   ])("retains tier resistance and caps at attribute $value with roll $roll", ({ value, roll, gain }) => {
     const state = makeState();
@@ -420,7 +420,7 @@ describe("advisor project three-stage settlement", () => {
     const completionLogs = completed.log.filter((entry) => entry.text.startsWith(`${type === "horizontal" ? "横向" : "纵向"}项目完成：`));
     expect(completionLogs).toHaveLength(1);
     expect(completionLogs[0]!.text).toBe(type === "horizontal"
-      ? "横向项目完成：科研经费 +60，科研经费 -5（劳务费）；金币 +5"
+      ? "横向项目完成：科研经费 +50，科研经费 -10（劳务费）；金币 +2.5；senior、peer、junior各领2.5金币"
       : "纵向项目完成：科研积累 +2");
     const eventIndex = completed.log.findIndex((entry) => Boolean(entry.eventHistoryId));
     const projectIndex = completed.log.findIndex((entry) => entry.id === completionLogs[0]!.id);
@@ -492,7 +492,7 @@ describe("advisor project three-stage settlement", () => {
     expect(completed.advisorProgressState).toMatchObject({
       lastPlayerProjectTotalMonths: marker, lastAdvisorProjectTotalMonths: marker,
       lastProjectTotalMonths: marker, lastHorizontalTotalMonths: marker,
-      funding: type === "horizontal" ? 68 : 13,
+      funding: type === "horizontal" ? 53 : 13,
       researchAccumulation: type === "vertical" ? 31 : 29,
     });
     expect(completed.player.san).toBe(type === "horizontal" ? 92 : 94);
@@ -501,7 +501,7 @@ describe("advisor project three-stage settlement", () => {
     expect(completed.loverProgressState).toEqual(state.loverProgressState);
   });
 
-  it("allows vertical guidance to accept a journal only after final confirmation and awards it once", () => {
+  it("accepts a journal after final project confirmation, awards it once and queues unpaid publication fees", () => {
     const state = makeState({
       papers: [makePaper("journal-paper", {
         status: "journal-reviewing", journalTarget: "pami", idea: 40, experiment: 40, writing: 40,
@@ -527,12 +527,18 @@ describe("advisor project three-stage settlement", () => {
     expect(collaborationTotal(completed.externalPublications[0]!)).toBe(10);
     expect(completed.totalResearchScore).toBe(5);
     expect(completed.advisorProgressState).toMatchObject({
-      researchAccumulation: 36, funding: 8, verticalProgress: 64, countedPaperIds: ["journal-paper"],
+      researchAccumulation: 36, funding: state.advisorProgressState.funding, verticalProgress: 64, countedPaperIds: ["journal-paper"],
     });
-    expect(completed.advisorProgressState.paidJournalPaperIds).toContain("journal-paper");
+    expect(completed.player.money).toBe(state.player.money);
+    expect(completed.advisorProgressState.paidJournalPaperIds ?? []).not.toContain("journal-paper");
+    const feeEvents = completed.eventQueue.filter((event) => event.journalFeePreview?.paperId === "journal-paper");
+    expect(feeEvents).toHaveLength(1);
+    expect(feeEvents[0]).toMatchObject({ blocking: true, deadlineMonths: 0,
+      journalFeePreview: { paperId: "journal-paper", stage: "act1" } });
     const repeated = dispatchAction(completed, "resolve-event", {
       eventId: result.id, eventChoiceId: result.choices[0]!.id,
     });
     expect(settlementState(repeated)).toEqual(settlementState(completed));
+    expect(repeated.eventQueue.filter((event) => event.journalFeePreview?.paperId === "journal-paper")).toEqual(feeEvents);
   });
 });

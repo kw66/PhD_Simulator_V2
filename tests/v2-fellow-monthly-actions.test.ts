@@ -237,14 +237,14 @@ describe("research selection and funding retries", () => {
       expect(currentPaper(state).experiment).toBe(0);
       expect(fellow(state).nextMonthlyAction).toBe("research");
       expect(state.advisorProgressState).toMatchObject({
-        horizontalProgress: attempt * 20 % 100, funding: attempt === 5 ? 51 : 1,
+        horizontalProgress: attempt * 20 % 100, funding: attempt === 5 ? 1 + 50 - 2 * 2.5 : 1,
       });
-      expect(state.player.money).toBe(attempt === 5 ? 25 : 20);
+      expect(state.player.money).toBe(attempt === 5 ? 22.5 : 20);
     }
     const retried = nextMonth(state);
     expect(currentPaper(retried).experiment).toBe(10);
-    expect(retried.advisorProgressState).toMatchObject({ funding: 48, horizontalProgress: 0, verticalProgress: 0 });
-    expect(retried.player.money).toBe(25);
+    expect(retried.advisorProgressState).toMatchObject({ funding: 1 + 50 - 2 * 2.5 - 3, horizontalProgress: 0, verticalProgress: 0 });
+    expect(retried.player.money).toBe(22.5);
     expect(fellow(retried).nextMonthlyAction).toBe("project");
   });
 
@@ -275,8 +275,8 @@ describe("entry funding and sequential card order", () => {
     const before = makeState({ fellows: profiles, funding: 59, horizontalProgress: 90 });
     if (reversed) before.fellowPapers!.reverse();
     const next = nextMonth(before);
-    expect(next.advisorProgressState).toMatchObject({ funding: 109, horizontalProgress: 10, verticalProgress: 0 });
-    expect(next.player.money).toBe(25);
+    expect(next.advisorProgressState).toMatchObject({ funding: 59 + 50 - 3 * 2.5, horizontalProgress: 10, verticalProgress: 0 });
+    expect(next.player.money).toBe(22.5);
     for (const profile of profiles) {
       expect(scores(currentPaper(next, profile.id))).toEqual([0, 0, 0]);
       expect(fellow(next, profile.id).nextMonthlyAction).toBe("research");
@@ -329,8 +329,8 @@ describe("entry funding and sequential card order", () => {
     const next = nextMonth(before);
     expect(scores(currentPaper(next, "project"))).toEqual([0, 0, 0]);
     expect(currentPaper(next, "research").experiment).toBe(10);
-    expect(next.advisorProgressState).toMatchObject({ funding: 48, horizontalProgress: 0, verticalProgress: 0 });
-    expect(next.player.money).toBe(25);
+    expect(next.advisorProgressState).toMatchObject({ funding: 1 + 50 - 3 * 2.5 - 3, horizontalProgress: 0, verticalProgress: 0 });
+    expect(next.player.money).toBe(22.5);
     expect(fellow(next, "project").nextMonthlyAction).toBe("research");
     expect(fellow(next, "research").nextMonthlyAction).toBe("project");
   });
@@ -340,8 +340,8 @@ describe("entry funding and sequential card order", () => {
     const before = withPaper(makeState({ fellows: profiles, totalMonths: 2, funding: 1, horizontalProgress: 70 }), { idea: 10 }, "research");
     const next = nextMonth(before);
     expect(currentPaper(next, "research").experiment).toBe(0);
-    expect(next.advisorProgressState).toMatchObject({ funding: 46, horizontalProgress: 0, verticalProgress: 0 });
-    expect(next.player.money).toBe(25);
+    expect(next.advisorProgressState).toMatchObject({ funding: 1 + 50 - 3 * 2.5, horizontalProgress: 0, verticalProgress: 0 });
+    expect(next.player.money).toBe(22.5);
     expect(fellow(next, "research").nextMonthlyAction).toBe("research");
   });
 });
@@ -376,11 +376,11 @@ describe("fellow experiments and zero lab funding", () => {
     expect(currentPaper(next, "research").experiment).toBe(10);
     expect(fellow(next, "research").nextMonthlyAction).toBe("project");
     expect(next.advisorProgressState).toMatchObject({
-      funding: funding - 3 + 50,
+      funding: funding - 3 + 50 - 3 * 2.5,
       horizontalProgress: 0,
       verticalProgress: 0,
     });
-    expect(next.player.money).toBe(25);
+    expect(next.player.money).toBe(22.5);
     expect(fellow(next, "project").nextMonthlyAction).toBe("research");
     expect(fellow(next, "project").lastProjectTotalMonths)
       .toBe(3);
@@ -390,8 +390,8 @@ describe("fellow experiments and zero lab funding", () => {
   it.each([
     [3, 5, 0, 5, "经费 -3"],
     [1, 5, 0, 3, "自费 -2"],
-    [0, 3, 0, 0, "自费 -3"],
-    [0.5, 2.5, 0, 0, "自费 -2.5"],
+    [0, 4, 0, 1, "自费 -3"],
+    [0.5, 3.5, 0, 1, "自费 -2.5"],
   ] as const)("pays an experiment using funding %s and personal money %s", (funding, money, remainingFunding, remainingMoney, summary) => {
     const state = withPaper(makeState({ funding }), { idea: 10 });
     state.fellowFinanceAccounts = { fellow: { name: "fellow", money }, departed: { name: "departed", money: 9 } };
@@ -417,7 +417,7 @@ describe("fellow experiments and zero lab funding", () => {
     expect(next.player).toEqual(state.player);
   });
 
-  it("continues free idea research and records the project actor at zero funding", () => {
+  it("continues free idea research and advances shared projects without contributor tracking at zero funding", () => {
     const state = makeState({ funding: 0, fellows: [
       makeFellow("research"), makeFellow("project", { nextMonthlyAction: "project" }),
     ] });
@@ -425,7 +425,7 @@ describe("fellow experiments and zero lab funding", () => {
     const next = nextMonth(state);
     expect(currentPaper(next, "research").idea).toBe(10);
     expect(next.advisorProgressState.horizontalProgress).toBe(20);
-    expect(project).toHaveBeenCalledWith(expect.any(Object), "horizontal", 20, expect.any(Function), "project");
+    expect(project).toHaveBeenCalledWith(expect.any(Object), "horizontal", 20, expect.any(Function));
     expect(next.player).toEqual(state.player);
   });
 });

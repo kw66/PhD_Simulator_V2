@@ -1,9 +1,11 @@
-import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
+import { getConferenceInfo } from "./v2-conference-catalog";
 import { getPaperConferenceTripId } from "./v2-conference-identity";
 import { getJournalDefinition } from "./v2-journal-system";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { roundMoney } from "./v2-money";
-import { CONFERENCE_REGISTRATION_FEE, CONFERENCE_TRAVEL_FEES, JOURNAL_PUBLICATION_FEES } from "./v2-publication-fees";
+import { CONFERENCE_REGISTRATION_FEE, JOURNAL_PUBLICATION_FEES } from "./v2-publication-fees";
+import { createJournalFeeEvent } from "./v2-journal-fee-events";
+import { enqueueEventQueueItem } from "./v2-event-queue";
 import type { GameState, Paper } from "./v2-types";
 
 export { CONFERENCE_TRAVEL_FEES, JOURNAL_PUBLICATION_FEES } from "./v2-publication-fees";
@@ -16,6 +18,10 @@ function getPublishedPapers(state: GameState): Paper[] {
 function hasLabPublicationResponsibility(paper: Paper): boolean {
   if (paper.leadAuthorId?.startsWith("lover")) return false;
   return Boolean(paper.leadAuthorId && paper.leadAuthorId !== "player") || !paper.nonFirstAuthor;
+}
+
+function isFellowPaper(paper: Paper): boolean {
+  return Boolean(paper.leadAuthorId && paper.leadAuthorId !== "player" && !paper.leadAuthorId.startsWith("lover"));
 }
 
 function isConferencePaper(paper: Paper): boolean {
@@ -35,13 +41,21 @@ function recordFellowPublicationCost(state: GameState, fellowId: string | undefi
 }
 
 export function settleJournalPublicationFees(state: GameState): GameState {
-  if (state.phase !== "playing" || !state.selectedAdvisorName) return state;
+  if (state.phase !== "playing") return state;
   let nextState = state;
   const paid = new Set(state.advisorProgressState.paidJournalPaperIds ?? []);
   for (const paper of getPublishedPapers(state)) {
     if (nextState.advisorProgressState.funding < 0) break;
     const journal = paper.journalTarget ?? paper.publication?.journalTarget;
     if (!journal || paid.has(paper.id) || !hasLabPublicationResponsibility(paper)) continue;
+    if (!isFellowPaper(paper)) {
+      if (!nextState.eventQueue.some((event) => event.journalFeePreview?.paperId === paper.id)) {
+        const event = createJournalFeeEvent(nextState, paper);
+        if (event) nextState = enqueueEventQueueItem(nextState, event);
+      }
+      continue;
+    }
+    if (!state.selectedAdvisorName) continue;
     paid.add(paper.id);
     const fee = JOURNAL_PUBLICATION_FEES[journal];
     nextState = pushMilestoneLog({ ...nextState, advisorProgressState: {
@@ -59,7 +73,7 @@ export function settleConferenceRegistrationFees(state: GameState): GameState {
   const paid = new Set(state.advisorProgressState.paidConferenceRegistrationPaperIds ?? []);
   const groups = new Map<string, Paper[]>();
   for (const paper of getPublishedPapers(state)) {
-    if (!isConferencePaper(paper) || paid.has(paper.id)
+    if (!isConferencePaper(paper) || !isFellowPaper(paper) || paid.has(paper.id)
       || (paper.conferenceAvailableAtTotalMonths ?? Infinity) > state.totalMonths) continue;
     const trip = getPaperConferenceTripId(paper, state.conferenceLocationSeed)!;
     groups.set(trip, [...(groups.get(trip) ?? []), paper]);
@@ -75,7 +89,7 @@ export function settleConferenceRegistrationFees(state: GameState): GameState {
       ...nextState.advisorProgressState,
       funding: roundMoney(nextState.advisorProgressState.funding - fee),
       paidConferenceRegistrationPaperIds: [...paid],
-    } }, `${venue.name} ${venue.year}注册费（${papers.length}篇）：科研经费 -${fee}。`, "conference-registration-fee");
+    } }, `${venue.name} ${venue.year}同学论文已安排会外联系人代贴（${papers.length}篇）：科研经费 -${fee}。`, "conference-registration-fee");
     for (const entry of papers) nextState = recordFellowPublicationCost(nextState, entry.leadAuthorId, "registration", CONFERENCE_REGISTRATION_FEE);
   }
   return nextState;
@@ -97,21 +111,12 @@ export function settleFellowConferenceFees(state: GameState): GameState {
   }
   for (const [trip, papers] of groups) {
     if (nextState.advisorProgressState.funding < 0) break;
-    const paper = papers[0]!;
-    const venue = getConferenceInfo(paper.submittedMonth!, paper.target!, paper.submittedYear!);
-    const location = getConferenceLocation(paper.submittedMonth!, paper.target!, paper.submittedYear!, state.conferenceLocationSeed);
-    const fee = trips.has(trip) ? 0 : CONFERENCE_TRAVEL_FEES[location.region];
     trips.add(trip);
     for (const entry of papers) { paid.add(entry.id); handled.add(entry.id); }
-    const names = [...new Set(papers.map((entry) => entry.leadAuthorName ?? "同学"))].join("、");
-    nextState = pushMilestoneLog({ ...nextState, advisorProgressState: {
+    nextState = { ...nextState, advisorProgressState: {
       ...nextState.advisorProgressState,
-      funding: roundMoney(nextState.advisorProgressState.funding - fee),
       paidFellowConferencePaperIds: [...paid], paidFellowConferenceTrips: [...trips],
-    } }, `${names}参加${venue.name} ${venue.year}（${papers.length}篇）：科研经费 -${fee}（差旅）。`, "fellow-conference-fee");
-    for (const fellowId of new Set(papers.map((entry) => entry.leadAuthorId))) {
-      nextState = recordFellowPublicationCost(nextState, fellowId, "sharedTravel", fee);
-    }
+    } };
   }
   if (!handled.size) return nextState;
   const update = (paper: Paper): Paper => handled.has(paper.id)

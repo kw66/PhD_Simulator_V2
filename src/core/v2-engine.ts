@@ -49,7 +49,7 @@ import { ensureFellowFinanceAccounts } from "./v2-fellow-finance";
 import { normalizeGameMoney } from "./v2-money";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { settleLabResearchGrowth } from "./v2-lab-talent";
-import { settleConferenceRegistrationFees, settleJournalPublicationFees } from "./v2-lab-publication-costs";
+import { settleJournalPublicationFees } from "./v2-lab-publication-costs";
 import { advanceAdvisorProject, settleAdvisorMonth, syncAdvisorResearchAccumulation } from "./v2-advisor-progress";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { advanceLoverDate, advanceLoverMonth, settlePendingLoverHelp } from "./v2-lover-progression";
@@ -224,8 +224,6 @@ const MONTH_START_RELATIONSHIP_STEPS: ReadonlyArray<(state: GameState) => GameSt
 
 function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
   if (state.phase !== "playing") return state;
-  state = evaluateCoreEndings(settleConferenceRegistrationFees(state));
-  if (state.phase !== "playing") return state;
   const candidates = [...state.papers, ...state.externalPublications]
     .filter((paper): paper is typeof paper & { target: NonNullable<typeof paper.target>; submittedMonth: number; submittedYear: number } => (
       paper.status === "published"
@@ -253,6 +251,7 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
     advisorProgressState: state.advisorProgressState,
     social: state.player.social,
     research: state.player.research,
+    researchCapacityState: state.researchCapacityState,
     shopState: state.shopState,
     eventSupport: state.eventSupport,
     eventCounters: state.eventCounters,

@@ -42,8 +42,8 @@ describe("fellow AI selection and payment", () => {
     expect(random).not.toHaveBeenCalled();
   });
 
-  it("reserves only one experiment despite unpaid conference and journal publications", () => {
-    const state = makeState(4, 4);
+  it("reserves one experiment and living costs despite unpaid publications", () => {
+    const state = makeState(4, 5);
     state.fellowPapers![0]!.idea = 100;
     const pending = {
       ...createDraftPaper(1, 0, () => 0), id: "unpaid", status: "published" as const,
@@ -56,7 +56,7 @@ describe("fellow AI selection and payment", () => {
     expect(getFellowAiBudget(state, "fellow")).toBe(1);
     const selected = subscribeFellowAi(state, "fellow", state.fellowPapers![0]!.id, "idea");
     expect(selected.model?.slot).toBe("deepseek");
-    expect(selected.state.fellowFinanceAccounts?.fellow?.money).toBe(3);
+    expect(selected.state.fellowFinanceAccounts?.fellow?.money).toBe(4);
     expect(selected.state.fellowFinanceAccounts?.departed).toEqual(state.fellowFinanceAccounts?.departed);
     expect(selected.state.advisorProgressState).toEqual(state.advisorProgressState);
     expect(selected.state.player).toEqual(state.player);
@@ -64,13 +64,13 @@ describe("fellow AI selection and payment", () => {
   });
 
   it("reserves the current experiment cost exactly once even with ample lab funding", () => {
-    const state = makeState(4, 5);
+    const state = makeState(4, 6);
     state.buffs = [createLabGpuFailureBuff()];
     state.fellowPapers![0]!.idea = 100;
     expect(getFellowAiBudget(state, "fellow")).toBe(1);
     const selected = subscribeFellowAi(state, "fellow", state.fellowPapers![0]!.id, "idea");
     expect(selected.model?.slot).toBe("deepseek");
-    expect(selected.state.fellowFinanceAccounts?.fellow?.money).toBe(4);
+    expect(selected.state.fellowFinanceAccounts?.fellow?.money).toBe(5);
     expect(selected.state.advisorProgressState.funding).toBe(100);
     state.advisorProgressState.funding = 0;
     expect(getFellowAiBudget(state, "fellow")).toBe(1);
@@ -88,18 +88,18 @@ describe("fellow AI selection and payment", () => {
   });
 
   it("selects affordable DeepSeek for a high-score task when paid alternatives exceed the reserved budget", () => {
-    const state = makeState(4, 4);
+    const state = makeState(4, 5);
     state.fellowPapers![0] = { ...state.fellowPapers![0]!, idea: 100 };
     const selected = subscribeFellowAi(state, "fellow", state.fellowPapers![0]!.id, "idea");
     expect(selected.model?.slot).toBe("deepseek");
-    expect(selected.state.fellowFinanceAccounts?.fellow?.money).toBe(3);
+    expect(selected.state.fellowFinanceAccounts?.fellow?.money).toBe(4);
   });
 
-  it.each([0, 2, 3, 3.99])("keeps the experiment reserve with wallet %s and no affordable paid model", (money) => {
+  it.each([0, 2, 3, 3.99, 4, 4.99])("keeps experiment and living reserves with wallet %s and no affordable paid model", (money) => {
     const state = makeState(4, money);
     state.fellowPapers![0] = { ...state.fellowPapers![0]!, idea: 100 };
     const selected = subscribeFellowAi(state, "fellow", state.fellowPapers![0]!.id, "idea");
-    expect(getFellowAiBudget(state, "fellow")).toBe(Math.max(0, Math.round((money - 3) * 100) / 100));
+    expect(getFellowAiBudget(state, "fellow")).toBe(Math.max(0, Math.round((money - 4) * 100) / 100));
     expect(selected.model?.slot).toBe("doubao");
     expect(selected.state.fellowFinanceAccounts?.fellow?.money).toBe(money);
   });
@@ -209,7 +209,7 @@ describe("fellow AI shares the player research formula", () => {
   });
 
   it("charges one experiment for DeepSeek repetitions and keeps collaboration scores untouched", () => {
-    const state = makeState(4, 4);
+    const state = makeState(4, 5);
     state.advisorProgressState.funding = 0;
     state.fellowPapers![0] = { ...state.fellowPapers![0]!, idea: 100, experiment: 100, writing: 200,
       collaborationScores: { experiment: 10 } };
@@ -224,7 +224,7 @@ describe("fellow AI shares the player research formula", () => {
       fellowPapers: [{ ...paper, idea: 200 }],
     }, () => 0);
     expect(next.advisorProgressState.funding).toBe(0);
-    expect(next.fellowFinanceAccounts?.fellow?.money).toBe(0);
+    expect(next.fellowFinanceAccounts?.fellow?.money).toBe(1);
     expect(next.player).toEqual(state.player);
     expect(next.fellowPapers![0]!.experiment).toBe(102);
   });

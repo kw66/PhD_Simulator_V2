@@ -97,7 +97,7 @@ import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
 import { createVisitStats } from "./v2-visit-stats";
-import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
+import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
 import { createRelationshipTooltips } from "./v2-relationship-tooltips";
@@ -389,6 +389,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let activeEventChainId: string | null = null;
   let activeEventHistoryIndex: number | null = null;
   let activeLogPage: number | null = null;
+  let timelineScrollLeft = 0;
   let activePendingPage = 0;
   let activeRelationshipIndex = 0;
   let currentResearchPaperIndex = 0;
@@ -931,6 +932,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const previousTalentTree = state.phase === "setup" && lobby.selectedLobbyRoleId === lastRenderedSetupRoleId
       ? root.querySelector<HTMLElement>(".lobby-talent-tree")
       : null;
+    const previousTimelineTrack = root.querySelector<HTMLElement>(".event-timeline-track");
+    if (state.phase === "setup") {
+      timelineScrollLeft = 0;
+    } else if (previousTimelineTrack && previousTimelineTrack.clientWidth > 0) {
+      timelineScrollLeft = previousTimelineTrack.scrollLeft;
+    }
     root.dataset.phase = state.phase;
     root.innerHTML = renderApp(state, lobby, {
       activePlayTab,
@@ -1094,16 +1101,17 @@ export function bootstrapApp(root: HTMLDivElement): void {
       },
       root,
     });
-    if (state.phase !== "setup" && activeLogPage === null) {
+    if (state.phase !== "setup") {
       const timelineTrack = root.querySelector<HTMLElement>(".event-timeline-track");
       const currentMarker = timelineTrack?.querySelector<HTMLElement>(".event-timeline-marker.is-current");
-      if (timelineTrack && currentMarker) {
-        const centeredScrollLeft = currentMarker.offsetLeft - (timelineTrack.clientWidth - currentMarker.offsetWidth) / 2;
-        timelineTrack.scrollLeft = Math.max(
-          0,
-          Math.min(centeredScrollLeft, timelineTrack.scrollWidth - timelineTrack.clientWidth),
-        );
-        activeLogPage = Number(currentMarker.dataset.uiLogPageIndex ?? "0");
+      if (timelineTrack && timelineTrack.clientWidth > 0) {
+        if (activeLogPage === null && currentMarker) {
+          const centeredScrollLeft = currentMarker.offsetLeft - (timelineTrack.clientWidth - currentMarker.offsetWidth) / 2;
+          timelineScrollLeft = Math.max(0, Math.min(centeredScrollLeft, timelineTrack.scrollWidth - timelineTrack.clientWidth));
+          activeLogPage = Number(currentMarker.dataset.uiLogPageIndex ?? "0");
+        }
+        timelineTrack.scrollLeft = timelineScrollLeft;
+        timelineScrollLeft = timelineTrack.scrollLeft;
       }
     }
     showNewPaperSlotUnlocks(state);
@@ -1241,6 +1249,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const length = countMessageCharacters(target.value);
       if (counter) counter.textContent = `${length}/${MESSAGE_MAX_LENGTH}`;
       target.setAttribute("aria-invalid", String(length > MESSAGE_MAX_LENGTH));
+      refreshCommunityComposerLayout(target.parentElement!);
     } else if (target instanceof HTMLTextAreaElement && target.hasAttribute("data-community-edit-content")) {
       community.setEditContent(target.value);
       const length = countMessageCharacters(target.value);

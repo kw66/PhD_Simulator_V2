@@ -1,7 +1,7 @@
 import { createConferenceActivityEvent } from "./v2-conference-activity-events";
 import type { ConferenceActivityBuildState, ConferenceActivityContext } from "./v2-conference-activity-shared";
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
-import { getConferenceTripId, getPaperConferenceTripId } from "./v2-conference-identity";
+import { getConferenceTripId } from "./v2-conference-identity";
 import { getPaperConferencePromotionMultiplier } from "./v2-publication-system";
 import { CONFERENCE_REGISTRATION_FEE } from "./v2-publication-fees";
 import { getConferencePaperPresentationResults, getConferencePaperPresentationTitles } from "./v2-conference-activity-shared";
@@ -52,32 +52,26 @@ function getPaperTargetPriority(target: PaperTarget): number {
 }
 
 function createPaperHandledUpdates(context: ConferenceEventContext, conferenceHandled = true) {
-  return context.paperIds.map((id) => ({ id, conferenceHandled }));
+  return [...new Set(context.paperIds)].map((id) => ({ id, conferenceHandled }));
 }
 
 function getConferenceRegistrationSummary(context: ConferenceEventContext, state: ConferenceEventBuilderState) {
   const paperIds = new Set(context.paperIds);
   const paidIds = new Set(state.advisorProgressState?.paidConferenceRegistrationPaperIds ?? []);
-  const paidCount = [...paperIds].filter((id) => paidIds.has(id)).length;
-  const paidCost = paidCount * CONFERENCE_REGISTRATION_FEE;
-  const paymentStatus = paidCount === 0
-    ? `本场 ${paperIds.size} 篇尚无注册费支付记录。`
-    : paidCount === paperIds.size
-      ? `本场 ${paperIds.size} 篇共 ${paidCost} 金币已支付。`
-      : `本场 ${paperIds.size} 篇中已支付 ${paidCount} 篇，共 ${paidCost} 金币，其余尚无支付记录。`;
+  const unpaidCount = [...paperIds].filter((id) => !paidIds.has(id)).length;
   return {
-    description: `注册费每篇 ${CONFERENCE_REGISTRATION_FEE} 金币，录用满 3 个月时由导师科研经费自动支付。${paymentStatus}`,
-    resultItems: paidCount > 0 ? [`科研经费 -${paidCost}（注册费，已支付）`] : [],
+    unpaidCount,
+    description: `会务邮件注明注册费每篇 ${CONFERENCE_REGISTRATION_FEE} 金币，本次需缴 ${unpaidCount} 篇，共 ${unpaidCount * CONFERENCE_REGISTRATION_FEE} 金币，由导师科研经费支付。亲自到场还需安排差旅，选好参会方式后一起结算。`,
   };
 }
 
-function hasFellowAtConference(context: ConferenceEventContext, state: ConferenceEventBuilderState): boolean {
-  const fellowIds = new Set((state.fellowProgressState ?? []).map((fellow) => fellow.id));
-  const tripId = getConferenceTripId(context);
-  return [...(state.fellowPapers ?? []), ...(state.externalPublications ?? []), ...(state.papers ?? [])]
-    .some((paper) => paper.status === "published" && paper.leadAuthorId !== undefined
-      && fellowIds.has(paper.leadAuthorId)
-      && getPaperConferenceTripId(paper, state.conferenceLocationSeed ?? context.locationSeed) === tripId);
+function getConferenceSettlementItems(decision: ReturnType<typeof resolveConferenceDecisionCost>): string[] {
+  const items = [
+    ...(decision.resource === "favor" ? [`导师好感 -${decision.actualCost}`]
+      : decision.actualCost > 0 ? [`金币 -${decision.actualCost}`] : []),
+    ...(decision.fundingCost > 0 ? [`科研经费 -${decision.fundingCost}`] : []),
+  ];
+  return items.length > 0 ? items : ["无额外费用"];
 }
 
 function getConferenceFundingDisabledReason(state: ConferenceEventBuilderState, fundingCost: number): string | undefined {
@@ -91,8 +85,9 @@ function getConferenceDecisionDisabledReason(
   state: ConferenceEventBuilderState,
   decision: ReturnType<typeof resolveConferenceDecisionCost>,
 ): string | undefined {
-  if (decision.mode === "advisor") return getConferenceFundingDisabledReason(state, decision.fundingCost);
-  return state.money !== undefined && state.money < decision.actualCost
+  const fundingDisabledReason = getConferenceFundingDisabledReason(state, decision.fundingCost);
+  if (fundingDisabledReason) return fundingDisabledReason;
+  return decision.resource === "money" && decision.actualCost > 0 && state.money !== undefined && state.money < decision.actualCost
     ? `金币不足，需要 ${decision.actualCost} 金币。` : undefined;
 }
 
@@ -102,19 +97,12 @@ function createConferenceDecisionAct3(
   decision: ReturnType<typeof resolveConferenceDecisionCost>,
   getRoll: () => number,
 ): PendingEvent {
-  const modeText = decision.mode === "self" ? "自费参会" : decision.mode === "advisor" ? "导师报销" : decision.actualCost === 0 ? "同学代贴" : "陌生人代贴";
-  const costText = decision.actualCost > 0
-    ? decision.resource === "favor"
-      ? `导师好感 -${decision.actualCost}`
-      : `金币 -${decision.actualCost}`
-    : decision.mode === "advisor"
-      ? "导师好感 -0"
-      : decision.mode === "proxy"
-        ? "代贴免费"
-        : "差旅费 0";
-  const settlementItems = [costText, ...(decision.fundingCost > 0 ? [`科研经费 -${decision.fundingCost}`] : [])];
+  const modeText = decision.mode === "self" ? "自费参会" : decision.mode === "advisor" ? "导师报销" : "找人代贴";
+  const settlementItems = getConferenceSettlementItems(decision);
   const registration = getConferenceRegistrationSummary(context, state);
-  const settlementSummary = [...settlementItems, ...registration.resultItems].join("，");
+  const settlementSummary = settlementItems.join("，");
+  const travelCost = state.advisorProgressState?.paidPlayerConferenceTrips?.includes(getConferenceTripId(context))
+    ? 0 : getConferenceBaseCosts(context.region).selfPay;
   const presentationResults = getConferencePaperPresentationResults(context);
   const resultItems = [
     `结果：${settlementSummary}`,
@@ -126,12 +114,12 @@ function createConferenceDecisionAct3(
     title: "论文参会 ➜ 参会方式 ➜ 参会确认",
     description: [
       decision.mode === "proxy"
-        ? decision.actualCost === 0
-          ? "仍在人际栏中的同学也中了这场会议，答应免费帮你代贴。你把展示材料和时间表发过去，再次核对安排。"
-          : "你找好陌生人帮忙代贴，把展示材料、时间表和几条可能被问到的问题一并发过去，再次核对安排。"
+        ? "你联系了一位实验室外的参会者，对方答应免费帮忙代贴。你把展示材料、时间表和几条可能被问到的问题一并发过去，再次核对安排。"
         : "参会方式定下来了，你照着会务邮件准备材料。电脑里存了一份，邮箱里再留一份，毕竟会场的网速还没见识过。",
       "录用时以为终于忙完了，眼下才发现，会务邮件也能攒出一份待办清单。你挨个打上勾，总算把这趟安排妥当。",
-      registration.description,
+      decision.mode === "proxy"
+        ? `本次 ${registration.unpaidCount} 篇论文的注册费共 ${decision.fundingCost} 金币，由导师科研经费支付；不用安排差旅，你不用出钱，也不消耗导师好感。`
+        : `本次 ${registration.unpaidCount} 篇论文的注册费为 ${registration.unpaidCount * CONFERENCE_REGISTRATION_FEE} 金币，由导师科研经费支付；差旅 ${travelCost} 金币，${decision.mode === "advisor" ? "也由导师科研经费承担" : "由你自付"}。确认后一起结算。`,
       ...(decision.resistanceNarrative ? [decision.resistanceNarrative] : []),
       "机制结算",
       ...resultItems,
@@ -153,6 +141,8 @@ function createConferenceDecisionAct3(
           disabledReason: getConferenceDecisionDisabledReason(state, decision),
           effects: {
             recordPlayerConferenceTrip: getConferenceTripId(context),
+            recordConferenceRegistrationPayment: [...new Set(context.paperIds)],
+            paperUpdates: createPaperHandledUpdates(context),
             ...(decision.resource === "money" && decision.actualCost > 0 ? { money: -decision.actualCost } : {}),
             ...(decision.resource === "favor" && decision.actualCost > 0 ? { favor: -decision.actualCost } : {}),
             ...(decision.fundingCost > 0 ? { advisorProgressStateDeltas: { funding: -decision.fundingCost } } : {}),
@@ -166,10 +156,11 @@ function createConferenceDecisionAct3(
       : [{
           id: "proxy-finish",
           label: "结束本次流程",
-          outcome: decision.actualCost === 0 ? "同学免费代贴。" : "陌生人代贴，金币 -1。",
+          outcome: `实验室外的人免费代贴，${settlementSummary}。`,
           disabledReason: getConferenceDecisionDisabledReason(state, decision),
           effects: {
-            money: -decision.actualCost,
+            ...(decision.fundingCost > 0 ? { advisorProgressStateDeltas: { funding: -decision.fundingCost } } : {}),
+            recordConferenceRegistrationPayment: [...new Set(context.paperIds)],
             paperUpdates: createPaperHandledUpdates(context),
           },
         }],
@@ -184,9 +175,8 @@ function createConferenceDecisionAct2(
   const travelAlreadyPaid = state.advisorProgressState?.paidPlayerConferenceTrips?.includes(getConferenceTripId(context)) ?? false;
   const baseInput = {
     region: context.region,
-    paperCount: context.paperCount,
+    paperCount: getConferenceRegistrationSummary(context, state).unpaidCount,
     travelAlreadyPaid,
-    hasFellowAtConference: hasFellowAtConference(context, state),
     favor: state.favor,
     social: state.social,
     shopState: state.shopState,
@@ -200,10 +190,8 @@ function createConferenceDecisionAct2(
   const proxyDecision = resolveConferenceDecisionCost({ ...baseInput, mode: "proxy" });
   const regionName = getRegionName(context.region);
   const baseCosts = getConferenceBaseCosts(context.region);
-  const selfCostHint = `差旅费每场会议只收一次，本次 ${selfDecision.actualCost} 金币。`;
-  const proxyCostHint = baseInput.hasFellowAtConference
-    ? "人际栏中有同学也中了这场会议，可以免费代贴。"
-    : "目前没有在栏同学中了这场会议，找陌生人代贴需 1 金币，与篇数和地区无关。";
+  const selfCostHint = `注册费每篇 ${CONFERENCE_REGISTRATION_FEE} 金币，本次需缴 ${baseInput.paperCount} 篇，由导师科研经费支付；差旅 ${travelAlreadyPaid ? 0 : baseCosts.selfPay} 金币，可以自付或申请导师报销。`;
+  const proxyCostHint = `也可以找实验室外的人免费代贴，只由导师科研经费支付注册费 ${proxyDecision.fundingCost} 金币，你不付钱、不消耗导师好感。`;
   const advisorHint = state.favor >= 6
     ? "导师报销能省下这笔钱，平时的交情也能缓和麻烦老师的顾虑，但未必完全不伤人情。"
     : "导师报销能省下这笔钱，只是你和老师还不熟，这趟开销会欠下一些人情。";
@@ -211,9 +199,7 @@ function createConferenceDecisionAct2(
   const createChoice = (mode: ConferenceDecisionMode, decision: ReturnType<typeof resolveConferenceDecisionCost>) => ({
     id: mode,
     label: mode === "self" ? "自费参会" : mode === "advisor" ? "导师报销" : "找人代贴",
-    outcome: mode === "proxy"
-      ? decision.actualCost === 0 ? "同学免费代贴。" : "陌生人代贴，金币 -1。"
-      : `${decision.resource === "favor" ? "导师好感" : "金币"} -${decision.actualCost}${decision.fundingCost > 0 ? `，科研经费 -${decision.fundingCost}` : ""}。`,
+    outcome: `${getConferenceSettlementItems(decision).join("，")}。`,
     disabledReason: getConferenceDecisionDisabledReason(state, decision),
     effects: {
       enqueueEvents: [createConferenceDecisionAct3(context, state, decision, getRoll)],

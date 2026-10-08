@@ -18,8 +18,8 @@ const ROUTE_LABELS = { play: "玩耍", study: "学习", shopping: "购物" };
 export function createLoverProgressState(type?: LoverTypeId, random: () => number = Math.random, academicYear = 1): LoverProgressState {
   return {
     active: Boolean(type),
-    research: type ? generateRelationshipResearch(academicYear, random, type === "smart" ? 4 : 0) : 0,
-    intimacy: type ? 3 + Math.floor(random() * 4) + (type === "beautiful" ? 3 : 0) : 0,
+    research: type ? generateRelationshipResearch(academicYear, random, type === "smart" ? 3 : 0) : 0,
+    intimacy: type ? applyTierResist(3 + Math.floor(random() * 4) + (type === "beautiful" ? 3 : 0), 0, random).effectiveChange : 0,
     taskProgress: 0,
     taskMax: LOVER_TASK_MAX,
     relationProgress: 0,
@@ -64,18 +64,20 @@ export function getLoverDateFailure(state: GameState, route: LoverRoute): string
 }
 
 export function getLoverPassiveGains(state: GameState): { play: number; study: number } {
-  const intimacy = state.loverProgressState.intimacy;
+  const gain = Math.floor(state.loverProgressState.intimacy / 2);
   return state.loverState.type === "beautiful"
-    ? { play: intimacy, study: Math.floor(intimacy / 2) }
-    : { play: Math.floor(intimacy / 2), study: intimacy };
+    ? { play: gain * 2, study: gain }
+    : { play: gain, study: gain * 2 };
 }
 
 export function getLoverNextReward(state: GameState, route: LoverRoute): string {
-  if (route === "shopping") return "下次购物免单、亲密 +2";
+  const intimacyGain = applyTierResist(route === "shopping" ? 2 : 1, state.loverProgressState.intimacy, () => 0).effectiveChange;
+  const intimacyReward = `、亲密 +${intimacyGain}`;
+  if (route === "shopping") return `下次购物免单${intimacyReward}`;
   const cycle = getRoute(state, route).completed % 3;
   return (route === "play"
     ? ["SAN +6", "SAN上限 +1", "下月SAN消耗 -1"]
-    : [`论文最低项 +${state.loverProgressState.research}分`, "永久idea、实验、写作各 +1分", "双方科研较低者 +1，相同不提升"])[cycle]! + "、亲密 +1";
+    : [`论文最低项 +${Math.max(0, Math.floor(state.loverProgressState.research))}分`, "永久idea、实验、写作各 +1分", "双方科研较低者 +1，相同不提升"])[cycle]! + intimacyReward;
 }
 
 export function settlePendingLoverHelp(state: GameState, random: () => number = Math.random): GameState {
@@ -94,7 +96,7 @@ export function settlePendingLoverHelp(state: GameState, random: () => number = 
   return pushMilestoneLog({ ...state,
     papers: state.papers.map((entry) => entry.id === paper.id ? paper : entry),
     loverProgressState: { ...state.loverProgressState, pendingPaperHelp: null },
-  }, `恋人帮助：${help.name}帮你完善《${paper.title}》，${{ idea: "idea", experiment: "实验", writing: "写作" }[target.field]} +${help.amount}`, "lover-help");
+  }, `恋人帮助：${help.name}帮你完善《${paper.title}》，${{ idea: "idea", experiment: "实验", writing: "写作" }[target.field]} +${paper[target.field] - target.paper[target.field]}`, "lover-help");
 }
 
 function advanceRoute(
@@ -116,8 +118,9 @@ function advanceRoute(
     const cycle = (count - 1) % 3;
     const lover = nextState.loverProgressState;
     const playerResearch = nextState.player.research;
-    const intimacy = Math.min(20, lover.intimacy + (route === "shopping" ? 2 : 1));
-    const effects = [describeTalentReward("亲密", route === "shopping" ? 2 : 1, lover.intimacy, intimacy)];
+    const intimacyResult = applyTierResist(route === "shopping" ? 2 : 1, lover.intimacy, random);
+    const intimacy = lover.intimacy + intimacyResult.effectiveChange;
+    const effects = [describeResistedTalentReward("亲密", lover.intimacy, intimacyResult)];
     nextState = { ...nextState, loverProgressState: { ...lover, intimacy } };
     if (route === "play") {
       if (cycle === 0) {
@@ -137,10 +140,11 @@ function advanceRoute(
       effects.push("购物免单 +1");
     } else if (cycle === 0) {
       const stored = lover.pendingPaperHelp;
-      nextState.loverProgressState.pendingPaperHelp = stored ?? { amount: lover.research,
+      const amount = Math.max(0, Math.floor(lover.research));
+      nextState.loverProgressState.pendingPaperHelp = stored ?? { amount,
         collaboratorId: `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`, name: getLoverName(state.loverState) };
       effects.push(stored ? `已有一次论文帮助待生效（${stored.amount}分），不叠加`
-        : `论文帮助已就绪（最低项 +${lover.research}分）`);
+        : `论文帮助已就绪（最低项 +${amount}分）`);
     } else if (cycle === 1) {
       const previous = nextState.buffs.find((buff) => buff.id === "lover-study-score");
       const bonus = (previous?.actionEffects?.idea?.bonus ?? 0) + 1;

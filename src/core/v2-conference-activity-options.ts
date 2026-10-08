@@ -12,8 +12,8 @@ export function selectConferenceActivityOptions(
   state: ConferenceActivityBuildState,
   getRoll: () => number = Math.random,
 ): ConferenceActivityOptionDefinition[] {
-  const baseOptions = createBaseConferenceActivityOptions(context, state);
-  const advancedOptions = createAdvancedConferenceActivityOptions(state);
+  const baseOptions = createBaseConferenceActivityOptions(context, state, getRoll);
+  const advancedOptions = createAdvancedConferenceActivityOptions(state, getRoll);
   const allOptions = [...baseOptions, ...advancedOptions];
 
   if (context.grade === "C") {

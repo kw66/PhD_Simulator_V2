@@ -23,7 +23,7 @@ import { previewNextMonthEffects } from "../core/v2-monthly-effects";
 import { getFellowName, getFellowResearchTopic, getFellowRoleLabel, getFellowsInCardOrder } from "../core/v2-fellow-progression";
 import { getFellowDiscussionSanCost } from "../core/v2-fellow-actions";
 import { getFellowCurrentPaper } from "../core/v2-fellow-research";
-import { getFellowAcademicLabel, getFellowResearchScore } from "../core/v2-fellow-academic";
+import { getFellowAcademicLabel, getFellowResearchScore, getStudentAcademicLabel } from "../core/v2-fellow-academic";
 import { getNextMonthLabPayroll } from "../core/v2-lab-payroll";
 import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2-relationship-activity";
 import { formatMoney, roundMoney } from "../core/v2-money";
@@ -47,16 +47,15 @@ import { getPaperScoreBreakdown } from "../core/v2-paper-collaboration";
 import { getPaperHeatTier } from "../core/v2-paper-topics";
 import {
   ADVISOR_GRANTS,
-  ADVISOR_HORIZONTAL_REWARD,
   PROJECT_PROGRESS_MAX,
   getActiveAdvisorGrants,
   getAdvisorGrantLimit,
-  getAdvisorMonthlySalary,
   getAdvisorMeetingAttendancePercent,
   getAdvisorRankLabel,
   getAdvisorTaskSanCost,
   getEligibleAdvisorGrant,
 } from "../core/v2-advisor-progress";
+import { getAdvisorHorizontalReward, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "../core/v2-lab-projects";
 import {
   getCalendarForTotalMonths,
   getRoleDefinition,
@@ -274,7 +273,7 @@ function clampPercent(value: number): number {
 
 function formatSignedNumber(value: number): string {
   if (!Number.isFinite(value)) return "0";
-  return value >= 0 ? `+${value}` : `${value}`;
+  return value >= 0 ? `+${formatMoney(value)}` : formatMoney(value);
 }
 
 function normalizeGameDisplayText(value: string): string {
@@ -407,17 +406,17 @@ function getAttrTierName(kind: AttrTierId, value: number): string {
 
 function getAttrTierTooltip(kind: AttrTierId, value: number, illnessProbability = 0): string {
   const tier = getAttrTier(value);
-  const currentChance = Math.round(getTierResistChance(value) * 100);
+  const resistance = Math.round(getTierResistChance(value) * 100);
   if (kind === "san") {
     const monthEndChange = DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[tier];
     const signedChange = monthEndChange >= 0 ? `+${monthEndChange}` : String(monthEndChange);
     return `当前疾病概率 ${illnessProbability}%｜月末结算 ${signedChange}%`;
   }
   if (kind === "research") {
-    return `科研增减有${currentChance}%概率无效\n事件中的科研任务 SAN 减免 ${RESEARCH_CHORE_SAN_DISCOUNT[tier]}`;
+    return `科研增减抵抗${resistance}%\n科研任务SAN减免${RESEARCH_CHORE_SAN_DISCOUNT[tier]}`;
   }
   const label = kind === "social" ? "社交" : "好感";
-  return `${label}增减有${currentChance}%概率无效`;
+  return `${label}增减抵抗${resistance}%`;
 }
 
 function getAttrFillStateClass(value: number, cap: number, lowThreshold: number, dangerThreshold: number): string {
@@ -450,6 +449,7 @@ function renderAttrItem(
     : getAttrFillStateClass(value, cap, 3, 1);
   const safePercent = cap > 0 ? ((value + (value > 0 ? 1 : 0)) / (cap + 1)) * 100 : 0;
   const progressClassName = `${fillClassName}${fillStateClass}${value > 0 ? " is-nonzero" : ""}`;
+  const displayedValue = tierKind === "san" ? formatMoney(value) : String(Math.floor(value));
 
   return `
     <div
@@ -457,17 +457,15 @@ function renderAttrItem(
       data-player-stat="${tierKind}"
       data-stat-value="${value}"
       data-stat-cap="${cap}"
+      tabindex="0"
+      aria-label="${escapeHtml(`${name} ${displayedValue}/${formatMoney(cap)}，${getAttrTierName(tierKind, value)}，${getAttrTierTooltip(tierKind, value, illnessProbability)}`)}"
+      data-tooltip="${escapeHtml(getAttrTierTooltip(tierKind, value, illnessProbability))}"
     >
       <div class="new-attr-header">
         <span class="new-attr-icon">${icon}</span>
         <span class="new-attr-name">${name}</span>
-        <span class="new-attr-value">${value}/${cap}</span>
-        <span
-          class="new-attr-level attr-level-${tierKind}"
-          tabindex="0"
-          aria-label="${escapeHtml(`${getAttrTierName(tierKind, value)}，${getAttrTierTooltip(tierKind, value, illnessProbability)}`)}"
-          data-tooltip="${escapeHtml(getAttrTierTooltip(tierKind, value, illnessProbability))}"
-        >${getAttrTierName(tierKind, value)}</span>
+        <span class="new-attr-value">${displayedValue}/${formatMoney(cap)}</span>
+        <span class="new-attr-level attr-level-${tierKind}">${getAttrTierName(tierKind, value)}</span>
       </div>
       <div class="new-attr-bar-row">
         ${renderProgressBar(progressClassName, safePercent)}
@@ -496,15 +494,9 @@ function renderEffectItems(items: EffectBucketItem[]): string {
 
 function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
   if (state.phase === "finished" || state.totalMonths >= state.maxMonths) return [];
-  const hasMonthStartBuff = state.buffs.some((buff) => (
-    buff.timing !== "next-action"
-    && (buff.remainingMonths === null || buff.remainingMonths > 0)
-    && buff.monthlyStats !== undefined
-    && Object.keys(buff.monthlyStats).length > 0
-  ));
-  if (isPreEnrollmentState(state) && !hasMonthStartBuff) return [];
   const labels = { san: "SAN", research: "科研", social: "社交", favor: "好感", money: "金币" } as const;
   const resolution = previewNextMonthEffects(state);
+  if (resolution.items.length === 0) return [];
 
   const items = (Object.keys(labels) as Array<keyof typeof labels>).flatMap((statId) => {
     const sources = resolution.items.flatMap((item) => {
@@ -977,7 +969,7 @@ function renderEventDescriptionHtml(
     const isNarrative = !/^(?:备注|小提示)：/u.test(paragraph) && !paragraph.includes("\n")
       && paragraph.length <= 160 && !/^-{3,}$/u.test(paragraph)
       && !/^(?:规则|条件|判定|培养安排|工资|待遇|毕业|转博|转博士|科研分|送审|录用|发表|会议)[：:]/u.test(paragraph);
-    if (isNarrative && narrativeBlockCount >= 2) {
+    if (isNarrative && narrativeBlockCount >= 2 && !/^\p{Extended_Pictographic}/u.test(paragraph)) {
       const previousNarrative = [...storyBlocks].reverse().find((block) => block.isNarrative);
       if (previousNarrative) {
         previousNarrative.paragraphs[previousNarrative.paragraphs.length - 1] = `${previousNarrative.paragraphs.at(-1) ?? ""} ${paragraph}`;
@@ -1515,7 +1507,7 @@ function renderPaperTopicMeta(paper: Paper, showTooltip = true, showParticipatio
       <span class="paper-topic-tag">${escapeHtml(paper.topicLabel)}</span>
       <span
         class="paper-heat-badge is-${heatTier}"
-        ${showTooltip ? `title="${escapeHtml(`${decayText} · 引用倍率 ×${paper.heatMultiplier.toFixed(2)}`)}"` : ""}
+        ${showTooltip ? `title="${escapeHtml(decayText)}"` : ""}
       >热度 ×${renderAnimatedNumber(`paper:${paper.id}:${showParticipation ? "fellow" : "workstation"}:heat`, paper.heatMultiplier, paper.heatMultiplier.toFixed(2))}</span>
       ${renderPaperHistoryBadges(paper, showParticipation, showParticipation ? "fellow" : "workstation")}
     </span>
@@ -2020,7 +2012,7 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       relationProgress: 0,
       relationMax: 0,
       relationGrowthPerMonth: 0,
-      taskRewardText: "经费 +1",
+      taskRewardText: `结项经费 +${getAdvisorHorizontalReward(state.advisorProgressState)}，每人劳务5%`,
       taskLabel: "做横向",
       taskCostLabel: `SAN-${getAdvisorTaskSanCost(state)}`,
       taskUsedThisMonth: false,
@@ -2252,22 +2244,18 @@ function getFellowCooperationHint(state: GameState, profile: FellowProgressProfi
   const research = Math.max(0, Math.floor(state.player.research));
   const role = getFellowRoleLabel(profile.type, profile.gender);
   const target = profile.type === "senior" ? "idea" : profile.type === "peer" ? "随机项" : "实验";
-  const monthlyHint = profile.longTermMentoring
-    ? `每月${role}自动推进2次：默契×2＝${Math.floor(profile.affinity) * 2}；长期合作每月SAN-1`
-    : `每月${role}自动推进：默契＝${Math.floor(profile.affinity)}`;
-  return `科研协作：⌊你的科研⌋+随机0～5，即${research}～${research + 5}\n${monthlyHint}\n满100：${role}帮你论文${target}+${Math.floor(profile.research)}分，你帮对方论文最低项+${research}分`;
+  const monthlyGain = profile.affinity * (profile.longTermMentoring ? 2 : 1);
+  return `主动推进+${research}～${research + 5}，每月自动推进+${formatMoney(monthlyGain)}\n满100：${role}帮你论文${target}+${Math.floor(profile.research)}，你帮对方最低项+${research}`;
 }
 
 function getFellowInheritanceHint(): string {
-  return "每学年末（8月），同学科研原始+2+⌊n/2⌋，合并后逐点抵抗，上限20\n2为自然成长；n为结算前科研更高的其他成员人数，导师计1人，恋人不计\n第一学年末起结算，与认识月数无关；详见年度科研成长提示";
+  return "每学年末（8月）科研+2，并参与实验室传承";
 }
 
 function getLoverTraitHint(type: LoverTypeId | null): string {
-  const initial = type === "beautiful"
-    ? "活泼：初始亲密额外+3，亲密6～9"
-    : "聪慧：初始科研原始增量额外+4，与基础合并后抵抗";
-  const passive = type === "beautiful" ? "玩耍+亲密、学习+⌊亲密/2⌋" : "学习+亲密、玩耍+⌊亲密/2⌋";
-  return `${initial}\n恋爱次月起每月${passive}`;
+  return type === "beautiful"
+    ? "初始亲密+3\n每月玩耍2次、学习1次，每次推进⌊亲密/2⌋"
+    : "初始科研+3\n每月学习2次、玩耍1次，每次推进⌊亲密/2⌋";
 }
 
 function renderFellowCooperationButton(state: GameState, profile: FellowProgressProfile): string {
@@ -2323,7 +2311,7 @@ function renderAdvisorStatus(state: GameState): string {
       ? `${pendingGrant.name}结果已公布`
       : `${pendingGrant.name}申请·${(8 - calendarMonth + 12) % 12 || 12}月后公布`
     : `${monthsToApplication}月后可申请${applicationGrant.name}${limited ? "·限项" : ""}`;
-  const accumulationHint = `科研积累：纵向项目满100，+⌊当前积累×10%⌋\n玩家和同学发表论文按科研分计入，同篇去重\n${nextTier ? `下一档${nextTier.name}：${score}/${nextTier.threshold}` : ""}${reachedTier ? `；已达到${reachedTier.name}：${score}/${reachedTier.threshold}` : ""}`;
+  const accumulationHint = "纵向项目满100，科研积累+10%\n发表论文按科研分提升科研积累";
   const progressBar = (label: string, value: number, max: number): string => `
     <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${Math.min(value, max)}" aria-valuetext="${value}/${max}">
       <div class="rel-progress-fill task ${label === "科研积累" ? "research" : "funding"}" ${animationBarAttribute(`person:advisor:${label === "科研积累" ? "research" : "funding"}`)} style="width:${clampPercent(value / max * 100)}%"></div>
@@ -2338,7 +2326,7 @@ function renderAdvisorStatus(state: GameState): string {
         <span class="rel-detail-label" ${relationshipTooltip(accumulationHint)}>${renderRelationshipIcon("💡")}科研积累</span>
         ${progressBar("科研积累", score, researchMax)}
         <strong class="rel-progress-val rel-advisor-thresholds">${renderAnimatedNumber("person:advisor:research:next", score)}/${renderAnimatedNumber("person:advisor:research:next-threshold", researchMax)}${(nextTier ?? reachedTier)!.name}</strong>
-        ${!isPreEnrollmentState(state) ? `<span class="rel-advisor-countdown" ${relationshipTooltip(`${applicationText}\n每年3月不限项即申请，8月公布\n按申请时积累判定：${applicationGrant.threshold * 0.8}及以下0%，线性增至${applicationGrant.threshold}时100%`)}>${academician ? applicationText : applicationText.replace(/\d+/, (display) => renderAnimatedNumber(`person:advisor:${pendingGrant ? "result" : "application"}:months`, Number(display)))}</span>` : ""}
+        ${!isPreEnrollmentState(state) ? `<span class="rel-advisor-countdown" ${relationshipTooltip("每年3月申请，8月公布")}>${academician ? applicationText : applicationText.replace(/\d+/, (display) => renderAnimatedNumber(`person:advisor:${pendingGrant ? "result" : "application"}:months`, Number(display)))}</span>` : ""}
       </div>
         ${(["vertical", "horizontal"] as const).map((projectType) => {
           const label = projectType === "horizontal" ? "横向项目" : "纵向项目";
@@ -2347,12 +2335,10 @@ function renderAdvisorStatus(state: GameState): string {
           const projectSanCost = getAdvisorTaskSanCost(state, projectType);
           const blocked = baseBlocked || (state.player.san < projectSanCost ? `SAN不足，需要${projectSanCost}` : "");
           const research = Math.max(0, Math.floor(state.player.research));
-          const reward = projectType === "horizontal" ? `经费+${ADVISOR_HORIZONTAL_REWARD}，再支付你和本项目每位参与同学各5金币（含已离校同学）`
-            : "科研积累+10%（下取整），你和每位同学各获论文写作协作+10";
-          const advisorProgress = projectType === "horizontal"
-            ? "导师每月与纵向交替，轮到横向时自动+10"
-            : "导师每月与横向交替，轮到纵向时自动+10";
-          const hint = `${label}：⌊你的科研⌋+随机0～5，即${research}～${research + 5}\n${advisorProgress}\n同学参与项目时：⌊同学科研⌋+随机0～5\n满100：${reward}`;
+          const reward = projectType === "horizontal" ? `经费+${getAdvisorHorizontalReward(advisor)}，每人金币+${formatMoney(getAdvisorHorizontalReward(advisor) * 0.05)}`
+            : "科研积累+10%，全组论文写作协作+10";
+          const automaticGain = (advisor.nextProject ?? "horizontal") === projectType ? 10 : 0;
+          const hint = `主动推进+${research}～${research + 5}，导师下月自动推进+${automaticGain}\n满100：${reward}`;
           return `<div class="rel-advisor-project-row" data-advisor-project="${projectType}">
             <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icon)}${label}</span>
             <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${PROJECT_PROGRESS_MAX}" aria-valuenow="${Math.min(progress, PROJECT_PROGRESS_MAX)}">
@@ -2371,7 +2357,6 @@ function renderAdvisorStatus(state: GameState): string {
 function renderLoverRoutes(state: GameState): string {
   const identity = `person:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`;
   const passiveGains = getLoverPassiveGains(state);
-  const loverTypeLabel = state.loverState.type === "beautiful" ? "活泼恋人" : "聪慧恋人";
   const icons = { play: "🎡", study: "📖", shopping: "🛍️" };
   const labels = { play: "玩耍", study: "学习", shopping: "购物" };
   const used = state.loverProgressState.taskUsedThisMonth
@@ -2387,12 +2372,9 @@ function renderLoverRoutes(state: GameState): string {
           : used ? "下月可再次约会"
             : isDevelopmentPreEnrollmentPreview(state) ? null : getLoverDateFailure(state, route);
       const gain = getLoverRouteGain(state, route);
-      const formula = route === "play" ? "⌊(亲密+你的社交)/2⌋" : route === "study" ? "⌊(你的科研+恋人科研)/2⌋" : "⌊亲密/2⌋+10";
       const reward = getLoverNextReward(state, route).replace("永久idea、实验、写作各+1分", "论文三项分数永久+1");
-      const passiveFormula = (state.loverState.type === "beautiful" && route === "play")
-        || (state.loverState.type === "smart" && route === "study") ? "亲密" : "⌊亲密/2⌋";
-      const passiveHint = route === "shopping" ? "" : `\n${loverTypeLabel}每月自动推进：${passiveFormula}＝${passiveGains[route]}`;
-      const hint = `${label}：${formula}＝${gain}${passiveHint}\n下次满100：${reward}`;
+      const passiveGain = route === "shopping" ? 0 : passiveGains[route];
+      const hint = `主动推进+${gain}，每月自动推进+${passiveGain}\n下次满100：${reward}`;
       return `<div class="rel-lover-route" data-lover-route="${route}">
         <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icons[route])}${label}</span>
         <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
@@ -2415,15 +2397,13 @@ function renderRelationshipMonthlyActivity(state: GameState, card: RelationshipR
   const feeParts = costs ? [
     ...(costs.registration > 0 ? [`注册经费-${formatMoney(costs.registration)}`] : []),
     ...(costs.journal > 0 ? [`OA经费-${formatMoney(costs.journal)}`] : []),
-    ...(costs.sharedTravel > 0 ? [`同会差旅-${formatMoney(costs.sharedTravel)}`] : []),
   ] : [];
   const parts = compactRelationshipActivity(activity ?? "暂无活动");
   const actions = parts.filter((part) => !/^协作[+\-]/u.test(part));
   const cooperation = parts.filter((part) => /^协作[+\-]/u.test(part));
   const activityText = summarizeRelationshipActivity([...feeParts, ...actions, ...(support ? ["论文帮助"] : []), ...cooperation]);
   const fullActivity = [activity ?? "暂无活动", ...feeParts,
-    ...(feeParts.length ? ["论文费用由科研经费支付；同会差旅为本届同学合计支出，不按人数重复扣款。"] : []),
-    ...(support ? [support] : []), ...(annualActivity ? [`最近年度成长：${annualActivity}`] : []),
+    ...(support ? [support] : []), ...(annualActivity ? [`最近年度成长：${annualActivity.split("；")[0]}`] : []),
   ].join("\n");
   return `<div class="rel-monthly-activity"><strong>本月</strong><span ${relationshipTooltip(fullActivity)}>${escapeHtml(activityText)}</span></div>`;
 }
@@ -2434,7 +2414,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
   const advisor = card.type === "advisor";
   const payroll = getNextMonthLabPayroll(state);
   const payrollHint = [
-    "下月预计学生工资，随加入、离校和学位实时更新；6月先判断转博与离校。四舍五入到两位直接发放，不凑整。",
+    "下月工资",
     `你：${formatMoney(payroll.player.payment)}金币`,
     ...payroll.fellows.map((payment) => `${getFellowName(state.fellowProgressState.find((profile) => profile.id === payment.id)!)}：${formatMoney(payment.payment)}金币`),
   ].join("\n");
@@ -2442,13 +2422,19 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
   const fellowAi = finance?.aiSlot && finance.aiSubscribedTotalMonths === state.totalMonths
     ? getAiModelForTotalMonths(state.totalMonths, finance.aiSlot) : undefined;
   const knownHint = fellow ? getFellowInheritanceHint()
-    : `相恋${card.knownMonths}个月\n${state.loverState.type === "beautiful" ? "活泼恋人更擅长推进玩耍，也会陪你学习" : "聪慧恋人更擅长推进学习，也会陪你玩耍"}`;
+    : "每学年末（8月）科研+2";
   const attributes: RelationshipRenderCard["detailItems"] = fellow
     ? [{ label: "科研", value: fellow.research, max: 20 }, { label: "默契", value: fellow.affinity, max: 20 }]
     : card.detailItems.map((item) => ({ ...item, label: item.label === "亲密度" ? "亲密" : item.label }));
-  const renderAttributes = (): string => attributes.map((item) => `
-    <span class="rel-detail-item"><span class="rel-detail-label">${renderRelationshipIcon(item.label === "科研" ? "💡" : card.type === "lover" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedNumber(`${identity}:${item.label === "科研" ? "research" : card.type === "lover" ? "intimacy" : "affinity"}`, item.value)}${item.max === undefined ? "" : `/${item.max}`}</strong></span>
-  `).join("");
+  const renderAttributes = (): string => attributes.map((item) => {
+    const kind = item.label === "科研" ? "research" : card.type === "lover" ? "intimacy" : "affinity";
+    const tier = getAttrTier(item.value);
+    const tierName = kind === "research" ? getAttrTierName("research", item.value)
+      : (kind === "intimacy" ? ["初识", "亲近", "甜蜜", "挚爱"] : ["生疏", "熟悉", "合拍", "无间"])[tier];
+    const hint = `${item.label}增减抵抗${getTierResistChance(item.value) * 100}%`;
+    const displayedValue = Math.floor(item.value);
+    return `<span class="rel-detail-item" ${relationshipTooltip(hint)}><span class="rel-detail-label">${renderRelationshipIcon(kind === "research" ? "💡" : kind === "intimacy" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedNumber(`${identity}:${kind}`, displayedValue)}${item.max === undefined ? "" : `/${item.max}`}</strong><span class="new-attr-level attr-level-${kind} rel-stat-tier">${tierName}</span></span>`;
+  }).join("");
   return `
     <article class="rel-card filled rel-card-compact${fellow ? " rel-card-fellow" : card.type === "lover" ? " rel-card-lover" : ""}" data-relationship-type="${card.type}" data-relationship-id="${escapeHtml(card.relationshipId)}">
       <div class="rel-card-identity">
@@ -2457,18 +2443,18 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
             ${fellow?.longTermMentoring ? `<span class="rel-mentoring-mark" ${relationshipTooltip("长期合作：每月SAN-1，协作额外推进1次。", "left")} aria-label="长期合作">⭐</span>` : ""}<span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
             ${card.type === "lover" ? `<span class="rel-lover-trait" ${relationshipTooltip(getLoverTraitHint(state.loverState.type))}>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span>` : ""}
             <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
-            ${fellow ? `<span class="rel-detail-item" ${relationshipTooltip(`同学金币：${formatMoney(finance?.money ?? 0)}\n工资和劳务费入个人钱包；仅用于实验差额和订阅AI；论文注册、差旅及OA由科研经费承担，离校责任保留。`)}>${renderRelationshipIcon("💰")}<strong>${formatMoney(finance?.money ?? 0)}</strong></span>${fellowAi ? `<span class="rel-type" ${relationshipTooltip(`当月AI：${fellowAi.name}\n每位同学同时使用一种AI，仅显示本月订阅。`)}>AI·${escapeHtml(fellowAi.name)}</span>` : ""}` : ""}
+            ${fellow ? `<span class="rel-detail-item" ${relationshipTooltip("用于生活费、自费实验和订阅AI")}>${renderRelationshipIcon("💰")}<strong>${formatMoney(finance?.money ?? 0)}</strong></span>${fellowAi ? `<span class="rel-type" ${relationshipTooltip(`本月订阅${fellowAi.name}`)}>AI·${escapeHtml(fellowAi.name)}</span>` : ""}` : ""}
           </div>
           ${advisor ? renderAdvisorFundSummary(state) : `<div class="rel-card-meta">
             <button class="rel-end-compact" data-card-icon-action type="button" title="${fellow ? "停止合作" : "分手"}" aria-label="${fellow ? "停止合作" : "分手"}" data-action="end-relationship" data-relationship-id="${escapeHtml(card.relationshipId)}"><span aria-hidden="true">${fellow ? "✂️" : "💔"}</span></button>
           </div>`}
         </div>
       </div>
-      ${card.type === "lover" ? `<div class="rel-fellow-academic-row">${renderAttributes()}<span class="rel-known-time" ${relationshipTooltip(knownHint, "right")}>${renderRelationshipIcon("🗓️")}认识<strong class="rel-detail-value" ${animationNumberAttributes(`${identity}:known-months`, card.knownMonths)}>${card.knownMonths}</strong>月</span></div>` : ""}
-      ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip("实验室可用经费，0仍可继续，低于0时破产。", "left")}>科研经费 <strong aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", roundMoney(state.advisorProgressState.funding), formatMoney(state.advisorProgressState.funding))}</strong></span><span ${relationshipTooltip(payrollHint, "right")}>学生工资 <strong>${formatMoney(payroll.total)}</strong></span></div>` : ""}
+      ${card.type === "lover" ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip(knownHint)}>${renderRelationshipIcon("🎓")}${escapeHtml(getStudentAcademicLabel(state.year, state.degree))}</span>${renderAttributes()}</div>` : ""}
+      ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip(`用于工资、实验和论文费用\n经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：同学做纵向，硕士工资+0.5、博士+1\n经费低于0时破产`, "left")}>科研经费 <strong aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", roundMoney(state.advisorProgressState.funding), formatMoney(state.advisorProgressState.funding))}</strong></span><span ${relationshipTooltip(payrollHint, "right")}>学生工资 <strong>${formatMoney(payroll.total)}</strong></span></div>` : ""}
       ${fellow ? `<div class="rel-fellow-academic-row">
         <span ${relationshipTooltip(knownHint, "left")}>${renderRelationshipIcon("🎓")}${escapeHtml(getFellowAcademicLabel(state, fellow))}</span>
-        <span class="rel-detail-item" ${relationshipTooltip(`科研分＝入组基础${fellow.initialResearchScore ?? 0}分＋加入后发表的一作科研分\n${fellow.degree === "phd" ? "博士第六年6月结束，科研分≥7才毕业" : "硕士第三年6月结束，未转博且科研分≥1才毕业"}；提前达标不会提前离校\n6月结束先转博，再判断毕业或退学`)}>科研分 <strong class="rel-detail-value">${getFellowResearchScore(state, fellow)}/${fellow.degree === "phd" ? 7 : 1}</strong></span>
+        <span class="rel-detail-item" ${relationshipTooltip(fellow.degree === "phd" ? "第六年6月毕业，要求科研分≥7" : "第三年6月硕士毕业，要求科研分≥1")}>科研分 <strong class="rel-detail-value">${getFellowResearchScore(state, fellow)}/${fellow.degree === "phd" ? 7 : 1}</strong></span>
         ${renderAttributes()}
       </div>${renderFellowPaper(state, fellow)}` : ""}
       ${advisor ? renderAdvisorStatus(state) : card.type === "lover" ? renderLoverRoutes(state) : `<div class="rel-progress-section rel-resource-row">
@@ -3199,11 +3185,11 @@ function buildInternshipTalentItem(state: GameState, requestedPage = 0): TalentP
   const pending = status.pending && remote;
   const metrics = remote
     ? [
-        { label: "线上实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-2" }, { label: "每月金币", value: "+1" },
+        { label: "线上实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-2" }, { label: "工资", value: "1金" },
         { label: "自己实验费用", value: "-1" }, { label: "实验", value: "+4" }, { label: "实验", value: "×1.0" },
       ]
     : [
-        { label: "线下实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-5" }, { label: "每月金币", value: `+${getInternshipMonthlyIncome(getPublishedAPaperCount(state))}` },
+        { label: "线下实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-5" }, { label: "工资", value: `${getInternshipMonthlyIncome(getPublishedAPaperCount(state))}金` },
         { label: "自己实验费用", value: "-2" }, { label: "实验", value: "+6" }, { label: "实验", value: "×1.25" },
       ];
   const activation = remote ? "导师约谈事件激活" : "论文参会事件激活";
@@ -3216,7 +3202,7 @@ function buildInternshipTalentItem(state: GameState, requestedPage = 0): TalentP
     internshipPager: { page },
     ...(pending ? { tagLabel: "下月开始" } : {}),
     metrics,
-    description: `${activation}${active ? `；剩余${status.remainingMonths}个月（含本月）` : ""}`,
+    description: `${activation}；${remote ? "固定工资1金/月" : "工资＝1＋一作A类论文数，上限6金/月"}${active ? `；剩余${status.remainingMonths}个月（含本月）` : ""}`,
   };
 }
 
@@ -3256,8 +3242,8 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
       grant?.name ?? "—",
       grant ? String(grant.funding) : "30",
       grant ? grant.durationYears > 0 ? `${grant.durationYears}年` : "永久" : "—",
-      String(getAdvisorMonthlySalary(advisor, "master")),
-      String(getAdvisorMonthlySalary(advisor, "phd")),
+      String(getAdvisorHorizontalReward(advisor)),
+      formatMoney(getAdvisorHorizontalReward(advisor) * 0.05),
       `${getAdvisorMeetingAttendancePercent(advisor)}%`,
     ];
   });
@@ -3278,16 +3264,16 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
         const row = salaryRows[startIndex]!;
         return [
           { label: "职称", value: row[0] },
-          { label: "硕士工资", value: `${row[4]}金币` },
-          { label: "博士工资", value: `${row[5]}金币` },
+          { label: "横向经费", value: row[4] },
+          { label: "劳务费", value: `${row[5]}金`, tooltip: "横向结项经费的5%，你和在组同学各领一份" },
           { label: "条件", value: row[1] },
-          { label: "经费", value: `+${row[2]}` },
+          { label: startIndex === 0 ? "启动经费" : "基金经费", value: row[2] },
           { label: "组会/团建到场", value: row[6] },
         ];
       })(),
       description: startIndex > 0
         ? `科研积累${ADVISOR_GRANTS[startIndex - 1]!.threshold}可晋升`
-        : "初始职称，科研启动经费30",
+        : "初始职称",
     },
     {
       id: "lab-mutual-growth",
@@ -3297,11 +3283,11 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
       hideStatus: true,
       ruleCard: true,
       metrics: [
-        { label: "你的当前奖励", value: `最多+${getPlayerAnnualResearchGrowth(state)}` },
-        { label: "当前同学累计", value: "+" + state.fellowProgressState.reduce((total, profile) => total + (profile.annualResearchGrowthTotal ?? 0), 0), tooltip: "当前人际栏同学历次年度科研实际提升之和，包含自然成长与传承；同学离校或停止合作后不再计入。" },
+        { label: "你的当前奖励", value: `+${formatMoney(getPlayerAnnualResearchGrowth(state))}` },
+        { label: "当前同学累计", value: "+" + formatMoney(state.fellowProgressState.reduce((total, profile) => total + (profile.annualResearchGrowthTotal ?? 0), 0)), tooltip: "当前同学每学年科研成长的累计值" },
       ],
       description: "每学年末（8月），你和同学科研+⌊n/2⌋",
-      descriptionTooltip: "n为结算前科研更高的其他成员人数，导师计1人，恋人不计\n玩家只获传承；同学另有自然成长+2，合并后逐点抵抗\n当前奖励实际受抵抗影响；完整规则见年度科研成长提示",
+      descriptionTooltip: "n为科研高于自己的实验室成员人数",
     },
     {
       id: "fellow-paper-cooperation",
@@ -4249,8 +4235,8 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
   const seasonLabel = getSeasonLabel(state);
   const blockLinearEvents = state.blockLinearEvents !== false;
   const eventBlockingHint = blockLinearEvents
-    ? "无分支事件：阻塞，需手动处理。\n点击切换为不阻塞"
-    : "无分支事件：不阻塞，下一月自动结算到期事件。\n点击切换为阻塞";
+    ? "无分支事件手动处理\n点击改为自动"
+    : "无分支事件到期自动处理\n点击改为手动";
 
   return `
     <aside class="play-right-rail new-right-container" id="new-right-container">

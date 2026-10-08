@@ -70,9 +70,9 @@ describe("VALSE annual conference", () => {
   it.each([
     { mode: "自费参会", favor: 6, roll: 0, change: 0 },
     { mode: "请导师报销", favor: 5, roll: 0, change: -1 },
-    { mode: "请导师报销", favor: 6, roll: 0.1, change: 0 },
-    { mode: "请导师报销", favor: 6, roll: 0.99, change: -1 },
-  ])("settles $mode once with favor $favor and resistance roll $roll", ({ mode, favor, roll, change }) => {
+    { mode: "请导师报销", favor: 6, roll: 0.1, change: -0.75 },
+    { mode: "请导师报销", favor: 6, roll: 0.99, change: -0.75 },
+  ])("settles $mode once with favor $favor independently of roll $roll", ({ mode, favor, roll, change }) => {
     vi.spyOn(Math, "random").mockReturnValue(roll);
     let state = queuedState();
     state = { ...state, player: { ...state.player, favor } };
@@ -92,7 +92,7 @@ describe("VALSE annual conference", () => {
     const effects = [...result!.matchAll(/<span class="event-settlement-effect ([^"]+)"[^>]*>([^<]+)<\/span>/gu)]
       .map((match) => [match[1], match[2]]);
     expect(effects).toEqual(mode === "自费参会" ? [["is-money", "金币 -2"]] : [
-      ["is-relationship", change === 0 ? "导师好感 -0（抵抗1）" : "导师好感 -1"],
+      ["is-relationship", `导师好感 ${change}`],
       ["is-advisor-funding", "科研经费 -2"],
     ]);
     const unstyled = result!

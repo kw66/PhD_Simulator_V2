@@ -46,25 +46,28 @@ function choose(state: GameState, choiceId?: string): GameState {
 }
 
 describe("conference fee settlement", () => {
-  it.each(["self", "advisor", "proxy"] as const)("reports prepaid registration without charging again for %s", (mode) => {
+  it.each(["self", "advisor", "proxy"] as const)("collects the full fee only on confirmation for %s", (mode) => {
     for (const paperCount of [1, 3]) {
-      const paidIds = Array.from({ length: paperCount }, (_, index) => `paper-${index}`);
-      let state = conferenceState("domestic", paperCount, paidIds);
-      const registration = `科研经费 -${paperCount}（注册费，已支付）`;
-      const narrative = `本场 ${paperCount} 篇共 ${paperCount} 金币已支付。`;
-      expect(state.eventQueue[0]!.description).toContain(narrative);
+      const paperIds = Array.from({ length: paperCount }, (_, index) => `paper-${index}`);
+      let state = conferenceState("domestic", paperCount);
+      const personalCost = mode === "self" ? 2 : 0;
+      const fundingCost = paperCount + (mode === "advisor" ? 2 : 0);
+      expect(state.eventQueue[0]!.description).toContain(`注册费每篇 1 金币，本次需缴 ${paperCount} 篇`);
+      expect(state.eventQueue[0]!.description).not.toMatch(/自动支付|已支付|预扣/u);
       state = choose(state);
       state = choose(state, mode);
       const confirmation = state.eventQueue[0]!;
-      expect(confirmation.description).toContain("注册费每篇 1 金币，录用满 3 个月时由导师科研经费自动支付。");
-      expect(confirmation.description).toContain(narrative);
-      expect(confirmation.description).toContain(registration);
-      expect(confirmation.completionLog).toContain(registration);
+      const payment = `科研经费 -${fundingCost}`;
+      expect(confirmation.description).toContain(payment);
+      expect(confirmation.completionLog).toContain(payment);
+      expect(confirmation.description.split("机制结算")[1]).not.toContain("注册费");
+      expect(confirmation.completionLog).not.toContain("注册费");
       expect(state.player.money).toBe(30);
       expect(state.advisorProgressState.funding).toBe(30);
       const effects = confirmation.choices[0]!.effects;
-      expect(effects.money ?? 0).toBe(mode === "self" ? -2 : mode === "proxy" ? -1 : 0);
-      expect(effects.advisorProgressStateDeltas?.funding ?? 0).toBe(mode === "advisor" ? -2 : 0);
+      expect(effects.money ?? 0).toBe(personalCost === 0 ? 0 : -personalCost);
+      expect(effects.advisorProgressStateDeltas?.funding).toBe(-fundingCost);
+      expect(effects.recordConferenceRegistrationPayment).toEqual(paperIds);
       const assertNoRegistration = (event: PendingEvent): void => {
         expect(event.description).not.toContain("注册费");
         expect(event.completionLog ?? "").not.toContain("注册费");
@@ -74,36 +77,38 @@ describe("conference fee settlement", () => {
       };
       for (const next of effects.enqueueEvents ?? []) assertNoRegistration(next);
       state = choose(state);
-      expect(state.player.money).toBe(mode === "advisor" ? 30 : mode === "self" ? 28 : 29);
-      expect(state.advisorProgressState.funding).toBe(mode === "advisor" ? 28 : 30);
-      expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(paidIds);
+      expect(state.player.money).toBe(30 - personalCost);
+      expect(state.advisorProgressState.funding).toBe(30 - fundingCost);
+      expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(paperIds);
       const duplicate = dispatchAction(state, "resolve-event", { eventId: confirmation.id, eventChoiceId: confirmation.choices[0]!.id });
       expect(duplicate.player.money).toBe(state.player.money);
       expect(duplicate.advisorProgressState).toEqual(state.advisorProgressState);
     }
   });
 
-  it.each([undefined, [], ["unrelated-paper"], ["paper-0", "paper-0", "unrelated-paper"]])(
-    "reports only the current papers with a payment record: %j", (paidIds) => {
+  it.each([
+    { paidIds: undefined, unpaidCount: 3 },
+    { paidIds: [], unpaidCount: 3 },
+    { paidIds: ["unrelated-paper"], unpaidCount: 3 },
+    { paidIds: ["paper-0", "paper-0", "unrelated-paper"], unpaidCount: 2 },
+    { paidIds: ["paper-0", "paper-1", "paper-2"], unpaidCount: 0 },
+  ])(
+    "charges only $unpaidCount unpaid unique paper IDs without a prepaid narrative: $paidIds", ({ paidIds, unpaidCount }) => {
       const state = conferenceState("domestic", 3, paidIds);
       const original = state.eventQueue[0]!.conferencePreview!.context;
       const root = createConferenceDecisionAct1({ ...original, paperIds: [...original.paperIds, "paper-0"] }, builderState(state), () => 0.99);
-      const paidCount = paidIds?.includes("paper-0") ? 1 : 0;
-      const narrative = paidCount > 0
-        ? "本场 3 篇中已支付 1 篇，共 1 金币，其余尚无支付记录。"
-        : "本场 3 篇尚无注册费支付记录。";
       const selection = root.choices[0]!.effects.enqueueEvents![0]!;
-      expect(root.description).toContain(narrative);
+      expect(root.description).toContain(`本次需缴 ${unpaidCount} 篇`);
+      expect(root.description).not.toMatch(/自动支付|已支付|预扣/u);
       for (const choice of selection.choices) {
         const confirmation = choice.effects.enqueueEvents![0]!;
-        expect(confirmation.description).toContain(narrative);
-        if (paidCount > 0) {
-          expect(confirmation.description).toContain("科研经费 -1（注册费，已支付）");
-          expect(confirmation.completionLog).toContain("科研经费 -1（注册费，已支付）");
-        } else {
-          expect(confirmation.description).not.toContain("已支付");
-          expect(confirmation.completionLog).not.toContain("注册费");
-        }
+        const effects = confirmation.choices[0]!.effects;
+        expect(effects.recordConferenceRegistrationPayment).toEqual(["paper-0", "paper-1", "paper-2"]);
+        expect(effects.money ?? 0).toBe(choice.id === "self" ? -2 : 0);
+        const fundingCost = unpaidCount + (choice.id === "advisor" ? 2 : 0);
+        expect(effects.advisorProgressStateDeltas?.funding ?? 0).toBe(fundingCost === 0 ? 0 : -fundingCost);
+        if (choice.id === "proxy" && unpaidCount === 0) expect(confirmation.description).toContain("结果：无额外费用");
+        expect(confirmation.completionLog).not.toContain("注册费");
       }
     },
   );
@@ -130,7 +135,8 @@ describe("conference fee settlement", () => {
     expect(restored[0]!.conferencePreview!.context.paperIds).toEqual(["paper-0", "paper-1"]);
     const decision = restored[0]!.choices[0]!.effects.enqueueEvents![0]!;
     const proxy = decision.choices.find((choice) => choice.id === "proxy")!.effects.enqueueEvents![0]!;
-    expect(proxy.choices[0]!.effects.money).toBe(-1);
+    expect(proxy.choices[0]!.effects.money).toBeUndefined();
+    expect(proxy.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(-2);
   });
 
   it("does not charge again when discarding an activity after paying attendance", () => {
@@ -142,16 +148,18 @@ describe("conference fee settlement", () => {
     }] };
     state = choose(choose(choose(state), "self"));
     expect(state.player.money).toBe(28);
+    expect(state.advisorProgressState.funding).toBe(29);
     const discarded = discardBlockingQueueEvents(state);
     expect(discarded.papers[0]!.conferenceHandled).toBe(true);
     expect(discarded.player.money).toBe(28);
+    expect(discarded.advisorProgressState.funding).toBe(29);
     const advanced = dispatchAction(state, "force-next-month");
     expect(advanced.eventQueue.some((event) => event.conferencePreview)).toBe(false);
   });
 
   it.each([
-    ["domestic", 2, 1], ["asia", 4, 2], ["west", 6, 3],
-  ] as const)("charges only one trip or proxy fee in %s", (region, travel, favor) => {
+    ["domestic", 2, 0.5], ["asia", 4, 1.25], ["west", 6, 2],
+  ] as const)("charges one combined registration and travel fee in %s", (region, travel, favor) => {
     for (const paperCount of [1, 3]) {
       for (const mode of ["self", "advisor", "proxy"] as ConferenceDecisionMode[]) {
         let state = conferenceState(region, paperCount);
@@ -163,10 +171,10 @@ describe("conference fee settlement", () => {
         const confirmation = state.eventQueue[0]!;
         expect(confirmation.description).not.toMatch(/参会次数|(?:国内|亚太|欧美)参会\s*\d|实验室经费/u);
         expect(confirmation.completionLog).not.toMatch(/参会次数|(?:国内|亚太|欧美)参会\s*\d|实验室经费/u);
-        if (mode === "advisor") expect(confirmation.description).toContain(`科研经费 -${travel}`);
+        if (mode === "advisor") expect(confirmation.description).toContain(`科研经费 -${travel + paperCount}`);
         state = choose(state);
-        expect(state.player.money).toBe(30 - (mode === "advisor" ? 0 : mode === "self" ? travel : 1));
-        expect(state.advisorProgressState.funding).toBe(30 - (mode === "advisor" ? travel : 0));
+        expect(state.player.money).toBe(30 - (mode === "self" ? travel : 0));
+        expect(state.advisorProgressState.funding).toBe(30 - paperCount - (mode === "advisor" ? travel : 0));
         expect(state.player.favor).toBe(12 - (mode === "advisor" ? favor : 0));
         expect(state.player.social).toBe(12);
         expect(state.eventCounters.meetingCount).toBe(mode === "proxy" ? 0 : 1);
@@ -181,7 +189,7 @@ describe("conference fee settlement", () => {
     }
   });
 
-  it("groups papers before calculating one trip without registration", () => {
+  it("groups unique papers before combining registration with one trip", () => {
     const state = playingState();
     const events = buildConferenceDecisionEventsForAcceptedPapers([
       { id: "one", target: "C", submittedMonth: 10, submittedYear: 1 },
@@ -197,42 +205,49 @@ describe("conference fee settlement", () => {
     const decision = events[0]!.choices[0]!.effects.enqueueEvents![0]!;
     const result = decision.choices.find((choice) => choice.id === "self")!.effects.enqueueEvents![0]!;
     expect(result.choices[0]!.effects.money).toBe(-trip);
+    expect(result.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(-2);
   });
 
-  it("disables and rechecks lab funding at both conference decision and final confirmation", () => {
+  it.each(["self", "advisor", "proxy"] as const)("rechecks lab funding for %s at selection and confirmation without partial payment", (mode) => {
     let state = choose(conferenceState("west", 3));
-    const insufficient = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: 5 } };
-    expect(getResolvableQueuedEvent(insufficient, insufficient.eventQueue[0]!).choices.find((choice) => choice.id === "advisor")!.disabledReason).toContain("6");
-    const blockedDecision = choose(insufficient, "advisor");
+    const fundingCost = mode === "advisor" ? 9 : 3;
+    const insufficient = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: fundingCost - 0.25 } };
+    expect(getResolvableQueuedEvent(insufficient, insufficient.eventQueue[0]!).choices.find((choice) => choice.id === mode)!.disabledReason).toContain(`${fundingCost}`);
+    const blockedDecision = choose(insufficient, mode);
     expect(blockedDecision.player).toEqual(insufficient.player);
     expect(blockedDecision.advisorProgressState).toEqual(insufficient.advisorProgressState);
     expect(blockedDecision.eventQueue[0]!.id).toBe(insufficient.eventQueue[0]!.id);
-    state = choose(state, "advisor");
-    state = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: 5 } };
-    expect(getResolvableQueuedEvent(state, state.eventQueue[0]!).choices[0]!.disabledReason).toContain("6");
+    state = choose(state, mode);
+    state = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: fundingCost - 0.25 } };
+    const refreshed = getResolvableQueuedEvent(state, state.eventQueue[0]!);
+    expect(refreshed.choices[0]!.disabledReason).toContain(`${fundingCost}`);
+    expect(refreshed.choices.some((choice) => choice.id === "change-payment-method")).toBe(true);
     const blockedConfirmation = choose(state);
     expect(blockedConfirmation.player).toEqual(state.player);
     expect(blockedConfirmation.advisorProgressState).toEqual(state.advisorProgressState);
     expect(blockedConfirmation.eventQueue[0]!.id).toBe(state.eventQueue[0]!.id);
-    state = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: 6 } };
+    expect(choose(state, "change-payment-method").eventQueue[0]!.stage).toBe("act2");
+    state = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: fundingCost } };
     const confirmed = choose(state);
     expect(confirmed.advisorProgressState.funding).toBe(0);
-    expect(confirmed.player.money).toBe(30);
+    expect(confirmed.player.money).toBe(mode === "self" ? 24 : 30);
+    expect(confirmed.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["paper-0", "paper-1", "paper-2"]);
   });
 
   it("honors optional builder funding without requiring it for standalone construction", () => {
     const state = conferenceState("domestic", 1);
     const context = state.eventQueue[0]!.conferencePreview!.context;
-    for (const funding of [undefined, 1, 2]) {
+    for (const funding of [undefined, 2, 3]) {
       const root = createConferenceDecisionAct1(context, { ...builderState(state), advisorFunding: funding }, () => 0.99);
       const decision = root.choices[0]!.effects.enqueueEvents![0]!;
-      expect(Boolean(decision.choices.find((choice) => choice.id === "advisor")!.disabledReason)).toBe(funding === 1);
+      expect(Boolean(decision.choices.find((choice) => choice.id === "advisor")!.disabledReason)).toBe(funding === 2);
     }
   });
 
-  it.each(["self", "proxy"] as const)("rechecks personal money for %s before selection and confirmation", (mode) => {
+  it("rechecks personal travel money before selection and confirmation", () => {
+    const mode = "self";
     let state = choose(conferenceState("west", 3));
-    const cost = mode === "self" ? 6 : 1;
+    const cost = 6;
     const insufficient = { ...state, player: { ...state.player, money: cost - 1 } };
     expect(getResolvableQueuedEvent(insufficient, insufficient.eventQueue[0]!).choices.find((choice) => choice.id === mode)!.disabledReason).toContain(`需要 ${cost}`);
     const blocked = choose(insufficient, mode);
@@ -251,30 +266,35 @@ describe("conference fee settlement", () => {
     expect(paid.player.money).toBe(0);
   });
 
-  it.each(["self", "proxy"] as const)("uses optional builder money for the initial %s preview", (mode) => {
+  it.each(["self", "advisor", "proxy"] as const)("requires personal money only for self travel in the initial %s preview", (mode) => {
     const state = conferenceState("west", 1);
     const context = state.eventQueue[0]!.conferencePreview!.context;
     const root = createConferenceDecisionAct1(context, { ...builderState(state), money: 0 }, () => 0.99);
     const selected = root.choices[0]!.effects.enqueueEvents![0]!.choices.find((choice) => choice.id === mode)!;
-    expect(selected.disabledReason).toContain("金币不足");
-    expect(selected.effects.enqueueEvents![0]!.choices[0]!.disabledReason).toContain("金币不足");
+    if (mode === "self") {
+      expect(selected.disabledReason).toContain("金币不足");
+      expect(selected.effects.enqueueEvents![0]!.choices[0]!.disabledReason).toContain("金币不足");
+    } else {
+      expect(selected.disabledReason).toBeUndefined();
+      expect(selected.effects.enqueueEvents![0]!.choices[0]!.disabledReason).toBeUndefined();
+    }
   });
 
   it.each(["self", "proxy"] as const)("lets an unfunded mentor confirmation switch to %s without losing the fee", (mode) => {
     let state = choose(choose(conferenceState("west", 3)), "advisor");
-    state = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: 1 } };
+    state = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: 3 } };
     state = choose(state, "change-payment-method");
     expect(state.eventQueue[0]!.stage).toBe("act2");
-    expect(state.eventQueue[0]!.choices.find((choice) => choice.id === "advisor")!.disabledReason).toContain("6");
+    expect(state.eventQueue[0]!.choices.find((choice) => choice.id === "advisor")!.disabledReason).toContain("9");
     expect(state.player.money).toBe(30);
     expect(state.player.favor).toBe(12);
-    expect(state.advisorProgressState.funding).toBe(1);
+    expect(state.advisorProgressState.funding).toBe(3);
     state = choose(state, mode);
     expect(state.eventQueue[0]!.conferencePreview?.mode).toBe(mode);
     state = choose(state);
-    expect(state.player.money).toBe(mode === "self" ? 24 : 29);
+    expect(state.player.money).toBe(mode === "self" ? 24 : 30);
     expect(state.player.favor).toBe(12);
-    expect(state.advisorProgressState.funding).toBe(1);
+    expect(state.advisorProgressState.funding).toBe(0);
     expect(state.eventCounters.meetingCount).toBe(mode === "self" ? 1 : 0);
   });
 

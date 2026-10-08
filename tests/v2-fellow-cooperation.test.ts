@@ -172,6 +172,15 @@ describe("fellow cooperation completion", () => {
     expect(advanceFellowCooperation(completed, 100, 10).affinity).toBe(19);
   });
 
+  it.each([false, true])("uses fractional affinity for automatic progress without resisting it again, long-term=%s", (longTermMentoring) => {
+    const state = withPending(makeState(), { affinity: 6.75, taskProgress: 90, longTermMentoring, nextMonthlyAction: "project" });
+    const next = advanceFellowResearch({ ...state, totalMonths: 2, month: 2 }, () => 0);
+    const progress = 6.75 * (longTermMentoring ? 2 : 1);
+    expect(next.fellowProgressState[0]!.taskProgress).toBe((90 + progress) % 100);
+    expect(next.fellowProgressState[0]!.affinity).toBe(6.75);
+    expect(next.fellowProgressState[0]!.monthlyActivity).toContain(`协作进度 +${progress}`);
+  });
+
   it.each([{ roll: 0, gain: 10 }, { roll: 0.999, gain: 15 }])("uses full player research and a zero-to-five roll: %j", ({ roll, gain }) => {
     const state = makeState();
     const next = advanceFellowTask(state, state.fellowProgressState[0]!.id, () => roll);
@@ -450,7 +459,14 @@ describe("engine and research lifecycle retries", () => {
     expect(next.externalPublications.find((entry) => entry.id === paper.id)?.status).toBe("published");
     expect(next.phase).toBe("playing");
     expect(next.ending).toBeNull();
-    expect(next.advisorProgressState.paidJournalPaperIds).toContain(paper.id);
-    expect(dispatchAction(next, "next-month").ending).toBe("master");
+    expect(next.advisorProgressState.paidJournalPaperIds ?? []).not.toContain(paper.id);
+    expect(dispatchAction(next, "next-month").phase).toBe("playing");
+    let paid = next;
+    for (const choiceId of ["continue", "advisor", "confirm"]) {
+      const payment = paid.eventQueue.find((entry) => entry.journalFeePreview)!;
+      paid = dispatchAction(paid, "resolve-event", { eventId: payment.id, eventChoiceId: choiceId });
+    }
+    expect(paid.advisorProgressState.paidJournalPaperIds).toContain(paper.id);
+    expect(dispatchAction(paid, "next-month").ending).toBe("master");
   });
 });

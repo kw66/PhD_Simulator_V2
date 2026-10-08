@@ -104,7 +104,6 @@ export function resolveSummerVacationFixedEvent(
   state: GameState,
   resolution: FixedEventResolution,
   getRoll: RandomRollProvider,
-  preservedTravelSocialResult?: ReturnType<typeof applyTierResist>,
 ): FixedResolutionResult | null {
   switch (resolution.kind) {
     case "summer-vacation-home": {
@@ -154,7 +153,7 @@ export function resolveSummerVacationFixedEvent(
       const missingSan = Math.max(0, state.sanCap - state.player.san);
       const sanRecovery = Math.floor(missingSan * 0.5);
       const sanSummary = formatSummerSanRecovery(missingSan, 0.5);
-      const socialResult = preservedTravelSocialResult ?? applyTierResist(1, state.player.social, getRoll);
+      const socialResult = applyTierResist(1, state.player.social, getRoll);
       const socialText = formatTierResistedOutcome("社交", 1, socialResult);
       const fullSanTier = state.player.san >= 18;
       return {
@@ -202,21 +201,13 @@ export function refreshSummerVacationEvent<Event extends PendingEvent>(state: Ga
         : null;
   if (!kind) return event;
 
-  const existingChoice = event.choices[0];
-  const preservedTravelSocialResult = kind === "summer-vacation-travel" && existingChoice
-    ? {
-        effectiveChange: existingChoice.effects.social ?? 0,
-        resistedCount: existingChoice.effects.social === 1 ? 0 : 1,
-        ...(existingChoice.effects.social === 0 && state.player.social >= 20 ? { cappedCount: 1 } : {}),
-      }
-    : undefined;
-  const resolution = resolveSummerVacationFixedEvent(state, { kind }, () => 0, preservedTravelSocialResult);
+  const resolution = resolveSummerVacationFixedEvent(state, { kind }, () => 0);
   const refreshed = resolution?.enqueueEvents?.[0];
   if (!refreshed) return event;
   return {
     ...event,
     title: refreshed.title,
     description: refreshed.description,
-    choices: refreshed.choices,
+    choices: refreshed.choices.map((choice, index) => ({ ...choice, id: event.choices[index]?.id ?? choice.id })),
   };
 }

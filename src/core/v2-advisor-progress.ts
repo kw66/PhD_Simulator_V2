@@ -1,19 +1,17 @@
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "./v2-calendar";
-import { roundMoney } from "./v2-money";
-import { ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
+import { ADVISOR_SALARY, ADVISOR_SALARY_BONUS, SCORE_BY_TARGET } from "./v2-content";
 import { pushLog, pushMilestoneLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getJournalDefinition } from "./v2-journal-system";
 import type { AdvisorGrantApplication, AdvisorGrantId, AdvisorProgressState, Degree, GameState, Paper } from "./v2-types";
 import { createAdvisorGrantResultEvent, type AdvisorGrantResultContext } from "./v2-advisor-grant-events";
 import { enqueueEventQueueItem } from "./v2-event-queue";
-import { recordTalentTrigger } from "./v2-talent-history";
 import { getRelationshipSanCost } from "./v2-buffs";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
-import { advanceSharedLabProject } from "./v2-lab-projects";
+import { advanceSharedLabProject, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 
 export const ADVISOR_HORIZONTAL_SAN_COST = 5;
 export const ADVISOR_VERTICAL_SAN_COST = 4;
-export { ADVISOR_HORIZONTAL_REWARD, PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
+export { getAdvisorHorizontalReward, PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
 
 export interface AdvisorGrantDefinition {
   id: AdvisorGrantId;
@@ -54,24 +52,27 @@ function getHighestAdvisorAwardIndex(advisor: AdvisorProgressState): number {
 }
 
 export function getAdvisorRankLabel(advisor: AdvisorProgressState): string {
-  return ["讲师", "副教授", "四级教授", "三级教授", "二级教授", "一级教授"][getHighestAdvisorAwardIndex(advisor) + 1]!;
+  return ["讲师", "副教授", "四级教授", "三级教授", "二级教授", "一级教授"][getAdvisorRankIndex(advisor)]!;
+}
+
+export function getAdvisorRankIndex(advisor: AdvisorProgressState): number {
+  return getHighestAdvisorAwardIndex(advisor) + 1;
 }
 
 export function getAdvisorMeetingAttendancePercent(advisor: AdvisorProgressState): number {
   return 60 - (getHighestAdvisorAwardIndex(advisor) + 1) * 10;
 }
 
-export function getAdvisorMonthlySalary(advisor: AdvisorProgressState, degree: Degree): number {
-  const rankIndex = getHighestAdvisorAwardIndex(advisor) + 1;
-  return roundMoney(ADVISOR_SALARY[degree] + rankIndex * (degree === "phd" ? 0.5 : 0.25));
+export function getAdvisorMonthlySalary(_advisor: AdvisorProgressState, degree: Degree): number {
+  return ADVISOR_SALARY[degree];
 }
 
-export function getAdvisorNextSalaryIncrease(advisor: AdvisorProgressState, degree: Degree): number {
-  return getHighestAdvisorAwardIndex(advisor) === ADVISOR_GRANTS.length - 1 ? 0 : degree === "phd" ? 0.5 : 0.25;
+export function getAdvisorMonthlySalaryBonus(advisor: AdvisorProgressState, degree: Degree): number {
+  return advisor.funding >= LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD ? ADVISOR_SALARY_BONUS[degree] : 0;
 }
 
 export function getAdvisorSalaryPayment(advisor: AdvisorProgressState, degree: Degree) {
-  return { payment: getAdvisorMonthlySalary(advisor, degree) };
+  return { payment: getAdvisorMonthlySalary(advisor, degree) + getAdvisorMonthlySalaryBonus(advisor, degree) };
 }
 
 export function getAdvisorGrantLimit(advisor: AdvisorProgressState): number {
@@ -205,8 +206,6 @@ export function getAdvisorGrantResultContext(state: GameState, application: Advi
   return {
     application: { ...application }, grantName: grant.name, funding: grant.funding, success, successChance,
     rank: getAdvisorRankLabel(awardedAdvisor),
-    previousSalary: getAdvisorMonthlySalary(advisor, state.degree),
-    salary: getAdvisorMonthlySalary(awardedAdvisor, state.degree),
   };
 }
 
@@ -232,13 +231,7 @@ export function settleAdvisorGrantResult(state: GameState, application: AdvisorG
       }],
     },
   };
-  return context.salary > context.previousSalary
-    ? recordTalentTrigger(nextState, `advisor-salary:${grant.id}:${application.calendarYear}`, {
-      name: "导师晋升", recipient: "你", reason: `导师晋升${context.rank}`,
-      effects: [`每月补助 +${context.salary - context.previousSalary}（${context.previousSalary}→${context.salary}金币）`],
-      details: ["下次月初起按新标准发放"],
-    })
-    : nextState;
+  return nextState;
 }
 
 export function settleAdvisorMonth(state: GameState, random: () => number = Math.random): GameState {

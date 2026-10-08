@@ -188,6 +188,7 @@ export const DEBUG_COMPLETED_EVENT_IDS = [
   "before-grad-school",
   "mentor-assign",
   "teachers-day",
+  "scholarship",
   "winter-vacation",
   "summer-vacation",
   "advisor-grant-success",

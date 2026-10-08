@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
+import { evaluateCoreEndings } from "../src/core/v2-ending-system";
 import { activateInternship, activateRemoteInternship, createInternshipState, getInternshipStatus } from "../src/core/v2-internship-system";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { createGrantedPublishedPaper } from "../src/core/v2-publication-rules";
@@ -39,14 +40,14 @@ describe("monthly effects", () => {
     expect(result.resolution.items.filter((item) => item.id.startsWith("money-"))
       .map((item) => ({ raw: item.stats.money, actual: item.appliedStats.money })))
       .toEqual([{ raw: 0.01, actual: 0.01 }, { raw: 0.01, actual: 0.01 }, { raw: -0.01, actual: -0.01 }]);
-    expect(result.resolution.totals.money).toBe(0.01);
-    expect(result.nextState.player.money).toBe(0.11);
-    expect(previewNextMonthEffects(state).player.money).toBe(0.11);
+    expect(result.resolution.totals.money).toBe(-0.99);
+    expect(result.nextState.player.money).toBe(-0.89);
+    expect(previewNextMonthEffects(state).player.money).toBe(-0.89);
   });
 
   it.each([
-    [null, 1, 3], ["youth", 1.25, 3.5], ["general", 1.5, 4],
-    ["excellent", 1.75, 4.5], ["distinguished", 2, 5], ["academician", 2.25, 5.5],
+    [null, 1, 2.5], ["youth", 1, 2.5], ["general", 1, 2.5],
+    ["excellent", 1, 2.5], ["distinguished", 1, 2.5], ["academician", 1, 2.5],
   ] satisfies Array<[AdvisorGrantId | null, number, number]>)("pays exact master and PhD salary for %s each month", (award, master, phd) => {
     const state = createPlayingMonth(2, 2);
     state.selectedAdvisorName = "林老师";
@@ -63,27 +64,49 @@ describe("monthly effects", () => {
         expect(current).toEqual(before);
         const settled = applyMonthlyEffects({ ...current, month: paymentIndex + 1, totalMonths: paymentIndex + 1 });
         expect(settled.resolution.items.find((item) => item.id === "advisor-salary")?.appliedStats.money).toBe(payment);
-        expect(settled.nextState.player.money).toBe(10 + salary * paymentIndex);
+        expect(settled.nextState.player.money).toBe(10 + (salary - 1) * paymentIndex);
         current = settled.nextState;
       }
     }
   });
 
-  it("switches to the exact new wage after promotion and conversion to PhD", () => {
+  it("changes wages only on conversion to PhD, and charges living costs without an advisor", () => {
     const state = createPlayingMonth(2, 2);
     state.selectedAdvisorName = "林老师";
     state.advisorProgressState.awards = [{ id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2027 }];
     const first = applyMonthlyEffects(state).nextState;
-    expect(first.player.money - state.player.money).toBe(1.25);
+    expect(first.player.money - state.player.money).toBe(0);
     const promoted = applyMonthlyEffects({ ...first, advisorProgressState: {
       ...first.advisorProgressState,
       awards: [{ id: "general", awardedYear: 2024, startYear: 2025, endYear: 2028 }],
     } }).nextState;
-    expect(promoted.player.money - first.player.money).toBe(1.5);
+    expect(promoted.player.money - first.player.money).toBe(0);
     const phd = applyMonthlyEffects({ ...promoted, degree: "phd" }).nextState;
-    expect(phd.player.money - promoted.player.money).toBe(4);
+    expect(phd.player.money - promoted.player.money).toBe(1.5);
     const noAdvisor = applyMonthlyEffects({ ...phd, selectedAdvisorName: null }).nextState;
-    expect(noAdvisor.player.money).toBe(phd.player.money);
+    expect(noAdvisor.player.money).toBe(phd.player.money - 1);
+  });
+
+  it.each([0, 1])("does not charge living costs during pre-enrollment or enrollment month %s", (totalMonths) => {
+    const state = createPlayingMonth(totalMonths, totalMonths);
+    expect(resolveMonthlyEffects(state).items.some((item) => item.id === "living-cost")).toBe(false);
+    expect(applyMonthlyEffects(state).nextState.player.money).toBe(state.player.money);
+  });
+
+  it.each(["master", "phd"] as const)("settles %s salary and living costs as one batch before judging poverty", (degree) => {
+    const state = { ...createPlayingMonth(2, 2), degree, selectedAdvisorName: "导师" };
+    state.player.money = 0;
+    const settled = applyMonthlyEffects(state);
+    expect(settled.resolution.items.find((item) => item.id === "living-cost")?.appliedStats.money).toBe(-1);
+    expect(settled.nextState.player.money).toBe(degree === "master" ? 0 : 1.5);
+    expect(evaluateCoreEndings(settled.nextState).phase).toBe("playing");
+  });
+
+  it("ends a real month advance when living costs leave genuine negative player money", () => {
+    const state = createPlayingMonth(2, 2);
+    state.player.money = 0.5;
+    const next = dispatchAction(state, "next-month");
+    expect(next).toMatchObject({ phase: "finished", ending: "poor", player: { money: -0.5 } });
   });
 
   it("restores base SAN and applies autumn as a separate source", () => {
@@ -93,6 +116,7 @@ describe("monthly effects", () => {
     expect(resolution.totals.san).toBe(2);
     expect(resolution.items.map((item) => [item.name, item.appliedStats.san])).toEqual([
       ["自动恢复", 1],
+      ["生活费", undefined],
       ["秋季", 1],
     ]);
   });
@@ -113,6 +137,7 @@ describe("monthly effects", () => {
     expect(resolution.totals.san).toBe(0);
     expect(resolution.items.map((item) => [item.id, item.appliedStats.san])).toEqual([
       ["base-san-recovery", 1],
+      ["living-cost", undefined],
       ["winter-san-effect", -1],
     ]);
   });
@@ -158,14 +183,14 @@ describe("monthly effects", () => {
     const resolution = resolveMonthlyEffects(dating);
     expect(resolution).toEqual(baseline);
     expect(resolution.player.san).toBe(11);
-    expect(resolution.player.money).toBe(state.player.money);
+    expect(resolution.player.money).toBe(state.player.money - 1);
     expect(resolution.items.some((item) => item.id.startsWith("lover-"))).toBe(false);
     expect(applyMonthlyEffects(dating).nextState.loverProgressState).toEqual(dating.loverProgressState);
   });
 
   it("runs the automatic coffee machine independently at month start", () => {
     const state = createPlayingMonth(8, 8, 10);
-    state.player = { ...state.player, money: 2 };
+    state.player = { ...state.player, money: 3 };
     state.coffeeState = {
       ...state.coffeeState,
       machineOwned: true,
@@ -197,7 +222,7 @@ describe("monthly effects", () => {
       },
     });
     expect(resolution.items.some((item) => item.id === "automatic-coffee-machine")).toBe(false);
-    expect(nextState.player).toMatchObject({ san: 20, money: 2 });
+    expect(nextState.player).toMatchObject({ san: 20, money: 1 });
     expect(nextState.coffeeState.coffeeProducedCountThisMonth).toBe(0);
   });
 
@@ -218,12 +243,12 @@ describe("monthly effects", () => {
         money: 0,
       },
     });
-    expect(resolution.player).toMatchObject({ san: 20, money: 2 });
+    expect(resolution.player).toMatchObject({ san: 20, money: 1 });
   });
 
   it("lets the automatic machine add one cup alongside the regular monthly cup", () => {
     const state = createPlayingMonth(8, 8, 10);
-    state.player = { ...state.player, money: 4 };
+    state.player = { ...state.player, money: 5 };
     state.coffeeState = {
       ...state.coffeeState,
       machineOwned: true,
@@ -251,7 +276,7 @@ describe("monthly effects", () => {
     const { nextState, resolution } = applyMonthlyEffects(state);
     expect(resolution.items.find((item) => item.id === "internship-monthly")?.stats).toEqual({ san: -2, money: 1 });
     expect(nextState.player.san).toBe(9);
-    expect(nextState.player.money).toBe(1);
+    expect(nextState.player.money).toBe(0);
     expect(nextState.internshipState).toEqual(createInternshipState());
   });
 
@@ -307,7 +332,7 @@ describe("monthly effects", () => {
     expect(resolveMonthlyEffects(state).items.some((item) => item.id === "internship-monthly")).toBe(false);
   });
 
-  it("pays internship salary independently of fractional advisor salary and previews without consuming it", () => {
+  it("pays internship salary independently of fixed advisor salary and previews without consuming it", () => {
     const initial = createPlayingMonth(2, 2, 20);
     initial.selectedAdvisorName = "林老师";
     initial.advisorProgressState.awards = [{ id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2027 }];
@@ -323,10 +348,10 @@ describe("monthly effects", () => {
       const settled = applyMonthlyEffects({ ...state, totalMonths: index + 3, month: index + 3 });
       expect(settled.resolution.items.find((item) => item.id === "internship-monthly")?.appliedStats.money).toBe(payment);
       expect(settled.resolution.items.find((item) => item.id === "advisor-salary")?.appliedStats.money)
-        .toBe(1.25);
+        .toBe(1);
       total += payment;
       state = settled.nextState;
-      expect(state.player.money).toBe(total + 1.25 * (index + 1));
+      expect(state.player.money).toBe(total);
     }
     expect(state.internshipState.active).toBe(false);
     expect(total).toBe(12);
@@ -336,14 +361,14 @@ describe("monthly effects", () => {
     const initial = createPlayingMonth(2, 2, 20);
     const publication = { ...createDraftPaper(1, 0, () => 0), status: "published" as const, target: "A" as const };
     let state = applyMonthlyEffects({ ...initial, papers: [publication], internshipState: { ...activateInternship(), remainingMonths: 2 } }).nextState;
-    expect(state.player.money).toBe(2);
+    expect(state.player.money).toBe(1);
     state.externalPublications = [{ ...publication, id: "another-first-author-a" }];
     const second = applyMonthlyEffects(state);
     expect(second.resolution.items.find((item) => item.id === "internship-monthly")?.stats.money).toBe(3);
     expect(second.nextState.internshipState).toEqual(createInternshipState());
     state = applyMonthlyEffects(second.nextState).nextState;
     expect(state.internshipState).toEqual(createInternshipState());
-    expect(state.player.money).toBe(5);
+    expect(state.player.money).toBe(2);
   });
 
   it("stacks strong body and active monthly buffs, then expires finite buffs", () => {
@@ -361,8 +386,8 @@ describe("monthly effects", () => {
 
     const { nextState, resolution } = applyMonthlyEffects(state);
     expect(nextState.player.san).toBe(10);
-    expect(nextState.player.money).toBe(3);
-    expect(resolution.totals).toMatchObject({ san: 0, money: 3 });
+    expect(nextState.player.money).toBe(2);
+    expect(resolution.totals).toMatchObject({ san: 0, money: 2 });
     expect(nextState.buffs).toEqual([]);
     expect(nextState.actionState).toEqual({ used: 0, limit: 1, aiResearchBonusUsed: false });
   });
@@ -404,7 +429,7 @@ describe("monthly effects", () => {
     const resolution = resolveMonthlyEffects(state);
     expect(resolution.player.san).toBe(20);
     expect(resolution.totals.san).toBe(0);
-    expect(resolution.items.map((item) => item.appliedStats.san ?? 0)).toEqual([1, 1, -2]);
+    expect(resolution.items.filter((item) => item.appliedStats.san !== undefined).map((item) => item.appliedStats.san)).toEqual([1, 1, -2]);
   });
 
   it("lets the spike chair restore SAN to 3 after month-start settlement", () => {
@@ -486,7 +511,7 @@ describe("monthly effects", () => {
 
   it("previews ice-Americano and AI renewals in the same month-start balance", () => {
     const state = createPlayingMonth(1, 1);
-    state.player = { ...state.player, money: 3 };
+    state.player = { ...state.player, money: 4 };
     state.selectedAdvisorName = "测试导师";
     state.coffeeState = {
       ...state.coffeeState,
@@ -508,7 +533,7 @@ describe("monthly effects", () => {
     ]));
     expect(preview.items.find((item) => item.id === "coffee-subscription")?.source).toBe("商店订阅");
     expect(preview.items.find((item) => item.id === "ai-renewal-gpt")?.appliedStats.money).toBe(-2);
-    expect(preview.totals.money).toBe(-3);
+    expect(preview.totals.money).toBe(-4);
     expect(preview.player.money).toBe(0);
   });
 
@@ -516,6 +541,7 @@ describe("monthly effects", () => {
     const state = createPlayingMonth(1, 1);
     state.player = { ...state.player, money: 1 };
     state.selectedAdvisorName = "测试导师";
+    state.degree = "phd";
     state.coffeeState = {
       ...state.coffeeState,
       machineOwned: true,
@@ -525,12 +551,13 @@ describe("monthly effects", () => {
     const preview = previewNextMonthEffects(state);
     expect(preview.items.some((item) => item.id === "coffee-subscription")).toBe(true);
     expect(preview.items.some((item) => item.id === "coffee-subscription-paused")).toBe(false);
-    expect(preview.player.money).toBe(0);
+    expect(preview.player.money).toBe(1 + 2.5 - 1 - 2);
   });
 
   it("renews ice-Americano without a coffee machine and keeps it out of machine production", () => {
     const state = createPlayingMonth(1, 1, 10);
     state.player = { ...state.player, money: 2 };
+    state.selectedAdvisorName = "测试导师";
     state.coffeeState = { ...state.coffeeState, subscriptionEnabled: true };
 
     const preview = previewNextMonthEffects(state);
@@ -556,7 +583,7 @@ describe("monthly effects", () => {
       appliedStats: { san: 0, money: 0 },
       note: "SAN 已满，本月未购买",
     });
-    expect(preview.player.money).toBe(2);
+    expect(preview.player.money).toBe(1);
   });
 
   it("does not deduct an AI subscription that will pause for insufficient money", () => {
@@ -574,11 +601,12 @@ describe("monthly effects", () => {
       appliedStats: { money: 0 },
       note: "金币不足，本月暂停",
     });
-    expect(preview.totals.money).toBe(0);
+    expect(preview.totals.money).toBe(-1);
   });
 
   it("records a successful free AI renewal as 金币 +0", () => {
     const state = createPlayingMonth(1, 1);
+    state.player.money = 1;
     state.aiShopState = {
       subscriptions: {
         ...state.aiShopState.subscriptions,
@@ -595,7 +623,7 @@ describe("monthly effects", () => {
 
   it("settles coffee and AI together from cheapest to priciest without negative money", () => {
     const state = createPlayingMonth(12, 24);
-    state.player = { ...state.player, money: 4 };
+    state.player = { ...state.player, money: 5 };
     state.coffeeState = {
       ...state.coffeeState,
       machineOwned: true,
@@ -626,7 +654,7 @@ describe("monthly effects", () => {
 
   it("settles the automatic coffee machine before every renewal", () => {
     const state = createPlayingMonth(1, 1, 10);
-    state.player = { ...state.player, money: 2 };
+    state.player = { ...state.player, money: 3 };
     state.coffeeState = {
       ...state.coffeeState,
       machineOwned: true,

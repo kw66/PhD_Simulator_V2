@@ -155,7 +155,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
   ));
   for (const profile of activeProfiles) {
     const cooperationCount = profile.longTermMentoring ? 2 : 1;
-    const cooperationGain = Math.floor(profile.affinity) * cooperationCount;
+    const cooperationGain = profile.affinity * cooperationCount;
     nextState = advanceFellowCooperationWithLog(nextState, profile.id, cooperationGain);
     addActivity(profile.id, `协作进度 +${cooperationGain}${profile.longTermMentoring ? "（长期合作，推进2次）" : ""}`);
     nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id
@@ -165,7 +165,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
   const advanceProject = (profile: typeof state.fellowProgressState[number], forceHorizontal = false): void => {
     const type = forceHorizontal ? "horizontal" : monthlyProjectType;
     const amount = Math.floor(profile.research) + Math.floor(random() * 6);
-    const result = advanceSharedLabProject(nextState, type, amount, random, profile.id);
+    const result = advanceSharedLabProject(nextState, type, amount, random);
     nextState = {
       ...result.state,
       fellowProgressState: result.state.fellowProgressState.map((fellow) => fellow.id === profile.id

@@ -34,13 +34,13 @@ describe("fellow monthly salary records", () => {
     const expected = getLabPayroll(state);
     const paid = settleLabPayroll(state);
     expect(paid.fellowProgressState[0]).toMatchObject({
-      monthlySalaryPaid: 1.25, lastSalaryTotalMonths: 4, monthlyActivity: "上月活动",
+      monthlySalaryPaid: 1.5, lastSalaryTotalMonths: 4, monthlyActivity: "上月活动",
     });
     expect(paid.advisorProgressState.funding).toBe(state.advisorProgressState.funding - expected.total);
     const advanced = advanceFellowResearch(paid, () => 0);
-    expect(advanced.fellowProgressState[0]).toMatchObject({ monthlySalaryPaid: 1.25, lastSalaryTotalMonths: 4 });
+    expect(advanced.fellowProgressState[0]).toMatchObject({ monthlySalaryPaid: 1.5, lastSalaryTotalMonths: 4 });
     const following = settleLabPayroll({ ...advanced, month: 5, totalMonths: 5 });
-    expect(following.fellowProgressState[0]).toMatchObject({ monthlySalaryPaid: 1.25, lastSalaryTotalMonths: 5 });
+    expect(following.fellowProgressState[0]).toMatchObject({ monthlySalaryPaid: 1.5, lastSalaryTotalMonths: 5 });
   });
 
   it.each(["pre-enrollment", "just-joined"] as const)("records zero for a %s fellow rather than retaining last month's payment", (kind) => {
@@ -57,7 +57,7 @@ describe("fellow monthly salary records", () => {
     const state = makeState();
     const advanced = dispatchAction(state, "next-month");
     expect(advanced).toMatchObject({ phase: "playing", totalMonths: 5 });
-    expect(advanced.fellowProgressState[0]).toMatchObject({ monthlySalaryPaid: 1, lastSalaryTotalMonths: 5 });
+    expect(advanced.fellowProgressState[0]).toMatchObject({ monthlySalaryPaid: 1.5, lastSalaryTotalMonths: 5 });
     expect(advanced.fellowProgressState[0]!.monthlyActivity).toContain("协作进度");
   });
 });

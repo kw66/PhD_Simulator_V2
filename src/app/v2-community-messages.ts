@@ -691,6 +691,7 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
 }
 
 export function refreshCommunityContentOverflow(root: ParentNode): void {
+  refreshCommunityComposerLayout(root);
   root.querySelectorAll<HTMLElement>("[data-community-message-content]").forEach((content) => {
     const toggle = content.parentElement?.querySelector<HTMLButtonElement>("[data-community-toggle-content]");
     if (!toggle || content.getClientRects().length === 0) return;
@@ -700,6 +701,17 @@ export function refreshCommunityContentOverflow(root: ParentNode): void {
     content.dataset.expanded = String(expanded);
     toggle.hidden = !expanded && !overflowing;
     toggle.setAttribute("aria-expanded", String(expanded));
+  });
+}
+
+export function refreshCommunityComposerLayout(root: ParentNode): void {
+  root.querySelectorAll<HTMLTextAreaElement>("textarea[data-community-content]").forEach((textarea) => {
+    if (textarea.clientWidth === 0) return;
+    const style = getComputedStyle(textarea);
+    const borderWidth = parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+    const scrollbarWidth = textarea.scrollHeight > textarea.clientHeight + 1
+      ? Math.max(12, textarea.offsetWidth - textarea.clientWidth - borderWidth) : 0;
+    textarea.parentElement?.style.setProperty("--community-composer-scrollbar-width", `${scrollbarWidth}px`);
   });
 }
 

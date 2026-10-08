@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   applySanCostModifiers,
   applyTierResist,
@@ -12,6 +12,7 @@ import {
   getTierResistedNarrative,
   getTierResistChance,
   formatTierResistedOutcome,
+  formatTierResistedChange,
 } from "../src/core/v2-sanity-rules";
 
 describe("v2 sanity rules", () => {
@@ -63,50 +64,86 @@ describe("v2 sanity rules", () => {
 
   it("applies tier resist point by point using the confirmed thresholds", () => {
     expect([0, 6, 12, 18].map(getTierResistChance)).toEqual([0, 0.25, 0.5, 0.75]);
-    expect(applyTierResist(-4, 18, () => 0)).toEqual({ effectiveChange: 0, resistedCount: 4 });
-    expect(applyTierResist(-4, 18, () => 0.99)).toEqual({ effectiveChange: -4, resistedCount: 0 });
+    expect([0, 6, 12, 18].map((value) => applyTierResist(1, value))).toEqual([
+      { effectiveChange: 1, resistedCount: 0 },
+      { effectiveChange: 0.75, resistedCount: 0.25 },
+      { effectiveChange: 0.5, resistedCount: 0.5 },
+      { effectiveChange: 0.25, resistedCount: 0.75 },
+    ]);
+    expect([0, 6, 12, 18].map((value) => applyTierResist(-1, value))).toEqual([
+      { effectiveChange: -1, resistedCount: 0 },
+      { effectiveChange: -0.75, resistedCount: 0.25 },
+      { effectiveChange: -0.5, resistedCount: 0.5 },
+      { effectiveChange: -0.25, resistedCount: 0.75 },
+    ]);
   });
 
   it("re-reads the tier after every applied point, for gains and losses alike", () => {
-    const replay = (rolls: number[]) => {
-      let index = 0;
-      return () => rolls[index++] ?? 0;
-    };
-
-    // 11 → 12 at 25%, then the next two points face 50%.
-    expect(applyTierResist(3, 11, replay([0.3, 0.3, 0.3]))).toEqual({ effectiveChange: 1, resistedCount: 2 });
-    // 12 → 11 at 50%, then the lower tier only resists 25%.
-    expect(applyTierResist(-3, 12, replay([0.6, 0.3, 0.3]))).toEqual({ effectiveChange: -3, resistedCount: 0 });
-    // Tier 0 does not roll; the second point already sits at 6.
-    expect(applyTierResist(2, 5, () => 0)).toEqual({ effectiveChange: 1, resistedCount: 1 });
-    // A resisted point leaves the value, and so the tier, unchanged.
-    expect(applyTierResist(2, 11, replay([0.1, 0.3]))).toEqual({ effectiveChange: 1, resistedCount: 1 });
-    // Points past the cap are reported as capped, not resisted.
-    expect(applyTierResist(3, 7, () => 0.99, 8)).toEqual({ effectiveChange: 1, resistedCount: 0, cappedCount: 2 });
+    expect(applyTierResist(3, 11)).toEqual({ effectiveChange: 2, resistedCount: 1 });
+    expect(applyTierResist(-3, 12)).toEqual({ effectiveChange: -2, resistedCount: 1 });
+    expect(applyTierResist(2, 5)).toEqual({ effectiveChange: 1.75, resistedCount: 0.25 });
+    expect(applyTierResist(-2, 6)).toEqual({ effectiveChange: -1.75, resistedCount: 0.25 });
+    expect(applyTierResist(2, 17.75)).toEqual({ effectiveChange: 0.75, resistedCount: 1.25 });
+    expect(applyTierResist(-2, 18)).toEqual({ effectiveChange: -0.75, resistedCount: 1.25 });
+    expect(applyTierResist(28, 0)).toEqual({ effectiveChange: 18.5, resistedCount: 9.5 });
+    expect(applyTierResist(-28, 18)).toEqual({ effectiveChange: -19.25, resistedCount: 8.75 });
   });
 
-  it("resolves every point of a two-point favor gain independently", () => {
-    const resolve = (rolls: number[]) => {
-      let index = 0;
-      return applyTierResist(2, 12, () => rolls[index++] ?? 0);
-    };
+  it("does not consume RNG or vary resistance with the supplied roll", () => {
+    for (const roll of [0, 0.3, 0.6, 0.99]) {
+      const random = vi.fn(() => roll);
+      const result = applyTierResist(2, 12, random);
+      expect(result).toEqual({ effectiveChange: 1, resistedCount: 1 });
+      expect(applyTierResist(-4, 18, random)).toEqual({ effectiveChange: -1.75, resistedCount: 2.25 });
+      expect(getTierResistedNarrative("导师好感", 2, result)).toBe("");
+      expect(random).not.toHaveBeenCalled();
+    }
+    const random = vi.spyOn(Math, "random");
+    try {
+      expect(applyTierResist(2, 12)).toEqual({ effectiveChange: 1, resistedCount: 1 });
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+    }
+  });
 
-    const fullyResisted = resolve([0, 0]);
-    const partlyResisted = resolve([0, 0.99]);
-    const fullyApplied = resolve([0.99, 0.99]);
+  it("settles fractional raw deltas without rounding them up to whole points", () => {
+    expect(applyTierResist(0.5, 0)).toEqual({ effectiveChange: 0.5, resistedCount: 0 });
+    expect(applyTierResist(0.5, 6)).toEqual({ effectiveChange: 0.375, resistedCount: 0.125 });
+    expect(applyTierResist(-0.5, 12)).toEqual({ effectiveChange: -0.25, resistedCount: 0.25 });
+    expect(applyTierResist(0.1, 18)).toEqual({ effectiveChange: 0.025, resistedCount: 0.075 });
+    expect(applyTierResist(1.5, 5)).toEqual({ effectiveChange: 1.375, resistedCount: 0.125 });
+    expect(applyTierResist(-1.5, 6)).toEqual({ effectiveChange: -1.25, resistedCount: 0.25 });
+    expect(applyTierResist(0, 12)).toEqual({ effectiveChange: 0, resistedCount: 0 });
+  });
 
-    expect(fullyResisted).toEqual({ effectiveChange: 0, resistedCount: 2 });
-    expect(partlyResisted).toEqual({ effectiveChange: 1, resistedCount: 1 });
-    expect(fullyApplied).toEqual({ effectiveChange: 2, resistedCount: 0 });
-    expect(getTierResistedNarrative("导师好感", 2, fullyResisted)).toBe("");
-    expect(getTierResistedNarrative("导师好感", 2, partlyResisted)).toBe("");
-    expect(getTierResistedNarrative("导师好感", 2, fullyApplied)).toBe("");
+  it("fills fractional cap room and reports only the discarded retained amount as capped", () => {
+    expect(applyTierResist(3, 7, undefined, 8)).toEqual({ effectiveChange: 1, resistedCount: 0.75, cappedCount: 1.25 });
+    expect(applyTierResist(1, 19.9)).toEqual({ effectiveChange: 0.1, resistedCount: 0.75, cappedCount: 0.15 });
+    expect(applyTierResist(1, 20)).toEqual({ effectiveChange: 0, resistedCount: 0.75, cappedCount: 0.25 });
+    expect(applyTierResist(1, 21)).toEqual({ effectiveChange: 0, resistedCount: 0.75, cappedCount: 0.25 });
+    expect(applyTierResist(-1, 21)).toEqual({ effectiveChange: -0.25, resistedCount: 0.75 });
+    expect(applyTierResist(1, 21.9, undefined, 22)).toEqual({ effectiveChange: 0.1, resistedCount: 0.75, cappedCount: 0.15 });
+    expect(applyTierResist(0.5, 19.9)).toEqual({ effectiveChange: 0.1, resistedCount: 0.375, cappedCount: 0.025 });
+  });
+
+  it("normalizes floating-point noise without discarding small retained values", () => {
+    expect(applyTierResist(0.1 + 0.2, 6)).toEqual({ effectiveChange: 0.225, resistedCount: 0.075 });
+    expect(applyTierResist(0.000001, 18)).toEqual({ effectiveChange: 0.00000025, resistedCount: 0.00000075 });
+    expect(applyTierResist(3.2, 11.3)).toEqual({ effectiveChange: 1.85, resistedCount: 1.35 });
+    expect(applyTierResist(2.1, 5.1, undefined, 6.3)).toEqual({ effectiveChange: 1.2, resistedCount: 0.275, cappedCount: 0.625 });
   });
 
   it("formats resisted outcomes as compact final values", () => {
-    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 1 })).toBe("科研 +0（抵抗1）");
+    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 1 })).toBe("科研 +0");
     expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 1, resistedCount: 0 })).toBe("科研 +1");
     expect(formatTierResistedOutcome("导师好感", -1, { effectiveChange: -1, resistedCount: 0 })).toBe("导师好感 -1");
     expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 0, cappedCount: 1 })).toBe("科研 +0（上限）");
+    expect(formatTierResistedOutcome("科研", 1, applyTierResist(1, 6))).toBe("科研 +0.75");
+    expect(formatTierResistedOutcome("社交", -1, applyTierResist(-1, 12))).toBe("社交 -0.5");
+    expect(formatTierResistedOutcome("导师好感", -1, applyTierResist(-1, 6))).toBe("导师好感 -0.75");
+    expect(formatTierResistedOutcome("导师好感", 1, applyTierResist(1, 19.9))).toBe("导师好感 +0.1（上限）");
+    expect(formatTierResistedChange("科研", 0.5, applyTierResist(0.5, 6))).toBe("科研 +0.375");
+    expect(formatTierResistedChange("社交", -1, applyTierResist(-1, 12))).toBe("社交 -0.5");
   });
 });

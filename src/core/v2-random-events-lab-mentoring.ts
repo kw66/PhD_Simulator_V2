@@ -37,10 +37,12 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
   const mentoringSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const mentoringSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
   const mentorshipJunior = createGeneratedFellowProfileAddition("junior", serial, undefined, usedNames, undefined, { ...recruitmentCalendar, fixedYear: 0 }, recruitmentSeed);
+  const affinityResult = applyTierResist(2, mentorshipJunior.affinity, getRoll, 20);
+  const affinitySummary = formatTierResistedOutcome("默契", 2, affinityResult);
   const guidedJunior = {
     ...mentorshipJunior,
     research: Math.min(20, mentorshipJunior.research + 1),
-    affinity: Math.min(20, mentorshipJunior.affinity + 2),
+    affinity: mentorshipJunior.affinity + affinityResult.effectiveChange,
   };
   const mentorshipJuniorName = mentorshipJunior.name ?? "这名本科生";
   const mentorshipJuniorLabel = getFellowRoleLabel(mentorshipJunior.type, mentorshipJunior.gender);
@@ -68,7 +70,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
         id: `random-1-self-${serial}`,
         label: "亲自指导",
         outcome: staysForGradSchool
-          ? `条件：对方考研进组（50%）${canAddJunior ? "" : `；师弟师妹人数 ${state.relationshipState.juniorCount}，人际栏已满`}｜结果：${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1｜${mentorshipJuniorLabel}科研 +1｜${mentorshipJuniorLabel}默契 +2` : "｜未新增关系"}`
+          ? `条件：对方考研进组（50%）${canAddJunior ? "" : `；师弟师妹人数 ${state.relationshipState.juniorCount}，人际栏已满`}｜结果：${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1｜${mentorshipJuniorLabel}科研 +1｜${mentorshipJuniorLabel}${affinitySummary}` : "｜未新增关系"}`
           : `对方毕业（50%）｜${mentoringSanSummary}`,
         effects: becomesJunior
           ? {
@@ -115,7 +117,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
           ? [
               `你陪${mentorshipJuniorName}补对照、改草稿，一张表讲了几遍，水早凉了。等${mentorshipJuniorPronoun}能自己解释结果，你的任务却还停在原处。`,
               canAddJunior
-                ? `${mentorshipJuniorPronoun}决定考研进组：“谢谢${playerHonorific}，以后还得多请教。”辅导让${mentorshipJuniorLabel}科研 +1、与你的默契 +2；目前科研 ${guidedJunior.research}、默契 ${guidedJunior.affinity}。你多了一位${mentorshipJuniorLabel}，笔记里已有自己整理的问题。`
+                ? `${mentorshipJuniorPronoun}决定考研进组：“谢谢${playerHonorific}，以后还得多请教。”辅导让${mentorshipJuniorLabel}科研 +1、与你的${affinitySummary}；目前科研 ${guidedJunior.research}、默契 ${guidedJunior.affinity}。你多了一位${mentorshipJuniorLabel}，笔记里已有自己整理的问题。`
                 : `${mentorshipJuniorPronoun}决定考研进组，但关系栏已满，暂未记入人际栏。你整理好资料发回去，之后仍得各忙各的。`,
             ].join("\n\n")
           : [

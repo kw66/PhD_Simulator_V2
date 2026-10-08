@@ -138,7 +138,8 @@ describe("funding rewards from a separate closing project", () => {
     const expired = applyMonthlyEffects({ ...purchased, month: 8, totalMonths: 8 }).nextState;
     const noCoverage = applyMonthlyEffects({ ...purchased, buffs: purchased.buffs.filter((buff) => !buff.shopEffects?.aiCostsCovered), month: 8, totalMonths: 8 }).nextState;
     expect(expired.advisorProgressState).toEqual(noCoverage.advisorProgressState);
-    expect(expired.advisorProgressState.funding).toBe(initial.advisorProgressState.funding - 2);
+    expect(covered.advisorProgressState.funding).toBe(initial.advisorProgressState.funding - 1.5);
+    expect(expired.advisorProgressState.funding).toBe(initial.advisorProgressState.funding - 2 * 1.5);
     expect(hasAiReimbursement(expired)).toBe(false);
   });
 });

@@ -29,7 +29,7 @@ function selectHelpTarget(targets: HelpTarget[], type: FellowProgressProfile["ty
 
 export function advanceFellowCooperation(profile: FellowProgressProfile, amount: number, playerResearch: number): FellowProgressProfile {
   if (amount <= 0) return profile;
-  const progress = profile.taskProgress + Math.floor(amount);
+  const progress = profile.taskProgress + amount;
   const completed = Math.floor(progress / profile.taskMax);
   return {
     ...profile,
@@ -44,7 +44,7 @@ export function advanceFellowCooperationWithLog(state: GameState, fellowId: stri
   if (!profile || amount <= 0) return state;
   const progressed = advanceFellowCooperation(profile, amount, state.player.research);
   const nextState = { ...state, fellowProgressState: state.fellowProgressState.map((fellow) => fellow.id === fellowId ? progressed : fellow) };
-  const completed = Math.floor((profile.taskProgress + Math.floor(amount)) / profile.taskMax);
+  const completed = Math.floor((profile.taskProgress + amount) / profile.taskMax);
   if (completed <= 0) return nextState;
   const name = getFellowName(profile);
   const playerHelp = profile.pendingHelpToPlayer != null

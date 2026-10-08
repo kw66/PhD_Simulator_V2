@@ -70,20 +70,20 @@ describe("lab inheritance calendar through the dispatcher", () => {
     const september = dispatchAction(august, "next-month");
 
     expect(september).toMatchObject({ phase: "playing", year: 2, month: 1, totalMonths: 13 });
-    expect(september.player.research).toBe(7);
-    expect(september.loverProgressState).toMatchObject({ research: 8, lastAnnualGrowthTotalMonths: 12 });
+    expect(september.player.research).toBe(6 + 0.75);
+    expect(september.loverProgressState).toMatchObject({ research: 6 + 2 * 0.75, lastAnnualGrowthTotalMonths: 12 });
     const loverHistory = september.eventHistory.filter((entry) => entry.id.startsWith("talent:annual-research:lover:"));
     expect(loverHistory).toHaveLength(1);
     expect(loverHistory[0]).toMatchObject({ completedAtTotalMonths: 12, completedAtMonth: 12, completedAtYear: 1 });
     expect(loverHistory[0]!.stages[0]!.talentTrigger).toMatchObject({
-      recipient: "周明", effects: ["科研 +2（6→8）"], details: ["原始奖励：自然成长 +2；逐点抵抗并受科研上限限制"],
+      recipient: "周明", effects: ["科研 +1.5（6→7.5，抵抗0.5）"], details: ["原始奖励：自然成长 +2；逐点抵抗并受科研上限限制"],
     });
     expect(september.log.some((entry) => entry.eventHistoryId === loverHistory[0]!.id)).toBe(false);
     expect(september.loverProgressState.annualResearchActivity)
-      .toBe("第1学年末：科研 +2（6→8）；原始奖励：自然成长 +2");
+      .toBe("第1学年末：科研 +1.5（6→7.5，抵抗0.5）；原始奖励：自然成长 +2");
     expect(september.loverProgressState.monthlyActivity).toContain("学习进度");
-    expect(september.fellowProgressState.map((profile) => profile.research)).toEqual([9, 9, 12]);
-    expect(september.fellowProgressState.map((profile) => profile.annualResearchGrowthTotal ?? 0)).toEqual([3, 3, 2]);
+    expect(september.fellowProgressState.map((profile) => profile.research)).toEqual([8.25, 8.25, 11.5]);
+    expect(september.fellowProgressState.map((profile) => profile.annualResearchGrowthTotal ?? 0)).toEqual([2.25, 2.25, 1.5]);
     expect(september.fellowProgressState.every((profile) => profile.lastAnnualGrowthTotalMonths === 12)).toBe(true);
     const history = inheritanceHistory(september);
     expect(history.map((entry) => entry.id).sort()).toEqual([
@@ -94,11 +94,11 @@ describe("lab inheritance calendar through the dispatcher", () => {
       && entry.completedAtYear === 1 && entry.completedAtMonth === 12)).toBe(true);
     expect(history.map((entry) => entry.stages[0]!.talentTrigger)).toEqual([
       ...["同学0", "同学1"].map((recipient) => expect.objectContaining({
-        recipient, reason: "第1学年结束，结算年度科研成长", effects: ["科研 +3（6→9）"],
+        recipient, reason: "第1学年结束，结算年度科研成长", effects: ["科研 +2.25（6→8.25，抵抗0.75）"],
         details: ["原始奖励：自然成长 +2，实验室传承 +1，合计 +3；合并后逐点抵抗并受科研上限限制"],
       })),
-      expect.objectContaining({ recipient: "同学2", effects: ["科研 +2（10→12）"] }),
-      expect.objectContaining({ recipient: "你·林青", reason: "第1学年结束，结算年度科研成长", effects: ["科研 +1（6→7）"] }),
+      expect.objectContaining({ recipient: "同学2", effects: ["科研 +1.5（10→11.5，抵抗0.5）"] }),
+      expect.objectContaining({ recipient: "你·林青", reason: "第1学年结束，结算年度科研成长", effects: ["科研 +0.75（6→6.75，抵抗0.25）"] }),
     ]);
     const logs = inheritanceLogs(september);
     expect(logs).toHaveLength(1);
@@ -108,7 +108,7 @@ describe("lab inheritance calendar through the dispatcher", () => {
     expect(september.eventHistory.find((entry) => entry.id === logs[0]!.eventHistoryId))
       .toMatchObject({ completedAtYear: 1, completedAtMonth: 12, completedAtTotalMonths: 12 });
     expect(september.fellowProgressState[0]!.annualResearchActivity)
-      .toBe("第1学年末：科研 +3（6→9）；原始奖励：自然成长 +2、传承 +1");
+      .toBe("第1学年末：科研 +2.25（6→8.25，抵抗0.75）；原始奖励：自然成长 +2、传承 +1");
     expect(september.fellowProgressState[0]!.monthlyActivity).toBeTruthy();
     expectNoPublications(september);
     expectNoInheritance(august);
@@ -155,11 +155,11 @@ describe("lab inheritance calendar through the dispatcher", () => {
     expect(october).toMatchObject({ phase: "playing", year: 2, month: 2, totalMonths: 14 });
     expect(inheritanceHistory(september)).toHaveLength(4);
     for (const current of [worked, october]) {
-      expect(current.player.research).toBe(7);
-      expect(current.loverProgressState).toMatchObject({ research: 8, lastAnnualGrowthTotalMonths: 12 });
+      expect(current.player.research).toBe(6.75);
+      expect(current.loverProgressState).toMatchObject({ research: 7.5, lastAnnualGrowthTotalMonths: 12 });
       expect(current.eventHistory.filter((entry) => entry.id.startsWith("talent:annual-research:lover:")))
         .toEqual(september.eventHistory.filter((entry) => entry.id.startsWith("talent:annual-research:lover:")));
-      expect(current.fellowProgressState.map((profile) => profile.research)).toEqual([9, 9, 12]);
+      expect(current.fellowProgressState.map((profile) => profile.research)).toEqual([8.25, 8.25, 11.5]);
       expect(current.fellowProgressState.every((profile) => profile.lastAnnualGrowthTotalMonths === 12)).toBe(true);
       expect(inheritanceHistory(current)).toEqual(inheritanceHistory(september));
       expect(inheritanceLogs(current)).toEqual(inheritanceLogs(september));

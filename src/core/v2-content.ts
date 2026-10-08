@@ -177,7 +177,9 @@ export const ADVISOR_REQUIREMENTS: AdvisorRequirements = {
   phdGrad: 7,
 };
 
-export const ADVISOR_SALARY = { master: 1, phd: 3 } as const;
+export const ADVISOR_SALARY = { master: 1, phd: 2.5 } as const;
+export const ADVISOR_SALARY_BONUS = { master: 0.5, phd: 1 } as const;
+export const MONTHLY_LIVING_COST = 1;
 
 export const SCORE_BY_TARGET: Record<PaperTarget, number> = { C: 1, B: 2, A: 4 };
 export const PAPER_SLOT_RESEARCH_THRESHOLDS = [0, 6, 12, 18] as const;

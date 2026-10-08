@@ -159,8 +159,10 @@ function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOut
     id: `scholarship-decision-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 申报决定",
     description: [
-      `你翻出论文和证明材料，先给自己估了个分：这次能计入 ${context.score} 分。往年同年级的分数线在${range}，今年还要看大家提交的成果。`,
-      `本年度国奖奖金为 **${context.reward}金币**。整理证明材料、准备答辩PPT，再上台讲清自己的成果，少不了一番忙碌。你刚在心里列起购物清单，又赶紧叫停：答辩还没准备，钱倒先花上了。`,
+      `细则写着：${getScholarshipGradeLabel(state)}共 5 个名额，按科研积分排名，已用于获奖的论文不能再次计入。你核对成果，这次能计入 ${context.score} 分；往年同年级的分数线在${range}，今年还要看大家提交的成果。`,
+      `本年度国奖奖金为 **${context.reward}金币**。整理证明材料、准备答辩PPT，再上台讲清自己的成果，少不了一番忙碌。${context.score > 0
+        ? "你翻着手里的成果，已经在想奖金能添置些什么，又赶紧收住心：材料还没交，钱倒先花上了。"
+        : "申报表的成果栏还空着，你盯着光标看了一会儿，又看向桌边没写完的论文。"}没用于获奖的成果可以留到以后，不必这次就申报。`,
     ].join("\n\n"),
     chainId: "scholarship",
     stage: "act2",
@@ -219,10 +221,8 @@ function buildScholarshipIntroEvent(state: GameState, context: ScholarshipOutcom
     id: `scholarship-y${context.year}-m${context.month}`,
     title: "国奖评选",
     description: [
-      `晚上十点，学院发来“国奖评选启动”通知：${getScholarshipGradeLabel(state)}共 5 个名额，按科研积分排名。你翻出往年的获奖材料，今年的结果仍要等正式名单。用于获奖的论文不能再次计入。`,
-      "附件占了半屏，群里又在追问格式。" + (context.score > 0
-        ? "手里还有没用于获奖的成果，值得试试。准备材料费精力，暂不申报也能留到以后。"
-        : "翻过成果记录，这次还没有能计入的新积累。申报恐怕难入选，准备材料还得花精力。"),
+      "晚上十点，学院群弹出“国奖评选启动”的通知，紧接着是申报表、材料清单和答辩安排。原本安静的群一下热闹起来，消息很快刷过了屏幕。",
+      "你把手头的文档切到一旁，点开通知。附件占了半屏，有人找往年的模板，有人问盖章要去哪个办公室。你先把文件存进文件夹，再从头读起这次的评选细则。",
     ].join("\n\n"),
     chainId: "scholarship",
     choices: [

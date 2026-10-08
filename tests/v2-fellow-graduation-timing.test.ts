@@ -82,22 +82,22 @@ describe("fellow graduation timing through month advancement", () => {
   });
 
   it.each([
-    [3, 1, "master", 9, "master", 1],
-    [6, 7, "phd", 9, "phd", 3],
+    [3, 1, "master", 9, "master", 1 + 0.5],
+    [6, 7, "phd", 9, "phd", 2.5 + 1],
     [3, 1, "master", 10, null, 0],
     [6, 7, "phd", 10, null, 0],
-    [5, 7, "phd", 10, "phd", 3],
-    [2, 2, "master", 10, "phd", 3],
-    [3, 3, "master", 10, "phd", 3],
+    [5, 7, "phd", 10, "phd", 2.5 + 1],
+    [2, 2, "master", 10, "phd", 2.5 + 1],
+    [3, 3, "master", 10, "phd", 2.5 + 1],
   ] as const)("matches preview and actual payroll for year %s score %s %s in month %s", (academicYear, score, degree, month, nextDegree, salary) => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const state = makeState(academicYear, score, degree, month);
     const before = structuredClone(state);
     const payroll = getNextMonthLabPayroll(state);
     const preview = previewNextMonthEffects(state);
-    expect(payroll.total).toBe(3 + salary);
+    expect(payroll.total).toBe(2.5 + 1 + salary);
     expect(preview.items.find((item) => item.id === "advisor-salary")?.note)
-      .toBe(`学生工资：科研经费 -${payroll.total}`);
+      .toBeUndefined();
     expect(getNextMonthLabPayroll(state)).toEqual(payroll);
     expect(previewNextMonthEffects(state)).toEqual(preview);
     expect(state).toEqual(before);
@@ -106,5 +106,7 @@ describe("fellow graduation timing through month advancement", () => {
     expect(next.fellowProgressState[0]?.degree ?? null).toBe(nextDegree);
     expect(next.fellowProgressState[0]?.monthlySalaryPaid ?? 0).toBe(salary);
     expect(next.player.money).toBe(preview.player.money);
+    expect(next.player.money).toBe(state.player.money + 2.5 + 1 - 1);
+    expect(next.advisorProgressState.funding).toBe(state.advisorProgressState.funding - payroll.total);
   });
 });

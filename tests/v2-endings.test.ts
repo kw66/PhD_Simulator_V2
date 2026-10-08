@@ -346,7 +346,11 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
         if (helper === "fellow") expect(current.fellowProgressState[0]?.pendingHelpToPlayer).toBeNull();
       }
       for (const actionId of ["next-month", "force-next-month"] as const) {
-        const next = dispatchAction(current, actionId);
+        const awaitingPayment = dispatchAction(current, actionId);
+        expect(awaitingPayment.phase).toBe("playing");
+        expect(awaitingPayment.eventQueue.some((event) => event.journalFeePreview)).toBe(true);
+        expect(awaitingPayment.advisorProgressState.paidJournalPaperIds ?? []).not.toContain(state.papers[0]!.id);
+        const next = dispatchAction(resolveDueEvents(awaitingPayment), actionId);
         expect(next.advisorProgressState.paidJournalPaperIds).toContain(state.papers[0]!.id);
         expect(next).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
         expect(next.externalPublications).toHaveLength(1);
@@ -364,8 +368,10 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
     const next = dispatchAction({ ...state, totalResearchScore: Math.max(0, state.graduationScoreTarget! - 5) }, "select-paper", { paperId: state.papers[0]!.id });
     expect(next).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
     expect(next.externalPublications).toHaveLength(1);
-    expect(next.advisorProgressState.paidJournalPaperIds).toContain(state.papers[0]!.id);
-    expect(dispatchAction(resolveDueEvents(next), "next-month")).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
+    expect(next.advisorProgressState.paidJournalPaperIds ?? []).not.toContain(state.papers[0]!.id);
+    const paid = resolveDueEvents(next);
+    expect(paid.advisorProgressState.paidJournalPaperIds).toContain(state.papers[0]!.id);
+    expect(dispatchAction(paid, "next-month")).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
   });
 
   it.each([

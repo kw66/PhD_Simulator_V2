@@ -1,6 +1,7 @@
 import { addOrReplaceBuffs, advanceBuffDurations, getActiveBuffs, removeBuffs } from "./v2-buffs";
 import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipStatus } from "./v2-internship-system";
 import { getLabPayroll, settleLabPayroll } from "./v2-lab-payroll";
+import { MONTHLY_LIVING_COST } from "./v2-content";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { roundMoney } from "./v2-money";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
@@ -76,12 +77,21 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
   });
 
   if (state.selectedAdvisorName && state.totalMonths > 1) {
+    const payroll = getLabPayroll(state);
     effects.push({
       id: "advisor-salary",
       name: "学生工资",
       source: "导师待遇",
-      stats: { money: getLabPayroll(state).player.payment },
-      note: `学生工资：科研经费 -${getLabPayroll(state).total}`,
+      stats: { money: payroll.player.payment },
+    });
+  }
+
+  if (state.totalMonths > 1) {
+    effects.push({
+      id: "living-cost",
+      name: "生活费",
+      source: "基础规则",
+      stats: { money: -MONTHLY_LIVING_COST },
     });
   }
 

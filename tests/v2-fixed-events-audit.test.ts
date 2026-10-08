@@ -42,12 +42,13 @@ describe("audited fixed-event rules", () => {
     expect([2, 3, 4, 5].map(getScholarshipReward)).toEqual([6, 6, 9, 9]);
   });
 
-  it("hints at scholarship eligibility without revealing the hidden cutoff", () => {
+  it("introduces scholarship applications before showing policy and eligibility in the decision", () => {
     const event = createScholarshipEvent(playingState({ year: 2, month: 2, totalMonths: 14 }), () => 0);
-    expect(event.description).toContain("往年的获奖材料");
-    expect(event.description).toContain("今年的结果仍要等正式名单");
+    expect(event.description).toContain("国奖评选启动");
+    expect(event.description).toContain("申报表、材料清单和答辩安排");
     expect(event.description).not.toMatch(/分数线.*\d|[≥≤<>]/u);
-    expect(event.description).toContain("用于获奖的论文不能再次计入");
+    expect(event.description).not.toMatch(/能计入|难入选|值得试试|不能再次计入/);
+    expect(event.choices[0]?.effects.enqueueEvents?.[0]?.description).toContain("用于获奖的论文不能再次计入");
     expect(event.description).not.toContain("积分页面");
     expect(event.choices.map((choice) => choice.label)).toEqual(["继续"]);
     expect(event.choices[0]?.effects.san).toBeUndefined();
@@ -208,16 +209,16 @@ describe("audited fixed-event rules", () => {
     expect(counts).toEqual([30, 30, 40]);
   });
 
-  it.each([[5, 0, 1, 1], [6, 0.1, 0, 2], [6, 0.9, 1, 2], [20, 0.9, 0, 2]])(
-    "settles reunion social %s exactly once with resistance roll %s",
-    (social, resistanceRoll, gain, rollCount) => {
+  it.each([[5, 0, 1], [6, 0.1, 0.75], [6, 0.9, 0.75], [12, 0.9, 0.5], [18, 0.9, 0.25], [20, 0.9, 0]])(
+    "settles reunion social %s exactly once without consuming unused roll %s",
+    (social, unusedRoll, gain) => {
       const initial = playingState();
       const state = { ...initial, player: { ...initial.player, social, san: 10 } };
-      const rolls = [0.1, resistanceRoll];
+      const rolls = [0.1, unusedRoll];
       const random = vi.fn(() => rolls.shift() ?? 0);
       const resolution = resolveWinterVacationFixedEvent(state, { kind: "winter-vacation-rest" }, random)!;
       expect(resolution.nextState).toBe(state);
-      expect(random).toHaveBeenCalledTimes(rollCount);
+      expect(random).toHaveBeenCalledTimes(1);
       const result = resolution.enqueueEvents![0]!;
       expect(result.description).toContain(`社交 +${gain}`);
       expect(result.description).not.toContain("抵抗概率");
@@ -225,7 +226,7 @@ describe("audited fixed-event rules", () => {
       expect(settled.player.social).toBe(social + gain);
       expect(settled.player.money).toBe(state.player.money + 2);
       expect(settled.player.san).toBe(12);
-      expect(random).toHaveBeenCalledTimes(rollCount);
+      expect(random).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -428,8 +429,8 @@ describe("audited fixed-event rules", () => {
     const socialResult = resolveYearSummaryFixedEvent(state, { kind: "year-summary-social" }, () => 0.99);
     const favorResult = resolveYearSummaryFixedEvent(state, { kind: "year-summary-favor" }, () => 0.99);
     const partTimeResult = resolveYearSummaryFixedEvent(state, { kind: "year-summary-part-time" }, () => 0);
-    expect(socialResult?.enqueueEvents?.[0]?.choices[0]?.effects.social).toBe(1);
-    expect(favorResult?.enqueueEvents?.[0]?.choices[0]?.effects.favor).toBe(1);
+    expect(socialResult?.enqueueEvents?.[0]?.choices[0]?.effects.social).toBe(0.75);
+    expect(favorResult?.enqueueEvents?.[0]?.choices[0]?.effects.favor).toBe(0.75);
     expect(partTimeResult?.outcome).toContain("兼职攒下一笔钱");
     expect(partTimeResult?.enqueueEvents?.[0]?.choices[0]?.effects.money).toBe(3);
   });

@@ -341,14 +341,14 @@ describe("v2 shop transactions", () => {
     expect(state.aiShopState.subscriptions.doubao.modelId).toBe(doubaoModel.id);
     expect(state.aiShopState.subscriptions.gpt.active).toBe(false);
     expect(state.aiShopState.subscriptions.gpt.paused).toBe(true);
-    expect(state.player.money).toBe(initial.player.money + 1);
+    expect(state.player.money).toBe(initial.player.money + 1 - 1);
   });
 
   it("keeps the combined coffee and AI subscription preview equal to actual month-start charges", () => {
     const initial = admittedState();
     const state = {
       ...initial,
-      player: { ...initial.player, money: 3 },
+      player: { ...initial.player, money: 4 },
       eventQueue: [],
       coffeeState: {
         ...initial.coffeeState,
@@ -366,6 +366,7 @@ describe("v2 shop transactions", () => {
     const preview = previewNextMonthEffects(state);
     const advanced = dispatchAction(state, "next-month");
     expect(advanced.player.money).toBe(preview.player.money);
+    expect(advanced.player.money).toBe(state.player.money + 1 - 1 - 2 - 2);
     expect(advanced.coffeeState.machineTrackedCoffeeCount).toBe(1);
     expect(advanced.coffeeState.coffeePurchaseCountThisMonth).toBe(1);
     expect(advanced.coffeeState.coffeeProducedCountThisMonth).toBe(1);

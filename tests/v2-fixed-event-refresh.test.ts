@@ -47,16 +47,20 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     expect(state.log[0]!.text).toContain("金币 +4");
   });
 
-  it("rechecks reunion resistance using the saved roll when the social tier changes", () => {
+  it.each([[5.5, 1], [6, 0.75], [11.5, 0.75], [12, 0.5], [17.5, 0.5], [18, 0.25]])(
+    "rechecks deterministic reunion resistance at current social %s", (social, gain) => {
     let state = start("winter-vacation", 0.1);
     state = { ...state, player: { ...state.player, social: 5 } };
     state = choose(choose(state));
     expect(state.eventQueue[0]!.description).toContain("社交 +1");
-    state = refreshPendingEventDecisions({ ...state, player: { ...state.player, social: 6 } });
-    expect(state.eventQueue[0]!.description).toContain("社交 +0（抵抗1）");
+    const random = vi.mocked(Math.random);
+    random.mockClear();
+    state = refreshPendingEventDecisions({ ...state, player: { ...state.player, social } });
+    expect(state.eventQueue[0]!.description).toContain(`社交 +${gain}`);
     expect(state.eventQueue[0]!.description).not.toContain("抵抗概率");
+    expect(random).not.toHaveBeenCalled();
     state = choose(state);
-    expect(state.player.social).toBe(6);
+    expect(state.player.social).toBe(social + gain);
     expect(state.player.money).toBe(22);
   });
 
@@ -77,8 +81,8 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     let state = choose(start("year-summary", 0.1));
     state = choose(state, "-social-");
     state = refreshPendingEventDecisions({ ...state, player: { ...state.player, social: 6 } });
-    expect(state.eventQueue[0]!.description).toContain("社交 +0（抵抗1）");
-    expect(choose(state).player.social).toBe(6);
+    expect(state.eventQueue[0]!.description).toContain("社交 +0.75");
+    expect(choose(state).player.social).toBe(6.75);
     state = choose(start("ccig"));
     state = choose(state, "-self-");
     expect(state.eventQueue[0]!.description).toContain("金币 -2");
@@ -94,7 +98,7 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     state = choose(state, "transfer-phd");
     expect(state.eventQueue[0]!.title).toContain("转博失败");
     state = refreshPendingEventDecisions({ ...state, totalResearchScore: 2 });
-    expect(state.eventQueue[0]!.description).toContain("转为博士");
+    expect(state.eventQueue[0]!.description).toContain("学院确认了你的转博资格");
     expect(state.degree).toBe("master");
     state = choose(state);
     expect(state.degree).toBe("phd");

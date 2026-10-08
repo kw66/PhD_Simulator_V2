@@ -69,7 +69,7 @@ describe("v2 conference activity", () => {
     expect(root.description).toContain(`论文2：《${titles[1]}》`);
     expect(root.description).not.toContain("倍率");
     const selection = root.choices[0]!.effects.enqueueEvents![0]!;
-    expect(selection.description).not.toContain("注册费");
+    expect(selection.description).toContain("注册费每篇 1 金币，本次需缴 2 篇，由导师科研经费支付");
     const result = selection.choices.find((choice) => choice.id === "self")!.effects.enqueueEvents![0]!;
     expect(result.description).toContain("论文1：Oral 展示完成，会后引用倍率 ×1.50");
     expect(result.description).toContain("论文2：Poster 展示完成");
@@ -271,7 +271,7 @@ describe("v2 conference activity", () => {
     );
     const cooperationChoice = options.find((option) => option.id === "big-bull-coop");
 
-    expect(cooperationChoice?.effects.social).toBe(1);
+    expect(cooperationChoice?.effects.social).toBe(0.75);
     expect(cooperationChoice?.effects.temporaryActionEffectUpdates).toEqual({
       writing: { bonus: 8 },
     });

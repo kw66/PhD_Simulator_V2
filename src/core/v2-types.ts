@@ -503,6 +503,8 @@ export interface EventChoice {
     researchCapacityStateDeltas?: Partial<Record<keyof ResearchCapacityState, number>>;
     advisorProgressStateDeltas?: Partial<Pick<AdvisorProgressState, "researchAccumulation" | "funding">>;
     recordPlayerConferenceTrip?: string;
+    recordConferenceRegistrationPayment?: string[];
+    recordJournalFeePayment?: string;
     advisorGrantResult?: AdvisorGrantApplication;
     labProjectProgress?: {
       type: "horizontal" | "vertical";
@@ -592,6 +594,11 @@ export interface PendingEvent {
     context: ConferenceEventContext;
     rolls: number[];
     mode?: "self" | "advisor" | "proxy";
+  };
+  journalFeePreview?: {
+    paperId: string;
+    stage: "act1" | "act2" | "act3";
+    paymentMode?: "self" | "advisor";
   };
   randomReplay?: {
     eventId: number;

@@ -159,44 +159,40 @@ export function formatTierResistedOutcome(
 ): string {
   const actual = result.effectiveChange;
   const signedActual = formatSignedEffectChange(actual, rawChange);
-  const details: string[] = [];
-  if (result.resistedCount > 0) details.push(`抵抗${result.resistedCount}`);
-  if (result.cappedCount && rawChange > 0) details.push("上限");
-  const detailText = details.length > 0 ? `（${details.join("；")}）` : "";
+  const detailText = result.cappedCount && rawChange > 0 ? "（上限）" : "";
   return `${label} ${signedActual}${detailText}`;
 }
 
 export function applyTierResist(
   rawChange: number,
   currentValue: number,
-  getRoll: () => number = Math.random,
+  _getRoll: () => number = Math.random,
   maximumValue = 20,
 ): { effectiveChange: number; resistedCount: number; cappedCount?: number } {
   if (rawChange === 0) {
     return { effectiveChange: 0, resistedCount: 0 };
   }
 
-  // Each point reads the tier of the value left by the previous point, so a
-  // batch that crosses 6 / 12 / 18 changes resist chance mid-way (both ways).
-  const absChange = Math.abs(rawChange);
+  const round = (amount: number): number => Number(amount.toFixed(10));
+  const absChange = round(Math.abs(rawChange));
   const sign = rawChange > 0 ? 1 : -1;
   let value = currentValue;
+  let effectiveChange = 0;
   let resistedCount = 0;
   let cappedCount = 0;
   for (let index = 0; index < absChange; index += 1) {
-    const resistChance = getTierResistChance(value);
-    if (resistChance > 0 && getRoll() < resistChance) {
-      resistedCount += 1;
-    } else if (sign > 0 && value + 1 > maximumValue) {
-      cappedCount += 1;
-    } else {
-      value += sign;
-    }
+    const rawStep = round(Math.min(1, absChange - index));
+    const resisted = round(rawStep * getTierResistChance(value));
+    const retained = round(rawStep - resisted);
+    const applied = sign > 0 ? round(Math.min(retained, Math.max(0, maximumValue - value))) : retained;
+    resistedCount = round(resistedCount + resisted);
+    cappedCount = round(cappedCount + retained - applied);
+    effectiveChange = round(effectiveChange + sign * applied);
+    value = round(currentValue + effectiveChange);
   }
 
-  const finalCount = absChange - resistedCount - cappedCount;
   return {
-    effectiveChange: finalCount === 0 ? 0 : finalCount * sign,
+    effectiveChange: effectiveChange === 0 ? 0 : effectiveChange,
     resistedCount,
     ...(cappedCount > 0 ? { cappedCount } : {}),
   };

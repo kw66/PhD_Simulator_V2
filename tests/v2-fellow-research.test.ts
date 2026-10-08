@@ -348,6 +348,7 @@ describe("fellow reciprocal cooperation", () => {
 
   it("engine creates fellow papers on joining and advances through the real month pipeline", () => {
     const base = { ...createStartedGameState("normal"), totalMonths: 1, month: 1, year: 1, eventQueue: [] };
+    base.selectedAdvisorName = "测试导师";
     const joined = dispatchAction(base, "debug-add-relationship", { debugRelationshipType: "peer" });
     expect(joined.fellowPapers).toHaveLength(1);
     const next = dispatchAction(joined, "next-month");

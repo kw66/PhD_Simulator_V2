@@ -2,20 +2,28 @@ import { getAdvisorGuidanceAmount, queueAdvisorGuidance, settleAdvisorGuidance }
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { creditFellowMoney, ensureFellowFinanceAccounts, getFellowFinanceAccount } from "./v2-fellow-finance";
 import { roundMoney } from "./v2-money";
-import type { GameState } from "./v2-types";
+import type { AdvisorProgressState, GameState } from "./v2-types";
 
 export const PROJECT_PROGRESS_MAX = 100;
-export const ADVISOR_HORIZONTAL_REWARD = 60;
-export const PROJECT_LABOR_REWARD = 5;
+const HORIZONTAL_REWARD_BY_RANK = [50, 60, 70, 80, 90, 100] as const;
+const PROJECT_LABOR_SHARE = 0.05;
 export const LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD = 60;
 export type LabProjectType = "horizontal" | "vertical";
+
+function getAdvisorRankIndex(advisor: AdvisorProgressState): number {
+  const grantOrder = ["youth", "general", "excellent", "distinguished", "academician"] as const;
+  return grantOrder.reduce((highest, id, index) => advisor.awards.some((award) => award.id === id) ? index : highest, -1) + 1;
+}
+
+export function getAdvisorHorizontalReward(advisor: AdvisorProgressState): number {
+  return HORIZONTAL_REWARD_BY_RANK[getAdvisorRankIndex(advisor)]!;
+}
 
 export function advanceSharedLabProject(
   state: GameState,
   type: LabProjectType,
   amount: number,
   random: () => number = Math.random,
-  contributorId?: string,
 ): { state: GameState; gain: number; completed: number } {
   const gain = Math.max(0, Math.floor(amount));
   if (state.phase !== "playing" || gain === 0) return { state, gain: 0, completed: 0 };
@@ -23,33 +31,28 @@ export function advanceSharedLabProject(
   const field = type === "horizontal" ? "horizontalProgress" : "verticalProgress";
   const total = (state.advisorProgressState[field] ?? 0) + gain;
   const completed = Math.floor(total / PROJECT_PROGRESS_MAX);
-  let contributors = new Set(state.advisorProgressState.horizontalContributorIds ?? []);
-  if (type === "horizontal" && contributorId) contributors.add(contributorId);
   let nextState: GameState = {
     ...state,
-    advisorProgressState: { ...state.advisorProgressState, [field]: total % PROJECT_PROGRESS_MAX,
-      ...(type === "horizontal" ? { horizontalContributorIds: [...contributors] } : {}),
-    },
+    advisorProgressState: { ...state.advisorProgressState, [field]: total % PROJECT_PROGRESS_MAX },
   };
   for (let index = 0; index < completed; index += 1) {
     let completionSummary: string;
     if (type === "horizontal") {
-      const laborCost = PROJECT_LABOR_REWARD * (contributors.size + 1);
-      const recipientNames = [...contributors].map((id) => getFellowFinanceAccount(nextState, id).name);
-      for (const id of contributors) nextState = creditFellowMoney(nextState, id, PROJECT_LABOR_REWARD);
+      const reward = getAdvisorHorizontalReward(nextState.advisorProgressState);
+      const laborReward = roundMoney(reward * PROJECT_LABOR_SHARE);
+      const recipients = nextState.fellowProgressState;
+      const laborCost = roundMoney(laborReward * (recipients.length + 1));
+      const recipientNames = recipients.map((profile) => getFellowFinanceAccount(nextState, profile.id).name);
+      for (const profile of recipients) nextState = creditFellowMoney(nextState, profile.id, laborReward);
       nextState = {
         ...nextState,
-        player: { ...nextState.player, money: roundMoney(nextState.player.money + PROJECT_LABOR_REWARD) },
+        player: { ...nextState.player, money: roundMoney(nextState.player.money + laborReward) },
         advisorProgressState: {
           ...nextState.advisorProgressState,
-          funding: roundMoney(nextState.advisorProgressState.funding + ADVISOR_HORIZONTAL_REWARD - laborCost),
+          funding: roundMoney(nextState.advisorProgressState.funding + reward - laborCost),
         },
       };
-      completionSummary = `科研经费 +${ADVISOR_HORIZONTAL_REWARD}，科研经费 -${laborCost}（劳务费）；金币 +${PROJECT_LABOR_REWARD}${recipientNames.length ? `；${recipientNames.join("、")}各领${PROJECT_LABOR_REWARD}金币` : ""}`;
-      contributors = new Set(contributorId ? [contributorId] : []);
-      nextState = { ...nextState, advisorProgressState: { ...nextState.advisorProgressState,
-        horizontalContributorIds: index === completed - 1 && total % PROJECT_PROGRESS_MAX === 0 ? [] : [...contributors],
-      } };
+      completionSummary = `科研经费 +${reward}，科研经费 -${laborCost}（劳务费）；金币 +${laborReward}${recipientNames.length ? `；${recipientNames.join("、")}各领${laborReward}金币` : ""}`;
     } else {
       nextState = settleAdvisorGuidance(nextState, random);
       const accumulation = nextState.advisorProgressState.researchAccumulation;

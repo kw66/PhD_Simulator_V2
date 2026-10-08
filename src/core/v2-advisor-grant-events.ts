@@ -8,20 +8,17 @@ export interface AdvisorGrantResultContext {
   success: boolean;
   successChance: number;
   rank: string;
-  previousSalary: number;
-  salary: number;
 }
 
 export function createAdvisorGrantResultEvent(context: AdvisorGrantResultContext): PendingEvent {
-  const { application, grantName, success, funding, rank, previousSalary, salary } = context;
+  const { application, grantName, success, funding, rank } = context;
   const academician = application.id === "academician";
   const title = academician ? "导师增选结果" : "基金结果";
   const chainId = `advisor-grant-${application.calendarYear}-${application.id}`;
-  const salaryGain = salary - previousSalary;
   const resultPercent = Number(((success ? context.successChance : 1 - context.successChance) * 100).toFixed(1));
   const condition = `条件：科研积累 ${application.researchSnapshot}；${success ? "获批" : "未获批"}（${resultPercent}%）`;
   const settlement = success
-    ? [`科研经费 +${funding}`, `导师晋升${rank}`, ...(salaryGain > 0 ? [`每月补助 +${salaryGain}`] : [])].join("；")
+    ? [`科研经费 +${funding}`, `导师晋升${rank}`].join("；")
     : "无事发生";
   const result = createFixedEvent({
     id: `${chainId}-result`,
@@ -33,7 +30,7 @@ export function createAdvisorGrantResultEvent(context: AdvisorGrantResultContext
           academician
             ? "组会还没开始，导师先把手机放到桌上，笑着说：“名单出了，我当选了。”你跟着大家鼓掌，忽然觉得前阵子反复核对的那几页成果清单，终于有了点分量。"
             : `组会刚坐下，导师就笑着宣布：“系统里查到结果了，今年的${grantName}中了，大家这阵子辛苦了。”你跟着鼓掌，脑子里先闪过的不是项目名称，而是那张改到看不出第一版模样的技术路线图。`,
-          `导师接着说，${academician ? "下个月按新标准发补助" : `自己也评上了${rank}，下个月按新标准发补助`}。经费到账后，实验室总算宽裕了一些。你和旁边的同学对视一眼：横向的活，暂时可以少赶一点了。`,
+          `导师接着说，${academician ? "最近来谈合作的单位也多了" : `自己也评上了${rank}，最近来谈合作的单位也多了`}。经费到账后，实验室总算宽裕了一些，往后接横向项目也更有底气。你和旁边的同学对视一眼，手里的实验总算能接着跑了。`,
         ].join("\n\n")
       : [
           academician

@@ -1,5 +1,5 @@
 import { getAiModelForTotalMonths, polishUnsubmittedPapers, type AiModelOffer } from "./v2-ai-shop";
-import { creditFellowMoney, getFellowFinanceAccount } from "./v2-fellow-finance";
+import { creditFellowMoney, getFellowFinanceAccount, getFellowSpendableMoney } from "./v2-fellow-finance";
 import { getLabExperimentMoneyCost } from "./v2-lab-compute";
 import { roundMoney } from "./v2-money";
 import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
@@ -32,7 +32,7 @@ export function scoreFellowAiModel(paper: Paper, field: PaperActionType, researc
 }
 
 export function getFellowAiBudget(state: GameState, fellowId: string): number {
-  return Math.max(0, roundMoney(getFellowFinanceAccount(state, fellowId).money
+  return Math.max(0, roundMoney(getFellowSpendableMoney(state, fellowId)
     - getLabExperimentMoneyCost(state)));
 }
 

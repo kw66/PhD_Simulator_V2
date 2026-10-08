@@ -65,6 +65,7 @@ describe("recruitment random stream isolation", () => {
       { social: 6, favor: 5, research: 10 },
       { social: 12, favor: 6, research: 12 },
       { social: 18, favor: 18, research: 18 },
+      { social: 6.75, favor: 12.5, research: 18.25 },
     ]) {
       const changed = { ...queued, player: { ...queued.player, ...stats } };
       const refreshed = getResolvableQueuedEvent(changed, JSON.parse(JSON.stringify(queued.eventQueue[0])));

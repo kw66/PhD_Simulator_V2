@@ -302,6 +302,7 @@ describe("lover shopping gifts", () => {
 
   it("keeps repeated quote, render and monthly previews pure", () => {
     const state = fullyEquipped();
+    state.player.money = 1;
     const before = structuredClone(state);
     for (let repeat = 0; repeat < 2; repeat += 1) {
       expect(getLoverGiftQuote(state, 2, true)).toEqual({ price: 0, usesGift: true });
@@ -366,6 +367,7 @@ describe("lover shopping gifts", () => {
 
   it("keeps preview and actual gift fallback consistent without spending input coupons", () => {
     const state = fullyEquipped();
+    state.player.money = 1;
     state.loverProgressState.giftCoupons = 3;
     const before = structuredClone(state);
     const first = previewNextMonthEffects(state);

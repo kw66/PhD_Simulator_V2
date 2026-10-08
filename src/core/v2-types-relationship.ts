@@ -84,7 +84,6 @@ export interface AdvisorGrantApplication {
 }
 
 export interface AdvisorProgressState {
-  horizontalContributorIds?: string[];
   researchAccumulation: number;
   funding: number;
   horizontalProgress?: number;

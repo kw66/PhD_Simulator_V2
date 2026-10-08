@@ -37,8 +37,8 @@ describe("new advisor project economy", () => {
   it("pays horizontal rewards only when the 100-point project completes", () => {
     const before = state({ advisorProgressState: { ...createAdvisorProgressState(), horizontalProgress: 99 } });
     const next = advanceAdvisorProject(before, "horizontal", () => 0);
-    expect(next.advisorProgressState.funding).toBe(85);
-    expect(next.player.money).toBe(5);
+    expect(next.advisorProgressState.funding).toBe(before.advisorProgressState.funding + 50 - 2.5);
+    expect(next.player.money).toBe(before.player.money + 2.5);
     expect(next.advisorProgressState.horizontalProgress).toBe(19);
   });
 

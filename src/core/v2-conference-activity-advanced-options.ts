@@ -1,4 +1,5 @@
 import { createLoverState } from "./v2-lover-system";
+import { resolveConferenceActivityAttributes } from "./v2-conference-activity-shared";
 import type {
   ConferenceActivityBuildState,
   ConferenceActivityOptionDefinition,
@@ -6,6 +7,7 @@ import type {
 
 export function createAdvancedConferenceActivityOptions(
   state: ConferenceActivityBuildState,
+  getRoll: () => number = Math.random,
 ): ConferenceActivityOptionDefinition[] {
   const options: ConferenceActivityOptionDefinition[] = [];
   const loverState = state.loverState ?? createLoverState();
@@ -162,5 +164,5 @@ export function createAdvancedConferenceActivityOptions(
     });
   }
 
-  return options;
+  return options.map((option) => resolveConferenceActivityAttributes(option, state, getRoll));
 }

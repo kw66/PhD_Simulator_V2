@@ -1,3 +1,5 @@
+import { getResearchCap } from "./v2-research-cap-system";
+import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
 import type {
   ConferenceCareerState,
   ConferenceEncounterState,
@@ -7,6 +9,7 @@ import type {
   PaperAcceptType,
   PaperTarget,
   RelationshipState,
+  ResearchCapacityState,
 } from "./v2-types";
 
 export interface ConferencePaperPresentation {
@@ -47,6 +50,7 @@ export function getConferenceActivityChainId(context: Pick<ConferenceActivityCon
 export interface ConferenceActivityBuildState {
   research: number;
   social: number;
+  researchCapacityState?: ResearchCapacityState;
   relationshipState: RelationshipState;
   conferenceEncounterState: ConferenceEncounterState;
   conferenceCareerState: ConferenceCareerState;
@@ -60,6 +64,27 @@ export interface ConferenceActivityOptionDefinition {
   outcome: string;
   resultDescription: string;
   effects: EventChoice["effects"];
+}
+
+export function resolveConferenceActivityAttributes(
+  option: ConferenceActivityOptionDefinition,
+  state: ConferenceActivityBuildState,
+  getRoll: () => number = Math.random,
+): ConferenceActivityOptionDefinition {
+  const effects = { ...option.effects };
+  let outcome = option.outcome;
+  for (const attribute of ["research", "social"] as const) {
+    const rawChange = effects[attribute];
+    if (rawChange === undefined) continue;
+    const maximum = attribute === "research" && state.researchCapacityState
+      ? getResearchCap(state.researchCapacityState) : 20;
+    const result = applyTierResist(rawChange, state[attribute], getRoll, maximum);
+    const label = attribute === "research" ? "科研" : "社交";
+    effects[attribute] = result.effectiveChange;
+    outcome = outcome.replace(`${label} ${rawChange >= 0 ? "+" : ""}${rawChange}`,
+      formatTierResistedOutcome(label, rawChange, result));
+  }
+  return { ...option, effects, outcome };
 }
 
 export function getConferenceGradeLabel(grade: PaperTarget): string {

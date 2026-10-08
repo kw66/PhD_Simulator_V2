@@ -44,7 +44,7 @@ describe("June transfer priority", () => {
     expect(skipped).toMatchObject({ phase: "finished", ending: "master", totalMonths: 34, degree: "master", maxMonths: 34 });
     expect(skipped.eventQueue).toHaveLength(0);
     const decision = chooseTransferStage(june);
-    expect(decision.eventQueue.find((event) => event.chainId === "phd-decision")?.description).toContain("今年转博需要达到 3 分");
+    expect(june.eventQueue.find((event) => event.chainId === "phd-decision")?.description).toContain("今年转博需要达到 3 分");
     const result = chooseTransferStage(decision, choice);
     expect(result).toMatchObject({ phase: "playing", ending: null, degree: "master", maxMonths: 34 });
     expect(result.eventQueue.find((event) => event.chainId === "phd-decision")?.stage).toBe("result");
@@ -65,7 +65,7 @@ describe("June transfer priority", () => {
     const june = dispatchAction({ ...makeState(21), totalResearchScore: score }, "next-month");
     expect(june).toMatchObject({ phase: "playing", ending: null, totalMonths: 22, year: 2, month: 10 });
     const decision = chooseTransferStage(june);
-    expect(decision.eventQueue.find((event) => event.chainId === "phd-decision")?.description).toContain("今年转博需要达到 2 分");
+    expect(june.eventQueue.find((event) => event.chainId === "phd-decision")?.description).toContain("今年转博需要达到 2 分");
     const settled = chooseTransferStage(chooseTransferStage(decision, "transfer-phd"));
     expect(settled).toMatchObject({
       phase: "playing", ending: null, totalMonths: 22,

@@ -146,7 +146,7 @@ describe("v2 before grad school events", () => {
     expect(advisorInfo.description).not.toContain("科研资源");
     expect(advisorInfo.description).not.toContain("项目任务倍率");
     expect(advisorInfo.description).not.toContain("做项目消耗 SAN");
-    expect(advisorInfo.description).toContain("工资：硕士 1 金币｜博士 3 金币");
+    expect(advisorInfo.description).toContain("工资：硕士 1 金币｜博士 2.5 金币");
     expect(advisorInfo.description).toContain("科研分：论文录用，C 类 +1｜B 类 +2｜A 类 +4");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分");
     expect(advisorInfo.description).toContain("毕业：硕士 1 分｜博士 7 分\n转博士：第 2 年 2 分｜第 3 年 3 分");

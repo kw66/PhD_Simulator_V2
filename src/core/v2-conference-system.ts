@@ -1,5 +1,5 @@
 import { applyTierResist, getTierResistedNarrative } from "./v2-sanity-rules";
-import { CONFERENCE_TRAVEL_FEES } from "./v2-publication-fees";
+import { CONFERENCE_REGISTRATION_FEE, CONFERENCE_TRAVEL_FEES } from "./v2-publication-fees";
 import type { EventCounters, EventSupportState, ShopState } from "./v2-types";
 
 export type ConferenceRegionId = "domestic" | "asia" | "west";
@@ -9,7 +9,6 @@ export type ConferenceCostResource = "money" | "favor";
 export interface ConferenceBaseCosts {
   selfPay: number;
   advisorCost: number;
-  proxyCost: number;
 }
 
 export interface ConferenceDecisionInput {
@@ -22,7 +21,6 @@ export interface ConferenceDecisionInput {
   eventCounters: EventCounters;
   paperCount?: number;
   travelAlreadyPaid?: boolean;
-  hasFellowAtConference?: boolean;
 }
 
 export interface ConferenceDecisionCost {
@@ -37,12 +35,12 @@ export interface ConferenceDecisionCost {
 
 export function getConferenceBaseCosts(region: ConferenceRegionId): ConferenceBaseCosts {
   if (region === "domestic") {
-    return { selfPay: CONFERENCE_TRAVEL_FEES.domestic, advisorCost: 1, proxyCost: 1 };
+    return { selfPay: CONFERENCE_TRAVEL_FEES.domestic, advisorCost: 1 };
   }
   if (region === "asia") {
-    return { selfPay: CONFERENCE_TRAVEL_FEES.asia, advisorCost: 2, proxyCost: 1 };
+    return { selfPay: CONFERENCE_TRAVEL_FEES.asia, advisorCost: 2 };
   }
-  return { selfPay: CONFERENCE_TRAVEL_FEES.west, advisorCost: 3, proxyCost: 1 };
+  return { selfPay: CONFERENCE_TRAVEL_FEES.west, advisorCost: 3 };
 }
 
 export function resolveConferenceDecisionCost(
@@ -51,13 +49,15 @@ export function resolveConferenceDecisionCost(
 ): ConferenceDecisionCost {
   const baseCosts = getConferenceBaseCosts(input.region);
   const attendanceCost = input.travelAlreadyPaid ? 0 : baseCosts.selfPay;
+  const registrationCost = Math.max(0, Math.floor(input.paperCount ?? 1)) * CONFERENCE_REGISTRATION_FEE;
+  const totalCost = registrationCost + attendanceCost;
 
   if (input.mode === "self") {
     return {
       mode: input.mode,
       resource: "money",
       actualCost: attendanceCost,
-      fundingCost: 0,
+      fundingCost: registrationCost,
       meetingDiscount: 0,
       countsAsMeeting: true,
     };
@@ -70,7 +70,7 @@ export function resolveConferenceDecisionCost(
       mode: input.mode,
       resource: "favor",
       actualCost,
-      fundingCost: attendanceCost,
+      fundingCost: totalCost,
       meetingDiscount: 0,
       countsAsMeeting: true,
       resistanceNarrative: getTierResistedNarrative("导师好感", -baseCosts.advisorCost, favorResult),
@@ -80,8 +80,8 @@ export function resolveConferenceDecisionCost(
   return {
     mode: input.mode,
     resource: "money",
-    actualCost: input.hasFellowAtConference ? 0 : baseCosts.proxyCost,
-    fundingCost: 0,
+    actualCost: 0,
+    fundingCost: registrationCost,
     meetingDiscount: 0,
     countsAsMeeting: false,
   };

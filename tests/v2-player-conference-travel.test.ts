@@ -48,17 +48,18 @@ describe("player conference travel across paper batches", () => {
         const saved = JSON.parse(JSON.stringify(first)) as GameState;
         const queued = queueBatch({ ...saved, totalMonths: 5, month: 5 }, "second", { region, paperCount: 2, paperIds: ["second-1", "second-2"] });
         const decision = choose(queued);
-        expect(decision.eventQueue[0]!.description).toContain("本次 0 金币");
+        expect(decision.eventQueue[0]!.description).toContain("差旅 0 金币");
         const pending = choose(decision, secondMode);
         expect(pending.player.money).toBe(first.player.money);
         expect(pending.advisorProgressState).toEqual(first.advisorProgressState);
-        const paymentText = secondMode === "advisor" ? "导师好感" : "差旅费 0";
+        const paymentText = secondMode === "advisor" ? "导师好感" : "科研经费 -2";
         expect(pending.eventQueue[0]!.description).toContain(paymentText);
         const paid = choose(pending);
         expect(paid.player.money).toBe(100 - (firstMode === "self" ? travel : 0));
-        expect(paid.advisorProgressState.funding).toBe(100 - (firstMode === "advisor" ? travel : 0));
+        expect(paid.advisorProgressState.funding).toBe(100 - 3 - (firstMode === "advisor" ? travel : 0));
+        expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["paper-first", "second-1", "second-2"]);
         expect(paid.advisorProgressState.paidPlayerConferenceTrips).toEqual(first.advisorProgressState.paidPlayerConferenceTrips);
-        expect(paid.player.favor).toBe(first.player.favor - (secondMode === "advisor" ? { domestic: 1, asia: 2, west: 3 }[region] : 0));
+        expect(paid.player.favor).toBe(first.player.favor - (secondMode === "advisor" ? { domestic: 0.25, asia: 0.5, west: 0.75 }[region] : 0));
         expect(paid.log.some((entry) => entry.text.includes(paymentText))).toBe(true);
         const confirmation = pending.eventQueue[0]!;
         const duplicate = dispatchAction(paid, "resolve-event", { eventId: confirmation.id, eventChoiceId: confirmation.choices[0]!.id });
@@ -70,15 +71,17 @@ describe("player conference travel across paper batches", () => {
 
   it.each(["self", "advisor"] as const)("does not consume a physical trip for proxy before %s attendance", (mode) => {
     const proxy = pay(queueBatch(makeState(), "proxy", { paperCount: 2, paperIds: ["proxy-1", "proxy-2"] }), "proxy");
-    expect(proxy.player.money).toBe(99);
+    expect(proxy.player.money).toBe(100);
+    expect(proxy.advisorProgressState.funding).toBe(98);
     expect(proxy.advisorProgressState.paidPlayerConferenceTrips).toBeUndefined();
     const physical = pay(queueBatch(proxy, "physical"), mode);
-    expect(physical.player.money).toBe(mode === "self" ? 93 : 99);
-    expect(physical.advisorProgressState.funding).toBe(mode === "advisor" ? 94 : 100);
+    expect(physical.player.money).toBe(mode === "self" ? 94 : 100);
+    expect(physical.advisorProgressState.funding).toBe(mode === "advisor" ? 91 : 97);
     expect(physical.advisorProgressState.paidPlayerConferenceTrips).toHaveLength(1);
     const nextProxy = pay(queueBatch(physical, "next-proxy"), "proxy");
-    expect(nextProxy.player.money).toBe(physical.player.money - 1);
-    expect(nextProxy.advisorProgressState).toEqual(physical.advisorProgressState);
+    expect(nextProxy.player).toEqual(physical.player);
+    expect(nextProxy.advisorProgressState.funding).toBe(physical.advisorProgressState.funding - 1);
+    expect(nextProxy.advisorProgressState.paidPlayerConferenceTrips).toEqual(physical.advisorProgressState.paidPlayerConferenceTrips);
   });
 
   it.each(["self", "advisor"] as const)("does not record unpaid %s previews, rejected funding, or discarded confirmations", (mode) => {
@@ -99,17 +102,17 @@ describe("player conference travel across paper batches", () => {
 
   it("refreshes an old final confirmation after another batch pays the same trip", () => {
     const pending = choose(choose(queueBatch(makeState(), "pending")), "advisor");
-    expect(pending.eventQueue[0]!.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(-6);
+    expect(pending.eventQueue[0]!.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(-7);
     const first = pay(queueBatch(pending, "paid-first"), "self");
     const restored = { ...first, eventQueue: pending.eventQueue,
       advisorProgressState: { ...first.advisorProgressState, funding: 2 } };
     const snapshot = structuredClone(restored);
     const refreshed = getResolvableQueuedEvent(restored, restored.eventQueue[0]!);
     expect(refreshed.choices[0]!.disabledReason).toBeUndefined();
-    expect(refreshed.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBeUndefined();
+    expect(refreshed.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(-1);
     expect(restored).toEqual(snapshot);
     const paid = choose(restored);
-    expect(paid.advisorProgressState.funding).toBe(2);
+    expect(paid.advisorProgressState.funding).toBe(1);
     expect(paid.advisorProgressState.paidPlayerConferenceTrips).toEqual(first.advisorProgressState.paidPlayerConferenceTrips);
   });
 

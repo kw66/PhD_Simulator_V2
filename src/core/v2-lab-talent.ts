@@ -42,7 +42,8 @@ export function getFellowAnnualResearchGrowth(state: GameState, profile: FellowP
 }
 
 export function getPlayerAnnualResearchGrowth(state: GameState): number {
-  return Math.min(getAnnualResearchReward(state, state.player.research), Math.max(0, getResearchCap(state.researchCapacityState) - state.player.research));
+  return applyTierResist(getAnnualResearchReward(state, state.player.research), state.player.research,
+    undefined, getResearchCap(state.researchCapacityState)).effectiveChange;
 }
 
 export function settleLabResearchGrowth(state: GameState, random: () => number = Math.random): GameState {
@@ -130,16 +131,18 @@ export function settleFellowCoauthoredPapers(state: GameState): GameState {
       : !paper.leadAuthorId && paper.nonFirstAuthor !== true && paper.collaborators?.some((person) => person.id === profile.id)))
       .map((paper) => paper.id));
     if (newIds.size === 0) return profile;
-    const affinity = Math.min(20, profile.affinity + newIds.size);
+    const affinityResult = applyTierResist(newIds.size, profile.affinity, undefined, 20);
+    const affinity = profile.affinity + affinityResult.effectiveChange;
+    const affinitySummary = describeResistedTalentReward("默契", profile.affinity, affinityResult);
     triggers.push({ key: `cooperation:${profile.id}:${JSON.stringify([...newIds].sort())}`, record: {
       name: "论文合作", recipient: `你与${getFellowName(profile)}`, reason: `共同发表${newIds.size}篇论文`,
-      effects: [describeTalentReward("默契", newIds.size, profile.affinity, affinity)],
+      effects: [affinitySummary],
       details: [...newIds].map((id) => `《${published.find((paper) => paper.id === id)!.title}》`),
     } });
     return recordFellowMonthlySupport({
       ...profile, affinity,
       affinityRewardedPaperIds: [...rewardedIds, ...newIds],
-    }, state.totalMonths, `合作发表${newIds.size}篇；${describeTalentReward("默契", newIds.size, profile.affinity, affinity)}`);
+    }, state.totalMonths, `合作发表${newIds.size}篇；${affinitySummary}`);
   });
   if (triggers.length === 0) return state;
   let nextState = { ...state, fellowProgressState };

@@ -5,6 +5,10 @@ import {
   getActiveAdvisorGrants,
   getAdvisorGrantLimit,
   getAdvisorRankLabel,
+  getAdvisorMonthlySalary,
+  getAdvisorMonthlySalaryBonus,
+  getAdvisorSalaryPayment,
+  ADVISOR_GRANTS,
   getEligibleAdvisorGrant,
   settleAdvisorMonth,
   syncAdvisorResearchAccumulation,
@@ -53,6 +57,20 @@ function finishGrantEvent(state: GameState): GameState {
 }
 
 describe("advisor project economy", () => {
+  it.each([null, ...ADVISOR_GRANTS.map((grant) => grant.id)])("keeps base wages independent of rank %s and bonuses tied only to funding", (award) => {
+    for (const funding of [59.99, 60, 60.01]) {
+      const advisor = createAdvisorProgressState();
+      advisor.funding = funding;
+      advisor.awards = award ? [{ id: award, awardedYear: 2023, startYear: null, endYear: null }] : [];
+      expect(getAdvisorMonthlySalary(advisor, "master")).toBe(1);
+      expect(getAdvisorMonthlySalary(advisor, "phd")).toBe(2.5);
+      expect(getAdvisorMonthlySalaryBonus(advisor, "master")).toBe(funding >= 60 ? 0.5 : 0);
+      expect(getAdvisorMonthlySalaryBonus(advisor, "phd")).toBe(funding >= 60 ? 1 : 0);
+      expect(getAdvisorSalaryPayment(advisor, "master")).toEqual({ payment: funding >= 60 ? 1.5 : 1 });
+      expect(getAdvisorSalaryPayment(advisor, "phd")).toEqual({ payment: funding >= 60 ? 3.5 : 2.5 });
+    }
+  });
+
   it("starts at 20 accumulation and 30 uncapped funding", () => {
     const state = createAdvisorProgressState();
     expect(state).toMatchObject({ researchAccumulation: 20, funding: 30, awards: [], pendingApplication: null });
@@ -84,10 +102,10 @@ describe("advisor project economy", () => {
   it("keeps horizontal project rewards uncapped and pays player labor", () => {
     const before = makeState({ funding: 100, horizontalProgress: 99 });
     const after = advanceAdvisorProject(before, "horizontal", () => 0);
-    expect(after.advisorProgressState).toMatchObject({ funding: 155, horizontalProgress: 19 });
-    expect(after.player.money).toBe(25);
+    expect(after.advisorProgressState).toMatchObject({ funding: 147.5, horizontalProgress: 19 });
+    expect(after.player.money).toBe(22.5);
     expect(after.log[1]?.text).toBe("推进横向项目：SAN -5，进度 +20");
-    expect(after.log[0]?.text).toBe("横向项目完成：科研经费 +60，科研经费 -5（劳务费）；金币 +5");
+    expect(after.log[0]?.text).toBe("横向项目完成：科研经费 +50，科研经费 -2.5（劳务费）；金币 +2.5");
   });
 
   it("adds ten percent of current accumulation when vertical project completes", () => {

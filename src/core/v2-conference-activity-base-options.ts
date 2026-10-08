@@ -1,4 +1,5 @@
 import { increaseInternshipExperimentMultiplier } from "./v2-internship-system";
+import { resolveConferenceActivityAttributes } from "./v2-conference-activity-shared";
 import type {
   ConferenceActivityBuildState,
   ConferenceActivityContext,
@@ -8,8 +9,9 @@ import type {
 export function createBaseConferenceActivityOptions(
   context: ConferenceActivityContext,
   state: ConferenceActivityBuildState,
+  getRoll: () => number = Math.random,
 ): ConferenceActivityOptionDefinition[] {
-  return [
+  const options: ConferenceActivityOptionDefinition[] = [
     {
       id: "tour-local",
       label: "顺便在当地走走",
@@ -92,4 +94,5 @@ export function createBaseConferenceActivityOptions(
       },
     },
   ];
+  return options.map((option) => resolveConferenceActivityAttributes(option, state, getRoll));
 }

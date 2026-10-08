@@ -100,16 +100,17 @@ describe("v2 reading system", () => {
     const options = { consumeMonthlyAction: false, allowSanOverdraw: true, source: "看论文" };
 
     const resisted = applyReadPaperActions(state, 1, { ...options, random: () => 0 });
-    expect(resisted).toMatchObject({ researchGain: 0, researchMilestones: 1, researchResisted: 1 });
-    expect(resisted.nextState.player.research).toBe(6);
-    expect(resisted.nextState.log[0]?.text).toContain("科研 +0（抵抗1）");
+    expect(resisted).toMatchObject({ researchGain: 0.75, researchMilestones: 1, researchResisted: 0.25 });
+    expect(resisted.nextState.player.research).toBe(6.75);
+    expect(resisted.nextState.log[0]?.text).toContain("科研 +0.75");
+    expect(resisted.nextState.log[0]?.text).not.toContain("抵抗");
 
     const applied = applyReadPaperActions(state, 1, { ...options, random: () => 0.99 });
-    expect(applied).toMatchObject({ researchGain: 1, researchResisted: 0 });
-    expect(applied.nextState.player.research).toBe(7);
+    expect(applied).toMatchObject({ researchGain: 0.75, researchResisted: 0.25 });
+    expect(applied.nextState.player.research).toBe(6.75);
 
-    expect(applyReadingCountProgress(state, 1, () => 0).nextState.player.research).toBe(6);
-    expect(applyReadingCountProgress(state, 1, () => 0.99).nextState.player.research).toBe(7);
+    expect(applyReadingCountProgress(state, 1, () => 0).nextState.player.research).toBe(6.75);
+    expect(applyReadingCountProgress(state, 1, () => 0.99).nextState.player.research).toBe(6.75);
   });
 
   it("never lowers research that already sits above the cap", () => {

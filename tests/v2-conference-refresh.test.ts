@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildConferenceDecisionEventsForAcceptedPapers, refreshConferenceDecision } from "../src/core/v2-conference-events";
-import { getConferenceTripId, getPaperConferenceTripId } from "../src/core/v2-conference-identity";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createGrantedPublishedPaper } from "../src/core/v2-publication-rules";
@@ -36,8 +35,8 @@ function confirmation(event: PendingEvent, mode = "proxy") {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("conference live proxy and stable previews", () => {
-  it.each(["act1", "act2", "act3"] as const)("refreshes paid registration at %s without rerolling or changing charges", (stage) => {
+describe("conference registration and stable previews", () => {
+  it.each(["act1", "act2", "act3"] as const)("refreshes unpaid registration at %s without rerolling or changing travel charges", (stage) => {
     const { state, root } = fixture();
     const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("preview rerolled"); });
     for (const mode of ["self", "advisor", "proxy"]) {
@@ -57,20 +56,14 @@ describe("conference live proxy and stable previews", () => {
         const final = stage === "act3" ? pending : confirmation(stage === "act1" ? decision(pending) : pending, mode);
         const narrative = stage === "act1" ? pending.description : final.description;
         const paidCount = paidIds.includes("new-paper") ? 2 : paidIds.includes("player-paper") ? 1 : 0;
-        if (paidCount > 0) {
-          const label = `科研经费 -${paidCount}（注册费，已支付）`;
-          expect(final.description).toContain(label);
-          expect(final.completionLog).toContain(label);
-          expect(narrative).toContain(paidCount === 2
-            ? "本场 2 篇共 2 金币已支付。"
-            : "本场 2 篇中已支付 1 篇，共 1 金币，其余尚无支付记录。");
-        } else {
-          expect(narrative).toContain("本场 2 篇尚无注册费支付记录。");
-          expect(final.description).not.toContain("已支付");
-          expect(final.completionLog).not.toContain("注册费");
-        }
+        expect(narrative).toContain(`${2 - paidCount} 篇`);
+        expect(final.description).not.toMatch(/已支付|自动支付|预扣/u);
+        expect(final.completionLog).not.toContain("注册费");
         expect(final.choices[0]!.effects.money).toBe(originalConfirmation.choices[0]!.effects.money);
-        expect(final.choices[0]!.effects.advisorProgressStateDeltas).toEqual(originalConfirmation.choices[0]!.effects.advisorProgressStateDeltas);
+        const travelFunding = mode === "advisor" ? -(originalConfirmation.choices[0]!.effects.advisorProgressStateDeltas!.funding!) - 1 : 0;
+        const fundingCost = 2 - paidCount + travelFunding;
+        expect(final.choices[0]!.effects.advisorProgressStateDeltas?.funding ?? 0).toBe(fundingCost === 0 ? 0 : -fundingCost);
+        expect(final.choices[0]!.effects.recordConferenceRegistrationPayment).toEqual(["player-paper", "new-paper"]);
         expect(final.choices[0]!.effects.favor).toBe(originalConfirmation.choices[0]!.effects.favor);
         expect(pending.conferencePreview!.rolls).toEqual(originalPreview.rolls);
         expect(final.conferencePreview!.rolls).toEqual(originalPreview.rolls);
@@ -105,16 +98,18 @@ describe("conference live proxy and stable previews", () => {
     expect(refreshed.conferencePreview!.rolls).toEqual(originalPreview.rolls);
   });
 
-  it.each(["fellowPapers", "externalPublications", "papers"] as const)("finds a current fellow's accepted paper in %s", (collection) => {
+  it.each(["fellowPapers", "externalPublications", "papers"] as const)("keeps outside-lab proxy costs independent of fellow papers in %s", (collection) => {
     const { state, paper, root } = fixture();
     const current = { ...state, fellowPapers: [], externalPublications: [], papers: [], [collection]: [paper] };
     const refreshed = refreshConferenceDecision(current, decision(root));
-    expect(confirmation(refreshed).choices[0]!.effects.money).toBe(-0);
+    expect(confirmation(refreshed).choices[0]!.effects.money).toBeUndefined();
+    expect(confirmation(refreshed).choices[0]!.effects.favor).toBeUndefined();
+    expect(confirmation(refreshed).choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(-1);
     expect(refreshed.description).toContain("免费代贴");
-    expect(getPaperConferenceTripId(paper, state.conferenceLocationSeed)).toBe(getConferenceTripId(root.conferencePreview!.context));
+    expect(refreshed.description).toContain("实验室外");
   });
 
-  it("rechecks departed fellows at both selection and final confirmation without rerolling", () => {
+  it("keeps proxy costs unchanged when fellows depart without rerolling", () => {
     const { state, root } = fixture();
     const initialDecision = decision(root);
     const initialConfirmation = confirmation(initialDecision);
@@ -122,32 +117,30 @@ describe("conference live proxy and stable previews", () => {
     const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("preview rerolled"); });
     const selected = refreshConferenceDecision(departed, initialDecision);
     const final = refreshConferenceDecision(departed, initialConfirmation);
-    expect(confirmation(selected).choices[0]!.effects.money).toBe(-1);
-    expect(final.choices[0]!.effects.money).toBe(-1);
-    expect(final.description).toContain("陌生人帮忙代贴");
-    expect(refreshConferenceDecision(state, final).choices[0]!.effects.money).toBe(-0);
-    expect(initialConfirmation.choices[0]!.effects.money).toBe(-0);
+    expect(confirmation(selected).choices[0]!.effects).toEqual(initialConfirmation.choices[0]!.effects);
+    expect(final.choices[0]!.effects).toEqual(initialConfirmation.choices[0]!.effects);
+    expect(final.description).toContain("实验室外的参会者");
+    expect(refreshConferenceDecision(state, final).choices[0]!.effects).toEqual(initialConfirmation.choices[0]!.effects);
+    expect(final.choices[0]!.effects.enqueueEvents).toBeUndefined();
     expect(random).not.toHaveBeenCalled();
   });
 
-  it("requires acceptance at the same conference and ignores journals and previous years", () => {
+  it("does not base proxy registration on fellow paper status, venue, year, or journal", () => {
     const { state, paper, root } = fixture();
     const pending = confirmation(decision(root));
     for (const patch of [{ status: "reviewing" as const }, { submittedYear: 2 }, { submittedMonth: 7 }, { journalTarget: "pami" as const }]) {
-      expect(refreshConferenceDecision({ ...state, fellowPapers: [{ ...paper, ...patch }] }, pending).choices[0]!.effects.money).toBe(-1);
+      expect(refreshConferenceDecision({ ...state, fellowPapers: [{ ...paper, ...patch }] }, pending).choices[0]!.effects).toEqual(pending.choices[0]!.effects);
     }
-    expect(getPaperConferenceTripId({ ...paper, journalTarget: "pami" }, 42)).toBeNull();
-    expect(getPaperConferenceTripId({ ...paper, submittedMonth: null }, 42)).toBeNull();
   });
 
   it("refreshes a new acceptance and preserves advisor and activity rolls across favor tiers", () => {
     const { state, paper, root } = fixture();
     const selected = decision(root);
     const withoutAcceptance = refreshConferenceDecision({ ...state, fellowPapers: [{ ...paper, status: "reviewing" }] }, selected);
-    expect(confirmation(withoutAcceptance).choices[0]!.effects.money).toBe(-1);
+    expect(confirmation(withoutAcceptance).choices[0]!.effects.money).toBeUndefined();
     const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("preview rerolled"); });
     const refreshed = refreshConferenceDecision(state, withoutAcceptance);
-    expect(confirmation(refreshed).choices[0]!.effects.money).toBe(-0);
+    expect(confirmation(refreshed).choices[0]!.effects.money).toBeUndefined();
     const lowerFavor = refreshConferenceDecision({ ...state, player: { ...state.player, favor: 0 } }, refreshed);
     const restored = refreshConferenceDecision(state, lowerFavor);
     expect(confirmation(restored, "advisor")).toEqual(confirmation(selected, "advisor"));

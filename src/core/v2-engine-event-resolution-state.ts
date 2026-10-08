@@ -267,6 +267,16 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     researchCapacityState[typedKey] += value ?? 0;
   }
   const advisorProgressState = { ...state.advisorProgressState };
+  if (effects.recordConferenceRegistrationPayment) {
+    advisorProgressState.paidConferenceRegistrationPaperIds = [...new Set([
+      ...(advisorProgressState.paidConferenceRegistrationPaperIds ?? []), ...effects.recordConferenceRegistrationPayment,
+    ])];
+  }
+  if (effects.recordJournalFeePayment) {
+    advisorProgressState.paidJournalPaperIds = [...new Set([
+      ...(advisorProgressState.paidJournalPaperIds ?? []), effects.recordJournalFeePayment,
+    ])];
+  }
   if (effects.recordPlayerConferenceTrip) {
     advisorProgressState.paidPlayerConferenceTrips = [...new Set([
       ...(advisorProgressState.paidPlayerConferenceTrips ?? []), effects.recordPlayerConferenceTrip,

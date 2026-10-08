@@ -1,4 +1,5 @@
-import { getAdvisorMonthlySalary } from "./v2-advisor-progress";
+import { getAdvisorSalaryPayment } from "./v2-advisor-progress";
+import { MONTHLY_LIVING_COST } from "./v2-content";
 import { getFellowAcademicYear } from "./v2-fellow-academic";
 import { creditFellowMoney } from "./v2-fellow-finance";
 import { roundMoney } from "./v2-money";
@@ -9,17 +10,17 @@ import type { GameState } from "./v2-types";
 export function getLabMonthlySalaryTotal(state: GameState): number {
   if (!state.selectedAdvisorName) return 0;
   return roundMoney(state.fellowProgressState.reduce((total, profile) => total + (getFellowAcademicYear(state, profile) > 0
-    ? getAdvisorMonthlySalary(state.advisorProgressState, profile.degree ?? "master") : 0),
-  getAdvisorMonthlySalary(state.advisorProgressState, state.degree)));
+    ? getAdvisorSalaryPayment(state.advisorProgressState, profile.degree ?? "master").payment : 0),
+  getAdvisorSalaryPayment(state.advisorProgressState, state.degree).payment));
 }
 
 export function getLabPayroll(state: GameState) {
   const player = { payment: state.selectedAdvisorName && state.totalMonths > 1
-    ? getAdvisorMonthlySalary(state.advisorProgressState, state.degree) : 0 };
+    ? getAdvisorSalaryPayment(state.advisorProgressState, state.degree).payment : 0 };
   const fellows = state.fellowProgressState.map((profile) => ({ id: profile.id,
     payment: state.selectedAdvisorName && state.totalMonths > 1 && getFellowAcademicYear(state, profile) > 0
       && state.totalMonths > profile.startTotalMonths
-      ? getAdvisorMonthlySalary(state.advisorProgressState, profile.degree ?? "master") : 0,
+      ? getAdvisorSalaryPayment(state.advisorProgressState, profile.degree ?? "master").payment : 0,
   }));
   return { player, fellows, total: roundMoney(player.payment + fellows.reduce((sum, payment) => sum + payment.payment, 0)) };
 }
@@ -34,11 +35,14 @@ export function getNextMonthLabPayroll(state: GameState): ReturnType<typeof getL
 }
 
 export function settleLabPayroll(state: GameState): GameState {
-  if (!state.selectedAdvisorName || state.totalMonths <= 1) return state;
+  if (state.totalMonths <= 1) return state;
   const payroll = getLabPayroll(state);
   let paidState = state;
   for (const payment of payroll.fellows) {
-    if (payment.payment > 0) paidState = creditFellowMoney(paidState, payment.id, payment.payment);
+    const profile = state.fellowProgressState.find((entry) => entry.id === payment.id)!;
+    if (state.totalMonths <= profile.startTotalMonths) continue;
+    const familySupport = getFellowAcademicYear(state, profile) === 0 ? MONTHLY_LIVING_COST : 0;
+    paidState = creditFellowMoney(paidState, payment.id, payment.payment + familySupport - MONTHLY_LIVING_COST);
   }
   return { ...paidState,
     advisorProgressState: { ...state.advisorProgressState,

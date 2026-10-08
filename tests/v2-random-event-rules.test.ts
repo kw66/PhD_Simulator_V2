@@ -20,6 +20,12 @@ describe("v2 random event rules", () => {
     expect(getAttributeTier(12)).toBe(2);
     expect(getAttributeTier(17)).toBe(2);
     expect(getAttributeTier(18)).toBe(3);
+    expect(getAttributeTier(5.99)).toBe(0);
+    expect(getAttributeTier(6.01)).toBe(1);
+    expect(getAttributeTier(11.99)).toBe(1);
+    expect(getAttributeTier(12.01)).toBe(2);
+    expect(getAttributeTier(17.99)).toBe(2);
+    expect(getAttributeTier(18.01)).toBe(3);
   });
 
   it("matches the confirmed random event count probabilities", () => {
@@ -109,11 +115,12 @@ describe("v2 random event rules", () => {
   it("does not advertise a resisted gain that the stat cap will discard", () => {
     expect(applyTierResist(1, 20, () => 0.99)).toMatchObject({
       effectiveChange: 0,
-      resistedCount: 0,
-      cappedCount: 1,
+      resistedCount: 0.75,
+      cappedCount: 0.25,
     });
     expect(applyTierResist(1, 21, () => 0.99, 22)).toMatchObject({
-      effectiveChange: 1,
+      effectiveChange: 0.25,
+      resistedCount: 0.75,
     });
   });
 

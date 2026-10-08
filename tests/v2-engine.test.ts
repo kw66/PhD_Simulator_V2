@@ -10,6 +10,8 @@ import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import { createPhdDecisionEvent } from "../src/core/v2-phd-decision-event";
 import { pushLog, pushNoOpLog } from "../src/core/v2-engine-helpers";
+import { previewNextMonthEffects } from "../src/core/v2-monthly-effects";
+import { isPreEnrollmentState } from "../src/core/v2-progression";
 
 function startGame() {
   return dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
@@ -62,6 +64,23 @@ describe("minimal game engine", () => {
     expect(next.log).toEqual(state.log);
   });
 
+  it("enters month one directly without a player pre-enrollment living-cost or family-support cycle", () => {
+    const initial = startGame();
+    initial.player.money = 0;
+    expect(isPreEnrollmentState(initial)).toBe(true);
+    expect(previewNextMonthEffects(initial).items).toEqual([]);
+    const enrolled = admitGame(initial);
+    expect(enrolled).toMatchObject({ phase: "playing", month: 1, totalMonths: 1, player: { money: 0 } });
+    expect(isPreEnrollmentState(enrolled)).toBe(false);
+    expect(enrolled.advisorProgressState.funding).toBe(initial.advisorProgressState.funding);
+    const preview = previewNextMonthEffects(enrolled);
+    expect(preview.items.find((item) => item.id === "advisor-salary")?.stats.money).toBe(1);
+    expect(preview.items.find((item) => item.id === "living-cost")?.stats.money).toBe(-1);
+    expect(preview.totals.money).toBe(0);
+    const advanced = dispatchAction({ ...enrolled, eventQueue: [], availableRandomEvents: [] }, "next-month");
+    expect(advanced).toMatchObject({ phase: "playing", month: 2, totalMonths: 2, player: { money: 0 } });
+  });
+
   it("preserves existing relationship cards when mentoring is delegated", () => {
     const initial = createInitialState();
     const fellow = createCustomFellowProgressProfile({
@@ -104,7 +123,7 @@ describe("minimal game engine", () => {
   });
 
   it("delays the conference event by three months after a confirmed publication", () => {
-    const base = startGame();
+    const base = admitGame();
     const paper = attachPaperPublication({
       ...createDraftPaper(1, 0, () => 0),
       status: "published" as const,
@@ -203,7 +222,7 @@ describe("minimal game engine", () => {
 
     expect(withoutLogIds(forced)).toEqual(withoutLogIds(expected));
     expect(forced.totalMonths).toBe(2);
-    expect(forced.player.money).toBe(state.player.money + 3);
+    expect(forced.player.money).toBe(state.player.money + 1 + 2 - 1);
     expect(forced.eventQueue.some((event) => event.id === "due-blocker-a" || event.id === "due-blocker-b")).toBe(false);
     expect(forced.eventQueue.find((event) => event.id === "future-blocker")?.deadlineMonths).toBe(1);
     expect(forced.eventQueue.find((event) => event.id === "deferrable")?.deadlineMonths).toBe(0);
@@ -264,7 +283,7 @@ describe("minimal game engine", () => {
     expect(forced.buffs.some((buff) => buff.id === "pending-event-penalty")).toBe(false);
     expect(forced.papers.find((paper) => paper.id === paperId)?.conferenceHandled).toBe(true);
     expect(forced.player.san).toBe(state.player.san + 2);
-    expect(forced.player.money).toBe(state.player.money + 1);
+    expect(forced.player.money).toBe(state.player.money + 1 - 1);
   });
 
   it("runs the workstation reading action once per monthly action point", () => {
@@ -357,12 +376,12 @@ describe("minimal game engine", () => {
     };
     const advanced = dispatchAction(unblocked, "next-month");
     expect(advanced.totalMonths).toBe(2);
-    expect(advanced.player.money).toBe(state.player.money + 3);
+    expect(advanced.player.money).toBe(state.player.money + 1 + 2 - 1);
     expect(advanced.player.san).toBe(14);
     expect(advanced.buffs).toEqual([]);
     expect(advanced.log[0]?.text).toBe([
       "进入第 1 年 2 月。",
-      "月初结算：自动恢复 SAN +1｜学生工资 金币 +1（学生工资：科研经费 -1）｜秋季 SAN +1｜每月补贴 金币 +2",
+      "月初结算：自动恢复 SAN +1｜学生工资 金币 +1｜生活费 金币 -1｜秋季 SAN +1｜每月补贴 金币 +2",
     ].join("\n"));
   });
 
@@ -437,35 +456,44 @@ describe("minimal game engine", () => {
       eventQueue: [createEventQueueItem(createPhdDecisionEvent(state, 2), 1)],
     };
 
+    expect(state.eventQueue[0]?.description).toContain("已发表一作1篇，科研分2");
+    expect(state.eventQueue[0]?.description).toContain("今年转博需要达到 2 分");
     state = resolveCurrent(state);
     expect(state.eventQueue[0]?.stage).toBe("act2");
-    expect(state.eventQueue[0]?.description).toContain("已经发表 1 篇可计分的一作论文（B 类 1 篇），科研分是 2");
-    expect(state.eventQueue[0]?.description).toContain("今年转博需要达到 2 分");
     expect(state.eventQueue[0]?.description).toContain("同届同门");
-    expect(state.eventQueue[0]?.description).toContain("读博压力");
+    expect(state.eventQueue[0]?.description).toContain("别觉得多一张文凭就稳了");
 
     const decision = state.eventQueue[0];
+    const moneyBeforeTransfer = state.player.money;
+    const fundingBeforeTransfer = state.advisorProgressState.funding;
     expect(decision?.choices.map((choice) => choice.id)).toContain("transfer-phd");
-    expect(decision?.choices.find((choice) => choice.id === "transfer-phd")?.outcome).toContain("读博压力：SAN -1（每月，永久）");
-    expect(decision?.choices.find((choice) => choice.id === "transfer-phd")?.outcome).not.toContain("毕业要求");
+    expect(decision?.choices.map((choice) => choice.label)).toEqual(["继续硕士", "申请转博"]);
+    expect(decision?.choices.find((choice) => choice.id === "transfer-phd")?.outcome).toContain("每月SAN -1");
+    expect(decision?.choices.find((choice) => choice.id === "transfer-phd")?.outcome).toContain("毕业要求 1→7分");
     state = dispatchAction(state, "resolve-event", {
       eventId: decision?.id,
       eventChoiceId: "transfer-phd",
     });
     expect(state.degree).toBe("master");
     expect(state.eventQueue[0]?.stage).toBe("result");
-    expect(state.eventQueue[0]?.description).toContain("基础的每月 SAN +1 仍会生效");
-    expect(state.eventQueue[0]?.description).toContain("毕业要求调整为科研分 7");
+    expect(state.eventQueue[0]?.description).toContain("条件：科研分 2 ≥ 2｜结果：毕业要求 1→7分");
+    expect(state.eventQueue[0]?.description).toContain("工资 1→2.5金");
+    expect(state.eventQueue[0]?.description).toContain("学院确认了你的转博资格");
+    expect(state.eventQueue[0]?.description).not.toMatch(/月末判断|基础的每月 SAN \+1|毕业要求调整/);
+    expect(state.player.money).toBe(moneyBeforeTransfer);
+    expect(state.advisorProgressState.funding).toBe(fundingBeforeTransfer);
 
     state = resolveCurrent(state);
     expect(state.degree).toBe("phd");
     expect(state.phdStartYear).toBe(3);
     expect(state.maxMonths).toBe(70);
     expect(state.graduationScoreTarget).toBe(7);
+    expect(state.player.money).toBe(moneyBeforeTransfer);
+    expect(state.advisorProgressState.funding).toBe(fundingBeforeTransfer);
     expect(state.eventQueue).toHaveLength(0);
     expect(state.eventHistory.at(-1)?.stages).toHaveLength(3);
     expect(state.log[0]?.text).toContain("转博抉择");
-    expect(state.log[0]?.text).toContain("读博压力");
+    expect(state.log[0]?.text).toContain("每月SAN -1");
     expect(state.buffs.find((buff) => buff.id === "phd-pressure")).toMatchObject({
       name: "读博压力",
       source: "转博",
