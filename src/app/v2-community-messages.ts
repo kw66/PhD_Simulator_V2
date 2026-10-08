@@ -14,6 +14,36 @@ const API_KEY = "sb_publishable_TRVbO2x2mmuoRw592EqtvQ_FHpqUMkJ";
 const NICKNAME_KEY = "kwgame_last_nickname";
 const NICKNAME_MAX_LENGTH = 10;
 export const MESSAGE_PAGE_SIZE = 5;
+export const MESSAGE_MAX_LENGTH = 2000;
+const OWNERSHIP_KEY = "kwgame_v2_message_ownership";
+const PUBLIC_COLUMNS = "id,nickname,content,source,created_at,parent_id";
+
+export function countMessageCharacters(value: string): number {
+  return Array.from(value).length;
+}
+
+function validMessageContent(value: string): boolean {
+  return countMessageCharacters(value) >= 1 && countMessageCharacters(value) <= MESSAGE_MAX_LENGTH
+    && Array.from(value).every((character) => {
+      const point = character.codePointAt(0)!;
+      return point !== 0 && (point < 0xd800 || point > 0xdfff);
+    });
+}
+
+interface MessageOwnership {
+  secret: string;
+  ids: number[];
+}
+
+function readOwnership(storage: MessageOptions["storage"]): MessageOwnership | null {
+  try {
+    const record = JSON.parse(storage?.getItem(OWNERSHIP_KEY) ?? "null") as MessageOwnership | null;
+    if (!record || !/^[a-f0-9]{64}$/.test(record.secret) || !Array.isArray(record.ids)) return null;
+    return { secret: record.secret, ids: record.ids.filter((id) => Number.isSafeInteger(id) && id > 0) };
+  } catch {
+    return null;
+  }
+}
 
 type MessageStatus = "idle" | "loading" | "ready" | "error";
 
@@ -47,6 +77,12 @@ export function createCommunityMessages(options: MessageOptions = {}) {
   let replies: CommunityMessage[] = [];
   let replyTarget: { id: number; nickname: string; content: string; source: MessageSource } | null = null;
   const expandedReplyIds = new Set<number>();
+  const expandedContentIds = new Set<number>();
+  let ownership = readOwnership(storage);
+  let editTarget: { id: number; source: MessageSource; originalContent: string } | null = null;
+  let editContent = "";
+  let editNotice = "";
+  let savingEdit = false;
   let total = 0;
   let visibleTotal: number | null = null;
   let page = 0;
@@ -58,9 +94,26 @@ export function createCommunityMessages(options: MessageOptions = {}) {
 
   const notify = (): void => options.onChange?.();
 
+  const prepareOwnership = async (): Promise<string | null> => {
+    try {
+      if (!storage || !globalThis.crypto?.subtle) return null;
+      ownership = readOwnership(storage);
+      if (!ownership) {
+        const bytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
+        ownership = { secret: Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(""), ids: [] };
+        storage.setItem(OWNERSHIP_KEY, JSON.stringify(ownership));
+        if (readOwnership(storage)?.secret !== ownership.secret) return null;
+      }
+      const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(ownership.secret));
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    } catch {
+      return null;
+    }
+  };
+
   const loadPage = async (nextPage: number): Promise<void> => {
     if (!Number.isSafeInteger(nextPage) || nextPage < 0) return;
-    if (nextPage !== page && replyTarget) {
+    if (nextPage !== page && replyTarget && !submitting) {
       contents[replyTarget.source] = draftBeforeReply;
       replyTarget = null;
       draftBeforeReply = "";
@@ -71,7 +124,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     notify();
     try {
       const url = new URL(API_URL);
-      url.searchParams.set("select", "id,nickname,content,source,created_at,parent_id");
+      url.searchParams.set("select", PUBLIC_COLUMNS);
       url.searchParams.set("parent_id", "is.null");
       url.searchParams.set("order", "created_at.desc,id.desc");
       url.searchParams.set("limit", String(MESSAGE_PAGE_SIZE));
@@ -107,7 +160,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
       let pageReplies: CommunityMessage[] = [];
       if (mainMessages.length > 0) {
         const replyUrl = new URL(API_URL);
-        replyUrl.searchParams.set("select", "id,nickname,content,source,created_at,parent_id");
+        replyUrl.searchParams.set("select", PUBLIC_COLUMNS);
         replyUrl.searchParams.set("parent_id", `in.(${mainMessages.map((message) => message.id).join(",")})`);
         replyUrl.searchParams.set("order", "created_at.asc,id.asc");
         const replyResponse = await request(replyUrl, {
@@ -125,7 +178,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
       if (revision !== loadRevision) return;
       messages = mainMessages;
       replies = pageReplies;
-      if (replyTarget && !mainMessages.some((message) => message.id === replyTarget?.id)) {
+      if (replyTarget && !submitting && !mainMessages.some((message) => message.id === replyTarget?.id)) {
         contents[replyTarget.source] = draftBeforeReply;
         replyTarget = null;
         draftBeforeReply = "";
@@ -141,18 +194,19 @@ export function createCommunityMessages(options: MessageOptions = {}) {
   };
 
   const submit = async (source: MessageSource): Promise<boolean> => {
-    if (submitting) return false;
+    if (submitting || savingEdit) return false;
     const target = replyTarget?.source === source ? replyTarget : null;
     const submittedNickname = nickname.trim();
     const submittedContent = contents[source].trim();
+    const submittedDraft = contents[source];
     noticeSource = source;
-    if (!submittedNickname || submittedNickname.length > NICKNAME_MAX_LENGTH) {
+    if (!submittedNickname || countMessageCharacters(submittedNickname) > NICKNAME_MAX_LENGTH) {
       notice = `请输入不超过 ${NICKNAME_MAX_LENGTH} 字的昵称`;
       notify();
       return false;
     }
-    if (!submittedContent || submittedContent.length > 150) {
-      notice = "请输入不超过 150 字的留言";
+    if (!validMessageContent(submittedContent)) {
+      notice = `请输入不超过 ${MESSAGE_MAX_LENGTH} 字的有效留言`;
       notify();
       return false;
     }
@@ -160,25 +214,48 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     notice = "正在发送…";
     notify();
     try {
-      const response = await request(API_URL, {
+      const editTokenHash = await prepareOwnership();
+      const submittedSecret = editTokenHash ? ownership?.secret : null;
+      const postUrl = new URL(API_URL);
+      if (editTokenHash) postUrl.searchParams.set("select", "id");
+      const response = await request(postUrl, {
         method: "POST",
-        headers: { apikey: API_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify({ nickname: submittedNickname, content: submittedContent, source, parent_id: target?.id ?? null }),
+        headers: { apikey: API_KEY, "Content-Type": "application/json", Prefer: editTokenHash ? "return=representation" : "return=minimal" },
+        body: JSON.stringify({ nickname: submittedNickname, content: submittedContent, source, parent_id: target?.id ?? null,
+          ...(editTokenHash ? { edit_token_hash: editTokenHash } : {}) }),
         signal: AbortSignal.timeout(8000),
       });
       if (!response.ok) throw new Error(`Message submission failed: ${response.status}`);
-      nickname = submittedNickname;
-      contents[source] = target ? draftBeforeReply : "";
+      let trackedOwnership = false;
+      if (submittedSecret) {
+        try {
+          const rows: unknown = await response.json();
+          const id = Array.isArray(rows) && rows.length === 1 ? rows[0]?.id : null;
+          const latest = readOwnership(storage);
+          if (Number.isSafeInteger(id) && id > 0 && latest?.secret === submittedSecret) {
+            ownership = { secret: submittedSecret, ids: [...new Set([...latest.ids, id])] };
+            storage?.setItem(OWNERSHIP_KEY, JSON.stringify(ownership));
+            trackedOwnership = readOwnership(storage)?.ids.includes(id) ?? false;
+          }
+        } catch {
+          ownership = readOwnership(storage);
+        }
+      }
+      if (nickname.trim() === submittedNickname) nickname = submittedNickname;
+      if (contents[source] === submittedDraft) contents[source] = target ? draftBeforeReply : "";
       if (target) {
         replyTarget = null;
         draftBeforeReply = "";
       }
       try {
-        storage?.setItem(NICKNAME_KEY, nickname);
+        storage?.setItem(NICKNAME_KEY, submittedNickname);
       } catch {
         // The message can succeed even when browser storage is unavailable.
       }
       notice = target ? "已回复" : "已发送";
+      if (!trackedOwnership) {
+        notice += "；编辑凭证不可用，此留言无法编辑";
+      }
       await loadPage(target ? page : 0);
       return true;
     } catch {
@@ -190,9 +267,83 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     }
   };
 
+  const saveEdit = async (): Promise<boolean> => {
+    if (!editTarget || savingEdit || submitting) return false;
+    const target = editTarget;
+    const content = editContent.trim();
+    ownership = readOwnership(storage);
+    if (!ownership?.ids.includes(target.id)) {
+      editNotice = "无法验证本浏览器的编辑凭证";
+      notify();
+      return false;
+    }
+    if (!validMessageContent(content)) {
+      editNotice = `请输入不超过 ${MESSAGE_MAX_LENGTH} 字的有效留言`;
+      notify();
+      return false;
+    }
+    savingEdit = true;
+    editNotice = "正在保存…";
+    notify();
+    try {
+      const response = await request(new URL("rpc/edit_phd_simulator_v2_message", `${API_URL.slice(0, API_URL.lastIndexOf("/"))}/`), {
+        method: "POST",
+        headers: { apikey: API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_id: target.id, p_edit_token: ownership.secret, p_content: content,
+          p_expected_content: target.originalContent }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) throw new Error("Edit failed");
+      const result: unknown = await response.json();
+      if (result !== true) {
+        editNotice = "保存失败：留言已变更或无编辑权限，请刷新后重试";
+        return false;
+      }
+      editTarget = null;
+      editContent = "";
+      editNotice = "";
+      await loadPage(page);
+      return true;
+    } catch {
+      editNotice = "保存失败，请稍后重试";
+      return false;
+    } finally {
+      savingEdit = false;
+      notify();
+    }
+  };
+
   return {
     loadPage,
     submit,
+    saveEdit,
+    openEdit(id: number, source: MessageSource = "board"): void {
+      if (savingEdit || submitting || editTarget) return;
+      ownership = readOwnership(storage);
+      const message = [...messages, ...replies].find((entry) => entry.id === id);
+      if (!message || !ownership?.ids.includes(id)) return;
+      editTarget = { id, source, originalContent: message.content };
+      editContent = message.content;
+      editNotice = "";
+      notify();
+    },
+    setEditContent(value: string): void {
+      if (!editTarget || savingEdit) return;
+      editContent = value;
+      editNotice = "";
+    },
+    cancelEdit(): void {
+      if (savingEdit) return;
+      editTarget = null;
+      editContent = "";
+      editNotice = "";
+      notify();
+    },
+    toggleContent(id: number): void {
+      if (expandedContentIds.has(id)) expandedContentIds.delete(id);
+      else expandedContentIds.add(id);
+      notify();
+    },
     openReply(id: number, source: MessageSource = "board"): void {
       if (submitting) return;
       const target = messages.find((message) => message.id === id);
@@ -206,7 +357,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
       notify();
     },
     cancelReply(source: MessageSource = "board"): void {
-      if (!replyTarget || replyTarget.source !== source) return;
+      if (submitting || !replyTarget || replyTarget.source !== source) return;
       contents[source] = draftBeforeReply;
       replyTarget = null;
       draftBeforeReply = "";
@@ -231,6 +382,12 @@ export function createCommunityMessages(options: MessageOptions = {}) {
         replies: [...replies],
         replyTarget,
         expandedReplyIds: new Set(expandedReplyIds),
+        expandedContentIds: new Set(expandedContentIds),
+        ownedMessageIds: new Set(readOwnership(storage)?.ids ?? []),
+        editTarget: editTarget ? { ...editTarget } : null,
+        editContent,
+        editNotice,
+        savingEdit,
         total,
         visibleTotal,
         page,
@@ -245,7 +402,9 @@ export function createCommunityMessages(options: MessageOptions = {}) {
 
 export type CommunityMessages = ReturnType<typeof createCommunityMessages>;
 
-function createMessageBody(message: CommunityMessage, isReply = false): HTMLElement {
+type CommunityMessageState = ReturnType<CommunityMessages["snapshot"]>;
+
+function createMessageBody(message: CommunityMessage, state: CommunityMessageState, isReply = false): HTMLElement {
   const item = document.createElement("article");
   item.className = isReply ? "community-reply-item" : "community-message-item";
   const header = document.createElement("div");
@@ -271,14 +430,78 @@ function createMessageBody(message: CommunityMessage, isReply = false): HTMLElem
   }).format(date);
   header.append(author, time);
   const content = document.createElement("p");
+  content.className = "community-message-content";
+  const expanded = state.expandedContentIds.has(message.id);
+  content.dataset.expanded = String(expanded);
+  content.dataset.communityMessageContent = String(message.id);
   content.textContent = message.content;
   item.append(header, content);
+  {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "community-expand-content";
+    toggle.dataset.communityToggleContent = String(message.id);
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.textContent = expanded ? "收起" : "展开全文";
+    toggle.hidden = true;
+    item.append(toggle);
+  }
+  if (state.ownedMessageIds.has(message.id)) {
+    const actions = document.createElement("div");
+    actions.className = "community-message-actions";
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "community-edit-button";
+    edit.dataset.communityEdit = String(message.id);
+    edit.textContent = "编辑";
+    edit.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null;
+    actions.append(edit);
+    header.append(actions);
+  }
+  if (state.editTarget?.id === message.id) {
+    const editor = document.createElement("div");
+    editor.className = "community-message-editor";
+    editor.dataset.communityEditor = String(message.id);
+    const input = document.createElement("textarea");
+    input.className = "community-edit-content";
+    input.dataset.communityEditContent = String(message.id);
+    input.value = state.editContent;
+    input.rows = 4;
+    input.disabled = state.savingEdit;
+    input.setAttribute("aria-label", "编辑留言");
+    input.setAttribute("aria-invalid", String(!validMessageContent(state.editContent.trim())));
+    const footer = document.createElement("div");
+    footer.className = "community-edit-footer";
+    const count = document.createElement("span");
+    count.className = "community-edit-count";
+    count.dataset.communityEditCount = String(message.id);
+    count.textContent = `${countMessageCharacters(state.editContent)}/${MESSAGE_MAX_LENGTH}`;
+    const save = document.createElement("button");
+    save.type = "button";
+    save.dataset.communitySaveEdit = String(message.id);
+    save.textContent = state.savingEdit ? "保存中…" : "保存";
+    save.disabled = state.savingEdit || state.submitting !== null;
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.dataset.communityCancelEdit = String(message.id);
+    cancel.textContent = "取消";
+    cancel.disabled = state.savingEdit;
+    const status = document.createElement("span");
+    status.className = "community-edit-notice";
+    status.dataset.communityEditNotice = String(message.id);
+    status.setAttribute("role", "status");
+    status.textContent = state.editNotice;
+    footer.append(count, save, cancel);
+    editor.append(input, footer, status);
+    item.append(editor);
+  }
   return item;
 }
 
-function createMessageItem(message: CommunityMessage, replies: CommunityMessage[], expanded: boolean): HTMLElement {
-  const item = createMessageBody(message);
-  const actions = document.createElement("div");
+function createMessageItem(message: CommunityMessage, replies: CommunityMessage[], state: CommunityMessageState): HTMLElement {
+  const expanded = state.expandedReplyIds.has(message.id);
+  const item = createMessageBody(message, state);
+  const actions = item.querySelector(".community-message-actions") ?? document.createElement("div");
   actions.className = "community-message-actions";
   const replyButton = document.createElement("button");
   replyButton.type = "button";
@@ -299,7 +522,8 @@ function createMessageItem(message: CommunityMessage, replies: CommunityMessage[
   if (replies.length > 0) {
     const replyList = document.createElement("div");
     replyList.className = "community-replies";
-    replyList.append(...(expanded ? replies : replies.slice(0, 1)).map((reply) => createMessageBody(reply, true)));
+    const visibleReplies = expanded ? replies : replies.filter((reply, index) => index === 0 || reply.id === state.editTarget?.id);
+    replyList.append(...visibleReplies.map((reply) => createMessageBody(reply, state, true)));
     if (replies.length > 1) {
       const expandButton = document.createElement("button");
       expandButton.type = "button";
@@ -324,19 +548,21 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
       input.disabled = state.submitting === source;
     });
     root.querySelectorAll<HTMLElement>(`[data-community-nickname-count="${source}"]`).forEach((target) => {
-      target.textContent = `${state.nickname.length}/${NICKNAME_MAX_LENGTH}`;
+      target.textContent = `${countMessageCharacters(state.nickname)}/${NICKNAME_MAX_LENGTH}`;
     });
     root.querySelectorAll<HTMLTextAreaElement>(`textarea[data-community-content="${source}"]`).forEach((input) => {
       input.value = state.contents[source];
+      input.removeAttribute("maxlength");
+      input.setAttribute("aria-invalid", String(countMessageCharacters(state.contents[source].trim()) > MESSAGE_MAX_LENGTH));
       input.disabled = state.submitting === source;
       input.placeholder = state.replyTarget?.source === source
         ? `回复 ${state.replyTarget.nickname}` : "说点什么吧";
     });
     root.querySelectorAll<HTMLElement>(`[data-community-char-count="${source}"]`).forEach((target) => {
-      target.textContent = `${state.contents[source].length}/150`;
+      target.textContent = `${countMessageCharacters(state.contents[source])}/${MESSAGE_MAX_LENGTH}`;
     });
     root.querySelectorAll<HTMLButtonElement>(`button[data-community-send="${source}"]`).forEach((button) => {
-      button.disabled = state.submitting !== null;
+      button.disabled = state.submitting !== null || state.savingEdit;
       const label = button.querySelector("span");
       if (label) label.textContent = state.replyTarget?.source === source ? "回复" : "发送";
     });
@@ -346,6 +572,7 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
   }
   root.querySelectorAll<HTMLButtonElement>("button[data-community-cancel-reply]").forEach((button) => {
     button.hidden = button.dataset.communityCancelReply !== state.replyTarget?.source;
+    button.disabled = state.submitting !== null;
   });
   root.querySelectorAll<HTMLElement>("[data-community-reply-indicator]").forEach((indicator) => {
     const target = state.replyTarget?.source === indicator.dataset.communityReplyIndicator ? state.replyTarget : null;
@@ -367,7 +594,7 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
       list.replaceChildren(...state.messages.map((message) => createMessageItem(
         message,
         state.replies.filter((reply) => reply.parent_id === message.id),
-        state.expandedReplyIds.has(message.id),
+        state,
       )));
     } else {
       const title = empty.querySelector<HTMLElement>("[data-community-empty-title]");
@@ -383,6 +610,20 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
     target.textContent = `${state.status === "loading" ? "--" : state.visibleTotal ?? "--"} 条`;
   });
   renderCommunityPagination(root, state);
+  refreshCommunityContentOverflow(root);
+}
+
+export function refreshCommunityContentOverflow(root: ParentNode): void {
+  root.querySelectorAll<HTMLElement>("[data-community-message-content]").forEach((content) => {
+    const toggle = content.parentElement?.querySelector<HTMLButtonElement>("[data-community-toggle-content]");
+    if (!toggle || content.getClientRects().length === 0) return;
+    const expanded = content.dataset.expanded === "true";
+    content.dataset.expanded = "false";
+    const overflowing = content.scrollHeight > content.clientHeight + 1;
+    content.dataset.expanded = String(expanded);
+    toggle.hidden = !expanded && !overflowing;
+    toggle.setAttribute("aria-expanded", String(expanded));
+  });
 }
 
 function renderCommunityPagination(root: ParentNode, state: ReturnType<CommunityMessages["snapshot"]>): void {

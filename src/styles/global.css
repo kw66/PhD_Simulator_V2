@@ -1519,6 +1519,83 @@ p {
   align-items: center;
   justify-self: end;
   min-width: 0;
+  gap: 4px;
+}
+
+.community-message-content[data-expanded="false"] {
+  max-height: 6em;
+  overflow: hidden;
+}
+
+.community-expand-content {
+  margin-top: 4px;
+  padding: 2px 0;
+  border: 0;
+  color: var(--accent-deep);
+  background: transparent;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.community-message-editor {
+  margin-top: 8px;
+}
+
+.community-edit-content {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  max-height: 320px;
+  resize: vertical;
+  padding: 7px;
+  border: 1px solid var(--setup-divider);
+  border-radius: 4px;
+  color: var(--ink);
+  background: #fffdf7;
+  font: inherit;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.community-edit-content[aria-invalid="true"],
+.community-content-wrap textarea[aria-invalid="true"] {
+  border-color: #a33e3e;
+}
+
+.community-edit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.community-edit-count {
+  margin-right: auto;
+  color: var(--ink-soft);
+  font-size: 0.66rem;
+}
+
+.community-edit-footer button {
+  padding: 3px 7px;
+  border: 1px solid var(--setup-divider);
+  border-radius: 4px;
+  color: var(--accent-deep);
+  background: #fffdf7;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.community-edit-footer button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.community-edit-notice {
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
 }
 
 .community-message-actions button,
@@ -3751,6 +3828,26 @@ button.pager-arrow:disabled {
   border-radius: 4px;
   background: rgba(255, 253, 247, 0.62);
   box-shadow: 0 2px 0 rgba(64, 72, 55, 0.06);
+}
+
+.announcement-card[data-announcement-expanded="false"] [data-announcement-body] {
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.announcement-card [data-announcement-toggle] {
+  display: block;
+  margin-top: 8px;
+  padding: 3px 0;
+  border: 0;
+  color: var(--accent-deep);
+  background: transparent;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.announcement-card [data-announcement-toggle][hidden] {
+  display: none;
 }
 
 .announcement-date {

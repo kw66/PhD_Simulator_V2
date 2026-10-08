@@ -97,7 +97,7 @@ import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
 import { createVisitStats } from "./v2-visit-stats";
-import { createCommunityMessages, renderCommunityMessages } from "./v2-community-messages";
+import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
 import { createRelationshipTooltips } from "./v2-relationship-tooltips";
@@ -130,7 +130,7 @@ import {
 } from "./v2-render";
 import { renderRoleRail } from "./v2-render-setup-screen";
 import { getAnnouncementPageIndex } from "./v2-announcements";
-import { renderAnnouncementPage } from "./v2-render-announcements";
+import { bindAnnouncementCollapse, renderAnnouncementPage } from "./v2-render-announcements";
 import { normalizeShopTab, type ShopTabId } from "./v2-render-shop-panel";
 import {
   type RoleRailViewId,
@@ -595,6 +595,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       fixedStageScaleFrame = 0;
       syncAllFixedStageScales();
       syncMountedTabSliders();
+      refreshCommunityContentOverflow(root);
     });
   };
 
@@ -983,6 +984,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     }
     visitStats.render(root);
     renderCommunityMessages(root, community);
+    bindAnnouncementCollapse(root);
     if (state.phase === "finished") {
       for (const button of root.querySelectorAll<HTMLButtonElement>("button[data-action]")) {
         if (["restart-game", "reset-game", "set-date-display-mode"].includes(button.dataset.action ?? "")) continue;
@@ -1236,7 +1238,18 @@ export function bootstrapApp(root: HTMLDivElement): void {
     } else if (target instanceof HTMLTextAreaElement && (target.dataset.communityContent === "board" || target.dataset.communityContent === "feedback")) {
       community.setContent(target.dataset.communityContent, target.value);
       const counter = target.closest(".community-compose")?.querySelector<HTMLElement>("[data-community-char-count]");
-      if (counter) counter.textContent = `${target.value.length}/150`;
+      const length = countMessageCharacters(target.value);
+      if (counter) counter.textContent = `${length}/${MESSAGE_MAX_LENGTH}`;
+      target.setAttribute("aria-invalid", String(length > MESSAGE_MAX_LENGTH));
+    } else if (target instanceof HTMLTextAreaElement && target.hasAttribute("data-community-edit-content")) {
+      community.setEditContent(target.value);
+      const length = countMessageCharacters(target.value);
+      const editor = target.closest("[data-community-editor]");
+      const counter = editor?.querySelector<HTMLElement>("[data-community-edit-count]");
+      if (counter) counter.textContent = `${length}/${MESSAGE_MAX_LENGTH}`;
+      target.setAttribute("aria-invalid", String(length > MESSAGE_MAX_LENGTH));
+      const notice = editor?.querySelector<HTMLElement>("[data-community-edit-notice]");
+      if (notice) notice.textContent = "";
     }
     if (target instanceof HTMLElement && (target.hasAttribute("data-community-nickname") || target.hasAttribute("data-community-content"))) {
       const notice = target.closest(".community-compose")?.querySelector<HTMLElement>("[data-community-notice]");
@@ -1344,6 +1357,40 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
+    const toggleContentButton = target.closest<HTMLButtonElement>("button[data-community-toggle-content]");
+    if (toggleContentButton && !toggleContentButton.disabled) {
+      const id = Number(toggleContentButton.dataset.communityToggleContent);
+      if (Number.isSafeInteger(id)) {
+        const list = toggleContentButton.closest("[data-community-list]");
+        community.toggleContent(id);
+        list?.querySelector<HTMLButtonElement>(`[data-community-toggle-content="${id}"]`)?.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    const editButton = target.closest<HTMLButtonElement>("button[data-community-edit]");
+    if (editButton && !editButton.disabled) {
+      const id = Number(editButton.dataset.communityEdit);
+      if (Number.isSafeInteger(id)) {
+        const source = editButton.closest(".community-feedback-overlay") ? "feedback" : "board";
+        community.openEdit(id, source);
+        root.querySelector<HTMLTextAreaElement>("[data-community-edit-content]")?.focus({ preventScroll: false });
+      }
+      return;
+    }
+
+    const cancelEditButton = target.closest<HTMLButtonElement>("button[data-community-cancel-edit]");
+    if (cancelEditButton && !cancelEditButton.disabled) {
+      community.cancelEdit();
+      return;
+    }
+
+    const saveEditButton = target.closest<HTMLButtonElement>("button[data-community-save-edit]");
+    if (saveEditButton && !saveEditButton.disabled) {
+      void community.saveEdit();
+      return;
+    }
+
     const replyButton = target.closest<HTMLButtonElement>("button[data-community-reply-to]");
     if (replyButton && !replyButton.disabled) {
       const id = Number(replyButton.dataset.communityReplyTo);
@@ -1410,6 +1457,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       });
       visitStats.render(root);
       syncCommunityView();
+      bindAnnouncementCollapse(root);
       scheduleAllFixedStageScales();
       if (activeRoleRailView === "messages") void community.loadPage(community.snapshot().page);
       return;
@@ -1426,6 +1474,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const restoreFocus = document.activeElement === announcementPageButton;
       announcementPageIndex = nextPage;
       content.innerHTML = renderAnnouncementPage(announcementPageIndex);
+      bindAnnouncementCollapse(root);
       createIcons({ icons: { ChevronLeft, ChevronRight }, root: content });
       if (restoreFocus) {
         const nextButton = content.querySelector<HTMLButtonElement>(`[data-ui-announcement-page="${announcementPageIndex + direction}"]:not(:disabled)`)

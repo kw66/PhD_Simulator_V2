@@ -1,4 +1,5 @@
 import type { RoleRailViewId } from "./v2-render-types";
+import { MESSAGE_MAX_LENGTH } from "./v2-community-messages";
 
 function renderMessageComposer(mode: "board" | "feedback"): string {
   const prefix = mode === "board" ? "lobby-message" : "game-feedback";
@@ -21,8 +22,8 @@ function renderMessageComposer(mode: "board" | "feedback"): string {
         </button>
       </div>
       <div class="community-content-wrap">
-        <textarea id="${prefix}-content" maxlength="150" rows="4" aria-label="留言内容" aria-describedby="${prefix}-count" placeholder="说点什么吧" data-community-content="${mode}"></textarea>
-        <span class="community-character-count" id="${prefix}-count" data-community-char-count="${mode}">0/150</span>
+        <textarea id="${prefix}-content" rows="4" aria-label="留言内容" aria-describedby="${prefix}-count" placeholder="说点什么吧" data-community-content="${mode}"></textarea>
+        <span class="community-character-count" id="${prefix}-count" data-community-char-count="${mode}">0/${MESSAGE_MAX_LENGTH}</span>
         <span class="community-service-state" data-community-notice="${mode}" role="status" aria-live="polite"></span>
       </div>
     </section>
