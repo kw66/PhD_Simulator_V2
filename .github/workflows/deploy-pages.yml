@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install browser for interaction tests
+        run: npx playwright install --with-deps chromium
+
       - name: Test and build
         run: npm run verify
 
