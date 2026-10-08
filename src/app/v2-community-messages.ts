@@ -7,16 +7,18 @@ export interface CommunityMessage {
   source: MessageSource;
   created_at: string;
   parent_id: number | null;
+  is_deleted?: boolean;
 }
 
 const API_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/phd_simulator_v2_messages";
+const PUBLIC_API_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/phd_simulator_v2_public_messages";
 const API_KEY = "sb_publishable_TRVbO2x2mmuoRw592EqtvQ_FHpqUMkJ";
 const NICKNAME_KEY = "kwgame_last_nickname";
 const NICKNAME_MAX_LENGTH = 10;
 export const MESSAGE_PAGE_SIZE = 5;
 export const MESSAGE_MAX_LENGTH = 2000;
 const OWNERSHIP_KEY = "kwgame_v2_message_ownership";
-const PUBLIC_COLUMNS = "id,nickname,content,source,created_at,parent_id";
+const PUBLIC_COLUMNS = "id,nickname,content,source,created_at,parent_id,is_deleted";
 
 export function countMessageCharacters(value: string): number {
   return Array.from(value).length;
@@ -83,6 +85,8 @@ export function createCommunityMessages(options: MessageOptions = {}) {
   let editContent = "";
   let editNotice = "";
   let savingEdit = false;
+  let deletingMessageId: number | null = null;
+  let messageNotice: { id: number; text: string } | null = null;
   let total = 0;
   let visibleTotal: number | null = null;
   let page = 0;
@@ -123,13 +127,13 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     page = nextPage;
     notify();
     try {
-      const url = new URL(API_URL);
+      const url = new URL(PUBLIC_API_URL);
       url.searchParams.set("select", PUBLIC_COLUMNS);
       url.searchParams.set("parent_id", "is.null");
       url.searchParams.set("order", "created_at.desc,id.desc");
       url.searchParams.set("limit", String(MESSAGE_PAGE_SIZE));
       url.searchParams.set("offset", String(nextPage * MESSAGE_PAGE_SIZE));
-      const countUrl = new URL(API_URL);
+      const countUrl = new URL(PUBLIC_API_URL);
       countUrl.searchParams.set("select", "id");
       const responsePromise = request(url, {
         headers: { apikey: API_KEY, Prefer: "count=exact" },
@@ -159,7 +163,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
       const mainMessages = rows as CommunityMessage[];
       let pageReplies: CommunityMessage[] = [];
       if (mainMessages.length > 0) {
-        const replyUrl = new URL(API_URL);
+        const replyUrl = new URL(PUBLIC_API_URL);
         replyUrl.searchParams.set("select", PUBLIC_COLUMNS);
         replyUrl.searchParams.set("parent_id", `in.(${mainMessages.map((message) => message.id).join(",")})`);
         replyUrl.searchParams.set("order", "created_at.asc,id.asc");
@@ -313,15 +317,53 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     }
   };
 
+  const deleteMessage = async (id: number): Promise<boolean> => {
+    if (deletingMessageId !== null || savingEdit || submitting) return false;
+    ownership = readOwnership(storage);
+    const message = [...messages, ...replies].find((entry) => entry.id === id);
+    if (!message || message.is_deleted || !ownership?.ids.includes(id)) {
+      messageNotice = { id, text: "无法验证本浏览器的删除凭证" };
+      notify();
+      return false;
+    }
+    deletingMessageId = id;
+    messageNotice = null;
+    notify();
+    try {
+      const response = await request(new URL("rpc/delete_phd_simulator_v2_message", `${API_URL.slice(0, API_URL.lastIndexOf("/"))}/`), {
+        method: "POST",
+        headers: { apikey: API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_id: id, p_edit_token: ownership.secret, p_expected_content: message.content }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) throw new Error("Delete failed");
+      const result: unknown = await response.json();
+      if (result !== true) {
+        messageNotice = { id, text: "删除失败：留言已变更或无删除权限" };
+        return false;
+      }
+      messageNotice = null;
+      await loadPage(page);
+      return true;
+    } catch {
+      messageNotice = { id, text: "删除失败，请稍后重试" };
+      return false;
+    } finally {
+      deletingMessageId = null;
+      notify();
+    }
+  };
+
   return {
     loadPage,
     submit,
     saveEdit,
+    deleteMessage,
     openEdit(id: number, source: MessageSource = "board"): void {
       if (savingEdit || submitting || editTarget) return;
       ownership = readOwnership(storage);
       const message = [...messages, ...replies].find((entry) => entry.id === id);
-      if (!message || !ownership?.ids.includes(id)) return;
+      if (!message || message.is_deleted || !ownership?.ids.includes(id)) return;
       editTarget = { id, source, originalContent: message.content };
       editContent = message.content;
       editNotice = "";
@@ -339,7 +381,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
       editNotice = "";
       notify();
     },
-    toggleContent(id: number): void {
+      toggleContent(id: number): void {
       if (expandedContentIds.has(id)) expandedContentIds.delete(id);
       else expandedContentIds.add(id);
       notify();
@@ -347,7 +389,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     openReply(id: number, source: MessageSource = "board"): void {
       if (submitting) return;
       const target = messages.find((message) => message.id === id);
-      if (!target) return;
+      if (!target || target.is_deleted) return;
       if (replyTarget?.id === id && replyTarget.source === source) return;
       if (replyTarget) contents[replyTarget.source] = draftBeforeReply;
       draftBeforeReply = contents[source];
@@ -388,6 +430,8 @@ export function createCommunityMessages(options: MessageOptions = {}) {
         editContent,
         editNotice,
         savingEdit,
+        deletingMessageId,
+        messageNotice,
         total,
         visibleTotal,
         page,
@@ -429,12 +473,13 @@ function createMessageBody(message: CommunityMessage, state: CommunityMessageSta
     hour: "2-digit", minute: "2-digit",
   }).format(date);
   header.append(author, time);
+  const deleted = Boolean(message.is_deleted);
   const content = document.createElement("p");
-  content.className = "community-message-content";
+  content.className = `community-message-content${deleted ? " is-deleted" : ""}`;
   const expanded = state.expandedContentIds.has(message.id);
   content.dataset.expanded = String(expanded);
   content.dataset.communityMessageContent = String(message.id);
-  content.textContent = message.content;
+  content.textContent = deleted ? "该留言已删除" : message.content;
   item.append(header, content);
   {
     const toggle = document.createElement("button");
@@ -443,10 +488,10 @@ function createMessageBody(message: CommunityMessage, state: CommunityMessageSta
     toggle.dataset.communityToggleContent = String(message.id);
     toggle.setAttribute("aria-expanded", String(expanded));
     toggle.textContent = expanded ? "收起" : "展开全文";
-    toggle.hidden = true;
+    toggle.hidden = deleted;
     item.append(toggle);
   }
-  if (state.ownedMessageIds.has(message.id)) {
+  if (state.ownedMessageIds.has(message.id) && !deleted) {
     const actions = document.createElement("div");
     actions.className = "community-message-actions";
     const edit = document.createElement("button");
@@ -456,9 +501,23 @@ function createMessageBody(message: CommunityMessage, state: CommunityMessageSta
     edit.textContent = "编辑";
     edit.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null;
     actions.append(edit);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "community-delete-button";
+    remove.dataset.communityDelete = String(message.id);
+    remove.textContent = state.deletingMessageId === message.id ? "删除中…" : "删除";
+    remove.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null || state.deletingMessageId !== null;
+    actions.append(remove);
+    if (state.messageNotice?.id === message.id) {
+      const notice = document.createElement("span");
+      notice.className = "community-delete-notice";
+      notice.setAttribute("role", "status");
+      notice.textContent = state.messageNotice.text;
+      actions.append(notice);
+    }
     header.append(actions);
   }
-  if (state.editTarget?.id === message.id) {
+  if (state.editTarget?.id === message.id && !deleted) {
     const editor = document.createElement("div");
     editor.className = "community-message-editor";
     editor.dataset.communityEditor = String(message.id);
@@ -503,6 +562,7 @@ function createMessageItem(message: CommunityMessage, replies: CommunityMessage[
   const item = createMessageBody(message, state);
   const actions = item.querySelector(".community-message-actions") ?? document.createElement("div");
   actions.className = "community-message-actions";
+  if (message.is_deleted) return item;
   const replyButton = document.createElement("button");
   replyButton.type = "button";
   replyButton.dataset.communityReplyTo = String(message.id);

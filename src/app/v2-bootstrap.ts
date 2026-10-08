@@ -1379,6 +1379,15 @@ export function bootstrapApp(root: HTMLDivElement): void {
       return;
     }
 
+    const deleteButton = target.closest<HTMLButtonElement>("button[data-community-delete]");
+    if (deleteButton && !deleteButton.disabled) {
+      const id = Number(deleteButton.dataset.communityDelete);
+      if (Number.isSafeInteger(id) && window.confirm("确定删除这条留言吗？删除后正文将无法恢复。")) {
+        void community.deleteMessage(id);
+      }
+      return;
+    }
+
     const cancelEditButton = target.closest<HTMLButtonElement>("button[data-community-cancel-edit]");
     if (cancelEditButton && !cancelEditButton.disabled) {
       community.cancelEdit();

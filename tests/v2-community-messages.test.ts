@@ -311,6 +311,18 @@ describe("V2 message ownership and editing", () => {
     expect(community.snapshot().contents.board).toBe("未发的新留言");
   });
 
+  it("soft deletes an owned message through the credentialed RPC and preserves the thread contract", async () => {
+    const { community, request } = editingHarness();
+    await community.loadPage(0);
+    expect(await community.deleteMessage(21)).toBe(true);
+    const post = request.mock.calls.find(([, init]) => init?.method === "POST")!;
+    expect(new URL(String(post[0])).pathname).toBe("/rest/v1/rpc/delete_phd_simulator_v2_message");
+    expect(JSON.parse(String(post[1]?.body))).toEqual({
+      p_id: 21, p_edit_token: secret, p_expected_content: "原留言",
+    });
+    expect(community.snapshot().deletingMessageId).toBeNull();
+  });
+
   it("retains edit drafts through refresh, navigation, conflict, and failure until cancellation", async () => {
     const { community, request, setRows } = editingHarness();
     await community.loadPage(0);
@@ -456,6 +468,17 @@ describe("V2 message ownership and editing", () => {
     expect(sql).toMatch(/and message\.is_visible/);
     expect(sql).not.toMatch(/set\s+edit_token_hash\s*=/i);
     expect(sql).toMatch(/between 1 and 2000/);
+    const deletionSql = readFileSync(new URL("../supabase/migrations/20261008_kwgame_v2_message_deletion.sql", import.meta.url), "utf8");
+    expect(deletionSql).toMatch(/set search_path = ''/);
+    expect(deletionSql).toMatch(/set content = '该留言已删除'/);
+    expect(deletionSql).toMatch(/edit_token_hash = null/);
+    expect(deletionSql).toMatch(/grant execute on function public\.delete_phd_simulator_v2_message\(bigint, text, text\) to anon/);
+    expect(deletionSql).not.toMatch(/grant\s+(?:update|all)\b/i);
+    const viewSql = readFileSync(new URL("../supabase/migrations/20261008_kwgame_v2_message_public_view.sql", import.meta.url), "utf8");
+    expect(viewSql).toContain("phd_simulator_v2_public_messages");
+    expect(viewSql).toMatch(/grant select on public\.phd_simulator_v2_public_messages to anon/);
+    expect(viewSql).toMatch(/security_barrier = true/);
+    expect(viewSql).not.toContain("edit_token_hash");
   });
 });
 

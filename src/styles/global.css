@@ -1527,6 +1527,16 @@ p {
   overflow: hidden;
 }
 
+.community-message-content.is-deleted {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.community-delete-notice {
+  color: #a33e3e;
+  font-size: 0.64rem;
+}
+
 .community-expand-content {
   margin-top: 4px;
   padding: 2px 0;
