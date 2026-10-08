@@ -8671,7 +8671,7 @@ button[data-card-icon-action]:focus-visible {
 }
 
 .talent-panel .talent-item-row[data-talent-item-id="advisor"] .talent-item-metrics {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(7.5em, 1.3fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
   grid-auto-flow: row;
 }
 

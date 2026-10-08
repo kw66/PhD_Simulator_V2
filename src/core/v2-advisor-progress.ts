@@ -54,7 +54,7 @@ function getHighestAdvisorAwardIndex(advisor: AdvisorProgressState): number {
 }
 
 export function getAdvisorRankLabel(advisor: AdvisorProgressState): string {
-  return ["讲师", "副教授", "教授·四级", "教授·三级", "教授·二级", "教授·一级"][getHighestAdvisorAwardIndex(advisor) + 1]!;
+  return ["讲师", "副教授", "教授·四级", "教授·三级", "教授·二级", "一级教授"][getHighestAdvisorAwardIndex(advisor) + 1]!;
 }
 
 export function getAdvisorMeetingAttendancePercent(advisor: AdvisorProgressState): number {

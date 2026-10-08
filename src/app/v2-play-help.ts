@@ -143,7 +143,7 @@ const RELATIONSHIP_PAGES: readonly PlayHelpPage[] = [
     <p><b>金额四舍五入到两位，直接发放</b>，如1.5每月发1.5。你和同学按各自学位计薪，均扣实验室经费；同学工资进入个人钱包，加入次月起领薪，入学前不领工资，导师本人不计薪。</p>`,
     `<table class="panel-tip-table advisor-salary-table"><thead><tr><th>获批</th><th>职称</th><th>硕士/月</th><th>博士/月</th></tr></thead><tbody>
     <tr><th>—</th><td>讲师</td><td>1</td><td>3</td></tr>
-    <tr><th>青基</th><td>副教授</td><td>1.25</td><td>3.5</td></tr><tr><th>面上</th><td>教授·四级</td><td>1.5</td><td>4</td></tr><tr><th>优青</th><td>教授·三级</td><td>1.75</td><td>4.5</td></tr><tr><th>杰青</th><td>教授·二级</td><td>2</td><td>5</td></tr><tr><th>院士</th><td>教授·一级</td><td>2.25</td><td>5.5</td></tr>
+    <tr><th>青基</th><td>副教授</td><td>1.25</td><td>3.5</td></tr><tr><th>面上</th><td>教授·四级</td><td>1.5</td><td>4</td></tr><tr><th>优青</th><td>教授·三级</td><td>1.75</td><td>4.5</td></tr><tr><th>杰青</th><td>教授·二级</td><td>2</td><td>5</td></tr><tr><th>院士</th><td>一级教授</td><td>2.25</td><td>5.5</td></tr>
     </tbody></table><p>讲师限1项，晋升后限2项；项目到期释放名额，职称与已获项目保留。</p>`),
   directPage("同学协作", `<p>每位同学每月可主动协作一次，师兄／师姐、同门、师弟／师妹基础SAN消耗为4、3、2；审稿时也可协作。</p>
     <p>主动推进=⌊你的科研⌋+随机0～5；默契每月推进协作进度，数值为当前默契。</p>

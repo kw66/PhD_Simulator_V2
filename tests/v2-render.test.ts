@@ -4205,7 +4205,7 @@ describe("v2 render lobby shell", () => {
     expect(advisorTalent).toContain('<span>博士工资</span>');
     const salaryRows = [
       ["讲师", "—", "30", 1, 3], ["副教授", "青基", "30", 1.25, 3.5], ["教授·四级", "面上", "60", 1.5, 4],
-      ["教授·三级", "优青", "150", 1.75, 4.5], ["教授·二级", "杰青", "300", 2, 5], ["教授·一级", "院士", "600", 2.25, 5.5],
+      ["教授·三级", "优青", "150", 1.75, 4.5], ["教授·二级", "杰青", "300", 2, 5], ["一级教授", "院士", "600", 2.25, 5.5],
     ];
     for (let startIndex = 0; startIndex < 6; startIndex += 1) {
       const page = getTalentCardHtml(renderApp(state, createDefaultAccountProfile(), {
@@ -5193,7 +5193,7 @@ describe("v2 render lobby shell", () => {
 
   it.each([
     ["youth", "副教授"], ["general", "教授·四级"], ["excellent", "教授·三级"],
-    ["distinguished", "教授·二级"], ["academician", "教授·一级"],
+    ["distinguished", "教授·二级"], ["academician", "一级教授"],
   ] satisfies Array<[AdvisorGrantId, string]>)("renders the actual rank after the %s award", (id, rank) => {
     const state = createRelationshipCardTestState();
     state.advisorProgressState.awards = [{ id, awardedYear: 2024, startYear: null, endYear: null }];
