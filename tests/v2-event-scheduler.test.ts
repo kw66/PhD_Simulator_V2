@@ -908,29 +908,28 @@ describe("v2 event scheduler", () => {
       ...choice,
       effects: { ...choice.effects, ...choice.effects.enqueueEvents![0]!.choices[0]!.effects },
     }));
-    expect(decisions[0]?.effects.shopEntitlementDeltas).toBeUndefined();
-    expect(decisions[2]?.effects.shopEntitlementDeltas).toBeUndefined();
+    expect(decisions[0]?.effects.labReimbursement).toBeUndefined();
+    expect(decisions[2]?.effects.labReimbursement).toBeUndefined();
     expect(decisions[3]?.effects.addBuffs).toBeUndefined();
     expect(choices.map((choice) => choice.label)).toEqual(["买显卡", "发劳务费", "装修工位", "报销 AI 费用"]);
-    expect(choices[0]?.effects.shopEntitlementDeltas).toEqual({ gpuTransaction: 1 });
+    expect(choices[0]?.effects.labReimbursement).toBe("gpuTransaction");
     expect(choices[0]?.outcome).toContain("结果：显卡报销：");
     expect(choices[2]?.outcome).toContain("结果：工位报销：");
     expect(choices[2]?.outcome).not.toContain("+1");
     expect(choices[1]?.effects.money).toBe(7);
-    expect(choices[1]?.effects.advisorProgressStateDeltas).toBeUndefined();
+    expect(choices[1]?.effects.advisorProgressStateDeltas).toEqual({ funding: -7 });
     const salaryPaid = applyChoiceEffectsToState(baseState, choices[1]!).nextState;
     expect(salaryPaid.player.money).toBe(baseState.player.money + 7);
-    expect(salaryPaid.advisorProgressState).toEqual(baseState.advisorProgressState);
-    expect(choices[2]?.effects.shopEntitlementDeltas).toEqual({
-      workstationTransaction: 1,
-    });
+    expect(salaryPaid.advisorProgressState.funding).toBe(baseState.advisorProgressState.funding - 7);
+    expect(choices[2]?.effects.labReimbursement).toBe("workstationTransaction");
     const funded = applyChoiceEffectsToState(baseState, choices[2]!).nextState;
-    expect(funded.shopState.entitlements).toEqual({
+    expect(funded.shopState.labReimbursements).toEqual({
+      totalMonths: baseState.totalMonths,
       gpuTransaction: 0,
       workstationTransaction: 1,
     });
     const fundedTwice = applyChoiceEffectsToState(funded, choices[2]!).nextState;
-    expect(fundedTwice.shopState.entitlements.workstationTransaction).toBe(2);
+    expect(fundedTwice.shopState.labReimbursements.workstationTransaction).toBe(1);
     expect(choices[3]?.outcome).toContain("AI");
     expect(choices[3]?.effects.addBuffs).toEqual([expect.objectContaining({
       id: "ai-reimbursement-18",
@@ -948,7 +947,7 @@ describe("v2 event scheduler", () => {
     expect(aiResult?.description).toContain("AI报销：下月免费");
   });
 
-  it("waits for advisor funding above the shared project threshold before showing event 8", () => {
+  it("waits for advisor funding to reach the shared threshold before showing event 8", () => {
     const initial = createInitialState();
     const state = {
       ...initial,
@@ -956,7 +955,7 @@ describe("v2 event scheduler", () => {
       year: 2,
       month: 5,
       totalMonths: 17,
-      advisorProgressState: { ...initial.advisorProgressState, funding: 60 },
+      advisorProgressState: { ...initial.advisorProgressState, funding: 59.99 },
       availableRandomEvents: [8],
       usedRandomEvents: [],
       totalRandomEventCount: 0,
@@ -968,7 +967,7 @@ describe("v2 event scheduler", () => {
 
     const activated = activatePendingRandomEvents({
       ...waiting.nextState,
-      advisorProgressState: { ...waiting.nextState.advisorProgressState, funding: 61 },
+      advisorProgressState: { ...waiting.nextState.advisorProgressState, funding: 60 },
     }, () => 0);
     expect(activated.pendingRandomEvents).toEqual([]);
     expect(activated.eventQueue.some((event) => event.chainId === "random-8")).toBe(true);
@@ -1156,8 +1155,8 @@ describe("v2 event scheduler", () => {
       expect(choices[3]!.label).toBe("极端反抗");
       expect(choices[3]!.effects).toMatchObject({ money: 2, favor: -2 });
       const story = choices[3]!.effects.enqueueEvents![0]!.description.split("\n\n机制结算")[0]!;
-      expect(story).toContain("找个由头安抚你");
-      expect(story.split("\n\n")).toHaveLength(2);
+      expect(story).toContain("你听得出是在安抚");
+      expect(story.split("\n\n")).toHaveLength(3);
     }
   });
 

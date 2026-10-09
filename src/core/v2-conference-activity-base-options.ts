@@ -55,9 +55,9 @@ export function createBaseConferenceActivityOptions(
     },
     {
       id: "peer-collaboration",
-      label: "和同学约一次后续合作",
+      label: "交流实验经验",
       outcome: "下次做实验 +5。",
-      resultDescription: "你和一位同学在海报前核对实验设置，发现彼此都被相似的问题卡过。对方分享了排查的办法，你们约好回去各试一试，再交换结果；至少这次不用独自对着报错猜。",
+      resultDescription: "你和一位同学在海报前核对实验设置，发现彼此都被相似的问题卡过。对方分享了排查的办法，你把关键步骤记进笔记；回去再遇到同样的报错，终于有了具体的排查方向。",
       effects: {
         temporaryActionEffectUpdates: {
           experiment: { bonus: 5 },

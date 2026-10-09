@@ -165,7 +165,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
   nextState = settlePendingFellowHelp(nextState, random);
   const advanceProject = (profile: typeof state.fellowProgressState[number], forceHorizontal = false): void => {
     const type = forceHorizontal ? "horizontal" : monthlyProjectType;
-    const amount = Math.floor(profile.research) + Math.floor(random() * 6);
+    const amount = profile.research + Math.floor(random() * 6);
     const result = advanceSharedLabProject(nextState, type, amount, random);
     nextState = {
       ...result.state,

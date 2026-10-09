@@ -14,6 +14,7 @@ import { refreshSummerVacationEvent, resolveSummerVacationFixedEvent } from "../
 import { createBaseConferenceActivityOptions } from "../src/core/v2-conference-activity-base-options";
 import { createAdvancedConferenceActivityOptions } from "../src/core/v2-conference-activity-advanced-options";
 import { createConferenceDecisionAct1, refreshConferenceDecision } from "../src/core/v2-conference-events";
+import { scheduleConferenceAttendance, settleDueConferenceAttendance } from "../src/core/v2-conference-attendance";
 import { createSocialCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
 import type { GameState, PendingEvent } from "../src/core/v2-types";
 
@@ -58,7 +59,7 @@ describe("decimal attributes across module boundaries", () => {
       gender: "male", name: "陈青", startTotalMonths: 1, identitySeed: "decimal" });
     const next = advanceFellowCooperation({ ...fellow, taskProgress: 99.5 }, 1.25, 12.5);
     expect(next).toMatchObject({ research: 6.75, affinity: 1.25, taskProgress: 0.75,
-      pendingHelpToPlayer: 6, pendingHelpToFellow: 12 });
+      pendingHelpToPlayer: 6.75, pendingHelpToFellow: 12.5 });
   });
 
   it.each(["player", "lover"] as const)("settles the lower %s research once without truncating", (recipient) => {
@@ -94,7 +95,7 @@ describe("decimal attributes across module boundaries", () => {
     expect(getLoverNextReward(state, "study")).toContain("论文最低项 +6分");
     const pending = advanceLoverDate(state, "study");
     expect(pending.loverProgressState.research).toBe(6.75);
-    expect(pending.loverProgressState.pendingPaperHelp?.amount).toBe(6);
+    expect(pending.loverProgressState.pendingPaperHelp?.amount).toBe(6.75);
     const helped = settlePendingLoverHelp({ ...pending, papers: [createDraftPaper(1, 0, () => 0)] }, () => 0);
     expect(helped.papers[0]!.idea).toBe(6);
     expect(helped.log[0]!.text).toContain("idea +6");
@@ -165,15 +166,20 @@ describe("decimal attributes across module boundaries", () => {
 
   it("preserves conference option draws while refreshing decimal favor costs", () => {
     const state = stateWithDecimals();
-    const values = Array.from({ length: 16 }, (_, index) => (index + 1) / 17);
+    const values = Array.from({ length: 51 }, (_, index) => (index + 1) / 52);
     const random = vi.fn(() => values.shift() ?? 0.4);
     const root = createConferenceDecisionAct1(conference, conferenceState(state), random);
-    expect(random).toHaveBeenCalledTimes(16);
+    expect(random).toHaveBeenCalledTimes(51);
     const confirmation = root.choices[0]!.effects.enqueueEvents![0]!.choices.find((choice) => choice.id === "advisor")!.effects.enqueueEvents![0]!;
-    const optionIds = (event: PendingEvent) => event.choices[0]!.effects.enqueueEvents![0]!.choices[0]!.effects.enqueueEvents![0]!.choices.map((choice) => choice.id);
+    const optionIds = (event: PendingEvent) => {
+      const plan = event.choices[0]!.effects.scheduleConferenceAttendance!;
+      const attended = settleDueConferenceAttendance(scheduleConferenceAttendance(state, plan));
+      return attended.eventQueue[0]!.choices[0]!.effects.enqueueEvents![0]!.choices.map((choice) => choice.id);
+    };
     state.player.favor = 6.25;
     const liveRandom = vi.spyOn(Math, "random");
     const refreshed = refreshConferenceDecision(state, confirmation);
+    expect(refreshed.choices[0]!.effects.scheduleConferenceAttendance).toEqual(confirmation.choices[0]!.effects.scheduleConferenceAttendance);
     expect(optionIds(refreshed)).toEqual(optionIds(confirmation));
     expect(refreshed.choices[0]!.effects.favor).toBe(-0.75);
     expect(liveRandom).not.toHaveBeenCalled();

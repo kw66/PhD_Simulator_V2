@@ -126,7 +126,7 @@ export interface AiRenewalItem {
   model: AiModelOffer;
   paid: boolean;
   price: number;
-  reason: "paid" | "insufficient-money" | "model-updated";
+  reason: "paid" | "insufficient-money" | "insufficient-funding" | "model-updated";
 }
 
 export interface AiRenewalResolution {
@@ -145,6 +145,7 @@ export function renewAiSubscriptionSlot(
   money: number,
   slot: AiSlotId,
   reimbursement = false,
+  availableFunding?: number,
 ): AiRenewalResolution {
   const subscription = aiShopState.subscriptions[slot];
   const model = getAiModelForTotalMonths(totalMonths, slot);
@@ -176,7 +177,8 @@ export function renewAiSubscriptionSlot(
   }
 
   const renewalPrice = getAiRenewalPrice(totalMonths, slot, reimbursement);
-  if (subscription.enabled && money >= renewalPrice) {
+  const insufficientFunding = reimbursement && availableFunding !== undefined && model.price > 0 && availableFunding < model.price;
+  if (subscription.enabled && money >= renewalPrice && !insufficientFunding) {
     return {
       state: {
         subscriptions: {
@@ -210,7 +212,7 @@ export function renewAiSubscriptionSlot(
     },
     money,
     items: subscription.enabled
-      ? [{ slot, model, paid: false, price: model.price, reason: "insufficient-money" }]
+      ? [{ slot, model, paid: false, price: model.price, reason: insufficientFunding ? "insufficient-funding" : "insufficient-money" }]
       : [],
   };
 }

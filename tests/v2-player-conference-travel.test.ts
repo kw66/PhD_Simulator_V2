@@ -148,7 +148,7 @@ describe("player conference travel across paper batches", () => {
     expect(state.advisorProgressState.paidPlayerConferenceTrips).toHaveLength(1);
   });
 
-  it("waits until three months after acceptance before queueing one merged conference", () => {
+  it("queues one merged attendance decision early and keeps its deadline anchored to acceptance", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     const initial = makeState();
     const papers = [0, 1].map((index) => ({
@@ -159,16 +159,23 @@ describe("player conference travel across paper batches", () => {
     let state: GameState = { ...initial, papers: [], externalPublications: papers,
       advisorProgressState: { ...initial.advisorProgressState, paidConferenceRegistrationPaperIds: papers.map((paper) => paper.id) } };
     for (const totalMonths of [5, 6]) {
-      state = dispatchAction({ ...state, eventQueue: [] }, "force-next-month");
+      state = dispatchAction(state, "force-next-month");
       expect(state.totalMonths).toBe(totalMonths);
-      expect(state.eventQueue.some((event) => event.conferencePreview)).toBe(false);
+      const meetings = state.eventQueue.filter((event) => event.conferencePreview);
+      expect(meetings).toHaveLength(1);
+      expect(meetings[0]?.deadlineMonths).toBe(7 - totalMonths);
+      expect(meetings[0]?.conferencePreview?.context.paperIds).toEqual(["delayed-0", "delayed-1"]);
+      expect(state.externalPublications.every((paper) => paper.conferenceHandled === false)).toBe(true);
       expect(state.externalPublications.map((paper) => paper.conferenceAvailableAtTotalMonths)).toEqual([7, 7]);
     }
-    state = dispatchAction({ ...state, eventQueue: [] }, "force-next-month");
+    state = dispatchAction(state, "force-next-month");
     const meetings = state.eventQueue.filter((event) => event.conferencePreview);
     expect(state.totalMonths).toBe(7);
     expect(meetings).toHaveLength(1);
     expect(meetings[0]!.conferencePreview!.context.paperIds).toEqual(["delayed-0", "delayed-1"]);
-    expect(meetings[0]!.title).toBe(`${meetings[0]!.conferencePreview!.context.conferenceName}安排`);
+    expect(meetings[0]!.title).toBe(`${meetings[0]!.conferencePreview!.context.conferenceName}参会`);
+    expect(meetings[0]?.deadlineMonths).toBe(0);
+    expect(state.eventCounters.meetingCount).toBe(0);
+    expect(state.eventQueue.some((event) => event.chainId.endsWith("-activity"))).toBe(false);
   });
 });

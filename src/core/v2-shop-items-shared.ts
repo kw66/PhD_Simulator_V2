@@ -96,6 +96,7 @@ export function createShopState(): ShopState {
       gpuTransaction: 0,
       workstationTransaction: 0,
     },
+    labReimbursements: { totalMonths: null, gpuTransaction: 0, workstationTransaction: 0 },
     chairOwned: false,
     chairUpgrade: null,
     chairSanRecovered: 0,

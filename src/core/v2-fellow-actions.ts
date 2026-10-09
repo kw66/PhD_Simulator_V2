@@ -14,7 +14,7 @@ export function advanceFellowTask(state: GameState, fellowId: string, random: ()
   if (!profile || profile.taskUsedThisMonth) return state;
   const sanCost = getFellowDiscussionSanCost(state, profile);
   if (state.player.san < sanCost) return pushNoOpLog(state, `科研协作：SAN不足，需要${sanCost}`);
-  const progress = Math.floor(state.player.research) + Math.floor(random() * 6);
+  const progress = Math.floor(state.player.research + Math.floor(random() * 6));
   const paidState = {
     ...state,
     player: { ...state.player, san: state.player.san - sanCost },

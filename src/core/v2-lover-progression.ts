@@ -140,11 +140,11 @@ function advanceRoute(
       effects.push("购物免单 +1");
     } else if (cycle === 0) {
       const stored = lover.pendingPaperHelp;
-      const amount = Math.max(0, Math.floor(lover.research));
+      const amount = Math.max(0, lover.research);
       nextState.loverProgressState.pendingPaperHelp = stored ?? { amount,
         collaboratorId: `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`, name: getLoverName(state.loverState) };
-      effects.push(stored ? `已有一次论文帮助待生效（${stored.amount}分），不叠加`
-        : `论文帮助已就绪（最低项 +${amount}分）`);
+      effects.push(stored ? `已有一次论文帮助待生效（${Math.floor(stored.amount)}分），不叠加`
+        : `论文帮助已就绪（最低项 +${Math.floor(amount)}分）`);
     } else if (cycle === 1) {
       const previous = nextState.buffs.find((buff) => buff.id === "lover-study-score");
       const bonus = (previous?.actionEffects?.idea?.bonus ?? 0) + 1;

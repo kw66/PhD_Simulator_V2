@@ -4,6 +4,7 @@ import { ADVISOR_SALARY_BONUS } from "../core/v2-content";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "../core/v2-lab-projects";
 import { ANNUAL_RESEARCH_HELP_PAGE, ATTRIBUTE_RESISTANCE_HELP_PAGE, SALARY_HELP_PAGE, getSecondaryPlayHelpContext } from "./v2-play-help-secondary";
 import type { PlayRenderUiState } from "./v2-render-types";
+import { renderPaperTerm } from "./v2-paper-terms";
 
 export interface PlayHelpPage {
   title: string;
@@ -79,7 +80,7 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
     <p>“仅下次”加分与倍率只用于第一遍；持续Buff和装备每遍生效。协作分不变。</p>
     <p>例如原自身分10，连续生成8和9分，两遍分别保底到11和12分。</p>`),
   detailPage("科研分数计算", `<p>科研越高，本次生成分数通常越高。操作只更新一项<b>自身分，至少+1</b>；协作分持续累加，不会被覆盖。</p>`,
-    `<p><b>基础分</b> = 科研能力×随机倍率（0.5～1.5）+随机加分（0～5）</p>
+    `<p><b>基础分</b> = 实际科研能力×随机倍率（0.5～1.5）+随机加分（0～5），科研小数不提前取整。</p>
     <p><b>本次分</b> = 基础分×总倍率+固定分，结果四舍五入</p>
     <p><b>更新自身分：</b>原自身+1与本次分，取较大值</p>
     <p><b>先合并倍率，再加固定分</b>：倍率从×1开始，×1.5算+0.5，×0.8算−0.2。两个×1.5合并为×2。</p>
@@ -88,7 +89,7 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
   directPage("会议投稿", `<p>idea、实验、写作都有分即可投稿；<b>审稿3个月，期间不能修改</b>。</p>
     <p>评审按<b>投稿时idea、实验、写作各项的自身分与协作分之和</b>计算，审稿期间的衰减不影响本次评审。</p>
     <p>会议参考分对应三项均衡时约50%的录用率，<b>不保证录用</b>。</p>
-    <p><b>三人评审：</b>接收+1、边缘0、拒稿−1。总评≥+2接收，≤−2拒稿；其余由PC结合总评、投稿总分和会议等级判定。</p>`),
+    <p><b>三人评审：</b>${renderPaperTerm("Accept")} +1、${renderPaperTerm("Borderline")} 0、${renderPaperTerm("Reject")} −1。总评≥+2为Accept，≤−2为Reject；其余由PC结合总评、投稿总分和会议等级判定。</p>`),
   detailPage("会议分数衰减", `<p>草稿和会议审稿中的论文每月衰减，<b>热度越高，衰减越快</b>。拒稿后从衰减后的分数继续修改。</p>`,
     `<p>每项扣分=⌊s×h×10%⌋，至少扣1；合计最低保留1。</p>
     <p>s为该项自身与协作合计分，h为热度。</p>
@@ -98,12 +99,12 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
     <p>3位独立抽取，类型可重复。<b>y=投稿学年−1</b>，首年y=0。</p>${renderReviewerGuide("probability")}`),
   directPage("审稿评分", `${renderReviewerGuide("method")}<p>普通与LLM的三项权重随机生成，<b>权重之和均为3</b>。最高／最低按投稿时的各项合计分选取，有效分四舍五入。</p>`),
   directPage("审稿人反馈", `<p>拒稿加分只在退稿后生效；<b>SAN变化无论中稿或拒稿都生效</b>，三位审稿人的效果可叠加。扣SAN先乘疾病倍率并向上取整，再加季节与恋人固定修正，最低0；恢复不受影响。</p>${renderReviewerGuide("effect")}`),
-  directPage("审稿门槛", `<p><b>基础门槛：边缘／接收</b>，低于前值拒稿，达到后值接收。</p>${renderReviewerThresholds()}
+  directPage("审稿门槛", `<p><b>基础门槛：${renderPaperTerm("Borderline")}／${renderPaperTerm("Accept")}</b>，低于前值为Reject，达到后值为Accept。</p>${renderReviewerThresholds()}
     <p>实际门槛=基础门槛×会议影响力÷等级均值，四舍五入。等级均值：A ${REVIEW_TARGET_AVERAGE_INFLUENCE.A}，B ${REVIEW_TARGET_AVERAGE_INFLUENCE.B}，C ${REVIEW_TARGET_AVERAGE_INFLUENCE.C}。</p>`),
-  directPage("会议结果", `<p><b>拒稿：</b>回到草稿，保留衰减后的分数，再将审稿反馈加到自身分，协作分不变。</p>
-    <p><b>中稿：</b>论文移入成果、腾出卡片，一作按等级增加科研分。</p>
+  directPage("会议结果", `<p><b>${renderPaperTerm("Reject")}：</b>回到草稿，保留衰减后的分数，再将审稿反馈加到自身分，协作分不变。</p>
+    <p><b>${renderPaperTerm("Accept")}：</b>论文移入成果、腾出卡片，一作按等级增加科研分。</p>
     <p>成长奖励另记为<b>天赋触发</b>，一篇可同时完成多项；审稿SAN影响在确认结果时结算。</p>
-    <p><b>录用类型：</b>A类可获Poster、Spotlight、Oral、Best Paper Candidate或Best Paper；B／C类为Poster或Oral。</p>
+    <p><b>录用类型：</b>A类可获${renderPaperTerm("Poster")}、${renderPaperTerm("Spotlight")}、${renderPaperTerm("Oral")}、${renderPaperTerm("Best Paper Candidate")}或${renderPaperTerm("Best Paper")}；B／C类为Poster或Oral。</p>
     <p>按投稿总分和会议影响力抽取，达到分数线也不保证抽中。引用倍率见成果提示。</p>`),
   directPage("期刊投稿", `<p>期刊送审后<b>不衰减，可继续修改、接受协作</b>。</p>
     <table class="panel-tip-table"><thead><tr><th>期刊</th><th>送审分</th><th>达标分</th></tr></thead><tbody>
@@ -118,21 +119,24 @@ const RELATIONSHIP_PAGES: readonly PlayHelpPage[] = [
     <p><b>项目进度满100才结算：</b>横向按导师职称获得50／60／70／80／90／100科研经费，再从经费支付你和结项时每位在组同学各占总奖励5%的劳务费；无需参与，已离校不领取。纵向导师科研积累增加当前值的10%（下取整）。</p>
     <p>纵向项目满100时，导师为玩家和每位同学各随机选择一篇论文，<b>写作协作+10</b>。暂无可修改论文时，保留一次指导。</p>`),
   detailPage("项目推进", `<p>导师、同学和你共同推进卡片上的两条项目进度。</p>
-    <p><b>玩家每月选一项：</b>横向 SAN-5、纵向 SAN-4；推进=⌊科研能力⌋+随机0～5。同学也按自身科研计算。</p>
+    <p><b>玩家每月选一项：</b>横向 SAN-5、纵向 SAN-4；推进=⌊实际科研能力+随机0～5⌋，最终向下取整。同学也按自身科研计算。</p>
     <p>导师每月轮流推进项目<b>10</b>，横向不设最低经费要求。</p>`,
     `<p>“导师项目”事件由你牵头：横向基础SAN-8、纵向基础SAN-6，享受科研档位减免；对应进度+100。满条奖励单独记入项目完成日志。</p>`),
   directPage("经费使用", `<p><b>科研经费用于学生工资、实验和论文费用。</b>发薪前经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}时，硕士额外补贴${ADVISOR_SALARY_BONUS.master}、博士额外补贴${ADVISOR_SALARY_BONUS.phd}金币。</p>
     <p><b>实验基础花费3经费</b>，个人显卡和实习减免仅限玩家；先算共享涨价与个人减免。玩家经费不足时暂停实验，同学先用经费、不足差额自付。</p>
     <p>算力短缺持续6个月，玩家与同学每次实验费用+1。同学经费与个人金币合计不足当次实验费用时改做横向。</p>
     <p>同学自动做项目时按月初经费选择：<b>≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}做纵向</b>，否则做横向。</p>
-    <p>“导师经费”事件抽中后，需经费<b>超过${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}</b>才会出现；未达标的机会暂存，达标后触发。</p>`),
-  directPage("经费报销", `<p>“导师经费”事件另有结项资金，奖励不扣实验室经费。显卡、工位、AI报销按导师好感档位以<b>40%／60%／80%／100%</b>获批。</p>
-    <p>劳务费无需概率判定，四档为<b>3／5／7／9金币</b>。显卡、工位获批后获得一次对应购买或升级免单，资格可跨月保留。</p>
-    <p>AI报销<b>下月</b>生效，覆盖购买和续费，本月已支付费用不退还。</p>`),
+    <p>“导师经费”事件抽中后，需经费<b>达到${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}</b>才会出现；未达标的机会暂存，达标后触发。</p>`),
+  directPage("经费报销", `<p>“导师经费”使用实验室经费。显卡、工位、AI报销按导师好感档位以<b>40%／60%／80%／100%</b>获批。</p>
+    <p>劳务费无需概率判定，四档为<b>3／5／7／9金币</b>，领取时扣同额经费。</p>
+    <p>显卡、工位报销各限<b>获批当月一次</b>，购买或升级时扣实际经费；未使用月底失效，资格列在“本月效果”。</p>
+    <p>AI报销<b>下月</b>生效，购买和续费时扣实际经费，本月已支付费用不退还。经费不足时暂停报销，不自动转为自费。</p>`),
   directPage("会议费用", `<p><b>录用结果确认时，每篇一作注册费1金币，由导师经费支付。</b>玩家与同学相同，3个月后不再扣注册费。</p>
-    <p><b>3个月后，同一届会议统一安排差旅。</b>国内／亚太／欧美为2／4／6金币。自费只扣个人金币；导师报销扣同额经费，好感基础消耗1／2／3，经过抵抗。</p>
+    <p><b>确认录用结果后立即出现“会议名参会”，同届论文合并处理。</b>开会月固定为录用结果生成后第3个月，延后确认不顺延；可提前1～3个月完成参会决定，最迟在开会月完成。</p>
+    <p>差旅在参会决定最终确认时支付，国内／亚太／欧美为2／4／6金币。自费只扣个人金币；导师报销扣同额经费，好感基础消耗1／2／3，经过抵抗。</p>
+    <p>亲自参会确认后，未来待办显示“会议名活动”；到开会月才开放会场活动与论文展示。提前付款不会提前公开论文；挂arXiv或在VALSE展示海报可提前被引，宣传加成在公开后生效。原会议的Oral／Best加成仍等该会议举办后生效。</p>
     <p>请会外联系人代参加免费，不扣差旅或好感，也不进入参会活动。同学默认免费代贴，无差旅。</p>
-    <p>领域年会VALSE免注册费，不论有无论文均只需差旅2；自费扣个人金币，报销扣科研经费。</p>
+    <p>领域年会VALSE免注册费，不论有无论文均只需差旅2；自费扣个人金币，报销扣科研经费。到场后的活动名为“VALSE活动”。</p>
     <p>经费为0仍可继续，低于0才破产。危险选择的标记见“事件提示”。</p>`),
   directPage("期刊版面费", `<p>PAMI／NMI／Nature的OA版面费分别5／10／20，不等待3个月。玩家一作发表后进入<b>期刊中稿→缴费方式→缴费确认</b>三幕事件。</p>
     <p>可选自费或导师经费，最终确认时才扣款；选定后不能返回重选。余额不足也可选择，请留意按钮的危险标记。</p>
@@ -148,7 +152,7 @@ const RELATIONSHIP_PAGES: readonly PlayHelpPage[] = [
     <tr><th>青基</th><td>副教授</td><td>60</td><td>3</td></tr><tr><th>面上</th><td>四级教授</td><td>70</td><td>3.5</td></tr><tr><th>优青</th><td>三级教授</td><td>80</td><td>4</td></tr><tr><th>杰青</th><td>二级教授</td><td>90</td><td>4.5</td></tr><tr><th>院士</th><td>一级教授</td><td>100</td><td>5</td></tr>
     </tbody></table><p>讲师限1项，晋升后限2项；项目到期释放名额，职称与已获项目保留。</p>`),
   directPage("同学协作", `<p>每位同学每月可主动协作一次，师兄／师姐、同门、师弟／师妹基础SAN消耗为4、3、2；审稿时也可协作。</p>
-    <p><b>主动推进</b>=⌊你的科研⌋+随机0～5；<b>每月自动推进</b>=默契，长期合作每月推进2次。</p>
+    <p><b>主动推进</b>=⌊你的实际科研+随机0～5⌋，最终向下取整；<b>每月自动推进</b>=默契，长期合作每月推进2次。</p>
     <p>自动协作使用实际默契，保留小数。例如默契6.75，普通合作每月推进6.75，长期合作推进13.5。</p>
     <p><b>满100互助：</b>你帮同学论文最低项；同学帮你的方向见表，加分为帮助者科研向下取整。</p>
     <table class="panel-tip-table rel-help-table"><thead><tr><th>同学</th><th>帮助方式</th></tr></thead><tbody>

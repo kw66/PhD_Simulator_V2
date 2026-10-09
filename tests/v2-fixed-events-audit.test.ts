@@ -268,7 +268,7 @@ describe("audited fixed-event rules", () => {
     expect(confirmation.description).not.toContain("分论坛");
     expect(activity.description).toContain("签到处");
     expect(activity.description).toContain("海报区");
-    expect(activity.title).toBe("VALSE参会");
+    expect(activity.title).toBe("VALSE活动");
     const activityDecision = activity.choices[0]?.effects.enqueueEvents?.[0];
     for (const event of [activity, activityDecision!]) {
       expect(event.description).not.toMatch(/导师报销|导师好感 -1|机制结算|结果：/u);
@@ -280,7 +280,7 @@ describe("audited fixed-event rules", () => {
     const weakerPaper = createGrantedPublishedPaper(17, 0, {
       title: "较早的 A 类论文",
       target: "A",
-      acceptedScore: 30,
+      acceptedScore: 100,
     });
     const strongerPaper = createGrantedPublishedPaper(17, 1, {
       title: "准备展示的 A 类论文",
@@ -293,6 +293,7 @@ describe("audited fixed-event rules", () => {
       acceptedScore: 90,
       nonFirstAuthor: true,
     });
+    weakerPaper.publication!.effectiveScore = 30;
     let state: GameState = {
       ...playingState(),
       player: { ...createInitialState().player, san: 10 },
@@ -306,7 +307,7 @@ describe("audited fixed-event rules", () => {
     const posterChoice = activityDecision?.choices.find((choice) => choice.label === "海报展示");
 
     expect(activityDecision?.description).toContain("准备展示的 A 类论文");
-    expect(posterChoice?.outcome).toContain("该论文宣传倍率 +50%");
+    expect(posterChoice?.outcome).toContain("论文宣传倍率 +25%");
     state = {
       ...state,
       eventQueue: [createEventQueueItem(activityDecision!, 1)],
@@ -318,7 +319,9 @@ describe("audited fixed-event rules", () => {
 
     expect(state.player.san).toBe(10);
     expect(state.externalPublications[1]?.publication?.promotionMultiplier).toBe(1);
-    expect(state.eventQueue[0]?.description).toContain("宣传倍率 +50%");
+    expect(state.externalPublications[1]?.publication?.posterExposed).not.toBe(true);
+    expect(state.eventQueue[0]?.description).toContain("论文宣传倍率 +25%");
+    expect(state.eventQueue[0]?.description).not.toContain("条件：展示论文");
 
     const resultEvent = state.eventQueue[0]!;
     state = dispatchAction(state, "resolve-event", {
@@ -328,9 +331,11 @@ describe("audited fixed-event rules", () => {
 
     expect(state.player.san).toBe(8);
     expect(state.externalPublications[0]?.publication?.promotionMultiplier).toBe(1);
-    expect(state.externalPublications[1]?.publication?.promotionMultiplier).toBe(1.5);
+    expect(state.externalPublications[1]?.publication?.promotionMultiplier).toBe(1.25);
+    expect(state.externalPublications[1]?.publication?.posterExposed).toBe(true);
+    expect(state.externalPublications[0]?.publication?.posterExposed).not.toBe(true);
     expect(state.externalPublications[2]?.publication?.promotionMultiplier).toBe(1);
-    expect(state.log.some((entry) => entry.text.includes("海报展示") && entry.text.includes("宣传倍率 +50%"))).toBe(true);
+    expect(state.log.some((entry) => entry.text.includes("海报展示") && entry.text.includes("宣传倍率 +25%"))).toBe(true);
   });
 
   it("does not show poster activity without an eligible A paper and never gates dinner by money", () => {
@@ -344,7 +349,7 @@ describe("audited fixed-event rules", () => {
     });
     const activity = createCcigActivityEvent(state, "self", ["自费参会"]);
     const activityDecision = activity.choices[0]?.effects.enqueueEvents?.[0];
-    const dinnerChoice = activityDecision?.choices.find((choice) => choice.label === "请同学吃饭");
+    const dinnerChoice = activityDecision?.choices.find((choice) => choice.label === "品尝当地美食");
 
     expect(activityDecision?.choices.map((choice) => choice.label)).not.toContain("海报展示");
     expect(dinnerChoice).toBeDefined();
@@ -375,7 +380,7 @@ describe("audited fixed-event rules", () => {
     expect(state.player.money).toBe(10);
 
     resolveByLabel("确定");
-    expect(state.eventQueue[0]?.title).toBe("VALSE参会");
+    expect(state.eventQueue[0]?.title).toBe("VALSE活动");
     expect(state.eventQueue[0]?.description).not.toMatch(/金币 -2|机制结算|结果：/u);
     expect(state.player.money).toBe(8);
     expect(state.eventCounters.meetingCount).toBe(1);

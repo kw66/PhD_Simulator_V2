@@ -87,7 +87,7 @@ export function calculateThesisProgressGain(baseProgress: number, publishedPaper
   }
 
   const papersBonus = Math.min(publishedPaperCount * 2, 10);
-  const researchBonus = Math.floor((research / 20) * 5);
+  const researchBonus = (research / 20) * 5;
   return Math.round(baseProgress + papersBonus + researchBonus);
 }
 

@@ -9,6 +9,7 @@ import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaborati
 import { combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { getInternshipExperimentEffect } from "./v2-internship-system";
 import { getLabExperimentMoneyCost } from "./v2-lab-compute";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 import type { GameState, PaperActionType } from "./v2-types";
 
 export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
@@ -233,7 +234,7 @@ export function applyResearchOperation(
   }, actionType);
   const operationCountText = executionCount > 1 ? `，共 ${executionCount} 次` : "";
   return pushLog(
-    nextState,
+    recordLabFinance(nextState, "player-experiment", -advisorFundingUsed),
     `${RESEARCH_OPERATION_LABEL[actionType]}：${paper.title}，${actionType} ${paper[actionType]} → ${updatedPaper[actionType]}${operationCountText}；SAN -${preview.sanCost}`,
   );
 }

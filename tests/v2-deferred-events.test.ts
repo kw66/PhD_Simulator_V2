@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildConferenceDecisionEventsForAcceptedPapers, createConferenceDecisionAct1 } from "../src/core/v2-conference-events";
+import { scheduleConferenceAttendance, settleDueConferenceAttendance } from "../src/core/v2-conference-attendance";
 import { createConferenceCareerState, createConferenceEncounterState } from "../src/core/v2-conference-encounters";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventCounters } from "../src/core/v2-event-counters";
@@ -235,10 +236,8 @@ describe("deferred-system event content", () => {
     expect(chosen.loverProgressState.active).toBe(false);
     const accepted = resolve(chosen, "close");
     expect(accepted.loverState).toMatchObject({ active: true, type, gender: "male", startTotalMonths: 5 });
-    expect(accepted.loverProgressState.research).toBeGreaterThanOrEqual(type === "smart" ? 6 : 2);
-    expect(accepted.loverProgressState.research).toBeLessThanOrEqual(type === "smart" ? 9 : 5);
-    expect(accepted.loverProgressState.intimacy).toBeGreaterThanOrEqual(type === "beautiful" ? 6 : 3);
-    expect(accepted.loverProgressState.intimacy).toBeLessThanOrEqual(type === "beautiful" ? 9 : 6);
+    expect(type === "smart" ? [5, 6, 6.75, 7.5] : [2, 3, 4, 5]).toContain(accepted.loverProgressState.research);
+    expect(type === "beautiful" ? [6, 6.75, 7.5, 8.25] : [3, 4, 5, 6]).toContain(accepted.loverProgressState.intimacy);
     expect(accepted.loverProgressState.routes).toEqual({
       play: { progress: 0, completed: 0 }, study: { progress: 0, completed: 0 }, shopping: { progress: 0, completed: 0 },
     });
@@ -287,19 +286,27 @@ describe("deferred-system event content", () => {
     expect(event.description).not.toContain("倍率");
     const act2 = event.choices[0]?.effects.enqueueEvents?.[0];
     expect(act2?.stage).toBe("act2");
-    expect(event.title).toBe("ICML安排");
-    expect(act2?.title).toBe("ICML安排 ➜ 参会方式");
+    expect(event.title).toBe("ICML参会");
+    expect(act2?.title).toBe("ICML参会 ➜ 参会方式");
     expect(act2?.choices.map((choice) => choice.id)).toEqual(["self", "advisor", "proxy"]);
     const selfConfirmation = act2?.choices.find((choice) => choice.id === "self")?.effects.enqueueEvents?.[0];
-    expect(selfConfirmation?.description).toContain("论文1：Poster 展示完成");
-    expect(selfConfirmation?.description).toContain("论文2：Oral 展示完成，会后引用倍率 ×1.50");
-    expect(selfConfirmation?.description).toContain("论文3：Best Paper 展示完成，会后引用倍率 ×5.00");
-    expect(selfConfirmation?.description).not.toContain("×1.00");
+    expect(selfConfirmation?.description).toContain("亲自参会");
+    expect(selfConfirmation?.description).not.toMatch(/展示完成|引用倍率/u);
     expect(selfConfirmation?.description).toContain("金币 -6");
-    const selfActivity = selfConfirmation?.choices[0]?.effects.enqueueEvents?.[0];
-    expect(selfActivity?.title).toBe("ICML参会");
+    expect(selfConfirmation?.choices[0]?.effects.enqueueEvents).toBeUndefined();
+    const scheduled = scheduleConferenceAttendance({ ...createInitialState(), phase: "playing", eventQueue: [] }, selfConfirmation!.choices[0]!.effects.scheduleConferenceAttendance!);
+    const selfActivity = settleDueConferenceAttendance(scheduled).eventQueue[0];
+    expect(selfActivity?.title).toBe("ICML活动");
     expect(selfActivity?.description).not.toMatch(/自费参会|金币|引用倍率/u);
     expect(selfActivity?.chainId).toBe(`${event.chainId}-activity`);
+    const activityDecision = selfActivity!.choices[0]!.effects.enqueueEvents![0]!;
+    for (const choice of activityDecision.choices) {
+      const final = choice.effects.enqueueEvents![0]!;
+      expect(final.description).toContain("论文1：Poster 展示完成");
+      expect(final.description).toContain("论文2：Oral 展示完成，会后引用倍率 ×1.50");
+      expect(final.description).toContain("论文3：Best Paper 展示完成，会后引用倍率 ×5.00");
+      expect(final.description).not.toContain("×1.00");
+    }
 
     const grouped = buildConferenceDecisionEventsForAcceptedPapers([
       { id: "paper-1", target: "C", submittedMonth: 10, submittedYear: 1 },
@@ -315,6 +322,7 @@ describe("deferred-system event content", () => {
       ...createGrantedPublishedPaper(1, 0, { target: "C", acceptedScore: 24 }),
       id: "paper-a",
       conferenceHandled: false,
+      conferenceAvailableAtTotalMonths: 5,
     };
     const context = {
       favor: 12,
@@ -338,6 +346,7 @@ describe("deferred-system event content", () => {
       grade: "C",
       paperCount: 1,
       paperIds: ["paper-a"],
+      availableAtTotalMonths: 5,
     }, context, () => 0);
     let state: GameState = {
       ...initial,
@@ -357,10 +366,21 @@ describe("deferred-system event content", () => {
     expect(state.eventQueue[0]?.choices[0]?.effects.recordConferenceRegistrationPayment).toBeUndefined();
 
     state = resolve(state, "enter-venue");
-    expect(state.eventQueue[0]?.title).toBe("WACV参会");
+    expect(state.eventQueue).toHaveLength(0);
+    expect(state.player.money).toBe(4);
+    expect(state.papers[0]?.conferenceHandled).toBe(false);
+    expect(state.eventCounters.meetingCount).toBe(0);
+    expect(state.conferenceAttendancePlans).toHaveLength(1);
+    expect(state.eventHistory).toHaveLength(1);
+    const beforeDue = { ...state, totalMonths: 4 };
+    expect(settleDueConferenceAttendance(beforeDue)).toBe(beforeDue);
+    state = settleDueConferenceAttendance({ ...state, totalMonths: 5 });
+    expect(state.eventQueue[0]?.title).toBe("WACV活动");
     expect(state.eventQueue[0]?.description).not.toContain("金币 -6");
     expect(state.player.money).toBe(4);
     expect(state.papers[0]?.conferenceHandled).toBe(true);
+    expect(state.eventCounters.meetingCount).toBe(1);
+    expect(settleDueConferenceAttendance(state)).toBe(state);
 
     state = resolve(state, "continue");
     state = resolve(state, "tour-local");
@@ -405,6 +425,7 @@ describe("deferred-system event content", () => {
       grade: "C",
       paperCount: 1,
       paperIds: ["paper-proxy"],
+      availableAtTotalMonths: 5,
     }, context, () => 0);
     let state: GameState = {
       ...initial,
@@ -415,12 +436,15 @@ describe("deferred-system event content", () => {
 
     state = resolve(state, "continue");
     state = resolve(state, "proxy");
-    expect(state.eventQueue[0]?.title).toBe("CCF安排 ➜ 参会方式 ➜ 参会确认");
-    expect(state.eventQueue[0]?.description).toContain("无额外费用");
+    expect(state.eventQueue[0]?.title).toBe("CCF参会 ➜ 参会方式 ➜ 参会确认");
+    expect(state.eventQueue[0]?.description).toContain("不去参会");
     expect(state.eventQueue[0]?.choices[0]?.label).toBe("确定");
-    expect(state.eventQueue[0]?.choices[0]?.effects).toEqual({
-      paperUpdates: [{ id: "paper-proxy", conferenceHandled: true }],
-    });
+    const plan = state.eventQueue[0]!.choices[0]!.effects.scheduleConferenceAttendance!;
+    expect(plan.mode).toBe("proxy");
+    expect(plan.context.paperIds).toEqual(["paper-proxy"]);
+    expect(plan.context.availableAtTotalMonths).toBe(5);
+    expect(state.eventQueue[0]?.choices[0]?.effects.paperUpdates).toBeUndefined();
+    expect(state.eventQueue[0]?.choices[0]?.effects.enqueueEvents).toBeUndefined();
     state = resolve(state, "proxy-finish");
 
     expect(state.eventQueue).toHaveLength(0);
@@ -431,6 +455,17 @@ describe("deferred-system event content", () => {
     expect(state.player.money).toBe(1);
     expect(state.player.favor).toBe(initial.player.favor);
     expect(state.advisorProgressState).toEqual(initial.advisorProgressState);
-    expect(state.log.some((entry) => entry.text.includes("找人代贴") && entry.text.includes("论文参会已处理"))).toBe(true);
+    expect(state.conferenceAttendancePlans).toEqual([plan]);
+    expect(state.log.some((entry) => entry.text.includes("找人代贴") && entry.text.includes("不去参会"))).toBe(true);
+    expect(state.log.some((entry) => entry.text.includes("代贴完成"))).toBe(false);
+    const beforeDue = { ...state, totalMonths: 4 };
+    expect(settleDueConferenceAttendance(beforeDue)).toBe(beforeDue);
+    state = settleDueConferenceAttendance({ ...state, totalMonths: 5 });
+    expect(state.conferenceAttendancePlans).toHaveLength(0);
+    expect(state.eventQueue).toHaveLength(0);
+    expect(state.eventCounters.meetingCount).toBe(0);
+    expect(state.player.money).toBe(1);
+    expect(state.log.some((entry) => entry.text.includes("代贴完成"))).toBe(true);
+    expect(settleDueConferenceAttendance(state)).toBe(state);
   });
 });

@@ -45,7 +45,7 @@ describe("advisor funding reimbursements", () => {
         const branches = choices(makeState(favor), [roll, roll, roll]);
         const approved = roll < percent / 100;
         expect(branches[1]!.effects).toMatchObject({ money });
-        expect(branches[1]!.effects.advisorProgressStateDeltas).toBeUndefined();
+        expect(branches[1]!.effects.advisorProgressStateDeltas).toEqual({ funding: -money });
         for (const index of [0, 2, 3]) {
           const choice = branches[index]!;
           expect(choice.outcome).toContain(`${approved ? "同意报销" : "未获同意"}（${approved ? percent : 100 - percent}%）`);
@@ -61,8 +61,8 @@ describe("advisor funding reimbursements", () => {
 
   it("draws each reimbursement separately and preserves labor pay", () => {
     const branches = choices(makeState(), [0.1, 0.8, 0.2]);
-    expect(branches[0]!.effects.shopEntitlementDeltas).toEqual({ gpuTransaction: 1 });
-    expect(branches[2]!.effects.shopEntitlementDeltas).toBeUndefined();
+    expect(branches[0]!.effects.labReimbursement).toBe("gpuTransaction");
+    expect(branches[2]!.effects.labReimbursement).toBeUndefined();
     expect(branches[3]!.effects.addBuffs).toHaveLength(1);
     expect(branches[1]!.effects.money).toBe(3);
   });

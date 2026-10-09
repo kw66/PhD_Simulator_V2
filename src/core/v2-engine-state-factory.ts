@@ -63,6 +63,7 @@ export function createInitialState(): GameState {
     fellowFinanceAccounts: {},
     fellowPapers: [],
     conferenceEncounterState: createConferenceEncounterState(),
+    conferenceAttendancePlans: [],
     conferenceLocationSeed: null,
     conferenceCareerState: createConferenceCareerState(),
     internshipState: createInternshipState(),

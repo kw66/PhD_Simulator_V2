@@ -118,7 +118,7 @@ describe("advisor grant result events", () => {
     state.advisorProgressState.researchAccumulation = 400;
     state = nextScene(nextScene(state));
     expect(state.eventQueue[0]?.description).toContain("听组里的同学说起");
-    expect(state.eventQueue[0]?.description).toContain("未获批（20%）\n结果：无事发生");
+    expect(state.eventQueue[0]?.description).toContain("未获批（20%）\n结果：青基未获批");
     const final = nextScene(state);
     expect(final.advisorProgressState).toMatchObject({ funding: 30, awards: [], pendingApplication: null });
     expect(final.eventHistory.some((entry) => entry.id.startsWith("talent:advisor-salary"))).toBe(false);

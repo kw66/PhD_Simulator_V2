@@ -2,6 +2,7 @@ import { getAdvisorGuidanceAmount, queueAdvisorGuidance, settleAdvisorGuidance }
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { creditFellowMoney, ensureFellowFinanceAccounts, getFellowFinanceAccount } from "./v2-fellow-finance";
 import { roundMoney } from "./v2-money";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 import type { AdvisorProgressState, GameState } from "./v2-types";
 
 export const PROJECT_PROGRESS_MAX = 100;
@@ -29,7 +30,7 @@ export function advanceSharedLabProject(
   if (state.phase !== "playing" || gain === 0) return { state, gain: 0, completed: 0 };
   state = ensureFellowFinanceAccounts(state);
   const field = type === "horizontal" ? "horizontalProgress" : "verticalProgress";
-  const total = (state.advisorProgressState[field] ?? 0) + gain;
+  const total = Math.floor(state.advisorProgressState[field] ?? 0) + gain;
   const completed = Math.floor(total / PROJECT_PROGRESS_MAX);
   let nextState: GameState = {
     ...state,
@@ -52,6 +53,8 @@ export function advanceSharedLabProject(
           funding: roundMoney(nextState.advisorProgressState.funding + reward - laborCost),
         },
       };
+      nextState = recordLabFinance(nextState, "horizontal-income", reward);
+      nextState = recordLabFinance(nextState, "labor", -laborCost);
       completionSummary = `科研经费 +${reward}，科研经费 -${laborCost}（劳务费）；金币 +${laborReward}${recipientNames.length ? `；${recipientNames.join("、")}各领${laborReward}金币` : ""}`;
     } else {
       nextState = settleAdvisorGuidance(nextState, random);

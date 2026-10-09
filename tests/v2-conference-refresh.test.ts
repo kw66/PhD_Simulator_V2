@@ -90,8 +90,11 @@ describe("conference travel and stable previews", () => {
     const final = stage === "act3" ? selected : confirmation(selected);
     const refreshed = refreshConferenceDecision(state, final);
     expect(refreshed.conferencePreview!.context.paperIds).toEqual(["player-paper", "new-paper"]);
-    expect(refreshed.choices[0]!.effects.paperUpdates?.map((paper) => paper.id)).toEqual(["player-paper", "new-paper"]);
-    expect(refreshed.description).toContain("论文2：Oral");
+    const plan = refreshed.choices[0]!.effects.scheduleConferenceAttendance!;
+    expect(plan.context.paperIds).toEqual(["player-paper", "new-paper"]);
+    expect(plan.context.paperPresentations?.[1]).toMatchObject({ title: "Newly accepted paper", acceptType: "Oral" });
+    expect(refreshed.choices[0]!.effects.paperUpdates).toBeUndefined();
+    expect(refreshed.description).not.toContain("展示完成");
     expect(refreshed.conferencePreview!.rolls).toEqual(originalPreview.rolls);
   });
 
@@ -142,8 +145,8 @@ describe("conference travel and stable previews", () => {
     const restored = refreshConferenceDecision(state, lowerFavor);
     expect(confirmation(restored, "advisor")).toEqual(confirmation(selected, "advisor"));
     for (const mode of ["self", "advisor"]) {
-      expect(confirmation(lowerFavor, mode).choices[0]!.effects.enqueueEvents)
-        .toEqual(confirmation(selected, mode).choices[0]!.effects.enqueueEvents);
+      expect(confirmation(lowerFavor, mode).choices[0]!.effects.scheduleConferenceAttendance)
+        .toEqual(confirmation(selected, mode).choices[0]!.effects.scheduleConferenceAttendance);
     }
     expect(random).not.toHaveBeenCalled();
   });

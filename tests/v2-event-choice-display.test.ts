@@ -40,7 +40,9 @@ describe("event navigation and risk display", () => {
     try {
       const html = renderEvent(current, event);
       const button = html.match(/<button\s+class="event-choice-btn[\s\S]*?<\/button>/u)![0];
-      expect(button).toContain('title="会暴毙"');
+      expect(button).toContain('data-event-risk-tooltip');
+      expect(button).toContain('金币不足，结算后为-1，将进入失败结局：穷困潦倒。');
+      expect(button).not.toContain('title=');
       expect(button).toContain('is-certain');
       expect(button).not.toContain('disabled');
       expect(button).toContain('data-action="resolve-event"');
@@ -59,13 +61,26 @@ describe("event navigation and risk display", () => {
     const html = renderEvent(current, decision);
     const button = [...html.matchAll(/<button\s+class="event-choice-btn[\s\S]*?<\/button>/gu)]
       .map(match => match[0]).find(value => value.includes('聚餐'))!;
-    expect(button).toContain('可能会暴毙');
+    expect(button).toContain('金币可能不足（结算后-2～0），可能进入失败结局：穷困潦倒。');
+    expect(button).toContain('data-event-risk-tooltip');
     expect(button).toContain('is-possible');
   });
 });
 
 describe("publication agenda previews", () => {
-  it("shows separate review results and one future arrangement per conference", () => {
+  function attendancePlan(mode: "self" | "advisor" | "proxy", due: number | undefined = 18): NonNullable<GameState["conferenceAttendancePlans"]>[number] {
+    return {
+      context: {
+        id: "conference-trip", conferenceName: getConferenceInfo(1, "A", 2).name,
+        conferenceYear: 2027, city: "北京", country: "中国", region: "domestic",
+        grade: "A", paperCount: 2, paperIds: ["accepted1", "accepted2"],
+        availableAtTotalMonths: due,
+      },
+      mode, rolls: [0.25, 0.75],
+    };
+  }
+
+  it("keeps separate review results without previewing unarranged accepted papers", () => {
     const current = state();
     const draft = { ...createDraftPaper(1, 0, () => 0), target: "A" as const, submittedMonth: 1, submittedYear: 2 };
     const venue = getConferenceInfo(1, "A", 2).name;
@@ -82,8 +97,41 @@ describe("publication agenda previews", () => {
     const before = structuredClone(current);
     const items = buildFutureTodoPreviewItems(current);
     expect(items.filter(item => item.title === `${venue}结果`)).toHaveLength(2);
-    expect(items.filter(item => item.title === `${venue}安排`)).toMatchObject([{ monthsLater: 3 }]);
-    expect(buildFutureTodoPreviewItems({ ...current, maxMonths: 17 }).some(item => item.title === `${venue}安排`)).toBe(false);
+    expect(items.some(item => [`${venue}安排`, `${venue}参会`, `${venue}活动`].includes(item.title))).toBe(false);
     expect(current).toEqual(before);
+  });
+
+  it.each(["self", "advisor"] as const)("previews one activity for a confirmed %s plan with multiple papers", (mode) => {
+    const current = state();
+    const plan = attendancePlan(mode);
+    current.conferenceAttendancePlans = [plan];
+    const before = structuredClone(current);
+    const random = vi.spyOn(Math, "random");
+    try {
+      for (const monthsLater of [1, 2, 3]) {
+        const items = buildFutureTodoPreviewItems({ ...current, totalMonths: 18 - monthsLater });
+        expect(items.filter(item => item.title === `${plan.context.conferenceName}活动`))
+          .toMatchObject([{ monthsLater }]);
+        expect(items.some(item => item.title === `${plan.context.conferenceName}参会`)).toBe(false);
+      }
+      expect(current).toEqual(before);
+      expect(random).not.toHaveBeenCalled();
+    } finally { random.mockRestore(); }
+  });
+
+  it("excludes proxy, undated, current and past plans and respects the training endpoint", () => {
+    const current = state();
+    const title = `${attendancePlan("self").context.conferenceName}活动`;
+    current.conferenceAttendancePlans = [
+      attendancePlan("proxy"),
+      { ...attendancePlan("self"), context: { ...attendancePlan("self").context, availableAtTotalMonths: undefined } },
+      attendancePlan("self", 15),
+      attendancePlan("advisor", 14),
+    ];
+    expect(buildFutureTodoPreviewItems(current).some(item => item.title === title)).toBe(false);
+    current.conferenceAttendancePlans = [attendancePlan("self")];
+    expect(buildFutureTodoPreviewItems({ ...current, maxMonths: 17 }).some(item => item.title === title)).toBe(false);
+    expect(buildFutureTodoPreviewItems({ ...current, maxMonths: 18 }).filter(item => item.title === title))
+      .toMatchObject([{ monthsLater: 3 }]);
   });
 });

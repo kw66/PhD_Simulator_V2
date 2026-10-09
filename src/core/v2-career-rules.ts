@@ -121,8 +121,8 @@ export function calculateCareerProgress(
   }
 
   const weights = CAREER_DEFINITIONS[careerType].weights;
-  const researchBonus = Math.floor((input.research / 20) * 20 * weights.research);
-  const socialBonus = Math.floor((input.social / 20) * 20 * weights.social);
+  const researchBonus = (input.research / 20) * 20 * weights.research;
+  const socialBonus = (input.social / 20) * 20 * weights.social;
   const papersBonus = Math.min(input.publishedPaperCount * 5, 30) * weights.papers;
   const internshipBonus = input.internshipCount * (careerType === "internet" ? 15 : careerType === "stateOwned" ? 5 : 0);
 

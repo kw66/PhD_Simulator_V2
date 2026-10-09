@@ -37,6 +37,7 @@ import { advancePaperReviewDeadlines, refreshPaperReviewEvents, resolveDuePaperR
 import { resolveReadyJournalPapers, submitJournalPaper } from "./v2-journal-system";
 import { buildConferenceDecisionEventsForAcceptedPapers, createConferenceDecisionAct1, refreshConferenceDecision } from "./v2-conference-events";
 import { getConferenceTripId } from "./v2-conference-identity";
+import { settleDueConferenceAttendance } from "./v2-conference-attendance";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyShopAction } from "./v2-shop-transactions";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
@@ -231,7 +232,6 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
       && !paper.nonFirstAuthor
       && !paper.journalTarget && !paper.publication?.journalTarget
       && paper.conferenceHandled !== true
-      && (paper.conferenceAvailableAtTotalMonths === undefined || paper.conferenceAvailableAtTotalMonths <= state.totalMonths)
       && paper.target !== null
       && typeof paper.submittedMonth === "number"
       && typeof paper.submittedYear === "number"
@@ -243,9 +243,11 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
       submittedYear: paper.submittedYear,
       title: paper.title,
       acceptType: paper.publication?.acceptType ?? "Poster",
+      availableAtTotalMonths: paper.conferenceAvailableAtTotalMonths ?? state.totalMonths,
     }));
   if (candidates.length === 0) return state;
   const builderState = {
+    totalMonths: state.totalMonths,
     favor: state.player.favor,
     money: state.player.money,
     advisorProgressState: state.advisorProgressState,
@@ -270,6 +272,18 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
   let nextState = state;
   for (const group of grouped) {
     const context = group.conferencePreview!.context;
+    const planned = nextState.conferenceAttendancePlans?.find((plan) => getConferenceTripId(plan.context) === getConferenceTripId(context));
+    if (planned) {
+      const paperIds = [...new Set([...planned.context.paperIds, ...context.paperIds])];
+      if (paperIds.length !== planned.context.paperIds.length) {
+        nextState = { ...nextState, conferenceAttendancePlans: nextState.conferenceAttendancePlans!.map((plan) => plan !== planned ? plan : {
+          ...plan, context: { ...plan.context, paperIds, paperCount: paperIds.length,
+            paperPresentations: [...new Map([...(plan.context.paperPresentations ?? []), ...(context.paperPresentations ?? [])].map((paper) => [paper.id, paper])).values()],
+          },
+        }) };
+      }
+      continue;
+    }
     const previous = nextState.eventQueue.find((event) => event.conferencePreview
       && getConferenceTripId(event.conferencePreview.context) === getConferenceTripId(context));
     if (!previous?.conferencePreview) {
@@ -333,7 +347,7 @@ function advanceMonth(state: GameState): GameState {
   state = settleLabResearchGrowth(settleFellowAcademicYear(state));
   if (state.totalMonths >= state.maxMonths) return finishTrainingIfReady(syncAdvisorResearchAccumulation(state));
 
-  const nextState = evaluateCoreEndings(enqueueAcceptedPaperConferenceEvents(createAdvancedCalendarState(state)));
+  const nextState = evaluateCoreEndings(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(createAdvancedCalendarState(state))));
   if (nextState.phase !== "playing") return nextState;
   const queuedState = enqueueMonthlyEventsForMonth(nextState).nextState;
   return settleLinearEvents(queuedState, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
@@ -365,6 +379,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   }
   const setupState = dispatchSetupAction(state, actionId, payload, createInitialState);
   if (setupState !== null) return setupState;
+  if (actionId === "debug-trigger-ending") return dispatchDebugAction(state, actionId, payload) ?? state;
   if (state.phase === "finished") return state;
   if (actionId === "set-linear-event-blocking" && state.phase !== "playing") return dispatchGameAction(state, actionId, payload);
   if (state.phase !== "playing") return dispatchDebugAction(state, actionId, payload) ?? state;
@@ -383,7 +398,8 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   const settledState = actionId === "resolve-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;
-  const refreshed = refreshPendingEventDecisions(refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingRandomEvents(syncAdvisorResearchAccumulation(settledState)))));
+  const conferenceState = settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(settledState));
+  const refreshed = refreshPendingEventDecisions(refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingRandomEvents(syncAdvisorResearchAccumulation(conferenceState)))));
   if (debugAction) return refreshed;
   const evaluated = evaluateCoreEndings(refreshed);
   if (evaluated.phase !== "playing") return evaluated;

@@ -38,7 +38,7 @@ describe("game announcements", () => {
     expect(current).toContain("VALSE跨月保留原届年份、城市与活动");
     expect(current).toContain("转博事件加入已审阅标记");
     expect(current).toContain("按钮加“！”或“？”");
-    expect(current).toContain("会暴毙／可能会暴毙");
+    expect(current).toContain("必定或可能失败的具体原因及预计结算值");
     expect(current).toContain("需手动确认");
     expect(current).toContain("多篇同会论文合并安排");
     expect(current).toContain("论文结果和参会显示具体会议名");

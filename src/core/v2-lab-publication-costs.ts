@@ -3,6 +3,7 @@ import { getPaperConferenceTripId } from "./v2-conference-identity";
 import { getJournalDefinition } from "./v2-journal-system";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { roundMoney } from "./v2-money";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { CONFERENCE_REGISTRATION_FEE, JOURNAL_PUBLICATION_FEES } from "./v2-publication-fees";
 import { createJournalFeeEvent } from "./v2-journal-fee-events";
 import { enqueueEventQueueItem } from "./v2-event-queue";
@@ -67,6 +68,7 @@ export function settleJournalPublicationFees(state: GameState): GameState {
       funding: roundMoney(nextState.advisorProgressState.funding - fee),
       paidJournalPaperIds: [...paid],
     } }, `${paper.leadAuthorName ?? "你"}的《${paper.title}》：${getJournalDefinition(journal).name}版面费，科研经费 -${fee}。`, "journal-fee");
+    nextState = recordLabFinance(nextState, "journal-fee", -fee);
     nextState = recordFellowPublicationCost(nextState, paper.leadAuthorId, "journal", fee);
   }
   return nextState;
@@ -88,6 +90,7 @@ function resolveConferenceRegistrationFees(state: GameState, paperIds: readonly 
       funding: roundMoney(nextState.advisorProgressState.funding - fee),
       paidConferenceRegistrationPaperIds: [...paid],
     } };
+    nextState = recordLabFinance(nextState, "conference-registration", -fee);
     if (recordLogs) nextState = pushMilestoneLog(nextState,
       `${paper.leadAuthorName ?? "你"}的《${paper.title}》：${venue.name} ${venue.year}录用注册费，科研经费 -${fee}（导师已支付）。`, "conference-registration-fee");
     if (isFellowPaper(paper)) nextState = recordFellowPublicationCost(nextState, paper.leadAuthorId, "registration", fee);

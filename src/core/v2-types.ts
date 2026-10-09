@@ -15,6 +15,7 @@ import type {
 } from "./v2-types-economy";
 import type { FixedEventResolution } from "./v2-types-fixed-events";
 import type { ConferenceEventContext } from "./v2-conference-events";
+import type { ConferenceActivityContext } from "./v2-conference-activity-shared";
 import type {
   AdvisorGrantApplication,
   AdvisorProgressState,
@@ -133,11 +134,13 @@ export interface PaperPublicationState {
   pendingCitationFraction?: number;
   /** arXiv makes the paper visible before the conference attendance flow ends. */
   preprintExposed?: boolean;
+  posterExposed?: boolean;
   promotions?: PaperPromotionState;
 }
 
 export interface PaperReviewerReport {
   reviewer: string;
+  weightInfo?: string;
   reviewerType?: PaperReviewerType;
   focus: PaperReviewerFocus;
   effectiveScore: number;
@@ -176,6 +179,20 @@ export interface PaperReviewSettlement {
   reports: PaperReviewerReport[];
 }
 
+export type PaperReviewScores = Pick<Paper, "idea" | "experiment" | "writing">;
+
+export type PaperReviewScoreSnapshot = PaperReviewScores & { total: number };
+
+export interface PaperReviewScoreChange {
+  submitted: PaperReviewScoreSnapshot;
+  beforeSettlement: PaperReviewScoreSnapshot;
+  afterSettlement: PaperReviewScoreSnapshot;
+  duringReviewChange: PaperReviewScoreSnapshot;
+  reviewerImprovement: PaperReviewScoreSnapshot;
+  settlementChange: PaperReviewScoreSnapshot;
+  totalChange: PaperReviewScoreSnapshot;
+}
+
 export type PaperReviewEventPresentation =
   | {
       kind: "overview";
@@ -183,6 +200,9 @@ export type PaperReviewEventPresentation =
       target: PaperTarget;
       conferenceName: string;
       conferenceYear: number;
+      conferenceFullName: string;
+      field: string;
+      referenceScore: number;
       venueInfluence: number;
       reviewStrictnessMultiplier: number;
       submittedScore: number;
@@ -190,6 +210,10 @@ export type PaperReviewEventPresentation =
   | {
       kind: "reviewers";
       paperTitle: string;
+      target: PaperTarget;
+      venueInfluence: number;
+      submittedScore: number;
+      submittedScores: PaperReviewScores;
       reports: PaperReviewerReport[];
       conferenceName?: string;
       conferenceYear?: number;
@@ -204,6 +228,7 @@ export type PaperReviewEventPresentation =
       totalReviewScore: number;
       borderlineChance: number | null;
       rewardText: string;
+      scoreChange: PaperReviewScoreChange;
       conferenceName?: string;
       conferenceYear?: number;
       reports?: PaperReviewerReport[];
@@ -490,6 +515,7 @@ export interface EventChoice {
     grantedPublication?: GrantedPublicationEffect;
     eventSupportUpdates?: Partial<EventSupportState>;
     shopEntitlementDeltas?: Partial<ShopEntitlementState>;
+    labReimbursement?: keyof ShopEntitlementState;
     persistentExtraActionDeltas?: Partial<PersistentExtraActions>;
     relationshipAdditions?: RelationshipKind[];
     fellowAdditions?: FellowProfileAddition[];
@@ -502,7 +528,9 @@ export interface EventChoice {
     activateLoverProgress?: LoverTypeId;
     researchCapacityStateDeltas?: Partial<Record<keyof ResearchCapacityState, number>>;
     advisorProgressStateDeltas?: Partial<Pick<AdvisorProgressState, "researchAccumulation" | "funding">>;
+    labFinanceCategory?: LabFinanceCategory;
     recordPlayerConferenceTrip?: string;
+    scheduleConferenceAttendance?: ConferenceAttendancePlan;
     recordConferenceRegistrationPayment?: string[];
     recordJournalFeePayment?: string;
     advisorGrantResult?: AdvisorGrantApplication;
@@ -583,6 +611,18 @@ export interface PendingEvent {
     resolution: FixedEventResolution;
     rolls: number[];
   };
+  ccigActivityPreview?: {
+    year: number;
+    month: number;
+    participationMode: "advisor" | "self";
+    attendanceSettlementItems: string[];
+  };
+  conferenceActivityPreview?: {
+    context: ConferenceActivityContext;
+    attendanceSummary: string;
+    rolls: number[];
+    selectedOptionId?: string;
+  };
   fixedTreePreview?: {
     kind: "mentor-assign" | "phd-decision";
     year: number;
@@ -633,7 +673,18 @@ export interface EventQueueItem extends PendingEvent {
   queueOrder: number;
 }
 
+export interface ConferenceAttendancePlan {
+  context: ConferenceEventContext;
+  mode: "self" | "advisor" | "proxy";
+  rolls: number[];
+}
+
+export type LabFinanceCategory = "conference-registration" | "conference-travel" | "journal-fee"
+  | "labor" | "student-wages" | "student-experiment" | "player-experiment"
+  | "student-reimbursement" | "horizontal-income" | "grant-income" | "initial-funding" | "other";
+
 export interface GameState extends RandomEventState {
+  labFinanceLedger?: { totalMonths: number; amounts: Partial<Record<LabFinanceCategory, number>> };
   blockLinearEvents: boolean;
   debugEventReplayEnabled?: boolean;
   phase: GamePhase;
@@ -669,6 +720,7 @@ export interface GameState extends RandomEventState {
   actionState: MonthlyActionState;
   relationshipState: RelationshipState;
   conferenceEncounterState: ConferenceEncounterState;
+  conferenceAttendancePlans?: ConferenceAttendancePlan[];
   /** Seed chosen once at run start; keeps all conference locations stable within this run. */
   conferenceLocationSeed?: number | null;
   conferenceCareerState: ConferenceCareerState;

@@ -50,6 +50,7 @@ describe("independent debug window", () => {
     const html = renderDebugPanel(createStartedGameState("normal"), true);
     const paperGroup = html.match(/<h3>论文相关<\/h3>([\s\S]*?)<\/div>/)?.[1] ?? "";
     const graduationGroup = html.match(/<h3>毕业相关<\/h3>([\s\S]*?)<\/div>/)?.[1] ?? "";
+    expect(paperGroup.match(/data-event-id="([^"]+)"/)?.[1]).toBe("review-result");
     for (const [id, label] of [["conference", "论文参会"], ["conference-activity", "会场活动"], ["review-result", "论文结果"]]) {
       expect(paperGroup).toContain(`data-event-id="${id}"`);
       expect(paperGroup).toContain(label);
@@ -84,6 +85,8 @@ describe("independent debug window", () => {
     expect(html).toContain('data-action="debug-adjust-action-points" data-delta="1"');
     expect(html).toContain("读研之始 ✓");
     expect(html).toContain("教师节 ✓");
+    expect(html).toContain("领域年会 ✓");
+    expect(html).toContain("年会活动 ✓");
     expect(html).toContain("导师经费 ✓");
     expect(html).toContain("游戏放松 ✓");
     expect(html).toContain("数据丢失 ✓");

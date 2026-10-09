@@ -1,4 +1,5 @@
 import { AI_SLOT_IDS, getAiModelForTotalMonths, hasAiReimbursement } from "./v2-ai-shop";
+import { getLabReimbursementCount, getLabReimbursementKind } from "./v2-lab-reimbursement";
 import { getNextBikeTierDefinition } from "./v2-bike-system";
 import { COFFEE_MACHINE_PRICE, COFFEE_MACHINE_UPGRADE_DEFINITIONS, getAvailableCoffeeMachineUpgrades, getCoffeeBuyPrice } from "./v2-coffee-system";
 import { canBuyShopItem, getAvailableShopUpgrades, getShopItemSellPrice } from "./v2-shop-items-ownership";
@@ -23,35 +24,47 @@ export function consumeLoverGift(state: GameState): GameState {
   return { ...state, loverProgressState };
 }
 
-export function getShopActionBasePrice(state: GameState, actionId: ShopPurchaseAction, payload: PurchasePayload): number | null {
-  const entitlements = state.shopState.entitlements;
+export function getShopActionListedPrice(state: GameState, actionId: ShopPurchaseAction, payload: PurchasePayload): number | null {
   if (actionId === "buy-shop-item" && payload.shopItemId) {
     const itemId = payload.shopItemId;
     if (itemId === "gpu_buy") {
       const price = getNextGpuPrice(state.shopState.gpuLevel);
-      return price === null ? null : entitlements.gpuTransaction > 0 ? 0 : price;
+      return price;
     }
     if (itemId === "bike") return getNextBikeTierDefinition(state.shopState.bikeLevel)?.price ?? null;
-    if (itemId === "keyboard" && entitlements.workstationTransaction > 0) return 0;
-    if (itemId === "monitor" && entitlements.workstationTransaction > 0) return 0;
-    if (itemId === "chair" && entitlements.workstationTransaction > 0) return 0;
     return getShopItemDefinition(itemId).price;
   }
   if (actionId === "upgrade-shop-item" && payload.shopUpgradeId) {
-    return entitlements.workstationTransaction > 0 ? 0 : getShopUpgradeDefinition(payload.shopUpgradeId as ShopUpgradeId).price;
+    return getShopUpgradeDefinition(payload.shopUpgradeId as ShopUpgradeId).price;
   }
   if (actionId === "buy-coffee") return getCoffeeBuyPrice(state.coffeeState);
-  if (actionId === "buy-coffee-machine") return entitlements.workstationTransaction > 0 ? 0 : COFFEE_MACHINE_PRICE;
+  if (actionId === "buy-coffee-machine") return COFFEE_MACHINE_PRICE;
   if (actionId === "upgrade-coffee-machine" && payload.shopUpgradeId) {
     const upgrade = COFFEE_MACHINE_UPGRADE_DEFINITIONS.find((entry) => entry.id === payload.shopUpgradeId);
-    return upgrade ? entitlements.workstationTransaction > 0 ? 0 : upgrade.price : null;
+    return upgrade?.price ?? null;
   }
   if (actionId === "buy-ai-month" && payload.aiSlotId) {
-    return hasAiReimbursement(state)
-      ? 0 : getAiModelForTotalMonths(state.totalMonths, payload.aiSlotId).price;
+    return getAiModelForTotalMonths(state.totalMonths, payload.aiSlotId).price;
   }
   if (actionId === "buy-support-item" && payload.supportItemId) return getSupportItemDefinition(payload.supportItemId).price;
   return null;
+}
+
+export function getShopActionBasePrice(state: GameState, actionId: ShopPurchaseAction, payload: PurchasePayload): number | null {
+  const listedPrice = getShopActionListedPrice(state, actionId, payload);
+  if (listedPrice === null) return null;
+  const kind = getLabReimbursementKind(actionId, payload);
+  if (kind && (state.shopState.entitlements[kind] > 0 || getLabReimbursementCount(state, kind) > 0)) return 0;
+  if (actionId === "buy-ai-month" && hasAiReimbursement(state)) return 0;
+  return listedPrice;
+}
+
+export function getShopLabFundingCost(state: GameState, actionId: ShopPurchaseAction, payload: PurchasePayload): number {
+  const kind = getLabReimbursementKind(actionId, payload);
+  const covered = kind
+    ? state.shopState.entitlements[kind] === 0 && getLabReimbursementCount(state, kind) > 0
+    : actionId === "buy-ai-month" && hasAiReimbursement(state);
+  return covered ? getShopActionListedPrice(state, actionId, payload) ?? 0 : 0;
 }
 
 export function hasOtherLoverGiftPurchases(state: GameState): boolean {

@@ -1,11 +1,12 @@
 import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
+import { PAPER_TERM_TRANSLATIONS } from "./v2-paper-terms";
 import { getActiveOperationAllowance, getAiCollaborationStatus, getAiModelForTotalMonths, hasAiReimbursement } from "../core/v2-ai-shop";
 import { PAPER_SLOT_RESEARCH_THRESHOLDS, SCORE_BY_TARGET } from "../core/v2-content";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getCitationStats } from "../core/v2-citation-stats";
 import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-catalog";
-import { getPaperConferenceTripId } from "../core/v2-conference-identity";
-import { getEventChoiceRisk } from "../core/v2-event-choice-risk";
+import { getEventChoiceRiskDetails } from "../core/v2-event-choice-risk";
+import { getResolvableQueuedEvent } from "../core/v2-engine-event-resolution";
 import type { ConferenceRegionId } from "../core/v2-conference-system";
 import { getCurrentEvent, getEventQueuePriority, getSortedEventQueue } from "../core/v2-event-queue";
 import { canAutoResolveLinearEvent, isEventBlocking, isLinearEvent } from "../core/v2-event-auto-resolution";
@@ -27,6 +28,9 @@ import { getFellowDiscussionSanCost } from "../core/v2-fellow-actions";
 import { getFellowCurrentPaper } from "../core/v2-fellow-research";
 import { getFellowAcademicLabel, getFellowResearchScore, getStudentAcademicLabel } from "../core/v2-fellow-academic";
 import { getNextMonthLabPayroll } from "../core/v2-lab-payroll";
+import { getLabFinanceMonthSummary } from "../core/v2-lab-finance-ledger";
+import { renderPaperReviewEvent } from "./v2-render-paper-review";
+import { getLabReimbursementCount } from "../core/v2-lab-reimbursement";
 import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2-relationship-activity";
 import { formatMoney, roundMoney } from "../core/v2-money";
 import { getPlayerAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
@@ -79,7 +83,6 @@ import {
 } from "../core/v2-random-name";
 import {
   DISEASE_MONTH_END_CHANGE_BY_SAN_TIER,
-  formatEventSanChange,
   getSeasonByMonth,
   getSeasonSanModifier,
   getTierResistChance,
@@ -92,7 +95,7 @@ import {
   getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
-import type { DateDisplayMode, EventChoice, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PaperReviewEventPresentation, PaperReviewerReport, PendingEvent, RoleId } from "../core/v2-types";
+import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PendingEvent, RoleId } from "../core/v2-types";
 import {
   type PlayRenderUiState,
   type PlayTabId,
@@ -164,7 +167,7 @@ function getAvailablePromotionCount(state: GameState): number {
       : ["arxiv", "github", "xiaohongshu"] as PaperPromotionId[];
     return count + ids.filter((id) => {
       if (promotions[id] === true) return false;
-      if (id === "arxiv" && (paper.target === null || paper.conferenceHandled === true || (paper.publication?.monthsSincePublish ?? 0) >= 3)) return false;
+      if (id === "arxiv" && (paper.target === null || paper.conferenceHandled === true || paper.publication?.preprintExposed === true || paper.publication?.posterExposed === true || (paper.publication?.monthsSincePublish ?? 0) >= 3)) return false;
       return state.player.san >= getPaperPromotionCost(id, state)
         && state.player.money >= getPaperPromotionMoneyCost(id);
     }).length;
@@ -451,7 +454,7 @@ function renderAttrItem(
     : getAttrFillStateClass(value, cap, 3, 1);
   const safePercent = cap > 0 ? ((value + (value > 0 ? 1 : 0)) / (cap + 1)) * 100 : 0;
   const progressClassName = `${fillClassName}${fillStateClass}${value > 0 ? " is-nonzero" : ""}`;
-  const displayedValue = tierKind === "san" ? formatMoney(value) : String(Math.floor(value));
+  const displayedValue = formatMoney(value);
 
   return `
     <div
@@ -534,7 +537,7 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
     upsertBucketItem(items, "next-month-lover-play-discount", "SAN消耗 -1", "恋人玩耍 · 下个月生效，持续1个月");
   }
   if (hasAiReimbursement({ ...state, totalMonths: state.totalMonths + 1, buffs: advanceBuffDurations(state.buffs) })) {
-    upsertBucketItem(items, "next-month-ai-reimbursement", "AI报销", "导师经费 · 下月AI购买与自动续费免费", false, "money");
+    upsertBucketItem(items, "next-month-ai-reimbursement", "AI报销", "下月AI购买与续费由科研经费支付", false, "money");
   }
   return items;
 }
@@ -595,7 +598,13 @@ function buildEffectBuckets(state: GameState): {
     upsertBucketItem(monthly, "monthly", `冰美式额外 SAN +${coffeeBonus}`, "咖啡机");
   }
   if (hasAiReimbursement(state)) {
-    upsertBucketItem(monthly, "monthly-ai-reimbursement", "AI报销", "导师经费 · 本月AI购买与自动续费免费", false, "money");
+    upsertBucketItem(monthly, "monthly-ai-reimbursement", "AI报销", "本月AI购买与续费由科研经费支付", false, "money");
+  }
+  if (getLabReimbursementCount(state, "gpuTransaction") > 0) {
+    upsertBucketItem(monthly, "monthly-gpu-reimbursement", "显卡报销", "本月购买或升级显卡一次，扣实际科研经费", false, "money");
+  }
+  if (getLabReimbursementCount(state, "workstationTransaction") > 0) {
+    upsertBucketItem(monthly, "monthly-workstation-reimbursement", "工位报销", "本月键盘、显示器、办公椅或咖啡机购买／升级任选一次，扣实际科研经费", false, "money");
   }
   const entitlementCountText = (count: number) => count > 1 ? ` ×${count}` : "";
   const loverGiftCount = getLoverGiftCount(state);
@@ -851,22 +860,14 @@ function getEventEmoji(title: string, stage: EventStage = "act1"): string {
 export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[] {
   const items: TodoPreviewItem[] = [];
   const reviewingPapers = state.papers.filter((paper) => paper.status === "reviewing" && paper.reviewMonthsLeft > 0);
-  const pendingConferenceTrips = new Map<string, { title: string; monthsLater: number }>();
-  for (const paper of [...state.papers, ...state.externalPublications]) {
-    if (paper.status !== "published" || paper.nonFirstAuthor || (paper.leadAuthorId && paper.leadAuthorId !== "player")
-      || paper.conferenceHandled || paper.journalTarget || paper.publication?.journalTarget
-      || paper.conferenceAvailableAtTotalMonths === undefined || !paper.target
-      || paper.submittedMonth == null || paper.submittedYear == null) continue;
-    const tripId = getPaperConferenceTripId(paper, state.conferenceLocationSeed);
-    const monthsLater = paper.conferenceAvailableAtTotalMonths - state.totalMonths;
-    if (!tripId || monthsLater <= 0) continue;
-    const existing = pendingConferenceTrips.get(tripId);
-    if (!existing || monthsLater < existing.monthsLater) {
-      pendingConferenceTrips.set(tripId, {
-        title: `${getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear).name}安排`, monthsLater,
-      });
-    }
-  }
+  const pendingConferenceActivities = (state.conferenceAttendancePlans ?? [])
+    .filter((plan) => (plan.mode === "self" || plan.mode === "advisor")
+      && plan.context.availableAtTotalMonths !== undefined
+      && plan.context.availableAtTotalMonths > state.totalMonths)
+    .map((plan) => ({
+      title: `${plan.context.conferenceName}活动`,
+      monthsLater: plan.context.availableAtTotalMonths! - state.totalMonths,
+    }));
   let sortOrder = 0;
 
   const addItem = (params: {
@@ -895,8 +896,8 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
         addItem({ title: `${venue}结果`, monthsLater });
       }
     }
-    for (const trip of pendingConferenceTrips.values()) {
-      if (trip.monthsLater === monthsLater) addItem(trip);
+    for (const activity of pendingConferenceActivities) {
+      if (activity.monthsLater === monthsLater) addItem(activity);
     }
 
     const calendar = getCalendarForTotalMonths(nextTotalMonths, state.degree);
@@ -986,25 +987,22 @@ function renderEventDescriptionHtml(
         .flatMap((paragraph) => paragraph.split(/\r?\n/u))
         .map((line) => line.trim().replace(/[。.]+$/u, ""))
         .filter((line) => line && line !== "机制结算" && line !== "本次活动结果");
-  const storyBlocks: { paragraphs: string[]; isNarrative: boolean }[] = [];
-  let narrativeBlockCount = 0;
-  for (const paragraph of storyParagraphs) {
-    const isNarrative = !/^(?:备注|小提示)：/u.test(paragraph) && !paragraph.includes("\n")
-      && paragraph.length <= 160 && !/^-{3,}$/u.test(paragraph)
-      && !/^(?:规则|条件|判定|培养安排|工资|待遇|毕业|转博|转博士|科研分|送审|录用|发表|会议)[：:]/u.test(paragraph);
-    if (isNarrative && narrativeBlockCount >= 2 && !/^\p{Extended_Pictographic}/u.test(paragraph)) {
-      const previousNarrative = [...storyBlocks].reverse().find((block) => block.isNarrative);
-      if (previousNarrative) {
-        previousNarrative.paragraphs[previousNarrative.paragraphs.length - 1] = `${previousNarrative.paragraphs.at(-1) ?? ""} ${paragraph}`;
-        continue;
-      }
-    }
-    if (isNarrative) narrativeBlockCount += 1;
-    storyBlocks.push({ paragraphs: [paragraph], isNarrative });
-  }
+  const storyBlocks = storyParagraphs.map((paragraph) => ({
+    paragraphs: [paragraph],
+    isNarrative: !/^(?:备注|小提示)：/u.test(paragraph) && !/^-{3,}$/u.test(paragraph)
+      && !/^(?:规则|条件|判定|培养安排|工资|待遇|毕业|转博|转博士|科研分|送审|录用|发表|会议)[：:]/u.test(paragraph),
+  }));
   const storyHtml = storyBlocks
     .map(({ paragraphs: blockParagraphs, isNarrative }, index) => {
       const paragraph = blockParagraphs.join("");
+      const detailLines = paragraph.split(/\r?\n/u).map((line) => /^\*\*([^*\n]+)\*\*：(.+)$/u.exec(line));
+      if (detailLines.length > 1 && detailLines.every((line) => line !== null)) {
+        return `<dl class="event-description-details">${detailLines.map((line) => `<div><dt>${renderEventInlineHtml(line![1]!)}</dt><dd>${renderEventInlineHtml(line![2]!)}</dd></div>`).join("")}</dl>`;
+      }
+      if (paragraph.startsWith("涉及论文：")) {
+        return `<p class="event-description-paper"><span>涉及论文</span>${renderEventInlineHtml(paragraph.slice("涉及论文：".length))}</p>`;
+      }
+      if (/^(?:备注|小提示)：\s*$/u.test(paragraph)) return "";
       if (/^-{3,}$/u.test(paragraph)) {
         return '<hr class="event-description-divider" role="separator">';
       }
@@ -1125,7 +1123,7 @@ function renderEventSettlementValues(values: string[]): string {
     .join("");
 }
 
-function renderEventSettlementSummary(items: string[]): string {
+export function renderEventSettlementSummary(items: string[]): string {
   if (items.length === 0) return "";
   const rows = splitEventSettlementRows(items.filter((item) => !item.startsWith("额外：")));
   const extraRows = items.filter((item) => item.startsWith("额外："))
@@ -1151,113 +1149,6 @@ function renderEventSettlementSummary(items: string[]): string {
   return `<div class="event-settlement-summary">${renderRow("条件", rows.conditions)}${renderRow("结果", rows.results)}${extras}</div>`;
 }
 
-function formatPaperReviewDecision(report: PaperReviewerReport): string {
-  if (report.decision === "Accept") return "接收";
-  if (report.decision === "Borderline") return "边缘";
-  return "拒稿";
-}
-
-function getPaperReviewImprovementText(report: PaperReviewerReport): string {
-  const improvements = [
-    ...(report.improvements?.idea ? [`idea +${report.improvements.idea}`] : []),
-    ...(report.improvements?.experiment ? [`实验 +${report.improvements.experiment}`] : []),
-    ...(report.improvements?.writing ? [`写作 +${report.improvements.writing}`] : []),
-    ...(report.improvementAction && report.improvementAmount
-      ? [`${report.improvementAction === "idea" ? "idea" : report.improvementAction === "experiment" ? "实验" : "写作"} +${report.improvementAmount}`]
-      : []),
-  ];
-  return improvements.join(" · ");
-}
-
-function renderPaperReviewEvent(presentation: PaperReviewEventPresentation, settled = false): string {
-  const venue = presentation.conferenceName
-    ? `${presentation.conferenceName}${presentation.conferenceYear ?? ""}` : "会议评审";
-  const heading = `
-    <header class="paper-review-event-heading">
-      <span class="paper-review-venue">${escapeHtml(venue)}</span>
-      <strong>${escapeHtml(presentation.paperTitle)}</strong>
-    </header>`;
-  if (presentation.kind === "overview") {
-    return `
-      <section class="paper-review-event is-overview">
-        ${heading}
-        <p class="paper-review-intro">📬 刷了三个月邮箱，审稿结果终于到了</p>
-        <div class="paper-review-overview-grid">
-          <span><small>会议等级</small><strong>${presentation.target}类</strong></span>
-          <span><small>投稿总分</small><strong>${presentation.submittedScore}</strong></span>
-          <span><small>影响力</small><strong>×${presentation.venueInfluence.toFixed(2)}</strong></span>
-          <span><small>审稿标准</small><strong>×${presentation.reviewStrictnessMultiplier.toFixed(2)}</strong></span>
-        </div>
-        <p class="paper-review-event-footnote">投稿时的分数决定本轮评审，先读读三位审稿人的意见</p>
-      </section>
-    `;
-  }
-
-  if (presentation.kind === "reviewers") {
-    return `
-      <section class="paper-review-event is-reviewers">
-        ${heading}
-        <div class="paper-reviewer-grid">
-          ${presentation.reports.map((report, index) => {
-            const improvement = getPaperReviewImprovementText(report);
-            const tone = report.decision === "Accept" ? "accept" : report.decision === "Borderline" ? "borderline" : "reject";
-            return `
-              <article class="paper-reviewer-card is-${tone}">
-                <div class="paper-reviewer-card-head">
-                  <span class="paper-reviewer-number">R${index + 1}</span>
-                  <h3>${escapeHtml(report.reviewer)}</h3>
-                </div>
-                <div class="paper-reviewer-verdict">
-                  <strong>${escapeHtml(formatPaperReviewDecision(report))} ${report.reviewScore === 0 ? "0" : formatSignedNumber(report.reviewScore)}</strong>
-                  <span>有效分 <b>${report.effectiveScore}</b></span>
-                </div>
-                <p class="paper-reviewer-comment">${escapeHtml(report.comment ?? "未留下具体意见")}</p>
-                <div class="paper-reviewer-meta">
-                  ${improvement ? `<div><span>拒稿后修改</span><strong>${escapeHtml(improvement)}</strong></div>` : ""}
-                  ${report.sanChange ? `<div><span>审稿影响</span><strong>${escapeHtml(formatEventSanChange(report.sanChange, report.illnessSanIncrease))}</strong></div>` : ""}
-                  ${!improvement && !report.sanChange ? "<div><span>无额外影响</span></div>" : ""}
-                </div>
-              </article>
-            `;
-          }).join("")}
-        </div>
-        <p class="paper-review-event-footnote">接收+1 · 边缘0 · 拒稿−1，三人总评交由PC判定；修改加分仅在最终拒稿时生效</p>
-      </section>
-    `;
-  }
-
-  const resultItems = presentation.rewardText.split("；").map((item) => item.trim()).filter(Boolean);
-  return `
-    <section class="paper-review-event is-decision ${presentation.accepted ? "is-accepted" : "is-rejected"}">
-      ${heading}
-      <div class="paper-review-decision-head">
-        <div>
-          <span>PC 最终决定</span>
-          <strong>${presentation.accepted
-            ? `🎉 接收 · ${escapeHtml(presentation.acceptType ?? "Poster")}`
-            : "📨 本轮未录用"}</strong>
-        </div>
-        <div class="paper-review-total-score">
-          <small>总评</small>
-          <strong>${presentation.totalReviewScore === 0 ? "0" : formatSignedNumber(presentation.totalReviewScore)}</strong>
-        </div>
-      </div>
-      <div class="paper-review-votes">
-        ${(presentation.reports ?? []).map((report, index) => `<span class="is-${report.decision.toLowerCase()}">R${index + 1} <b>${report.reviewScore === 0 ? "0" : formatSignedNumber(report.reviewScore)}</b></span>`).join("")}
-        <span class="paper-review-decision-rule">${presentation.borderlineChance === null
-          ? presentation.accepted ? "总评≥+2，直接接收" : "总评≤−2，直接拒稿"
-          : `边缘录用概率 ${(presentation.borderlineChance * 100).toFixed(1)}%`}</span>
-      </div>
-      <section class="paper-review-settlement">
-        <h3>${settled ? "结算记录" : "本次结算"}</h3>
-        <div class="paper-review-result-strip">${resultItems.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
-      </section>
-      <p class="paper-review-event-footnote">${settled
-        ? presentation.accepted ? "论文已移入成果" : "论文已退回草稿，修改后可以再次投稿"
-        : presentation.accepted ? "确认后论文移入成果" : "确认后论文退回草稿，应用修改反馈，拒稿次数+1"}</p>
-    </section>
-  `;
-}
 
 function getEventSceneLabel(title: string): string {
   const titleParts = title.split("➜").map((part) => part.trim()).filter(Boolean);
@@ -1315,6 +1206,11 @@ function renderEventContentBox(
     && currentEvent?.replayContext !== undefined
     && historicalPage !== null;
   const selectedChoiceId = historicalPage?.selectedChoiceId ?? null;
+  const riskEvent = state && currentEvent && !isCompleted
+    ? historicalPage?.replayEvent
+      ? getResolvableQueuedEvent(state, { ...historicalPage.replayEvent, queueOrder: currentEvent.queueOrder })
+      : historicalPage ? null : currentEvent
+    : null;
   const sceneTabs = isCompleted
     ? completedStages.map((page, index) => ({
       index,
@@ -1352,7 +1248,7 @@ function renderEventContentBox(
       </div>
       <div class="event-content-body" id="event-content-body">
         ${paperReviewPresentation
-          ? renderPaperReviewEvent(paperReviewPresentation, historicalPage !== null)
+          ? renderPaperReviewEvent(paperReviewPresentation, historicalPage !== null, renderEventSettlementSummary)
           : renderEventDescriptionHtml(
             displayEvent.description,
             displayEvent.choices.filter((choice) => !isSecondaryEventChoice(choice)).length <= 1,
@@ -1367,13 +1263,15 @@ function renderEventContentBox(
             const choiceLabel = !secondary && displayEvent.choices.filter((entry) => !isSecondaryEventChoice(entry)).length === 1
               ? displayStage === "act1" ? "继续" : displayStage === "act3" || displayStage === "result" ? "确定" : choice.label
               : choice.label;
-            const risk = state && currentEvent && !historicalPage && !disabledReason
-              ? getEventChoiceRisk(state, currentEvent, choice as EventChoice) : null;
-            const riskText = risk === "certain" ? "会暴毙" : risk === "possible" ? "可能会暴毙" : "";
+            const riskChoice = riskEvent?.choices.find((candidate) => candidate.id === choice.id);
+            const riskDetails = state && riskEvent && riskChoice && !disabledReason
+              ? getEventChoiceRiskDetails(state, riskEvent, riskChoice) : null;
+            const risk = riskDetails?.risk;
+            const riskText = riskDetails?.explanation ?? "";
             const canReplay = debugReplayable && disabledReason === "";
             const isDisabled = !canReplay && (historicalPage !== null || disabledReason !== "");
             const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"`
-              : riskText ? ` title="${riskText}" data-tooltip="${riskText}"` : "";
+              : riskText ? ` data-event-risk-tooltip data-tooltip="${escapeHtml(riskText)}" aria-description="${escapeHtml(riskText)}"` : "";
             const buttonAttributes = canReplay
               ? `data-action="debug-replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
               : isDisabled
@@ -1385,7 +1283,7 @@ function renderEventContentBox(
                 type="button"
                 ${secondary ? "data-event-secondary" : ""}
                 ${buttonAttributes}
-              ><span>${escapeHtml(normalizeGameDisplayText(choiceLabel))}</span>${risk ? `<span class="event-choice-risk is-${risk}" aria-label="${riskText}">${risk === "certain" ? "！" : "？"}</span>` : ""}${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
+              ><span>${escapeHtml(normalizeGameDisplayText(choiceLabel))}</span>${risk ? `<span class="event-choice-risk is-${risk}" aria-label="${escapeHtml(riskText)}">${risk === "certain" ? "！" : "？"}</span>` : ""}${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
             `;
           }).join("")}
         </div>
@@ -2272,11 +2170,11 @@ function relationshipTooltip(hint: string, align: "left" | "right" = "left"): st
 }
 
 function getFellowCooperationHint(state: GameState, profile: FellowProgressProfile): string {
-  const research = Math.max(0, Math.floor(state.player.research));
+  const research = Math.max(0, state.player.research);
   const role = getFellowRoleLabel(profile.type, profile.gender);
   const target = profile.type === "senior" ? "idea" : profile.type === "peer" ? "随机项" : "实验";
   const monthlyGain = profile.affinity * (profile.longTermMentoring ? 2 : 1);
-  return `主动推进+${research}～${research + 5}，每月自动推进+${formatMoney(monthlyGain)}\n满100：${role}帮你论文${target}+${Math.floor(profile.research)}，你帮对方最低项+${research}`;
+  return `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，每月自动推进+${formatMoney(monthlyGain)}\n满100：${role}帮你论文${target}+${Math.floor(profile.research)}，你帮对方最低项+${Math.floor(research)}`;
 }
 
 function getFellowInheritanceHint(): string {
@@ -2357,19 +2255,19 @@ function renderAdvisorStatus(state: GameState): string {
         <span class="rel-detail-label" ${relationshipTooltip(accumulationHint)}>${renderRelationshipIcon("💡")}科研积累</span>
         ${progressBar("科研积累", score, researchMax)}
         <strong class="rel-progress-val rel-advisor-thresholds">${renderAnimatedNumber("person:advisor:research:next", score)}/${renderAnimatedNumber("person:advisor:research:next-threshold", researchMax)}${(nextTier ?? reachedTier)!.name}</strong>
-        ${!isPreEnrollmentState(state) ? `<span class="rel-advisor-countdown" ${relationshipTooltip("每年3月申请，8月公布")}>${academician ? applicationText : applicationText.replace(/\d+/, (display) => renderAnimatedNumber(`person:advisor:${pendingGrant ? "result" : "application"}:months`, Number(display)))}</span>` : ""}
+        ${!isPreEnrollmentState(state) ? `<span class="rel-advisor-countdown" ${relationshipTooltip("每年3月申请，8月公布", "right")}>${academician ? applicationText : applicationText.replace(/\d+/, (display) => renderAnimatedNumber(`person:advisor:${pendingGrant ? "result" : "application"}:months`, Number(display)))}</span>` : ""}
       </div>
         ${(["vertical", "horizontal"] as const).map((projectType) => {
           const label = projectType === "horizontal" ? "横向项目" : "纵向项目";
           const icon = projectType === "horizontal" ? "🛠️" : "🧪";
-          const progress = projectType === "horizontal" ? advisor.horizontalProgress ?? 0 : advisor.verticalProgress ?? 0;
+          const progress = Math.floor(projectType === "horizontal" ? advisor.horizontalProgress ?? 0 : advisor.verticalProgress ?? 0);
           const projectSanCost = getAdvisorTaskSanCost(state, projectType);
           const blocked = baseBlocked || (state.player.san < projectSanCost ? `SAN不足，需要${projectSanCost}` : "");
-          const research = Math.max(0, Math.floor(state.player.research));
-          const reward = projectType === "horizontal" ? `经费+${getAdvisorHorizontalReward(advisor)}，每人金币+${formatMoney(getAdvisorHorizontalReward(advisor) * 0.05)}`
+          const research = Math.max(0, state.player.research);
+          const reward = projectType === "horizontal" ? `经费+${getAdvisorHorizontalReward(advisor)}，每人发${formatMoney(getAdvisorHorizontalReward(advisor) * 0.05)}金劳务费`
             : "科研积累+10%，全组论文写作协作+10";
           const automaticGain = (advisor.nextProject ?? "horizontal") === projectType ? 10 : 0;
-          const hint = `主动推进+${research}～${research + 5}，导师下月自动推进+${automaticGain}\n满100：${reward}`;
+          const hint = `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，导师下月自动推进+${automaticGain}\n满100：${reward}`;
           return `<div class="rel-advisor-project-row" data-advisor-project="${projectType}">
             <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icon)}${label}</span>
             <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${PROJECT_PROGRESS_MAX}" aria-valuenow="${Math.min(progress, PROJECT_PROGRESS_MAX)}">
@@ -2443,6 +2341,10 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
   const identity = card.type === "lover" ? `person:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}` : `person:${card.relationshipId}`;
   const fellow = state.fellowProgressState.find((profile) => profile.id === card.relationshipId);
   const advisor = card.type === "advisor";
+  const monthFinance = advisor ? getLabFinanceMonthSummary(state) : undefined;
+  const signedMoney = (amount: number): string => `${roundMoney(amount) > 0 ? "+" : ""}${formatMoney(amount)}`;
+  const monthFinanceHint = monthFinance?.items.filter((item) => roundMoney(item.amount) !== 0)
+    .map((item) => `${item.label} ${signedMoney(item.amount)}`).join("\n") || "本月暂无经费收支";
   const payroll = getNextMonthLabPayroll(state);
   const payrollHint = [
     "下月工资",
@@ -2463,30 +2365,32 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
     const tierName = kind === "research" ? getAttrTierName("research", item.value)
       : (kind === "intimacy" ? ["初识", "亲近", "甜蜜", "挚爱"] : ["生疏", "熟悉", "合拍", "无间"])[tier];
     const hint = `${item.label}增减抵抗${getTierResistChance(item.value) * 100}%`;
-    const displayedValue = Math.floor(item.value);
-    return `<span class="rel-detail-item" ${relationshipTooltip(hint)}><span class="rel-detail-label">${renderRelationshipIcon(kind === "research" ? "💡" : kind === "intimacy" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedNumber(`${identity}:${kind}`, displayedValue)}${item.max === undefined ? "" : `/${item.max}`}</strong><span class="new-attr-level attr-level-${kind} rel-stat-tier">${tierName}</span></span>`;
+    const displayedValue = roundMoney(item.value);
+    return `<span class="rel-detail-item" ${relationshipTooltip(hint, "right")}><span class="rel-detail-label">${renderRelationshipIcon(kind === "research" ? "💡" : kind === "intimacy" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedNumber(`${identity}:${kind}`, displayedValue, formatMoney(item.value))}${item.max === undefined ? "" : `/${item.max}`}</strong><span class="new-attr-level attr-level-${kind} rel-stat-tier">${tierName}</span></span>`;
   }).join("");
   return `
     <article class="rel-card filled rel-card-compact${fellow ? " rel-card-fellow" : card.type === "lover" ? " rel-card-lover" : ""}" data-relationship-type="${card.type}" data-relationship-id="${escapeHtml(card.relationshipId)}">
       <div class="rel-card-identity">
         <div class="rel-card-head rel-card-header paper-card-header">
           <div class="rel-header-main">
-            ${fellow?.longTermMentoring ? `<span class="rel-mentoring-mark" ${relationshipTooltip("长期合作：每月SAN-1，协作额外推进1次。", "left")} aria-label="长期合作">⭐</span>` : ""}<span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
-            ${card.type === "lover" ? `<span class="rel-lover-trait" ${relationshipTooltip(getLoverTraitHint(state.loverState.type))}>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span>` : ""}
+            <span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
             <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
-            ${fellow ? `<span class="rel-detail-item" ${relationshipTooltip("用于生活费、自费实验和订阅AI")}>${renderRelationshipIcon("💰")}<strong>${formatMoney(finance?.money ?? 0)}</strong></span>${fellowAi ? `<span class="rel-type" ${relationshipTooltip(`本月订阅${fellowAi.name}`)}>AI·${escapeHtml(fellowAi.name)}</span>` : ""}` : ""}
+            ${fellow?.longTermMentoring ? `<span class="rel-type rel-mentoring-mark" ${relationshipTooltip("长期合作：每月SAN-1，协作额外推进1次。", "left")} aria-label="长期合作">长期合作</span>` : ""}
+            ${fellowAi ? `<span class="rel-type rel-ai-label" ${relationshipTooltip(`本月订阅${fellowAi.name}`)}>AI</span>` : ""}
+            ${card.type === "lover" ? `<span class="rel-type rel-lover-trait" ${relationshipTooltip(getLoverTraitHint(state.loverState.type))}>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span>` : ""}
+            ${fellow || card.type === "lover" ? `<span class="rel-academic-label" ${relationshipTooltip(knownHint, "right")}>${renderRelationshipIcon("🎓")}${escapeHtml(fellow ? getFellowAcademicLabel(state, fellow) : getStudentAcademicLabel(state.year, state.degree))}</span>` : ""}
+            ${fellow ? `<span class="rel-detail-item rel-research-score" ${relationshipTooltip(fellow.degree === "phd" ? "第六年6月毕业，要求科研分≥7" : "第三年6月硕士毕业，要求科研分≥1", "right")}>科研分 <strong class="rel-detail-value">${getFellowResearchScore(state, fellow)}</strong></span>` : ""}
           </div>
           ${advisor ? renderAdvisorFundSummary(state) : `<div class="rel-card-meta">
             <button class="rel-end-compact" data-card-icon-action type="button" title="${fellow ? "停止合作" : "分手"}" aria-label="${fellow ? "停止合作" : "分手"}" data-action="end-relationship" data-relationship-id="${escapeHtml(card.relationshipId)}"><span aria-hidden="true">${fellow ? "✂️" : "💔"}</span></button>
           </div>`}
         </div>
       </div>
-      ${card.type === "lover" ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip(knownHint)}>${renderRelationshipIcon("🎓")}${escapeHtml(getStudentAcademicLabel(state.year, state.degree))}</span>${renderAttributes()}</div>` : ""}
-      ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip(`用于工资、实验和论文费用\n经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：同学做纵向，硕士工资+0.5、博士+1\n经费低于0时破产`, "left")}>科研经费 <strong aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", roundMoney(state.advisorProgressState.funding), formatMoney(state.advisorProgressState.funding))}</strong></span><span ${relationshipTooltip(payrollHint, "right")}>学生工资 <strong>${formatMoney(payroll.total)}</strong></span></div>` : ""}
-      ${fellow ? `<div class="rel-fellow-academic-row">
-        <span ${relationshipTooltip(knownHint, "left")}>${renderRelationshipIcon("🎓")}${escapeHtml(getFellowAcademicLabel(state, fellow))}</span>
-        <span class="rel-detail-item" ${relationshipTooltip(fellow.degree === "phd" ? "第六年6月毕业，要求科研分≥7" : "第三年6月硕士毕业，要求科研分≥1")}>科研分 <strong class="rel-detail-value">${getFellowResearchScore(state, fellow)}/${fellow.degree === "phd" ? 7 : 1}</strong></span>
+      ${card.type === "lover" ? `<div class="rel-fellow-academic-row rel-attributes-row">${renderAttributes()}</div>` : ""}
+      ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip(`用于工资、实验、论文和报销，低于0破产\n经费＜${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：同学只做横向，不做纵向\n经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：硕士工资+0.5、博士+1，可触发导师经费事件`, "left")}>科研经费 <strong aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", roundMoney(state.advisorProgressState.funding), formatMoney(state.advisorProgressState.funding))}</strong></span><span class="rel-finance-summary" ${relationshipTooltip(monthFinanceHint)}>经费收支 <strong>${signedMoney(monthFinance!.net)}</strong></span><span ${relationshipTooltip(payrollHint, "right")}>学生工资 <strong>${formatMoney(payroll.total)}</strong></span></div>` : ""}
+      ${fellow ? `<div class="rel-fellow-academic-row rel-attributes-row">
         ${renderAttributes()}
+        <span class="rel-detail-item rel-wallet" ${relationshipTooltip("用于生活费、自费实验和订阅AI", "right")}>${renderRelationshipIcon("💰")}<strong>${formatMoney(finance?.money ?? 0)}</strong></span>
       </div>${renderFellowPaper(state, fellow)}` : ""}
       ${advisor ? renderAdvisorStatus(state) : card.type === "lover" ? renderLoverRoutes(state) : `<div class="rel-progress-section rel-resource-row">
         <div class="rel-progress-item">
@@ -2789,6 +2693,8 @@ function renderResearchPromotionActions(state: GameState, paper: Paper): string 
     return promotions.arxiv === true
       || (paper.target !== null
       && paper.conferenceHandled !== true
+      && paper.publication?.preprintExposed !== true
+      && paper.publication?.posterExposed !== true
       && (paper.publication?.monthsSincePublish ?? 0) < 3);
   }) as PaperPromotionId[];
   if (visiblePromotionIds.length === 0) return "";
@@ -2994,17 +2900,18 @@ function renderSelectedResearchPaper(state: GameState, paper: Paper | null): str
   const citationMultiplier = getPaperCitationMultiplier(state, paper);
   const citationExposurePending = paper.target !== null
     && paper.conferenceHandled !== true
-    && paper.publication?.preprintExposed !== true;
+    && paper.publication?.preprintExposed !== true
+    && paper.publication?.posterExposed !== true;
   const displayedCitationMultiplier = citationExposurePending ? 0 : citationMultiplier;
   const publicationLabel = venue.journal
     ? "\u671f\u520a"
     : paper.conferenceHandled !== true
-      ? paper.publication?.preprintExposed === true ? "arXiv" : "\u672a\u5f00\u4f1a"
+      ? paper.publication?.preprintExposed === true ? "arXiv" : paper.publication?.posterExposed === true ? "海报展示" : "\u672a\u5f00\u4f1a"
       : paper.publication?.acceptType ?? "Poster";
   const publicationMultiplier = venue.journal
     ? 1
     : paper.conferenceHandled !== true
-      ? paper.publication?.preprintExposed === true ? 1 : 0
+      ? citationExposurePending ? 0 : 1
       : getPaperConferencePromotionMultiplier(paper.publication?.acceptType);
   const durationMonths = paper.publication?.monthsSincePublish ?? 0;
   return `
@@ -3026,7 +2933,7 @@ function renderSelectedResearchPaper(state: GameState, paper: Paper | null): str
           <div class="research-metric-item"><span>\u5f53\u524d\u5206</span><strong ${animationNumberAttributes(`paper:${paper.id}:research-detail:score`, currentScore)}>${currentScore}</strong></div>
           <div class="research-metric-item"><span>\u5386\u65f6</span><strong>${renderAnimatedNumber(`paper:${paper.id}:research-detail:months`, durationMonths)}\u4e2a\u6708</strong></div>
           <div class="research-metric-item research-metric-item-publication-type">
-            <span class="research-publication-label">${publicationLabel === "Best Paper Candidate"
+            <span class="research-publication-label${publicationLabel in PAPER_TERM_TRANSLATIONS ? ' play-tooltip' : ''}"${publicationLabel in PAPER_TERM_TRANSLATIONS ? ` tabindex="0" data-tooltip="${PAPER_TERM_TRANSLATIONS[publicationLabel as keyof typeof PAPER_TERM_TRANSLATIONS]}"` : ''}>${publicationLabel === "Best Paper Candidate"
               ? '<span>Best Paper</span><span>Candidate</span>'
               : escapeHtml(publicationLabel)}</span><strong>\u00d7${renderAnimatedNumber(`paper:${paper.id}:research-detail:publication-multiplier`, publicationMultiplier, venue.journal ? publicationMultiplier.toFixed(1) : String(publicationMultiplier))}</strong>
           </div>

@@ -83,9 +83,9 @@ const REVIEWER_COMMENTS: Record<PaperReviewerType, { Accept: string; Borderline:
     Reject: "现有结果还不足以支撑主要结论",
   },
   expert: {
-    Accept: "亮点抓得准，最重要的两项已经做得很扎实",
-    Borderline: "主要优点已经有了，再把关键部分打磨一下会更完整",
-    Reject: "核心优点还没有充分展现，建议先把最重要的两项补起来",
+    Accept: "工作扎实，关键结果有说服力",
+    Borderline: "想法有趣，但缺少深入分析",
+    Reject: "贡献有限，与已有工作的区别不足",
   },
   gpt: {
     Accept: "结构清晰，方法与结果能够相互印证",
@@ -98,9 +98,9 @@ const REVIEWER_COMMENTS: Record<PaperReviewerType, { Accept: string; Borderline:
     Reject: "目前还有明显缺口，但主要方向仍然值得继续做",
   },
   strict: {
-    Accept: "最弱的部分也经得起检查，整体比较可靠",
-    Borderline: "短板仍然影响整体可信度，需要进一步补强",
-    Reject: "最弱的两项拖住了整体表现，当前版本还不够稳",
+    Accept: "论证严谨，实验和写作都经得起推敲",
+    Borderline: "关键对比还不充分，结论需要更多证据",
+    Reject: "实验不足，分析不够深入，当前结论无法成立",
   },
   hostile: {
     Accept: "SOTA 对比、局限性和新颖性说明都交代得比较完整",
@@ -340,19 +340,29 @@ export function getReviewerEffectiveScore(
   writing: number,
   random: () => number,
 ): number {
+  return getReviewerCalculation(reviewerType, idea, experiment, writing, random).effectiveScore;
+}
+
+function getReviewerCalculation(
+  reviewerType: PaperReviewerType,
+  idea: number,
+  experiment: number,
+  writing: number,
+  random: () => number,
+): { effectiveScore: number; weightInfo: string } {
   const values = [idea, experiment, writing];
-  if (reviewerType === "novelty") return Math.round(idea * 2 + experiment * 0.5 + writing * 0.5);
-  if (reviewerType === "experiment") return Math.round(idea * 0.5 + experiment * 2 + writing * 0.5);
+  if (reviewerType === "novelty") return { effectiveScore: Math.round(idea * 2 + experiment * 0.5 + writing * 0.5), weightInfo: "idea×2 · 实验×0.5 · 写作×0.5" };
+  if (reviewerType === "experiment") return { effectiveScore: Math.round(idea * 0.5 + experiment * 2 + writing * 0.5), weightInfo: "idea×0.5 · 实验×2 · 写作×0.5" };
   if (reviewerType === "expert") {
     const sorted = [...values].sort((left, right) => left - right);
-    return Math.round((sorted[1] ?? 0) * 1.5 + (sorted[2] ?? 0) * 1.5);
+    return { effectiveScore: Math.round((sorted[1] ?? 0) * 1.5 + (sorted[2] ?? 0) * 1.5), weightInfo: "最高两项各×1.5" };
   }
-  if (reviewerType === "kind") return Math.round(Math.max(...values, 0) * 3);
+  if (reviewerType === "kind") return { effectiveScore: Math.round(Math.max(...values, 0) * 3), weightInfo: "最高项×3" };
   if (reviewerType === "strict") {
     const sorted = [...values].sort((left, right) => left - right);
-    return Math.round((sorted[0] ?? 0) * 1.5 + (sorted[1] ?? 0) * 1.5);
+    return { effectiveScore: Math.round((sorted[0] ?? 0) * 1.5 + (sorted[1] ?? 0) * 1.5), weightInfo: "最低两项各×1.5" };
   }
-  if (reviewerType === "hostile") return Math.round(Math.min(idea, experiment, writing) * 3);
+  if (reviewerType === "hostile") return { effectiveScore: Math.round(Math.min(idea, experiment, writing) * 3), weightInfo: "最低项×3" };
 
   const splitWeight = (): [number, number, number] => {
     const total = reviewerType === "gpt" ? 2.4 : 0.6;
@@ -367,7 +377,8 @@ export function getReviewerEffectiveScore(
     return [base + extras[0]!, base + extras[1]!, base + extras[2]!];
   };
   const [ideaWeight, experimentWeight, writingWeight] = splitWeight();
-  return Math.round(idea * ideaWeight + experiment * experimentWeight + writing * writingWeight);
+  return { effectiveScore: Math.round(idea * ideaWeight + experiment * experimentWeight + writing * writingWeight),
+    weightInfo: `idea×${ideaWeight.toFixed(2)} · 实验×${experimentWeight.toFixed(2)} · 写作×${writingWeight.toFixed(2)}` };
 }
 
 function getStrictReviewerImprovements(
@@ -415,7 +426,7 @@ function createReviewerReport(
     return reviewerRoll < cumulative;
   })?.[0] ?? "hostile";
   const reviewer = REVIEWER_DEFINITIONS.find((entry) => entry.type === reviewerType) ?? REVIEWER_DEFINITIONS[0]!;
-  const effectiveScore = getReviewerEffectiveScore(reviewer.type, idea, experiment, writing, random);
+  const { effectiveScore, weightInfo } = getReviewerCalculation(reviewer.type, idea, experiment, writing, random);
   const { decision, reviewScore } = getReviewDecision(effectiveScore, target, reviewer.type, influence);
   const improvementAction = reviewer.type === "novelty"
     ? "idea"
@@ -440,6 +451,7 @@ function createReviewerReport(
   return {
     reviewer: reviewer.name,
     reviewerType: reviewer.type,
+    weightInfo,
     focus: reviewer.focus,
     effectiveScore,
     decision,

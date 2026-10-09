@@ -134,16 +134,26 @@ describe("v2 sanity rules", () => {
     expect(applyTierResist(2.1, 5.1, undefined, 6.3)).toEqual({ effectiveChange: 1.2, resistedCount: 0.275, cappedCount: 0.625 });
   });
 
-  it("formats resisted outcomes as compact final values", () => {
-    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 1 })).toBe("科研 +0");
+  it("formats actual changes with resistance amounts separate from caps", () => {
+    expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 1 })).toBe("科研 +0（抵抗1）");
     expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 1, resistedCount: 0 })).toBe("科研 +1");
     expect(formatTierResistedOutcome("导师好感", -1, { effectiveChange: -1, resistedCount: 0 })).toBe("导师好感 -1");
     expect(formatTierResistedOutcome("科研", 1, { effectiveChange: 0, resistedCount: 0, cappedCount: 1 })).toBe("科研 +0（上限）");
-    expect(formatTierResistedOutcome("科研", 1, applyTierResist(1, 6))).toBe("科研 +0.75");
-    expect(formatTierResistedOutcome("社交", -1, applyTierResist(-1, 12))).toBe("社交 -0.5");
-    expect(formatTierResistedOutcome("导师好感", -1, applyTierResist(-1, 6))).toBe("导师好感 -0.75");
-    expect(formatTierResistedOutcome("导师好感", 1, applyTierResist(1, 19.9))).toBe("导师好感 +0.1（上限）");
-    expect(formatTierResistedChange("科研", 0.5, applyTierResist(0.5, 6))).toBe("科研 +0.375");
-    expect(formatTierResistedChange("社交", -1, applyTierResist(-1, 12))).toBe("社交 -0.5");
+    expect(formatTierResistedOutcome("科研", 1, applyTierResist(1, 6))).toBe("科研 +0.75（抵抗0.25）");
+    expect(formatTierResistedOutcome("社交", -1, applyTierResist(-1, 12))).toBe("社交 -0.5（抵抗0.5）");
+    expect(formatTierResistedOutcome("导师好感", -1, applyTierResist(-1, 6))).toBe("导师好感 -0.75（抵抗0.25）");
+    expect(formatTierResistedOutcome("导师好感", -2, applyTierResist(-2, 8))).toBe("导师好感 -1.5（抵抗0.5）");
+    expect(formatTierResistedOutcome("导师好感", 1, applyTierResist(1, 19.9))).toBe("导师好感 +0.1（抵抗0.75；上限）");
+    expect(formatTierResistedChange("科研", 0.5, applyTierResist(0.5, 6))).toBe("科研 +0.38（抵抗0.13）");
+    expect(formatTierResistedChange("社交", -1, applyTierResist(-1, 12))).toBe("社交 -0.5（抵抗0.5）");
+    expect(formatTierResistedChange("科研", 1, applyTierResist(1, 20))).toBe("科研 +0（抵抗0.75；上限）");
+    expect(formatTierResistedOutcome("社交", -1, { effectiveChange: 0, resistedCount: 1 })).toBe("社交 -0（抵抗1）");
+  });
+
+  it("limits result and resistance displays to two decimals without float tails", () => {
+    const result = { effectiveChange: 0.1 + 0.2, resistedCount: 0.295 };
+    expect(formatTierResistedOutcome("科研", 0.595, result)).toBe("科研 +0.3（抵抗0.3）");
+    expect(result).toEqual({ effectiveChange: 0.1 + 0.2, resistedCount: 0.295 });
+    expect(formatTierResistedOutcome("社交", -0.004, { effectiveChange: -0.004, resistedCount: 0 })).toBe("社交 -0");
   });
 });

@@ -47,7 +47,7 @@ describe("shop reward lifecycle", () => {
     state = dispatchAction(state, action, payload);
     expect(state.shopState.entitlements.workstationTransaction).toBe(0);
     expect(state.player.money).toBe(0);
-    expect(before.shopState.entitlements.workstationTransaction).toBe(1);
+    expect(before.shopState.labReimbursements.workstationTransaction).toBe(1);
     for (const purchase of workstationPurchases) {
       expect(getShopActionPrice(state, purchase.action, purchase.payload)).toBeGreaterThan(0);
       const rejected = dispatchAction(state, purchase.action, purchase.payload);
@@ -62,7 +62,7 @@ describe("shop reward lifecycle", () => {
     state = { ...state, loverProgressState: { ...state.loverProgressState, giftCoupons: 1 } };
     state = dispatchAction(state, "upgrade-shop-item", { shopUpgradeId: "chair-advanced" });
     state = dispatchAction(state, "upgrade-coffee-machine", { shopUpgradeId: "manual" });
-    expect(state.shopState.entitlements.workstationTransaction).toBe(1);
+    expect(state.shopState.labReimbursements.workstationTransaction).toBe(1);
     expect(state.loverProgressState.giftCoupons).toBe(1);
     state = dispatchAction(state, "buy-shop-item", { shopItemId: "keyboard" });
     expect(state.shopState.entitlements.workstationTransaction).toBe(0);

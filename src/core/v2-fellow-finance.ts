@@ -1,4 +1,5 @@
 import { roundMoney } from "./v2-money";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { MONTHLY_LIVING_COST } from "./v2-content";
 import type { FellowFinanceAccount, GameState } from "./v2-types";
 
@@ -35,9 +36,9 @@ export function payFellowResearchCost(state: GameState, fellowId: string, amount
   const labCost = Math.min(availableFunding, cost);
   const personalCost = roundMoney(cost - labCost);
   const nextState = creditFellowMoney(state, fellowId, -personalCost);
-  return { state: { ...nextState, advisorProgressState: { ...nextState.advisorProgressState,
+  return { state: recordLabFinance({ ...nextState, advisorProgressState: { ...nextState.advisorProgressState,
     funding: roundMoney(state.advisorProgressState.funding - labCost),
-  } }, paid: true, labCost, personalCost };
+  } }, "student-experiment", -labCost), paid: true, labCost, personalCost };
 }
 
 export function getFellowSpendableMoney(state: GameState, fellowId: string): number {

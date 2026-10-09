@@ -31,6 +31,23 @@ function renderCurrentEvent(state: GameState): string {
 afterEach(() => vi.restoreAllMocks());
 
 describe("VALSE annual conference", () => {
+  it("splits the local-food meal bill and preserves its deferred two-coin settlement", () => {
+    let state = queuedState();
+    state.player.social = 2;
+    state = choose(choose(choose(choose(state), "请导师报销"), "确定"));
+    expect(state.eventQueue[0]!.description).toContain("AA 聚餐，人均 2 金币");
+    expect(state.eventQueue[0]!.choices.map((choice) => choice.label)).toContain("品尝当地美食");
+    const beforeMeal = state.player;
+    state = choose(state, "品尝当地美食");
+    expect(state.eventQueue[0]!.description).toContain("AA 聚餐");
+    expect(state.eventQueue[0]!.description).toContain("各付各的，你付了自己那份 2 金币");
+    expect(state.eventQueue[0]!.description).not.toContain("你买了单");
+    expect(state.eventQueue[0]!.choices[0]!.effects).toMatchObject({ money: -2, san: 2, social: 1 });
+    expect(state.player).toEqual(beforeMeal);
+    state = choose(state);
+    expect(state.player).toMatchObject({ money: beforeMeal.money - 2, san: beforeMeal.san + 2, social: 3 });
+  });
+
   it.each([
     ["act1", 0], ["act1", 1], ["act1", 12],
     ["act2", 1], ["act2", 12], ["act3", 1], ["act3", 12],
@@ -78,14 +95,14 @@ describe("VALSE annual conference", () => {
     expect(blocked.chainId).toBe(chainId);
     expect(blocked.choices.find((choice) => choice.label === "自费参会")?.disabledReason).toBeUndefined();
     expect(blocked.choices.find((choice) => choice.label === "请导师报销")?.disabledReason).toBeUndefined();
-    expect(blocked.description).toContain("你和老师还不熟");
+    expect(blocked.description).toContain("和导师还没那么熟");
     expect(state).toEqual(before);
     state = { ...state, player: { ...state.player, money: 2, favor: 12 },
       advisorProgressState: { ...state.advisorProgressState, funding: 2 } };
     const available = getResolvableQueuedEvent(state, state.eventQueue[0]!);
     expect(available.choices.find((choice) => choice.label === "自费参会")?.disabledReason).toBeUndefined();
     expect(available.choices.find((choice) => choice.label === "请导师报销")?.disabledReason).toBeUndefined();
-    expect(available.description).toContain("平时有交情");
+    expect(available.description).toContain("和导师平时还算熟");
     state = choose(state, "请导师报销");
     expect(state.player.favor).toBe(12);
     expect(state.advisorProgressState.funding).toBe(2);
@@ -225,7 +242,7 @@ describe("VALSE annual conference", () => {
     const effects = [...result!.matchAll(/<span class="event-settlement-effect ([^"]+)"[^>]*>([^<]+)<\/span>/gu)]
       .map((match) => [match[1], match[2]]);
     expect(effects).toEqual(mode === "自费参会" ? [["is-money", "金币 -2"]] : [
-      ["is-relationship", `导师好感 ${change}`],
+      ["is-relationship", `导师好感 ${change}${change === -0.75 ? "（抵抗0.25）" : ""}`],
       ["is-advisor-funding", "科研经费 -2"],
     ]);
     const unstyled = result!
@@ -250,7 +267,7 @@ describe("VALSE annual conference", () => {
     expect(duplicate.eventCounters).toEqual(state.eventCounters);
     for (const stage of ["act1", "act2"]) {
       expect(state.eventQueue[0]!.stage).toBe(stage);
-      expect(state.eventQueue[0]!.title).toContain("VALSE参会");
+      expect(state.eventQueue[0]!.title).toContain("VALSE活动");
       expect(state.eventQueue[0]!.description).not.toMatch(/机制结算|结果：|金币 -2|科研经费 -2|导师好感|CCIG/u);
       expect(renderCurrentEvent(state)).not.toContain('class="event-settlement-row is-result"');
       state = choose(state, stage === "act1" ? "继续" : "趁机旅游");

@@ -191,14 +191,14 @@ describe("fixed result conditions", () => {
     expect(roll).not.toHaveBeenCalled();
   });
 
-  it("marks CCIG poster percentage as an effect, with the paper requirement separate", () => {
+  it("shows the CCIG poster effect without repeating option eligibility as a result condition", () => {
     const initial = createInitialState();
     const paper = createGrantedPublishedPaper(17, 0, { target: "A", acceptedScore: 30 });
     const state = { ...initial, externalPublications: [paper] };
     const result = resolveCcigFixedEvent(state, { kind: "ccig-activity-poster", ccigPaperId: paper.id }, () => 0).enqueueEvents![0]!;
     const settlement = settlementOf(result);
-    expect(settlement).toContain("条件：展示论文为已发表的一作 A 类论文");
-    expect(settlement).toMatch(/结果：[^\n]*宣传倍率 \+50%/u);
+    expect(settlement).not.toContain("条件：");
+    expect(settlement).toMatch(/结果：[^\n]*论文宣传倍率 \+25%/u);
     expect(result.choices[0]!.effects.paperUpdates?.[0]?.id).toBe(paper.id);
   });
 

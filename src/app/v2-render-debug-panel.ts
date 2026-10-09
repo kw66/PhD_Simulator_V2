@@ -2,6 +2,7 @@ import { DEBUG_COMPLETED_EVENT_IDS, DEBUG_EVENT_GROUPS, DEBUG_MONTH_DELTAS, DEBU
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getResearchCap } from "../core/v2-research-cap-system";
 import type { GameState } from "../core/v2-types";
+import { DEBUG_ENDINGS } from "../core/v2-debug-endings";
 
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
@@ -79,6 +80,12 @@ export function renderDebugPanel(state: GameState | null, connected: boolean, co
       <section class="debug-popup-card debug-popup-events" aria-label="事件触发">
         <h2>🔔 事件触发 <span>待处理 ${state?.eventQueue.length ?? 0}</span></h2>
         ${DEBUG_EVENT_GROUPS.map((group) => `<section class="debug-popup-event-group"><div class="debug-popup-event-buttons debug-popup-buttons"><h3>${escapeHtml(group.title)}</h3>${group.buttons.map((item) => button(`${item.label}${DEBUG_COMPLETED_EVENT_IDS.includes(item.id as typeof DEBUG_COMPLETED_EVENT_IDS[number]) ? " ✓" : ""}`, "debug-trigger-event", { "event-id": item.id })).join("")}</div></section>`).join("")}
+      </section>
+    </fieldset>
+    <fieldset class="debug-popup-tools debug-popup-endings" ${connected && state && state.phase !== "setup" ? "" : "disabled"}>
+      <section class="debug-popup-card" aria-label="结局调试">
+        <h2>🏁 结局 <span>随机生成符合条件的数据，替换当前进度</span></h2>
+        <div class="debug-popup-buttons">${Object.entries(DEBUG_ENDINGS).map(([id, label]) => button(label, "debug-trigger-ending", { "event-id": id })).join("")}</div>
       </section>
     </fieldset>
     <footer class="debug-popup-footer">

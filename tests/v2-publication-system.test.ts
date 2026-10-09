@@ -6,6 +6,7 @@ import { applyPrepublicationPaperDecay, createDraftPaper } from "../src/core/v2-
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import {
   advancePaperReviewDeadlines,
+  getPaperCitationMultiplier,
   getPaperCitationMultiplierBreakdown,
   resolveDuePaperReviews,
   settlePublishedPaperCitations,
@@ -14,11 +15,11 @@ import type { GameState } from "../src/core/v2-types";
 
 function advanceReviewToPc(state: GameState): { state: GameState; reviewerEvent: GameState["eventQueue"][number]; finalEvent: GameState["eventQueue"][number] } {
   let next = state;
-  const first = next.eventQueue[0]!;
+  const first = next.eventQueue.find((event) => event.source === "review")!;
   next = dispatchAction(next, "resolve-event", { eventId: first.id, eventChoiceId: first.choices[0]!.id });
-  const reviewerEvent = next.eventQueue[0]!;
+  const reviewerEvent = next.eventQueue.find((event) => event.chainId === first.chainId)!;
   next = dispatchAction(next, "resolve-event", { eventId: reviewerEvent.id, eventChoiceId: reviewerEvent.choices[0]!.id });
-  return { state: next, reviewerEvent, finalEvent: next.eventQueue[0]! };
+  return { state: next, reviewerEvent, finalEvent: next.eventQueue.find((event) => event.chainId === first.chainId)! };
 }
 
 function confirmReview(state: GameState): GameState {
@@ -772,7 +773,7 @@ describe("v2 publication loop", () => {
     expect(getPaperCitationMultiplierBreakdown(state, createAtType("Best Paper Candidate", false)).promotion).toBe(1);
   });
 
-  it("delays paper promotion multipliers until a conference paper is handled", () => {
+  it("applies publicity multipliers independently of conference attendance", () => {
     const paper = attachPaperPublication({
       ...createDraftPaper(1, 0),
       heatMultiplier: 1,
@@ -789,7 +790,7 @@ describe("v2 publication loop", () => {
     paper.publication!.promotions = { arxiv: false, github: false, xiaohongshu: true };
     const state = createStartedGameState("normal");
 
-    expect(getPaperCitationMultiplierBreakdown(state, paper).promotion).toBe(1);
+    expect(getPaperCitationMultiplierBreakdown(state, paper).promotion).toBeCloseTo(1.35);
     expect(getPaperCitationMultiplierBreakdown(state, { ...paper, conferenceHandled: true }).promotion).toBeCloseTo(1.35);
   });
 
@@ -929,6 +930,126 @@ describe("v2 publication loop", () => {
     const citedNextMonth = settlePublishedPaperCitations(cited).state;
     expect(citedNextMonth.papers[0]?.publication?.monthsSincePublish).toBe(3);
     expect(citedNextMonth.papers[0]?.publication?.citations).toBe(10);
+  });
+
+  describe("early citation exposure", () => {
+    function createCitationState(): GameState {
+      const paper = attachPaperPublication({
+        ...createDraftPaper(1, 0, () => 0),
+        heatMultiplier: 1,
+        idea: 34,
+        experiment: 33,
+        writing: 33,
+        status: "published",
+        target: "A",
+        conferenceHandled: false,
+      }, 1, "Oral", 1);
+      return {
+        ...createStartedGameState("normal"),
+        eventQueue: [],
+        papers: [paper],
+        externalPublications: [],
+        buffs: [],
+      };
+    }
+
+    it("applies arXiv and Xiaohongshu before the original Oral conference", () => {
+      let state = createCitationState();
+      state.papers[0]!.heatMultiplier = 1.35;
+      const paperId = state.papers[0]!.id;
+      state = dispatchAction(state, "promote-paper", { paperId, promotionId: "arxiv" });
+      state = dispatchAction(state, "promote-paper", { paperId, promotionId: "xiaohongshu" });
+
+      expect(getPaperCitationMultiplier(state, state.papers[0]!)).toBeCloseTo(1.6875);
+      const settled = settlePublishedPaperCitations(state).state;
+      expect(settled.papers[0]!.publication).toMatchObject({
+        citations: 8,
+        pendingCitationFraction: 0.4375,
+        preprintExposed: true,
+      });
+      expect(settled.papers[0]!.conferenceHandled).toBe(false);
+    });
+
+    it.each(["Oral", "Best Paper", "Best Paper Candidate"] as const)(
+      "adds poster and Xiaohongshu publicity once before and after %s presentation",
+      (acceptType) => {
+        let state = createCitationState();
+        const paper = state.papers[0]!;
+        paper.publication = { ...paper.publication!, acceptType, posterExposed: true, promotionMultiplier: 1.25 };
+        state = dispatchAction(state, "promote-paper", { paperId: paper.id, promotionId: "xiaohongshu" });
+        const promoted = state.papers[0]!;
+        expect(getPaperCitationMultiplierBreakdown(state, promoted).promotion).toBe(1.5);
+        expect(promoted.publication!.preprintExposed).not.toBe(true);
+        const repeated = dispatchAction(state, "promote-paper", { paperId: paper.id, promotionId: "xiaohongshu" });
+        expect(repeated.player.san).toBe(state.player.san);
+        expect(getPaperCitationMultiplier(repeated, repeated.papers[0]!)).toBe(1.5);
+
+        state = settlePublishedPaperCitations(state).state;
+        expect(state.papers[0]!.publication).toMatchObject({ citations: 7, pendingCitationFraction: 0.5 });
+        state.papers[0] = { ...state.papers[0]!, conferenceHandled: true, conferenceHandledAtTotalMonths: state.totalMonths };
+        const expectedMultiplier = acceptType === "Oral" ? 2 : 5.5;
+        expect(getPaperCitationMultiplier(state, state.papers[0]!)).toBe(expectedMultiplier);
+        state = settlePublishedPaperCitations(state).state;
+        expect(state.papers[0]!.publication!.citations).toBe(acceptType === "Oral" ? 17 : 35);
+        expect(state.papers[0]!.publication!.promotionMultiplier).toBe(1.25);
+        expect(getPaperCitationMultiplier(state, state.papers[0]!)).toBe(expectedMultiplier);
+      },
+    );
+
+    it.each([
+      { preprintExposed: false, posterExposed: false, expectedCitations: 0 },
+      { preprintExposed: true, posterExposed: false, expectedCitations: 7 },
+      { preprintExposed: false, posterExposed: true, expectedCitations: 7 },
+      { preprintExposed: true, posterExposed: true, expectedCitations: 7 },
+    ])("handles same-month conference exposure without double-counting: %j", ({ expectedCitations, ...exposure }) => {
+      const state = createCitationState();
+      const paper = state.papers[0]!;
+      paper.conferenceHandled = true;
+      paper.conferenceHandledAtTotalMonths = state.totalMonths;
+      paper.publication = { ...paper.publication!, ...exposure };
+      const result = settlePublishedPaperCitations(state);
+      expect(result.state.totalCitations).toBe(expectedCitations);
+      expect(result.state.papers[0]!.publication!.citations).toBe(expectedCitations);
+      expect(result.changes).toHaveLength(expectedCitations > 0 ? 1 : 0);
+    });
+
+    it("keeps unexposed citations and fractions unchanged while aging and decaying the paper", () => {
+      let state = createCitationState();
+      const paper = state.papers[0]!;
+      paper.publication = {
+        ...paper.publication!,
+        promotionMultiplier: 1.25,
+        promotions: { arxiv: false, github: false, xiaohongshu: true },
+      };
+      expect(getPaperCitationMultiplier(state, paper)).toBe(1.5);
+      for (let month = 0; month < 4; month += 1) {
+        const result = settlePublishedPaperCitations(state);
+        expect(result.changes).toEqual([]);
+        expect(result.state.totalCitations).toBe(0);
+        expect(result.state.citationHistoryByYear).toEqual(state.citationHistoryByYear);
+        state = result.state;
+      }
+      expect(state.papers[0]!.publication).toMatchObject({
+        citations: 0, pendingCitationFraction: 0, monthsSincePublish: 4, effectiveScore: 90,
+      });
+    });
+
+    it.each(["papers", "externalPublications"] as const)("blocks arXiv after poster exposure in %s without charging SAN", (collection) => {
+      const state = createCitationState();
+      const paper = state.papers[0]!;
+      paper.publication!.posterExposed = true;
+      if (collection === "externalPublications") {
+        state.papers = [];
+        state.externalPublications = [paper];
+      }
+      const next = dispatchAction(state, "promote-paper", { paperId: paper.id, promotionId: "arxiv" });
+      expect(next.player.san).toBe(state.player.san);
+      expect(next[collection][0]!.publication).toEqual(paper.publication);
+      expect(next[collection][0]!.publication!.promotions?.arxiv).not.toBe(true);
+      expect(next[collection][0]!.publication!.preprintExposed).not.toBe(true);
+      expect(next.log[0]!.text).toContain("论文已经公开");
+      expect(settlePublishedPaperCitations(next).state[collection][0]!.publication!.citations).toBe(5);
+    });
   });
 
   it("keeps conference citations blocked until attendance is handled", () => {

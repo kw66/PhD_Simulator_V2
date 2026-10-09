@@ -69,7 +69,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         label: "随便水一下",
         outcome: advisorPresentForSlack
           ? `导师到场（${attendancePercent}%）｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
-          : `导师缺席（${absencePercent}%）｜无事发生。`,
+          : `导师缺席（${absencePercent}%）`,
         effects: advisorPresentForSlack && slackFavorChange < 0 ? { favor: slackFavorChange } : {},
       },
     ],

@@ -38,6 +38,7 @@ export const GAME_ACTION_IDS = [
   "debug-add-relationship",
   "debug-shift-month",
   "debug-trigger-event",
+  "debug-trigger-ending",
   "debug-replay-event",
   "debug-toggle-event-replay",
   "debug-adjust-action-points",

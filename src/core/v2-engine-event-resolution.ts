@@ -19,6 +19,8 @@ import { refreshWinterVacationPlan } from "./v2-fixed-events-winter";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { refreshConferenceDecision } from "./v2-conference-events";
+import { refreshCcigActivityEvent } from "./v2-fixed-events-ccig-refresh";
+import { refreshConferenceActivityEvent } from "./v2-conference-activity-refresh";
 import { refreshJournalFeeEvent } from "./v2-journal-fee-events";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
@@ -377,6 +379,8 @@ function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem
       deferredStatePatch: createDeferredStatePatch(state, resolved.nextState),
     };
   }
+  queuedEvent = refreshCcigActivityEvent(state, queuedEvent);
+  queuedEvent = refreshConferenceActivityEvent(state, queuedEvent);
   queuedEvent = refreshJournalFeeEvent(state, refreshConferenceDecision(state, refreshWinterVacationPlan(state, queuedEvent)));
   return refreshSummerVacationEvent(state, refreshScholarshipEvent(state, refreshOccupiedLoverEvent(state, refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state,
     refreshRandomResultPreview(state, rebuildEventFromCurrentState(state, queuedEvent)))))));
@@ -438,7 +442,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => event.fixedResultPreview || event.fixedTreePreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
+  const eventQueue = state.eventQueue.map((event) => event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
     && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };

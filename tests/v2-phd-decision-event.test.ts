@@ -49,12 +49,12 @@ describe("PhD decision copy", () => {
       expect(intro.description).toContain(`已发表一作0篇，科研分${score}。今年转博需要达到 ${required} 分`);
       expect(intro.description).toContain(score < required ? "你的成果还不够" : "你已经过线");
       expect(decision.description).not.toMatch(/已发表一作|科研分|今年转博需要/);
-      expect(decision.description).toContain("你听博士师兄说");
+      expect(decision.description).toContain("博士师兄也叹气");
       expect(decision.description).toContain("简历迟迟没有回应");
       expect(decision.description).toContain("别觉得多一张文凭就稳了");
       expect(decision.description).toContain("AI发展得太快");
-      expect(decision.description).toContain("自己的课题就失去了意义");
-      expect(decision.description).toContain("自己找饭碗的日子往后推一推");
+      expect(decision.description).toContain("课题先失去意义");
+      expect(decision.description).toContain("借读博晚些面对找工作");
       expect(decision.description).not.toMatch(/月末判断|SAN|永久效果|金币|经费达到/);
       expect(intro.description).toContain(year === 2 ? "今年不转，明年还有一次机会" : "这是硕士阶段最后一次转博机会");
       const transfer = decision.choices.find((choice) => choice.id === "transfer-phd")!;
@@ -88,7 +88,7 @@ describe("PhD decision copy", () => {
     expect(state).toEqual(before);
   });
 
-  it("renders the four emoji-led decision paragraphs separately", () => {
+  it("renders the three emoji-led decision paragraphs separately", () => {
     const state = decisionState(2, 2);
     const decision = nextStage(createPhdDecisionEvent(state));
     const event = createEventQueueItem(decision, state.totalMonths);
@@ -96,10 +96,10 @@ describe("PhD decision copy", () => {
       isEventContentOpen: true, activeEventId: event.id,
     });
     const paragraphs = html.match(/<p\b[^>]*>[\s\S]*?<\/p>/gu) ?? [];
-    for (const emoji of ["💼", "🤖", "💭", "📩"]) {
+    for (const emoji of ["💼", "🤖", "💭"]) {
       const paragraph = paragraphs.find((entry) => entry.includes(emoji));
       expect(paragraph).toBeDefined();
-      expect(["💼", "🤖", "💭", "📩"].filter((marker) => paragraph!.includes(marker))).toEqual([emoji]);
+      expect(["💼", "🤖", "💭"].filter((marker) => paragraph!.includes(marker))).toEqual([emoji]);
     }
   });
 
@@ -150,7 +150,7 @@ describe("PhD decision copy", () => {
     try {
       Object.assign(ADVISOR_SALARY, { master: 1.75, phd: 3.25 });
       const decision = nextStage(createPhdDecisionEvent(state));
-      expect(decision.description).toContain("读博每月有补助");
+      expect(decision.description).toContain("读博有补助");
       const result = nextStage(decision, "transfer-phd");
       expect(result.description).toContain("工资 1.75→3.25金");
       expect(result.description).not.toContain("1→2.5");

@@ -431,7 +431,7 @@ describe("image misuse scholarship disqualification", () => {
     const preview = resolve(decision, currentEvent(decision).choices[1]!.id);
     expect(random).not.toHaveBeenCalled();
     expect(currentEvent(preview).stage).toBe("result");
-    expect(currentEvent(preview).description).toContain("结果：无事发生");
+    expect(currentEvent(preview).description).toContain("结果：不申报国奖");
     expectUnclaimed(preview, original);
     const completed = resolve(preview);
     expectUnclaimed(completed, original);

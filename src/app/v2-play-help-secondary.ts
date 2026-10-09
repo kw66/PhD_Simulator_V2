@@ -3,6 +3,7 @@ import { normalizeShopTab, type ShopTabId } from "./v2-render-shop-panel";
 import type { PlayRenderUiState, TalentPanelTabId } from "./v2-render-types";
 import { ADVISOR_SALARY, ADVISOR_SALARY_BONUS, MONTHLY_LIVING_COST } from "../core/v2-content";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "../core/v2-lab-projects";
+import { renderPaperTerm } from "./v2-paper-terms";
 
 export const ATTRIBUTE_RESISTANCE_HELP_PAGE: PlayHelpPage = {
   title: "属性与抵抗",
@@ -10,7 +11,8 @@ export const ATTRIBUTE_RESISTANCE_HELP_PAGE: PlayHelpPage = {
   body: `<p>科研、社交、导师好感、同学默契和恋人亲密的增减都受档位抵抗。</p>
     <p><b>0／6／12／18档位，抵抗0%／25%／50%／75%。</b>每1点原始变化先按当前档位减免，再处理下一点；不足1点也按比例计算。</p>
     <p>例：科研5增加2点，先到6，再增加0.75，实际到6.75。</p>
-    <p><b>界面向下取整数显示，内部保留小数。</b>玩家科研、社交、好感和人际科研、默契、亲密都如此。达到6／12／18才换档，显示为6不代表小数消失。</p>
+    <p><b>属性显示至多两位小数，计算使用实际数值。</b>玩家科研、社交、好感和人际科研、默契、亲密都如此。实际达到6／12／18才换档。</p>
+    <p>结果括号注明抵抗掉的数值，如好感-1.5（抵抗0.5）。上限截断另行注明。</p>
     <p>默契：生疏／熟悉／合拍／无间。亲密：初识／亲近／甜蜜／挚爱。</p>
     <p>SAN和金币没有档位抵抗。详情中的“原始+1”表示抵抗前的奖励。</p>`,
 };
@@ -39,13 +41,13 @@ export const ANNUAL_RESEARCH_HELP_PAGE: PlayHelpPage = {
 const RESEARCH_PAGES: readonly PlayHelpPage[] = [
   {
     title: "引用流程",
-    summary: "<p><b>会议开会或挂arXiv后开始被引；期刊接收后直接开始。</b>引用按月结算，尚未公开时总引用倍率显示0。</p>",
-    body: "<p>录用分保留接收时的成绩；当前分决定后续引用。<b>每月引用增长 = 当前分 × 0.05 × 总引用倍率。</b>小数累积满1才增加引用。</p><p>例：当前分10、总倍率1，连续两个月增加1次引用。</p><p>从接收后开始计月，<b>当前分每4个月衰减10%</b>，尚未公开也会衰减；录用分和科研分不变。扣分向上取整，最低0；该月先算引用，再扣分。</p><p>会议录用结果确认时，导师支付每篇一作注册费1金币。3个月后只处理差旅，同学免费代贴。玩家期刊可选自费或导师支付，选定后不能返回重选。费用详情见人际提示。</p>",
+    summary: "<p><b>会议开会、挂arXiv或在VALSE展示海报后开始被引；期刊接收后直接开始。</b>引用按月结算，尚未公开时总引用倍率显示0。</p>",
+    body: "<p>录用分保留接收时的成绩；当前分决定后续引用。<b>每月引用增长 = 当前分 × 0.05 × 总引用倍率。</b>小数累积满1才增加引用。</p><p>例：当前分10、总倍率1，连续两个月增加1次引用。</p><p>从接收后开始计月，<b>当前分每4个月衰减10%</b>，尚未公开也会衰减；录用分和科研分不变。扣分向上取整，最低0；该月先算引用，再扣分。</p><p>会议录用结果确认时，导师支付每篇一作注册费1金币，随后即可决定参会并确认支付差旅，找人代贴免费。开会月固定为录用结果生成后第3个月；提前付款不会提前公开论文。玩家期刊可选自费或导师支付，选定后不能返回重选。费用详情见人际提示。</p>",
   },
   {
     title: "论文推广",
     summary: "<p>每篇一作论文各可推广一次：<b>arXiv提前被引，GitHub提高当前分，小红书和量子位提高倍率。</b></p>",
-    body: "<p><b>GitHub：</b>增加当前分的25%（增加量向下取整），录用分不变。</p><p><b>小红书、量子位：</b>录用/推广倍率+0.25，如Oral从×1.5变为×1.75。量子位仅用于期刊论文，金币-5，引用倍率+0.25。</p><p>会议开会前挂arXiv，录用/推广部分先按×1；热度、影响力和其他倍率照常计入。开会后才启用录用与推广加成。</p>",
+    body: "<p><b>GitHub：</b>增加当前分的25%（增加量向下取整），录用分不变。</p><p><b>小红书、量子位：</b>录用/推广倍率+0.25，如Oral从×1.5变为×1.75。量子位仅用于期刊论文，金币-5。</p><p><b>VALSE海报：</b>从已录用的一作A类论文中选当前分最高的一篇，宣传倍率+0.25；尚未公开的论文同时公开。</p><p>论文公开后，宣传加成立即生效；尚未公开时先保留加成，暂不被引。原会议的Oral／Best加成仍等该会议举办后生效。</p>",
   },
   {
     title: "引用倍率",
@@ -53,9 +55,9 @@ const RESEARCH_PAGES: readonly PlayHelpPage[] = [
     body: `<p><b>总倍率 = 热度 × 影响力 × 录用/推广倍率 × 其他引用倍率。</b>基础系数0.05不计入显示的总倍率。</p><table class="panel-tip-table citation-factor-table">
       <thead><tr><th scope="col">录用类型</th><th scope="col">基础倍率</th></tr></thead>
       <tbody>
-        <tr><th scope="row">Poster / Spotlight</th><td>×1</td></tr>
-        <tr><th scope="row">Oral</th><td>×1.5</td></tr>
-        <tr><th scope="row">Best Paper / Candidate</th><td>×5</td></tr>
+        <tr><th scope="row">${renderPaperTerm("Poster")} / ${renderPaperTerm("Spotlight")}</th><td>×1</td></tr>
+        <tr><th scope="row">${renderPaperTerm("Oral")}</th><td>×1.5</td></tr>
+        <tr><th scope="row">${renderPaperTerm("Best Paper")} / ${renderPaperTerm("Best Paper Candidate")}</th><td>×5</td></tr>
         <tr><th scope="row">期刊</th><td>×1</td></tr>
       </tbody>
     </table>`,
@@ -150,7 +152,7 @@ const EVENT_PAGES: readonly PlayHelpPage[] = [
   {
     title: "危险选择",
     summary: "",
-    body: "<p><b>余额不足的危险事件仍可选择。</b>请先看按钮上的标记。</p><p><b>！</b>：悬浮显示“会暴毙”。<b>？</b>：悬浮显示“可能会暴毙”。危险事件需手动确认，不会自动结算。</p><p>缺少目标、前置条件未满足或本月次数用尽等限制，仍会禁用选项。危险标记不代表这些条件已满足。</p>",
+    body: "<p><b>余额不足的危险事件仍可选择。</b>请先看按钮上的标记。</p><p><b>！</b>：本次结算必定导致失败。<b>？</b>：部分随机结果可能导致失败。悬浮或聚焦按钮，可查看金币、SAN、属性或科研经费不足的具体原因和预计结算值。</p><p>危险事件需手动确认，不会自动结算；只检查本次结算，不预测下月支出。</p><p>缺少目标、前置条件未满足或本月次数用尽等限制，仍会禁用选项。</p>",
   },
   {
     title: "毕业时间",

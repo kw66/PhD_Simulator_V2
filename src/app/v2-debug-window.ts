@@ -6,6 +6,7 @@ const DEBUG_WINDOW_ACTIONS = new Set([
   "debug-adjust-stat", "debug-shift-month", "force-next-month", "debug-add-paper",
   "debug-add-all-buffs", "debug-add-relationship", "debug-trigger-event", "restart-game", "reset-game",
   "debug-toggle-event-replay", "debug-adjust-action-points",
+  "debug-trigger-ending",
 ]);
 
 export function isDebugWindowActionData(value: unknown): value is Record<string, string> {
@@ -47,7 +48,8 @@ export function createDebugWindow(getState: () => GameState, onAction: (data: DO
       sendState();
     }
     if (event.data.type === "debug-action" && isDebugWindowActionData(event.data.data)) {
-      if (getState().phase !== "playing" && event.data.data.action !== "restart-game" && event.data.data.action !== "reset-game") return;
+      if (getState().phase !== "playing" && event.data.data.action !== "restart-game" && event.data.data.action !== "reset-game"
+        && !(getState().phase === "finished" && event.data.data.action === "debug-trigger-ending")) return;
       onAction(event.data.data);
     }
   });

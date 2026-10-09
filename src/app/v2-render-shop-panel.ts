@@ -26,7 +26,7 @@ import {
 } from "../core/v2-shop-items";
 import { getBikeTierDefinition, getNextBikeTierDefinition } from "../core/v2-bike-system";
 import { getSupportItemDefinition, isSupportItemOwned } from "../core/v2-support-items";
-import { getGiftAwareShopSellPrice, getShopActionPrice } from "../core/v2-lover-gift";
+import { getGiftAwareShopSellPrice, getShopActionPrice, getShopLabFundingCost, type ShopPurchaseAction } from "../core/v2-lover-gift";
 import { animationNumberAttributes, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
 import type {
   AiSlotId,
@@ -49,6 +49,7 @@ type ActionButtonConfig = {
   label: string;
   title?: string;
   price?: number | "?";
+  labFundingCost?: number;
   priceDirection?: "cost" | "gain";
   variant?: "primary" | "secondary" | "current";
   action?: string;
@@ -184,6 +185,7 @@ export function normalizeShopTab(value: string | undefined | null): ShopTabId {
 
 function renderActionButton(config: ActionButtonConfig): string {
   const variant = config.variant ?? "primary";
+  const label = config.labFundingCost ? `${config.label}（经费 -${formatMoney(config.labFundingCost)}）` : config.label;
   const displayedPrice = typeof config.price === "number" ? formatMoney(config.price) : config.price;
   const priceText = config.price !== undefined
     ? `，${displayedPrice} 金币`
@@ -191,7 +193,7 @@ function renderActionButton(config: ActionButtonConfig): string {
   const attrs = [
     `class="shop-item-btn is-${variant}${config.price === 0 ? " has-free-price" : ""}"`,
     'type="button"',
-    `aria-label="${escapeHtml(`${config.label}${priceText}`)}"`,
+    `aria-label="${escapeHtml(`${label}${priceText}`)}"`,
   ];
   if (config.action) {
     attrs.push(`data-action="${escapeHtml(config.action)}"`);
@@ -210,7 +212,7 @@ function renderActionButton(config: ActionButtonConfig): string {
 
   return `
     <button ${attrs.join(" ")}>
-      <span class="shop-item-btn-label">${escapeHtml(config.label)}</span>
+      <span class="shop-item-btn-label">${escapeHtml(label)}</span>
       ${config.price !== undefined ? `
         <span class="shop-item-btn-price is-${config.priceDirection ?? "cost"}">
           <span aria-hidden="true">💰</span>
@@ -219,6 +221,28 @@ function renderActionButton(config: ActionButtonConfig): string {
       ` : ""}
     </button>
   `;
+}
+
+function renderPurchaseButton(state: GameState, config: Omit<ActionButtonConfig, "action"> & { action?: ShopPurchaseAction }): string {
+  if (!config.action || typeof config.price !== "number") return renderActionButton(config);
+  const labFundingCost = getShopLabFundingCost(state, config.action, {
+    shopItemId: config.itemId,
+    shopUpgradeId: config.upgradeId,
+    aiSlotId: config.aiSlotId,
+    supportItemId: config.supportItemId,
+  });
+  if (labFundingCost <= 0) return renderActionButton(config);
+  const insufficientFunding = state.advisorProgressState.funding < labFundingCost;
+  const disabledReason = config.disabledReason ?? (insufficientFunding
+    ? `科研经费不足（需${formatMoney(labFundingCost)}，现有${formatMoney(state.advisorProgressState.funding)}）`
+    : undefined);
+  return renderActionButton({
+    ...config,
+    labFundingCost,
+    disabled: config.disabled || insufficientFunding,
+    disabledReason,
+    title: disabledReason ?? `报销：科研经费 -${formatMoney(labFundingCost)}，个人金币 ${formatMoney(config.price)}`,
+  });
 }
 
 function renderShopEffectHtml(effectText: string, animation?: RowConfig["effectAnimation"]): string {
@@ -450,7 +474,7 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
           }),
           currentUpgrade
             ? renderActionButton({ label: "已升级", variant: "current", disabled: true })
-            : renderActionButton({
+            : renderPurchaseButton(state, {
                 label: "升级",
                 price: selectedPrice ?? "?",
                 action: selectedOption ? "upgrade-shop-item" : undefined,
@@ -461,7 +485,7 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
                   : state.player.money < (selectedPrice ?? 0) ? "金币不足" : undefined,
               }),
         ]
-      : [renderActionButton({
+      : [renderPurchaseButton(state, {
           label: "购买",
           price: purchasePrice,
           action: "buy-shop-item",
@@ -537,7 +561,7 @@ function renderGpuRow(state: GameState): string {
           itemId: "gpu_buy",
         })
         : "",
-      renderActionButton({
+      renderPurchaseButton(state, {
         label: nextTier ? currentTier ? "升级" : "购买" : "已满级",
         price: nextTier && nextPrice !== null ? nextPrice : undefined,
         variant: nextTier ? "primary" : "current",
@@ -585,7 +609,7 @@ function renderShopItemRow(
             : "",
           renderActionButton({ label: "已购买", variant: "current", disabled: true }),
         ]
-      : [renderActionButton({
+      : [renderPurchaseButton(state, {
           label: "购买",
           price: purchasePrice,
           action: "buy-shop-item",
@@ -736,7 +760,7 @@ function renderCoffeeRows(
             }),
             currentUpgrade
               ? renderActionButton({ label: "已升级", variant: "current", disabled: true })
-              : renderActionButton({
+              : renderPurchaseButton(state, {
                   label: "升级",
                   price: selectedPrice ?? "?",
                   action: selectedOption ? "upgrade-coffee-machine" : undefined,
@@ -747,7 +771,7 @@ function renderCoffeeRows(
                     : state.player.money < (selectedPrice ?? 0) ? "金币不足" : undefined,
                 }),
           ]
-        : [renderActionButton({
+        : [renderPurchaseButton(state, {
             label: "购买",
             price: coffeeMachinePurchasePrice,
             action: "buy-coffee-machine",
@@ -908,7 +932,7 @@ function renderAiRows(state: GameState): string {
       effectAnimation: { key: `shop:ai:${slot}`, template: effectTemplate, values: effectValues },
       actions: [
         renderAiSubscriptionToggle(slot, subscription.enabled, subscription.paused),
-        renderActionButton({
+        renderPurchaseButton(state, {
           label: purchasedThisMonth
             ? "本月已订购"
             : reimbursed ? "导师报销" : "订购本月",

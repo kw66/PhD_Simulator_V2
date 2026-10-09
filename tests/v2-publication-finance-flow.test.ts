@@ -147,18 +147,34 @@ describe("registration at acceptance confirmation", () => {
     expect(applyPaperReviewSettlement(next, settlement)).toBe(next);
   });
 
-  it("generates attendance three months later without paying registration again", () => {
+  it("confirms proxy attendance early and settles three months later without paying registration again", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     let state = resolveDuePaperReviews(makeState([paper("attendee")]), () => 0).state;
     state = chooseReview(chooseReview(chooseReview(state, "attendee"), "attendee"), "attendee");
+    const attendance = state.eventQueue.find((event) => event.conferencePreview)!;
+    expect(attendance).toMatchObject({ title: "CVPR参会", deadlineMonths: 3 });
+    for (const choiceId of ["continue", "proxy", "proxy-finish"]) {
+      const event = state.eventQueue.find((entry) => entry.chainId === attendance.chainId)!;
+      state = dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: choiceId });
+    }
+    expect(state.advisorProgressState.funding).toBe(99);
+    expect(state.player.money).toBe(30);
+    expect(state.externalPublications[0]?.conferenceHandled).toBe(false);
+    expect(state.conferenceAttendancePlans).toHaveLength(1);
+    expect(state.conferenceAttendancePlans?.[0]).toMatchObject({ mode: "proxy", context: { availableAtTotalMonths: 9 } });
     for (const totalMonths of [7, 8, 9]) {
       const beforeFunding = state.advisorProgressState.funding;
       state = dispatchAction({ ...state, eventQueue: [] }, "next-month");
       expect(state.totalMonths).toBe(totalMonths);
       expect(state.advisorProgressState.funding).toBe(beforeFunding - 1.5);
       expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["attendee"]);
-      expect(state.eventQueue.filter((event) => event.conferencePreview)).toHaveLength(totalMonths === 9 ? 1 : 0);
+      expect(state.eventQueue.filter((event) => event.conferencePreview)).toHaveLength(0);
+      expect(state.externalPublications[0]?.conferenceHandled).toBe(totalMonths === 9);
+      expect(state.conferenceAttendancePlans).toHaveLength(totalMonths === 9 ? 0 : 1);
+      expect(state.eventCounters.meetingCount).toBe(0);
+      expect(state.eventQueue.some((event) => event.chainId.endsWith("-activity"))).toBe(false);
     }
+    expect(state.externalPublications[0]?.conferenceHandledAtTotalMonths).toBe(9);
   });
 });
 

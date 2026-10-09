@@ -16,10 +16,11 @@ export function createAdvisorGrantResultEvent(context: AdvisorGrantResultContext
   const title = academician ? "导师增选结果" : "基金结果";
   const chainId = `advisor-grant-${application.calendarYear}-${application.id}`;
   const resultPercent = Number(((success ? context.successChance : 1 - context.successChance) * 100).toFixed(1));
-  const condition = `条件：科研积累 ${application.researchSnapshot}；${success ? "获批" : "未获批"}（${resultPercent}%）`;
+  const resultLabel = academician ? success ? "当选院士" : "未当选院士" : success ? "获批" : "未获批";
+  const condition = `条件：科研积累 ${application.researchSnapshot}；${resultLabel}（${resultPercent}%）`;
   const settlement = success
     ? [`科研经费 +${funding}`, `导师晋升${rank}`].join("；")
-    : "无事发生";
+    : academician ? "导师未当选院士" : `${grantName}未获批`;
   const result = createFixedEvent({
     id: `${chainId}-result`,
     title: `${title} ➜ 等待消息 ➜ ${success ? academician ? "当选院士" : "获批资助" : academician ? "未能当选" : "未获资助"}`,
@@ -40,7 +41,7 @@ export function createAdvisorGrantResultEvent(context: AdvisorGrantResultContext
             ? "你把整理过的成果材料收好，没删。桌边的横向项目交付表倒是不用收，原定周五的截止日期，一天也没往后挪。"
             : "后来，导师发来几处需要补强的论证，你又打开了那份以为可以封存的本子。横向项目交付表也还在桌边，原定周五的截止日期，一天都没往后挪。",
         ].join("\n\n"), `${condition}\n结果：${settlement}`),
-    completionLog: success ? `${academician ? "导师当选院士" : `${grantName}获批`}；${settlement}` : `${grantName}${academician ? "增选未通过" : "未获批"}；无事发生`,
+    completionLog: success ? `${academician ? "导师当选院士" : `${grantName}获批`}；${settlement}` : settlement,
     choices: [{
       id: `${chainId}-finish`,
       label: "知道了",
@@ -56,10 +57,10 @@ export function createAdvisorGrantResultEvent(context: AdvisorGrantResultContext
     description: [
       academician
         ? "你翻出当时核对的成果清单，文章标题、年份、作者顺序，一项项查得眼睛发酸。材料交上去之后，这件事就从大家的待办里消失了，却没从心里消失。"
-        : `三月赶${grantName}申请，你们补实验、查文献，导师反复改“研究内容”和“关键问题”。文件名从“终稿”变成“终稿_再改”，真正提交的那版，名字反而最朴素。`,
+        : `等消息时，同学聊起${grantName}的函评，有人问拿到几个A才有希望。导师说，函评会看科学问题、创新性和研究基础，评价和资助意见还得合起来看，不能只数字母。`,
       academician
         ? "同学私下议论着增选的消息，谁也没有准信。你把手机扣在桌上，决定先别追着导师问，手上的实验还等着往下做。"
-        : "同学聊起函评的A、B、C，又有人问“上会是不是就稳了”。导师之前说过，进了会评也还得等最后的资助决定。你点开课题组群，最新一条仍是催大家交周报。",
+        : "有人接着问：“那上会是不是就稳了？”导师摇摇头：会评还要比较，也受资助名额限制。你把聊天窗口收起，最新一条周报提醒却又弹了出来。",
     ].join("\n\n"),
     choices: [{ id: `${chainId}-wait`, label: "继续", outcome: "留意组里的消息。", effects: { enqueueEvents: [result] } }],
   });
@@ -69,10 +70,10 @@ export function createAdvisorGrantResultEvent(context: AdvisorGrantResultContext
     chainId,
     description: [
       academician
-        ? "八月，群里开始转发院士增选的消息。你想起前阵子帮导师整理材料，光是把各处的成果清单对齐，就和同学核了好几轮。"
-        : `八月，工位旁有人小声问：“今年基金是不是快出结果了？”你想起春天帮导师赶${grantName}本子，白天跑实验，晚上把图往模板里塞，连做梦都在调箭头的位置。`,
-      "你点开课题组群，还没有新通知。聊天记录往上一翻，当初催大家交材料的消息居然还在，后面整整齐齐跟着一排“收到”。",
+        ? "八月，群里开始转发院士增选的消息。有人问起导师这次有没有希望，大家都说不准，只好等正式通知。"
+        : `八月，工位旁有人小声问：“今年基金是不是快出结果了？”导师申请的${grantName}还没有消息，大家一边等，一边猜下学期的实验能不能宽裕些。`,
+      "你点开课题组群，只有组会通知。隔壁同门刷新了一遍页面，又把手机扣回桌上：“先干活吧，有消息老师会说的。”",
     ].join("\n\n"),
-    choices: [{ id: `${chainId}-continue`, label: "继续", outcome: "回想申请时的准备。", effects: { enqueueEvents: [decision] } }],
+    choices: [{ id: `${chainId}-continue`, label: "继续", outcome: "聊起评审进展。", effects: { enqueueEvents: [decision] } }],
   });
 }

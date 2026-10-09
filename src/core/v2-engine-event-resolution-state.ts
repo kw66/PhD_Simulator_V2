@@ -1,4 +1,5 @@
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
+import { scheduleConferenceAttendance } from "./v2-conference-attendance";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { createCustomFellowProgressProfile, getFellowName, getUniqueFellowName } from "./v2-fellow-progression";
@@ -10,6 +11,7 @@ import { applyPaperCompetitionResolution } from "./v2-paper-competition";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { clampResearchToCap } from "./v2-research-cap-system";
 import { roundMoney } from "./v2-money";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { applyReadPaperActions, applyReadingCountProgress } from "./v2-reading-system";
 import { canAddRelationship, syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
@@ -184,6 +186,14 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   for (const [key, value] of Object.entries(effects.shopEntitlementDeltas ?? {})) {
     const typedKey = key as keyof typeof shopState.entitlements;
     shopState.entitlements[typedKey] = Math.max(0, shopState.entitlements[typedKey] + (value ?? 0));
+  }
+  if (effects.labReimbursement) {
+    const current = state.shopState.labReimbursements;
+    const reimbursements = current.totalMonths === state.totalMonths
+      ? { ...current }
+      : { totalMonths: state.totalMonths, gpuTransaction: 0, workstationTransaction: 0 };
+    reimbursements[effects.labReimbursement] = 1;
+    shopState.labReimbursements = reimbursements;
   }
   let actionState = state.actionState;
   if (effects.restAction && state.actionState.used < state.actionState.limit) {
@@ -392,7 +402,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   ];
   const buffs = removeBuffs(addOrReplaceBuffs(state.buffs, additions), effects.removeBuffIds ?? []);
 
-  const directlyResolvedState: GameState = {
+  const directlyResolvedState: GameState = recordLabFinance({
     ...state,
     player,
     actionState,
@@ -424,8 +434,9 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     eventCounters,
     scholarshipState,
     buffs,
-  };
-  let resolvedState = directlyResolvedState;
+  }, effects.labFinanceCategory ?? "other", advisorProgressState.funding - state.advisorProgressState.funding);
+  let resolvedState = effects.scheduleConferenceAttendance
+    ? scheduleConferenceAttendance(directlyResolvedState, effects.scheduleConferenceAttendance) : directlyResolvedState;
   if (!state.internshipState.active && directlyResolvedState.internshipState.active
     && directlyResolvedState.internshipState.kind === "remote3") {
     resolvedState = pushMilestoneLog(

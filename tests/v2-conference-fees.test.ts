@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildConferenceDecisionEventsForAcceptedPapers, createConferenceDecisionAct1 } from "../src/core/v2-conference-events";
+import { settleDueConferenceAttendance } from "../src/core/v2-conference-attendance";
 import type { ConferenceEventBuilderState } from "../src/core/v2-conference-events";
 import type { ConferenceDecisionMode, ConferenceRegionId } from "../src/core/v2-conference-system";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -36,6 +37,7 @@ function conferenceState(region: ConferenceRegionId, paperCount: number, paidPap
     id: "conference-fees", conferenceName: "CVPR", conferenceYear: 2026,
     city: "测试会址", country: "测试国家", region, grade: "A", paperCount,
     paperIds: Array.from({ length: paperCount }, (_, index) => `paper-${index}`),
+    availableAtTotalMonths: 5,
   }, builderState(state), () => 0.99);
   return { ...state, eventQueue: [createEventQueueItem(event, state.totalMonths)] };
 }
@@ -52,14 +54,14 @@ describe("conference fee settlement", () => {
       const personalCost = mode === "self" ? 2 : 0;
       const fundingCost = mode === "advisor" ? 2 : 0;
       expect(state.eventQueue[0]!.description).not.toContain("注册费");
-      expect(state.eventQueue[0]!.title).toBe("CVPR安排");
+      expect(state.eventQueue[0]!.title).toBe("CVPR参会");
       expect(state.eventQueue[0]!.choices[0]!.label).toBe("继续");
       expect(state.eventQueue[0]!.description).not.toMatch(/自动支付|已支付|预扣/u);
       state = choose(state);
       state = choose(state, mode);
       const confirmation = state.eventQueue[0]!;
       const payment = mode === "advisor" ? "科研经费 -2" : mode === "self" ? "金币 -2" : "无额外费用";
-      expect(confirmation.title).toBe("CVPR安排 ➜ 参会方式 ➜ 参会确认");
+      expect(confirmation.title).toBe("CVPR参会 ➜ 参会方式 ➜ 参会确认");
       expect(confirmation.choices).toHaveLength(1);
       expect(confirmation.choices[0]!.label).toBe("确定");
       expect(confirmation.description).toContain(payment);
@@ -85,9 +87,22 @@ describe("conference fee settlement", () => {
       expect(state.player.money).toBe(30 - personalCost);
       expect(state.advisorProgressState.funding).toBe(30 - fundingCost);
       expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toBeUndefined();
+      expect(state.conferenceAttendancePlans).toEqual([effects.scheduleConferenceAttendance]);
+      expect(state.eventQueue).toHaveLength(0);
+      expect(state.eventCounters.meetingCount).toBe(0);
+      const beforeDue = { ...state, totalMonths: 4 };
+      expect(settleDueConferenceAttendance(beforeDue)).toBe(beforeDue);
       const duplicate = dispatchAction(state, "resolve-event", { eventId: confirmation.id, eventChoiceId: confirmation.choices[0]!.id });
       expect(duplicate.player.money).toBe(state.player.money);
       expect(duplicate.advisorProgressState).toEqual(state.advisorProgressState);
+      expect(duplicate.conferenceAttendancePlans).toEqual(state.conferenceAttendancePlans);
+      const attended = settleDueConferenceAttendance({ ...state, totalMonths: 5 });
+      expect(attended.player.money).toBe(state.player.money);
+      expect(attended.advisorProgressState).toEqual(state.advisorProgressState);
+      expect(attended.eventCounters.meetingCount).toBe(mode === "proxy" ? 0 : 1);
+      expect(attended.eventQueue).toHaveLength(mode === "proxy" ? 0 : 1);
+      expect(attended.conferenceAttendancePlans).toHaveLength(0);
+      expect(settleDueConferenceAttendance(attended)).toBe(attended);
     }
   });
 
@@ -109,7 +124,8 @@ describe("conference fee settlement", () => {
         const confirmation = choice.effects.enqueueEvents![0]!;
         const effects = confirmation.choices[0]!.effects;
         expect(effects.recordConferenceRegistrationPayment).toBeUndefined();
-        expect(effects.paperUpdates?.map((paper) => paper.id)).toEqual(["paper-0", "paper-1", "paper-2"]);
+        expect(effects.paperUpdates).toBeUndefined();
+        expect([...new Set(effects.scheduleConferenceAttendance!.context.paperIds)]).toEqual(["paper-0", "paper-1", "paper-2"]);
         expect(effects.money ?? 0).toBe(choice.id === "self" ? -2 : 0);
         const fundingCost = choice.id === "advisor" ? 2 : 0;
         expect(effects.advisorProgressStateDeltas?.funding ?? 0).toBe(fundingCost === 0 ? 0 : -fundingCost);
@@ -120,13 +136,18 @@ describe("conference fee settlement", () => {
   );
 
   it.each(["act1", "act2", "self", "advisor", "proxy"] as const)("preserves pending attendance when discarding %s", (stage) => {
-    let state = conferenceState("domestic", 2);
+    let state = { ...playingState(), totalMonths: 5 };
     const papers = [0, 1].map((index) => ({
       ...createGrantedPublishedPaper(1, index, { target: "C", acceptedScore: 4 }),
       id: `paper-${index}`, submittedMonth: 10, submittedYear: 1,
-      conferenceHandled: false, conferenceAvailableAtTotalMonths: 0,
+      conferenceHandled: false, conferenceAvailableAtTotalMonths: 5,
     }));
-    state = { ...state, papers: [papers[0]!], externalPublications: [papers[1]!] };
+    const root = buildConferenceDecisionEventsForAcceptedPapers(papers.map((paper) => ({
+      id: paper.id, target: paper.target!, submittedMonth: paper.submittedMonth, submittedYear: paper.submittedYear,
+      availableAtTotalMonths: 5,
+    })), builderState(state), () => 0.99)[0]!;
+    state = { ...state, papers: [papers[0]!], externalPublications: [papers[1]!],
+      eventQueue: [createEventQueueItem(root, state.totalMonths)] };
     if (stage !== "act1") state = choose(state);
     if (stage !== "act1" && stage !== "act2") state = choose(state, stage);
     const discarded = discardBlockingQueueEvents(state);
@@ -150,11 +171,20 @@ describe("conference fee settlement", () => {
     state = { ...state, papers: [{
       ...createGrantedPublishedPaper(1, 0, { target: "C", acceptedScore: 4 }),
       id: "paper-0", submittedMonth: 10, submittedYear: 1,
-      conferenceHandled: false, conferenceAvailableAtTotalMonths: 0,
+      conferenceHandled: false, conferenceAvailableAtTotalMonths: 5,
     }] };
+    const root = buildConferenceDecisionEventsForAcceptedPapers(state.papers.map((paper) => ({
+      id: paper.id, target: paper.target!, submittedMonth: paper.submittedMonth!, submittedYear: paper.submittedYear!,
+      availableAtTotalMonths: 5,
+    })), builderState(state), () => 0.99)[0]!;
+    state = { ...state, eventQueue: [createEventQueueItem(root, state.totalMonths)] };
     state = choose(choose(choose(state), "self"));
     expect(state.player.money).toBe(28);
     expect(state.advisorProgressState.funding).toBe(30);
+    expect(state.papers[0]!.conferenceHandled).toBe(false);
+    expect(state.eventCounters.meetingCount).toBe(0);
+    state = settleDueConferenceAttendance({ ...state, totalMonths: 5 });
+    expect(state.eventQueue[0]!.title).toBe(`${root.conferencePreview!.context.conferenceName}活动`);
     const discarded = discardBlockingQueueEvents(state);
     expect(discarded.papers[0]!.conferenceHandled).toBe(true);
     expect(discarded.player.money).toBe(28);
@@ -183,6 +213,9 @@ describe("conference fee settlement", () => {
         expect(state.advisorProgressState.funding).toBe(30 - (mode === "advisor" ? travel : 0));
         expect(state.player.favor).toBe(12 - (mode === "advisor" ? favor : 0));
         expect(state.player.social).toBe(12);
+        expect(state.eventCounters.meetingCount).toBe(0);
+        expect(state.eventQueue).toHaveLength(0);
+        state = settleDueConferenceAttendance({ ...state, totalMonths: 5 });
         expect(state.eventCounters.meetingCount).toBe(mode === "proxy" ? 0 : 1);
         const regionCounter = { domestic: "domesticMeetingCount", asia: "asiaMeetingCount", west: "westMeetingCount" } as const;
         expect(state.eventCounters[regionCounter[region]]).toBe(mode === "proxy" ? 30 : 31);
@@ -317,7 +350,7 @@ describe("conference fee settlement", () => {
     expect(state.player.favor).toBe(11.5);
     expect(state.phase).toBe("playing");
     expect(state.eventCounters.meetingCount).toBe(1);
-    expect(state.eventQueue[0]!.title).toBe("VALSE参会");
+    expect(state.eventQueue[0]!.title).toBe("VALSE活动");
     const duplicate = dispatchAction(state, "resolve-event", { eventId: confirmation.id, eventChoiceId: confirmation.choices[0]!.id });
     expect(duplicate.player).toEqual(state.player);
     expect(duplicate.advisorProgressState).toEqual(state.advisorProgressState);

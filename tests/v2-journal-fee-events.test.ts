@@ -54,7 +54,7 @@ describe("player journal fee events", () => {
         journalFeePreview: { paperId: "journal-paper", stage: "act3", paymentMode: mode } });
       expect(result.choices[0]!.outcome).toBe(text);
       expect(result.description.split("机制结算\n")[1]).toBe(`结果：${text}`);
-      expect(result.choices[0]!.effects).toEqual({ recordJournalFeePayment: "journal-paper",
+      expect(result.choices[0]!.effects).toEqual({ recordJournalFeePayment: "journal-paper", labFinanceCategory: "journal-fee",
         ...(mode === "self" ? { money: -fee } : { advisorProgressStateDeltas: { funding: -fee } }) });
       expect(result.choices[0]!.disabledReason).toBeUndefined();
       expect(result.choices.map(({ id, label }) => ({ id, label }))).toEqual([{ id: "confirm", label: "确定" }]);

@@ -331,7 +331,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider, recr
       {
         id: `random-14-decline-${serial}`,
         label: "委婉拒绝",
-        outcome: "无事发生。",
+        outcome: "本次不指导。",
         effects: {},
       },
       {

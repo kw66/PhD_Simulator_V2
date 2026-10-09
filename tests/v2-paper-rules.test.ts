@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   applyPrepublicationPaperDecay,
@@ -35,6 +35,30 @@ function fromRolls(rolls: number[]): () => number {
 }
 
 describe("v2 paper rules", () => {
+  it.each([
+    [0.01, "idea×2 · 实验×0.5 · 写作×0.5", 0],
+    [0.15, "idea×0.5 · 实验×2 · 写作×0.5", 0],
+    [0.35, "idea×0.80 · 实验×1.40 · 写作×0.80", 4],
+    [0.55, "idea×0.20 · 实验×2.60 · 写作×0.20", 4],
+    [0.65, "最高两项各×1.5", 0],
+    [0.75, "最高项×3", 0],
+    [0.85, "最低两项各×1.5", 0],
+    [0.95, "最低项×3", 0],
+  ] as const)("captures the actual reviewer weight formula at roll %s without additional draws", (reviewerRoll, weightInfo, weightDraws) => {
+    const paper = { ...createDraftPaper(1, 0, () => 0), target: "A" as const, status: "reviewing" as const,
+      submittedIdea: 1, submittedExperiment: 2, submittedWriting: 3, submittedYear: 1 };
+    const random = vi.fn().mockReturnValue(0);
+    random.mockReturnValueOnce(reviewerRoll);
+    const before = structuredClone(paper);
+    const reviewed = resolvePaperReview(paper, random).nextPaper.lastReview!;
+    expect(reviewed.reports[0]!.weightInfo).toBe(weightInfo);
+    expect(random).toHaveBeenCalledTimes(3 + weightDraws);
+    const scoreRandom = vi.fn().mockReturnValue(0);
+    expect(reviewed.reports[0]!.effectiveScore).toBe(getReviewerEffectiveScore(reviewed.reports[0]!.reviewerType!, 1, 2, 3, scoreRandom));
+    expect(scoreRandom).toHaveBeenCalledTimes(weightDraws);
+    expect(paper).toEqual(before);
+    expect(JSON.parse(JSON.stringify(reviewed)).reports[0].weightInfo).toBe(weightInfo);
+  });
   it("创建草稿论文时生成稳定初始结构", () => {
     expect(createDraftPaper(7, 1, () => 0)).toEqual({
       id: "paper-7-2",

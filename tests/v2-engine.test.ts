@@ -123,7 +123,7 @@ describe("minimal game engine", () => {
     expect(state.relationshipState).toMatchObject({ advisorCount: 1, juniorCount: 1, occupiedSlots: 1 });
   });
 
-  it("pays registration on acceptance confirmation and schedules attendance three months later without charging twice", () => {
+  it("saves early attendance confirmation without early citations and activates once three months after acceptance", () => {
     const base = admitGame();
     const paper = {
       ...createDraftPaper(1, 0, () => 0),
@@ -148,6 +148,7 @@ describe("minimal game engine", () => {
       availableRandomEvents: [],
       usedRandomEvents: [],
       illnessProbability: 0,
+      player: { ...base.player, money: 30 },
       advisorProgressState: { ...base.advisorProgressState, funding: 30 },
       papers: [paper],
     };
@@ -165,6 +166,28 @@ describe("minimal game engine", () => {
     expect(state.externalPublications.find((entry) => entry.id === paper.id)).toMatchObject({
       acceptedTotalMonths: 4, conferenceAvailableAtTotalMonths: 7, conferenceHandled: false,
     });
+    const attendance = state.eventQueue.find((event) => event.conferencePreview)!;
+    expect(attendance).toMatchObject({ title: `${venue}参会`, deadlineMonths: 3 });
+    const travel = { domestic: 2, asia: 4, west: 6 }[attendance.conferencePreview!.context.region];
+    const initialMeetingCount = state.eventCounters.meetingCount;
+    for (const choiceId of ["continue", "self", "enter-venue"]) {
+      const event = state.eventQueue.find((entry) => entry.chainId === attendance.chainId)!;
+      state = dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: choiceId });
+    }
+    expect(state.player.money).toBe(moneyBeforeConfirmation - travel);
+    expect(state.advisorProgressState.funding).toBe(29);
+    expect(state.advisorProgressState.paidPlayerConferenceTrips).toHaveLength(1);
+    expect(state.eventCounters.meetingCount).toBe(initialMeetingCount);
+    expect(state.externalPublications.find((entry) => entry.id === paper.id)).toMatchObject({
+      conferenceHandled: false, publication: { citations: 0 },
+    });
+    expect(state.eventQueue.some((event) => event.chainId.endsWith("-activity"))).toBe(false);
+    expect(state.conferenceAttendancePlans).toHaveLength(1);
+    expect(state.conferenceAttendancePlans?.[0]).toMatchObject({
+      mode: "self", context: { paperIds: [paper.id], availableAtTotalMonths: 7 },
+    });
+    const savedPlan = structuredClone(state.conferenceAttendancePlans![0]);
+    state = JSON.parse(JSON.stringify(state)) as typeof state;
     for (const totalMonths of [5, 6, 7]) {
       const fundingBeforeMonth = state.advisorProgressState.funding;
       state = dispatchAction({ ...state, eventQueue: [] }, "next-month");
@@ -172,9 +195,27 @@ describe("minimal game engine", () => {
       expect(state.advisorProgressState.funding).toBe(fundingBeforeMonth - 1);
       expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual([paper.id]);
       const trips = state.eventQueue.filter((event) => event.conferencePreview);
-      expect(trips).toHaveLength(totalMonths === 7 ? 1 : 0);
-      if (totalMonths === 7) expect(trips[0]?.title).toBe(`${venue}安排`);
+      expect(trips).toHaveLength(0);
+      expect(state.externalPublications.find((entry) => entry.id === paper.id)).toMatchObject({
+        conferenceHandled: totalMonths === 7, publication: { citations: 0 },
+      });
+      expect(state.eventCounters.meetingCount).toBe(initialMeetingCount + (totalMonths === 7 ? 1 : 0));
+      expect(state.conferenceAttendancePlans).toEqual(totalMonths === 7 ? [] : [savedPlan]);
+      const activities = state.eventQueue.filter((event) => event.chainId === `${attendance.chainId}-activity`);
+      expect(activities).toHaveLength(totalMonths === 7 ? 1 : 0);
+      if (totalMonths === 7) expect(activities[0]?.title).toBe(`${venue}活动`);
     }
+    expect(state.externalPublications.find((entry) => entry.id === paper.id)?.conferenceHandledAtTotalMonths).toBe(7);
+    const activity = state.eventQueue.find((event) => event.chainId === `${attendance.chainId}-activity`)!;
+    state = dispatchAction(JSON.parse(JSON.stringify(state)), "resolve-event", { eventId: "already-resolved", eventChoiceId: "continue" });
+    expect(state.eventQueue.filter((event) => event.chainId === activity.chainId)).toEqual([activity]);
+    expect(state.eventCounters.meetingCount).toBe(initialMeetingCount + 1);
+    state = dispatchAction({ ...state, eventQueue: [] }, "next-month");
+    expect(state.totalMonths).toBe(8);
+    expect(state.eventCounters.meetingCount).toBe(initialMeetingCount + 1);
+    expect(state.conferenceAttendancePlans).toEqual([]);
+    expect(state.eventQueue.some((event) => event.chainId === activity.chainId || event.conferencePreview)).toBe(false);
+    expect(state.externalPublications.find((entry) => entry.id === paper.id)?.publication?.citations).toBeGreaterThan(0);
   });
 
   it("force advances through real month settlement after deleting only current blockers", () => {
@@ -474,7 +515,7 @@ describe("minimal game engine", () => {
     expect(state.eventQueue[0]?.description).toContain("今年转博需要达到 2 分");
     state = resolveCurrent(state);
     expect(state.eventQueue[0]?.stage).toBe("act2");
-    expect(state.eventQueue[0]?.description).toContain("同届同门");
+    expect(state.eventQueue[0]?.description).toContain("同门投出去的简历迟迟没有回应");
     expect(state.eventQueue[0]?.description).toContain("别觉得多一张文凭就稳了");
 
     const decision = state.eventQueue[0];

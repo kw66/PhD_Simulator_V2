@@ -54,6 +54,7 @@ function createPaymentConfirmation(state: GameState, paper: Paper, mode: Payment
         effects: {
           ...(mode === "self" ? { money: -fee } : { advisorProgressStateDeltas: { funding: -fee } }),
           recordJournalFeePayment: paper.id,
+          labFinanceCategory: "journal-fee",
         },
       },
     ],

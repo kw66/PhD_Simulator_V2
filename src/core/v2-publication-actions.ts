@@ -26,6 +26,8 @@ function getPromotionFailure(state: GameState, paperId: string, promotionId: Pap
     && (
       paper.target === null
       || paper.conferenceHandled === true
+      || paper.publication.preprintExposed === true
+      || paper.publication.posterExposed === true
       || (paper.publication.monthsSincePublish ?? 0) >= 3
     )
   ) {

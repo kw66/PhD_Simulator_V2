@@ -1,5 +1,5 @@
 export function createRelationshipTooltips(root: HTMLElement) {
-  const triggers = "[data-relationship-tooltip], [data-card-tooltip], .center-tab-btn[data-tooltip], .shop-tab-btn[data-tooltip], .panel-switch-btn[data-tooltip], .center-tab-badge[aria-label]";
+  const triggers = "[data-relationship-tooltip], [data-card-tooltip], [data-event-risk-tooltip], .center-tab-btn[data-tooltip], .shop-tab-btn[data-tooltip], .panel-switch-btn[data-tooltip], .center-tab-badge[aria-label]";
   const tooltip = document.createElement("div");
   tooltip.id = "relationship-tooltip";
   tooltip.className = "relationship-tooltip";
@@ -31,7 +31,7 @@ export function createRelationshipTooltips(root: HTMLElement) {
     const card = active.closest(".rel-card, .paper-card")?.getBoundingClientRect();
     const leftEdge = Math.max(12, card?.left ?? 12);
     const rightEdge = Math.min(viewportWidth - 12, card?.right ?? viewportWidth - 12);
-    tooltip.style.maxWidth = `${Math.max(0, Math.min(card ? 440 : 240, rightEdge - leftEdge))}px`;
+    tooltip.style.maxWidth = `${Math.max(0, Math.min(card ? 440 : active.hasAttribute("data-event-risk-tooltip") ? 360 : 240, rightEdge - leftEdge))}px`;
     const bounds = tooltip.getBoundingClientRect();
     if (anchor.bottom < 0 || anchor.top > viewportHeight || anchor.right < 0 || anchor.left > viewportWidth) {
       hide();

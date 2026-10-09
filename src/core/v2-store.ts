@@ -137,6 +137,7 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
       return () => listeners.delete(listener);
     },
     dispatch(actionId: GameActionId, payload: DispatchPayload = {}): void {
+      if (actionId === "debug-trigger-ending" && state.phase !== "setup") runUsedDebugPanel = true;
       if (actionId === "select-role" && payload.roleId) {
         if (state.phase === "setup" && payload.roleId === accountProfile.selectedLobbyRoleId) {
           return;
@@ -203,7 +204,16 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
       }
 
       const nextState = dispatchAction(state, actionId, payload);
-      commit(nextState);
+      if (actionId === "debug-trigger-ending" && nextState !== state && state.phase === "finished") {
+        const progress = accountProfile.roleProgress[nextState.selectedRoleId];
+        commit(nextState, {
+          ...accountProfile,
+          lastRunExperience: {
+            roleId: nextState.selectedRoleId, gained: 0, previousLevel: progress.level,
+            level: progress.level, exp: progress.exp, disqualifiedByDebug: true,
+          },
+        });
+      } else commit(nextState);
     },
   };
 }

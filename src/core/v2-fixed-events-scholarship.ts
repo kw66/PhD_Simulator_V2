@@ -149,7 +149,7 @@ function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOut
     description: appendMechanismSettlement([
       "你关掉申报页面，把论文和证明材料归进文件夹。这次先不交了，没用于获奖的成果还能留到以后。",
       "群里还在追问附件格式，你把消息设成免打扰，重新打开手头的工作。至少今晚不用再和表格较劲。",
-    ].join("\n\n"), "结果：无事发生"),
+    ].join("\n\n"), "结果：不申报国奖"),
     chainId: "scholarship",
     stage: "result",
     choices: [{ id: `scholarship-skip-finish-y${context.year}-m${context.month}`, label: "确定", outcome: "暂不申报，成果留到以后。", effects: {} }],

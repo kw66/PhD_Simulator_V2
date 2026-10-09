@@ -12,7 +12,7 @@ export function getFellowAcademicLabel(state: Pick<GameState, "year">, profile: 
 }
 
 export function getStudentAcademicLabel(year: number, degree: Degree): string {
-  if (year === 0) return "入学前";
+  if (year === 0) return "大四";
   return `第${["零", "一", "二", "三", "四", "五", "六"][year] ?? year}年${degree === "phd" ? "博士" : "硕士"}`;
 }
 

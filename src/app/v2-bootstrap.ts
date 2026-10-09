@@ -97,6 +97,7 @@ import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
 import { createVisitStats } from "./v2-visit-stats";
+import { createConferenceStats, loadConferenceGlobalStats } from "./v2-conference-stats";
 import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
@@ -253,6 +254,7 @@ function isDebugRelationshipType(value: string | undefined): value is DebugRelat
 export function bootstrapApp(root: HTMLDivElement): void {
   const store = createStore();
   const visitStats = createVisitStats({ recordVisit: import.meta.env.PROD && window.location.protocol === "https:" });
+  const conferenceStats = createConferenceStats({ onChange: () => render(), enabled: import.meta.env.PROD && window.location.protocol === "https:" });
   const community = createCommunityMessages({ onChange: () => syncCommunityView() });
   function syncCommunityView(): void {
     renderCommunityMessages(root, community);
@@ -1118,6 +1120,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
     resetEffectSourceUi();
     eventLayout.update(isEventContentOpen ? renderEventLayoutSamples(getActiveQueueEvent(state), getActiveHistoryEvent(state), state) : []);
     scheduleAllFixedStageScales();
+    for (const element of root.querySelectorAll<HTMLElement>("[data-conference-stats-name]")) {
+      const target = element.dataset.conferenceStatsTarget;
+      if (isPaperTarget(target)) void loadConferenceGlobalStats(element.dataset.conferenceStatsName ?? "", Number(element.dataset.conferenceStatsYear), target);
+    }
     animatePanelValues(shouldAnimatePlayer);
     if (shouldAnimatePlayer && previousRenderedPlayer) {
       animatePlayerStatChanges(previousRenderedPlayer, state.player);
@@ -1167,6 +1173,17 @@ export function bootstrapApp(root: HTMLDivElement): void {
       selectedCoffeeUpgradeId = null;
     }
 
+    if (actionId === "start-game" || actionId === "restart-game") {
+      conferenceStats.resetRun();
+      if (debugWindow.isOpen()) conferenceStats.markDebug();
+    }
+    if (actionId.startsWith("debug-")) conferenceStats.markDebug();
+    if (actionId === "debug-trigger-ending") {
+      isEndingContentOpen = true;
+      activePlayTab = "events";
+      activeLogPage = null;
+      resetEventContentUiState();
+    }
     store.dispatch(actionId, {
       roleId: isRoleId(dataset.roleId) ? dataset.roleId : undefined,
       paperId: typeof dataset.paperId === "string" ? dataset.paperId : undefined,
@@ -1203,18 +1220,24 @@ export function bootstrapApp(root: HTMLDivElement): void {
         store.dispatch("next-month");
       }
     }
-    if ((actionId === "start-game" || actionId === "restart-game") && debugWindow.isOpen()) {
-      store.markCurrentRunAsDebugged();
+    if (actionId === "start-game" || actionId === "restart-game") {
+      const openingEvent = store.getState().eventQueue.find((event) => event.chainId === "before-grad-school");
+      if (openingEvent) openEventContent(openingEvent.id);
+      if (debugWindow.isOpen()) store.markCurrentRunAsDebugged();
     }
   }
 
   const debugWindow = createDebugWindow(
     () => store.getState(),
     executeButtonAction,
-    () => store.markCurrentRunAsDebugged(),
+    () => { store.markCurrentRunAsDebugged(); conferenceStats.markDebug(); },
   );
 
+  let previousConferenceState = store.getState();
   store.subscribe((state) => {
+    const before = previousConferenceState;
+    previousConferenceState = state;
+    void conferenceStats.track(before, state);
     debugWindow.update();
     render();
     void visitStats.trackGamePhase(state.phase, {

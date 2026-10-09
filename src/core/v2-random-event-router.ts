@@ -51,7 +51,7 @@ function appendRandomEventAppearanceCondition(
 export function getRandomEventAppearanceCondition(eventId: number): string | null {
   switch (eventId) {
     case 8:
-      return `科研经费 > ${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}`;
+      return `科研经费 ≥ ${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}`;
     case 10:
       return "社交能力 ≥ 6";
     case 11:
@@ -110,7 +110,7 @@ export function createRandomEventById(
 export function isRandomEventEligible(state: GameState, eventId: number): boolean {
   switch (eventId) {
     case 8:
-      return state.advisorProgressState.funding > LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD;
+      return state.advisorProgressState.funding >= LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD;
     case 10:
       return state.player.social >= 6 && getRecruitmentAcademicYears("peer", state).length > 0;
     case 11:

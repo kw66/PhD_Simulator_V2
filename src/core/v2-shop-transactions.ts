@@ -5,6 +5,9 @@ import {
   hasAiReimbursement as hasAiReimbursementState,
 } from "./v2-ai-shop";
 import { applyAiActivationEffects } from "./v2-ai-activation";
+import { getLabReimbursementKind } from "./v2-lab-reimbursement";
+import { roundMoney } from "./v2-money";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import {
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
@@ -25,7 +28,7 @@ import {
 import { getNextBikeTierDefinition } from "./v2-bike-system";
 import { getSupportItemDefinition, getSupportItemSellPrice, isSupportItemOwned } from "./v2-support-items";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "./v2-development-flags";
-import { consumeLoverGift, getGiftAwareShopSellPrice, getLoverGiftQuote, getShopActionBasePrice, recordBikeGiftDiscount, recordShopInvestment } from "./v2-lover-gift";
+import { consumeLoverGift, getGiftAwareShopSellPrice, getLoverGiftQuote, getShopActionBasePrice, getShopLabFundingCost, recordBikeGiftDiscount, recordShopInvestment, type ShopPurchaseAction } from "./v2-lover-gift";
 import type { AiSlotId, CoffeeMachineUpgradeId, DispatchPayload, GameActionId, GameState, ShopItemId, ShopUpgradeId, SupportItemId } from "./v2-types";
 
 type CoffeeMachineUpgrade = Exclude<CoffeeMachineUpgradeId, null>;
@@ -389,12 +392,7 @@ function toggleAiSubscription(state: GameState, slot: AiSlotId): GameState {
   };
 }
 
-export function applyShopAction(state: GameState, actionId: ShopActionId, payload: DispatchPayload): GameState {
-  if (
-    state.phase !== "playing"
-    || (state.month <= 0 && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)
-    || (state.totalMonths <= 0 && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)
-  ) return state;
+function executeShopAction(state: GameState, actionId: ShopActionId, payload: DispatchPayload): GameState {
   switch (actionId) {
     case "buy-shop-item":
       return payload.shopItemId ? buyShopItem(state, payload.shopItemId) : state;
@@ -425,6 +423,30 @@ export function applyShopAction(state: GameState, actionId: ShopActionId, payloa
     default:
       return state;
   }
+}
+
+export function applyShopAction(state: GameState, actionId: ShopActionId, payload: DispatchPayload): GameState {
+  if (
+    state.phase !== "playing"
+    || (state.month <= 0 && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)
+    || (state.totalMonths <= 0 && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)
+  ) return state;
+  const kind = getLabReimbursementKind(actionId, payload);
+  const fundingCost = kind || actionId === "buy-ai-month"
+    ? getShopLabFundingCost(state, actionId as ShopPurchaseAction, payload) : 0;
+  if (fundingCost > 0 && state.advisorProgressState.funding < fundingCost) {
+    return fail(state, `科研经费不足，本次报销需要 ${fundingCost}；未扣费，报销机会保留至有效期结束。`);
+  }
+  const purchased = executeShopAction(state, actionId, payload);
+  if (fundingCost <= 0 || (purchased.shopState === state.shopState
+    && purchased.coffeeState === state.coffeeState && purchased.aiShopState === state.aiShopState)) return purchased;
+  const labReimbursements = { ...purchased.shopState.labReimbursements };
+  if (kind) labReimbursements[kind] -= 1;
+  return pushLog(recordLabFinance({
+    ...purchased,
+    advisorProgressState: { ...purchased.advisorProgressState, funding: roundMoney(purchased.advisorProgressState.funding - fundingCost) },
+    shopState: { ...purchased.shopState, labReimbursements },
+  }, "student-reimbursement", -fundingCost), `商店报销：科研经费 -${fundingCost}。`);
 }
 
 export { getShopActionPrice } from "./v2-lover-gift";

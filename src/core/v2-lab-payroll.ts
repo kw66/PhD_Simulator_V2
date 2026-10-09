@@ -3,6 +3,7 @@ import { MONTHLY_LIVING_COST } from "./v2-content";
 import { getFellowAcademicYear } from "./v2-fellow-academic";
 import { creditFellowMoney } from "./v2-fellow-finance";
 import { roundMoney } from "./v2-money";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { getCalendarForTotalMonths } from "./v2-progression";
 import type { GameState } from "./v2-types";
@@ -44,7 +45,7 @@ export function settleLabPayroll(state: GameState): GameState {
     const familySupport = getFellowAcademicYear(state, profile) === 0 ? MONTHLY_LIVING_COST : 0;
     paidState = creditFellowMoney(paidState, payment.id, payment.payment + familySupport - MONTHLY_LIVING_COST);
   }
-  return { ...paidState,
+  return recordLabFinance({ ...paidState,
     advisorProgressState: { ...state.advisorProgressState,
       funding: roundMoney(state.advisorProgressState.funding - payroll.total) },
     fellowProgressState: state.fellowProgressState.map((profile) => {
@@ -52,5 +53,5 @@ export function settleLabPayroll(state: GameState): GameState {
       return { ...profile,
         monthlySalaryPaid: payment.payment, lastSalaryTotalMonths: state.totalMonths };
     }),
-  };
+  }, "student-wages", -payroll.total);
 }

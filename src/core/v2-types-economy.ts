@@ -5,6 +5,7 @@ export interface ShopState {
   gpuLevel: number;
   investments: ShopInvestmentState;
   entitlements: ShopEntitlementState;
+  labReimbursements: ShopEntitlementState & { totalMonths: number | null };
   chairOwned: boolean;
   chairUpgrade: ChairUpgradeId;
   /** Total SAN actually restored by chair effects during this run. */

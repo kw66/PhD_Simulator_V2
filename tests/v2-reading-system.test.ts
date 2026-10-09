@@ -102,8 +102,7 @@ describe("v2 reading system", () => {
     const resisted = applyReadPaperActions(state, 1, { ...options, random: () => 0 });
     expect(resisted).toMatchObject({ researchGain: 0.75, researchMilestones: 1, researchResisted: 0.25 });
     expect(resisted.nextState.player.research).toBe(6.75);
-    expect(resisted.nextState.log[0]?.text).toContain("科研 +0.75");
-    expect(resisted.nextState.log[0]?.text).not.toContain("抵抗");
+    expect(resisted.nextState.log[0]?.text).toContain("科研 +0.75（抵抗0.25）");
 
     const applied = applyReadPaperActions(state, 1, { ...options, random: () => 0.99 });
     expect(applied).toMatchObject({ researchGain: 0.75, researchResisted: 0.25 });

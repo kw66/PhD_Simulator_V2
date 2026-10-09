@@ -267,7 +267,7 @@ export function resolveTeachersDayFixedEvent(
 
       return {
         nextState: state,
-        outcome: "教师节祝福：无事发生。",
+        outcome: "教师节祝福：导师回复祝福，本次没有额外安排。",
         enqueueEvents: [createTeachersDayResultEvent({
           state,
           resultId: "message-plain",

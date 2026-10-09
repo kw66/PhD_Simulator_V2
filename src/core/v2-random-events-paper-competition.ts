@@ -33,7 +33,8 @@ const PAPER_COMPETITION_COPY: Record<PaperCompetitionEventId, PaperCompetitionCo
     title: "被抢发idea",
     introButton: "对照看看",
     introDescription: (title) => [
-      `你照例刷 arXiv，一篇新论文的题目让你停住了：怎么和自己正在做的《${title}》这么像？点开摘要，再往下翻，连研究动机和方法设计都撞得八九不离十。`,
+      "你照例刷 arXiv，一篇新论文的内容让你停住了：研究动机和方法设计，怎么和自己正在做的工作撞得八九不离十？你点开摘要，又往下翻了几页。",
+      `涉及论文：**《${title}》**`,
       "你把对方论文和自己的草稿并排放好，又看了一眼提交日期。几处当初想通时恨不得立刻找人聊聊的设计，已经出现在了别人的论文里。原本只是想看看今天有什么新工作，结果看到了自己的工作。",
     ].join("\n\n"),
     decisionDescription: [
@@ -91,7 +92,8 @@ const PAPER_COMPETITION_COPY: Record<PaperCompetitionEventId, PaperCompetitionCo
     title: "新sota",
     introButton: "核对结果",
     introDescription: (title) => [
-      `你整理《${title}》的实验结果时，刷到一篇刷新性能纪录的新论文。你先看数据划分，再看评价指标和测试设置，来回翻了几遍，对方的结果确实更好。`,
+      "你整理实验结果时，刷到一篇刷新性能纪录的新论文。你先看数据划分，再看评价指标和测试设置，来回翻了几遍，对方的结果确实更好。",
+      `涉及论文：**《${title}》**`,
       "新数字填进对照表，原来的加粗就得挪位置了。你把光标停在那一格，迟迟没按下删除键。",
     ].join("\n\n"),
     decisionDescription: [

@@ -8,6 +8,7 @@ import { enqueueEventQueueItem } from "./v2-event-queue";
 import { getRelationshipSanCost } from "./v2-buffs";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { advanceSharedLabProject, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 
 export const ADVISOR_HORIZONTAL_SAN_COST = 5;
 export const ADVISOR_VERTICAL_SAN_COST = 4;
@@ -174,7 +175,7 @@ export function advanceAdvisorProject(
   if (state.advisorProgressState.lastPlayerProjectTotalMonths === state.totalMonths) return pushNoOpLog(state, "科研项目：本月已推进，下月恢复");
   const sanCost = getAdvisorTaskSanCost(state, projectType);
   if (state.player.san < sanCost) return pushNoOpLog(state, `科研项目：SAN不足，需要${sanCost}`);
-  const progress = Math.floor(state.player.research) + Math.floor(random() * 6);
+  const progress = Math.floor(state.player.research + Math.floor(random() * 6));
   const paidState = pushMilestoneLog({
     ...state,
     player: { ...state.player, san: state.player.san - sanCost },
@@ -231,7 +232,7 @@ export function settleAdvisorGrantResult(state: GameState, application: AdvisorG
       }],
     },
   };
-  return nextState;
+  return recordLabFinance(nextState, "grant-income", grant.funding);
 }
 
 export function settleAdvisorMonth(state: GameState, random: () => number = Math.random): GameState {

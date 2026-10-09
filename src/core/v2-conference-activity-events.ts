@@ -3,6 +3,7 @@ import type { PendingEvent } from "./v2-types";
 import {
   getConferenceActivityChainId,
   getConferenceGradeLabel,
+  getConferencePaperPresentationResults,
   type ConferenceActivityBuildState,
   type ConferenceActivityContext,
   type ConferenceActivityOptionDefinition,
@@ -73,17 +74,19 @@ export function createConferenceActivityResult(
   context: ConferenceActivityContext,
   option: ConferenceActivityOptionDefinition,
   _attendanceSummary: string,
+  preview?: PendingEvent["conferenceActivityPreview"],
 ): PendingEvent {
   const activitySummary = trimOutcome(option.outcome);
   const activityChainId = getConferenceActivityChainId(context);
   return {
     id: `${activityChainId}-result-${option.id}`,
-    title: `${context.conferenceName}参会 ➜ 选择安排 ➜ 活动结果`,
+    title: `${context.conferenceName}活动 ➜ 选择安排 ➜ 活动结果`,
     description: [
       option.resultDescription,
       "回程时，你把胸牌塞进会务袋。下次再挂上它，又不知道会在哪座城市了。",
       "机制结算",
       ...getActivityConditions(option),
+      ...getConferencePaperPresentationResults(context).map((result) => `结果：${result}`),
       ...activitySummary.split("；").map((result) => `结果：${result}`),
     ].join("\n\n"),
     source: "fixed",
@@ -91,6 +94,7 @@ export function createConferenceActivityResult(
     deadlineMonths: 0,
     chainId: activityChainId,
     stage: "result",
+    ...(preview ? { conferenceActivityPreview: { ...preview, selectedOptionId: option.id } } : {}),
     discardPaperUpdates: createDiscardPaperUpdates(context),
     completionLog: activitySummary,
     choices: [{
@@ -112,15 +116,18 @@ export function createConferenceActivityDecisionEvent(
   attendanceSummary: string,
   getRoll: () => number = Math.random,
 ): PendingEvent {
+  const rolls = Array.from({ length: 4 }, () => getRoll());
+  let rollIndex = 0;
+  const preview = { context, attendanceSummary, rolls };
   const selectedOptions = selectConferenceActivityOptions(
     context,
     { ...state, loverState: state.loverState ?? createLoverState() },
-    getRoll,
+    () => rolls[rollIndex++] ?? 0,
   );
   const activityChainId = getConferenceActivityChainId(context);
   return {
     id: `${activityChainId}-act2`,
-    title: `${context.conferenceName}参会 ➜ 选择安排`,
+    title: `${context.conferenceName}活动 ➜ 选择安排`,
     description: [
       `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，先前圈过的几项恰好撞了时间。` + (context.paperCount >= 2
         ? `忙完 ${context.paperCount} 篇论文的展示，你不想再赶场，只想好好参加一项。`
@@ -133,13 +140,14 @@ export function createConferenceActivityDecisionEvent(
     deadlineMonths: 0,
     chainId: activityChainId,
     stage: "act2",
+    conferenceActivityPreview: preview,
     discardPaperUpdates: createDiscardPaperUpdates(context),
     choices: selectedOptions.map((option) => ({
       id: option.id,
       label: option.label,
       outcome: option.outcome,
       effects: {
-        enqueueEvents: [createConferenceActivityResult(context, option, attendanceSummary)],
+        enqueueEvents: [createConferenceActivityResult(context, option, attendanceSummary, preview)],
       },
     })),
   };
@@ -153,9 +161,10 @@ export function createConferenceActivityEvent(
 ): PendingEvent {
   const activityChainId = getConferenceActivityChainId(context);
   const attendanceSummary = attendanceSettlementItems.join("，");
+  const decision = createConferenceActivityDecisionEvent(context, state, attendanceSummary, getRoll);
   return {
     id: `${activityChainId}-act1`,
-    title: `${context.conferenceName}参会`,
+    title: `${context.conferenceName}活动`,
     description: [
       `在${context.city}的会场，你按 ${context.conferenceName} 的安排完成了论文展示。走出展示区时，肩膀才慢慢松下来。`,
       context.paperCount >= 2
@@ -167,13 +176,14 @@ export function createConferenceActivityEvent(
     deadlineMonths: 0,
     chainId: activityChainId,
     stage: "act1",
+    conferenceActivityPreview: decision.conferenceActivityPreview,
     discardPaperUpdates: createDiscardPaperUpdates(context),
     choices: [{
       id: "continue",
       label: "继续",
       outcome: "查看会场活动安排。",
       effects: {
-        enqueueEvents: [createConferenceActivityDecisionEvent(context, state, attendanceSummary, getRoll)],
+        enqueueEvents: [decision],
       },
     }],
   };

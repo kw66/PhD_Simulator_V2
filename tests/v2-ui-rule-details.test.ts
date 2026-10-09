@@ -73,8 +73,9 @@ describe("v2 research rule details and publication metrics", () => {
     const events = { activePlayTab: "events" } as const;
     const help = getHelpPageText(events, "危险选择");
     expect(help).toContain("余额不足的危险事件仍可选择");
-    expect(help).toContain("！：悬浮显示“会暴毙”");
-    expect(help).toContain("？：悬浮显示“可能会暴毙”");
+    expect(help).toContain("！：本次结算必定导致失败");
+    expect(help).toContain("？：部分随机结果可能导致失败");
+    expect(help).toContain("不足的具体原因和预计结算值");
     expect(help).not.toMatch(/确定死|可能死/);
     expect(help).toContain("缺少目标、前置条件未满足或本月次数用尽等限制，仍会禁用选项");
     expect(getHelpPageText(events, "处理事件")).toContain("危险事件不会自动结算，需手动确认");
@@ -169,7 +170,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("导师计1人，恋人不计");
     expect(help).not.toMatch(/发表积累|累计一作|每学年9月/);
     expect(help).toContain("双方主导的合作论文均可触发");
-    expect(help).toContain("主动推进=⌊你的科研⌋+随机0～5");
+    expect(help).toContain("主动推进=⌊你的实际科研+随机0～5⌋，最终向下取整");
     expect(help).toContain("默契：生疏/熟悉/合拍/无间");
     expect(help).toContain("你帮同学论文最低项");
     expect(help).toContain("加分为帮助者科研向下取整");
@@ -222,20 +223,30 @@ describe("v2 research rule details and publication metrics", () => {
     expect(workstation).toContain("可选自费或导师经费，最终确认时扣款");
   });
 
-  it("separates registration on acceptance from travel three months later", () => {
+  it("separates early attendance payment from meeting-month activities and citation boosts", () => {
     const help = getHelpPageText({ activePlayTab: "relationship" }, "会议费用");
     expect(help).toContain("录用结果确认时，每篇一作注册费1金币，由导师经费支付");
     expect(help).toContain("玩家与同学相同，3个月后不再扣注册费");
-    expect(help).toContain("3个月后，同一届会议统一安排差旅");
+    expect(help).toContain("确认录用结果后立即出现“会议名参会”，同届论文合并处理");
+    expect(help).toContain("开会月固定为录用结果生成后第3个月，延后确认不顺延");
+    expect(help).toContain("可提前1～3个月完成参会决定，最迟在开会月完成");
+    expect(help).toContain("差旅在参会决定最终确认时支付");
+    expect(help).toContain("亲自参会确认后，未来待办显示“会议名活动”");
+    expect(help).toContain("到开会月才开放会场活动与论文展示");
+    expect(help).toContain("提前付款不会提前公开论文");
+    expect(help).toContain("挂arXiv或在VALSE展示海报可提前被引");
     expect(help).toContain("国内/亚太/欧美为2/4/6金币");
     expect(help).toContain("自费只扣个人金币；导师报销扣同额经费，好感基础消耗1/2/3，经过抵抗");
     expect(help).toContain("会外联系人代参加免费，不扣差旅或好感，也不进入参会活动");
     expect(help).toContain("同学默认免费代贴，无差旅");
     expect(help).toContain("领域年会VALSE免注册费，不论有无论文均只需差旅2");
+    expect(help).toContain("到场后的活动名为“VALSE活动”");
+    expect(help).not.toContain("VALSE参会");
     expect(help).not.toMatch(/同学中同一届会议则免费|否则个人金币-1|只收一次差旅|全部自费/);
     const research = getHelpText({ activePlayTab: "research" });
     expect(research).toContain("会议录用结果确认时，导师支付每篇一作注册费1金币");
-    expect(research).toContain("3个月后只处理差旅，同学免费代贴");
+    expect(research).toContain("随后即可决定参会并确认支付差旅，找人代贴免费");
+    expect(research).toContain("提前付款不会提前公开论文");
     expect(research).toContain("玩家期刊可选自费或导师支付，选定后不能返回重选");
   });
 
@@ -249,7 +260,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("每1点原始变化先按当前档位减免，再处理下一点");
     expect(help).toContain("不足1点也按比例计算");
     expect(help).toContain("科研5增加2点，先到6，再增加0.75，实际到6.75");
-    expect(help).toContain("界面向下取整数显示，内部保留小数");
+    expect(help).toContain("属性显示至多两位小数，计算使用实际数值");
     expect(help).toContain("玩家科研、社交、好感和人际科研、默契、亲密都如此");
     expect(help).not.toMatch(/概率无效|快照|科研.*随机失效/);
   });
@@ -265,7 +276,10 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("研0每月家里给1金币、生活费-1");
     expect(help).toContain("家庭给钱不扣实验室经费；入学后改领工资");
     expect(help).toContain("经费为0仍可继续，低于0才破产");
-    expect(help).toContain("导师经费”事件另有结项资金，奖励不扣实验室经费");
+    expect(help).toContain("导师经费”使用实验室经费");
+    expect(help).toContain("领取时扣同额经费");
+    expect(help).toContain("获批当月一次");
+    expect(help).toContain("未使用月底失效");
     expect(help).toContain("同学初始金币为0");
     expect(help).toContain("扣除生活费后，同学钱包用于实验经费不足的差额和购买AI，不承担论文费用");
     expect(help).toContain("预留1金币生活费和一次实验费用，再用剩余个人金币");
@@ -311,7 +325,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("玩家与同学每次实验费用+1");
     expect(help).toContain("同学经费与个人金币合计不足当次实验费用时改做横向");
     expect(help).toContain("导师、同学和你共同推进卡片上的两条项目进度");
-    expect(help).toContain("推进=⌊科研能力⌋+随机0～5。同学也按自身科研计算");
+    expect(help).toContain("推进=⌊实际科研能力+随机0～5⌋，最终向下取整。同学也按自身科研计算");
     expect(help).toContain("导师每月轮流推进项目10");
     expect(help).not.toContain("每月为玩家和每位同学各提供一次论文指导");
     expect(help).toContain("每年3月不限项即申请");
@@ -333,7 +347,7 @@ describe("v2 research rule details and publication metrics", () => {
 
     expect(help).toContain("分数格上行是自身分，下行是协作分，右侧总分为六格之和");
     expect(help).toContain("实验需要idea有分，写作需要实验有分");
-    expect(help).toContain("基础分=科研能力×随机倍率（0.5～1.5）+随机加分（0～5）");
+    expect(help).toContain("基础分=实际科研能力×随机倍率（0.5～1.5）+随机加分（0～5），科研小数不提前取整");
     expect(help).toContain("本次分=基础分×总倍率+固定分，结果四舍五入");
     expect(help).toContain("更新自身分：原自身+1与本次分，取较大值");
     expect(help).toContain("协作分持续累加，不会被覆盖");
@@ -379,7 +393,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("最高/最低按投稿时的各项合计分选取");
     expect(help).toContain("拒稿：最低两项各+3");
     expect(help).toContain("SAN变化无论中稿或拒稿都生效");
-    expect(help).toContain("总评≥+2接收，≤−2拒稿");
+    expect(help).toContain("总评≥+2为Accept，≤−2为Reject");
     expect(help).toContain("实际门槛=基础门槛×会议影响力÷等级均值，四舍五入");
 
     expect(help).toContain("期刊送审后不衰减，可继续修改、接受协作");
@@ -502,7 +516,7 @@ describe("v2 research rule details and publication metrics", () => {
       .map((match) => match[1]!.replace(/<[^>]*>/g, ""));
 
     expect(labels).toEqual(["引用", "录用分", "当前分", "历时", "Best Paper", "热度", "影响力", "总引用倍率"]);
-    expect(metrics).toContain('<span class="research-publication-label"><span>Best Paper</span><span>Candidate</span></span><strong>×5</strong>');
+    expect(metrics).toContain('<span class="research-publication-label play-tooltip" tabindex="0" data-tooltip="最佳论文候选"><span>Best Paper</span><span>Candidate</span></span><strong>×5</strong>');
   });
 
   it("retains the zero multiplier before exposure and replaces arXiv with the conference award", () => {
@@ -512,7 +526,28 @@ describe("v2 research rule details and publication metrics", () => {
     paper.publication!.preprintExposed = true;
     expect(renderMetrics(paper)).toContain('<span class="research-publication-label">arXiv</span><strong>×1</strong>');
     paper.conferenceHandled = true;
-    expect(renderMetrics(paper)).toContain('<span class="research-publication-label">Oral</span><strong>×1.5</strong>');
+    expect(renderMetrics(paper)).toContain('<span class="research-publication-label play-tooltip" tabindex="0" data-tooltip="口头报告">Oral</span><strong>×1.5</strong>');
+  });
+
+  it("shows live publicity for arXiv and poster exposure before the original conference", () => {
+    const paper = attachPaperPublication({
+      ...createDraftPaper(1, 0, () => 0), status: "published", target: "A", conferenceHandled: false, heatMultiplier: 1.35,
+    }, 1, "Oral");
+    paper.publication!.influence = 1;
+    paper.publication!.promotions = { arxiv: true, github: false, xiaohongshu: true, quantum: false };
+    expect(renderMetrics(paper)).toContain('<span>总引用倍率</span><strong>0</strong>');
+    paper.publication!.preprintExposed = true;
+    expect(renderMetrics(paper)).toContain('<span>总引用倍率</span><strong>×1.69</strong>');
+    paper.publication!.preprintExposed = false;
+    paper.publication!.promotions.arxiv = false;
+    paper.publication!.posterExposed = true;
+    paper.publication!.promotionMultiplier = 1.25;
+    const metrics = renderMetrics(paper);
+    expect(metrics).toContain('<span class="research-publication-label">海报展示</span><strong>×1</strong>');
+    expect(metrics).toContain('<span>总引用倍率</span><strong>×2.03</strong>');
+    const state = { ...createResearchState(), papers: [paper] };
+    const html = renderApp(state, undefined, { activePlayTab: "research" });
+    expect(html).not.toContain('data-promotion-id="arxiv"');
   });
 
   it("shows journal publication as ×1.0 without requiring conference attendance", () => {
@@ -553,16 +588,16 @@ describe("v2 research rule details and publication metrics", () => {
     expect(html).not.toContain('class="research-mechanism-notes"');
     expect(html).not.toContain('data-research-note="citation"');
     expect(noteIndex).toBeGreaterThan(html.indexOf('class="play-right-rail'));
-    expect(notes).toContain("会议开会或挂arXiv后开始被引");
+    expect(notes).toContain("会议开会、挂arXiv或在VALSE展示海报后开始被引");
     expect(notes).toContain("期刊接收后直接开始");
-    expect(notes).toContain("开会后才启用录用与推广加成");
-    expect(notes).toContain("会议开会前挂arXiv，录用/推广部分先按×1");
+    expect(notes).toContain("原会议的Oral/Best加成仍等该会议举办后生效");
+    expect(notes).toContain("论文公开后，宣传加成立即生效");
     expect(notes).toContain("每月引用增长=当前分×0.05×总引用倍率");
     expect(notes).toContain("小数累积满1才增加引用");
     expect(notes).toContain("尚未公开时总引用倍率显示0");
     expect(notes).toContain("Poster/Spotlight×1");
     expect(notes).toContain("Oral×1.5");
-    expect(notes).toContain("BestPaper/Candidate×5");
+    expect(notes).toContain("BestPaper/BestPaperCandidate×5");
     expect(notes).toContain("期刊×1");
     expect(notes).toContain("GitHub：增加当前分的25%（增加量向下取整），录用分不变");
     expect(notes).toContain("录用/推广倍率+0.25");

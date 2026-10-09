@@ -92,7 +92,7 @@ describe("debug publication shortcuts", () => {
     expect(state.totalMonths).toBe(6);
   });
 
-  it("requires result confirmation and schedules accepted papers together three months later", () => {
+  it("queues merged attendance on result confirmation with a three-month decision deadline", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     let state = trigger(trigger(startState([reviewingPaper("first"), reviewingPaper("second")]), "review-result"), "review-result");
     for (const paperId of ["first", "second"]) {
@@ -104,13 +104,20 @@ describe("debug publication shortcuts", () => {
       expect(state.externalPublications.find((paper) => paper.id === paperId)).toMatchObject({
         status: "published", acceptedTotalMonths: 6, conferenceAvailableAtTotalMonths: 9, conferenceHandled: false,
       });
-      expect(state.eventQueue.some((event) => event.conferencePreview)).toBe(false);
+      const attendance = state.eventQueue.filter((event) => event.conferencePreview);
+      expect(attendance).toHaveLength(1);
+      expect(attendance[0]).toMatchObject({ title: "CVPR参会", deadlineMonths: 3 });
+      expect(attendance[0]?.conferencePreview?.context.paperIds)
+        .toEqual(paperId === "first" ? ["first"] : ["first", "second"]);
     }
     for (let month = 7; month <= 9; month += 1) {
       state = dispatchAction(state, "force-next-month");
       expect(state.totalMonths).toBe(month);
       const conferences = state.eventQueue.filter((event) => event.conferencePreview);
-      expect(conferences).toHaveLength(month === 9 ? 1 : 0);
+      expect(conferences).toHaveLength(1);
+      expect(conferences[0]?.deadlineMonths).toBe(9 - month);
+      expect(state.eventQueue.some((event) => event.chainId.endsWith("-activity"))).toBe(false);
+      expect(state.externalPublications.every((paper) => paper.conferenceHandled === false)).toBe(true);
     }
     expect(state.eventQueue.find((event) => event.conferencePreview)?.conferencePreview?.context.paperIds)
       .toEqual(["first", "second"]);

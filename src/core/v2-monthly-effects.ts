@@ -4,6 +4,7 @@ import { getLabPayroll, settleLabPayroll } from "./v2-lab-payroll";
 import { MONTHLY_LIVING_COST } from "./v2-content";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { roundMoney } from "./v2-money";
+import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
@@ -18,6 +19,7 @@ import { getChairMonthlyRecovery, getShopEmergencySan } from "./v2-shop-items-ef
 import {
   AI_SLOT_IDS,
   createAiBuffs,
+  getAiModelForTotalMonths,
   getAiRenewalPrice,
   hasAiReimbursement,
   renewAiSubscriptionSlot,
@@ -415,19 +417,22 @@ export function applyMonthStartSubscriptions(
       continue;
     }
 
+    const fundingCost = reimbursement ? getAiModelForTotalMonths(nextState.totalMonths, target.slot).price : 0;
     const renewed = renewAiSubscriptionSlot(
       nextState.aiShopState,
       nextState.totalMonths,
       resolution.player.money,
       target.slot,
       reimbursement || usesGift,
+      reimbursement ? nextState.advisorProgressState.funding : undefined,
     );
     nextState = { ...nextState, aiShopState: renewed.state };
     for (const item of renewed.items) {
       const note = item.reason === "model-updated"
         ? "模型已更新，自动续费已关闭"
-        : item.reason === "insufficient-money" ? "金币不足，本月暂停"
-          : usesGift ? "恋人赠礼，本次免费" : reimbursement ? "导师经费报销" : undefined;
+        : item.reason === "insufficient-funding" ? "科研经费不足，本月暂停"
+          : item.reason === "insufficient-money" ? "金币不足，本月暂停"
+          : usesGift ? "恋人赠礼，本次免费" : reimbursement ? `导师经费报销，科研经费 -${fundingCost}` : undefined;
       appendMonthlyEffect(nextState, resolution, {
         id: `ai-renewal-${item.slot}`,
         name: `${item.model.name}续费`,
@@ -438,6 +443,10 @@ export function applyMonthStartSubscriptions(
       if (item.paid) {
         paidModels.push(item.model);
         if (usesGift) nextState = consumeLoverGift(nextState);
+        if (fundingCost > 0) nextState = recordLabFinance({
+          ...nextState,
+          advisorProgressState: { ...nextState.advisorProgressState, funding: roundMoney(nextState.advisorProgressState.funding - fundingCost) },
+        }, "student-reimbursement", -fundingCost);
       }
       nextState = { ...nextState, player: { ...resolution.player } };
     }
@@ -512,6 +521,9 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     player: { ...resolution.player },
     shopState: {
       ...state.shopState,
+      labReimbursements: state.shopState.labReimbursements.totalMonths === state.totalMonths
+        ? state.shopState.labReimbursements
+        : { totalMonths: null, gpuTransaction: 0, workstationTransaction: 0 },
       chairSanRecovered,
       bikeSanSpent,
       bikeSanCapGains,
@@ -582,7 +594,7 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
   };
   const resolution = resolveMonthlyEffects(nextMonthState);
   const monthStartState: GameState = {
-    ...nextMonthState,
+    ...settleLabPayroll(nextMonthState),
     player: { ...resolution.player },
     coffeeState: {
       ...nextMonthState.coffeeState,

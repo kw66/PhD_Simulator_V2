@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createConferenceActivityDecisionEvent } from "../src/core/v2-conference-activity-events";
+import { scheduleConferenceAttendance, settleDueConferenceAttendance } from "../src/core/v2-conference-attendance";
 import { buildConferenceDecisionEventsForAcceptedPapers } from "../src/core/v2-conference-events";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { selectConferenceActivityOptions } from "../src/core/v2-conference-activity-options";
@@ -59,43 +60,58 @@ describe("v2 conference activity", () => {
   });
 
   it("shows long titles once with short result references and preserves real citation multipliers", () => {
-    const state = createStartedGameState("normal");
+    const state = { ...createStartedGameState("normal"), totalMonths: 5, eventQueue: [] };
     const titles = ["A very long paper title repeated for a detailed scientific presentation", "另一篇很长很长的论文标题用于检查多论文结算的信息对应关系"];
     const root = buildConferenceDecisionEventsForAcceptedPapers(titles.map((title, index) => ({
       id: `paper-${index}`, title, target: "A", submittedMonth: 3, submittedYear: 1,
       acceptType: index === 0 ? "Oral" : "Poster",
+      availableAtTotalMonths: 8,
     })), { ...state, research: 0, social: 0, favor: 0 }, () => 0)[0]!;
     expect(root.description).toContain(`论文1：《${titles[0]}》`);
     expect(root.description).toContain(`论文2：《${titles[1]}》`);
     expect(root.description).not.toContain("倍率");
     const name = root.conferencePreview!.context.conferenceName;
-    expect(root.title).toBe(`${name}安排`);
+    expect(root.title).toBe(`${name}参会`);
     expect(root.choices[0]!.label).toBe("继续");
     const selection = root.choices[0]!.effects.enqueueEvents![0]!;
     expect(selection.description).not.toContain("注册费");
     expect(selection.description).toContain("同一场会议只收一次");
     const result = selection.choices.find((choice) => choice.id === "self")!.effects.enqueueEvents![0]!;
-    expect(selection.title).toBe(`${name}安排 ➜ 参会方式`);
-    expect(result.title).toBe(`${name}安排 ➜ 参会方式 ➜ 参会确认`);
+    expect(selection.title).toBe(`${name}参会 ➜ 参会方式`);
+    expect(result.title).toBe(`${name}参会 ➜ 参会方式 ➜ 参会确认`);
     expect(result.choices[0]!.label).toBe("确定");
-    expect(result.description).toContain("论文1：Oral 展示完成，会后引用倍率 ×1.50");
-    expect(result.description).toContain("论文2：Poster 展示完成");
-    expect(result.description).not.toContain("×1.00");
+    expect(result.description).toContain("亲自参会");
+    expect(result.description).not.toMatch(/展示完成|引用倍率/u);
+    expect(result.completionLog).not.toMatch(/展示完成|展示已完成|引用倍率/u);
     for (const title of titles) expect(result.description).not.toContain(title);
-    const activityRoot = result.choices[0]!.effects.enqueueEvents![0]!;
+    expect(result.choices[0]!.effects.enqueueEvents).toBeUndefined();
+    const scheduled = scheduleConferenceAttendance(state, result.choices[0]!.effects.scheduleConferenceAttendance!);
+    expect(settleDueConferenceAttendance(scheduled)).toBe(scheduled);
+    expect(scheduled.eventQueue).toHaveLength(0);
+    const attended = settleDueConferenceAttendance({ ...scheduled, totalMonths: 8 });
+    const activityRoot = attended.eventQueue[0]!;
     const activityDecision = activityRoot.choices[0]!.effects.enqueueEvents![0]!;
-    expect(activityRoot.title).toBe(`${name}参会`);
+    expect(activityRoot.title).toBe(`${name}活动`);
     expect(activityRoot.choices[0]!.label).toBe("继续");
-    expect(activityDecision.title).toBe(`${name}参会 ➜ 选择安排`);
+    expect(activityDecision.title).toBe(`${name}活动 ➜ 选择安排`);
     for (const choice of activityDecision.choices) {
       const final = choice.effects.enqueueEvents![0]!;
-      expect(final.title).toBe(`${name}参会 ➜ 选择安排 ➜ 活动结果`);
+      expect(final.title).toBe(`${name}活动 ➜ 选择安排 ➜ 活动结果`);
       expect(final.choices[0]!.label).toBe("确定");
+      expect(final.description).toContain("论文1：Oral 展示完成，会后引用倍率 ×1.50");
+      expect(final.description).toContain("论文2：Poster 展示完成");
+      expect(final.description).not.toContain("×1.00");
+      for (const title of titles) expect(final.description).not.toContain(title);
     }
     for (const event of [activityRoot, activityDecision, ...activityDecision.choices.map((choice) => choice.effects.enqueueEvents![0]!)]) {
-      expect(event.description).not.toMatch(/金币|科研经费|引用倍率|论文[12]：/);
+      expect(event.description).not.toMatch(/金币|科研经费/);
       expect(event.completionLog ?? "").not.toMatch(/金币|科研经费|引用倍率/);
     }
+    const tour = activityDecision.choices.find((choice) => choice.id === "tour-local")!.effects.enqueueEvents![0]!;
+    expect(tour.description).toContain("结果：SAN +6");
+    expect(tour.choices[0]!.effects.san).toBe(6);
+    expect(tour.completionLog).toBe("SAN +6");
+    expect(settleDueConferenceAttendance(attended)).toBe(attended);
   });
 
   it("falls back to four base options for A-grade before follow-up lines are migrated", () => {

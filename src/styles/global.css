@@ -15,6 +15,7 @@
   --setup-divider-highlight: rgba(255, 251, 241, 0.72);
   --ink: #20312e;
   --ink-soft: #62706c;
+  --attr-level-muted: var(--ink-soft);
   --accent: #b88b3a;
   --accent-deep: #845e1e;
   --card-ink: #4a433c;
@@ -1069,7 +1070,7 @@ p {
 .lobby-masthead-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
-  gap: 12px;
+  gap: 8px;
   margin-left: 16px;
   border-bottom: 2px solid var(--setup-divider);
 }
@@ -4901,7 +4902,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   padding: 0 8px;
   border-radius: 999px;
   border: 1px solid color-mix(in oklab, var(--attr-level-fg, #374151) 14%, rgba(39, 68, 58, 0.08));
-  color: color-mix(in oklab, var(--attr-level-fg, #374151) 70%, var(--ink-soft) 30%);
+  color: color-mix(in oklab, var(--attr-level-fg, #374151) 70%, var(--attr-level-muted) 30%);
   background: linear-gradient(
     180deg,
     color-mix(in oklab, rgba(255, 252, 246, 0.94) 92%, var(--attr-level-fg, #374151) 8%),
@@ -4954,7 +4955,8 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   z-index: 70;
 }
 
-.new-attr-item[data-tooltip] .new-attr-level {
+.new-attr-item[data-tooltip] .new-attr-level,
+.rel-stat-tier {
   animation: attrTierBreath 3.6s ease-in-out infinite;
 }
 
@@ -5059,11 +5061,13 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   --attr-level-fg: #1d4ed8;
 }
 
-.new-attr-level.attr-level-social {
+.new-attr-level.attr-level-social,
+.new-attr-level.attr-level-affinity {
   --attr-level-fg: #0f766e;
 }
 
-.new-attr-level.attr-level-favor {
+.new-attr-level.attr-level-favor,
+.new-attr-level.attr-level-intimacy {
   --attr-level-fg: #9d174d;
 }
 
@@ -5325,6 +5329,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   .new-currency-value.is-value-increase,
   .new-currency-value.is-value-decrease,
   .new-attr-item[data-tooltip] .new-attr-level,
+  .rel-stat-tier,
   .new-attr-item[data-tooltip] .new-attr-level.is-tier-up,
   .new-attr-item[data-tooltip] .new-attr-level.is-tier-down,
   .new-currency-item.is-stat-increase,
@@ -7285,25 +7290,6 @@ button[data-card-icon-action]:focus-visible {
   cursor: default;
 }
 
-.rel-stat-tier {
-  flex-shrink: 0;
-  min-width: 0;
-  margin-left: 2px;
-  padding-inline: 4px;
-}
-
-.attr-level-affinity {
-  --attr-level-fg: #278a65;
-}
-
-.attr-level-intimacy {
-  --attr-level-fg: #b74476;
-}
-
-.relationship-section .rel-card .rel-stat-tier {
-  color: var(--attr-level-fg);
-}
-
 .rel-card-identity {
   display: grid;
   gap: 5px;
@@ -7336,6 +7322,37 @@ button[data-card-icon-action]:focus-visible {
   align-items: center;
   gap: 2px 6px;
   min-width: 0;
+}
+
+.rel-academic-label {
+  white-space: nowrap;
+  font-size: var(--workstation-font-main);
+}
+
+.rel-attributes-row {
+  justify-content: flex-start;
+  gap: 6px 10px;
+}
+
+.rel-finance-summary {
+  white-space: nowrap;
+}
+
+.rel-card-fellow .rel-name {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+@media (max-width: 600px) {
+  .rel-attributes-row {
+    gap: 6px;
+    padding-inline: 6px;
+  }
+
+  .rel-attributes-row .rel-detail-item {
+    gap: 2px;
+    font-size: 0.75rem;
+  }
 }
 
 .rel-card-meta {
@@ -7413,14 +7430,8 @@ button[data-card-icon-action]:focus-visible {
 }
 
 .rel-lover-trait {
-  flex: 0 0 auto;
-  padding: 1px 5px;
-  border: 1px solid rgba(198, 68, 115, 0.22);
-  border-radius: 4px;
+  background: rgba(198, 68, 115, 0.12);
   color: #9a2c54;
-  font-size: var(--workstation-font-small);
-  font-weight: 700;
-  white-space: nowrap;
 }
 
 .rel-card-lover .rel-card-header {
@@ -7871,7 +7882,7 @@ button[data-card-icon-action]:focus-visible {
   color: #171717;
 }
 
-.relationship-section .rel-card :is(span, strong, small, button, p, a, div) {
+.relationship-section .rel-card :is(span, strong, small, button, p, a, div):not(.new-attr-level) {
   color: #171717;
 }
 
@@ -10245,9 +10256,46 @@ button[data-card-icon-action]:focus-visible {
 
 .event-content-body > .event-description-story {
   margin-bottom: 0.85em;
-  text-align: center;
-  text-wrap: balance;
+  text-align: left;
+  text-wrap: pretty;
   line-break: strict;
+}
+
+.event-description-details {
+  width: 100%;
+  max-width: 38rem;
+  margin: 0 auto 0.85em;
+  border-block: 1px solid #e3d9c7;
+  font-size: 0.94em;
+}
+
+.event-description-details > div {
+  display: grid;
+  grid-template-columns: minmax(7em, 0.8fr) minmax(0, 2fr);
+  gap: 6px 12px;
+  padding: 9px 10px;
+}
+
+.event-description-details > div + div { border-top: 1px solid #eee6d8; }
+.event-description-details > div:nth-child(odd) { background: #f8f4eb; }
+.event-description-details dt { font-weight: 700; }
+.event-description-details dd { margin: 0; }
+
+.event-content-body > .event-description-paper {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 0.85em;
+  padding: 8px 12px;
+  border-left: 2px solid #bca880;
+  background: #f8f4eb;
+  font-size: 0.94em;
+}
+
+.event-description-paper > span { color: #786d59; font-size: 0.85em; }
+.event-description-paper .event-story-word { white-space: normal; }
+
+@media (max-width: 480px) {
+  .event-description-details > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
 
 .event-description-emoji {
@@ -10570,196 +10618,122 @@ button[data-card-icon-action]:focus-visible {
 }
 
 .event-content-box.is-paper-review-result .event-content-body {
-  padding: 14px;
-  background: #fffdf8;
+  padding: 16px;
+  background: #fffdf9;
+  justify-content: flex-start;
+  min-height: 0;
 }
-
 .paper-review-event {
+  --review-divider: #e0e3ef;
   display: grid;
-  gap: 9px;
+  gap: 14px;
   min-width: 0;
+  width: 100%;
+  color: #30364b;
   font-family: var(--ui-font-cjk);
-  font-size: var(--workstation-font-main);
+  font-size: 14px;
   line-height: 1.5;
+  text-align: left;
 }
-
-.paper-review-event-heading {
-  display: grid;
-  gap: 4px;
-  padding-bottom: 9px;
-  border-bottom: var(--play-divider-thin);
-  min-width: 0;
-  text-align: center;
-}
-
-.paper-review-event-heading .paper-review-venue {
-  color: var(--accent-deep);
-  font-size: var(--workstation-font-small);
-  font-weight: 700;
-}
-
-.paper-review-event-heading strong {
-  color: var(--ink);
-  font-size: var(--type-body);
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
-.paper-review-event p { margin: 0; }
-.paper-review-intro { color: var(--ink); text-align: center; }
-
-.paper-review-overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--research-card-border);
-  border-radius: 5px;
-  background: var(--research-card-footer);
-}
-
-.paper-review-overview-grid > span {
-  display: grid;
-  gap: 4px;
-  padding: 9px 6px;
-  text-align: center;
-}
-
-.paper-review-overview-grid > span + span { border-left: var(--play-divider-thin); }
-.paper-review-overview-grid small,
-.paper-review-total-score small { color: var(--setup-label-color); font-size: var(--workstation-font-small); }
-.paper-review-overview-grid strong { font-size: var(--workstation-font-main); font-family: var(--ui-font-cjk); font-variant-numeric: tabular-nums; }
-
-.paper-reviewer-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.paper-reviewer-card {
-  --review-tone: #896524;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--review-tone) 45%, #d6cdbb);
-  border-top: 3px solid var(--review-tone);
-  border-radius: 5px;
-  background: #fffdf8;
-  overflow: hidden;
-}
-
-.paper-reviewer-card.is-accept { --review-tone: #397452; }
-.paper-reviewer-card.is-reject { --review-tone: #9a4b43; }
-
-.paper-reviewer-card-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 8px;
-  border-bottom: var(--play-divider-thin);
-  background: color-mix(in srgb, var(--review-tone) 9%, #fffdf8);
-}
-
-.paper-reviewer-number {
-  color: var(--accent-deep);
-  font-family: var(--ui-font-cjk);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--workstation-font-small);
-  font-weight: 700;
-}
-
-.paper-reviewer-card h3,
-.paper-review-settlement h3 {
-  margin: 0;
-  color: var(--ink);
-  font-size: var(--workstation-font-main);
-  font-weight: 700;
-}
-
-.paper-reviewer-verdict {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 5px;
-  padding: 7px 8px 0;
-  font-size: var(--workstation-font-small);
-}
-
-.paper-reviewer-verdict strong {
-  color: var(--review-tone);
-  background: color-mix(in srgb, var(--review-tone) 9%, transparent);
-  padding: 2px 7px;
-  border-radius: 4px;
-}
-
-.paper-reviewer-verdict > span { color: var(--setup-label-color); }
-.paper-reviewer-card .paper-reviewer-comment {
-  padding: 8px;
-  color: var(--ink);
-  font-size: var(--workstation-font-small);
-  line-height: 1.6;
-}
-
-.paper-reviewer-meta {
-  display: grid;
-  gap: 4px;
-  margin: auto 9px 0;
-  padding: 6px 0;
-  border-top: var(--play-divider-thin);
-  font-size: var(--workstation-font-small);
-}
-
-.paper-reviewer-meta > div { display: grid; gap: 2px; }
-.paper-reviewer-meta span { color: var(--setup-label-color); }
-.paper-reviewer-meta strong { color: var(--ink); font-weight: 600; }
-
-.paper-review-decision-head {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--research-card-border);
-  border-left: 3px solid var(--review-tone);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--review-tone) 7%, #fffdf7);
-}
-
-.paper-review-event.is-accepted { --review-tone: #397452; }
-.paper-review-event.is-rejected { --review-tone: #9a4b43; }
-.paper-review-decision-head > div { display: grid; gap: 3px; }
-.paper-review-decision-head > div:first-child { grid-column: 2; text-align: center; }
-.paper-review-decision-head > div > span { color: var(--setup-label-color); font-size: var(--workstation-font-small); }
-.paper-review-decision-head strong { color: var(--review-tone); font-size: var(--type-body); }
-.paper-review-total-score { justify-self: end; text-align: center; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--review-tone) 40%, transparent); border-radius: 4px; }
-.paper-review-total-score strong { font-family: var(--ui-font-cjk); font-size: 1rem; font-variant-numeric: tabular-nums; }
-
-.paper-review-votes { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; font-size: var(--workstation-font-small); }
-.paper-review-votes > span:not(.paper-review-decision-rule) { padding: 2px 8px; background: var(--research-card-footer); border-radius: 4px; }
-.paper-review-votes .is-accept { color: #397452; }
-.paper-review-votes .is-borderline { color: #896524; }
-.paper-review-votes .is-reject { color: #9a4b43; }
-.paper-review-decision-rule { flex-basis: 100%; text-align: center; color: var(--ink); }
-
-.paper-review-settlement { display: grid; gap: 6px; padding-top: 9px; border-top: var(--play-divider-thin); text-align: center; }
-.paper-review-result-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.paper-review-result-strip > span { padding: 5px 10px; border: 1px solid #c4b390; border-radius: 4px; background: #f5eddd; font-size: var(--workstation-font-main); font-weight: 700; }
-.paper-review-event .paper-review-event-footnote { color: var(--ink); font-size: var(--workstation-font-small); line-height: 1.5; text-align: center; }
-
+.paper-review-event p, .paper-review-event h2, .paper-review-event h3 { margin: 0; }
+.paper-review-conference-hero { display: grid; gap: 5px; padding: 10px 12px; background: linear-gradient(120deg, #f3efff, #f0f7ff); text-align: center; }
+.paper-review-conference-hero h2 { color: #6250ad; font-size: 32px; line-height: 1.15; letter-spacing: .025em; }
+.paper-review-conference-fullname { text-align: center; color: #68708b; font-size: 14px; font-weight: 400; overflow-wrap: anywhere; }
+.paper-review-statistics { border: 1px solid var(--review-divider); }
+.paper-term { display: inline-block; }
+.paper-review-global-table th:nth-child(-n+3) .paper-term::after,
+.paper-review-pc h3 .paper-term::after { left: 0; right: auto; }
+.paper-review-global-totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #fff; border-bottom: 1px solid var(--review-divider); }
+.paper-review-global-totals > div { display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: 5px 9px; padding: 12px 5px; }
+.paper-review-global-totals > div + div { border-left: 1px solid #edf0f7; }
+.paper-review-global-totals span { font-size: 13px; color: #68708b; }
+.paper-review-global-totals b { font-size: 19px; font-variant-numeric: tabular-nums; }
+.paper-review-global-totals > div:nth-child(1) b { color: #7554bd; }
+.paper-review-global-totals > div:nth-child(2) b { color: #347ac5; }
+.paper-review-global-totals > div:nth-child(3) b { color: #20836a; }
+.paper-review-global-totals > div:nth-child(4) b { color: #ac791b; }
+.paper-review-global-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.paper-review-global-table th, .paper-review-global-table td { text-align: center; padding: 8px 3px; border-bottom: 1px solid #e8ebf3; border-right: 1px solid #e8ebf3; font-size: 13px; }
+.paper-review-global-table tbody tr:last-child > * { border-bottom: 0; }
+.paper-review-global-table th:last-child, .paper-review-global-table td:last-child { border-right: 0; }
+.paper-review-global-table th:first-child { width: 48px; background: #f7f8fc; color: #68708b; font-weight: 500; }
+.paper-review-global-table thead th { font-weight: 600; padding-block: 9px; }
+.paper-review-global-table .is-reject { --column-tone: #c65363; background: #ffedf0; color: #b74354; }
+.paper-review-global-table .is-poster { --column-tone: #4389d6; background: #eaf3ff; color: #326eb4; }
+.paper-review-global-table .is-spotlight { --column-tone: #2a9fc5; background: #e8f7fc; color: #197c9f; }
+.paper-review-global-table .is-oral { --column-tone: #d8a337; background: #fff5d9; color: #946715; }
+.paper-review-global-table .is-candidate { --column-tone: #5ba978; background: #edf8e9; color: #37744e; }
+.paper-review-global-table .is-best { --column-tone: #28a18b; background: #e4f7f0; color: #197c66; }
+.paper-review-global-table tbody td[class] { background: #fff; color: #4e5873; }
+.paper-review-global-table tbody tr:nth-child(2) td[class] { background: #f9faff; }
+.paper-review-global-table thead th:not(:first-child) { box-shadow: inset 0 2px var(--column-tone); }
+.paper-review-paper-block { display: grid; gap: 12px; text-align: center; }
+.paper-review-paper-block h2 { padding: 2px 8px 0; color: #514180; font-size: 19px; line-height: 1.4; overflow-wrap: anywhere; }
+.paper-review-submission { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid var(--review-divider); background: #fff; }
+.paper-review-submission th, .paper-review-submission td { text-align: center; border-right: 1px solid #edf0f7; padding: 0 5px 8px; }
+.paper-review-submission th:last-child, .paper-review-submission td:last-child { border-right: 0; }
+.paper-review-submission th { padding-top: 7px; color: #68708b; font-weight: 400; font-size: 12px; }
+.paper-review-submission td { font-size: 18px; font-weight: 700; }
+.paper-review-submission td:nth-child(1) { color: #8660be; }
+.paper-review-submission td:nth-child(2) { color: #20836a; }
+.paper-review-submission td:nth-child(3) { color: #347ac5; }
+.paper-review-submission th:last-child, .paper-review-submission td:last-child { background: #f1edff; color: #6247ae; }
+.paper-reviewer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 10px; }
+.paper-reviewer-card { --review-tone: #377dc3; display: grid; grid-template-rows: subgrid; grid-row: span 5; min-width: 0; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--review-tone) 20%, #e8ecf4); border-top: 3px solid var(--review-tone); }
+.paper-reviewer-card > :not(:last-child) { margin-bottom: 9px; }
+.paper-reviewer-card.is-accept { --review-tone: #20836a; background: #f0faf5; }
+.paper-reviewer-card.is-reject { --review-tone: #c65363; background: #fff3f5; }
+.paper-reviewer-card.is-borderline { --review-tone: #377dc3; background: #f0f6ff; }
+.paper-reviewer-card-head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px; font-size: 11px; }
+.paper-reviewer-number { color: #68708b; letter-spacing: .04em; }
+.paper-reviewer-card h3 { grid-column: 1 / -1; color: #30364b; font-size: 15px; font-weight: 650; }
+.paper-reviewer-card .paper-reviewer-verdict { color: var(--review-tone); font-size: 12px; white-space: nowrap; }
+.paper-reviewer-weights { display: grid; align-content: start; gap: 3px; font-size: 11px; color: #68708b; }
+.paper-reviewer-weights p { color: #515b75; font-size: 12px; }
+.paper-reviewer-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding-block: 6px; background: #fff; border: 1px solid color-mix(in srgb, var(--review-tone) 15%, #f4f6fa); }
+.paper-reviewer-metrics > div { text-align: center; }
+.paper-reviewer-metrics > div + div { border-left: 1px solid color-mix(in srgb, var(--review-tone) 12%, transparent); }
+.paper-reviewer-metrics dt { font-size: 11px; color: #68708b; }
+.paper-reviewer-metrics dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; color: #515b75; }
+.paper-reviewer-metrics > div:first-child dd { color: var(--review-tone); font-weight: 750; }
+.paper-reviewer-comment { margin: 0; font-size: 13px; line-height: 1.7; color: #3e465e; }
+.paper-reviewer-effects { display: grid; align-content: end; gap: 3px; font-size: 11px; color: var(--review-tone); }
+.paper-reviewer-effects:empty { display: none; }
+.paper-review-pc { display: grid; grid-template-columns: 1fr; gap: 7px; padding: 10px 14px; border: 1px solid #ddd4f4; border-left: 3px solid #9370ca; background: linear-gradient(120deg, #f4efff, #f0f3ff); }
+.paper-review-pc h3 { color: #7950b1; font-size: 13px; font-weight: 700; }
+.paper-review-pc p { font-size: 13px; line-height: 1.65; }
+.paper-review-pc-summary { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 8px 10px; background: #fff; border: 1px solid #e4dff2; }
+.paper-review-pc-summary > div { display: flex; align-items: baseline; gap: 8px; }
+.paper-review-pc-summary dt { color: #68708b; font-size: 12px; }
+.paper-review-pc-summary dd { margin: 0; font-size: 15px; font-weight: 650; }
+.paper-review-pc-summary .paper-review-pc-verdict { color: var(--review-tone); }
+.paper-review-event.is-accepted { --review-tone: #20836a; --review-surface: #e9f9f1; }
+.paper-review-event.is-rejected { --review-tone: #c65363; --review-surface: #ffedf1; }
+.paper-review-decision-head { display: grid; gap: 6px; justify-items: center; padding: 14px 18px; background: var(--review-surface); text-align: center; }
+.paper-review-decision-head .paper-review-result-icon { font-size: 32px; line-height: 1.2; }
+.paper-review-decision-head > strong { color: var(--review-tone); font-size: clamp(20px, 2vw, 26px); line-height: 1.4; }
+.paper-review-decision-head p { font-size: 13px; color: #68708b; }
+.paper-review-settlement { padding: 0; }
+.paper-review-settlement .event-settlement-summary { margin: 0; }
 @media (max-width: 700px) {
-  .is-paper-review-result .event-scene-tab {
-    flex: 1 1 0;
-    padding: 5px;
-    line-height: 1.4;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-  }
-
+  .event-content-box.is-paper-review-result .event-content-body { padding: 12px; }
+  .is-paper-review-result .event-scene-tab { flex: 1 1 0; padding: 5px; line-height: 1.4; white-space: normal; overflow: visible; text-overflow: clip; }
+  .paper-review-event { font-size: 13px; }
+  .paper-review-conference-hero { padding: 2px; }
+  .paper-review-conference-hero h2 { font-size: 30px; }
+  .paper-review-conference-fullname { font-size: 14px; }
+  .paper-review-global-totals > div { display: grid; gap: 2px; justify-items: center; padding: 6px 2px; }
+  .paper-review-global-totals span { font-size: 11px; }
+  .paper-review-global-totals b { font-size: 16px; }
+  .paper-review-global-table th, .paper-review-global-table td { font-size: 10px; padding: 6px 1px; overflow-wrap: anywhere; }
+  .paper-review-global-table th:first-child { width: 30px; }
+  .paper-review-global-table .is-candidate .paper-term { font-size: 9px; overflow-wrap: normal; }
+  .paper-review-paper-block h2 { font-size: 16px; }
   .paper-reviewer-grid { grid-template-columns: minmax(0, 1fr); }
-  .paper-review-decision-head { grid-template-columns: minmax(0, 1fr) auto; }
-  .paper-review-decision-head > div:first-child { grid-column: 1; }
-  .paper-reviewer-meta > div { display: flex; flex-wrap: wrap; gap: 3px 10px; }
-  .paper-review-decision-rule { margin-left: 0; flex-basis: 100%; }
+  .paper-reviewer-grid { gap: 10px; }
+  .paper-reviewer-card { display: grid; grid-row: auto; grid-template-rows: auto; }
+  .paper-review-pc { grid-template-columns: 1fr; gap: 5px; padding: 10px 12px; }
+  .paper-review-decision-head { padding: 12px; }
 }
 
 .event-log-panel {
@@ -12383,6 +12357,8 @@ button:disabled {
 }
 
 @media (max-width: 820px) {
+  .event-content-buttons { padding-bottom: 52px; }
+
   .play-help-area {
     display: contents;
   }

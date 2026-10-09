@@ -1,4 +1,5 @@
 import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
+import { createDebugEnding, isDebugEndingId } from "./v2-debug-endings";
 import { createConferenceActivityEvent } from "./v2-conference-activity-events";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
@@ -186,6 +187,10 @@ export const DEBUG_MONTH_DELTAS = [-12, -1, 1, 12] as const;
 
 /** Manual cross-run audit checklist. Add an id here after the user confirms that the event has been checked. */
 export const DEBUG_COMPLETED_EVENT_IDS = [
+  "ccig",
+  "ccig-activity",
+  "review-result",
+  "conference",
   "before-grad-school",
   "phd-choice",
   "mentor-assign",
@@ -264,9 +269,9 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
   {
     title: "论文相关",
     buttons: [
+      { id: "review-result", label: "论文结果" },
       { id: "conference", label: "论文参会" },
       { id: "conference-activity", label: "会场活动" },
-      { id: "review-result", label: "论文结果" },
       { id: "joint-training-invite", label: "联合培养" },
       { id: "lover-beautiful", label: "活泼关系线" },
       { id: "lover-smart", label: "聪慧关系线" },
@@ -1055,6 +1060,9 @@ export function dispatchDebugAction(
   actionId: GameActionId,
   payload: DispatchPayload,
 ): GameState | null {
+  if (actionId === "debug-trigger-ending") {
+    return state.phase !== "setup" && isDebugEndingId(payload.eventId) ? createDebugEnding(state, payload.eventId) : state;
+  }
   if (state.phase !== "playing") {
     switch (actionId) {
       case "debug-adjust-stat":

@@ -34,8 +34,8 @@ describe("v2 thesis rules", () => {
   it("能正确推进进度、判定完成并识别当前阶段", () => {
     const initialThesis = startThesisIfAvailable(2, 7, createInitialThesisState());
     const firstStep = applyThesisOption(initialThesis, THESIS_OPTIONS[2], 2, 10);
-    expect(firstStep.progressGain).toBe(18);
-    expect(firstStep.nextThesis.progress).toBe(18);
+    expect(firstStep.progressGain).toBe(19);
+    expect(firstStep.nextThesis.progress).toBe(19);
     expect(getThesisStage(firstStep.nextThesis.progress).name).toBe("未开始");
 
     const finalStep = applyThesisOption({ ...firstStep.nextThesis, progress: 90 }, THESIS_OPTIONS[3], 4, 20);

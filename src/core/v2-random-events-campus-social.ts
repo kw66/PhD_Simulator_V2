@@ -74,7 +74,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         id: `random-7-poker-${serial}`,
         label: "打德州扑克",
         outcome: pokerStake === 0
-          ? (pokerWin ? `条件：本金 0，纯游戏获胜（${pokerWinRate * 100}%）｜结果：${pokerGrowth || "无事发生"}` : `条件：本金 0，纯游戏落败（${100 - pokerWinRate * 100}%）｜结果：${pokerGrowth || "无事发生"}`)
+          ? (pokerWin ? `条件：本金 0，纯游戏获胜（${pokerWinRate * 100}%）｜结果：${pokerGrowth || "金币 +0"}` : `条件：本金 0，纯游戏落败（${100 - pokerWinRate * 100}%）｜结果：${pokerGrowth || "金币 +0"}`)
           : pokerWin ? `条件：押注 ${pokerStake} 金币；获胜（${pokerWinRate * 100}%）｜结果：金币 +${pokerStake}${pokerGrowth ? `｜${pokerGrowth}` : ""}` : `条件：押注 ${pokerStake} 金币；落败（${100 - pokerWinRate * 100}%）｜结果：金币 -${pokerStake}${pokerGrowth ? `｜${pokerGrowth}` : ""}`,
         effects: pokerWin
           ? {
@@ -197,12 +197,12 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
   const workstationApproved = getRoll() < approvalPercent / 100;
   const aiApproved = getRoll() < approvalPercent / 100;
   const reimbursementOutcome = (approved: boolean, reward: string): string =>
-    `条件：${favorCondition}；${approved ? "同意报销" : "未获同意"}（${approved ? approvalPercent : 100 - approvalPercent}%）｜结果：${approved ? reward : "无事发生"}`;
+    `条件：${favorCondition}；${approved ? "同意报销" : "未获同意"}（${approved ? approvalPercent : 100 - approvalPercent}%）｜结果：${approved ? reward : "报销失败"}`;
 
   const event: PendingEvent = {
     id: `random-8-y${state.year}-m${state.month}-n${serial}`,
     title: "导师经费",
-    description: "组会快结束时，导师翻出另一笔快结项的项目经费，说还有些预算，想给大家添点设备或发份劳务费。刚合上的电脑又被打开，大家开始列清单。",
+    description: "组会快结束时，导师翻出实验室经费表，说账上有些经费近期需要花出去，想给大家添点设备或发份劳务费。刚合上的电脑又被打开，大家开始列清单。",
     source: "random",
     blocking: true,
     deadlineMonths: 1,
@@ -212,33 +212,33 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
       {
         id: `random-8-gpu-${serial}`,
         label: "买显卡",
-        outcome: reimbursementOutcome(gpuApproved, "显卡报销：免单1次"),
+        outcome: reimbursementOutcome(gpuApproved, "显卡报销：本月免单1次，使用时扣科研经费"),
         effects: gpuApproved ? {
-          shopEntitlementDeltas: { gpuTransaction: 1 },
+          labReimbursement: "gpuTransaction",
         } : {},
       },
       {
         id: `random-8-salary-${serial}`,
         label: "发劳务费",
-        outcome: `${favorCondition}｜金币 +${salaryGain}。`,
+        outcome: `${favorCondition}｜金币 +${salaryGain}｜科研经费 -${salaryGain}。`,
         effects: {
           money: salaryGain,
+          advisorProgressStateDeltas: { funding: -salaryGain },
+          labFinanceCategory: "labor",
         },
       },
       {
         id: `random-8-renovate-${serial}`,
         label: "装修工位",
-        outcome: reimbursementOutcome(workstationApproved, "工位报销：免单1次"),
+        outcome: reimbursementOutcome(workstationApproved, "工位报销：本月免单1次，使用时扣科研经费"),
         effects: workstationApproved ? {
-          shopEntitlementDeltas: {
-            workstationTransaction: 1,
-          },
+          labReimbursement: "workstationTransaction",
         } : {},
       },
       {
         id: `random-8-ai-${serial}`,
         label: "报销 AI 费用",
-        outcome: reimbursementOutcome(aiApproved, "AI报销：下月免费"),
+        outcome: reimbursementOutcome(aiApproved, "AI报销：下月免费，使用时扣科研经费"),
         effects: aiApproved ? {
           addBuffs: [{
             id: `ai-reimbursement-${state.totalMonths + 1}`,
@@ -247,7 +247,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
             timing: "monthly",
             remainingMonths: 2,
             shopEffects: { aiCostsCovered: true, aiCostsCoveredAtTotalMonths: state.totalMonths + 1 },
-            description: "指定月份的 AI 购买与自动续费免费。",
+            description: "下月 AI 购买与自动续费由科研经费支付，余额不足时暂停。",
           }],
         } : {},
       },
@@ -256,7 +256,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
 
   const stagedEvent = createThreeStageEvent(event, {
     introDescription: [
-      "组会快结束时，导师翻出另一笔快结项的项目经费，说还有些预算，想给大家添点设备或发份劳务费。刚合上的电脑又被打开，大家开始列清单。",
+      "组会快结束时，导师翻出实验室经费表，说账上有些经费近期需要花出去，想给大家添点设备或发份劳务费。刚合上的电脑又被打开，大家开始列清单。",
       "白板上陆续写下显卡、劳务费、工位设备和 AI 费用。导师对着表格核了一遍：“先提一项，设备和软件还得看看是否合适，别把同一笔预算报两遍。”",
     ].join("\n\n"),
     decisionTitle: "你的选择",
@@ -268,7 +268,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
       [`random-8-gpu-${serial}`]: {
         title: "显卡采购",
         description: gpuApproved ? [
-          "你指了指白板上的显卡。导师点点头，让你选好型号，把下次购买或升级的费用报到这笔结项经费里。",
+          "你指了指白板上的显卡。导师点点头，让你本月选好型号，购买或升级一次，实际费用从实验室经费里支付。",
           "你记下这次报销机会，打开参数页看起了显存容量。手指习惯性地往价格那一栏滑，停了一下，又往上翻了回去。",
         ].join("\n\n") : [
           "你把显卡报价递过去，导师看了眼型号：“组里的卡先排着用，个人显卡这次就不报了。”你准备好的显存对比还没讲完，话题已经转到了下一位同学。",
@@ -295,7 +295,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
       [`random-8-renovate-${serial}`]: {
         title: "布置工位",
         description: workstationApproved ? [
-          "导师同意用这笔结项经费给你改善工位：键盘、显示器、办公椅和咖啡机任选一样，也能升级已有的椅子或咖啡机。",
+          "导师同意本月从实验室经费里报销一次工位开支：键盘、显示器、办公椅和咖啡机任选一样，也能升级已有的椅子或咖啡机。",
           "回到工位，你量量桌面空位，又比画椅子高度。认真挑办公设备，也得在自己这一平方米里来回折腾。",
         ].join("\n\n") : [
           "你提起吱呀响的椅子和想换的设备，导师听完说：“先找后勤修修，能用的暂时别换。”你低头看看列好的清单，把那几个型号划掉了。",

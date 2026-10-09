@@ -1,5 +1,6 @@
 import { getAttributeTier } from "./v2-random-event-rules";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
+import { formatMoney } from "./v2-money";
 import type { Buff, EventSupportState } from "./v2-types";
 
 export type SeasonId = "spring" | "summer" | "autumn" | "winter";
@@ -148,19 +149,18 @@ export function formatResearchMiscSanChange(
   return formatEventSanChange(finalDelta, getIllnessSanIncrease(baseDelta, month, eventSupport, buffs, research), tierDiscount, baseDelta);
 }
 
-/**
- * Formats the compact result shown in event settlement rows. Narrative about
- * why a point was resisted belongs in the event copy, not beside the result.
- */
 export function formatTierResistedOutcome(
   label: string,
   rawChange: number,
   result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount" | "cappedCount">,
 ): string {
   const actual = result.effectiveChange;
-  const signedActual = formatSignedEffectChange(actual, rawChange);
-  const detailText = result.cappedCount && rawChange > 0 ? "（上限）" : "";
-  return `${label} ${signedActual}${detailText}`;
+  const signedActual = formatSignedEffectChange(Number(formatMoney(actual)), rawChange);
+  const detailText = [
+    result.resistedCount > 0 ? `抵抗${formatMoney(result.resistedCount)}` : "",
+    result.cappedCount && rawChange > 0 ? "上限" : "",
+  ].filter(Boolean).join("；");
+  return `${label} ${signedActual}${detailText ? `（${detailText}）` : ""}`;
 }
 
 export function applyTierResist(
@@ -205,13 +205,11 @@ export function getTierResistChance(currentValue: number): number {
 
 export function formatTierResistedChange(
   label: string,
-  _rawChange: number,
-  result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount">,
+  rawChange: number,
+  result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount" | "cappedCount">,
   _currentValue?: number,
 ): string {
-  const actual = result.effectiveChange;
-  if (actual === 0) return `${label} 未变化`;
-  return `${label} ${actual > 0 ? "+" : ""}${actual}`;
+  return formatTierResistedOutcome(label, rawChange, result);
 }
 
 export function getTierResistedNarrative(
