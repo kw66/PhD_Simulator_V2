@@ -7,16 +7,16 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("dates the unannounced October work without changing the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 2).map((entry) => entry.date)).toEqual(["2026-10-09", "2026-10-08"]);
-    for (const page of [0, 1]) {
+    expect(GAME_ANNOUNCEMENTS.slice(0, 3).map((entry) => entry.date)).toEqual(["2026-10-10", "2026-10-09", "2026-10-08"]);
+    for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes).toHaveLength(6);
       const html = renderAnnouncementPage(page);
-      expect(html.match(/<li>/g)).toHaveLength(6);
+      expect(html.match(/data-announcement-item=/g)).toHaveLength(6);
       expect(html).toContain('data-announcement-toggle');
       for (const change of entry.changes) expect(html).toContain(change.title);
     }
-    const october8 = GAME_ANNOUNCEMENTS[1]!.changes.map((change) => change.description).join("\n");
+    const october8 = GAME_ANNOUNCEMENTS.find((entry) => entry.date === "2026-10-08")!.changes.map((change) => change.description).join("\n");
     expect(october8).toContain("编辑和删除自己的留言");
     expect(october8).toContain("匿名留言编辑权限");
     expect(october8).toContain("简写教授职称");
@@ -28,7 +28,7 @@ describe("game announcements", () => {
   });
 
   it("records October 9 fee timing, risk buttons and May fixes without redating October 8 changes", () => {
-    const current = GAME_ANNOUNCEMENTS[0]!.changes.map((change) => change.description).join("\n");
+    const current = GAME_ANNOUNCEMENTS.find((entry) => entry.date === "2026-10-09")!.changes.map((change) => change.description).join("\n");
     expect(current).toContain("确认会议录用结果时，导师即付每篇一作注册费1金币");
     expect(current).toContain("3个月后只安排差旅");
     expect(current).toContain("期刊可选自费或导师，选定后不再返回重选");

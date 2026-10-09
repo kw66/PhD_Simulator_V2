@@ -13,9 +13,9 @@ export function bindAnnouncementCollapse(root: HTMLElement): () => void {
     announcementCollapseStates.set(root, state);
   }
   state.dispose?.();
-  const expandedDates = state.expanded;
+  const expandedItems = state.expanded;
   const view = root.ownerDocument.defaultView;
-  const cards = Array.from(root.querySelectorAll<HTMLElement>(".announcement-card[data-announcement-date]"));
+  const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-announcement-item]"));
   let disposed = false;
 
   const updateCard = (card: HTMLElement): void => {
@@ -29,12 +29,13 @@ export function bindAnnouncementCollapse(root: HTMLElement): () => void {
       return;
     }
     const overflowing = body.scrollHeight > body.clientHeight;
-    const expanded = overflowing && expandedDates.has(card.dataset.announcementDate!);
+    const expanded = overflowing && expandedItems.has(card.dataset.announcementItem!);
     card.dataset.announcementOverflow = String(overflowing);
     card.dataset.announcementExpanded = String(expanded);
     button.hidden = !overflowing;
     button.setAttribute("aria-expanded", String(expanded));
     button.textContent = expanded ? "收起" : "展开";
+    button.setAttribute("aria-label", `${expanded ? "收起" : "展开"}：${card.querySelector("strong")?.textContent ?? "公告详情"}`);
   };
   const update = (): void => {
     if (!disposed) cards.forEach(updateCard);
@@ -43,11 +44,11 @@ export function bindAnnouncementCollapse(root: HTMLElement): () => void {
     const target = event.target;
     if (!(target instanceof Element)) return;
     const button = target.closest<HTMLButtonElement>("[data-announcement-toggle]");
-    const card = button?.closest<HTMLElement>(".announcement-card[data-announcement-date]");
+    const card = button?.closest<HTMLElement>("[data-announcement-item]");
     if (!button || button.hidden || !card || !root.contains(card)) return;
-    const date = card.dataset.announcementDate!;
-    if (expandedDates.has(date)) expandedDates.delete(date);
-    else expandedDates.add(date);
+    const item = card.dataset.announcementItem!;
+    if (expandedItems.has(item)) expandedItems.delete(item);
+    else expandedItems.add(item);
     updateCard(card);
   };
 
@@ -55,7 +56,7 @@ export function bindAnnouncementCollapse(root: HTMLElement): () => void {
   view?.addEventListener("resize", update);
   const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(update);
   for (const card of cards) {
-    card.querySelectorAll("[data-announcement-body], .announcement-changes").forEach((element) => observer?.observe(element));
+    card.querySelectorAll("[data-announcement-body], [data-announcement-text]").forEach((element) => observer?.observe(element));
   }
   void root.ownerDocument.fonts?.ready.then(update);
   update();
@@ -88,16 +89,16 @@ export function renderAnnouncementPage(requestedPage = 0): string {
         <button class="pager-arrow" type="button" data-ui-announcement-page="${page + 1}" aria-label="较早公告"${page === GAME_ANNOUNCEMENTS.length - 1 ? " disabled" : ""}><i data-lucide="chevron-right" aria-hidden="true"></i></button>
       </nav>
     </div>
-    <article class="announcement-card" aria-label="${announcement.date} 更新记录" data-announcement-date="${announcement.date}" data-announcement-expanded="false">
-      <div class="announcement-body" id="announcement-body-${announcement.date}" data-announcement-body>
+    <article class="announcement-card" aria-label="${announcement.date} 更新记录" data-announcement-date="${announcement.date}">
         <ul class="announcement-changes">
-        ${announcement.changes.map((change) => `<li>
+        ${announcement.changes.map((change, index) => `<li data-announcement-item="${announcement.date}-${index}" data-announcement-expanded="false">
           <span class="announcement-category">${change.category}</span>
-          <div><strong>${escapeHtml(change.title)}</strong><p>${escapeHtml(change.description)}</p></div>
+          <div><strong>${escapeHtml(change.title)}</strong>
+            <div class="announcement-body" id="announcement-body-${announcement.date}-${index}" data-announcement-body><p data-announcement-text>${escapeHtml(change.description)}</p></div>
+            <button class="announcement-toggle" type="button" data-announcement-toggle aria-label="展开：${escapeHtml(change.title)}" aria-controls="announcement-body-${announcement.date}-${index}" aria-expanded="false" hidden>展开</button>
+          </div>
         </li>`).join("")}
         </ul>
-      </div>
-      <button class="announcement-toggle" type="button" data-announcement-toggle aria-controls="announcement-body-${announcement.date}" aria-expanded="false" hidden>展开</button>
     </article>
   `;
 }

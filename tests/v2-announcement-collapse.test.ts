@@ -16,7 +16,7 @@ declare global {
 
 const fixture = `<!doctype html><html><head><style>
   body { margin: 0; font: 16px/20px sans-serif; }
-  .announcement-body { max-height: 320px; overflow: hidden; }
+  .announcement-body { max-height: 60px; overflow: hidden; }
   [data-announcement-expanded="true"] .announcement-body { max-height: none; }
   .announcement-toggle[hidden] { display: none; }
   .announcement-changes { margin: 0; padding: 0; list-style: none; }
@@ -68,35 +68,39 @@ describe("announcement overflow controls", () => {
     await page?.close();
   });
 
-  const expanded = () => page.locator(".announcement-card").getAttribute("data-announcement-expanded");
-  const toggle = () => page.locator("[data-announcement-toggle]");
+  const expanded = () => page.locator("[data-announcement-item]").first().getAttribute("data-announcement-expanded");
+  const toggle = () => page.locator("[data-announcement-toggle]").first();
 
   it("shows a toggle only when measured content exceeds the collapsed height", async () => {
-    for (const height of [20, 320, 321]) {
-      await page.locator(".announcement-changes").evaluate((element, contentHeight) => {
-        element.innerHTML = `<li style="height:${contentHeight}px;padding:0">公告</li>`;
+    for (const height of [20, 60, 61]) {
+      await page.locator("[data-announcement-text]").first().evaluate((element, contentHeight) => {
+        element.innerHTML = `<span style="display:block;height:${contentHeight}px">公告</span>`;
         window.announcementHarness.bind();
       }, height);
-      expect(await toggle().isVisible()).toBe(height > 320);
+      expect(await toggle().isVisible()).toBe(height > 60);
       expect(await expanded()).toBe("false");
     }
   });
 
-  it("expands the full announcement and supports keyboard collapse with accessible state", async () => {
-    const body = page.locator("[data-announcement-body]");
-    expect(await body.evaluate((element) => element.clientHeight)).toBe(320);
+  it("expands only one subtitle and supports keyboard collapse with accessible state", async () => {
+    const body = page.locator("[data-announcement-body]").first();
+    const otherItems = () => page.locator("[data-announcement-item]").evaluateAll((items) => items.slice(1).map((item) => ({ expanded: item.getAttribute("data-announcement-expanded"), height: item.clientHeight })));
+    const before = await otherItems();
+    expect(await body.evaluate((element) => element.clientHeight)).toBe(60);
     expect(await toggle().getAttribute("aria-controls")).toBe(await body.getAttribute("id"));
     await toggle().focus();
     await page.keyboard.press("Enter");
     expect(await expanded()).toBe("true");
     expect(await toggle().getAttribute("aria-expanded")).toBe("true");
     expect(await toggle().textContent()).toBe("收起");
-    expect(await body.evaluate((element) => element.clientHeight)).toBeGreaterThan(320);
+    expect(await body.evaluate((element) => element.clientHeight)).toBeGreaterThan(60);
+    expect(await otherItems()).toEqual(before);
+    expect(await page.locator(".announcement-card").getAttribute("data-announcement-expanded")).toBeNull();
     await page.keyboard.press("Space");
     expect(await expanded()).toBe("false");
     expect(await toggle().getAttribute("aria-expanded")).toBe("false");
     expect(await toggle().textContent()).toBe("展开");
-    expect(await body.evaluate((element) => element.clientHeight)).toBe(320);
+    expect(await body.evaluate((element) => element.clientHeight)).toBe(60);
   });
 
   it("retains independent date choices across page changes and full rerenders without duplicate listeners", async () => {
@@ -117,8 +121,8 @@ describe("announcement overflow controls", () => {
   });
 
   it("remeasures wrapping on resize and keeps the expansion preference when content temporarily fits", async () => {
-    await page.locator(".announcement-changes").evaluate((element) => {
-      element.innerHTML = `<li>${"An announcement with text that wraps. ".repeat(20)}</li>`;
+    await page.locator("[data-announcement-text]").first().evaluate((element) => {
+      element.textContent = "An announcement with text that wraps. ".repeat(10);
       window.announcementHarness.bind();
     });
     await toggle().click();
@@ -131,8 +135,8 @@ describe("announcement overflow controls", () => {
   });
 
   it("observes content growth and measures cards after their hidden container becomes visible", async () => {
-    await page.locator(".announcement-changes").evaluate((element) => {
-      element.innerHTML = "<li>简短公告</li>";
+    await page.locator("[data-announcement-text]").first().evaluate((element) => {
+      element.textContent = "简短公告";
     });
     await expect.poll(() => toggle().isVisible()).toBe(false);
     await page.locator("#test-root").evaluate((root) => {
