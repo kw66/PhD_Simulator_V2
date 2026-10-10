@@ -61,11 +61,15 @@ export function discardBlockingQueueEvents(state: GameState): GameState {
 
   const removedBuffIds = discardedEvents.flatMap((event) => event.removeBuffIdsOnCompletion ?? []);
   const paperUpdates = discardedEvents.flatMap((event) => event.discardPaperUpdates ?? []);
+  const skippedJournalIds = discardedEvents.flatMap((event) => event.journalFeePreview ? [event.journalFeePreview.paperId] : []);
   const applyPaperUpdates = (papers: GameState["papers"]): GameState["papers"] => papers.map((paper) => applyPaperEffectUpdates(paper, paperUpdates));
 
   return {
     ...state,
     eventQueue: removeBlockingEventQueueItems(state.eventQueue),
+    ...(skippedJournalIds.length ? { debugSkippedJournalFeePaperIds: [...new Set([
+      ...(state.debugSkippedJournalFeePaperIds ?? []), ...skippedJournalIds,
+    ])] } : {}),
     buffs: removeBuffs(state.buffs, removedBuffIds),
     papers: applyPaperUpdates(state.papers),
     externalPublications: applyPaperUpdates(state.externalPublications),

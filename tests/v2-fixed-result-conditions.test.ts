@@ -221,19 +221,30 @@ describe("fixed result conditions", () => {
       loverState: initial.loverState,
     }, () => 0);
     const context = { id: "test", conferenceName: "CVPR", conferenceYear: 2026, city: "杭州", country: "中国", paperCount: 1, grade: "A" as const };
-    expect(options.map((option) => option.id)).toEqual(["big-bull-coop", "opposite-scholar", "enterprise-networking"]);
+    expect(options.map((option) => option.id)).toEqual(["big-bull-coop", "opposite-scholar"]);
     expect(options[0]!.effects.triggerJointTrainingInvite).toBe(count >= 2);
     expect(options[0]!.effects.conferenceEncounterUpdates?.bigBull).toEqual({ ...mentor, cooperationCount: count + 1 });
-    expect(options[1]!.effects.triggerLoverDevelopment).toBe("beautiful");
+    expect(options[1]!.effects.triggerLoverDevelopment).toBe(count >= 2 ? "beautiful" : undefined);
     expect(options[1]!.effects.conferenceEncounterUpdates?.scholars?.beautiful).toEqual({ ...scholar, encounterCount: count + 1 });
-    expect(options[2]!.effects.triggerInternshipInvite).toBe(count >= 1);
     for (const option of options) {
       const result = createConferenceActivityResult(context, option, "自费参会");
       const settlement = settlementOf(result);
-      if (option.id === "big-bull-coop") expect(settlement).toContain(`条件：与${mentor.name}合作次数 ${count + 1}`);
-      if (option.id === "enterprise-networking") expect(settlement).toContain(`条件：企业交流次数 ${count + 1}`);
-      if (option.id === "opposite-scholar") expect(settlement).not.toContain("条件：");
-      expect(settlement).not.toMatch(/<\s*2|≥\s*2/u);
+      expect(result.description).toContain(`小提示：选项出现条件：${option.label}需A/B类会议、社交 ≥ 6`);
+      if (option.id === "big-bull-coop") {
+        expect(settlement).toContain("结果：下次写论文 +8");
+        expect(settlement.split(`与${mentor.name}合作达${count + 1}次`)).toHaveLength(2);
+        expect(option.outcome.split(`与${mentor.name}合作达${count + 1}次`)).toHaveLength(2);
+        expect(settlement.includes(`条件：与${mentor.name}合作 ≥ 2次`)).toBe(count >= 1);
+        expect(settlement.includes(`条件：科研 ≥ 12｜与${mentor.name}合作 ≥ 3次｜尚未联培`)).toBe(count >= 2);
+      }
+      if (option.id === "opposite-scholar") {
+        expect(settlement).toContain("条件：活泼学者（50%）");
+        expect(settlement.split(`与${scholar.name}搭讪达${count + 1}次`)).toHaveLength(2);
+        expect(option.outcome.split(`与${scholar.name}搭讪达${count + 1}次`)).toHaveLength(2);
+        expect(settlement.includes(`条件：社交 ≥ 12｜与${scholar.name}搭讪 ≥ 3次｜没有恋人｜结果：会后有约`)).toBe(count >= 2);
+      }
+      expect(settlement + option.outcome).not.toContain("已收到");
+      expect(settlement).not.toContain("选项出现条件");
       expect(result.choices[0]!.effects.conferenceEncounterUpdates).toEqual(option.effects.conferenceEncounterUpdates);
     }
   });
@@ -251,7 +262,8 @@ describe("fixed result conditions", () => {
     ];
     for (const root of roots) {
       const decision = decisionOf(root);
-      expect(root.description + decision.description).not.toContain("条件：");
+      expect(root.description).toContain("小提示：出现条件：");
+      expect(decision.description).not.toContain("条件：");
       const decline = decision.choices.find((choice) => choice.id === "decline")!;
       const result = decline.effects.enqueueEvents![0]!;
       expect(decline.effects.conferenceCareerUpdates).toBeUndefined();
@@ -259,12 +271,13 @@ describe("fixed result conditions", () => {
       expect(result.choices[0]!.label).toBe("确定");
       expect(result.description).not.toMatch(/永久关闭|剩余1次/u);
       if (root.chainId === "internship-invite") {
-        expect(settlementOf(result).trim()).toBe("结果：暂不实习");
+        expect(settlementOf(result).trim()).toBe("结果：婉拒实习");
         expect(result.choices[0]!.effects.conferenceCareerUpdates).toMatchObject({
           rejectedInternshipCount: rejectCount + 1, permanentlyBlockedInternship: false,
         });
       } else {
-        expect(settlementOf(result).trim()).toBe("结果：无事发生");
+        expect(settlementOf(result)).toContain(result.loverDevelopmentPreview!.context.replacement!.name);
+        expect(settlementOf(result)).not.toMatch(/无事发生|重计数|归零|暂不/u);
         const updates = result.choices[0]!.effects.conferenceEncounterUpdates!;
         expect(updates.permanentlyBlockedBeautifulLover).toBe(false);
         expect(updates.scholars?.beautiful?.encounterCount).toBe(0);

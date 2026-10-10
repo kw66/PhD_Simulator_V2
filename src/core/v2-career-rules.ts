@@ -32,7 +32,7 @@ export interface CareerProgressInput {
 
 export const CAREER_DEFINITIONS: Record<CareerType, CareerDefinition> = {
   internet: {
-    name: "互联网",
+    name: "私企",
     activeMonths: [11, 12, 1, 2],
     levels: [
       { threshold: 0, name: "未开始" },

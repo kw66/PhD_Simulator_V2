@@ -7,7 +7,8 @@ import { activateInternship, activateRemoteInternship } from "../src/core/v2-int
 import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
 import { applyMonthlyEffects, previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { getCalendarForTotalMonths } from "../src/core/v2-progression";
-import type { CareerType } from "../src/core/v2-career-rules";
+import { CAREER_OPTIONS, type CareerType } from "../src/core/v2-career-rules";
+import { getActualSanChange } from "../src/core/v2-sanity-rules";
 import type { GameState } from "../src/core/v2-types";
 
 function startInternship(kind: "conference6" | "remote3", initial = createStartedGameState("normal")): GameState {
@@ -24,13 +25,17 @@ function advanceMonth(state: GameState): GameState {
 }
 
 function settleCareer(state: GameState, careerType: CareerType): number {
-  let current = { ...state, eventQueue: [createEventQueueItem(createCareerEventForType(state, careerType), 1)] };
+  const prepared: GameState = { ...state, careerLastPreparedTotalMonths: null, player: { ...state.player, san: state.sanCap } };
+  let current: GameState = { ...prepared, eventQueue: [createEventQueueItem(createCareerEventForType(prepared, careerType), 1)] };
   for (const choiceId of [current.eventQueue[0]!.choices[0]!.id, "light", "light-finish"]) {
     current = applyQueuedEventEffects(current, current.eventQueue[0]!, choiceId, {
       evaluateImmediateEndings: (next) => next,
       runPostQueuePipeline: (next) => next,
     });
   }
+  const option = CAREER_OPTIONS.find((entry) => entry.id === "light")!;
+  expect(current.player.san).toBe(prepared.player.san + getActualSanChange(-option.sanCost, prepared.month, prepared.eventSupport, prepared.buffs));
+  expect(current.careerLastPreparedTotalMonths).toBe(prepared.totalMonths);
   return current.careerProgress[careerType] - state.careerProgress[careerType];
 }
 

@@ -4,6 +4,7 @@ import { addPaperCollaboration } from "./v2-paper-collaboration";
 import { getLoverName } from "./v2-lover-system";
 import { getResearchCap } from "./v2-research-cap-system";
 import { generateRelationshipResearch } from "./v2-relationship-research";
+import { formatMoney } from "./v2-money";
 import { applyTierResist } from "./v2-sanity-rules";
 import { describeResistedTalentReward, describeTalentReward, recordTalentTrigger } from "./v2-talent-history";
 import type { GameState, LoverProgressState, LoverTypeId } from "./v2-types";
@@ -72,7 +73,7 @@ export function getLoverPassiveGains(state: GameState): { play: number; study: n
 
 export function getLoverNextReward(state: GameState, route: LoverRoute): string {
   const intimacyGain = applyTierResist(route === "shopping" ? 2 : 1, state.loverProgressState.intimacy, () => 0).effectiveChange;
-  const intimacyReward = `、亲密 +${intimacyGain}`;
+  const intimacyReward = `、亲密 +${formatMoney(intimacyGain)}`;
   if (route === "shopping") return `下次购物免单${intimacyReward}`;
   const cycle = getRoute(state, route).completed % 3;
   return (route === "play"

@@ -3,6 +3,11 @@ import { bootstrapDebugWindow, createDebugWindow, isDebugWindowActionData } from
 import { renderDebugPanel } from "../src/app/v2-render-debug-panel";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { DEBUG_EVENT_GROUPS, DEBUG_MONTH_DELTAS, DEBUG_STAT_GROUPS } from "../src/core/v2-debug-tools";
+import { createRelationshipTooltips } from "../src/app/v2-relationship-tooltips";
+
+vi.mock("../src/app/v2-relationship-tooltips", () => ({
+  createRelationshipTooltips: vi.fn(() => ({ sync: vi.fn() })),
+}));
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -46,18 +51,29 @@ function createPopupFixture() {
 }
 
 describe("independent debug window", () => {
-  it("groups thesis progress with graduation and keeps separate conference shortcuts", () => {
+  it("uses shared tooltips and refreshes them after rendering", () => {
+    const { root } = createPopupFixture();
+    bootstrapDebugWindow(root as unknown as HTMLDivElement, "tooltip-test");
+    expect(createRelationshipTooltips).toHaveBeenCalledWith(root);
+    const tooltip = vi.mocked(createRelationshipTooltips).mock.results.at(-1)!.value;
+    expect(tooltip.sync).toHaveBeenCalled();
+    const html = renderDebugPanel(createStartedGameState("normal"), true);
+    const button = html.match(/<button[^>]*data-action="force-next-month"[^>]*>/)![0];
+    expect(button).toContain("data-card-tooltip");
+    expect(button).not.toContain(" title=");
+  });
+  it("groups thesis blind review with graduation and keeps separate conference shortcuts", () => {
     const html = renderDebugPanel(createStartedGameState("normal"), true);
     const paperGroup = html.match(/<h3>论文相关<\/h3>([\s\S]*?)<\/div>/)?.[1] ?? "";
     const graduationGroup = html.match(/<h3>毕业相关<\/h3>([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(paperGroup.match(/data-event-id="([^"]+)"/)?.[1]).toBe("review-result");
-    for (const [id, label] of [["conference", "论文参会"], ["conference-activity", "会场活动"], ["review-result", "论文结果"]]) {
+    for (const [id, label] of [["conference", "论文参会"], ["conference-activity-a", "A会活动"], ["conference-activity-b", "B会活动"], ["conference-activity-c", "C会活动"], ["review-result", "论文结果"]]) {
       expect(paperGroup).toContain(`data-event-id="${id}"`);
       expect(paperGroup).toContain(label);
     }
     expect(paperGroup).not.toContain('data-event-id="thesis-progress"');
     expect(graduationGroup).toContain('data-event-id="thesis-progress"');
-    expect(graduationGroup).toContain("论文推进");
+    expect(graduationGroup).toContain("毕业盲审");
     expect(graduationGroup).toContain('data-event-id="career-internet"');
     expect(html).not.toContain("招聘相关");
     expect(html).toContain("年会活动");

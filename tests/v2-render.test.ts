@@ -13,6 +13,7 @@ import { getFellowDiscussionSanCost } from "../src/core/v2-fellow-actions";
 import { activateLover, getLoverName } from "../src/core/v2-lover-system";
 import { LOVER_ROUTES, advanceLoverMonth, getLoverNextReward, getLoverRouteCost } from "../src/core/v2-lover-progression";
 import { pickStableRandomName } from "../src/core/v2-random-name";
+import { createConferenceScholarContact } from "../src/core/v2-conference-contacts";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { getConferenceInfo, getConferenceLocation } from "../src/core/v2-conference-catalog";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
@@ -314,7 +315,7 @@ describe("v2 explicit render animation markers", () => {
     expect(card).not.toContain("基础分");
   });
 
-  it("labels the advisor condition column concisely and adds navigation hover text", () => {
+  it("labels advisor conditions concisely and keeps shop tabs free of hover text", () => {
     const html = renderApp(createRelationshipCardTestState(), undefined, { activePlayTab: "talent", activeTalentTab: "relation" });
     const advisor = getTalentCardHtml(html, "advisor");
     expect(advisor).toContain('<span>条件</span>');
@@ -322,7 +323,10 @@ describe("v2 explicit render animation markers", () => {
     for (const attribute of ["data-ui-play-tab", "data-ui-shop-tab", "data-ui-talent-tab"]) {
       const buttons = [...html.matchAll(new RegExp(`<button[^>]*${attribute}="[^"]+"[^>]*>`, "g"))];
       expect(buttons.length).toBeGreaterThan(0);
-      for (const button of buttons) expect(button[0]).toMatch(/data-tooltip="[^"]+"/);
+      for (const button of buttons) {
+        if (attribute === "data-ui-shop-tab") expect(button[0]).not.toContain("data-tooltip=");
+        else expect(button[0]).toMatch(/data-tooltip="[^"]+"/);
+      }
     }
   });
 
@@ -2715,10 +2719,11 @@ describe("v2 render lobby shell", () => {
     expect(submitHtml).toContain("ICLR 2023");
     const runLocation = getConferenceLocation(state.month, "A", state.year, state.conferenceLocationSeed);
     expect(submitHtml).toContain(`${runLocation.city} · `);
-    expect(submitHtml).toContain("影响力1.40 · 参考分82");
+    expect(submitHtml).toContain("影响力 1.40\n参考分 82");
     expect(submitHtml).toContain(">Nature</strong>");
-    expect(submitHtml).toContain("送审分150");
-    expect(submitHtml).toContain("达标分500");
+    expect(submitHtml).toContain("送审分 150");
+    expect(submitHtml).toContain("达标分 500");
+    expect(submitHtml).not.toContain("workstation-submit-info-item");
     expect(submitHtml).toContain('class="workstation-submit-target-grid" role="group"');
     expect((submitHtml.match(/class="paper-submit-option paper-submit-conference grade-/g) ?? [])).toHaveLength(3);
     expect(submitHtml).not.toContain('class="paper-submit-target-btn"');
@@ -2726,12 +2731,12 @@ describe("v2 render lobby shell", () => {
     expect(submitHtml).toMatch(/class="paper-submit-option paper-submit-conference grade-a"/);
     expect((submitHtml.match(/class="paper-submit-destination"/g) ?? [])).toHaveLength(6);
     expect((submitHtml.match(/class="paper-submit-grade-mark"/g) ?? [])).toHaveLength(3);
-    expect(submitHtml).toContain("International Conference on Learning Representations");
+    expect(submitHtml).not.toContain('title="International Conference on Learning Representations');
     expect((submitHtml.match(/class="paper-journal-btn(?:\s|\")/g) ?? [])).toHaveLength(3);
     expect(submitHtml).toContain('aria-label="投稿 Nature"');
     expect(submitHtml).toContain('aria-label="投稿 子刊NMI"');
     expect(submitHtml).toContain('aria-label="投稿 顶刊PAMI"');
-    expect(submitHtml).toContain("Nature · 期刊分不足，需要 150");
+    expect(submitHtml).toContain('data-tooltip="送审分 150\n达标分 500"');
     expect(submitHtml).not.toContain('class="paper-journal-meta"');
     expect(submitHtml).not.toContain('class="paper-journal-acceptance"');
     expect(submitHtml).not.toContain("投稿 <span aria-hidden=\"true\">|</span>");
@@ -3809,8 +3814,8 @@ describe("v2 render lobby shell", () => {
     ["《多模态，科研与协作》：会后引用倍率 ×1.50（+50%）", ["《多模态，科研与协作》：会后引用倍率 ×1.50（+50%）"]],
     ["金币 -6｜科研经费 -1（注册费）", ["金币 -6", "科研经费 -1（注册费）"]],
     ["论文1：Oral 展示完成，会后引用倍率 ×1.50｜论文2：Poster 展示完成", ["论文1：Oral 展示完成，会后引用倍率 ×1.50", "论文2：Poster 展示完成"]],
-    ["下次写论文 +8；联培邀请：已收到", ["下次写论文 +8", "联培邀请：已收到"]],
-    ["SAN +8，SAN 上限 +3；关系邀请：已收到", ["SAN +8", "SAN 上限 +3", "关系邀请：已收到"]],
+    ["下次写论文 +8；联培邀约", ["下次写论文 +8", "联培邀约"]],
+    ["SAN +8，SAN 上限 +3；会后有约", ["SAN +8", "SAN 上限 +3", "会后有约"]],
   ] satisfies [string, string[]][])("renders complete semantic chips for %s", (settlement, labels) => {
     const event = createEventQueueItem({
       id: "semantic-settlement", title: "事件结果", source: "random", blocking: true, deadlineMonths: 0,
@@ -3845,7 +3850,7 @@ describe("v2 render lobby shell", () => {
     }
     roots.push(...(["stomach", "flu", "fever"] as const).map((type) => createIllnessRandomEvent(state, roll, type)));
     roots.push(createJointTrainingAct1(buildJointTrainingContext(state)), createPhdDecisionEvent(state, 2));
-    const thesis = collectThesisEventForMonth(state);
+    const thesis = collectThesisEventForMonth({ ...state, month: 8, totalMonths: 32 });
     expect(thesis.event).not.toBeNull();
     roots.push(thesis.event!);
     const scholarship = createScholarshipEvent(state, roll).choices[0]!.effects.enqueueEvents![0]!;
@@ -3862,9 +3867,13 @@ describe("v2 render lobby shell", () => {
       conferenceEncounterState: {
         ...state.conferenceEncounterState,
         bigBull: { id: "render-mentor", name: "林老师", level: 1, cooperationCount: 2 },
+        scholars: {
+          beautiful: { ...createConferenceScholarContact("beautiful"), encounterCount: 2 },
+          smart: { ...createConferenceScholarContact("smart"), encounterCount: 2 },
+        },
       },
     });
-    expect(options).toHaveLength(3);
+    expect(options).toHaveLength(2);
     roots.push(...options.map((option) => createConferenceActivityResult({
       id: "render-audit-conference", conferenceName: "测试会议", conferenceYear: 2026,
       city: "北京", country: "中国", paperCount: 2, grade: "A",
@@ -3908,13 +3917,13 @@ describe("v2 render lobby shell", () => {
     expect(rendered).toMatch(/>[^<]*永久[^<]*<\/span>/u);
     expect(rendered).toMatch(/>[^<]*idea[^<]*（\d+→\d+）<\/span>/u);
     expect(rendered).toMatch(/>[^<]*实验[^<]*（\d+→\d+）<\/span>/u);
-    expect(rendered).toContain(">大论文进度 +0</span>");
+    expect(rendered).toMatch(/>(?:盲审通过|盲审未通过|未能送审)<\/span>/u);
     expect(rendered).toMatch(/>评奖科研分[^<]*(?:≥|&lt;)[^<]*<\/span>/u);
     expect(rendered).toMatch(/>科研分[^<]*(?:≥|&lt;)[^<]*<\/span>/u);
     expect(rendered).toContain(">论文1：Oral 展示完成，会后引用倍率 ×1.50</span>");
     expect(rendered).toContain(">论文2：Poster 展示完成</span>");
-    expect(rendered).toContain(">联培邀请：已收到</span>");
-    expect(rendered).toContain(">关系邀请：已收到</span>");
+    expect(rendered).toContain(">联培邀约</span>");
+    expect(rendered).toContain(">会后有约</span>");
     if (attribute === 20) expect(rendered).toMatch(/>[^<]*\+0（抵抗0\.6；上限）<\/span>/u);
   });
 
@@ -4103,20 +4112,25 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("data-ui-event-history-nav");
   });
 
-  it("leads the opening paragraph with the scene emoji and picks the most specific theme", () => {
+  it("preserves authored emoji positions without adding a generic opening or result icon", () => {
     const started = dispatchAction(dispatchAction(createInitialState(), "select-role", { roleId: "normal" }), "start-game", { roleId: "normal" });
     const render = (title: string, stage: "act1" | "result") => {
       const event = createEventQueueItem({
-        id: `emoji-${stage}`, title, description: "第一句话。第二句话。", source: "random", blocking: true,
+        id: `emoji-${stage}`, title, description: "你收起报告。📄 接着和同行聊起方法。\n\n讨论结束，互留了联系方式。🤝", source: "random", blocking: true,
         deadlineMonths: 0, chainId: `emoji-${stage}`, stage,
         choices: [{ id: `emoji-${stage}-ok`, label: "确定", outcome: "", effects: {} }],
       }, 1);
       return renderApp({ ...started, eventQueue: [event] }, createDefaultAccountProfile(), { isEventContentOpen: true, activeEventId: event.id });
     };
     const opening = render("年会活动", "act1");
-    expect(opening).toContain('<span class="event-description-emoji" aria-hidden="true">🏟️</span>第一句话。第二句话。');
-    expect(opening).not.toMatch(/[。！？]<span class="event-description-emoji"/u);
-    expect(render("署名风波 ➜ 如何抉择 ➜ 据理力争", "result")).toContain('<span class="event-description-emoji" aria-hidden="true">✅</span>第一句话');
+    expect(opening).toContain('<p class="event-description-story">你收起报告。📄 接着和同行聊起方法。</p>');
+    expect(opening).toContain('<p class="event-description-story">讨论结束，互留了联系方式。🤝</p>');
+    for (const html of [opening, render("署名风波 ➜ 如何抉择 ➜ 据理力争", "result")]) {
+      const body = html.match(/id="event-content-body">([\s\S]*?)<\/div>/)?.[1] ?? "";
+      expect(body).not.toContain("✅");
+      expect(body).not.toContain("🏟️");
+      expect(body).not.toContain("event-description-emoji");
+    }
   });
 
   it("renders all three Teacher's Day scenes in current and historical views", () => {
@@ -4144,7 +4158,8 @@ describe("v2 render lobby shell", () => {
     expect(currentHtml).toContain(">教师节</button>");
     expect(currentHtml).toContain(">你的选择</button>");
     expect(currentHtml).toContain(">礼物送达</button>");
-    expect(currentHtml).toContain('class="event-description-emoji"');
+    const currentStory = currentHtml.match(/class="event-description-story">([\s\S]*?)<\/p>/g)?.join("") ?? "";
+    expect(currentStory).toMatch(/\p{Extended_Pictographic}/u);
 
     state = dispatchAction(state, "resolve-event", {
       eventId: state.eventQueue[0]?.id,
@@ -4872,7 +4887,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("idea +5分");
     expect(html).toContain("idea +1次");
     expect(html).not.toContain(">下次想 idea +5分<");
-    expect(html).toContain("事件 · 对应效果触发后消耗");
+    expect(html).toContain("事件 · 生效后消耗");
     expect(html).not.toContain("过期补贴");
     expect(html).not.toContain('data-effect-id="next-month-money"');
   });
@@ -5390,6 +5405,7 @@ describe("v2 render lobby shell", () => {
     { value: 5.999, display: "6", resistance: 0 },
     { value: 6.25, display: "6.25", resistance: 20 },
     { value: 6.75, display: "6.75", resistance: 20 },
+    { value: 7.8000000004, display: "7.8", resistance: 20 },
     { value: 12.5, display: "12.5", resistance: 40 },
     { value: 18, display: "18", resistance: 60 },
   ])("displays decimal attributes $display while retaining actual resistance $resistance percent", ({ value, display, resistance }) => {
@@ -5406,6 +5422,7 @@ describe("v2 render lobby shell", () => {
       expect(attribute).toContain(`class="new-attr-value">${display}/20</span>`);
       expect(attribute).toContain(`${label}增减抵抗${resistance}%`);
       expect(attribute).not.toContain("概率无效");
+      expect(attribute).toContain(`data-stat-value="${display}"`);
     }
     for (const type of ["senior", "lover"] as const) {
       expect(getRelationshipCardHtml(html, type).match(new RegExp(`class="rel-detail-value">${display.replace(".", "\\.")}/20</strong>`, "g"))).toHaveLength(2);

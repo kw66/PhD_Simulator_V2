@@ -54,14 +54,14 @@ describe("conference and invitation help", () => {
 
   it("distinguishes extra executions from action point costs and covers lover consequences", () => {
     const text = pageText(relationshipHelp.pages, "会场搭讪");
-    expect(text).toContain("搭讪只有一个选项，活泼／聪慧各50%");
+    expect(text).toContain("选择“异性学者”后，活泼／聪慧各50%");
     expect(text).toContain("活泼：SAN+5");
     expect(text).toContain("聪慧：下次想idea+2分、额外执行2次");
     expect(text).toContain("不额外消耗行动点");
-    expect(text).toContain("同类型第2次搭讪起，社交原始+1，经过抵抗");
-    expect(text).toContain("两种类型分别计数");
+    expect(text).toContain("与同一人第2次搭讪起，社交原始+1，经过抵抗");
+    expect(text).toContain("两位学者分别计数");
     const invitation = pageText(relationshipHelp.pages, "恋人邀请");
-    expect(invitation).toContain("搭讪时社交≥12且没有恋人，即可收到恋人邀请");
+    expect(invitation).toContain("与同一人搭讪≥3次（含本次），社交≥12且没有恋人时，对方会约你单独见面");
     expect(invitation).toContain("接受活泼恋人：SAN上限+3");
     expect(invitation).toContain("接受聪慧恋人：科研原始+1，经过抵抗");
     expect(invitation).toContain("接受或拒绝后，同类型会场联系人换新、计数归0");

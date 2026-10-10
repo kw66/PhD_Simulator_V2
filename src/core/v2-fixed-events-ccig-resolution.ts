@@ -67,10 +67,10 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigActivityResultEvent({
           state: eventState,
           mode: "listen",
-          title: "VALSE活动 ➜ 选择安排 ➜ 活动结果",
+          title: "VALSE活动 ➜ 选择安排 ➜ 认真听报告",
           description: [
-            "你先听 Tutorial 梳理多模态模型的方法，再去 Workshop 听视频生成和三维空间理解的讨论。讲者放出的演示很漂亮，台下却接连追问训练数据、失败案例和评测是否公平。你原本只顾着记新方法，听着听着，也在笔记里补上了这些问题。",
-            "茶歇时，你拿自己的实验困惑请教讲者，对方换个角度解释，你才发现把问题想窄了。回去能试的新思路有了，判断问题的方法也学到一点；最大的问号旁总算补上了几行字。",
+            "你先听 Tutorial 梳理多模态模型的方法，再去 Workshop 听视频生成和三维空间理解的讨论。讲者放出的演示很漂亮，台下却接连追问训练数据、失败案例和评测是否公平。你原本只顾着记新方法，听着听着，📝也在笔记里补上了这些问题。",
+            "茶歇时，你拿自己的实验困惑请教讲者，对方换个角度解释，你才发现把问题想窄了。💡回去能试的新思路有了，判断问题的方法也学到一点；最大的问号旁总算补上了几行字。",
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
@@ -108,10 +108,10 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigActivityResultEvent({
           state: eventState,
           mode: "poster",
-          title: "VALSE活动 ➜ 选择安排 ➜ 活动结果",
+          title: "VALSE活动 ➜ 选择安排 ➜ 海报展示",
           description: [
-            "你贴好海报，向同行介绍工作。有人追问基线和实验设置，你指着图解释，把疑问记在空白处。",
-            "收海报时，开场白已说得不用过脑子，嗓子也哑了。有同行拍照说回去细看，你赶紧指了指角落的论文链接。",
+            "你贴好海报，向同行介绍工作。🗣️有人追问基线和实验设置，你指着图解释，把疑问记在空白处。",
+            "收海报时，开场白已说得不用过脑子，嗓子也哑了。有同行拍照说回去细看，📸你赶紧指了指角落的论文链接。",
             `涉及论文：**《${paper.title}》**`,
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
@@ -145,11 +145,12 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigActivityResultEvent({
           state: eventState,
           mode: "travel",
-          title: "VALSE活动 ➜ 选择安排 ➜ 活动结果",
+          title: "VALSE活动 ➜ 选择安排 ➜ 顺便旅游",
           description: [
-            "你把会务袋放回酒店，留了些空当出门走走。今天不用给每段时间都排上正事。",
-            `你${attraction}，路上没再反复琢磨那几个实验。回酒店时腿有点酸，脑子倒是松快了不少。`,
+            "你把会务袋放回酒店，留了些空当出门走走。🚶今天不用给每段时间都排上正事。",
+            `你${attraction}，路上没再反复琢磨那几个实验。回酒店时腿有点酸，😌脑子倒是松快了不少。`,
           ].join("\n\n"),
+          condition: "国内参会",
           outcome: `${activityOutcome}。`,
           completionLog,
           effects: { san: 4 },
@@ -177,10 +178,10 @@ export function resolveCcigFixedEvent(
         enqueueEvents: [createCcigActivityResultEvent({
           state: eventState,
           mode: "food",
-          title: "VALSE活动 ➜ 选择安排 ➜ 活动结果",
+          title: "VALSE活动 ➜ 选择安排 ➜ 品尝当地美食",
           description: [
-            `你和几位同学约好 AA 聚餐，一起品尝${location}当地菜：${food}。`,
-            `大家从报告聊到没跑通的实验，越聊越熟悉。结账时各付各的，你付了自己那份 2 金币，约好回去继续交流；几个只认得胸牌的名字总算对上了人。${socialNarrative}`,
+            `你和几位同学约好 AA 聚餐，🍽️一起品尝${location}当地菜：${food}。`,
+            `大家从报告聊到没跑通的实验，越聊越熟悉。💬结账时各付各的，你付了自己那份 2 金币，约好回去继续交流；几个只认得胸牌的名字总算对上了人。${socialNarrative}`,
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,

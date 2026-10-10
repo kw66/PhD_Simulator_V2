@@ -67,8 +67,8 @@ function buildScholarshipAwardEvent(context: ScholarshipOutcomeContext, disquali
       id: `scholarship-result-y${context.year}-m${context.month}`,
       title: "国奖评选 ➜ 申报决定 ➜ 资格取消",
       description: appendMechanismSettlement([
-        "公示名单里有你的名字，你刚截好图，学院又发来消息——公示期间有人举报你用于评奖的论文存在图片误用，核实后取消了你的国奖资格。",
-        "你重新打开名单，自己的名字已经被划去。申报材料还放在桌边，那张准备发给家里的截图，最后也没发出去。",
+        "公示名单里有你的名字，你刚截好图，学院又发来消息——公示期间有人举报你用于评奖的论文存在图片误用，⚠️核实后取消了你的国奖资格。",
+        "你重新打开名单，自己的名字已经被划去。申报材料还放在桌边，那张准备发给家里的截图，😞最后也没发出去。",
       ].join("\n\n"), `条件：评奖科研分 ${context.score} ≥ 分数线 ${context.requirement}；被举报\n结果：资格取消，金币 +0`),
       chainId: "scholarship",
       stage: "result",
@@ -83,15 +83,15 @@ function buildScholarshipAwardEvent(context: ScholarshipOutcomeContext, disquali
   if (context.success) {
     const diff = context.score - context.requirement;
     const reaction = diff >= 3
-      ? "你在名单里找到自己的名字，截了张图，又点开确认一遍。刚才还嫌通知太多，这一条倒是舍不得划掉。"
+      ? "你在名单里找到自己的名字，截了张图，又点开确认一遍。刚才还嫌通知太多，🥳这一条倒是舍不得划掉。"
       : diff >= 1
-        ? "你找到自己的名字，才松开一直攥着鼠标的手。申报文件夹里又多了一份通知，这次不用改格式，也不用补附件了。"
-        : "你把名字和分数来回核了两遍，刚好踩线。截完图还不放心，又放大看了一眼，生怕自己高兴得太早，看错了行。";
+        ? "你找到自己的名字，才松开一直攥着鼠标的手。😌申报文件夹里又多了一份通知，这次不用改格式，也不用补附件了。"
+        : "你把名字和分数来回核了两遍，刚好踩线。截完图还不放心，又放大看了一眼，🔍生怕自己高兴得太早，看错了行。";
     return createScholarshipScene(context, {
       id: `scholarship-result-y${context.year}-m${context.month}`,
       title: "国奖评选 ➜ 申报决定 ➜ 获得奖学金",
       description: appendMechanismSettlement([
-        `📱 学院通知弹出：“恭喜获得本年度国家奖学金。”你的科研积分为 ${context.score} 分，分数线为 ${context.requirement} 分。`,
+        `学院通知弹出：“恭喜获得本年度国家奖学金。”🏅你的科研积分为 ${context.score} 分，分数线为 ${context.requirement} 分。`,
         reaction,
       ].join("\n\n"), `条件：评奖科研分 ${context.score} ≥ 分数线 ${context.requirement}\n结果：金币 +${context.reward}`),
       chainId: "scholarship",
@@ -116,16 +116,16 @@ function buildScholarshipAwardEvent(context: ScholarshipOutcomeContext, disquali
 
   const diff = context.requirement - context.score;
   const reaction = diff === 1
-    ? "你把分数又加了一遍，还是差那一点。计算器关了又打开，也算不出另一种结果。没用于获奖的成果能继续累计，只是眼下还不太甘心。"
+    ? "你把分数又加了一遍，还是差那一点。计算器关了又打开，也算不出另一种结果。😔没用于获奖的成果能继续累计，只是眼下还不太甘心。"
     : diff <= 3
-      ? "你逐项核了一遍材料，没有漏算。申报页面停了好一会儿，最后还是关掉了；文件留在原处，未用于获奖的成果可以继续累计。"
-      : "你看着分数线，原本准备好的安慰自己的话，一时也没想起来。申报材料先收进文件夹，未用于获奖的成果仍能累计，下次再用得上。";
+      ? "你逐项核了一遍材料，没有漏算。申报页面停了好一会儿，最后还是关掉了；😞文件留在原处，未用于获奖的成果可以继续累计。"
+      : "你看着分数线，原本准备好的安慰自己的话，一时也没想起来。😔申报材料先收进文件夹，未用于获奖的成果仍能累计，下次再用得上。";
 
   return createScholarshipScene(context, {
     id: `scholarship-result-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 申报决定 ➜ 遗憾落选",
     description: appendMechanismSettlement([
-      `📱 学院通知弹出，你没能进入获奖名单。你的科研积分为 ${context.score} 分，距离 ${context.requirement} 分的分数线还差 ${diff} 分。`,
+      `学院通知弹出，你没能进入获奖名单。📱你的科研积分为 ${context.score} 分，距离 ${context.requirement} 分的分数线还差 ${diff} 分。`,
       reaction,
     ].join("\n\n"), `条件：评奖科研分 ${context.score} < 分数线 ${context.requirement}\n结果：金币 +0`),
     chainId: "scholarship",
@@ -147,8 +147,8 @@ function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOut
     id: `scholarship-skip-result-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 申报决定 ➜ 暂不申报",
     description: appendMechanismSettlement([
-      "你关掉申报页面，把论文和证明材料归进文件夹。这次先不交了，没用于获奖的成果还能留到以后。",
-      "群里还在追问附件格式，你把消息设成免打扰，重新打开手头的工作。至少今晚不用再和表格较劲。",
+      "你关掉申报页面，把论文和证明材料归进文件夹。📂这次先不交了，没用于获奖的成果还能留到以后。",
+      "群里还在追问附件格式，你把消息设成免打扰，重新打开手头的工作。😌至少今晚不用再和表格较劲。",
     ].join("\n\n"), "结果：不申报国奖"),
     chainId: "scholarship",
     stage: "result",
@@ -159,10 +159,10 @@ function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOut
     id: `scholarship-decision-y${context.year}-m${context.month}`,
     title: "国奖评选 ➜ 申报决定",
     description: [
-      `细则写着：${getScholarshipGradeLabel(state)}共 5 个名额，按科研积分排名，已用于获奖的论文不能再次计入。你核对成果，这次能计入 ${context.score} 分；往年同年级的分数线在${range}，今年还要看大家提交的成果。`,
+      `细则写着：${getScholarshipGradeLabel(state)}共 5 个名额，按科研积分排名，已用于获奖的论文不能再次计入。你核对成果，这次能计入 ${context.score} 分；往年同年级的分数线在${range}，📊今年还要看大家提交的成果。`,
       `本年度国奖奖金为 **${context.reward}金币**。整理证明材料、准备答辩PPT，再上台讲清自己的成果，少不了一番忙碌。${context.score > 0
-        ? "你翻着手里的成果，已经在想奖金能添置些什么，又赶紧收住心：材料还没交，钱倒先花上了。"
-        : "申报表的成果栏还空着，你盯着光标看了一会儿，又看向桌边没写完的论文。"}没用于获奖的成果可以留到以后，不必这次就申报。`,
+        ? "你翻着手里的成果，已经在想奖金能添置些什么，又赶紧收住心：材料还没交，😅钱倒先花上了。"
+        : "申报表的成果栏还空着，你盯着光标看了一会儿，📝又看向桌边没写完的论文。"}没用于获奖的成果可以留到以后，不必这次就申报。`,
     ].join("\n\n"),
     chainId: "scholarship",
     stage: "act2",
@@ -221,8 +221,8 @@ function buildScholarshipIntroEvent(state: GameState, context: ScholarshipOutcom
     id: `scholarship-y${context.year}-m${context.month}`,
     title: "国奖评选",
     description: [
-      "晚上十点，学院群弹出“国奖评选启动”的通知，紧接着是申报表、材料清单和答辩安排。原本安静的群一下热闹起来，消息很快刷过了屏幕。",
-      "你把手头的文档切到一旁，点开通知。附件占了半屏，有人找往年的模板，有人问盖章要去哪个办公室。你先把文件存进文件夹，再从头读起这次的评选细则。",
+      "晚上十点，学院群弹出“国奖评选启动”的通知，紧接着是申报表、材料清单和答辩安排。原本安静的群一下热闹起来，📱消息很快刷过了屏幕。",
+      "你把手头的文档切到一旁，点开通知。附件占了半屏，有人找往年的模板，有人问盖章要去哪个办公室。你先把文件存进文件夹，📋再从头读起这次的评选细则。",
     ].join("\n\n"),
     chainId: "scholarship",
     choices: [

@@ -85,14 +85,14 @@ export function getIllnessSanIncrease(
 function formatSignedEffectChange(finalDelta: number, originalDelta = finalDelta): string {
   // A fully resisted cost is still a loss; a net zero keeps the default +0.
   if (finalDelta === 0 && originalDelta < 0) return "-0";
-  return finalDelta >= 0 ? `+${finalDelta}` : String(finalDelta);
+  return `${finalDelta >= 0 ? "+" : "-"}${formatMoney(Math.abs(finalDelta))}`;
 }
 
 export function formatEventSanChange(finalDelta: number, illnessIncrease = 0, researchDiscount = 0, originalDelta = finalDelta): string {
   const signedDelta = formatSignedEffectChange(finalDelta, originalDelta);
   const notes = [
-    researchDiscount > 0 ? `（减免${researchDiscount}）` : "",
-    finalDelta < 0 && illnessIncrease > 0 ? `（疾病增加${illnessIncrease}）` : "",
+    researchDiscount > 0 ? `（减免${formatMoney(researchDiscount)}）` : "",
+    finalDelta < 0 && illnessIncrease > 0 ? `（疾病增加${formatMoney(illnessIncrease)}）` : "",
   ].join("");
   return `SAN ${signedDelta}${notes}`;
 }

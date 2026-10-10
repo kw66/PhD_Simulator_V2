@@ -14,7 +14,7 @@ import { createScholarshipEvent, resolveScholarshipApplication } from "../src/co
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "../src/core/v2-fixed-events-teachers-day";
 import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
-import { collectThesisEventForMonth } from "../src/core/v2-monthly-thesis-events";
+import { advanceThesisResearchPoint, syncThesisState } from "../src/core/v2-thesis-rules";
 import { createFundingCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
 import { createAdvisorTalkRandomEvent } from "../src/core/v2-random-events-lab-advisor-talk";
 import { createAdvisorMeetingRandomEvent } from "../src/core/v2-random-events-lab-advisor-meeting";
@@ -1160,7 +1160,7 @@ describe("v2 event scheduler", () => {
     }
   });
 
-  it("applies seasonal SAN changes to every event operation with a direct SAN cost", () => {
+  it("applies seasonal SAN changes to event costs and thesis writing", () => {
     const initial = createInitialState();
     const spring = {
       ...initial,
@@ -1173,8 +1173,11 @@ describe("v2 event scheduler", () => {
     const scholarshipDecision = createScholarshipEvent(spring, () => 0).choices[0]!.effects.enqueueEvents![0]!;
     const scholarshipResult = resolveScholarshipApplication(spring, scholarshipDecision.choices[0]!.effects.fixedEventResolution!, () => 0).enqueueEvents![0]!;
     expect(scholarshipResult.choices[0]?.effects.san).toBe(-1);
-    expect(getDecisionChoices(createCareerEventForType(spring, "academic"))[1]?.effects.san).toBe(-2);
-    expect(getDecisionChoices(collectThesisEventForMonth(spring).event ?? undefined)[1]?.effects.san).toBe(-1);
+    const careerChoice = getDecisionChoices(createCareerEventForType(spring, "academic"))[1]!;
+    expect(careerChoice.effects.san).toBeUndefined();
+    expect(careerChoice.effects.enqueueEvents![0]!.choices[0]!.effects.san).toBe(-2);
+    const writing = syncThesisState({ ...spring, month: 7, totalMonths: 31 }, () => 0);
+    expect(advanceThesisResearchPoint(writing, 0).player.san).toBe(writing.player.san - 2);
   });
 
   it("builds the real event 13 choices with a shared six-month rental surcharge", () => {

@@ -51,6 +51,22 @@ function publishedPaper(id: string, patch: Partial<Paper> = {}): Paper {
 }
 
 describe("basic ending presentation", () => {
+  it("formats fractional final attributes and the failure reason without mutating them", () => {
+    const state = finishedState("overthinking");
+    state.player = { ...state.player, san: 8.8000000004, research: -0.8000000004,
+      social: 12.3000000004, favor: 6.7500000004, money: 2.5500000004 };
+    const before = structuredClone(state);
+    const card = endingCard(renderApp(state));
+    expectEndingStat(card, "san", "8.8/20");
+    expectEndingStat(card, "research", "-0.8/20");
+    expectEndingStat(card, "social", "12.3/20");
+    expectEndingStat(card, "favor", "6.75/20");
+    expectEndingStat(card, "money", "2.55");
+    expect(card).toContain("科研能力 -0.8，低于0，无法继续学业");
+    expect(card).not.toMatch(/\d+\.\d{5,}/);
+    expect(state).toEqual(before);
+  });
+
   it.each([
     ["burnout", "不堪重负"], ["poor", "穷困潦倒"], ["expelled", "逐出师门"], ["isolated", "被孤立"],
     ["overthinking", "用脑过度"],
@@ -298,9 +314,10 @@ describe("basic ending presentation", () => {
     expect(state).toEqual(snapshot);
   });
 
-  it("uses current degree requirements for graduation and delay without requiring thesis or job progress", () => {
-    expect(endingCard(renderApp(finishedState("phd")))).toContain("博士毕业要求已达成：科研分 9/7");
+  it("explains graduation and differentiates score failure from missing blind review", () => {
+    expect(endingCard(renderApp(finishedState("phd")))).toContain("博士毕业要求已达成：科研分 9/7，盲审通过");
     expect(endingCard(renderApp({ ...finishedState("delay"), totalResearchScore: 0 }))).toContain("培养期已满34个月，科研分0/1，尚未达标");
+    expect(endingCard(renderApp(finishedState("delay")))).toContain("未完成毕业论文盲审送审");
   });
 
   it.each<PlayTabId>(["events", "research", "workstation", "relationship", "shop", "talent", "settings"])("honors explicit %s browsing after finishing", (activePlayTab) => {

@@ -44,6 +44,7 @@ describe("conference follow-up invitation refresh", () => {
     const state = makeState();
     state.conferenceEncounterState.bigBull!.level = level;
     const root = createJointTrainingAct1(buildJointTrainingContext(state));
+    expect(root.description).toContain(`小提示：出现条件：与${state.conferenceEncounterState.bigBull!.name}合作≥3次（含本次），科研≥12，且尚未联培`);
     const act2 = next(root, "continue");
     const result = next(act2, "accept");
     const original = structuredClone(root);
@@ -51,7 +52,10 @@ describe("conference follow-up invitation refresh", () => {
     state.conferenceEncounterState.bigBull = { ...state.conferenceEncounterState.bigBull!, name: "不会覆盖邀请姓名", level: 2, cooperationCount: 7 };
     const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("refresh must not reroll"); });
     for (const event of [root, act2, result]) {
-      const refreshed = refreshJointTrainingEvent(state, { ...event, queueOrder: 7 });
+      expect(event.narrativeNames).toEqual([root.jointTrainingPreview!.context.contact!.name]);
+      const refreshed = refreshJointTrainingEvent(state, { ...event, narrativeNames: ["过期姓名"], queueOrder: 7 });
+      expect(refreshed.narrativeNames).toEqual([root.jointTrainingPreview!.context.contact!.name]);
+      expect(refreshed.description).toBe(event.description);
       expect(refreshed.queueOrder).toBe(7);
       expect(refreshed.jointTrainingPreview?.context).toMatchObject({
         invitationCitations: 399, pendingCitationCapBonus: level + 1,
@@ -85,6 +89,7 @@ describe("conference follow-up invitation refresh", () => {
     expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(3);
     expect(state.buffs).toHaveLength(base.buffs.length + 2);
     expect(refreshJointTrainingEvent(state, result).choices[0]!.effects).toEqual({});
+    expect(refreshJointTrainingEvent(state, result).description.split("机制结算")[1]?.trim()).toBe("结果：无事发生");
     const replay = choose({ ...state, eventQueue: [result] }, "close");
     expect(replay.buffs).toEqual(state.buffs);
     expect(replay.researchCapacityState).toEqual(state.researchCapacityState);
@@ -116,6 +121,7 @@ describe("conference follow-up invitation refresh", () => {
     const contact = base.conferenceEncounterState.scholars![type]!;
     const otherType = type === "beautiful" ? "smart" : "beautiful";
     const root = loverRoot(base, type);
+    expect(root.description).toContain(`小提示：出现条件：与${contact.name}搭讪≥3次（含本次），社交≥12，且没有恋人`);
     const act2 = next(root, "continue");
     expect(act2.description).toContain(contact.name);
     expect(Object.keys(act2.choices.find((choice) => choice.id === "accept")!.effects)).toEqual(["enqueueEvents"]);
@@ -193,7 +199,8 @@ describe("conference follow-up invitation refresh", () => {
         refreshed = next(refreshed, "accept");
       }
       expect(refreshed.choices[0]!.effects).toEqual({});
-      expect(refreshed.description).toContain("不计拒绝次数");
+      expect(refreshed.description).toContain("你已有恋人");
+      expect(refreshed.description.split("机制结算")[1]?.trim()).toBe("结果：无事发生");
     }
     const resumed = refreshLoverDevelopmentEvent(state, refreshLoverDevelopmentEvent(occupied, result));
     expect(resumed.choices[0]!.effects.relationshipAdditions).toEqual(["lover"]);

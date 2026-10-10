@@ -5,16 +5,18 @@ import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { getCalendarForTotalMonths, getGraduationScoreTarget, getMonthLimitByDegree } from "../src/core/v2-progression";
 import type { Degree, GameState } from "../src/core/v2-types";
+import { withPassingThesisReview } from "./helpers/v2-thesis-fixtures";
 
 function makeState(totalMonths: number, degree: Degree = "master"): GameState {
   const base = createStartedGameState("normal");
-  return {
+  const state: GameState = {
     ...base, ...getCalendarForTotalMonths(totalMonths, degree), totalMonths, degree,
     maxMonths: getMonthLimitByDegree(degree), selectedAdvisorName: "测试导师",
     graduationScoreTarget: getGraduationScoreTarget(degree, "测试导师"),
     availableRandomEvents: [], eventQueue: [], buffs: [],
     player: { san: 20, research: 10, social: 5, favor: 5, money: 20 },
   };
+  return totalMonths >= getMonthLimitByDegree(degree) - 2 ? withPassingThesisReview(state) : state;
 }
 
 function chooseTransferStage(state: GameState, choiceId?: string): GameState {

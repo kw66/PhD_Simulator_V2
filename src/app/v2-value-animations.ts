@@ -1,3 +1,5 @@
+import { roundMoney } from "../core/v2-money";
+
 export interface AnimatedValueSnapshot {
   value: number;
   visible: boolean;
@@ -9,7 +11,7 @@ export function getVisibleValueDelta(
 ): number {
   if (!previous?.visible || !current.visible) return 0;
   if (!Number.isFinite(previous.value) || !Number.isFinite(current.value)) return 0;
-  return Number((current.value - previous.value).toFixed(6));
+  return roundMoney(roundMoney(current.value) - roundMoney(previous.value));
 }
 
 function isVisible(element: HTMLElement): boolean {

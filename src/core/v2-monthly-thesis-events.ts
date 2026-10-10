@@ -1,135 +1,64 @@
-import {
-  THESIS_OPTIONS,
-  applyThesisOption,
-  getThesisStage,
-  shouldTriggerThesisEvent,
-  startThesisIfAvailable,
-} from "./v2-thesis-rules";
-import type { EventChoice, GameState, PendingEvent } from "./v2-types";
-import { getPublishedPaperCount } from "./v2-publication-rules";
-import { createThreeStageEvent, type RandomEventResultCopy } from "./v2-random-events-core-shared";
-import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
+import { getGraduationPreparationYear, prepareThesisBlindReview, THESIS_REVIEW_THRESHOLDS } from "./v2-thesis-rules";
+import type { GameState, PendingEvent } from "./v2-types";
 
-/** Opening line per effort level, so the three writing results read differently. */
-const THESIS_EFFORT_LEAD: Record<string, string> = {
-  light: "你趁实验跑着的空档写了几段。",
-  normal: "这个月你留出整块时间坐下来写。",
-  "all-in": "这个月你几乎住在了文档里，饭是对着屏幕吃的，觉也睡得断断续续。",
-};
-
-function createThesisChoices(state: GameState): {
-  nextState: GameState;
-  choices: EventChoice[];
-  results: Record<string, RandomEventResultCopy>;
-} {
-  const nextThesis = startThesisIfAvailable(state.year, state.month, state.thesis);
-  const publishedPaperCount = getPublishedPaperCount(state);
-  const results: Record<string, RandomEventResultCopy> = {};
-
-  const choices: EventChoice[] = THESIS_OPTIONS.map((option) => {
-    const result = applyThesisOption(nextThesis, option, publishedPaperCount, state.player.research);
-    const sanChange = result.sanCost > 0
-      ? getActualSanChange(-result.sanCost, state.month, state.eventSupport, state.buffs)
-      : 0;
-    results[option.id] = {
-      title: "推进结果",
-      description: result.progressGain > 0
-        ? [
-            `${THESIS_EFFORT_LEAD[option.id] ?? ""}你按目录理顺材料，把几处“这里再补”换成了正文。有一段写的时候觉得挺明白，回头读却连自己也绕进去，只好拆开重写。`,
-            `总进度从 ${nextThesis.progress}% 提升到 ${result.nextThesis.progress}%，${getThesisStage(result.nextThesis.progress).name === getThesisStage(nextThesis.progress).name
-              ? `当前阶段仍是「${getThesisStage(nextThesis.progress).name}」`
-              : `进入「${getThesisStage(result.nextThesis.progress).name}」阶段`}。保存，再备份；你又往下翻了翻，这回确实多了些自己写下的东西。`,
-          ].join("\n\n")
-        : [
-            "你打开毕业论文文档，光标在原处闪了一会儿，最后还是关掉了窗口。这个月先搁置，正文没有多出一个字。",
-            `总进度保持在 ${nextThesis.progress}%，当前阶段仍是「${getThesisStage(nextThesis.progress).name}」。关窗口时倒很利索，下回点开，却还是得接着面对这一页。`,
-          ].join("\n\n"),
-    };
-    return {
-      id: option.id,
-      label: option.text,
-      outcome: result.progressGain > 0
-        ? `大论文推进 +${result.progressGain}，${sanChange < 0 ? formatActualSanChange(-result.sanCost, state.month, state.eventSupport, state.buffs) : "SAN 不变"}。`
-        : `大论文进度 +0${sanChange < 0 ? `｜${formatActualSanChange(-result.sanCost, state.month, state.eventSupport, state.buffs)}` : ""}。`,
-      effects: {
-        san: sanChange,
-        thesisProgress: result.progressGain,
-      },
-    };
-  });
-
-  choices.push({
-    id: "abandon-thesis",
-    label: "放弃大论文",
-    outcome: "停止推进大论文。",
-    effects: {
-      abandonThesis: true,
-    },
-  });
-  results["abandon-thesis"] = {
-    title: "放弃确认",
-    description: [
-      "你关掉毕业论文文档，把后续写作从日程里删去。这次不再往下个月挪，也不再继续补正文。",
-      "文件还在原来的文件夹里，目录中空着的地方也照旧空着。你看了一眼文件名，没有给它添上“终稿”两个字。",
-    ].join("\n\n"),
-  };
-
-  return {
-    nextState: {
-      ...state,
-      thesis: nextThesis,
-    },
-    choices,
-    results,
-  };
-}
-
-function createThesisEvent(state: GameState): { nextState: GameState; event: PendingEvent | null } {
-  if (!shouldTriggerThesisEvent(state.year, state.month, state.thesis)) {
+export function collectThesisEventForMonth(
+  state: GameState,
+  random: () => number = Math.random,
+): { nextState: GameState; event: PendingEvent | null } {
+  const id = `thesis-review-${state.degree}-y${state.year}`;
+  if (state.phase !== "playing" || state.year !== getGraduationPreparationYear(state.degree) || state.month < 8 || state.thesis.reviewResolved
+    || state.eventQueue.some((event) => event.id === id || event.id.startsWith(`${id}-`) || event.chainId === id)) {
     return { nextState: state, event: null };
   }
-
-  const { nextState, choices, results } = createThesisChoices(state);
-  const stage = getThesisStage(nextState.thesis.progress);
-  const progress = nextState.thesis.progress;
-  const backgroundDescription = progress < 20
-    ? "你打开毕业论文文档，封面和目录倒是齐整，往下翻却没多少正文。光标停在第一章开头，你把题目又读了一遍。"
-    : progress < 40
-      ? "你翻开开题材料，停在“拟解决的问题”这一栏。题目已经很像样了，可要说清到底准备做什么，你又删掉了半行。"
-      : progress < 60
-        ? "你把几篇相关论文并排打开，来回找各自的方法和结论。PDF里满是高亮，轮到在综述里串成一段话，光标却迟迟没往前走。"
-        : progress < 80
-          ? "你翻出研究记录，对着结果核查当时的步骤。一处备注只写了“同上”，你往上翻了好几页，开始怀疑当时的自己到底有多赶时间。"
-          : "你在正文、图表和参考文献间来回跳转。刚改好图号，又发现后面还引用着旧编号；论文有了样子，细看却到处要伸手修一修。";
-  const event: PendingEvent = {
-    id: `thesis-progress-y${state.year}-m${state.month}`,
-    title: "毕业论文",
-    description: "",
-    source: "thesis",
-    blocking: true,
-    deadlineMonths: 0,
-    chainId: "thesis-progress",
-    stage: "act1",
-    choices,
+  const nextState = prepareThesisBlindReview(state, random);
+  const review = nextState.thesis.review;
+  if (!review) return { nextState, event: null };
+  const thresholds = THESIS_REVIEW_THRESHOLDS[review.degree];
+  const excellentTitle = review.degree === "master" ? "优秀硕士论文" : "优秀博士论文";
+  const result = !review.submitted ? "未能送审" : review.passed ? "盲审通过" : "盲审未通过";
+  const settlement = `机制结算\n结果：${result}${review.excellent ? `\n结果：${excellentTitle}` : ""}`;
+  const delay = review.degree === "master"
+    ? "若五月没有转入博士培养，六月将按本硕士培养阶段延毕处理。"
+    : "六月将按本博士培养阶段延毕处理。";
+  const narrative = !review.submitted
+    ? `你在送审名单上没找到自己的名字，回头核对科研分，📋材料确实还没达到要求。\n\n${review.reason}${delay}你把缺项记在目录旁，📝重新安排后续工作。`
+    : review.excellent
+      ? `你逐份读完意见，每位评审都给出了 A。那些反复核对过的实验和论证，📄得到了共同认可。\n\n学院将这份工作评为「${excellentTitle}」。你把意见存进论文文件夹，🎓终于能安心准备接下来的毕业手续。`
+      : review.passed
+        ? "你打开评审文件，几份意见都在 A、B 两档。还有些表达需要打磨，📄但研究工作已经达到要求。\n\n你把修改建议列成清单，准备逐项补好，📝接着办理六月的毕业手续。"
+        : `你读到评审意见中的 C 或 D，停下来对照正文。几处论证还撑不起结论，📄需要继续补充研究。\n\n${delay}你把最需要补强的部分单独列出，📝先从这里改起。`;
+  const base = { source: "thesis" as const, blocking: true, deadlineMonths: 0, chainId: id };
+  const resultEvent: PendingEvent = {
+    ...base, id: `${id}-result`, title: "毕业论文盲审 ➜ 评审结果", stage: "result",
+    description: `${narrative}\n\n${settlement}`,
+    thesisReviewPresentation: {
+      degree: review.degree, title: review.title,
+      pointScores: review.researchPoints.map((point) => point.score),
+      review: {
+        ...review,
+        researchPoints: review.researchPoints.map((point) => ({ ...point })),
+        reports: review.reports.map((report) => ({ ...report, weights: [...report.weights] })),
+      },
+    },
+    completionLog: `${result}${review.excellent ? `，${excellentTitle}` : ""}`,
+    choices: [{ id: `${id}-confirm`, label: "确定", outcome: "收好学院通知与评审材料。", effects: { resolveThesisReview: true } }],
   };
-
+  const requirementsEvent: PendingEvent = {
+    ...base, id: `${id}-requirements`, title: "毕业论文盲审 ➜ 送审要求", stage: "act2",
+    description: [
+      "你核对学院的送审说明，📋把科研分与论文版本一并确认。",
+      `学院要求送审时达到已确定的毕业科研分要求。${review.degree === "master" ? "硕士论文的 2 个研究点交由 3 位评审" : "博士论文的 3 个研究点交由 5 位评审"}独立评阅；评审对各研究点的侧重不同，权重合计 3，加权分四舍五入。`,
+      `A ≥ ${thresholds.A}，B ≥ ${thresholds.B}，C ≥ ${thresholds.C}，其余为 D。全部 A/B 才通过，全部 A 可获评${excellentTitle}。百分制分数在对应等级内给出。`,
+      "四月提交的版本和送审资格将作为本次评审依据，后续发表的论文不再补入。你把通知收好，📁六月办理本培养阶段的毕业或延毕手续。",
+    ].join("\n\n"),
+    choices: [{ id: `${id}-read`, label: "继续", outcome: "查看本次评审结果。", effects: { enqueueEvents: [resultEvent] } }],
+  };
   return {
     nextState,
-    event: createThreeStageEvent(event, {
-      introDescription: [
-        backgroundDescription,
-        `当前阶段：${stage.name}，进度 ${progress}%。你顺手把待处理的地方记在目录旁，本来以为只剩几处，写着写着又多了一行。`,
-      ].join("\n\n"),
-      decisionTitle: "本月安排",
-      decisionDescription: [
-        "你翻出已发表论文和研究笔记。很多内容亲手做过，写起来有底，可要理顺，还是得踏踏实实坐下来写。",
-        "目录旁几处空缺拖到现在，你翻了两页又拉回原处。这个月想多写一点，就得留出不被打断的时间和精力。",
-      ].join("\n\n"),
-      results,
-    }),
+    event: {
+      ...base, id, title: "毕业论文盲审", stage: "act1",
+      description: `学院发来了四月毕业论文送审通知。你打开《${review.title}》，核对封面、目录和研究记录，📁把这一版另存进文件夹。\n\n办公室还要核对送审资格，你翻出科研成果清单，📋准备逐项检查。`,
+      choices: [{ id: `${id}-continue`, label: "继续", outcome: "核对送审要求。", effects: { enqueueEvents: [requirementsEvent] } }],
+    },
   };
-}
-
-export function collectThesisEventForMonth(state: GameState): { nextState: GameState; event: PendingEvent | null } {
-  return createThesisEvent(state);
 }

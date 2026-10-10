@@ -32,6 +32,7 @@ export function createFixedEvent(params: {
   id: string;
   title: string;
   description: string;
+  narrativeNames?: string[];
   chainId: string;
   stage?: PendingEvent["stage"];
   deadlineMonths?: number;
@@ -42,6 +43,7 @@ export function createFixedEvent(params: {
     id: params.id,
     title: params.title,
     description: appendFixedEventHint(params.chainId, params.stage ?? "act1", params.description),
+    ...(params.narrativeNames ? { narrativeNames: params.narrativeNames } : {}),
     source: "fixed",
     blocking: true,
     deadlineMonths: params.deadlineMonths ?? 0,

@@ -437,7 +437,7 @@ describe("deferred-system event content", () => {
     state = resolve(state, "continue");
     state = resolve(state, "proxy");
     expect(state.eventQueue[0]?.title).toBe("CCF参会 ➜ 参会方式 ➜ 参会确认");
-    expect(state.eventQueue[0]?.description).toContain("不去参会");
+    expect(state.eventQueue[0]?.description.split("机制结算")[1]?.trim()).toBe("结果：无差旅费");
     expect(state.eventQueue[0]?.choices[0]?.label).toBe("确定");
     const plan = state.eventQueue[0]!.choices[0]!.effects.scheduleConferenceAttendance!;
     expect(plan.mode).toBe("proxy");

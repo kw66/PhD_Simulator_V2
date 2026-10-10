@@ -109,11 +109,12 @@ function createAdvisorInfoEvent(
 ): PendingEvent {
   return createFixedEvent({
     id: "before-grad-school-advisor-info",
+    narrativeNames: [advisorName],
     title: "读研之始 ➜ 导师信息",
     description: [
       [
         `${advisorName} · 讲师`,
-        [
+        "🧑‍🏫 " + [
           intel.reporting,
           intel.projects,
           intel.internship,
@@ -123,7 +124,7 @@ function createAdvisorInfoEvent(
           intel.atmosphere,
           intel.focus,
           intel.pace,
-        ].join("；"),
+        ].join("；") + " 📝",
       ].join("\n"),
       `工资：硕士 ${ADVISOR_SALARY.master} 金币｜博士 ${ADVISOR_SALARY.phd} 金币\n科研分：论文录用，C 类 +${SCORE_BY_TARGET.C}｜B 类 +${SCORE_BY_TARGET.B}｜A 类 +${SCORE_BY_TARGET.A}\n毕业：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分｜博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博士：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分｜第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
       "小提示：换导师只会刷新姓名和介绍，对游戏数值没有影响。",
@@ -167,6 +168,7 @@ function createAdvisorInfoEvent(
 function createBeforeGradSchoolResultEvent(advisorName: string): PendingEvent {
   return createFixedEvent({
     id: "before-grad-school-admission",
+    narrativeNames: [advisorName],
     title: "读研之始 ➜ 导师信息 ➜ 正式录取",
     description: [
       `你和${advisorName}老师都没有变卦，大四上便定了去向。${ENROLLMENT_CALENDAR_YEAR}年夏天，录取通知书寄到，你拆开信封拍照。朋友圈祝贺不断🎉，亲戚已经叫你“研究生”了。`,
@@ -198,9 +200,10 @@ export function createBeforeGradSchoolAct1Event(
   const candidateName = studentName ?? pickRandomAdvisorName(getRoll);
   return createFixedEvent({
     id: "before-grad-school-qualification",
+    narrativeNames: [candidateName],
     title: "读研之始",
     description: [
-      `你叫${candidateName}，是人工智能专业学生🤖。大三下，还没想清楚是否喜欢科研，收藏夹倒先攒了不少保研攻略📚。看着忙碌的同学，你也打算随大流继续读研，把课程项目写进个人陈述，参加夏令营和预推免面试。讲了几轮项目，大四上总算拿到心仪学校的预录取🎉。`,
+      `你叫${candidateName}，是人工智能专业学生。大三下，还没想清楚是否喜欢科研，收藏夹倒先攒了不少保研攻略📚。看着忙碌的同学，你也打算随大流继续读研，把课程项目写进个人陈述，参加夏令营和预推免面试。讲了几轮项目，大四上总算拿到心仪学校的预录取🎉。`,
       "联系导师时，群里有人答应入组后去了别处，也有人等到最后才得知老师没了名额🫠。你写好入组意愿邮件，检查过称呼和附件，才按下发送。",
       `小提示：换个姓名只会刷新称呼，对游戏数值没有影响。`,
     ].join("\n\n"),

@@ -52,7 +52,7 @@ describe("player conference travel across paper batches", () => {
         const pending = choose(decision, secondMode);
         expect(pending.player.money).toBe(first.player.money);
         expect(pending.advisorProgressState).toEqual(first.advisorProgressState);
-        const paymentText = secondMode === "advisor" ? "导师好感" : "无额外费用";
+        const paymentText = secondMode === "advisor" ? "导师好感" : "无差旅费";
         expect(pending.eventQueue[0]!.description).toContain(paymentText);
         const paid = choose(pending);
         expect(paid.player.money).toBe(100 - (firstMode === "self" ? travel : 0));

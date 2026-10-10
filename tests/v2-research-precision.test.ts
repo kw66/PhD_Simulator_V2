@@ -14,7 +14,7 @@ import { activateLover } from "../src/core/v2-lover-system";
 import { getPaperScoreBreakdown } from "../src/core/v2-paper-collaboration";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { applyResearchOperation, generateResearchScore } from "../src/core/v2-research-operation";
-import { calculateThesisProgressGain } from "../src/core/v2-thesis-rules";
+import { advanceThesisResearchPoint, syncThesisState } from "../src/core/v2-thesis-rules";
 import type { GameState } from "../src/core/v2-types";
 
 function makeState(): GameState {
@@ -199,9 +199,13 @@ describe("decimal research calculations", () => {
     expect(settlePendingLoverHelp(settled, () => 0)).toBe(settled);
   });
 
-  it("rounds thesis progress after adding the decimal research contribution", () => {
-    expect(calculateThesisProgressGain(12, 3, 6.75)).toBe(20);
-    expect(calculateThesisProgressGain(0, 3, 6.75)).toBe(0);
+  it("floors research for a thesis point without changing fractional research", () => {
+    const base = makeState();
+    const state = syncThesisState({ ...base, year: 3, month: 1, totalMonths: 25,
+      player: { ...base.player, research: 6.75 } }, () => 0);
+    const next = advanceThesisResearchPoint(state, 0);
+    expect(next.thesis.researchPoints[0]!.score - state.thesis.researchPoints[0]!.score).toBe(6);
+    expect(next.player.research).toBe(6.75);
   });
 
   it("rounds career progress after adding weighted research and publication contributions", () => {

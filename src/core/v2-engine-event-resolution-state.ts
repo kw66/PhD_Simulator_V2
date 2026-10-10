@@ -11,6 +11,7 @@ import { applyPaperCompetitionResolution } from "./v2-paper-competition";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { clampResearchToCap } from "./v2-research-cap-system";
 import { roundMoney } from "./v2-money";
+import { createInitialThesisState } from "./v2-thesis-rules";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { applyReadPaperActions, applyReadingCountProgress } from "./v2-reading-system";
 import { canAddRelationship, syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
@@ -300,13 +301,12 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     }
   }
 
-  const thesisProgress = Math.min(100, state.thesis.progress + (effects.thesisProgress ?? 0));
-  const thesis = effects.abandonThesis
-    ? { ...state.thesis, abandoned: true }
-    : effects.thesisProgress
-      ? { ...state.thesis, started: true, progress: thesisProgress, completed: thesisProgress >= 100 }
-      : state.thesis;
-  const careerProgress = effects.careerType && effects.careerProgress
+  const thesis = transferToPhd ? createInitialThesisState()
+    : effects.resolveThesisReview && state.thesis.review
+      ? { ...state.thesis, reviewResolved: true } : state.thesis;
+  const careerProgress = transferToPhd
+    ? { internet: 0, stateOwned: 0, civilService: 0, academic: 0 }
+    : effects.careerType && effects.careerProgress
     ? {
         ...state.careerProgress,
         [effects.careerType]: state.careerProgress[effects.careerType] + effects.careerProgress,
@@ -429,7 +429,12 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       : state.graduationScoreTarget,
     totalResearchScore: Math.max(0, state.totalResearchScore + (effects.score ?? 0)),
     thesis,
+    eventQueue: transferToPhd
+      ? state.eventQueue.filter((event) => event.source !== "thesis" && event.source !== "career") : state.eventQueue,
     careerProgress,
+    careerPreparedMonths: transferToPhd ? {} : state.careerPreparedMonths,
+    careerLastPreparedTotalMonths: transferToPhd ? null
+      : effects.recordCareerPreparation ? state.totalMonths : state.careerLastPreparedTotalMonths,
     papers,
     externalPublications,
     relationshipState,

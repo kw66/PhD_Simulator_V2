@@ -83,8 +83,8 @@ describe("v2 journal system", () => {
     const state = playingState();
     const paper = { ...createDraftPaper(1, 0), idea: 40, experiment: 40, writing: 40 };
     const html = renderApp({ ...state, papers: [paper], selectedPaperId: paper.id }, createDefaultAccountProfile());
-    expect(html).toContain("送审分150");
-    expect(html).toContain("达标分500");
+    expect(html).toContain('data-tooltip="送审分 150\n达标分 500"');
+    expect(html).not.toContain("workstation-submit-info-item");
     expect(html).toContain('data-action="submit-journal-paper"');
     expect(html).toContain('data-journal-target="nmi"');
   });

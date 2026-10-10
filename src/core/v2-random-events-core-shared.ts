@@ -45,6 +45,7 @@ export function createThreeStageEvent(
         deadlineMonths: 0,
         chainId: event.chainId,
         stage: "result",
+        ...(event.narrativeNames ? { narrativeNames: [...event.narrativeNames] } : {}),
         ...(event.randomReplay ? { randomReplay: event.randomReplay } : {}),
         removeBuffIdsOnCompletion: event.removeBuffIdsOnCompletion,
         completionLog: `${choice.label}：${choice.outcome}`,
@@ -109,7 +110,7 @@ export function createRandomEventSkeleton(eventId: number, state: GameState): Pe
   return {
     id: `random-${eventId}-y${state.year}-m${state.month}-n${serial}`,
     title: "临时事务",
-    description: "一件计划外的事突然打断了这个月的安排。先把眼前的问题处理掉，原来的进度只能稍后再接上。",
+    description: "一件计划外的事突然打断了这个月的安排。📅先把眼前的问题处理掉，😮‍💨原来的进度只能稍后再接上。",
     source: "random",
     blocking: true,
     deadlineMonths: 0,

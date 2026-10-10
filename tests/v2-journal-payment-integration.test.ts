@@ -5,6 +5,7 @@ import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { getCalendarForTotalMonths } from "../src/core/v2-progression";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import type { GameState, JournalTarget } from "../src/core/v2-types";
+import { withPassingThesisReview } from "./helpers/v2-thesis-fixtures";
 
 function readyState(target: JournalTarget = "pami", month = 8): GameState {
   const base = createStartedGameState("normal");
@@ -160,7 +161,7 @@ describe("journal payment through the engine", () => {
   });
 
   it("preserves the payment stage and requires final payment before graduation through next-month", () => {
-    let pending = submit(readyState("pami", 34));
+    let pending = submit(withPassingThesisReview(readyState("pami", 34)));
     for (const choice of ["continue", "advisor", "confirm"]) {
       const preview = paymentEvent(pending).journalFeePreview;
       const blocked = dispatchAction(pending, "next-month");
@@ -176,39 +177,83 @@ describe("journal payment through the engine", () => {
     expect(graduated.advisorProgressState.funding).toBe(95);
   });
 
-  it.each(["act1", "act2", "act3"] as const)("rebuilds discarded %s payment responsibility on force-next-month and still blocks graduation", (stage) => {
-    let pending = submit(readyState("pami", 34));
+  it.each(["act1", "act2", "act3"] as const)("force-next-month crosses an ordinary month after discarding %s unpaid payment", (stage) => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    let pending = submit(readyState());
     if (stage !== "act1") pending = choosePayment(pending, "continue");
     if (stage === "act3") pending = choosePayment(pending, "advisor");
-    const blocked = dispatchAction(pending, "force-next-month");
-    expect(blocked).toMatchObject({ phase: "playing", ending: null, totalMonths: 34 });
-    expect(blocked.player).toEqual(pending.player);
-    expect(blocked.advisorProgressState.funding).toBe(100);
-    expect(blocked.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
-    expect(blocked.eventQueue.filter((event) => event.journalFeePreview)).toHaveLength(1);
-    expect(paymentEvent(blocked).journalFeePreview).toEqual({ paperId: "test-pami", stage: "act1" });
-    const repeated = dispatchAction(blocked, "force-next-month");
-    expect(repeated).toMatchObject({ phase: "playing", ending: null, totalMonths: 34 });
-    expect(repeated.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
-    const confirmation = choosePayment(choosePayment(repeated, "continue"), "advisor");
-    expect(confirmation.advisorProgressState.funding).toBe(100);
-    expect(confirmation.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
-    const paid = choosePayment(confirmation, "confirm");
-    expect(paid.advisorProgressState.paidJournalPaperIds).toEqual(["test-pami"]);
-    expect(paid.advisorProgressState.funding).toBe(95);
-    const graduated = dispatchAction(paid, "force-next-month");
-    expect(graduated).toMatchObject({ phase: "finished", ending: "master", totalMonths: 34 });
-    expect(graduated.advisorProgressState.funding).toBe(95);
-    expect(graduated.player.money).toBe(pending.player.money);
+    const normal = dispatchAction(pending, "next-month");
+    expect(normal).toMatchObject({ phase: "playing", ending: null, totalMonths: 8 });
+    expect(paymentEvent(normal).journalFeePreview).toEqual(paymentEvent(pending).journalFeePreview);
+    expect(normal.player.money).toBe(pending.player.money);
+    expect(normal.advisorProgressState.funding).toBe(pending.advisorProgressState.funding);
+    expect(normal.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
+
+    let advanced = pending;
+    let control: GameState = { ...pending, eventQueue: [], advisorProgressState: {
+      ...pending.advisorProgressState, paidJournalPaperIds: ["test-pami"],
+    } };
+    for (const totalMonths of [9, 10]) {
+      advanced = dispatchAction(advanced, "force-next-month");
+      control = dispatchAction(control, "force-next-month");
+      expect(advanced).toMatchObject({ phase: "playing", ending: null, totalMonths });
+      expect(advanced.player.money).toBe(control.player.money);
+      expect(advanced.advisorProgressState.funding).toBe(control.advisorProgressState.funding);
+      expect(advanced.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
+      expect(advanced.externalPublications).toEqual(control.externalPublications);
+      expect(advanced.eventQueue.some((event) => event.journalFeePreview?.paperId === "test-pami")).toBe(false);
+      expect(advanced.debugSkippedJournalFeePaperIds).toEqual(["test-pami"]);
+      const resumed = dispatchAction(JSON.parse(JSON.stringify(advanced)), "next-month");
+      const controlResumed = dispatchAction(control, "next-month");
+      expect(resumed.totalMonths).toBe(controlResumed.totalMonths);
+      expect(resumed.eventQueue.some((event) => event.journalFeePreview?.paperId === "test-pami")).toBe(false);
+      expect(resumed.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
+    }
   });
 
-  it.each(["next-month", "force-next-month"] as const)("queues archived unpaid journals before graduation through %s", (action) => {
-    const initial = readyState("pami", 34);
+  it("skips only the discarded paper and clears skip records on restart", () => {
+    const pending = submit(readyState());
+    const advanced = dispatchAction(pending, "force-next-month");
+    const retriggered = dispatchAction(advanced, "debug-trigger-event", { eventId: "journal-accepted" });
+    const paperId = paymentEvent(retriggered).journalFeePreview!.paperId;
+    expect(paperId).not.toBe("test-pami");
+    expect(retriggered.debugSkippedJournalFeePaperIds).toEqual(["test-pami"]);
+    const paid = choosePayment(choosePayment(choosePayment(retriggered, "continue"), "self"), "confirm");
+    expect(paid.player.money).toBe(retriggered.player.money - 5);
+    expect(paid.advisorProgressState.paidJournalPaperIds).toEqual([paperId]);
+    expect(paid.eventQueue.some((event) => event.journalFeePreview?.paperId === "test-pami")).toBe(false);
+    const restarted = dispatchAction(paid, "restart-game");
+    expect(restarted.debugSkippedJournalFeePaperIds).toEqual([]);
+  });
+
+  it.each(["act1", "act2", "act3"] as const)("force-next-month completes graduation past %s without paying", (stage) => {
+    let pending = submit(withPassingThesisReview(readyState("pami", 34)));
+    if (stage !== "act1") pending = choosePayment(pending, "continue");
+    if (stage === "act3") pending = choosePayment(pending, "advisor");
+    const graduated = dispatchAction(pending, "force-next-month");
+    expect(graduated).toMatchObject({ phase: "finished", ending: "master", totalMonths: 34 });
+    expect(graduated.player.money).toBe(pending.player.money);
+    expect(graduated.advisorProgressState.funding).toBe(pending.advisorProgressState.funding);
+    expect(graduated.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
+    expect(graduated.eventQueue.some((event) => event.journalFeePreview)).toBe(false);
+    expect(dispatchAction(graduated, "force-next-month")).toBe(graduated);
+  });
+
+  it.each(["next-month", "force-next-month"] as const)("handles archived unpaid journals before graduation through %s", (action) => {
+    const initial = withPassingThesisReview(readyState("pami", 34));
     initial.papers = [];
     initial.totalResearchScore = 10;
     initial.externalPublications = [{ ...createDraftPaper(1, 0, () => 0), id: "archived", status: "published", journalTarget: "pami" }];
     initial.advisorProgressState.funding = 4;
     const pending = dispatchAction(initial, action);
+    if (action === "force-next-month") {
+      expect(pending).toMatchObject({ phase: "finished", ending: "master", totalMonths: 34 });
+      expect(pending.player.money).toBe(100);
+      expect(pending.advisorProgressState.funding).toBe(4);
+      expect(pending.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
+      expect(pending.eventQueue.some((event) => event.journalFeePreview)).toBe(false);
+      return;
+    }
     expect(pending).toMatchObject({ phase: "playing", ending: null, totalMonths: 34, advisorProgressState: { funding: 4 } });
     const paid = choosePayment(choosePayment(choosePayment(pending, "continue"), "self"), "confirm");
     expect(paid.player.money).toBe(95);

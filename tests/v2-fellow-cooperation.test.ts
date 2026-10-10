@@ -9,6 +9,7 @@ import { advanceFellowResearch, ensureFellowPapers, getFellowCurrentPaper } from
 import { addPaperCollaboration, getPaperScoreBreakdown } from "../src/core/v2-paper-collaboration";
 import { createDraftPaper, prepareConferenceSubmission } from "../src/core/v2-paper-rules";
 import type { FellowProgressProfile, FellowTypeId, GameState, Paper } from "../src/core/v2-types";
+import { withPassingThesisReview } from "./helpers/v2-thesis-fixtures";
 
 function makeState(type: FellowTypeId = "peer"): GameState {
   const base = createStartedGameState("normal");
@@ -452,10 +453,11 @@ describe("engine and research lifecycle retries", () => {
       id: "final-cooperation", title: "最后一件事", description: "", source: "system", blocking: true,
       deadlineMonths: 0, chainId: "final-cooperation", stage: "result",
       choices: [{ id: "finish", label: "完成", outcome: "", effects: {} }],
-    }, 36);
-    const next = dispatchAction({ ...base, selectedAdvisorName: "导师", totalMonths: 36, maxMonths: 36, graduationScoreTarget: 5,
+    }, 34);
+    const next = dispatchAction(withPassingThesisReview({ ...base, selectedAdvisorName: "导师",
+      totalMonths: 34, maxMonths: 34, year: 3, month: 10, graduationScoreTarget: 5,
       papers: [paper], eventQueue: [event],
-    }, "resolve-event", { eventId: event.id, eventChoiceId: "finish" });
+    }), "resolve-event", { eventId: event.id, eventChoiceId: "finish" });
     expect(next.externalPublications.find((entry) => entry.id === paper.id)?.status).toBe("published");
     expect(next.phase).toBe("playing");
     expect(next.ending).toBeNull();

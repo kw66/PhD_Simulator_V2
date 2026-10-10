@@ -2,6 +2,7 @@ import { SCORE_BY_TARGET } from "./v2-content";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { createInitialState } from "./v2-engine-state-factory";
 import { evaluateCoreEndings, finishTrainingIfReady, quitGame } from "./v2-ending-system";
+import { prepareThesisBlindReview, syncThesisState, THESIS_REVIEW_THRESHOLDS } from "./v2-thesis-rules";
 import { createDraftPaper, getUnlockedPaperSlotCount } from "./v2-paper-rules";
 import { createGrantedPublishedPaper } from "./v2-publication-rules";
 import { getCalendarForTotalMonths, getGraduationScoreTarget, getMonthLimitByDegree } from "./v2-progression";
@@ -110,5 +111,19 @@ export function createDebugEnding(state: GameState, ending: NonNullable<EndingId
     advisorProgressState: { ...base.advisorProgressState, funding: ending === "lab-bankrupt" ? -integer(1, 20) / 2 : integer(1, 180) },
     log: [{ id: `debug-ending-${ending}`, month: totalMonths, text: cause }],
   };
-  return atGraduation ? finishTrainingIfReady(preview) : ending === "quit" ? quitGame(preview) : evaluateCoreEndings(preview);
+  if (atGraduation) {
+    let prepared = syncThesisState({ ...preview, month: 7 }, random);
+    if (ending === "master" || ending === "phd") {
+      prepared = { ...prepared, thesis: { ...prepared.thesis,
+        researchPoints: prepared.thesis.researchPoints.map((point) => ({ ...point,
+          score: Math.ceil(THESIS_REVIEW_THRESHOLDS[degree].B / 3) + integer(1, 60),
+        })),
+      } };
+    }
+    const reviewed = prepareThesisBlindReview({ ...prepared, month: 8 }, random);
+    return finishTrainingIfReady({ ...reviewed, ...calendar,
+      thesis: { ...reviewed.thesis, reviewResolved: true },
+    });
+  }
+  return ending === "quit" ? quitGame(preview) : evaluateCoreEndings(preview);
 }

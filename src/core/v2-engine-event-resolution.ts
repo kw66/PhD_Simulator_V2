@@ -21,8 +21,12 @@ import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { refreshConferenceDecision } from "./v2-conference-events";
 import { refreshCcigActivityEvent } from "./v2-fixed-events-ccig-refresh";
 import { refreshConferenceActivityEvent } from "./v2-conference-activity-refresh";
+import { createConferenceActivityEvent } from "./v2-conference-activity-events";
+import { getRoleDefinition } from "./v2-progression";
+import { getEventNarrativeNames } from "./v2-event-narrative";
 import { refreshTeachersDayEvent } from "./v2-fixed-events-teachers-day-refresh";
 import { refreshJournalFeeEvent } from "./v2-journal-fee-events";
+import { refreshCareerPreparation } from "./v2-graduation-career";
 import { refreshInternshipInviteEvent } from "./v2-internship-events";
 import { refreshJointTrainingEvent } from "./v2-joint-training-events";
 import { refreshLoverDevelopmentEvent } from "./v2-lover-events";
@@ -274,7 +278,7 @@ function rebuildEventFromCurrentState(
       ? createPhdDecisionEvent(current, context.year)
       : createMentorAssignEvent(current, () => context.rolls[rollIndex++] ?? 0);
     if (queuedEvent.stage === "act2") rebuilt = rebuilt.choices[0]!.effects.enqueueEvents![0]!;
-    return { ...queuedEvent, title: rebuilt.title, description: rebuilt.description, choices: rebuilt.choices };
+    return { ...queuedEvent, title: rebuilt.title, description: rebuilt.description, narrativeNames: rebuilt.narrativeNames, choices: rebuilt.choices };
   }
   const replay = queuedEvent.randomReplay;
   if (!replay || queuedEvent.source !== "random" || (queuedEvent.stage !== "act1" && queuedEvent.stage !== "act2")) {
@@ -369,6 +373,17 @@ export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQue
 }
 
 function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
+  if (queuedEvent.careerPreparation) {
+    const preparation = queuedEvent.careerPreparation;
+    if (preparation.degree !== state.degree || preparation.totalMonths !== state.totalMonths
+      || state.careerLastPreparedTotalMonths === preparation.totalMonths) {
+      return { ...queuedEvent, description: "这份求职安排已经结束，📄你收起旧的计划表。\n\n机制结算\n结果：无事发生",
+        deferredStatePatch: undefined,
+        choices: [{ id: "close-expired-career", label: "确定", outcome: "求职安排已结束。", effects: {} }],
+      };
+    }
+    return { ...queuedEvent, ...refreshCareerPreparation(state, queuedEvent) };
+  }
   if (queuedEvent.fixedResultPreview) {
     const context = queuedEvent.fixedResultPreview;
     let rollIndex = 0;
@@ -378,6 +393,7 @@ function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem
       ...queuedEvent,
       title: result.title,
       description: result.description,
+      narrativeNames: result.narrativeNames,
       completionLog: result.completionLog,
       choices: result.choices.map((choice, index) => ({ ...choice, id: queuedEvent.choices[index]?.id ?? choice.id })),
       deferredStatePatch: createDeferredStatePatch(state, resolved.nextState),
@@ -451,7 +467,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => event.internshipInvitePreview || event.jointTrainingPreview || event.loverDevelopmentPreview || event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.teachersDayPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
+  const eventQueue = state.eventQueue.map((event) => event.careerPreparation || event.internshipInvitePreview || event.jointTrainingPreview || event.loverDevelopmentPreview || event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.teachersDayPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
     && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };
@@ -465,6 +481,20 @@ export function applyQueuedEventEffects(
 ): GameState {
   if (queuedEvent.chainId === "scholarship" && !state.eventQueue.some((event) => event.id === queuedEvent.id)) {
     return state;
+  }
+  const activityPreview = queuedEvent.conferenceActivityPreview;
+  if (state.debugEventReplayEnabled && queuedEvent.debugReplayable && queuedEvent.stage === "act1"
+    && activityPreview && queuedEvent.choices.some((choice) => choice.id === choiceId && !choice.disabledReason)) {
+    const rootEvent = createConferenceActivityEvent(activityPreview.context, {
+      ...state, research: state.player.research, social: state.player.social,
+      playerGender: getRoleDefinition(state.selectedRoleId).gender,
+    }, [activityPreview.attendanceSummary]);
+    queuedEvent = {
+      ...queuedEvent,
+      choices: rootEvent.choices,
+      conferenceActivityPreview: rootEvent.conferenceActivityPreview,
+      replayContext: { ...queuedEvent.replayContext, rootEvent },
+    };
   }
   const resolvedEvent = getResolvableQueuedEvent(state, queuedEvent);
   let choice = resolvedEvent.choices.find((item) => item.id === choiceId);
@@ -486,6 +516,12 @@ export function applyQueuedEventEffects(
       && change.path.join(".") !== "player.money")
     : resolvedEvent.deferredStatePatch;
   const stateWithDeferredResolution = applyDeferredStatePatch(state, pendingPatch);
+  const sourceTitle = resolvedEvent.history?.[0]?.title ?? resolvedEvent.title.split(" ➜ ")[0] ?? "事件";
+  const previousScene = resolvedEvent.history?.at(-1);
+  const activityChoice = resolvedEvent.chainId.endsWith("-activity")
+    ? previousScene?.choices.find((entry) => entry.id === previousScene.selectedChoiceId)?.label
+      ?? resolvedEvent.title.split(" ➜ ").at(-1)
+    : undefined;
   const {
     nextState: resolvedState,
     resolvedOutcome,
@@ -494,7 +530,7 @@ export function applyQueuedEventEffects(
   } = applyChoiceEffectsToState(
     stateWithDeferredResolution,
     choice,
-    resolvedEvent.history?.[0]?.title ?? resolvedEvent.title.split(" ➜ ")[0] ?? "事件",
+    activityChoice && activityChoice !== sourceTitle ? `${sourceTitle} · ${activityChoice}` : sourceTitle,
     resolvedEvent,
   );
 
@@ -533,7 +569,9 @@ export function applyQueuedEventEffects(
     {
       title: recordedEvent.title,
       description: recordedEvent.description,
+      narrativeNames: getEventNarrativeNames(recordedEvent, state),
       paperReviewPresentation: resolvedEvent.paperReviewPresentation,
+      thesisReviewPresentation: resolvedEvent.thesisReviewPresentation,
       choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason }) => ({ id, label, outcome, disabledReason })),
       selectedChoiceId: choice.id,
       replayEvent: sceneSource,

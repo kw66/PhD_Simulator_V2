@@ -16,13 +16,8 @@ declare global {
 
 const fixture = `<!doctype html><html><head><style>
   body { margin: 0; font: 16px/20px sans-serif; }
-  .announcement-body { max-height: 60px; overflow: hidden; }
-  [data-announcement-expanded="true"] .announcement-body { max-height: none; }
-  .announcement-toggle[hidden] { display: none; }
-  .announcement-changes { margin: 0; padding: 0; list-style: none; }
-  .announcement-changes li { padding: 8px 0; }
-  .announcement-changes p { margin: 0; overflow-wrap: anywhere; }
 </style></head><body><main id="test-root"></main><script type="module">
+  import '/src/styles/global.css';
   import { renderAnnouncementPage, bindAnnouncementCollapse } from '/src/app/v2-render-announcements.ts';
   const root = document.getElementById('test-root');
   let dispose = () => {};
@@ -72,35 +67,54 @@ describe("announcement overflow controls", () => {
   const toggle = () => page.locator("[data-announcement-toggle]").first();
 
   it("shows a toggle only when measured content exceeds the collapsed height", async () => {
-    for (const height of [20, 60, 61]) {
+    const twoLines = await page.locator("[data-announcement-body]").first().evaluate(element => Math.round(parseFloat(getComputedStyle(element).lineHeight) * 2));
+    for (const height of [twoLines / 2, twoLines, twoLines + 1]) {
       await page.locator("[data-announcement-text]").first().evaluate((element, contentHeight) => {
         element.innerHTML = `<span style="display:block;height:${contentHeight}px">公告</span>`;
         window.announcementHarness.bind();
       }, height);
-      expect(await toggle().isVisible()).toBe(height > 60);
+      expect(await toggle().isVisible()).toBe(height > twoLines);
       expect(await expanded()).toBe("false");
     }
   });
 
-  it("expands only one subtitle and supports keyboard collapse with accessible state", async () => {
+  it.each([320, 640])("keeps a full-width two-line preview and top-right toggle at width %i, expanding one subtitle with the keyboard", async (width) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.locator("[data-announcement-text]").first().evaluate(element => {
+      element.textContent = element.textContent!.repeat(2);
+      window.announcementHarness.bind();
+    });
     const body = page.locator("[data-announcement-body]").first();
+    const twoLines = await body.evaluate(element => Math.round(parseFloat(getComputedStyle(element).lineHeight) * 2));
     const otherItems = () => page.locator("[data-announcement-item]").evaluateAll((items) => items.slice(1).map((item) => ({ expanded: item.getAttribute("data-announcement-expanded"), height: item.clientHeight })));
     const before = await otherItems();
-    expect(await body.evaluate((element) => element.clientHeight)).toBe(60);
+    expect(await body.evaluate((element) => element.clientHeight)).toBe(twoLines);
+    const card = page.locator("[data-announcement-item]").first();
+    const badgeBounds = await card.locator(".announcement-category").boundingBox();
+    const bodyBounds = await body.boundingBox();
+    const toggleBounds = await toggle().boundingBox();
+    const headingBounds = await card.locator(".announcement-item-heading").boundingBox();
+    const textBounds = await card.locator("[data-announcement-text]").boundingBox();
+    expect(bodyBounds!.x).toBeCloseTo(badgeBounds!.x, 0);
+    expect(toggleBounds!.x + toggleBounds!.width).toBeCloseTo(bodyBounds!.x + bodyBounds!.width, 0);
+    expect(toggleBounds!.y).toBeGreaterThanOrEqual(headingBounds!.y);
+    expect(toggleBounds!.y + toggleBounds!.height).toBeLessThanOrEqual(bodyBounds!.y);
+    expect(textBounds!.width).toBeCloseTo(bodyBounds!.width, 0);
+    expect(await body.evaluate(element => getComputedStyle(element).paddingRight)).toBe("0px");
     expect(await toggle().getAttribute("aria-controls")).toBe(await body.getAttribute("id"));
     await toggle().focus();
     await page.keyboard.press("Enter");
     expect(await expanded()).toBe("true");
     expect(await toggle().getAttribute("aria-expanded")).toBe("true");
     expect(await toggle().textContent()).toBe("收起");
-    expect(await body.evaluate((element) => element.clientHeight)).toBeGreaterThan(60);
+    expect(await body.evaluate((element) => element.clientHeight)).toBeGreaterThan(twoLines);
     expect(await otherItems()).toEqual(before);
     expect(await page.locator(".announcement-card").getAttribute("data-announcement-expanded")).toBeNull();
     await page.keyboard.press("Space");
     expect(await expanded()).toBe("false");
     expect(await toggle().getAttribute("aria-expanded")).toBe("false");
     expect(await toggle().textContent()).toBe("展开");
-    expect(await body.evaluate((element) => element.clientHeight)).toBe(60);
+    expect(await body.evaluate((element) => element.clientHeight)).toBe(twoLines);
   });
 
   it("retains independent date choices across page changes and full rerenders without duplicate listeners", async () => {

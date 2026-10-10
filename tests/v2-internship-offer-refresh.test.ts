@@ -110,6 +110,8 @@ describe("enterprise internship refresh", () => {
     const context = buildInternshipInviteContext(state, () => 0.999);
     const root = createInternshipInviteAct1(context);
     const decision = decisionOf(root);
+    expect(root.description).toContain("小提示：出现条件：企业交流≥2次（含本次），有A会论文或实习经历（含远程），且暂无实习安排。");
+    expect(root.description).toContain("有A会论文或实习经历（含远程），且暂无实习安排");
     for (const event of [root, decision, resultOf(root, "accept"), resultOf(root, "decline")]) {
       expect(event.internshipInvitePreview?.context.offer).toBe(context.offer);
     }
@@ -148,7 +150,9 @@ describe("enterprise internship refresh", () => {
       };
       inspect(fresh);
       if (event.internshipInvitePreview?.decision === "accept") {
-        expect(fresh.description).toContain("金币 +3（每月）");
+        expect(fresh.description).toContain("每月SAN -6｜每月金币 +3");
+        expect(fresh.description.split("机制结算")[1]).toContain("结果：企业实习（6个月）");
+        expect(fresh.description.split("机制结算")[1]).not.toContain(context.offer.company);
         expect(fresh.completionLog).toContain("金币 +3");
       }
     }
@@ -165,6 +169,8 @@ describe("enterprise internship refresh", () => {
     expect(decision.choices.find((choice) => choice.id === "accept")?.disabledReason).toBeDefined();
     const fresh = refreshInternshipInviteEvent(state, resultOf(root, "accept"));
     expect(fresh.choices[0]!.effects).toEqual({});
+    expect(fresh.description.split("机制结算")[1]?.trim()).toBe("结果：原实习保持不变");
+    expect(fresh.choices[0]!.outcome).toBe("原实习保持不变");
     expect(fresh.completionLog).toBe("已有实习安排，本次不新增、不延期，原实习保持不变。");
     expect(fresh.choices[0]!.label).toBe("确定");
   });
@@ -178,6 +184,9 @@ describe("enterprise internship refresh", () => {
     expect(fresh.choices[0]!.effects.conferenceCareerUpdates).toMatchObject({
       rejectedInternshipCount: 101, permanentlyBlockedInternship: false,
     });
+    expect(fresh.description.split("机制结算")[1]?.trim()).toBe("结果：婉拒实习");
+    expect(fresh.description).not.toMatch(/暂不实习|重置|清零|拒绝次数|101/u);
+    expect(fresh.completionLog).toContain("婉拒");
     expect(refreshInternshipInviteEvent(state, decisionOf(root)).choices.find((choice) => choice.id === "accept")?.disabledReason).toBeUndefined();
   });
 

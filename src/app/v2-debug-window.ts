@@ -1,5 +1,6 @@
 import type { GameState } from "../core/v2-types";
 import { renderDebugPanel, type DebugConnectionStatus } from "./v2-render-debug-panel";
+import { createRelationshipTooltips } from "./v2-relationship-tooltips";
 import "../styles/debug-panel.css";
 
 const DEBUG_WINDOW_ACTIONS = new Set([
@@ -87,6 +88,7 @@ export function createDebugWindow(getState: () => GameState, onAction: (data: DO
 export function bootstrapDebugWindow(root: HTMLDivElement, channel: string): void {
   document.title = "调试面板 · 研究生模拟器 v2.0";
   document.body.classList.add("debug-popup-page");
+  const tooltips = createRelationshipTooltips(root);
   const host = window.opener as Window | null;
   const origin = window.location.origin;
   let state: GameState | null = null;
@@ -104,6 +106,7 @@ export function bootstrapDebugWindow(root: HTMLDivElement, channel: string): voi
     if (focusKey) [...root.querySelectorAll<HTMLButtonElement>("button")]
       .find((button) => JSON.stringify({ ...button.dataset }) === focusKey)?.focus({ preventScroll: true });
     window.scrollTo(0, scrollY);
+    tooltips.sync();
   };
   const disconnect = (status: DebugConnectionStatus = "disconnected"): void => {
     if (!connected && connectionStatus === status && root.childElementCount > 0) return;

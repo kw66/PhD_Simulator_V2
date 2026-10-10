@@ -35,8 +35,8 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
     id: `year-summary-choice-y${state.year}-m${state.month}`,
     title: "学年总结 ➜ 年初的目标",
     description: [
-      `${sleepHint}${socialHint}`,
-      `${favorHint}${partTimeHint}`,
+      `${sleepHint}😴${socialHint}`,
+      `${favorHint}💰${partTimeHint}`,
     ].join("\n\n"),
     chainId: "year-summary",
     stage: "act2",
@@ -83,8 +83,8 @@ export function createYearSummaryEvent(state: GameState): PendingEvent {
     id: `year-summary-y${state.year}-m${state.month}`,
     title: "学年总结",
     description: [
-      `${yearLabel}接近尾声，你把桌上的日历翻回学年初。第一页还写着当时给自己定下的目标：休养生息、广交朋友、取得导师信任、兼职挣钱。字写得很用力，仿佛写下来就已经完成了一半。`,
-      "往后翻，组会、截稿和随手记的备忘挤满了格子，连某天忘带钥匙都记着。你拿起笔，对照这一年的经历，准备把完成的目标一项项划掉。",
+      `${yearLabel}接近尾声，你把桌上的日历翻回学年初。📅第一页还写着当时给自己定下的目标：休养生息、广交朋友、取得导师信任、兼职挣钱。字写得很用力，仿佛写下来就已经完成了一半。`,
+      "往后翻，组会、截稿和随手记的备忘挤满了格子，连某天忘带钥匙都记着。你拿起笔，对照这一年的经历，✍️准备把完成的目标一项项划掉。",
     ].join("\n\n"),
     chainId: "year-summary",
     choices: [

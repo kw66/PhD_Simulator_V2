@@ -1,5 +1,5 @@
 export function createRelationshipTooltips(root: HTMLElement) {
-  const triggers = "[data-relationship-tooltip], [data-card-tooltip], [data-event-risk-tooltip], .center-tab-btn[data-tooltip], .shop-tab-btn[data-tooltip], .panel-switch-btn[data-tooltip], .center-tab-badge[aria-label]";
+  const triggers = "[data-relationship-tooltip], [data-card-tooltip], [data-event-risk-tooltip], .center-tab-btn[data-tooltip], .shop-tab-btn[data-tooltip], .panel-switch-btn[data-tooltip], .center-tab-badge[aria-label], [title]:not(.play-tooltip):not([data-tooltip])";
   const tooltip = document.createElement("div");
   tooltip.id = "relationship-tooltip";
   tooltip.className = "relationship-tooltip";
@@ -51,6 +51,11 @@ export function createRelationshipTooltips(root: HTMLElement) {
     if (!element || !root.contains(element)) {
       hide();
       return;
+    }
+    if (element.hasAttribute("title")) {
+      element.dataset.tooltip ??= element.getAttribute("title") ?? "";
+      element.setAttribute("data-card-tooltip", "");
+      element.removeAttribute("title");
     }
     if (active !== element) {
       hide();

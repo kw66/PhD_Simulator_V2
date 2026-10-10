@@ -30,6 +30,8 @@ import { getFellowAcademicLabel, getFellowResearchScore, getStudentAcademicLabel
 import { getNextMonthLabPayroll } from "../core/v2-lab-payroll";
 import { getLabFinanceMonthSummary } from "../core/v2-lab-finance-ledger";
 import { renderPaperReviewEvent } from "./v2-render-paper-review";
+import { renderGraduationCards, renderThesisReviewReports } from "./v2-render-graduation";
+import { getGraduationPreparationYear } from "../core/v2-thesis-rules";
 import { getLabReimbursementCount } from "../core/v2-lab-reimbursement";
 import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2-relationship-activity";
 import { formatMoney, roundMoney } from "../core/v2-money";
@@ -96,6 +98,7 @@ import {
 } from "../core/v2-shop-items-effects";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
 import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PendingEvent, RoleId } from "../core/v2-types";
+import { getEventNarrativeNames } from "../core/v2-event-narrative";
 import {
   type PlayRenderUiState,
   type PlayTabId,
@@ -265,12 +268,15 @@ function escapeHtml(value: string): string {
 }
 
 
-function renderEventInlineHtml(value: string): string {
-  return escapeHtml(normalizeGameDisplayText(value))
-    .replace(/(^|\n)([^，。\n]+?)(?= · 讲师(?:\n|$))/gu, "$1<mark class=\"event-name-highlight\">$2</mark>")
-    .replace(/(^|\n)(你叫)([^，。\n]+)(?=，)/gu, "$1$2<mark class=\"event-name-highlight\">$3</mark>")
+function renderEventInlineHtml(value: string, names: readonly string[] = []): string {
+  const html = escapeHtml(normalizeGameDisplayText(value))
     .replace(/\*\*([^*\n]+)\*\*/gu, "<strong>$1</strong>")
     .replace(/\n/g, "<br>");
+  if (names.length === 0) return html;
+  const pattern = new RegExp([...new Set(names)].filter(Boolean).sort((left, right) => right.length - left.length)
+    .map((name) => escapeHtml(name).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|"), "gu");
+  return html.split(/(<[^>]+>)/gu).map((part) => part.startsWith("<") ? part
+    : part.replace(pattern, '<mark class="event-name-highlight">$&</mark>')).join("");
 }
 
 function clampPercent(value: number): number {
@@ -462,8 +468,8 @@ function renderAttrItem(
     <div
       class="new-attr-item attr-item-${tierKind}"
       data-player-stat="${tierKind}"
-      data-stat-value="${value}"
-      data-stat-cap="${cap}"
+      data-stat-value="${displayedValue}"
+      data-stat-cap="${formatMoney(cap)}"
       tabindex="0"
       aria-label="${escapeHtml(`${name} ${displayedValue}/${formatMoney(cap)}，${getAttrTierName(tierKind, value)}，${getAttrTierTooltip(tierKind, value, illnessProbability)}`)}"
       data-tooltip="${escapeHtml(getAttrTierTooltip(tierKind, value, illnessProbability))}"
@@ -648,7 +654,7 @@ function buildEffectBuckets(state: GameState): {
     const delta = getActiveOperationSanDelta(buffs) + (timing === "monthly" ? seasonalSanCostDelta : 0);
     const sources = timing === "monthly" ? [...seasonalSanSources] : [];
     for (const buff of buffs) {
-      const duration = timing === "permanent" ? "永久" : timing === "next-action" ? "对应效果触发后消耗"
+      const duration = timing === "permanent" ? "永久" : timing === "next-action" ? "生效后消耗"
         : buff.remainingMonths === null ? "持续生效" : `剩余 ${buff.remainingMonths} 月`;
       sources.push(`${buff.source} · ${duration} · SAN消耗 ${formatSignedNumber(buff.activeOperationSanDelta ?? 0)}${buff.description?.trim() ? `：${buff.description.trim()}` : ""}`);
     }
@@ -750,114 +756,6 @@ function getEventRootTitle(title: string): string {
   return normalizeGameDisplayText(title.split("➜")[0]?.trim() || title.trim());
 }
 
-const EVENT_EMOJI_THEMES: readonly [string, readonly [string, string, string]][] = [
-  ["肚子虚弱", ["💩", "🚽", "😮‍💨"]],
-  ["流感来袭", ["🤧", "💊", "😷"]],
-  ["高烧不退", ["🌡️", "💉", "🥵"]],
-  ["教师节", ["🎁", "💬", "😊"]],
-  ["寒假", ["🏠", "🧳", "😌"]],
-  ["暑假", ["☀️", "🗓️", "😎"]],
-  ["国奖", ["🏆", "📋", "🎉"]],
-  ["学年总结", ["📅", "📅", "✅"]],
-  ["读研之始", ["🎓", "🧭", "🚪"]],
-  ["转博", ["🔬", "🧠", "🎓"]],
-  ["指导新生", ["🧑‍🏫", "💻", "🤝"]],
-  ["指导师弟", ["🧑‍💻", "🧑‍🏫", "🤝"]],
-  ["指导师妹", ["🧑‍💻", "🧑‍🏫", "🤝"]],
-  ["师兄指导", ["🧑‍🏫", "📚", "💡"]],
-  ["师姐指导", ["🧑‍🏫", "📚", "💡"]],
-  ["毕设辅导", ["🎓", "🗂️", "😮‍💨"]],
-  ["审稿", ["📄", "🔍", "📝"]],
-  ["论文结果", ["📄", "👀", "📬"]],
-  ["论文推进", ["📄", "✍️", "✅"]],
-  ["导师项目", ["📋", "💼", "💰"]],
-  ["横向项目", ["📋", "🤝", "💰"]],
-  ["纵向项目", ["📋", "🔬", "💰"]],
-  ["调整分工", ["📋", "🧩", "🤝"]],
-  ["分工协作", ["📋", "🤝", "✅"]],
-  ["导师约谈", ["🧑‍🏫", "💬", "📅"]],
-  ["汇报进展", ["📊", "💬", "✅"]],
-  ["当面请教", ["🧑‍🏫", "❓", "💡"]],
-  ["组会汇报", ["📊", "🗣️", "😅"]],
-  ["深入汇报", ["📊", "🧪", "✅"]],
-  ["系列汇报", ["📊", "🗣️", "📚"]],
-  ["摸鱼划水", ["📊", "😅", "🫠"]],
-  ["组内团建", ["🎉", "🍽️", "😄"]],
-  ["导师经费", ["💰", "🧾", "😌"]],
-  ["基金结果", ["📝", "📨", "📣"]],
-  ["导师增选结果", ["📝", "📨", "🏅"]],
-  ["显卡采购", ["🖥️", "💳", "✅"]],
-  ["领劳务费", ["💰", "🧾", "😊"]],
-  ["布置工位", ["🪑", "🛠️", "✨"]],
-  ["报销 AI 费用", ["🤖", "🧾", "💡"]],
-  ["不断学习", ["📚", "💡", "🧠"]],
-  ["基础学习", ["📚", "🔎", "💡"]],
-  ["技术深挖", ["💻", "🔬", "🧠"]],
-  ["读源码", ["💻", "🔍", "💡"]],
-  ["理论推导", ["📐", "🧠", "✅"]],
-  ["同门合作", ["🤝", "🧩", "💬"]],
-  ["师兄/师姐指导", ["🧑‍🏫", "📚", "🤝"]],
-  ["交换合作", ["🤝", "💬", "💡"]],
-  ["互补合作", ["🤝", "📄", "✅"]],
-  ["拒绝合作", ["🤝", "🛑", "🧘"]],
-  ["新增同门", ["🤝", "📝", "🎉"]],
-  ["继续合作", ["🤝", "📋", "🔗"]],
-  ["先观望", ["👀", "⏳", "😌"]],
-  ["浅合作", ["🤝", "🧩", "💡"]],
-  ["深合作", ["🤝", "🔬", "📄"]],
-  ["拜入门下", ["🧑‍🏫", "📚", "💡"]],
-  ["署名风波", ["✍️", "💬", "⚖️"]],
-  ["向导师诉苦", ["✍️", "💬", "🧑‍🏫"]],
-  ["转移到师弟师妹", ["✍️", "🔄", "📝"]],
-  ["据理力争", ["✍️", "⚖️", "✅"]],
-  ["极端反抗", ["✍️", "⚠️", "🧯"]],
-  ["显卡故障", ["🖥️", "🛠️", "✅"]],
-  ["找导师", ["🖥️", "🧑‍🏫", "🛠️"]],
-  ["举报挖矿", ["🖥️", "🚫", "✅"]],
-  ["自己重装", ["🖥️", "🛠️", "✅"]],
-  ["淘宝维修", ["🖥️", "📦", "✅"]],
-  ["淘宝翻车", ["🖥️", "📦", "😵"]],
-  ["游戏放松", ["🎮", "🕹️", "😄"]],
-  ["数据丢失", ["💾", "🧰", "😵"]],
-  ["熬夜恢复", ["💾", "🌙", "✅"]],
-  ["重新开始", ["💾", "🔁", "📁"]],
-  ["数据找回", ["💾", "🧰", "✅"]],
-  ["留下隐患", ["💾", "⚠️", "😬"]],
-  ["被抢发idea", ["💡", "🛡️", "🧩"]],
-  ["新sota", ["📈", "🧪", "🚀"]],
-  ["联合培养", ["🤝", "🌐", "🧳"]],
-  ["毕业论文", ["🎓", "📚", "✅"]],
-  ["临时事务", ["📝", "📋", "✅"]],
-  ["会场活动", ["🏟️", "🎤", "🌆"]],
-  ["年会", ["🎤", "🧳", "🌆"]],
-  ["年会活动", ["🏟️", "🎤", "🌆"]],
-  ["论文参会", ["📄", "🎤", "🧳"]],
-  ["羽毛球", ["🏸", "🏃", "🏅"]],
-  ["德州扑克", ["🃏", "💰", "😅"]],
-  ["KTV 唱歌", ["🎤", "🎶", "😄"]],
-  ["聚餐", ["🍽️", "💬", "😊"]],
-  ["发展关系", ["💬", "❤️", "💞"]],
-  ["实习邀请", ["💼", "📅", "🚀"]],
-  ["招聘", ["💼", "📄", "🎉"]],
-];
-
-function findEventEmojiTheme(text: string): readonly [string, string, string] | undefined {
-  let best: readonly [string, readonly [string, string, string]] | undefined;
-  for (const entry of EVENT_EMOJI_THEMES) {
-    if (text.includes(entry[0]) && (!best || entry[0].length > best[0].length)) best = entry;
-  }
-  return best?.[1];
-}
-
-function getEventEmoji(title: string, stage: EventStage = "act1"): string {
-  // Branch-specific themes (e.g. 据理力争) are keyed by the current scene name;
-  // the event root title is the fallback. The longest keyword wins so that
-  // 年会活动 is not swallowed by 年会.
-  const scene = normalizeGameDisplayText(title.split("➜").at(-1)?.trim() ?? "");
-  const theme = findEventEmojiTheme(scene) ?? findEventEmojiTheme(getEventRootTitle(title))
-    ?? ["📌", "🧭", "✅"] as const;
-  return stage === "act2" ? theme[1] : stage === "act3" || stage === "act4" || stage === "result" ? theme[2] : theme[0];
-}
 
 export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[] {
   const items: TodoPreviewItem[] = [];
@@ -938,6 +836,10 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
         monthsLater,
       });
     }
+    if (calendar.month === 8 && calendar.year === getGraduationPreparationYear(state.degree)
+      && !state.thesis.review) {
+      addItem({ title: "毕业盲审", monthsLater });
+    }
     if (state.degree === "master" && calendar.month === 9 && (calendar.year === 2 || calendar.year === 3)) {
       addItem({
         title: "转博抉择",
@@ -963,8 +865,7 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
 
 function renderEventDescriptionHtml(
   description: string,
-  _mergeNarrative = true,
-  eventEmoji = "",
+  names: readonly string[] = [],
 ): string {
   const normalized = description.trim();
   if (!normalized) {
@@ -995,11 +896,11 @@ function renderEventDescriptionHtml(
       && !/^(?:规则|条件|判定|培养安排|工资|待遇|毕业|转博|转博士|科研分|送审|录用|发表|会议)[：:]/u.test(paragraph),
   }));
   const storyHtml = storyBlocks
-    .map(({ paragraphs: blockParagraphs, isNarrative }, index) => {
+    .map(({ paragraphs: blockParagraphs, isNarrative }) => {
       const paragraph = blockParagraphs.join("");
       const detailLines = paragraph.split(/\r?\n/u).map((line) => /^\*\*([^*\n]+)\*\*：(.+)$/u.exec(line));
       if (detailLines.length > 1 && detailLines.every((line) => line !== null)) {
-        return `<dl class="event-description-details">${detailLines.map((line) => `<div><dt>${renderEventInlineHtml(line![1]!)}</dt><dd>${renderEventInlineHtml(line![2]!)}</dd></div>`).join("")}</dl>`;
+        return `<dl class="event-description-details">${detailLines.map((line) => `<div><dt>${renderEventInlineHtml(line![1]!, names)}</dt><dd>${renderEventInlineHtml(line![2]!, names)}</dd></div>`).join("")}</dl>`;
       }
       if (paragraph.startsWith("涉及论文：")) {
         return `<p class="event-description-paper"><span>涉及论文</span>${renderEventInlineHtml(paragraph.slice("涉及论文：".length))}</p>`;
@@ -1009,17 +910,11 @@ function renderEventDescriptionHtml(
         return '<hr class="event-description-divider" role="separator">';
       }
       const isTip = /^(?:备注|小提示)：/u.test(paragraph);
-      const displayText = paragraph.replace(/^(?:备注|小提示)：(?=出现条件：)/u, "")
+      const displayText = paragraph.replace(/^(?:备注|小提示)：(?=(?:选项)?出现条件：)/u, "")
         .replace(/^备注：/u, "小提示：");
       const className = isTip ? ' class="event-description-note"' : isNarrative ? ' class="event-description-story"' : "";
-      const renderedText = renderEventInlineHtml(displayText);
-      // The scene emoji leads the opening paragraph instead of being wedged
-      // after its first sentence, where it read as part of the next sentence.
-      const leadingEmoji = index === 0 && eventEmoji && /[。！？!?]/u.test(displayText)
-        && !/^\s*\p{Extended_Pictographic}/u.test(displayText)
-        ? `<span class="event-description-emoji" aria-hidden="true">${eventEmoji}</span>`
-        : "";
-      return `<p${className}>${isTip ? '<span aria-hidden="true">💡</span> ' : ""}${leadingEmoji}${renderedText}</p>`;
+      const renderedText = renderEventInlineHtml(displayText, isTip ? [] : names);
+      return `<p${className}>${isTip ? '<span aria-hidden="true">💡</span> ' : ""}${renderedText}</p>`;
     })
     .join("");
   const settlementHtml = renderEventSettlementSummary(settlementItems);
@@ -1239,7 +1134,6 @@ function renderEventContentBox(
               type="button"
               data-ui-event-scene-index="${scene.index}"
               aria-current="${scene.index === displayPageIndex ? "step" : "false"}"
-              title="${escapeHtml(scene.label)}"
             >${escapeHtml(scene.label)}</button>
             ${index < sceneTabs.length - 1
               ? '<i class="event-scene-separator" data-lucide="chevron-right" aria-hidden="true"></i>'
@@ -1249,13 +1143,10 @@ function renderEventContentBox(
         <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情">×</button>
       </div>
       <div class="event-content-body" id="event-content-body">
+        ${displayEvent.thesisReviewPresentation ? renderThesisReviewReports(displayEvent.thesisReviewPresentation) : ""}
         ${paperReviewPresentation
           ? renderPaperReviewEvent(paperReviewPresentation, historicalPage !== null, renderEventSettlementSummary)
-          : renderEventDescriptionHtml(
-            displayEvent.description,
-            displayEvent.choices.filter((choice) => !isSecondaryEventChoice(choice)).length <= 1,
-            getEventEmoji(displayEvent.title, displayStage),
-          )}
+          : renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state))}
       </div>
       ${displayEvent.choices.length > 0 ? `
         <div class="event-content-buttons" id="event-content-buttons">
@@ -1310,7 +1201,7 @@ export function renderEventLayoutSamples(
     seen.add(event);
     samples.push({ key: `${event.id}:${history.map((stage) => stage.selectedChoiceId).join("/")}:${branch}`,
       html: renderEventContentBox({ ...event, history, queueOrder: currentEvent.queueOrder }, null, null) });
-    const stage = { title: event.title, description: event.description, choices: event.choices,
+    const stage = { title: event.title, description: event.description, narrativeNames: getEventNarrativeNames(event, state), choices: event.choices,
       paperReviewPresentation: event.paperReviewPresentation, selectedChoiceId: "" };
     for (const choice of event.choices) {
       if (event.choices.length > 1) {
@@ -1449,7 +1340,7 @@ function renderPaperTitleWithMeta(paper: Paper, trailingAction = ""): string {
   return `
     <div class="paper-title-meta-row${trailingAction ? " has-trailing-action" : ""}">
       <div class="paper-title-meta-content">
-        <strong class="paper-title">${escapeHtml(paper.title)}</strong>
+        <strong class="paper-title" title="${escapeHtml(paper.title)}">${escapeHtml(paper.title)}</strong>
         ${renderPaperTopicMeta(paper)}
       </div>
       ${trailingAction}
@@ -1627,21 +1518,19 @@ function renderWorkstationPaperActions(
       target,
       conference,
       displayName: conference.name === "-" ? "待定" : conference.name,
-      displayFullName: conference.fullName === "入学前无会议" ? "会议将在入学后确定" : conference.fullName,
       referenceScore: conference.referenceScore > 0 ? String(conference.referenceScore) : "-",
       influenceText: conference.influence.toFixed(2),
       locationText: formatConferenceLocationText(location),
     };
   });
   const conferenceTargets = conferenceOptions.map((option) => {
-    const { target, conference, displayName, displayFullName, referenceScore, influenceText, locationText } = option;
-    const title = [displayFullName, submitFailure].filter(Boolean).join(" · ");
+    const { target, conference, displayName, referenceScore, influenceText, locationText } = option;
+    const hint = `${locationText}\n影响力 ${influenceText}\n参考分 ${referenceScore}`;
     return `
-      <div class="workstation-submit-target grade-${target.toLowerCase()}">
+      <div class="workstation-submit-target grade-${target.toLowerCase()}" data-card-tooltip data-tooltip="${escapeHtml(hint)}" tabindex="0" aria-label="${escapeHtml(`${displayName} ${conference.year}：${hint}`)}">
         <button
           class="paper-submit-option paper-submit-conference grade-${target.toLowerCase()}"
           type="button"
-          title="${escapeHtml(title)}"
           aria-label="投稿 ${target} 类${displayName === "待定" ? "" : ` · ${displayName}` }"
           ${canSubmit && paper
             ? `data-action="submit-paper" data-paper-id="${escapeHtml(paper.id)}" data-paper-target="${target}"`
@@ -1651,10 +1540,6 @@ function renderWorkstationPaperActions(
           <span class="paper-submit-grade-mark" aria-hidden="true">${target}</span>
           <strong class="paper-submit-destination">${escapeHtml(displayName)} ${conference.year}</strong>
         </button>
-        <span class="workstation-submit-info-item grade-${target.toLowerCase()}">
-          <small>${escapeHtml(locationText)}</small>
-          <small>影响力${influenceText} · 参考分${referenceScore}</small>
-        </span>
       </div>
     `;
   }).join("");
@@ -1671,17 +1556,13 @@ function renderWorkstationPaperActions(
     const journalAttributes = journalFailure === null && paper
       ? `data-action="submit-journal-paper" data-paper-id="${escapeHtml(paper.id)}" data-journal-target="${id}"`
       : "disabled aria-disabled=\"true\"";
-    const journalTitle = [name, journalFailure].filter(Boolean).join(" · ");
+    const hint = `送审分 ${journal.submissionScore}\n达标分 ${journal.acceptanceScore}`;
     return `
-      <div class="workstation-submit-target is-${id}">
-        <button class="paper-journal-btn is-${id}" type="button" title="${escapeHtml(journalTitle)}" aria-label="投稿 ${name}" ${journalAttributes}>
+      <div class="workstation-submit-target is-${id}" data-card-tooltip data-tooltip="${escapeHtml(hint)}" tabindex="0" aria-label="${escapeHtml(`${name}：${hint}`)}">
+        <button class="paper-journal-btn is-${id}" type="button" aria-label="投稿 ${name}" ${journalAttributes}>
           <span class="paper-submit-action-prefix">投</span>
           <strong class="paper-submit-destination">${name}</strong>
         </button>
-        <span class="workstation-submit-info-item is-${id}">
-          <small>送审分${journal.submissionScore}</small>
-          <small>达标分${journal.acceptanceScore}</small>
-        </span>
       </div>
     `;
   }).join("");
@@ -1878,6 +1759,7 @@ function renderEnhancedWorkstationSection(state: GameState): string {
           : renderWorkstationPaperCards(state)}
       </div>
       ${preEnrollment ? "" : renderWorkstationPaperActions(state, selectedPaper)}
+      ${renderGraduationCards(state)}
     </div>
   `;
   return html;
@@ -2244,7 +2126,7 @@ function renderAdvisorStatus(state: GameState): string {
     : `${monthsToApplication}月后可申请${applicationGrant.name}${limited ? "·限项" : ""}`;
   const accumulationHint = "纵向项目满100，科研积累+10%\n发表论文按科研分提升科研积累";
   const progressBar = (label: string, value: number, max: number): string => `
-    <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${Math.min(value, max)}" aria-valuetext="${value}/${max}">
+    <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${formatMoney(max)}" aria-valuenow="${formatMoney(Math.min(value, max))}" aria-valuetext="${formatMoney(value)}/${formatMoney(max)}">
       <div class="rel-progress-fill task ${label === "科研积累" ? "research" : "funding"}" ${animationBarAttribute(`person:advisor:${label === "科研积累" ? "research" : "funding"}`)} style="width:${clampPercent(value / max * 100)}%"></div>
     </div>`;
   const baseBlocked = state.phase !== "playing" ? "本轮未在进行"
@@ -2272,7 +2154,7 @@ function renderAdvisorStatus(state: GameState): string {
           const hint = `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，导师下月自动推进+${automaticGain}\n满100：${reward}`;
           return `<div class="rel-advisor-project-row" data-advisor-project="${projectType}">
             <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icon)}${label}</span>
-            <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${PROJECT_PROGRESS_MAX}" aria-valuenow="${Math.min(progress, PROJECT_PROGRESS_MAX)}">
+            <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${PROJECT_PROGRESS_MAX}" aria-valuenow="${formatMoney(Math.min(progress, PROJECT_PROGRESS_MAX))}">
               <div class="rel-progress-fill project-${projectType}" ${animationBarAttribute(`person:advisor:${projectType}:progress`)} style="width:${clampPercent(progress / PROJECT_PROGRESS_MAX * 100)}%"></div>
             </div>
             <span class="rel-progress-val">${renderAnimatedNumber(`person:advisor:${projectType}:progress`, progress)}/${PROJECT_PROGRESS_MAX}</span>
@@ -2305,10 +2187,10 @@ function renderLoverRoutes(state: GameState): string {
       const gain = getLoverRouteGain(state, route);
       const reward = getLoverNextReward(state, route).replace("永久idea、实验、写作各+1分", "论文三项分数永久+1");
       const passiveGain = route === "shopping" ? 0 : passiveGains[route];
-      const hint = `主动推进+${gain}，每月自动推进+${passiveGain}\n下次满100：${reward}`;
+      const hint = `主动推进+${formatMoney(gain)}，每月自动推进+${formatMoney(passiveGain)}\n下次满100：${reward}`;
       return `<div class="rel-lover-route" data-lover-route="${route}">
         <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icons[route])}${label}</span>
-        <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
+        <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${formatMoney(progress)}">
           <div class="rel-progress-fill task lover-${route}" ${animationBarAttribute(`${identity}:${route}:progress`)} style="width:${progress}%"></div>
         </div>
         <span class="rel-progress-val">${renderAnimatedNumber(`${identity}:${route}:progress`, progress)}/100</span>
@@ -2937,7 +2819,7 @@ function renderSelectedResearchPaper(state: GameState, paper: Paper | null): str
           <div class="research-metric-item research-metric-item-publication-type">
             <span class="research-publication-label${publicationLabel in PAPER_TERM_TRANSLATIONS ? ' play-tooltip' : ''}"${publicationLabel in PAPER_TERM_TRANSLATIONS ? ` tabindex="0" data-tooltip="${PAPER_TERM_TRANSLATIONS[publicationLabel as keyof typeof PAPER_TERM_TRANSLATIONS]}"` : ''}>${publicationLabel === "Best Paper Candidate"
               ? '<span>Best Paper</span><span>Candidate</span>'
-              : escapeHtml(publicationLabel)}</span><strong>\u00d7${renderAnimatedNumber(`paper:${paper.id}:research-detail:publication-multiplier`, publicationMultiplier, venue.journal ? publicationMultiplier.toFixed(1) : String(publicationMultiplier))}</strong>
+              : escapeHtml(publicationLabel)}</span><strong>\u00d7${renderAnimatedNumber(`paper:${paper.id}:research-detail:publication-multiplier`, publicationMultiplier, venue.journal ? publicationMultiplier.toFixed(1) : formatMoney(publicationMultiplier))}</strong>
           </div>
           <div class="research-metric-item"><span>\u70ed\u5ea6${renderPaperHistoryBadges(paper, false, "research-detail")}</span><strong>\u00d7${renderAnimatedNumber(`paper:${paper.id}:research-detail:heat`, paper.heatMultiplier, paper.heatMultiplier.toFixed(2))}</strong></div>
           <div class="research-metric-item"><span>\u5f71\u54cd\u529b</span><strong>\u00d7${venue.influence.toFixed(2)}</strong></div>
@@ -4222,7 +4104,7 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
                 aria-label="切换日期显示"
                 title="切换日期显示"
               ><span aria-hidden="true">🔄</span></button>
-              ${seasonLabel ? `<span class="new-time-item new-time-season play-tooltip" id="new-time-season" tabindex="0" aria-label="${escapeHtml(getSeasonEffectText(state))}" data-tooltip="${escapeHtml(getSeasonEffectText(state))}" title="${escapeHtml(getSeasonEffectText(state))}">${seasonLabel}</span>` : ""}
+              ${seasonLabel ? `<span class="new-time-item new-time-season play-tooltip" id="new-time-season" tabindex="0" aria-label="${escapeHtml(getSeasonEffectText(state))}" data-tooltip="${escapeHtml(getSeasonEffectText(state))}">${seasonLabel}</span>` : ""}
               <span class="new-time-item new-time-remaining" id="new-time-remaining">${getRemainingMonthsText(state)}</span>
             `}
         </div>

@@ -212,13 +212,14 @@ describe("v2 research rule details and publication metrics", () => {
     const help = getHelpText({ activePlayTab: "events" });
     expect(help).toContain("硕士培养期34个月（第三年6月），博士70个月（第六年6月）");
     expect(help).toContain("6月可完整操作");
-    expect(help).toContain("玩家转博抉择在硕士第二、三年5月出现，申请分别需科研分2/3");
+    expect(help).toContain("硕士第二、三年5月出现转博抉择，申请分别需科研分2/3");
     expect(help).not.toContain("内部第9月");
     expect(help).toContain("与领域年会同月，须分别处理");
     expect(help).toContain("5月确认转博后，6月起按博士标准发工资");
-    expect(help).toContain("未转博仍可完整进行6月；处理完到期事件（含非阻塞结果）后，点击下一月才结算毕业");
-    expect(help).toContain("仍为硕士需科研分≥1，博士需≥7；未达标为延毕");
-    expect(help).toContain("转博成功则继续博士学业，毕业结算不额外推进月份");
+    expect(help).toContain("6月处理完到期事件后，点击下一月检查科研分和盲审");
+    expect(help).toContain("毕业学年4月送审时须达到科研分要求：硕士≥1，博士≥7");
+    expect(help).toContain("两项均通过才毕业，否则延毕；不会额外推进月份");
+    expect(help).toContain("即使硕士盲审未通过，5月仍可申请转博");
     const fellows = getHelpPageText({ activePlayTab: "relationship" }, "同学学业");
     expect(fellows).toContain("6月底：第二/三年硕士科研分达到2/3先转博");
     expect(fellows).toContain("第三年仍为硕士需科研分1，第六年博士需科研分7，达标毕业");

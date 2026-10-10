@@ -41,6 +41,12 @@ export function getConferenceActivityTravelSanRecovery(region: ConferenceActivit
   return 5;
 }
 
+export function getConferenceRegionName(region: ConferenceActivityContext["region"]): string {
+  if (region === "domestic") return "国内";
+  if (region === "west") return "欧美";
+  return "亚太";
+}
+
 export function getConferencePaperPresentationResults(context: ConferenceActivityContext): string[] {
   return (context.paperPresentations ?? []).map((paper, index) => {
     const multiplierText = paper.citationPromotionMultiplier === 1
@@ -80,6 +86,7 @@ export interface ConferenceActivityOptionDefinition {
   label: string;
   outcome: string;
   resultDescription: string;
+  settlementItems?: string[];
   effects: EventChoice["effects"];
 }
 

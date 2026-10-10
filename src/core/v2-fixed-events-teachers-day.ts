@@ -33,8 +33,8 @@ const TEACHERS_DAY_GIFTS: readonly TeachersDayGiftDefinition[] = [
     highFavorHint: "同学推荐了一盒茶叶，标价 1 金币。你想起老师桌上的茶杯，拎着它去办公室，连开场白都有了。",
     lowFavorHint: "同学推荐了一盒茶叶，标价 1 金币。你放大照片看了看，脑子里全是论文题目，老师爱喝哪种茶却一点也想不起来。",
     resultDescription: [
-      "下午，你拎着茶叶敲开办公室的门，等导师从论文前抬头，递上盒子：“老师，教师节快乐！给您带了盒茶叶。”",
-      "导师接过盒子：“谢谢你的心意。”你说了声“不打扰您了”，带上门。回工位才发现，空袋子还攥在手里。",
+      "下午，你拎着茶叶敲开办公室的门，等导师从论文前抬头，递上盒子：“老师，教师节快乐！🍵给您带了盒茶叶。”",
+      "导师接过盒子：“谢谢你的心意。”你说了声“不打扰您了”，带上门。回工位才发现，😅空袋子还攥在手里。",
     ],
   },
   {
@@ -45,8 +45,8 @@ const TEACHERS_DAY_GIFTS: readonly TeachersDayGiftDefinition[] = [
     highFavorHint: "店里的月饼礼盒标着 1 金币。看着包装上的月亮，你连“提前祝中秋快乐”都想好了。",
     lowFavorHint: "月饼礼盒要花 1 金币。你在心里试了一句“老师，尝尝这个”，比刚才想的那段正式祝词顺口多了。",
     resultDescription: [
-      "你拎着一盒月饼来到办公室，等导师回完邮件，再递上盒子：“老师，教师节快乐！给您带了盒月饼，尝尝看。”",
-      "导师接过盒子，向你道谢。你回了句“不客气”，又寒暄几句便告辞，没有把节日问候聊成一场临时汇报。",
+      "你拎着一盒月饼来到办公室，等导师回完邮件，再递上盒子：“老师，教师节快乐！给您带了盒月饼，🥮尝尝看。”",
+      "导师接过盒子，向你道谢。你回了句“不客气”，又寒暄几句便告辞，😌没有把节日问候聊成一场临时汇报。",
     ],
   },
   {
@@ -57,8 +57,8 @@ const TEACHERS_DAY_GIFTS: readonly TeachersDayGiftDefinition[] = [
     highFavorHint: "花店里的一束鲜花要 1 金币。想到老师得从那堆资料旁腾个位置放花，你忍不住笑了。",
     lowFavorHint: "花店里的一束鲜花要 1 金币。花是挺好看，可一想到要捧着它穿过走廊，你先有点不好意思了。",
     resultDescription: [
-      "你捧着一束鲜花来到办公室，正好碰见导师整理课件。你把花递过去：“老师，教师节快乐！给您带了束花。”",
-      "导师向你道谢，腾出桌角放好花束。你看着花挨着一摞资料摆好，忽然觉得这间总让人惦记进度的办公室，也有了点过节的样子。",
+      "你捧着一束鲜花来到办公室，正好碰见导师整理课件。你把花递过去：“老师，教师节快乐！💐给您带了束花。”",
+      "导师向你道谢，腾出桌角放好花束。你看着花挨着一摞资料摆好，忽然觉得这间总让人惦记进度的办公室，😊也有了点过节的样子。",
     ],
   },
 ] as const;
@@ -131,8 +131,8 @@ function createTeachersDayChoiceEvent(
     id: `teachers-day-choice-y${state.year}-m${state.month}`,
     title: "教师节 ➜ 你的选择",
     description: [
-      `${noGiftHint}${getTeachersDayMessageHint(state)}`,
-      `${giftHint}${stampHint}`,
+      `${noGiftHint}💬${getTeachersDayMessageHint(state)}`,
+      `${giftHint}🎁${stampHint}`,
     ].join("\n\n"),
     chainId: "teachers-day",
     stage: "act2",
@@ -178,8 +178,8 @@ export function createTeachersDayEvent(
     id: `teachers-day-y${state.year}-m${state.month}`,
     title: "教师节",
     description: [
-      "9 月 10 日一早，你打开实验室群，满屏都是“教师节快乐”。还没翻到底，同学又发来消息，问今天去不去办公室，有没有准备小礼物。",
-      "导师在群里回了句“谢谢大家”，后面又跟上几条祝福。你看着不断刷新的消息，也想起自己该说点什么。",
+      "9 月 10 日一早，你打开实验室群，满屏都是“教师节快乐”。📱还没翻到底，同学又发来消息，问今天去不去办公室，有没有准备小礼物。",
+      "导师在群里回了句“谢谢大家”，后面又跟上几条祝福。你看着不断刷新的消息，💭也想起自己该说点什么。",
     ].join("\n\n"),
     chainId: "teachers-day",
     choices: [
@@ -237,8 +237,8 @@ export function resolveTeachersDayFixedEvent(
             resultId: "message-idea",
             resultTitle: "导师来电",
             description: [
-              "你发微信：“老师，教师节快乐！祝您身体健康，工作顺利！”没多久，导师打来了电话。",
-              "“谢谢！正好有个想法跟你聊聊。”你赶紧拿便签记了几行。挂断后誊一遍，发现几个问题连起来了，连随手画的箭头都有了用处。",
+              "你发微信：“老师，教师节快乐！祝您身体健康，工作顺利！”没多久，📞导师打来了电话。",
+              "“谢谢！正好有个想法跟你聊聊。”你赶紧拿便签记了几行。挂断后誊一遍，发现几个问题连起来了，💡连随手画的箭头都有了用处。",
             ].join("\n\n"),
             settlement: `条件：导师好感 ≥ 6；分享想法（50%）\n结果：下次想 idea +${ideaBonus}`,
             buttonLabel: "期待明天",
@@ -265,8 +265,8 @@ export function resolveTeachersDayFixedEvent(
             resultId: "message-errand",
             resultTitle: "导师请求",
             description: [
-              "你发微信：“老师，教师节快乐！”导师回复：“谢谢。正好有份报销材料，下午帮我送到财务处吧。”",
-              "你拿齐材料，在财务处排了快一个小时，回来向导师报了受理情况。窗外的天已经暗下来了。只是发了句祝福，怎么半个下午也跟着送出去了。" + favorNarrative,
+              "你发微信：“老师，教师节快乐！”导师回复：“谢谢。正好有份报销材料，🧾下午帮我送到财务处吧。”",
+              "你拿齐材料，在财务处排了快一个小时，回来向导师报了受理情况。窗外的天已经暗下来了。只是发了句祝福，😮‍💨怎么半个下午也跟着送出去了。" + favorNarrative,
             ].join("\n\n"),
             settlement: [
               `条件：导师好感 < 6；报销跑腿（${errandPercent}%）`,
@@ -288,8 +288,8 @@ export function resolveTeachersDayFixedEvent(
           resultId: "message-plain",
           resultTitle: "简单祝福",
           description: [
-            "你发了条微信：“老师，教师节快乐！”过了一会儿，导师回复：“谢谢，新学期加油。”",
-            "你敲了几句新学期的打算，想想又删掉，最后只回了“谢谢老师”。聊天框安静下来，你把手机放到一边，桌上的资料还摊在刚才那一页。",
+            "你发了条微信：“老师，教师节快乐！”过了一会儿，导师回复：“谢谢，💬新学期加油。”",
+            "你敲了几句新学期的打算，想想又删掉，最后只回了“谢谢老师”。😅聊天框安静下来，你把手机放到一边，桌上的资料还摊在刚才那一页。",
           ].join("\n\n"),
           settlement: `条件：导师好感 ${highFavor ? "≥" : "<"} 6；普通回复（${highFavor ? 50 : 100 - errandPercent}%）\n结果：无事发生`,
           buttonLabel: "继续",
@@ -341,8 +341,8 @@ export function resolveTeachersDayFixedEvent(
           resultId: "stamp",
           resultTitle: "邮票送达",
           description: [
-            "你选好一套邮票，装进保护袋，下午带到办公室。“老师，教师节快乐！”你把邮票递过去，简单介绍了一下图案。",
-            "导师接过来翻看，向你道谢。你原本准备了一段祝福，临到面前只说出一句“希望您喜欢”，说完自己也有点不好意思。" + favorNarrative,
+            "你选好一套邮票，装进保护袋，下午带到办公室。✉️“老师，教师节快乐！”你把邮票递过去，简单介绍了一下图案。",
+            "导师接过来翻看，向你道谢。你原本准备了一段祝福，临到面前只说出一句“希望您喜欢”，😳说完自己也有点不好意思。" + favorNarrative,
           ].join("\n\n"),
           settlement: [
             "结果：金币 -3",

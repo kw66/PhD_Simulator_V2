@@ -4,6 +4,8 @@ import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { getResolvableQueuedEvent } from "../src/core/v2-engine-event-resolution";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createCcigEvent } from "../src/core/v2-fixed-events-ccig-decision-events";
+import { createDraftPaper } from "../src/core/v2-paper-rules";
+import { formatActualSanChange } from "../src/core/v2-sanity-rules";
 import type { GameState } from "../src/core/v2-types";
 
 function queuedState(year = 1): GameState {
@@ -31,6 +33,54 @@ function renderCurrentEvent(state: GameState): string {
 afterEach(() => vi.restoreAllMocks());
 
 describe("VALSE annual conference", () => {
+  it.each(["absent", "coauthor", "unposted", "promoted"])("explains the poster option independently of result conditions with %s papers", (paperState) => {
+    let state = queuedState();
+    if (paperState !== "absent") {
+      state.papers = [{
+        ...createDraftPaper(state.totalMonths, 0, () => 0),
+        id: "valse-poster", title: "待展示论文", status: "published", target: "A",
+        nonFirstAuthor: paperState === "coauthor", conferenceHandled: false,
+        publication: {
+          citations: 0, effectiveScore: 50, citationDebuffMultiplier: 1,
+          promotionMultiplier: paperState === "promoted" ? 1.25 : 1,
+          posterExposed: paperState === "promoted",
+        },
+      }];
+    }
+    state = choose(choose(choose(choose(state), "自费参会"), "确定"));
+    const hint = "小提示：选项出现条件：海报展示需有已录用的一作 A 类论文（含尚未公开的论文）。";
+    expect(state.eventQueue[0]!.description).not.toContain("选项出现条件");
+    const hasPoster = paperState === "unposted" || paperState === "promoted";
+    expect(state.eventQueue[0]!.choices.some((choice) => choice.label === "海报展示")).toBe(hasPoster);
+    expect(state.eventQueue[0]!.ccigActivityPreview).toMatchObject({
+      year: 1, month: 9, participationMode: "self",
+    });
+    if (!hasPoster) return;
+    const sanText = formatActualSanChange(-2, state.month, state.eventSupport, state.buffs);
+    state = choose(state, "海报展示");
+    const description = state.eventQueue[0]!.description;
+    expect(description).toContain(`${hint}\n\n机制结算\n\n结果：`);
+    expect(description.split("机制结算")[1]).toBe(`\n\n结果：${sanText}；论文宣传倍率 +25%。`);
+    expect(state.eventQueue[0]!.fixedResultPreview).toBeDefined();
+    const html = renderCurrentEvent(state);
+    expect(html).toContain("选项出现条件：海报展示需有已录用的一作 A 类论文");
+    expect(html).not.toContain('class="event-settlement-row is-condition"');
+    const settled = choose(state, "确定");
+    expect(settled.papers[0]!.publication!.posterExposed).toBe(true);
+    expect(settled.papers[0]!.publication!.promotionMultiplier).toBe(paperState === "promoted" ? 1.5 : 1.25);
+  });
+
+  it("shows domestic travel as the SAN reward condition rather than an option gate", () => {
+    let state = queuedState();
+    state = choose(choose(choose(choose(state), "自费参会"), "确定"));
+    state = choose(state, "顺便旅游");
+    expect(state.eventQueue[0]!.description).toContain("机制结算\n\n条件：国内参会\n\n结果：SAN +4。");
+    expect(state.eventQueue[0]!.description).not.toContain("选项出现条件");
+    expect(state.eventQueue[0]!.choices[0]!.effects).toMatchObject({ san: 4 });
+    expect(renderCurrentEvent(state)).toContain('class="event-settlement-row is-condition"');
+    expect(choose(state, "确定").player.san).toBe(14);
+  });
+
   it("splits the local-food meal bill and preserves its deferred two-coin settlement", () => {
     let state = queuedState();
     state.player.social = 2;

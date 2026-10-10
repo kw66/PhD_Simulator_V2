@@ -2,7 +2,7 @@ import type { CareerType } from "./v2-career-rules";
 import type { DebugRelationshipType, DebugStatId } from "./v2-action-ids";
 import type { PaperCompetitionResolution } from "./v2-paper-competition";
 import type { RandomEventState } from "./v2-random-event-rules";
-import type { ThesisState } from "./v2-thesis-rules";
+import type { ThesisBlindReview, ThesisState } from "./v2-thesis-rules";
 import type { EventCounters } from "./v2-event-counters";
 import type {
   AiShopState,
@@ -499,11 +499,10 @@ export interface EventChoice {
     transferToPhd?: boolean;
     stayOnEvent?: boolean;
     sanCapDelta?: number;
-    thesisProgress?: number;
-    abandonThesis?: boolean;
+    resolveThesisReview?: boolean;
     careerType?: CareerType;
     careerProgress?: number;
-    abandonCareer?: boolean;
+    recordCareerPreparation?: boolean;
     ideaBonus?: number;
     experimentBonus?: number;
     writingBonus?: number;
@@ -573,8 +572,10 @@ export interface EventChoice {
 }
 
 export interface ResolvedEventStage {
+  thesisReviewPresentation?: { degree: Degree; title: string; pointScores: number[]; review: ThesisBlindReview };
   title: string;
   description: string;
+  narrativeNames?: string[];
   paperReviewPresentation?: PaperReviewEventPresentation;
   talentTrigger?: import("./v2-talent-history").TalentTriggerRecord;
   choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason">[];
@@ -596,10 +597,13 @@ export interface ResolvedEventRecord {
 }
 
 export interface PendingEvent {
+  thesisReviewPresentation?: { degree: Degree; title: string; pointScores: number[]; review: ThesisBlindReview };
+  careerPreparation?: { type: CareerType; totalMonths: number; degree: Degree };
   id: string;
   continuationSourceId?: string;
   title: string;
   description: string;
+  narrativeNames?: string[];
   source: EventSource;
   blocking: boolean;
   deadlineMonths: number;
@@ -706,6 +710,7 @@ export interface GameState extends RandomEventState {
   labFinanceLedger?: { totalMonths: number; amounts: Partial<Record<LabFinanceCategory, number>> };
   blockLinearEvents: boolean;
   debugEventReplayEnabled?: boolean;
+  debugSkippedJournalFeePaperIds?: string[];
   phase: GamePhase;
   selectedRoleId: RoleId;
   setupSelectedRoleId?: RoleId | null;
@@ -729,6 +734,8 @@ export interface GameState extends RandomEventState {
   externalPublications: Paper[];
   thesis: ThesisState;
   careerProgress: Record<CareerType, number>;
+  careerLastPreparedTotalMonths: number | null;
+  careerPreparedMonths: Partial<Record<CareerType, number>>;
   internshipCount: number;
   selectedPaperId: string | null;
   shopState: ShopState;
@@ -778,6 +785,8 @@ export interface DispatchPayload {
   roleId?: RoleId | undefined;
   paperId?: string | undefined;
   paperSlotIndex?: number | undefined;
+  thesisPointIndex?: number | undefined;
+  careerType?: CareerType | undefined;
   paperActionType?: PaperActionType | undefined;
   paperTarget?: PaperTarget | undefined;
   journalTarget?: JournalTarget | undefined;

@@ -49,6 +49,7 @@ export function refreshConferenceActivityEvent<Event extends PendingEvent>(state
     ...event,
     title: fresh.title,
     description: fresh.description,
+    narrativeNames: fresh.narrativeNames,
     completionLog: fresh.completionLog,
     choices: fresh.choices,
     conferenceActivityPreview: fresh.conferenceActivityPreview,

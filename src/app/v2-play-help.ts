@@ -3,6 +3,7 @@ import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "../core/v2-lab-projects"
 import { ANNUAL_RESEARCH_HELP_PAGE, ATTRIBUTE_RESISTANCE_HELP_PAGE, SALARY_HELP_PAGE, getSecondaryPlayHelpContext } from "./v2-play-help-secondary";
 import type { PlayRenderUiState } from "./v2-render-types";
 import { renderPaperTerm } from "./v2-paper-terms";
+import { THESIS_REVIEW_THRESHOLDS } from "../core/v2-thesis-rules";
 
 export interface PlayHelpPage {
   title: string;
@@ -104,6 +105,21 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
     <p>成长奖励另记为<b>天赋触发</b>，一篇可同时完成多项；审稿SAN影响在确认结果时结算。</p>
     <p><b>录用类型：</b>A类可获${renderPaperTerm("Poster")}、${renderPaperTerm("Spotlight")}、${renderPaperTerm("Oral")}、${renderPaperTerm("Best Paper Candidate")}或${renderPaperTerm("Best Paper")}；B／C类为Poster或Oral。</p>
     <p>按投稿总分和会议影响力抽取，达到分数线也不保证抽中。引用倍率见成果提示。</p>`),
+  directPage("毕业论文", `<p>硕士第三年、博士第六年<b>9月</b>开放，分别有2／3个研究点。9月至3月，每项每月可推进一次：<b>+⌊科研能力⌋</b>，不占行动点。</p>
+    <p>每次基础SAN-3，不受科研档位减免；季节与通用SAN效果仍生效。4月送审后不可继续推进。</p>`),
+  directPage("支撑论文", `<p>只计自己的一作成果。各方向取最高的2／3篇，合计最高的方向作为大论文方向，缺少的研究点从0开始。</p>
+    <p>送审前，同方向新论文高于研究点<b>当前总分</b>才整体替换，不叠加此前提升；每篇只支撑一个研究点。</p>
+    <p>其他方向最高2／3篇的总分超过当前所有研究点总分时，整体换方向，旧提升清除，当月次数不重置。</p>`),
+  directPage("研究点刻度", `<p>进度条用<b>蓝色显示原始分、紫色显示改进分</b>。悬浮查看支撑论文和两部分分数；换支撑论文时原始分更新。</p>
+    <p>C／B／A刻度为盲审门槛÷3，表示各研究点同分时的等级参考。实际按专家随机权重计算；超过A参考线仍可继续提升。</p>
+    <p>转博清空毕业与求职准备，博士毕业学年重新开放，不保留硕士阶段的提升。</p>`),
+  directPage("毕业盲审", `<p><b>4月送审时</b>科研分必须达到毕业要求；未达标不能送审。硕士3位、博士5位专家，随机权重之和为3，有效分四舍五入。</p>
+    <table class="panel-tip-table"><thead><tr><th>有效分门槛</th><th>C</th><th>B</th><th>A</th></tr></thead><tbody>
+    <tr><th>硕士</th><td>${THESIS_REVIEW_THRESHOLDS.master.C}</td><td>${THESIS_REVIEW_THRESHOLDS.master.B}</td><td>${THESIS_REVIEW_THRESHOLDS.master.A}</td></tr>
+    <tr><th>博士</th><td>${THESIS_REVIEW_THRESHOLDS.phd.C}</td><td>${THESIS_REVIEW_THRESHOLDS.phd.B}</td><td>${THESIS_REVIEW_THRESHOLDS.phd.A}</td></tr></tbody></table>
+    <p>低于C线为D；<b>全部A／B才通过</b>，全A获优秀硕士／博士论文。百分制评分在对应等级区间内生成，不改变结果。</p>`),
+  directPage("毕业与求职", `<p>6月末同时检查科研分与盲审。未送审或出现C／D，本培养阶段延毕；硕士5月转博成功则清除本轮结果。</p>
+    <p>求职卡同样在毕业学年9月开放。四个方向每月各可推进一次，不占行动点；私企／央国企／公务员／教职固定消耗SAN 4／2／3／2。准备进度不等于已拿到offer，也不影响能否毕业。</p>`),
   directPage("期刊投稿", `<p>期刊送审后<b>不衰减，可继续修改、接受协作</b>。</p>
     <table class="panel-tip-table"><thead><tr><th>期刊</th><th>送审分</th><th>达标分</th></tr></thead><tbody>
       <tr><th>PAMI</th><td>75</td><td>125</td></tr><tr><th>NMI</th><td>100</td><td>250</td></tr><tr><th>Nature</th><td>150</td><td>500</td></tr>
@@ -138,10 +154,10 @@ const RELATIONSHIP_PAGES: readonly PlayHelpPage[] = [
   directPage("企业交流与邀请", `<p>企业交流第2次起，<b>已有A类会议论文，或有实习经历</b>，且当前没有进行中的实习，即可收到企业实习邀请。</p>
     <p>可无限拒绝，拒绝不清空企业交流计数；以后满足条件仍可获邀。</p>
     <p>远程实习通过导师约谈获准。两类实习的工资、消耗与实验奖励见天赋→关系。</p>`),
-  directPage("会场搭讪", `<p>搭讪只有一个选项，活泼／聪慧各50%，不能直接选类型。</p>
+  directPage("会场搭讪", `<p>选择“异性学者”后，活泼／聪慧各50%，不能直接选类型。</p>
     <p>活泼：SAN+5；聪慧：下次想idea+2分、额外执行2次，不额外消耗行动点。</p>
-    <p>同类型第2次搭讪起，社交原始+1，经过抵抗；两种类型分别计数。</p>`),
-  directPage("恋人邀请", `<p>搭讪时社交≥12且没有恋人，即可收到恋人邀请。</p>
+    <p>与同一人第2次搭讪起，社交原始+1，经过抵抗；两位学者分别计数。</p>`),
+  directPage("恋人邀请", `<p>与同一人搭讪≥3次（含本次），社交≥12且没有恋人时，对方会约你单独见面。</p>
     <p>接受活泼恋人：SAN上限+3；接受聪慧恋人：科研原始+1，经过抵抗。接受或拒绝后，同类型会场联系人换新、计数归0，可再次结识。</p>
     <p>已有恋人时搭讪，当前恋人亲密原始-6，经过抵抗；结算后亲密&lt;0则分手。</p>`),
   directPage("期刊版面费", `<p>PAMI／NMI／Nature的OA版面费为5／10／20；玩家一作发表后进入“期刊中稿→缴费方式→缴费确认”。</p>

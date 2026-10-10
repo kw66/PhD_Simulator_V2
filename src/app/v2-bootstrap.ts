@@ -99,7 +99,7 @@ import { createStore } from "../core/v2-store";
 import { createVisitStats } from "./v2-visit-stats";
 import { createConferenceStats, loadConferenceGlobalStats } from "./v2-conference-stats";
 import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
-import { createValueAnimations } from "./v2-value-animations";
+import { createValueAnimations, getVisibleValueDelta } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
 import { createRelationshipTooltips } from "./v2-relationship-tooltips";
 import { createDebugWindow } from "./v2-debug-window";
@@ -465,7 +465,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
   const animatePlayerStatChanges = (previous: PlayerStats, current: PlayerStats): void => {
     if (document.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const animateValue = (statId: keyof PlayerStats, delta: number): void => {
+    const animateValue = (statId: keyof PlayerStats): void => {
+      const delta = getVisibleValueDelta(
+        { value: previous[statId], visible: true },
+        { value: current[statId], visible: true },
+      );
       const item = root.querySelector<HTMLElement>(`[data-player-stat="${statId}"]`);
       if (!item || item.getClientRects().length === 0 || delta === 0) return;
 
@@ -517,9 +521,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
     };
 
     for (const statId of ANIMATED_ATTRIBUTE_IDS) {
-      animateValue(statId, current[statId] - previous[statId]);
+      animateValue(statId);
     }
-    animateValue("money", current.money - previous.money);
+    animateValue("money");
   };
 
   const showNewPaperSlotUnlocks = (state: GameState): void => {
@@ -1192,6 +1196,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
       roleId: isRoleId(dataset.roleId) ? dataset.roleId : undefined,
       paperId: typeof dataset.paperId === "string" ? dataset.paperId : undefined,
       paperSlotIndex: typeof dataset.paperSlotIndex === "string" ? Number(dataset.paperSlotIndex) : undefined,
+      thesisPointIndex: typeof dataset.thesisPointIndex === "string" ? Number(dataset.thesisPointIndex) : undefined,
+      careerType: dataset.careerType === "internet" || dataset.careerType === "stateOwned"
+        || dataset.careerType === "civilService" || dataset.careerType === "academic" ? dataset.careerType : undefined,
       paperActionType: isPaperActionType(dataset.paperActionType) ? dataset.paperActionType : undefined,
       paperTarget: isPaperTarget(dataset.paperTarget) ? dataset.paperTarget : undefined,
       journalTarget: isJournalTarget(dataset.journalTarget) ? dataset.journalTarget : undefined,

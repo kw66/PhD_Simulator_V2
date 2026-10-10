@@ -60,7 +60,7 @@ describe("conference fee settlement", () => {
       state = choose(state);
       state = choose(state, mode);
       const confirmation = state.eventQueue[0]!;
-      const payment = mode === "advisor" ? "科研经费 -2" : mode === "self" ? "金币 -2" : "无额外费用";
+      const payment = mode === "advisor" ? "科研经费 -2" : mode === "self" ? "金币 -2" : "无差旅费";
       expect(confirmation.title).toBe("CVPR参会 ➜ 参会方式 ➜ 参会确认");
       expect(confirmation.choices).toHaveLength(1);
       expect(confirmation.choices[0]!.label).toBe("确定");
@@ -129,7 +129,7 @@ describe("conference fee settlement", () => {
         expect(effects.money ?? 0).toBe(choice.id === "self" ? -2 : 0);
         const fundingCost = choice.id === "advisor" ? 2 : 0;
         expect(effects.advisorProgressStateDeltas?.funding ?? 0).toBe(fundingCost === 0 ? 0 : -fundingCost);
-        if (choice.id === "proxy") expect(confirmation.description).toContain("结果：无额外费用");
+        if (choice.id === "proxy") expect(confirmation.description).toContain("结果：无差旅费");
         expect(confirmation.completionLog).not.toContain("注册费");
       }
     },

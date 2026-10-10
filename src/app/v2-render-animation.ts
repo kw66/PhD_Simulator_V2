@@ -1,3 +1,5 @@
+import { formatMoney } from "../core/v2-money";
+
 function escapeAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("'", "&#39;");
 }
@@ -10,7 +12,7 @@ export function animationBarAttribute(key: string): string {
   return `data-animate-bar="${escapeAttribute(key)}"`;
 }
 
-export function renderAnimatedNumber(key: string, value: number, display = String(value)): string {
+export function renderAnimatedNumber(key: string, value: number, display = formatMoney(value)): string {
   return `<span class="animated-number" ${animationNumberAttributes(key, value)}>${escapeAttribute(display)}</span>`;
 }
 

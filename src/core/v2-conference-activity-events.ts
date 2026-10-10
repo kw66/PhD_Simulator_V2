@@ -3,7 +3,7 @@ import { getConferenceMentorContact, getConferenceScholarContact } from "./v2-co
 import type { PendingEvent } from "./v2-types";
 import {
   getConferenceActivityChainId,
-  getConferenceGradeLabel,
+  getConferenceRegionName,
   getConferencePaperPresentationResults,
   type ConferenceActivityBuildState,
   type ConferenceActivityContext,
@@ -20,27 +20,30 @@ function createDiscardPaperUpdates(context: ConferenceActivityContext) {
   return (context.paperIds ?? []).map((id) => ({ id, conferenceHandled: true }));
 }
 
-function getActivityConditions(option: ConferenceActivityOptionDefinition): string[] {
-  const updates = option.effects.conferenceEncounterUpdates;
-  if (option.id === "big-bull-coop" && updates?.bigBull) {
-    return [`条件：与${updates.bigBull.name}合作次数 ${updates.bigBull.cooperationCount}`];
-  }
-  if (option.id === "enterprise-networking") {
-    return [`条件：企业交流次数 ${option.effects.conferenceCareerUpdates?.enterpriseCount ?? 0}`];
-  }
-  return [];
-}
+const ADVANCED_ACTIVITY_IDS = new Set(["big-bull-coop", "opposite-scholar"]);
 
 function getActivityDecisionHint(option: ConferenceActivityOptionDefinition, state: ConferenceActivityBuildState): string {
   switch (option.id) {
+    case "tour-local":
+      return "同行发来几张街景，你望向门外，这座城市还没好好逛过，🚶出去换换心情也不错。";
+    case "tea-break":
+      return "茶歇区有人端着咖啡找座位，胸牌上的方向很熟悉，☕一句“报告怎么样”或许就能聊起来。";
+    case "experiment-discussion":
+      return "几位同行正对照实验结果。听到“复现不出来”，你想起自己的难题，🔬也想凑过去问问。";
+    case "idea-networking":
+      return "邻近海报用了不同方法解决相似问题。挨个聊聊，💡也许能给自己的课题换个思路。";
+    case "famous-scholar":
+      return "报告结束，著名学者身边的人渐渐少了。你把疑问在心里过了一遍，💬犹豫要不要上前请教。";
     case "enterprise-networking":
       return state.internshipState.active
-        ? "企业代表问起你正在做的实习项目，也想听听实验中遇到的问题。"
-        : "企业展台前的人翻着你的论文，等你过去聊聊研究近况。";
+        ? "企业展台的演示让你想起实习中的难题，🛠️正好问问他们是怎么处理的。"
+        : "企业展台旁贴着实习招聘。你想聊聊实际项目，💼也看看自己的研究能派上什么用场。";
     case "big-bull-coop":
-      return `${option.effects.conferenceEncounterUpdates?.bigBull?.name ?? "那位学者"}还在讲台边答疑，你把自己的论文翻了出来。`;
+      return (option.effects.conferenceEncounterUpdates?.bigBull?.cooperationCount ?? 1) >= 2
+        ? `${option.effects.conferenceEncounterUpdates?.bigBull?.name ?? "那位学者"}认出你，问起上次的工作。新稿就在包里，🤝正好继续聊聊合作。`
+        : `${option.effects.conferenceEncounterUpdates?.bigBull?.name ?? "那位学者"}还在答疑。你读过对方不少论文，🤝想拿着卡住的草稿争取一次合作。`;
     case "opposite-scholar":
-      return "邻座的异性学者收起报告笔记，你考虑过去打个招呼。";
+      return "邻座的异性学者恰好看过来。你想搭句话，又怕一开口全是论文，😅像在追加一轮审稿。";
     default:
       return "";
   }
@@ -56,14 +59,18 @@ export function createConferenceActivityResult(
   const activityChainId = getConferenceActivityChainId(context);
   return {
     id: `${activityChainId}-result-${option.id}`,
-    title: `${context.conferenceName}活动 ➜ 选择安排 ➜ 活动结果`,
+    title: `${context.conferenceName}活动 ➜ 选择安排 ➜ ${option.label}`,
+    narrativeNames: [
+      option.effects.conferenceEncounterUpdates?.bigBull?.name,
+      ...Object.values(option.effects.conferenceEncounterUpdates?.scholars ?? {}).map((contact) => contact?.name),
+    ].filter((name): name is string => Boolean(name)),
     description: [
       option.resultDescription,
-      "回程时，你把胸牌塞进会务袋。下次再挂上它，又不知道会在哪座城市了。",
+      ...(ADVANCED_ACTIVITY_IDS.has(option.id) ? [`小提示：选项出现条件：${option.label}需A/B类会议、社交 ≥ 6，随机抽取。`] : []),
       "机制结算",
-      ...getActivityConditions(option),
       ...getConferencePaperPresentationResults(context).map((result) => `结果：${result}`),
-      ...activitySummary.split("；").map((result) => `结果：${result}`),
+      ...(option.id === "tour-local" ? [`条件：${getConferenceRegionName(context.region)}参会`] : []),
+      ...(option.settlementItems ?? activitySummary.split("；").map((result) => `结果：${result}`)),
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -115,15 +122,21 @@ export function createConferenceActivityDecisionEvent(
     () => rolls[rollIndex++] ?? 0.5,
   );
   const activityChainId = getConferenceActivityChainId(context);
+  const hints = selectedOptions.map((option) => getActivityDecisionHint(option, state)).filter(Boolean);
+  const sceneParagraphs: string[] = [];
+  for (let hintIndex = 0; hintIndex < hints.length; hintIndex += 2) {
+    sceneParagraphs.push(hints.slice(hintIndex, hintIndex + 2).join(""));
+  }
   return {
     id: `${activityChainId}-act2`,
     title: `${context.conferenceName}活动 ➜ 选择安排`,
+    narrativeNames: [contacts.bigBull.name, ...Object.values(contacts.scholars).map((contact) => contact.name)],
     description: [
-      `你翻着${context.city}这场 ${context.conferenceName}（${getConferenceGradeLabel(context.grade)}）的议程，先前圈过的几项恰好撞了时间。` + (context.paperCount >= 2
-        ? `忙完 ${context.paperCount} 篇论文的展示，你不想再赶场，只想好好参加一项。`
-        : "展示忙完了，你准备挑一项参加。"),
-      "收好讲稿，你看看周围。" + (selectedOptions.map((option) => getActivityDecisionHint(option, state)).filter(Boolean).join("")
-        || "茶歇区还在聊刚才的报告，门外也透着阳光。忙了这么久，出去走走同样让人心动。"),
+      (context.paperCount >= 2
+        ? `忙完 ${context.paperCount} 篇论文的展示，你嗓子都有些哑了。`
+        : "自己的展示告一段落，你终于松了口气。")
+        + "剩下的时间不够处处赶场，得挑一件最想做的事。",
+      ...sceneParagraphs,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -157,10 +170,16 @@ export function createConferenceActivityEvent(
     id: `${activityChainId}-act1`,
     title: `${context.conferenceName}活动`,
     description: [
-      `在${context.city}的会场，你按 ${context.conferenceName} 的安排完成了论文展示。走出展示区时，肩膀才慢慢松下来。`,
+      `在${context.city}的 ${context.conferenceName} 会场，你按安排完成了论文展示。出发前背得滚瓜烂熟的介绍，真有人问起细节，还是得现翻图表。最后一位听众道谢离开，🥤你才发现手里的水早就凉了。`,
       context.paperCount >= 2
-        ? `同会的 ${context.paperCount} 篇论文让你忙得够呛，记下的问题也攒了几页。你把材料收好，终于有空听听周围的人在聊什么。`
-        : "你把记着问题的纸收好。茶歇区飘来咖啡味，邻近海报前还围着几个人，你终于有心思看看周围。",
+        ? `同会的 ${context.paperCount} 篇论文让你来回赶场，手机里存了几张同行画的草图，还有一串回去要核对的问题。 📝你给组里发了句“展示结束”，想了想，又补上一句“还挺有收获”。`
+        : "有个问题问得很准，你在本子上打了个星；另一个没来得及回答的，约好会后发邮件。 📧你给组里报了平安，收起材料，肩膀才慢慢松下来。",
+      context.grade === "A"
+        ? "隔壁几场报告同时散场，走廊一下挤满了人。文献里熟悉的名字出现在胸牌上，有人讨论刚听到的方法，有人已经打开电脑争论起来。站在这里，💬你忽然觉得屏幕另一端的研究圈有了声音。"
+        : context.grade === "B"
+          ? "走廊里还在延续刚才专题的讨论。你听见一个熟悉的数据集名称，回头发现大家也在为同样的问题发愁。原来那些写得干净利落的论文背后，🌙也有没跑通的实验和来回修改的夜晚。"
+          : "茶歇桌旁还有人在聊刚才的报告，海报前的讨论也没散。听见同行抱怨实验和截稿日，你忍不住笑了一下：换了座城市，😄大家过的研究生日子竟然差不多。",
+      "小提示：出现条件：已安排亲自参会，且到达会议举办月。",
     ].join("\n\n"),
     source: "fixed",
     blocking: true,

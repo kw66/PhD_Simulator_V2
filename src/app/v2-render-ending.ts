@@ -110,10 +110,10 @@ function renderEndingSummary(state: GameState): string {
   const relationshipCount = state.relationshipState.advisorCount + state.fellowProgressState.length + Number(state.loverState.active);
   // Same value/cap format as the left attribute rail; money and headcount have no cap.
   const attributes = [
-    ["san", "🧠 SAN", `${state.player.san}/${state.sanCap}`, state.ending === "burnout"],
-    ["research", "💡 科研", `${state.player.research}/${getResearchCap(state.researchCapacityState)}`, state.ending === "overthinking"],
-    ["social", "🤝 社交", `${state.player.social}/20`, state.ending === "isolated"],
-    ["favor", "🎓 导师好感", `${state.player.favor}/20`, state.ending === "expelled"],
+    ["san", "🧠 SAN", `${formatMoney(state.player.san)}/${formatMoney(state.sanCap)}`, state.ending === "burnout"],
+    ["research", "💡 科研", `${formatMoney(state.player.research)}/${formatMoney(getResearchCap(state.researchCapacityState))}`, state.ending === "overthinking"],
+    ["social", "🤝 社交", `${formatMoney(state.player.social)}/20`, state.ending === "isolated"],
+    ["favor", "🎓 导师好感", `${formatMoney(state.player.favor)}/20`, state.ending === "expelled"],
     ["money", "💰 金币", formatMoney(state.player.money), state.ending === "poor"],
     ["relationships", "👥 关系人数", relationshipCount, false],
   ] as const;
@@ -134,11 +134,13 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
   const target = state.graduationScoreTarget;
   const failureStats = { burnout: ["SAN", state.player.san], poor: ["金币", state.player.money], expelled: ["导师好感", state.player.favor], isolated: ["社交", state.player.social], overthinking: ["科研能力", state.player.research] } as const;
   const failedStat = ending && ending in failureStats ? failureStats[ending as keyof typeof failureStats] : null;
-  const reason = failedStat ? `${failedStat[0]} ${ending === "poor" ? formatMoney(failedStat[1]) : failedStat[1]}，低于0，无法继续学业`
+  const reason = failedStat ? `${failedStat[0]} ${formatMoney(failedStat[1])}，低于0，无法继续学业`
     : ending === "lab-bankrupt" ? `科研经费 ${formatMoney(state.advisorProgressState.funding)}，低于0，实验室无法继续运转`
     : ending === "quit" ? "你选择结束本轮学业"
-    : ending === "delay" ? `培养期已满${state.maxMonths}个月，${target === null ? "毕业要求尚未确定" : `科研分${state.totalResearchScore}/${target}，尚未达标`}`
-    : graduated ? `${degree}毕业要求已达成：科研分 ${state.totalResearchScore}/${target ?? "—"}` : "本轮已结束";
+    : ending === "delay" ? `培养期已满${state.maxMonths}个月，${target === null ? "毕业要求尚未确定"
+      : state.totalResearchScore < target ? `科研分${state.totalResearchScore}/${target}，尚未达标`
+        : state.thesis.review?.submitted ? "毕业论文盲审未通过" : "未完成毕业论文盲审送审"}`
+    : graduated ? `${degree}毕业要求已达成：科研分 ${state.totalResearchScore}/${target ?? "—"}，盲审通过` : "本轮已结束";
   const cause = failedStat ? state.endingCause?.text.trim() : null;
   const role = getRoleDefinition(state.selectedRoleId);
   const calendar = getCalendarForTotalMonths(state.totalMonths, state.degree);
@@ -155,6 +157,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
         <div class="ending-identity"><div class="ending-identity-details"><span>${escapeHtml(identity)}</span><span>${degree}</span><span>在校${state.totalMonths}个月</span></div><span>${date}</span></div>
         <div class="ending-story">${copy.story.map((paragraph) => `<p>${paragraph}</p>`).join("")}</div>
         <section class="ending-reason" aria-label="${graduated ? "毕业条件" : "结局原因"}">
+          ${graduated && state.thesis.review?.excellent ? `<p><strong>🏅 优秀${degree}论文</strong>${escapeHtml(state.thesis.title)}</p>` : ""}
           <p><strong>${graduated ? "毕业条件" : "结局原因"}</strong>${escapeHtml(reason)}</p>
           ${cause ? `<p class="ending-cause"><strong>最后发生的事</strong>${escapeHtml(cause)}</p>` : ""}
         </section>

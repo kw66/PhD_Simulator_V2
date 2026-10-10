@@ -2,7 +2,7 @@ import type { ConferenceActivityBuildState, ConferenceActivityContext } from "./
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
 import { getConferenceTripId } from "./v2-conference-identity";
 import { getPaperConferencePromotionMultiplier } from "./v2-publication-system";
-import { getConferencePaperPresentationTitles } from "./v2-conference-activity-shared";
+import { getConferencePaperPresentationTitles, getConferenceRegionName } from "./v2-conference-activity-shared";
 import type { EventCounters, EventSupportState, GameState, PaperAcceptType, PendingEvent, PaperTarget, ShopState } from "./v2-types";
 import type { ConferenceDecisionMode, ConferenceRegionId } from "./v2-conference-system";
 import { getConferenceBaseCosts, resolveConferenceDecisionCost } from "./v2-conference-system";
@@ -41,12 +41,6 @@ export interface ConferenceEventBuilderState extends ConferenceActivityBuildStat
   externalPublications?: GameState["externalPublications"];
 }
 
-function getRegionName(region: ConferenceRegionId): string {
-  if (region === "domestic") return "国内";
-  if (region === "asia") return "亚太";
-  return "欧美";
-}
-
 function getPaperTargetPriority(target: PaperTarget): number {
   if (target === "A") return 3;
   if (target === "B") return 2;
@@ -72,7 +66,7 @@ function getConferenceSettlementItems(decision: ReturnType<typeof resolveConfere
       : decision.actualCost > 0 ? [`金币 -${decision.actualCost}`] : []),
     ...(decision.fundingCost > 0 ? [`科研经费 -${decision.fundingCost}`] : []),
   ];
-  return items.length > 0 ? items : ["无额外费用"];
+  return items.length > 0 ? items : ["无差旅费"];
 }
 
 function createConferenceDecisionAct3(
@@ -84,7 +78,7 @@ function createConferenceDecisionAct3(
   const modeText = decision.mode === "self" ? "自费参会" : decision.mode === "advisor" ? "导师报销" : "找人代贴";
   const settlementItems = getConferenceSettlementItems(decision, context.region);
   const attendanceResult = decision.countsAsMeeting ? "亲自参会" : "不去参会";
-  const resultItems = [...settlementItems, attendanceResult];
+  const resultItems = decision.countsAsMeeting ? [...settlementItems, attendanceResult] : settlementItems;
   const travelCost = state.advisorProgressState?.paidPlayerConferenceTrips?.includes(getConferenceTripId(context))
     ? 0 : getConferenceBaseCosts(context.region).selfPay;
   const rolls = Array.from({ length: 16 }, () => getRoll());
@@ -94,12 +88,13 @@ function createConferenceDecisionAct3(
     title: `${context.conferenceName}参会 ➜ 参会方式 ➜ 参会确认`,
     description: [
       decision.mode === "proxy"
-        ? "你联系了一位实验室外的参会者，对方恰好也去现场，答应顺手帮忙，不收费用。你把海报和展示时间发过去，又补了几条可能被问到的问题。"
-        : "参会方式定下来了，你照着会务邮件准备材料。电脑里存了一份，邮箱里再留一份，毕竟会场的网速还没见识过。",
+        ? "你联系了一位实验室外的参会者，对方恰好也去现场，答应顺手帮忙，不收费用。你把海报和展示时间发过去，📧又补了几条可能被问到的问题。"
+        : "参会方式定下来了，你照着会务邮件准备材料。电脑里存了一份，邮箱里再留一份，💻毕竟会场的网速还没见识过。",
       decision.mode === "proxy"
-        ? "对方回了句“收到”，说贴好后给你拍张照片。你又检查了一遍文件，把联系方式留在邮件末尾，免得现场有人追问时找不到你。"
-        : `你把车票、住宿和展示时间逐项核对，算下来差旅 ${travelCost} 金币。${decision.mode === "advisor" ? "准备走导师报销，票据得仔细收好。" : "这笔钱自己出，你又翻了翻订房记录，确认没多订一晚。"}`,
+        ? "对方回了句“收到”，说贴好后给你拍张照片。 📷你又检查了一遍文件，把联系方式留在邮件末尾，免得现场有人追问时找不到你。"
+        : `你把车票、住宿和展示时间逐项核对，算下来差旅 ${travelCost} 金币。${decision.mode === "advisor" ? "准备走导师报销，🧾票据得仔细收好。" : "这笔钱自己出，你又翻了翻订房记录，🏨确认没多订一晚。"}`,
       "机制结算",
+      ...(decision.countsAsMeeting ? [`条件：${getConferenceRegionName(context.region)}参会`] : []),
       `结果：${resultItems.join("，")}`,
     ].join("\n\n"),
     source: "fixed",
@@ -154,7 +149,7 @@ function createConferenceDecisionAct2(
   const selfDecision = resolveConferenceDecisionCost({ ...baseInput, mode: "self" });
   const advisorDecision = resolveConferenceDecisionCost({ ...baseInput, mode: "advisor" }, () => favorRolls[favorRollIndex++]!);
   const proxyDecision = resolveConferenceDecisionCost({ ...baseInput, mode: "proxy" });
-  const regionName = getRegionName(context.region);
+  const regionName = getConferenceRegionName(context.region);
   const baseCosts = getConferenceBaseCosts(context.region);
   const selfCostHint = `差旅 ${travelAlreadyPaid ? 0 : baseCosts.selfPay} 金币，同一场会议只收一次，可以自付或申请导师报销。`;
   const proxyCostHint = "也可以找实验室外的人免费代贴，对方恰好也去，愿意顺手帮忙。";
@@ -175,10 +170,10 @@ function createConferenceDecisionAct2(
     id: `${context.id}-act2`,
     title: `${context.conferenceName}参会 ➜ 参会方式`,
     description: [
-      `你查好去${context.city}的行程，把${regionName}参会的费用加了一遍。` + (context.paperCount >= 2
+      `你查好去${context.city}的行程，🧮把${regionName}参会的费用加了一遍。` + (context.paperCount >= 2
         ? `同会的 ${context.paperCount} 篇论文得一起安排，展示材料也要逐份核对。`
         : "这次有 1 篇论文要展示，你还挺想亲口讲讲自己的工作。") + selfCostHint,
-      `${advisorHint}${proxyCostHint}只是这样一来，会场里那些想当面聊聊的人，就只能等下次再见了。`,
+      `${advisorHint}${proxyCostHint}只是这样一来，会场里那些想当面聊聊的人，💭就只能等下次再见了。`,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -272,10 +267,10 @@ function buildConferenceDecisionAct1(
     id: `${context.id}-act1`,
     title: `${context.conferenceName}参会`,
     description: [
-      `论文录用结果已经确认，你开始准备参会安排。这次是 ${context.conferenceName} ${context.conferenceYear}，地点在${context.city}，${context.country}。`,
+      `论文录用结果已经确认，你开始准备参会安排。这次是 ${context.conferenceName} ${context.conferenceYear}，📍地点在${context.city}，${context.country}。`,
       context.paperCount >= 2
-        ? `同一场会议有 ${context.paperCount} 篇论文要展示，你在日历上挨个标好。平时看着挺空的几格，忽然写得密密麻麻。`
-        : "这次有一篇论文要展示。你把自己的名字从日程里找出来，又核了一遍时间，才把那封长长的会务邮件往下翻。",
+        ? `同一场会议有 ${context.paperCount} 篇论文要展示，你在日历上挨个标好。平时看着挺空的几格，📅忽然写得密密麻麻。`
+        : "这次有一篇论文要展示。你把自己的名字从日程里找出来，又核了一遍时间，📧才把那封长长的会务邮件往下翻。",
       ...getConferencePaperPresentationTitles(context),
     ].join("\n\n"),
     source: "fixed",

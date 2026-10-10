@@ -11,6 +11,8 @@ import { createIllnessRandomEvent } from "./v2-random-events-core-health";
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { rememberPendingRandomEvent } from "./v2-paper-competition-waiting";
 import { getPublishedPaperCount } from "./v2-publication-rules";
+import { collectThesisEventForMonth } from "./v2-monthly-thesis-events";
+import { syncThesisState } from "./v2-thesis-rules";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -147,6 +149,10 @@ export function enqueueMonthlyEventsForMonth(
     return { nextState: state, queuedEvents: [] };
   }
 
+  state = syncThesisState(state, getRoll);
+  const thesis = collectThesisEventForMonth(state, getRoll);
+  const thesisCollection = enqueuePendingEvents(thesis.nextState, thesis.event ? [thesis.event] : []);
+  state = thesisCollection.nextState;
   const illnessEvents = collectIllnessEventForMonth(state, getRoll);
   const illnessCollection = enqueuePendingEvents(state, illnessEvents);
   const fixedCollection = enqueuePendingEvents(
@@ -164,6 +170,6 @@ export function enqueueMonthlyEventsForMonth(
 
   return {
     nextState: randomEnqueueCollection.nextState,
-    queuedEvents: [...illnessCollection.queuedEvents, ...fixedCollection.queuedEvents, ...randomEnqueueCollection.queuedEvents],
+    queuedEvents: [...thesisCollection.queuedEvents, ...illnessCollection.queuedEvents, ...fixedCollection.queuedEvents, ...randomEnqueueCollection.queuedEvents],
   };
 }

@@ -93,8 +93,8 @@ function resolveReviewerSan(state: GameState, settlement: PaperReviewSettlement)
 
 function getReviewResultDescription(settlement: PaperReviewSettlement, paper?: Paper): string {
   return [
-    `PC Meta Review：${settlement.accepted ? "Accept" : "Reject"}。${getReviewResultText(settlement)}。`,
-    `总评 ${settlement.totalReviewScore >= 0 ? "+" : ""}${settlement.totalReviewScore}。`,
+    `${settlement.accepted ? "🎉" : "😔"}PC Meta Review：${settlement.accepted ? "Accept" : "Reject"}。${getReviewResultText(settlement)}。`,
+    `📝总评 ${settlement.totalReviewScore >= 0 ? "+" : ""}${settlement.totalReviewScore}。`,
     ...(settlement.borderlineChance !== null
       ? [`Borderline 录用概率 ${(settlement.borderlineChance * 100).toFixed(1)}%。`] : []),
     "机制结算",
@@ -104,9 +104,9 @@ function getReviewResultDescription(settlement: PaperReviewSettlement, paper?: P
 
 function getReviewerDescription(settlement: PaperReviewSettlement): string {
   return [
-    "你先扫了一眼评分，又从头读起三份审稿意见。这篇改过不知多少遍的论文，到了别人眼里，会是什么样？",
+    "你先扫了一眼评分，又从头读起三份审稿意见。🔍 这篇改过不知多少遍的论文，到了别人眼里，会是什么样？",
     ...getReviewerLines(settlement),
-    "三份意见翻完，你又看了一遍分数。接下来，就看 PC 的最终决定了。",
+    "三份意见翻完，你又看了一遍分数。接下来，📨就看 PC 的最终决定了。",
   ].join("\n\n");
 }
 
@@ -306,9 +306,9 @@ export function createPaperReviewResultEvent(paper: Paper, settlement: PaperRevi
     id: `paper-review-result-${paper.id}`,
     title,
     description: [
-      `邮箱弹出审稿通知，你把手头的窗口切到一边。${conference ? `${conference.name} ${conference.year} 的结果终于到了。` : "审稿结果终于到了。"}`,
+      `邮箱弹出审稿通知，📬你把手头的窗口切到一边。${conference ? `${conference.name} ${conference.year} 的结果终于到了。` : "审稿结果终于到了。"}`,
       `本年会议概况：会议影响力 ${settlement.venueInfluence.toFixed(2)}，审稿标准 ×${settlement.reviewStrictnessMultiplier.toFixed(2)}。`,
-      `投稿时总分 ${settlement.submittedScore}。你点开邮件，先找了找查看审稿意见的入口。`,
+      `投稿时总分 ${settlement.submittedScore}。你点开邮件，🔍先找了找查看审稿意见的入口。`,
     ].join("\n"),
     source: "review",
     blocking: true,

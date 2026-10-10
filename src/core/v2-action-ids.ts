@@ -19,6 +19,8 @@ export const GAME_ACTION_IDS = [
   "reroll-paper-topic",
   "discard-paper",
   "research-paper",
+  "advance-thesis-point",
+  "prepare-career",
   "submit-paper",
   "submit-journal-paper",
   "withdraw-paper",

@@ -47,13 +47,15 @@ import { advanceFellowTask } from "./v2-fellow-actions";
 import { settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { advanceFellowResearch, attendFellowConferences, ensureFellowPapers } from "./v2-fellow-research";
 import { ensureFellowFinanceAccounts } from "./v2-fellow-finance";
-import { normalizeGameMoney } from "./v2-money";
+import { formatMoney, normalizeGameMoney } from "./v2-money";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { settleLabResearchGrowth } from "./v2-lab-talent";
 import { settleJournalPublicationFees } from "./v2-lab-publication-costs";
 import { advanceAdvisorProject, settleAdvisorMonth, syncAdvisorResearchAccumulation } from "./v2-advisor-progress";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { advanceLoverDate, advanceLoverMonth, settlePendingLoverHelp } from "./v2-lover-progression";
+import { advanceThesisResearchPoint, createInitialThesisState, syncThesisState } from "./v2-thesis-rules";
+import { prepareCareer } from "./v2-graduation-career";
 import type { DispatchPayload, GameActionId, GameState, PlayerStats } from "./v2-types";
 
 const MONTHLY_LOG_STAT_LABELS: Record<keyof PlayerStats, string> = {
@@ -138,7 +140,7 @@ function takeRest(state: GameState): GameState {
       ? state.shopState
       : { ...state.shopState, chairSanRecovered },
   };
-  return appliedGain === 0 ? nextState : pushLog(nextState, `休息：你放下手头的事休息了一会儿，SAN +${appliedGain}。`);
+  return appliedGain === 0 ? nextState : pushLog(nextState, `休息：你放下手头的事休息了一会儿，SAN +${formatMoney(appliedGain)}。`);
 }
 
 function resolveQueuedEvent(state: GameState, eventId: string | undefined, choiceId: string | undefined): GameState {
@@ -308,13 +310,15 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
   return nextState;
 }
 
-function advanceMonth(state: GameState): GameState {
+function advanceMonth(state: GameState, force = false): GameState {
   if (state.phase !== "playing") return state;
   state = evaluateCoreEndings(settleJournalPublicationFees(state));
   if (state.phase !== "playing") return state;
+  if (force) state = discardBlockingQueueEvents(state);
   if (hasManualBlockingEvents(state)) return pushNoOpLog(state, "必须先处理待办事件。");
   state = settleLinearEvents(state, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
   if (state.phase !== "playing") return state;
+  if (force) state = discardBlockingQueueEvents(state);
   if (hasBlockingQueueEvent(state)) return pushNoOpLog(state, "必须先处理待办事件。");
 
   if (isPreEnrollmentState(state)) {
@@ -346,6 +350,7 @@ function advanceMonth(state: GameState): GameState {
     state = evaluateCoreEndings(settleReadyJournals(settlePendingPaperHelp(state)));
   }
   if (state.phase !== "playing") return state;
+  if (force) state = discardBlockingQueueEvents(state);
   if (hasManualBlockingEvents(state)) return state;
   state = settleLabResearchGrowth(settleFellowAcademicYear(state));
   if (state.totalMonths >= state.maxMonths) return finishTrainingIfReady(syncAdvisorResearchAccumulation(state));
@@ -393,7 +398,15 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
     if (checkedState.phase !== "playing") return checkedState;
     state = checkedState;
   }
-  const nextState = normalizeGameMoney(ensureFellowFinanceAccounts(dispatchGameAction(ensureFellowPapers(state), actionId, payload)));
+  let nextState = normalizeGameMoney(ensureFellowFinanceAccounts(dispatchGameAction(ensureFellowPapers(state), actionId, payload)));
+  if (state.degree === "master" && nextState.degree === "phd") {
+    nextState = { ...nextState, thesis: createInitialThesisState(),
+      careerProgress: { internet: 0, stateOwned: 0, civilService: 0, academic: 0 },
+      careerLastPreparedTotalMonths: null,
+      careerPreparedMonths: {},
+      eventQueue: nextState.eventQueue.filter((event) => event.source !== "thesis" && event.source !== "career"),
+    };
+  }
   if (nextState.phase !== "playing") return nextState;
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
@@ -401,7 +414,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   const settledState = actionId === "resolve-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;
-  const conferenceState = settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(settledState));
+  const conferenceState = syncThesisState(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(settledState)));
   const refreshed = refreshPendingEventDecisions(refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingRandomEvents(syncAdvisorResearchAccumulation(conferenceState)))));
   if (debugAction) return refreshed;
   const evaluated = evaluateCoreEndings(refreshed);
@@ -415,6 +428,11 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
   if (debugState !== null) return debugState;
 
   switch (actionId) {
+    case "advance-thesis-point":
+      return typeof payload.thesisPointIndex === "number"
+        ? advanceThesisResearchPoint(syncThesisState(state), payload.thesisPointIndex) : state;
+    case "prepare-career":
+      return payload.careerType ? prepareCareer(state, payload.careerType) : state;
     case "set-linear-event-blocking":
       return typeof payload.blockLinearEvents === "boolean" ? { ...state, blockLinearEvents: payload.blockLinearEvents } : state;
     case "select-paper": {
@@ -508,7 +526,7 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
     case "next-month":
       return advanceMonth(state);
     case "force-next-month":
-      return advanceMonth(discardBlockingQueueEvents(state));
+      return advanceMonth(discardBlockingQueueEvents(state), true);
     default:
       return state;
   }

@@ -35,7 +35,7 @@ describe("conference result resistance suffix", () => {
 
   it("keeps money and free proxy settlement free of resistance suffixes", () => {
     const decision = createDecision(18);
-    for (const [mode, text] of [["self", "金币 -4"], ["proxy", "无额外费用"]]) {
+    for (const [mode, text] of [["self", "金币 -4"], ["proxy", "无差旅费"]]) {
       const choice = decision.choices.find((candidate) => candidate.id === mode)!;
       const result = choice.effects.enqueueEvents![0]!;
       expect(choice.outcome).toBe(`${text}。`);

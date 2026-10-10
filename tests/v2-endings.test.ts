@@ -9,6 +9,7 @@ import { createLoverProgressState } from "../src/core/v2-lover-progression";
 import { activateLover } from "../src/core/v2-lover-system";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { getCalendarForTotalMonths, getGraduationScoreTarget, getMonthLimitByDegree } from "../src/core/v2-progression";
+import { prepareThesisBlindReview, syncThesisState, THESIS_REVIEW_THRESHOLDS } from "../src/core/v2-thesis-rules";
 import type { Degree, EventChoice, GameState, PendingEvent } from "../src/core/v2-types";
 
 function makeState(totalMonths = 10, degree: Degree = "master"): GameState {
@@ -35,6 +36,24 @@ function makeEvent(id: string, effects: EventChoice["effects"] = {}, patch: Part
     choices: [{ id: "confirm", label: "确认", outcome: "事件结算", effects }],
     ...patch,
   }, 1);
+}
+
+function withResolvedThesis(state: GameState, grade: "B" | "C" = "B"): GameState {
+  const reviewMonth = getMonthLimitByDegree(state.degree) - 2;
+  const prepared = syncThesisState({
+    ...state,
+    ...getCalendarForTotalMonths(reviewMonth, state.degree),
+    totalMonths: reviewMonth,
+    totalResearchScore: state.graduationScoreTarget!,
+  }, () => 0);
+  prepared.thesis.researchPoints = prepared.thesis.researchPoints.map((point) => ({
+    ...point, score: Math.ceil(THESIS_REVIEW_THRESHOLDS[state.degree][grade] / 3),
+  }));
+  const reviewed = prepareThesisBlindReview(prepared, () => 0);
+  expect(reviewed.thesis.review).toMatchObject({ submitted: true, passed: grade === "B", excellent: false });
+  expect(reviewed.thesis.review!.reports.map((report) => report.grade))
+    .toEqual(Array.from({ length: state.degree === "master" ? 3 : 5 }, () => grade));
+  return { ...state, thesis: { ...reviewed.thesis, reviewResolved: true } };
 }
 
 function resolveEvent(state: GameState, eventId: string): GameState {
@@ -101,7 +120,7 @@ describe("ending failure boundaries", () => {
     [{ san: 0, money: 0, favor: 0, social: -1 }, "isolated"],
     [{ san: 0, money: 0, favor: 0, social: 0, research: -1 }, "overthinking"],
   ] as const)("prioritizes failures before graduation: %j", (stats, ending) => {
-    const state = makeState(getMonthLimitByDegree("master"));
+    const state = withResolvedThesis(makeState(getMonthLimitByDegree("master")));
     const next = dispatchAction({ ...state, totalResearchScore: 10, player: { ...state.player, ...stats } }, "next-month");
     expect(next.ending).toBe(ending);
     expect(next.totalMonths).toBe(34);
@@ -256,12 +275,52 @@ describe("ending failure boundaries", () => {
   });
 });
 
+describe("forced month advance with journal acceptance", () => {
+  it.each(["lover", "fellow"] as const)("crosses June and July when %s help creates a new unpaid acceptance", (helper) => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const initial = withPendingJournalHelp(makeState(10), helper);
+    const paperId = initial.papers[0]!.id;
+    expect(initial.month).toBe(10);
+    expect(initial.eventQueue).toEqual([]);
+    expect(initial.papers[0]!.status).toBe("journal-reviewing");
+    const normal = dispatchAction(initial, "next-month");
+    expect(normal).toMatchObject({ phase: "playing", ending: null, totalMonths: 10 });
+    expect(normal.externalPublications).toEqual([expect.objectContaining({ id: paperId, status: "published" })]);
+    expect(normal.eventQueue.some((event) => event.journalFeePreview?.paperId === paperId)).toBe(true);
+    expect(normal.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
+
+    let advanced = initial;
+    let control: GameState = { ...initial, advisorProgressState: {
+      ...initial.advisorProgressState, paidJournalPaperIds: [paperId],
+    } };
+    for (const totalMonths of [11, 12]) {
+      advanced = dispatchAction(advanced, "force-next-month");
+      control = dispatchAction(control, "force-next-month");
+      expect(advanced).toMatchObject({ phase: "playing", ending: null, totalMonths, totalResearchScore: 5 });
+      expect(advanced.externalPublications).toEqual([expect.objectContaining({ id: paperId, status: "published" })]);
+      expect(advanced.papers).toHaveLength(0);
+      expect(advanced.player.money).toBe(control.player.money);
+      expect(advanced.advisorProgressState.funding).toBe(control.advisorProgressState.funding);
+      expect(advanced.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
+      expect(advanced.debugSkippedJournalFeePaperIds).toContain(paperId);
+      expect(advanced.eventQueue.some((event) => event.journalFeePreview?.paperId === paperId)).toBe(false);
+      const resumed = dispatchAction(advanced, "next-month");
+      expect(resumed.totalMonths).toBe(dispatchAction(control, "next-month").totalMonths);
+      expect(resumed.eventQueue.some((event) => event.journalFeePreview?.paperId === paperId)).toBe(false);
+    }
+  });
+});
+
 describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) => {
   const limit = degree === "master" ? 34 : 70;
 
+  function makeGraduationState(totalMonths = limit): GameState {
+    return withResolvedThesis(makeState(totalMonths, degree));
+  }
+
   it.each(["next-month", "force-next-month"] as const)("keeps final June playable until %s is pressed again", (actionId) => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const state = makeState(limit - 1, degree);
+    const state = makeGraduationState(limit - 1);
     state.totalResearchScore = state.graduationScoreTarget!;
     state.player.san = 10;
     const advanced = dispatchAction(state, actionId);
@@ -279,7 +338,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   });
 
   it("checks the degree-specific limit and current target", () => {
-    const state = makeState(limit, degree);
+    const state = makeGraduationState();
     expect(state.maxMonths).toBe(limit);
     expect(state.graduationScoreTarget).toBe(degree === "master" ? 1 : 7);
     for (const offset of [-1, 0, 1]) {
@@ -290,9 +349,23 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
     }
   });
 
+  it.each(["missing", "unresolved", "failed"] as const)("delays despite enough score when blind review is %s", (reviewStatus) => {
+    const base = makeState(limit, degree);
+    base.totalResearchScore = base.graduationScoreTarget!;
+    const state = reviewStatus === "missing" ? syncThesisState(base, () => 0)
+      : withResolvedThesis(base, reviewStatus === "failed" ? "C" : "B");
+    if (reviewStatus === "unresolved") state.thesis.reviewResolved = false;
+    for (const actionId of ["next-month", "force-next-month"] as const) {
+      expect(dispatchAction(state, actionId)).toMatchObject({
+        phase: "finished", ending: "delay", totalMonths: limit,
+        totalResearchScore: base.graduationScoreTarget,
+      });
+    }
+  });
+
   it("allows paper research in final June before settling a delayed graduation", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const state = makeState(limit, degree);
+    const state = makeGraduationState();
     const paper = createDraftPaper(1, 0, () => 0);
     state.papers = [paper];
     const researched = dispatchAction(state, "research-paper", { paperId: paper.id, paperActionType: "idea" });
@@ -304,7 +377,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
 
   it("settles final June without adding a month or ending before due choices", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const state = makeState(limit - 1, degree);
+    const state = makeGraduationState(limit - 1);
     state.eventQueue = [makeEvent("last-choice", { score: state.graduationScoreTarget! }, { deadlineMonths: 1 })];
     const advanced = dispatchAction(state, "next-month");
     expect(advanced).toMatchObject({ phase: "playing", totalMonths: limit });
@@ -320,7 +393,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   });
 
   it.each(["next-month", "force-next-month"] as const)("%s waits for due nonblocking results but ignores unreachable future events", (actionId) => {
-    const state = makeState(limit, degree);
+    const state = makeGraduationState();
     state.eventQueue = [makeEvent("due-result", { score: state.graduationScoreTarget! }, { blocking: false }), makeEvent("future", { money: -100 }, { deadlineMonths: 1 })];
     const blocked = dispatchAction(state, actionId);
     expect(blocked).toMatchObject({ phase: "playing", ending: null, totalMonths: limit });
@@ -335,7 +408,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
 
   it.each(["lover", "fellow"] as const)("credits %s journal help on both final-event and final-month routes", (helper) => {
     vi.spyOn(Math, "random").mockReturnValue(0);
-    const state = withPendingJournalHelp(makeState(limit, degree), helper);
+    const state = withPendingJournalHelp(makeGraduationState(), helper);
     state.totalResearchScore = Math.max(0, state.graduationScoreTarget! - 5);
     for (const route of ["event", "month"] as const) {
       let current = state;
@@ -347,11 +420,18 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
       }
       for (const actionId of ["next-month", "force-next-month"] as const) {
         const awaitingPayment = dispatchAction(current, actionId);
-        expect(awaitingPayment.phase).toBe("playing");
-        expect(awaitingPayment.eventQueue.some((event) => event.journalFeePreview)).toBe(true);
         expect(awaitingPayment.advisorProgressState.paidJournalPaperIds ?? []).not.toContain(state.papers[0]!.id);
-        const next = dispatchAction(resolveDueEvents(awaitingPayment), actionId);
-        expect(next.advisorProgressState.paidJournalPaperIds).toContain(state.papers[0]!.id);
+        let next = awaitingPayment;
+        if (actionId === "next-month") {
+          expect(awaitingPayment.phase).toBe("playing");
+          expect(awaitingPayment.eventQueue.some((event) => event.journalFeePreview)).toBe(true);
+          next = dispatchAction(resolveDueEvents(awaitingPayment), actionId);
+          expect(next.advisorProgressState.paidJournalPaperIds).toContain(state.papers[0]!.id);
+        } else {
+          expect(next.eventQueue.some((event) => event.journalFeePreview)).toBe(false);
+          expect(next.player.money).toBe(current.player.money);
+          expect(next.advisorProgressState.funding).toBe(current.advisorProgressState.funding);
+        }
         expect(next).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
         expect(next.externalPublications).toHaveLength(1);
         expect(next.externalPublications[0]).toMatchObject({ id: state.papers[0]!.id, status: "published", journalTarget: "pami" });
@@ -364,7 +444,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   });
 
   it("waits for month-end after action-triggered journal publication", () => {
-    const state = withPendingJournalHelp(makeState(limit, degree), "lover");
+    const state = withPendingJournalHelp(makeGraduationState(), "lover");
     const next = dispatchAction({ ...state, totalResearchScore: Math.max(0, state.graduationScoreTarget! - 5) }, "select-paper", { paperId: state.papers[0]!.id });
     expect(next).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
     expect(next.externalPublications).toHaveLength(1);
@@ -377,7 +457,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   it.each([
     ["san", "burnout"], ["money", "poor"], ["favor", "expelled"], ["social", "isolated"], ["research", "overthinking"],
   ] as const)("still ends immediately when a final-June event drops %s below zero", (stat, ending) => {
-    const state = makeState(limit, degree);
+    const state = makeGraduationState();
     state.totalResearchScore = 10;
     state.player[stat] = 0;
     state.eventQueue = [makeEvent("fatal", { [stat]: -1 })];
@@ -385,14 +465,14 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   });
 
   it("still checks failures before an ordinary final-June action", () => {
-    const state = makeState(limit, degree);
+    const state = makeGraduationState();
     state.totalResearchScore = 10;
     state.player.san = -1;
     expect(dispatchAction(state, "rest")).toMatchObject({ phase: "finished", ending: "burnout", totalMonths: limit, player: { san: -1 } });
   });
 
   it("settles due automatic events before checking graduation at month-end", () => {
-    const state = makeState(limit, degree);
+    const state = makeGraduationState();
     state.blockLinearEvents = false;
     state.eventQueue = [makeEvent("automatic-result", { score: state.graduationScoreTarget! })];
     const finished = dispatchAction(state, "next-month");
@@ -401,7 +481,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   });
 
   it("does not award graduation with an undetermined target", () => {
-    expect(dispatchAction({ ...makeState(limit, degree), graduationScoreTarget: null, totalResearchScore: 100 }, "next-month").ending).toBe("delay");
+    expect(dispatchAction({ ...makeGraduationState(), graduationScoreTarget: null, totalResearchScore: 100 }, "next-month").ending).toBe("delay");
   });
 });
 
@@ -422,11 +502,12 @@ describe("terminal state and quitting", () => {
   });
 
   it.each(["quit", "failure", "graduation"])("rejects all gameplay dispatches after %s, including queued events and debug actions", (reason) => {
-    const state = makeState(getMonthLimitByDegree("master"));
+    const state = withResolvedThesis(makeState(getMonthLimitByDegree("master")));
     state.eventQueue = [makeEvent("reward", { money: 10 })];
     const finished = reason === "quit" ? dispatchAction(state, "quit-game")
       : reason === "failure" ? resolveEvent({ ...state, eventQueue: [makeEvent("fatal", { san: -100 }), ...state.eventQueue] }, "fatal")
         : dispatchAction({ ...state, eventQueue: [], totalResearchScore: 1 }, "next-month");
+    expect(finished.ending).toBe(reason === "quit" ? "quit" : reason === "failure" ? "burnout" : "master");
     const snapshot = structuredClone(finished);
     for (const actionId of GAME_ACTION_IDS) {
       if (actionId === "restart-game" || actionId === "reset-game") continue;

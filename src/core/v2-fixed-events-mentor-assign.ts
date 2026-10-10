@@ -4,6 +4,7 @@ import { createThreeStageEvent } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 import { canAddRelationship } from "./v2-relationship-rules";
 import { attachFixedTreePreview } from "./v2-fixed-event-preview";
+import { formatMoney } from "./v2-money";
 
 const CANDIDATE_DESCRIPTIONS = [
   "刚接触科研，读论文和跑实验都要从头学起。",
@@ -48,6 +49,7 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
   });
   const event: PendingEvent = createFixedEvent({
     id: "mentor-assign-junior",
+    narrativeNames: candidates.flatMap((candidate) => candidate.addition.name ? [candidate.addition.name] : []),
     title: "指导新生",
     description: "",
     chainId: "mentor-assign",
@@ -62,22 +64,22 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
 
   const stagedEvent = createThreeStageEvent(event, {
     introDescription: [
-      "转博后的新学期，导师发来四位新生的材料，希望你带其中一位熟悉代码、实验和组会流程。群里刚拉进来的几个头像还很陌生，已经有人在问实验室怎么走。",
-      "你翻开材料，入学照片一张比一张精神。电脑右下角又弹出导师的消息：“先认识一下，有问题多帮帮忙。”",
+      "转博后的新学期，导师发来四位新生的材料，希望你带其中一位熟悉代码、实验和组会流程。群里刚拉进来的几个头像还很陌生，🧭已经有人在问实验室怎么走。",
+      "你翻开材料，入学照片一张比一张精神。🌱电脑右下角又弹出导师的消息：“先认识一下，有问题多帮帮忙。”",
     ].join("\n\n"),
     decisionTitle: "选择一位新生",
     decisionDescription: [
-      "你翻开四位新生的材料，看看各自的研究经历，盘算从哪里开始带。",
+      "你翻开四位新生的材料，看看各自的研究经历，📋盘算从哪里开始带。",
       candidates.map((candidate) => `**${candidate.label}**：${candidate.description}`).join("\n"),
       canAddJunior
-        ? "还能接下一位新生，你决定先约其中一位聊聊。"
-        : "再看现有的合作安排，你已经顾不过来了。材料可以继续看，这次却接不下任何一位，只能请导师另作安排。",
+        ? "还能接下一位新生，💬你决定先约其中一位聊聊。"
+        : "再看现有的合作安排，你已经顾不过来了。材料可以继续看，这次却接不下任何一位，😓只能请导师另作安排。",
     ].join("\n\n"),
     results: Object.fromEntries(candidates.map((candidate) => [candidate.choiceId, {
       title: candidate.label,
       description: canAddJunior
-        ? `你和${candidate.prose}约好在实验室见面，发去门牌号，又补了句“找不到就发消息”。原来现在也轮到你给别人指路了。\n\n${candidate.prose}：科研能力 ${candidate.addition.research}/20，默契度 ${candidate.addition.affinity}/20。`
-        : "你看完材料，还是没接下这次指导。眼下已有的合作还要顾，新生的安排只能请导师另找人选。",
+        ? `你和${candidate.prose}约好在实验室见面，📍发去门牌号，又补了句“找不到就发消息”。🌱原来现在也轮到你给别人指路了。\n\n${candidate.prose}：科研能力 ${formatMoney(candidate.addition.research)}/20，默契度 ${formatMoney(candidate.addition.affinity)}/20。`
+        : "你看完材料，还是没接下这次指导。📋眼下已有的合作还要顾，😓新生的安排只能请导师另找人选。",
     }])),
   });
   const condition = `条件：${canAddJunior ? "人际栏有空位" : "人际栏已满"}`;

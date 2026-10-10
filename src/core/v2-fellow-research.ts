@@ -1,4 +1,5 @@
 import { getAcademicCalendarYear } from "./v2-calendar";
+import { formatMoney } from "./v2-money";
 import { getConferenceInfo } from "./v2-conference-catalog";
 import { advanceFellowCooperationWithLog, settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { getFellowName, getFellowResearchTopic, getFellowsInCardOrder } from "./v2-fellow-progression";
@@ -158,7 +159,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
     const cooperationCount = profile.longTermMentoring ? 2 : 1;
     const cooperationGain = profile.affinity * cooperationCount;
     nextState = advanceFellowCooperationWithLog(nextState, profile.id, cooperationGain);
-    addActivity(profile.id, `协作进度 +${cooperationGain}${profile.longTermMentoring ? "（长期合作，推进2次）" : ""}`);
+    addActivity(profile.id, `协作进度 +${formatMoney(cooperationGain)}${profile.longTermMentoring ? "（长期合作，推进2次）" : ""}`);
     nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id
       ? { ...fellow, taskUsedThisMonth: false, lastAdvancedTotalMonths: state.totalMonths } : fellow) };
   }

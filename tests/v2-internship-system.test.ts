@@ -63,8 +63,40 @@ describe("v2 internship system", () => {
       permanentlyBlockedInternship: false,
     });
     expect(result.description.split("机制结算")[1]?.trim()).toBe(
-      "结果：暂不实习",
+      "结果：婉拒实习",
     );
+  });
+
+  it.each([0, 0.5, 0.999])("gives each internship scene a concrete choice and keeps emoji inside prose at roll %s", (roll) => {
+    const context = { ...buildInternshipInviteContext(playingState(), () => roll), origin: "企业交流" };
+    const root = createInternshipInviteAct1(context);
+    const decision = root.choices[0]!.effects.enqueueEvents![0]!;
+    const accepted = decision.choices.find((choice) => choice.id === "accept")!.effects.enqueueEvents![0]!;
+    const declined = decision.choices.find((choice) => choice.id === "decline")!.effects.enqueueEvents![0]!;
+    for (const event of [root, decision, accepted, declined]) {
+      const narrative = event.description.split(/机制结算|小提示：/u)[0]!.trim();
+      const paragraphs = narrative.split("\n\n");
+      expect(paragraphs.length).toBeGreaterThanOrEqual(2);
+      expect(paragraphs.length).toBeLessThanOrEqual(3);
+      expect(narrative).toContain(context.offer.company);
+      for (const paragraph of paragraphs) {
+        expect(paragraph).not.toMatch(/[。！？]\s*\p{Extended_Pictographic}/u);
+        expect(paragraph).not.toMatch(/\p{Extended_Pictographic}[\uFE0F\u200D\s]*$/u);
+      }
+    }
+    expect(root.description).toContain("企业交流结束后");
+    expect(decision.description).toContain("组会、实验和项目交付");
+    expect(accepted.description).toContain("不同的数据和交付要求");
+    expect(declined.description).toContain("无法兼顾");
+    expect(declined.title).toContain("婉拒实习");
+    expect(declined.completionLog).toContain("婉拒");
+    expect(declined.choices[0]!.outcome).toBe("婉拒实习");
+    expect(declined.description).not.toMatch(/暂不实习|重置|清零|拒绝次数|合作学者|合作对象/u);
+    expect(declined.choices[0]!.effects).toEqual({ conferenceCareerUpdates: {
+      rejectedInternshipCount: context.rejectedInternshipCount + 1,
+      permanentlyBlockedInternship: false,
+      lastInternshipOffer: context.offer,
+    } });
   });
 
   it("shows a shared internship duration while distinguishing monthly settlement from each experiment", () => {
@@ -74,19 +106,19 @@ describe("v2 internship system", () => {
     expect(remote.outcome.match(/持续3个月/gu)).toHaveLength(1);
     expect(remote.outcome).toContain("远程实习（下月起，持续3个月）");
     expect(remote.outcome).toContain("SAN -2（每月）｜金币 +1（每月）");
-    expect(remote.outcome).toContain("个人实验费用 -1（每次）");
-    expect(remote.outcome).toContain("实验 +4（每次）");
+    expect(remote.outcome).toContain("个人实验费用 -1");
+    expect(remote.outcome).toContain("实验 +4");
+    expect(remote.outcome).not.toContain("每次");
     expect(getInternshipExperimentEffect({ ...state, totalMonths: state.totalMonths + 1,
       internshipState: activateRemoteInternship(state.totalMonths) })).toEqual({ bonus: 4, multiplier: 1, moneyDiscount: 1 });
     const context = buildInternshipInviteContext(state, () => 0.5);
     const decision = createInternshipInviteAct1(context).choices[0]!.effects.enqueueEvents![0]!;
     const result = decision.choices.find((choice) => choice.id === "accept")!.effects.enqueueEvents![0]!;
-    expect(result.description.match(/持续6个月/gu)).toHaveLength(1);
-    expect(result.description).toContain("SAN -5（每月）");
-    expect(result.description).toContain("金币 +1（每月）");
-    expect(result.description).toContain("实验 ×1.25（每次）");
-    expect(result.description).toContain("实验 +5（每次）");
-    expect(result.description).toContain("实验费用 -2（每次）");
+    expect(result.description.match(/企业实习（6个月）/gu)).toHaveLength(1);
+    expect(result.description).toContain("每月SAN -5｜每月金币 +1");
+    expect(result.description).toContain("实验 ×1.25、+5");
+    expect(result.description).toContain("实验费用 -2");
+    expect(result.description.split("机制结算")[1]).not.toContain("每次");
     expect(result.choices[0]!.effects.internshipStateUpdates).toEqual(activateInternship(context.offer));
   });
 
@@ -295,9 +327,9 @@ describe("v2 internship system", () => {
     const resultStages = history.stages.slice(approval.history!.length);
     expect(resultStages).toHaveLength(1);
     for (const stage of resultStages) {
-      expect(stage.description).toContain(expectedOutcome);
+      expect(stage.description.split("机制结算")[1]?.trim()).toBe("结果：原实习保持不变");
       expect(stage.title).not.toContain("实习已确认");
-      expect(stage.choices.find((choice) => choice.id === stage.selectedChoiceId)?.outcome).toBe(expectedOutcome);
+      expect(stage.choices.find((choice) => choice.id === stage.selectedChoiceId)?.outcome).toBe("原实习保持不变");
     }
     const repeated = dispatchAction(completed, "resolve-event", { eventId: approval.id, eventChoiceId: "close" });
     expect(repeated.eventHistory).toEqual(completed.eventHistory);
@@ -329,7 +361,7 @@ describe("v2 internship system", () => {
     const context = buildInternshipInviteContext(initial, () => 0.5);
     const event = createInternshipInviteAct1(context);
     let state = resolveFirst(queueEvent(initial, event));
-    expect(state.eventQueue[0]!.choices.find((choice) => choice.id === "accept")?.outcome).toContain("（持续6个月）");
+    expect(state.eventQueue[0]!.choices.find((choice) => choice.id === "accept")?.outcome).toContain("企业实习（6个月）");
     state = resolveFirst(state, "accept");
     expect(state.internshipState.active).toBe(false);
     expect(resolveFirst(state).internshipState).toEqual(activateInternship(context.offer));

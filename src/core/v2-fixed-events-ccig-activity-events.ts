@@ -10,6 +10,8 @@ import {
 import type { GameState, PendingEvent } from "./v2-types";
 import { formatActualSanChange } from "./v2-sanity-rules";
 
+const POSTER_OPTION_HINT = "小提示：选项出现条件：海报展示需有已录用的一作 A 类论文（含尚未公开的论文）。";
+
 export function createCcigActivityEvent(
   state: GameState,
   participationMode: Exclude<CcigParticipationMode, "skip">,
@@ -20,15 +22,15 @@ export function createCcigActivityEvent(
   const realYear = getCcigRealYear(state.year, state.month);
   const posterPaper = getCcigPosterPaper(state);
   const arrivalText = participationMode === "advisor"
-    ? `报销手续办妥后，你来到${location}参加 VALSE ${realYear}，在签到处出示凭证和证件，领到胸牌与手册。`
-    : `行程安排妥当后，你来到${location}参加 VALSE ${realYear}，在签到处出示凭证和证件，领到胸牌与手册。`;
+    ? `报销手续办妥后，你来到${location}参加 VALSE ${realYear}，在签到处出示凭证和证件，🪪领到胸牌与手册。`
+    : `行程安排妥当后，你来到${location}参加 VALSE ${realYear}，在签到处出示凭证和证件，🪪领到胸牌与手册。`;
   return { ...createCcigFixedEvent(state, {
     id: `${activityChainId}-act1`,
     title: "VALSE活动",
     description: [
       arrivalText,
       "这就是前些天群里商量出行的那场领域年会。走廊里挤满了挂胸牌的人，主会场还没开门，门口已经排起队；有人聊起往届院士的主旨报告，有人正对着会场分布图找下一场的入口。",
-      `海报区汇集着近年的顶会顶刊工作，刚读过的论文作者就站在展板前。${posterPaper ? "你会前已报了海报展示，正好照着通知找找自己的展板。" : "你翻开手册，盘算这几天听什么、和谁聊。"}`,
+      `海报区汇集着近年的顶会顶刊工作，📄刚读过的论文作者就站在展板前。${posterPaper ? "你会前已报了海报展示，正好照着通知找找自己的展板。" : "你翻开手册，盘算这几天听什么、和谁聊。"}`,
       ...(posterPaper ? [`涉及论文：**《${posterPaper.title}》**`] : []),
     ].join("\n\n"),
     chainId: activityChainId,
@@ -58,11 +60,11 @@ export function createCcigActivityDecisionEvent(
     id: `${activityChainId}-act2`,
     title: "VALSE活动 ➜ 选择安排",
     description: [
-      `你在${location}的 VALSE ${realYear} 会场外圈好日程：多模态大模型、视频生成、三维视觉与空间智能。Tutorial 讲方法，Workshop 讨论数据和评测，偏偏几场撞了时间。`,
-      "同学发来餐馆定位，约大家 AA 聚餐，人均 2 金币。有人想听完报告再去，有人准备先逛逛。你看看日程，再看看美食照片，开始重新安排今天。",
+      `你在${location}的 VALSE ${realYear} 会场外圈好日程：多模态大模型、视频生成、三维视觉与空间智能。Tutorial 讲方法，Workshop 讨论数据和评测，📅偏偏几场撞了时间。`,
+      "同学发来餐馆定位，约大家 AA 聚餐，人均 2 金币。有人想听完报告再去，有人准备先逛逛。你看看日程，再看看美食照片，🍜开始重新安排今天。",
       posterPaper
-        ? "海报展示在会前就报了名，展板位置也分好了。想到同行会来听，你又默念了一遍开场白。"
-        : "会前报名时，你没有适合展示的论文，这次便没有报名海报展示。眼前几张展板倒是和课题有关，正好去听作者讲讲。",
+        ? "海报展示在会前就报了名，展板位置也分好了。想到同行会来听，💬你又默念了一遍开场白。"
+        : "会前报名时，你没有适合展示的论文，这次便没有报名海报展示。眼前几张展板倒是和课题有关，💬正好去听作者讲讲。",
       ...(posterPaper ? [`涉及论文：**《${posterPaper.title}》**`] : []),
     ].filter(Boolean).join("\n\n"),
     chainId: activityChainId,
@@ -121,7 +123,13 @@ export function createCcigActivityResultEvent(params: {
   return createCcigFixedEvent(params.state, {
     id: `ccig-activity-result-y${params.state.year}-m${params.state.month}-${params.mode}`,
     title: params.title.includes("➜") ? params.title : `VALSE活动 ➜ 选择安排 ➜ ${params.title}`,
-    description: [params.description, "机制结算", ...(params.condition ? [`条件：${params.condition}`] : []), `结果：${params.outcome}`].join("\n\n"),
+    description: [
+      params.description,
+      ...(params.mode === "poster" ? [POSTER_OPTION_HINT] : []),
+      "机制结算",
+      ...(params.condition ? [`条件：${params.condition}`] : []),
+      `结果：${params.outcome}`,
+    ].join("\n\n"),
     chainId: getCcigActivityChainId(params.state),
     stage: "result",
     completionLog: params.completionLog,

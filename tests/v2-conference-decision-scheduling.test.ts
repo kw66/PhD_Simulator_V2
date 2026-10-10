@@ -65,7 +65,8 @@ describe("conference decision scheduling contract", () => {
     const effects = final.choices[0]!.effects;
     expect(final.title).toBe("CVPR参会 ➜ 参会方式 ➜ 参会确认");
     const attendanceResult = mode === "proxy" ? "不去参会" : "亲自参会";
-    expect(final.description).toContain(attendanceResult);
+    expect(final.description).toContain(mode === "proxy" ? "结果：无差旅费" : attendanceResult);
+    if (mode === "proxy") expect(final.description.split("机制结算")[1]?.trim()).toBe("结果：无差旅费");
     expect(final.completionLog).toContain(attendanceResult);
     expect(`${final.description}\n${final.completionLog}`).not.toMatch(/展示完成|展示已完成|引用倍率|参会已处理/u);
     expect(effects.enqueueEvents).toBeUndefined();

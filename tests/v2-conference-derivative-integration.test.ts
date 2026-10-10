@@ -81,8 +81,11 @@ describe("conference derivative settlement integration", () => {
     expect(state.eventQueue).toEqual([]);
     expect(state.buffs.some((buff) => buff.actionEffects?.idea?.extraActions === 2)).toBe(true);
     state = choose(choose(choose(activity(state, 2), "continue"), "opposite-scholar"), "close");
-    expect(state.eventQueue[0]?.chainId).toBe("lover-development");
+    expect(state.eventQueue).toEqual([]);
     expect(state.conferenceEncounterState.scholars?.smart?.encounterCount).toBe(2);
+    state = choose(choose(choose(activity(state, 3), "continue"), "opposite-scholar"), "close");
+    expect(state.eventQueue[0]?.chainId).toBe("lover-development");
+    expect(state.conferenceEncounterState.scholars?.smart?.encounterCount).toBe(3);
   });
 
   it("keeps a lover at exactly zero intimacy without renaming a contact", () => {

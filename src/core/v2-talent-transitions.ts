@@ -5,6 +5,7 @@ import { addOrReplaceBuffs } from "./v2-buffs";
 import { getReadingIdeaBonus } from "./v2-reading-system";
 import { getResearchCap } from "./v2-research-cap-system";
 import { recordTalentTrigger } from "./v2-talent-history";
+import { formatMoney } from "./v2-money";
 import type { GameState } from "./v2-types";
 
 export function recordTalentTransitions(before: GameState, after: GameState): GameState {
@@ -22,7 +23,7 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
   const readAfter = Math.floor(after.readingState.readCount / 10);
   if (readAfter > readBefore) {
     add("reading-growth", "阅读积累", `累计阅读${after.readingState.readCount}次`, [
-      `科研奖励 +${readAfter - readBefore}，经档位抵抗并受科研上限限制（当前${after.player.research}/${getResearchCap(after.researchCapacityState)}）`,
+      `科研奖励 +${readAfter - readBefore}，经档位抵抗并受科研上限限制（当前${formatMoney(after.player.research)}/${formatMoney(getResearchCap(after.researchCapacityState))}）`,
       `阅读idea加成 ${getReadingIdeaBonus(before.readingState.readCount + 1)}→${getReadingIdeaBonus(after.readingState.readCount + 1)}`,
     ]);
   }
@@ -39,7 +40,7 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
   const pokerRate = Math.min(100, 40 + after.eventCounters.pokerCount * 10);
   if (pokerRate > oldPokerRate) add("poker-growth", "牌局策略", `累计参加${after.eventCounters.pokerCount}次`, [`胜率 ${oldPokerRate}%→${pokerRate}%`]);
   const bikeGain = after.shopState.bikeSanCapGains - before.shopState.bikeSanCapGains;
-  if (bikeGain > 0) add("bike", "骑行积累", `累计骑行消耗SAN ${after.shopState.bikeSanSpent}`, [`SAN上限 +${bikeGain}（当前${after.sanCap}）`]);
+  if (bikeGain > 0) add("bike", "骑行积累", `累计骑行消耗SAN ${formatMoney(after.shopState.bikeSanSpent)}`, [`SAN上限 +${formatMoney(bikeGain)}（当前${formatMoney(after.sanCap)}）`]);
   const coffeeBefore = getCurrentCoffeeBonus(before.coffeeState);
   const coffeeAfter = getCurrentCoffeeBonus(after.coffeeState);
   if (coffeeAfter > coffeeBefore) add("coffee-machine", "高级咖啡机", `累计生产${after.coffeeState.machineTrackedCoffeeCount}杯冰美式`, [

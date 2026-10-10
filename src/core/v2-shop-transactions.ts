@@ -6,7 +6,7 @@ import {
 } from "./v2-ai-shop";
 import { applyAiActivationEffects } from "./v2-ai-activation";
 import { getLabReimbursementKind } from "./v2-lab-reimbursement";
-import { roundMoney } from "./v2-money";
+import { formatMoney, roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import {
@@ -245,7 +245,7 @@ function buyCoffee(state: GameState): GameState {
       money: state.player.money - coffeePrice,
       san: nextSan,
     },
-  }, `商店：购买冰美式，${purchaseCostText(coffeePrice, usesGift)}；SAN +${actualCoffeeGain}。`);
+  }, `商店：购买冰美式，${purchaseCostText(coffeePrice, usesGift)}；SAN +${formatMoney(actualCoffeeGain)}。`);
 }
 
 function sellCoffeeMachine(state: GameState): GameState {

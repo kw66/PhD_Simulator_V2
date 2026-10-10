@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createDefaultAccountProfile, buildLobbySelectedRoleViewModel } from "../src/core/v2-lobby";
 import { loadRoleRecords } from "../src/core/v2-role-records";
 import { createStore } from "../src/core/v2-store";
+import { getCalendarForTotalMonths, getMonthLimitByDegree } from "../src/core/v2-progression";
+import { withPassingThesisReview } from "./helpers/v2-thesis-fixtures";
 
 function createStorage() {
   const values = new Map<string, string>();
@@ -37,9 +39,12 @@ describe("role history and run statistics", () => {
     if (ending === "overthinking") state.player.research = -1;
     if (ending === "master" || ending === "phd" || ending === "delay") {
       state.degree = ending === "phd" ? "phd" : "master";
+      state.maxMonths = getMonthLimitByDegree(state.degree);
       state.totalMonths = state.maxMonths;
+      Object.assign(state, getCalendarForTotalMonths(state.totalMonths, state.degree));
       state.graduationScoreTarget = ending === "phd" ? 7 : 1;
       state.totalResearchScore = ending === "delay" ? 0 : state.graduationScoreTarget;
+      state.thesis = withPassingThesisReview(state).thesis;
     }
     store.dispatch(ending === "quit" ? "quit-game" : "next-month");
     expect(store.getState()).toMatchObject({ phase: "finished", ending });

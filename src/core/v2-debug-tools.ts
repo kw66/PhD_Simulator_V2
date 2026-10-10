@@ -29,9 +29,11 @@ import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-t
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
 import { createCareerEventForType } from "./v2-monthly-career-events";
 import { collectThesisEventForMonth } from "./v2-monthly-thesis-events";
+import { createInitialThesisState, getGraduationPreparationYear } from "./v2-thesis-rules";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
 import { createDraftPaper, REVIEW_STABLE_SCORE_BY_TARGET } from "./v2-paper-rules";
 import { getJournalDefinition } from "./v2-journal-system";
+import { createJournalFeeEvent } from "./v2-journal-fee-events";
 import { getCalendarForTotalMonths, getRoleDefinition } from "./v2-progression";
 import { attachPaperPublication, createGrantedPublishedPaper, recordPaperAcceptances } from "./v2-publication-rules";
 import { resolveDuePaperReviews } from "./v2-publication-system";
@@ -270,8 +272,11 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
     title: "论文相关",
     buttons: [
       { id: "review-result", label: "论文结果" },
+      { id: "journal-accepted", label: "期刊中稿" },
       { id: "conference", label: "论文参会" },
-      { id: "conference-activity", label: "会场活动" },
+      { id: "conference-activity-a", label: "A会活动" },
+      { id: "conference-activity-b", label: "B会活动" },
+      { id: "conference-activity-c", label: "C会活动" },
       { id: "internship-invite", label: "实习邀请" },
       { id: "joint-training-invite", label: "联合培养" },
       { id: "lover-beautiful", label: "活泼关系线" },
@@ -281,8 +286,8 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
   {
     title: "毕业相关",
     buttons: [
-      { id: "thesis-progress", label: "论文推进" },
-      { id: "career-internet", label: "互联网招聘" },
+      { id: "thesis-progress", label: "毕业盲审" },
+      { id: "career-internet", label: "私企招聘" },
       { id: "career-state-owned", label: "央国企招聘" },
       { id: "career-civil-service", label: "公务员招聘" },
       { id: "career-academic", label: "教职招聘" },
@@ -520,6 +525,17 @@ function triggerReviewResultDebugEvent(state: GameState): GameState {
   };
 }
 
+function triggerJournalAcceptedDebugEvent(state: GameState): GameState {
+  if (state.eventQueue.some((event) => event.journalFeePreview)) return state;
+  for (const paper of [...state.papers, ...state.externalPublications]) {
+    const event = createJournalFeeEvent(state, paper);
+    if (event) return enqueuePendingEvents(state, [event]).nextState;
+  }
+  const nextState = addDebugPublishedJournalPaper(state, "pami", "first");
+  const event = createJournalFeeEvent(nextState, nextState.externalPublications.at(-1)!);
+  return event ? enqueuePendingEvents(nextState, [event]).nextState : state;
+}
+
 function markTriggeredEventForReplay(before: GameState, after: GameState, debugEventId: string): GameState {
   const previousIds = new Set(before.eventQueue.map((event) => event.id));
   return {
@@ -569,7 +585,6 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
   const baseState = state;
   let targetEvent = targetScene;
   let nextContext = context;
-  const activityPreview = currentEvent.conferenceActivityPreview ?? context.rootEvent.conferenceActivityPreview;
   const fixedReplayRoot = currentEvent.chainId === "teachers-day"
     ? createTeachersDayEvent(baseState, Math.random)
     : currentEvent.chainId === "mentor-assign"
@@ -577,22 +592,7 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
       : currentEvent.chainId === "before-grad-school"
         ? createBeforeGradSchoolAct1Event(baseState, Math.random)
         : null;
-  if (activityPreview && currentEvent.chainId.endsWith("-activity")) {
-    const rebuiltRoot = createConferenceActivityEvent(
-      activityPreview.context,
-      { ...baseState, research: baseState.player.research, social: baseState.player.social },
-      activityPreview.attendanceSummary ? [activityPreview.attendanceSummary] : [],
-      Math.random,
-    );
-    targetEvent = rebuiltRoot;
-    for (const stage of history.slice(0, targetIndex)) {
-      const choice = targetEvent.choices.find((item) => item.id === stage.selectedChoiceId);
-      const followUp = choice?.effects.enqueueEvents?.find((event) => event.chainId === currentEvent.chainId);
-      if (!followUp) return state;
-      targetEvent = followUp;
-    }
-    nextContext = { ...context, rootEvent: rebuiltRoot };
-  } else if (fixedReplayRoot && targetIndex <= 1) {
+  if (fixedReplayRoot && targetIndex <= 1) {
     targetEvent = fixedReplayRoot;
     for (const stage of history.slice(0, targetIndex)) {
       const choice = targetEvent.choices.find((item) => item.id === stage.selectedChoiceId);
@@ -689,21 +689,24 @@ function buildDebugEvent(
       return { nextState: state, event: createCcigEvent(state) };
     case "ccig-activity":
       return { nextState: state, event: createCcigActivityEvent(state, "self", []) };
-    case "conference-activity": {
+    case "conference-activity-a":
+    case "conference-activity-b":
+    case "conference-activity-c": {
+      const grade = eventId === "conference-activity-a" ? "A" : eventId === "conference-activity-b" ? "B" : "C";
       const month = Math.max(1, state.month);
       const year = Math.max(1, state.year);
-      const conference = getConferenceInfo(month, "C", year);
-      const location = getConferenceLocation(month, "C", year, state.conferenceLocationSeed);
+      const conference = getConferenceInfo(month, grade, year);
+      const location = getConferenceLocation(month, grade, year, state.conferenceLocationSeed);
       return {
         nextState: state,
         event: createConferenceActivityEvent({
-          id: `debug-conference-${year}-${month}-C-${location.city}`,
+          id: `debug-conference-${year}-${month}-${grade}-${location.city}`,
           conferenceName: conference.name,
           conferenceYear: conference.year,
           city: location.city,
           country: location.country,
           region: location.region,
-          grade: "C",
+          grade,
           paperCount: 1,
           paperIds: [],
         }, buildConferenceDebugState(state), []),
@@ -746,13 +749,10 @@ function buildDebugEvent(
     case "thesis-progress": {
       const thesisState = {
         ...state,
-        thesis: {
-          ...state.thesis,
-          progress: Math.min(99, state.thesis.progress),
-          started: true,
-          completed: false,
-          abandoned: false,
-        },
+        year: getGraduationPreparationYear(state.degree),
+        month: 8,
+        totalMonths: (getGraduationPreparationYear(state.degree) - 1) * 12 + 8,
+        thesis: createInitialThesisState(),
       };
       return collectThesisEventForMonth(thesisState);
     }
@@ -875,6 +875,9 @@ function triggerDebugEvent(state: GameState, eventId: string): GameState {
   if (eventId === "review-result") {
     return markTriggeredEventForReplay(replayState, triggerReviewResultDebugEvent(replayState), eventId);
   }
+  if (eventId === "journal-accepted") {
+    return markTriggeredEventForReplay(replayState, triggerJournalAcceptedDebugEvent(replayState), eventId);
+  }
 
   const built = buildDebugEvent(replayState, eventId);
   const label = DEBUG_EVENT_LABELS[eventId] ?? eventId;
@@ -975,6 +978,16 @@ function addDebugPublishedJournalPaper(
   const calendarYear = getAcademicCalendarYear(submittedYear, submittedMonth);
   const topic = createDraftPaper(state.totalMonths, publicationIndex, Math.random, calendarYear);
   const journal = getJournalDefinition(journalTarget);
+  const reservedIds = new Set([
+    ...state.papers.map((paper) => paper.id),
+    ...state.externalPublications.map((paper) => paper.id),
+    ...(state.fellowPapers ?? []).map((paper) => paper.id),
+    ...(state.advisorProgressState.paidJournalPaperIds ?? []),
+    ...(state.debugSkippedJournalFeePaperIds ?? []),
+    ...state.eventQueue.flatMap((event) => event.journalFeePreview ? [event.journalFeePreview.paperId] : []),
+  ]);
+  let paperSerial = publicationIndex + 1;
+  while (reservedIds.has(`debug-journal-${state.totalMonths}-${paperSerial}`)) paperSerial += 1;
   const acceptedScore = journal.acceptanceScore + 30 + Math.floor(Math.random() * 36);
   const baseScore = Math.floor(acceptedScore / 3);
   const remainder = acceptedScore - baseScore * 3;
@@ -983,7 +996,7 @@ function addDebugPublishedJournalPaper(
   const writing = baseScore;
   const paper = attachPaperPublication({
     ...topic,
-    id: `debug-journal-${state.totalMonths}-${publicationIndex + 1}`,
+    id: `debug-journal-${state.totalMonths}-${paperSerial}`,
     idea,
     experiment,
     writing,

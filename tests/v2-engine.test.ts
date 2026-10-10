@@ -13,6 +13,7 @@ import { createPhdDecisionEvent } from "../src/core/v2-phd-decision-event";
 import { pushLog, pushNoOpLog } from "../src/core/v2-engine-helpers";
 import { previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { isPreEnrollmentState } from "../src/core/v2-progression";
+import { prepareThesisBlindReview, syncThesisState, THESIS_REVIEW_THRESHOLDS } from "../src/core/v2-thesis-rules";
 
 function startGame() {
   return dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
@@ -465,7 +466,6 @@ describe("minimal game engine", () => {
             research: 2,
             score: 3,
             temporaryActionEffectUpdates: { idea: { bonus: 3 } },
-            thesisProgress: 50,
             relationshipAdditions: ["junior"],
           },
         }],
@@ -475,7 +475,7 @@ describe("minimal game engine", () => {
     const resolved = dispatchAction(state, "resolve-event", { eventId: "core-effect", eventChoiceId: "apply" });
     expect(resolved.player.research).toBe(state.player.research + 2);
     expect(resolved.totalResearchScore).toBe(state.totalResearchScore + 3);
-    expect(resolved.thesis).toMatchObject({ progress: 50, started: true, completed: false });
+    expect(resolved.thesis).toEqual(state.thesis);
     expect(resolved.relationshipState.juniorCount).toBe(state.relationshipState.juniorCount + 1);
     expect(resolved.buffs.map((buff) => buff.name)).toEqual(["下次想 idea +3分"]);
     expect(resolved.eventHistory).toHaveLength(1);
@@ -705,8 +705,18 @@ describe("minimal game engine", () => {
   });
 
   it("finishes at the training limit with graduation or delay", () => {
+    const prepared = syncThesisState({
+      ...startGame(), graduationScoreTarget: 1, totalResearchScore: 1,
+      year: 3, month: 8, totalMonths: 32, eventQueue: [],
+    }, () => 0);
+    prepared.thesis.researchPoints = prepared.thesis.researchPoints.map((point) => ({
+      ...point, score: Math.ceil(THESIS_REVIEW_THRESHOLDS.master.B / 3),
+    }));
+    const reviewed = prepareThesisBlindReview(prepared, () => 0);
+    expect(reviewed.thesis.review).toMatchObject({ submitted: true, passed: true, excellent: false });
     const readyState = {
-      ...startGame(),
+      ...reviewed,
+      thesis: { ...reviewed.thesis, reviewResolved: true },
       selectedAdvisorName: "测试导师",
       graduationScoreTarget: 1,
       year: 3,
@@ -719,12 +729,12 @@ describe("minimal game engine", () => {
     const graduated = dispatchAction({ ...readyState, totalResearchScore: 1 }, "next-month");
     expect(graduated.phase).toBe("finished");
     expect(graduated.ending).toBe("master");
-    expect(graduated.log[0]?.text).toBe("硕士毕业：科研分 1/1。");
+    expect(graduated.log[0]?.text).toBe("硕士毕业：科研分 1/1，盲审通过。");
 
     const delayed = dispatchAction({ ...readyState, totalResearchScore: 0 }, "next-month");
     expect(delayed.phase).toBe("finished");
     expect(delayed.ending).toBe("delay");
-    expect(delayed.log[0]?.text).toBe("延期毕业：科研分 0/1。");
+    expect(delayed.log[0]?.text).toBe("延期毕业：科研分 0/1，盲审通过。");
   });
 
   it("allows core attributes to cross zero and trigger endings", () => {

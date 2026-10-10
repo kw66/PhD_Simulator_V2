@@ -1,4 +1,5 @@
 import { formatMoney, roundMoney } from "../core/v2-money";
+import "../styles/shop-unified.css";
 import {
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
   COFFEE_MACHINE_PRICE,
@@ -499,12 +500,6 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
 
 function renderShopTabButtons(activeTab: ShopTabId, upgradeNoticeTabs: readonly ShopTabId[] = []): string {
   const noticeTabSet = new Set(upgradeNoticeTabs);
-  const hints: Record<ShopTabId, string> = {
-    ai: "订阅AI，辅助科研和阅读",
-    coffee: "购买冰美式、升级咖啡机",
-    gear: "购买与升级个人设备",
-    rest: "选择休息设备及升级路线",
-  };
   return SHOP_TABS.map((tab) => {
     const activeClass = tab.id === activeTab ? " active" : "";
     const upgradeBadge = noticeTabSet.has(tab.id)
@@ -516,7 +511,6 @@ function renderShopTabButtons(activeTab: ShopTabId, upgradeNoticeTabs: readonly 
         type="button"
         data-ui-shop-tab="${tab.id}"
         aria-pressed="${tab.id === activeTab ? "true" : "false"}"
-        data-tooltip="${escapeHtml(hints[tab.id])}"
       >
         <span class="shop-tab-icon" aria-hidden="true">${tab.icon}</span>
         <span>${tab.label}</span>

@@ -3,7 +3,9 @@ import { createConferenceMentorContact, createConferenceScholarContact, getConfe
 import { applyTierResist } from "../src/core/v2-sanity-rules";
 import { describe, expect, it } from "vitest";
 
-import { createConferenceActivityDecisionEvent } from "../src/core/v2-conference-activity-events";
+import { createConferenceActivityDecisionEvent, createConferenceActivityResult } from "../src/core/v2-conference-activity-events";
+import { dispatchAction } from "../src/core/v2-engine";
+import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createBaseConferenceActivityOptions } from "../src/core/v2-conference-activity-base-options";
 import { scheduleConferenceAttendance, settleDueConferenceAttendance } from "../src/core/v2-conference-attendance";
 import { buildConferenceDecisionEventsForAcceptedPapers } from "../src/core/v2-conference-events";
@@ -52,9 +54,9 @@ describe("v2 conference activity", () => {
     expect(tea.outcome).toBe("社交 +0.6（抵抗0.4）。");
     expect(tea.effects).toEqual({ social: 0.6 });
     for (const [id, label, action, effect] of [
-      ["idea-networking", "广泛交流idea", "idea", { extraActions: 3 }],
-      ["experiment-discussion", "同行交流实验", "experiment", { extraActions: 3 }],
-      ["famous-scholar", "与著名学者交流", "idea", { multiplier: 1.25 }],
+      ["idea-networking", "idea交流", "idea", { extraActions: 3 }],
+      ["experiment-discussion", "实验交流", "experiment", { extraActions: 3 }],
+      ["famous-scholar", "学者请教", "idea", { multiplier: 1.25 }],
     ] as const) {
       const option = options.find((entry) => entry.id === id)!;
       expect(option.label).toBe(label);
@@ -131,7 +133,7 @@ describe("v2 conference activity", () => {
     expect(activityDecision.title).toBe(`${name}活动 ➜ 选择安排`);
     for (const choice of activityDecision.choices) {
       const final = choice.effects.enqueueEvents![0]!;
-      expect(final.title).toBe(`${name}活动 ➜ 选择安排 ➜ 活动结果`);
+      expect(final.title).toBe(`${name}活动 ➜ 选择安排 ➜ ${choice.label}`);
       expect(final.choices[0]!.label).toBe("确定");
       expect(final.description).toContain("论文1：Oral 展示完成，会后引用倍率 ×1.50");
       expect(final.description).toContain("论文2：Poster 展示完成");
@@ -160,27 +162,27 @@ describe("v2 conference activity", () => {
     }
   });
 
-  it("offers exactly three advanced options and excludes enterprise from C meetings", () => {
+  it("keeps enterprise in the basic pool and leaves only social options advanced", () => {
     const state = createBuildState({ social: 6 });
     expect(selectConferenceActivityOptions({ ...baseContext, grade: "B" }, state, () => 0.99).map((option) => option.id))
-      .toEqual(["enterprise-networking", "opposite-scholar", "big-bull-coop", "famous-scholar"]);
-    expect(createAdvancedConferenceActivityOptions(state, () => 0.99)).toHaveLength(3);
+      .toEqual(["opposite-scholar", "big-bull-coop", "enterprise-networking", "famous-scholar"]);
+    expect(createAdvancedConferenceActivityOptions(state, () => 0.99)).toHaveLength(2);
     expect(selectConferenceActivityOptions(baseContext, state, () => 0.99).map((option) => option.id))
-      .toEqual(["famous-scholar", "idea-networking", "experiment-discussion"]);
+      .toEqual(["enterprise-networking", "famous-scholar", "idea-networking"]);
     expect(createAdvancedConferenceActivityOptions(createBuildState({ social: 5.9 }), () => 0.99)).toEqual([]);
   });
 
   it("invites experienced enterprise contacts only from the second exchange", () => {
     const state = createBuildState({ social: 6, internshipCount: 1 });
-    const enterprise = (current: typeof state) => createAdvancedConferenceActivityOptions(current, () => 0.99)
+    const enterprise = (current: typeof state) => createBaseConferenceActivityOptions(baseContext, current, () => 0.99)
       .find((option) => option.id === "enterprise-networking")!;
-    expect(enterprise(state).effects.triggerInternshipInvite).toBe(false);
+    expect(enterprise(state).effects.triggerInternshipInvite ?? false).toBe(false);
     const second = { ...state, conferenceCareerState: { ...state.conferenceCareerState, enterpriseCount: 1 } };
-    expect(enterprise(second).effects.triggerInternshipInvite).toBe(true);
-    expect(enterprise({ ...second, internshipCount: 0 }).effects.triggerInternshipInvite).toBe(false);
+    expect(enterprise(second).effects.triggerInternshipInvite ?? false).toBe(true);
+    expect(enterprise({ ...second, internshipCount: 0 }).effects.triggerInternshipInvite ?? false).toBe(false);
     for (const internshipState of [activateInternship(), activateRemoteInternship(11)]) {
       const choice = enterprise({ ...second, internshipState, totalMonths: 11 });
-      expect(choice.effects.triggerInternshipInvite).toBe(false);
+      expect(choice.effects.triggerInternshipInvite ?? false).toBe(false);
       expect(choice.effects.internshipStateUpdates).toBeUndefined();
       expect(choice.effects.temporaryActionEffectUpdates).toEqual({ experiment: { multiplier: 1.25 } });
     }
@@ -226,10 +228,10 @@ describe("v2 conference activity", () => {
     expect(option.effects.research).toBeUndefined();
   });
 
-  it("allows first-encounter romance at social 12 but penalizes an existing lover without clamping", () => {
+  it("requires repeated encounters for romance but penalizes an existing lover even on the first encounter", () => {
     const state = createBuildState({ social: 12 });
     const first = createAdvancedConferenceActivityOptions(state, () => 0)[1]!;
-    expect(first.effects.triggerLoverDevelopment).toBe("beautiful");
+    expect(first.effects.triggerLoverDevelopment).toBeUndefined();
     expect(first.effects.social).toBeUndefined();
     const game = createStartedGameState("normal");
     for (const intimacy of [2, 12]) {
@@ -240,6 +242,58 @@ describe("v2 conference activity", () => {
       expect(option.effects.loverIntimacyDelta).toBe(applyTierResist(-6, intimacy).effectiveChange);
       expect(option.effects.triggerLoverDevelopment).toBeUndefined();
       if (intimacy === 2) expect(intimacy + option.effects.loverIntimacyDelta!).toBeLessThan(0);
+    }
+  });
+
+  it.each(["beautiful", "smart"] as const)("gates %s romance on that person's third encounter, social and relationship status", (type) => {
+    const otherType = type === "beautiful" ? "smart" : "beautiful";
+    for (const count of [0, 1, 2, 5]) {
+      for (const social of [11, 12]) {
+        for (const hasLover of [false, true]) {
+          const scholar = { ...createConferenceScholarContact(type), encounterCount: count };
+          const other = { ...createConferenceScholarContact(otherType), encounterCount: 20 };
+          const state = createBuildState({ social, loverState: { ...createLoverState(), active: hasLover },
+            conferenceEncounterState: { ...createConferenceEncounterState(), scholars: { [type]: scholar, [otherType]: other } },
+          });
+          const option = createAdvancedConferenceActivityOptions(state, () => type === "beautiful" ? 0 : 0.9)[1]!;
+          const invited = count >= 2 && social >= 12 && !hasLover;
+          expect(option.effects.triggerLoverDevelopment).toBe(invited ? type : undefined);
+          expect(option.outcome.includes("会后有约")).toBe(invited);
+          expect(option.settlementItems!.join("\n").includes(`与${scholar.name}搭讪 ≥ 3次`)).toBe(invited);
+          expect(option.settlementItems).toContain(`条件：${type === "beautiful" ? "活泼" : "聪慧"}学者（50%）`);
+          const countText = `与${scholar.name}搭讪达${count + 1}次`;
+          expect(option.outcome.split(countText)).toHaveLength(2);
+          expect(option.settlementItems!.join("\n").split(countText)).toHaveLength(2);
+          expect(option.effects.conferenceEncounterUpdates?.scholars?.[type]?.encounterCount).toBe(count + 1);
+          expect(option.effects.conferenceEncounterUpdates?.scholars?.[otherType]).toEqual(other);
+        }
+      }
+    }
+  });
+
+  it.each([
+    ["big-bull-coop", 0], ["opposite-scholar", 0], ["opposite-scholar", 0.9],
+  ] as const)("commits the displayed %s count once per result at roll %s", (optionId, roll) => {
+    let state = createStartedGameState("normal");
+    state.player.social = 12;
+    state.player.research = 12;
+    const type = roll < 0.5 ? "beautiful" : "smart";
+    for (const count of [1, 2, 3]) {
+      const original = structuredClone(state.conferenceEncounterState);
+      const option = createAdvancedConferenceActivityOptions({ ...state, ...state.player }, () => roll)
+        .find((entry) => entry.id === optionId)!;
+      const event = createConferenceActivityResult({ ...baseContext, grade: "A" }, option, "");
+      expect(state.conferenceEncounterState).toEqual(original);
+      state = dispatchAction({ ...state, eventQueue: [createEventQueueItem(event, count)] }, "resolve-event", {
+        eventId: event.id, eventChoiceId: "close",
+      });
+      const actualCount = optionId === "big-bull-coop"
+        ? state.conferenceEncounterState.bigBull!.cooperationCount
+        : state.conferenceEncounterState.scholars![type]!.encounterCount;
+      expect(actualCount).toBe(count);
+      expect(state.eventQueue.some((queued) => queued.chainId === (optionId === "big-bull-coop" ? "joint-training" : "lover-development"))).toBe(count >= 3);
+      const repeated = dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: "close" });
+      expect(repeated.conferenceEncounterState).toEqual(state.conferenceEncounterState);
     }
   });
 

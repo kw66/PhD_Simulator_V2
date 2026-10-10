@@ -68,7 +68,7 @@ export function renderDebugPanel(state: GameState | null, connected: boolean, co
             ${actionPoints}${replayControl}
             <div class="debug-popup-time-control"><strong>📅 <span data-debug-date>${date}</span></strong>
               <div class="debug-popup-time debug-popup-buttons">${DEBUG_MONTH_DELTAS.map((delta) => button(`${delta > 0 ? "+" : ""}${delta}月`, "debug-shift-month", { delta })).join("")}
-                <button type="button" data-action="force-next-month" title="删除当前阻塞事件并真实结算下一月">下一月</button>
+                <button type="button" data-action="force-next-month" data-card-tooltip data-tooltip="删除当前阻塞事件并真实结算下一月" aria-description="删除当前阻塞事件并真实结算下一月">下一月</button>
               </div>
             </div>
           </div>

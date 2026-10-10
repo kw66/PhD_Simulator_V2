@@ -92,11 +92,10 @@ export function renderAnnouncementPage(requestedPage = 0): string {
     <article class="announcement-card" aria-label="${announcement.date} 更新记录" data-announcement-date="${announcement.date}">
         <ul class="announcement-changes">
         ${announcement.changes.map((change, index) => `<li data-announcement-item="${announcement.date}-${index}" data-announcement-expanded="false">
-          <span class="announcement-category">${change.category}</span>
-          <div><strong>${escapeHtml(change.title)}</strong>
-            <div class="announcement-body" id="announcement-body-${announcement.date}-${index}" data-announcement-body><p data-announcement-text>${escapeHtml(change.description)}</p></div>
+          <div class="announcement-item-heading"><span class="announcement-category">${change.category}</span><strong>${escapeHtml(change.title)}</strong>
             <button class="announcement-toggle" type="button" data-announcement-toggle aria-label="展开：${escapeHtml(change.title)}" aria-controls="announcement-body-${announcement.date}-${index}" aria-expanded="false" hidden>展开</button>
           </div>
+          <div class="announcement-body" id="announcement-body-${announcement.date}-${index}" data-announcement-body><p data-announcement-text>${escapeHtml(change.description)}</p></div>
         </li>`).join("")}
         </ul>
     </article>

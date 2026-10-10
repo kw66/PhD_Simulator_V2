@@ -33,7 +33,7 @@ describe("new multi-stage event shape", () => {
     expect(result?.description).toContain("科研上限 +3");
     expect(result?.description).toContain("idea +5（永久）｜写作 +5（永久）");
     expect(result?.description).not.toContain("导师科研资源");
-    expect(result?.completionLog).toBe("你接受了联合培养，科研上限 +3。");
+    expect(result?.completionLog).toBe(`你接受了与${result!.jointTrainingPreview!.context.contact!.name}的联合培养，科研上限 +3。`);
     expect(result?.choices[0]?.effects.advisorProgressStateDeltas).toBeUndefined();
   });
 
