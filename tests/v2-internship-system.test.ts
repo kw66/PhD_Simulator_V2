@@ -4,6 +4,7 @@ import {
   activateInternship,
   activateRemoteInternship,
   advanceInternshipMonth,
+  createInternshipOffer,
   createInternshipState,
   getInternshipExperimentEffect,
   getInternshipMonthlyIncome,
@@ -12,7 +13,6 @@ import {
   getInternshipStatus,
   getPublishedAPaperCount,
   hasOngoingInternship,
-  increaseInternshipExperimentMultiplier,
 } from "../src/core/v2-internship-system";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolution-state";
@@ -42,26 +42,28 @@ describe("v2 internship system", () => {
     const state = activateInternship();
 
     expect(state).toEqual({
+      offer: createInternshipOffer(() => 0.5),
       active: true,
       kind: "conference6",
       remainingMonths: 6,
       experimentMultiplier: 1.25,
-      experimentBonus: 0,
-      experimentMoneyDiscount: 0,
+      experimentBonus: 5,
+      experimentMoneyDiscount: 2,
     });
   });
 
-  it.each([0, 1])("keeps the remaining invitation state after rejection %s", (rejectedInternshipCount) => {
+  it.each([0, 1, 2, 100])("allows future invitations after rejection %s", (rejectedInternshipCount) => {
     const context = { ...buildInternshipInviteContext(playingState()), rejectedInternshipCount };
     const decision = createInternshipInviteAct1(context).choices[0]!.effects.enqueueEvents![0]!;
     const decline = decision.choices.find((choice) => choice.id === "decline")!;
     const result = decline.effects.enqueueEvents![0]!;
-    expect(decline.effects.conferenceCareerUpdates).toMatchObject({
+    expect(decline.effects.conferenceCareerUpdates).toBeUndefined();
+    expect(result.choices[0]!.effects.conferenceCareerUpdates).toMatchObject({
       rejectedInternshipCount: rejectedInternshipCount + 1,
-      permanentlyBlockedInternship: rejectedInternshipCount === 1,
+      permanentlyBlockedInternship: false,
     });
     expect(result.description.split("机制结算")[1]?.trim()).toBe(
-      rejectedInternshipCount === 0 ? "结果：大厂实习机会剩余1次" : "结果：大厂实习机会永久关闭",
+      "结果：暂不实习",
     );
   });
 
@@ -76,19 +78,16 @@ describe("v2 internship system", () => {
     expect(remote.outcome).toContain("实验 +4（每次）");
     expect(getInternshipExperimentEffect({ ...state, totalMonths: state.totalMonths + 1,
       internshipState: activateRemoteInternship(state.totalMonths) })).toEqual({ bonus: 4, multiplier: 1, moneyDiscount: 1 });
-    const decision = createInternshipInviteAct1(buildInternshipInviteContext(state)).choices[0]!.effects.enqueueEvents![0]!;
+    const context = buildInternshipInviteContext(state, () => 0.5);
+    const decision = createInternshipInviteAct1(context).choices[0]!.effects.enqueueEvents![0]!;
     const result = decision.choices.find((choice) => choice.id === "accept")!.effects.enqueueEvents![0]!;
     expect(result.description.match(/持续6个月/gu)).toHaveLength(1);
-    expect(result.description).toContain("SAN -2（每月）");
+    expect(result.description).toContain("SAN -5（每月）");
     expect(result.description).toContain("金币 +1（每月）");
     expect(result.description).toContain("实验 ×1.25（每次）");
-    expect(result.choices[0]!.effects.internshipStateUpdates).toEqual(activateInternship());
-  });
-
-  it("grows active internship multiplier by 0.05 per enterprise follow-up", () => {
-    const nextState = increaseInternshipExperimentMultiplier(activateInternship());
-
-    expect(nextState.experimentMultiplier).toBe(1.3);
+    expect(result.description).toContain("实验 +5（每次）");
+    expect(result.description).toContain("实验费用 -2（每次）");
+    expect(result.choices[0]!.effects.internshipStateUpdates).toEqual(activateInternship(context.offer));
   });
 
   it.each([[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [100, 6]])("calculates salary for %s first-author A papers", (papers, salary) => {
@@ -112,7 +111,7 @@ describe("v2 internship system", () => {
     for (const totalCitations of [0, 100000]) {
       const current = { ...state, totalCitations };
       expect(getInternshipMonthlyStats(current).money).toBe(3);
-      expect(buildInternshipInviteContext(current).currentMonthlyIncome).toBe(3);
+      expect(buildInternshipInviteContext(current, () => 0.5).currentMonthlyIncome).toBe(3);
     }
   });
 
@@ -161,7 +160,6 @@ describe("v2 internship system", () => {
     expect(advanceInternshipMonth({ ...state, totalMonths: 14 }).remainingMonths).toBe(1);
     expect(advanceInternshipMonth({ ...state, totalMonths: 15 })).toEqual(createInternshipState());
     expect(state).toEqual(before);
-    expect(increaseInternshipExperimentMultiplier(state.internshipState)).toBe(state.internshipState);
   });
 
   it.each([
@@ -235,8 +233,12 @@ describe("v2 internship system", () => {
         state = resolveFirst(state, choice.id);
         state = resolveFirst({ ...state, internshipState: ongoing });
         expect(state.internshipState).toEqual(ongoing);
-        expect(state.eventQueue[0]?.description).toContain("已有实习安排，本次不新增、不延期");
-        state = resolveFirst(state);
+        if (source === "advisor") {
+          expect(state.eventQueue[0]?.description).toContain("已有实习安排，本次不新增、不延期");
+          state = resolveFirst(state);
+        } else {
+          expect(state.eventQueue).toHaveLength(0);
+        }
         expect(state.log[0]?.text).toContain("原实习保持不变");
         expect(state.log[0]?.text).not.toMatch(/每月金币|未来3个月/);
         expect(state.internshipState).toEqual(ongoing);
@@ -258,7 +260,7 @@ describe("v2 internship system", () => {
     expect(resolveFirst(denied).log[0]?.text).toContain("条件：科研分 < 2");
   });
 
-  it.each(["ongoing", "blocked"] as const)("keeps a denied %s internship in its own chain when another result has the same close choice", (reason) => {
+  it("keeps an occupied internship in its own chain when another result has the same close choice", () => {
     const initial = playingState();
     let state = resolveFirst(queueEvent(initial, createInternshipInviteAct1(buildInternshipInviteContext(initial))));
     state = resolveFirst(state, "accept");
@@ -279,21 +281,10 @@ describe("v2 internship system", () => {
     state = {
       ...state,
       eventQueue: [unrelated, { ...approval, queueOrder: 2 }],
-      internshipState: reason === "ongoing" ? activateRemoteInternship(state.totalMonths) : state.internshipState,
-      conferenceCareerState: { ...state.conferenceCareerState, permanentlyBlockedInternship: reason === "blocked" },
+      internshipState: activateRemoteInternship(state.totalMonths),
     };
-    const expectedOutcome = reason === "ongoing"
-      ? "已有实习安排，本次不新增、不延期，原实习保持不变。"
-      : "大厂实习机会已关闭，本次未开始实习。";
-    const denied = dispatchAction(state, "resolve-event", { eventId: approval.id, eventChoiceId: "close" });
-    const failure = denied.eventQueue.find((event) => event.id === `${approval.id}-unavailable`)!;
-    expect(failure).toMatchObject({ chainId: approval.chainId, completionLog: expectedOutcome });
-    expect(denied.eventQueue.find((event) => event.id === unrelated.id)).toEqual(unrelated);
-    expect(denied.internshipState).toEqual(state.internshipState);
-    expect(denied.eventHistory).toEqual(state.eventHistory);
-    expect(denied.log).toEqual(state.log);
-
-    const completed = dispatchAction(denied, "resolve-event", { eventId: failure.id, eventChoiceId: failure.choices[0]!.id });
+    const expectedOutcome = "已有实习安排，本次不新增、不延期，原实习保持不变。";
+    const completed = dispatchAction(state, "resolve-event", { eventId: approval.id, eventChoiceId: "close" });
     expect(completed.eventQueue).toEqual([unrelated]);
     expect(completed.internshipState).toEqual(state.internshipState);
     expect(completed.log[0]?.text).toContain(expectedOutcome);
@@ -302,7 +293,7 @@ describe("v2 internship system", () => {
     expect(history.chainId).toBe(approval.chainId);
     expect(completed.eventHistory).toHaveLength(state.eventHistory.length + 1);
     const resultStages = history.stages.slice(approval.history!.length);
-    expect(resultStages).toHaveLength(2);
+    expect(resultStages).toHaveLength(1);
     for (const stage of resultStages) {
       expect(stage.description).toContain(expectedOutcome);
       expect(stage.title).not.toContain("实习已确认");
@@ -333,30 +324,31 @@ describe("v2 internship system", () => {
     expect(accepted.internshipState).toEqual(ongoing);
   });
 
-  it("preserves conference acceptance and blocks stale closed enterprise offers", () => {
+  it("preserves the selected offer and ignores the obsolete blocked flag", () => {
     const initial = playingState();
-    const event = createInternshipInviteAct1(buildInternshipInviteContext(initial));
+    const context = buildInternshipInviteContext(initial, () => 0.5);
+    const event = createInternshipInviteAct1(context);
     let state = resolveFirst(queueEvent(initial, event));
     expect(state.eventQueue[0]!.choices.find((choice) => choice.id === "accept")?.outcome).toContain("（持续6个月）");
     state = resolveFirst(state, "accept");
     expect(state.internshipState.active).toBe(false);
-    expect(resolveFirst(state).internshipState).toEqual(activateInternship());
+    expect(resolveFirst(state).internshipState).toEqual(activateInternship(context.offer));
     const blocked = { ...state, conferenceCareerState: { ...state.conferenceCareerState, permanentlyBlockedInternship: true } };
-    const denied = resolveFirst(blocked);
-    expect(denied.internshipState.active).toBe(false);
-    expect(denied.eventQueue[0]?.description).toContain("大厂实习机会已关闭");
-    expect(resolveFirst(denied).log[0]?.text).toContain("本次未开始实习");
+    const accepted = resolveFirst(blocked);
+    expect(accepted.internshipState).toEqual(activateInternship(context.offer));
+    expect(accepted.conferenceCareerState.hasInternshipExperience).toBe(true);
+    expect(accepted.conferenceCareerState.lastInternshipOffer).toEqual(context.offer);
   });
 
   it("does not restore an expired placement from stale networking effects", () => {
     const initial = playingState();
     const choice = { id: "enterprise", label: "企业交流", outcome: "", effects: {
       triggerInternshipInvite: true,
-      internshipStateUpdates: increaseInternshipExperimentMultiplier(activateInternship()),
+      internshipStateUpdates: activateInternship(),
     } };
     const resolved = applyChoiceEffectsToState(initial, choice).nextState;
     expect(resolved.internshipState).toEqual(initial.internshipState);
     const current = { ...initial, internshipState: { ...activateInternship(), remainingMonths: 2, experimentMultiplier: 1.4 } };
-    expect(applyChoiceEffectsToState(current, choice).nextState.internshipState).toEqual({ ...current.internshipState, experimentMultiplier: 1.45 });
+    expect(applyChoiceEffectsToState(current, choice).nextState.internshipState).toEqual(current.internshipState);
   });
 });

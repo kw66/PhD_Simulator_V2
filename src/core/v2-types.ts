@@ -14,6 +14,7 @@ import type {
   ShopState,
 } from "./v2-types-economy";
 import type { FixedEventResolution } from "./v2-types-fixed-events";
+import type { TeachersDayGiftId } from "./v2-types-fixed-events";
 import type { ConferenceEventContext } from "./v2-conference-events";
 import type { ConferenceActivityContext } from "./v2-conference-activity-shared";
 import type {
@@ -525,6 +526,8 @@ export interface EventChoice {
     internshipStateUpdates?: Partial<InternshipState>;
     loverStateUpdates?: Partial<LoverState>;
     loverProgressStateUpdates?: Partial<LoverProgressState>;
+    loverIntimacyDelta?: number;
+    loverProgressRolls?: number[];
     activateLoverProgress?: LoverTypeId;
     researchCapacityStateDeltas?: Partial<Record<keyof ResearchCapacityState, number>>;
     advisorProgressStateDeltas?: Partial<Pick<AdvisorProgressState, "researchAccumulation" | "funding">>;
@@ -617,10 +620,26 @@ export interface PendingEvent {
     participationMode: "advisor" | "self";
     attendanceSettlementItems: string[];
   };
+  teachersDayPreview?: {
+    giftId: TeachersDayGiftId;
+  };
+  internshipInvitePreview?: {
+    context: import("./v2-internship-events").InternshipInviteContext;
+    decision?: "accept" | "decline";
+  };
+  jointTrainingPreview?: {
+    context: import("./v2-joint-training-events").JointTrainingContext;
+    decision?: "accept" | "decline";
+  };
+  loverDevelopmentPreview?: {
+    context: import("./v2-lover-events").LoverDevelopmentContext;
+    decision?: "accept" | "decline";
+  };
   conferenceActivityPreview?: {
     context: ConferenceActivityContext;
     attendanceSummary: string;
     rolls: number[];
+    contacts?: Pick<ConferenceEncounterState, "bigBull" | "scholars">;
     selectedOptionId?: string;
   };
   fixedTreePreview?: {

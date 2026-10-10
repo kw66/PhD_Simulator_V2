@@ -171,9 +171,10 @@ function createTeachersDayChoiceEvent(
 export function createTeachersDayEvent(
   state: GameState,
   getRoll: RandomRollProvider = Math.random,
+  giftId?: TeachersDayGiftId,
 ): PendingEvent {
-  const gift = drawTeachersDayGift(getRoll);
-  return createFixedEvent({
+  const gift = getTeachersDayGift(giftId) ?? drawTeachersDayGift(getRoll);
+  const event = createFixedEvent({
     id: `teachers-day-y${state.year}-m${state.month}`,
     title: "教师节",
     description: [
@@ -192,6 +193,20 @@ export function createTeachersDayEvent(
       },
     ],
   });
+  return {
+    ...event,
+    teachersDayPreview: { giftId: gift.id },
+    choices: event.choices.map((choice) => ({
+      ...choice,
+      effects: {
+        ...choice.effects,
+        enqueueEvents: choice.effects.enqueueEvents?.map((followUp) => ({
+          ...followUp,
+          teachersDayPreview: { giftId: gift.id },
+        })),
+      },
+    })),
+  };
 }
 
 export function getTeachersDayResultPreviews(state: GameState, resolution: FixedEventResolution): PendingEvent[] {

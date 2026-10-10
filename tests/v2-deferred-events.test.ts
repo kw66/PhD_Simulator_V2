@@ -192,7 +192,7 @@ describe("deferred-system event content", () => {
     const acceptChoice = act2?.choices.find((choice) => choice.id === "accept");
 
     expect(context.loverGender).toBe("male");
-    expect(acceptChoice?.effects.loverStateUpdates?.gender).toBe("male");
+    expect(acceptChoice?.effects.enqueueEvents?.[0]?.choices[0]?.effects.loverStateUpdates?.gender).toBe("male");
   });
 
   it("keeps lasting modifiers as Buffs and commits relationship state directly", () => {
@@ -203,7 +203,7 @@ describe("deferred-system event content", () => {
     state = resolve(state, "close");
     expect(state.buffs.map((buff) => buff.name)).toEqual(expect.arrayContaining(["每次想 idea +5分", "每次写论文 +5分"]));
     expect(state.buffs.some((buff) => buff.actionEffects?.experiment)).toBe(false);
-    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(5);
+    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(6);
 
     let loverState: GameState = { ...createInitialState(), phase: "playing" };
     loverState = {
@@ -219,13 +219,13 @@ describe("deferred-system event content", () => {
     loverState = resolve(resolve(loverState, "continue"), "accept");
     expect(loverState.player.research).toBe(researchBeforeRelationship);
     loverState = resolve(loverState, "close");
-    expect(loverState.player.research).toBe(researchBeforeRelationship);
+    expect(loverState.player.research).toBe(researchBeforeRelationship + 1);
     expect(loverState.buffs).toEqual([]);
     expect(loverState.loverState.active).toBe(true);
     expect(loverState.loverProgressState.active).toBe(true);
   });
 
-  it.each(["beautiful", "smart"] as const)("initializes %s only on result acceptance without start bonuses", (type) => {
+  it.each(["beautiful", "smart"] as const)("initializes %s and its start bonus only on result acceptance", (type) => {
     const base: GameState = { ...createInitialState(), phase: "playing", totalMonths: 5 };
     expect(base.year).toBe(1);
     const event = createLoverDevelopmentAct1(buildLoverDevelopmentContext({
@@ -236,13 +236,13 @@ describe("deferred-system event content", () => {
     expect(chosen.loverProgressState.active).toBe(false);
     const accepted = resolve(chosen, "close");
     expect(accepted.loverState).toMatchObject({ active: true, type, gender: "male", startTotalMonths: 5 });
-    expect(type === "smart" ? [5, 6, 6.75, 7.5] : [2, 3, 4, 5]).toContain(accepted.loverProgressState.research);
-    expect(type === "beautiful" ? [6, 6.75, 7.5, 8.25] : [3, 4, 5, 6]).toContain(accepted.loverProgressState.intimacy);
+    expect(type === "smart" ? [5, 6, 6.8, 7.6] : [2, 3, 4, 5]).toContain(accepted.loverProgressState.research);
+    expect(type === "beautiful" ? [6, 6.8, 7.6, 8.4] : [3, 4, 5, 6]).toContain(accepted.loverProgressState.intimacy);
     expect(accepted.loverProgressState.routes).toEqual({
       play: { progress: 0, completed: 0 }, study: { progress: 0, completed: 0 }, shopping: { progress: 0, completed: 0 },
     });
-    expect(accepted.player).toEqual(base.player);
-    expect(accepted.sanCap).toBe(base.sanCap);
+    expect(accepted.player).toEqual({ ...base.player, research: base.player.research + (type === "smart" ? 1 : 0) });
+    expect(accepted.sanCap).toBe(base.sanCap + (type === "beautiful" ? 3 : 0));
     expect(accepted.buffs).toEqual(base.buffs);
   });
 

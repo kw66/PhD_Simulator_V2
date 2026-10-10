@@ -48,6 +48,31 @@ function choose(state: GameState, chainId: string, choiceId?: string): GameState
 }
 
 describe("debug publication shortcuts", () => {
+  it("returns to the new decision menu when replay redraws the previously selected gift", () => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    let state = trigger({ ...startState(), debugEventReplayEnabled: true }, "teachers-day");
+    state = choose(state, "teachers-day");
+    const decision = state.eventQueue.find((event) => event.chainId === "teachers-day")!;
+    const gift = decision.choices.find((choice) => choice.label === "送茶叶")!;
+    expect(gift).toBeDefined();
+    state = choose(state, "teachers-day", gift.id);
+    const result = state.eventQueue.find((event) => event.chainId === "teachers-day")!;
+    expect(result.stage).toBe("result");
+    const before = { ...state.player };
+    random.mockReturnValue(0.99);
+    state = dispatchAction(state, "debug-replay-event", {
+      eventId: result.id, eventHistoryIndex: 1, eventChoiceId: gift.id,
+    });
+    const replayed = state.eventQueue.find((event) => event.chainId === "teachers-day")!;
+    expect(replayed.stage).toBe("act2");
+    expect(replayed.choices.some((choice) => choice.label === "送鲜花")).toBe(true);
+    expect(replayed.choices.some((choice) => choice.id === gift.id)).toBe(false);
+    expect(state.player).toEqual(before);
+    state = choose(state, "teachers-day", replayed.choices.find((choice) => choice.label === "送鲜花")!.id);
+    expect(state.eventQueue.find((event) => event.chainId === "teachers-day")?.stage).toBe("result");
+    expect(state.player).toEqual(before);
+  });
+
   it.each([0, 1, 2])("queues independent same-venue results while the first is at scene %i", (advancedScenes) => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const initial = startState([reviewingPaper("first"), reviewingPaper("second")]);
@@ -152,6 +177,21 @@ describe("debug publication shortcuts", () => {
     expect(state.papers).toEqual(initial.papers);
     expect(state.externalPublications).toEqual(initial.externalPublications);
     expect(state.eventHistory.find((event) => event.chainId === activity.chainId)?.stages).toHaveLength(3);
+  });
+
+  it("rerolls randomly selected conference activities when replay is enabled", () => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    let state = trigger(startState(), "conference-activity");
+    const activity = state.eventQueue.find((event) => event.chainId.endsWith("-activity"))!;
+    state = choose(state, activity.chainId);
+    const initialOptions = state.eventQueue.find((event) => event.chainId === activity.chainId)!.choices.map((choice) => choice.id);
+    state = choose(state, activity.chainId, initialOptions[0]);
+    state = dispatchAction(state, "debug-toggle-event-replay", { debugEventReplayEnabled: true });
+    random.mockReturnValue(0.99);
+    const result = state.eventQueue.find((event) => event.chainId === activity.chainId)!;
+    state = dispatchAction(state, "debug-replay-event", { eventId: result.id, eventHistoryIndex: 1 });
+    const replayedOptions = state.eventQueue.find((event) => event.chainId === activity.chainId)!.choices.map((choice) => choice.id);
+    expect(replayedOptions).not.toEqual(initialOptions);
   });
 
   it("keeps the original attendance shortcut separate from the activity shortcut", () => {

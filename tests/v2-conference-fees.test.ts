@@ -194,7 +194,7 @@ describe("conference fee settlement", () => {
   });
 
   it.each([
-    ["domestic", 2, 0.5], ["asia", 4, 1.25], ["west", 6, 2],
+    ["domestic", 2, 0.6], ["asia", 4, 1.4], ["west", 6, 2.2],
   ] as const)("charges one travel fee and resisted favor in %s", (region, travel, favor) => {
     for (const paperCount of [1, 3]) {
       for (const mode of ["self", "advisor", "proxy"] as ConferenceDecisionMode[]) {
@@ -263,7 +263,7 @@ describe("conference fee settlement", () => {
     const effects = confirmation.choices[0]!.effects;
     expect(effects.money).toBe(mode === "self" ? -6 : undefined);
     expect(effects.advisorProgressStateDeltas?.funding).toBe(mode === "advisor" ? -6 : undefined);
-    expect(effects.favor).toBe(mode === "advisor" ? -2 : undefined);
+    expect(effects.favor).toBe(mode === "advisor" ? -2.2 : undefined);
     expect(effects.recordConferenceRegistrationPayment).toBeUndefined();
     if (mode === "proxy") {
       expect(effects.enqueueEvents).toBeUndefined();
@@ -305,7 +305,7 @@ describe("conference fee settlement", () => {
     expect(refreshed.choices[0]!.effects.advisorProgressStateDeltas?.funding).toBe(mode === "advisor" ? -2 : undefined);
     state = choose(state);
     expect(state.player.money).toBe(mode === "self" ? -2 : 0);
-    expect(state.player.favor).toBe(mode === "advisor" ? 11.5 : 12);
+    expect(state.player.favor).toBe(mode === "advisor" ? 11.4 : 12);
     expect(state.advisorProgressState.funding).toBe(mode === "advisor" ? -2 : 0);
     expect(state.eventCounters.meetingCount).toBe(1);
     expect(state.phase).toBe("finished");
@@ -347,7 +347,7 @@ describe("conference fee settlement", () => {
     state = choose(state);
     expect(state.advisorProgressState.funding).toBe(0);
     expect(state.player.money).toBe(30);
-    expect(state.player.favor).toBe(11.5);
+    expect(state.player.favor).toBe(11.4);
     expect(state.phase).toBe("playing");
     expect(state.eventCounters.meetingCount).toBe(1);
     expect(state.eventQueue[0]!.title).toBe("VALSE活动");

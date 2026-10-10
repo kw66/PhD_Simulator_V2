@@ -21,7 +21,11 @@ import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { refreshConferenceDecision } from "./v2-conference-events";
 import { refreshCcigActivityEvent } from "./v2-fixed-events-ccig-refresh";
 import { refreshConferenceActivityEvent } from "./v2-conference-activity-refresh";
+import { refreshTeachersDayEvent } from "./v2-fixed-events-teachers-day-refresh";
 import { refreshJournalFeeEvent } from "./v2-journal-fee-events";
+import { refreshInternshipInviteEvent } from "./v2-internship-events";
+import { refreshJointTrainingEvent } from "./v2-joint-training-events";
+import { refreshLoverDevelopmentEvent } from "./v2-lover-events";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
 import { hasRecruitLeft } from "./v2-recruitment-eligibility";
@@ -381,12 +385,17 @@ function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem
   }
   queuedEvent = refreshCcigActivityEvent(state, queuedEvent);
   queuedEvent = refreshConferenceActivityEvent(state, queuedEvent);
+  queuedEvent = refreshTeachersDayEvent(state, queuedEvent);
+  queuedEvent = refreshInternshipInviteEvent(state, queuedEvent);
+  queuedEvent = refreshJointTrainingEvent(state, queuedEvent);
+  queuedEvent = refreshLoverDevelopmentEvent(state, queuedEvent);
   queuedEvent = refreshJournalFeeEvent(state, refreshConferenceDecision(state, refreshWinterVacationPlan(state, queuedEvent)));
   return refreshSummerVacationEvent(state, refreshScholarshipEvent(state, refreshOccupiedLoverEvent(state, refreshPaperReviewEvent(state, refreshPaperCompetitionEvent(state,
     refreshRandomResultPreview(state, rebuildEventFromCurrentState(state, queuedEvent)))))));
 }
 
 function refreshOccupiedLoverEvent(state: GameState, event: EventQueueItem): EventQueueItem {
+  if (event.loverDevelopmentPreview) return event;
   if (event.chainId !== "lover-development" || !(state.loverState.active || state.relationshipState.loverCount > 0)) return event;
   if (event.stage === "act2") {
     // The confession may have been queued before the player found a lover:
@@ -442,7 +451,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
+  const eventQueue = state.eventQueue.map((event) => event.internshipInvitePreview || event.jointTrainingPreview || event.loverDevelopmentPreview || event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.teachersDayPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
     && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };

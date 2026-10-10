@@ -20,8 +20,8 @@ function createDecision(favor: number) {
 
 describe("conference result resistance suffix", () => {
   it.each([
-    [8, -1.5, "导师好感 -1.5（抵抗0.5）"],
-    [12, -1.25, "导师好感 -1.25（抵抗0.75）"],
+    [8, -1.6, "导师好感 -1.6（抵抗0.4）"],
+    [12, -1.4, "导师好感 -1.4（抵抗0.6）"],
     [0, -2, "导师好感 -2"],
   ] as const)("shows the settled advisor cost at favor %s in previews and results", (favor, cost, text) => {
     const choice = createDecision(favor).choices.find((candidate) => candidate.id === "advisor")!;

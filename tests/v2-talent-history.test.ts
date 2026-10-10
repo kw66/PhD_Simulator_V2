@@ -8,7 +8,7 @@ import { advanceFellowResearch } from "../src/core/v2-fellow-research";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { applyPublicationTalentRewards } from "../src/core/v2-publication-talent";
-import { recordTalentTrigger } from "../src/core/v2-talent-history";
+import { describeResistedTalentReward, describeTalentChange, describeTalentReward, recordTalentTrigger } from "../src/core/v2-talent-history";
 import { recordTalentTransitions } from "../src/core/v2-talent-transitions";
 import type { GameState } from "../src/core/v2-types";
 
@@ -23,6 +23,19 @@ function triggers(value: GameState) {
 }
 
 describe("talent trigger history", () => {
+  it("formats reward, change, and resisted snapshots without floating-point tails", () => {
+    expect(describeTalentChange("科研", 8.4, 8.4 + 0.8)).toBe("科研 +0.8（8.4→9.2）");
+    expect(describeTalentChange("社交", 6.8, 6.8 - 0.8)).toBe("社交 -0.8（6.8→6）");
+    expect(describeTalentReward("科研上限", 0.1 + 0.2, 20.125, 20.425))
+      .toBe("科研上限 +0.3（20.13→20.43）");
+    const result = { effectiveChange: 0.8, resistedCount: 0.2 };
+    expect(describeResistedTalentReward("科研", 8.4, result)).toBe("科研 +0.8（8.4→9.2，抵抗0.2）");
+    expect(describeResistedTalentReward("默契", 19.875, {
+      effectiveChange: 0.125, resistedCount: 1.234, cappedCount: 0.675,
+    })).toBe("默契 +0.13（19.88→20，抵抗1.23，上限）");
+    expect(result).toEqual({ effectiveChange: 0.8, resistedCount: 0.2 });
+  });
+
   it("shows a passive talent snapshot inline without a replay action or gameplay changes", () => {
     const base = state();
     const random = vi.spyOn(Math, "random");
@@ -61,10 +74,10 @@ describe("talent trigger history", () => {
     expect(triggers(next)[0]!.effects).toContain("SAN +2（19→20）");
     expect(triggers(next)[1]!.effects).toContain("SAN +4（20→20）");
     expect(triggers(next)[2]!.effects).toContain("SAN +8（20→20）");
-    expect(next.player.research).toBe(20.75);
-    expect(triggers(next)[0]!.effects).toContain("科研 +0.25（20→20.25，抵抗0.75）");
-    expect(triggers(next)[1]!.effects).toContain("科研 +0.25（20.25→20.5，抵抗0.75）");
-    expect(triggers(next)[2]!.effects).toContain("科研 +0.25（20.5→20.75，抵抗0.75）");
+    expect(next.player.research).toBeCloseTo(21);
+    expect(triggers(next)[0]!.effects).toContain("科研 +0.4（20→20.4，抵抗0.6）");
+    expect(triggers(next)[1]!.effects.some((effect) => effect.startsWith("科研 +0.4（") && effect.includes("抵抗0.6"))).toBe(true);
+    expect(triggers(next)[2]!.effects.some((effect) => effect.startsWith("科研 +0.2（") && effect.includes("上限"))).toBe(true);
     expect(triggers(next)[2]!.effects).toContain("科研上限 +1（20→21）");
     expect(applyPublicationTalentRewards(next)).toBe(next);
     expect(next.eventQueue).toBe(base.eventQueue);
@@ -78,8 +91,8 @@ describe("talent trigger history", () => {
       ...createDraftPaper(1, index, () => 0), status: "published", target: "C", nonFirstAuthor,
     }));
     const next = applyPublicationTalentRewards(base, () => 0.99);
-    expect(triggers(next).find((trigger) => trigger.name === "研究之始")!.effects).toContain("好感 +0（20→20，抵抗0.75，上限）");
-    expect(triggers(next).find((trigger) => trigger.name === "携手启程")!.effects).toContain("社交 +0（20→20，抵抗0.75，上限）");
+    expect(triggers(next).find((trigger) => trigger.name === "研究之始")!.effects).toContain("好感 +0（20→20，抵抗0.6，上限）");
+    expect(triggers(next).find((trigger) => trigger.name === "携手启程")!.effects).toContain("社交 +0（20→20，抵抗0.6，上限）");
     expect(next.player.favor).toBe(20);
     expect(next.player.social).toBe(20);
   });
@@ -94,11 +107,11 @@ describe("talent trigger history", () => {
     }));
 
     const resisted = applyPublicationTalentRewards(base, () => 0);
-    expect(resisted.player).toMatchObject({ favor: 11.75, social: 6.75, research: 10.75, san: 14 });
+    expect(resisted.player).toMatchObject({ favor: 11.8, social: 6.8, research: 10.8, san: 14 });
     const resistedEffects = triggers(resisted).flatMap((trigger) => trigger.effects);
-    expect(resistedEffects).toContain("好感 +0.75（11→11.75，抵抗0.25）");
-    expect(resistedEffects).toContain("社交 +0.75（6→6.75，抵抗0.25）");
-    expect(resistedEffects).toContain("科研 +0.75（10→10.75，抵抗0.25）");
+    expect(resistedEffects).toContain("好感 +0.8（11→11.8，抵抗0.2）");
+    expect(resistedEffects).toContain("社交 +0.8（6→6.8，抵抗0.2）");
+    expect(resistedEffects).toContain("科研 +0.8（10→10.8，抵抗0.2）");
 
     const random = vi.fn(() => 0.99);
     const applied = applyPublicationTalentRewards(base, random);
@@ -106,7 +119,7 @@ describe("talent trigger history", () => {
     expect(random).not.toHaveBeenCalled();
   });
 
-  it.each([19, 20])("preserves the original combined annual reward display at research cap %i", (research) => {
+  it.each([19, 20])("shows actual combined annual growth at research cap %i", (research) => {
     const base = { ...state(), totalMonths: 12, year: 1, month: 12 };
     base.player.research = 25;
     base.fellowProgressState = [research, 20, 20].map((value, index) => ({
@@ -114,16 +127,16 @@ describe("talent trigger history", () => {
       id: `fellow-${index}`,
     }));
     const next = settleLabResearchGrowth(base, () => 0.99);
-    expect(triggers(next)[0]!.effects).toEqual([research === 19 ? "科研 +1（19→20，抵抗3）" : "科研 +3（20→20）"]);
+    expect(triggers(next)[0]!.effects).toEqual([research === 19 ? "科研 +1（19→20，抵抗2.4，上限）" : "科研 +0（20→20，抵抗1.8，上限）"]);
     expect(triggers(next)[0]!.details).toEqual([
       `原始奖励：自然成长 +2，实验室传承 +${research === 19 ? 2 : 1}，合计 +${research === 19 ? 4 : 3}；合并后逐点抵抗并受科研上限限制`,
-      ...(research === 20 ? ["档位抵抗 2.25 点，上限限制 0.75 点"] : []),
+      research === 19 ? "档位抵抗 2.4 点，上限限制 0.6 点" : "档位抵抗 1.8 点，上限限制 1.2 点",
     ]);
     expect(next.fellowProgressState[0]!.annualResearchGrowthTotal ?? 0).toBe(20 - research);
     expect(next.fellowProgressState[0]!.research).toBe(20);
   });
 
-  it.each([8, 9])("preserves the player's original inheritance reward display at their own cap from %i", (research) => {
+  it.each([8, 9])("shows the player's actual inheritance growth at their own cap from %i", (research) => {
     const base = { ...state(), totalMonths: 12, year: 1, month: 12 };
     base.player.research = research;
     base.researchCapacityState.baseCap = 9;
@@ -133,11 +146,47 @@ describe("talent trigger history", () => {
     }));
     const next = settleLabResearchGrowth(base, () => 0.99);
     expect(triggers(next).find((trigger) => trigger.recipient === "你·林青")).toMatchObject({
-      effects: [`科研 +2（${research}→9）`],
-      details: ["原始奖励：实验室传承 +2；逐点抵抗并受科研上限限制", `档位抵抗 0.5 点，上限限制 ${research === 8 ? 0.5 : 1.5} 点`],
+      effects: [`科研 +${9 - research}（${research}→9，抵抗0.4，上限）`, "社交 +1（1→2）"],
+      details: ["原始奖励：实验室传承 +2；逐点抵抗并受科研上限限制",
+        "在组同学 3 人；社交原始 +1，逐点抵抗并受上限20限制",
+        `档位抵抗 0.4 点，上限限制 ${research === 8 ? 0.6 : 1.6} 点`],
     });
     expect(next.player.research).toBe(9);
     expect(settleLabResearchGrowth(next, () => 0.99)).toBe(next);
+  });
+
+  it("shows cap loss even below the first resistance tier", () => {
+    const base = { ...state(), totalMonths: 12, year: 1, month: 12 };
+    base.player.research = 5.125;
+    base.researchCapacityState.baseCap = 5.25;
+    base.fellowProgressState = [createCustomFellowProgressProfile({
+      type: "peer", gender: "female", research: 10, affinity: 1, startTotalMonths: 1,
+    })];
+    const next = settleLabResearchGrowth(base);
+    expect(next.player.research).toBe(5.25);
+    expect(triggers(next).find((trigger) => trigger.recipient === "你·林青")).toMatchObject({
+      effects: ["科研 +0.13（5.13→5.25，上限）"],
+      details: ["原始奖励：实验室传承 +1；逐点抵抗并受科研上限限制", "档位抵抗 0 点，上限限制 0.88 点"],
+    });
+  });
+
+  it("keeps fractional annual results consistent across cards, individual history and the group log", () => {
+    const base = { ...state(), totalMonths: 12, year: 1, month: 12 };
+    base.player.research = 8.4;
+    base.fellowProgressState = [createCustomFellowProgressProfile({
+      type: "peer", gender: "female", research: 11.2, affinity: 1, startTotalMonths: 1,
+    })];
+    base.loverState = { ...base.loverState, active: true, name: "周明" };
+    base.loverProgressState = { ...base.loverProgressState, active: true, research: 11.2 };
+    const next = settleLabResearchGrowth(base);
+    expect(triggers(next).find((trigger) => trigger.recipient === "你·林青")!.effects)
+      .toContain("科研 +0.8（8.4→9.2，抵抗0.2）");
+    const expected = "科研 +1.4（11.2→12.6，抵抗0.6）";
+    expect(next.fellowProgressState[0]!.annualResearchActivity).toContain(expected);
+    expect(next.loverProgressState.annualResearchActivity).toContain(expected);
+    expect(triggers(next).find((trigger) => trigger.recipient === "周明")!.effects).toEqual([expected]);
+    expect(next.log[0]!.text).toContain(expected);
+    expect(JSON.stringify(triggers(next))).not.toMatch(/\d+\.\d{3,}/u);
   });
 
   it.each(["fellow", "player", "lover"] as const)
@@ -159,8 +208,8 @@ describe("talent trigger history", () => {
       const random = vi.fn().mockReturnValueOnce(0).mockReturnValue(0.99);
       const capped = settleLabResearchGrowth(base, random);
       const cappedTrigger = triggers(capped).find((trigger) => trigger.recipient === target)!;
-      expect(cappedTrigger.effects).toEqual([`科研 +${reward}（20→20）`]);
-      expect(cappedTrigger.details).toContain(`档位抵抗 ${reward * 0.75} 点，上限限制 ${reward * 0.25} 点`);
+      expect(cappedTrigger.effects).toEqual([`科研 +0（20→20，抵抗${reward * 0.6}，上限）`, ...(recipient === "player" ? ["社交 +2（1→3）"] : [])]);
+      expect(cappedTrigger.details).toContain(`档位抵抗 ${reward * 0.6} 点，上限限制 ${reward * 0.4} 点`);
       expect(random).not.toHaveBeenCalled();
       const resisted = settleLabResearchGrowth(base, () => 0);
       expect(resisted).toEqual(capped);
@@ -181,10 +230,10 @@ describe("talent trigger history", () => {
     }));
     const next = settleFellowCoauthoredPapers({ ...base, fellowProgressState: [fellow], fellowPapers: papers });
     const expected = affinity === 19
-      ? "默契 +0.5（19→19.5，抵抗1.5）"
-      : "默契 +0（20→20，抵抗1.5，上限）";
+      ? "默契 +0.8（19→19.8，抵抗1.2）"
+      : "默契 +0（20→20，抵抗1.2，上限）";
     expect(triggers(next)[0]!.effects).toEqual([expected]);
-    expect(next.fellowProgressState[0]!.affinity).toBe(affinity === 19 ? 19.5 : 20);
+    expect(next.fellowProgressState[0]!.affinity).toBe(affinity === 19 ? 19.8 : 20);
   });
 
   it("records August year-end inheritance for the player and fellows including August joiners", () => {
@@ -196,23 +245,23 @@ describe("talent trigger history", () => {
     const next = settleLabResearchGrowth(base, () => 0.99);
     expect(triggers(next).map((trigger) => trigger.recipient)).toEqual(["同学0", "同学1", "同学2", "你·林青", "第1学年末"]);
     expect(triggers(next)[0]!.effects).toEqual(["科研 +4（2→6）"]);
-    expect(triggers(next)[1]!.effects).toEqual(["科研 +2.25（6→8.25，抵抗0.75）"]);
-    expect(triggers(next)[2]!.effects).toEqual(["科研 +2（20→20）"]);
-    expect(triggers(next)[3]!.effects).toEqual(["科研 +0.75（10→10.75，抵抗0.25）"]);
+    expect(triggers(next)[1]!.effects).toEqual(["科研 +2.4（6→8.4，抵抗0.6）"]);
+    expect(triggers(next)[2]!.effects).toEqual(["科研 +0（20→20，抵抗1.2，上限）"]);
+    expect(triggers(next)[3]!.effects).toEqual(["科研 +0.8（10→10.8，抵抗0.2）", "社交 +1（1→2）"]);
     expect(triggers(next).every((trigger) => trigger.reason === "第1学年结束，结算年度科研成长")).toBe(true);
     expect(next.eventHistory.filter((entry) => entry.id.startsWith("talent:inheritance:")))
       .toEqual(Array.from({ length: 4 }, () => expect.objectContaining({ completedAtTotalMonths: 12, completedAtMonth: 12, completedAtYear: 1 })));
     expect(next.log).toHaveLength(base.log.length + 1);
     expect(next.log[0]).toMatchObject({ id: "talent:annual-research:group:12", month: 12, eventHistoryId: "talent:annual-research:group:12" });
     expect(triggers(next)[4]!.effects).toEqual([
-      "同学0：科研 +4（2→6）", "同学1：科研 +2.25（6→8.25，抵抗0.75）", "同学2：科研 +2（20→20）", "你·林青：科研 +0.75（10→10.75，抵抗0.25）",
+      "同学0：科研 +4（2→6）", "同学1：科研 +2.4（6→8.4，抵抗0.6）", "同学2：科研 +0（20→20，抵抗1.2，上限）", "你·林青：科研 +0.8（10→10.8，抵抗0.2）；社交 +1（1→2）",
     ]);
     expect(settleLabResearchGrowth(next, () => 0.99)).toBe(next);
     const october = { ...base, totalMonths: 14, month: 2 };
     expect(settleLabResearchGrowth(october, () => 0.99)).toBe(october);
     const html = renderApp(next, undefined, { activePlayTab: "events" }).replace(/<[^>]*>/g, "");
     expect(html).toContain("第1学年结束，结算年度科研成长");
-    expect(html).toContain("科研 +2.25（6→8.25，抵抗0.75）");
+    expect(html).toContain("科研 +2.4（6→8.4，抵抗0.6）");
     expect(html).toContain("自然成长 +2，实验室传承 +1，合计 +3");
   });
 
@@ -224,11 +273,11 @@ describe("talent trigger history", () => {
       id: `fellow-${index}`, name: `同学${index}`,
     }));
     const next = settleLabResearchGrowth(base, () => 0.1);
-    expect(triggers(next)[0]!.effects).toEqual(["科研 +3.25（5→8.25，抵抗0.75）"]);
-    expect(triggers(next).find((trigger) => trigger.recipient === "你·林青")!.effects).toEqual(["科研 +1.75（5→6.75，抵抗0.25）"]);
-    expect(next.fellowProgressState[0]!.research).toBe(8.25);
+    expect(triggers(next)[0]!.effects).toEqual(["科研 +3.4（5→8.4，抵抗0.6）"]);
+    expect(triggers(next).find((trigger) => trigger.recipient === "你·林青")!.effects).toEqual(["科研 +1.8（5→6.8，抵抗0.2）", "社交 +2（1→3）"]);
+    expect(next.fellowProgressState[0]!.research).toBe(8.4);
     const html = renderApp(next, undefined, { activePlayTab: "events" }).replace(/<[^>]*>/g, "");
-    expect(html).toContain("科研 +1.75（5→6.75，抵抗0.25）");
+    expect(html).toContain("科研 +1.8（5→6.8，抵抗0.2）");
   });
 
   it.each([1, 2, 4, 7, 11, 16])("does not grant research or milestone history for %i fellow publications", (count) => {
@@ -265,7 +314,7 @@ describe("talent trigger history", () => {
     const read = dispatchAction(base, "read-paper");
     vi.restoreAllMocks();
     expect(triggers(read).map((trigger) => trigger.name)).toEqual(["阅读积累"]);
-    expect(read.player.research).toBe(10.75);
+    expect(read.player.research).toBe(10.8);
     const workBase = { ...base, partTimeWorkCount: 7 };
     const work = dispatchAction(workBase, "part-time-work");
     expect(triggers(work).map((trigger) => trigger.name)).toEqual(["熟练打工"]);

@@ -1,8 +1,10 @@
-import { describeTalentReward, describeResistedTalentReward, recordTalentTrigger, type TalentTriggerRecord } from "./v2-talent-history";
+import { describeResistedTalentReward, recordTalentTrigger, type TalentTriggerRecord } from "./v2-talent-history";
+import { formatMoney } from "./v2-money";
 import { getFellowName } from "./v2-fellow-progression";
 import { recordFellowMonthlySupport } from "./v2-fellow-monthly-support";
 import { getLoverName } from "./v2-lover-system";
 import { getResearchCap } from "./v2-research-cap-system";
+import { getAttributeTier } from "./v2-random-event-rules";
 import { applyTierResist } from "./v2-sanity-rules";
 import type { FellowProgressProfile, GameState } from "./v2-types";
 
@@ -37,6 +39,13 @@ function getAnnualResearchReward(state: GameState, research: number): number {
   return Math.floor(higherCount / 2);
 }
 
+export function getAnnualLabSocialRewards(state: GameState): { fellowAffinity: number; playerSocial: number } {
+  return {
+    fellowAffinity: getAttributeTier(state.player.social),
+    playerSocial: Math.floor(state.fellowProgressState.length / 2),
+  };
+}
+
 export function getFellowAnnualResearchGrowth(state: GameState, profile: FellowProgressProfile): number {
   return Math.min(getAnnualResearchReward(state, profile.research), Math.max(0, FELLOW_RESEARCH_CAP - profile.research));
 }
@@ -51,6 +60,7 @@ export function settleLabResearchGrowth(state: GameState, random: () => number =
   const playerKey = `inheritance:player:${state.totalMonths}`;
   const playerReward = getAnnualResearchReward(state, state.player.research);
   const fellowRewards = state.fellowProgressState.map((profile) => getAnnualResearchReward(state, profile.research));
+  const socialRewards = getAnnualLabSocialRewards(state);
   const reason = `第${state.year}学年结束，结算年度科研成长`;
   const triggers: Array<{ key: string; record: TalentTriggerRecord }> = [];
   const fellowProgressState = state.fellowProgressState.map((profile, index) => {
@@ -59,33 +69,39 @@ export function settleLabResearchGrowth(state: GameState, random: () => number =
     const reward = 2 + inheritance;
     const result = applyTierResist(reward, profile.research, random, FELLOW_RESEARCH_CAP);
     const growth = result.effectiveChange;
+    const affinityResult = applyTierResist(socialRewards.fellowAffinity, profile.affinity, random, 20);
+    const affinitySummary = describeResistedTalentReward("默契", profile.affinity, affinityResult);
     triggers.push({ key: `inheritance:${profile.id}:${state.totalMonths}`, record: {
       name: "年度科研成长", recipient: getFellowName(profile), reason,
-      effects: [result.cappedCount ? describeTalentReward("科研", reward, profile.research, profile.research + growth)
-        : describeResistedTalentReward("科研", profile.research, result)],
+      effects: [describeResistedTalentReward("科研", profile.research, result),
+        ...(socialRewards.fellowAffinity > 0 ? [affinitySummary] : [])],
       details: [`原始奖励：自然成长 +2，实验室传承 +${inheritance}，合计 +${reward}；合并后逐点抵抗并受科研上限限制`,
-        ...(result.cappedCount && result.resistedCount > 0 ? [`档位抵抗 ${result.resistedCount} 点，上限限制 ${result.cappedCount} 点`] : [])],
+        ...(socialRewards.fellowAffinity > 0 ? [`社交档位 ${socialRewards.fellowAffinity}；默契原始 +${socialRewards.fellowAffinity}，逐点抵抗并受上限20限制`] : []),
+        ...(result.cappedCount ? [`档位抵抗 ${formatMoney(result.resistedCount)} 点，上限限制 ${formatMoney(result.cappedCount)} 点`] : [])],
     } });
     return {
       ...profile,
       research: profile.research + growth,
+      affinity: profile.affinity + affinityResult.effectiveChange,
       lastAnnualGrowthTotalMonths: state.totalMonths,
-      annualResearchActivity: `第${state.year}学年末：${describeResistedTalentReward("科研", profile.research, result)}；原始奖励：自然成长 +2、传承 +${inheritance}`,
+      annualResearchActivity: `第${state.year}学年末：${describeResistedTalentReward("科研", profile.research, result)}${socialRewards.fellowAffinity > 0 ? `；${affinitySummary}` : ""}；原始奖励：自然成长 +2、传承 +${inheritance}`,
       ...(growth > 0 ? { annualResearchGrowthTotal: (profile.annualResearchGrowthTotal ?? 0) + growth } : {}),
     };
   });
   let player = state.player;
   if (!state.eventHistory.some((entry) => entry.id === `talent:${playerKey}`)) {
     const result = applyTierResist(playerReward, player.research, random, getResearchCap(state.researchCapacityState));
+    const socialResult = applyTierResist(socialRewards.playerSocial, player.social, random);
     const research = player.research + result.effectiveChange;
     triggers.push({ key: playerKey, record: {
       name: "实验室传承", recipient: state.playerName ? `你·${state.playerName}` : "你", reason,
-      effects: [result.cappedCount ? describeTalentReward("科研", playerReward, player.research, research)
-        : describeResistedTalentReward("科研", player.research, result)],
+      effects: [describeResistedTalentReward("科研", player.research, result),
+        ...(socialRewards.playerSocial > 0 ? [describeResistedTalentReward("社交", player.social, socialResult)] : [])],
       details: [`原始奖励：实验室传承 +${playerReward}；逐点抵抗并受科研上限限制`,
-        ...(result.cappedCount && result.resistedCount > 0 ? [`档位抵抗 ${result.resistedCount} 点，上限限制 ${result.cappedCount} 点`] : [])],
+        ...(socialRewards.playerSocial > 0 ? [`在组同学 ${state.fellowProgressState.length} 人；社交原始 +${socialRewards.playerSocial}，逐点抵抗并受上限20限制`] : []),
+        ...(result.cappedCount ? [`档位抵抗 ${formatMoney(result.resistedCount)} 点，上限限制 ${formatMoney(result.cappedCount)} 点`] : [])],
     } });
-    player = { ...player, research };
+    player = { ...player, research, social: player.social + socialResult.effectiveChange };
   }
   let loverProgressState = state.loverProgressState;
   if (state.loverState.active && loverProgressState.active
@@ -93,10 +109,9 @@ export function settleLabResearchGrowth(state: GameState, random: () => number =
     const result = applyTierResist(2, loverProgressState.research, random, FELLOW_RESEARCH_CAP);
     triggers.push({ key: `annual-research:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}:${state.totalMonths}`, record: {
       name: "年度科研成长", recipient: getLoverName(state.loverState), reason,
-      effects: [result.cappedCount ? describeTalentReward("科研", 2, loverProgressState.research, loverProgressState.research + result.effectiveChange)
-        : describeResistedTalentReward("科研", loverProgressState.research, result)],
+      effects: [describeResistedTalentReward("科研", loverProgressState.research, result)],
       details: ["原始奖励：自然成长 +2；逐点抵抗并受科研上限限制",
-        ...(result.cappedCount && result.resistedCount > 0 ? [`档位抵抗 ${result.resistedCount} 点，上限限制 ${result.cappedCount} 点`] : [])],
+        ...(result.cappedCount ? [`档位抵抗 ${formatMoney(result.resistedCount)} 点，上限限制 ${formatMoney(result.cappedCount)} 点`] : [])],
     } });
     loverProgressState = { ...loverProgressState, research: loverProgressState.research + result.effectiveChange,
       annualResearchActivity: `第${state.year}学年末：${describeResistedTalentReward("科研", loverProgressState.research, result)}；原始奖励：自然成长 +2`,

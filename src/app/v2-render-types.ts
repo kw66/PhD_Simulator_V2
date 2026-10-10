@@ -33,6 +33,7 @@ export interface PlayRenderUiState {
   selectedCoffeeUpgradeId?: Exclude<CoffeeMachineUpgradeId, null> | null;
   activeTalentTab?: TalentPanelTabId;
   advisorSalaryStartIndex?: number | null;
+  labInheritancePage?: number;
   loverRewardPage?: number;
   internshipPage?: number;
   gameGrowthPage?: number;

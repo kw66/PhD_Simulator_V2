@@ -47,7 +47,7 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     expect(state.log[0]!.text).toContain("金币 +4");
   });
 
-  it.each([[5.5, 1], [6, 0.75], [11.5, 0.75], [12, 0.5], [17.5, 0.5], [18, 0.25]])(
+  it.each([[5.5, 1], [6, 0.8], [11.5, 0.8], [12, 0.6], [17.5, 0.6], [18, 0.4]])(
     "rechecks deterministic reunion resistance at current social %s", (social, gain) => {
     let state = start("winter-vacation", 0.1);
     state = { ...state, player: { ...state.player, social: 5 } };
@@ -81,8 +81,8 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     let state = choose(start("year-summary", 0.1));
     state = choose(state, "-social-");
     state = refreshPendingEventDecisions({ ...state, player: { ...state.player, social: 6 } });
-    expect(state.eventQueue[0]!.description).toContain("社交 +0.75");
-    expect(choose(state).player.social).toBe(6.75);
+    expect(state.eventQueue[0]!.description).toContain("社交 +0.8");
+    expect(choose(state).player.social).toBe(6.8);
     state = choose(start("ccig"));
     state = choose(state, "-self-");
     expect(state.eventQueue[0]!.description).toContain("金币 -2");

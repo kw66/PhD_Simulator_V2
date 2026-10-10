@@ -380,6 +380,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activePlayTab = nextPlayTab;
   };
   let advisorSalaryStartIndex: number | null = null;
+  let labInheritancePage = 0;
   let loverRewardPage = 0;
   let internshipPage = 0;
   let gameGrowthPage = 0;
@@ -840,7 +841,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeRelationshipIndex = Math.min(Math.max(activeRelationshipIndex, 0), 4);
   };
 
-  const renderRelationCardPage = (cardId: "advisor" | "lover" | "internship" | "game-growth", button: HTMLButtonElement): void => {
+  const renderRelationCardPage = (cardId: "advisor" | "lab-mutual-growth" | "lover" | "internship" | "game-growth", button: HTMLButtonElement): void => {
     const card = button.closest<HTMLElement>(`[data-talent-item-id="${cardId}"]`);
     if (!card) return;
     const buttons = [...card.querySelectorAll<HTMLButtonElement>(".research-pagination button")];
@@ -848,6 +849,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const template = document.createElement("template");
     template.innerHTML = renderRelationTalentCard(store.getState(), cardId, {
       advisorSalaryStartIndex,
+      labInheritancePage,
       loverRewardPage,
       internshipPage,
       gameGrowthPage,
@@ -877,6 +879,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     skipNextPlayerAnimation = false;
     if (state.phase !== lastPhase) {
       isEndingContentOpen = true;
+      labInheritancePage = 0;
       loverRewardPage = 0;
       internshipPage = 0;
       gameGrowthPage = 0;
@@ -966,6 +969,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeTalentTab,
       currentResearchPaperIndex,
       advisorSalaryStartIndex,
+      labInheritancePage,
       loverRewardPage,
       internshipPage,
       gameGrowthPage,
@@ -1621,6 +1625,16 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const upgradeId = coffeeUpgradeOption.dataset.uiSelectCoffeeUpgrade;
       selectedCoffeeUpgradeId = selectedCoffeeUpgradeId === upgradeId ? null : upgradeId;
       render();
+      return;
+    }
+
+    const labInheritanceButton = target.closest<HTMLButtonElement>("button[data-ui-lab-inheritance-page]");
+    if (labInheritanceButton && !labInheritanceButton.disabled) {
+      const page = Number(labInheritanceButton.dataset.uiLabInheritancePage);
+      if (Number.isInteger(page) && page >= 0 && page < 2) {
+        labInheritancePage = page;
+        renderRelationCardPage("lab-mutual-growth", labInheritanceButton);
+      }
       return;
     }
 

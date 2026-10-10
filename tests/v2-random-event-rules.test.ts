@@ -115,12 +115,12 @@ describe("v2 random event rules", () => {
   it("does not advertise a resisted gain that the stat cap will discard", () => {
     expect(applyTierResist(1, 20, () => 0.99)).toMatchObject({
       effectiveChange: 0,
-      resistedCount: 0.75,
-      cappedCount: 0.25,
+      resistedCount: 0.6,
+      cappedCount: 0.4,
     });
     expect(applyTierResist(1, 21, () => 0.99, 22)).toMatchObject({
-      effectiveChange: 0.25,
-      resistedCount: 0.75,
+      effectiveChange: 0.4,
+      resistedCount: 0.6,
     });
   });
 

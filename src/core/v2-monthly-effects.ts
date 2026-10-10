@@ -535,6 +535,7 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     },
     actionState: { ...state.actionState, used: 0, aiResearchBonusUsed: false },
     internshipState,
+    internshipCount: state.internshipCount + (state.internshipState.active && !internshipState.active ? 1 : 0),
     buffs: advanceBuffDurations(state.buffs),
   };
   const automaticCoffeeState = applyAutomaticCoffeeMachineEffect(activateLoverMonthlyDiscount(monthStartState), resolution);

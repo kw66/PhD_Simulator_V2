@@ -8507,6 +8507,50 @@ button[data-card-icon-action]:focus-visible {
   line-height: 1.45;
 }
 
+.talent-item-row[data-talent-item-id="lab-mutual-growth"] .talent-item-desc {
+  flex: 0 0 auto;
+  margin-top: auto;
+  min-height: 2.9em;
+  white-space: pre-line;
+}
+
+.talent-item-identity {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  color: var(--setup-body-color);
+  font-size: var(--type-kicker);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.talent-item-identity strong {
+  color: var(--ink);
+}
+
+.talent-item-row:is([data-talent-item-id="internship"], [data-talent-item-id="joint-training"]) .talent-item-desc {
+  flex: 0 0 auto;
+  margin-top: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 430px) {
+  .talent-item-row[data-talent-item-id="internship"] .talent-item-head {
+    --talent-icon-size: 32px;
+    min-height: 42px;
+    gap: 5px;
+  }
+
+  .talent-item-row[data-talent-item-id="internship"] .talent-item-tag {
+    padding-inline: 4px;
+    font-size: 0.62rem;
+  }
+}
+
 .talent-item-metrics {
   min-width: 0;
   display: grid;

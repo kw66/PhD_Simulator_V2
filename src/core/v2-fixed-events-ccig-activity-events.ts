@@ -90,8 +90,8 @@ export function createCcigActivityDecisionEvent(
       }] : []),
       {
         id: `ccig-activity-travel-y${state.year}-m${state.month}`,
-        label: "趁机旅游",
-        outcome: "SAN +5。",
+        label: "顺便旅游",
+        outcome: "SAN +4。",
         effects: {
           fixedEventResolution: { kind: "ccig-activity-travel", ccigAttendanceSummary: attendanceSummary },
         },

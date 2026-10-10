@@ -137,11 +137,11 @@ export function resolveCcigFixedEvent(
         武汉: "沿着江滩散步，看轮渡慢慢驶过江面",
         重庆: "坐轻轨穿过山城，又在洪崖洞看了夜景",
       } as Record<string, string>)[location] ?? "在附近的街巷随意走走";
-      const activityOutcome = "SAN +5";
+      const activityOutcome = "SAN +4";
       const completionLog = [resolution.ccigAttendanceSummary, activityOutcome].filter(Boolean).join("；");
       return {
         nextState: state,
-        outcome: "SAN +5。",
+        outcome: "SAN +4。",
         enqueueEvents: [createCcigActivityResultEvent({
           state: eventState,
           mode: "travel",
@@ -152,7 +152,7 @@ export function resolveCcigFixedEvent(
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
-          effects: { san: 5 },
+          effects: { san: 4 },
         })],
       };
     }

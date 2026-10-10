@@ -59,7 +59,7 @@ describe("player conference travel across paper batches", () => {
         expect(paid.advisorProgressState.funding).toBe(100 - (firstMode === "advisor" ? travel : 0));
         expect(paid.advisorProgressState.paidConferenceRegistrationPaperIds).toBeUndefined();
         expect(paid.advisorProgressState.paidPlayerConferenceTrips).toEqual(first.advisorProgressState.paidPlayerConferenceTrips);
-        expect(paid.player.favor).toBe(first.player.favor - (secondMode === "advisor" ? { domestic: 0.25, asia: 0.5, west: 0.75 }[region] : 0));
+        expect(paid.player.favor).toBe(first.player.favor - (secondMode === "advisor" ? { domestic: 0.4, asia: 0.8, west: 1.2 }[region] : 0));
         expect(paid.log.some((entry) => entry.text.includes(paymentText))).toBe(true);
         const confirmation = pending.eventQueue[0]!;
         const duplicate = dispatchAction(paid, "resolve-event", { eventId: confirmation.id, eventChoiceId: confirmation.choices[0]!.id });

@@ -156,7 +156,7 @@ describe("VALSE activity live refresh", () => {
     expect(blocked.player).toEqual(unavailable.player);
   });
 
-  it.each(["海报展示", "趁机旅游", "品尝当地美食"])("keeps selected %s and saved rolls after a better paper appears", (label) => {
+  it.each(["海报展示", "顺便旅游", "品尝当地美食"])("keeps selected %s and saved rolls after a better paper appears", (label) => {
     let state = activityState();
     state = refreshPendingEventDecisions({ ...state, papers: [publishedPaper()] });
     const chosenDecision = structuredClone(state.eventQueue[0]!);

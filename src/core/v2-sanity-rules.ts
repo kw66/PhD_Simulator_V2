@@ -199,7 +199,7 @@ export function applyTierResist(
 }
 
 export function getTierResistChance(currentValue: number): number {
-  const resistChanceByTier = [0, 0.25, 0.5, 0.75] as const;
+  const resistChanceByTier = [0, 0.2, 0.4, 0.6] as const;
   return resistChanceByTier[getAttributeTier(currentValue)];
 }
 

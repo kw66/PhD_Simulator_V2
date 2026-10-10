@@ -54,7 +54,7 @@ describe("lover completion announcements", () => {
     const next = advanceLoverDate(base, "play");
     const effects = next.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
     expect(effects).toContain("SAN +6（20→20）");
-    expect(effects).toContain("亲密 +0（20→20，抵抗0.75，上限）");
+    expect(effects).toContain("亲密 +0（20→20，抵抗0.6，上限）");
     expect(next.player.san).toBe(20);
     expect(next.loverProgressState.intimacy).toBe(20);
   });
@@ -82,7 +82,7 @@ describe("lover completion announcements", () => {
     const reasons = completions.map((entry) => next.eventHistory.find((record) => record.id === entry.eventHistoryId)!.stages[0]!.talentTrigger!.reason);
     expect(reasons).toEqual(["每月相处·学习进度满100，第1次", "每月相处·玩耍进度满100，第1次"]);
     expect(next.log.findIndex((entry) => entry.text.startsWith("恋人帮助："))).toBeLessThan(next.log.indexOf(completions[0]!));
-    expect(next.loverProgressState.intimacy).toBe(6.75);
+    expect(next.loverProgressState.intimacy).toBe(6.8);
     expect(next.eventHistory.filter((record) => record.id.startsWith("talent:lover:"))).toHaveLength(2);
     expect(advanceLoverMonth(next)).toBe(next);
     const ordinary = advanceLoverMonth({ ...next, totalMonths: 10, month: 10 });
@@ -141,11 +141,11 @@ describe("lover initialization and monthly progression", () => {
     for (const researchOffset of [0, 1, 2, 3]) {
       for (const intimacyOffset of [0, 1, 2, 3]) {
         const rawResearch = (type === "smart" ? 5 : 2) + researchOffset;
-        const expectedIntimacy = type === "beautiful" ? [6, 6.75, 7.5, 8.25][intimacyOffset] : 3 + intimacyOffset;
+        const expectedIntimacy = type === "beautiful" ? [6, 6.8, 7.6, 8.4][intimacyOffset] : 3 + intimacyOffset;
         const random = vi.fn().mockReturnValueOnce(researchOffset / 4);
         random.mockReturnValueOnce((intimacyOffset + 0.999) / 4);
         expect(createLoverProgressState(type, random)).toMatchObject({ active: true,
-          research: Math.min(6, rawResearch) + Math.max(0, rawResearch - 6) * 0.75,
+          research: Math.min(6, rawResearch) + Math.max(0, rawResearch - 6) * 0.8,
           intimacy: expectedIntimacy,
           giftCoupons: 0, pendingPaperHelp: null,
         });
@@ -155,10 +155,10 @@ describe("lover initialization and monthly progression", () => {
   });
 
   it.each(["beautiful", "smart"] as const)("generates %s research for the joining cohort with resistance", (type) => {
-    expect(createLoverProgressState(type, () => 0, 4)).toMatchObject({ research: type === "smart" ? 9.75 : 7.5,
+    expect(createLoverProgressState(type, () => 0, 4)).toMatchObject({ research: type === "smart" ? 10 : 7.6,
       intimacy: type === "beautiful" ? 6 : 3 });
-    expect(createLoverProgressState(type, () => 0.99, 4)).toMatchObject({ research: type === "smart" ? 12 : 9.75,
-      intimacy: type === "beautiful" ? 8.25 : 6 });
+    expect(createLoverProgressState(type, () => 0.99, 4)).toMatchObject({ research: type === "smart" ? 12.4 : 10,
+      intimacy: type === "beautiful" ? 8.4 : 6 });
   });
 
   it.each(["beautiful", "smart"] as const)("uses one intimacy snapshot for both %s passive routes and preserves excess", (type) => {
@@ -171,7 +171,7 @@ describe("lover initialization and monthly progression", () => {
       study: { progress: type === "beautiful" ? 1 : 3, completed: 1 },
       shopping: { progress: 0, completed: 0 },
     });
-    expect(next.loverProgressState).toMatchObject({ intimacy: 6.75, lastAdvancedTotalMonths: 8, pendingPaperHelp: { amount: 10 } });
+    expect(next.loverProgressState).toMatchObject({ intimacy: 6.8, lastAdvancedTotalMonths: 8, pendingPaperHelp: { amount: 10 } });
     expect(next.loverProgressState.monthlyActivity).toContain(type === "beautiful" ? "玩耍进度 +4，学习进度 +2" : "玩耍进度 +2，学习进度 +4");
     expect(next.loverProgressState.monthlyActivity).toContain("SAN +6");
     expect(next.loverProgressState.monthlyActivity).toContain("论文帮助已就绪");
@@ -302,14 +302,14 @@ describe("lover route reward cycles", () => {
     const second = advanceLoverDate(withRoute(nextDateMonth(first), "play", 99, 1), "play");
     expect(second.player.san).toBe(16);
     expect(second.sanCap).toBe(21);
-    expect(second.loverProgressState.intimacy).toBe(6.75);
+    expect(second.loverProgressState.intimacy).toBe(6.8);
     const third = advanceLoverDate(withRoute(nextDateMonth(second), "play", 99, 2), "play");
     expect(third.loverProgressState.sanDiscountMonths).toEqual([11]);
     expect(third.buffs.some((buff) => buff.id === "lover-play-discount")).toBe(false);
     const fourth = advanceLoverDate(withRoute(nextDateMonth(third), "play", 99, 3), "play");
     expect(fourth.player.san).toBe(21);
     expect(fourth.sanCap).toBe(21);
-    expect(fourth.loverProgressState.intimacy).toBe(8.25);
+    expect(fourth.loverProgressState.intimacy).toBe(8.4);
   });
 
   it("activates the play discount next month, floors costs at zero and expires it the following month", () => {
@@ -341,19 +341,19 @@ describe("lover route reward cycles", () => {
       random.mockClear();
       random.mockReturnValue(roll);
       const next = advanceLoverDate(thirdStudy, "study");
-      expect(next.player.research).toBe(8.75);
-      expect(effectsOf(next)).toContain("你的科研 +0.75（8→8.75，抵抗0.25）");
+      expect(next.player.research).toBe(8.8);
+      expect(effectsOf(next)).toContain("你的科研 +0.8（8→8.8，抵抗0.2）");
       expect(random).toHaveBeenCalledTimes(1);
     }
   });
 
   it.each([
     { research: 5, expected: 6, effect: "恋人科研 +1（5→6）" },
-    { research: 8, expected: 8.75, effect: "恋人科研 +0.75（8→8.75，抵抗0.25）" },
-    { research: 12, expected: 12.5, effect: "恋人科研 +0.5（12→12.5，抵抗0.5）" },
-    { research: 18, expected: 18.25, effect: "恋人科研 +0.25（18→18.25，抵抗0.75）" },
-    { research: 19.875, expected: 20, effect: "恋人科研 +0.125（19.875→20，抵抗0.75，上限）" },
-    { research: 20, expected: 20, effect: "恋人科研 +0（20→20，抵抗0.75，上限）" },
+    { research: 8, expected: 8.8, effect: "恋人科研 +0.8（8→8.8，抵抗0.2）" },
+    { research: 12, expected: 12.6, effect: "恋人科研 +0.6（12→12.6，抵抗0.4）" },
+    { research: 18, expected: 18.4, effect: "恋人科研 +0.4（18→18.4，抵抗0.6）" },
+    { research: 19.875, expected: 20, effect: "恋人科研 +0.13（19.88→20，抵抗0.6，上限）" },
+    { research: 20, expected: 20, effect: "恋人科研 +0（20→20，抵抗0.6，上限）" },
   ])("uses the lover's own research tier and partial cap room at $research", ({ research, expected, effect }) => {
     const state = withRoute(makeState(), "study", 99, 2);
     state.player.research = 25;
@@ -375,10 +375,10 @@ describe("lover route reward cycles", () => {
   });
 
   it.each([
-    { research: 20, expected: 20.25, effect: "你的科研 +0.25（20→20.25，抵抗0.75）" },
-    { research: 24, expected: 24.25, effect: "你的科研 +0.25（24→24.25，抵抗0.75）" },
-    { research: 24.875, expected: 25, effect: "你的科研 +0.125（24.875→25，抵抗0.75，上限）" },
-    { research: 25, expected: 25, effect: "你的科研 +0（25→25，抵抗0.75，上限）" },
+    { research: 20, expected: 20.4, effect: "你的科研 +0.4（20→20.4，抵抗0.6）" },
+    { research: 24, expected: 24.4, effect: "你的科研 +0.4（24→24.4，抵抗0.6）" },
+    { research: 24.875, expected: 25, effect: "你的科研 +0.13（24.88→25，抵抗0.6，上限）" },
+    { research: 25, expected: 25, effect: "你的科研 +0（25→25，抵抗0.6，上限）" },
   ])("uses the player's expanded cap and resistance at $research", ({ research, expected, effect }) => {
     const state = withRoute(makeState(), "study", 99, 2);
     state.player.research = research;
@@ -462,9 +462,9 @@ describe("lover route reward cycles", () => {
   });
 
   it.each([
-    [8, 10, 20, 8.75, 10], [10, 8, 20, 10, 8.75], [10, 10, 20, 10, 10],
-    [8, 10, 8, 8, 10], [19, 20, 25, 19.25, 20], [20, 21, 25, 20.25, 21],
-    [21, 20, 25, 21, 20], [19, 18, 20, 19, 18.25],
+    [8, 10, 20, 8.8, 10], [10, 8, 20, 10, 8.8], [10, 10, 20, 10, 10],
+    [8, 10, 8, 8, 10], [19, 20, 25, 19.4, 20], [20, 21, 25, 20.4, 21],
+    [21, 20, 25, 21, 20], [19, 18, 20, 19, 18.4],
   ])("raises only the lower research with player=%s lover=%s cap=%s", (player, lover, cap, expectedPlayer, expectedLover) => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     const state = withRoute(makeState(), "study", 99, 2);
@@ -491,9 +491,9 @@ describe("lover route reward cycles", () => {
     base.loverProgressState.intimacy = 18;
     base.loverProgressState.giftCoupons = 2;
     const first = advanceLoverDate(withRoute(base, "shopping", 95), "shopping");
-    expect(first.loverProgressState).toMatchObject({ intimacy: 18.5, giftCoupons: 3, routes: { shopping: { progress: 14, completed: 1 } } });
+    expect(first.loverProgressState).toMatchObject({ intimacy: 18.8, giftCoupons: 3, routes: { shopping: { progress: 14, completed: 1 } } });
     const second = advanceLoverDate(withRoute(nextDateMonth(first), "shopping", 99, 1), "shopping");
-    expect(second.loverProgressState).toMatchObject({ intimacy: 19, giftCoupons: 4, routes: { shopping: { progress: 18, completed: 2 } } });
+    expect(second.loverProgressState).toMatchObject({ intimacy: 19.6, giftCoupons: 4, routes: { shopping: { progress: 18, completed: 2 } } });
     expect(second.player.money).toBe(base.player.money - 6);
     expect(second.loverProgressState.routes!.play).toEqual(base.loverProgressState.routes!.play);
     expect(second.loverProgressState.routes!.study).toEqual(base.loverProgressState.routes!.study);
@@ -525,20 +525,20 @@ describe("lover intimacy percentage resistance", () => {
     state.player.research = 250;
     state.researchCapacityState.otherCapBonus = 230;
     state.loverProgressState.intimacy = 11.75;
-    expect(getLoverNextReward(state, "study")).toContain("亲密 +0.75");
+    expect(getLoverNextReward(state, "study")).toContain("亲密 +0.8");
     const next = advanceLoverDate(state, "study");
     expect(next.loverProgressState.routes!.study.completed).toBe(2);
-    expect(next.loverProgressState.intimacy).toBe(13);
+    expect(next.loverProgressState.intimacy).toBe(13.15);
     const rewards = next.eventHistory.slice(state.eventHistory.length)
       .flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []))
       .filter((effect) => effect.startsWith("亲密"));
-    expect(rewards).toEqual(["亲密 +0.75（11.75→12.5，抵抗0.25）", "亲密 +0.5（12.5→13，抵抗0.5）"]);
-    expect(getLoverNextReward(next, "study")).toBe("双方科研较低者 +1，相同不提升、亲密 +0.5");
+    expect(rewards).toEqual(["亲密 +0.8（11.75→12.55，抵抗0.2）", "亲密 +0.6（12.55→13.15，抵抗0.4）"]);
+    expect(getLoverNextReward(next, "study")).toBe("双方科研较低者 +1，相同不提升、亲密 +0.6");
   });
 
   it.each([
-    [0, 1, 1], [5.5, 6.5, 1], [6, 6.75, 0.75], [11.75, 12.5, 0.75],
-    [12, 12.5, 0.5], [17.75, 18.25, 0.5], [18, 18.25, 0.25], [19.9, 20, 0.1], [20, 20, 0],
+    [0, 1, 1], [5.5, 6.5, 1], [6, 6.8, 0.8], [11.75, 12.55, 0.8],
+    [12, 12.6, 0.6], [17.75, 18.35, 0.6], [18, 18.4, 0.4], [19.9, 20, 0.1], [20, 20, 0],
   ])("settles a one-point reward from intimacy %s as %s and logs actual gain", (before, after, gain) => {
     const state = withRoute(makeState(), "play", 99);
     state.loverProgressState.intimacy = before;
@@ -551,8 +551,8 @@ describe("lover intimacy percentage resistance", () => {
   });
 
   it.each([
-    [5.5, 7.25, 1.75], [6, 7.5, 1.5], [11.5, 12.75, 1.25],
-    [12, 13, 1], [17.5, 18.25, 0.75], [18, 18.5, 0.5], [19.9, 20, 0.1], [20, 20, 0],
+    [5.5, 7.3, 1.8], [6, 7.6, 1.6], [11.5, 12.9, 1.4],
+    [12, 13.2, 1.2], [17.5, 18.5, 1], [18, 18.8, 0.8], [19.9, 20, 0.1], [20, 20, 0],
   ])("rereads the tier for each shopping reward point at intimacy %s", (before, after, gain) => {
     const state = withRoute(makeState(), "shopping", 99);
     state.loverProgressState.intimacy = before;
@@ -583,7 +583,7 @@ describe("lover intimacy percentage resistance", () => {
       study: { progress: type === "beautiful" ? 98 : 0, completed: type === "beautiful" ? 0 : 1 },
       shopping: { progress: 99, completed: 0 },
     });
-    expect(next.loverProgressState.intimacy).toBe(type === "beautiful" ? 6.5 : 7.25);
+    expect(next.loverProgressState.intimacy).toBe(type === "beautiful" ? 6.5 : 7.3);
     expect(next.loverProgressState.taskUsedThisMonth).toBe(false);
     expect(next.loverProgressState.giftCoupons).toBe(0);
     expect(advanceLoverMonth(next)).toBe(next);

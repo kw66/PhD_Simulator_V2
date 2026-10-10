@@ -200,7 +200,7 @@ describe("v2 research operations", () => {
       expect(researched.advisorProgressState.funding).toBe(funding < cost ? funding : funding - cost);
       if (funding < cost) expect(researched.papers).toEqual(created.papers);
       expect(getResearchExperimentMoneyCost({ ...state, totalMonths: initial.totalMonths + 3 })).toBe(cost + 1);
-      expect(getResearchExperimentMoneyCost({ ...state, internshipState: activateInternship() })).toBe(cost + 1);
+      expect(getResearchExperimentMoneyCost({ ...state, internshipState: activateInternship() })).toBe(Math.max(0, cost - 1));
     }
   });
 

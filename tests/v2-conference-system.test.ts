@@ -55,10 +55,10 @@ describe("v2 conference system", () => {
     const resistedAdvisor = resolveConferenceDecisionCost({ ...input, mode: "advisor", paperCount: 3 }, () => 0);
 
     expect(advisor.resource).toBe("favor");
-    expect(advisor.actualCost).toBe(1.25);
+    expect(advisor.actualCost).toBe(1.4);
     expect(advisor.fundingCost).toBe(4);
     expect(advisor.countsAsMeeting).toBe(true);
-    expect(resistedAdvisor.actualCost).toBe(1.25);
+    expect(resistedAdvisor.actualCost).toBe(1.4);
     expect(resistedAdvisor.fundingCost).toBe(4);
 
     expect(proxy.resource).toBe("money");

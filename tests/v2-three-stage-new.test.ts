@@ -23,23 +23,23 @@ describe("new multi-stage event shape", () => {
     expect(first.stage).toBe("act1");
     expect(second?.stage).toBe("act2");
     expect(result?.stage).toBe("result");
-    expect(accept?.effects).toEqual({
+    expect(accept?.effects).toEqual({ enqueueEvents: [result] });
+    expect(result?.choices[0]?.effects).toMatchObject({
       conferenceEncounterUpdates: { bigBullCooperation: true },
       researchCapacityStateDeltas: { jointTrainingCitationCapBonus: 3 },
       ideaBonus: 5,
       writingBonus: 5,
-      enqueueEvents: [result],
     });
     expect(result?.description).toContain("科研上限 +3");
     expect(result?.description).toContain("idea +5（永久）｜写作 +5（永久）");
     expect(result?.description).not.toContain("导师科研资源");
     expect(result?.completionLog).toBe("你接受了联合培养，科研上限 +3。");
-    expect(result?.choices[0]?.effects).toEqual({});
+    expect(result?.choices[0]?.effects.advisorProgressStateDeltas).toBeUndefined();
   });
 
   it("keeps conference activity effects in its result stage", () => {
     const context = { id: "conference-test", conferenceName: "CVPR", conferenceYear: 2026, city: "杭州", country: "中国", paperCount: 1, grade: "B" as const, paperIds: ["p1"] };
-    const state = { research: 0, social: 6, relationshipState: createRelationshipState(), conferenceEncounterState: createConferenceEncounterState(), conferenceCareerState: createConferenceCareerState(), internshipState: createInternshipState(), loverState: createLoverState() };
+    const state = { research: 0, social: 6, relationshipState: createRelationshipState(), conferenceEncounterState: createConferenceEncounterState(), conferenceCareerState: { ...createConferenceCareerState(), enterpriseCount: 1, hasInternshipExperience: true }, internshipState: createInternshipState(), loverState: createLoverState() };
     const first = createConferenceActivityEvent(context, state, ["自费参会", "金币 -2"], () => 0.99);
     const second = first.choices[0]?.effects.enqueueEvents?.[0];
     expect(first.stage).toBe("act1");

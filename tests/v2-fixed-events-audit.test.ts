@@ -209,7 +209,7 @@ describe("audited fixed-event rules", () => {
     expect(counts).toEqual([30, 30, 40]);
   });
 
-  it.each([[5, 0, 1], [6, 0.1, 0.75], [6, 0.9, 0.75], [12, 0.9, 0.5], [18, 0.9, 0.25], [20, 0.9, 0]])(
+  it.each([[5, 0, 1], [6, 0.1, 0.8], [6, 0.9, 0.8], [12, 0.9, 0.6], [18, 0.9, 0.4], [20, 0.9, 0]])(
     "settles reunion social %s exactly once without consuming unused roll %s",
     (social, unusedRoll, gain) => {
       const initial = playingState();
@@ -246,7 +246,7 @@ describe("audited fixed-event rules", () => {
       () => 0,
     );
     expect(summer?.enqueueEvents?.[0]?.description).toContain("机制结算");
-    expect(summer?.enqueueEvents?.[0]?.description).toContain("金币 -4");
+    expect(summer?.enqueueEvents?.[0]?.description).toContain("金币 -3");
 
     const yearSummary = resolveYearSummaryFixedEvent(
       playingState({ month: 11 }),
@@ -387,17 +387,17 @@ describe("audited fixed-event rules", () => {
 
     resolveByLabel("继续");
     expect(state.eventQueue[0]?.description).not.toMatch(/金币 -2|机制结算|结果：/u);
-    resolveByLabel("趁机旅游");
+    resolveByLabel("顺便旅游");
     expect(state.eventQueue[0]?.stage).toBe("result");
     expect(state.player.san).toBe(10);
     resolveByLabel("确定");
 
     expect(state.player.money).toBe(8);
-    expect(state.player.san).toBe(15);
+    expect(state.player.san).toBe(14);
     expect(state.eventHistory).toHaveLength(2);
     expect(state.eventHistory[0]?.stages).toHaveLength(3);
     expect(state.eventHistory[1]?.stages).toHaveLength(3);
-    expect(state.log.some((entry) => entry.text.includes("自费参会") && entry.text.includes("SAN +5"))).toBe(true);
+    expect(state.log.some((entry) => entry.text.includes("自费参会") && entry.text.includes("SAN +4"))).toBe(true);
   });
 
   it("ends a skipped VALSE branch without creating an activity event", () => {
@@ -434,8 +434,8 @@ describe("audited fixed-event rules", () => {
     const socialResult = resolveYearSummaryFixedEvent(state, { kind: "year-summary-social" }, () => 0.99);
     const favorResult = resolveYearSummaryFixedEvent(state, { kind: "year-summary-favor" }, () => 0.99);
     const partTimeResult = resolveYearSummaryFixedEvent(state, { kind: "year-summary-part-time" }, () => 0);
-    expect(socialResult?.enqueueEvents?.[0]?.choices[0]?.effects.social).toBe(0.75);
-    expect(favorResult?.enqueueEvents?.[0]?.choices[0]?.effects.favor).toBe(0.75);
+    expect(socialResult?.enqueueEvents?.[0]?.choices[0]?.effects.social).toBe(0.8);
+    expect(favorResult?.enqueueEvents?.[0]?.choices[0]?.effects.favor).toBe(0.8);
     expect(partTimeResult?.outcome).toContain("兼职攒下一笔钱");
     expect(partTimeResult?.enqueueEvents?.[0]?.choices[0]?.effects.money).toBe(3);
   });

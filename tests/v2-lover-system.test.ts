@@ -60,7 +60,8 @@ describe("v2 lover system", () => {
       totalMonths: state.totalMonths,
       playerGender: getRoleDefinition(state.selectedRoleId).gender,
     });
-    const expectedLover = activateLover(type, context.totalMonths, context.playerGender);
+    const expectedLover = { ...activateLover(type, context.totalMonths, context.playerGender),
+      name: context.contact!.name, contactId: context.contact!.id };
     state.eventQueue = [createEventQueueItem(createLoverDevelopmentAct1(context), 1)];
 
     for (const eventChoiceId of ["continue", "accept"]) {
@@ -68,7 +69,7 @@ describe("v2 lover system", () => {
       state = dispatchAction(state, "resolve-event", { eventId, eventChoiceId });
     }
     expect(state.loverState.active).toBe(false);
-    expect(state.eventQueue[0]?.description.split("机制结算")[1]?.trim()).toBe(
+    expect(state.eventQueue[0]?.description.split("机制结算")[1]?.trim()).toContain(
       `结果：恋人 +1（${type === "beautiful" ? "活泼" : "聪慧"}）`,
     );
     state = dispatchAction(state, "resolve-event", { eventId: state.eventQueue[0]?.id, eventChoiceId: "close" });
@@ -84,14 +85,15 @@ describe("v2 lover system", () => {
 
   it.each([
     ["beautiful", 0], ["beautiful", 1], ["smart", 0], ["smart", 1],
-  ] as const)("retains the %s relationship closure rule after %s previous refusals", (type, rejectCount) => {
+  ] as const)("keeps %s relationship opportunities open after %s previous refusals", (type, rejectCount) => {
     const event = createLoverDevelopmentAct1({ type, rejectCount, totalMonths: 6, playerGender: "male", loverGender: "female" });
     const decline = event.choices[0]!.effects.enqueueEvents![0]!.choices.find((choice) => choice.id === "decline")!;
-    expect(decline.effects.conferenceEncounterUpdates).toEqual(type === "beautiful"
-      ? { rejectedBeautifulLoverCount: rejectCount + 1, permanentlyBlockedBeautifulLover: rejectCount === 1 }
-      : { rejectedSmartLoverCount: rejectCount + 1, permanentlyBlockedSmartLover: rejectCount === 1 });
+    expect(decline.effects.conferenceEncounterUpdates).toBeUndefined();
+    expect(decline.effects.enqueueEvents![0]!.choices[0]!.effects.conferenceEncounterUpdates).toMatchObject(type === "beautiful"
+      ? { rejectedBeautifulLoverCount: 0, permanentlyBlockedBeautifulLover: false, beautifulCount: 0 }
+      : { rejectedSmartLoverCount: 0, permanentlyBlockedSmartLover: false, smartCount: 0 });
     expect(decline.effects.enqueueEvents![0]!.description.split("机制结算")[1]?.trim()).toBe(
-      `结果：${type === "beautiful" ? "活泼" : "聪慧"}恋人机会${rejectCount === 1 ? "永久关闭" : "剩余1次"}`,
+      "结果：无事发生",
     );
   });
 

@@ -1,4 +1,4 @@
-import type { GameState, InternshipState, Paper } from "./v2-types";
+import type { GameState, InternshipOffer, InternshipState, Paper } from "./v2-types";
 import { roundMoney } from "./v2-money";
 
 type InternshipContext = Pick<GameState, "internshipState" | "totalMonths">;
@@ -10,8 +10,29 @@ export interface InternshipStatus {
   remainingMonths: number;
 }
 
-function roundToTwoDecimals(value: number): number {
-  return Math.round(value * 100) / 100;
+type InternshipEligibilityContext = InternshipContext
+  & Pick<GameState, "conferenceCareerState" | "papers" | "externalPublications" | "internshipCount">;
+
+const INTERNSHIP_POSITIONS = [
+  { company: "初创科技公司", position: "研发实习生", baseMonthlyIncome: 0 },
+  { company: "产业技术公司", position: "算法实习生", baseMonthlyIncome: 1 },
+  { company: "大型科技公司", position: "研究实习生", baseMonthlyIncome: 2 },
+] as const;
+
+function rollInternshipValue(getRoll: () => number): number {
+  return Math.min(2, Math.max(0, Math.floor(getRoll() * 3)));
+}
+
+export function createInternshipOffer(getRoll: () => number = Math.random): InternshipOffer {
+  const positionIndex = rollInternshipValue(getRoll);
+  const monthlySanCost = 4 + rollInternshipValue(getRoll);
+  const experimentBonus = 4 + rollInternshipValue(getRoll);
+  return {
+    id: `enterprise-${positionIndex}-${monthlySanCost}-${experimentBonus}`,
+    ...INTERNSHIP_POSITIONS[positionIndex]!,
+    monthlySanCost,
+    experimentBonus,
+  };
 }
 
 function countPublishedAPapers(papers: Paper[]): number {
@@ -28,14 +49,15 @@ export function createInternshipState(): InternshipState {
   };
 }
 
-export function activateInternship(): InternshipState {
+export function activateInternship(offer: InternshipOffer = createInternshipOffer(() => 0.5)): InternshipState {
   return {
+    offer,
     active: true,
     kind: "conference6",
     remainingMonths: 6,
     experimentMultiplier: 1.25,
-    experimentBonus: 0,
-    experimentMoneyDiscount: 0,
+    experimentBonus: offer.experimentBonus,
+    experimentMoneyDiscount: 2,
   };
 }
 
@@ -87,12 +109,29 @@ export function hasOngoingInternship(state: InternshipContext): boolean {
   return status.active || status.pending;
 }
 
+export function hasInternshipExperience(
+  state: InternshipContext & Pick<GameState, "conferenceCareerState" | "internshipCount">,
+): boolean {
+  return state.internshipCount > 0 || state.conferenceCareerState.hasInternshipExperience === true || hasOngoingInternship(state);
+}
+
+export function hasPublishedAConferencePaper(state: Pick<GameState, "papers" | "externalPublications">): boolean {
+  return [...state.papers, ...state.externalPublications].some((paper) => paper.status === "published"
+    && paper.target === "A" && !paper.journalTarget && !paper.publication?.journalTarget);
+}
+
+export function canTriggerConferenceInternshipInvite(state: InternshipEligibilityContext, nextEnterpriseCount: number): boolean {
+  return nextEnterpriseCount >= 2 && !hasOngoingInternship(state)
+    && (hasPublishedAConferencePaper(state) || hasInternshipExperience(state));
+}
+
 export function getInternshipSalaryPayment(
   state: InternshipContext & Pick<GameState, "papers" | "externalPublications">,
 ): { payment: number } {
   const status = getInternshipStatus(state);
   if (!status.active) return { payment: 0 };
-  const income = status.kind === "remote3" ? 1 : getInternshipMonthlyIncome(getPublishedAPaperCount(state));
+  const income = status.kind === "remote3" ? 1
+    : getInternshipMonthlyIncome(getPublishedAPaperCount(state), state.internshipState.offer?.baseMonthlyIncome);
   return { payment: roundMoney(income) };
 }
 
@@ -101,7 +140,10 @@ export function getInternshipMonthlyStats(
 ): { san: number; money: number } {
   const status = getInternshipStatus(state);
   if (!status.active) return { san: 0, money: 0 };
-  return { san: -2, money: getInternshipSalaryPayment(state).payment };
+  return {
+    san: status.kind === "remote3" ? -2 : -(state.internshipState.offer?.monthlySanCost ?? 5),
+    money: getInternshipSalaryPayment(state).payment,
+  };
 }
 
 export function getInternshipExperimentEffect(state: InternshipContext): {
@@ -113,7 +155,7 @@ export function getInternshipExperimentEffect(state: InternshipContext): {
   if (!status.active) return { bonus: 0, multiplier: 1, moneyDiscount: 0 };
   return status.kind === "remote3"
     ? { bonus: 4, multiplier: 1, moneyDiscount: 1 }
-    : { bonus: 0, multiplier: state.internshipState.experimentMultiplier, moneyDiscount: 0 };
+    : { bonus: state.internshipState.offer?.experimentBonus ?? 5, multiplier: 1.25, moneyDiscount: 2 };
 }
 
 export function advanceInternshipMonth(state: InternshipContext): InternshipState {
@@ -129,22 +171,11 @@ export function advanceInternshipMonth(state: InternshipContext): InternshipStat
     : { ...state.internshipState, remainingMonths: state.internshipState.remainingMonths - 1 };
 }
 
-export function increaseInternshipExperimentMultiplier(state: InternshipState): InternshipState {
-  if (!state.active || state.kind === "remote3") {
-    return state;
-  }
-
-  return {
-    ...state,
-    experimentMultiplier: roundToTwoDecimals(state.experimentMultiplier + 0.05),
-  };
-}
-
 export function getPublishedAPaperCount(state: Pick<GameState, "papers" | "externalPublications">): number {
   return countPublishedAPapers(state.papers.filter((paper) => paper.nonFirstAuthor !== true))
     + countPublishedAPapers(state.externalPublications.filter((paper) => paper.nonFirstAuthor !== true));
 }
 
-export function getInternshipMonthlyIncome(publishedAPaperCount: number): number {
-  return Math.min(1 + publishedAPaperCount, 6);
+export function getInternshipMonthlyIncome(publishedAPaperCount: number, baseMonthlyIncome: number = 1): number {
+  return Math.min(baseMonthlyIncome + publishedAPaperCount, 6);
 }

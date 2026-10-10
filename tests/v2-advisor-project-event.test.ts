@@ -314,8 +314,8 @@ describe("advisor project SAN and attribute rules", () => {
 
   it.each([
     { value: 3, roll: 0, gain: 1 },
-    { value: 12, roll: 0, gain: 0.5 },
-    { value: 12, roll: 0.999, gain: 0.5 },
+    { value: 12, roll: 0, gain: 0.6 },
+    { value: 12, roll: 0.999, gain: 0.6 },
     { value: 20, roll: 0.999, gain: 0 },
   ])("retains tier resistance and caps at attribute $value with roll $roll", ({ value, roll, gain }) => {
     const state = makeState();

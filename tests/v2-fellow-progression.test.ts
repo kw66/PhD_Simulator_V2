@@ -27,11 +27,11 @@ afterEach(() => vi.restoreAllMocks());
 const RESEARCH_BY_YEAR = [
   [0, 1, 2, 3],
   [2, 3, 4, 5],
-  [4, 5, 6, 6.75],
-  [6, 6.75, 7.5, 8.25],
-  [7.5, 8.25, 9, 9.75],
-  [9, 9.75, 10.5, 11.25],
-  [10.5, 11.25, 12, 12.5],
+  [4, 5, 6, 6.8],
+  [6, 6.8, 7.6, 8.4],
+  [7.6, 8.4, 9.2, 10],
+  [9.2, 10, 10.8, 11.6],
+  [10.8, 11.6, 12.4, 13],
 ] as const;
 
 describe("v2 fellow progression", () => {
@@ -63,7 +63,7 @@ describe("v2 fellow progression", () => {
     for (let draw = 0; draw < 4; draw += 1) random.mockReturnValueOnce(0);
     random.mockReturnValueOnce(0.99);
     const profile = createGeneratedFellowProfileAddition("peer", 0, "male", [], random, { year: 6 });
-    expect(profile.research).toBe(6 + 8 * 0.75 + 0.5);
+    expect(profile.research).toBe(6 + 8 * 0.8 + 0.6);
     expect(random).toHaveBeenCalledTimes(5);
   });
 

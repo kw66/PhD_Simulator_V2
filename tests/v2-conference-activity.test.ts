@@ -1,6 +1,10 @@
+import { createAdvancedConferenceActivityOptions } from "../src/core/v2-conference-activity-advanced-options";
+import { createConferenceMentorContact, createConferenceScholarContact, getConferenceMentorContact, getConferenceScholarContact, replaceConferenceMentorContact, replaceConferenceScholarContact } from "../src/core/v2-conference-contacts";
+import { applyTierResist } from "../src/core/v2-sanity-rules";
 import { describe, expect, it } from "vitest";
 
 import { createConferenceActivityDecisionEvent } from "../src/core/v2-conference-activity-events";
+import { createBaseConferenceActivityOptions } from "../src/core/v2-conference-activity-base-options";
 import { scheduleConferenceAttendance, settleDueConferenceAttendance } from "../src/core/v2-conference-attendance";
 import { buildConferenceDecisionEventsForAcceptedPapers } from "../src/core/v2-conference-events";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -41,6 +45,25 @@ describe("v2 conference activity", () => {
     ]);
   });
 
+  it("keeps short activity names and applies tea friendship without SAN recovery", () => {
+    const options = createBaseConferenceActivityOptions(baseContext, createBuildState({ social: 12 }), () => 0);
+    const tea = options.find((option) => option.id === "tea-break")!;
+    expect(tea.label).toBe("茶歇交友");
+    expect(tea.outcome).toBe("社交 +0.6（抵抗0.4）。");
+    expect(tea.effects).toEqual({ social: 0.6 });
+    for (const [id, label, action, effect] of [
+      ["idea-networking", "广泛交流idea", "idea", { extraActions: 3 }],
+      ["experiment-discussion", "同行交流实验", "experiment", { extraActions: 3 }],
+      ["famous-scholar", "与著名学者交流", "idea", { multiplier: 1.25 }],
+    ] as const) {
+      const option = options.find((entry) => entry.id === id)!;
+      expect(option.label).toBe(label);
+      expect(option.effects.temporaryActionEffectUpdates).toEqual({ [action]: effect });
+      expect(option.outcome).not.toContain("多");
+    }
+    expect(options.find((option) => option.id === "tour-local")?.label).toBe("顺便旅游");
+  });
+
   it("keeps local travel in the story and only SAN in the settlement", () => {
     const activity = createConferenceActivityDecisionEvent(
       baseContext,
@@ -51,13 +74,25 @@ describe("v2 conference activity", () => {
     const travelChoice = activity.choices.find((choice) => choice.id === "tour-local");
     const result = travelChoice?.effects.enqueueEvents?.at(-1);
 
-    expect(travelChoice?.outcome).toBe("SAN +6。");
+    expect(travelChoice?.outcome).toBe("SAN +5。");
     expect(result?.description).toContain("测试城");
     expect(result?.description).toContain("街道");
     expect(result?.description).toContain("机制结算");
-    expect(result?.description).toContain("SAN +6");
+    expect(result?.description).toContain("SAN +5");
     expect(result?.completionLog).not.toContain("金币");
   });
+
+  it.each([["domestic", 4], ["asia", 5], ["west", 6]] as const)(
+    "uses regional travel recovery for %s conferences",
+    (region, recovery) => {
+      const activity = createConferenceActivityDecisionEvent(
+        { ...baseContext, region }, createBuildState(), "", () => 0,
+      );
+      const choice = activity.choices.find((entry) => entry.id === "tour-local")!;
+      expect(choice.outcome).toBe(`SAN +${recovery}。`);
+      expect(choice.effects.enqueueEvents?.[0]?.choices[0]?.effects.san).toBe(recovery);
+    },
+  );
 
   it("shows long titles once with short result references and preserves real citation multipliers", () => {
     const state = { ...createStartedGameState("normal"), totalMonths: 5, eventQueue: [] };
@@ -108,210 +143,148 @@ describe("v2 conference activity", () => {
       expect(event.completionLog ?? "").not.toMatch(/金币|科研经费|引用倍率/);
     }
     const tour = activityDecision.choices.find((choice) => choice.id === "tour-local")!.effects.enqueueEvents![0]!;
-    expect(tour.description).toContain("结果：SAN +6");
-    expect(tour.choices[0]!.effects.san).toBe(6);
-    expect(tour.completionLog).toBe("SAN +6");
+    const travelSan = activityRoot.conferenceActivityPreview?.context.region === "domestic" ? 4
+      : activityRoot.conferenceActivityPreview?.context.region === "west" ? 6 : 5;
+    expect(tour.description).toContain(`结果：SAN +${travelSan}`);
+    expect(tour.choices[0]!.effects.san).toBe(travelSan);
+    expect(tour.completionLog).toBe(`SAN +${travelSan}`);
     expect(settleDueConferenceAttendance(attended)).toBe(attended);
   });
 
-  it("falls back to four base options for A-grade before follow-up lines are migrated", () => {
-    const options = selectConferenceActivityOptions({ ...baseContext, grade: "A" }, createBuildState(), () => 0);
-    expect(options.map((option) => option.id)).toEqual([
-      "tour-local",
-      "tea-break",
-      "experiment-discussion",
-      "idea-networking",
-    ]);
+  it("draws five mixed A options with no advanced guarantee", () => {
+    for (const social of [0, 6, 12]) {
+      const options = selectConferenceActivityOptions({ ...baseContext, grade: "A" }, createBuildState({ social }), () => 0);
+      expect(options.map((option) => option.id)).toEqual([
+        "tour-local", "tea-break", "experiment-discussion", "idea-networking", "famous-scholar",
+      ]);
+    }
   });
 
-  it("offers audited advanced first-encounter options for B-grade meetings when social is high enough", () => {
-    const options = selectConferenceActivityOptions(
-      { ...baseContext, grade: "B" },
-      createBuildState({ social: 6 }),
-      () => 0.99,
-    );
-
-    expect(options.map((option) => option.id)).toEqual([
-      "smart-scholar",
-      "beautiful-scholar",
-      "big-bull-coop",
-      "enterprise-networking",
-    ]);
+  it("offers exactly three advanced options and excludes enterprise from C meetings", () => {
+    const state = createBuildState({ social: 6 });
+    expect(selectConferenceActivityOptions({ ...baseContext, grade: "B" }, state, () => 0.99).map((option) => option.id))
+      .toEqual(["enterprise-networking", "opposite-scholar", "big-bull-coop", "famous-scholar"]);
+    expect(createAdvancedConferenceActivityOptions(state, () => 0.99)).toHaveLength(3);
+    expect(selectConferenceActivityOptions(baseContext, state, () => 0.99).map((option) => option.id))
+      .toEqual(["famous-scholar", "idea-networking", "experiment-discussion"]);
+    expect(createAdvancedConferenceActivityOptions(createBuildState({ social: 5.9 }), () => 0.99)).toEqual([]);
   });
 
-  it("builds famous scholar as pure idea multiplier and marks the encounter", () => {
-    const rolls = [0.8, 0.7, 0.7];
-    const activity = createConferenceActivityDecisionEvent(
-      baseContext,
-      createBuildState(),
-      "自费参会，金币 -2",
-      () => rolls.shift() ?? 0,
-    );
-    expect(activity.choices.map((choice) => choice.id)).toEqual([
-      "famous-scholar",
-      "peer-collaboration",
-      "idea-networking",
-    ]);
-
-    const famousScholarChoice = activity.choices.find((choice) => choice.id === "famous-scholar");
-    const famousResultChoice = famousScholarChoice?.effects.enqueueEvents?.[0]?.choices[0];
-    expect(famousResultChoice?.effects.temporaryActionEffectUpdates).toEqual({
-      idea: { multiplier: 1.25 },
-    });
-    expect(famousResultChoice?.effects.conferenceEncounterUpdates).toBeUndefined();
-    expect(famousScholarChoice?.effects.enqueueEvents?.[0]?.chainId).toBe(`${baseContext.id}-activity`);
+  it("invites experienced enterprise contacts only from the second exchange", () => {
+    const state = createBuildState({ social: 6, internshipCount: 1 });
+    const enterprise = (current: typeof state) => createAdvancedConferenceActivityOptions(current, () => 0.99)
+      .find((option) => option.id === "enterprise-networking")!;
+    expect(enterprise(state).effects.triggerInternshipInvite).toBe(false);
+    const second = { ...state, conferenceCareerState: { ...state.conferenceCareerState, enterpriseCount: 1 } };
+    expect(enterprise(second).effects.triggerInternshipInvite).toBe(true);
+    expect(enterprise({ ...second, internshipCount: 0 }).effects.triggerInternshipInvite).toBe(false);
+    for (const internshipState of [activateInternship(), activateRemoteInternship(11)]) {
+      const choice = enterprise({ ...second, internshipState, totalMonths: 11 });
+      expect(choice.effects.triggerInternshipInvite).toBe(false);
+      expect(choice.effects.internshipStateUpdates).toBeUndefined();
+      expect(choice.effects.temporaryActionEffectUpdates).toEqual({ experiment: { multiplier: 1.25 } });
+    }
   });
 
-  it("tracks enterprise networking as a low-coupling conference career counter", () => {
-    const rolls = [0.99, 0.99, 0.99];
-    const activity = createConferenceActivityDecisionEvent(
-      baseContext,
-      createBuildState(),
-      "导师报销，导师好感 -1",
-      () => rolls.shift() ?? 0.99,
-    );
-    const enterpriseChoice = activity.choices.find((choice) => choice.id === "enterprise-networking");
-
-    const enterpriseResultChoice = enterpriseChoice?.effects.enqueueEvents?.[0]?.choices[0];
-    expect(enterpriseResultChoice?.effects.temporaryActionEffectUpdates).toEqual({
-      experiment: { multiplier: 1.25 },
-    });
-    expect(enterpriseResultChoice?.effects.conferenceCareerUpdates).toEqual({
-      enterpriseCount: 1,
-    });
-    expect(enterpriseResultChoice?.effects.triggerInternshipInvite).toBe(true);
+  it("tracks mentor cooperation per contact with no repeat permanent cap reward", () => {
+    const mentor = createConferenceMentorContact({ id: baseContext.id, levelRoll: 0.99 });
+    const state = createBuildState({ social: 6, research: 12 });
+    for (const cooperationCount of [0, 1, 2, 4]) {
+      const encounter = { ...state.conferenceEncounterState, bigBull: { ...mentor, cooperationCount } };
+      const option = createAdvancedConferenceActivityOptions({ ...state, conferenceEncounterState: encounter }, () => 0.99)[0]!;
+      expect(option.label).toBe("大牛合作");
+      expect(option.effects.conferenceEncounterUpdates?.bigBull).toEqual({ ...mentor, cooperationCount: cooperationCount + 1 });
+      expect(option.effects.social).toBe(cooperationCount >= 1 ? 0.8 : undefined);
+      expect(option.effects.triggerJointTrainingInvite).toBe(cooperationCount >= 2);
+      expect(option.effects.temporaryActionEffectUpdates).toEqual({ writing: { bonus: 8 } });
+      expect(option.effects.researchCapacityStateDeltas).toBeUndefined();
+      const completed = createAdvancedConferenceActivityOptions({ ...state, conferenceEncounterState: {
+        ...encounter, bigBullCooperation: true,
+      } }, () => 0.99)[0]!;
+      expect(completed.effects.triggerJointTrainingInvite).toBe(false);
+      expect(completed.effects.researchCapacityStateDeltas).toBeUndefined();
+    }
   });
 
-  it("grows active internship multiplier when enterprise networking happens during internship", () => {
-    const options = selectConferenceActivityOptions(
-      { ...baseContext, grade: "B" },
-      createBuildState({ social: 6, internshipState: activateInternship() }),
-      () => 0.99,
-    );
-    const enterpriseChoice = options.find((option) => option.id === "enterprise-networking");
-
-    expect(enterpriseChoice?.effects.internshipStateUpdates).toEqual({
-      active: true,
-      kind: "conference6",
-      remainingMonths: 6,
-      experimentMultiplier: 1.3,
-      experimentBonus: 0,
-      experimentMoneyDiscount: 0,
+  it.each([0, 0.499999, 0.5, 0.999999])("uses the 50 percent scholar split every encounter at roll %s", (roll) => {
+    const beautiful = { ...createConferenceScholarContact("beautiful", { id: "beautiful" }), encounterCount: 2 };
+    const smart = { ...createConferenceScholarContact("smart", { id: "smart" }), encounterCount: 4 };
+    const state = createBuildState({ social: 12, conferenceEncounterState: {
+      ...createConferenceEncounterState(), scholars: { beautiful, smart },
+    } });
+    const option = createAdvancedConferenceActivityOptions(state, () => roll)[1]!;
+    expect(option.id).toBe("opposite-scholar");
+    const type = roll < 0.5 ? "beautiful" : "smart";
+    expect(option.effects.triggerLoverDevelopment).toBe(type);
+    expect(option.effects.conferenceEncounterUpdates?.scholars?.[type]).toEqual({
+      ...(type === "beautiful" ? beautiful : smart), encounterCount: type === "beautiful" ? 3 : 5,
     });
+    expect(option.effects.social).toBe(0.6);
+    expect(option.effects.san).toBe(type === "beautiful" ? 5 : undefined);
+    expect(option.effects.temporaryActionEffectUpdates).toEqual(type === "smart" ? { idea: { bonus: 2, extraActions: 2 } } : undefined);
+    expect(option.effects.sanCapDelta).toBeUndefined();
+    expect(option.effects.research).toBeUndefined();
   });
 
-  it("does not add enterprise multiplier growth to remote placements", () => {
-    const internshipState = activateRemoteInternship(11);
-    const options = selectConferenceActivityOptions(
-      { ...baseContext, grade: "B" },
-      createBuildState({ social: 6, internshipState }),
-      () => 0.99,
-    );
-    const choice = options.find((option) => option.id === "enterprise-networking")!;
-    expect(choice.effects.internshipStateUpdates).toEqual(internshipState);
-    expect(choice.effects.temporaryActionEffectUpdates).toEqual({ experiment: { multiplier: 1.25 } });
+  it("allows first-encounter romance at social 12 but penalizes an existing lover without clamping", () => {
+    const state = createBuildState({ social: 12 });
+    const first = createAdvancedConferenceActivityOptions(state, () => 0)[1]!;
+    expect(first.effects.triggerLoverDevelopment).toBe("beautiful");
+    expect(first.effects.social).toBeUndefined();
+    const game = createStartedGameState("normal");
+    for (const intimacy of [2, 12]) {
+      const option = createAdvancedConferenceActivityOptions({ ...state,
+        loverState: { ...state.loverState, active: true },
+        loverProgressState: { ...game.loverProgressState, intimacy },
+      }, () => 0)[1]!;
+      expect(option.effects.loverIntimacyDelta).toBe(applyTierResist(-6, intimacy).effectiveChange);
+      expect(option.effects.triggerLoverDevelopment).toBeUndefined();
+      if (intimacy === 2) expect(intimacy + option.effects.loverIntimacyDelta!).toBeLessThan(0);
+    }
   });
 
-  it("offers the audited deep joint-training option after big-bull cooperation has been opened", () => {
-    const options = selectConferenceActivityOptions(
-      { ...baseContext, grade: "B" },
-      createBuildState({
-        social: 6,
-        research: 12,
-        conferenceEncounterState: {
-          ...createConferenceEncounterState(),
-          metBigBullCoop: true,
-          bigBullDeepCount: 1,
-        },
-      }),
-      () => 0.99,
-    );
-    const jointTrainingChoice = options.find((option) => option.id === "big-bull-joint-training");
-
-    expect(jointTrainingChoice?.effects.temporaryActionEffectUpdates).toEqual({
-      writing: { bonus: 8 },
-    });
-    expect(jointTrainingChoice?.effects.conferenceEncounterUpdates).toEqual({
-      bigBullDeepCount: 2,
-    });
-    expect(jointTrainingChoice?.effects.triggerJointTrainingInvite).toBe(true);
-    expect(jointTrainingChoice?.outcome).toBe("下次写论文 +8；联培邀请：已收到。");
+  it("keeps contact helpers pure, stable and replacement-specific", () => {
+    const seed = { id: "conference", roll: 0.3, levelRoll: 0.8, playerGender: "female" as const };
+    const encounter = createConferenceEncounterState();
+    const before = structuredClone(encounter);
+    const mentor = getConferenceMentorContact(encounter, seed);
+    const scholar = getConferenceScholarContact(encounter, "smart", seed);
+    expect(mentor).toEqual(getConferenceMentorContact(encounter, seed));
+    expect(mentor.level).toBe(2);
+    expect(scholar.gender).toBe("male");
+    expect(encounter).toEqual(before);
+    expect(getConferenceMentorContact({ ...encounter, bigBull: mentor }, { id: "different" })).toBe(mentor);
+    expect(getConferenceScholarContact({ ...encounter, scholars: { smart: scholar } }, "smart")).toBe(scholar);
+    const nextMentor = replaceConferenceMentorContact({ ...mentor, cooperationCount: 9 }, seed);
+    const nextScholar = replaceConferenceScholarContact({ ...scholar, encounterCount: 9 }, "smart", seed);
+    expect(nextMentor.id).not.toBe(mentor.id);
+    expect(nextMentor.name).not.toBe(mentor.name);
+    expect(nextMentor.cooperationCount).toBe(0);
+    expect(nextScholar.id).not.toBe(scholar.id);
+    expect(nextScholar.name).not.toBe(scholar.name);
+    expect(nextScholar.encounterCount).toBe(0);
+    expect(nextScholar.gender).toBe(scholar.gender);
   });
 
-  it("offers beautiful-lover follow-up after the audited second-threshold setup", () => {
-    const options = selectConferenceActivityOptions(
-      { ...baseContext, grade: "B" },
-      createBuildState({
-        social: 12,
-        conferenceEncounterState: {
-          ...createConferenceEncounterState(),
-          metBeautiful: true,
-          beautifulCount: 1,
-        },
-      }),
-      () => 0.99,
-    );
-    const loverChoice = options.find((option) => option.id === "beautiful-lover-development");
-
-    expect(loverChoice?.effects.san).toBe(8);
-    expect(loverChoice?.effects.sanCapDelta).toBe(3);
-    expect(loverChoice?.effects.conferenceEncounterUpdates).toEqual({
-      beautifulCount: 2,
-    });
-    expect(loverChoice?.effects.triggerLoverDevelopment).toBe("beautiful");
-    expect(loverChoice?.outcome).toBe("SAN +8，SAN 上限 +3；关系邀请：已收到。");
+  it("bounds identity size through one hundred deterministic replacements", () => {
+    let mentor = createConferenceMentorContact();
+    let scholar = createConferenceScholarContact("smart");
+    const mentorIds = new Set([mentor.id]);
+    const scholarIds = new Set([scholar.id]);
+    for (let iteration = 0; iteration < 100; iteration += 1) {
+      const nextMentor = replaceConferenceMentorContact(mentor, { id: `${mentor.id}:replacement` });
+      const nextScholar = replaceConferenceScholarContact(scholar, "smart", { id: `${scholar.id}:replacement` });
+      expect(nextMentor.id.length).toBeLessThan(64);
+      expect(nextScholar.id.length).toBeLessThan(64);
+      expect(mentorIds.has(nextMentor.id)).toBe(false);
+      expect(scholarIds.has(nextScholar.id)).toBe(false);
+      expect(nextMentor.name).not.toBe(mentor.name);
+      expect(nextScholar.name).not.toBe(scholar.name);
+      expect(nextMentor).toEqual(replaceConferenceMentorContact(mentor, { id: `${mentor.id}:replacement` }));
+      mentorIds.add(nextMentor.id);
+      scholarIds.add(nextScholar.id);
+      mentor = nextMentor;
+      scholar = nextScholar;
+    }
   });
-
-  it("offers smart-lover follow-up with the audited immediate SAN and research gain", () => {
-    const options = selectConferenceActivityOptions(
-      { ...baseContext, grade: "B" },
-      createBuildState({
-        social: 12,
-        conferenceEncounterState: {
-          ...createConferenceEncounterState(),
-          metSmart: true,
-          smartCount: 1,
-        },
-      }),
-      () => 0.99,
-    );
-    const loverChoice = options.find((option) => option.id === "smart-lover-development");
-
-    expect(loverChoice?.effects.san).toBe(1);
-    expect(loverChoice?.effects.research).toBe(1);
-    expect(loverChoice?.effects.conferenceEncounterUpdates).toEqual({
-      smartCount: 2,
-    });
-    expect(loverChoice?.effects.triggerLoverDevelopment).toBe("smart");
-    expect(loverChoice?.outcome).toBe("SAN +1，科研 +1；关系邀请：已收到。");
-  });
-
-  it("offers post-joint-training big-bull cooperation with the audited cap gain", () => {
-    const options = selectConferenceActivityOptions(
-      { ...baseContext, grade: "B" },
-      createBuildState({
-        social: 6,
-        conferenceEncounterState: {
-          ...createConferenceEncounterState(),
-          bigBullCooperation: true,
-          bigBullCoopCount: 2,
-          metBigBullCoop: true,
-        },
-      }),
-      () => 0.99,
-    );
-    const cooperationChoice = options.find((option) => option.id === "big-bull-coop");
-
-    expect(cooperationChoice?.effects.social).toBe(0.75);
-    expect(cooperationChoice?.effects.temporaryActionEffectUpdates).toEqual({
-      writing: { bonus: 8 },
-    });
-    expect(cooperationChoice?.effects.researchCapacityStateDeltas).toEqual({
-      otherCapBonus: 1,
-    });
-    expect(cooperationChoice?.effects.conferenceEncounterUpdates).toEqual({
-      bigBullCoopCount: 3,
-    });
-  });
-
 });

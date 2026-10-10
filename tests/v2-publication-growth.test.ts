@@ -193,7 +193,7 @@ describe("v2 publication growth transparency", () => {
 
     const at10000 = applyPublicationTalentRewards({ ...at1000, totalCitations: 10000 }, noResist);
     expect(at10000.player.san).toBe(Math.min(at10000.sanCap, at1000.player.san + 8));
-    expect(at10000.player.research).toBe(at1000.player.research + 0.75);
+    expect(at10000.player.research).toBeCloseTo(at1000.player.research + 0.8);
     expect(at10000.researchCapacityState.otherCapBonus).toBe(at1000.researchCapacityState.otherCapBonus + 1);
   });
 });

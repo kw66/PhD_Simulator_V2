@@ -117,7 +117,7 @@ export function resolveSummerVacationFixedEvent(
           idSuffix: "home",
           year: state.year,
           month: state.month,
-          title: "暑假 ➜ 暑假计划 ➜ 新学期将至",
+          title: "暑假 ➜ 暑假计划 ➜ 回家休息",
           description: [
             "回家后，你干脆关掉闹钟，睡到中午才慢吞吞地下楼。下午陪家人逛街，顺路买些零碎东西，晚饭也不用对着电脑边吃边看实验日志。",
             "几天过去，脑子里那根绷紧的弦终于松了。你偶尔想起论文，却没有立刻打开电脑；这次休息得更充分些，新学期再把状态慢慢接回来。",
@@ -131,7 +131,7 @@ export function resolveSummerVacationFixedEvent(
     case "summer-vacation-research":
       return {
         nextState: state,
-        outcome: "下次想 idea 多 1 次，永久 idea +1。",
+        outcome: "下次想idea +1 次，永久 idea +1。",
         enqueueEvents: [createSummerVacationResultEvent({
           idSuffix: "research",
           year: state.year,
@@ -141,7 +141,7 @@ export function resolveSummerVacationFixedEvent(
             "你留在校园，白天去图书馆和实验楼之间来回。树上的蝉叫得响，空荡荡的教学楼里却凉快，傍晚还能绕到操场走一圈，看留校的人慢慢多起来。",
             "晚上回到实验室，你才把文献、实验记录和疑问摊开，沿着一个问题慢慢查。没有人催你立刻给出结果，几轮对照后，笔记里终于多了一条能继续试的思路。",
           ].join("\n\n"),
-          outcome: "下次想 idea 多 1 次，永久 idea +1 分。",
+          outcome: "下次想idea +1 次，永久 idea +1 分。",
           settlement: "结果：下次想 idea +1 次｜永久 idea +1",
           effects: {
             temporaryActionEffectUpdates: { idea: { extraActions: 1 } },
@@ -151,14 +151,14 @@ export function resolveSummerVacationFixedEvent(
       };
     case "summer-vacation-travel": {
       const missingSan = Math.max(0, state.sanCap - state.player.san);
-      const sanRecovery = Math.floor(missingSan * 0.5);
-      const sanSummary = formatSummerSanRecovery(missingSan, 0.5);
+      const sanRecovery = Math.floor(missingSan * 0.3);
+      const sanSummary = formatSummerSanRecovery(missingSan, 0.3);
       const socialResult = applyTierResist(1, state.player.social, getRoll);
       const socialText = formatTierResistedOutcome("社交", 1, socialResult);
       const fullSanTier = state.player.san >= 18;
       return {
         nextState: state,
-        outcome: `金币 -4，${sanSummary}，${socialText}${fullSanTier ? "，SAN上限 +1" : ""}。`,
+        outcome: `金币 -3，${sanSummary}，${socialText}${fullSanTier ? "，SAN上限 +1" : ""}。`,
         enqueueEvents: [createSummerVacationResultEvent({
           idSuffix: "travel",
           year: state.year,
@@ -168,15 +168,15 @@ export function resolveSummerVacationFixedEvent(
             "你和朋友去邻近城市，行程排得很松。白天闲逛，晚上找小馆子，聊的从实验进度变成了明天去哪儿、哪家店好吃，话题终于不只围着课题转。",
             "回程翻照片核对开销，拍得最多的还是吃的。你们约好下次再见；这趟花了钱，心情和熟络程度也确实往前走了一点。",
           ].join("\n\n"),
-          outcome: `金币 -4，${sanSummary}。`,
+          outcome: `金币 -3，${sanSummary}。`,
           settlement: [
-            "结果：金币 -4",
+            "结果：金币 -3",
             `结果：${sanSummary}`,
             `结果：${socialText}`,
             ...(fullSanTier ? ["额外：条件：SAN ≥ 18｜结果：SAN上限 +1"] : []),
           ].join("\n"),
           effects: {
-            money: -4,
+            money: -3,
             social: socialResult.effectiveChange,
             ...(fullSanTier ? { sanCapDelta: 1 } : {}),
             ...(sanRecovery === 0 ? {} : { san: sanRecovery }),

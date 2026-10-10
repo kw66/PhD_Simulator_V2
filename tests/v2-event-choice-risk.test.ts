@@ -362,11 +362,11 @@ describe("event choice immediate ending risk", () => {
 
   it("projects fixed actual result effects once after the branch is resolved", () => {
     const current = state();
-    current.player.money = 3;
+    current.player.money = 2;
     const resolution: FixedEventResolution = { kind: "summer-vacation-travel" };
     const result = applyFixedEventResolution(current, resolution, () => 0).enqueueEvents![0]!;
     expect(risk(current, result)).toBe("certain");
-    expect(risk({ ...current, player: { ...current.player, money: 4 } }, result)).toBeNull();
+    expect(risk({ ...current, player: { ...current.player, money: 3 } }, result)).toBeNull();
   });
 
   it.each([0, 1, 12])("warns for the VALSE meal in runtime act2 and act3 after a %i-month shift", (delta) => {

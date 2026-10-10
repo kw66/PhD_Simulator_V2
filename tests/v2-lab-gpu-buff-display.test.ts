@@ -102,33 +102,40 @@ describe("lab GPU failure Buff display", () => {
     expect(surcharge).toContain("玩家经费不足时暂停实验");
     expect(surcharge).toContain("同学先用经费、不足差额自付，合计不足改做横向");
     expect(surcharge).not.toMatch(/玩家自付|自费/);
-    expect(getEffectChip(sidebar, "自己实验费用 -2")).toContain('class="effect-chip is-money"');
-    expect(getEffectChip(sidebar, "自己实验费用 -2")).toContain("个人显卡");
-    expect(getEffectChip(sidebar, "自己实验费用 -1")).toContain('class="effect-chip is-money"');
-    expect(getEffectChip(sidebar, "自己实验费用 -1")).toContain("远程实习 · 剩余 3 月");
+    expect(getEffectChip(sidebar, "实验费用 -2")).toContain('class="effect-chip is-money"');
+    expect(getEffectChip(sidebar, "实验费用 -2")).toContain("个人显卡");
+    expect(getEffectChip(sidebar, "实验费用 -1")).toContain('class="effect-chip is-money"');
+    expect(getEffectChip(sidebar, "实验费用 -1")).toContain("远程实习 · 剩余 3 月");
     expect(sidebar).not.toContain("实验金币");
 
     state.buffs = [{ ...createLabGpuFailureBuff(), remainingMonths: 0 }];
     const expiredSidebar = renderBuffSidebar(state);
     expect(expiredSidebar).not.toContain("实验费用 +1");
-    getEffectChip(expiredSidebar, "自己实验费用 -2");
-    getEffectChip(expiredSidebar, "自己实验费用 -1");
+    getEffectChip(expiredSidebar, "实验费用 -2");
+    getEffectChip(expiredSidebar, "实验费用 -1");
   });
 
   it.each(["workstation", "relationship"] as const)("explains shared costs and personal discounts in the existing %s help", (activePlayTab) => {
-    const help = getPlayHelpContext({ activePlayTab }).pages
-      .map((page) => page.summary + page.body).join("").replace(/<[^>]*>/g, "");
+    const page = getPlayHelpContext({ activePlayTab }).pages
+      .find((entry) => entry.title === (activePlayTab === "relationship" ? "科研经费" : "科研入门"));
+    expect(page).toBeDefined();
+    const help = (page!.summary + page!.body).replace(/<[^>]*>/g, "");
 
-    expect(help).toContain("算力短缺持续6个月，玩家与同学每次实验费用+1");
     expect(help).toContain("减免仅限玩家");
-    expect(help).toContain("先算共享涨价与个人减免");
     expect(help).not.toContain("实验金币");
     expect(help).not.toMatch(/不足部分自付|最后扣你的金币|自费租卡/);
     if (activePlayTab === "relationship") {
-      expect(help).toContain("玩家经费不足时暂停实验");
-      expect(help).toContain("同学经费与个人金币合计不足当次实验费用时改做横向");
+      expect(help).toContain("实验基础费用3");
+      expect(help).toContain("算力短缺持续6个月，双方每次+1");
+      expect(help).toContain("显卡和实习减免仅限玩家，先算涨价再减免");
+      expect(help).toContain("玩家经费不足暂停实验");
+      expect(help).toContain("同学先用经费，不足差额用钱包，两者都不足则改做横向");
     } else {
+      expect(help).toContain("实验基础费用3经费");
+      expect(help).toContain("先算共享涨价与个人减免，再扣实验室经费");
+      expect(help).toContain("算力短缺持续6个月，玩家与同学每次实验费用+1");
       expect(help).toContain("费用由实验室支付，不足时暂停实验");
+      expect(help).toContain("同学不足差额由自己的钱包支付");
       expect(help).toContain("悬浮实验按钮查看实际经费消耗");
     }
   });

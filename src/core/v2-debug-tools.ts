@@ -272,6 +272,7 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
       { id: "review-result", label: "论文结果" },
       { id: "conference", label: "论文参会" },
       { id: "conference-activity", label: "会场活动" },
+      { id: "internship-invite", label: "实习邀请" },
       { id: "joint-training-invite", label: "联合培养" },
       { id: "lover-beautiful", label: "活泼关系线" },
       { id: "lover-smart", label: "聪慧关系线" },
@@ -285,7 +286,6 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
       { id: "career-state-owned", label: "央国企招聘" },
       { id: "career-civil-service", label: "公务员招聘" },
       { id: "career-academic", label: "教职招聘" },
-      { id: "internship-invite", label: "实习邀请" },
     ],
   },
 ];
@@ -569,7 +569,39 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
   const baseState = state;
   let targetEvent = targetScene;
   let nextContext = context;
-  if (targetScene.source === "random") {
+  const activityPreview = currentEvent.conferenceActivityPreview ?? context.rootEvent.conferenceActivityPreview;
+  const fixedReplayRoot = currentEvent.chainId === "teachers-day"
+    ? createTeachersDayEvent(baseState, Math.random)
+    : currentEvent.chainId === "mentor-assign"
+      ? createMentorAssignEvent(baseState, Math.random)
+      : currentEvent.chainId === "before-grad-school"
+        ? createBeforeGradSchoolAct1Event(baseState, Math.random)
+        : null;
+  if (activityPreview && currentEvent.chainId.endsWith("-activity")) {
+    const rebuiltRoot = createConferenceActivityEvent(
+      activityPreview.context,
+      { ...baseState, research: baseState.player.research, social: baseState.player.social },
+      activityPreview.attendanceSummary ? [activityPreview.attendanceSummary] : [],
+      Math.random,
+    );
+    targetEvent = rebuiltRoot;
+    for (const stage of history.slice(0, targetIndex)) {
+      const choice = targetEvent.choices.find((item) => item.id === stage.selectedChoiceId);
+      const followUp = choice?.effects.enqueueEvents?.find((event) => event.chainId === currentEvent.chainId);
+      if (!followUp) return state;
+      targetEvent = followUp;
+    }
+    nextContext = { ...context, rootEvent: rebuiltRoot };
+  } else if (fixedReplayRoot && targetIndex <= 1) {
+    targetEvent = fixedReplayRoot;
+    for (const stage of history.slice(0, targetIndex)) {
+      const choice = targetEvent.choices.find((item) => item.id === stage.selectedChoiceId);
+      const followUp = choice?.effects.enqueueEvents?.find((event) => event.chainId === currentEvent.chainId);
+      if (!followUp) return state;
+      targetEvent = followUp;
+    }
+    nextContext = { ...context, rootEvent: fixedReplayRoot };
+  } else if (targetScene.source === "random") {
     const rootEvent = rebuildDebugReplayRootEvent(context.rootEvent, baseState, context.debugEventId);
     targetEvent = rootEvent;
     for (const stage of history.slice(0, targetIndex)) {
@@ -579,6 +611,15 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
       targetEvent = followUp;
     }
     nextContext = { ...context, rootEvent };
+  }
+  if (targetEvent.fixedResultPreview?.rolls.length) {
+    targetEvent = {
+      ...targetEvent,
+      fixedResultPreview: {
+        ...targetEvent.fixedResultPreview,
+        rolls: targetEvent.fixedResultPreview.rolls.map(() => Math.random()),
+      },
+    };
   }
   targetEvent = assignAvailableContinuationId(targetEvent, baseState.eventQueue.filter((event) => event.id !== currentEvent.id));
   const replayedState: GameState = {
@@ -594,7 +635,7 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
   };
   if (!choiceId) return replayedState;
   const event = replayedState.eventQueue.find((item) => item.id === targetEvent.id);
-  if (!event || !event.choices.some((choice) => choice.id === choiceId)) return state;
+  if (!event || !event.choices.some((choice) => choice.id === choiceId)) return replayedState;
   return applyQueuedEventEffects(replayedState, event, choiceId, {
     evaluateImmediateEndings: (nextState) => nextState,
     runPostQueuePipeline: (nextState) => nextState,
@@ -661,6 +702,7 @@ function buildDebugEvent(
           conferenceYear: conference.year,
           city: location.city,
           country: location.country,
+          region: location.region,
           grade: "C",
           paperCount: 1,
           paperIds: [],
@@ -726,6 +768,7 @@ function buildDebugEvent(
       return {
         nextState: state,
         event: createLoverDevelopmentAct1(buildLoverDevelopmentContext({
+          state,
           conferenceEncounterState: state.conferenceEncounterState,
           totalMonths: state.totalMonths,
           type,

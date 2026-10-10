@@ -15,10 +15,11 @@ import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { applyReadPaperActions, applyReadingCountProgress } from "./v2-reading-system";
 import { canAddRelationship, syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
-import { activateInternship, activateRemoteInternship, hasOngoingInternship, hasRemoteInternshipScore, increaseInternshipExperimentMultiplier } from "./v2-internship-system";
+import { activateInternship, activateRemoteInternship, hasOngoingInternship, hasRemoteInternshipScore } from "./v2-internship-system";
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
 import { createLoverProgressState } from "./v2-lover-progression";
+import { createLoverState, getLoverName } from "./v2-lover-system";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { advanceSharedLabProject } from "./v2-lab-projects";
 import { settleAdvisorGrantResult } from "./v2-advisor-progress";
@@ -38,7 +39,6 @@ function createTriggeredFollowUpEvents(state: GameState, choice: EventChoice): P
   const hasQueuedChain = (chainId: string): boolean => state.eventQueue.some((event) => event.chainId === chainId);
   if (
     effects.triggerInternshipInvite
-    && !state.conferenceCareerState.permanentlyBlockedInternship
     && !hasOngoingInternship(state)
     && !hasQueuedChain("internship-invite")
   ) {
@@ -49,7 +49,6 @@ function createTriggeredFollowUpEvents(state: GameState, choice: EventChoice): P
   }
   if (
     effects.triggerJointTrainingInvite
-    && !state.conferenceEncounterState.permanentlyBlockedBigBullCoop
     && !state.conferenceEncounterState.bigBullCooperation
     && !hasQueuedChain("joint-training")
   ) {
@@ -62,6 +61,7 @@ function createTriggeredFollowUpEvents(state: GameState, choice: EventChoice): P
     const hasLover = state.loverState.active || state.relationshipState.loverCount > 0;
     if (!hasLover && !hasQueuedChain("lover-development")) {
       events.push(createLoverDevelopmentAct1(buildLoverDevelopmentContext({
+        state,
         conferenceEncounterState: state.conferenceEncounterState,
         totalMonths: state.totalMonths,
         type: effects.triggerLoverDevelopment,
@@ -81,7 +81,7 @@ const ACTION_LABELS: Record<PaperActionType, string> = {
 };
 
 function formatExtraActions(value: number): string {
-  return `${value > 0 ? "多" : "少"} ${Math.abs(value)} 次`;
+  return `${value > 0 ? "+" : ""}${value} 次`;
 }
 
 function createBuffsFromEventEffects(choice: EventChoice, state: GameState, source: string): Buff[] {
@@ -363,18 +363,16 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     ...(effects.conferenceCareerUpdates ?? {}),
   };
   let internshipState = state.internshipState;
-  if (effects.internshipStateUpdates) {
-    if (effects.triggerInternshipInvite) {
-      if (hasOngoingInternship(state)) {
-        internshipState = increaseInternshipExperimentMultiplier(state.internshipState);
-      }
-    } else if (!hasOngoingInternship(state)) {
-      if (effects.internshipStateUpdates.kind === "remote3") {
-        if (hasRemoteInternshipScore(state)) internshipState = activateRemoteInternship(state.totalMonths);
-      } else if (!state.conferenceCareerState.permanentlyBlockedInternship) {
-        internshipState = activateInternship();
-      }
+  if (effects.internshipStateUpdates && !effects.triggerInternshipInvite && !hasOngoingInternship(state)) {
+    if (effects.internshipStateUpdates.kind === "remote3") {
+      if (hasRemoteInternshipScore(state)) internshipState = activateRemoteInternship(state.totalMonths);
+    } else {
+      internshipState = activateInternship(effects.internshipStateUpdates.offer);
     }
+  }
+  if (internshipState !== state.internshipState && internshipState.active) {
+    conferenceCareerState.hasInternshipExperience = true;
+    if (internshipState.offer) conferenceCareerState.lastInternshipOffer = internshipState.offer;
   }
   const mergedLoverState = { ...state.loverState, ...(effects.loverStateUpdates ?? {}) };
   const loverUsedNames = [
@@ -382,13 +380,28 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     state.selectedAdvisorName ?? "",
     state.playerName ?? "",
   ];
-  const loverState = mergedLoverState.name
+  let loverState = mergedLoverState.name && !mergedLoverState.contactId
     ? { ...mergedLoverState, name: getUniqueFellowName(mergedLoverState.name, loverUsedNames, `lover:${mergedLoverState.type}:${mergedLoverState.startTotalMonths}:${mergedLoverState.gender}`) }
     : mergedLoverState;
-  const loverProgressState = {
-    ...(effects.activateLoverProgress ? createLoverProgressState(effects.activateLoverProgress, Math.random, state.year) : state.loverProgressState),
+  let loverProgressRollIndex = 0;
+  const loverProgressRandom = effects.loverProgressRolls
+    ? () => effects.loverProgressRolls![loverProgressRollIndex++] ?? 0.5 : Math.random;
+  let loverProgressState = {
+    ...(effects.activateLoverProgress ? createLoverProgressState(effects.activateLoverProgress, loverProgressRandom, state.year) : state.loverProgressState),
     ...(effects.loverProgressStateUpdates ?? {}),
   };
+  if (effects.loverIntimacyDelta && loverState.active) {
+    loverProgressState = {
+      ...loverProgressState,
+      intimacy: roundMoney(loverProgressState.intimacy + effects.loverIntimacyDelta),
+    };
+  }
+  const lostLover = loverState.active && loverProgressState.intimacy < 0;
+  if (lostLover) {
+    loverState = createLoverState();
+    loverProgressState = createLoverProgressState();
+    relationshipState = { ...relationshipState, loverCount: 0 };
+  }
 
   const addedFellowIds = fellowProgressState.length > state.fellowProgressState.length
     ? fellowProgressState.slice(state.fellowProgressState.length).map((profile) => profile.id)
@@ -400,7 +413,8 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     ...(effects.addBuffs ?? []).map((buff) => relationshipId ? { ...buff, relationshipId } : buff),
     ...createBuffsFromEventEffects(choice, state, buffSource).map((buff) => relationshipId ? { ...buff, relationshipId } : buff),
   ];
-  const buffs = removeBuffs(addOrReplaceBuffs(state.buffs, additions), effects.removeBuffIds ?? []);
+  const buffs = removeBuffs(addOrReplaceBuffs(state.buffs, additions), effects.removeBuffIds ?? [])
+    .filter((buff) => !lostLover || buff.relationshipId !== "lover");
 
   const directlyResolvedState: GameState = recordLabFinance({
     ...state,
@@ -437,6 +451,9 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   }, effects.labFinanceCategory ?? "other", advisorProgressState.funding - state.advisorProgressState.funding);
   let resolvedState = effects.scheduleConferenceAttendance
     ? scheduleConferenceAttendance(directlyResolvedState, effects.scheduleConferenceAttendance) : directlyResolvedState;
+  if (lostLover) {
+    resolvedState = pushMilestoneLog(resolvedState, `${getLoverName(state.loverState)}与你结束了恋爱关系。`, "lover-separated");
+  }
   if (!state.internshipState.active && directlyResolvedState.internshipState.active
     && directlyResolvedState.internshipState.kind === "remote3") {
     resolvedState = pushMilestoneLog(

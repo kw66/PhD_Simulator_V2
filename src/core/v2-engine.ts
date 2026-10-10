@@ -247,6 +247,9 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
     }));
   if (candidates.length === 0) return state;
   const builderState = {
+    selectedRoleId: state.selectedRoleId,
+    internshipCount: state.internshipCount,
+    loverProgressState: state.loverProgressState,
     totalMonths: state.totalMonths,
     favor: state.player.favor,
     money: state.player.money,

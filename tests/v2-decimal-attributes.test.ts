@@ -13,6 +13,7 @@ import { clampResearchToCap, createResearchCapacityState } from "../src/core/v2-
 import { refreshSummerVacationEvent, resolveSummerVacationFixedEvent } from "../src/core/v2-fixed-events-summer";
 import { createBaseConferenceActivityOptions } from "../src/core/v2-conference-activity-base-options";
 import { createAdvancedConferenceActivityOptions } from "../src/core/v2-conference-activity-advanced-options";
+import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "../src/core/v2-lover-events";
 import { createConferenceDecisionAct1, refreshConferenceDecision } from "../src/core/v2-conference-events";
 import { scheduleConferenceAttendance, settleDueConferenceAttendance } from "../src/core/v2-conference-attendance";
 import { createSocialCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
@@ -45,13 +46,13 @@ function resultChoices(event: PendingEvent): PendingEvent["choices"] {
 describe("decimal attributes across module boundaries", () => {
   it("preserves fractional research through caps and fellow recruitment", () => {
     const research = generateRelationshipResearch(2, () => 0.99);
-    expect(research).toBe(6.75);
+    expect(research).toBe(6.8);
     expect(clampResearchToCap(research, createResearchCapacityState())).toBe(research);
     expect(clampResearchToCap(20.75, { ...createResearchCapacityState(), otherCapBonus: 0.5 })).toBe(20.5);
     const state = stateWithDecimals();
     const next = applyChoiceEffectsToState(state, { id: "recruit", label: "recruit", outcome: "",
       effects: { fellowAdditions: [{ type: "peer", name: "陈青", gender: "male", research, affinity: 1.25 }] } }).nextState;
-    expect(next.fellowProgressState[0]).toMatchObject({ research: 6.75, affinity: 1.25 });
+    expect(next.fellowProgressState[0]).toMatchObject({ research: 6.8, affinity: 1.25 });
   });
 
   it("retains fractional cooperation progress while keeping integer paper output", () => {
@@ -72,7 +73,7 @@ describe("decimal attributes across module boundaries", () => {
     expect(getLoverRouteGain(state, "study")).toBe(7);
     const random = vi.spyOn(Math, "random").mockReturnValue(0);
     const next = advanceLoverDate(state, "study");
-    expect(recipient === "player" ? next.player.research : next.loverProgressState.research).toBe(7.5);
+    expect(recipient === "player" ? next.player.research : next.loverProgressState.research).toBe(7.55);
     expect(recipient === "lover" ? next.player.research : next.loverProgressState.research).toBe(8.25);
     expect(random).toHaveBeenCalledTimes(1);
   });
@@ -110,12 +111,12 @@ describe("decimal attributes across module boundaries", () => {
     state.player.social = 12.5;
     const random = vi.spyOn(Math, "random");
     const refreshed = refreshSummerVacationEvent(state, initial);
-    expect(refreshed.choices[0]!.effects.social).toBe(0.5);
+    expect(refreshed.choices[0]!.effects.social).toBe(0.6);
     expect(refreshSummerVacationEvent(state, refreshed)).toEqual(refreshed);
-    expect(refreshed.description).toContain("社交 +0.5");
+    expect(refreshed.description).toContain("社交 +0.6");
     expect(refreshed.description).not.toContain("抵抗1");
     const next = applyChoiceEffectsToState(state, refreshed.choices[0]!).nextState;
-    expect(next.player).toMatchObject({ social: 13, money: 26 });
+    expect(next.player).toMatchObject({ social: 13.1, money: 27 });
     expect(random).not.toHaveBeenCalled();
   });
 
@@ -134,15 +135,21 @@ describe("decimal attributes across module boundaries", () => {
   it("resolves conference raw attributes once and respects research above the base cap", () => {
     const state = stateWithDecimals();
     const tea = createBaseConferenceActivityOptions(conference, conferenceState(state)).find((option) => option.id === "tea-break")!;
-    expect(tea.effects.social).toBe(0.5);
-    expect(tea.outcome).toContain("社交 +0.5");
-    expect(applyChoiceEffectsToState(state, { ...tea }).nextState.player.social).toBe(13);
+    expect(tea.effects.social).toBe(0.6);
+    expect(tea.outcome).toContain("社交 +0.6");
+    expect(applyChoiceEffectsToState(state, { ...tea }).nextState.player.social).toBe(13.1);
     state.player.research = 20.25;
     state.researchCapacityState.otherCapBonus = 2;
-    state.conferenceEncounterState.metSmart = true;
-    const smart = createAdvancedConferenceActivityOptions(conferenceState(state)).find((option) => option.id === "smart-lover-development")!;
-    expect(smart.effects.research).toBe(0.25);
-    expect(applyChoiceEffectsToState(state, { ...smart }).nextState.player.research).toBe(20.5);
+    const smart = createAdvancedConferenceActivityOptions(conferenceState(state), () => 0.9).find((option) => option.id === "opposite-scholar")!;
+    expect(smart.effects.research).toBeUndefined();
+    expect(smart.effects.temporaryActionEffectUpdates?.idea).toEqual({ bonus: 2, extraActions: 2 });
+    const root = createLoverDevelopmentAct1(buildLoverDevelopmentContext({
+      state, conferenceEncounterState: state.conferenceEncounterState,
+      totalMonths: state.totalMonths, type: "smart", playerGender: "male",
+    }));
+    const result = root.choices[0]!.effects.enqueueEvents![0]!.choices.find((choice) => choice.id === "accept")!.effects.enqueueEvents![0]!;
+    expect(result.choices[0]!.effects.research).toBe(0.4);
+    expect(applyChoiceEffectsToState(state, result.choices[0]!).nextState.player.research).toBe(20.65);
   });
 
   it("keeps campus social event random partitions stable across attribute tiers", () => {
@@ -161,7 +168,7 @@ describe("decimal attributes across module boundaries", () => {
     expect(high.map((choice) => choice.id)).toEqual(low.map((choice) => choice.id));
     expect(high.map((choice) => choice.effects.money)).toEqual(low.map((choice) => choice.effects.money));
     expect(high.map((choice) => choice.effects.counterDeltas)).toEqual(low.map((choice) => choice.effects.counterDeltas));
-    expect(high.some((choice) => choice.effects.social === 0.25)).toBe(true);
+    expect(high.some((choice) => choice.effects.social === 0.4)).toBe(true);
   });
 
   it("preserves conference option draws while refreshing decimal favor costs", () => {
@@ -181,7 +188,7 @@ describe("decimal attributes across module boundaries", () => {
     const refreshed = refreshConferenceDecision(state, confirmation);
     expect(refreshed.choices[0]!.effects.scheduleConferenceAttendance).toEqual(confirmation.choices[0]!.effects.scheduleConferenceAttendance);
     expect(optionIds(refreshed)).toEqual(optionIds(confirmation));
-    expect(refreshed.choices[0]!.effects.favor).toBe(-0.75);
+    expect(refreshed.choices[0]!.effects.favor).toBe(-0.8);
     expect(liveRandom).not.toHaveBeenCalled();
   });
 });

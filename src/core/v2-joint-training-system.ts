@@ -1,3 +1,3 @@
-export function getJointTrainingCitationCapBonus(totalCitations: number): number {
-  return Math.min(1 + Math.floor(Math.max(0, totalCitations) / 300), 5);
+export function getJointTrainingCitationCapBonus(totalCitations: number, level: 0 | 1 | 2 = 1): number {
+  return Math.min(level + Math.floor(Math.max(0, totalCitations) / 200), 6);
 }

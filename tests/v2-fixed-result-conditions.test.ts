@@ -9,6 +9,7 @@ import { resolveWinterVacationFixedEvent } from "../src/core/v2-fixed-events-win
 import { resolveCcigFixedEvent } from "../src/core/v2-fixed-events-ccig-resolution";
 import { createGrantedPublishedPaper } from "../src/core/v2-publication-rules";
 import { createAdvancedConferenceActivityOptions } from "../src/core/v2-conference-activity-advanced-options";
+import { createConferenceMentorContact, createConferenceScholarContact } from "../src/core/v2-conference-contacts";
 import { createConferenceActivityResult } from "../src/core/v2-conference-activity-events";
 import { createInternshipInviteAct1, buildInternshipInviteContext } from "../src/core/v2-internship-events";
 import { createLoverDevelopmentAct1, buildLoverDevelopmentContext } from "../src/core/v2-lover-events";
@@ -62,7 +63,7 @@ describe("fixed result conditions", () => {
   it.each([0, 1, 3, 4, 5, 7, 15, 20])("reports rounded summer recovery for SAN gap %i", (gap) => {
     const initial = createInitialState();
     const state = { ...initial, player: { ...initial.player, san: initial.sanCap - gap } };
-    for (const [kind, ratio] of [["summer-vacation-home", 0.3], ["summer-vacation-travel", 0.5]] as const) {
+    for (const [kind, ratio] of [["summer-vacation-home", 0.3], ["summer-vacation-travel", 0.3]] as const) {
       const roll = vi.fn(() => 0);
       const resolution = resolveSummerVacationFixedEvent(state, { kind }, roll)!;
       const result = resolution.enqueueEvents![0]!;
@@ -93,12 +94,12 @@ describe("fixed result conditions", () => {
     const initial = createInitialState();
     const beforeTravel = { ...initial, player: { ...initial.player, san: initial.sanCap - 7 } };
     const result = resolveSummerVacationFixedEvent(beforeTravel, { kind: "summer-vacation-travel" }, () => 0)!.enqueueEvents![0]!;
-    expect(result.description).toContain("SAN +3（已损SAN50%）");
+    expect(result.description).toContain("SAN +2（已损SAN30%）");
     const refreshed = refreshSummerVacationEvent(
       { ...initial, player: { ...initial.player, san: initial.sanCap } },
       { ...result, queueOrder: 1 },
     );
-    expect(refreshed.description).toContain("结果：金币 -4\n结果：SAN +0（已损SAN50%）");
+    expect(refreshed.description).toContain("结果：金币 -3\n结果：SAN +0（已损SAN30%）");
     expect(refreshed.description).not.toContain("旅行放松");
     expect(refreshed.choices[0]!.effects.san).toBeUndefined();
   });
@@ -113,7 +114,7 @@ describe("fixed result conditions", () => {
     const choice = result.choices[0]!;
     expect(choice.effects.social).toBe(1);
     expect(choice.effects.sanCapDelta).toBe(1);
-    expect(choice.effects.san).toBe(1);
+    expect(choice.effects.san).toBeUndefined();
     expect(result.description).toContain("结果：社交 +1");
     expect(result.description).toContain("额外：条件：SAN ≥ 18｜结果：SAN上限 +1");
     expect(result.description).toContain("结果：SAN上限 +1");
@@ -126,8 +127,8 @@ describe("fixed result conditions", () => {
     }, undefined, { activePlayTab: "events", activeEventId: result.id, isEventContentOpen: true });
     const rows = html.match(/<div class="event-settlement-row[^>]*>[\s\S]*?<\/div>/g)!;
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toContain("金币 -4");
-    expect(rows[0]).toContain("已损SAN50%");
+    expect(rows[0]).toContain("金币 -3");
+    expect(rows[0]).toContain("已损SAN30%");
     expect(rows[0]).toContain("社交 +1");
     expect(rows[0]).not.toContain("SAN上限");
     expect(rows[0]).not.toContain("≥");
@@ -202,52 +203,73 @@ describe("fixed result conditions", () => {
     expect(result.choices[0]!.effects.paperUpdates?.[0]?.id).toBe(paper.id);
   });
 
-  it.each([0, 1])("keeps conference follow-up counters factual before count %i", (count) => {
+  it.each([0, 1, 2])("keeps merged conference follow-up counters factual before count %i", (count) => {
     const initial = createInitialState();
+    const mentor = { ...createConferenceMentorContact(), cooperationCount: count };
+    const scholar = { ...createConferenceScholarContact("beautiful"), encounterCount: count };
     const options = createAdvancedConferenceActivityOptions({
       research: 12,
       social: 12,
       relationshipState: initial.relationshipState,
       conferenceEncounterState: {
         ...initial.conferenceEncounterState,
-        metBigBullCoop: true, metBeautiful: true, metSmart: true,
-        bigBullDeepCount: count, beautifulCount: count, smartCount: count,
+        bigBull: mentor, scholars: { beautiful: scholar },
       },
-      conferenceCareerState: initial.conferenceCareerState,
+      conferenceCareerState: { ...initial.conferenceCareerState, enterpriseCount: count },
+      externalPublications: [createGrantedPublishedPaper(17, 0, { target: "A", acceptedScore: 30 })],
       internshipState: initial.internshipState,
       loverState: initial.loverState,
-    });
+    }, () => 0);
     const context = { id: "test", conferenceName: "CVPR", conferenceYear: 2026, city: "杭州", country: "中国", paperCount: 1, grade: "A" as const };
-    expect(options.map((option) => option.id)).toEqual(["big-bull-joint-training", "beautiful-lover-development", "smart-lover-development"]);
+    expect(options.map((option) => option.id)).toEqual(["big-bull-coop", "opposite-scholar", "enterprise-networking"]);
+    expect(options[0]!.effects.triggerJointTrainingInvite).toBe(count >= 2);
+    expect(options[0]!.effects.conferenceEncounterUpdates?.bigBull).toEqual({ ...mentor, cooperationCount: count + 1 });
+    expect(options[1]!.effects.triggerLoverDevelopment).toBe("beautiful");
+    expect(options[1]!.effects.conferenceEncounterUpdates?.scholars?.beautiful).toEqual({ ...scholar, encounterCount: count + 1 });
+    expect(options[2]!.effects.triggerInternshipInvite).toBe(count >= 1);
     for (const option of options) {
       const result = createConferenceActivityResult(context, option, "自费参会");
-      expect(settlementOf(result)).toContain("条件：");
-      expect(settlementOf(result)).toMatch(count === 0 ? /<\s*2/u : /≥\s*2/u);
-      expect(Boolean(option.effects.triggerJointTrainingInvite || option.effects.triggerLoverDevelopment)).toBe(count >= 1);
+      const settlement = settlementOf(result);
+      if (option.id === "big-bull-coop") expect(settlement).toContain(`条件：与${mentor.name}合作次数 ${count + 1}`);
+      if (option.id === "enterprise-networking") expect(settlement).toContain(`条件：企业交流次数 ${count + 1}`);
+      if (option.id === "opposite-scholar") expect(settlement).not.toContain("条件：");
+      expect(settlement).not.toMatch(/<\s*2|≥\s*2/u);
       expect(result.choices[0]!.effects.conferenceEncounterUpdates).toEqual(option.effects.conferenceEncounterUpdates);
     }
   });
 
-  it.each([0, 1])("shows remaining internship and lover opportunities after prior rejection count %i", (rejectCount) => {
+  it.each([0, 1, 100])("keeps internship and new lover opportunities open after rejection count %i", (rejectCount) => {
     const initial = createInitialState();
     const roots = [
-      createInternshipInviteAct1({ ...buildInternshipInviteContext(initial), rejectedInternshipCount: rejectCount }),
+      createInternshipInviteAct1({ ...buildInternshipInviteContext(initial, () => 0.5), rejectedInternshipCount: rejectCount }),
       createLoverDevelopmentAct1({ ...buildLoverDevelopmentContext({
         conferenceEncounterState: initial.conferenceEncounterState,
         totalMonths: 1,
         type: "beautiful",
         playerGender: "female",
-      }), rejectCount }),
+      }, () => 0.5), rejectCount }),
     ];
     for (const root of roots) {
       const decision = decisionOf(root);
       expect(root.description + decision.description).not.toContain("条件：");
       const decline = decision.choices.find((choice) => choice.id === "decline")!;
       const result = decline.effects.enqueueEvents![0]!;
-      const opportunity = root.chainId === "internship-invite" ? "大厂实习机会" : "活泼恋人机会";
-      expect(settlementOf(result).trim()).toBe(`结果：${opportunity}${rejectCount >= 1 ? "永久关闭" : "剩余1次"}`);
-      expect(decline.effects.conferenceCareerUpdates?.permanentlyBlockedInternship
-        ?? decline.effects.conferenceEncounterUpdates?.permanentlyBlockedBeautifulLover).toBe(rejectCount >= 1);
+      expect(decline.effects.conferenceCareerUpdates).toBeUndefined();
+      expect(decline.effects.conferenceEncounterUpdates).toBeUndefined();
+      expect(result.choices[0]!.label).toBe("确定");
+      expect(result.description).not.toMatch(/永久关闭|剩余1次/u);
+      if (root.chainId === "internship-invite") {
+        expect(settlementOf(result).trim()).toBe("结果：暂不实习");
+        expect(result.choices[0]!.effects.conferenceCareerUpdates).toMatchObject({
+          rejectedInternshipCount: rejectCount + 1, permanentlyBlockedInternship: false,
+        });
+      } else {
+        expect(settlementOf(result).trim()).toBe("结果：无事发生");
+        const updates = result.choices[0]!.effects.conferenceEncounterUpdates!;
+        expect(updates.permanentlyBlockedBeautifulLover).toBe(false);
+        expect(updates.scholars?.beautiful?.encounterCount).toBe(0);
+        expect(updates.scholars?.beautiful?.id).not.toBe(root.loverDevelopmentPreview!.context.contact!.id);
+      }
     }
   });
 });

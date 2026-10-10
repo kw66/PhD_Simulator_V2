@@ -1,4 +1,5 @@
 import { createLoverState } from "./v2-lover-system";
+import { getConferenceMentorContact, getConferenceScholarContact } from "./v2-conference-contacts";
 import type { PendingEvent } from "./v2-types";
 import {
   getConferenceActivityChainId,
@@ -7,6 +8,7 @@ import {
   type ConferenceActivityBuildState,
   type ConferenceActivityContext,
   type ConferenceActivityOptionDefinition,
+  type ConferenceActivityPreview,
 } from "./v2-conference-activity-shared";
 import { selectConferenceActivityOptions } from "./v2-conference-activity-options";
 
@@ -19,52 +21,26 @@ function createDiscardPaperUpdates(context: ConferenceActivityContext) {
 }
 
 function getActivityConditions(option: ConferenceActivityOptionDefinition): string[] {
-  const conditions: string[] = [];
-  const encounterUpdates = option.effects.conferenceEncounterUpdates;
-  const addCountCondition = (label: string, nextCount: number | undefined): void => {
-    if (nextCount !== undefined) {
-      conditions.push(`条件：${label} ${nextCount} ${nextCount >= 2 ? "≥" : "<"} 2`);
-    }
-  };
-
-  switch (option.id) {
-    case "big-bull-joint-training":
-      addCountCondition("深入合作次数", encounterUpdates?.bigBullDeepCount);
-      break;
-    case "beautiful-lover-development":
-      addCountCondition("活泼学者交流次数", encounterUpdates?.beautifulCount);
-      break;
-    case "smart-lover-development":
-      addCountCondition("聪慧学者交流次数", encounterUpdates?.smartCount);
-      break;
+  const updates = option.effects.conferenceEncounterUpdates;
+  if (option.id === "big-bull-coop" && updates?.bigBull) {
+    return [`条件：与${updates.bigBull.name}合作次数 ${updates.bigBull.cooperationCount}`];
   }
-  return conditions;
+  if (option.id === "enterprise-networking") {
+    return [`条件：企业交流次数 ${option.effects.conferenceCareerUpdates?.enterpriseCount ?? 0}`];
+  }
+  return [];
 }
 
 function getActivityDecisionHint(option: ConferenceActivityOptionDefinition, state: ConferenceActivityBuildState): string {
   switch (option.id) {
     case "enterprise-networking":
       return state.internshipState.active
-        ? "企业代表认出了你，问起你正在做的实习项目，还想听听实验中遇到的问题。"
-        : state.conferenceCareerState.permanentlyBlockedInternship
-          ? "企业代表记得你先前说暂不考虑实习，这回只问起了研究近况。"
-          : "企业展台前的人翻着你的论文，问你有没有时间聊聊他们正在招的实习岗位。";
+        ? "企业代表问起你正在做的实习项目，也想听听实验中遇到的问题。"
+        : "企业展台前的人翻着你的论文，等你过去聊聊研究近况。";
     case "big-bull-coop":
-      return state.conferenceEncounterState.bigBullCooperation
-        ? "联培合作的老师朝你招手，手里还拿着你前几天发去的草稿。"
-        : "那位学者还在讲台边答疑，你把自己的论文翻出来，先在心里练了一遍开场白。";
-    case "big-bull-joint-training":
-      return option.effects.triggerJointTrainingInvite
-        ? "前几次讨论的结果已经寄给对方，回信里除了改稿意见，还问起你能否来组里待一段时间。"
-        : "上回聊过的学者还记得你的问题，说想看看你后来补的实验。";
-    case "beautiful-lover-development":
-      return option.effects.triggerLoverDevelopment
-        ? "那位总能把你逗笑的同行发来消息，约你散场后单独走走，末尾还添了个有些害羞的表情。"
-        : "上次聊得很投缘的同行认出了你，隔着人群挥了挥手。";
-    case "smart-lover-development":
-      return option.effects.triggerLoverDevelopment
-        ? "那位常和你讨论问题的同行问起散场后的安排，又补了一句：“这回不聊论文也行。”"
-        : "上次一起推过公式的同行发来座位号，说给你留了旁边的位置。";
+      return `${option.effects.conferenceEncounterUpdates?.bigBull?.name ?? "那位学者"}还在讲台边答疑，你把自己的论文翻了出来。`;
+    case "opposite-scholar":
+      return "邻座的异性学者收起报告笔记，你考虑过去打个招呼。";
     default:
       return "";
   }
@@ -74,7 +50,7 @@ export function createConferenceActivityResult(
   context: ConferenceActivityContext,
   option: ConferenceActivityOptionDefinition,
   _attendanceSummary: string,
-  preview?: PendingEvent["conferenceActivityPreview"],
+  preview?: ConferenceActivityPreview,
 ): PendingEvent {
   const activitySummary = trimOutcome(option.outcome);
   const activityChainId = getConferenceActivityChainId(context);
@@ -115,14 +91,28 @@ export function createConferenceActivityDecisionEvent(
   state: ConferenceActivityBuildState,
   attendanceSummary: string,
   getRoll: () => number = Math.random,
+  frozenPreview?: ConferenceActivityPreview,
 ): PendingEvent {
-  const rolls = Array.from({ length: 4 }, () => getRoll());
+  const rolls = frozenPreview?.rolls ?? Array.from({ length: 32 }, () => getRoll());
   let rollIndex = 0;
-  const preview = { context, attendanceSummary, rolls };
+  const seed = { id: context.id, roll: rolls[10] ?? 0.5, levelRoll: rolls[9] ?? 0.5,
+    selectedRoleId: state.selectedRoleId, playerGender: state.playerGender };
+  const encounter = state.conferenceEncounterState;
+  const contacts = {
+    bigBull: encounter.bigBull ?? frozenPreview?.contacts?.bigBull ?? getConferenceMentorContact(encounter, seed),
+    scholars: {
+      beautiful: encounter.scholars?.beautiful ?? frozenPreview?.contacts?.scholars?.beautiful ?? getConferenceScholarContact(encounter, "beautiful", seed),
+      smart: encounter.scholars?.smart ?? frozenPreview?.contacts?.scholars?.smart ?? getConferenceScholarContact(encounter, "smart", seed),
+    },
+  };
+  const preview: ConferenceActivityPreview = { context, attendanceSummary, rolls, contacts };
+  const scholarType = (rolls[8] ?? 0.5) < 0.5 ? "beautiful" : "smart";
   const selectedOptions = selectConferenceActivityOptions(
     context,
-    { ...state, loverState: state.loverState ?? createLoverState() },
-    () => rolls[rollIndex++] ?? 0,
+    { ...state, conferenceEncounterState: { ...encounter, bigBull: contacts.bigBull,
+      scholars: { ...encounter.scholars, [scholarType]: contacts.scholars[scholarType] },
+    }, loverState: state.loverState ?? createLoverState() },
+    () => rolls[rollIndex++] ?? 0.5,
   );
   const activityChainId = getConferenceActivityChainId(context);
   return {
@@ -158,10 +148,11 @@ export function createConferenceActivityEvent(
   state: ConferenceActivityBuildState,
   attendanceSettlementItems: string[],
   getRoll: () => number = Math.random,
+  frozenPreview?: ConferenceActivityPreview,
 ): PendingEvent {
   const activityChainId = getConferenceActivityChainId(context);
   const attendanceSummary = attendanceSettlementItems.join("，");
-  const decision = createConferenceActivityDecisionEvent(context, state, attendanceSummary, getRoll);
+  const decision = createConferenceActivityDecisionEvent(context, state, attendanceSummary, getRoll, frozenPreview);
   return {
     id: `${activityChainId}-act1`,
     title: `${context.conferenceName}活动`,

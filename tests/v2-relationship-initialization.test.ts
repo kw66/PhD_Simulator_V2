@@ -39,11 +39,11 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("lover cohort initialization through dispatch", () => {
   it.each([
-    ["beautiful", 0, 2, 7.5, 6],
-    ["beautiful", 0.99, 5, 9.75, 8.25],
-    ["smart", 0, 5, 9.75, 3],
-    ["smart", 0.3, 6, 10.5, 4],
-    ["smart", 0.99, 7.5, 12, 6],
+    ["beautiful", 0, 2, 7.6, 6],
+    ["beautiful", 0.99, 5, 10, 8.4],
+    ["smart", 0, 5, 10, 3],
+    ["smart", 0.3, 6, 10.8, 4],
+    ["smart", 0.99, 7.6, 12.4, 6],
   ] as const)("initializes natural %s at roll %s with cohort research %s / %s", (type, roll, firstYearResearch, fourthYearResearch, intimacy) => {
     vi.spyOn(Math, "random").mockReturnValue(roll);
     expect(createLoverProgressState(type, () => roll)).toMatchObject({ research: firstYearResearch, intimacy });
@@ -66,15 +66,15 @@ describe("lover cohort initialization through dispatch", () => {
       expect(accepted.loverProgressState.routes).toEqual({
         play: { progress: 0, completed: 0 }, study: { progress: 0, completed: 0 }, shopping: { progress: 0, completed: 0 },
       });
-      expect(accepted.player).toEqual(initial.player);
+      expect(accepted.player).toEqual({ ...initial.player, research: initial.player.research + (type === "smart" ? 0.8 : 0) });
       expect(initial).toEqual(snapshot);
     }
   });
 
   it.each([
-    [0, 5, 9.75, 3],
-    [0.3, 6, 10.5, 4],
-    [0.99, 7.5, 12, 6],
+    [0, 5, 10, 3],
+    [0.3, 6, 10.8, 4],
+    [0.99, 7.6, 12.4, 6],
   ] as const)("uses the current year for debug smart lovers at roll %s", (roll, firstYearResearch, fourthYearResearch, intimacy) => {
     vi.spyOn(Math, "random").mockReturnValue(roll);
     for (const [year, research] of [[1, firstYearResearch], [4, fourthYearResearch]] as const) {
@@ -95,7 +95,7 @@ describe("lover cohort initialization through dispatch", () => {
     const random = vi.fn()
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0.99);
-    expect(createLoverProgressState("smart", random, 4)).toMatchObject({ research: 6 + 5 * 0.75, intimacy: 6 });
+    expect(createLoverProgressState("smart", random, 4)).toMatchObject({ research: 6 + 5 * 0.8, intimacy: 6 });
     expect(random).toHaveBeenCalledTimes(2);
   });
 
@@ -105,7 +105,7 @@ describe("lover cohort initialization through dispatch", () => {
     random.mockReturnValue(0);
     const accepted = choose(pending, "close");
     expect(accepted.loverProgressState).toMatchObject({
-      active: true, research: type === "smart" ? 12 : 9.75, intimacy: type === "beautiful" ? 8.25 : 6,
+      active: true, research: type === "smart" ? 12.4 : 10, intimacy: type === "beautiful" ? 8.4 : 6,
     });
   });
 

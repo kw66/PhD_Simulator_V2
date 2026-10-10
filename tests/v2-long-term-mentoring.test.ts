@@ -95,7 +95,7 @@ describe.each([10, 11, 14])("long-term cooperation event %s", (eventId) => {
     const intro = createRandomEventById(14, base, () => 0).event!;
     const decision = intro.choices[0]!.effects.enqueueEvents![0]!;
     const dinner = decision.choices.find((choice) => choice.label === "请客吃饭")!;
-    expect(dinner.outcome).toContain(social === 0 ? "社交 +1" : "社交 +0.75");
+    expect(dinner.outcome).toContain(social === 0 ? "社交 +1" : "社交 +0.8");
     const chosen = dispatchAction({ ...base, eventQueue: [createEventQueueItem(decision, 6)] }, "resolve-event", {
       eventId: decision.id, eventChoiceId: dinner.id,
     });
@@ -104,7 +104,7 @@ describe.each([10, 11, 14])("long-term cooperation event %s", (eventId) => {
     const payload = { eventId: result.id, eventChoiceId: result.choices[0]!.id };
     const settled = dispatchAction(chosen, "resolve-event", payload);
     expect(settled.player.money).toBe(8);
-    expect(settled.player.social).toBe(social === 0 ? 1 : social + 0.75);
+    expect(settled.player.social).toBe(social === 0 ? 1 : social + 0.8);
     expect(settled.fellowProgressState).toEqual(base.fellowProgressState);
     expect(settled.buffs).toEqual(base.buffs);
     expect(dispatchAction(settled, "resolve-event", payload).player).toEqual(settled.player);

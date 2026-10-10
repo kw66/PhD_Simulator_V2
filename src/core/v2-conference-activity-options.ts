@@ -1,49 +1,29 @@
 import { createAdvancedConferenceActivityOptions } from "./v2-conference-activity-advanced-options";
 import { createBaseConferenceActivityOptions } from "./v2-conference-activity-base-options";
-import type {
-  ConferenceActivityBuildState,
-  ConferenceActivityContext,
-  ConferenceActivityOptionDefinition,
-} from "./v2-conference-activity-shared";
+import type { ConferenceActivityBuildState, ConferenceActivityContext, ConferenceActivityOptionDefinition } from "./v2-conference-activity-shared";
 import { pickDistinctRandomOptions } from "./v2-conference-activity-shared";
+
+export function getConferenceActivityOptions(
+  context: ConferenceActivityContext,
+  state: ConferenceActivityBuildState,
+  rolls: readonly number[],
+): ConferenceActivityOptionDefinition[] {
+  let attributeIndex = 12;
+  let personIndex = 8;
+  return [
+    ...createBaseConferenceActivityOptions(context, state, () => rolls[attributeIndex++] ?? 0.5),
+    ...(context.grade === "C" ? [] : createAdvancedConferenceActivityOptions(state, () => rolls[personIndex++] ?? 0.5, context)),
+  ];
+}
 
 export function selectConferenceActivityOptions(
   context: ConferenceActivityContext,
   state: ConferenceActivityBuildState,
   getRoll: () => number = Math.random,
 ): ConferenceActivityOptionDefinition[] {
-  const baseOptions = createBaseConferenceActivityOptions(context, state, getRoll);
-  const advancedOptions = createAdvancedConferenceActivityOptions(state, getRoll);
-  const allOptions = [...baseOptions, ...advancedOptions];
-
-  if (context.grade === "C") {
-    return pickDistinctRandomOptions(baseOptions, 3, getRoll);
-  }
-
-  if (context.grade === "B") {
-    return pickDistinctRandomOptions(allOptions, 4, getRoll);
-  }
-
-  const selected = pickDistinctRandomOptions(advancedOptions, 2, getRoll);
-  if (selected.length === 0) {
-    return pickDistinctRandomOptions(baseOptions, 4, getRoll);
-  }
-
-  const usedIds = new Set(selected.map((option) => option.id));
-  while (selected.length < Math.min(4, allOptions.length)) {
-    const remaining = allOptions.filter((option) => !usedIds.has(option.id));
-    if (remaining.length === 0) {
-      break;
-    }
-
-    const [picked] = pickDistinctRandomOptions(remaining, 1, getRoll);
-    if (!picked) {
-      break;
-    }
-
-    selected.push(picked);
-    usedIds.add(picked.id);
-  }
-
-  return selected;
+  const rolls = Array.from({ length: 32 }, () => getRoll());
+  const options = getConferenceActivityOptions(context, state, rolls);
+  let menuIndex = 0;
+  return pickDistinctRandomOptions(options, context.grade === "C" ? 3 : context.grade === "B" ? 4 : 5,
+    () => rolls[menuIndex++] ?? 0.5);
 }

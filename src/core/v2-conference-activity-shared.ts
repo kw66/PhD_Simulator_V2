@@ -4,10 +4,13 @@ import type {
   ConferenceCareerState,
   ConferenceEncounterState,
   EventChoice,
+  GameState,
+  Gender,
   InternshipState,
   LoverState,
   PaperAcceptType,
   PaperTarget,
+  PendingEvent,
   RelationshipState,
   ResearchCapacityState,
 } from "./v2-types";
@@ -27,8 +30,15 @@ export interface ConferenceActivityContext {
   country: string;
   paperCount: number;
   grade: PaperTarget;
+  region?: "domestic" | "asia" | "west";
   paperIds?: string[];
   paperPresentations?: ConferencePaperPresentation[];
+}
+
+export function getConferenceActivityTravelSanRecovery(region: ConferenceActivityContext["region"]): number {
+  if (region === "domestic") return 4;
+  if (region === "west") return 6;
+  return 5;
 }
 
 export function getConferencePaperPresentationResults(context: ConferenceActivityContext): string[] {
@@ -48,6 +58,13 @@ export function getConferenceActivityChainId(context: Pick<ConferenceActivityCon
 }
 
 export interface ConferenceActivityBuildState {
+  selectedRoleId?: GameState["selectedRoleId"];
+  playerGender?: Gender;
+  totalMonths?: number;
+  papers?: GameState["papers"];
+  externalPublications?: GameState["externalPublications"];
+  internshipCount?: number;
+  loverProgressState?: GameState["loverProgressState"];
   research: number;
   social: number;
   researchCapacityState?: ResearchCapacityState;
@@ -65,6 +82,12 @@ export interface ConferenceActivityOptionDefinition {
   resultDescription: string;
   effects: EventChoice["effects"];
 }
+
+export type ConferenceActivityContacts = Pick<ConferenceEncounterState, "bigBull" | "scholars">;
+
+export type ConferenceActivityPreview = NonNullable<PendingEvent["conferenceActivityPreview"]> & {
+  contacts?: ConferenceActivityContacts;
+};
 
 export function resolveConferenceActivityAttributes(
   option: ConferenceActivityOptionDefinition,

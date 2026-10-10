@@ -60,8 +60,8 @@ describe("pure review settlement projection", () => {
     expect(projected.player.san).toBe(accepted ? 17 : -1);
     if (accepted) {
       expect(projected.researchCapacityState.otherCapBonus).toBe(1);
-      expect(projected.player.research).toBe(21);
-      expect(projected.fellowProgressState[0]!.affinity).toBe(6.75);
+      expect(projected.player.research).toBeCloseTo(21, 10);
+      expect(projected.fellowProgressState[0]!.affinity).toBe(6.8);
       expect(projected.buffs.some((buff) => buff.id === "image-misuse")).toBe(true);
       expect(projected.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["projected"]);
       expect(projectPaperReviewSettlement(projected, settlement)).toBe(projected);

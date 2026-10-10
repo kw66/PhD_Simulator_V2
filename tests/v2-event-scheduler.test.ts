@@ -69,8 +69,8 @@ describe("v2 event scheduler", () => {
       expect(choice.effects.enqueueEvents!.at(-1)!.description).toContain(choice.outcome);
     }
     expect(decision.choices[0]!.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(research >= 6 ? 5 : undefined);
-    expect(decision.choices[0]!.effects.favor).toBe(research < 6 ? (favor >= 6 ? -0.75 : -1) : undefined);
-    expect(decision.choices[1]!.effects.research).toBe(favor >= 6 ? (research >= 6 ? 0.75 : 1) : undefined);
+    expect(decision.choices[0]!.effects.favor).toBe(research < 6 ? (favor >= 6 ? -0.8 : -1) : undefined);
+    expect(decision.choices[1]!.effects.research).toBe(favor >= 6 ? (research >= 6 ? 0.8 : 1) : undefined);
     expect(decision.choices[1]!.effects.favor).toBe(favor < 6 ? -1 : undefined);
   });
 
@@ -177,7 +177,7 @@ describe("v2 event scheduler", () => {
     expect(result.outcome).not.toContain("连续");
   });
 
-  it.each([[5, 1.75], [11.5, 1.25], [12, 1], [17.5, 0.75], [18, 0.5]])(
+  it.each([[5, 1.8], [11.5, 1.4], [12, 1.2], [17.5, 1], [18, 0.8]])(
     "resolves stamp favor +2 deterministically from %s with updated tiers", (favor, gain) => {
     const base = createInitialState();
     const state = {
@@ -200,7 +200,7 @@ describe("v2 event scheduler", () => {
       resolveWith([0.99, 0.99]),
     ].map((result) => result.nextState.player.favor - state.player.favor);
 
-    expect(gains).toEqual([gain, gain, gain]);
+    gains.forEach((actual) => expect(actual).toBeCloseTo(gain, 10));
   });
 
   it("keeps the resolved condition when a Teacher's Day result changes no values", () => {
@@ -541,7 +541,7 @@ describe("v2 event scheduler", () => {
     };
     const result = collectRandomEventsForMonth(state, fromRolls([0.7]));
     const choice = getDecisionChoices(result.events[0])[1]!;
-    expect(choice.outcome).toContain("科研 +0.5");
+    expect(choice.outcome).toContain("科研 +0.6");
     expect(choice.effects.readPaperRolls ?? []).toEqual([]);
 
     const realRandom = Math.random;
@@ -549,7 +549,7 @@ describe("v2 event scheduler", () => {
     try {
       const resolved = applyChoiceEffectsToState(state, choice).nextState;
       expect(resolved.readingState.readCount).toBe(11);
-      expect(resolved.player.research).toBe(12.5);
+      expect(resolved.player.research).toBe(12.6);
     } finally {
       Math.random = realRandom;
     }
@@ -788,7 +788,7 @@ describe("v2 event scheduler", () => {
     expect(result.events[0]?.title).toBe("导师约谈");
     expect(getDecisionChoices(result.events[0]).map((choice) => choice.label)).toEqual(["认真汇报", "请教推进方法", "提出远程实习"]);
     expect(getDecisionChoices(result.events[0])[0]?.effects.temporaryActionEffectUpdates?.idea?.bonus).toBe(5);
-    expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(0.75);
+    expect(getDecisionChoices(result.events[0])[1]?.effects.research).toBe(0.8);
     expect(getDecisionChoices(result.events[0])[2]?.effects.internshipStateUpdates).toBeUndefined();
     expect(getDecisionChoices(result.events[0])[2]?.effects.enqueueEvents?.at(-1)?.choices[0]?.effects.internshipStateUpdates).toMatchObject({
       active: true,
@@ -1142,8 +1142,8 @@ describe("v2 event scheduler", () => {
     expect(story).toContain("毕业、找工作");
     if (type === "junior") expect(story).toContain("林晓");
     const resisted = getDecisionChoices(createAdvisorAuthorshipRandomEvent({ ...state, player: { ...state.player, social: 18 } }, () => 0))[1]!;
-    expect(resisted.effects.social).toBe(type === "junior" ? -0.25 : -0.75);
-    expect(resisted.outcome).toContain(`社交 ${type === "junior" ? -0.25 : -0.75}`);
+    expect(resisted.effects.social).toBe(type === "junior" ? -0.4 : -1);
+    expect(resisted.outcome).toContain(`社交 ${type === "junior" ? -0.4 : -1}`);
   });
 
   it("uses three base SAN for arguing and a calming stipend for resistance", () => {

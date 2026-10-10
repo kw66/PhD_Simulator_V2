@@ -33,12 +33,12 @@ import { renderPaperReviewEvent } from "./v2-render-paper-review";
 import { getLabReimbursementCount } from "../core/v2-lab-reimbursement";
 import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2-relationship-activity";
 import { formatMoney, roundMoney } from "../core/v2-money";
-import { getPlayerAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
+import { getAnnualLabSocialRewards, getPlayerAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
 import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverPassiveGains, getLoverRouteCost, getLoverRouteGain, getLoverRouteProgress } from "../core/v2-lover-progression";
 import { previewPartTimeWork } from "../core/v2-part-time-work";
 import { getLoverName } from "../core/v2-lover-system";
 import { getLoverGiftCount } from "../core/v2-lover-gift";
-import { getInternshipExperimentEffect, getInternshipMonthlyIncome, getInternshipStatus, getPublishedAPaperCount } from "../core/v2-internship-system";
+import { getInternshipExperimentEffect, getInternshipMonthlyIncome, getInternshipMonthlyStats, getInternshipSalaryPayment, getInternshipStatus, getPublishedAPaperCount } from "../core/v2-internship-system";
 import { getJointTrainingCitationCapBonus } from "../core/v2-joint-training-system";
 import {
   getAcceptedPaperScore,
@@ -224,6 +224,7 @@ type TalentPanelItem = {
   tagLabel?: string;
   ruleCard?: boolean;
   hideStatus?: boolean;
+  identity?: { name: string; detail: string };
   description: string;
   descriptionTooltip?: string;
   detail?: string;
@@ -232,6 +233,7 @@ type TalentPanelItem = {
   descriptionAnimation?: { template: string; values: Record<string, number> };
   rewardTable?: { label: string; columns: string[]; rows: string[][]; currentRow?: number };
   advisorSalaryPager?: { startIndex: number; lastStartIndex: number };
+  labInheritancePager?: { page: number };
   loverRewardPager?: { page: number };
   internshipPager?: { page: number };
   gameGrowthPager?: { page: number };
@@ -582,8 +584,8 @@ function buildEffectBuckets(state: GameState): {
   }
   const experimentMoneyDiscount = getShopExperimentMoneyDiscount(state.shopState);
   if (experimentMoneyDiscount > 0) {
-    upsertBucketItem(permanent, "gpu-experiment-money", `自己实验费用 -${experimentMoneyDiscount}`,
-      "个人显卡 · 自己每次实验减费，再使用科研经费", false, "money");
+    upsertBucketItem(permanent, "gpu-experiment-money", `实验费用 -${experimentMoneyDiscount}`,
+      "个人显卡 · 实验减费后由科研经费支付", false, "money");
   }
   if (writingModifier.bonus > 0) {
     upsertBucketItem(permanent, "permanent", `论文 +${writingModifier.bonus}分`, "机械键盘");
@@ -638,8 +640,8 @@ function buildEffectBuckets(state: GameState): {
     actionEffects: { experiment: { bonus: internshipEffect.bonus, multiplier: internshipEffect.multiplier } },
   }] : state.buffs);
   if (internshipEffect.moneyDiscount > 0) {
-    upsertBucketItem(monthly, "internship-experiment-money", `自己实验费用 -${internshipEffect.moneyDiscount}`,
-      `${internshipSource} · 剩余 ${internship.remainingMonths} 月 · 自己每次实验减费，再使用科研经费`, false, "money");
+    upsertBucketItem(monthly, "internship-experiment-money", `实验费用 -${internshipEffect.moneyDiscount}`,
+      `${internshipSource} · 剩余 ${internship.remainingMonths} 月 · 实验减费后由科研经费支付`, false, "money");
   }
   for (const [timing, target] of [["permanent", permanent], ["monthly", monthly], ["next-action", single]] as const) {
     const buffs = getActiveBuffs(state.buffs).filter((buff) => buff.timing === timing && buff.activeOperationSanDelta !== undefined);
@@ -3059,6 +3061,9 @@ function renderTalentPanelItem(item: TalentPanelItem, showStatus = true): string
         ${item.advisorSalaryPager ? `<div class="research-pagination" role="group" aria-label="查看导师职称">
           <button type="button" data-ui-advisor-salary-start="${item.advisorSalaryPager.startIndex - 1}"${item.advisorSalaryPager.startIndex === 0 ? " disabled" : ""} title="查看较低职称" aria-label="查看较低职称"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
           <button type="button" data-ui-advisor-salary-start="${item.advisorSalaryPager.startIndex + 1}"${item.advisorSalaryPager.startIndex === item.advisorSalaryPager.lastStartIndex ? " disabled" : ""} title="查看较高职称" aria-label="查看较高职称"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+        </div>` : item.labInheritancePager ? `<div class="research-pagination" role="group" aria-label="查看实验室传承">
+          <button type="button" data-ui-lab-inheritance-page="${item.labInheritancePager.page - 1}"${item.labInheritancePager.page === 0 ? " disabled" : ""} title="查看科研传承" aria-label="查看科研传承"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+          <button type="button" data-ui-lab-inheritance-page="${item.labInheritancePager.page + 1}"${item.labInheritancePager.page === 1 ? " disabled" : ""} title="查看社交传承" aria-label="查看社交传承"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
         </div>` : item.loverRewardPager ? `<div class="research-pagination" role="group" aria-label="查看恋人奖励">
           <button type="button" data-ui-lover-reward-page="${item.loverRewardPager.page - 1}"${item.loverRewardPager.page === 0 ? " disabled" : ""} title="上一条奖励" aria-label="上一条奖励"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
           <button type="button" data-ui-lover-reward-page="${item.loverRewardPager.page + 1}"${item.loverRewardPager.page === 2 ? " disabled" : ""} title="下一条奖励" aria-label="下一条奖励"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
@@ -3070,6 +3075,7 @@ function renderTalentPanelItem(item: TalentPanelItem, showStatus = true): string
           <button type="button" data-ui-game-growth-page="${item.gameGrowthPager.page + 1}"${item.gameGrowthPager.page === 2 ? " disabled" : ""} aria-label="下一个游戏"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
         </div>` : ""}
       </div>
+      ${item.identity ? `<div class="talent-item-identity"><strong>${escapeHtml(item.identity.name)}</strong><span>${escapeHtml(item.identity.detail)}</span></div>` : ""}
       ${item.metrics ? `
         <div class="talent-item-metrics">
           ${item.metrics.map((metric) => `
@@ -3121,16 +3127,21 @@ function buildInternshipTalentItem(state: GameState, requestedPage = 0): TalentP
   const status = getInternshipStatus(state);
   const active = status.active && status.kind === kind;
   const pending = status.pending && remote;
-  const metrics = remote
-    ? [
-        { label: "线上实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-2" }, { label: "工资", value: "1金" },
-        { label: "自己实验费用", value: "-1" }, { label: "实验", value: "+4" }, { label: "实验", value: "×1.0" },
-      ]
-    : [
-        { label: "线下实习", value: `${state.internshipCount}次` }, { label: "每月 SAN", value: "-5" }, { label: "工资", value: `${getInternshipMonthlyIncome(getPublishedAPaperCount(state))}金` },
-        { label: "自己实验费用", value: "-2" }, { label: "实验", value: "+6" }, { label: "实验", value: "×1.25" },
-      ];
-  const activation = remote ? "导师约谈事件激活" : "论文参会事件激活";
+  const offer = !remote ? state.internshipState.offer ?? state.conferenceCareerState.lastInternshipOffer : undefined;
+  const monthlyStats = getInternshipMonthlyStats(state);
+  const experiment = getInternshipExperimentEffect(state);
+  const publishedAPapers = getPublishedAPaperCount(state);
+  const minimumIncome = getInternshipMonthlyIncome(publishedAPapers, 0);
+  const maximumIncome = getInternshipMonthlyIncome(publishedAPapers, 2);
+  const expectedIncome = minimumIncome === maximumIncome ? `${minimumIncome}` : `${minimumIncome}～${maximumIncome}`;
+  const metrics = [
+    { label: active || remote ? "每月工资" : "预计月薪", value: `${active ? formatMoney(getInternshipSalaryPayment(state).payment) : remote ? "1" : expectedIncome}金` },
+    { label: "每月 SAN", value: active ? formatSignedNumber(monthlyStats.san) : remote ? "-2" : "-4～6" },
+    { label: active || pending ? "剩余时间" : "持续时间", value: `${active || pending ? status.remainingMonths : remote ? 3 : 6}个月` },
+    { label: "实验加分", value: active ? formatSignedNumber(experiment.bonus) : remote ? "+4" : "+4～6" },
+    { label: "实验倍率", value: `×${active ? formatMoney(experiment.multiplier) : remote ? "1" : "1.25"}` },
+    { label: "实验费用", value: active ? formatSignedNumber(-experiment.moneyDiscount) : remote ? "-1" : "-2" },
+  ];
   return {
     id: "internship",
     icon: "💼",
@@ -3139,8 +3150,13 @@ function buildInternshipTalentItem(state: GameState, requestedPage = 0): TalentP
     ruleCard: true,
     internshipPager: { page },
     ...(pending ? { tagLabel: "下月开始" } : {}),
+    identity: remote
+      ? { name: "远程实习", detail: "导师约谈获准" }
+      : offer
+        ? { name: offer.company, detail: `${active ? "" : "最近邀约 · "}${offer.position}` }
+        : { name: "企业实习", detail: "邀约后确定公司与岗位" },
     metrics,
-    description: `${activation}；${remote ? "固定工资1金/月" : "工资＝1＋一作A类论文数，上限6金/月"}${active ? `；剩余${status.remainingMonths}个月（含本月）` : ""}`,
+    description: active ? "剩余时间含本月 · 机制见小提示" : pending ? "次月开始 · 机制见小提示" : "邀约与收益规则见小提示",
   };
 }
 
@@ -3168,8 +3184,13 @@ function buildLoverTalentItem(state: GameState, requestedPage = 0): TalentPanelI
   };
 }
 
-function buildRelationTalentItems(state: GameState, requestedSalaryStart?: number | null, loverRewardPage = 0, internshipPage = 0): TalentPanelItem[] {
+function buildRelationTalentItems(state: GameState, requestedSalaryStart?: number | null, labInheritancePage = 0, loverRewardPage = 0, internshipPage = 0): TalentPanelItem[] {
   const publicationTotals = getFellowPublicationTotals(state);
+  const inheritancePage = labInheritancePage === 1 ? 1 : 0;
+  const socialRewards = getAnnualLabSocialRewards(state);
+  const jointReward = state.conferenceEncounterState.jointTrainingReward;
+  const jointCapMinimum = getJointTrainingCitationCapBonus(state.totalCitations, 0);
+  const jointCapMaximum = getJointTrainingCitationCapBonus(state.totalCitations, 2);
   const salaryRows = [null, ...ADVISOR_GRANTS].map((grant) => {
     const advisor = {
       ...state.advisorProgressState,
@@ -3220,12 +3241,17 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
       active: true,
       hideStatus: true,
       ruleCard: true,
-      metrics: [
+      labInheritancePager: { page: inheritancePage },
+      metrics: inheritancePage === 0 ? [
         { label: "你的当前奖励", value: `+${formatMoney(getPlayerAnnualResearchGrowth(state))}` },
         { label: "当前同学累计", value: "+" + formatMoney(state.fellowProgressState.reduce((total, profile) => total + (profile.annualResearchGrowthTotal ?? 0), 0)), tooltip: "当前同学每学年科研成长的累计值" },
+      ] : [
+        { label: "同学默契原始", value: `+${socialRewards.fellowAffinity}/人` },
+        { label: "你的社交原始", value: `+${socialRewards.playerSocial}` },
       ],
-      description: "每学年末（8月），你和同学科研+⌊n/2⌋",
-      descriptionTooltip: "n为科研高于自己的实验室成员人数",
+      description: inheritancePage === 0
+        ? "8月科研+⌊n/2⌋，n为科研更高人数\n含导师、不含恋人；详见人际提示"
+        : "8月默契+你的社交档位／人\n你的社交+⌊同学人数/2⌋；均抵抗",
     },
     {
       id: "fellow-paper-cooperation",
@@ -3246,16 +3272,17 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
         id: "joint-training",
         icon: "🧠",
         name: "大牛联培",
-        active: state.conferenceEncounterState.bigBullCooperation,
+        active: state.conferenceEncounterState.bigBullCooperation || !!jointReward,
         ruleCard: true,
+        ...(jointReward ? { identity: { name: jointReward.mentorName, detail: "联培导师" } } : {}),
         metrics: [
-          { label: "想 idea", value: "+5" },
-          { label: "写论文", value: "+5" },
-          { label: "科研上限", value: `+${state.conferenceEncounterState.bigBullCooperation
-            ? state.researchCapacityState.jointTrainingCitationCapBonus
-            : getJointTrainingCitationCapBonus(state.totalCitations)}` },
+          { label: "想 idea", value: jointReward ? formatSignedNumber(jointReward.ideaBonus) : "+4～6" },
+          { label: "写论文", value: jointReward ? formatSignedNumber(jointReward.writingBonus) : "+4～6" },
+          { label: jointReward ? "科研上限" : "预计上限", value: jointReward
+            ? formatSignedNumber(jointReward.capBonus)
+            : `+${jointCapMinimum}${jointCapMinimum === jointCapMaximum ? "" : `～${jointCapMaximum}`}` },
         ],
-        description: "论文参会事件激活",
+        description: jointReward ? "接受时奖励已固定 · 永久生效" : "会场合作获邀 · 范围按当前引用预计",
       },
       buildInternshipTalentItem(state, internshipPage),
     ],
@@ -3644,11 +3671,11 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
 
 export function renderRelationTalentCard(
   state: GameState,
-  cardId: "advisor" | "lover" | "internship" | "game-growth",
+  cardId: "advisor" | "lab-mutual-growth" | "lover" | "internship" | "game-growth",
   uiState: PlayRenderUiState = {},
 ): string {
   if (cardId === "game-growth") return renderTalentPanelItem(buildGameGrowthTalentItem(state, uiState.gameGrowthPage), false);
-  const item = buildRelationTalentItems(state, uiState.advisorSalaryStartIndex, uiState.loverRewardPage, uiState.internshipPage)
+  const item = buildRelationTalentItems(state, uiState.advisorSalaryStartIndex, uiState.labInheritancePage, uiState.loverRewardPage, uiState.internshipPage)
     .find((entry) => entry.id === cardId);
   return item ? renderTalentPanelItem(item) : "";
 }
@@ -3657,13 +3684,14 @@ function renderTalentSection(
   state: GameState,
   activeTalentTab: TalentPanelTabId | undefined,
   advisorSalaryStartIndex?: number | null,
+  labInheritancePage?: number,
   loverRewardPage?: number,
   internshipPage?: number,
   gameGrowthPage?: number,
 ): string {
   const tabId = normalizeTalentPanelTab(activeTalentTab);
   const items = tabId === "relation"
-    ? buildRelationTalentItems(state, advisorSalaryStartIndex, loverRewardPage, internshipPage)
+    ? buildRelationTalentItems(state, advisorSalaryStartIndex, labInheritancePage, loverRewardPage, internshipPage)
     : tabId === "equip"
       ? buildEquipTalentItems(state)
       : tabId === "publication"
@@ -3831,7 +3859,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("talent")}" data-tab-panel="talent"${getTabPanelHidden("talent")}>
-            ${lockedModule ?? renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.loverRewardPage, uiState.internshipPage, uiState.gameGrowthPage)}
+            ${lockedModule ?? renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.labInheritancePage, uiState.loverRewardPage, uiState.internshipPage, uiState.gameGrowthPage)}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("settings")}" data-tab-panel="settings"${getTabPanelHidden("settings")}>

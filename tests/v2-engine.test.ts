@@ -155,11 +155,16 @@ describe("minimal game engine", () => {
     const venue = getConferenceInfo(1, "A", 1).name;
     state = resolveDuePaperReviews(state, () => 0).state;
     expect(state.eventQueue[0]?.title).toBe(`${venue}结果`);
-    state = resolveCurrent(resolveCurrent(state));
-    expect(state.eventQueue[0]?.stage).toBe("result");
+    const reviewChainId = state.eventQueue[0]!.chainId;
+    const resolveReview = (current: typeof state) => {
+      const event = current.eventQueue.find((entry) => entry.chainId === reviewChainId)!;
+      return dispatchAction(current, "resolve-event", { eventId: event.id, eventChoiceId: event.choices[0]!.id });
+    };
+    state = resolveReview(resolveReview(state));
+    expect(state.eventQueue.find((event) => event.chainId === reviewChainId)?.stage).toBe("result");
     expect(state.advisorProgressState.funding).toBe(30);
     const moneyBeforeConfirmation = state.player.money;
-    state = resolveCurrent(state);
+    state = resolveReview(state);
     expect(state.advisorProgressState.funding).toBe(29);
     expect(state.player.money).toBe(moneyBeforeConfirmation);
     expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual([paper.id]);

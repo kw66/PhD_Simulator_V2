@@ -16,7 +16,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("mentoring affinity rewards", () => {
   it.each([
-    [1, 2], [5, 1.75], [6, 1.5], [11.75, 1.25], [12, 1], [17.75, 0.75], [18, 0.5], [19.9, 0.1], [20, 0],
+    [1, 2], [5, 1.8], [6, 1.6], [11.75, 1.4], [12, 1.2], [17.75, 1], [18, 0.8], [19.9, 0.1], [20, 0],
   ])("resists mentoring raw +2 at affinity %s once and reports actual gain %s", (affinity, gain) => {
     const state = makeState();
     vi.spyOn(fellowProgression, "createGeneratedFellowProfileAddition").mockReturnValue({

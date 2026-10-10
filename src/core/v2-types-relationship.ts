@@ -18,7 +18,41 @@ export interface RelationshipState {
   mentorshipStacks: number;
 }
 
+export interface ConferenceMentorContact {
+  id: string;
+  name: string;
+  level: 0 | 1 | 2;
+  cooperationCount: number;
+}
+
+export interface ConferenceScholarContact {
+  id: string;
+  name: string;
+  gender: Gender;
+  encounterCount: number;
+}
+
+export interface InternshipOffer {
+  id: string;
+  company: string;
+  position: string;
+  baseMonthlyIncome: number;
+  monthlySanCost: number;
+  experimentBonus: number;
+}
+
+export interface JointTrainingReward {
+  mentorId: string;
+  mentorName: string;
+  ideaBonus: number;
+  writingBonus: number;
+  capBonus: number;
+}
+
 export interface ConferenceEncounterState {
+  bigBull?: ConferenceMentorContact;
+  scholars?: Partial<Record<LoverTypeId, ConferenceScholarContact>>;
+  jointTrainingReward?: JointTrainingReward;
   metBigBullCoop: boolean;
   bigBullCooperation: boolean;
   bigBullCoopCount: number;
@@ -36,12 +70,15 @@ export interface ConferenceEncounterState {
 }
 
 export interface ConferenceCareerState {
+  hasInternshipExperience?: boolean;
+  lastInternshipOffer?: InternshipOffer;
   enterpriseCount: number;
   rejectedInternshipCount: number;
   permanentlyBlockedInternship: boolean;
 }
 
 export interface InternshipState {
+  offer?: InternshipOffer;
   active: boolean;
   kind?: "remote3" | "conference6";
   startTotalMonths?: number;
@@ -53,6 +90,7 @@ export interface InternshipState {
 }
 
 export interface LoverState {
+  contactId?: string;
   active: boolean;
   name?: string;
   type: LoverTypeId | null;
