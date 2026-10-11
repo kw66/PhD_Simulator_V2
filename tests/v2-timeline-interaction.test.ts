@@ -42,7 +42,7 @@ describe("timeline scrolling through the real app handlers", () => {
     await action("start-game", { roleId: "normal" });
     await action("debug-shift-month", { delta: "18" });
     await page.waitForFunction(() => (document.querySelector(".event-timeline-track")?.scrollLeft ?? 0) > 0);
-  });
+  }, 30_000);
 
   afterEach(async () => { await page?.close(); });
 

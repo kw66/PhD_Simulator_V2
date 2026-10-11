@@ -177,6 +177,52 @@ describe("workstation visual layout through real bootstrap", () => {
     } finally { await page.close(); }
   }, 45_000);
 
+  it("anchors research and relationship hints immediately below their trigger on either side", async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1080 }, reducedMotion: "reduce" });
+    try {
+      await openWorkstation(page);
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 1080 });
+        for (const tab of ["workstation", "relationship"]) {
+          await page.locator(`[data-ui-play-tab="${tab}"]`).click();
+          await settleLayout(page);
+          const targets = page.locator(tab === "workstation"
+            ? '.workstation-submit-target, .graduation-point-bar[data-tooltip], .graduation-career-bar[data-tooltip], .workstation-paper-action-btn[data-card-tooltip]'
+            : '.rel-card [data-relationship-tooltip]');
+          expect(await targets.count()).toBeGreaterThan(5);
+          for (let index = 0; index < await targets.count(); index += 1) {
+            const target = targets.nth(index);
+            if (!await target.isVisible()) continue;
+            await target.evaluate(element => element.scrollIntoView({ block: "center" }));
+            await target.hover();
+            const position = await target.evaluate(element => {
+              const anchor = element.getBoundingClientRect();
+              const tooltip = document.querySelector<HTMLElement>("#relationship-tooltip")!;
+              const bounds = tooltip.getBoundingClientRect();
+              const region = element.closest(".rel-card, .paper-card")?.getBoundingClientRect()
+                ?? element.closest("#workstation-section, .relationship-panel")?.getBoundingClientRect();
+              const regionLeft = Math.max(8, region?.left ?? 8);
+              const regionRight = Math.min(document.documentElement.clientWidth - 8, region?.right ?? document.documentElement.clientWidth - 8);
+              const right = element.getAttribute("data-tooltip-align") === "right"
+                || (element.getAttribute("data-tooltip-align") !== "left" && anchor.left + anchor.width / 2 > (regionLeft + regionRight) / 2);
+              const expectedLeft = Math.max(8, Math.min(right ? anchor.right - bounds.width : anchor.left, document.documentElement.clientWidth - 8 - bounds.width));
+              return { hidden: tooltip.hidden, gap: bounds.top - anchor.bottom, roomBelow: anchor.bottom + 2 + bounds.height <= innerHeight - 8,
+                left: bounds.left, right: bounds.right, expectedLeft, viewport: document.documentElement.clientWidth };
+            });
+            expect(position.hidden, `${tab} ${width} trigger ${index}`).toBe(false);
+            if (position.roomBelow) expect(Math.abs(position.gap - 2)).toBeLessThanOrEqual(1);
+            expect(Math.abs(position.left - position.expectedLeft)).toBeLessThanOrEqual(1);
+            expect(position.left).toBeGreaterThanOrEqual(7);
+            expect(position.right).toBeLessThanOrEqual(position.viewport - 7);
+            await page.keyboard.press("Escape");
+          }
+          await targets.first().hover();
+          await page.screenshot({ path: `artifacts/workstation-visual/${tab}-tooltips-${width}.png` });
+        }
+      }
+    } finally { await page.close(); }
+  }, 60_000);
+
   it("removes shared icon underlines on hover while preserving keyboard focus", async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1080 }, reducedMotion: "reduce" });
     try {

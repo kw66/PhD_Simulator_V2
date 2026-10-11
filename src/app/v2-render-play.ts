@@ -2049,7 +2049,7 @@ function renderRelationshipIcon(icon: string): string {
   return `<span class="rel-inline-icon" aria-hidden="true">${icon}</span>`;
 }
 
-function relationshipTooltip(hint: string, align: "left" | "right" = "left"): string {
+function relationshipTooltip(hint: string, align: "left" | "right" | "auto" = "auto"): string {
   return `data-relationship-tooltip data-tooltip="${escapeHtml(hint)}" data-tooltip-align="${align}" tabindex="0" aria-description="${escapeHtml(hint)}"`;
 }
 
@@ -2250,7 +2250,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
       : (kind === "intimacy" ? ["初识", "亲近", "甜蜜", "挚爱"] : ["生疏", "熟悉", "合拍", "无间"])[tier];
     const hint = `${item.label}增减抵抗${getTierResistChance(item.value) * 100}%`;
     const displayedValue = roundMoney(item.value);
-    return `<span class="rel-detail-item" ${relationshipTooltip(hint, "right")}><span class="rel-detail-label">${renderRelationshipIcon(kind === "research" ? "💡" : kind === "intimacy" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedNumber(`${identity}:${kind}`, displayedValue, formatMoney(item.value))}${item.max === undefined ? "" : `/${item.max}`}</strong><span class="new-attr-level attr-level-${kind} rel-stat-tier">${tierName}</span></span>`;
+    return `<span class="rel-detail-item" ${relationshipTooltip(hint)}><span class="rel-detail-label">${renderRelationshipIcon(kind === "research" ? "💡" : kind === "intimacy" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedNumber(`${identity}:${kind}`, displayedValue, formatMoney(item.value))}${item.max === undefined ? "" : `/${item.max}`}</strong><span class="new-attr-level attr-level-${kind} rel-stat-tier">${tierName}</span></span>`;
   }).join("");
   return `
     <article class="rel-card filled rel-card-compact${fellow ? " rel-card-fellow" : card.type === "lover" ? " rel-card-lover" : ""}" data-relationship-type="${card.type}" data-relationship-id="${escapeHtml(card.relationshipId)}">

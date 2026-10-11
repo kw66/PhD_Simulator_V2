@@ -5028,6 +5028,7 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 .relationship-tooltip {
   position: fixed;
   box-sizing: border-box;
+  overflow-y: auto;
   overflow-wrap: anywhere;
   z-index: 1000;
   right: auto;
