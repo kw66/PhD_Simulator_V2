@@ -69,6 +69,12 @@ function getSourceText(buff: Buff): string {
   return `${source} · ${getDurationText(buff)}${description ? `：${description}` : ""}`;
 }
 
+export function getLabExperimentMoneySource(buff: Buff): string {
+  const description = buff.description?.trim();
+  return `${buff.source} · ${getDurationText(buff)} · 实验费用 ${formatSignedNumber(buff.labExperimentMoneyDelta ?? 0)}（玩家与同学共享）`
+    + (description ? `：${description}` : "");
+}
+
 function appendUnique(target: string[], value: string): void {
   if (!target.includes(value)) target.push(value);
 }
@@ -146,7 +152,7 @@ function addActionEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): 
         operation: "multiplier",
         value: actionEffect.multiplier,
         source,
-        renderLabel: (value) => `${actionLabel} 总分 ×${formatNumber(value)}`,
+        renderLabel: (value) => `${actionLabel}倍率 ×${formatNumber(value)}`,
       });
     }
     if (actionEffect.extraActions !== undefined) {
@@ -263,7 +269,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       timing: buff.timing,
       operation: "sum",
       value: buff.labExperimentMoneyDelta,
-      source: `${getSourceText(buff)} · 玩家与同学共享；玩家经费不足时暂停实验，同学先用经费、不足差额自付，合计不足改做横向`,
+      source: getLabExperimentMoneySource(buff),
       isCost: true,
       category: "money",
       renderLabel: (value) => `实验费用 ${formatSignedNumber(value)}`,

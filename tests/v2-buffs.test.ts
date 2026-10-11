@@ -170,7 +170,7 @@ describe("generic buffs", () => {
 
     expect(getBuffActionEffect(buffs, "idea").multiplier).toBe(0);
     expect(buildBuffDisplayBuckets(buffs).nextAction).toEqual([
-      expect.objectContaining({ label: "idea 总分 ×0", isDebuff: true }),
+      expect.objectContaining({ label: "idea倍率 ×0", isDebuff: true }),
     ]);
   });
 
@@ -369,7 +369,7 @@ describe("generic buffs", () => {
       idea: { bonus: 4, multiplier: 0.5 },
     });
     expect(resolved.buffs.map((buff) => buff.name)).toEqual([
-      "下次想 idea +4分 · 总分 ×0.5",
+      "下次想 idea +4分 · 倍率 ×0.5",
       "每次写论文 +1分",
     ]);
   });

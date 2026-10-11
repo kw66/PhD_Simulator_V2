@@ -62,6 +62,9 @@
   font-variant-numeric: tabular-nums;
 }
 
+.graduation-card.is-locked .graduation-countdown { font-size: 0.72rem; }
+.graduation-card.is-locked .graduation-countdown > strong { font-size: 0.8rem; }
+
 .graduation-lock-hint,
 .graduation-career-status,
 .graduation-review-reason {
@@ -85,11 +88,22 @@
 
 .graduation-thesis-heading {
   display: flex;
+  position: relative;
+  top: 1px;
   align-items: center;
   gap: 6px;
   line-height: 1.4;
   height: 32px;
   box-sizing: border-box;
+}
+
+.graduation-card .graduation-careers,
+.graduation-card .graduation-points {
+  padding-top: 0;
+}
+
+.graduation-card .graduation-points {
+  margin-top: -2px;
 }
 
 .graduation-thesis-heading > strong { flex: 1; }
@@ -124,9 +138,25 @@
   display: flex;
 }
 
-.graduation-point-bar > .rel-progress-fill {
+.graduation-point-bar > .graduation-bar-fill-track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.graduation-bar-fill-track > .rel-progress-fill {
   display: block;
   flex: 0 0 auto;
+  height: 100%;
+  border-radius: 0;
+}
+
+.graduation-bar-fill-track > .graduation-improved,
+.graduation-bar-fill-track.is-unimproved > .graduation-original {
+  border-radius: 0 999px 999px 0;
 }
 
 .graduation-point-bar { overflow: visible; }
@@ -149,16 +179,21 @@
 
 .graduation-bar-grade.is-a { background: #f1e1b3; color: #815b1e; }
 
-.graduation-point-bar > .rel-progress-fill { border-radius: 0; }
+.graduation-point-bar.is-high-score .graduation-bar-grade.is-b { display: none; }
 .graduation-point > .rel-progress-val,
 .graduation-career-row > .rel-progress-val { text-align: right; }
 .graduation-point > .rel-detail-label,
 .graduation-career-row > .rel-detail-label { white-space: nowrap; }
+.graduation-point > .rel-detail-label[data-card-tooltip],
+.graduation-career-row > .rel-detail-label[data-card-tooltip] { cursor: help; }
 .graduation-unused-action { grid-area: action; text-align: center; font-size: 0.75rem; color: var(--ink-soft); white-space: nowrap; }
 .graduation-point.is-unused { opacity: 0.65; }
 
 .graduation-card .graduation-action {
   font-size: var(--workstation-font-small, 0.68rem);
+  gap: 3px;
+  padding-inline: 3px;
+  white-space: nowrap;
 }
 
 .graduation-action:focus-visible,

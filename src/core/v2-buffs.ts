@@ -235,7 +235,30 @@ export function getActiveBuffs(
 
 export function hasActiveAiCostCoverage(buffs: readonly Buff[], totalMonths: number): boolean {
   return buffs.some((buff) => isActiveBuff(buff) && buff.shopEffects?.aiCostsCovered === true
-    && (buff.shopEffects.aiCostsCoveredAtTotalMonths === undefined || buff.shopEffects.aiCostsCoveredAtTotalMonths === totalMonths));
+    && (buff.shopEffects.aiCostsCoveredAtTotalMonths === undefined || buff.shopEffects.aiCostsCoveredAtTotalMonths === totalMonths)
+    && (buff.shopEffects.aiCostsCoveredUses === undefined || buff.shopEffects.aiCostsCoveredUses > 0));
+}
+
+/** Consume one use of a current-month AI reimbursement, leaving legacy unlimited coverage intact. */
+export function consumeAiCostCoverage(state: GameState): GameState {
+  let changed = false;
+  const buffs = state.buffs.flatMap((buff) => {
+    const shopEffects = buff.shopEffects;
+    if (!isActiveBuff(buff) || shopEffects?.aiCostsCovered !== true
+      || (shopEffects.aiCostsCoveredAtTotalMonths !== undefined
+        && shopEffects.aiCostsCoveredAtTotalMonths !== state.totalMonths)
+      || shopEffects.aiCostsCoveredUses === undefined) {
+      return [buff];
+    }
+    const remainingUses = shopEffects.aiCostsCoveredUses - 1;
+    changed = true;
+    if (remainingUses <= 0) return [];
+    return [{
+      ...cloneBuff(buff),
+      shopEffects: { ...shopEffects, aiCostsCoveredUses: remainingUses },
+    }];
+  });
+  return changed ? { ...state, buffs } : state;
 }
 
 export function getPublicationBuffEffect(

@@ -11,7 +11,7 @@ import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "../core/v2-lab-projects";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
 import { getRoleLobbyAchievementDefinitions } from "../core/v2-role-lobby-meta";
-import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
+import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, MAX_ROLE_LEVEL, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 import { renderLobbyMasthead, renderLobbyMessageRailView } from "./v2-render-community";
@@ -22,6 +22,12 @@ const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain", "speci
 const CURSED_ROLE_IDS = new Set<RoleId>(["cursed-frail", "cursed-debt", "special-finite-life", "special-fading-genius"]);
 function hasDesignedTalentTree(roleId: RoleId): roleId is keyof typeof DESIGNED_TALENT_TREES {
   return Object.hasOwn(DESIGNED_TALENT_TREES, roleId);
+}
+
+export type TalentAllocation = Partial<Record<RoleId, Record<string, number>>>;
+
+export function getDisplayedRoleLevel(level: number): number {
+  return import.meta.env.MODE === "development" ? MAX_ROLE_LEVEL : level;
 }
 
 type TalentPointSummary = {
@@ -162,7 +168,7 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
               <span>${getRoleModeLabel(roleId)}</span>
             </div>
             ${renderRoleAchievementDisplay(role.id, progress, owned, accountProfile)}
-            ${renderRoleCardCornerBadge(roleId, progress.level, owned)}
+            ${renderRoleCardCornerBadge(roleId, getDisplayedRoleLevel(progress.level), owned)}
           </div>
         </div>
       </div>
@@ -290,20 +296,22 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
   `;
 }
 
-function buildTalentPointSummary(viewModel: LobbySelectedRoleViewModel): TalentPointSummary {
-  const nextExp = getNextRoleLevelExperience(viewModel.progress.level);
+function buildTalentPointSummary(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>): TalentPointSummary {
+  const level = getDisplayedRoleLevel(viewModel.progress.level);
+  const nextExp = getNextRoleLevelExperience(level);
 
   return {
-    level: viewModel.progress.level,
+    level,
     currentExp: viewModel.progress.exp,
     nextExp,
-    availablePoints: viewModel.progress.level * ROLE_TALENT_POINTS_PER_LEVEL,
+    availablePoints: allocation ? getTalentPointBalance(viewModel.role.id, viewModel.progress.level, allocation) : level * ROLE_TALENT_POINTS_PER_LEVEL,
   };
 }
 
 function renderGrowthProgress(
   viewModel: LobbySelectedRoleViewModel,
   pointSummary: TalentPointSummary,
+  allocation?: Record<string, number>,
 ): string {
   const expTarget = pointSummary.nextExp;
   const expProgressPercent = expTarget === null
@@ -326,7 +334,7 @@ function renderGrowthProgress(
         <div class="lobby-growth-exp-detail-row">
           <div class="lobby-talent-allocation-meta">
             <span class="lobby-talent-points-hint" role="note" tabindex="0" aria-label="天赋点${pointSummary.availablePoints}，每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点。" data-tooltip="每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点，用于解锁天赋。">天赋点 <strong class="lobby-talent-points-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</strong></span>
-            <button class="lobby-talent-reset-button" type="button" disabled title="重置天赋点"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span></button>
+            <button class="lobby-talent-reset-button" type="button" data-ui-talent-reset="${viewModel.role.id}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置天赋点"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span></button>
           </div>
         </div>
       </div>
@@ -341,8 +349,8 @@ function renderGrowthProgress(
   `;
 }
 
-function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
-  const pointSummary = buildTalentPointSummary(viewModel);
+function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>): string {
+  const pointSummary = buildTalentPointSummary(viewModel, allocation);
   const unlockAchievement = getRoleLobbyAchievementDefinitions(viewModel.role.id)
     .find((achievement) => achievement.unlocksRoleId === viewModel.role.id);
   const unlockHint = unlockAchievement
@@ -382,7 +390,7 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel): string {
           </div>
         </section>
       </div>
-      ${renderGrowthProgress(viewModel, pointSummary)}
+      ${renderGrowthProgress(viewModel, pointSummary, allocation)}
     </section>
   `;
 }
@@ -726,7 +734,27 @@ const DESIGNED_TALENT_TREES = {
   },
 } as const;
 
-function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, selectedNodeIndex: number): string {
+export function getDesignedTalentNodes(roleId: RoleId): readonly DesignedTalentNode[] | null {
+  return hasDesignedTalentTree(roleId) ? DESIGNED_TALENT_TREES[roleId].nodes : null;
+}
+
+export function getTalentPointBalance(roleId: RoleId, level: number, allocation: Record<string, number>): number {
+  const spent = getDesignedTalentNodes(roleId)?.reduce((sum, node) => sum + (allocation[node.id] ?? 0) * node.cost, 0) ?? 0;
+  return Math.max(0, getDisplayedRoleLevel(level) * ROLE_TALENT_POINTS_PER_LEVEL - spent);
+}
+
+export function getTalentUpgradeReason(roleId: RoleId, level: number, allocation: Record<string, number>, talentId: string): string | null {
+  const nodes = getDesignedTalentNodes(roleId);
+  const node = nodes?.find((entry) => entry.id === talentId);
+  if (!node || node.fixed) return "不可加点";
+  if ((allocation[node.id] ?? node.initialLevel ?? 0) >= node.maxLevel) return "已满级";
+  if (node.challenge) return nodes!.some((entry) => entry.challenge && entry.id !== node.id && (allocation[entry.id] ?? 0) > 0) ? "只能选择一个档位" : null;
+  if (node.prerequisiteIds.length > 0 && !node.prerequisiteIds.some((id) => (allocation[id] ?? 0) >= 1)) return "需要先点亮相邻前置天赋";
+  if (getTalentPointBalance(roleId, level, allocation) < node.cost) return "天赋点不足";
+  return null;
+}
+
+export function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, selectedNodeIndex: number, allocation?: Record<string, number>, level?: number, showPoints = false): string {
   const tree = DESIGNED_TALENT_TREES[roleId];
   const nodes: readonly DesignedTalentNode[] = tree.nodes;
   const { paths, viewBoxHeight } = tree;
@@ -734,8 +762,10 @@ function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, s
     ? selectedNodeIndex : 0;
   const exclusiveChallenge = nodes.every((node) => node.challenge);
   const nodeLabel = (node: DesignedTalentNode) => node.fixed ? "固定生效" : node.challenge ? "四选一" : `${node.cost}天赋点`;
+  const points = allocation && level !== undefined ? getTalentPointBalance(roleId, level, allocation) : null;
   return `
     <section class="lobby-profile-growth-card lobby-profile-section is-designed-growth-card">
+      ${!showPoints || points === null ? "" : `<div class="character-talent-points"><span>天赋点 <strong>${points}</strong></span><button type="button" data-ui-talent-reset="${roleId}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置本次测试加点" aria-label="重置本次测试加点"><i data-lucide="rotate-ccw" aria-hidden="true"></i></button></div>`}
       <div class="lobby-talent-tree is-designed-tree is-${roleId}-tree${nodes.some((node) => node.fixed) ? " is-fixed-tree" : ""}${exclusiveChallenge ? " is-cursed-choice-tree" : ""}" role="group" aria-label="${exclusiveChallenge ? "挑战档位预览，四选一" : "天赋树预览"}" data-active-page="0" ${exclusiveChallenge ? 'data-selection-mode="exclusive"' : 'data-prerequisite-mode="any" data-prerequisite-min-level="1"'}>
         <div class="lobby-talent-tree-pages">
           <div class="lobby-talent-tree-page is-active is-designed-page" data-tree-page="0">
@@ -743,9 +773,9 @@ function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, s
               ${paths.map((path) => `<path d="${path}" />`).join("")}
             </svg>
             ${nodes.map((node, index) => `
-              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}${node.fixed ? " is-fixed" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.fixed ? "fixed" : node.tier}" data-fixed="${node.fixed ? "true" : "false"}" aria-label="${escapeHtml(`${node.name}：${node.effect}，${nodeLabel(node)}，仅预览`)}" title="${node.name}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-initial-level="${node.initialLevel ?? 0}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}">
+              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}${node.fixed ? " is-fixed" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.fixed ? "fixed" : node.tier}" data-fixed="${node.fixed ? "true" : "false"}" aria-label="${escapeHtml(`${node.name}：${node.effect}，${nodeLabel(node)}，仅预览`)}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-initial-level="${node.initialLevel ?? 0}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}" data-current-level="${allocation?.[node.id] ?? node.initialLevel ?? 0}">
                 <span class="lobby-talent-tree-node-ring"><i data-lucide="${node.icon}" aria-hidden="true"></i></span>
-                ${node.fixed ? "" : `<span class="lobby-normal-tree-node-level">${node.challenge ? ["简单", "中等", "困难", "地狱"][node.tier] : `${node.initialLevel ?? 0}/${node.maxLevel}`}</span>`}
+                ${node.fixed ? "" : `<span class="lobby-normal-tree-node-level">${node.challenge ? ["简单", "中等", "困难", "地狱"][node.tier] : `${allocation?.[node.id] ?? node.initialLevel ?? 0}/${node.maxLevel}`}</span>`}
               </button>
             `).join("")}
             <div class="lobby-normal-tree-details" aria-live="polite">
@@ -780,8 +810,10 @@ function renderSelectedRoleDetail(
   _talentTreePageIndex: number,
   talentTreeSelectedNodeByPage: readonly number[],
   announcementPageIndex: number,
+  talentAllocation?: TalentAllocation,
 ): string {
   const viewModel = buildLobbySelectedRoleViewModel(accountProfile, selectedRoleId);
+  const allocation = talentAllocation?.[selectedRoleId] ?? (import.meta.env.MODE === "development" ? {} : undefined);
 
   return `
     <section class="lobby-detail-stage">
@@ -800,10 +832,10 @@ function renderSelectedRoleDetail(
                 alt="${escapeHtml(`${viewModel.role.name}立绘`)}"
               />
             </div>
-            ${renderProfileInfoPanel(viewModel)}
+            ${renderProfileInfoPanel(viewModel, allocation)}
           </section>
           ${hasDesignedTalentTree(selectedRoleId)
-            ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0)
+            ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined)
             : ""}
         </div>
         ${renderRoleRail(accountProfile, selectedRoleId, activeRoleRailView, announcementPageIndex)}
@@ -819,6 +851,7 @@ export function renderSetupScreen(
   talentTreePageIndex = 0,
   talentTreeSelectedNodeByPage: readonly number[] = [0],
   announcementPageIndex = 0,
+  talentAllocation?: TalentAllocation,
 ): string {
   const selectedRoleId = accountProfile.selectedLobbyRoleId;
   const ownedCount = getRoleOptions().filter((role) => isRoleOwned(accountProfile, role.id)).length;
@@ -853,7 +886,7 @@ export function renderSetupScreen(
 
               <div class="lobby-detail-column">
                 ${renderLobbyMasthead(activeRoleRailView)}
-                ${renderSelectedRoleDetail(accountProfile, selectedRoleId, activeRoleRailView, talentTreePageIndex, talentTreeSelectedNodeByPage, announcementPageIndex)}
+                ${renderSelectedRoleDetail(accountProfile, selectedRoleId, activeRoleRailView, talentTreePageIndex, talentTreeSelectedNodeByPage, announcementPageIndex, talentAllocation)}
               </div>
             </section>
           </section>

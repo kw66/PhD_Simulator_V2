@@ -30,6 +30,12 @@ function resultOf(root: PendingEvent, decision: "accept" | "decline"): PendingEv
   return decisionOf(root).choices.find((choice) => choice.id === decision)!.effects.enqueueEvents![0]!;
 }
 
+it("uses the concise internship acceptance label", () => {
+  const context = buildInternshipInviteContext(createInitialState(), () => 0.5);
+  const accept = decisionOf(createInternshipInviteAct1(context)).choices.find((choice) => choice.id === "accept");
+  expect(accept?.label).toBe("接受实习");
+});
+
 afterEach(() => vi.restoreAllMocks());
 
 describe("enterprise internship offer contract", () => {

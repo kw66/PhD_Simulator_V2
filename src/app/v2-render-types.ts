@@ -1,4 +1,5 @@
 import type { AccountProfile, CoffeeMachineUpgradeId, RoleExperienceAward, ShopUpgradeId } from "../core/v2-types";
+import type { TalentAllocation } from "./v2-render-setup-screen";
 import type { ShopTabId } from "./v2-render-shop-panel";
 
 export type PlayTabId = "events" | "workstation" | "relationship" | "shop" | "research" | "talent" | "settings";
@@ -12,6 +13,8 @@ export interface PlayRenderUiState {
   announcementPageIndex?: number;
   talentTreePageIndex?: number;
   talentTreeSelectedNodeByPage?: readonly number[];
+  talentAllocation?: TalentAllocation;
+  roleLevel?: number;
   isFeedbackOpen?: boolean;
   dateDisplayMode?: AccountProfile["dateDisplayMode"];
   roleExperienceAward?: RoleExperienceAward;
@@ -24,6 +27,7 @@ export interface PlayRenderUiState {
   activeEventHistoryId?: string | null;
   activeEventHistoryIndex?: number | null;
   activeLogPage?: number | null;
+  isSanChartOpen?: boolean;
   activePendingPage?: number | null;
   activeRelationshipIndex?: number | null;
   activeShopTab?: ShopTabId;
@@ -38,6 +42,7 @@ export interface PlayRenderUiState {
   internshipPage?: number;
   gameGrowthPage?: number;
   currentResearchPaperIndex?: number | null;
+  researchPageIndex?: number;
   researchSortMode?: ResearchSortMode;
   researchAuthorshipFilter?: ResearchAuthorshipFilter;
 }

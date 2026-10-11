@@ -606,7 +606,7 @@ describe("stored lover paper collaboration", () => {
     const paper = makePaper({ idea: 0, experiment: 0, writing: 0 });
     const helped = settlePendingLoverHelp({ ...repeated, papers: [paper] }, () => 0.999);
     expect(getPaperScoreBreakdown(helped.papers[0]!, "idea")).toEqual({ own: 0, collaboration: 10, total: 10 });
-    expect(helped.papers[0]!.collaborators).toEqual([{ id: "lover:7:林青", name: "林青" }]);
+    expect(helped.papers[0]!.collaborators).toEqual([{ id: "lover:7:林青", name: "林青", contributionScores: { idea: 10 } }]);
     expect(helped.loverProgressState.pendingPaperHelp).toBeNull();
     expect(settlePendingLoverHelp(helped)).toBe(helped);
   });
@@ -619,7 +619,7 @@ describe("stored lover paper collaboration", () => {
       const next = settlePendingLoverHelp(base, () => random);
       expect(getPaperScoreBreakdown(next.papers[0]!, field)).toEqual({ own: 10, collaboration: 10, total: 20 });
       expect(next.papers[0]!.idea + next.papers[0]!.experiment + next.papers[0]!.writing).toBe(40);
-      expect(next.papers[0]!.collaborators).toEqual([{ id: "lover:7:林青", name: "林青" }]);
+      expect(next.papers[0]!.collaborators).toEqual([{ id: "lover:7:林青", name: "林青", contributionScores: { [field]: 10 } }]);
       expect(next.player).toEqual(base.player);
       expect(next.actionState).toEqual(base.actionState);
       expect(next.loverProgressState.pendingPaperHelp).toBeNull();

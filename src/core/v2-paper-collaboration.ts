@@ -6,6 +6,25 @@ function normalizeScore(value: number | undefined): number {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value!)) : 0;
 }
 
+function scaleCollaboratorScores(paper: Paper, field: PaperActionType, previousTotal: number, nextTotal: number): Paper["collaborators"] {
+  const collaborators = paper.collaborators;
+  if (!collaborators?.length) return collaborators;
+  const values = collaborators.map((collaborator) => normalizeScore(collaborator.contributionScores?.[field]));
+  const attributed = values.reduce((sum, value) => sum + value, 0);
+  if (attributed === 0) return collaborators;
+  const target = previousTotal > 0 ? Math.min(nextTotal, Math.round(attributed * nextTotal / previousTotal)) : 0;
+  const shares = values.map((value) => value * target / attributed);
+  const adjusted = shares.map(Math.floor);
+  const remainderOrder = shares.map((share, index) => ({ index, fraction: share - adjusted[index]! }))
+    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+  for (let left = target - adjusted.reduce((sum, value) => sum + value, 0); left > 0; left--) {
+    adjusted[remainderOrder[left - 1]!.index]!++;
+  }
+  return collaborators.map((collaborator, index) => collaborator.contributionScores?.[field] === undefined
+    ? collaborator
+    : { ...collaborator, contributionScores: { ...collaborator.contributionScores, [field]: adjusted[index] } });
+}
+
 export function getPaperScoreBreakdown(paper: Paper, field: PaperActionType): {
   own: number;
   collaboration: number;
@@ -35,6 +54,7 @@ export function setPaperTotalScore(paper: Paper, field: PaperActionType, score: 
     ...paper,
     [field]: total,
     collaborationScores: { ...paper.collaborationScores, [field]: Math.max(0, Math.min(total, collaboration)) },
+    collaborators: scaleCollaboratorScores(paper, field, previous.collaboration, Math.max(0, Math.min(total, collaboration))),
   };
 }
 
@@ -77,10 +97,17 @@ export function addPaperCollaboration(paper: Paper, effect: PaperCollaborationEf
   }
   if (nextPaper === paper) return paper;
   const collaborators = paper.collaborators ?? [];
+  const previous = collaborators.find((collaborator) => collaborator.id === id);
+  const contributionScores = { ...previous?.contributionScores };
+  for (const field of SCORE_FIELDS) {
+    const gain = normalizeScore(effect.scores[field]);
+    if (gain > 0) contributionScores[field] = normalizeScore(contributionScores[field]) + gain;
+  }
+  const contributor = { id, name: previous?.name ?? name, contributionScores };
   return {
     ...nextPaper,
-    collaborators: collaborators.some((collaborator) => collaborator.id === id)
-      ? collaborators
-      : [...collaborators, { id, name }],
+    collaborators: previous
+      ? collaborators.map((collaborator) => collaborator.id === id ? contributor : collaborator)
+      : [...collaborators, contributor],
   };
 }

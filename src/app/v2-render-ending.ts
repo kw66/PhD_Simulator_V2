@@ -171,7 +171,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
           <p class="ending-closing">${copy.closing}</p>
           <div class="ending-buttons">
             <button class="settings-primary-btn is-restart" type="button" data-action="restart-game"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>再读一次</span></button>
-            <button class="settings-primary-btn is-return" type="button" data-action="reset-game"><i data-lucide="house" aria-hidden="true"></i><span>返回开始页</span></button>
+            <button class="settings-primary-btn is-return" type="button" data-action="reset-game"><i data-lucide="house" aria-hidden="true"></i><span>返回开始页面</span></button>
           </div>
         </footer>
     </section>`;

@@ -111,6 +111,7 @@ describe("basic ending presentation", () => {
     expect(actions.match(/<button\b/g)).toHaveLength(2);
     expect(actions).toContain('data-action="restart-game"');
     expect(actions).toContain('data-action="reset-game"');
+    expect(actions).toContain("返回开始页面");
     expect(card).not.toContain('data-action="quit-game"');
   });
 

@@ -239,9 +239,10 @@
 .shop-panel[data-shop-tab] > .shop-tab-btns {
   border-color: #e2d4b8;
   background:
-    linear-gradient(#e8ddc7, #e8ddc7) 25% 0 / 1px 100% no-repeat,
-    linear-gradient(#e8ddc7, #e8ddc7) 50% 0 / 1px 100% no-repeat,
-    linear-gradient(#e8ddc7, #e8ddc7) 75% 0 / 1px 100% no-repeat,
+    linear-gradient(#e8ddc7, #e8ddc7) 20% 0 / 1px 100% no-repeat,
+    linear-gradient(#e8ddc7, #e8ddc7) 40% 0 / 1px 100% no-repeat,
+    linear-gradient(#e8ddc7, #e8ddc7) 60% 0 / 1px 100% no-repeat,
+    linear-gradient(#e8ddc7, #e8ddc7) 80% 0 / 1px 100% no-repeat,
     #f7efdf;
 }
 

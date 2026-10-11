@@ -25,10 +25,12 @@ export function renderApp(
       playUiState.talentTreePageIndex,
       playUiState.talentTreeSelectedNodeByPage,
       playUiState.announcementPageIndex,
+      playUiState.talentAllocation,
     )
     : renderPlayScreen(state, {
       ...playUiState,
       dateDisplayMode: playUiState.dateDisplayMode ?? accountProfile.dateDisplayMode,
       roleExperienceAward: accountProfile.lastRunExperience,
+      roleLevel: accountProfile.roleProgress[state.selectedRoleId]?.level ?? 0,
     });
 }

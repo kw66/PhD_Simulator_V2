@@ -51,9 +51,10 @@ describe("graduation workstation cards", () => {
       expect(point).toContain('class="rel-progress-fill cooperation graduation-improved"');
       expect(point).not.toContain("data-thesis-grade");
     });
-    const reference = THESIS_REVIEW_THRESHOLDS[degree].A / 3;
-    expect(points[0]).toMatch(new RegExp(`graduation-original"[^>]*style="width:${formatMoney(60 / reference * 100)}%"`));
-    expect(points[0]).toMatch(new RegExp(`graduation-improved"[^>]*style="width:${formatMoney(24 / reference * 100)}%"`));
+    const scale = Math.ceil(THESIS_REVIEW_THRESHOLDS[degree].A / 3 * 2);
+    expect(points[0]).toContain(`aria-valuemax="${scale}"`);
+    expect(points[0]).toMatch(new RegExp(`graduation-original"[^>]*style="width:${formatMoney(60 / scale * 100)}%"`));
+    expect(points[0]).toMatch(new RegExp(`graduation-improved"[^>]*style="width:${formatMoney(24 / scale * 100)}%"`));
     expect(html).not.toContain("graduation-baselines");
     expect(html.match(/class="graduation-reference"/g)).toHaveLength(1);
     const header = html.match(/<header\b[^>]*>[\s\S]*?<\/header>/)![0];
@@ -155,12 +156,14 @@ describe("graduation workstation cards", () => {
     const html = renderGraduationCards(state);
     expect(visibleText(html)).toContain("250.12");
     expect(html).toContain(`data-thesis-grade="A" data-thesis-threshold="${formatMoney(THESIS_REVIEW_THRESHOLDS.phd.A / 3)}"`);
-    expect(html).toContain('style="width:100%"');
+    expect(html).toContain('aria-valuemax="334"');
+    expect(html).toContain(`style="width:${formatMoney(250.123456 / 334 * 100)}%"`);
     expect(html).toContain('data-animate-number="250.123456"');
     const supportBar = html.match(/<div class="rel-progress-bar graduation-point-bar"[^>]*>/)![0];
     expect(supportBar).toContain('data-tooltip="完整支撑论文 &lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; title\n原始分 0 · 改进分 250.12"');
     expect(visibleText(html)).not.toContain("完整支撑论文");
-    expect(html.match(/<[^>]*data-tooltip="完整支撑论文[^>]*>/g)).toHaveLength(1);
+    expect(html.match(/<[^>]*data-tooltip="完整支撑论文[^>]*>/g)).toHaveLength(2);
+    expect(html).toMatch(/class="rel-detail-label"[^>]*data-tooltip="完整支撑论文/);
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img");
     expect(state).toEqual(before);
@@ -251,7 +254,7 @@ describe("graduation workstation cards", () => {
     expect(headers[1]).not.toContain("招聘");
     const rows = html.match(/<div class="graduation-career-row">[\s\S]*?<\/button>\s*<\/div>/g) ?? [];
     expect(rows).toHaveLength(4);
-    expect(rows[0]).toContain('class="rel-detail-label">私企</strong>');
+    expect(rows[0]).toMatch(/class="rel-detail-label"[^>]*data-card-tooltip[^>]*>私企<\/strong>/);
     rows.forEach((row, index) => {
       expect(row.match(/class="rel-detail-label"/g)).toHaveLength(1);
       expect(row.match(/class="rel-progress-bar graduation-career-bar"/g)).toHaveLength(1);
@@ -259,7 +262,7 @@ describe("graduation workstation cards", () => {
       expect(row).toMatch(/rel-detail-label[\s\S]*graduation-career-bar[\s\S]*rel-progress-val[\s\S]*<button/);
       const actions = buttons(row, "prepare-career");
       expect(actions).toHaveLength(1);
-      expect(visibleText(actions[0]!)).toBe(`推进SAN-${[4, 2, 3, 2][index]}`);
+      expect(visibleText(actions[0]!)).toBe(`📈推进SAN-${[4, 2, 3, 2][index]}`);
       expect(row).toContain(`aria-valuenow="${["500.12", "300", "200", "150"][index]}"`);
       expect(row).toContain(`style="width:${[100, 60, 40, 30][index]}%"`);
     });
@@ -323,11 +326,11 @@ describe("graduation workstation cards", () => {
         expect(action).toContain("data-event-risk-tooltip");
         expect(action).toContain("event-choice-risk is-certain");
         expect(action).toContain(`SAN不足，结算后为${san - cost}`);
-        expect(visibleText(action)).toBe(`推进！SAN-${cost}`);
+        expect(visibleText(action)).toBe(`📈推进！SAN-${cost}`);
       } else {
         expect(action).not.toContain("data-event-risk-tooltip");
         expect(action).not.toContain("event-choice-risk");
-        expect(visibleText(action)).toBe(`推进SAN-${cost}`);
+        expect(visibleText(action)).toBe(`📈推进SAN-${cost}`);
       }
     });
     expect(state).toEqual(before);

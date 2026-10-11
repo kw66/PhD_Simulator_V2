@@ -2,6 +2,7 @@ import {
   Activity,
   ArrowRight,
   Award,
+  Backpack,
   BadgeCheck,
   BadgeDollarSign,
   Bell,
@@ -29,6 +30,7 @@ import {
   Dumbbell,
   Eye,
   Feather,
+  FastForward,
   Files,
   FileHeart,
   FileText,
@@ -55,6 +57,7 @@ import {
   Laptop,
   Lightbulb,
   Lock,
+  LogOut,
   Medal,
   MessageCircle,
   MessageSquare,
@@ -67,6 +70,9 @@ import {
   NotebookPen,
   Presentation,
   PiggyBank,
+  Pause,
+  Play,
+  RefreshCw,
   Reply,
   RotateCcw,
   Rocket,
@@ -80,14 +86,18 @@ import {
   Sprout,
   Star,
   Store,
+  Sun,
   Sunrise,
   Target,
   Trophy,
   TrendingUp,
   Users,
+  UsersRound,
+  ShoppingCart,
   UserRound,
   UserRoundPlus,
   Wallet,
+  Wrench,
   X,
   Zap,
 } from "lucide";
@@ -103,7 +113,7 @@ import { createValueAnimations, getVisibleValueDelta } from "./v2-value-animatio
 import { createEventLayout } from "./v2-event-layout";
 import { createRelationshipTooltips } from "./v2-relationship-tooltips";
 import { createDebugWindow } from "./v2-debug-window";
-import { renderEventLayoutSamples, renderRelationTalentCard } from "./v2-render-play";
+import { RESEARCH_PAGE_SIZE, renderEventLayoutSamples, renderRelationTalentCard } from "./v2-render-play";
 import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
 import { getRoleOptions, isPreEnrollmentState } from "../core/v2-progression";
 import { getAttributeTier } from "../core/v2-random-event-rules";
@@ -129,7 +139,7 @@ import type {
 import {
   renderApp,
 } from "./v2-render";
-import { renderRoleRail } from "./v2-render-setup-screen";
+import { getDesignedTalentNodes, getTalentUpgradeReason, renderRoleRail, type TalentAllocation } from "./v2-render-setup-screen";
 import { getAnnouncementPageIndex } from "./v2-announcements";
 import { bindAnnouncementCollapse, renderAnnouncementPage } from "./v2-render-announcements";
 import { normalizeShopTab, type ShopTabId } from "./v2-render-shop-panel";
@@ -148,7 +158,7 @@ const ROLE_IDS: ReadonlySet<string> = new Set(getRoleOptions().map((role) => rol
 const ROLE_IDS_IN_DISPLAY_ORDER = getRoleOptions().map((role) => role.id);
 const PLAY_TAB_IDS: ReadonlySet<string> = new Set(["events", "workstation", "relationship", "shop", "research", "talent", "settings"]);
 const ROLE_RAIL_VIEW_IDS: ReadonlySet<string> = new Set(["achievements", "messages", "announcements"]);
-const SHOP_TAB_IDS: ReadonlySet<string> = new Set(["ai", "rest", "coffee", "gear"]);
+const SHOP_TAB_IDS: ReadonlySet<string> = new Set(["ai", "coffee", "gear", "life", "rest"]);
 const TALENT_PANEL_TAB_IDS: ReadonlySet<string> = new Set(["character", "relation", "equip", "growth", "publication"]);
 const DATE_DISPLAY_MODES: ReadonlySet<string> = new Set(["academic", "calendar"]);
 const GAME_ACTION_ID_SET: ReadonlySet<string> = new Set(GAME_ACTION_IDS);
@@ -268,7 +278,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let activePlayTab: PlayTabId = "events";
   const playTabOrder: readonly PlayTabId[] = ["events", "workstation", "relationship", "shop", "research", "talent", "settings"];
   let playTabTransitionDirection: "from-left" | "from-right" | null = null;
-  const shopTabOrder: readonly ShopTabId[] = ["ai", "coffee", "gear", "rest"];
+  const shopTabOrder: readonly ShopTabId[] = ["ai", "coffee", "gear", "life", "rest"];
   let shopTabTransitionDirection: "from-left" | "from-right" | null = null;
   let helpPageByContext: Record<string, number> = {};
   let isHelpOpen = false;
@@ -276,6 +286,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let announcementPageIndex = 0;
   let talentTreePageIndex = 0;
   const talentTreeSelectedNodeByPage: number[] = [0];
+  const talentAllocation: TalentAllocation = {};
+  let refreshTalentTree = false;
   let isFeedbackOpen = false;
   let activeShopTab: ShopTabId = "ai";
   let selectedChairUpgradeId: ShopUpgradeId | null = null;
@@ -393,9 +405,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let activeEventHistoryIndex: number | null = null;
   let activeLogPage: number | null = null;
   let timelineScrollLeft = 0;
+  let isSanChartOpen = false;
+  let sanChartScrollLeft = 0;
+  let scrollSanChartToEnd = false;
   let activePendingPage = 0;
   let activeRelationshipIndex = 0;
-  let currentResearchPaperIndex = 0;
+  let currentResearchPaperIndex: number | null = null;
+  let researchPageIndex = 0;
   let researchSortMode: ResearchSortMode = "year";
   let researchAuthorshipFilter: ResearchAuthorshipFilter = "all";
   let timelineDrag: {
@@ -815,7 +831,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const syncResearchUiState = (): void => {
     const state = store.getState();
     if (state.phase === "setup") {
-      currentResearchPaperIndex = 0;
+      currentResearchPaperIndex = null;
+      researchPageIndex = 0;
       return;
     }
 
@@ -825,14 +842,15 @@ export function bootstrapApp(root: HTMLDivElement): void {
         || (researchAuthorshipFilter === "first" ? paper.nonFirstAuthor !== true : paper.nonFirstAuthor === true))
       .length;
     if (publishedPaperCount === 0) {
-      currentResearchPaperIndex = 0;
+      currentResearchPaperIndex = null;
+      researchPageIndex = 0;
       return;
     }
 
-    currentResearchPaperIndex = Math.min(
-      Math.max(currentResearchPaperIndex, 0),
-      publishedPaperCount - 1,
-    );
+    if (currentResearchPaperIndex !== null) {
+      currentResearchPaperIndex = Math.min(Math.max(currentResearchPaperIndex, 0), publishedPaperCount - 1);
+    }
+    researchPageIndex = Math.min(researchPageIndex, Math.ceil(publishedPaperCount / RESEARCH_PAGE_SIZE) - 1);
   };
 
   const syncRelationshipUiState = (): void => {
@@ -899,15 +917,20 @@ export function bootstrapApp(root: HTMLDivElement): void {
         activeTalentTab = "character";
         resetEventContentUiState();
         activeLogPage = null;
+        isSanChartOpen = false;
+        sanChartScrollLeft = 0;
         activePendingPage = 0;
         activeRelationshipIndex = 0;
-        currentResearchPaperIndex = 0;
+        currentResearchPaperIndex = null;
+        researchPageIndex = 0;
         researchSortMode = "year";
         researchAuthorshipFilter = "all";
       } else if (state.phase === "finished") {
         activePlayTab = "events";
         resetEventContentUiState();
         activeLogPage = null;
+        isSanChartOpen = false;
+        sanChartScrollLeft = 0;
       } else if (state.phase === "setup") {
         activeRoleRailView = "achievements";
         announcementPageIndex = 0;
@@ -924,7 +947,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
         activeLogPage = null;
         activePendingPage = 0;
         activeRelationshipIndex = 0;
-        currentResearchPaperIndex = 0;
+        currentResearchPaperIndex = null;
+        researchPageIndex = 0;
         researchSortMode = "year";
         researchAuthorshipFilter = "all";
       }
@@ -938,15 +962,18 @@ export function bootstrapApp(root: HTMLDivElement): void {
     syncShopUpgradeNotices(state);
     const shopUpgradeNotices = getShopUpgradeNotices(state);
     const lobby = store.getLobbyState();
-    const previousTalentTree = state.phase === "setup" && lobby.selectedLobbyRoleId === lastRenderedSetupRoleId
+    const previousTalentTree = !refreshTalentTree && state.phase === "setup" && lobby.selectedLobbyRoleId === lastRenderedSetupRoleId
       ? root.querySelector<HTMLElement>(".lobby-talent-tree")
       : null;
     const previousTimelineTrack = root.querySelector<HTMLElement>(".event-timeline-track");
+    const previousSanChart = root.querySelector<HTMLElement>(".san-chart-scroll");
     if (state.phase === "setup") {
       timelineScrollLeft = 0;
     } else if (previousTimelineTrack && previousTimelineTrack.clientWidth > 0) {
       timelineScrollLeft = previousTimelineTrack.scrollLeft;
     }
+    if (previousSanChart && previousSanChart.clientWidth > 0) sanChartScrollLeft = previousSanChart.scrollLeft;
+    if (scrollSanChartToEnd) sanChartScrollLeft = Number.MAX_SAFE_INTEGER;
     root.dataset.phase = state.phase;
     root.innerHTML = renderApp(state, lobby, {
       activePlayTab,
@@ -956,6 +983,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       announcementPageIndex,
       talentTreePageIndex,
       talentTreeSelectedNodeByPage,
+      talentAllocation,
       isFeedbackOpen,
       isEventContentOpen,
       isEndingContentOpen,
@@ -963,6 +991,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeEventHistoryId,
       activeEventHistoryIndex,
       activeLogPage,
+      isSanChartOpen,
       activePendingPage,
       activeRelationshipIndex,
       activeShopTab,
@@ -972,6 +1001,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       selectedCoffeeUpgradeId,
       activeTalentTab,
       currentResearchPaperIndex,
+      researchPageIndex,
       advisorSalaryStartIndex,
       labInheritancePage,
       loverRewardPage,
@@ -985,6 +1015,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       previousTalentTree.querySelector(".lobby-talent-tree-page.is-entering")?.classList.remove("is-entering");
       root.querySelector(".lobby-talent-tree")?.replaceWith(previousTalentTree);
     }
+    refreshTalentTree = false;
     lastRenderedSetupRoleId = state.phase === "setup" ? lobby.selectedLobbyRoleId : null;
     mountTabSliders();
     if (playTabTransitionDirection) {
@@ -1021,6 +1052,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         Activity,
         ArrowRight,
         Award,
+        Backpack,
         BadgeCheck,
         BadgeDollarSign,
         Bell,
@@ -1047,6 +1079,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         Dumbbell,
         Eye,
         Feather,
+        FastForward,
         Files,
         FileHeart,
         FileText,
@@ -1073,6 +1106,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         Laptop,
         Lightbulb,
         Lock,
+        LogOut,
         Medal,
         MessageCircle,
         MessageSquare,
@@ -1085,6 +1119,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
         NotebookPen,
         Presentation,
         PiggyBank,
+        Pause,
+        Play,
+        RefreshCw,
         Reply,
         RotateCcw,
         Rocket,
@@ -1098,14 +1135,18 @@ export function bootstrapApp(root: HTMLDivElement): void {
         Sprout,
         Star,
         Store,
+        Sun,
         Sunrise,
         Target,
         Trophy,
         TrendingUp,
         Users,
+        UsersRound,
+        ShoppingCart,
         UserRound,
         UserRoundPlus,
         Wallet,
+        Wrench,
         X,
         Zap,
       },
@@ -1124,6 +1165,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
         timelineScrollLeft = timelineTrack.scrollLeft;
       }
     }
+    const sanChart = root.querySelector<HTMLElement>(".san-chart-scroll");
+    if (sanChart && sanChart.clientWidth > 0) {
+      sanChart.scrollLeft = sanChartScrollLeft;
+      sanChartScrollLeft = sanChart.scrollLeft;
+    }
+    scrollSanChartToEnd = false;
     showNewPaperSlotUnlocks(state);
     resetEffectSourceUi();
     eventLayout.update(isEventContentOpen ? renderEventLayoutSamples(getActiveQueueEvent(state), getActiveHistoryEvent(state), state) : []);
@@ -1149,10 +1196,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
   function executeButtonAction(dataset: DOMStringMap): void {
     const actionId = dataset.action;
     if (!isGameActionId(actionId)) return;
-    if (actionId === "quit-game" && !window.confirm("确定主动退学吗？本轮将结束，并进入“主动退学”结局。")) return;
+    if (actionId === "quit-game" && !window.confirm("确定退学并结束本局吗？将进入退学结局，可在结局页重开。")) return;
 
     if (actionId === "next-month" || actionId === "force-next-month") {
       animateEventPanelAfterNextMonth = activePlayTab === "events";
+      if (isSanChartOpen) scrollSanChartToEnd = true;
     }
     if (actionId === "debug-replay-event") {
       selectPlayTab("events");
@@ -1345,6 +1393,17 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    const talentResetButton = target.closest<HTMLButtonElement>("button[data-ui-talent-reset]");
+    if (talentResetButton && !talentResetButton.disabled && store.getState().phase === "setup") {
+      const roleId = talentResetButton.dataset.uiTalentReset as RoleId;
+      if (getDesignedTalentNodes(roleId)) {
+        delete talentAllocation[roleId];
+        refreshTalentTree = true;
+        render();
+      }
+      return;
+    }
+
     const talentTreePageButton = target.closest<HTMLButtonElement>("button[data-ui-talent-tree-page-delta]");
     if (talentTreePageButton && !talentTreePageButton.disabled) {
       const tree = talentTreePageButton.closest<HTMLElement>(".lobby-talent-tree");
@@ -1381,7 +1440,20 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const nodes = page?.querySelectorAll<HTMLButtonElement>("button[data-ui-talent-tree-node]");
       const pageIndex = Number(page?.dataset.treePage);
       const nodeIndex = nodes ? [...nodes].indexOf(talentTreeNode) : -1;
+      const alreadySelected = talentTreeNode.classList.contains("is-selected");
       if (Number.isInteger(pageIndex) && nodeIndex >= 0) talentTreeSelectedNodeByPage[pageIndex] = nodeIndex;
+      if (alreadySelected && talentTreeNode.dataset.talentId && store.getState().phase === "setup") {
+        const roleId = store.getLobbyState().selectedLobbyRoleId;
+        const allocation = talentAllocation[roleId] ?? {};
+        const level = store.getLobbyState().roleProgress[roleId]?.level ?? 0;
+        const talentId = talentTreeNode.dataset.talentId;
+        if (getTalentUpgradeReason(roleId, level, allocation, talentId) === null) {
+          talentAllocation[roleId] = { ...allocation, [talentId]: (allocation[talentId] ?? 0) + 1 };
+          refreshTalentTree = true;
+          render();
+        }
+        return;
+      }
       nodes?.forEach((node) => {
         const selected = node === talentTreeNode;
         node.classList.toggle("is-selected", selected);
@@ -1703,7 +1775,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (researchPageButton && !researchPageButton.disabled) {
       const nextIndex = Number(researchPageButton.dataset.uiResearchPage ?? "");
       if (Number.isFinite(nextIndex) && nextIndex >= 0) {
-        currentResearchPaperIndex = Math.floor(nextIndex);
+        researchPageIndex = Math.floor(nextIndex / RESEARCH_PAGE_SIZE);
+        currentResearchPaperIndex = null;
         render();
       }
       return;
@@ -1713,7 +1786,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (researchIndexButton && !researchIndexButton.disabled) {
       const nextIndex = Number(researchIndexButton.dataset.uiResearchIndex ?? "");
       if (Number.isFinite(nextIndex) && nextIndex >= 0) {
-        currentResearchPaperIndex = Math.floor(nextIndex);
+        currentResearchPaperIndex = currentResearchPaperIndex === Math.floor(nextIndex) ? null : Math.floor(nextIndex);
+        researchPageIndex = Math.floor(nextIndex / RESEARCH_PAGE_SIZE);
         render();
       }
       return;
@@ -1724,7 +1798,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const nextMode = researchSortButton.dataset.uiResearchSort;
       if (nextMode === "year" || nextMode === "citations") {
         researchSortMode = nextMode;
-        currentResearchPaperIndex = 0;
+        currentResearchPaperIndex = null;
+        researchPageIndex = 0;
         render();
       }
       return;
@@ -1735,7 +1810,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const nextFilter = researchAuthorshipButton.dataset.uiResearchAuthorship;
       if (nextFilter === "first" || nextFilter === "coauthor") {
         researchAuthorshipFilter = researchAuthorshipFilter === nextFilter ? "all" : nextFilter;
-        currentResearchPaperIndex = 0;
+        currentResearchPaperIndex = null;
+        researchPageIndex = 0;
         render();
       }
       return;
@@ -1817,6 +1893,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
         activeEventHistoryIndex = selectedPageIndex === currentPageIndex ? null : Math.floor(selectedPageIndex);
         render();
       }
+      return;
+    }
+
+    const sanChartToggle = target.closest<HTMLButtonElement>("button[data-ui-san-chart-toggle]");
+    if (sanChartToggle) {
+      isSanChartOpen = !isSanChartOpen;
+      if (isSanChartOpen) scrollSanChartToEnd = true;
+      render();
       return;
     }
 

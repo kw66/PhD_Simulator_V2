@@ -157,7 +157,7 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
       },
       {
         id: "accept",
-        label: "接受这份实习",
+        label: "接受实习",
         outcome: `企业实习（6个月）｜每月SAN -${context.offer.monthlySanCost}｜每月金币 +${context.currentMonthlyIncome}｜实验 ×1.25、+${context.offer.experimentBonus}｜实验费用 -2`,
         ...(context.unavailable ? { disabledReason: "已有实习安排，本次不新增、不延期。" } : {}),
         effects: {

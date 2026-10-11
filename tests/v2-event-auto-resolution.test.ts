@@ -221,6 +221,9 @@ describe("automatic linear event resolution", () => {
     expect(agenda.indexOf('data-ui-open-event-id="branch"')).toBeLessThan(agenda.indexOf('data-ui-open-event-id="automatic"'));
     expect(agenda.indexOf('data-ui-open-event-id="automatic"')).toBeLessThan(agenda.indexOf('data-ui-open-event-id="future-branch"'));
     expect(agenda.match(/class="event-auto-indicator"/g)).toHaveLength(1);
+    const automaticRow = agenda.match(/<article class="pending-event-row">\s*<button[^>]*data-ui-open-event-id="automatic"[\s\S]*?<\/article>/)?.[0] ?? "";
+    expect(automaticRow).toMatch(/<button[^>]*>[\s\S]*<span class="event-auto-indicator"[\s\S]*<\/button>/);
+    expect(agenda).not.toContain("event-auto-slot");
     expect(agenda.split('data-ui-open-event-id="automatic"')[1]?.split('</article>')[0]).toContain('data-deadline="pending"');
     expect(renderApp({ ...initial, blockLinearEvents: true })).not.toContain('class="event-auto-indicator"');
   });

@@ -412,7 +412,7 @@ describe("lover shopping gifts", () => {
     state = applyShopAction(state, "buy-shop-item", { shopItemId: "down_jacket" });
     state = applyShopAction(state, "buy-shop-item", { shopItemId: "bike" });
     state = applyShopAction(state, "buy-support-item", { supportItemId: "parasol" });
-    const html = renderShopSection(state, "gear");
+    const html = renderShopSection(state, "life");
     for (const itemId of ["ebike", "down_jacket", "bike"]) {
       expect(findButton(html, "sell-shop-item", `data-shop-item-id="${itemId}"`)).toContain('aria-label="出售，0 金币"');
     }
@@ -424,10 +424,11 @@ describe("lover shopping gifts", () => {
     const gear = renderShopSection(state, "gear");
     const ai = renderShopSection(state, "ai");
     const coffee = renderShopSection(state, "coffee");
+    const life = renderShopSection(state, "life");
     const rest = renderShopSection(state, "rest");
     const buttons = [
       findButton(gear, "buy-shop-item", 'data-shop-item-id="keyboard"'),
-      findButton(gear, "buy-support-item", 'data-support-item-id="parasol"'),
+      findButton(life, "buy-support-item", 'data-support-item-id="parasol"'),
       findButton(ai, "buy-ai-month", 'data-ai-slot-id="gpt"'),
       findButton(coffee, "buy-coffee-machine"),
       findButton(rest, "buy-shop-item", 'data-shop-item-id="chair"'),
@@ -441,7 +442,7 @@ describe("lover shopping gifts", () => {
       expect(button).not.toContain("disabled");
       expect(button).toContain("has-free-price");
     }
-    for (const shop of [gear, ai, coffee, rest]) expect(shop).not.toContain("shop-gift-notice");
+    for (const shop of [gear, ai, coffee, life, rest]) expect(shop).not.toContain("shop-gift-notice");
   });
 
   it("tracks gift coupons in next-action effects until the last coupon is consumed", () => {

@@ -33,7 +33,7 @@ describe("advisor guidance", () => {
       expect(guided).toMatchObject({
         idea: 10, experiment: 10, writing: 10,
         collaborationScores: { idea: 0, experiment: 0, writing: 10 },
-        collaborators: [{ id: "advisor", name: "导师" }],
+        collaborators: [{ id: "advisor", name: "导师", contributionScores: { writing: 10 } }],
       });
     }
     expect(after.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
@@ -79,7 +79,7 @@ describe("advisor guidance", () => {
         ...original,
         writing: original.writing + 10,
         collaborationScores: { idea: 0, experiment: 0, writing: 10 },
-        collaborators: [{ id: "advisor", name: "导师" }],
+        collaborators: [{ id: "advisor", name: "导师", contributionScores: { writing: 10 } }],
       } : original);
     }
     expect(after.advisorProgressState.pendingGuidanceToPlayer).toBeNull();

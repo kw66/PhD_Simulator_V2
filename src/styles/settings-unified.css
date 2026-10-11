@@ -1,0 +1,83 @@
+.settings-panel {
+  padding: 7px 4px 0;
+}
+
+.settings-panel .settings-quick-actions {
+  gap: 10px;
+}
+
+.settings-panel .settings-quick-actions > button {
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid #b8a787;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #fffaf0, #f0e6d5);
+  color: #574933;
+  box-shadow: inset 0 1px 0 #fffdf7, 0 2px 0 #d6c8ae, 0 3px 6px rgba(77, 58, 33, 0.07);
+  font-size: 0.8rem;
+  font-weight: 750;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.settings-panel .settings-quick-actions > button .lucide {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2;
+}
+
+.settings-panel .settings-quick-actions > button.is-quit {
+  border-color: #b88d81;
+  background: linear-gradient(180deg, #f9efea, #efdfd8);
+  color: #7a483e;
+  box-shadow: inset 0 1px 0 #fff9f5, 0 2px 0 #d2b8ae, 0 3px 6px rgba(90, 49, 43, 0.07);
+}
+
+.settings-panel .settings-quick-actions > button.is-return {
+  border-color: #bb9b61;
+  background: linear-gradient(180deg, #f9edcd, #efddb4);
+  color: #684d27;
+  box-shadow: inset 0 1px 0 #fff9e7, 0 2px 0 #ceb987, 0 3px 6px rgba(93, 66, 31, 0.08);
+}
+
+.settings-panel .settings-quick-actions > button.is-feedback {
+  border-color: #9eaf9a;
+  background: linear-gradient(180deg, #f2f5eb, #e3eadc);
+  color: #4a654b;
+  box-shadow: inset 0 1px 0 #fcfff8, 0 2px 0 #c5d2bd, 0 3px 6px rgba(48, 74, 47, 0.07);
+}
+
+.settings-panel .settings-quick-actions > button:hover:not(:disabled):not(.active) {
+  border-color: #9b7d4e;
+  background: #f1e2c6;
+  box-shadow: inset 0 1px 0 #fffdf7, 0 2px 0 #c3a97a, 0 4px 7px rgba(77, 58, 33, 0.11);
+  transform: none;
+}
+
+.settings-panel .settings-quick-actions > button.is-quit:hover:not(:disabled):not(.active) {
+  border-color: #a96d60;
+  background: #eddbd2;
+}
+
+.settings-panel .settings-quick-actions > button.is-feedback:hover:not(:disabled):not(.active) {
+  border-color: #819b80;
+  background: #dce8d6;
+}
+
+.settings-panel .settings-quick-actions > button:disabled {
+  border-color: #c9c1b2;
+  background: #ebe7dd;
+  color: #928b7d;
+  box-shadow: inset 0 1px 0 #f7f4eb;
+  cursor: not-allowed;
+}
+
+.settings-panel .settings-quick-actions > button:focus-visible {
+  outline: 2px solid #a6803f;
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .settings-panel .settings-quick-actions { gap: 8px; }
+  .settings-panel .settings-quick-actions > button { min-height: 44px; }
+}

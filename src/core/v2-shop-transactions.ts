@@ -8,7 +8,7 @@ import { applyAiActivationEffects } from "./v2-ai-activation";
 import { getLabReimbursementKind } from "./v2-lab-reimbursement";
 import { formatMoney, roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
-import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
+import { addOrReplaceBuffs, consumeAiCostCoverage, removeBuffs } from "./v2-buffs";
 import {
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
   getAvailableCoffeeMachineUpgrades,
@@ -437,9 +437,10 @@ export function applyShopAction(state: GameState, actionId: ShopActionId, payloa
   if (fundingCost > 0 && state.advisorProgressState.funding < fundingCost) {
     return fail(state, `科研经费不足，本次报销需要 ${fundingCost}；未扣费，报销机会保留至有效期结束。`);
   }
-  const purchased = executeShopAction(state, actionId, payload);
-  if (fundingCost <= 0 || (purchased.shopState === state.shopState
-    && purchased.coffeeState === state.coffeeState && purchased.aiShopState === state.aiShopState)) return purchased;
+  const executed = executeShopAction(state, actionId, payload);
+  if (fundingCost <= 0 || (executed.shopState === state.shopState
+    && executed.coffeeState === state.coffeeState && executed.aiShopState === state.aiShopState)) return executed;
+  const purchased = actionId === "buy-ai-month" ? consumeAiCostCoverage(executed) : executed;
   const labReimbursements = { ...purchased.shopState.labReimbursements };
   if (kind) labReimbursements[kind] -= 1;
   return pushLog(recordLabFinance({

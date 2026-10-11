@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
@@ -17,6 +18,7 @@ describe("timeline scrolling through the real app handlers", () => {
     server = await createServer({ configFile: false, logLevel: "error", server: { host: "127.0.0.1", port: 0 } });
     await server.listen();
     browser = await chromium.launch();
+    await mkdir("artifacts/timeline", { recursive: true });
   }, 30_000);
 
   afterAll(async () => {
@@ -53,6 +55,29 @@ describe("timeline scrolling through the real app handlers", () => {
 
   const scroll = () => page.locator(".event-timeline-track").evaluate(element => element.scrollLeft);
   const selected = () => page.locator(".event-timeline-marker.is-current").getAttribute("data-ui-log-page-index");
+
+  it("keeps the timeline strip legible at desktop and narrow widths", async () => {
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      await page.mouse.move(0, 0);
+      const track = page.locator(".event-timeline-track");
+      await track.screenshot({ path: `artifacts/timeline/strip-${width}.png`, animations: "disabled" });
+      await page.screenshot({ path: `artifacts/timeline/page-${width}.png`, animations: "disabled" });
+      expect(await track.evaluate(element => {
+        const labels = [...element.querySelectorAll<HTMLElement>(".event-timeline-marker-label")];
+        const bounds = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return style.borderRadius === "0px" && labels.every(label => {
+          const labelBounds = label.getBoundingClientRect();
+          return labelBounds.top >= bounds.top && labelBounds.bottom <= bounds.bottom;
+        });
+      })).toBe(true);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await action("debug-trigger-ending", { eventId: "master" });
+    await page.locator(".event-timeline-marker[data-ui-ending-page]").waitFor();
+    await page.locator(".event-timeline-track").screenshot({ path: "artifacts/timeline/strip-ending.png", animations: "disabled" });
+  });
 
   it("keeps the scrolled viewport when clicking a month cell away from its dot", async () => {
     const before = await scroll();
@@ -95,4 +120,38 @@ describe("timeline scrolling through the real app handlers", () => {
     });
     expect(visible).toBe(true);
   });
+
+  it("shows SAN changes in the month strip and opens a navigable chart", async () => {
+    await action("restart-game");
+    await page.locator(".event-content-buttons button").first().click();
+    await page.locator(".event-content-buttons button").nth(1).click();
+    await page.locator(".event-content-buttons button").first().click();
+    await action("debug-adjust-stat", { debugStatId: "san", delta: "-5" });
+    await action("force-next-month");
+    await action("debug-adjust-stat", { debugStatId: "san", delta: "-4" });
+    await action("force-next-month");
+
+    const markerCount = await page.locator(".event-timeline-marker").count();
+    expect(markerCount).toBe(4);
+    expect(await page.locator(".event-timeline-san-segment").count()).toBe(markerCount - 1);
+    expect(await page.locator(".event-timeline-node").evaluateAll((nodes) => (
+      new Set(nodes.map((node) => Math.round(node.getBoundingClientRect().top))).size > 1
+    ))).toBe(true);
+
+    const panelHeight = await page.locator("#event-log-panel").evaluate((element) => (element as HTMLElement).offsetHeight);
+    await page.locator("[data-ui-san-chart-toggle]").click();
+    expect(await page.locator(".san-chart-point").count()).toBe(markerCount);
+    expect(await page.locator("#event-log-panel").evaluate((element) => (element as HTMLElement).offsetHeight)).toBe(panelHeight);
+    await page.locator('.san-chart-point[data-ui-log-page-index="1"]').click();
+    expect(await page.locator("#event-log-panel").getAttribute("data-log-page-index")).toBe("1");
+    expect(await page.locator("[data-ui-san-chart-toggle]").getAttribute("aria-expanded")).toBe("true");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const chartBounds = await page.locator(".san-chart-panel").boundingBox();
+    expect(chartBounds).not.toBeNull();
+    expect(chartBounds!.x).toBeGreaterThanOrEqual(0);
+    expect(chartBounds!.x + chartBounds!.width).toBeLessThanOrEqual(391);
+    await page.locator("[data-ui-san-chart-toggle]").click();
+    expect(await page.locator(".san-chart-panel").count()).toBe(0);
+  }, 30_000);
 });

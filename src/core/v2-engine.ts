@@ -43,6 +43,8 @@ import { applyShopAction } from "./v2-shop-transactions";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER } from "./v2-sanity-rules";
 import { endRelationship } from "./v2-relationship-actions";
+import { recordRelationshipActivityMonth } from "./v2-relationship-activity-history";
+import { recordSanMonth } from "./v2-san-history";
 import { advanceFellowTask } from "./v2-fellow-actions";
 import { settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { advanceFellowResearch, attendFellowConferences, ensureFellowPapers } from "./v2-fellow-research";
@@ -323,7 +325,7 @@ function advanceMonth(state: GameState, force = false): GameState {
 
   if (isPreEnrollmentState(state)) {
     const enrolledState = appendAcademicYearLog({
-      ...state,
+      ...recordSanMonth(state),
       year: 1,
       month: 1,
       totalMonths: 1,
@@ -355,7 +357,9 @@ function advanceMonth(state: GameState, force = false): GameState {
   state = settleLabResearchGrowth(settleFellowAcademicYear(state));
   if (state.totalMonths >= state.maxMonths) return finishTrainingIfReady(syncAdvisorResearchAccumulation(state));
 
-  const nextState = evaluateCoreEndings(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(createAdvancedCalendarState(state))));
+  const nextState = evaluateCoreEndings(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(
+    createAdvancedCalendarState(recordRelationshipActivityMonth(recordSanMonth(state))),
+  )));
   if (nextState.phase !== "playing") return nextState;
   const queuedState = enqueueMonthlyEventsForMonth(nextState).nextState;
   return settleLinearEvents(queuedState, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));

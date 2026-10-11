@@ -7,7 +7,7 @@ import {
   getCoffeeMachineSellPrice,
   getCoffeeSanGain,
 } from "../core/v2-coffee-system";
-import { getAiModelForTotalMonths, hasAiReimbursement } from "../core/v2-ai-shop";
+import { getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { isPreEnrollmentState } from "../core/v2-progression";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "../core/v2-development-flags";
 import anthropicIcon from "../assets/ai/anthropic.svg?raw";
@@ -38,7 +38,7 @@ import type {
   SupportItemId,
 } from "../core/v2-types";
 
-export type ShopTabId = "ai" | "rest" | "coffee" | "gear";
+export type ShopTabId = "ai" | "rest" | "life" | "coffee" | "gear";
 
 type ShopTabDefinition = {
   id: ShopTabId;
@@ -50,7 +50,6 @@ type ActionButtonConfig = {
   label: string;
   title?: string;
   price?: number | "?";
-  labFundingCost?: number;
   priceDirection?: "cost" | "gain";
   variant?: "primary" | "secondary" | "current";
   action?: string;
@@ -117,10 +116,11 @@ type UpgradeRouteOption = {
 };
 
 const SHOP_TABS: ShopTabDefinition[] = [
-  { id: "ai", icon: "🤖", label: "AI" },
-  { id: "coffee", icon: "☕", label: "咖啡" },
-  { id: "gear", icon: "🎒", label: "装备" },
-  { id: "rest", icon: "🪑", label: "休息" },
+  { id: "ai", icon: "cpu", label: "AI" },
+  { id: "coffee", icon: "coffee", label: "咖啡" },
+  { id: "gear", icon: "monitor", label: "设备" },
+  { id: "life", icon: "sun", label: "生活" },
+  { id: "rest", icon: "armchair", label: "休息" },
 ];
 
 const AI_ICON_SVGS: Partial<Record<AiSlotId, string>> = {
@@ -180,13 +180,14 @@ function normalizeShopDescription(value: string): string {
 }
 
 export function normalizeShopTab(value: string | undefined | null): ShopTabId {
-  if (value === "display" || value === "outdoor") return "gear";
+  if (value === "display") return "gear";
+  if (value === "outdoor") return "life";
   return SHOP_TABS.some((tab) => tab.id === value) ? (value as ShopTabId) : "ai";
 }
 
 function renderActionButton(config: ActionButtonConfig): string {
   const variant = config.variant ?? "primary";
-  const label = config.labFundingCost ? `${config.label}（经费 -${formatMoney(config.labFundingCost)}）` : config.label;
+  const label = config.label;
   const displayedPrice = typeof config.price === "number" ? formatMoney(config.price) : config.price;
   const priceText = config.price !== undefined
     ? `，${displayedPrice} 金币`
@@ -239,10 +240,9 @@ function renderPurchaseButton(state: GameState, config: Omit<ActionButtonConfig,
     : undefined);
   return renderActionButton({
     ...config,
-    labFundingCost,
     disabled: config.disabled || insufficientFunding,
     disabledReason,
-    title: disabledReason ?? `报销：科研经费 -${formatMoney(labFundingCost)}，个人金币 ${formatMoney(config.price)}`,
+    title: disabledReason,
   });
 }
 
@@ -512,7 +512,7 @@ function renderShopTabButtons(activeTab: ShopTabId, upgradeNoticeTabs: readonly 
         data-ui-shop-tab="${tab.id}"
         aria-pressed="${tab.id === activeTab ? "true" : "false"}"
       >
-        <span class="shop-tab-icon" aria-hidden="true">${tab.icon}</span>
+        <span class="shop-tab-icon" aria-hidden="true"><i data-lucide="${tab.icon}"></i></span>
         <span>${tab.label}</span>
         ${upgradeBadge}
       </button>
@@ -910,7 +910,6 @@ function renderAiRows(state: GameState): string {
   const rows = slots.map((slot) => {
     const model = getAiModelForTotalMonths(state.totalMonths, slot);
     const subscription = state.aiShopState.subscriptions[slot];
-    const reimbursed = hasAiReimbursement(state);
     const price = getShopActionPrice(state, "buy-ai-month", { aiSlotId: slot })!;
     const purchasedThisMonth = subscription.active;
     const effectText = renderAiEffectText(model);
@@ -929,7 +928,7 @@ function renderAiRows(state: GameState): string {
         renderPurchaseButton(state, {
           label: purchasedThisMonth
             ? "本月已订购"
-            : reimbursed ? "导师报销" : "订购本月",
+            : "订购本月",
           price: purchasedThisMonth ? undefined : price,
           variant: purchasedThisMonth ? "current" : "primary",
           action: "buy-ai-month",
@@ -953,8 +952,14 @@ function renderTabContent(
     case "ai":
       return renderAiRows(state);
     case "rest":
+      return renderChairUpgradeRoute(state, "🪑", selectedChairUpgradeId);
+    case "life":
       return [
-        renderChairUpgradeRoute(state, "🪑", selectedChairUpgradeId),
+        renderBikeRow(state),
+        renderShopItemRow(state, "ebike", "🛵"),
+        renderShopItemRow(state, "down_jacket", "🧥"),
+        renderSupportItemRow(state, "parasol", "🌂"),
+        renderSupportItemRow(state, "badminton_racket", "🏸"),
       ].join("");
     case "coffee":
       return renderCoffeeRows(state, selectedCoffeeUpgradeId);
@@ -963,11 +968,6 @@ function renderTabContent(
         renderGpuRow(state),
         renderShopItemRow(state, "keyboard", "⌨️"),
         renderShopItemRow(state, "monitor", "🖥️"),
-        renderBikeRow(state),
-        renderShopItemRow(state, "ebike", "🛵"),
-        renderShopItemRow(state, "down_jacket", "🧥"),
-        renderSupportItemRow(state, "parasol", "🌂"),
-        renderSupportItemRow(state, "badminton_racket", "🏸"),
       ].join("");
     default:
       return "";

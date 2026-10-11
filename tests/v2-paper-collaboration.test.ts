@@ -64,7 +64,10 @@ describe("paper collaboration scores", () => {
     const third = addPaperCollaboration(second, assistance(paper, { experiment: 5 }, "peer-two"));
     expect(getPaperScoreBreakdown(third, "experiment")).toEqual({ own: 20, collaboration: 19, total: 39 });
     expect(third.collaborationScores).toEqual({ idea: 0, experiment: 19, writing: 3 });
-    expect(third.collaborators).toEqual([{ id: "peer-one", name: "林知远" }, { id: "peer-two", name: "陈思宁" }]);
+    expect(third.collaborators).toEqual([
+      { id: "peer-one", name: "林知远", contributionScores: { experiment: 14, writing: 3 } },
+      { id: "peer-two", name: "陈思宁", contributionScores: { experiment: 5 } },
+    ]);
     expect(paper.experiment).toBe(20);
     let repeated = third;
     for (let iteration = 0; iteration < 100; iteration++) {
@@ -72,6 +75,17 @@ describe("paper collaboration scores", () => {
     }
     expect(repeated.experiment).toBe(1039);
     expect(repeated.collaborators).toHaveLength(2);
+    expect(repeated.collaborators?.[0]?.contributionScores?.experiment).toBe(1014);
+  });
+
+  it("apportions current collaborator credit after paper score changes", () => {
+    const paper = makePaper();
+    const first = addPaperCollaboration(paper, assistance(paper, { idea: 5 }));
+    const second = addPaperCollaboration(first, assistance(paper, { idea: 5 }, "peer-two"));
+    const reduced = setPaperTotalScore(second, "idea", 15);
+    expect(getPaperScoreBreakdown(reduced, "idea").collaboration).toBe(5);
+    expect(reduced.collaborators?.map((collaborator) => collaborator.contributionScores?.idea)).toEqual([3, 2]);
+    expect(second.collaborators?.map((collaborator) => collaborator.contributionScores?.idea)).toEqual([5, 5]);
   });
 
   it.each(["idea", "experiment", "writing"] as const)("compares only personal %s scores and keeps collaboration outside buffs", (field) => {
@@ -149,7 +163,9 @@ describe("paper collaboration scores", () => {
     expect(getAcceptedPaperScore(adjusted.papers[0]!)).toBe(90);
     const withdrawn = withdrawPaper(adjusted, paper.id).papers[0]!;
     expect(withdrawn).toMatchObject({ idea: 18, collaborationScores: { idea: 9 }, status: "draft" });
-    expect(withdrawn.collaborators).toEqual(paper.collaborators);
+    expect(withdrawn.collaborators).toEqual([{
+      id: "peer-one", name: "林知远", contributionScores: { idea: 9, experiment: 9 },
+    }]);
     expect(withdrawn.submittedCollaborationScores).toBeNull();
   });
 
@@ -207,7 +223,9 @@ describe("paper collaboration scores", () => {
     expect(getPaperScoreBreakdown(updated.papers[0]!, "idea")).toEqual({ own: 10, collaboration: 10, total: 20 });
     const cleared = applyChoiceEffectsToState(state, { id: "clear", label: "clear", outcome: "", effects: { clearDraftProgress: true } }).nextState;
     expect(cleared.papers[0]).toMatchObject({ idea: 0, experiment: 0, writing: 0, collaborationScores: { idea: 0, experiment: 0, writing: 0 } });
-    expect(cleared.papers[0]!.collaborators).toEqual(paper.collaborators);
+    expect(cleared.papers[0]!.collaborators).toEqual([{
+      id: "peer-one", name: "林知远", contributionScores: { idea: 0 },
+    }]);
   });
 
   it("does not apply AI polish to the collaboration pool", () => {

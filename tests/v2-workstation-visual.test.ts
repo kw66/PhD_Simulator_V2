@@ -77,6 +77,63 @@ describe("workstation visual layout through real bootstrap", () => {
     await settleLayout(page);
   }
 
+  it.each([1920, 390])("keeps an empty paper card the same height after creation at %ipx", async width => {
+    const page = await browser.newPage({ viewport: { width, height: width === 390 ? 844 : 1080 }, reducedMotion: "reduce" });
+    try {
+      await openWorkstation(page);
+      await page.evaluate(() => {
+        const store = (window as WorkstationWindow).workstationVisualStore;
+        store.getState().papers = store.getState().papers.filter(paper => paper.paperSlotIndex !== 0);
+        store.getState().selectedPaperId = null;
+        store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
+      });
+      const slot = page.locator('[data-paper-slot-index="0"].paper-slot-card');
+      await slot.locator('[data-action="create-paper"]').waitFor();
+      const before = await slot.evaluate(card => card.getBoundingClientRect().height);
+      await slot.locator('[data-action="create-paper"]').click();
+      await page.locator('[data-paper-slot-index="0"].paper-card-filled').waitFor();
+      const after = await slot.evaluate(card => card.getBoundingClientRect().height);
+      expect(after).toBeCloseTo(before, 0);
+    } finally {
+      await page.close();
+    }
+  }, 15_000);
+
+  it.each([1920, 390])("shows every paper contributor in score order at %ipx", async width => {
+    const page = await browser.newPage({ viewport: { width, height: width === 390 ? 844 : 1080 }, reducedMotion: "reduce" });
+    try {
+      await openWorkstation(page);
+      await page.evaluate(() => {
+        const store = (window as WorkstationWindow).workstationVisualStore;
+        const paper = store.getState().papers[0]!;
+        paper.collaborationScores = { idea: 13, experiment: 7, writing: 17 };
+        paper.collaborators = [
+          { id: "peer-low", name: "陈同学", contributionScores: { idea: 3 } },
+          { id: "advisor", name: "张老师", contributionScores: { writing: 15 } },
+          { id: "peer-high", name: "李同学", contributionScores: { idea: 10 } },
+          { id: "peer-extra", name: "王同学", contributionScores: { writing: 2 } },
+          { id: "peer-mid", name: "林同学", contributionScores: { experiment: 7 } },
+        ];
+        store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
+      });
+      const card = page.locator('#workstation-paper-grid .paper-slot-card[data-paper-id="visual-paper-0"]');
+      const avatars = card.locator(".paper-collaborator-avatar");
+      expect(await avatars.evaluateAll(elements => elements.map(element => element.getAttribute("data-paper-participant-id"))))
+        .toEqual(["player", "peer-high", "peer-mid", "peer-low", "peer-extra", "advisor"]);
+      expect(await card.evaluate(element => {
+        const header = element.querySelector(".paper-card-header")!.getBoundingClientRect();
+        return [...element.querySelectorAll(".paper-collaborator-avatar")].every(avatar => {
+          const bounds = avatar.getBoundingClientRect();
+          return bounds.left >= header.left && bounds.right <= header.right && bounds.bottom <= header.bottom;
+        });
+      })).toBe(true);
+      await page.mouse.move(0, 0);
+      await card.screenshot({ path: `artifacts/workstation-visual/contributors-${width}.png`, animations: "disabled" });
+    } finally {
+      await page.close();
+    }
+  }, 15_000);
+
   it("fits four drafts at 1920, 1440 and 390 with aligned titles, scores and submissions", async () => {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, reducedMotion: "reduce" });
     const errors: string[] = [];

@@ -117,14 +117,14 @@ describe("v2 research rule details and publication metrics", () => {
     expect(publication).not.toMatch(/不重复发奖|重复发表不额外奖励SAN或好感/);
     const events = getHelpText({ activePlayTab: "events" });
     expect(events).toContain("到期的阻塞事件须处理完才能进入下一月");
-    expect(events).toContain("点击待办事件右上角的⏸️或▶️切换无分支事件阻塞");
+    expect(events).toContain("点击待办事件右上角的处理方式按钮，切换无分支事件的手动或自动处理");
     expect(events).toContain("优先完成当前事件的后续情节");
     expect(events).toContain("遇到需要你选择的阻塞事件时暂停");
     expect(events).toContain("论文结果自动处理后，可在日志回看审稿意见、录用决定与天赋奖励");
     const contexts: PlayRenderUiState[] = [
       { activePlayTab: "workstation" }, { activePlayTab: "relationship" }, { activePlayTab: "research" },
       { activePlayTab: "events" }, { activePlayTab: "settings" },
-      ...(["ai", "coffee", "gear", "rest"] as const).map((activeShopTab) => ({ activePlayTab: "shop" as const, activeShopTab })),
+      ...(["ai", "coffee", "gear", "life", "rest"] as const).map((activeShopTab) => ({ activePlayTab: "shop" as const, activeShopTab })),
       ...(["character", "relation", "equip", "growth", "publication"] as const).map((activeTalentTab) => ({ activePlayTab: "talent" as const, activeTalentTab })),
     ];
     for (const context of contexts) {
@@ -330,7 +330,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("四档好感对应报销率40%/60%/80%/100%");
     expect(help).toContain("劳务费必得3/5/7/9金币，领取时扣同额经费");
     expect(help).toContain("显卡、工位各限获批当月一次，购买或升级时扣实际经费，月底失效");
-    expect(help).toContain("AI报销下月生效，购买与续费扣实际经费；已付费用不退");
+    expect(help).toContain("AI报销从下次购买或续费开始生效，按导师好感档位覆盖1～4次，使用时扣实际经费；已付费用不退");
     expect(help).toContain("经费不足时暂停报销，不自动自费");
   });
 
@@ -580,6 +580,7 @@ describe("v2 research rule details and publication metrics", () => {
   it("explains coffee prerequisites, subscription skips and the different seasonal penalties", () => {
     const coffee = getHelpText({ activePlayTab: "shop", activeShopTab: "coffee" });
     const gear = getHelpText({ activePlayTab: "shop", activeShopTab: "gear" });
+    const life = getHelpText({ activePlayTab: "shop", activeShopTab: "life" });
     const rest = getHelpText({ activePlayTab: "shop", activeShopTab: "rest" });
 
     expect(coffee).toContain("冰美式可直接购买，SAN+2");
@@ -587,11 +588,13 @@ describe("v2 research rule details and publication metrics", () => {
     expect(coffee).toContain("无需咖啡机即可开启月初自动续费");
     expect(coffee).toContain("SAN已满时，自动续费当月跳过");
     expect(coffee).toContain("金币不足且没有可用于续费的礼物券时，当月暂停续费");
-    expect(gear).toContain("显卡和自行车可逐档升级");
-    expect(gear).toMatch(/夏季（公历6–8月）.*SAN消耗\+1，遮阳伞可免除/);
-    expect(gear).toContain("季节、疾病与恋人玩耍减耗影响所有即时SAN损失，含事件和审稿人影响");
-    expect(gear).toContain("最低0，不影响固定月耗和恢复");
-    expect(gear).toMatch(/冬季（公历12–2月）.*每月SAN-1，羽绒服可免除/);
+    expect(gear).toContain("设备栏包含显卡、机械键盘和显示器");
+    expect(gear).not.toContain("自行车");
+    expect(life).toContain("自行车可逐档升级");
+    expect(life).toMatch(/夏季（公历6–8月）.*SAN消耗\+1，遮阳伞可免除/);
+    expect(life).toContain("季节、疾病与恋人玩耍减耗影响所有即时SAN损失，含事件和审稿人影响");
+    expect(life).toContain("最低0，不影响固定月耗和恢复");
+    expect(life).toMatch(/冬季（公历12–2月）.*每月SAN-1，羽绒服可免除/);
     expect(rest).toContain("选定后不能直接换路线");
     expect(rest).toContain("出售并重新购买后可重新选择");
     expect(rest).toContain("休息效果+3");

@@ -192,6 +192,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
   const favorTier = getAttributeTier(state.player.favor);
   const salaryGain = [3, 5, 7, 9][favorTier] ?? 3;
   const approvalPercent = [40, 60, 80, 100][favorTier] ?? 40;
+  const aiReimbursementUses = favorTier + 1;
   const favorCondition = ["导师好感 < 6", "6 ≤ 导师好感 < 12", "12 ≤ 导师好感 < 18", "导师好感 ≥ 18"][favorTier];
   const gpuApproved = getRoll() < approvalPercent / 100;
   const workstationApproved = getRoll() < approvalPercent / 100;
@@ -238,16 +239,20 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
       {
         id: `random-8-ai-${serial}`,
         label: "报销 AI 费用",
-        outcome: reimbursementOutcome(aiApproved, "AI报销：下月免费，使用时扣科研经费"),
+        outcome: reimbursementOutcome(aiApproved, `AI报销：下${aiReimbursementUses}次免单，使用时扣科研经费`),
         effects: aiApproved ? {
           addBuffs: [{
             id: `ai-reimbursement-${state.totalMonths + 1}`,
             name: "AI报销",
             source: "导师经费",
-            timing: "monthly",
+            timing: "next-action",
             remainingMonths: 2,
-            shopEffects: { aiCostsCovered: true, aiCostsCoveredAtTotalMonths: state.totalMonths + 1 },
-            description: "下月 AI 购买与自动续费由科研经费支付，余额不足时暂停。",
+            shopEffects: {
+              aiCostsCovered: true,
+              aiCostsCoveredAtTotalMonths: state.totalMonths + 1,
+              aiCostsCoveredUses: aiReimbursementUses,
+            },
+            description: `下${aiReimbursementUses}次 AI 购买或续费由科研经费支付，经费不足时暂停。`,
           }],
         } : {},
       },
@@ -262,7 +267,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
     decisionTitle: "你的选择",
     decisionDescription: [
       `你接过笔，显卡报价还开着，椅子往后一靠又吱呀响；🪑同门小声说，发劳务费也挺好。${favorTier >= 2 ? "导师提起你这阵子的工作，说选劳务费会多安排些。" : favorTier >= 1 ? "导师翻翻你的工作记录，说劳务费可以再添一点。" : "你和导师还不太熟，选劳务费的话，大概只能按惯常标准发。"}`,
-      `显卡、工位设备和下月的 AI 费用都可以提，但还得导师点头。${favorTier >= 3 ? "老师熟悉你的需要，让你选好报销项目就记下来。" : favorTier >= 1 ? "平时积下的信任让你更敢开口，只是老师仍会问问用途。" : "你和老师还不熟，想报的东西得好好解释用途。"}劳务费倒是能直接到账，🤔你在几项之间犹豫起来。`,
+      `显卡、工位设备和接下来的 AI 费用都可以提，但还得导师点头。${favorTier >= 3 ? "老师熟悉你的需要，让你选好报销项目就记下来。" : favorTier >= 1 ? "平时积下的信任让你更敢开口，只是老师仍会问问用途。" : "你和老师还不熟，想报的东西得好好解释用途。"}劳务费倒是能直接到账，🤔你在几项之间犹豫起来。`,
     ].join("\n\n"),
     results: {
       [`random-8-gpu-${serial}`]: {
@@ -306,7 +311,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
         title: "报销 AI 费用",
         description: aiApproved ? [
           "你指着清单上的 AI 费用说：“查资料、改代码都能用上，想报销下个月的费用。”导师点头，🤖把这一项记进了经费表。",
-          "下个月购买和续费都能报销，这个月已经订好的也不白花。你在日历上记下这件事，📅总算不用再盯着免费额度倒计时。",
+          `接下来${aiReimbursementUses}次购买和续费都能报销，这个月已经订好的也不白花。你在日历上记下这件事，📅总算不用再盯着免费额度倒计时。`,
         ].join("\n\n") : [
           "你说想报销下个月的 AI 费用，导师反问：“免费版不也能用吗？先用着，真离不开再说。”你想解释几种工具的区别，看老师已低头核对表格，😶又把话咽了回去。",
           "回到工位，页面正好提示免费额度已用完。😵你看了看订阅价格，决定先去接杯水，回来再算。",

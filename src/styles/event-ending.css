@@ -35,10 +35,6 @@
 .ending-buttons { display: flex; gap: 8px; margin-left: auto; }
 .ending-buttons > button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 5px 9px; border-radius: 4px; font-size: 12px; font-weight: 700; box-shadow: none; }
 .ending-buttons > button.is-restart { border-color: var(--ending-accent); background: var(--ending-tint); color: var(--ending-accent); }
-.settings-quit-row { margin: 2px 0 0; text-align: right; }
-.settings-quit-row button { padding: 4px 0; border: 0; border-bottom: 1px solid #b99b83; background: transparent; color: #83513f; font: inherit; font-size: 12px; cursor: pointer; box-shadow: none; }
-.settings-quit-row button:hover { color: #963e39; border-color: currentColor; }
-.settings-quit-row button:focus-visible { outline: 2px solid #a6803f; outline-offset: 3px; }
 @media (max-width: 560px) {
   .ending-header-actions .ending-status { display: none; }
   .ending-panel .ending-header { padding: 10px 12px; }

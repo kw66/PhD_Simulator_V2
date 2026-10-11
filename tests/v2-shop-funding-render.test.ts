@@ -53,14 +53,14 @@ describe("shop lab funding presentation", () => {
       const before = structuredClone(state);
       const html = renderShopSection(state, purchase.tab, "chair-advanced", "manual");
       const button = findButton(html, purchase.action, "attribute" in purchase ? purchase.attribute : undefined);
-      expect(button).toContain(`（经费 -${purchase.cost}）`);
+      expect(button).not.toContain("（经费 -");
       expect(button).toContain(`，0 金币"`);
       if (funding < purchase.cost) {
         expect(button).toContain('disabled aria-disabled="true"');
         expect(button).toContain(`title="科研经费不足（需${purchase.cost}，现有${funding}）"`);
       } else {
         expect(button).not.toContain('aria-disabled="true"');
-        expect(button).toContain(`title="报销：科研经费 -${purchase.cost}，个人金币 0"`);
+        expect(button).not.toContain("title=");
       }
       expect(state).toEqual(before);
     }
@@ -68,7 +68,7 @@ describe("shop lab funding presentation", () => {
 
   it("preserves ordinary personal purchases and free AI models with no lab debit", () => {
     const state = reimbursedState(0);
-    const bike = findButton(renderShopSection(state, "gear"), "buy-shop-item", 'data-shop-item-id="bike"');
+    const bike = findButton(renderShopSection(state, "life"), "buy-shop-item", 'data-shop-item-id="bike"');
     expect(bike).not.toContain("经费");
     expect(bike).toContain('aria-disabled="true"');
     expect(bike).toContain('，6 金币"');

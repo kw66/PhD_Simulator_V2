@@ -1,0 +1,215 @@
+.relationship-section .rel-card-grid {
+  gap: 8px;
+}
+
+.relationship-section .rel-card-grid > .rel-card {
+  --relationship-accent: #8a795e;
+  border: 1px solid #b5a17e;
+  border-left: 3px solid var(--relationship-accent);
+  border-radius: 5px;
+  background: #fff9ed;
+  box-shadow: inset 0 0 0 2px #fffdf6, 0 2px 5px rgba(74, 55, 30, 0.11);
+}
+
+.relationship-section .rel-card[data-relationship-type="advisor"] {
+  --relationship-accent: #9f6e72;
+}
+
+.relationship-section .rel-card[data-relationship-type="senior"] {
+  --relationship-accent: #657eab;
+}
+
+.relationship-section .rel-card[data-relationship-type="peer"] {
+  --relationship-accent: #8273a4;
+}
+
+.relationship-section .rel-card[data-relationship-type="junior"] {
+  --relationship-accent: #608c7a;
+}
+
+.relationship-section .rel-card[data-relationship-type="lover"],
+.relationship-section .rel-card-lover-locked {
+  --relationship-accent: #ad6986;
+}
+
+.relationship-section .rel-card.filled .rel-card-header {
+  min-height: 32px;
+  border-bottom-color: #d8c6a5;
+  background: #f1e3c8;
+  box-shadow: inset 0 1px 0 #fff9eb;
+}
+
+.relationship-section .rel-card .rel-type {
+  border: 1px solid color-mix(in srgb, var(--relationship-accent) 36%, #f1e3c8);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--relationship-accent) 15%, #fff9ed);
+  color: color-mix(in srgb, var(--relationship-accent) 82%, #29231e);
+}
+
+.relationship-section .rel-card .rel-fellow-academic-row {
+  border-bottom-color: #e2d2b3;
+  background: #faf2e2;
+}
+
+.relationship-section .rel-card[data-relationship-type="advisor"] .rel-fellow-academic-row > span > .rel-inline-icon {
+  margin-right: 3px;
+}
+
+.relationship-section .rel-card .rel-detail-label,
+.relationship-section .rel-card .rel-known-time,
+.relationship-section .rel-card .rel-advisor-grants {
+  color: #655746;
+}
+
+.relationship-section .rel-card .rel-progress-val,
+.relationship-section .rel-card .rel-detail-value {
+  color: #433829;
+}
+
+.relationship-section .rel-card .rel-monthly-activity {
+  border-top-color: #d8c5a1;
+  background: #f0e1c3;
+}
+
+.relationship-section .rel-card-grid > .rel-card:has(.rel-activity-history[open]) {
+  position: relative;
+  z-index: 20;
+  overflow: visible;
+}
+
+.rel-monthly-activity > span {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rel-activity-history {
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.rel-activity-history > summary {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #b9a47f;
+  border-radius: 4px;
+  background: #f8eed8;
+  color: #594629;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rel-activity-history > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rel-activity-history > summary:hover,
+.rel-activity-history[open] > summary {
+  border-color: #a78958;
+  background: #efdbad;
+}
+
+.rel-activity-history > summary:focus-visible {
+  outline: 2px solid #9b7942;
+  outline-offset: 2px;
+}
+
+.rel-activity-history > summary > svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 180ms ease;
+}
+
+.rel-activity-history[open] > summary > svg {
+  transform: rotate(180deg);
+}
+
+.rel-activity-history-panel {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: -8px;
+  z-index: 21;
+  width: min(330px, calc(100vw - 32px));
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid #b9a47f;
+  border-radius: 5px;
+  background: #fff9ed;
+  box-shadow: 0 6px 18px rgba(61, 43, 17, 0.2);
+  scrollbar-width: thin;
+  scrollbar-color: #b9a071 #f5e9d0;
+}
+
+.rel-card-grid > .rel-card:nth-last-child(-n + 2) .rel-activity-history-panel {
+  top: auto;
+  bottom: calc(100% + 5px);
+}
+
+.rel-activity-history-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 10px;
+  line-height: 1.45;
+}
+
+.rel-activity-history-row + .rel-activity-history-row {
+  border-top: 1px solid #e9dac0;
+}
+
+.rel-activity-history-row > strong {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rel-activity-history-row > span {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.rel-activity-history-empty {
+  padding: 12px;
+  text-align: center;
+}
+
+.relationship-section .rel-card .rel-action-btn {
+  color: #4b3b25;
+}
+
+.relationship-section .rel-card .rel-action-btn:disabled {
+  border-style: solid;
+  border-color: #d1c5b1;
+  background: #eee9df;
+  color: #7c7163;
+}
+
+.relationship-section .rel-card.locked,
+.relationship-section .rel-card.empty {
+  background: #f7f2e8;
+  box-shadow: inset 0 0 0 2px #fbf8f1, 0 1px 3px rgba(74, 55, 30, 0.07);
+}
+
+.relationship-section .rel-card .rel-card-empty-header {
+  min-height: 30px;
+  border-bottom-color: #dfd3bf;
+  background: #eee5d6;
+  box-shadow: inset 0 1px 0 #faf7ef;
+  color: #6b6255;
+  font-size: var(--workstation-font-small);
+}
+
+.relationship-section .rel-card .rel-card-empty-header > strong {
+  font-weight: 700;
+}
+
+.relationship-section .rel-card .rel-card-empty-header > span {
+  color: #877d6d;
+}
+
+.relationship-section .rel-card .rel-card-empty-content {
+  color: #5d5548;
+}

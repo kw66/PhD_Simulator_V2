@@ -1,4 +1,4 @@
-import { addOrReplaceBuffs, advanceBuffDurations, getActiveBuffs, removeBuffs } from "./v2-buffs";
+import { addOrReplaceBuffs, advanceBuffDurations, consumeAiCostCoverage, getActiveBuffs, removeBuffs } from "./v2-buffs";
 import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipStatus } from "./v2-internship-system";
 import { getLabPayroll, settleLabPayroll } from "./v2-lab-payroll";
 import { MONTHLY_LIVING_COST } from "./v2-content";
@@ -344,14 +344,13 @@ export function applyMonthStartSubscriptions(
     player: { ...state.player },
   },
 ): AppliedMonthlyEffects {
-  const reimbursement = hasAiReimbursement(state);
   const renewalTargets: Array<
     | { kind: "ai"; slot: typeof AI_SLOT_IDS[number]; price: number; order: number }
     | { kind: "coffee"; price: number; order: number }
   > = AI_SLOT_IDS.map((slot, order) => ({
     kind: "ai" as const,
     slot,
-    price: getAiRenewalPrice(state.totalMonths, slot, reimbursement),
+    price: getAiRenewalPrice(state.totalMonths, slot),
     order,
   }));
   if (state.coffeeState.subscriptionEnabled
@@ -363,7 +362,11 @@ export function applyMonthStartSubscriptions(
   let nextState: GameState = { ...state, player: { ...resolution.player } };
   const paidModels: AiModelOffer[] = [];
   for (const target of renewalTargets) {
-    const { price, usesGift } = getLoverGiftQuote(nextState, target.price, true);
+    const reimbursement = target.kind === "ai" && hasAiReimbursement(nextState);
+    const basePrice = target.kind === "ai"
+      ? getAiRenewalPrice(nextState.totalMonths, target.slot, reimbursement)
+      : target.price;
+    const { price, usesGift } = getLoverGiftQuote(nextState, basePrice, true);
     if (target.kind === "coffee") {
       if (resolution.player.san >= nextState.sanCap) {
         appendMonthlyEffect(nextState, resolution, {
@@ -447,6 +450,7 @@ export function applyMonthStartSubscriptions(
           ...nextState,
           advisorProgressState: { ...nextState.advisorProgressState, funding: roundMoney(nextState.advisorProgressState.funding - fundingCost) },
         }, "student-reimbursement", -fundingCost);
+        if (fundingCost > 0) nextState = consumeAiCostCoverage(nextState);
       }
       nextState = { ...nextState, player: { ...resolution.player } };
     }

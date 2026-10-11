@@ -94,6 +94,12 @@ export interface PlayerStats {
   money: number;
 }
 
+export interface SanHistoryEntry {
+  totalMonths: number;
+  san: number;
+  sanCap: number;
+}
+
 export type PaperActionType = "idea" | "experiment" | "writing";
 export type ActiveOperationType =
   | "read"
@@ -291,6 +297,8 @@ export interface Buff {
   shopEffects?: {
     aiCostsCovered?: boolean;
     aiCostsCoveredAtTotalMonths?: number;
+    /** Number of AI purchases or renewals covered when the reimbursement is consumed one use at a time. */
+    aiCostsCoveredUses?: number;
   };
   /** Publication multipliers consumed by publication and citation settlement. */
   publicationEffects?: {
@@ -473,6 +481,7 @@ export type PaperEffectUpdate = { id: string } & Partial<Omit<Paper, "id">>;
 export interface PaperCollaborator {
   id: string;
   name: string;
+  contributionScores?: Partial<Record<PaperActionType, number>>;
 }
 
 export interface PaperCollaborationEffect {
@@ -724,6 +733,7 @@ export interface GameState extends RandomEventState {
   totalMonths: number;
   maxMonths: number;
   sanCap: number;
+  sanHistory?: SanHistoryEntry[];
   paperSlotsUnlocked: number;
   graduationScoreTarget: number | null;
   totalResearchScore: number;

@@ -173,7 +173,7 @@ describe("shared lab project lifecycle", () => {
     for (const paper of [...completed.state.papers, ...completed.state.fellowPapers!]) {
       expect(collaborationTotal(paper)).toBe(10);
       expect(paper).toMatchObject({ idea: 10, experiment: 10, writing: 10, collaborationScores: { idea: 0, experiment: 0, writing: 10 } });
-      expect(paper.collaborators).toEqual([{ id: "advisor", name: "Advisor" }]);
+      expect(paper.collaborators).toEqual([{ id: "advisor", name: "Advisor", contributionScores: { writing: 10 } }]);
     }
     expect(completed.state.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
     expect(completed.state.fellowProgressState.map((profile) => profile.pendingGuidanceFromAdvisor)).toEqual([null, null]);
@@ -266,7 +266,7 @@ describe("vertical completion guidance across actions", () => {
     for (const paper of [...after.papers, researcherPaper]) {
       expect(collaborationTotal(paper)).toBe(10);
       expect(paper.collaborationScores).toEqual({ idea: 0, experiment: 0, writing: 10 });
-      expect(paper.collaborators).toEqual([{ id: "advisor", name: "Advisor" }]);
+      expect(paper.collaborators).toEqual([{ id: "advisor", name: "Advisor", contributionScores: { writing: 10 } }]);
     }
     const completerPaper = after.fellowPapers!.find((paper) => paper.id === "fellow-paper")!;
     expect(completerPaper).toMatchObject({ experiment: 0, writing: 0, collaborators: [] });

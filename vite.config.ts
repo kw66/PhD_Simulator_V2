@@ -25,5 +25,6 @@ export default defineConfig({
     include: ["tests/v2-*.test.ts"],
     // Browser-backed test files each start Vite and Chromium; serialize them in CI.
     fileParallelism: process.env.CI !== "true",
+    maxWorkers: 4,
   },
 });

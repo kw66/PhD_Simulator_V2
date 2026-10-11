@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AI_SLOT_IDS, getAiModelForTotalMonths, hasAiReimbursement } from "../src/core/v2-ai-shop";
+import { AI_SLOT_IDS, hasAiReimbursement } from "../src/core/v2-ai-shop";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
@@ -176,7 +176,7 @@ describe("advisor event spending from actual lab funding", () => {
     expect(renewed.resolution.items[0]!.note).toContain("模型已更新");
   });
 
-  it("covers all six AI providers next month and charges only successful use", () => {
+  it("covers the granted AI uses next month and charges later uses personally", () => {
     const funded = resolve(fundingDecision(makeState(), 3));
     expect(hasAiReimbursement(funded)).toBe(false);
     expect(funded.advisorProgressState.funding).toBe(100);
@@ -184,14 +184,18 @@ describe("advisor event spending from actual lab funding", () => {
     const covered = applyMonthlyEffects({ ...funded, month: 7, totalMonths: 7 }).nextState;
     const control = applyMonthlyEffects({ ...funded, buffs: [], month: 7, totalMonths: 7 }).nextState;
     expect(covered.advisorProgressState.funding).toBe(control.advisorProgressState.funding - 2);
+    covered.player.money = 100;
     let purchased = covered;
-    for (const slot of AI_SLOT_IDS) {
+    for (const [index, slot] of AI_SLOT_IDS.entries()) {
+      const beforeMoney = purchased.player.money;
+      const quotedPrice = getShopActionPrice(purchased, "buy-ai-month", { aiSlotId: slot })!;
       purchased = applyShopAction(purchased, "buy-ai-month", { aiSlotId: slot });
       expect(purchased.aiShopState.subscriptions[slot].active).toBe(true);
+      if (index < 3) expect(purchased.player.money).toBe(beforeMoney);
+      else expect(purchased.player.money).toBe(beforeMoney - quotedPrice);
     }
-    const totalCost = AI_SLOT_IDS.reduce((sum, slot) => sum + getAiModelForTotalMonths(7, slot).price, 0);
-    expect(purchased.player.money).toBe(covered.player.money);
-    expect(purchased.advisorProgressState.funding).toBe(control.advisorProgressState.funding - totalCost);
+    expect(purchased.player.money).toBeLessThan(covered.player.money);
+    expect(purchased.advisorProgressState.funding).toBeLessThan(covered.advisorProgressState.funding);
     expect(applyMonthStartSubscriptions(purchased).nextState.advisorProgressState).toEqual(purchased.advisorProgressState);
     const expired = applyMonthlyEffects({ ...purchased, month: 8, totalMonths: 8 }).nextState;
     expect(hasAiReimbursement(expired)).toBe(false);

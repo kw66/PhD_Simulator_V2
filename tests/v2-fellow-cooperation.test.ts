@@ -211,7 +211,7 @@ describe("automatic reciprocal help", () => {
     const state = { ...withPending(makeState("senior"), { pendingHelpToPlayer: 7, pendingHelpToFellow: 8 }), papers: [] };
     const next = settlePendingFellowHelp(state, () => 0);
     expect(getPaperScoreBreakdown(next.fellowPapers![0]!, "idea")).toEqual({ own: 0, collaboration: 8, total: 8 });
-    expect(next.fellowPapers![0]!.collaborators).toEqual([{ id: "player", name: "张明" }]);
+    expect(next.fellowPapers![0]!.collaborators).toEqual([{ id: "player", name: "张明", contributionScores: { idea: 8 } }]);
     expect(next.fellowProgressState[0]!.pendingHelpToFellow).toBeNull();
     expect(next.fellowProgressState[0]!.pendingHelpToPlayer).toBe(7);
     const created = dispatchAction(next, "create-paper", { paperSlotIndex: 0 });
@@ -382,7 +382,7 @@ describe("engine and research lifecycle retries", () => {
     expect(draft.status).toBe(accepted ? "draft" : "reviewing");
     expect(draft.id === submitted.id).toBe(!accepted);
     expect(Object.values(draft.collaborationScores ?? {}).reduce((total, amount) => total + amount, 0)).toBe(10);
-    expect(draft.collaborators).toEqual([{ id: "player", name: "张明" }]);
+    expect(draft.collaborators).toEqual([{ id: "player", name: "张明", contributionScores: { [accepted ? "idea" : "experiment"]: 10 } }]);
     expect(next.fellowProgressState[0]!.pendingHelpToFellow).toBeNull();
   });
 
@@ -425,7 +425,7 @@ describe("engine and research lifecycle retries", () => {
     expect(next.papers).toHaveLength(0);
     const published = next.externalPublications.find((entry) => entry.id === paper.id)!;
     expect(published).toMatchObject({ status: "published", journalTarget: "pami", idea: 60, experiment: 40, writing: 40 });
-    expect(published.collaborators).toEqual([{ id: base.fellowProgressState[0]!.id, name: "林青" }]);
+    expect(published.collaborators).toEqual([{ id: base.fellowProgressState[0]!.id, name: "林青", contributionScores: { idea: 20 } }]);
     expect(next.fellowProgressState[0]!.pendingHelpToPlayer).toBeNull();
     expect(dispatchAction(next, "select-paper", { paperId: paper.id }).externalPublications).toEqual(next.externalPublications);
   });

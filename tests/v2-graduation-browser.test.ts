@@ -94,6 +94,38 @@ describe("graduation cards and blind review in the browser", () => {
         });
       });
       expect(rowsAlign).toEqual(Array.from({ length: 4 }, () => ({ offset: 0, thesisHeight: 32, careerHeight: 32 })));
+      for (const selector of [".graduation-point .rel-detail-label", ".graduation-point-bar",
+        ".graduation-career-row .rel-detail-label", ".graduation-career-bar"]) {
+        await page.locator(selector).first().hover();
+        await expect.poll(() => page.locator("#relationship-tooltip").textContent()).toContain(
+          selector.includes("career") ? "初始准备参考" : "Unified Learning",
+        );
+        expect(await page.locator("#relationship-tooltip").isVisible()).toBe(true);
+      }
+      await page.evaluate(() => {
+        const store = (window as GraduationWindow).graduationStore;
+        store.getState().thesis.researchPoints[0]!.score = 562;
+        store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
+      });
+      const highScoreBar = page.locator(".graduation-point-bar").first();
+      expect(await highScoreBar.getAttribute("aria-valuemax")).toBe("675");
+      expect(await highScoreBar.locator(".graduation-bar-fill-track").evaluate(track => {
+        const style = getComputedStyle(track);
+        const outer = getComputedStyle(track.parentElement!);
+        const finalFill = track.querySelector<HTMLElement>(".graduation-improved")!;
+        return style.overflow === "hidden" && style.borderRadius === outer.borderRadius
+          && getComputedStyle(finalFill).borderTopRightRadius !== "0px";
+      })).toBe(true);
+      await highScoreBar.locator(".graduation-improved").evaluate(async fill => {
+        await Promise.all(fill.getAnimations().map(animation => animation.finished.catch(() => undefined)));
+      });
+      expect(await highScoreBar.locator(".graduation-bar-fill-track").evaluate(track => {
+        const filledWidth = [...track.querySelectorAll<HTMLElement>(".rel-progress-fill")]
+          .reduce((sum, fill) => sum + fill.getBoundingClientRect().width, 0);
+        return filledWidth / track.getBoundingClientRect().width;
+      })).toBeCloseTo(562 / 675, 2);
+      await page.mouse.move(0, 0);
+      await page.locator(".graduation-cards").screenshot({ path: `artifacts/graduation/${degree}-high-score.png` });
       await page.setViewportSize({ width: 390, height: 844 });
       await page.mouse.move(0, 0);
       await page.locator(".graduation-cards").screenshot({ path: `artifacts/graduation/${degree}-cards-mobile.png` });

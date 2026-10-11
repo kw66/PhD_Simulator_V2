@@ -121,6 +121,11 @@ export interface AdvisorGrantApplication {
   resultRoll: number;
 }
 
+export interface RelationshipActivityRecord {
+  totalMonths: number;
+  text: string;
+}
+
 export interface AdvisorProgressState {
   researchAccumulation: number;
   funding: number;
@@ -137,6 +142,7 @@ export interface AdvisorProgressState {
   lastPlayerProjectTotalMonths?: number | null;
   pendingGuidanceToPlayer?: number | null;
   monthlyActivity?: string;
+  activityHistory?: RelationshipActivityRecord[];
   paidJournalPaperIds?: string[];
   paidConferenceRegistrationPaperIds?: string[];
   paidFellowConferencePaperIds?: string[];
@@ -164,6 +170,7 @@ export interface LoverProgressState {
   annualResearchActivity?: string;
   sanDiscountMonths?: number[];
   monthlyActivity?: string;
+  activityHistory?: RelationshipActivityRecord[];
 }
 
 export interface FellowProgressProfile {
@@ -193,6 +200,7 @@ export interface FellowProgressProfile {
   annualResearchActivity?: string;
   lastProjectTotalMonths?: number;
   monthlyActivity?: string;
+  activityHistory?: RelationshipActivityRecord[];
   pendingGuidanceFromAdvisor?: number | null;
   monthlyPublicationCosts?: { totalMonths: number; registration: number; journal: number; sharedTravel: number };
   affinityRewardedPaperIds?: string[];

@@ -101,7 +101,7 @@ describe("advisor funding reimbursements", () => {
     expect(state.buffs[0]!.shopEffects?.aiCostsCoveredAtTotalMonths).toBe(8);
   });
 
-  it("covers all AI purchases and renewals next month, with matching preview and expiry", () => {
+  it("covers the granted number of AI purchases and renewals next month", () => {
     const initial = makeState();
     const funded = applyChoiceEffectsToState(initial, choices(initial)[3]!).nextState;
     expect(hasAiReimbursement(funded)).toBe(false);
@@ -117,21 +117,20 @@ describe("advisor funding reimbursements", () => {
     expect(preview.items.find(item => item.id === "ai-renewal-gpt")?.stats.money).toBeCloseTo(0);
     expect(next.resolution.items.find(item => item.id === "ai-renewal-gpt")?.stats.money).toBeCloseTo(0);
     expect(next.nextState.aiShopState.subscriptions.gpt.active).toBe(true);
-    expect(hasAiReimbursement(next.nextState)).toBe(true);
+    expect(hasAiReimbursement(next.nextState)).toBe(false);
     for (const slot of AI_SLOT_IDS) {
-      expect(getShopActionPrice(next.nextState, "buy-ai-month", { aiSlotId: slot })).toBe(0);
+      expect(getShopActionPrice(next.nextState, "buy-ai-month", { aiSlotId: slot })).toBe(getAiModelForTotalMonths(7, slot).price);
     }
     const manual = applyShopAction(next.nextState, "buy-ai-month", { aiSlotId: "claude" });
-    expect(manual.player.money).toBe(next.nextState.player.money);
+    expect(manual.player.money).toBe(next.nextState.player.money - getAiModelForTotalMonths(7, "claude").price);
     expect(manual.aiShopState.subscriptions.claude.active).toBe(true);
-    const expired = applyMonthlyEffects({ ...next.nextState, month: 8, totalMonths: 8 });
+    const expired = applyMonthlyEffects({ ...manual, month: 8, totalMonths: 8 });
     expect(hasAiReimbursement(expired.nextState)).toBe(false);
     expect(expired.resolution.items.find(item => item.id === "ai-renewal-gpt")?.stats.money).toBe(-2);
     expect(expired.nextState.buffs.some(buff => buff.shopEffects?.aiCostsCovered)).toBe(false);
-    expect(renderApp(funded)).toContain('data-effect-id="next-month-ai-reimbursement-');
-    expect(renderApp(funded)).not.toContain('data-effect-id="monthly-ai-reimbursement-');
-    expect(renderApp(next.nextState)).toContain('data-effect-id="monthly-ai-reimbursement-');
-    expect(renderApp(next.nextState)).not.toContain('data-effect-id="next-month-ai-reimbursement-');
+    expect(renderApp(funded)).toContain('data-effect-id="single-ai-reimbursement-');
+    expect(renderApp(funded)).not.toContain('data-effect-id="next-month-ai-reimbursement-');
+    expect(renderApp(next.nextState)).not.toContain('data-effect-id="single-ai-reimbursement-');
   });
 
   it("preserves current coverage when another reimbursement is granted for next month", () => {

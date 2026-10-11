@@ -4,7 +4,7 @@ import { renderApp } from "../src/app/v2-render";
 import { buildBuffDisplayBuckets } from "../src/app/v2-render-buffs";
 import { advanceBuffDurations } from "../src/core/v2-buffs";
 import { createInitialState } from "../src/core/v2-engine";
-import { activateRemoteInternship } from "../src/core/v2-internship-system";
+import { activateInternship, activateRemoteInternship } from "../src/core/v2-internship-system";
 import { createLabGpuFailureBuff } from "../src/core/v2-lab-compute";
 import type { Buff, GameState } from "../src/core/v2-types";
 
@@ -39,8 +39,7 @@ describe("lab GPU failure Buff display", () => {
       sources: [expect.stringContaining("显卡故障 · 剩余 6 月")],
     })]);
     expect(buckets.monthly[0]!.sources[0]).toContain("玩家与同学共享");
-    expect(buckets.monthly[0]!.sources[0]).toContain("玩家经费不足时暂停实验");
-    expect(buckets.monthly[0]!.sources[0]).toContain("同学先用经费、不足差额自付，合计不足改做横向");
+    expect(buckets.monthly[0]!.sources[0]).toContain("优先使用科研经费，同学可自付差额");
     expect(buckets.monthly[0]!.sources[0]).not.toMatch(/玩家自付|自费/);
   });
 
@@ -90,29 +89,44 @@ describe("lab GPU failure Buff display", () => {
     expect(sidebar).not.toContain("显卡故障");
   });
 
-  it("keeps the shared surcharge alongside personal GPU and internship discounts with existing colors", () => {
+  it("nets monthly shared surcharges and personal internship discounts while retaining each source", () => {
     const state = createPlayingState([createLabGpuFailureBuff()]);
     state.shopState.gpuLevel = 8;
     state.internshipState = activateRemoteInternship(state.totalMonths - 1);
     const sidebar = renderBuffSidebar(state);
-    const surcharge = getEffectChip(sidebar, "实验费用 +1");
+    const monthlyCost = getEffectChip(sidebar, "实验费用 +0");
 
-    expect(surcharge).toContain('class="effect-chip is-money is-debuff"');
-    expect(surcharge).toContain("玩家与同学共享");
-    expect(surcharge).toContain("玩家经费不足时暂停实验");
-    expect(surcharge).toContain("同学先用经费、不足差额自付，合计不足改做横向");
-    expect(surcharge).not.toMatch(/玩家自付|自费/);
+    expect(monthlyCost).toContain('class="effect-chip is-money"');
+    expect(monthlyCost).toContain("显卡故障 · 剩余 6 月 · 实验费用 +1");
+    expect(monthlyCost).toContain("远程实习 · 剩余 3 月 · 实验费用 -1");
+    expect(monthlyCost).toContain("玩家与同学共享");
+    expect(monthlyCost).toContain("优先使用科研经费，同学可自付差额");
+    expect(monthlyCost).not.toMatch(/玩家自付|自费/);
+    expect(sidebar).not.toContain(">实验费用 +1</button>");
+    expect(sidebar).not.toContain(">实验费用 -1</button>");
     expect(getEffectChip(sidebar, "实验费用 -2")).toContain('class="effect-chip is-money"');
     expect(getEffectChip(sidebar, "实验费用 -2")).toContain("个人显卡");
-    expect(getEffectChip(sidebar, "实验费用 -1")).toContain('class="effect-chip is-money"');
-    expect(getEffectChip(sidebar, "实验费用 -1")).toContain("远程实习 · 剩余 3 月");
     expect(sidebar).not.toContain("实验金币");
 
     state.buffs = [{ ...createLabGpuFailureBuff(), remainingMonths: 0 }];
     const expiredSidebar = renderBuffSidebar(state);
     expect(expiredSidebar).not.toContain("实验费用 +1");
     getEffectChip(expiredSidebar, "实验费用 -2");
-    getEffectChip(expiredSidebar, "实验费用 -1");
+    expect(getEffectChip(expiredSidebar, "实验费用 -1")).toContain("远程实习 · 剩余 3 月");
+  });
+
+  it("combines six-month enterprise savings with a shorter GPU failure only while both are active", () => {
+    const state = createPlayingState([{ ...createLabGpuFailureBuff(), remainingMonths: 4 }]);
+    state.internshipState = activateInternship();
+
+    const combined = getEffectChip(renderBuffSidebar(state), "实验费用 -1");
+    expect(combined).toContain("显卡故障 · 剩余 4 月 · 实验费用 +1");
+    expect(combined).toContain("大厂实习 · 剩余 6 月 · 实验费用 -2");
+
+    state.buffs = [];
+    const internshipOnly = getEffectChip(renderBuffSidebar(state), "实验费用 -2");
+    expect(internshipOnly).toContain("大厂实习 · 剩余 6 月 · 实验费用 -2");
+    expect(internshipOnly).not.toContain("显卡故障");
   });
 
   it.each(["workstation", "relationship"] as const)("explains shared costs and personal discounts in the existing %s help", (activePlayTab) => {

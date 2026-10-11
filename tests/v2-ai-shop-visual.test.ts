@@ -93,7 +93,7 @@ it("unifies shop surfaces without changing geometry or wrapping across tabs", as
         state.player.money = owned ? 100 : 0;
         store.dispatch("set-linear-event-blocking", { blockLinearEvents: true });
       }, owned);
-      for (const tab of ["coffee", "gear", "rest"]) {
+      for (const tab of ["coffee", "gear", "life", "rest"]) {
         await page.locator(`[data-ui-shop-tab="${tab}"]`).click();
         for (const width of [1440, 390]) {
           await page.setViewportSize({ width, height: 1000 });
@@ -153,7 +153,7 @@ it("unifies shop surfaces without changing geometry or wrapping across tabs", as
           || Math.abs(parseFloat(intermediate.top) - parseFloat(slider.style.top)) > 1;
         const clearOverlay = [...document.querySelectorAll<HTMLElement>(".shop-panel .shop-tab-btn")].every(button => {
           const style = getComputedStyle(button);
-          return style.borderRightColor === "rgba(0, 0, 0, 0)" && style.boxShadow === "none";
+          return style.borderRightWidth === "0px" && style.boxShadow === "none";
         });
         await Promise.all(slider.getAnimations().map(animation => animation.finished));
         const final = getComputedStyle(slider);

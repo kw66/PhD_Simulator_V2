@@ -41,6 +41,7 @@ export function createInitialState(): GameState {
     totalMonths: 0,
     maxMonths: getMonthLimitByDegree("master"),
     sanCap: MAX_SAN,
+    sanHistory: [],
     paperSlotsUnlocked: getUnlockedPaperSlotCount(0),
     graduationScoreTarget: null,
     totalResearchScore: 0,

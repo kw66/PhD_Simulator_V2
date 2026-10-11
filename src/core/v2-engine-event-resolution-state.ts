@@ -115,7 +115,7 @@ function createBuffsFromEventEffects(choice: EventChoice, state: GameState, sour
     const label = ACTION_LABELS[typedAction];
     const parts = [
       update.bonus ? `${update.bonus > 0 ? "+" : ""}${update.bonus}分` : "",
-      update.multiplier !== undefined && update.multiplier !== 1 ? `总分 ×${update.multiplier}` : "",
+      update.multiplier !== undefined && update.multiplier !== 1 ? `倍率 ×${update.multiplier}` : "",
       update.extraActions ? formatExtraActions(update.extraActions) : "",
     ].filter(Boolean);
     if (parts.length > 0) {

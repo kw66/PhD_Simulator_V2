@@ -934,9 +934,9 @@ describe("v2 event scheduler", () => {
     expect(choices[3]?.effects.addBuffs).toEqual([expect.objectContaining({
       id: "ai-reimbursement-18",
       name: "AI报销",
-      timing: "monthly",
+      timing: "next-action",
       remainingMonths: 2,
-      shopEffects: { aiCostsCovered: true, aiCostsCoveredAtTotalMonths: 18 },
+      shopEffects: { aiCostsCovered: true, aiCostsCoveredAtTotalMonths: 18, aiCostsCoveredUses: 3 },
     })]);
     expect(choices[3]?.effects.eventSupportUpdates).toBeUndefined();
     const aiFunded = applyChoiceEffectsToState(baseState, choices[3]!).nextState;
@@ -944,7 +944,7 @@ describe("v2 event scheduler", () => {
     const aiResult = choices[3]?.effects.enqueueEvents?.at(-1);
     expect(aiResult?.title).toContain("报销 AI 费用");
     expect(aiResult?.description).toContain("下个月的费用");
-    expect(aiResult?.description).toContain("AI报销：下月免费");
+    expect(aiResult?.description).toContain("AI报销：下3次免单");
   });
 
   it("waits for advisor funding to reach the shared threshold before showing event 8", () => {
