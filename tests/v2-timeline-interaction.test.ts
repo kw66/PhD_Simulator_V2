@@ -41,7 +41,12 @@ describe("timeline scrolling through the real app handlers", () => {
     await page.waitForSelector("[data-action='start-game']");
     await action("start-game", { roleId: "normal" });
     await action("debug-shift-month", { delta: "18" });
-    await page.waitForFunction(() => (document.querySelector(".event-timeline-track")?.scrollLeft ?? 0) > 0);
+    const initialScroll = await page.locator(".event-timeline-track").evaluate(element => {
+      const marker = element.querySelector<HTMLElement>(".event-timeline-marker.is-current")!;
+      element.scrollLeft = marker.offsetLeft - (element.clientWidth - marker.offsetWidth) / 2;
+      return element.scrollLeft;
+    });
+    expect(initialScroll).toBeGreaterThan(0);
   }, 30_000);
 
   afterEach(async () => { await page?.close(); });
