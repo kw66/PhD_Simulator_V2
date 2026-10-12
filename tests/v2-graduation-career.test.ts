@@ -1,323 +1,172 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { CAREER_OPTIONS, type CareerType } from "../src/core/v2-career-rules";
+import { describe, expect, it } from "vitest";
+import { CAREER_JOBS, getCareerAbility } from "../src/core/v2-career-rules";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { dispatchAction } from "../src/core/v2-engine";
-import { createEventQueueItem, enqueueEventQueueItem } from "../src/core/v2-event-queue";
-import { CAREER_PREPARATION_SAN_COST, getCareerPreparationFailure, prepareCareer, refreshCareerPreparation } from "../src/core/v2-graduation-career";
-import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
-import type { GameState, PendingEvent } from "../src/core/v2-types";
+import { enqueueEventQueueItem } from "../src/core/v2-event-queue";
+import { collectFixedEventsForState } from "../src/core/v2-fixed-events";
+import { getCareerPreparationFailure, prepareCareer } from "../src/core/v2-graduation-career";
+import { createCareerRecruitmentEvent, shouldScheduleCareerRecruitment } from "../src/core/v2-monthly-career-events";
+import type { GameState } from "../src/core/v2-types";
 
-function readyState(): GameState {
-  const initial = createStartedGameState("normal");
+function readyState(degree: "master" | "phd" = "master", month = 1): GameState {
+  const base = createStartedGameState("normal");
+  const year = degree === "master" ? 3 : 6;
   return {
-    ...initial,
-    year: 3,
-    month: 1,
-    totalMonths: 24,
-    eventQueue: [],
-    careerLastPreparedTotalMonths: null,
-    careerPreparedMonths: {},
-    player: { ...initial.player, research: 20, social: 10, san: 20 },
+    ...base, degree, year, month, totalMonths: (year - 1) * 12 + month, sanCap: 50,
+    selectedAdvisorName: "王老师", eventQueue: [],
+    player: { ...base.player, research: 20, san: 40, money: 100 },
+    advisorProgressState: { ...base.advisorProgressState, funding: 1000 },
   };
 }
 
-function decisionOf(root: PendingEvent): PendingEvent {
-  return root.choices[0]!.effects.enqueueEvents![0]!;
+function advanceScene(state: GameState, choiceId: string): GameState {
+  const event = state.eventQueue.find((item) => item.source === "career")!;
+  return dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: choiceId });
 }
 
-function resultOf(decision: PendingEvent, choiceId = "normal"): PendingEvent {
-  return decision.choices.find((choice) => choice.id === choiceId)!.effects.enqueueEvents![0]!;
+function startRecruitment(state: GameState, random: () => number): GameState {
+  return enqueueEventQueueItem(state, createCareerRecruitmentEvent(state, random));
 }
 
-afterEach(() => vi.restoreAllMocks());
-
-describe("career card preparation", () => {
-  it.each([
-    ["master", 2, 12, false],
-    ["master", 3, 0, false],
-    ["master", 3, 1, true],
-    ["master", 3, 8, true],
-    ["phd", 5, 12, false],
-    ["phd", 6, 0, false],
-    ["phd", 6, 1, true],
-    ["phd", 6, 12, true],
-  ] as const)("gates %s year %i month %i by graduation year", (degree, year, month, available) => {
-    const state = { ...readyState(), degree, year, month, totalMonths: (year - 1) * 12 + month - 1 };
-    expect(getCareerPreparationFailure(state) === null).toBe(available);
-    expect(getCareerPreparationFailure(state, "internet") === null).toBe(available);
-    expect(prepareCareer(state, "internet") === state).toBe(!available);
-  });
-
-  it("blocks setup, finished and graduated states", () => {
-    const ready = readyState();
-    for (const state of [
-      { ...ready, phase: "setup" as const },
-      { ...ready, phase: "finished" as const },
-      { ...ready, ending: "master" as const },
-    ]) {
-      expect(getCareerPreparationFailure(state)).not.toBeNull();
-      expect(prepareCareer(state, "academic")).toBe(state);
-    }
-  });
-
-  it.each([
-    ["internet", 4, 43],
-    ["stateOwned", 2, 43],
-    ["civilService", 3, 40],
-    ["academic", 2, 46],
-  ] as const)("directly advances %s for exactly %i SAN with no AP or event", (type, cost, gain) => {
+describe("career preparation", () => {
+  it("adds only monthly practice, so a changed resume is counted once", () => {
     const state = readyState();
-    const snapshot = structuredClone(state);
-    const prepared = dispatchAction(state, "prepare-career", { careerType: type });
-    expect(CAREER_PREPARATION_SAN_COST[type]).toBe(cost);
-    expect(prepared.player.san).toBe(20 - cost);
-    expect(prepared.careerProgress).toEqual({ ...state.careerProgress, [type]: gain });
-    expect(prepared.careerPreparedMonths).toEqual({ [type]: 24 });
-    expect(prepared.careerLastPreparedTotalMonths).toBeNull();
-    expect(prepared.eventQueue).toEqual([]);
-    expect(prepared.actionState).toEqual(state.actionState);
-    expect(state).toEqual(snapshot);
+    const first = prepareCareer(state, "internet");
+    expect(first.careerProgress.internet).toBe(10);
+    expect(getCareerAbility(first, "internet")).toBe(30);
+    expect(first.player.san).toBe(36);
+    expect(prepareCareer(first, "internet")).toBe(first);
+    const published = { ...first, totalResearchScore: 3, internshipCount: 1 };
+    expect(getCareerAbility(published, "internet")).toBe(62);
+    expect(published.careerProgress.internet).toBe(10);
+    expect(prepareCareer({ ...published, month: 2, totalMonths: 26 }, "internet").careerProgress.internet).toBe(20);
   });
 
-  it("rejects invalid directions without mutation", () => {
-    const state = readyState();
-    expect(getCareerPreparationFailure(state, "invalid" as CareerType)).not.toBeNull();
-    expect(prepareCareer(state, "invalid" as CareerType)).toBe(state);
-  });
-
-  it("advances every direction independently once per month and reopens next month", () => {
-    const state = readyState();
-    let prepared = state;
-    for (const type of ["internet", "stateOwned", "civilService", "academic"] as const) {
-      expect(getCareerPreparationFailure(prepared, type)).toBeNull();
-      prepared = dispatchAction(prepared, "prepare-career", { careerType: type });
-      expect(getCareerPreparationFailure(prepared, type)).not.toBeNull();
-      expect(prepareCareer(prepared, type)).toBe(prepared);
-    }
-    expect(prepared.player.san).toBe(9);
-    expect(prepared.careerProgress).toEqual({ internet: 43, stateOwned: 43, civilService: 40, academic: 46 });
-    expect(prepared.careerPreparedMonths).toEqual({ internet: 24, stateOwned: 24, civilService: 24, academic: 24 });
-    expect(prepared.actionState).toEqual(state.actionState);
-    expect(prepared.eventQueue).toEqual([]);
-    const nextMonth = { ...prepared, month: 2, totalMonths: 25 };
-    for (const type of ["internet", "stateOwned", "civilService", "academic"] as const) {
-      expect(getCareerPreparationFailure(nextMonth, type)).toBeNull();
-      expect(prepareCareer(nextMonth, type).careerPreparedMonths[type]).toBe(25);
-    }
-    expect(prepareCareer(nextMonth, "academic").careerProgress.academic).toBe(92);
-  });
-
-  it("ignores the legacy global allowance when a direction is supplied", () => {
-    const state = readyState();
-    const prepared = { ...state, careerLastPreparedTotalMonths: state.totalMonths };
-    expect(getCareerPreparationFailure(prepared)).not.toBeNull();
-    for (const type of ["internet", "stateOwned", "civilService", "academic"] as const) {
-      expect(getCareerPreparationFailure(prepared, type)).toBeNull();
-      expect(prepareCareer(prepared, type).careerPreparedMonths[type]).toBe(24);
-    }
-  });
-
-  it.each([1, 4, 7, 10])("keeps all four costs fixed in month %i despite SAN cost multipliers", (month) => {
-    const state = readyState();
-    const live = {
-      ...state,
-      month,
-      buffs: [{ id: "cost", name: "精力消耗", source: "test", timing: "monthly" as const, remainingMonths: 1, activeOperationSanMultiplier: 2 }],
-    };
-    for (const [type, cost] of [["internet", 4], ["stateOwned", 2], ["civilService", 3], ["academic", 2]] as const) {
-      expect(prepareCareer(live, type).player.san).toBe(20 - cost);
-    }
-  });
-
-  it("allows direct advancement with all monthly AP already spent", () => {
-    const state = readyState();
-    state.actionState.used = state.actionState.limit;
-    const prepared = dispatchAction(state, "prepare-career", { careerType: "internet" });
-    expect(prepared.careerProgress.internet).toBe(43);
-    expect(prepared.actionState).toEqual(state.actionState);
-  });
-
-  it.each([
-    ["internet", 4], ["stateOwned", 2], ["civilService", 3], ["academic", 2],
-  ] as const)("allows lethal %s advancement and lets engine endings settle", (type, cost) => {
-    const initial = readyState();
-    const state = { ...initial, player: { ...initial.player, san: cost - 1 } };
-    expect(getCareerPreparationFailure(state, type)).toBeNull();
-    const direct = prepareCareer(state, type);
-    expect(direct.player.san).toBe(-1);
-    expect(direct.phase).toBe("playing");
-    expect(direct.ending).toBeNull();
-    const settled = dispatchAction(state, "prepare-career", { careerType: type });
-    expect(settled.player.san).toBe(-1);
-    expect(settled.careerProgress[type]).toBeGreaterThan(0);
-    expect(settled.careerPreparedMonths[type]).toBe(24);
-    expect(settled.actionState).toEqual(state.actionState);
-    expect(settled.phase).toBe("finished");
-    expect(settled.ending).toBe("burnout");
-    expect(settled.endingCause?.text).toContain(`SAN -${cost}`);
-    const exact = dispatchAction({ ...state, player: { ...state.player, san: cost } }, "prepare-career", { careerType: type });
-    expect(exact.player.san).toBe(0);
-    expect(exact.phase).toBe("playing");
-  });
-
-  it("retains current stat, first-author publication and internship bonuses", () => {
-    const state = readyState();
-    const paper = { id: "published", title: "Paper", topicId: "topic", topicLabel: "Topic", heatMultiplier: 1, prepublicationDecayRate: 0.1, idea: 1, experiment: 1, writing: 1, status: "published" as const, target: "C" as const, reviewMonthsLeft: 0, submittedIdea: 1, submittedExperiment: 1, submittedWriting: 1 };
-    const live = {
-      ...state,
-      player: { ...state.player, research: 41, social: 21 },
-      internshipCount: 2,
-      papers: [paper, { ...paper, id: "draft", status: "draft" as const }],
-      externalPublications: [{ ...paper, id: "external" }, { ...paper, id: "coauthor", nonFirstAuthor: true }],
-      careerProgress: { internet: 90, stateOwned: 90, civilService: 90, academic: 90 },
-    };
-    for (const [type, gain] of [["internet", 85], ["stateOwned", 64], ["civilService", 46], ["academic", 64]] as const) {
-      expect(prepareCareer(live, type).careerProgress[type]).toBe(90 + gain);
-    }
-  });
-
-  it("blocks parallel requests at every pending stage regardless of direction", () => {
-    const state = readyState();
-    const root = createCareerEventForType(state, "internet");
-    const decision = decisionOf(root);
-    for (const event of [root, decision, resultOf(decision), { ...root, careerPreparation: undefined }]) {
-      const pending = { ...state, eventQueue: [createEventQueueItem(event, 1)] };
-      expect(getCareerPreparationFailure(pending)).toContain("当前求职");
-      expect(getCareerPreparationFailure(pending, "academic")).toContain("当前求职");
-      expect(prepareCareer(pending, "academic")).toBe(pending);
-    }
-  });
-
-  it("relocks the card after transferring and resetting its allowance", () => {
-    const state = { ...readyState(), degree: "phd" as const, careerLastPreparedTotalMonths: null };
-    expect(getCareerPreparationFailure(state)).toContain("第六年");
-    expect(prepareCareer(state, "academic")).toBe(state);
-    expect(getCareerPreparationFailure({ ...state, year: 6, totalMonths: 60 })).toBeNull();
-  });
-
-  it.each(["normal", "pause"])("commits legacy %s exactly at confirmation through the engine", (choiceId) => {
-    const initial = readyState();
-    const queued = enqueueEventQueueItem(initial, createCareerEventForType(initial, "internet"));
-    const root = queued.eventQueue.find((event) => event.source === "career")!;
-    const second = dispatchAction(queued, "resolve-event", { eventId: root.id, eventChoiceId: root.choices[0]!.id });
-    const decision = second.eventQueue.find((event) => event.source === "career")!;
-    const third = dispatchAction(second, "resolve-event", { eventId: decision.id, eventChoiceId: choiceId });
-    const result = third.eventQueue.find((event) => event.source === "career")!;
-    expect(third.player.san).toBe(initial.player.san);
-    expect(third.careerProgress).toEqual(initial.careerProgress);
-    expect(third.careerLastPreparedTotalMonths).toBeNull();
-    const settled = dispatchAction(third, "resolve-event", { eventId: result.id, eventChoiceId: result.choices[0]!.id });
-    expect(settled.player.san).toBe(initial.player.san - (choiceId === "normal" ? 6 : 0));
-    expect(settled.careerProgress.internet).toBe(choiceId === "normal" ? 43 : 0);
-    expect(settled.careerLastPreparedTotalMonths).toBe(initial.totalMonths);
-    expect(settled.actionState).toEqual(initial.actionState);
-    expect(settled.careerPreparedMonths).toEqual({});
-    expect(getCareerPreparationFailure(settled)).not.toBeNull();
-    expect(getCareerPreparationFailure(settled, "academic")).toBeNull();
-  });
-
-  it.each(["internet", "stateOwned", "civilService", "academic"] as const)("carries %s metadata and settles only on third confirmation", (type) => {
-    const state = readyState();
-    const root = createCareerEventForType(state, type);
-    const decision = decisionOf(root);
-    const metadata = { type, totalMonths: 24, degree: "master" };
-    expect(root.careerPreparation).toEqual(metadata);
-    expect(decision.careerPreparation).toEqual(metadata);
-    expect(root.choices[0]!.effects).toEqual({ enqueueEvents: [decision] });
-    expect(decision.choices.map((choice) => choice.id)).toEqual(CAREER_OPTIONS.map((option) => option.id));
-    for (const choice of decision.choices) {
-      const result = resultOf(decision, choice.id);
-      expect(choice.effects).toEqual({ enqueueEvents: [result] });
-      expect(result.careerPreparation).toEqual(metadata);
-      expect(result.stage).toBe("result");
-      expect(result.choices[0]!.effects.recordCareerPreparation).toBe(true);
-      expect(result.choices[0]!.effects.careerType).toBe(type);
-    }
-    expect(JSON.stringify(root)).not.toMatch(/abandonCareer|放弃方向|求职评估|小厂|大厂|省部级|顶尖高校/);
+  it("keeps teacher hiring unavailable to master's students", () => {
+    const master = readyState();
+    expect(getCareerPreparationFailure(master, "academic")).toContain("博士");
+    expect(prepareCareer(master, "academic")).toBe(master);
+    expect(getCareerPreparationFailure(readyState("phd"), "academic")).toBeNull();
   });
 });
 
-describe("live career preparation refresh", () => {
-  it("replaces an old deferred result patch with live confirmation effects", () => {
+describe("monthly recruitment", () => {
+  it("keeps job buttons short and puts pay and difficulty into the second act", () => {
+    for (const type of ["internet", "stateOwned", "civilService", "academic"] as const) {
+      const state = readyState("phd", 4);
+      const root = createCareerRecruitmentEvent(state, () => 0);
+      const direction = root.choices.find((choice) => choice.id === `choose-${type}`)!.effects.enqueueEvents![0]!;
+      const jobs = CAREER_JOBS[type];
+      expect(root.title).toBe("找工作");
+      expect(root.description.split("\n\n")).toHaveLength(2);
+      expect(direction.title).toContain("找工作 ➜");
+      expect(direction.description.split("\n\n")).toHaveLength(3);
+      expect(direction.choices).toHaveLength(3);
+      for (const choice of direction.choices) {
+        const job = jobs.find((item) => choice.id === `apply-${item.id}`)!;
+        expect(choice.label).toBe(job.name);
+        expect(choice.label).not.toMatch(/%|万|年总包|年收入/);
+        expect(direction.description).toContain(job.name);
+        if (job.compensation) expect(direction.description).toContain(job.compensation);
+        const result = choice.effects.enqueueEvents![0]!;
+        expect(result.title).toContain("找工作 ➜");
+        expect(result.description.split("\n\n机制结算")[0]!.split("\n\n")).toHaveLength(2);
+        expect(result.description).not.toContain("成功率");
+      }
+    }
+  });
+
+  it("gives failed interviews and resting distinct stories without inventing an offer", () => {
+    const state = readyState();
+    const root = createCareerRecruitmentEvent(state, () => 0.99);
+    const direction = root.choices.find((choice) => choice.id === "choose-internet")!.effects.enqueueEvents![0]!;
+    const result = direction.choices[0]!.effects.enqueueEvents![0]!;
+    expect(result.description).toContain("没有下一轮");
+    expect(result.description).not.toContain("录用通知");
+    const rest = root.choices.find((choice) => choice.id === "rest")!.effects.enqueueEvents![0]!;
+    expect(rest.description).not.toContain("下个月还会有");
+    expect(rest.choices[0]!.effects.enqueueEvents![0]!.description).not.toContain("已收到的 offer");
+  });
+
+  it("schedules each final-year month within the four windows, even after offers", () => {
+    for (const degree of ["master", "phd"] as const) {
+      for (let month = 1; month <= 10; month += 1) {
+        const state = readyState(degree, month);
+        const expected = [
+          ...(month <= 7 ? ["choose-internet"] : []),
+          ...(month >= 2 && month <= 8 ? ["choose-stateOwned"] : []),
+          ...(month >= 3 && month <= 9 ? ["choose-civilService"] : []),
+          ...(degree === "phd" && month >= 4 ? ["choose-academic"] : []),
+          "rest",
+        ];
+        const root = createCareerRecruitmentEvent(state, () => 0);
+        expect(root.choices.map((choice) => choice.id), `${degree} month ${month}`).toEqual(expected);
+        expect(collectFixedEventsForState(state, () => 0).filter((event) => event.source === "career"), `${degree} month ${month}`).toHaveLength(1);
+        const offered = { ...state, careerOffers: {
+          internet: { type: "internet" as const, jobId: "offer-internet", name: "已有大厂 offer", threshold: 45, score: 80 },
+          stateOwned: { type: "stateOwned" as const, jobId: "offer-state", name: "已有央国企 offer", threshold: 30, score: 80 },
+          civilService: { type: "civilService" as const, jobId: "offer-civil", name: "已有公务员 offer", threshold: 25, score: 80 },
+          academic: { type: "academic" as const, jobId: "offer-academic", name: "已有教职 offer", threshold: 30, score: 80 },
+        } };
+        expect(createCareerRecruitmentEvent(offered, () => 0).choices.map((choice) => choice.id)).toEqual(expected);
+        expect(shouldScheduleCareerRecruitment(offered)).toBe(true);
+      }
+    }
+    expect(createCareerRecruitmentEvent(readyState("phd", 4), () => 0).choices).toHaveLength(5);
+    expect(createCareerRecruitmentEvent(readyState("master", 10), () => 0).description).toContain("招聘窗口都已结束");
+    expect(shouldScheduleCareerRecruitment({ ...readyState("phd", 10), year: 5 })).toBe(false);
+  });
+
+  it("defers the interview until third-scene confirmation, then grants an offer and experience", () => {
     const initial = readyState();
-    const result = resultOf(decisionOf(createCareerEventForType(initial, "internet")));
-    const stale = {
-      ...result,
-      deferredStatePatch: [
-        { path: ["player", "san"], previousValue: 20, value: 14 },
-        { path: ["careerProgress", "internet"], previousValue: 0, value: 43 },
-      ],
-    };
-    const live = {
-      ...initial,
-      sanCap: 50,
-      player: { ...initial.player, research: 40, social: 20, san: 30 },
-      careerProgress: { ...initial.careerProgress, internet: 90 },
-      eventQueue: [createEventQueueItem(stale, 1)],
-    };
-    const settled = dispatchAction(live, "resolve-event", { eventId: stale.id, eventChoiceId: stale.choices[0]!.id });
-    expect(settled.player.san).toBe(24);
-    expect(settled.careerProgress.internet).toBe(141);
-    expect(settled.careerLastPreparedTotalMonths).toBe(24);
+    let current = startRecruitment(initial, () => 0);
+    current = advanceScene(current, "choose-internet");
+    expect(current.eventQueue.find((event) => event.source === "career")!.stage).toBe("act2");
+    const jobChoice = current.eventQueue.find((event) => event.source === "career")!.choices[0]!;
+    current = advanceScene(current, jobChoice.id);
+    expect(current.eventQueue.find((event) => event.source === "career")!.stage).toBe("result");
+    expect(current.player.san).toBe(40);
+    expect(current.careerProgress.internet).toBe(0);
+    expect(current.careerOffers.internet).toBeUndefined();
+    current = advanceScene(current, "accept-offer");
+    expect(current.player.san).toBe(34);
+    expect(current.careerProgress.internet).toBe(5);
+    expect(current.careerInterviewExperience.internet).toBe(5);
+    expect(current.careerOffers.internet?.jobId).toBe(CAREER_JOBS.internet[0]!.id);
+    expect(current.careerLastRecruitmentTotalMonths).toBe(initial.totalMonths);
+    expect(shouldScheduleCareerRecruitment(current)).toBe(false);
   });
 
-  it.each(["act1", "act2", "result", "act3"] as const)("refreshes live progress, stats and SAN in %s without RNG or mutation", (stage) => {
-    const state = readyState();
-    const root = createCareerEventForType(state, "internet");
-    const decision = decisionOf(root);
-    const original = stage === "act1" ? root : stage === "act2" ? decision : { ...resultOf(decision), stage };
-    const history = [{ title: "原场景", description: "原记录", choices: [], selectedChoiceId: "normal" }];
-    const event = { ...original, history, deferredStatePatch: [{ path: ["player", "san"], previousValue: 20, value: 14 }] };
-    const live = {
-      ...state,
-      careerProgress: { ...state.careerProgress, internet: 90 },
-      internshipCount: 2,
-      player: { ...state.player, research: 40, social: 20, san: 1 },
-      buffs: [{ id: "cost", name: "精力消耗", source: "test", timing: "monthly" as const, remainingMonths: 1, activeOperationSanMultiplier: 2 }],
-    };
-    const snapshot = structuredClone({ live, event });
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("unexpected RNG"); });
-    const refreshed = refreshCareerPreparation(live, event);
-    const refreshedDecision = stage === "act1" ? decisionOf(refreshed) : stage === "act2" ? refreshed : null;
-    const result = refreshedDecision ? resultOf(refreshedDecision) : refreshed;
-    expect(result.choices[0]!.effects).toMatchObject({ careerProgress: 81, san: -12, recordCareerPreparation: true });
-    expect(result.choices[0]!.disabledReason).toContain("12");
-    expect(result.description).toContain("从 90 提升到 171");
-    expect(refreshed.id).toBe(event.id);
-    expect(refreshed.stage).toBe(stage);
-    expect(refreshed.history).toBe(history);
-    expect(refreshed.deferredStatePatch).toBeUndefined();
-    expect(refreshed.careerPreparation).toEqual(event.careerPreparation);
-    expect(refreshed.choices.map((choice) => choice.id)).toEqual(event.choices.map((choice) => choice.id));
-    expect({ live, event }).toEqual(snapshot);
-    expect(random).not.toHaveBeenCalled();
+  it("records failed interviews and lets players keep or replace one offer per track", () => {
+    const initial = readyState();
+    let failed = startRecruitment(initial, () => 0.99);
+    failed = advanceScene(failed, "choose-internet");
+    failed = advanceScene(failed, failed.eventQueue.find((event) => event.source === "career")!.choices[0]!.id);
+    expect(failed.eventQueue.find((event) => event.source === "career")!.choices.map((choice) => choice.id)).toEqual(["confirm"]);
+    failed = advanceScene(failed, "confirm");
+    expect(failed.careerProgress.internet).toBe(10);
+    expect(failed.careerInterviewExperience.internet).toBe(10);
+    expect(failed.careerOffers.internet).toBeUndefined();
 
-    const affordable = refreshCareerPreparation({ ...live, player: { ...live.player, san: 12 } }, refreshed);
-    const affordableResult = stage === "act1" ? resultOf(decisionOf(affordable)) : stage === "act2" ? resultOf(affordable) : affordable;
-    expect(affordableResult.choices[0]!.disabledReason).toBeUndefined();
+    const old = { type: "internet" as const, jobId: "old", name: "旧 offer", threshold: 1, score: 1 };
+    for (const decision of ["keep-offer", "replace-offer"]) {
+      let current = startRecruitment({ ...initial, careerOffers: { internet: old } }, () => 0);
+      current = advanceScene(current, "choose-internet");
+      current = advanceScene(current, current.eventQueue.find((event) => event.source === "career")!.choices[1]!.id);
+      current = advanceScene(current, decision);
+      expect(current.careerOffers.internet?.jobId === "old").toBe(decision === "keep-offer");
+      expect(Object.keys(current.careerOffers)).toEqual(["internet"]);
+    }
   });
 
-  it("refreshes paper-count bonuses using current first-author publications", () => {
-    const state = readyState();
-    const event = createCareerEventForType(state, "academic");
-    const paper = { id: "published", title: "Paper", topicId: "topic", topicLabel: "Topic", heatMultiplier: 1, prepublicationDecayRate: 0.1, idea: 1, experiment: 1, writing: 1, status: "published" as const, target: "C" as const, reviewMonthsLeft: 0, submittedIdea: 1, submittedExperiment: 1, submittedWriting: 1 };
-    const live = { ...state, papers: [paper], externalPublications: [{ ...paper, id: "coauthor", nonFirstAuthor: true }] };
-    const result = resultOf(decisionOf(refreshCareerPreparation(live, event)));
-    expect(result.choices[0]!.effects.careerProgress).toBe(49);
-  });
-
-  it("keeps settled reviews, old months and transferred-degree events unchanged", () => {
-    const state = readyState();
-    const result = resultOf(decisionOf(createCareerEventForType(state, "internet")));
-    for (const live of [
-      { ...state, totalMonths: 25, month: 2 },
-      { ...state, totalMonths: 36, year: 4 },
-      { ...state, degree: "phd" as const },
-      { ...state, careerLastPreparedTotalMonths: 24, careerProgress: { ...state.careerProgress, internet: 100 } },
-    ]) expect(refreshCareerPreparation(live, result)).toBe(result);
-    const unrelated = { ...result, source: "fixed" as const };
-    expect(refreshCareerPreparation(state, unrelated)).toBe(unrelated);
-    const legacy = { ...result, careerPreparation: undefined };
-    expect(refreshCareerPreparation(state, legacy)).toBe(legacy);
+  it("uses rest without SAN cost and blocks a second recruitment this month", () => {
+    const initial = readyState();
+    let current = startRecruitment(initial, () => 0);
+    current = advanceScene(current, "rest");
+    current = advanceScene(current, "rest");
+    current = advanceScene(current, "confirm");
+    expect(current.player.san).toBe(initial.player.san);
+    expect(current.careerLastRecruitmentTotalMonths).toBe(initial.totalMonths);
+    expect(shouldScheduleCareerRecruitment(current)).toBe(false);
   });
 });

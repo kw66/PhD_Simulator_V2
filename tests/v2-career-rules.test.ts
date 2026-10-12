@@ -1,36 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { CAREER_DEFINITIONS, getCareerEventTargetYear } from "../src/core/v2-career-rules";
 
-import {
-  CAREER_DEFINITIONS,
-  CAREER_OPTIONS,
-  calculateCareerProgress,
-  getCareerEventTargetYear,
-  getCareerLevel,
-} from "../src/core/v2-career-rules";
-
-describe("v2 career rules", () => {
-  it("提供稳定的求职配置与月度活跃窗口", () => {
-    expect(CAREER_DEFINITIONS.internet.activeMonths).toEqual([11, 12, 1, 2]);
-    expect(CAREER_OPTIONS.map((option) => option.baseProgress)).toEqual([0, 15, 35, 60]);
-  });
-
-  it("按当前规则计算求职目标年", () => {
+describe("career calendar", () => {
+  it("opens each track in its own September-to-June window", () => {
+    expect(CAREER_DEFINITIONS.internet.activeMonths).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(CAREER_DEFINITIONS.stateOwned.activeMonths).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(CAREER_DEFINITIONS.civilService.activeMonths).toEqual([3, 4, 5, 6, 7, 8, 9]);
+    expect(CAREER_DEFINITIONS.academic.activeMonths).toEqual([4, 5, 6, 7, 8, 9, 10]);
     expect(getCareerEventTargetYear("master")).toBe(3);
-    expect(getCareerEventTargetYear("phd")).toBe(5);
-  });
-
-  it("按当前权重公式计算求职进度", () => {
-    const progress = calculateCareerProgress("internet", CAREER_OPTIONS[2], {
-      research: 20,
-      social: 10,
-      publishedPaperCount: 3,
-      internshipCount: 2,
-    });
-    expect(progress).toBe(78);
-  });
-
-  it("能根据进度映射当前 offer 层级", () => {
-    expect(getCareerLevel("academic", 199).name).toBe("普本");
-    expect(getCareerLevel("academic", 200).name).toBe("211");
+    expect(getCareerEventTargetYear("phd")).toBe(6);
   });
 });

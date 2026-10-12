@@ -34,8 +34,9 @@ export function buildLoverDevelopmentContext(input: {
   origin?: string;
 }, getRoll: () => number = Math.random): LoverDevelopmentContext {
   const encounter = input.state?.conferenceEncounterState ?? input.conferenceEncounterState;
+  const profileRolls: [number, number] = [getRoll(), getRoll()];
   const contact = input.contact ?? encounter.scholars?.[input.type]
-    ?? createConferenceScholarContact(input.type, { id: "conference-contact", playerGender: input.playerGender });
+    ?? createConferenceScholarContact(input.type, { id: "lover-development", roll: getRoll(), playerGender: input.playerGender });
   return normalizeContext({
     type: input.type, totalMonths: input.totalMonths, playerGender: input.playerGender,
     loverGender: contact.gender,
@@ -45,7 +46,7 @@ export function buildLoverDevelopmentContext(input: {
     contact: { ...contact }, scholars: { ...encounter.scholars },
     research: input.state?.player.research,
     researchCap: input.state ? getResearchCap(input.state.researchCapacityState) : undefined,
-    profileRolls: [getRoll(), getRoll()],
+    profileRolls,
   });
 }
 
@@ -65,7 +66,7 @@ function getTypeName(type: LoverTypeId): string {
   return type === "beautiful" ? "活泼" : "聪慧";
 }
 
-export const LOVER_OCCUPIED_TEXT = "可你已经有了恋人。你不想让对方误会，也不愿辜负身边的人，决定把自己的近况说清楚。";
+export const LOVER_OCCUPIED_TEXT = "可你已经有了恋人，决定把近况说清楚，不让对方误会。";
 
 function unavailableText(context: LoverDevelopmentContext): string | undefined {
   if (context.setAside || context.canAddRelationship === false) return "你已有恋人，便坦诚说明近况，没有答应这次单独见面的邀约。";
@@ -101,35 +102,31 @@ function createLoverResult(input: LoverDevelopmentContext, decision: "accept" | 
   const narrative = unavailable
     ? context.contactAvailable === false && !context.setAside && context.canAddRelationship !== false
       ? [
-        `你翻到和${context.contact.name}的聊天记录，才发现上次交谈已经隔了很久。那张📍小店定位还夹在论文链接中间，点进去，营业时间已经改过了。你打出一句“最近还好吗”，又停下来想了想。`,
-        "走廊的灯熄了一排，你收起手机，没再追问那顿饭还约不约。回到工位，先前借给对方的书已经放在桌角，里面夹着一张写了“谢谢”的便签；你把书放回架上，也关掉了那个聊天窗口。",
+        `你翻到和${context.contact.name}的聊天记录，📍那家小店的定位还在。上次说话已隔了很久，当时约好的日期也早就过去了。`,
+        "你打出一句“最近还好吗”，又想起彼此已经没有按原来的节奏联系。字删掉后，屏幕仍亮了一会儿；那顿饭最终没有约成。",
       ]
       : [
-        `你给${context.contact.name}回消息时，在输入框前坐了好一会儿。${unavailable}写到“以后有机会”时，你又把这几个字删掉，重新检查了一遍才按下发送。`,
-        "对方过了一会儿回了句“明白了”，又问起会上提过的数据集。你找出📎资料链接发过去，接着收到恋人问晚饭吃什么的消息。桌边的饭卡差点被论文盖住，你摸了两遍才找到，赶紧起身出门。",
+        `你向${context.contact.name}说明了近况。${unavailable}你斟酌了一下措辞，还是把话说清楚，免得对方继续等一个含糊的回答。`,
+        "对方回了句“明白”，还叮嘱你别再忙得忘记吃饭。你谢过这份关心，却也知道那顿单独的晚饭不会再约了。",
       ]
     : decision === "accept"
       ? context.type === "beautiful"
         ? [
-          `你向${context.contact.name}点了点头：“我也想和你试试。”对方刚笑起来，又低头问了一遍“真的？”你伸手碰了碰桌边那只手，两个人都没再缩回去。刚才还能滔滔不绝介绍的小店，这会儿倒谁也想不起名字了。`,
-          "走到门口，你终于想起周末还有一组实验，赶紧把日程翻出来。对方凑过来看，划掉原先想去的远郊，改成学校附近吃晚饭：“那就等你关仪器，我先去排队。”你有些不好意思，又忍不住把那个晚上标了颗💗小心心。",
-          "回去的路上，手机接连亮了几次，一张菜单、一句忌口调查，最后又补了句“到宿舍告诉我”。你站在楼下回完消息才上楼，室友问怎么这么晚，你把门带上，笑着说刚才多走了一段路。",
+          `你对${context.contact.name}说：“可以试试。”对方笑了一下，又确认：“不是因为我让你吃最后一块🍰蛋糕吧？”你说不是，对方才把盘子推过来：“那先庆祝一下。”`,
+          "说到周末，两个人都翻出手机找时间。对方挑中学校附近一家小店，还认真问你有没有忌口。走出店门时你们放慢了脚步，明明顺路，却都没急着道别。",
         ]
         : [
-          `你看着${context.contact.name}，把那句“我也喜欢你”说了出来。对方握着笔的手松下来，笔帽滚到桌沿，你们同时伸手去接，碰到一起又笑了。原来刚才那页纸上反复描深的线，根本不是什么待解的公式。`,
-          "说到毕业后的城市，你还是迟疑了一下：“我现在真说不准。”对方点点头，把没吃完的点心往你这边推：“我也没有定，等有消息了就告诉你。”你拿起一块，才发现两个人为了说这几句话，已经把茶放凉了。",
-          "出门后，你们沿着🌙月光下的操场慢慢走。话题又绕到实验，你刚想掏手机找图，对方却先问晚饭吃饱没有。你把手机放回口袋，说还想吃碗面；这一次，陪你绕去食堂的人牵住了你的手。",
+          `你告诉${context.contact.name}，自己也愿意试着往前走一步。对方放下杯子，笑着说：“我刚才把这句话在心里练了三遍。”你承认自己也紧张，这才一起笑出声。`,
+          "回去路上，你们商量周末去逛书店，结果先争论起哪家店旁边的面馆更好吃。对方发来📍地址，你回了个“好”，又补上一句：“这次我不会走错门。”",
         ]
       : context.type === "beautiful"
         ? [
-          `你向${context.contact.name}道了谢，话到嘴边却停了几秒：“和你聊天很开心，但我没有同样的心意。”对方转了转手里的杯子，把已经打开的小店页面按灭。你想找句轻松的话，最后只低声说了句抱歉。`,
-          "出门时，对方仍替你扶了一下门，却没再像往常那样问要不要绕去买夜宵。你们在路口分别，这段还没开始的恋爱就此结束。回到宿舍，你把打了一半的“到家了吗”删掉，桌上的实验记录很久才翻过一页。",
-          `后来一次学术交流中，${context.replacement.name}拿着📷拍下的海报来问你一个实验细节，讲着讲着又笑起会场迷路的经历。你们交换了资料和姓名。这个新认识的同行渐渐进入你的视野，聊天先从那组没讲完的数据开始。`,
+          `你感谢${context.contact.name}，却说自己还没有一样的心意。对方本想像平时那样打个趣，话到嘴边又停住，最后点点头说“明白了”。你没有急着把气氛往回拉。`,
+          `你们在路口道别。后来一次会场交流中，${context.replacement.name}拿着📷拍下的海报来问实验细节。你们聊得很自然，先交换了资料，再慢慢记住彼此的名字。`,
         ]
         : [
-          `你看着${context.contact.name}摊开的笔记，犹豫着说：“我很喜欢和你讨论问题，可是……我没有一样的心意。”对方的笔停在半空，过了一会儿才扣上笔帽，说了句“我知道了”。那道原本想接着聊的问题，谁也没有再提。`,
-          "你们各自收好东西，走到路口，对方说接下来会忙一阵，就不再约饭了。你点点头，看着对方过了马路。这段心意到这里落了幕；后来再翻到那页一起画过的草图，你仍记得当时没能说顺的那句话。",
-          `后来在一次学术交流里，${context.replacement.name}对着📎讲义问起你用过的基线。你们借了支笔，在空白处列了几种验证办法，散场才想起交换姓名。这个新同行的名字留在了你的资料旁，下一次联系约的是互发实验结果。`,
+          `你对${context.contact.name}说，自己很珍惜这些交流，却没准备好开始一段关系。对方低头扣上笔帽，过了一会儿才说理解。那页本来要继续讨论的草图，你们都没有再翻开。`,
+          `你们没有再约那顿饭。后来${context.replacement.name}在会场拿着📎讲义问起一个研究问题，你们聊了起来。交换资料时，你也认真记下了这位新同行的名字。`,
         ];
   return {
     id: `lover-development-result-${unavailable ? "set-aside" : decision}-${context.type}-${context.totalMonths}`,
@@ -155,13 +152,13 @@ function createLoverDevelopmentAct2(input: LoverDevelopmentContext): PendingEven
   const context = normalizeContext(input);
   const unavailable = unavailableText(context);
   const confession = unavailable
-    ? `你重新读了一遍${context.contact.name}发来的消息，手指停在那张📍小店定位上。想起几次散场后并肩走过的路，你还是点开了回复框；打好的“这周末呢”却迟迟没有发出去，从收到消息到现在，有些事情已经不同了。`
+    ? `你重新读了${context.contact.name}发来的📍小店定位，想起当时自己答应得有多快。可近况已经变了，这次不能再像原先说好的那样赴约。`
     : context.type === "beautiful"
-      ? `饭后，${context.contact.name}举着菜单说这家的甜点值得再来，你刚点头，手机上的实验通知就亮了。对方没像平时那样打趣，只把菜单放下，捏了捏杯套：“其实今天不只是想请你吃饭。我喜欢你，想和你在一起。”`
-      : `${context.contact.name}带来的笔记一直没翻开，点单时还把你的那杯茶记错了。聊到毕业后想去的城市，对方沉默了一会儿，忽然把笔推到一边：“以后的事我还没有想好。但今天约你出来，是想问你愿不愿意和我在一起。”`;
+      ? `饭后，${context.contact.name}指着菜单说下次还想试另一道甜点，接着又问：“下次也只约我们俩，可以吗？”见你愣住，对方笑着补了一句：“别紧张，我只是想多见你几次。”`
+      : `和${context.contact.name}坐下后，你们从学校附近哪家店关门最晚聊到周末想去的地方。对方说本来准备了几句开场白，结果一句也用不上：“我想多了解你，平时也能约出来走走吗？”`;
   const reflection = context.type === "beautiful"
-    ? "你下意识把手机扣在桌上。对方曾冒雨给你带过夜宵，也在你放鸽子时发来一长串生气的小表情；想到这些，你嘴角动了动，又担心自己总把约定排在实验后面。桌上的🍰蛋糕还剩最后一口，对方没有催你，只问要不要再坐一会儿。"
-    : "你想起那些聊到宿舍断电的晚上，也想起有回争论一个做法，两个人半天没说话，最后还是对方先发来了补充实验。此刻桌边的☕茶杯被你转了半圈，你欣赏面前这个人，却还分不清自己舍不得结束的，究竟只是话题，还是每次一起回去的路。";
+    ? "你想起那些不赶时间的饭后散步，也想起自己忙起来总忘记回消息。对方把🍰最后一块蛋糕推过来，没催你，只问要不要再坐一会儿。"
+    : "你转着☕杯子，想起几次散场后明明可以直接回去，却还是一起绕了远路。你想认真回答，又怕一句话说得太郑重，反而让两个人都不自在。";
   return {
     id: `lover-development-act2-${context.type}-${context.totalMonths}`, title: "发展关系 ➜ 你的心意",
     description: [confession, context.canAddRelationship === false || context.setAside ? LOVER_OCCUPIED_TEXT
@@ -184,11 +181,11 @@ export function createLoverDevelopmentAct1(input: LoverDevelopmentContext): Pend
     id: `lover-development-act1-${context.type}-${context.totalMonths}`, title: "发展关系",
     description: [
       `${context.origin ? `这次在${context.origin}又见到了${context.contact.name}。` : `几次在会场碰面，你和${context.contact.name}渐渐熟了。`}${context.type === "beautiful"
-        ? "起初见面只聊论文，后来食堂出了新菜，对方也会发来📷照片，附一句“看着好吃，千万别买”。有次你错过饭点，对方还拎着饭盒等在实验楼下，一边抱怨饭快凉了，一边问你的实验跑完没有。"
-        : "从茶歇时没聊完的问题，到深夜发来的几笔草图，你们的话题渐渐多了起来。有次你把失败结果发过去，对方回了一页📎标注，末尾却另起一行问你吃饭没有。你看着那行字，先回了晚饭，才去看实验。"}`,
+        ? "你错过饭点时，对方发来📷食堂新菜的照片，附一句“再晚就卖完啦”。后来会场茶歇多出一块小点心，对方说是拿多了，你也没拆穿。"
+        : "起初你们聊会上的报告，后来也会互发学校附近的小店。一次散场突然下雨，对方问你带没带伞；你说带了，却发现伞还在宿舍，对方笑着把伞往你这边挪了挪。"}`,
       unavailableText(context) ?? (context.type === "beautiful"
-        ? "散场时，你们照例并肩往外走，对方在门口停住：“下次不赶会了，找天一起吃饭？就我们俩。”你差点照常开个玩笑，看到对方正等你的回答，又把话咽了回去。回宿舍后，那家小店的位置还在屏幕上，你翻了两遍日历才开始打字。"
-        : "散场后，对方发来一家安静小店的位置：“下次想单独请你吃饭，聊点论文以外的事。”你回了个“好”，又担心显得太随意，补问哪天方便。对方正在输入的提示亮了又灭，你盯着屏幕，才发现自己已经把打开的论文晾了好一会儿。"),
+        ? "散场时，对方问：“下次不赶会了，单独吃顿饭？”你答应得很快，走出几步才想起没问是哪天。回宿舍后，对方把小店定位发来，你又把日历翻了一遍。"
+        : "散场后，对方发来一家小店的位置：“下次只我们俩去吃饭？”你回了“好”，又觉得太短，补了一句“那家店有什么好吃的”。等消息时，你连桌上的水凉了都没察觉。"),
       `小提示：出现条件：与${context.contact.name}搭讪≥3次（含本次），社交≥12，且没有恋人。`,
     ].join("\n\n"),
     narrativeNames: [context.contact.name],

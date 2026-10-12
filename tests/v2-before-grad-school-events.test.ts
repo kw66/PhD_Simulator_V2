@@ -296,6 +296,8 @@ describe("v2 before grad school events", () => {
       funding: 30,
       horizontalProgress: 0,
       verticalProgress: 0,
+      playerProjectCompletions: { horizontal: 0, vertical: 0 },
+      playerProjectParticipation: { horizontal: false, vertical: false },
       nextProject: "horizontal",
       monthlyActivity: "暂无项目安排",
       awards: [],

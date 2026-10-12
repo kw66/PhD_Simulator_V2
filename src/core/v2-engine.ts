@@ -406,8 +406,10 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   if (state.degree === "master" && nextState.degree === "phd") {
     nextState = { ...nextState, thesis: createInitialThesisState(),
       careerProgress: { internet: 0, stateOwned: 0, civilService: 0, academic: 0 },
-      careerLastPreparedTotalMonths: null,
+      careerInterviewExperience: { internet: 0, stateOwned: 0, civilService: 0, academic: 0 },
       careerPreparedMonths: {},
+      careerLastRecruitmentTotalMonths: null,
+      careerOffers: {},
       eventQueue: nextState.eventQueue.filter((event) => event.source !== "thesis" && event.source !== "career"),
     };
   }

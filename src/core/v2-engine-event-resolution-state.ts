@@ -221,6 +221,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   const scholarshipState = effects.scholarshipAward
     ? {
         lastAwardYear: effects.scholarshipAward.year,
+        awardCount: (state.scholarshipState.awardCount ?? 0) + 1,
         scoreBaseline: Math.max(0, effects.scholarshipAward.scoreBaseline),
         claimedPaperIds: [...new Set([
           ...state.scholarshipState.claimedPaperIds,
@@ -306,12 +307,22 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       ? { ...state.thesis, reviewResolved: true } : state.thesis;
   const careerProgress = transferToPhd
     ? { internet: 0, stateOwned: 0, civilService: 0, academic: 0 }
-    : effects.careerType && effects.careerProgress
+    : effects.careerRecruitment?.type && effects.careerRecruitment.experienceGain
     ? {
         ...state.careerProgress,
-        [effects.careerType]: state.careerProgress[effects.careerType] + effects.careerProgress,
+        [effects.careerRecruitment.type]: state.careerProgress[effects.careerRecruitment.type]
+          + effects.careerRecruitment.experienceGain,
       }
     : state.careerProgress;
+  const careerInterviewExperience = transferToPhd
+    ? { internet: 0, stateOwned: 0, civilService: 0, academic: 0 }
+    : effects.careerRecruitment?.type && effects.careerRecruitment.experienceGain
+      ? {
+          ...state.careerInterviewExperience,
+          [effects.careerRecruitment.type]: state.careerInterviewExperience[effects.careerRecruitment.type]
+            + effects.careerRecruitment.experienceGain,
+        }
+      : state.careerInterviewExperience;
   const scopedPapers = effects.draftCitationDebuffMultiplier === undefined && !effects.markDraftImageMisuse
     ? state.papers
     : state.papers.map((paper) => {
@@ -432,9 +443,13 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     eventQueue: transferToPhd
       ? state.eventQueue.filter((event) => event.source !== "thesis" && event.source !== "career") : state.eventQueue,
     careerProgress,
+    careerInterviewExperience,
     careerPreparedMonths: transferToPhd ? {} : state.careerPreparedMonths,
-    careerLastPreparedTotalMonths: transferToPhd ? null
-      : effects.recordCareerPreparation ? state.totalMonths : state.careerLastPreparedTotalMonths,
+    careerLastRecruitmentTotalMonths: transferToPhd ? null
+      : effects.careerRecruitment?.totalMonths ?? state.careerLastRecruitmentTotalMonths,
+    careerOffers: transferToPhd ? {} : effects.careerRecruitment?.offer
+      ? { ...state.careerOffers, [effects.careerRecruitment.offer.type]: effects.careerRecruitment.offer }
+      : state.careerOffers,
     papers,
     externalPublications,
     relationshipState,
@@ -511,7 +526,7 @@ export function applyChoiceEffectsToState(
     const { type, amount, guidanceRolls } = choice.effects.labProjectProgress;
     let rollIndex = 0;
     const random = guidanceRolls ? () => guidanceRolls[rollIndex++] ?? 0 : Math.random;
-    nextState = advanceSharedLabProject(nextState, type, amount, random).state;
+    nextState = advanceSharedLabProject(nextState, type, amount, random, "player").state;
   }
   if (choice.effects.paperReviewSettlement) {
     nextState = applyPaperReviewSettlement(nextState, choice.effects.paperReviewSettlement);

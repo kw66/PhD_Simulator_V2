@@ -6,6 +6,7 @@ import { createCcigEvent } from "./v2-fixed-events-ccig-decision-events";
 import { resolveCcigFixedEvent } from "./v2-fixed-events-ccig-resolution";
 import { createMentorAssignEvent } from "./v2-fixed-events-mentor-assign";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
+import { createCareerRecruitmentEvent, shouldScheduleCareerRecruitment } from "./v2-monthly-career-events";
 import { createScholarshipEvent, resolveScholarshipApplication } from "./v2-fixed-events-scholarship";
 import {
   createSummerVacationEvent,
@@ -103,6 +104,10 @@ export function collectFixedEventsForState(
   if (state.month === 11) {
     events.push(createSummerVacationEvent(state));
     events.push(createYearSummaryEvent(state));
+  }
+
+  if (shouldScheduleCareerRecruitment(state)) {
+    events.push(createCareerRecruitmentEvent(state, getRoll));
   }
 
   return events;

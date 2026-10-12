@@ -135,6 +135,7 @@ describe("shared lab project lifecycle", () => {
     expect(after.advisorProgressState.funding).toBe(contributor === "player" ? 75 : contributor === "advisor" ? 76.5 : 73);
     expect(after.player.money).toBe(before.player.money + 2.5);
     expect(after.advisorProgressState.horizontalProgress).toBe(contributor === "player" ? 10 : 0);
+    expect(after.advisorProgressState.playerProjectCompletions.horizontal).toBe(contributor === "player" ? 1 : 0);
     expect(after.advisorProgressState.researchAccumulation).toBe(20);
     expect(after.advisorProgressState.pendingGuidanceToPlayer).toBeUndefined();
     expect(collaborationTotal(after.papers[0]!)).toBe(0);
@@ -148,6 +149,31 @@ describe("shared lab project lifecycle", () => {
     expect(completed).toMatchObject({ gain: 202, completed: 3, state: { advisorProgressState: { horizontalProgress: 1, funding: 165 }, player: { money: 27.5 } } });
     expect(completed.state.papers).toEqual(before.papers);
     expect(completed.state.fellowPapers).toEqual(before.fellowPapers);
+  });
+
+  it.each(["horizontal", "vertical"] as const)("counts a %s project only when the player contributed before completion", (type) => {
+    const before = makeState();
+    const partial = advanceSharedLabProject(before, type, 30, Math.random, "player").state;
+    expect(partial.advisorProgressState.playerProjectCompletions[type]).toBe(0);
+    expect(partial.advisorProgressState.playerProjectParticipation[type]).toBe(true);
+
+    const completed = advanceSharedLabProject(partial, type, 70, Math.random).state;
+    expect(completed.advisorProgressState.playerProjectCompletions[type]).toBe(1);
+    expect(completed.advisorProgressState.playerProjectParticipation[type]).toBe(false);
+
+    const labOnly = advanceSharedLabProject(completed, type, 100, Math.random).state;
+    expect(labOnly.advisorProgressState.playerProjectCompletions[type]).toBe(1);
+    expect(labOnly.advisorProgressState.playerProjectCompletions[type === "horizontal" ? "vertical" : "horizontal"]).toBe(0);
+  });
+
+  it("counts each project crossed by one player contribution and tracks its overflow", () => {
+    const before = makeState();
+    const partial = advanceSharedLabProject(before, "horizontal", 250, Math.random, "player").state;
+    expect(partial.advisorProgressState.playerProjectCompletions.horizontal).toBe(2);
+    expect(partial.advisorProgressState.playerProjectParticipation.horizontal).toBe(true);
+    const completed = advanceSharedLabProject(partial, "horizontal", 50, Math.random).state;
+    expect(completed.advisorProgressState.playerProjectCompletions.horizontal).toBe(3);
+    expect(completed.advisorProgressState.playerProjectParticipation.horizontal).toBe(false);
   });
 
   it("floors vertical accumulation growth and guides each lab member once, excluding the lover", () => {

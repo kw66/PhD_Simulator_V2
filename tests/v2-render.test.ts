@@ -214,8 +214,8 @@ describe("v2 explicit render animation markers", () => {
       .pages.find((page) => page.title === "基金申请");
     expect(help).toBeDefined();
     expect(help!.body).toContain("院士需先获杰青，积累1000稳获批");
-    expect(help!.body).toContain("当选时一次性经费+600");
-    expect(getHelpText({ activePlayTab: "relationship" })).toContain("基金与晋升详见天赋→关系");
+    expect(help!.body).not.toContain("当选时一次性经费+600");
+    expect(getHelpText({ activePlayTab: "relationship" })).not.toContain("基金与晋升详见天赋→关系");
   });
 
   it.each([0, 3, 4, 7, 8])("keeps GPU level %i cost buffs and funding tooltips in sync", (gpuLevel) => {
@@ -230,10 +230,17 @@ describe("v2 explicit render animation markers", () => {
         state.advisorProgressState.funding = funding;
         const html = renderApp(state, undefined, { activePlayTab: "workstation" });
         const experimentButton = html.match(/<button[^>]*class="[^"]*workstation-paper-action-btn is-experiment[^"]*"[\s\S]*?<\/button>/)?.[0] ?? "";
-        expect(experimentButton).not.toMatch(/金币-|自费租卡/);
-        expect(experimentButton).toContain(`消耗${total}导师经费`);
-        if (funding < total) {
-          expect(experimentButton).toContain(`科研经费不足，需要 ${total}`);
+        const advisorCost = Math.min(funding, total);
+        const playerCost = total - advisorCost;
+        expect(experimentButton).not.toContain("自费租卡");
+        if (total === 0) expect(experimentButton).toContain("实验费用已减至0");
+        else if (advisorCost > 0) expect(experimentButton).toContain(`消耗${advisorCost}导师经费`);
+        if (playerCost > 0) {
+          expect(experimentButton).toContain(`自付${playerCost}金币`);
+          expect(experimentButton).toContain(`金币-${playerCost}`);
+        } else expect(experimentButton).not.toContain("金币-");
+        if (state.player.money < playerCost) {
+          expect(experimentButton).toContain(`金币不足，需自付 ${playerCost}`);
           expect(experimentButton).toContain('disabled aria-disabled="true"');
           expect(experimentButton).not.toContain('data-action="research-paper"');
         } else {
@@ -301,9 +308,8 @@ describe("v2 explicit render animation markers", () => {
     const card = getTalentCardHtml(renderApp(state, undefined, { activeTalentTab: "relation", internshipPage: 1 }), "internship");
     expect(card).toMatch(/<span>每月工资<\/span>\s*<strong>2金<\/strong>/);
     const help = getHelpText({ activePlayTab: "talent", activeTalentTab: "relation" });
-    expect(help).toContain("每月工资=min（offer基础工资+当前已发表一作A类论文篇数，6）金币");
-    expect(help).toContain("获准次月起持续3个月，每月工资1金币");
-    expect(help).toContain("企业实习持续6个月");
+    expect(help).toContain("每月按当时已发表的一作A类论文篇数重新计算");
+    expect(help).toContain("获准后从次月起持续3个月");
     expect(help).not.toContain("总引用÷500");
   });
 
@@ -2124,10 +2130,8 @@ describe("v2 render lobby shell", () => {
     expect(aiHtml).toContain("+3分");
     expect(aiHtml).not.toContain("早期通用模型");
     const aiHelp = getHelpText({ activePlayTab: "shop", activeShopTab: "ai" });
-    expect(aiHelp).toContain("订购仅在当月生效");
-    expect(aiHelp).toContain("月初自动续费");
-    expect(aiHelp).toContain("AI模型按学年更新，价格与效果随之变化");
-    expect(aiHelp).toContain("更新后需要重新开启自动续费");
+    expect(aiHelp).toContain("单次购买只覆盖当月");
+    expect(aiHelp).toContain("模型按学年更新时，原有自动续费不会沿用");
     expect(aiHtml).toContain("订购本月");
     expect(aiHtml).not.toContain("购买本月");
     expect(aiHtml).toMatch(/DeepSeek-V2[\s\S]*?class="shop-item-btn-price is-cost"[\s\S]*?<span>1<\/span>/);
@@ -2256,10 +2260,10 @@ describe("v2 render lobby shell", () => {
     const coffeeMachineCard = getShopCardHtml(coffeeHtml, "咖啡机");
     expect(coffeeHtml).toContain('data-ui-shop-tab="coffee"');
     const coffeeHelp = getHelpText({ activePlayTab: "shop", activeShopTab: "coffee" });
-    expect(coffeeHelp).toContain("冰美式可直接购买，SAN+2");
-    expect(coffeeHelp).toContain("购入咖啡机后提升为SAN+3");
-    expect(coffeeHelp).toContain("SAN已满时，自动续费当月跳过");
-    expect(coffeeHelp).toContain("金币不足且没有可用于续费的礼物券时，当月暂停续费");
+    expect(coffeeHelp).toContain("无需咖啡机也能自动续费");
+    expect(coffeeHelp).toContain("SAN已满时当月跳过");
+    expect(coffeeHelp).toContain("金币不足且没有可用礼物券时，当月暂停");
+    expect(coffeeHelp).not.toContain("冰美式可直接购买，SAN+2");
     expect(coffeeCard).toContain("SAN +3");
     expect(coffeeCard).not.toContain("本月已生产");
     expect(coffeeMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain("冰美式 SAN+3，每月1杯");
@@ -2279,11 +2283,11 @@ describe("v2 render lobby shell", () => {
     expect(coffeeHtml).toMatch(/class="shop-item-btn-price is-cost">\s*<span aria-hidden="true">💰<\/span>\s*<span>2<\/span>/);
 
     expect(getHelpText({ activePlayTab: "shop", activeShopTab: "gear" }))
-      .toContain("设备栏包含显卡、机械键盘和显示器");
+      .toContain("详细结算见科研提示");
     expect(getHelpText({ activePlayTab: "shop", activeShopTab: "life" }))
-      .toContain("自行车可逐档升级");
+      .toContain("即时SAN损失");
     expect(getHelpText({ activePlayTab: "shop", activeShopTab: "rest" }))
-      .toContain("办公椅可升级为不同休息路线");
+      .toContain("选定后不能直接改选");
     expect(gearHtml).not.toContain("按显卡方式");
     expect(gearHtml).not.toContain("小电驴是独立商品");
     expect(lifeHtml).toContain('class="shop-item-name">小电驴</strong>');
@@ -2616,8 +2620,8 @@ describe("v2 render lobby shell", () => {
     const defaultHtml = renderApp(state, createDefaultAccountProfile());
     expect(defaultHtml).toContain('class="workstation-action-toolbar"');
     expect(defaultHtml).toContain('new-identity-money-header');
-    expect(defaultHtml).toContain(`class="new-player-name" title="大多数：${state.playerName}"`);
-    expect(defaultHtml).toContain(`>大多数：${state.playerName}</span>`);
+    expect(defaultHtml).toContain(`class="new-player-name" title="${state.playerName}">${state.playerName}</span>`);
+    expect(defaultHtml).toContain('class="new-player-role" title="大多数">大多数</span>');
     expect(defaultHtml).toContain('class="new-currency-icon"');
     expect(defaultHtml).not.toContain('class="out-of-game-role-name"');
     expect(defaultHtml).not.toContain('class="out-of-game-role-portrait"');
@@ -2666,7 +2670,7 @@ describe("v2 render lobby shell", () => {
     expect(slotHtml).not.toContain('data-action="idea"');
     expect(slotHtml).toContain('class="paper-score-strip"');
     expect(getHelpText({ activePlayTab: "workstation" }))
-      .toContain("分数格上行是自身分，下行是协作分，右侧总分为六格之和");
+      .not.toContain("分数格上行是自身分，下行是协作分，右侧总分为六格之和");
     expect(slotHtml.indexOf('id="workstation-paper-grid"')).toBeLessThan(slotHtml.indexOf('class="workstation-paper-toolbar"'));
     expect(slotHtml).not.toContain('class="paper-score-track"');
     expect(slotHtml).not.toContain("通常消耗 1 个行动");
@@ -3109,10 +3113,10 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('data-ui-research-sort="citations"');
     expect(html.indexOf('data-ui-research-sort="citations"')).toBeLessThan(html.indexOf('data-ui-research-sort="year"'));
     const researchHelp = getHelpText({ activePlayTab: "research" });
-    expect(researchHelp).toContain("会议开会、挂arXiv或在VALSE展示海报后开始被引");
+    expect(researchHelp).toContain("会议论文在开会、挂arXiv或VALSE展示海报后开始被引");
     expect(researchHelp).toContain("期刊接收后直接开始");
     expect(researchHelp).toContain("当前分每4个月衰减10%");
-    expect(researchHelp).toContain("科研分只算一作，按论文等级累计");
+    expect(researchHelp).toContain("科研分只计一作，按录用等级累加");
     expect(html).toContain('id="research-current-title">A 论文唯一</h3>');
     expect(html).toContain('id="citation-profile-title">引用统计</h3>');
     expect(html.indexOf('id="research-current-title"')).toBeLessThan(html.indexOf('id="citation-profile-title"'));
@@ -3416,7 +3420,7 @@ describe("v2 render lobby shell", () => {
     expect((html.match(/data-ui-research-authorship=/g) ?? []).length).toBe(0);
     expect(html).toContain("暂无已发表论文");
     expect(getHelpText({ activePlayTab: "research" }))
-      .toContain("引用按月结算");
+      .toContain("每月引用增长");
     expect(html).not.toContain("成果说明");
     expect(html).not.toContain("ABC 为会议");
     expect(html).not.toContain("data-ui-research-index=");
@@ -3492,16 +3496,16 @@ describe("v2 render lobby shell", () => {
     let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
     const candidateName = state.eventQueue[0]?.choices[0]?.effects.fixedEventResolution?.studentName;
     expect(candidateName).toBeTruthy();
-    const attributeName = () => renderApp(state, createDefaultAccountProfile())
-      .match(/<span class="new-player-name" title="[^"]*">([^<]*)<\/span>/)?.[1];
+    const attributeIdentity = () => renderApp(state, createDefaultAccountProfile())
+      .match(/<span class="new-player-identity"><span class="new-player-name" title="[^"]*">([^<]*)<\/span><span class="new-player-role" title="[^"]*">([^<]*)<\/span><\/span>/)?.slice(1);
 
-    expect(attributeName()).toBe("大多数");
+    expect(attributeIdentity()).toEqual(["？？？", "大多数"]);
     state = dispatchAction(state, "resolve-event", { eventChoiceId: "before-grad-school-open-advisor-info" });
-    expect(attributeName()).toBe("大多数");
+    expect(attributeIdentity()).toEqual(["？？？", "大多数"]);
     state = dispatchAction(state, "resolve-event", { eventChoiceId: "before-grad-school-confirm" });
-    expect(attributeName()).toBe("大多数");
+    expect(attributeIdentity()).toEqual(["？？？", "大多数"]);
     state = dispatchAction(state, "resolve-event", { eventChoiceId: "before-grad-school-finish" });
-    expect(attributeName()).toBe(`大多数：${candidateName}`);
+    expect(attributeIdentity()).toEqual([candidateName, "大多数"]);
   });
 
   it.each([
@@ -4550,11 +4554,10 @@ describe("v2 render lobby shell", () => {
     expect(inheritance).toContain("当前同学累计");
     expect(inheritance).toContain("当前同学每学年科研成长的累计值");
     const talentHelp = getHelpText({ activePlayTab: "talent", activeTalentTab: "relation" });
-    expect(talentHelp).toContain("“当前同学累计”统计现有同学的年度实际提升");
-    expect(talentHelp).toContain("“本月”页可回看最近一次年度结果");
-    expect(talentHelp).toContain("属性抵抗、年度科研成长、工资与生活费，以及协作和约会规则，统一见人际提示");
+    expect(talentHelp).toContain("目前在组同学的年度实际提升");
+    expect(talentHelp).toContain("属性抵抗与年度成长规则见人际提示");
     const inheritanceHelp = getHelpText({ activePlayTab: "relationship" });
-    expect(inheritanceHelp).toContain("日志记录群体结算；卡片记录个人变化");
+    expect(inheritanceHelp).not.toContain("日志记录群体结算；卡片记录个人变化");
     expect(inheritanceHelp).toContain("玩家只获传承，受自身科研上限限制");
     expect(inheritanceHelp).toContain("同学另有自然成长+2，与传承合并后逐点抵抗，上限20");
     expect(inheritance).not.toMatch(/发表积累|累计一作|每学年9月/);
@@ -6027,9 +6030,9 @@ describe("v2 render lobby shell", () => {
     expect(card).toContain('满100：经费+50，每人发2.5金劳务费');
     expect(card).toContain('科研积累+10%，全组论文写作协作+10');
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain('导师每月轮流推进10，同学也会自动做项目');
-    expect(help).toContain('满100结项：横向增加经费并发劳务费');
-    expect(help).toContain('纵向科研积累+10%（向下取整），你和同学各获一篇论文写作协作+10');
+    expect(help).toContain('同学也会自动推进项目');
+    expect(help).toContain('若没有可修改论文，写作协作奖励会各暂存一次');
+    expect(help).not.toContain('满100结项：横向增加经费并发劳务费');
     expect(card.indexOf('class="rel-monthly-activity"')).toBeGreaterThan(card.indexOf('data-action="advisor-project"'));
     expect(state).toEqual(before);
   });
@@ -6088,8 +6091,8 @@ describe("v2 render lobby shell", () => {
     expect(footer).not.toContain("同会差旅");
     expect(footer).not.toContain("同学会议只按");
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain("录用确认：每篇一作注册费1金币，导师支付；同学同样处理，默认免费代贴");
-    expect(help).toContain("找人代贴免费，无会场活动");
+    expect(help).toContain("一作注册费由导师支付");
+    expect(help).toContain("找人代贴不参加活动");
     expect(card).toContain("订阅Claude 2（自费 -2）");
     expect(card).not.toContain("本月领薪");
     expect(card.match(/class="rel-monthly-activity"/g)).toHaveLength(1);
@@ -6163,8 +6166,8 @@ describe("v2 render lobby shell", () => {
       expect(row).toContain("主动推进+6～11");
       expect(row).not.toMatch(/37\.75|82\.5|推进\+6\.75/);
       const help = getHelpText({ activePlayTab: "relationship" });
-      expect(help).toContain('每月选一项：横向基础SAN-5、纵向SAN-4');
-      expect(help).toContain('推进⌊科研+随机0～5⌋');
+      expect(help).toContain('同学也会自动推进项目');
+      expect(help).not.toContain('横向基础SAN-5');
       expect(row).not.toMatch(/横向需经费|经费&gt;0/);
       expect(row).not.toContain('disabled aria-disabled="true"');
       expect(row).toContain(type === "horizontal" ? '满100：经费+50，每人发2.5金劳务费' : '满100：科研积累+10%，全组论文写作协作+10');
@@ -6370,7 +6373,7 @@ describe("v2 render lobby shell", () => {
     expect(hint).toContain("你帮同学最低项，同学随机选你的论文");
     expect(hint).toContain("无可修改论文时，双方各暂存一次帮助");
     expect(card).toContain(`帮你论文${cardTarget}+7，你帮对方最低项+1`);
-    expect(hint).toContain("审稿时也可协作");
+    expect(hint).toContain("审稿中的论文仍可协作");
     expect(hint).toContain("审稿3个月");
     expect(hint).toContain("自动推进使用实际默契");
     expect(card).toContain('role="progressbar" aria-label="协作进度"');
@@ -6704,11 +6707,10 @@ describe("v2 render lobby shell", () => {
     expect(card).toMatch(new RegExp(`<span>${active ? "科研上限" : "预计上限"}</span>\\s*<strong>\\+${active ? "2" : "4～6"}</strong>`));
     expect(card).not.toMatch(/实验|待定|200|300/);
     const help = getHelpText({ activePlayTab: "talent", activeTalentTab: "relation" });
-    expect(help).toContain("科研上限增加=min（等级+⌊邀请时总引用/200⌋，6）");
-    expect(help).toContain("想idea与写论文的永久加分同为4+等级，即各+4～6分");
-    expect(help).toContain("未激活时卡片只显示奖励范围；激活后显示已保存的实际奖励");
+    expect(help).toContain("科研上限加成使用邀请时的总引用计算，接受时不重算");
+    expect(help).toContain("想idea和写论文获得同一档位的永久加分");
     expect(getHelpText({ activePlayTab: "relationship" })).toContain("第3次及以后合作时，科研≥12可收到联培邀请");
-    expect(help).toContain("offer基础工资+当前已发表一作A类论文篇数，6");
+    expect(help).toContain("每月按当时已发表的一作A类论文篇数重新计算");
     expect(help).not.toContain("由谈薪确定");
   });
 
@@ -6832,7 +6834,7 @@ describe("v2 render lobby shell", () => {
     expect(rail).toContain('data-help-page-index="0"');
     expect(rail).toContain(`data-help-page-count="${context.pages.length}"`);
     expect(rail.match(/class="play-help-body\b/g) ?? []).toHaveLength(1);
-    expect(rail).toContain(`<strong class="play-help-topic">💡 ${context.pages[0]!.title}提示</strong>`);
+    expect(rail).toContain(`<strong class="play-help-topic">💡 ${context.pages[0]!.title}</strong>`);
     const header = rail.match(/<div class="play-help-header">([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(header).toContain('<nav class="play-help-pagination"');
     expect(header).toContain('</nav>');
@@ -7104,7 +7106,7 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(state, createDefaultAccountProfile());
     expect(html).toContain('data-phase="finished"');
     expect(html).toContain('<h2 id="ending-title">硕士毕业</h2>');
-    expect(html).toContain("科研分 1/1");
+    expect(html).toContain("毕业线 1 · 盲审通过");
     expect(html).toContain('data-action="restart-game"');
     expect(html).toContain('data-action="reset-game"');
     expect(html).toContain("data-ui-ending-page");

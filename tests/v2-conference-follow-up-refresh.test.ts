@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createConferenceMentorContact, createConferenceScholarContact } from "../src/core/v2-conference-contacts";
-import { buildJointTrainingContext, createJointTrainingAct1, refreshJointTrainingEvent } from "../src/core/v2-joint-training-events";
+import { buildJointTrainingContext, createJointTrainingAct1, refreshJointTrainingEvent, revealJointTrainingResult } from "../src/core/v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1, refreshLoverDevelopmentEvent } from "../src/core/v2-lover-events";
 import { activateLover } from "../src/core/v2-lover-system";
 import type { GameState, LoverTypeId, PendingEvent } from "../src/core/v2-types";
@@ -40,7 +40,36 @@ function choose(state: GameState, eventChoiceId: string): GameState {
 afterEach(() => vi.restoreAllMocks());
 
 describe("conference follow-up invitation refresh", () => {
-  it.each([0, 1, 2] as const)("freezes the level %s mentor and invitation citation reward across all stages", (level) => {
+  it("randomizes fresh debug invitation contacts but freezes each event's identity", () => {
+    const state = makeState();
+    state.conferenceEncounterState.bigBull = undefined;
+    state.conferenceEncounterState.scholars = {};
+
+    const firstMentorRoll = vi.fn().mockReturnValue(0.12);
+    const secondMentorRoll = vi.fn().mockReturnValue(0.82);
+    const firstJoint = createJointTrainingAct1(buildJointTrainingContext(state, undefined, firstMentorRoll));
+    const secondJoint = createJointTrainingAct1(buildJointTrainingContext(state, undefined, secondMentorRoll));
+    expect(firstMentorRoll).toHaveBeenCalledOnce();
+    expect(secondMentorRoll).toHaveBeenCalledOnce();
+    expect(firstJoint.jointTrainingPreview!.context.contact!.name)
+      .not.toBe(secondJoint.jointTrainingPreview!.context.contact!.name);
+    expect(refreshJointTrainingEvent(state, firstJoint).narrativeNames).toEqual(firstJoint.narrativeNames);
+
+    const makeLover = (identityRoll: number) => createLoverDevelopmentAct1(buildLoverDevelopmentContext({
+      state, conferenceEncounterState: state.conferenceEncounterState,
+      type: "smart", totalMonths: state.totalMonths, playerGender: "male",
+    }, vi.fn().mockReturnValueOnce(0.2).mockReturnValueOnce(0.8).mockReturnValue(identityRoll)));
+    const firstLover = makeLover(0.12);
+    const secondLover = makeLover(0.82);
+    expect(firstLover.loverDevelopmentPreview!.context.contact!.name)
+      .not.toBe(secondLover.loverDevelopmentPreview!.context.contact!.name);
+    expect(firstLover.loverDevelopmentPreview!.context.profileRolls).toEqual([0.2, 0.8]);
+    expect(refreshLoverDevelopmentEvent(state, firstLover).narrativeNames).toEqual(firstLover.narrativeNames);
+    expect(state.conferenceEncounterState.bigBull).toBeUndefined();
+    expect(state.conferenceEncounterState.scholars).toEqual({});
+  });
+
+  it.each([0, 1, 2] as const)("freezes citations and mentor identity, then draws support %s in the third stage", (level) => {
     const state = makeState();
     state.conferenceEncounterState.bigBull!.level = level;
     const root = createJointTrainingAct1(buildJointTrainingContext(state));
@@ -58,11 +87,12 @@ describe("conference follow-up invitation refresh", () => {
       expect(refreshed.description).toBe(event.description);
       expect(refreshed.queueOrder).toBe(7);
       expect(refreshed.jointTrainingPreview?.context).toMatchObject({
-        invitationCitations: 399, pendingCitationCapBonus: level + 1,
+        invitationCitations: 399, pendingCitationCapBonus: 2,
         contact: { name: root.jointTrainingPreview!.context.contact!.name, level, cooperationCount: 7 },
       });
     }
-    expect(refreshJointTrainingEvent(state, result).choices[0]!.effects).toMatchObject({
+    const revealed = revealJointTrainingResult(result, () => (level + 0.1) / 3);
+    expect(refreshJointTrainingEvent(state, revealed).choices[0]!.effects).toMatchObject({
       ideaBonus: 4 + level, writingBonus: 4 + level,
       researchCapacityStateDeltas: { jointTrainingCitationCapBonus: level + 1 },
     });
@@ -76,6 +106,7 @@ describe("conference follow-up invitation refresh", () => {
     const root = createJointTrainingAct1(buildJointTrainingContext(base));
     const act2 = next(root, "continue");
     expect(Object.keys(act2.choices.find((choice) => choice.id === "accept")!.effects)).toEqual(["enqueueEvents"]);
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
     let state = choose(choose({ ...base, eventQueue: [createEventQueueItem(root, 1)] }, "continue"), "accept");
     expect(state.buffs).toEqual(base.buffs);
     expect(state.conferenceEncounterState.jointTrainingReward).toBeUndefined();
@@ -241,7 +272,7 @@ describe("conference follow-up invitation refresh", () => {
     expect(random).not.toHaveBeenCalled();
   });
 
-  it("freezes deterministic replacement mentor levels without collapsing every replacement to level one", () => {
+  it("keeps replacement mentors high-level with stable names", () => {
     const levels = new Set<number>();
     const state = makeState();
     const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("replacement must not reroll"); });
@@ -252,7 +283,7 @@ describe("conference follow-up invitation refresh", () => {
       expect(buildJointTrainingContext(state).replacement).toEqual(context.replacement);
       expect(context.replacement!.name).not.toBe(context.contact!.name);
     }
-    expect([...levels].sort()).toEqual([0, 1, 2]);
+    expect([...levels]).toEqual([2]);
     expect(random).not.toHaveBeenCalled();
   });
 });

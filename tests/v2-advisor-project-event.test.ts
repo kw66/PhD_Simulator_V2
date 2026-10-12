@@ -156,7 +156,12 @@ describe("advisor project random event effects", () => {
     const before = structuredClone(state);
     const after = applyChoiceEffectsToState(state, decisionChoice(makeEvent(state), "horizontal")).nextState;
 
-    expect(after.advisorProgressState).toEqual({ ...state.advisorProgressState, funding: 53 });
+    expect(after.advisorProgressState).toEqual({
+      ...state.advisorProgressState,
+      funding: 53,
+      playerProjectCompletions: { horizontal: 1, vertical: 0 },
+      playerProjectParticipation: { horizontal: progress > 0, vertical: false },
+    });
     expect(after.player).toEqual({ ...state.player, money: 9.5, san: 92, favor: 4 });
     expect(after.papers).toEqual(state.papers);
     expect(after.fellowPapers).toEqual(state.fellowPapers);
@@ -174,6 +179,8 @@ describe("advisor project random event effects", () => {
       horizontalProgress: 37, verticalProgress: 64, funding: 13,
       researchAccumulation: accumulation + Math.floor(accumulation * 0.1),
       pendingGuidanceToPlayer: null,
+      playerProjectCompletions: { horizontal: 0, vertical: 1 },
+      playerProjectParticipation: { horizontal: false, vertical: true },
     });
     expect(after.player).toEqual({ ...state.player, san: 94, favor: 4, research: 1 });
     for (const paper of [...after.papers, ...after.fellowPapers!]) {

@@ -10,6 +10,7 @@ import { combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { getInternshipExperimentEffect } from "./v2-internship-system";
 import { getLabExperimentMoneyCost } from "./v2-lab-compute";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
+import { roundMoney } from "./v2-money";
 import type { GameState, PaperActionType } from "./v2-types";
 
 export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
@@ -32,7 +33,8 @@ export function getResearchExperimentCostBreakdown(state: Pick<GameState, "shopS
   playerMoney: number;
 } {
   const total = getResearchExperimentMoneyCost(state);
-  return { total, advisorFunding: total, playerMoney: 0 };
+  const advisorFunding = roundMoney(Math.min(total, Math.max(0, state.advisorProgressState.funding)));
+  return { total, advisorFunding, playerMoney: roundMoney(total - advisorFunding) };
 }
 
 export function getResearchActionEffect(state: GameState, actionType: PaperActionType, includeNextAction = true) {
@@ -197,9 +199,6 @@ export function applyResearchOperation(
     : { total: 0, advisorFunding: 0, playerMoney: 0 };
   const advisorFundingUsed = experimentCost.advisorFunding;
   const playerMoneyCost = experimentCost.playerMoney;
-  if (state.advisorProgressState.funding < advisorFundingUsed) {
-    return pushNoOpLog(state, `做实验：科研经费不足，需要 ${advisorFundingUsed}`);
-  }
   if (state.player.money < playerMoneyCost) {
     return pushNoOpLog(state, `${RESEARCH_OPERATION_LABEL[actionType]}：金币不足，需要 ${playerMoneyCost}`);
   }
@@ -227,14 +226,14 @@ export function applyResearchOperation(
     ...actionState,
     papers: state.papers.map((entry, index) => index === eligibility.paperIndex ? updatedPaper : entry),
     selectedPaperId: paper.id,
-    player: { ...state.player, san: state.player.san - preview.sanCost, money: state.player.money - playerMoneyCost },
+    player: { ...state.player, san: state.player.san - preview.sanCost, money: roundMoney(state.player.money - playerMoneyCost) },
     advisorProgressState: actionType === "experiment"
-      ? { ...state.advisorProgressState, funding: state.advisorProgressState.funding - advisorFundingUsed }
+      ? { ...state.advisorProgressState, funding: roundMoney(state.advisorProgressState.funding - advisorFundingUsed) }
       : state.advisorProgressState,
   }, actionType);
   const operationCountText = executionCount > 1 ? `，共 ${executionCount} 次` : "";
   return pushLog(
     recordLabFinance(nextState, "player-experiment", -advisorFundingUsed),
-    `${RESEARCH_OPERATION_LABEL[actionType]}：${paper.title}，${actionType} ${paper[actionType]} → ${updatedPaper[actionType]}${operationCountText}；SAN -${preview.sanCost}`,
+    `${RESEARCH_OPERATION_LABEL[actionType]}：${paper.title}，${actionType} ${paper[actionType]} → ${updatedPaper[actionType]}${operationCountText}；SAN -${preview.sanCost}${playerMoneyCost > 0 ? `；金币 -${playerMoneyCost}` : ""}`,
   );
 }

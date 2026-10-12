@@ -4,7 +4,7 @@ import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
-import { createPaperReviewResultEvent } from "../src/core/v2-publication-system";
+import { createPaperReviewResultEvent, refreshPaperReviewEvent } from "../src/core/v2-publication-system";
 import { createConferenceStats } from "../src/app/v2-conference-stats";
 import { renderPaperReviewEvent } from "../src/app/v2-render-paper-review";
 import { renderEventSettlementSummary } from "../src/app/v2-render-play";
@@ -57,7 +57,8 @@ describe("paper review presentation", () => {
     expect(html).toContain("40.0%");
     expect(html).toContain("投稿数");
     expect(html).toContain('data-tooltip="最佳论文候选">Best Paper Candidate</span>');
-    expect(html).toContain("paper-review-global-table");
+    expect(html).toContain("paper-review-distribution-grid");
+    expect(html).not.toContain("<table");
     expect(html).not.toMatch(/P90|P99|审稿通知|参考分/);
     expect(html).not.toContain("&lt;Paper&gt; &amp; &quot;review&quot;");
     const reviewers = content(advance(state));
@@ -75,6 +76,8 @@ describe("paper review presentation", () => {
     expect(content(state)).toContain("paper-review-global-totals");
     expect(content(state)).toContain("投稿数");
     expect(content(state)).toContain("−");
+    expect(content(state)).toContain("统计暂未同步");
+    expect(content(state)).toContain("paper-review-distribution-grid");
   });
 
   it("keeps stored reviewer weights and submitted scores visible in the second act", () => {
@@ -85,7 +88,10 @@ describe("paper review presentation", () => {
     presentation.reports[0] = { ...presentation.reports[0]!, reviewerType: "novelty", weightInfo: "idea×2 · 实验×0.5 · 写作×0.5" };
     const html = content(reviewers);
     expect(reviewers.eventQueue[0]!.title).toContain("审稿人意见");
-    expect(html).toContain('aria-label="投稿时分数"');
+    expect(html).toContain('aria-label="送审期间四项分数变化"');
+    expect(html).toContain('paper-review-score-item is-total is-decayed');
+    expect(html).toContain("衰减 90");
+    expect(html).toMatch(/Review [A-Za-z]{4}/);
     expect(html).toContain("idea×2 · 实验×0.5 · 写作×0.5");
     expect(html).toContain("有效分");
     expect(html).toContain('data-tooltip="拒稿">Reject</span> 阈值');
@@ -93,10 +99,49 @@ describe("paper review presentation", () => {
     expect(html).not.toMatch(/接收\+1 · 边缘0|你的三个审稿人/);
   });
 
+  it("shows the actual score loss during review without exposing the final decision", () => {
+    const { state, paper, settlement } = fixture(false);
+    const decayedPaper = { ...paper, idea: 27, experiment: 29, writing: 28 };
+    state.papers = [decayedPaper];
+    state.eventQueue = [createEventQueueItem(createPaperReviewResultEvent(decayedPaper, settlement), 1)];
+    const html = content(advance(state));
+    expect(html).toContain("衰减 3");
+    expect(html).toContain("衰减 1");
+    expect(html).toContain("衰减 2");
+    expect(html).toContain("衰减 6");
+    expect(html).toContain('paper-review-score-item is-total is-decayed');
+    expect(html).not.toContain("PC Meta Review");
+  });
+
+  it("keeps four-letter Review codes through later scenes and refresh", () => {
+    const { state, paper, settlement } = fixture(true);
+    state.conferenceLocationSeed = 12345;
+    settlement.reports = [settlement.reports[0]!,
+      { ...settlement.reports[0]!, reviewer: "实验审稿人" },
+      { ...settlement.reports[0]!, reviewer: "普通审稿人" }];
+    const root = createPaperReviewResultEvent(paper, settlement, state);
+    const reviewers = root.choices[0]!.effects.enqueueEvents![0]!;
+    const decision = reviewers.choices[0]!.effects.enqueueEvents![0]!;
+    const codes = reviewers.paperReviewPresentation?.kind === "reviewers"
+      ? reviewers.paperReviewPresentation.reports.map((report) => report.reviewCode) : [];
+    expect(codes).toHaveLength(3);
+    expect(new Set(codes).size).toBe(3);
+    for (const code of codes) expect(code).toMatch(/^[A-Za-z]{4}$/);
+    expect(decision.paperReviewPresentation?.kind === "decision"
+      ? decision.paperReviewPresentation.reports?.map((report) => report.reviewCode) : []).toEqual(codes);
+    const refreshed = refreshPaperReviewEvent(state, reviewers);
+    expect(refreshed.paperReviewPresentation?.kind === "reviewers"
+      ? refreshed.paperReviewPresentation.reports.map((report) => report.reviewCode) : []).toEqual(codes);
+    expect(renderPaperReviewEvent(decision.paperReviewPresentation!, false, renderEventSettlementSummary))
+      .toContain(`Review ${codes[0]}`);
+  });
+
   it("orders PC comments, prominent decision and final score table", () => {
     const { state } = fixture(false);
     const html = content(advance(advance(state)));
     expect(html).toContain('data-tooltip="程序委员会综合评审意见">PC Meta Review</span>');
+    expect(html).toContain("综合评审后，论文暂未达到本届录用要求");
+    expect(html).toContain("需要解释方法差异");
     expect(html.indexOf("PC Meta Review")).toBeLessThan(html.indexOf('class="paper-review-decision-head"'));
     expect(html.indexOf('class="paper-review-decision-head"')).toBeLessThan(html.indexOf("event-settlement-summary"));
     expect(html).toContain("论文总分 90 → 5");

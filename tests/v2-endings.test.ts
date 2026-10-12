@@ -329,8 +329,8 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
     expect(advanced).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, year: degree === "master" ? 3 : 6, month: 10 });
     const rested = dispatchAction(ready, "rest");
     expect(rested).toMatchObject({ phase: "playing", ending: null, totalMonths: limit });
-    expect(rested.player.san).toBeGreaterThan(advanced.player.san);
-    expect(rested.actionState.used).toBe(advanced.actionState.used + 1);
+    expect(rested.player.san).toBeGreaterThan(ready.player.san);
+    expect(rested.actionState.used).toBe(ready.actionState.used + 1);
     const finished = dispatchAction(rested, actionId);
     expect(finished).toMatchObject({ phase: "finished", ending: degree, totalMonths: limit });
     expect(finished.player).toEqual(rested.player);

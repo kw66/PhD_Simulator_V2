@@ -8,7 +8,7 @@ import {
 import { getReviewStrictnessMultiplier, resolvePaperReview } from "./v2-paper-rules";
 import { attachPaperPublication, getHighlyCitedThreshold, recordPaperAcceptances } from "./v2-publication-rules";
 import { enqueueEventQueueItem } from "./v2-event-queue";
-import type { GameState, Paper, PaperAcceptType, PaperReviewResult, PaperReviewScoreChange, PaperReviewScores, PaperReviewScoreSnapshot, PaperReviewSettlement, PaperTarget, PendingEvent } from "./v2-types";
+import type { GameState, Paper, PaperAcceptType, PaperReviewerReport, PaperReviewResult, PaperReviewScoreChange, PaperReviewScores, PaperReviewScoreSnapshot, PaperReviewSettlement, PaperTarget, PendingEvent } from "./v2-types";
 import { getJournalDefinition } from "./v2-journal-system";
 import { applyPublicationTalentRewards, projectPublicationTalentRewards } from "./v2-publication-talent";
 import { formatEventSanChange, getActualSanChange, getIllnessSanIncrease } from "./v2-sanity-rules";
@@ -164,6 +164,24 @@ function getReviewScoreChange(
   };
 }
 
+function getReviewCode(seed: string): string {
+  let hash = 2166136261;
+  for (const character of seed) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  let code = "";
+  for (let index = 0; index < 4; index += 1) {
+    hash = Math.imul(hash ^ (hash >>> 13), 16777619);
+    code += letters[(hash >>> 0) % letters.length];
+  }
+  return code;
+}
+
+function withReviewCodes(reports: PaperReviewerReport[], paperId: string, seed: string, previous?: PaperReviewerReport[]): PaperReviewerReport[] {
+  return reports.map((report, index) => ({ ...report,
+    reviewCode: previous?.[index]?.reviewCode ?? getReviewCode(`${seed}:${paperId}:${index}:${report.reviewer}`),
+  }));
+}
+
 export function refreshPaperReviewEvent<Event extends PendingEvent>(state: GameState, event: Event): Event {
   if (event.source !== "review" || !event.paperReviewPresentation) return event;
   const original = findReviewSettlement(event);
@@ -180,9 +198,13 @@ export function refreshPaperReviewEvent<Event extends PendingEvent>(state: GameS
         description: getReviewResultDescription(settlement, paper),
         completionLog: `${getReviewResultText(settlement)}；${getReviewRewardText(settlement, paper)}`,
       } : reviewers ? { description: getReviewerDescription(settlement) } : {}),
-      paperReviewPresentation: result ? { ...presentation, reports: settlement.reports, rewardText: getReviewRewardText(settlement, paper),
+      paperReviewPresentation: result ? { ...presentation,
+        reports: withReviewCodes(settlement.reports, settlement.paperId, String(state.conferenceLocationSeed), presentation.reports),
+        rewardText: getReviewRewardText(settlement, paper),
         ...(paper ? { scoreChange: getReviewScoreChange(paper, settlement, state, presentation.scoreChange.submitted) } : {}) }
-        : reviewers ? { ...presentation, reports: settlement.reports } : presentation,
+        : reviewers ? { ...presentation,
+          reports: withReviewCodes(settlement.reports, settlement.paperId, String(state.conferenceLocationSeed), presentation.reports),
+          reviewedScores: paper ? { idea: paper.idea, experiment: paper.experiment, writing: paper.writing } : presentation.reviewedScores } : presentation,
       choices: entry.choices.map((choice) => ({ ...choice, effects: {
         ...choice.effects,
         ...(choice.effects.paperReviewSettlement ? { paperReviewSettlement: settlement } : {}),
@@ -238,6 +260,8 @@ export function createPaperReviewResultEvent(paper: Paper, settlement: PaperRevi
   const title = `${conference?.name ?? `${settlement.target}类会议`}结果`;
   const chainId = `paper-review-result-${paper.id}`;
   const resultDescription = getReviewResultDescription(settlement, paper);
+  const presentedReports = withReviewCodes(settlement.reports, paper.id,
+    String(state?.conferenceLocationSeed ?? `${paper.submittedYear}:${paper.submittedMonth}:${settlement.totalReviewScore}`));
 
   const reviewerEvent: PendingEvent = {
     id: `paper-review-result-${paper.id}-reviewers`,
@@ -255,7 +279,11 @@ export function createPaperReviewResultEvent(paper: Paper, settlement: PaperRevi
       venueInfluence: settlement.venueInfluence,
       submittedScore: settlement.submittedScore,
       submittedScores: getSubmittedReviewScores(paper),
-      reports: settlement.reports,
+      reviewedScores: { idea: paper.idea, experiment: paper.experiment, writing: paper.writing },
+      ...(state && typeof paper.submittedYear === "number" && typeof paper.submittedMonth === "number"
+        ? { reviewDurationMonths: Math.max(0, state.totalMonths - ((paper.submittedYear - 1) * 12 + paper.submittedMonth)) }
+        : {}),
+      reports: presentedReports,
       conferenceName: conference?.name,
       conferenceYear: conference?.year,
     },
@@ -287,7 +315,7 @@ export function createPaperReviewResultEvent(paper: Paper, settlement: PaperRevi
             scoreChange: getReviewScoreChange(paper, settlement, state),
             conferenceName: conference?.name,
             conferenceYear: conference?.year,
-            reports: settlement.reports,
+            reports: presentedReports,
           },
           discardPaperUpdates: [createReviewDiscardUpdate(paper)],
           choices: [{

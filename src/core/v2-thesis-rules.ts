@@ -31,12 +31,19 @@ export interface ThesisBlindReview {
   researchPoints: ThesisResearchPoint[];
 }
 
+export interface ThesisScoreHistoryEntry {
+  totalMonths: number;
+  pointScores: number[];
+  title: string;
+}
+
 export interface ThesisState {
   degree: Degree | null;
   title: string;
   topicId: string | null;
   topicLabel: string;
   researchPoints: ThesisResearchPoint[];
+  scoreHistory: ThesisScoreHistoryEntry[];
   usedSupportPaperIds: string[];
   review: ThesisBlindReview | null;
   reviewResolved: boolean;
@@ -49,7 +56,7 @@ export const THESIS_REVIEW_THRESHOLDS = {
 
 export function createInitialThesisState(): ThesisState {
   return {
-    degree: null, title: "", topicId: null, topicLabel: "", researchPoints: [],
+    degree: null, title: "", topicId: null, topicLabel: "", researchPoints: [], scoreHistory: [],
     usedSupportPaperIds: [], review: null, reviewResolved: false,
   };
 }
@@ -114,15 +121,26 @@ function initializeThesis(state: GameState, random: () => number): ThesisState {
   const count = state.degree === "master" ? 2 : 3;
   const chosen = strongestSupportPapers(supportPapers(state), count);
   const topic = chosen[0] ?? generatePaperTopic(getAcademicCalendarYear(state.year, state.month), random);
+  const researchPoints = researchPointsFromPapers(chosen, count);
+  const title = thesisTitle(topic.topicLabel, random);
   return {
     ...createInitialThesisState(),
     degree: state.degree,
-    title: thesisTitle(topic.topicLabel, random),
+    title,
     topicId: topic.topicId,
     topicLabel: topic.topicLabel,
-    researchPoints: researchPointsFromPapers(chosen, count),
+    researchPoints,
+    scoreHistory: [{ totalMonths: state.totalMonths, pointScores: researchPoints.map((point) => point.score), title }],
     usedSupportPaperIds: chosen.map((paper) => paper.id),
   };
+}
+
+function withScoreHistory(thesis: ThesisState, totalMonths: number): ThesisState {
+  const pointScores = thesis.researchPoints.map((point) => point.score);
+  const last = thesis.scoreHistory?.at(-1);
+  if (last?.title === thesis.title && last.pointScores.length === pointScores.length
+    && pointScores.every((score, index) => score === last.pointScores[index])) return thesis;
+  return { ...thesis, scoreHistory: [...(thesis.scoreHistory ?? []), { totalMonths, pointScores, title: thesis.title }] };
 }
 
 export function syncThesisState(state: GameState, random: () => number = Math.random): GameState {
@@ -159,14 +177,14 @@ export function syncThesisState(state: GameState, random: () => number = Math.ra
     for (const paper of chosen) used.add(paper.id);
     return {
       ...state,
-      thesis: {
+      thesis: withScoreHistory({
         ...state.thesis, title: thesisTitle(topic.topicLabel, random), topicId: topic.topicId, topicLabel: topic.topicLabel,
         researchPoints: researchPointsFromPapers(chosen, count, researchPoints), usedSupportPaperIds: [...used],
-      },
+      }, state.totalMonths),
     };
   }
   return changed ? {
-    ...state, thesis: { ...state.thesis, researchPoints, usedSupportPaperIds: [...used] },
+    ...state, thesis: withScoreHistory({ ...state.thesis, researchPoints, usedSupportPaperIds: [...used] }, state.totalMonths),
   } : state;
 }
 
@@ -190,12 +208,12 @@ export function advanceThesisResearchPoint(state: GameState, index: number): Gam
   return {
     ...nextState,
     player: { ...nextState.player, san: nextState.player.san - getThesisAdvanceSanCost(nextState) },
-    thesis: {
+    thesis: withScoreHistory({
       ...nextState.thesis,
       researchPoints: nextState.thesis.researchPoints.map((point, pointIndex) => pointIndex === index ? {
         ...point, score: point.score + Math.floor(nextState.player.research), lastAdvancedTotalMonths: state.totalMonths,
       } : point),
-    },
+    }, state.totalMonths),
   };
 }
 
@@ -230,13 +248,14 @@ export function prepareThesisBlindReview(state: GameState, random: () => number 
   if (state.phase !== "playing" || state.thesis.review || state.thesis.reviewResolved
     || state.year !== getGraduationPreparationYear(state.degree) || state.month < 8) return state;
   const nextState = syncThesisState(state, random);
+  const thesis = withScoreHistory(nextState.thesis, state.totalMonths);
   const submitted = nextState.graduationScoreTarget !== null
     && nextState.totalResearchScore >= nextState.graduationScoreTarget;
-  const researchPoints = nextState.thesis.researchPoints.map((point) => ({ ...point }));
+  const researchPoints = thesis.researchPoints.map((point) => ({ ...point }));
   const reports = submitted ? Array.from({ length: state.degree === "master" ? 3 : 5 }, () =>
     sampleReport(state.degree, researchPoints, random)) : [];
   const review: ThesisBlindReview = {
-    degree: state.degree, title: nextState.thesis.title, researchPoints,
+    degree: state.degree, title: thesis.title, researchPoints,
     submitted,
     reason: submitted ? null : nextState.graduationScoreTarget === null
       ? "毕业科研分要求尚未确定，无法送审。" : `科研分 ${nextState.totalResearchScore} 未达到毕业要求 ${nextState.graduationScoreTarget}，无法送审。`,
@@ -244,5 +263,5 @@ export function prepareThesisBlindReview(state: GameState, random: () => number 
     passed: submitted && reports.every((report) => report.grade === "A" || report.grade === "B"),
     excellent: submitted && reports.every((report) => report.grade === "A"),
   };
-  return { ...nextState, thesis: { ...nextState.thesis, review } };
+  return { ...nextState, thesis: { ...thesis, review } };
 }

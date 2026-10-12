@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getJointTrainingCitationCapBonus } from "../src/core/v2-joint-training-system";
-import { createJointTrainingAct1, refreshJointTrainingEvent } from "../src/core/v2-joint-training-events";
+import { createJointTrainingAct1, refreshJointTrainingEvent, revealJointTrainingResult } from "../src/core/v2-joint-training-events";
 import { createConferenceMentorContact } from "../src/core/v2-conference-contacts";
 import { createInitialState } from "../src/core/v2-engine-state-factory";
 
@@ -38,26 +38,45 @@ describe("v2 joint training system", () => {
     expect(getJointTrainingCitationCapBonus(citations)).toBe(bonus);
   });
 
-  it.each([0, 1, 2] as const)("includes mentor level %s in the capped bonus", (level) => {
+  it.each([0, 1, 2] as const)("includes support level %s in the capped bonus", (level) => {
     expect(getJointTrainingCitationCapBonus(0, level)).toBe(level);
     expect(getJointTrainingCitationCapBonus(399, level)).toBe(level + 1);
     expect(getJointTrainingCitationCapBonus(1200, level)).toBe(6);
   });
 
-  it.each([
-    [0, "容易踩坑的实验细节"],
-    [1, "换个角度就找到了突破口"],
-    [2, "整个领域都在追问的问题"],
-  ] as const)("describes level %s through ability without revealing numerical rewards", (level, story) => {
+  it.each([0, 1, 2] as const)("reveals support level %s only in the result, independently of mentor prestige", (level) => {
     const contact = { ...createConferenceMentorContact(), level };
-    const root = createJointTrainingAct1({ rejectedBigBullCoopCount: 0, pendingCitationCapBonus: level + 1, contact });
+    const root = createJointTrainingAct1({ rejectedBigBullCoopCount: 0, pendingCitationCapBonus: 2, invitationCitations: 399, contact });
     const decision = root.choices[0]!.effects.enqueueEvents![0]!;
-    expect(decision.description).toContain(story);
+    expect(decision.description).toContain("具体支持则取决于团队和研究方向");
     expect(decision.description).toContain(contact.name);
     expect(decision.description).not.toMatch(/等级|科研上限|永久|idea|机制结算|[0-9]/u);
     expect(decision.narrativeNames).toEqual([contact.name]);
-    const result = decision.choices.find((choice) => choice.id === "accept")!.effects.enqueueEvents![0]!;
+    const pending = decision.choices.find((choice) => choice.id === "accept")!.effects.enqueueEvents![0]!;
+    expect(pending.jointTrainingPreview!.context.supportLevel).toBeUndefined();
+    const result = revealJointTrainingResult(pending, () => (level + 0.1) / 3);
+    expect(result.jointTrainingPreview!.context.supportLevel).toBe(level);
     expect(result.choices[0]!.effects).toMatchObject({ ideaBonus: 4 + level, writingBonus: 4 + level });
+    expect(result.choices[0]!.effects.researchCapacityStateDeltas?.jointTrainingCitationCapBonus).toBe(level + 1);
+    expect(revealJointTrainingResult(result, () => { throw new Error("support rerolled"); })).toBe(result);
+  });
+
+  it("keeps mentor prestige high while the team's support determines the actual reward", () => {
+    const contact = createConferenceMentorContact({ id: "senior-mentor", levelRoll: 0 });
+    expect(contact.level).toBe(2);
+    const root = createJointTrainingAct1({
+      rejectedBigBullCoopCount: 0, pendingCitationCapBonus: 2, invitationCitations: 399, contact,
+    });
+    const pending = root.choices[0]!.effects.enqueueEvents![0]!
+      .choices.find((choice) => choice.id === "accept")!.effects.enqueueEvents![0]!;
+    const modest = revealJointTrainingResult(pending, () => 0);
+    const generous = revealJointTrainingResult(pending, () => 0.999);
+    expect(modest.choices[0]!.effects).toMatchObject({
+      ideaBonus: 4, writingBonus: 4, researchCapacityStateDeltas: { jointTrainingCitationCapBonus: 1 },
+    });
+    expect(generous.choices[0]!.effects).toMatchObject({
+      ideaBonus: 6, writingBonus: 6, researchCapacityStateDeltas: { jointTrainingCitationCapBonus: 3 },
+    });
   });
 
   it.each([{}, { active: true }, { contactAvailable: false }])("keeps all joint-training scenes grounded and emoji within prose for %j", (availability) => {
@@ -93,7 +112,7 @@ describe("v2 joint training system", () => {
     expect(refreshed.id).toBe(queued.id);
     expect(refreshed.queueOrder).toBe(7);
     expect(refreshed.narrativeNames).toEqual(["林知远", "周明岚"]);
-    expect(refreshed.description).toContain("林知远理解了你的选择，随后转来另一位学者周明岚");
+    expect(refreshed.description).toContain("转来另一位学者周明岚");
     expect(refreshed.description.split("机制结算")[1]?.trim()).toBe("结果：合作学者：周明岚");
     expect(refreshed.choices[0]!.effects).toEqual(result.choices[0]!.effects);
     expect(refreshJointTrainingEvent(state, refreshed)).toEqual(refreshed);

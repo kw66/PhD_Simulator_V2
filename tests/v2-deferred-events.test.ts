@@ -200,8 +200,11 @@ describe("deferred-system event content", () => {
     state = { ...state, eventQueue: [createEventQueueItem(createJointTrainingAct1(buildJointTrainingContext(state)), 1)] };
     state = resolve(resolve(state, "continue"), "accept");
     expect(state.buffs).toHaveLength(0);
+    const supportBonus = 4 + state.eventQueue[0]!.jointTrainingPreview!.context.supportLevel!;
     state = resolve(state, "close");
-    expect(state.buffs.map((buff) => buff.name)).toEqual(expect.arrayContaining(["每次想 idea +5分", "每次写论文 +5分"]));
+    expect(state.buffs.map((buff) => buff.name)).toEqual(expect.arrayContaining([
+      `每次想 idea +${supportBonus}分`, `每次写论文 +${supportBonus}分`,
+    ]));
     expect(state.buffs.some((buff) => buff.actionEffects?.experiment)).toBe(false);
     expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(6);
 

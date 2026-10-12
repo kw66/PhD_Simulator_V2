@@ -37,7 +37,7 @@ import { getFellowCurrentPaper } from "../core/v2-fellow-research";
 import { getFellowAcademicLabel, getFellowResearchScore, getStudentAcademicLabel } from "../core/v2-fellow-academic";
 import { getNextMonthLabPayroll } from "../core/v2-lab-payroll";
 import { getLabFinanceMonthSummary } from "../core/v2-lab-finance-ledger";
-import { renderPaperReviewEvent } from "./v2-render-paper-review";
+import { renderJournalAcceptanceEvent, renderPaperReviewEvent } from "./v2-render-paper-review";
 import { renderGraduationCards, renderThesisReviewReports } from "./v2-render-graduation";
 import { getGraduationPreparationYear } from "../core/v2-thesis-rules";
 import { getLabReimbursementCount } from "../core/v2-lab-reimbursement";
@@ -737,7 +737,7 @@ function renderLeftRail(state: GameState): string {
   const effectBuckets = buildEffectBuckets(state);
   const role = getRoleDefinition(state.selectedRoleId);
   const playerName = state.playerName?.trim();
-  const displayName = playerName ? `${role.name}：${playerName}` : role.name;
+  const displayName = playerName || "？？？";
 
   return `
     <aside class="play-left-rail new-left-container">
@@ -746,9 +746,9 @@ function renderLeftRail(state: GameState): string {
         ${renderAttrItem("💡", "科研能力", state.player.research, Math.max(researchCap, 20), "research", "research")}
         ${renderAttrItem("🤝", "社交能力", state.player.social, 20, "social", "social")}
         ${renderAttrItem("👨‍🏫", "导师好感", state.player.favor, 20, "favor", "favor")}
-        <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${roundMoney(state.player.money)}" aria-label="${escapeHtml(`${displayName}，金币 ${formatMoney(state.player.money)}`)}">
+        <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${roundMoney(state.player.money)}" aria-label="${escapeHtml(`${displayName}，${role.name}，金币 ${formatMoney(state.player.money)}`)}">
           <div class="new-attr-header new-identity-money-header">
-            <span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span>
+            <span class="new-player-identity"><span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span><span class="new-player-role" title="${escapeHtml(role.name)}">${escapeHtml(role.name)}</span></span>
             <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}</span>
           </div>
         </div>
@@ -792,8 +792,7 @@ function getFutureOccurrenceText(monthsLater: number): string {
 }
 
 function getEventRootTitle(title: string): string {
-  const rootTitle = normalizeGameDisplayText(title.split("➜")[0]?.trim() || title.trim());
-  return rootTitle === "毕业论文盲审" ? "盲审结果" : rootTitle;
+  return normalizeGameDisplayText(title.split("➜")[0]?.trim() || title.trim());
 }
 
 
@@ -878,7 +877,7 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
     }
     if (calendar.month === 8 && calendar.year === getGraduationPreparationYear(state.degree)
       && !state.thesis.review) {
-      addItem({ title: "毕业盲审", monthsLater });
+      addItem({ title: "盲审结果", monthsLater });
     }
     if (state.degree === "master" && calendar.month === 9 && (calendar.year === 2 || calendar.year === 3)) {
       addItem({
@@ -1131,6 +1130,7 @@ function renderEventContentBox(
   const displayEvent = historicalPage ?? currentEvent;
   if (!displayEvent) return "";
   const paperReviewPresentation = displayEvent.paperReviewPresentation;
+  const journalAcceptancePresentation = displayEvent.journalAcceptancePresentation;
   const displayStage: EventStage = "stage" in displayEvent
     ? displayEvent.stage
     : /结果$/.test(displayEvent.title)
@@ -1165,7 +1165,7 @@ function renderEventContentBox(
     ];
 
   return `
-    <div class="event-content-box${paperReviewPresentation ? " is-paper-review-result" : ""}" id="event-content-box">
+    <div class="event-content-box${paperReviewPresentation ? " is-paper-review-result" : journalAcceptancePresentation ? " is-journal-acceptance" : displayEvent.thesisReviewPresentation ? " is-thesis-review" : ""}" id="event-content-box">
       <div class="event-content-header">
         <div class="event-scene-tabs" aria-label="${escapeHtml(displayEvent.title)}事件幕次">
           ${sceneTabs.map((scene, index) => `
@@ -1183,9 +1183,12 @@ function renderEventContentBox(
         <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情">×</button>
       </div>
       <div class="event-content-body" id="event-content-body">
-        ${displayEvent.thesisReviewPresentation ? renderThesisReviewReports(displayEvent.thesisReviewPresentation) : ""}
-        ${paperReviewPresentation
+        ${displayEvent.thesisReviewPresentation
+          ? renderThesisReviewReports(displayEvent.thesisReviewPresentation, renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state)))
+          : paperReviewPresentation
           ? renderPaperReviewEvent(paperReviewPresentation, historicalPage !== null, renderEventSettlementSummary)
+          : journalAcceptancePresentation
+          ? renderJournalAcceptanceEvent(journalAcceptancePresentation, renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state)))
           : renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state))}
       </div>
       ${displayEvent.choices.length > 0 ? `
@@ -1242,7 +1245,8 @@ export function renderEventLayoutSamples(
     samples.push({ key: `${event.id}:${history.map((stage) => stage.selectedChoiceId).join("/")}:${branch}`,
       html: renderEventContentBox({ ...event, history, queueOrder: currentEvent.queueOrder }, null, null) });
     const stage = { title: event.title, description: event.description, narrativeNames: getEventNarrativeNames(event, state), choices: event.choices,
-      paperReviewPresentation: event.paperReviewPresentation, selectedChoiceId: "" };
+      paperReviewPresentation: event.paperReviewPresentation, journalAcceptancePresentation: event.journalAcceptancePresentation,
+      selectedChoiceId: "" };
     for (const choice of event.choices) {
       if (event.choices.length > 1) {
         samples.push({ key: `${event.id}:selected:${history.map((entry) => entry.selectedChoiceId).join("/")}:${choice.id}:${branch}`,
@@ -1528,7 +1532,7 @@ function renderWorkstationPaperResearchActions(
       ? getResearchExperimentCostBreakdown(state)
       : { total: 0, advisorFunding: 0, playerMoney: 0 };
     const enabled = prerequisiteMet && preview.allowed && state.player.san >= preview.sanCost
-      && state.player.money >= experimentCost.playerMoney && state.advisorProgressState.funding >= experimentCost.advisorFunding;
+      && state.player.money >= experimentCost.playerMoney;
     const disabledReason = paper === null
       ? "请先新建一篇论文"
       : !prerequisiteMet
@@ -1536,8 +1540,7 @@ function renderWorkstationPaperResearchActions(
         : !preview.allowed
           ? "行动点和 AI行动均不可用"
           : state.player.san < preview.sanCost ? `需要 ${preview.sanCost} SAN`
-            : type === "experiment" && state.player.money < experimentCost.playerMoney ? `金币不足，需自付 ${formatMoney(experimentCost.playerMoney)}`
-              : type === "experiment" && state.advisorProgressState.funding < experimentCost.advisorFunding ? `科研经费不足，需要 ${formatMoney(experimentCost.advisorFunding)}` : "";
+            : type === "experiment" && state.player.money < experimentCost.playerMoney ? `金币不足，需自付 ${formatMoney(experimentCost.playerMoney)}` : "";
     const aiClass = preview.usesAiResearchBonus ? " is-ai-bonus" : "";
     const prerequisiteClass = paper !== null && !prerequisiteMet ? " is-prerequisite-locked" : "";
     // The button shows only the player's own coins; advisor funding stays in
@@ -1546,7 +1549,8 @@ function renderWorkstationPaperResearchActions(
       ? ` · 金币-${formatMoney(experimentCost.playerMoney)}`
       : "";
     const effectText = `SAN-${paper ? renderAnimatedNumber(`paper:${paper.id}:action:${type}:san-cost`, preview.sanCost) : preview.sanCost}${moneyText}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
-    const fundingHint = `消耗${formatMoney(experimentCost.advisorFunding)}导师经费${experimentCost.playerMoney > 0 ? `，差额自付${formatMoney(experimentCost.playerMoney)}金币` : ""}`;
+    const fundingHint = experimentCost.total === 0 ? "实验费用已减至0"
+      : `${experimentCost.advisorFunding > 0 ? `消耗${formatMoney(experimentCost.advisorFunding)}导师经费` : ""}${experimentCost.playerMoney > 0 ? `${experimentCost.advisorFunding > 0 ? "，差额" : ""}自付${formatMoney(experimentCost.playerMoney)}金币` : ""}`;
     const experimentHint = [fundingHint, enabled ? "" : disabledReason].filter(Boolean).join("\n");
     return `
       <button
@@ -3795,7 +3799,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
                 openEvent || openHistoryEvent
                   ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null, state.debugEventReplayEnabled === true, state)
                   : activeLogPage?.kind === "ending"
-                    ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state, uiState.roleExperienceAward)
+                    ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state, uiState.roleExperienceAward, uiState.talentAllocation?.[state.selectedRoleId])
                     : "",
               )}
             </div>
@@ -4127,8 +4131,25 @@ function renderSanChart(
   domainMax: number,
 ): string {
   const months = logPages.map((page, index) => ({ ...page, index })).filter((page) => page.kind !== "ending");
-  const width = 80 + Math.max(0, months.length - 1) * 78;
-  const y = (san: number): number => 20 + (domainMax - san) / (domainMax - domainMin) * 96;
+  const chartWidth = 1000;
+  const chartHeight = 218;
+  const x = (index: number): number => 48 + index / Math.max(1, months.length - 1) * 920;
+  const y = (san: number): number => 24 + (domainMax - san) / (domainMax - domainMin) * 140;
+  const getTicks = (maxLabels: number): Set<number> => {
+    const lastIndex = months.length - 1;
+    if (lastIndex < 0) return new Set();
+    const step = [1, 2, 3, 4, 6, 12, 24, 36, 48, 72]
+      .find((candidate) => Math.ceil(lastIndex / candidate) + 1 <= maxLabels)
+      ?? Math.ceil(lastIndex / (maxLabels - 1));
+    const ticks = Array.from({ length: Math.floor(lastIndex / step) + 1 }, (_, index) => index * step);
+    if (ticks.at(-1) !== lastIndex) {
+      if (lastIndex - ticks[ticks.length - 1] < step / 2) ticks.pop();
+      ticks.push(lastIndex);
+    }
+    return new Set(ticks);
+  };
+  const wideTicks = getTicks(7);
+  const narrowTicks = getTicks(4);
   const selected = logPages[pageIndex];
   const selectedSan = selected ? sanByMonth.get(selected.monthKey) : undefined;
   let previousMonth: number | null = null;
@@ -4140,28 +4161,31 @@ function renderSanChart(
     }
     const command = previousMonth === month.monthKey - 1 ? "L" : "M";
     previousMonth = month.monthKey;
-    return `${command}${40 + index * 78} ${y(point.san).toFixed(1)}`;
+    return `${command}${x(index).toFixed(1)} ${y(point.san).toFixed(1)}`;
   }).join(" ");
   return `
     <div class="san-chart-panel" id="san-chart-panel" aria-label="SAN月度走势">
       <div class="san-chart-heading"><strong>SAN走势</strong><span>${escapeHtml(selected?.label ?? "本月")} · ${selectedSan ? `${formatMoney(selectedSan.san)}/${formatMoney(selectedSan.sanCap)}` : "暂无记录"}</span></div>
       <div class="san-chart-scroll">
-        <div class="san-chart-plot" style="min-width:${width}px">
-          <svg class="san-chart-svg" viewBox="0 0 ${width} 150" preserveAspectRatio="none" aria-hidden="true">
-            <line class="san-chart-gridline" x1="40" y1="20" x2="${width - 40}" y2="20" />
-            <line class="san-chart-gridline" x1="40" y1="68" x2="${width - 40}" y2="68" />
-            <line class="san-chart-gridline" x1="40" y1="116" x2="${width - 40}" y2="116" />
+        <div class="san-chart-plot" style="--san-chart-hit-width:${(92 / Math.max(1, months.length - 1)).toFixed(3)}%;--san-chart-dot-size:${months.length > 48 ? 5 : months.length > 24 ? 7 : 10}px">
+          <svg class="san-chart-svg" viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="none" aria-hidden="true">
+            <line class="san-chart-gridline" x1="48" y1="24" x2="968" y2="24" />
+            <line class="san-chart-gridline" x1="48" y1="94" x2="968" y2="94" />
+            <line class="san-chart-gridline" x1="48" y1="164" x2="968" y2="164" />
             <path class="san-chart-line" d="${path.trim()}" />
+            ${months.map((_, index) => wideTicks.has(index) || narrowTicks.has(index)
+              ? `<line class="san-chart-tick${wideTicks.has(index) ? " is-wide-tick" : ""}${narrowTicks.has(index) ? " is-narrow-tick" : ""}" x1="${x(index).toFixed(1)}" y1="175" x2="${x(index).toFixed(1)}" y2="182" />`
+              : "").join("")}
           </svg>
           <span class="san-chart-axis is-max">${formatMoney(domainMax)}</span>
           <span class="san-chart-axis is-min">${formatMoney(domainMin)}</span>
           ${months.map((month, index) => {
             const point = sanByMonth.get(month.monthKey);
-            const left = ((40 + index * 78) / width * 100).toFixed(3);
+            const left = (x(index) / chartWidth * 100).toFixed(3);
             const label = escapeHtml(month.label);
             return `
-              ${point ? `<button class="san-chart-point${month.index === pageIndex ? " is-current" : ""}" type="button" data-ui-log-page-index="${month.index}" data-value="${label} · SAN ${formatMoney(point.san)}/${formatMoney(point.sanCap)}" title="${label} · SAN ${formatMoney(point.san)}/${formatMoney(point.sanCap)}" aria-label="查看${label}日志，SAN ${formatMoney(point.san)}/${formatMoney(point.sanCap)}" style="left:${left}%;top:${y(point.san).toFixed(1)}px"></button>` : ""}
-              <span class="san-chart-month" style="left:${left}%">${label}</span>`;
+              ${point ? `<button class="san-chart-point${month.index === pageIndex ? " is-current" : ""}" type="button" data-ui-log-page-index="${month.index}" title="${label} · SAN ${formatMoney(point.san)}/${formatMoney(point.sanCap)}" aria-label="查看${label}日志，SAN ${formatMoney(point.san)}/${formatMoney(point.sanCap)}" style="left:${left}%;top:${(y(point.san) / chartHeight * 100).toFixed(3)}%"></button>` : ""}
+              ${wideTicks.has(index) || narrowTicks.has(index) ? `<span class="san-chart-month${wideTicks.has(index) ? " is-wide-tick" : ""}${narrowTicks.has(index) ? " is-narrow-tick" : ""}${index === 0 ? " is-first" : ""}${index === months.length - 1 ? " is-last" : ""}" style="left:${left}%">${label}</span>` : ""}`;
           }).join("")}
         </div>
       </div>
@@ -4178,7 +4202,17 @@ function renderEventLogSection(
   eventContentHtml = "",
 ): string {
   const sanTimeline = getSanTimeline(state);
-  const sanByMonth = new Map(sanTimeline.map((entry) => [entry.totalMonths, entry]));
+  const sanByMonth = new Map<number, (typeof sanTimeline)[number]>();
+  let recordedIndex = 0;
+  let lastRecorded = sanTimeline[0]!;
+  // Debug time jumps skip monthly settlement, so carry the last known SAN across display-only gaps.
+  for (const timelinePage of logPages) {
+    if (timelinePage.kind === "ending") continue;
+    while (recordedIndex < sanTimeline.length && sanTimeline[recordedIndex]!.totalMonths <= timelinePage.monthKey) {
+      lastRecorded = sanTimeline[recordedIndex++]!;
+    }
+    sanByMonth.set(timelinePage.monthKey, { ...lastRecorded, totalMonths: timelinePage.monthKey });
+  }
   const domainMin = Math.min(0, ...sanTimeline.map((entry) => entry.san));
   const domainMax = Math.max(20, ...sanTimeline.flatMap((entry) => [entry.san, entry.sanCap]));
   const observedMin = Math.min(...sanTimeline.map((entry) => entry.san));

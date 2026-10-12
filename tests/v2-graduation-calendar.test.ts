@@ -40,6 +40,17 @@ function skipMayConference(state: GameState): GameState {
   return next;
 }
 
+function skipRecruitment(state: GameState): GameState {
+  let next = state;
+  for (let stage = 0; stage < 3; stage += 1) {
+    const event = next.eventQueue.find((entry) => entry.chainId?.startsWith("career-recruitment-"));
+    if (!event) return next;
+    const choice = event.choices.find((entry) => entry.id === "rest") ?? event.choices[0]!;
+    next = dispatchAction(next, "resolve-event", { eventId: event.id, eventChoiceId: choice.id });
+  }
+  return next;
+}
+
 describe("May player transfer before June graduation", () => {
   it.each([
     [3, "transfer-phd", "phd", "master"],
@@ -62,7 +73,7 @@ describe("May player transfer before June graduation", () => {
     expect(ready.eventQueue[0]!.description).toContain("今年转博需要达到 3 分");
     const result = chooseTransferStage(decision, choice);
     expect(result).toMatchObject({ phase: "playing", ending: null, degree: "master", maxMonths: 34 });
-    expect(result.eventQueue[0]?.stage).toBe("result");
+    expect(result.eventQueue.find((event) => event.chainId === "phd-decision")?.stage).toBe("result");
     expect(dispatchAction(result, "next-month")).toMatchObject({ phase: "playing", ending: null, totalMonths: 33 });
     const settled = chooseTransferStage(result);
     expect(settled).toMatchObject({
@@ -71,15 +82,17 @@ describe("May player transfer before June graduation", () => {
     });
     expect(settled.player.money).toBe(ready.player.money);
     expect(settled.advisorProgressState.funding).toBe(ready.advisorProgressState.funding);
-    expect(settled.eventQueue).toHaveLength(0);
-    const june = dispatchAction(settled, "next-month");
+    expect(settled.eventQueue.filter((event) => event.source === "career")).toHaveLength(degree === "phd" ? 0 : 1);
+    const afterRecruitment = skipRecruitment(settled);
+    const june = dispatchAction(afterRecruitment, "next-month");
     expect(june).toMatchObject({ phase: "playing", ending: null, totalMonths: 34, month: 10, degree });
     expect(june.eventQueue.some((event) => event.chainId === "phd-decision" || event.chainId?.startsWith("ccig-"))).toBe(false);
-    expect(june.player.money).toBe(settled.player.money + (degree === "phd" ? 1.5 : 0));
-    expect(june.advisorProgressState.funding).toBe(settled.advisorProgressState.funding - (degree === "phd" ? 2.5 : 1));
+    expect(june.player.money).toBe(afterRecruitment.player.money + (degree === "phd" ? 1.5 : 0));
+    expect(june.advisorProgressState.funding).toBe(afterRecruitment.advisorProgressState.funding - (degree === "phd" ? 2.5 : 1));
     const rested = dispatchAction(june, "rest");
     expect(rested).toMatchObject({ phase: "playing", ending: null, totalMonths: 34 });
-    expect(dispatchAction(rested, "next-month")).toMatchObject(degree === "phd"
+    const afterJuneRecruitment = skipRecruitment(rested);
+    expect(dispatchAction(afterJuneRecruitment, "next-month")).toMatchObject(degree === "phd"
       ? { phase: "playing", ending: null, totalMonths: 35, year: 3, month: 11, degree: "phd", maxMonths: 70 }
       : { phase: "finished", ending, totalMonths: 34, month: 10, maxMonths: 34 });
   });
@@ -119,16 +132,16 @@ describe("May player transfer before June graduation", () => {
     const june = dispatchAction(may, "force-next-month");
     expect(june).toMatchObject({ totalMonths: 34, month: 10, degree: "master", phase: "playing", ending: null });
     expect(june.eventQueue.some((event) => event.chainId === "phd-decision")).toBe(false);
-    expect(dispatchAction(june, "next-month")).toMatchObject({ totalMonths: 34, phase: "finished", ending: "master" });
+    expect(dispatchAction(skipRecruitment(june), "next-month")).toMatchObject({ totalMonths: 34, phase: "finished", ending: "master" });
   });
 
   it("uses later June achievements for graduation without reopening the failed May transfer", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const may = skipMayConference(dispatchAction({ ...makeState(32), totalResearchScore: 0 }, "next-month"));
     const failed = chooseTransferStage(chooseTransferStage(chooseTransferStage(may), "transfer-phd"));
-    const june = dispatchAction(failed, "next-month");
+    const june = dispatchAction(skipRecruitment(failed), "next-month");
     expect(june).toMatchObject({ phase: "playing", ending: null, totalMonths: 34, degree: "master" });
-    const finished = dispatchAction({ ...june, totalResearchScore: 3 }, "next-month");
+    const finished = dispatchAction(skipRecruitment({ ...june, totalResearchScore: 3 }), "next-month");
     expect(finished).toMatchObject({ phase: "finished", ending: "master", totalMonths: 34, degree: "master" });
     expect(finished.eventHistory.filter((event) => event.chainId === "phd-decision")).toHaveLength(1);
     expect(finished.eventQueue.some((event) => event.chainId === "phd-decision")).toBe(false);

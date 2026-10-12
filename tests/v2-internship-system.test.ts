@@ -78,7 +78,7 @@ describe("v2 internship system", () => {
       const paragraphs = narrative.split("\n\n");
       expect(paragraphs.length).toBeGreaterThanOrEqual(2);
       expect(paragraphs.length).toBeLessThanOrEqual(3);
-      expect(narrative).toContain(context.offer.company);
+      expect(narrative.length).toBeLessThan(220);
       for (const paragraph of paragraphs) {
         expect(paragraph).not.toMatch(/[。！？]\s*\p{Extended_Pictographic}/u);
         expect(paragraph).not.toMatch(/\p{Extended_Pictographic}[\uFE0F\u200D\s]*$/u);
@@ -95,7 +95,6 @@ describe("v2 internship system", () => {
     expect(declined.choices[0]!.effects).toEqual({ conferenceCareerUpdates: {
       rejectedInternshipCount: context.rejectedInternshipCount + 1,
       permanentlyBlockedInternship: false,
-      lastInternshipOffer: context.offer,
     } });
   });
 
@@ -361,15 +360,24 @@ describe("v2 internship system", () => {
     const context = buildInternshipInviteContext(initial, () => 0.5);
     const event = createInternshipInviteAct1(context);
     let state = resolveFirst(queueEvent(initial, event));
+    const lead = state.eventQueue[0]!.internshipInvitePreview!.context.lead!;
+    expect(lead.company).not.toBe("企业");
+    expect(state.eventQueue[0]!.description).toContain(lead.company);
+    expect(state.eventQueue[0]!.description).toContain(lead.direction);
+    expect(state.eventQueue[0]!.internshipInvitePreview!.context.offer.id).toBe("pending");
     expect(state.eventQueue[0]!.choices.find((choice) => choice.id === "accept")?.outcome).toContain("企业实习（6个月）");
     state = resolveFirst(state, "accept");
     expect(state.internshipState.active).toBe(false);
-    expect(resolveFirst(state).internshipState).toEqual(activateInternship(context.offer));
+    const revealedOffer = state.eventQueue[0]!.internshipInvitePreview!.context.offer;
+    expect(revealedOffer.id).not.toBe("pending");
+    expect(revealedOffer.company).toBe(lead.company);
+    expect(state.eventQueue[0]!.description).toContain(revealedOffer.company);
+    expect(resolveFirst(state).internshipState).toEqual(activateInternship(revealedOffer));
     const blocked = { ...state, conferenceCareerState: { ...state.conferenceCareerState, permanentlyBlockedInternship: true } };
     const accepted = resolveFirst(blocked);
-    expect(accepted.internshipState).toEqual(activateInternship(context.offer));
+    expect(accepted.internshipState).toEqual(activateInternship(revealedOffer));
     expect(accepted.conferenceCareerState.hasInternshipExperience).toBe(true);
-    expect(accepted.conferenceCareerState.lastInternshipOffer).toEqual(context.offer);
+    expect(accepted.conferenceCareerState.lastInternshipOffer).toEqual(revealedOffer);
   });
 
   it("does not restore an expired placement from stale networking effects", () => {

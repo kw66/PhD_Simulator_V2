@@ -1,166 +1,236 @@
 import {
   CAREER_DEFINITIONS,
-  CAREER_OPTIONS,
-  calculateCareerProgress,
+  getCareerAbility,
+  getCareerCandidates,
+  getCareerSuccessChance,
+  type CareerJobDefinition,
+  type CareerOffer,
   type CareerType,
 } from "./v2-career-rules";
+import { getActualSanChange } from "./v2-sanity-rules";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
-import { getPublishedPaperCount } from "./v2-publication-rules";
-import { createThreeStageEvent, type RandomEventResultCopy } from "./v2-random-events-core-shared";
-import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 
-const CAREER_COPY: Record<CareerType, {
-  intro: string;
-  currentWork: string;
-  decision: string;
-  result: string;
-  followup: string;
+export const CAREER_INTERVIEW_SAN_COST: Record<CareerType, number> = {
+  internet: 6,
+  stateOwned: 3,
+  civilService: 6,
+  academic: 4,
+};
+
+const CAREER_ORDER: CareerType[] = ["internet", "stateOwned", "civilService", "academic"];
+
+const CAREER_SCENES: Record<CareerType, {
+  search: string;
+  prepare: string;
+  interview: string;
+  accepted: string;
+  rejected: string;
 }> = {
   internet: {
-    intro: "你在工位上点开校招群的岗位表。都叫算法工程师，🔍细看却像在招几种不同的人。",
-    currentWork: "你把简历拖到旁边。组会上能讲半天的经历，放进这一页纸里，📄居然只剩几行技术名词。",
-    decision: "你对着岗位描述逐项核技术栈，又把项目里真正做过的部分列出来。写得太满，面试时容易被追问；写得太少，🤔又像什么都没做。",
-    result: "你对照岗位要求，把“参与项目”拆成具体做法。平时觉得没什么的细节，✍️倒比那串技术名词更好解释。",
-    followup: "你试着照这一版讲了讲经历，总算不必每说两句，💬就补一句“这个得从头说起”。",
+    search: "你把简历里的实验和代码改成能让招聘团队看懂的项目经历。原本写给审稿人的一页方法介绍，删改几次，才勉强装进两行。",
+    prepare: "几份技术岗的要求看着相似，细读却各有侧重。你翻出旧项目，试着讲清自己解决过什么问题，而不只是报出模型名字。",
+    interview: "技术面试从你简历上的一项实验问起。面试官追着问失败的尝试和后来如何排查，你在草稿纸上画出数据流，才把那段经历讲完整。",
+    accepted: "晚上，邮箱里终于出现了录用通知。你又点开附件确认了一遍岗位和待遇，才敢把消息告诉家里。",
+    rejected: "几天后邮件来了，措辞客气，却没有下一轮。你把被追问到卡住的地方记在简历旁，准备下次讲得更清楚。",
   },
   stateOwned: {
-    intro: "学校就业网转来了央国企招聘公告。单位名字都很熟，岗位地点、专业要求和材料清单，📋却得从头认一遍。",
-    currentWork: "你把岗位表和学籍信息并排打开。读了这么久的专业，核对全称时，🔍还是老老实实多看了一眼。",
-    decision: "公告里的专业全称、学历要求和附件清单一项都不能错。你把学籍信息和报名材料放在一起，光是确认每个文件该放哪一栏，🌙就够占掉一晚。",
-    result: "你对照公告核过专业全称、学历和联系方式，给拿不准的要求做了标记。刚才挤成一团的申请材料，🗂️总算各有了去处。",
-    followup: "录用还没影，好在重新打开材料目录时，😌已经不用挨个猜附件里装了什么。",
+    search: "你打开就业网的公告附件，专业目录、学历要求和材料模板各在不同的页面。导师签过字的证明也要重新扫描，光整理文件就占了半个晚上。",
+    prepare: "你逐条核对岗位要求，再把科研经历写进报名材料。某些项目在论文里只需一句话，在这里却要说明自己具体负责了什么。",
+    interview: "笔试结束后，你带着材料走进面试室。考官问起团队协作和项目推进，你挑了一次真正参与的经历讲，尽量不把组会上的术语原样搬过去。",
+    accepted: "录用通知比约定的时间晚来了一天。你看到名字后先松了口气，又仔细核对聘用条件，才把邮件存进招聘邮件文件夹。",
+    rejected: "名单公布时，你从头到尾看了两遍，没有找到自己的名字。你合上页面，想起面试里那道没答透的项目问题。",
   },
   civilService: {
-    intro: "公务员招录的职位表挂出来了。你在工位上筛过专业和学历，刚才还很长的表格，🔍已经没剩多少行。",
-    currentWork: "旁边开着行测题和申论资料。每个字都认识，轮到限时作答，⏱️你却迟迟没选下第一个答案。",
-    decision: "行测要在限时里做取舍，申论又不能只堆漂亮话。你可以先刷题找手感，也可以坐下来整理一篇完整的申论提纲，🤔时间只够顾好一边。",
-    result: "你核过报考条件，又理了一遍行测和申论笔记。对答案时觉得很明白的几道题，遮住解析，🧐才发现还卡在同一步。",
-    followup: "你把卡住的地方圈了出来。笔记上总算有了自己的笔迹，✏️下回就从这里接着练。",
+    search: "招聘群里有人发了职位表。你一边筛专业和学历，一边把组会日程挪开，给行测和申论留出完整的练习时间。",
+    prepare: "职位表缩到只剩几行，你又把报考要求读了一遍。名额有限，岗位越靠上，对笔试和面试的把握就越不能只靠临场发挥。",
+    interview: "行测交卷时，你还惦记着一道没算完的题。面试里又被问到如何协调不同意见，你停了半拍，才把答案从熟悉的实验室场景里抽出来。",
+    accepted: "公示名单上出现了你的名字。你对着准考证核了一遍，给家里打电话时，才发现自己一直捏着那张已经皱了的纸。",
+    rejected: "成绩和名单都出了，你离录用线还差一截。合上网页前，你把这次失分最多的部分记下来，免得下回又在同一处赶时间。",
   },
   academic: {
-    intro: "你在工位上翻起高校招聘页面。都写着“诚聘英才”，点开各学院的附件，🏫才知道有没有自己能报的方向。",
-    currentWork: "简历停在“未来研究计划”一栏。组会上熟悉的“下一步工作”，到了这里，💭忽然要多想几年。",
-    decision: "招聘页面要求提交研究计划。你把眼前课题的下一步往后推了几年，又删掉几句听起来很大的目标，✍️试着写出别人能据此判断的具体问题。",
-    result: "你梳理了研究经历，把后续设想写得具体一些。简历里几句很气派的话，念出来连自己也接不住，✏️只好删掉重写。",
-    followup: "再看这一版，总算能顺着每段讲下去了。你对照旁边的招聘页面，🔍又看了看自己与岗位是否合适。",
+    search: "你翻着各学院的招聘启事，把研究计划从论文的“未来工作”里一点点展开。写到未来三年的方向时，你第一次认真问自己还想追哪个问题。",
+    prepare: "岗位名称之外，各学院更关心你准备怎样独立开展研究。你把论文、项目经历和下一步计划排在一起，删掉几句听起来宏大却说不清如何做的话。",
+    interview: "学术报告讲到一半，评委打断你，追问结果能否推广到另一类数据。你把投影退回实验设置那页，解释哪些结论已经验证，哪些仍需要时间。",
+    accepted: "学院的邮件终于到了。你读完聘任条件，又回头看了看自己那份研究计划；几个月前写下的设想，忽然有了继续做下去的地方。",
+    rejected: "学院的回复很简短。你想起报告后那场讨论，知道有些方向值得继续补强，只是这次还没能说服他们。",
   },
 };
 
-/** Opening line per effort level, so the three effort results read differently. */
-const CAREER_EFFORT_LEAD: Record<string, string> = {
-  light: "你只在组会和实验的空档里挤出几个晚上。",
-  normal: "这个月你专门留出整段时间准备求职。",
-  "all-in": "这个月你几乎把能挪的时间都给了求职，实验进度表上空了好几格。",
-};
-
-function createCareerChoices(state: GameState, careerType: CareerType): {
-  choices: EventChoice[];
-  results: Record<string, RandomEventResultCopy>;
-} {
-  const definition = CAREER_DEFINITIONS[careerType];
-  const copy = CAREER_COPY[careerType];
-  const publishedPaperCount = getPublishedPaperCount(state);
-  const oldProgress = state.careerProgress[careerType];
-  const results: Record<string, RandomEventResultCopy> = {};
-
-  const choices: EventChoice[] = CAREER_OPTIONS.map((option) => {
-    const progressGain = calculateCareerProgress(careerType, option, {
-      research: state.player.research,
-      social: state.player.social,
-      publishedPaperCount,
-      internshipCount: state.internshipCount,
-    });
-    const sanChange = option.sanCost > 0
-      ? getActualSanChange(-option.sanCost, state.month, state.eventSupport, state.buffs)
-      : 0;
-    const newProgress = oldProgress + progressGain;
-    results[option.id] = {
-      title: "本月结果",
-      description: progressGain > 0
-        ? [
-            `${CAREER_EFFORT_LEAD[option.id] ?? ""}${copy.result}`,
-            `「${definition.name}」准备进度从 ${oldProgress} 提升到 ${newProgress}。`,
-            copy.followup,
-          ].join("\n\n")
-        : [
-            `你把「${definition.name}」的招聘页面加入收藏，🔖这个月先不往日程里挤准备时间。`,
-            `准备进度仍为 ${oldProgress}，本月暂不投入，下个月可以继续选择任一方向。`,
-            "关掉页面时，浏览器终于少了一排标签。下次还得从这里接着准备，💻眼下先把工位上的事做完。",
-          ].join("\n\n"),
-    };
-
-    return {
-      id: option.id,
-      label: option.id === "pause" ? "本月暂不投入" : option.text,
-      disabledReason: state.player.san < -sanChange ? `SAN 不足，需要 ${-sanChange}` : undefined,
-      outcome: progressGain > 0
-        ? `${definition.name}进度 +${progressGain}，${sanChange < 0 ? formatActualSanChange(-option.sanCost, state.month, state.eventSupport, state.buffs) : "SAN 不变"}。`
-        : `${definition.name}进度 +0${sanChange < 0 ? `｜${formatActualSanChange(-option.sanCost, state.month, state.eventSupport, state.buffs)}` : ""}。`,
-      effects: {
-        san: sanChange,
-        careerType,
-        careerProgress: progressGain,
-        recordCareerPreparation: true,
-      },
-    };
-  });
-
-  return { choices, results };
+function describeProspect(chance: number): string {
+  if (chance >= 70) return "你已有的经历与要求贴得很近，准备起来心里比较有底";
+  if (chance >= 45) return "要求大致能对上，能否讲好关键经历还要看面试";
+  if (chance >= 20) return "有几项要求需要你在面试里仔细解释";
+  if (chance > 5) return "能对上的经历不多，投出去算是一次冲刺";
+  return "要求几乎条条都很硬，你知道这一投胜算很小";
 }
 
-function createCareerEvent(state: GameState, careerType: CareerType): PendingEvent {
-  const definition = CAREER_DEFINITIONS[careerType];
-  const progress = state.careerProgress[careerType];
-  const { choices, results } = createCareerChoices(state, careerType);
-  const copy = CAREER_COPY[careerType];
-  const event: PendingEvent = {
-    id: `career-${careerType}-y${state.year}-m${state.month}`,
-    title: `${definition.name}求职准备`,
-    description: "",
-    source: "career",
-    blocking: true,
-    deadlineMonths: 0,
-    chainId: `career-${careerType}`,
-    stage: "act1",
-    careerPreparation: { type: careerType, totalMonths: state.totalMonths, degree: state.degree },
-    choices,
+function describeListing(job: CareerJobDefinition, chance: number): string {
+  const terms = job.compensation ? `待遇栏写着${job.compensation}`
+    : job.detail ? `公告还注明“${job.detail}”` : "公告列出了详细的招录要求";
+  return `${job.name}的${terms}，${describeProspect(chance)}`;
+}
+
+function drawExperience(random: () => number): number {
+  return 5 + Math.floor(Math.max(0, Math.min(0.999999, random())) * 6);
+}
+
+function makeOffer(job: CareerJobDefinition, score: number): CareerOffer {
+  return {
+    type: job.type,
+    jobId: job.id,
+    name: job.name,
+    threshold: job.threshold,
+    score,
+    ...(job.detail ? { detail: job.detail } : {}),
+    ...(job.compensation ? { compensation: job.compensation } : {}),
   };
-
-  const root = createThreeStageEvent(event, {
-    introDescription: [
-      copy.intro,
-      copy.currentWork,
-      `「${definition.name}」准备进度：${progress}。`,
-    ].join("\n\n"),
-    decisionTitle: "本月安排",
-    decisionDescription: [
-      copy.decision,
-      "你在日历上标好组会和实验，再圈出几项求职待办。 📅认真准备得留出整段时间和精力；想把去处落实，又舍不得把这个月排得太满。",
-      "这个月只安排一个方向；也可以先放一放，下个月再继续。",
-    ].join("\n\n"),
-    results,
-  });
-  const decision = root.choices[0]!.effects.enqueueEvents![0]!;
-  decision.choices = decision.choices.map((choice) => {
-    const { enqueueEvents, ...effects } = choice.effects;
-    return {
-      ...choice,
-      effects: {
-        enqueueEvents: enqueueEvents?.map((result) => ({
-          ...result,
-          careerPreparation: event.careerPreparation,
-          choices: result.choices.map((confirmation) => ({
-            ...confirmation,
-            disabledReason: choice.disabledReason,
-            effects,
-          })),
-        })),
-      },
-    };
-  });
-  return root;
 }
 
-export function createCareerEventForType(state: GameState, careerType: CareerType): PendingEvent {
-  return createCareerEvent(state, careerType);
+function createResultEvent(
+  state: GameState,
+  chainId: string,
+  type: CareerType,
+  job: CareerJobDefinition,
+  score: number,
+  success: boolean,
+  experienceGain: number,
+  sanChange: number,
+): PendingEvent {
+  const existing = state.careerOffers[type];
+  const offer = makeOffer(job, score);
+  const scene = CAREER_SCENES[type];
+  const summary = success
+    ? `${scene.accepted}${job.compensation ? `邮件写明${job.compensation}。` : ""}${existing ? `你已经留着${existing.name}的 offer，两个去向只能在这一方向上保留一个。` : "你把通知放在桌上，想好再回复。"}`
+    : `${scene.rejected}${existing ? `之前拿到的${existing.name} offer 还在，你暂时不用急着做决定。` : ""}`;
+  const outcome = `${CAREER_DEFINITIONS[type].name}能力 +${experienceGain}；SAN ${sanChange}；${success ? "面试通过" : "面试未通过"}`;
+  const baseEffects = {
+    san: sanChange,
+    careerRecruitment: { totalMonths: state.totalMonths, type, experienceGain },
+  };
+  const choices: EventChoice[] = success ? [
+    {
+      id: existing ? "replace-offer" : "accept-offer",
+      label: existing ? "替换旧 offer" : "接受 offer",
+      outcome: `${outcome}；获得${job.name} offer`,
+      effects: { ...baseEffects, careerRecruitment: { ...baseEffects.careerRecruitment, offer } },
+    },
+    {
+      id: existing ? "keep-offer" : "decline-offer",
+      label: existing ? "保留旧 offer" : "放弃 offer",
+      outcome: `${outcome}；${existing ? `保留${existing.name} offer` : "未保留 offer"}`,
+      effects: baseEffects,
+    },
+  ] : [{ id: "confirm", label: "确定", outcome, effects: baseEffects }];
+  return {
+    id: `${chainId}-${type}-${job.id}-result`,
+    title: `找工作 ➜ ${CAREER_DEFINITIONS[type].name}岗位 ➜ 面试结果`,
+    description: [
+      `你投了${job.name}。从投递到笔面试，邮箱和手机都被你看得比平时勤。${scene.interview}`,
+      summary,
+      `机制结算\n${outcome}`,
+    ].join("\n\n"),
+    source: "career", blocking: true, deadlineMonths: 0, chainId, stage: "result", choices,
+  };
+}
+
+function createDirectionEvent(
+  state: GameState,
+  chainId: string,
+  type: CareerType,
+  random: () => number,
+): PendingEvent {
+  const score = getCareerAbility(state, type);
+  const baseCost = CAREER_INTERVIEW_SAN_COST[type];
+  const sanChange = getActualSanChange(-baseCost, state.month, state.eventSupport, state.buffs);
+  const candidates = getCareerCandidates(state, type);
+  const choices: EventChoice[] = candidates.map((job) => {
+    const chance = getCareerSuccessChance(type, score, job);
+    const success = random() * 100 < chance;
+    const experienceGain = drawExperience(random);
+    const result = createResultEvent(state, chainId, type, job, score, success, experienceGain, sanChange);
+    return {
+      id: `apply-${job.id}`,
+      label: job.name,
+      disabledReason: state.player.san < -sanChange ? `SAN 不足，需要 ${-sanChange}` : undefined,
+      outcome: `应聘${job.name}，结果待公布`,
+      effects: { enqueueEvents: [result] },
+    };
+  });
+  return {
+    id: `${chainId}-${type}-choice`,
+    title: `找工作 ➜ ${CAREER_DEFINITIONS[type].name}岗位`,
+    description: [
+      CAREER_SCENES[type].search,
+      `${CAREER_SCENES[type].prepare}你把几份公告摊开，留意到这些去向：${candidates.map((job) => describeListing(job, getCareerSuccessChance(type, score, job))).join("；")}。`,
+      "你在日历上给笔试和面试留出一段时间，盯着最后几个岗位名称看了会儿，才决定投哪一份。",
+    ].join("\n\n"),
+    source: "career", blocking: true, deadlineMonths: 0, chainId, stage: "act2", choices,
+  };
+}
+
+function createRestEvent(state: GameState, chainId: string, hasOpenDirections: boolean): PendingEvent {
+  const result: PendingEvent = {
+    id: `${chainId}-rest-result`, title: "找工作 ➜ 本月休息 ➜ 月度安排",
+    description: [
+      hasOpenDirections
+        ? "你关掉职位表，把没改完的论文重新铺到桌上。消息群里还在讨论笔试题，你看了两眼，决定这个月先不跟着跑。"
+        : "你关掉职位表，把没改完的论文重新铺到桌上。招聘窗口已过，群里聊的也渐渐变成毕业手续和去向。",
+      `晚上离开实验室时，你终于没有再翻招聘邮件。眼下的安排清楚了些；${Object.keys(state.careerOffers).length ? "已经收到的 offer，也还好好留在邮箱里。" : "桌上的论文，至少又向前推进了一点。"}`,
+      "机制结算\n本月未应聘",
+    ].join("\n\n"),
+    source: "career", blocking: true, deadlineMonths: 0, chainId, stage: "result",
+    choices: [{ id: "confirm", label: "确定", outcome: "本月未应聘", effects: {
+      careerRecruitment: { totalMonths: state.totalMonths },
+    } }],
+  };
+  return {
+    id: `${chainId}-rest-choice`, title: "找工作 ➜ 本月休息",
+    description: [
+      hasOpenDirections
+        ? "你又把这几份岗位启事看了一遍。要求并非全不合适，只是论文、组会和毕业材料已经把这个月的日程排得很满。"
+        : "几个方向的招聘窗口都已结束。你又翻了一遍岗位启事，确认这个月没有能报名的去向。",
+      hasOpenDirections
+        ? "同门问你要不要一起准备笔试，你说想先把手头的事收一收。这次先不投了，至少能安静地把眼前的问题解决。"
+        : "你把职位表收进文件夹，继续处理论文和毕业材料。眼下不用再为笔试腾日程了。",
+    ].join("\n\n"),
+    source: "career", blocking: true, deadlineMonths: 0, chainId, stage: "act2",
+    choices: [{ id: "rest", label: "本月不应聘", outcome: "本月不参加招聘", effects: { enqueueEvents: [result] } }],
+  };
+}
+
+export function createCareerRecruitmentEvent(
+  state: GameState,
+  random: () => number = Math.random,
+  includeClosedDirections = false,
+): PendingEvent {
+  const chainId = `career-recruitment-${state.totalMonths}`;
+  const available = CAREER_ORDER.filter((type) => (includeClosedDirections || CAREER_DEFINITIONS[type].activeMonths.includes(state.month))
+    && (type !== "academic" || state.degree === "phd"));
+  return {
+    id: chainId, title: "找工作", source: "career", blocking: true, deadlineMonths: 0, chainId, stage: "act1",
+    description: [
+      available.length
+        ? "临近毕业，招聘群忽然比组会群还热闹。你把论文和项目经历整理进简历，翻出去年拍的证件照，发现文件名还叫“最终版2”。📄这次总得认真改一改。"
+        : "毕业就在眼前，招聘群里的消息却慢慢少了。你翻出之前改过的简历，再看一眼日历：📄几个方向今年的投递时间都过去了。",
+      available.length
+        ? `新的岗位信息接连发来，你一边核对要求，一边看着日历里没划掉的实验和毕业材料。${Object.keys(state.careerOffers).length ? "手上已有回复，但你还想看看有没有更合适的去向。" : "眼下还没有着落，你开始在几个方向之间犹豫。"}投递、笔试、面试都得花时间，这个月只够认真准备一个方向。`
+        : "到了6月，几个方向的招聘窗口都已结束。你把简历和毕业材料分开整理，这个月先把眼前的事做完。",
+    ].join("\n\n"),
+    choices: [
+      ...available.map((type): EventChoice => ({
+        id: `choose-${type}`, label: CAREER_DEFINITIONS[type].name,
+        outcome: `查看${CAREER_DEFINITIONS[type].name}岗位`,
+        effects: { enqueueEvents: [createDirectionEvent(state, chainId, type, random)] },
+      })),
+      { id: "rest", label: "本月休息", outcome: "本月不参加招聘", effects: { enqueueEvents: [createRestEvent(state, chainId, available.length > 0)] } },
+    ],
+  };
+}
+
+export function shouldScheduleCareerRecruitment(state: GameState): boolean {
+  return state.phase === "playing" && state.ending === null
+    && state.month >= 1 && state.month <= 10
+    && state.year === (state.degree === "master" ? 3 : 6)
+    && state.careerLastRecruitmentTotalMonths !== state.totalMonths
+    && !state.eventQueue.some((event) => event.chainId === `career-recruitment-${state.totalMonths}`);
 }

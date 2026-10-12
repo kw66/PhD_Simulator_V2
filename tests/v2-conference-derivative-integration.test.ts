@@ -7,6 +7,7 @@ import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { activateLover } from "../src/core/v2-lover-system";
 import { createLoverProgressState } from "../src/core/v2-lover-progression";
 import { getInternshipMonthlyStats, getInternshipExperimentEffect, hasInternshipExperience } from "../src/core/v2-internship-system";
+import { getJointTrainingCitationCapBonus } from "../src/core/v2-joint-training-system";
 import { DEBUG_EVENT_GROUPS } from "../src/core/v2-debug-tools";
 import type { EventChoice, GameState, InternshipOffer } from "../src/core/v2-types";
 
@@ -60,13 +61,17 @@ describe("conference derivative settlement integration", () => {
     expect(state.player.social).toBe(7.6);
     expect(state.eventQueue[0]!.jointTrainingPreview?.context.invitationCitations).toBe(400);
     state = choose(choose(state, "continue"), "accept");
+    const supportLevel = state.eventQueue[0]!.jointTrainingPreview!.context.supportLevel!;
+    expect(supportLevel).toBeGreaterThanOrEqual(0);
+    expect(supportLevel).toBeLessThanOrEqual(2);
+    const expectedCap = getJointTrainingCitationCapBonus(400, supportLevel);
     state = { ...state, totalCitations: 4000 };
     state = choose(state, "close");
-    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(4);
+    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(expectedCap);
     expect(state.buffs.filter((buff) => buff.timing === "permanent")).toHaveLength(2);
     state = choose(choose(choose(activity(state, 4), "continue"), "big-bull-coop"), "close");
     expect(state.eventQueue).toEqual([]);
-    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(4);
+    expect(state.researchCapacityState.jointTrainingCitationCapBonus).toBe(expectedCap);
     expect(state.buffs.filter((buff) => buff.timing === "permanent")).toHaveLength(2);
   });
 

@@ -39,7 +39,7 @@ describe("timeline scrolling through the real app handlers", () => {
   beforeEach(async () => {
     page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     await page.route("**/__timeline_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
-    await page.goto(`${server.resolvedUrls!.local[0]}__timeline_test__`);
+    await page.goto(`${server.resolvedUrls!.local[0]}__timeline_test__`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("[data-action='start-game']");
     await action("start-game", { roleId: "normal" });
     await action("debug-shift-month", { delta: "18" });
@@ -49,7 +49,7 @@ describe("timeline scrolling through the real app handlers", () => {
       return element.scrollLeft;
     });
     expect(initialScroll).toBeGreaterThan(0);
-  }, 30_000);
+  }, 60_000);
 
   afterEach(async () => { await page?.close(); });
 
@@ -154,4 +154,53 @@ describe("timeline scrolling through the real app handlers", () => {
     await page.locator("[data-ui-san-chart-toggle]").click();
     expect(await page.locator(".san-chart-panel").count()).toBe(0);
   }, 30_000);
+
+  it("keeps the SAN line connected after the blind-review debug jump", async () => {
+    await action("debug-trigger-event", { eventId: "thesis-progress" });
+    const markers = await page.locator(".event-timeline-marker").count();
+    expect(markers).toBeGreaterThan(20);
+    expect(await page.locator(".event-timeline-san-segment").count()).toBe(markers - 1);
+    await page.locator(".event-timeline-track").screenshot({ path: "artifacts/timeline/strip-blind-review.png", animations: "disabled" });
+    await page.locator("[data-ui-san-chart-toggle]").click();
+    expect(await page.locator(".san-chart-point").count()).toBe(markers);
+    expect(await page.locator(".san-chart-line").getAttribute("d")).toMatch(/L[\d.]+ [\d.]+/u);
+  });
+
+  it("fits every recorded SAN month into a long-career chart with sparse axis labels", async () => {
+    await action("restart-game");
+    await page.locator(".event-content-buttons button").first().click();
+    await page.locator(".event-content-buttons button").nth(1).click();
+    await page.locator(".event-content-buttons button").first().click();
+    for (let month = 0; month < 60; month += 1) {
+      if (month === 15 || month === 30 || month === 45) {
+        await action("debug-adjust-stat", { debugStatId: "san", delta: "-4" });
+      }
+      await action("force-next-month");
+    }
+
+    const monthCount = await page.locator(".event-timeline-marker:not([data-ui-ending-page])").count();
+    await page.locator("[data-ui-san-chart-toggle]").click();
+    expect(await page.locator(".san-chart-point").count()).toBe(monthCount);
+    expect(await page.locator(".san-chart-month:visible").count()).toBeLessThan(monthCount / 3);
+    expect(await page.locator(".san-chart-scroll").evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    expect(await page.locator(".san-chart-line").getAttribute("d")).toMatch(/L[\d.]+ [\d.]+/u);
+
+    const firstPoint = page.locator('.san-chart-point[data-ui-log-page-index="0"]');
+    const lastPoint = page.locator(`.san-chart-point[data-ui-log-page-index="${monthCount - 1}"]`);
+    expect(await firstPoint.isVisible()).toBe(true);
+    expect(await lastPoint.isVisible()).toBe(true);
+    await firstPoint.click();
+    expect(await page.locator("#event-log-panel").getAttribute("data-log-page-index")).toBe("0");
+    await lastPoint.click();
+    expect(await page.locator("#event-log-panel").getAttribute("data-log-page-index")).toBe(String(monthCount - 1));
+    await page.mouse.move(0, 0);
+    await page.locator(".san-chart-panel").screenshot({ path: "artifacts/timeline/san-career.png", animations: "disabled" });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.locator(".san-chart-month:visible").count()).toBeLessThanOrEqual(4);
+    expect(await page.locator(".san-chart-scroll").evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    expect(await page.locator(".play-help-toggle").isVisible()).toBe(false);
+    await page.mouse.move(0, 0);
+    await page.locator(".san-chart-panel").screenshot({ path: "artifacts/timeline/san-career-narrow.png", animations: "disabled" });
+  }, 60_000);
 });

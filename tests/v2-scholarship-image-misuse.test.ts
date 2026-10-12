@@ -174,6 +174,7 @@ describe("image misuse scholarship disqualification", () => {
     expect(completed.player.san).toBe(8);
     expect(completed.scholarshipState).toEqual({
       lastAwardYear: year,
+      awardCount: 1,
       scoreBaseline: snapshot.scoreBaseline + snapshot.score,
       claimedPaperIds: ["prior-paper", ...snapshot.eligiblePaperIds],
     });

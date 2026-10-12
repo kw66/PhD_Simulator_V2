@@ -13,7 +13,7 @@ import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolutio
 import { createScholarshipEvent, resolveScholarshipApplication } from "../src/core/v2-fixed-events-scholarship";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "../src/core/v2-fixed-events-teachers-day";
-import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
+import { createCareerRecruitmentEvent } from "../src/core/v2-monthly-career-events";
 import { advanceThesisResearchPoint, syncThesisState } from "../src/core/v2-thesis-rules";
 import { createFundingCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
 import { createAdvisorTalkRandomEvent } from "../src/core/v2-random-events-lab-advisor-talk";
@@ -326,7 +326,7 @@ describe("v2 event scheduler", () => {
 
     expect(collectFixedEventsForMonth({ ...initial, phase: "playing" as const, year: 1, month: 1, totalMonths: 1 }).map((event) => event.chainId)).toEqual(["teachers-day"]);
     expect(collectFixedEventsForMonth({ ...initial, phase: "playing" as const, year: 2, month: 2, totalMonths: 14 }).map((event) => event.chainId)).toEqual(["scholarship"]);
-    expect(collectFixedEventsForMonth({ ...initial, phase: "playing" as const, year: 3, month: 3, totalMonths: 27 })).toEqual([]);
+    expect(collectFixedEventsForMonth({ ...initial, phase: "playing" as const, year: 3, month: 3, totalMonths: 27 }).map((event) => event.chainId)).toEqual(["career-recruitment-27"]);
     expect(collectFixedEventsForMonth({ ...initial, phase: "playing" as const, degree: "phd" as const, phdStartYear: 3, year: 3, month: 1, totalMonths: 25 }).map((event) => event.chainId)).toEqual(["teachers-day", "mentor-assign"]);
     expect(collectFixedEventsForMonth({ ...initial, phase: "playing" as const, degree: "phd" as const, phdStartYear: 3, year: 4, month: 1, totalMonths: 37 }).map((event) => event.chainId)).toEqual(["teachers-day"]);
     expect(collectFixedEventsForMonth({ ...initial, phase: "playing" as const, year: 1, month: 11, totalMonths: 11 }).map((event) => event.chainId)).toEqual(["summer-vacation", "year-summary"]);
@@ -1173,7 +1173,7 @@ describe("v2 event scheduler", () => {
     const scholarshipDecision = createScholarshipEvent(spring, () => 0).choices[0]!.effects.enqueueEvents![0]!;
     const scholarshipResult = resolveScholarshipApplication(spring, scholarshipDecision.choices[0]!.effects.fixedEventResolution!, () => 0).enqueueEvents![0]!;
     expect(scholarshipResult.choices[0]?.effects.san).toBe(-1);
-    const careerChoice = getDecisionChoices(createCareerEventForType(spring, "academic"))[1]!;
+    const careerChoice = getDecisionChoices(createCareerRecruitmentEvent(spring, () => 0))[0]!;
     expect(careerChoice.effects.san).toBeUndefined();
     expect(careerChoice.effects.enqueueEvents![0]!.choices[0]!.effects.san).toBe(-2);
     const writing = syncThesisState({ ...spring, month: 7, totalMonths: 31 }, () => 0);

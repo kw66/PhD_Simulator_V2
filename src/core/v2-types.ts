@@ -1,8 +1,8 @@
-import type { CareerType } from "./v2-career-rules";
+import type { CareerOffer, CareerType } from "./v2-career-rules";
 import type { DebugRelationshipType, DebugStatId } from "./v2-action-ids";
 import type { PaperCompetitionResolution } from "./v2-paper-competition";
 import type { RandomEventState } from "./v2-random-event-rules";
-import type { ThesisBlindReview, ThesisState } from "./v2-thesis-rules";
+import type { ThesisBlindReview, ThesisScoreHistoryEntry, ThesisState } from "./v2-thesis-rules";
 import type { EventCounters } from "./v2-event-counters";
 import type {
   AiShopState,
@@ -147,6 +147,7 @@ export interface PaperPublicationState {
 
 export interface PaperReviewerReport {
   reviewer: string;
+  reviewCode?: string;
   weightInfo?: string;
   reviewerType?: PaperReviewerType;
   focus: PaperReviewerFocus;
@@ -221,6 +222,8 @@ export type PaperReviewEventPresentation =
       venueInfluence: number;
       submittedScore: number;
       submittedScores: PaperReviewScores;
+      reviewedScores: PaperReviewScores;
+      reviewDurationMonths?: number;
       reports: PaperReviewerReport[];
       conferenceName?: string;
       conferenceYear?: number;
@@ -240,6 +243,32 @@ export type PaperReviewEventPresentation =
       conferenceYear?: number;
       reports?: PaperReviewerReport[];
     };
+
+export interface JournalScoreHistoryEntry {
+  totalMonths: number;
+  score: number;
+}
+
+export interface JournalAcceptancePresentation {
+  stage: "overview" | "timeline";
+  paperTitle: string;
+  journalName: string;
+  journalTarget: JournalTarget;
+  submissionScore: number;
+  acceptanceScore: number;
+  submissionThreshold: number;
+  acceptanceThreshold: number;
+  scoreHistory: JournalScoreHistoryEntry[];
+}
+
+export interface ThesisReviewPresentation {
+  stage: "overview" | "reports" | "decision";
+  degree: Degree;
+  title: string;
+  pointScores: number[];
+  scoreHistory: ThesisScoreHistoryEntry[];
+  review: ThesisBlindReview;
+}
 
 export interface PaperPromotionState {
   arxiv: boolean;
@@ -347,6 +376,7 @@ export interface RoleHistoryBest {
 
 export interface ScholarshipState {
   lastAwardYear: number | null;
+  awardCount?: number;
   scoreBaseline: number;
   claimedPaperIds: string[];
 }
@@ -442,6 +472,7 @@ export interface Paper {
   submittedWriting: number | null;
   submittedMonth?: number | null;
   submittedYear?: number | null;
+  journalScoreHistory?: JournalScoreHistoryEntry[];
   conferenceHandled?: boolean;
   conferenceHandledAtTotalMonths?: number;
   /** Earliest month in which the post-acceptance conference event may appear. */
@@ -509,9 +540,12 @@ export interface EventChoice {
     stayOnEvent?: boolean;
     sanCapDelta?: number;
     resolveThesisReview?: boolean;
-    careerType?: CareerType;
-    careerProgress?: number;
-    recordCareerPreparation?: boolean;
+    careerRecruitment?: {
+      totalMonths: number;
+      type?: CareerType;
+      experienceGain?: number;
+      offer?: CareerOffer;
+    };
     ideaBonus?: number;
     experimentBonus?: number;
     writingBonus?: number;
@@ -581,11 +615,12 @@ export interface EventChoice {
 }
 
 export interface ResolvedEventStage {
-  thesisReviewPresentation?: { degree: Degree; title: string; pointScores: number[]; review: ThesisBlindReview };
+  thesisReviewPresentation?: ThesisReviewPresentation;
   title: string;
   description: string;
   narrativeNames?: string[];
   paperReviewPresentation?: PaperReviewEventPresentation;
+  journalAcceptancePresentation?: JournalAcceptancePresentation;
   talentTrigger?: import("./v2-talent-history").TalentTriggerRecord;
   choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason">[];
   selectedChoiceId: string;
@@ -606,8 +641,7 @@ export interface ResolvedEventRecord {
 }
 
 export interface PendingEvent {
-  thesisReviewPresentation?: { degree: Degree; title: string; pointScores: number[]; review: ThesisBlindReview };
-  careerPreparation?: { type: CareerType; totalMonths: number; degree: Degree };
+  thesisReviewPresentation?: ThesisReviewPresentation;
   id: string;
   continuationSourceId?: string;
   title: string;
@@ -619,6 +653,7 @@ export interface PendingEvent {
   chainId: string;
   stage: EventStage;
   paperReviewPresentation?: PaperReviewEventPresentation;
+  journalAcceptancePresentation?: JournalAcceptancePresentation;
   choices: EventChoice[];
   completionLog?: string;
   history?: ResolvedEventStage[];
@@ -744,8 +779,10 @@ export interface GameState extends RandomEventState {
   externalPublications: Paper[];
   thesis: ThesisState;
   careerProgress: Record<CareerType, number>;
-  careerLastPreparedTotalMonths: number | null;
+  careerInterviewExperience: Record<CareerType, number>;
   careerPreparedMonths: Partial<Record<CareerType, number>>;
+  careerLastRecruitmentTotalMonths: number | null;
+  careerOffers: Partial<Record<CareerType, CareerOffer>>;
   internshipCount: number;
   selectedPaperId: string | null;
   shopState: ShopState;

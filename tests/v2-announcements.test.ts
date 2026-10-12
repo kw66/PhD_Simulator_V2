@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 3).map((entry) => entry.date)).toEqual(["2026-10-10", "2026-10-09", "2026-10-08"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 3).map((entry) => entry.date)).toEqual(["2026-10-13", "2026-10-10", "2026-10-09"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -16,7 +16,11 @@ describe("game announcements", () => {
       expect(html).toContain('data-announcement-toggle');
       for (const change of entry.changes) expect(html).toContain(change.title);
     }
-    const latest = GAME_ANNOUNCEMENTS[0]!.changes.map((change) => change.description).join("\n");
+    const newest = GAME_ANNOUNCEMENTS[0]!.changes.map((change) => change.description).join("\n");
+    for (const text of ["最后一年每月", "四个方向", "面试经验", "Reviewer", "盲审", "人际人物", "持有商品"]) {
+      expect(newest).toContain(text);
+    }
+    const latest = GAME_ANNOUNCEMENTS[1]!.changes.map((change) => change.description).join("\n");
     for (const text of ["混合抽4项", "混合抽5项", "不再保底", "固定姓名", "一作A类论文数", "邀请时引用", "社交传承", "0%／20%／40%／60%", "Reviewer", "VALSE", "独立展开"]) {
       expect(latest).toContain(text);
     }

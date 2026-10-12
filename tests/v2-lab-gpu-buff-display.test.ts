@@ -129,35 +129,23 @@ describe("lab GPU failure Buff display", () => {
     expect(internshipOnly).not.toContain("显卡故障");
   });
 
-  it.each(["workstation", "relationship"] as const)("explains shared costs and personal discounts in the existing %s help", (activePlayTab) => {
-    const page = getPlayHelpContext({ activePlayTab }).pages
-      .find((entry) => entry.title === (activePlayTab === "relationship" ? "科研经费" : "科研入门"));
-    expect(page).toBeDefined();
-    const help = (page!.summary + page!.body).replace(/<[^>]*>/g, "");
-
-    expect(help).toContain("减免仅限玩家");
-    expect(help).not.toContain("实验金币");
-    expect(help).not.toMatch(/不足部分自付|最后扣你的金币|自费租卡/);
-    if (activePlayTab === "relationship") {
-      expect(help).toContain("实验基础费用3");
-      expect(help).toContain("算力短缺持续6个月，双方每次+1");
-      expect(help).toContain("显卡和实习减免仅限玩家，先算涨价再减免");
-      expect(help).toContain("玩家经费不足暂停实验");
-      expect(help).toContain("同学先用经费，不足差额用钱包，两者都不足则改做横向");
-    } else {
-      expect(help).toContain("实验基础费用3经费");
-      expect(help).toContain("先算共享涨价与个人减免，再扣实验室经费");
-      expect(help).toContain("算力短缺持续6个月，玩家与同学每次实验费用+1");
-      expect(help).toContain("费用由实验室支付，不足时暂停实验");
-      expect(help).toContain("同学不足差额由自己的钱包支付");
-      expect(help).toContain("悬浮实验按钮查看实际经费消耗");
-    }
+  it("keeps player experiment settlement in research help and fellow fallback in relationship help", () => {
+    const research = getPlayHelpContext({ activePlayTab: "workstation" }).pages.find((entry) => entry.title === "实验经费")!;
+    const relationship = getPlayHelpContext({ activePlayTab: "relationship" }).pages.find((entry) => entry.title === "科研经费")!;
+    expect(research.body).toContain("先结算全组费用变动，再扣你的个人减免");
+    expect(research.body).toContain("不足的差额由你自付金币");
+    expect(research.body).toContain("经费和金币合计不足时，本次无法做实验");
+    expect(research.body).not.toContain("同学经费不足");
+    expect(relationship.body).toContain("同学实验先用经费，不足差额用钱包");
+    expect(relationship.body).not.toContain("个人减免");
   });
 
-  it("clarifies the same scope in the existing equipment help page", () => {
+  it("keeps equipment scope in the shop without repeating experiment settlement", () => {
     const help = getPlayHelpContext({ activePlayTab: "shop", activeShopTab: "gear" });
     expect(help.pages).toHaveLength(1);
-    expect(help.pages[0]!.body).toContain("个人显卡与实习的实验减免仅限玩家，不影响同学；算力短缺则使双方实验费用上涨");
-    expect(help.pages[0]!.body).toContain("“实验费用”表示每次实验的花费变化，不是个人金币余额变化");
+    expect(help.pages[0]!.body).toContain("显卡只为你的实验减费");
+    expect(help.pages[0]!.body).toContain("不替同学减费");
+    expect(help.pages[0]!.body).toContain("详细结算见科研提示");
+    expect(help.pages[0]!.body).not.toContain("科研经费不足");
   });
 });

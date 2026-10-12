@@ -86,6 +86,7 @@ describe("audited fixed-event rules", () => {
     const awarded = applyChoiceEffectsToState(applied, claim!).nextState;
     expect(awarded.scholarshipState).toEqual({
       lastAwardYear: 3,
+      awardCount: 1,
       scoreBaseline: 4,
       claimedPaperIds: [firstPaper.id],
     });

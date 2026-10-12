@@ -120,7 +120,7 @@
 .graduation-point,
 .graduation-career-row {
   display: grid;
-  grid-template-columns: 4.3em minmax(0, 1fr) 4.5ch 78px;
+  grid-template-columns: 6.2em minmax(0, 1fr) 4.5ch 118px;
   grid-template-areas: "label bar value action";
   align-items: center;
   gap: 5px;
@@ -138,7 +138,7 @@
   display: flex;
 }
 
-.graduation-point-bar > .graduation-bar-fill-track {
+:is(.graduation-point-bar, .graduation-career-bar) > .graduation-bar-fill-track {
   position: absolute;
   inset: 0;
   display: flex;
@@ -153,6 +153,13 @@
   height: 100%;
   border-radius: 0;
 }
+
+.graduation-career-bar .graduation-career-resume { background: #7498b7; }
+.graduation-career-bar .graduation-career-practice { background: #6d9f83; }
+.graduation-career-bar .graduation-career-interview { background: #c9a155; }
+.graduation-career-bar .rel-progress-fill.is-start { border-radius: 999px 0 0 999px; }
+.graduation-career-bar .rel-progress-fill.is-end { border-radius: 0 999px 999px 0; }
+.graduation-career-bar .rel-progress-fill.is-start.is-end { border-radius: 999px; }
 
 .graduation-bar-fill-track > .graduation-improved,
 .graduation-bar-fill-track.is-unimproved > .graduation-original {
@@ -186,84 +193,91 @@
 .graduation-career-row > .rel-detail-label { white-space: nowrap; }
 .graduation-point > .rel-detail-label[data-card-tooltip],
 .graduation-career-row > .rel-detail-label[data-card-tooltip] { cursor: help; }
+.graduation-offer-marker { margin-left: 2px; color: #3f8060; font-size: 0.75em; }
 .graduation-unused-action { grid-area: action; text-align: center; font-size: 0.75rem; color: var(--ink-soft); white-space: nowrap; }
 .graduation-point.is-unused { opacity: 0.65; }
 
 .graduation-card .graduation-action {
-  font-size: var(--workstation-font-small, 0.68rem);
-  gap: 3px;
-  padding-inline: 3px;
+  font-size: var(--workstation-font-main, 0.8rem);
+  gap: 4px;
+  padding-inline: 5px;
   white-space: nowrap;
 }
+.graduation-action-gain { color: #4d7d65; font-size: 0.74rem; font-variant-numeric: tabular-nums; }
 
 .graduation-action:focus-visible,
 .graduation-card [tabindex]:focus-visible,
-.graduation-review-reports [tabindex]:focus-visible {
+.graduation-review-chart-scroll:focus-visible {
   outline: 2px solid var(--accent-deep, #845e1e);
   outline-offset: 2px;
 }
 
-.graduation-notice {
-  align-self: flex-start;
-  margin: 0 8px;
-}
-
-.graduation-review-reports {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  font-size: 0.8rem;
-}
-
-.graduation-review-point-scores {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-}
-
-.graduation-review-table-scroll {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.graduation-review-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.graduation-review-table caption {
-  padding: 0 0 5px;
-  text-align: left;
-  font-weight: 700;
-}
-
-.graduation-review-table th,
-.graduation-review-table td {
-  padding: 6px;
-  border: 1px solid #c7baa3;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.graduation-review-table thead {
-  background: #eee4d1;
-}
-
-.graduation-review-grade-a,
-.graduation-review-grade-b {
-  background: #eaf0e6;
-  color: #355c43;
-}
-
-.graduation-review-grade-c,
-.graduation-review-grade-d {
-  background: #f6e9e4;
-  color: #84483e;
-}
+.graduation-review-event { display: grid; gap: 10px; min-width: 0; color: #44443d; font-size: 13px; }
+.graduation-review-event h2, .graduation-review-event h3, .graduation-review-event p { margin: 0; }
+.graduation-review-hero { display: grid; justify-items: center; gap: 4px; padding: 11px 16px; border-top: 3px solid #7894a8; background: #eaf2f3; text-align: center; }
+.graduation-review-hero > span, .graduation-review-section-head > span { color: #627781; font-size: 12px; }
+.graduation-review-hero h2 { font-size: 18px; color: #3d5059; overflow-wrap: anywhere; }
+.graduation-review-score-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.graduation-review-score-grid > div { display: grid; justify-items: center; gap: 2px; min-width: 0; padding: 8px 4px; border-top: 3px solid #8baac0; background: #edf3f7; }
+.graduation-review-score-grid > div:nth-child(2) { border-color: #a594c4; background: #f2eef7; }
+.graduation-review-score-grid > div:nth-child(3) { border-color: #78a695; background: #ebf4ef; }
+.graduation-review-score-grid > .is-total { border-color: #c6a45e; background: #fbf1dc; }
+.graduation-review-score-grid span { color: #626b6a; font-size: 11px; }
+.graduation-review-score-grid strong { color: #36494d; font-size: 18px; font-variant-numeric: tabular-nums; }
+.graduation-review-chart-head, .graduation-review-section-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
+.graduation-review-chart-head h3, .graduation-review-section-head h2 { color: #47555a; font-size: 15px; }
+.graduation-review-legend { display: flex; flex-wrap: wrap; gap: 4px 11px; font-size: 11px; color: #657171; }
+.graduation-review-legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; background: #7899b4; }
+.graduation-review-legend .is-point-2::before { background: #9b85bb; }
+.graduation-review-legend .is-point-3::before { background: #70a08d; }
+.graduation-review-legend .is-total::before { background: #bd9554; }
+.graduation-review-chart-scroll { max-width: 100%; overflow-x: auto; border: 1px solid #e4ddcf; background: #f9f7f1; scrollbar-width: thin; scrollbar-color: #b8a67f #f0ece3; }
+.graduation-review-chart { display: block; max-width: none; }
+.graduation-review-chart text { fill: #77766e; font: 11px var(--ui-font-cjk); }
+.graduation-review-grid { stroke: #e2ded3; stroke-width: 1; }
+.graduation-review-line { fill: none; stroke: #7899b4; stroke-width: 2; stroke-linejoin: round; }
+.graduation-review-line.is-point-2 { stroke: #9b85bb; }
+.graduation-review-line.is-point-3 { stroke: #70a08d; }
+.graduation-review-line.is-total { stroke: #bd9554; stroke-width: 3; }
+.graduation-review-dot { fill: #fff; stroke: #7899b4; stroke-width: 2; }
+.graduation-review-dot.is-point-2 { stroke: #9b85bb; }
+.graduation-review-dot.is-point-3 { stroke: #70a08d; }
+.graduation-review-dot.is-total { fill: #bd9554; stroke: #bd9554; }
+.graduation-reviewer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 7px; }
+.graduation-reviewer-card { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 10px; border: 1px solid #dbe5df; border-top: 3px solid #6e9b80; background: #f3f7f2; }
+.graduation-reviewer-card.is-c, .graduation-reviewer-card.is-d { border-color: #ead8d1; border-top-color: #b57667; background: #faf2ee; }
+.graduation-reviewer-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: #5d6964; }
+.graduation-reviewer-head strong { font-size: 18px; color: #3f7d59; }
+.graduation-reviewer-card.is-c .graduation-reviewer-head strong, .graduation-reviewer-card.is-d .graduation-reviewer-head strong { color: #a45e51; }
+.graduation-reviewer-scores { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; }
+.graduation-reviewer-scores b { color: #3f514b; font-variant-numeric: tabular-nums; }
+.graduation-reviewer-card p { color: #70756d; font-size: 11px; }
+.graduation-reviewer-card blockquote { flex: 1; margin: 0; color: #4f5751; font-size: 12px; line-height: 1.55; }
+.graduation-review-unsubmitted { padding: 18px; border-left: 3px solid #b57667; background: #faf2ee; }
+.graduation-review-decision { display: grid; justify-items: center; gap: 4px; padding: 18px; text-align: center; background: #eaf4ec; }
+.graduation-review-event.is-failed .graduation-review-decision { background: #f8eeea; }
+.graduation-review-decision > span { font-size: 26px; }
+.graduation-review-decision strong { color: #367d54; font-size: 24px; }
+.graduation-review-event.is-failed .graduation-review-decision strong { color: #a15b50; }
+.graduation-review-decision p { color: #68736d; }
+.graduation-review-grade-list { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.graduation-review-grade-list span { padding: 4px 9px; background: #e8f0e8; color: #3c7452; }
+.graduation-review-grade-list .is-c, .graduation-review-grade-list .is-d { background: #f7e9e5; color: #a45e51; }
+.graduation-review-story { color: #504d45; }
+.graduation-review-global-stats { display: grid; gap: 6px; border-top: 1px solid #d9d5c9; padding-top: 8px; }
+.graduation-review-global-stats h3 { color: #625e55; font-size: 12px; text-align: center; }
+.graduation-review-stats-status { margin-left: 8px; color: #897e6c; font-size: 11px; font-weight: 400; }
+.graduation-review-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.graduation-review-stats-grid > div { display: flex; align-items: baseline; justify-content: center; gap: 5px; min-width: 0; padding: 7px 4px; background: #e9f0ec; border-top: 2px solid #73947e; white-space: nowrap; }
+.graduation-review-stats-grid > div:nth-child(2) { background: #e8f1f5; border-color: #7299ae; }
+.graduation-review-stats-grid > div:nth-child(3) { background: #f8f0dd; border-color: #b69a5f; }
+.graduation-review-stats-grid > div:nth-child(4) { background: #f5ebe7; border-color: #b68d7c; }
+.graduation-review-stats-grid span { color: #686861; font-size: 11px; }
+.graduation-review-stats-grid strong { color: #3e4b43; font-size: 13px; font-variant-numeric: tabular-nums; }
+.graduation-review-global-stats > p { color: #77756e; font-size: 10px; text-align: right; }
 
 @media (max-width: 760px) {
+  .graduation-review-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .graduation-cards.rel-card-grid {
     grid-template-columns: minmax(0, 1fr);
   }

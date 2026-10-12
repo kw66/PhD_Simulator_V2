@@ -190,15 +190,15 @@ describe("v2 research operations", () => {
         shopState: { ...initial.shopState, gpuLevel },
         advisorProgressState: { ...initial.advisorProgressState, funding } };
       expect(getResearchExperimentCostBreakdown(state)).toEqual({
-        total: cost, advisorFunding: cost, playerMoney: 0,
+        total: cost, advisorFunding: Math.min(funding, cost), playerMoney: Math.max(0, cost - funding),
       });
       const created = { ...state, papers: dispatchAction(initial, "create-paper", { paperSlotIndex: 0 }).papers };
       created.papers[0]!.idea = 1;
       created.player.money = 10;
       const researched = applyResearchOperation(created, created.papers[0]!.id, "experiment", () => 0);
-      expect(researched.player.money).toBe(10);
-      expect(researched.advisorProgressState.funding).toBe(funding < cost ? funding : funding - cost);
-      if (funding < cost) expect(researched.papers).toEqual(created.papers);
+      expect(researched.player.money).toBe(10 - Math.max(0, cost - funding));
+      expect(researched.advisorProgressState.funding).toBe(Math.max(0, funding - cost));
+      expect(researched.papers[0]?.experiment).toBeGreaterThan(created.papers[0]!.experiment);
       expect(getResearchExperimentMoneyCost({ ...state, totalMonths: initial.totalMonths + 3 })).toBe(cost + 1);
       expect(getResearchExperimentMoneyCost({ ...state, internshipState: activateInternship() })).toBe(Math.max(0, cost - 1));
     }

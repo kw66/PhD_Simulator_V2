@@ -108,13 +108,15 @@ import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
 import { createVisitStats } from "./v2-visit-stats";
 import { createConferenceStats, loadConferenceGlobalStats } from "./v2-conference-stats";
+import { createJournalStats, loadJournalGlobalStats } from "./v2-journal-stats";
+import { createThesisStats, loadThesisGlobalStats } from "./v2-thesis-stats";
 import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations, getVisibleValueDelta } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
 import { createRelationshipTooltips } from "./v2-relationship-tooltips";
 import { createDebugWindow } from "./v2-debug-window";
 import { RESEARCH_PAGE_SIZE, renderEventLayoutSamples, renderRelationTalentCard } from "./v2-render-play";
-import { getCurrentEvent, getSortedEventQueue } from "../core/v2-event-queue";
+import { getCurrentEvent, getEventRootId, getSortedEventQueue } from "../core/v2-event-queue";
 import { getRoleOptions, isPreEnrollmentState } from "../core/v2-progression";
 import { getAttributeTier } from "../core/v2-random-event-rules";
 import { getAvailablePaperSlotCount } from "../core/v2-paper-rules";
@@ -265,6 +267,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const store = createStore();
   const visitStats = createVisitStats({ recordVisit: import.meta.env.PROD && window.location.protocol === "https:" });
   const conferenceStats = createConferenceStats({ onChange: () => render(), enabled: import.meta.env.PROD && window.location.protocol === "https:" });
+  const journalStats = createJournalStats({ onChange: () => render(), enabled: import.meta.env.PROD && window.location.protocol === "https:" });
+  const thesisStats = createThesisStats({ onChange: () => render(), enabled: import.meta.env.PROD && window.location.protocol === "https:" });
   const community = createCommunityMessages({ onChange: () => syncCommunityView() });
   function syncCommunityView(): void {
     renderCommunityMessages(root, community);
@@ -402,12 +406,19 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let activeEventId: string | null = null;
   let activeEventHistoryId: string | null = null;
   let activeEventChainId: string | null = null;
+  let activeEventRootId: string | null = null;
   let activeEventHistoryIndex: number | null = null;
   let activeLogPage: number | null = null;
   let timelineScrollLeft = 0;
+  const syncTimelineLabels = (track: HTMLElement): void => {
+    const bounds = track.getBoundingClientRect();
+    const rightEdge = bounds.right - 74;
+    for (const label of track.querySelectorAll<HTMLElement>(".event-timeline-marker-label")) {
+      const box = label.getBoundingClientRect();
+      label.classList.toggle("is-edge-clipped", box.left < bounds.left + 7 || box.right > rightEdge);
+    }
+  };
   let isSanChartOpen = false;
-  let sanChartScrollLeft = 0;
-  let scrollSanChartToEnd = false;
   let activePendingPage = 0;
   let activeRelationshipIndex = 0;
   let currentResearchPaperIndex: number | null = null;
@@ -685,6 +696,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeEventId = null;
     activeEventHistoryId = null;
     activeEventChainId = null;
+    activeEventRootId = null;
     activeEventHistoryIndex = null;
   };
 
@@ -697,11 +709,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
   };
 
   const getActiveChainEvent = (state: GameState): GameState["eventQueue"][number] | null => {
-    if (!activeEventChainId) {
+    if (!activeEventChainId || !activeEventRootId) {
       return null;
     }
 
-    return getSortedEventQueue(state.eventQueue).find((event) => event.chainId === activeEventChainId) ?? null;
+    return getSortedEventQueue(state.eventQueue).find((event) =>
+      event.chainId === activeEventChainId && getEventRootId(event) === activeEventRootId) ?? null;
   };
 
   const getActiveHistoryEvent = (state: GameState): GameState["eventHistory"][number] | null => {
@@ -730,6 +743,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeEventId = nextEvent.id;
     activeEventHistoryId = null;
     activeEventChainId = nextEvent.chainId;
+    activeEventRootId = getEventRootId(nextEvent);
     activeEventHistoryIndex = null;
     render();
   };
@@ -748,6 +762,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeEventId = null;
     activeEventHistoryId = historyEvent.id;
     activeEventChainId = null;
+    activeEventRootId = null;
     activeEventHistoryIndex = null;
     render();
   };
@@ -780,6 +795,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const activeQueueEvent = getActiveQueueEvent(state);
     if (activeQueueEvent) {
       activeEventChainId = activeQueueEvent.chainId;
+      activeEventRootId = getEventRootId(activeQueueEvent);
       if (
         activeEventHistoryIndex !== null
         && (activeEventHistoryIndex < 0 || activeEventHistoryIndex >= (activeQueueEvent.history?.length ?? 0))
@@ -792,6 +808,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const nextChainEvent = getActiveChainEvent(state);
     if (nextChainEvent) {
       activeEventId = nextChainEvent.id;
+      activeEventRootId = getEventRootId(nextChainEvent);
       activeEventHistoryIndex = null;
       return;
     }
@@ -918,7 +935,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
         resetEventContentUiState();
         activeLogPage = null;
         isSanChartOpen = false;
-        sanChartScrollLeft = 0;
         activePendingPage = 0;
         activeRelationshipIndex = 0;
         currentResearchPaperIndex = null;
@@ -930,7 +946,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
         resetEventContentUiState();
         activeLogPage = null;
         isSanChartOpen = false;
-        sanChartScrollLeft = 0;
       } else if (state.phase === "setup") {
         activeRoleRailView = "achievements";
         announcementPageIndex = 0;
@@ -966,14 +981,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
       ? root.querySelector<HTMLElement>(".lobby-talent-tree")
       : null;
     const previousTimelineTrack = root.querySelector<HTMLElement>(".event-timeline-track");
-    const previousSanChart = root.querySelector<HTMLElement>(".san-chart-scroll");
     if (state.phase === "setup") {
       timelineScrollLeft = 0;
     } else if (previousTimelineTrack && previousTimelineTrack.clientWidth > 0) {
       timelineScrollLeft = previousTimelineTrack.scrollLeft;
     }
-    if (previousSanChart && previousSanChart.clientWidth > 0) sanChartScrollLeft = previousSanChart.scrollLeft;
-    if (scrollSanChartToEnd) sanChartScrollLeft = Number.MAX_SAFE_INTEGER;
     root.dataset.phase = state.phase;
     root.innerHTML = renderApp(state, lobby, {
       activePlayTab,
@@ -1163,14 +1175,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
         }
         timelineTrack.scrollLeft = timelineScrollLeft;
         timelineScrollLeft = timelineTrack.scrollLeft;
+        syncTimelineLabels(timelineTrack);
       }
     }
-    const sanChart = root.querySelector<HTMLElement>(".san-chart-scroll");
-    if (sanChart && sanChart.clientWidth > 0) {
-      sanChart.scrollLeft = sanChartScrollLeft;
-      sanChartScrollLeft = sanChart.scrollLeft;
-    }
-    scrollSanChartToEnd = false;
     showNewPaperSlotUnlocks(state);
     resetEffectSourceUi();
     eventLayout.update(isEventContentOpen ? renderEventLayoutSamples(getActiveQueueEvent(state), getActiveHistoryEvent(state), state) : []);
@@ -1178,6 +1185,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
     for (const element of root.querySelectorAll<HTMLElement>("[data-conference-stats-name]")) {
       const target = element.dataset.conferenceStatsTarget;
       if (isPaperTarget(target)) void loadConferenceGlobalStats(element.dataset.conferenceStatsName ?? "", Number(element.dataset.conferenceStatsYear), target);
+    }
+    for (const element of root.querySelectorAll<HTMLElement>("[data-journal-stats-target]")) {
+      const target = element.dataset.journalStatsTarget;
+      if (target === "nature" || target === "nmi" || target === "pami") void loadJournalGlobalStats(target);
+    }
+    for (const element of root.querySelectorAll<HTMLElement>("[data-thesis-stats-degree]")) {
+      const degree = element.dataset.thesisStatsDegree;
+      if (degree === "master" || degree === "phd") void loadThesisGlobalStats(degree);
     }
     animatePanelValues(shouldAnimatePlayer);
     if (shouldAnimatePlayer && previousRenderedPlayer) {
@@ -1200,7 +1215,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     if (actionId === "next-month" || actionId === "force-next-month") {
       animateEventPanelAfterNextMonth = activePlayTab === "events";
-      if (isSanChartOpen) scrollSanChartToEnd = true;
     }
     if (actionId === "debug-replay-event") {
       selectPlayTab("events");
@@ -1212,6 +1226,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         : undefined;
       activeEventId = null;
       activeEventChainId = replaySourceEvent?.chainId ?? null;
+      activeEventRootId = replaySourceEvent ? getEventRootId(replaySourceEvent) : null;
     }
     if (actionId === "restart-game") {
       skipNextPlayerAnimation = true;
@@ -1231,9 +1246,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     if (actionId === "start-game" || actionId === "restart-game") {
       conferenceStats.resetRun();
+      journalStats.resetRun();
+      thesisStats.resetRun();
       if (debugWindow.isOpen()) conferenceStats.markDebug();
+      if (debugWindow.isOpen()) journalStats.markDebug();
+      if (debugWindow.isOpen()) thesisStats.markDebug();
     }
-    if (actionId.startsWith("debug-")) conferenceStats.markDebug();
+    if (actionId.startsWith("debug-")) { conferenceStats.markDebug(); journalStats.markDebug(); thesisStats.markDebug(); }
     if (actionId === "debug-trigger-ending") {
       isEndingContentOpen = true;
       activePlayTab = "events";
@@ -1289,7 +1308,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const debugWindow = createDebugWindow(
     () => store.getState(),
     executeButtonAction,
-    () => { store.markCurrentRunAsDebugged(); conferenceStats.markDebug(); },
+    () => { store.markCurrentRunAsDebugged(); conferenceStats.markDebug(); journalStats.markDebug(); thesisStats.markDebug(); },
   );
 
   let previousConferenceState = store.getState();
@@ -1297,6 +1316,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const before = previousConferenceState;
     previousConferenceState = state;
     void conferenceStats.track(before, state);
+    void journalStats.track(before, state);
+    void thesisStats.track(before, state);
     debugWindow.update();
     render();
     void visitStats.trackGamePhase(state.phase, {
@@ -1362,6 +1383,16 @@ export function bootstrapApp(root: HTMLDivElement): void {
       moved: false,
     };
     track.classList.add("is-dragging");
+  });
+
+  root.addEventListener("scroll", (event) => {
+    if (event.target instanceof HTMLElement && event.target.classList.contains("event-timeline-track")) {
+      syncTimelineLabels(event.target);
+    }
+  }, true);
+  window.addEventListener("resize", () => {
+    const track = root.querySelector<HTMLElement>(".event-timeline-track");
+    if (track) syncTimelineLabels(track);
   });
 
   window.addEventListener("pointermove", (event) => {
@@ -1899,7 +1930,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const sanChartToggle = target.closest<HTMLButtonElement>("button[data-ui-san-chart-toggle]");
     if (sanChartToggle) {
       isSanChartOpen = !isSanChartOpen;
-      if (isSanChartOpen) scrollSanChartToEnd = true;
       render();
       return;
     }

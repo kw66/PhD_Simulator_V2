@@ -13,23 +13,43 @@ export interface InternshipStatus {
 type InternshipEligibilityContext = InternshipContext
   & Pick<GameState, "conferenceCareerState" | "papers" | "externalPublications" | "internshipCount">;
 
-const INTERNSHIP_POSITIONS = [
-  { company: "初创科技公司", position: "研发实习生", baseMonthlyIncome: 0 },
-  { company: "产业技术公司", position: "算法实习生", baseMonthlyIncome: 1 },
-  { company: "大型科技公司", position: "研究实习生", baseMonthlyIncome: 2 },
+const INTERNSHIP_COMPANIES = ["字节跳动", "月之暗面", "腾讯", "阿里巴巴", "华为", "美团", "百度", "上海AI Lab", "蚂蚁集团"] as const;
+const INTERNSHIP_DIRECTIONS = [
+  { name: "大模型训练", positions: ["预训练算法实习生", "后训练算法实习生"] },
+  { name: "推理优化", positions: ["推理加速实习生", "模型部署实习生"] },
+  { name: "多模态研究", positions: ["视觉语言模型实习生", "多模态算法实习生"] },
+  { name: "智能体应用", positions: ["智能体研发实习生", "大模型工具链实习生"] },
+  { name: "数据与评测", positions: ["大模型数据实习生", "大模型评测实习生"] },
 ] as const;
 
-function rollInternshipValue(getRoll: () => number): number {
-  return Math.min(2, Math.max(0, Math.floor(getRoll() * 3)));
+export interface InternshipLead {
+  company: string;
+  direction: (typeof INTERNSHIP_DIRECTIONS)[number]["name"];
 }
 
-export function createInternshipOffer(getRoll: () => number = Math.random): InternshipOffer {
-  const positionIndex = rollInternshipValue(getRoll);
-  const monthlySanCost = 4 + rollInternshipValue(getRoll);
-  const experimentBonus = 4 + rollInternshipValue(getRoll);
+function rollIndex(getRoll: () => number, count: number): number {
+  return Math.min(count - 1, Math.max(0, Math.floor(getRoll() * count)));
+}
+
+export function createInternshipLead(getRoll: () => number = Math.random): InternshipLead {
+  const companyIndex = rollIndex(getRoll, INTERNSHIP_COMPANIES.length);
+  const directionIndex = rollIndex(getRoll, INTERNSHIP_DIRECTIONS.length);
+  return { company: INTERNSHIP_COMPANIES[companyIndex]!, direction: INTERNSHIP_DIRECTIONS[directionIndex]!.name };
+}
+
+export function createInternshipOffer(getRoll: () => number = Math.random, lead = createInternshipLead(getRoll)): InternshipOffer {
+  const companyIndex = INTERNSHIP_COMPANIES.findIndex((company) => company === lead.company);
+  const directionIndex = INTERNSHIP_DIRECTIONS.findIndex((direction) => direction.name === lead.direction);
+  const positions = INTERNSHIP_DIRECTIONS[directionIndex >= 0 ? directionIndex : 0]!.positions;
+  const positionIndex = rollIndex(getRoll, positions.length);
+  const baseMonthlyIncome = rollIndex(getRoll, 3);
+  const monthlySanCost = 4 + rollIndex(getRoll, 3);
+  const experimentBonus = 4 + rollIndex(getRoll, 3);
   return {
-    id: `enterprise-${positionIndex}-${monthlySanCost}-${experimentBonus}`,
-    ...INTERNSHIP_POSITIONS[positionIndex]!,
+    id: `enterprise-${companyIndex}-${directionIndex}-${positionIndex}-${baseMonthlyIncome}-${monthlySanCost}-${experimentBonus}`,
+    company: lead.company,
+    position: positions[positionIndex]!,
+    baseMonthlyIncome,
     monthlySanCost,
     experimentBonus,
   };

@@ -106,9 +106,8 @@ describe("v2 lover system", () => {
         const story = scene.description.split(/小提示：|机制结算/u)[0]!.trim();
         expect(story.split("\n\n").length, scene.id).toBeGreaterThanOrEqual(2);
         expect(story.split("\n\n").length, scene.id).toBeLessThanOrEqual(3);
-        expect([...story].length, scene.id).toBeGreaterThanOrEqual(100);
-        expect([...story].length, scene.id).toBeLessThanOrEqual(360);
-        expect(story, scene.id).toMatch(/\p{Extended_Pictographic}/u);
+        expect([...story].length, scene.id).toBeGreaterThanOrEqual(45);
+        expect([...story].length, scene.id).toBeLessThanOrEqual(220);
         expect(story, scene.id).not.toMatch(/[。！？]\s*\p{Extended_Pictographic}|\p{Extended_Pictographic}[\uFE0F\u200D]*\s*(?:[。！？]|\n|$)/u);
         expect(story).toContain(context.contact!.name);
         expect(story).not.toMatch(/SAN|科研\s*[+＋]|恋人\s*[+＋]|拒绝次数|永久封锁|替换|社交[≥＞]|搭讪≥/u);
@@ -119,7 +118,7 @@ describe("v2 lover system", () => {
           if (replacesContact) {
             expect(settlement).toBe(`结果：${type === "beautiful" ? "活泼" : "聪慧"}学者：${context.replacement!.name}`);
             expect(story).toContain("后来");
-            expect(story).toContain("学术交流");
+            expect(story).toContain("会场");
             expect(story).toContain(context.replacement!.name);
           }
         }
@@ -129,7 +128,7 @@ describe("v2 lover system", () => {
 
   it.each(["beautiful", "smart"] as const)("retains %s preview rolls and rewards through narrative refresh", (type) => {
     const state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
-    const getRoll = vi.fn().mockReturnValueOnce(0.2).mockReturnValueOnce(0.8);
+    const getRoll = vi.fn().mockReturnValueOnce(0.2).mockReturnValueOnce(0.8).mockReturnValueOnce(0.35);
     const context = buildLoverDevelopmentContext({
       conferenceEncounterState: state.conferenceEncounterState, type, totalMonths: 6, playerGender: "male", state,
     }, getRoll);
@@ -143,7 +142,7 @@ describe("v2 lover system", () => {
       activateLoverProgress: type, loverProgressRolls: [0.2, 0.8], relationshipAdditions: ["lover"],
     });
     expect(refreshLoverDevelopmentEvent(state, result).choices[0]!.effects).toEqual(effects);
-    expect(getRoll).toHaveBeenCalledTimes(2);
+    expect(getRoll).toHaveBeenCalledTimes(3);
   });
 
   it.each(["beautiful", "smart"] as const)("retains the declined %s contact's name in all recorded scenes after replacement", (type) => {

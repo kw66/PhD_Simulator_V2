@@ -25,6 +25,7 @@ export function advanceSharedLabProject(
   type: LabProjectType,
   amount: number,
   random: () => number = Math.random,
+  contributor: "player" | "other" = "other",
 ): { state: GameState; gain: number; completed: number } {
   const gain = Math.max(0, Math.floor(amount));
   if (state.phase !== "playing" || gain === 0) return { state, gain: 0, completed: 0 };
@@ -32,9 +33,23 @@ export function advanceSharedLabProject(
   const field = type === "horizontal" ? "horizontalProgress" : "verticalProgress";
   const total = Math.floor(state.advisorProgressState[field] ?? 0) + gain;
   const completed = Math.floor(total / PROJECT_PROGRESS_MAX);
+  const remainder = total % PROJECT_PROGRESS_MAX;
+  const participatedBefore = state.advisorProgressState.playerProjectParticipation[type];
+  const playerCompleted = contributor === "player" ? completed : completed > 0 && participatedBefore ? 1 : 0;
   let nextState: GameState = {
     ...state,
-    advisorProgressState: { ...state.advisorProgressState, [field]: total % PROJECT_PROGRESS_MAX },
+    advisorProgressState: {
+      ...state.advisorProgressState,
+      [field]: remainder,
+      playerProjectCompletions: {
+        ...state.advisorProgressState.playerProjectCompletions,
+        [type]: state.advisorProgressState.playerProjectCompletions[type] + playerCompleted,
+      },
+      playerProjectParticipation: {
+        ...state.advisorProgressState.playerProjectParticipation,
+        [type]: remainder > 0 && (contributor === "player" || (completed === 0 && participatedBefore)),
+      },
+    },
   };
   for (let index = 0; index < completed; index += 1) {
     let completionSummary: string;

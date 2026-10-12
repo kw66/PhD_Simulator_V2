@@ -11,7 +11,7 @@ import { finishTrainingIfReady } from "../src/core/v2-ending-system";
 import { createInitialThesisState, syncThesisState } from "../src/core/v2-thesis-rules";
 import { getMonthLimitByDegree } from "../src/core/v2-progression";
 import { createPhdDecisionEvent } from "../src/core/v2-phd-decision-event";
-import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
+import { createCareerRecruitmentEvent } from "../src/core/v2-monthly-career-events";
 import { renderApp } from "../src/app/v2-render";
 import type { Degree, GameState } from "../src/core/v2-types";
 
@@ -126,16 +126,18 @@ describe("graduation preparation engine lifecycle", () => {
   it("clears both cards and pending events on transfer, then starts PhD points from publications only", () => {
     const state = openReview(prepared());
     state.careerProgress.internet = 120;
-    state.careerLastPreparedTotalMonths = state.totalMonths;
+    state.careerLastRecruitmentTotalMonths = state.totalMonths;
     state.careerPreparedMonths = { internet: state.totalMonths, academic: state.totalMonths };
+    state.careerOffers = { internet: { type: "internet", jobId: "old", name: "旧 offer", threshold: 45, score: 60 } };
     const transferred = applyChoiceEffectsToState({ ...state, month: 9, totalMonths: 33 }, {
       id: "transfer", label: "转博", outcome: "", effects: { transferToPhd: true },
     }).nextState;
     expect(transferred.degree).toBe("phd");
     expect(transferred.thesis).toEqual(createInitialThesisState());
     expect(Object.values(transferred.careerProgress)).toEqual([0, 0, 0, 0]);
-    expect(transferred.careerLastPreparedTotalMonths).toBeNull();
+    expect(transferred.careerLastRecruitmentTotalMonths).toBeNull();
     expect(transferred.careerPreparedMonths).toEqual({});
+    expect(transferred.careerOffers).toEqual({});
     expect(transferred.eventQueue.some((event) => event.source === "thesis" || event.source === "career")).toBe(false);
     expect(syncThesisState(transferred)).toBe(transferred);
     const reopened = syncThesisState({ ...transferred, year: 6, month: 1, totalMonths: 61 }, () => 0);
@@ -145,13 +147,14 @@ describe("graduation preparation engine lifecycle", () => {
 
   it("clears stale graduate events only when the actual transfer chain is confirmed", () => {
     const reviewed = openReview(prepared());
-    const state = enqueuePendingEvents(reviewed, [createCareerEventForType(reviewed, "internet")]).nextState;
+    const state = enqueuePendingEvents(reviewed, [createCareerRecruitmentEvent(reviewed, () => 0)]).nextState;
     state.month = 9;
     state.totalMonths = 33;
     state.totalResearchScore = 3;
     state.careerProgress.internet = 100;
-    state.careerLastPreparedTotalMonths = 32;
+    state.careerLastRecruitmentTotalMonths = 32;
     state.careerPreparedMonths = { internet: 33 };
+    state.careerOffers = { internet: { type: "internet", jobId: "old", name: "旧 offer", threshold: 45, score: 60 } };
     let next = enqueuePendingEvents(state, [createPhdDecisionEvent(state, 3)]).nextState;
     for (let index = 0; index < 3; index += 1) {
       const event = next.eventQueue.find((entry) => entry.chainId === "phd-decision")!;
@@ -161,29 +164,16 @@ describe("graduation preparation engine lifecycle", () => {
         expect(next.degree).toBe("master");
         expect(next.thesis.review).not.toBeNull();
         expect(next.careerProgress.internet).toBe(100);
+        expect(next.careerOffers.internet?.jobId).toBe("old");
       }
     }
     expect(next.degree).toBe("phd");
     expect(next.thesis).toEqual(createInitialThesisState());
     expect(next.careerProgress.internet).toBe(0);
-    expect(next.careerLastPreparedTotalMonths).toBeNull();
+    expect(next.careerLastRecruitmentTotalMonths).toBeNull();
     expect(next.careerPreparedMonths).toEqual({});
+    expect(next.careerOffers).toEqual({});
     expect(next.eventQueue.some((event) => event.source === "thesis" || event.source === "career")).toBe(false);
   });
 
-  it("closes an obsolete career confirmation without spending SAN or duplicating progress", () => {
-    const initial = prepared();
-    let state = enqueuePendingEvents(initial, [createCareerEventForType(initial, "internet")]).nextState;
-    const root = state.eventQueue.find((event) => event.source === "career")!;
-    state = dispatchAction(state, "resolve-event", { eventId: root.id, eventChoiceId: root.choices[0]!.id });
-    const decision = state.eventQueue.find((event) => event.source === "career")!;
-    state = dispatchAction(state, "resolve-event", { eventId: decision.id, eventChoiceId: "normal" });
-    const result = state.eventQueue.find((event) => event.source === "career")!;
-    const stale = { ...state, totalMonths: state.totalMonths + 1, month: 2 };
-    const refreshed = getResolvableQueuedEvent(stale, result);
-    const closed = dispatchAction(stale, "resolve-event", { eventId: result.id, eventChoiceId: refreshed.choices[0]!.id });
-    expect(closed.player.san).toBe(stale.player.san);
-    expect(closed.careerProgress).toEqual(stale.careerProgress);
-    expect(closed.careerLastPreparedTotalMonths).toBeNull();
-  });
 });

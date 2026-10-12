@@ -392,21 +392,20 @@ describe("generic buffs", () => {
     expect(consumed.buffs.map((buff) => buff.name)).toEqual(["每次想 idea +1分"]);
   });
 
-  it("keeps career progress out of the Buff bar until its dedicated UI is implemented", () => {
+  it("keeps interview experience out of the Buff bar", () => {
     const initial = createInitialState();
     const resolved = applyChoiceEffectsToState(initial, {
       id: "career-event",
-      label: "认真准备",
-      outcome: "互联网求职进度 +35。",
+      label: "确认结果",
+      outcome: "大厂应聘能力 +7。",
       effects: {
         san: -6,
-        careerType: "internet",
-        careerProgress: 35,
+        careerRecruitment: { totalMonths: initial.totalMonths, type: "internet", experienceGain: 7 },
       },
     }).nextState;
 
     expect(resolved.player.san).toBe(initial.player.san - 6);
-    expect(resolved.careerProgress.internet).toBe(35);
+    expect(resolved.careerProgress.internet).toBe(7);
     expect(resolved.buffs).toHaveLength(0);
   });
 

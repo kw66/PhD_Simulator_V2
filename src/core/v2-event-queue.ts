@@ -37,6 +37,10 @@ export function getSortedEventQueue(eventQueue: EventQueueItem[]): EventQueueIte
   return [...eventQueue].sort(compareEventQueueItems);
 }
 
+export function getEventRootId(event: Pick<PendingEvent, "id" | "replayContext" | "history">): string {
+  return event.replayContext?.rootEvent.id ?? event.history?.[0]?.replayEvent?.id ?? event.id;
+}
+
 export function getCurrentEvent(eventQueue: EventQueueItem[], eventId?: string): EventQueueItem | null {
   if (eventId) {
     return eventQueue.find((event) => event.id === eventId) ?? null;

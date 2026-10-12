@@ -51,6 +51,15 @@ export function getJournalScore(paper: Pick<Paper, "idea" | "experiment" | "writ
   return paper.idea + paper.experiment + paper.writing;
 }
 
+function recordJournalScore(paper: Paper, totalMonths: number): Paper {
+  if (!paper.journalScoreHistory) return paper;
+  const history = paper.journalScoreHistory;
+  const score = getJournalScore(paper);
+  const last = history.at(-1);
+  if (last?.totalMonths === totalMonths && last.score === score) return paper;
+  return { ...paper, journalScoreHistory: [...history, { totalMonths, score }] };
+}
+
 export function getJournalSubmissionFailure(
   paper: Paper | null | undefined,
   journalTarget: JournalTarget,
@@ -100,6 +109,7 @@ export function submitJournalPaper(
     ...(paper.collaborationScores ? { submittedCollaborationScores: { ...paper.collaborationScores } } : {}),
     submittedMonth: state.month,
     submittedYear: state.year,
+    journalScoreHistory: [{ totalMonths: state.totalMonths, score }],
     conferenceHandled: true,
     publication: null,
     lastReview: null,
@@ -136,8 +146,9 @@ export function resolveReadyJournalPapers(state: GameState): JournalResolution {
 
     const journal = getJournalDefinition(paper.journalTarget);
     const score = getJournalScore(paper);
+    const trackedPaper = recordJournalScore(paper, state.totalMonths);
     if (score < journal.acceptanceScore) {
-      activePapers.push(paper);
+      activePapers.push(trackedPaper);
       continue;
     }
 
@@ -145,7 +156,7 @@ export function resolveReadyJournalPapers(state: GameState): JournalResolution {
     const citationPenaltyMultiplier = paper.citationDebuffMultiplierOnPublish ?? 1;
     const promotionMultiplier = publicationEffect.nextPromotionMultiplier;
     const acceptedPaper = {
-      ...paper,
+      ...trackedPaper,
       status: "published" as const,
       reviewMonthsLeft: 0,
     };

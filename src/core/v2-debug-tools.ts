@@ -4,7 +4,6 @@ import { createConferenceActivityEvent } from "./v2-conference-activity-events";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
 import { SCORE_BY_TARGET } from "./v2-content";
-import type { CareerType } from "./v2-career-rules";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyQueuedEventEffects, rebaseGeneratedEventIds } from "./v2-engine-event-resolution";
 import { assignAvailableContinuationId } from "./v2-engine-event-resolution-followups";
@@ -27,7 +26,7 @@ import { createAdvisorGrantResultEvent } from "./v2-advisor-grant-events";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
 import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-training-events";
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
-import { createCareerEventForType } from "./v2-monthly-career-events";
+import { createCareerRecruitmentEvent } from "./v2-monthly-career-events";
 import { collectThesisEventForMonth } from "./v2-monthly-thesis-events";
 import { createInitialThesisState, getGraduationPreparationYear } from "./v2-thesis-rules";
 import { createPhdDecisionEvent } from "./v2-phd-decision-event";
@@ -189,10 +188,20 @@ export const DEBUG_MONTH_DELTAS = [-12, -1, 1, 12] as const;
 
 /** Manual cross-run audit checklist. Add an id here after the user confirms that the event has been checked. */
 export const DEBUG_COMPLETED_EVENT_IDS = [
+  "journal-accepted",
+  "thesis-progress",
+  "career-recruitment",
   "ccig",
   "ccig-activity",
   "review-result",
   "conference",
+  "conference-activity-a",
+  "conference-activity-b",
+  "conference-activity-c",
+  "internship-invite",
+  "joint-training-invite",
+  "lover-beautiful",
+  "lover-smart",
   "before-grad-school",
   "phd-choice",
   "mentor-assign",
@@ -286,11 +295,8 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
   {
     title: "毕业相关",
     buttons: [
-      { id: "thesis-progress", label: "毕业盲审" },
-      { id: "career-internet", label: "私企招聘" },
-      { id: "career-state-owned", label: "央国企招聘" },
-      { id: "career-civil-service", label: "公务员招聘" },
-      { id: "career-academic", label: "教职招聘" },
+      { id: "thesis-progress", label: "盲审结果" },
+      { id: "career-recruitment", label: "找工作" },
     ],
   },
 ];
@@ -642,17 +648,6 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
   });
 }
 
-function buildCareerEvent(state: GameState, eventId: string): PendingEvent | null {
-  const careerTypeMap: Record<string, CareerType> = {
-    "career-internet": "internet",
-    "career-state-owned": "stateOwned",
-    "career-civil-service": "civilService",
-    "career-academic": "academic",
-  };
-  const careerType = careerTypeMap[eventId];
-  return careerType ? createCareerEventForType(state, careerType) : null;
-}
-
 function attachDebugRandomReplay(event: PendingEvent, replay: NonNullable<PendingEvent["randomReplay"]>): PendingEvent {
   return {
     ...event,
@@ -778,8 +773,8 @@ function buildDebugEvent(
       };
     }
     default: {
-      if (eventId.startsWith("career-")) {
-        return { nextState: state, event: buildCareerEvent(state, eventId) };
+      if (eventId === "career-recruitment") {
+        return { nextState: state, event: createCareerRecruitmentEvent(state, Math.random, true) };
       }
 
       const randomMatch = /^random-(\d+)$/u.exec(eventId);
@@ -973,8 +968,10 @@ function addDebugPublishedJournalPaper(
 ): GameState {
   const nonFirstAuthor = authorship === "coauthor";
   const publicationIndex = state.externalPublications.length;
-  const submittedMonth = Math.floor(Math.random() * 12) + 1;
-  const submittedYear = Math.max(1, state.year);
+  const acceptedAt = Math.max(1, state.totalMonths);
+  const submittedAt = Math.max(1, acceptedAt - 2);
+  const submittedMonth = (submittedAt - 1) % 12 + 1;
+  const submittedYear = Math.floor((submittedAt - 1) / 12) + 1;
   const calendarYear = getAcademicCalendarYear(submittedYear, submittedMonth);
   const topic = createDraftPaper(state.totalMonths, publicationIndex, Math.random, calendarYear);
   const journal = getJournalDefinition(journalTarget);
@@ -989,6 +986,14 @@ function addDebugPublishedJournalPaper(
   let paperSerial = publicationIndex + 1;
   while (reservedIds.has(`debug-journal-${state.totalMonths}-${paperSerial}`)) paperSerial += 1;
   const acceptedScore = journal.acceptanceScore + 30 + Math.floor(Math.random() * 36);
+  const initialScore = journal.submissionScore + 5;
+  const middleScore = Math.floor((initialScore + acceptedScore) / 2);
+  const submittedBaseScore = Math.floor(initialScore / 3);
+  const journalScoreHistory = [
+    { totalMonths: submittedAt, score: initialScore },
+    { totalMonths: Math.max(submittedAt, acceptedAt - 1), score: middleScore },
+    { totalMonths: acceptedAt, score: acceptedScore },
+  ];
   const baseScore = Math.floor(acceptedScore / 3);
   const remainder = acceptedScore - baseScore * 3;
   const idea = baseScore + (remainder > 0 ? 1 : 0);
@@ -1004,11 +1009,12 @@ function addDebugPublishedJournalPaper(
     target: null,
     journalTarget,
     reviewMonthsLeft: 0,
-    submittedIdea: idea,
-    submittedExperiment: experiment,
-    submittedWriting: writing,
+    submittedIdea: submittedBaseScore + (initialScore % 3 > 0 ? 1 : 0),
+    submittedExperiment: submittedBaseScore + (initialScore % 3 > 1 ? 1 : 0),
+    submittedWriting: submittedBaseScore,
     submittedMonth,
     submittedYear,
+    journalScoreHistory,
     conferenceHandled: true,
     lastReview: null,
     nonFirstAuthor,

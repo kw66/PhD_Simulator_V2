@@ -1,10 +1,11 @@
-import { createConferenceMentorContact, getConferenceMentorContact, replaceConferenceMentorContact } from "./v2-conference-contacts";
+import { createConferenceMentorContact, replaceConferenceMentorContact } from "./v2-conference-contacts";
 import { getJointTrainingCitationCapBonus } from "./v2-joint-training-system";
 import type { ConferenceMentorContact, EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export interface JointTrainingContext {
   rejectedBigBullCoopCount: number;
   pendingCitationCapBonus: number;
+  supportLevel?: 0 | 1 | 2;
   origin?: string;
   contact?: ConferenceMentorContact;
   replacement?: ConferenceMentorContact;
@@ -15,13 +16,16 @@ export interface JointTrainingContext {
 
 export function buildJointTrainingContext(
   state: Pick<GameState, "conferenceEncounterState" | "totalCitations">,
-  contact = getConferenceMentorContact(state.conferenceEncounterState),
+  contact?: ConferenceMentorContact,
+  getRoll: () => number = Math.random,
 ): JointTrainingContext {
+  const mentor = contact ?? state.conferenceEncounterState.bigBull
+    ?? createConferenceMentorContact({ id: "joint-training-invite", roll: getRoll() });
   return normalizeContext({
     rejectedBigBullCoopCount: state.conferenceEncounterState.rejectedBigBullCoopCount,
-    pendingCitationCapBonus: getJointTrainingCitationCapBonus(state.totalCitations, contact.level),
+    pendingCitationCapBonus: getJointTrainingCitationCapBonus(state.totalCitations),
     invitationCitations: state.totalCitations,
-    contact: { ...contact },
+    contact: { ...mentor },
     active: state.conferenceEncounterState.bigBullCooperation || !!state.conferenceEncounterState.jointTrainingReward,
   });
 }
@@ -46,7 +50,7 @@ function unavailableText(context: JointTrainingContext): string | undefined {
 function createJointTrainingResult(input: JointTrainingContext, decision: "accept" | "decline"): PendingEvent {
   const context = normalizeContext(input);
   const unavailable = unavailableText(context);
-  const bonus = 4 + context.contact.level;
+  const bonus = 4 + (context.supportLevel ?? 1);
   const reward = {
     mentorId: context.contact.id,
     mentorName: context.contact.name,
@@ -76,16 +80,14 @@ function createJointTrainingResult(input: JointTrainingContext, decision: "accep
     id: `joint-training-result-${decision}`,
     title: `联合培养 ➜ 联培抉择 ➜ ${unavailable ? "暂时放下" : decision === "accept" ? "已确认" : "委婉拒绝"}`,
     description: [...(unavailable ? [
-      `📩${unavailable}你重新读了一遍与${context.contact.name}往来的邮件，把需要说明的近况写清楚，免得对方还按之前的讨论替你预留时间。`,
-      "附件里的批注仍有值得参考的地方，你把它们归进课题文件夹，没有再承诺新的安排。关掉邮件后，桌上的实验记录还停在昨天那一页；先把正在推进的事情接好，比再排满一张日程表更要紧。",
+      `${unavailable}你和${context.contact.name}说清楚目前的安排，也谢谢对方一直愿意讨论你的工作。`,
+      "对方说先把手头的课题做好，有新的问题仍可以交流。你把那几条讨论过的思路记下，没有再占着联培名额。",
     ] : decision === "accept" ? [
-      `你回信确认了与${context.contact.name}的联培安排，🤝也抄送给导师。写到自己的研究计划时，你停下来改了几处过于笼统的表述：既然对方愿意投入时间，你也得说明白准备带着什么问题去，而不只是期待一个更好的研究环境。`,
-      `${context.contact.name}回信后，你把其中的批注和原方案并排打开。参考文献里的名字，如今成了可以讨论实验失败原因的人。你整理出一份待核查的设置清单，准备从分歧最大的那组结果入手，把对方的建议真正接进自己的课题。`,
-      "新的合作让人兴奋，也意味着以后要把进展讲给两边听。你在日历上留出整理材料的时间，把还没想明白的问题单独列了一页。机会已经接住了，接下来要学的，是带着具体的问题去讨论，而不是等到每张图都漂亮了才敢发邮件。",
+      `你告诉${context.contact.name}，自己愿意接下联培。接着与那边的团队聊具体安排，发现他们能给你${(context.supportLevel ?? 1) === 2 ? "较多讨论时间和实验资源" : (context.supportLevel ?? 1) === 1 ? "固定的讨论时间和一部分实验资源" : "定期讨论与基础实验资源"}。你把最想追问的实验问题写在纸上，🤝这回不必只在会场匆匆讲几分钟。`,
+      "回到组里，你和导师一起核对两边的进度。想做的事情忽然多了，组会也得参加两边的；你在日历上留了整理材料的时间，免得第一次讨论就被自己没写清的设置难住。",
     ] : [
-      `📩你给${context.contact.name}认真写了回信，感谢对方把你的课题放进合作计划，也解释了眼下难以兼顾两边进度的顾虑。措辞改了几遍，你还是删掉了含糊的承诺：不想因为舍不得这次机会，让双方之后都被一份难落实的计划拖住。`,
-      `${context.contact.name}理解了你的选择，随后转来另一位学者${context.replacement.name}的相关工作，提到对方正在关注你邮件里那个尚未解决的问题。你读过摘要和实验部分，把自己的疑问整理成一封简短的介绍信；从一个具体问题开始联系，远比空泛地说“希望合作”自然。`,
-      `${context.replacement.name}回复了你的问题，💬还反问了一处实验设置。你翻出记录，把当时的取舍解释清楚，新的交流就这样有了开头。与${context.contact.name}的联培计划到此告一段落，接下来你会与${context.replacement.name}继续了解彼此的研究，看看有没有适合一起做的事。`,
+      `你感谢${context.contact.name}想到你，也说了眼下两篇稿子都在推进，暂时顾不上两边的课题。对方没有勉强，转来另一位学者${context.replacement.name}的一篇相关工作，说对方也在想类似的问题。`,
+      `你读到实验部分时圈出一处疑问，便给${context.replacement.name}写了封信，💬从这个具体问题聊起。联培先放下，新的联系却有了开头。`,
     ]),
     "机制结算", resultText].join("\n\n"),
     source: "fixed", blocking: true, deadlineMonths: 0, chainId: "joint-training", stage: "result",
@@ -101,17 +103,11 @@ function createJointTrainingResult(input: JointTrainingContext, decision: "accep
 function createJointTrainingAct2(input: JointTrainingContext): PendingEvent {
   const context = normalizeContext(input);
   const unavailable = unavailableText(context);
-  const levelStory = [
-    "对方把眼前课题拆成了几步可行的计划，连容易踩坑的实验细节也标了出来。",
-    "你卡了很久的论证，对方换个角度就找到了突破口；那几篇代表作里的思路，这下真用上了。",
-    "对方从你的小课题里挑出了一个整个领域都在追问的问题，连导师看完方案也说，这条路值得走。",
-  ][context.contact.level];
   return {
     id: "joint-training-act2", title: "联合培养 ➜ 联培抉择",
-    description: [`你带着${context.contact.name}的方案和导师商量，💬把自己最拿不准的地方标在页边。${levelStory}你原本只想补齐眼前的结果，讨论着才发现，有些问题值得重新设计实验，而不是再多跑几次。`,
-      "接着要想的是自己能拿出多少时间。联培意味着接触不同的研究习惯，也意味着同一组实验可能要向两边解释清楚。你把当前稿件和后续计划分开列下，既想借这次合作把问题做深，又不愿让已经推进的工作因为铺得太开而半途搁置。",
-      unavailable ? `📅${unavailable}你核对现有安排，决定把近况坦诚告诉对方；方案中的建议可以留作参考，时间上却不能再作重复承诺。`
-        : "📅你试着给第一次讨论列一个提纲，发现最想请教的恰好也是自己最怕被追问的地方。接受，得带着这些不确定走出去；婉拒，则能给眼前的课题留出更完整的时间。你合上日历，想清楚哪一种安排是自己接下来真正做得下去的。"].join("\n\n"),
+    description: [`你和导师提起${context.contact.name}说的联培机会，💬导师觉得对方的学术判断很强，也提醒你：换个环境不会让难题自动消失，联培后同一组实验还得向两边解释清楚。具体支持则取决于团队和研究方向。`,
+      unavailable ? `${unavailable}你看了看已经排满的日程，决定坦诚说清楚，不让对方继续为你留位置。`
+        : "你把眼前的稿件和想尝试的新问题列在一起。若接下邀请，可能有人帮你把卡住的思路往前推；若暂时不去，也能把这篇论文安稳做完。你合上笔记，准备给对方一个明确答复。"].join("\n\n"),
     source: "fixed", blocking: true, deadlineMonths: 0, chainId: "joint-training", stage: "act2",
     narrativeNames: [context.contact.name],
     jointTrainingPreview: { context },
@@ -119,7 +115,7 @@ function createJointTrainingAct2(input: JointTrainingContext): PendingEvent {
       id: decision,
       label: decision === "decline" ? "委婉拒绝" : unavailable ? "暂时放下" : "接受联培",
       outcome: unavailable ? "无事发生" : (decision === "decline" ? "婉拒联培，结识新的合作学者。"
-        : `科研上限 +${context.pendingCitationCapBonus}｜idea +${4 + context.contact.level}（永久）｜写作 +${4 + context.contact.level}（永久）。`),
+        : "接受联培｜具体增益在下一幕确定"),
       effects: { enqueueEvents: [createJointTrainingResult(context, decision)] },
     })),
   };
@@ -130,10 +126,10 @@ export function createJointTrainingAct1(input: JointTrainingContext): PendingEve
   return {
     id: "joint-training-act1", title: "联合培养",
     description: [
-      `📩${context.origin ? `${context.origin}结束后` : "会后"}，${context.contact.name}发来联培邀请，也把方案抄送给了你的导师。你点开邮件时还在整理会上的笔记，看到附件里引用了你们此前讨论的问题，连当时没来得及解释的实验设置都留了批注。这次的“保持联系”，已经变成一份认真写下的合作计划。`,
+      `${context.origin ? `${context.origin}结束后` : "会后"}，${context.contact.name}给你发来消息：他们实验室下学期有联培名额，正在找合适的方向。你们之前几次合作聊得很深入，对方觉得你的课题可以继续往下做，问你有没有兴趣来待一段时间，💬不用现在就答复。`,
       unavailableText(context)
-        ? `${unavailableText(context)}你仍把附件从头看了一遍，记下几处对当前课题有帮助的建议。邀请需要一个明确的答复，你先整理好近况，免得让对方继续按旧安排等下去。`
-        : "你往下翻，设备条件、课题分工和可讨论的方向列了好几页。有些是自己一直缺少的机会，有些却意味着要跳出熟悉的方法重新学起。你在附件旁开了个空文档，先记下想问的问题；要不要接受，得把期待和手头尚未完成的工作放在一起想。",
+        ? `${unavailableText(context)}你还是认真看完了消息，打算把眼下的安排告诉对方，不让这份好意悬着。`
+        : "你盯着那句“有兴趣吗”看了一会儿，才确定这回不是会后惯常的客套。对方水平很高，但到那边具体跟谁做、能投入多少时间还没谈；你得先想清自己想解决什么，也看看目前的论文能不能放下。",
       `小提示：出现条件：与${context.contact.name}合作≥3次（含本次），科研≥12，且尚未联培。`,
     ].join("\n\n"),
     source: "fixed", blocking: true, deadlineMonths: 0, chainId: "joint-training", stage: "act1",
@@ -141,6 +137,20 @@ export function createJointTrainingAct1(input: JointTrainingContext): PendingEve
     jointTrainingPreview: { context },
     choices: [{ id: "continue", label: "继续", outcome: "查看联培条件。", effects: { enqueueEvents: [createJointTrainingAct2(context)] } }],
   };
+}
+
+export function revealJointTrainingResult(event: PendingEvent, getRoll: () => number = Math.random): PendingEvent {
+  const preview = event.jointTrainingPreview;
+  if (event.stage !== "result" || preview?.decision !== "accept" || preview.context.supportLevel !== undefined) return event;
+  const supportLevel = Math.min(2, Math.max(0, Math.floor(getRoll() * 3))) as 0 | 1 | 2;
+  const context = {
+    ...preview.context,
+    supportLevel,
+    pendingCitationCapBonus: preview.context.invitationCitations === undefined
+      ? preview.context.pendingCitationCapBonus
+      : getJointTrainingCitationCapBonus(preview.context.invitationCitations, supportLevel),
+  };
+  return createJointTrainingResult(context, "accept");
 }
 
 export function refreshJointTrainingEvent<Event extends PendingEvent>(state: GameState, event: Event): Event {

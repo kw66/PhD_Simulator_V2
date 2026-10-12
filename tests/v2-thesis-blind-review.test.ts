@@ -117,6 +117,24 @@ describe("thesis blind-review sampling", () => {
 });
 
 describe("thesis blind-review event snapshots", () => {
+  it("records real point changes and freezes them before the review scenes", () => {
+    let state = fixture("master", [40, 10]);
+    state.player = { ...state.player, research: 6, san: 20 };
+    state.month = 2;
+    state.totalMonths = 26;
+    state = advanceThesisResearchPoint(state, 0);
+    expect(state.thesis.scoreHistory.at(-1)).toMatchObject({ totalMonths: 26, pointScores: [46, 10] });
+    state.month = 8;
+    state.totalMonths = 32;
+    const collected = collectThesisEventForMonth(state, () => 0);
+    const [overview, reports, decision] = stages(collected.event!);
+    expect(overview.thesisReviewPresentation?.scoreHistory.at(-1)?.pointScores).toEqual([46, 10]);
+    expect(reports.thesisReviewPresentation?.scoreHistory).toEqual(overview.thesisReviewPresentation?.scoreHistory);
+    expect(decision.thesisReviewPresentation?.scoreHistory).toEqual(overview.thesisReviewPresentation?.scoreHistory);
+    state.thesis.scoreHistory.at(-1)!.pointScores[0] = 999;
+    expect(overview.thesisReviewPresentation?.scoreHistory.at(-1)?.pointScores[0]).toBe(46);
+  });
+
   it.each(["master", "phd"] as const)("builds three %s scenes and resolves only on final confirmation", (degree) => {
     const state = fixture(degree, [200, 200, 200]);
     const collected = collectThesisEventForMonth(state, () => 0);
@@ -124,8 +142,10 @@ describe("thesis blind-review event snapshots", () => {
     const [intro, requirements, result] = stages(collected.event!);
     expect([intro, requirements, result].map((event) => event!.stage)).toEqual(["act1", "act2", "result"]);
     expect([intro, requirements, result].map((event) => event!.choices[0]!.label)).toEqual(["继续", "继续", "确定"]);
-    expect(intro!.thesisReviewPresentation).toBeUndefined();
-    expect(requirements!.thesisReviewPresentation).toBeUndefined();
+    expect(intro!.thesisReviewPresentation?.stage).toBe("overview");
+    expect(requirements!.thesisReviewPresentation?.stage).toBe("reports");
+    expect(result!.thesisReviewPresentation?.stage).toBe("decision");
+    expect(intro!.thesisReviewPresentation?.scoreHistory.at(-1)?.pointScores).toEqual(degree === "master" ? [200, 200] : [200, 200, 200]);
     expect(intro!.choices[0]!.effects.resolveThesisReview).toBeUndefined();
     expect(requirements!.choices[0]!.effects.resolveThesisReview).toBeUndefined();
     expect(result!.choices[0]!.effects).toEqual({ resolveThesisReview: true });

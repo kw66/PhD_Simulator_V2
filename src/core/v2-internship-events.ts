@@ -1,10 +1,11 @@
-import { activateInternship, createInternshipOffer, getInternshipMonthlyIncome, getPublishedAPaperCount, hasOngoingInternship } from "./v2-internship-system";
+import { activateInternship, createInternshipLead, createInternshipOffer, getInternshipMonthlyIncome, getPublishedAPaperCount, hasOngoingInternship, type InternshipLead } from "./v2-internship-system";
 import type { ConferenceCareerState, GameState, InternshipOffer, PendingEvent } from "./v2-types";
 
 type InternshipInviteState = Pick<GameState, "totalMonths" | "conferenceCareerState" | "internshipState" | "papers" | "externalPublications">;
 
 export interface InternshipInviteContext {
   offer: InternshipOffer;
+  lead?: InternshipLead;
   totalMonths: number;
   rejectedInternshipCount: number;
   currentMonthlyIncome: number;
@@ -13,12 +14,17 @@ export interface InternshipInviteContext {
   origin?: string;
 }
 
+const PENDING_OFFER: InternshipOffer = {
+  id: "pending", company: "企业", position: "大模型相关岗位", baseMonthlyIncome: 1,
+  monthlySanCost: 5, experimentBonus: 5,
+};
+
 export function buildInternshipInviteContext(
   state: InternshipInviteState,
-  getRoll: () => number = Math.random,
+  _getRoll: () => number = Math.random,
 ): InternshipInviteContext {
   return refreshInternshipInviteContext(state, {
-    offer: createInternshipOffer(getRoll),
+    offer: PENDING_OFFER,
     totalMonths: state.totalMonths,
     rejectedInternshipCount: 0,
     currentMonthlyIncome: 0,
@@ -41,8 +47,8 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
   const nextRejectCount = context.rejectedInternshipCount + 1;
   const result = "结果：婉拒实习";
   const description = [
-        `你给${context.offer.company}写了封回信，📩认真谢过对方对你的认可，也说明了眼下的课题进度。删掉“我应该能挤出时间”那句话时，你还有些舍不得；可与其接下来再反复解释延期，不如现在就把无法兼顾的事说清楚。`,
-        "对方回复理解，表示以后有合适的机会还可以联系。你把岗位说明和联系人一起存好，报酬那一栏仍让人心动，但今晚终于不用再拿组会和项目交付互相挪时间。你重新打开那份还没分析完的实验记录，决定先把手头的问题做扎实。",
+        `${context.offer.company}后来发来了${context.offer.position}的具体安排。你看完仍觉得眼下无法兼顾，于是给联系人发出📩回信，感谢他们认真考虑你的研究经历。`,
+        "对方表示理解，也说以后还有机会。你收好联系人，回到没分析完的实验记录前；刚才犹豫的那几分钟，倒帮你想清了手头最该先做什么。",
         "机制结算",
         result,
       ].join("\n\n");
@@ -66,7 +72,7 @@ function createInternshipDeclineResult(context: InternshipInviteContext): Pendin
         conferenceCareerUpdates: {
           rejectedInternshipCount: nextRejectCount,
           permanentlyBlockedInternship: false,
-          lastInternshipOffer: context.offer,
+          ...(context.offer.id !== "pending" ? { lastInternshipOffer: context.offer } : {}),
         } satisfies Partial<ConferenceCareerState>,
       },
     }],
@@ -80,8 +86,8 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
       id: `internship-invite-result-accept-${context.totalMonths}`,
       title: "实习邀请 ➜ 实习抉择 ➜ 实习安排未变更",
       description: [
-        `📅确认前，你重新核对日程，发现现有实习已经占住了能腾出的时间。${context.offer.company}的岗位确实有吸引力，但把两份安排叠在一起，最先被挤掉的恐怕就是自己的课题。`,
-        "你给联系人解释了目前的安排，收好这份邀请，没有再许下一个难以兑现的到岗日期。原实习的任务文档还开着，你把视线移回那张进度表，先把已经答应的事做好。",
+        `你核对📅日程后发现，现有实习已经占满了能腾出的时间。你向${context.offer.company}说明近况，原实习照常进行。`,
+        "两份安排没法同时答应，你先把已经接下的工作做好。",
         "机制结算",
         "结果：原实习保持不变",
       ].join("\n\n"),
@@ -95,13 +101,22 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
       choices: [{ id: "close", label: "确定", outcome: "原实习保持不变", effects: {} }],
     };
   }
+  const teamInterest = [
+    "团队认可你的想法，但基础待遇比较谨慎",
+    "团队希望你参与正在推进的方向",
+    "团队很看重你已有的研究，基础待遇也更积极",
+  ][context.offer.baseMonthlyIncome] ?? "团队希望你参与正在推进的方向";
+  const teamResources = [
+    "工作偏业务交付，能共享一些实验资源",
+    "团队能开放部分算力和数据",
+    "方向与你的课题贴近，算力和数据也更充足",
+  ][context.offer.experimentBonus - 4] ?? "团队能开放部分算力和数据";
   return {
     id: `internship-invite-result-accept-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择 ➜ 实习已确认",
     description: [
-      `你确认了${context.offer.company}的${context.offer.position}岗位，💼把六个月的实习安排记进日历。联系人发来入职材料和项目文档，你先把需要准备的东西列成清单，又在组会那天画了一道线，提醒自己别把两边都答应得太满。`,
-      "公司的工作群很快弹出欢迎消息。你回了句“请多指教”，点开第一份任务说明，发现熟悉的方法要面对不同的数据和交付要求。能接触真实业务、用上更齐全的实验条件，正是你想来试试的原因；只是论文里一句带过的细节，在这里都得落实。",
-      "晚上，你把课题和实习的待办并排放在桌上。报酬能让生活宽裕一些，项目经验也值得期待，但白天没做完的事不会自己消失。你给明天留下一个明确的小目标，先把环境跑通，再一点点找两边都能持续推进的节奏。",
+      `和${context.offer.company}的团队聊过后，具体岗位定为${context.offer.position}。负责人介绍了手头的项目，${teamInterest}；${teamResources}。你听到熟悉的模型名字，也发现交付要求比论文里一句话复杂得多。`,
+      "你把六个月的实习和组会排在同一张📅日历上，特意空出改论文的晚上。新团队发来第一份任务说明，你读到一半就开始记问题：这些不同的数据和交付要求，得从头摸清。",
       "机制结算",
       "结果：企业实习（6个月）",
       `结果：每月SAN -${context.offer.monthlySanCost}｜每月金币 +${context.currentMonthlyIncome}`,
@@ -129,16 +144,15 @@ function createInternshipAcceptResult(context: InternshipInviteContext): Pending
 
 function createInternshipInviteAct2(context: InternshipInviteContext): PendingEvent {
   const warningText = "这次不接，以后仍可收到实习邀请。";
+  const company = context.lead?.company ?? context.offer.company;
+  const direction = context.lead?.direction ?? "大模型研究";
 
   return {
     id: `internship-invite-act2-${context.totalMonths}`,
     title: "实习邀请 ➜ 实习抉择",
     description: [
-      `💼你把${context.offer.company}的${context.offer.position}岗位说明摊在实验记录旁。${(context.publishedAPaperCount ?? 0) > 0 ? "对方看过你的一作 A 类论文" : "对方看过你在会上的展示"}，为六个月的实习开出每月 ${context.currentMonthlyIncome} 金币。比起只看报酬，你更想知道自己的方法在真实业务里能不能站住脚，于是把项目要解决的问题逐条圈了出来。`,
-      `💰${context.offer.baseMonthlyIncome === 0 ? "这家初创公司的基础待遇不算丰厚" : context.offer.baseMonthlyIncome === 1 ? "这份算法岗位的基础待遇中规中矩" : "大公司的研究岗位给出了较优厚的基础待遇"}，对方也愿意根据你之后发表的论文重新谈报酬。${context.offer.monthlySanCost === 6 ? "项目交付排得很紧，连晚上的时间也未必保得住" : context.offer.monthlySanCost === 4 ? "项目节奏相对从容，但每周的交付还是要挤占课余时间" : "项目交付稳定，两边的进度都得按时跟上"}；${context.offer.experimentBonus === 6 ? "好在那边的设备和数据很齐全，能帮你推进不少实验" : context.offer.experimentBonus === 4 ? "那边也能开放一些实验资源，课题多少能跟着受益" : "公司的实验资源比组里宽裕，正好能补上课题需要的条件"}。`,
-      "你打开日历，📅组会、实验和项目交付挤在同一页。实习能缓解生活开销，也能积累以后找工作的经验，可课题停下来之后，再接上思路往往比想象中费劲。" + (context.unavailable
-        ? "先前的实习安排还在执行，这回实在接不下来；你不想让两个团队都等着自己的答复。"
-        : "你试着找出几个完整的晚上，又把休息时间留了一些，免得计划从第一周起就只能靠熬夜兑现。") + warningText,
+      `联系你的是${company}的${direction}团队。对方看过你${(context.publishedAPaperCount ?? 0) > 0 ? "的一作 A 类论文" : "在会上的展示"}，觉得有些方法或许能用在他们的项目里；目前谈的只是方向，具体负责哪部分、待遇和工作节奏还要继续聊。`,
+      `你顺手查了他们公开的工作，又在📅日历上对照组会、实验和项目交付。${context.unavailable ? "已有实习安排，没法再接第二份。" : "想试试真实业务，也舍不得让课题停摆；六个月能不能两边兼顾，你还得认真掂量。"}${warningText}`,
     ].join("\n\n"),
     source: "fixed",
     blocking: true,
@@ -158,7 +172,7 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
       {
         id: "accept",
         label: "接受实习",
-        outcome: `企业实习（6个月）｜每月SAN -${context.offer.monthlySanCost}｜每月金币 +${context.currentMonthlyIncome}｜实验 ×1.25、+${context.offer.experimentBonus}｜实验费用 -2`,
+        outcome: `企业实习（6个月）｜${company} · ${direction}｜具体岗位和待遇待沟通`,
         ...(context.unavailable ? { disabledReason: "已有实习安排，本次不新增、不延期。" } : {}),
         effects: {
           enqueueEvents: [createInternshipAcceptResult(context)],
@@ -173,8 +187,8 @@ export function createInternshipInviteAct1(context: InternshipInviteContext): Pe
     id: `internship-invite-act1-${context.totalMonths}`,
     title: "实习邀请",
     description: [
-      `📩${context.origin ? `${context.origin}结束后` : "会后"}，你正在整理交流时记下的笔记，收到${context.offer.company}发来的${context.offer.position}实习邀请。对方在邮件里提起你介绍过的方法，附件中的项目也确实能用上它。原以为只是互留联系方式，没想到后续真的找到了自己。`,
-      "你翻到报酬那一栏，心里先算了一遍日常开销，又往上拉回工作要求。设备和数据让人心动，陌生的业务问题也有趣，但桌边还压着等你修改的课题方案。邮件末尾附了联系人和入职流程，你没有马上回复，先打开日历，想看看这份机会该放进生活的哪里。",
+      `📩${context.origin ? `${context.origin}结束后` : "会后"}，有企业联系人问你愿不愿意聊聊大模型相关的实习。对方记得你介绍过的方法，说他们正在找能把研究想法用进项目的人。你又翻了翻自己的展示稿，没想到当时讲得最仓促的那页也有人记住。`,
+      "邮件没有催你立刻答复。你看着桌上还没跑完的实验，先把简历和一段工作介绍找出来：机会有点突然，至少值得听听他们想做什么。",
       "小提示：出现条件：企业交流≥2次（含本次），有A会论文或实习经历（含远程），且暂无实习安排。",
     ].join("\n\n"),
     source: "fixed",
@@ -192,6 +206,29 @@ export function createInternshipInviteAct1(context: InternshipInviteContext): Pe
       },
     }],
   };
+}
+
+export function revealInternshipInviteResult(event: PendingEvent, getRoll: () => number = Math.random): PendingEvent {
+  const preview = event.internshipInvitePreview;
+  if (event.stage !== "result" || !preview?.decision || preview.context.offer.id !== "pending") return event;
+  const offer = createInternshipOffer(getRoll, preview.context.lead);
+  const context = {
+    ...preview.context,
+    offer,
+    currentMonthlyIncome: getInternshipMonthlyIncome(preview.context.publishedAPaperCount ?? 0, offer.baseMonthlyIncome),
+  };
+  return preview.decision === "accept" ? createInternshipAcceptResult(context) : createInternshipDeclineResult(context);
+}
+
+export function revealInternshipInviteLead(event: PendingEvent, getRoll: () => number = Math.random): PendingEvent {
+  const preview = event.internshipInvitePreview;
+  if (event.stage !== "act2" || !preview || preview.context.lead) return event;
+  const lead = createInternshipLead(getRoll);
+  return createInternshipInviteAct2({
+    ...preview.context,
+    lead,
+    offer: { ...preview.context.offer, company: lead.company },
+  });
 }
 
 export function refreshInternshipInviteEvent<Event extends PendingEvent>(state: InternshipInviteState, event: Event): Event {

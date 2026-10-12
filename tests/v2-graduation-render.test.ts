@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { renderGraduationCards, renderThesisReviewReports } from "../src/app/v2-render-graduation";
 import { createInitialState } from "../src/core/v2-engine-state-factory";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
-import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
+import { createCareerRecruitmentEvent } from "../src/core/v2-monthly-career-events";
+import { getCareerAbility } from "../src/core/v2-career-rules";
 import { formatMoney } from "../src/core/v2-money";
 import { prepareThesisBlindReview, syncThesisState, THESIS_REVIEW_THRESHOLDS } from "../src/core/v2-thesis-rules";
 import type { Degree, GameState, PendingEvent } from "../src/core/v2-types";
@@ -28,7 +29,8 @@ function reviewPresentation(degree: Degree): NonNullable<PendingEvent["thesisRev
   let state = graduationState(degree, 8);
   state.thesis.researchPoints = state.thesis.researchPoints.map((point) => ({ ...point, score: 200.005 }));
   state = prepareThesisBlindReview(state, () => 0.5);
-  return { degree, title: state.thesis.title, pointScores: state.thesis.researchPoints.map((point) => point.score), review: state.thesis.review! };
+  return { stage: "reports", degree, title: state.thesis.title, pointScores: state.thesis.researchPoints.map((point) => point.score),
+    scoreHistory: state.thesis.scoreHistory, review: state.thesis.review! };
 }
 
 describe("graduation workstation cards", () => {
@@ -58,7 +60,7 @@ describe("graduation workstation cards", () => {
     expect(html).not.toContain("graduation-baselines");
     expect(html.match(/class="graduation-reference"/g)).toHaveLength(1);
     const header = html.match(/<header\b[^>]*>[\s\S]*?<\/header>/)![0];
-    expect(header).toContain(`id="graduation-thesis-title">${degree === "master" ? "硕士" : "博士"}毕业论文</strong>`);
+    expect(header).toContain(`id="graduation-thesis-title"><span class="rel-inline-icon" aria-hidden="true">📘</span>${degree === "master" ? "硕士" : "博士"}毕业论文</strong>`);
     expect(header).toMatch(/<strong\b[^>]*>[\s\S]*?<\/strong><span class="graduation-reference"[\s\S]*<span class="graduation-status">/);
     expect(header).not.toContain("is-countdown");
     expect(visibleText(header)).toContain("7月后盲审");
@@ -83,7 +85,7 @@ describe("graduation workstation cards", () => {
     expect(html.match(/class="graduation-card is-locked /g)).toHaveLength(2);
     const headers = html.match(/<header\b[^>]*>[\s\S]*?<\/header>/g)!;
     expect(visibleText(headers[0]!)).toContain("1月后开放");
-    expect(visibleText(headers[1]!)).toBe("找工作1月后开放");
+    expect(visibleText(headers[1]!)).toBe("💼找工作1月后开放");
     expect(html.match(/data-graduation-point="\d+"/g)).toHaveLength(3);
     expect(buttons(html, "advance-thesis-point")).toHaveLength(degree === "master" ? 2 : 3);
     expect(buttons(html, "prepare-career")).toHaveLength(4);
@@ -106,7 +108,7 @@ describe("graduation workstation cards", () => {
     expect(html.match(/class="graduation-point is-unused"/g)).toHaveLength(1);
     const placeholder = html.match(/<div class="graduation-point is-unused"[\s\S]*?<\/span><\/div>/)![0];
     expect(placeholder).toContain('data-graduation-point="2"');
-    expect(placeholder).toContain('class="rel-detail-label">研究点3</span>');
+    expect(placeholder).toContain('class="rel-detail-label"><span class="rel-inline-icon" aria-hidden="true">🔬</span>研究点3</span>');
     expect(placeholder).toMatch(/class="rel-progress-bar graduation-point-bar"[^>]*aria-valuenow="0"><\/div>/);
     expect(placeholder).toContain('class="rel-progress-val">0</strong>');
     expect(placeholder).toContain('<span class="graduation-unused-action">硕士不需要</span>');
@@ -191,7 +193,7 @@ describe("graduation workstation cards", () => {
     expect(html).not.toContain("event-choice-risk");
     expect(buttons(html, "advance-thesis-point").every((button) => !button.includes(" disabled"))).toBe(true);
     expect(buttons(html, "prepare-career")).toHaveLength(4);
-    expect(buttons(html, "prepare-career").every((button) => !button.includes(" disabled"))).toBe(true);
+    expect(buttons(html, "prepare-career").filter((button) => button.includes(" disabled"))).toHaveLength(1);
   });
 
   it.each([[1, 7], [7, 1]] as const)("shows the April countdown in month %s", (month, remaining) => {
@@ -205,7 +207,7 @@ describe("graduation workstation cards", () => {
     const html = renderGraduationCards(state);
     expect(buttons(html, "advance-thesis-point").every((button) => button.includes(" disabled"))).toBe(true);
     expect(buttons(html, "prepare-career")).toHaveLength(4);
-    expect(buttons(html, "prepare-career").every((button) => !button.includes(" disabled"))).toBe(true);
+    expect(buttons(html, "prepare-career").filter((button) => button.includes(" disabled"))).toHaveLength(1);
     expect(visibleText(html)).not.toMatch(/\d+月后盲审/);
   });
 
@@ -217,7 +219,7 @@ describe("graduation workstation cards", () => {
     expect(html).toContain("盲审通过");
     expect(html).not.toContain(`优秀${degree === "master" ? "硕士" : "博士"}论文`);
     expect(html).not.toContain("<table");
-    expect(buttons(html, "prepare-career").every((button) => !button.includes(" disabled"))).toBe(true);
+    expect(buttons(html, "prepare-career").filter((button) => button.includes(" disabled"))).toHaveLength(degree === "master" ? 1 : 0);
   });
 
   it("shows unsuccessful and unsubmitted outcomes without an excellent badge", () => {
@@ -240,21 +242,22 @@ describe("graduation workstation cards", () => {
     const html = renderGraduationCards(state);
     expect(html).toContain(submitted ? "已送审 · 等待结果" : "等待盲审通知");
     expect(html).not.toMatch(/盲审通过|盲审未通过|优秀硕士论文|尚不可透露的送审原因/);
-    expect(html).toContain('data-ui-open-event-id="thesis-notice-&quot;test&quot;"');
-    expect(html).toContain("查看通知");
+    expect(html).not.toContain('data-ui-open-event-id=');
+    expect(html).not.toContain("查看通知");
     expect(html).not.toContain("<table");
   });
 
-  it("renders compact career progress and actual SAN costs without old ranks, offers, or probabilities", () => {
-    const state = graduationState();
+  it("renders live career ability, SAN costs, and retained offers", () => {
+    const state = graduationState("phd");
     state.careerProgress = { internet: 500.123456, stateOwned: 300, civilService: 200, academic: 150 };
+    state.careerOffers.internet = { type: "internet", jobId: "old", name: "旧 offer", threshold: 45, score: 60 };
     const html = renderGraduationCards(state);
     const headers = html.match(/<header\b[^>]*>[\s\S]*?<\/header>/g)!;
-    expect(visibleText(headers[1]!)).toBe("找工作已开放");
+    expect(visibleText(headers[1]!)).toContain("已获1份 offer");
     expect(headers[1]).not.toContain("招聘");
     const rows = html.match(/<div class="graduation-career-row">[\s\S]*?<\/button>\s*<\/div>/g) ?? [];
     expect(rows).toHaveLength(4);
-    expect(rows[0]).toMatch(/class="rel-detail-label"[^>]*data-card-tooltip[^>]*>私企<\/strong>/);
+    expect(rows[0]).toContain('class="graduation-offer-marker"');
     rows.forEach((row, index) => {
       expect(row.match(/class="rel-detail-label"/g)).toHaveLength(1);
       expect(row.match(/class="rel-progress-bar graduation-career-bar"/g)).toHaveLength(1);
@@ -262,23 +265,43 @@ describe("graduation workstation cards", () => {
       expect(row).toMatch(/rel-detail-label[\s\S]*graduation-career-bar[\s\S]*rel-progress-val[\s\S]*<button/);
       const actions = buttons(row, "prepare-career");
       expect(actions).toHaveLength(1);
-      expect(visibleText(actions[0]!)).toBe(`📈推进SAN-${[4, 2, 3, 2][index]}`);
-      expect(row).toContain(`aria-valuenow="${["500.12", "300", "200", "150"][index]}"`);
-      expect(row).toContain(`style="width:${[100, 60, 40, 30][index]}%"`);
+      expect(visibleText(actions[0]!)).toBe(`📈推进${["+6", "+3～8", "+5～10", "+3"][index]}SAN-${[4, 2, 3, 2][index]}`);
+      const type = (["internet", "stateOwned", "civilService", "academic"] as const)[index]!;
+      expect(row).toContain(`aria-valuenow="${formatMoney(getCareerAbility(state, type))}"`);
+      expect(row).toContain(`aria-valuemax="${[850, 620, 365, 650][index]}"`);
+      expect(row).toContain("履历");
+      expect(row).toContain("推进");
+      expect(row).toContain("面试");
+      expect(row).toMatch(/graduation-career-resume[^>]*style="width:[^%]+%"/);
+      expect(row).toMatch(/graduation-career-practice[^>]*style="width:[^%]+%"/);
+      expect(row).toContain("graduation-career-interview");
     });
-    expect(visibleText(rows[0]!)).toContain("500.12");
+    expect(visibleText(rows[0]!)).toContain("554.12");
     expect(buttons(html, "prepare-career").map((button) => button.match(/data-career-type="([^"]+)"/)![1]))
       .toEqual(["internet", "stateOwned", "civilService", "academic"]);
-    expect(html).not.toMatch(/offer|人才计划|头部央企|市级|普本|概率|几率/i);
+  });
+
+  it("separates resume, preparation and interview experience in the career bar", () => {
+    const state = graduationState("phd");
+    state.careerProgress.internet = 30;
+    state.careerInterviewExperience.internet = 10;
+    const row = renderGraduationCards(state).match(/<div class="graduation-career-row">[\s\S]*?<\/button>\s*<\/div>/)![0];
+    expect(row).toContain("履历 54 分 · 推进 20 分 · 面试 10 分");
+    expect(row).toMatch(/graduation-career-resume[^>]*style="width:[1-9]/);
+    expect(row).toMatch(/graduation-career-practice[^>]*style="width:[1-9]/);
+    expect(row).toMatch(/graduation-career-interview[^>]*style="width:[1-9]/);
+    expect(row).toContain('aria-valuenow="84"');
+    expect(row).toContain('aria-valuemax="850"');
+    expect(row).toContain('style="width:6.35%"');
   });
 
   it.each(["monthly", "pending", "finished"] as const)("blocks all career directions for %s", (reason) => {
-    const state = graduationState();
+    const state = graduationState("phd");
     if (reason === "monthly") state.careerPreparedMonths = {
       internet: state.totalMonths, stateOwned: state.totalMonths,
       civilService: state.totalMonths, academic: state.totalMonths,
     };
-    if (reason === "pending") state.eventQueue = [createEventQueueItem(createCareerEventForType(state, "academic"), 0)];
+    if (reason === "pending") state.eventQueue = [createEventQueueItem(createCareerRecruitmentEvent(state, () => 0), 0)];
     if (reason === "finished") state.phase = "finished";
     const actions = buttons(renderGraduationCards(state), "prepare-career");
     expect(actions).toHaveLength(4);
@@ -286,7 +309,7 @@ describe("graduation workstation cards", () => {
   });
 
   it.each(["internet", "stateOwned", "civilService", "academic"] as const)("disables only the %s direction already advanced this month", (type) => {
-    const state = graduationState();
+    const state = graduationState("phd");
     state.player.san = 1;
     state.actionState.used = state.actionState.limit;
     state.careerPreparedMonths = { [type]: state.totalMonths };
@@ -312,7 +335,7 @@ describe("graduation workstation cards", () => {
   });
 
   it.each([1, 2, 3, 4])("uses each direction's exact SAN cost for risk markup at SAN %s", (san) => {
-    const state = graduationState();
+    const state = graduationState("phd");
     state.player.san = san;
     const before = structuredClone(state);
     const actions = buttons(renderGraduationCards(state), "prepare-career");
@@ -326,11 +349,11 @@ describe("graduation workstation cards", () => {
         expect(action).toContain("data-event-risk-tooltip");
         expect(action).toContain("event-choice-risk is-certain");
         expect(action).toContain(`SAN不足，结算后为${san - cost}`);
-        expect(visibleText(action)).toBe(`📈推进！SAN-${cost}`);
+        expect(visibleText(action)).toBe(`📈推进${["+6", "+3～8", "+5～10", "+3"][index]}！SAN-${cost}`);
       } else {
         expect(action).not.toContain("data-event-risk-tooltip");
         expect(action).not.toContain("event-choice-risk");
-        expect(visibleText(action)).toBe(`📈推进SAN-${cost}`);
+        expect(visibleText(action)).toBe(`📈推进${["+6", "+3～8", "+5～10", "+3"][index]}SAN-${cost}`);
       }
     });
     expect(state).toEqual(before);
@@ -342,11 +365,10 @@ describe("thesis expert review reports", () => {
     const presentation = reviewPresentation(degree);
     const before = structuredClone(presentation);
     const html = renderThesisReviewReports(presentation);
-    expect(html.match(/<tr class="graduation-review-grade-a">/g)).toHaveLength(degree === "master" ? 3 : 5);
-    expect(visibleText(html)).toContain("研究点1 200.01");
+    expect(html.match(/class="graduation-reviewer-card is-a"/g)).toHaveLength(degree === "master" ? 3 : 5);
     expect(visibleText(html)).toContain(formatMoney(presentation.review.reports[0]!.effectiveScore));
-    expect(html).toContain("加权原始分");
-    expect(html).toContain('data-tooltip="研究内容扎实，各研究点形成了清晰的论证，达到优秀标准。"');
+    expect(html).toContain("加权分");
+    expect(html).toContain("研究内容扎实，各研究点形成了清晰的论证，达到优秀标准。");
     expect(html).not.toContain("盲审通过");
     expect(presentation).toEqual(before);
   });
@@ -357,7 +379,7 @@ describe("thesis expert review reports", () => {
     const html = renderThesisReviewReports(presentation);
     expect(html).toContain("0.99 / 0.99 / 1.02");
     expect(visibleText(html)).toContain("601.24");
-    expect(html).toContain('data-animate-number="601.23789"');
+    expect(html).toContain("加权分 <b>601.24</b>");
   });
 
   it("marks A/B and C/D individually and safely escapes reviewer comments", () => {
@@ -366,7 +388,7 @@ describe("thesis expert review reports", () => {
       weights: [1, 1, 1], effectiveScore: 300, grade, score: 80, comment: '<script>"bad"</script>',
     }));
     const html = renderThesisReviewReports(presentation);
-    for (const grade of ["a", "b", "c", "d"]) expect(html).toContain(`graduation-review-grade-${grade}`);
+    for (const grade of ["a", "b", "c", "d"]) expect(html).toContain(`graduation-reviewer-card is-${grade}`);
     expect(html).toContain("&lt;script&gt;&quot;bad&quot;&lt;/script&gt;");
     expect(html).not.toContain("<script>");
   });
@@ -374,6 +396,7 @@ describe("thesis expert review reports", () => {
   it("renders no table or duplicate judgment when a thesis was not submitted", () => {
     const presentation = reviewPresentation("master");
     presentation.review.submitted = false;
-    expect(renderThesisReviewReports(presentation)).toBe("");
+    expect(renderThesisReviewReports(presentation)).toContain("未能送审");
+    expect(renderThesisReviewReports(presentation)).not.toContain("graduation-reviewer-card");
   });
 });

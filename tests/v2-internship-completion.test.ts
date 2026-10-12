@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolution-state";
-import { applyQueuedEventEffects } from "../src/core/v2-engine-event-resolution";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
-import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { activateInternship, activateRemoteInternship } from "../src/core/v2-internship-system";
-import { createCareerEventForType } from "../src/core/v2-monthly-career-events";
 import { applyMonthlyEffects, previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { getCalendarForTotalMonths } from "../src/core/v2-progression";
-import { CAREER_OPTIONS, type CareerType } from "../src/core/v2-career-rules";
-import { getActualSanChange } from "../src/core/v2-sanity-rules";
+import { getCareerBaseScore } from "../src/core/v2-career-rules";
 import type { GameState } from "../src/core/v2-types";
 
 function startInternship(kind: "conference6" | "remote3", initial = createStartedGameState("normal")): GameState {
@@ -22,21 +18,6 @@ function startInternship(kind: "conference6" | "remote3", initial = createStarte
 function advanceMonth(state: GameState): GameState {
   const totalMonths = state.totalMonths + 1;
   return applyMonthlyEffects({ ...state, totalMonths, ...getCalendarForTotalMonths(totalMonths, state.degree) }).nextState;
-}
-
-function settleCareer(state: GameState, careerType: CareerType): number {
-  const prepared: GameState = { ...state, careerLastPreparedTotalMonths: null, player: { ...state.player, san: state.sanCap } };
-  let current: GameState = { ...prepared, eventQueue: [createEventQueueItem(createCareerEventForType(prepared, careerType), 1)] };
-  for (const choiceId of [current.eventQueue[0]!.choices[0]!.id, "light", "light-finish"]) {
-    current = applyQueuedEventEffects(current, current.eventQueue[0]!, choiceId, {
-      evaluateImmediateEndings: (next) => next,
-      runPostQueuePipeline: (next) => next,
-    });
-  }
-  const option = CAREER_OPTIONS.find((entry) => entry.id === "light")!;
-  expect(current.player.san).toBe(prepared.player.san + getActualSanChange(-option.sanCost, prepared.month, prepared.eventSupport, prepared.buffs));
-  expect(current.careerLastPreparedTotalMonths).toBe(prepared.totalMonths);
-  return current.careerProgress[careerType] - state.careerProgress[careerType];
 }
 
 describe("internship completion and career experience", () => {
@@ -71,12 +52,12 @@ describe("internship completion and career experience", () => {
     expect(advanceMonth(state).internshipCount).toBe(2);
   });
 
-  it.each(["conference6", "remote3"] as const)("applies the completed %s experience to actual recruitment settlements", (kind) => {
+  it.each(["conference6", "remote3"] as const)("adds completed %s experience once to the live resume score", (kind) => {
     let state = startInternship(kind);
-    expect(settleCareer(state, "internet")).toBe(settleCareer({ ...state, internshipCount: 0 }, "internet"));
+    expect(getCareerBaseScore(state, "internet")).toBe(getCareerBaseScore({ ...state, internshipCount: 0 }, "internet"));
     for (let elapsed = 0; elapsed < (kind === "conference6" ? 6 : 4); elapsed += 1) state = advanceMonth(state);
-    for (const [careerType, bonus] of [["internet", 15], ["stateOwned", 5], ["civilService", 0], ["academic", 0]] as const) {
-      expect(settleCareer(state, careerType) - settleCareer({ ...state, internshipCount: 0 }, careerType)).toBe(bonus);
+    for (const [careerType, bonus] of [["internet", 20], ["stateOwned", 0], ["civilService", 0], ["academic", 0]] as const) {
+      expect(getCareerBaseScore(state, careerType) - getCareerBaseScore({ ...state, internshipCount: 0 }, careerType)).toBe(bonus);
     }
   });
 });

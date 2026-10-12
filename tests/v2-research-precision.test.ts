@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { advanceAdvisorProject } from "../src/core/v2-advisor-progress";
 import { getAiModelForTotalMonths } from "../src/core/v2-ai-shop";
-import { calculateCareerProgress, CAREER_OPTIONS } from "../src/core/v2-career-rules";
+import { calculateMonthlyCareerProgress } from "../src/core/v2-career-rules";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { advanceFellowTask } from "../src/core/v2-fellow-actions";
 import { applyFellowAiResearch } from "../src/core/v2-fellow-ai";
@@ -208,18 +208,18 @@ describe("decimal research calculations", () => {
     expect(next.player.research).toBe(6.75);
   });
 
-  it("rounds career progress after adding weighted research and publication contributions", () => {
-    expect(calculateCareerProgress("internet", CAREER_OPTIONS[2]!, {
-      research: 8.25, social: 10, publishedPaperCount: 3, internshipCount: 0,
-    })).toBe(44);
-    expect(calculateCareerProgress("internet", CAREER_OPTIONS[0]!, {
-      research: 8.25, social: 10, publishedPaperCount: 3, internshipCount: 0,
-    })).toBe(0);
+  it("floors fractional research for monthly career practice", () => {
+    const state = makeState();
+    state.player.research = 8.25;
+    expect(calculateMonthlyCareerProgress(state, "internet")).toBe(4);
+    expect(calculateMonthlyCareerProgress(state, "stateOwned", () => 0)).toBe(2);
   });
 
-  it("combines fractional research and social contributions before rounding career progress", () => {
-    expect(calculateCareerProgress("internet", CAREER_OPTIONS[2]!, {
-      research: 8.25, social: 12.5, publishedPaperCount: 0, internshipCount: 0,
-    })).toBe(40);
+  it("lets civil-service practice grow independently of research and social ability", () => {
+    const state = makeState();
+    state.player.research = 8.25;
+    state.player.social = 12.5;
+    expect(calculateMonthlyCareerProgress(state, "civilService", () => 0)).toBe(5);
+    expect(calculateMonthlyCareerProgress(state, "civilService", () => 0.99)).toBe(10);
   });
 });

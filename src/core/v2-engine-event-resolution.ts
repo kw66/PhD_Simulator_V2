@@ -26,9 +26,8 @@ import { getRoleDefinition } from "./v2-progression";
 import { getEventNarrativeNames } from "./v2-event-narrative";
 import { refreshTeachersDayEvent } from "./v2-fixed-events-teachers-day-refresh";
 import { refreshJournalFeeEvent } from "./v2-journal-fee-events";
-import { refreshCareerPreparation } from "./v2-graduation-career";
-import { refreshInternshipInviteEvent } from "./v2-internship-events";
-import { refreshJointTrainingEvent } from "./v2-joint-training-events";
+import { refreshInternshipInviteEvent, revealInternshipInviteLead, revealInternshipInviteResult } from "./v2-internship-events";
+import { refreshJointTrainingEvent, revealJointTrainingResult } from "./v2-joint-training-events";
 import { refreshLoverDevelopmentEvent } from "./v2-lover-events";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
@@ -373,17 +372,6 @@ export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQue
 }
 
 function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
-  if (queuedEvent.careerPreparation) {
-    const preparation = queuedEvent.careerPreparation;
-    if (preparation.degree !== state.degree || preparation.totalMonths !== state.totalMonths
-      || state.careerLastPreparedTotalMonths === preparation.totalMonths) {
-      return { ...queuedEvent, description: "这份求职安排已经结束，📄你收起旧的计划表。\n\n机制结算\n结果：无事发生",
-        deferredStatePatch: undefined,
-        choices: [{ id: "close-expired-career", label: "确定", outcome: "求职安排已结束。", effects: {} }],
-      };
-    }
-    return { ...queuedEvent, ...refreshCareerPreparation(state, queuedEvent) };
-  }
   if (queuedEvent.fixedResultPreview) {
     const context = queuedEvent.fixedResultPreview;
     let rollIndex = 0;
@@ -467,7 +455,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => event.careerPreparation || event.internshipInvitePreview || event.jointTrainingPreview || event.loverDevelopmentPreview || event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.teachersDayPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
+  const eventQueue = state.eventQueue.map((event) => event.internshipInvitePreview || event.jointTrainingPreview || event.loverDevelopmentPreview || event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.teachersDayPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
     && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };
@@ -546,7 +534,15 @@ export function applyQueuedEventEffects(
     };
   }
 
-  const followUpEvents = [...resolvedEnqueueEvents, ...(choice.effects.enqueueEvents ?? [])];
+  const followUpEvents = [...resolvedEnqueueEvents, ...(choice.effects.enqueueEvents ?? [])].map((event) => {
+    if (resolvedEvent.stage === "act1" && resolvedEvent.chainId === "internship-invite") {
+      return revealInternshipInviteLead(event);
+    }
+    if (resolvedEvent.stage !== "act2") return event;
+    if (resolvedEvent.chainId === "internship-invite") return revealInternshipInviteResult(event);
+    if (resolvedEvent.chainId === "joint-training") return revealJointTrainingResult(event);
+    return event;
+  });
   // Every intermediate scene is a preview. Carry its cumulative effects
   // forward, and commit only when the final confirmation closes this chain.
   const hasSameChainFollowUp = followUpEvents.some((event) => event.chainId === resolvedEvent.chainId);
@@ -571,6 +567,7 @@ export function applyQueuedEventEffects(
       description: recordedEvent.description,
       narrativeNames: getEventNarrativeNames(recordedEvent, state),
       paperReviewPresentation: resolvedEvent.paperReviewPresentation,
+      journalAcceptancePresentation: resolvedEvent.journalAcceptancePresentation,
       thesisReviewPresentation: resolvedEvent.thesisReviewPresentation,
       choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason }) => ({ id, label, outcome, disabledReason })),
       selectedChoiceId: choice.id,
@@ -579,8 +576,8 @@ export function applyQueuedEventEffects(
   ];
   const followUpResult = enqueueResolvedEventFollowUps(
     nextState,
-    choice,
-    resolvedEnqueueEvents,
+    { ...choice, effects: { ...choice.effects, enqueueEvents: followUpEvents } },
+    [],
     resolvedEvent.chainId,
     resolvedHistory,
     deferredStatePatch,

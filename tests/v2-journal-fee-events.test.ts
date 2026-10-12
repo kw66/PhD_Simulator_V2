@@ -7,6 +7,8 @@ import { dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { applyPublicationTalentRewards } from "../src/core/v2-publication-talent";
 import { JOURNAL_PUBLICATION_FEES } from "../src/core/v2-publication-fees";
+import { renderApp } from "../src/app/v2-render";
+import { renderJournalAcceptanceEvent } from "../src/app/v2-render-paper-review";
 import type { GameState, JournalTarget, Paper, PendingEvent } from "../src/core/v2-types";
 
 function makeState(journalTarget: JournalTarget = "pami"): GameState {
@@ -34,6 +36,59 @@ function confirmation(state: GameState, mode: "self" | "advisor"): PendingEvent 
 afterEach(() => vi.restoreAllMocks());
 
 describe("player journal fee events", () => {
+  it("keeps local papers out of global statistics and long histories horizontal", () => {
+    const state = makeState();
+    const current = { ...state.externalPublications[0]!, submittedYear: 1, submittedMonth: 3, acceptedTotalMonths: 5,
+      journalScoreHistory: [{ totalMonths: 3, score: 90 }, { totalMonths: 5, score: 125 }] };
+    const earlier = { ...current, id: "earlier-journal", idea: 50, experiment: 50, writing: 50,
+      submittedMonth: 1, acceptedTotalMonths: 4, journalScoreHistory: [{ totalMonths: 1, score: 90 }, { totalMonths: 4, score: 150 }] };
+    state.externalPublications = [current, earlier];
+    const root = createJournalFeeEvent(state, current)!;
+    expect(root.journalAcceptancePresentation?.journalTarget).toBe("pami");
+    expect(root.journalAcceptancePresentation).not.toHaveProperty("runStats");
+    const timeline = follow(root, "continue").journalAcceptancePresentation!;
+    const longHistory = { ...timeline, scoreHistory: Array.from({ length: 25 }, (_, index) => ({ totalMonths: index + 1, score: 90 + index * 2 })) };
+    const html = renderJournalAcceptanceEvent(longHistory, "");
+    expect(html).toContain("journal-chart-scroll");
+    expect(html.match(/class="journal-chart-dot/g)).toHaveLength(25);
+    expect(html).not.toContain("<ol>");
+    expect(html).toContain('width="946"');
+  });
+
+  it("shows the saved submission timeline and retains it in completed event history", () => {
+    const state = makeState();
+    state.externalPublications[0] = { ...state.externalPublications[0]!, submittedMonth: 3, submittedYear: 1,
+      journalScoreHistory: [{ totalMonths: 3, score: 90 }, { totalMonths: 4, score: 108 }, { totalMonths: 5, score: 125 }] };
+    const root = createJournalFeeEvent(state, state.externalPublications[0]!)!;
+    expect(root.journalAcceptancePresentation).toMatchObject({ stage: "overview", journalName: "顶刊PAMI", journalTarget: "pami", submissionScore: 90,
+      acceptanceScore: 125, acceptanceThreshold: 125 });
+    let current = { ...state, eventQueue: [createEventQueueItem(root, state.totalMonths)] };
+    const openHtml = renderApp(current, undefined, { activePlayTab: "events", activeEventId: root.id,
+      isEventContentOpen: true });
+    expect(openHtml).toContain("journal-run-stats-grid");
+    expect(openHtml).toContain("所有玩家统计");
+    expect(openHtml).toContain("统计暂未同步");
+    expect(openHtml).not.toContain("本局 · 顶刊PAMI统计");
+    expect(openHtml).not.toContain("journal-score-chart");
+    for (const choiceId of ["continue", "self", "confirm"]) {
+      const event = current.eventQueue[0]!;
+      current = dispatchAction(current, "resolve-event", { eventId: event.id, eventChoiceId: choiceId });
+      if (choiceId === "continue") {
+        expect(current.eventQueue[0]?.journalAcceptancePresentation?.stage).toBe("timeline");
+        const chartHtml = renderApp(current, undefined, { activePlayTab: "events", activeEventId: current.eventQueue[0]!.id,
+          isEventContentOpen: true });
+        expect(chartHtml).toContain("journal-score-chart");
+        expect(chartHtml).toContain("投稿 90");
+      }
+    }
+    const history = current.eventHistory.find((entry) => entry.chainId === root.chainId)!;
+    expect(history.stages[0]?.journalAcceptancePresentation?.scoreHistory).toEqual(root.journalAcceptancePresentation?.scoreHistory);
+    expect(renderApp(current, undefined, { activePlayTab: "events", activeEventHistoryId: history.id,
+      activeEventHistoryIndex: 0, isEventContentOpen: true })).toContain("journal-run-stats-grid");
+    expect(renderApp(current, undefined, { activePlayTab: "events", activeEventHistoryId: history.id,
+      activeEventHistoryIndex: 1, isEventContentOpen: true })).toContain("journal-score-chart");
+  });
+
   it.each([["pami", 5], ["nmi", 10], ["nature", 20]] as const)("offers the %s fee %s through three stages without early payment", (journal, fee) => {
     const state = makeState(journal);
     const snapshot = structuredClone(state);
@@ -42,7 +97,7 @@ describe("player journal fee events", () => {
     const root = createJournalFeeEvent(state, state.externalPublications[0]!)!;
     expect(root).toMatchObject({ stage: "act1", blocking: true, deadlineMonths: 0,
       journalFeePreview: { paperId: "journal-paper", stage: "act1" } });
-    expect(root.description.split("\n\n")).toHaveLength(2);
+    expect(root.description).toBe("");
     expect(root.choices.map(({ id, label }) => ({ id, label }))).toEqual([{ id: "continue", label: "继续" }]);
     const decision = follow(root, "continue");
     expect(decision).toMatchObject({ stage: "act2", chainId: root.chainId });
@@ -163,23 +218,24 @@ describe("player journal fee events", () => {
   it("uses actual submission snapshots for revision prose without scores or invented rounds", () => {
     const state = makeState();
     const paper = state.externalPublications[0]!;
-    const revised = createJournalFeeEvent(state, paper)!;
+    const revised = confirmation(state, "self");
     expect(revised.description).toContain("补做的实验");
     expect(revised.description).toContain("回复审稿意见");
     expect(revised.description).not.toMatch(/三项合计|\d+\s*分|大修|小修|第\d+轮/);
-    const writingOnly = createJournalFeeEvent(state, { ...paper, submittedIdea: 40, submittedExperiment: 40 })!;
+    const writingOnly = confirmation({ ...state, externalPublications: [{ ...paper, submittedIdea: 40, submittedExperiment: 40 }] }, "self");
     expect(writingOnly.description).toContain("改过的段落");
     expect(writingOnly.description).not.toContain("补做的实验");
-    const immediate = createJournalFeeEvent(state, { ...paper, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 45 })!;
+    const immediate = confirmation({ ...state, externalPublications: [{ ...paper, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 45 }] }, "self");
     expect(immediate.description).toContain("投稿前整理实验记录");
     expect(immediate.description).not.toMatch(/投稿后的修改|回复审稿意见|第\d+轮/);
-    const archived = createJournalFeeEvent(state, { ...paper, journalTarget: null,
+    const archivedPaper = { ...paper, journalTarget: null,
       submittedIdea: null, submittedExperiment: null, submittedWriting: null,
-      publication: { journalTarget: "nature", citations: 0, effectiveScore: 500, citationDebuffMultiplier: 1 } })!;
+      publication: { journalTarget: "nature" as const, citations: 0, effectiveScore: 500, citationDebuffMultiplier: 1 } };
+    const archived = confirmation({ ...state, externalPublications: [archivedPaper] }, "self");
     expect(archived.description).toContain("Nature");
     expect(archived.description).toContain("投稿前整理实验记录");
     expect(archived.description).not.toMatch(/三项合计|\d+\s*分|回复审稿意见/);
-    expect(follow(follow(archived, "continue"), "self").choices[0]!.outcome).toBe("金币 -20");
+    expect(archived.choices[0]!.outcome).toBe("金币 -20");
   });
 
   it.each([

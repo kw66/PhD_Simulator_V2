@@ -40,7 +40,7 @@ function contactName(id: string, previousName?: string): string {
 
 export function createConferenceMentorContact(seed: ContactSeed = defaultSeed): ConferenceMentorContact {
   const id = contactId("mentor", seed);
-  return { id, name: contactName(id), level: Math.floor(normalizeRoll(seed.levelRoll) * 3) as 0 | 1 | 2, cooperationCount: 0 };
+  return { id, name: contactName(id), level: 2, cooperationCount: 0 };
 }
 
 export function createConferenceScholarContact(type: LoverTypeId, seed: ContactSeed = defaultSeed): ConferenceScholarContact {

@@ -131,6 +131,8 @@ export interface AdvisorProgressState {
   funding: number;
   horizontalProgress?: number;
   verticalProgress?: number;
+  playerProjectCompletions: Record<"horizontal" | "vertical", number>;
+  playerProjectParticipation: Record<"horizontal" | "vertical", boolean>;
   nextProject?: "horizontal" | "vertical";
   awards: AdvisorGrantAward[];
   pendingApplication: AdvisorGrantApplication | null;

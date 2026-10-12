@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootstrapDebugWindow, createDebugWindow, isDebugWindowActionData } from "../src/app/v2-debug-window";
 import { renderDebugPanel } from "../src/app/v2-render-debug-panel";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
-import { DEBUG_EVENT_GROUPS, DEBUG_MONTH_DELTAS, DEBUG_STAT_GROUPS } from "../src/core/v2-debug-tools";
+import { DEBUG_COMPLETED_EVENT_IDS, DEBUG_EVENT_GROUPS, DEBUG_MONTH_DELTAS, DEBUG_STAT_GROUPS } from "../src/core/v2-debug-tools";
 import { createRelationshipTooltips } from "../src/app/v2-relationship-tooltips";
 
 vi.mock("../src/app/v2-relationship-tooltips", () => ({
@@ -71,10 +71,18 @@ describe("independent debug window", () => {
       expect(paperGroup).toContain(`data-event-id="${id}"`);
       expect(paperGroup).toContain(label);
     }
+    for (const id of ["conference-activity-a", "conference-activity-b", "conference-activity-c",
+      "internship-invite", "joint-training-invite", "lover-beautiful", "lover-smart"]) {
+      expect(DEBUG_COMPLETED_EVENT_IDS).toContain(id);
+      expect(paperGroup).toMatch(new RegExp(`[^>]*data-event-id="${id}"[^>]*>[^<]* ✓<\\/button>`));
+    }
     expect(paperGroup).not.toContain('data-event-id="thesis-progress"');
     expect(graduationGroup).toContain('data-event-id="thesis-progress"');
-    expect(graduationGroup).toContain("毕业盲审");
-    expect(graduationGroup).toContain('data-event-id="career-internet"');
+    expect(graduationGroup).toContain("盲审结果");
+    expect(graduationGroup).toContain('data-event-id="career-recruitment"');
+    expect(graduationGroup).toContain("找工作");
+    expect(graduationGroup).not.toContain("招聘季");
+    expect(graduationGroup).not.toContain('data-event-id="career-internet"');
     expect(html).not.toContain("招聘相关");
     expect(html).toContain("年会活动");
   });
@@ -110,6 +118,9 @@ describe("independent debug window", () => {
     expect(html).toContain("新sota ✓");
     expect(html).toContain("显卡故障 ✓");
     expect(html).toContain("署名风波 ✓");
+    expect(html).toContain("期刊中稿 ✓");
+    expect(html).toContain("盲审结果 ✓");
+    expect(html).toContain("找工作 ✓");
     expect(renderDebugPanel({ ...state, eventHistory: [] }, true)).toContain("读研之始 ✓");
     expect(renderDebugPanel({ ...state, eventHistory: [] }, true)).toContain("教师节 ✓");
   });

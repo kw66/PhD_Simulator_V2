@@ -698,7 +698,7 @@ describe("minimal game engine", () => {
       .some((event) => event.chainId === "phd-decision")).toBe(false);
     for (const state of [secondYear, thirdYear]) {
       expect(collectFixedEventsForState(state, () => 0.5).map((event) => event.chainId))
-        .toEqual([`ccig-y${state.year}-m9`, "phd-decision"]);
+        .toEqual([`ccig-y${state.year}-m9`, "phd-decision", ...(state.year === 3 ? ["career-recruitment-33"] : [])]);
       expect(collectFixedEventsForState({ ...state, month: 10, totalMonths: state.totalMonths + 1 }, () => 0.5)
         .some((event) => event.chainId === "phd-decision")).toBe(false);
     }

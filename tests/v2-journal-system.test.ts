@@ -79,6 +79,23 @@ describe("v2 journal system", () => {
     expect(submitted.log[0]?.text).toContain("送审子刊NMI");
   });
 
+  it("records actual journal scores through revisions and acceptance", () => {
+    const state = playingState();
+    const paper = { ...createDraftPaper(1, 0), idea: 30, experiment: 30, writing: 30 };
+    const submitted = submitJournalPaper({ ...state, papers: [paper] }, paper.id, "pami");
+    expect(submitted.papers[0]?.journalScoreHistory).toEqual([{ totalMonths: 1, score: 90 }]);
+    const revised = resolveReadyJournalPapers({ ...submitted, totalMonths: 2, month: 2,
+      papers: [{ ...submitted.papers[0]!, idea: 35 }] }).state;
+    expect(revised.papers[0]?.journalScoreHistory).toEqual([
+      { totalMonths: 1, score: 90 }, { totalMonths: 2, score: 95 },
+    ]);
+    const accepted = resolveReadyJournalPapers({ ...revised, totalMonths: 3, month: 3,
+      papers: [{ ...revised.papers[0]!, experiment: 65 }] }).state;
+    expect(accepted.externalPublications[0]?.journalScoreHistory).toEqual([
+      { totalMonths: 1, score: 90 }, { totalMonths: 2, score: 95 }, { totalMonths: 3, score: 130 },
+    ]);
+  });
+
   it("renders journal entries with both thresholds and enables eligible submissions", () => {
     const state = playingState();
     const paper = { ...createDraftPaper(1, 0), idea: 40, experiment: 40, writing: 40 };

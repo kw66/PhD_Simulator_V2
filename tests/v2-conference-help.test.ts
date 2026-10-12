@@ -71,28 +71,24 @@ describe("conference and invitation help", () => {
 
   it("separates random enterprise offers from the unchanged remote internship", () => {
     const enterprise = pageText(talentHelp.pages, "大厂实习");
-    expect(enterprise).toContain("持续6个月");
-    expect(enterprise).toContain("每份offer随机确定基础工资0～2金币、每月SAN消耗4～6、实验固定加分4～6");
-    expect(enterprise).toContain("每月工资=min（offer基础工资+当前已发表一作A类论文篇数，6）");
-    expect(enterprise).toContain("论文篇数按当月成果重算");
-    expect(enterprise).toContain("实验倍率×1.25，再加offer固定分");
-    expect(enterprise).toContain("每次实验费用减2，最低0");
+    expect(enterprise).toContain("公司与大致方向在邀请第二幕确定，具体岗位和待遇在第三幕确定");
+    expect(enterprise).toContain("每月按当时已发表的一作A类论文篇数重新计算");
+    expect(enterprise).not.toContain("先乘倍率，再加固定分");
+    expect(pageText(getPlayHelpContext({ activePlayTab: "workstation" }).pages, "科研分数计算"))
+      .toContain("先合并倍率，再加固定分");
+    expect(enterprise).toContain("公司名称不决定工资");
+    expect(enterprise).not.toContain("每月SAN消耗4～6");
     const remote = pageText(talentHelp.pages, "远程实习");
-    expect(remote).toContain("获准次月起持续3个月，每月工资1金币、固定SAN-2");
-    expect(remote).toContain("实验固定+4分、倍率×1");
-    expect(remote).toContain("每次实验费用减1，最低0");
+    expect(remote).toContain("获准后从次月起持续3个月");
+    expect(remote).toContain("固定SAN消耗与即时行动消耗分开结算");
   });
 
   it("uses one training level and invitation-time citations with a saved one-time reward", () => {
     const text = pageText(talentHelp.pages, "大牛联培");
-    expect(text).toContain("邀请随机等级0～2");
-    expect(text).toContain("想idea与写论文的永久加分同为4+等级，即各+4～6分，两项同档");
-    expect(text).toContain("科研上限增加=min（等级+⌊邀请时总引用/200⌋，6）");
-    expect(text).toContain("引用在邀请时冻结，接受时不重算");
-    expect(text).toContain("接受后在结果页确认领取，保存导师与奖励");
-    expect(text).toContain("之后刷新或再次确认不重复发放");
-    expect(text).toContain("未激活时卡片只显示奖励范围");
-    expect(text).toContain("激活后显示已保存的实际奖励");
+    expect(text).toContain("使用邀请时的总引用计算，接受时不重算");
+    expect(text).toContain("第三幕按具体团队的投入程度确定");
+    expect(text).toContain("想idea和写论文获得同一档位的永久加分");
+    expect(text).toContain("结果页确认后发放一次");
     const related = [...relationshipHelp.pages, ...talentHelp.pages]
       .map((page) => `${page.summary}${page.body}`).join("\n");
     expect(related).not.toMatch(/两次深入合作|两次深合作|永久关闭|机会剩余|永久各\+5|每满300|保底\+1|最多\+5|预计奖励|min（1\+一作A/);

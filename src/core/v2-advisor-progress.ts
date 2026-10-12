@@ -36,6 +36,8 @@ export function createAdvisorProgressState(): AdvisorProgressState {
     funding: 30,
     horizontalProgress: 0,
     verticalProgress: 0,
+    playerProjectCompletions: { horizontal: 0, vertical: 0 },
+    playerProjectParticipation: { horizontal: false, vertical: false },
     nextProject: "horizontal",
     monthlyActivity: "暂无项目安排",
     awards: [],
@@ -186,7 +188,7 @@ export function advanceAdvisorProject(
       ...(projectType === "horizontal" ? { lastHorizontalTotalMonths: state.totalMonths } : {}),
     },
   }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN -${sanCost}，进度 +${progress}`, "advisor-project-action");
-  return advanceSharedLabProject(paidState, projectType, progress, random).state;
+  return advanceSharedLabProject(paidState, projectType, progress, random, "player").state;
 }
 
 export function getAdvisorGrantResultContext(state: GameState, application: AdvisorGrantApplication): AdvisorGrantResultContext {

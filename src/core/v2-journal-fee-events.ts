@@ -1,6 +1,6 @@
-import { getJournalDefinition } from "./v2-journal-system";
+import { getJournalDefinition, getJournalScore } from "./v2-journal-system";
 import { JOURNAL_PUBLICATION_FEES } from "./v2-publication-fees";
-import type { GameState, JournalTarget, Paper, PendingEvent } from "./v2-types";
+import type { GameState, JournalAcceptancePresentation, JournalScoreHistoryEntry, JournalTarget, Paper, PendingEvent } from "./v2-types";
 
 type PaymentMode = "self" | "advisor";
 type FeeStage = "act1" | "act2" | "act3";
@@ -34,14 +34,16 @@ function createFeeStage(paper: Paper, stage: FeeStage, title: string, descriptio
 
 function createPaymentConfirmation(state: GameState, paper: Paper, mode: PaymentMode): PendingEvent {
   const fee = JOURNAL_PUBLICATION_FEES[getJournalTarget(paper)!];
+  const journalName = getJournalDefinition(getJournalTarget(paper)!).name.replace(/^(顶刊|子刊)/u, "");
   const result = `${mode === "self" ? "金币" : "科研经费"} -${fee}`;
   const event = createFeeStage(paper, "act3", "期刊中稿 ➜ 缴费方式 ➜ 缴费确认", [
     mode === "self"
-      ? `你决定自己支付《${paper.title}》的版面费。重新打开编辑部的邮件，附件里除了缴费单，还有排版和校样的说明；明明已经中稿，🧾待办列表却还没有清空。`
-      : `你把《${paper.title}》的录用通知和缴费单整理好，准备使用导师的科研经费支付。填表时又翻出投稿邮件，🧾论文题目、作者信息和收款单位都得一项项对上。`,
+      ? `你决定自己支付《${paper.title}》在${journalName}的版面费。重新打开编辑部的邮件，附件里除了缴费单，还有排版和校样的说明；明明已经中稿，🧾待办列表却还没有清空。`
+      : `你把《${paper.title}》在${journalName}的录用通知和缴费单整理好，准备使用导师的科研经费支付。填表时又翻出投稿邮件，🧾论文题目、作者信息和收款单位都得一项项对上。`,
     mode === "self"
       ? "你对着账户余额犹豫了片刻，又把金额和论文信息核对一遍。 💰缴费页面还停在确认按钮前，桌边那份改过许多遍的稿子终于可以先合上，等校样来了再打开。"
       : "你把表格检查完，顺手给录用邮件加上星标。这篇稿子占了很久的工位和心思，眼下终于走到出版手续；确认支付后，🗂️便能把缴费凭据和定稿一起归档。",
+    getRevisionSummary(paper),
     `机制结算\n结果：${result}`,
   ].join("\n\n"));
   return {
@@ -64,10 +66,9 @@ function createPaymentConfirmation(state: GameState, paper: Paper, mode: Payment
 function createPaymentDecision(state: GameState, paper: Paper): PendingEvent {
   const fee = JOURNAL_PUBLICATION_FEES[getJournalTarget(paper)!];
   return {
-    ...createFeeStage(paper, "act2", "期刊中稿 ➜ 缴费方式", [
-      `《${paper.title}》的版面费为 ${fee} 金币。你翻开缴费单，🤔想了想这笔钱从哪里出。`,
-      "可以自己支付，💰也可以使用导师的科研经费。",
-    ].join("\n\n")),
+    ...createFeeStage(paper, "act2", "期刊中稿 ➜ 缴费方式",
+      `《${paper.title}》的版面费为 ${fee} 金币。你核对缴费单，🤔决定是自己支付，还是使用导师的科研经费。`),
+    journalAcceptancePresentation: getJournalPresentation(state, paper, "timeline"),
     choices: (["self", "advisor"] as const).map((mode) => ({
       id: mode, label: mode === "self" ? "自费" : "导师经费",
       outcome: `${mode === "self" ? "金币" : "科研经费"} -${fee}`,
@@ -90,15 +91,44 @@ function getRevisionSummary(paper: Paper): string {
   return "你想起投稿前整理实验记录、核对图表和反复打磨文字的那些晚上，提交前连图注和参考文献都重新检查了一遍。 📝如今录用通知真的到了，你把稿件和邮件收进同一个文件夹，接着点开编辑部发来的版面费通知。";
 }
 
+function getScoreHistory(paper: Paper, totalMonths: number): JournalScoreHistoryEntry[] {
+  if (paper.journalScoreHistory?.length) return paper.journalScoreHistory.map((entry) => ({ ...entry }));
+  const submittedScore = [paper.submittedIdea, paper.submittedExperiment, paper.submittedWriting]
+    .every((score) => typeof score === "number")
+    ? paper.submittedIdea! + paper.submittedExperiment! + paper.submittedWriting! : null;
+  const submittedAt = typeof paper.submittedYear === "number" && typeof paper.submittedMonth === "number"
+    ? (paper.submittedYear - 1) * 12 + paper.submittedMonth : null;
+  const history: JournalScoreHistoryEntry[] = submittedScore !== null && submittedAt !== null && submittedAt <= totalMonths
+    ? [{ totalMonths: submittedAt, score: submittedScore }] : [];
+  const acceptedScore = getJournalScore(paper);
+  if (history.at(-1)?.score !== acceptedScore || history.at(-1)?.totalMonths !== totalMonths) {
+    history.push({ totalMonths, score: acceptedScore });
+  }
+  return history;
+}
+
+function getJournalPresentation(state: GameState, paper: Paper, stage: JournalAcceptancePresentation["stage"]): JournalAcceptancePresentation {
+  const journal = getJournalDefinition(getJournalTarget(paper)!);
+  const scoreHistory = getScoreHistory(paper, paper.acceptedTotalMonths ?? state.totalMonths);
+  return {
+    stage,
+    paperTitle: paper.title,
+    journalName: journal.name,
+    journalTarget: journal.id,
+    submissionScore: scoreHistory[0]?.score ?? getJournalScore(paper),
+    acceptanceScore: scoreHistory.at(-1)?.score ?? getJournalScore(paper),
+    submissionThreshold: journal.submissionScore,
+    acceptanceThreshold: journal.acceptanceScore,
+    scoreHistory,
+  };
+}
+
 export function createJournalFeeEvent(state: GameState, paper: Paper): PendingEvent | null {
   if (state.phase !== "playing" || !isEligiblePaper(paper) || hasPaid(state, paper.id)
     || state.debugSkippedJournalFeePaperIds?.includes(paper.id)) return null;
-  const journal = getJournalDefinition(getJournalTarget(paper)!);
   return {
-    ...createFeeStage(paper, "act1", "期刊中稿", [
-      `${journal.name}的录用通知到了：《${paper.title}》正式中稿。你盯着邮件里的录用字样看了两遍，又往下翻，确认没有漏掉什么附加要求。直到把消息发出去，🎉才发现自己终于松开了一直握着的鼠标。`,
-      getRevisionSummary(paper),
-    ].join("\n\n")),
+    ...createFeeStage(paper, "act1", "期刊中稿", ""),
+    journalAcceptancePresentation: getJournalPresentation(state, paper, "overview"),
     choices: [{ id: "continue", label: "继续", outcome: "选择缴费方式。",
       effects: { enqueueEvents: [createPaymentDecision(state, paper)] } }],
   };
