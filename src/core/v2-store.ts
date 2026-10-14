@@ -12,6 +12,7 @@ import { achievementRecordsChanged, loadRoleAchievementRecords, recordNewAchieve
 import { awardRoleExperience, getNextRoleLevelExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
 import { loadRoleRecords, recordRoleResult, recordRoleStart, saveRoleRecords } from "./v2-role-records";
 import { getTalentUpgradeReason, isRoleTalentImplemented, sanitizeRoleTalentAllocation } from "./v2-role-talent-definitions";
+import { ENABLE_TALENT_TEST_MODE } from "./v2-development-flags";
 import { loadRoleTalentAllocation, saveRoleTalentAllocation } from "./v2-role-talent-storage";
 import type { AccountProfile, DispatchPayload, GameActionId, GameState, RoleId } from "./v2-types";
 
@@ -73,6 +74,21 @@ function syncSetupSelection(state: GameState, selectedLobbyRoleId: DispatchPaylo
     ...state,
     setupSelectedRoleId: selectedLobbyRoleId ?? state.setupSelectedRoleId ?? state.selectedRoleId,
   };
+}
+
+function applyTalentTestMode(account: AccountProfile): AccountProfile {
+  if (!ENABLE_TALENT_TEST_MODE) return account;
+  const roleProgress = { ...account.roleProgress };
+  for (const roleId of Object.keys(roleProgress) as RoleId[]) {
+    if (!isRoleTalentImplemented(roleId)) continue;
+    roleProgress[roleId] = {
+      ...roleProgress[roleId],
+      unlocked: true,
+      level: MAX_ROLE_LEVEL,
+      exp: 0,
+    };
+  }
+  return { ...account, roleProgress };
 }
 
 export function createStore(options: { storage?: ExperienceStorage | null } = {}) {
@@ -159,6 +175,12 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
     },
     markCurrentRunAsDebugged(): void {
       if (state.phase === "playing") runUsedDebugPanel = true;
+    },
+    enableTalentTestMode(): void {
+      if (!ENABLE_TALENT_TEST_MODE) return;
+      accountProfile = applyTalentTestMode(accountProfile);
+      state = syncSetupSelection(state, accountProfile.selectedLobbyRoleId);
+      listeners.forEach((listener) => listener(state));
     },
     subscribe(listener: Listener): () => void {
       listeners.add(listener);

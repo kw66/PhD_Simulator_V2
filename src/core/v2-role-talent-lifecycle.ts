@@ -146,6 +146,14 @@ export function applyRoleTalentPhdTransfer(before: GameState, after: GameState):
       state = logTalent(state, { ...state, player: { ...state.player, money: roundMoney(state.player.money + gain) } }, id, name, "转博奖励");
     }
   } else if (state.selectedRoleId === "genius") {
+    // Freeze the publication snapshot before applying simultaneous transfer rewards.
+    if (level(state, "academic-confidence")) {
+      const count = new Set([...before.papers, ...before.externalPublications]
+        .filter((paper) => paper.status === "published" && paper.target === "A").map((paper) => paper.id)).size;
+      const reduction = precise(Math.min(0.6, count * 0.1));
+      state = { ...state, roleTalents: { ...state.roleTalents!, researchGrowthResistanceReduction: reduction } };
+      if (reduction) state = logTalent(state, state, "academic-confidence", "学术底气", `转博时已有${count}篇A类论文`, [`科研增长抵抗降低${Math.round(reduction * 100)}个百分点`]);
+    }
     // Award the cap before the simultaneous research reward so this batch can use it.
     const extraCap = aPapers * level(state, "boundless-study");
     state = logTalent(state, { ...state, researchCapacityState: { ...state.researchCapacityState, otherCapBonus: state.researchCapacityState.otherCapBonus + extraCap } }, "boundless-study", "学无止境", `转博时已有${aPapers}篇一作A类论文`);

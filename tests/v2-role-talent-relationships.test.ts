@@ -90,6 +90,16 @@ describe("relationship role talent settlements", () => {
     expect(confirm(toResult(initial, assigned, "select-1"), assigned.chainId!).player.social).toBe(4);
   });
 
+  it("rank two overflow social grants two raw points through final event settlement", () => {
+    const initial = state("social", { "overflow-social": 2 }, [fellow(1), fellow(2), fellow(3), fellow(4)]);
+    initial.player.social = 18;
+    const root = createRandomEventById(14, initial, () => 0).event!;
+    const preview = toResult(initial, root, "-idea-");
+    expect(preview.player.social).toBe(18);
+    const result = confirm(preview, root.chainId!);
+    expect(result.player.social).toBe(18.8);
+  });
+
   it.each([0, 1, 2])("cancels a full-capacity reward when its recruit graduates after %i scenes", (scenes) => {
     let initial = state("social", { "overflow-social": 1 }, [fellow(1), fellow(2), fellow(3), fellow(4)]);
     initial = { ...initial, month: 10, totalMonths: 10, totalRandomEventCount: 4,

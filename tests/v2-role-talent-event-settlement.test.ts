@@ -48,14 +48,14 @@ describe("role talent event settlement", () => {
     expect(state.player.research).toBe(18);
   });
 
-  it("preserves zero-gain original requests so overflow raises the cap only on confirmation", () => {
+  it("preserves original requests so overflow fills the new cap only on confirmation", () => {
     let state = initial("normal", { breakthrough: 1 });
     state = { ...state, player: { ...state.player, research: 20 } };
     state = pending(state, { research: 0, rawResearch: 3 });
     expect(state.researchCapacityState.otherCapBonus).toBe(0);
     expect(state.roleTalents?.breakthroughCounts?.research ?? 0).toBe(0);
     state = confirm(state);
-    expect(state.player.research).toBe(20);
+    expect(state.player.research).toBe(21);
     expect(state.researchCapacityState.otherCapBonus).toBe(1);
     expect(state.roleTalents?.breakthroughCounts?.research).toBe(1);
   });

@@ -3,58 +3,30 @@ import { ROLE_DESIGNED_ACHIEVEMENTS } from "../src/core/v2-achievement-catalog";
 import { createDefaultAccountProfile, getAchievementDisplayPages, getRoleAchievementPageCount } from "../src/core/v2-lobby";
 import { getRoleAchievementDefinitions, getRoleLobbyAchievementDefinitions } from "../src/core/v2-role-lobby-meta";
 import { getRoleOptions } from "../src/core/v2-progression";
-import { getDesignedTalentNodes } from "../src/core/v2-role-talent-definitions";
 import { getAchievementGlobalPercentage, renderAchievementCard } from "../src/app/v2-render-achievement-progress";
 import { renderRoleRail } from "../src/app/v2-render-setup-screen";
 
 describe("achievement design preview", () => {
-  it("gives each designed role an independent roster of 20 to 30 conditions", () => {
-    const designedRoles = getRoleOptions().filter((role) => ROLE_DESIGNED_ACHIEVEMENTS[role.id]);
-    expect(designedRoles).toHaveLength(12);
-    const allIds: string[] = [];
-    for (const role of designedRoles) {
-      const own = getRoleAchievementDefinitions(role.id);
-      const displayed = getRoleLobbyAchievementDefinitions(role.id);
-      expect(displayed.length).toBeGreaterThanOrEqual(20);
-      expect(displayed.length).toBeLessThanOrEqual(30);
-      expect(own.every((item) => item.id.startsWith(`${role.id}:`))).toBe(true);
-      allIds.push(...displayed.map((item) => item.id));
-      for (const item of ROLE_DESIGNED_ACHIEVEMENTS[role.id]!) {
-        expect(item).toMatchObject({ requiredRoleId: role.id, previewOnly: true, rewardText: "" });
-        expect(item.unlocksRoleId).toBeUndefined();
-      }
-      for (const mirror of displayed.filter((item) => !own.some((entry) => entry.id === item.id))) {
-        expect(mirror.id).toBe(`unlock:${role.id}`);
-        expect(mirror.unlocksRoleId).toBe(role.id);
-        expect(mirror.description).toContain("使用大多数角色");
-        expect(mirror.rewardText).toContain("经验+5");
-      }
+  it("shows only the original six and user-confirmed normal achievements", () => {
+    expect(Object.keys(ROLE_DESIGNED_ACHIEVEMENTS)).toEqual(["normal"]);
+    expect(ROLE_DESIGNED_ACHIEVEMENTS.normal!.map(({ title, description }) => [title, description])).toEqual([
+      ["自强不息Ⅰ", "硕士期间科研能力达到6"],
+      ["自强不息Ⅱ", "硕士期间社交能力达到6"],
+      ["自强不息Ⅲ", "硕士期间导师好感达到6"],
+      ["突破极限", "科研|社交|导师好感任一项达到25"],
+      ["二次行动", "某个月拥有2个普通行动点"],
+      ["走火入魔", "同时触发燃烧生命α、β"],
+      ["我有多动症", "某个月行动4次（包括AI行动）"],
+      ["医学奇迹", "连续触发10次触底反弹"],
+      ["爱看论文", "看20次论文"],
+    ]);
+    for (const item of ROLE_DESIGNED_ACHIEVEMENTS.normal!) {
+      expect(item).toMatchObject({ requiredRoleId: "normal", previewOnly: true, rewardText: "" });
     }
-    expect(new Set(allIds).size).toBe(allIds.length);
-  });
-
-  it("keeps recurring main-story milestones role-local with appropriate different targets", () => {
-    for (const items of Object.values(ROLE_DESIGNED_ACHIEVEMENTS)) {
-      for (const code of ["R01", "R12", "C11", "T01", "T02"]) {
-        expect(items.filter((item) => item.designCode === code)).toHaveLength(1);
-      }
-    }
-    for (const code of ["R12", "C11"]) {
-      const conditions = Object.values(ROLE_DESIGNED_ACHIEVEMENTS).map((items) => items.find((item) => item.designCode === code)!.description);
-      expect(new Set(conditions).size).toBeGreaterThan(1);
-    }
-  });
-
-  it("does not assign another character's exclusive talent to a role condition", () => {
-    const roles = getRoleOptions().filter((role) => ROLE_DESIGNED_ACHIEVEMENTS[role.id]);
-    for (const role of roles) {
-      const ownNames = new Set((getDesignedTalentNodes(role.id) ?? []).map((node) => node.name));
-      const foreignNames = roles.filter((other) => other.id !== role.id)
-        .flatMap((other) => getDesignedTalentNodes(other.id) ?? [])
-        .map((node) => node.name).filter((name) => !ownNames.has(name));
-      for (const item of ROLE_DESIGNED_ACHIEVEMENTS[role.id]!) {
-        for (const name of foreignNames) expect(item.description, `${role.id}: ${item.title}`).not.toContain(name);
-      }
+    expect(getRoleAchievementDefinitions("normal")).toHaveLength(15);
+    for (const role of getRoleOptions().filter(role => role.id !== "normal")) {
+      expect(getRoleAchievementDefinitions(role.id)).toHaveLength(0);
+      expect(getRoleLobbyAchievementDefinitions(role.id).every(item => item.id === "unlock:" + role.id)).toBe(true);
     }
   });
 
@@ -63,7 +35,7 @@ describe("achievement design preview", () => {
       const pages = getAchievementDisplayPages(role.id);
       const items = pages.flatMap((page) => page.achievements);
       expect(items.map((item) => item.id)).toEqual(getRoleLobbyAchievementDefinitions(role.id).map((item) => item.id));
-      expect(pages.every((page) => page.achievements.length <= 6)).toBe(true);
+      expect(pages.every((page) => page.achievements.length <= 9)).toBe(true);
       expect(pages.length).toBe(getRoleAchievementPageCount(role.id));
       const account = createDefaultAccountProfile();
       for (let index = 0; index < pages.length; index += 1) {
@@ -73,22 +45,22 @@ describe("achievement design preview", () => {
         expect(html).not.toContain("achievement-category-select");
         expect(html).not.toContain("通用成就");
       }
-      if (!ROLE_DESIGNED_ACHIEVEMENTS[role.id]) expect(items).toHaveLength(0);
+      if (!ROLE_DESIGNED_ACHIEVEMENTS[role.id]) expect(items.every(item => item.id.startsWith("unlock:"))).toBe(true);
     }
   });
 
   it("does not share completion of recurring achievements between characters", () => {
     const account = createDefaultAccountProfile();
-    account.roleProgress.normal.unlockedAchievementIds = ["normal:r01"];
+    account.roleProgress.normal.unlockedAchievementIds = ["normal:self-reliance-i"];
     const normalPages = getAchievementDisplayPages("normal");
-    account.lobbyRoleAchievementPage = normalPages.findIndex((page) => page.achievements.some((item) => item.id === "normal:r01"));
+    account.lobbyRoleAchievementPage = normalPages.findIndex((page) => page.achievements.some((item) => item.id === "normal:self-reliance-i"));
     const normalHtml = renderRoleRail(account, "normal", "achievements");
-    expect(normalHtml).toContain('aria-valuetext="1/27"');
-    expect(normalHtml).toContain('class="lobby-profile-achievement is-unlocked" data-achievement-id="normal:r01"');
+    expect(normalHtml).toContain('aria-valuetext="1/15"');
+    expect(normalHtml).toContain('class="lobby-profile-achievement is-unlocked" data-achievement-id="normal:self-reliance-i"');
     account.lobbyRoleAchievementPage = 0;
     const richHtml = renderRoleRail(account, "rich", "achievements");
-    expect(richHtml).toContain('aria-valuetext="0/27"');
-    expect(richHtml).toContain('data-achievement-id="rich:r01"');
+    expect(richHtml).toContain('aria-valuetext="0/1"');
+    expect(richHtml).not.toContain('data-achievement-id="normal:self-reliance-i"');
     expect(richHtml).not.toContain('class="lobby-profile-achievement is-unlocked"');
   });
 
@@ -99,7 +71,7 @@ describe("achievement design preview", () => {
       expect(item.rewardText).toMatch(/^经验\+5，解锁.+角色$/);
       expect(renderAchievementCard(item, false)).toContain(item.rewardText!);
     }
-    const fresh = ROLE_DESIGNED_ACHIEVEMENTS.rich![0];
+    const fresh = ROLE_DESIGNED_ACHIEVEMENTS.normal![0];
     expect(renderAchievementCard(fresh, false)).not.toContain("lobby-profile-achievement-reward");
   });
 

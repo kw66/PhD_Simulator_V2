@@ -10,6 +10,22 @@ function memoryStorage() {
 }
 
 describe("role talent allocation", () => {
+  it("supports revised levels, prices and the separate fourth-tier resistance paths", () => {
+    const normal = { "first-month-drive": 1, "self-determination": 12, breakthrough: 1 };
+    expect(sanitizeRoleTalentAllocation("normal", 10, normal)).toEqual(normal);
+    expect(getTalentPointBalance("normal", 10, normal)).toBe(5);
+    expect(getTalentUpgradeReason("normal", 10, { ...normal, "self-determination": 11 }, "self-determination")).toBeNull();
+    expect(getTalentUpgradeReason("normal", 10, normal, "self-determination")).toBe("已满级");
+    const genius = { "innate-insight": 1, "thirst-for-knowledge": 1, "boundless-study": 1 };
+    expect(getTalentUpgradeReason("genius", 10, genius, "academic-confidence")).toBeNull();
+    expect(getTalentUpgradeReason("genius", 10, genius, "rise-together")).not.toBeNull();
+    expect(getTalentUpgradeReason("genius", 10, { "proven-by-papers": 1 }, "rise-together")).toBeNull();
+    const mentor = { "near-the-source": 1, "family-patronage": 1, "mentor-insight": 1, "mentor-expectations": 3 };
+    expect(sanitizeRoleTalentAllocation("teacher-child", 10, mentor)).toEqual(mentor);
+    const social = { "supporting-juniors": 1, "peer-camaraderie": 1, "senior-mentorship": 1, "overflow-social": 2 };
+    expect(sanitizeRoleTalentAllocation("social", 10, social)).toEqual(social);
+  });
+
   it("uses the actual role level and unlocks a successor with one prerequisite level", () => {
     expect(getTalentPointBalance("normal", 0, {})).toBe(0);
     expect(getTalentPointBalance("normal", 2, { "first-month-drive": 1 })).toBe(3);

@@ -49,13 +49,13 @@ describe("lab annual growth", () => {
     state.player.research = 19.9;
     state.player.social = 20;
     const next = settleLabResearchGrowth(state);
-    expect(next.player.research).toBe(20);
-    expect(next.player.social).toBe(20);
+    expect(next.player.research).toBe(20.7);
+    expect(next.player.social).toBe(20.4);
     expect(next.researchCapacityState.otherCapBonus).toBe(1);
     expect(next.roleTalents?.capBonuses?.social).toBe(1);
     expect(next.roleTalents?.breakthroughCounts).toEqual({ research: 1, social: 1 });
     const following = settleLabResearchGrowth({ ...next, totalMonths: 24, year: 2 });
-    expect(following.player.social).toBe(20.4);
+    expect(following.player.social).toBe(20.8);
   });
 
   it.each([[6, 20, 1.6], [11.75, 20, 1.4], [18, 20, 0.8], [6, 6.25, 0.25], [20, 20, 0]])(

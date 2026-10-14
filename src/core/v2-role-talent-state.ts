@@ -19,6 +19,8 @@ export interface RoleTalentRunState {
   phdGranted?: boolean;
   /** Fixed additional kind-reviewer probability recorded at PhD transfer (0..1). */
   kindReviewerBonus?: number;
+  /** Growth-only reduction fixed from published A papers at PhD transfer (0..0.6). */
+  researchGrowthResistanceReduction?: number;
   capBonuses?: Partial<Record<PlayerAttribute, number>>;
   breakthroughCounts?: Partial<Record<PlayerAttribute, number>>;
   growthTotals?: Partial<Record<PlayerAttribute, number>>;

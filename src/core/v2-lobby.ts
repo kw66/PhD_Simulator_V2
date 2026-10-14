@@ -23,7 +23,7 @@ import type {
 
 export const LOBBY_ROLE_PAGE_SIZE = 10;
 export const LOBBY_ROLE_PAGE_ROW_COUNT = Math.max(1, Math.floor(LOBBY_ROLE_PAGE_SIZE / 2));
-export const ROLE_ACHIEVEMENT_PAGE_SIZE = 6;
+export const ROLE_ACHIEVEMENT_PAGE_SIZE = 9;
 const LOBBY_ROLE_ROWS: ReadonlyArray<ReadonlyArray<RoleId>> = [
   ["normal", "normal-reversed"],
   ["rich", "rich-reversed"],

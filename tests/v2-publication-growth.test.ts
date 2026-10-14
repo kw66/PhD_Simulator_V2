@@ -58,8 +58,8 @@ describe("v2 publication growth transparency", () => {
     state.player.social = 20;
     state.papers = [publishedPaper("C", "Poster"), { ...publishedPaper("C", "Poster", true), id: "coauthor" }];
     const next = applyPublicationTalentRewards(state);
-    expect(next.player.research).toBe(20);
-    expect(next.player.favor).toBe(20);
+    expect(next.player.research).toBe(20.4);
+    expect(next.player.favor).toBe(20.4);
     expect(next.player.social).toBe(20.4);
     expect(next.researchCapacityState.otherCapBonus).toBe(1);
     expect(next.roleTalents?.capBonuses).toEqual({ social: 2, favor: 1 });

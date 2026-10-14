@@ -3408,6 +3408,8 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="writing-mastery"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-work"] { --tree-tone: #a1738f; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="rise-together"] { --tree-tone: #6c9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="academic-confidence"] { --tree-tone: #b48b38; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="mentor-expectations"] { --tree-tone: #b47e83; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="near-the-source"] { --tree-tone: #b18a54; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-familiarity"] { --tree-tone: #bb718a; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="family-host"] { --tree-tone: #bd9445; }
@@ -3902,7 +3904,7 @@ button.pager-arrow:disabled {
 
 .lobby-profile-achievement-section {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   height: 100%;
   min-height: 0;
@@ -3925,7 +3927,8 @@ button.pager-arrow:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 38px;
   padding: 0 12px;
   overflow: hidden;
@@ -3952,7 +3955,6 @@ button.pager-arrow:disabled {
   z-index: 1;
 }
 
-.achievement-personal-rate,
 .achievement-global-rate {
   color: #7c6536;
   font-family: var(--ui-font-cjk);
@@ -3965,31 +3967,12 @@ button.pager-arrow:disabled {
 .achievement-global-rate { min-width: 40px; text-align: right; }
 .achievement-global-rate.is-pending { color: #918779; font-weight: 500; }
 
-.achievement-browse-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 2px 0 10px;
-}
-
 .achievement-page-index {
   min-width: 30px;
   text-align: center;
   color: var(--ink-soft);
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
-}
-
-.lobby-profile-achievement-title-block {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.lobby-profile-achievement-title-block span {
-  white-space: nowrap;
 }
 
 .lobby-role-pagination.is-compact {

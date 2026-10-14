@@ -41,8 +41,9 @@ export function getFellowOverflowEffects(state: GameState, candidate?: FellowPro
 }
 
 export function getFellowOverflowOutcome(state: GameState): string {
+  const rank = getRoleTalentLevel(state, "overflow-social");
   return state.selectedRoleId === "social" && getRoleTalentLevel(state, "overflow-social") > 0
-    ? `条件：人际栏已满｜结果：${formatTierResistedOutcome("社交", 1, previewPlayerAttributeChange(state, "social", 1))}`
+    ? `条件：人际栏已满｜结果：${formatTierResistedOutcome("社交", rank, previewPlayerAttributeChange(state, "social", rank))}`
     : "条件：人际栏已满｜结果：无事发生。";
 }
 
@@ -55,7 +56,7 @@ export function settleFellowRecruitmentTalent(before: GameState, after: GameStat
   }
   if (after.selectedRoleId === "social" && getRoleTalentLevel(after, "overflow-social") > 0
     && !canAddRelationship(after.relationshipState, "peer")) {
-    for (let index = 0; index < overflowAttempts; index++) after = applyPlayerAttributeChange(after, "social", 1).state;
+    for (let index = 0; index < overflowAttempts; index++) after = applyPlayerAttributeChange(after, "social", getRoleTalentLevel(after, "overflow-social")).state;
   }
   return after;
 }

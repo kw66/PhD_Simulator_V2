@@ -26,6 +26,16 @@ describe("session store", () => {
     expect(store.getState().selectedRoleId).toBe("normal");
   });
 
+  it("enables the temporary talent test profile without preallocating nodes", () => {
+    const store = createStore();
+    store.enableTalentTestMode();
+    for (const roleId of ["normal", "rich", "genius", "social", "teacher-child", "chosen",
+      "normal-reversed", "rich-reversed", "genius-reversed", "social-reversed", "teacher-child-reversed", "chosen-reversed"] as const) {
+      expect(store.getLobbyState().roleProgress[roleId]).toMatchObject({ unlocked: true, level: 10, exp: 0 });
+      expect(store.getLobbyState().talentAllocation?.[roleId]).toBeUndefined();
+    }
+  });
+
   it("keeps display settings only for the current store session", () => {
     const store = createStore();
     expect(store.getLobbyState().dateDisplayMode).toBe("calendar");

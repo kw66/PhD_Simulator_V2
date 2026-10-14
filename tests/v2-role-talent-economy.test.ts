@@ -64,7 +64,7 @@ describe("role talent monthly economy", () => {
     state.buffs = [1, -1].map((social, index) => ({ id: `test-${index}`, name: "test", source: "test",
       timing: "monthly", remainingMonths: 1, monthlyStats: { social } }));
     const result = applyMonthlyEffects(state);
-    expect(result.nextState.player.social).toBe(19.6);
+    expect(result.nextState.player.social).toBe(20);
     expect(result.nextState.roleTalents?.capBonuses?.social).toBe(1);
     expect(result.nextState.roleTalents?.breakthroughCounts?.social).toBe(1);
   });

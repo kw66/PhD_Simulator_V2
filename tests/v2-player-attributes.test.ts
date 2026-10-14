@@ -27,16 +27,42 @@ describe("shared player attribute settlement", () => {
     }
   });
 
-  it("raises each cap independently at most once per reward without refunding overflow", () => {
+  it("raises each cap once per reward, retains overflow within the new cap and has no lifetime limit", () => {
     let state = player("normal", { breakthrough: 1 });
     state.player = { ...state.player, research: 20, social: 20, favor: 20 };
     for (const stat of ["research", "social", "favor"] as const) {
       state = applyPlayerAttributeChange(state, stat, 100).state;
-      expect(state.player[stat]).toBe(20);
+      expect(state.player[stat]).toBe(21);
       expect(getPlayerAttributeCap(state, stat)).toBe(21);
       for (let i = 0; i < 11; i++) state = applyPlayerAttributeChange(state, stat, 100).state;
-      expect(getPlayerAttributeCap(state, stat)).toBe(30);
-      expect(state.roleTalents?.breakthroughCounts?.[stat]).toBe(10);
+      expect(state.player[stat]).toBe(32);
+      expect(getPlayerAttributeCap(state, stat)).toBe(32);
+      expect(state.roleTalents?.breakthroughCounts?.[stat]).toBe(12);
+    }
+  });
+
+  it("keeps fractional breakthrough overflow, with preview matching settlement", () => {
+    const state = player("normal", { breakthrough: 1 });
+    state.player.research = 20;
+    const preview = previewPlayerAttributeChange(state, "research", 1);
+    expect(preview).toMatchObject({ effectiveChange: 0.4, capIncrease: 1, cappedCount: 0 });
+    const settled = applyPlayerAttributeChange(state, "research", 1);
+    expect(settled.result).toEqual(preview);
+    expect(settled.state.player.research).toBe(20.4);
+    expect(getPlayerAttributeCap(settled.state, "research")).toBe(21);
+    expect(previewPlayerAttributeChange(state, "research", 1, "equalize").capIncrease).toBe(0);
+    expect(previewPlayerAttributeChange(state, "research", -1).capIncrease).toBe(0);
+  });
+
+  it("mentor expectations reduce only favor growth resistance at each rank", () => {
+    for (const rank of [1, 2, 3]) {
+      const state = player("teacher-child", { "mentor-expectations": rank });
+      state.player.favor = state.player.research = 18;
+      expect(previewPlayerAttributeChange(state, "favor", 1).effectiveChange).toBeCloseTo(0.4 + rank * 0.1);
+      expect(previewPlayerAttributeChange(state, "favor", -1).effectiveChange).toBe(-0.4);
+      expect(previewPlayerAttributeChange(state, "research", 1).effectiveChange).toBe(0.4);
+      state.player.favor = 1;
+      expect(previewPlayerAttributeChange(state, "favor", 1).effectiveChange).toBe(1);
     }
   });
 

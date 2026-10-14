@@ -25,6 +25,8 @@ export function getPlayerAttributeCap(state: GameState, stat: PlayerAttribute): 
 }
 
 export function getPlayerResistanceReduction(state: GameState, stat: PlayerAttribute, rawChange: number): number {
+  if (rawChange > 0 && state.selectedRoleId === "genius" && stat === "research") return state.roleTalents?.researchGrowthResistanceReduction ?? 0;
+  if (rawChange > 0 && state.selectedRoleId === "teacher-child" && stat === "favor") return getRoleTalentLevel(state, "mentor-expectations") * 0.1;
   if (state.selectedRoleId === "chosen" && rawChange > 0) return getRoleTalentLevel(state, "lasting-fortune") * 0.2;
   if (state.selectedRoleId !== "chosen-reversed") return 0;
   return getRoleTalentLevel(state, { research: "reverse-meter-alpha", social: "reverse-meter-beta", favor: "reverse-meter-gamma" }[stat]) * 0.1;
@@ -42,7 +44,7 @@ export function previewPlayerAttributeChange(
     ? delta - getRoleTalentLevel(state, "lower-favor-reset") : delta;
   const uncappedResearch = stat === "research" && state.selectedRoleId === "genius-reversed"
     && (state.roleTalents?.researchCurseBroken || (current >= 20 && getRoleTalentLevel(state, "break-research-curse") > 0));
-  const resolved = source === "reset"
+  let resolved = source === "reset"
     ? { effectiveChange: round(delta), resistedCount: 0, cappedCount: 0 }
     : applyTierResist(adjusted, current, undefined, source === "swap" || uncappedResearch ? Infinity : maximum,
       getPlayerResistanceReduction(state, stat, adjusted));
@@ -54,8 +56,14 @@ export function previewPlayerAttributeChange(
     cappedCount = round(cappedCount + excess);
   }
   const capIncrease = source === "ordinary" && delta > 0 && cappedCount > 0
-    && state.selectedRoleId === "normal" && getRoleTalentLevel(state, "breakthrough") > 0
-    && (state.roleTalents?.breakthroughCounts?.[stat] ?? 0) < 10 ? 1 : 0;
+    && state.selectedRoleId === "normal" && getRoleTalentLevel(state, "breakthrough") > 0 ? 1 : 0;
+  if (capIncrease) {
+    const expanded = applyTierResist(adjusted, current, undefined, maximum + capIncrease,
+      getPlayerResistanceReduction(state, stat, adjusted));
+    resolved = expanded;
+    effectiveChange = expanded.effectiveChange;
+    cappedCount = expanded.cappedCount ?? 0;
+  }
   const replacement = stat === "favor" ? "gold-power-beta" : stat === "social" ? "gold-power-gamma" : null;
   const quotedMoney = roundMoney(Math.abs(effectiveChange) * 2);
   const moneyCost = source === "ordinary" && effectiveChange < 0 && replacement !== null

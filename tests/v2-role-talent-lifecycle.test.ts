@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { applyPrepublicationPaperDecay, createDraftPaper } from "../src/core/v2-paper-rules";
-import { getPlayerAttributeCap } from "../src/core/v2-player-attributes";
+import { getPlayerAttributeCap, previewPlayerAttributeChange } from "../src/core/v2-player-attributes";
 import {
   initializeRoleTalents, applyRoleTalentAdvisorAssignment, applyRoleTalentPhdTransfer,
   settleRoleTalentMonthStart, settleRoleTalentYearEnd, syncRoleTalentFellows, settleRoleTalentDiseaseMilestones,
@@ -184,6 +184,31 @@ describe("role talent lifecycle", () => {
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
     expect(getPlayerAttributeCap(next, "research")).toBe(25);
     expect(next.player.research).toBeCloseTo(21.2);
+  });
+
+  it("freezes academic confidence from unique published A papers including coauthored papers before transfer growth", () => {
+    const before = run("genius", { "academic-confidence": 1, "proven-by-papers": 3, "boundless-study": 5 });
+    before.player.research = 20;
+    before.papers = [paper("a", "A"), paper("co", "A", true), paper("b", "B"), { ...paper("draft", "A"), status: "draft" }];
+    before.externalPublications = [paper("a", "A")];
+    expect(previewPlayerAttributeChange(before, "research", -1).effectiveChange).toBe(-0.4);
+    const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
+    expect(next.roleTalents?.researchGrowthResistanceReduction).toBe(0.2);
+    expect(next.player.research).toBeCloseTo(21.8);
+    expect(previewPlayerAttributeChange(next, "research", -1).effectiveChange).toBe(-0.4);
+    expect(previewPlayerAttributeChange(next, "research", 1).effectiveChange).toBe(0.6);
+    const later = { ...next, externalPublications: [...next.externalPublications, paper("later", "A")] };
+    expect(applyRoleTalentPhdTransfer(before, later)).toBe(later);
+    expect(later.roleTalents?.researchGrowthResistanceReduction).toBe(0.2);
+  });
+
+  it("academic confidence cannot turn resistance into bonus growth", () => {
+    const before = run("genius", { "academic-confidence": 1 });
+    before.papers = Array.from({ length: 8 }, (_, index) => paper(`a-${index}`, "A"));
+    before.player.research = 18;
+    const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
+    expect(next.roleTalents?.researchGrowthResistanceReduction).toBe(0.6);
+    expect(previewPlayerAttributeChange(next, "research", 1).effectiveChange).toBe(1);
   });
 
   it("each fellow receives the post-transfer boost once, including later recruits", () => {

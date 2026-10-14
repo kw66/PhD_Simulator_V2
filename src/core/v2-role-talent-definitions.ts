@@ -22,10 +22,10 @@ export interface DesignedTalentNode {
 
 export const NORMAL_TALENT_NODES = [
   { id: "first-month-drive", name: "满怀干劲", icon: "heart-plus", tier: 0, column: "1", row: "1 / 4", maxLevel: 3, cost: 1, effect: "首月结束后，下月初SAN回复+2/级", prerequisiteIds: [] },
-  { id: "self-determination", name: "我命由我", icon: "sunrise", tier: 1, column: "2", row: "1", maxLevel: 10, cost: 1, effect: "转博时科研、社交、导师好感提升10%/级，向上取整", prerequisiteIds: ["first-month-drive"] },
+  { id: "self-determination", name: "我命由我", icon: "sunrise", tier: 1, column: "2", row: "1", maxLevel: 12, cost: 1, effect: "转博时科研、社交、导师好感提升10%/级，向上取整", prerequisiteIds: ["first-month-drive"] },
   { id: "diligence", name: "勤能补拙", icon: "footprints", tier: 1, column: "2", row: "2", maxLevel: 10, cost: 1, effect: "转博后每月行动+0.1次/级，余数逐月累积", prerequisiteIds: ["first-month-drive"] },
   { id: "first-month-drive-plus", name: "满怀干劲+", icon: "zap", tier: 1, column: "2", row: "3", maxLevel: 5, cost: 1, effect: "除入学以外，每学期初SAN回复+1/级", prerequisiteIds: ["first-month-drive"] },
-  { id: "breakthrough", name: "突破极限", icon: "rocket", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 3, effect: "属性溢出时上限+1，最多+10", prerequisiteIds: ["self-determination"] },
+  { id: "breakthrough", name: "突破极限", icon: "rocket", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 2, effect: "每笔属性奖励溢出时上限+1，本次溢出可填入新增上限，累计不限", prerequisiteIds: ["self-determination"] },
   { id: "burning-life-alpha", name: "燃烧生命α", icon: "heart-crack", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 3, effect: "转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限", prerequisiteIds: ["diligence"] },
   { id: "burning-life-beta", name: "燃烧生命β", icon: "heart-pulse", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "转博后每月SAN不足时，免除1次SAN消耗，消耗1点SAN上限", prerequisiteIds: ["first-month-drive-plus"] },
   { id: "burnout", name: "触底反弹", icon: "flame", tier: 3, column: "4", row: "2 / 4", maxLevel: 1, cost: 3, effect: "每月初SAN上限低于8时，SAN上限+1", prerequisiteIds: ["burning-life-alpha", "burning-life-beta"] },
@@ -55,8 +55,9 @@ export const GENIUS_TALENT_NODES = [
   { id: "proven-by-papers", name: "以文证道", icon: "file-text", tier: 2, column: "3", row: "1", maxLevel: 3, cost: 2, effect: "转博时每篇一作A类论文，科研能力+1/级", prerequisiteIds: ["tireless-scholar"] },
   { id: "boundless-study", name: "学无止境", icon: "infinity", tier: 2, column: "3", row: "2", maxLevel: 5, cost: 1, effect: "转博时每篇一作A类论文，科研上限+1/级", prerequisiteIds: ["thirst-for-knowledge"] },
   { id: "writing-mastery", name: "妙笔成章", icon: "notebook-pen", tier: 2, column: "3", row: "3", maxLevel: 3, cost: 1, effect: "永久写论文+2分/级", prerequisiteIds: ["experiment-practice"] },
-  { id: "rise-together", name: "共攀高峰", icon: "users", tier: 3, column: "4", row: "1", maxLevel: 4, cost: 1, effect: "转博后同学的科研能力+1/级", prerequisiteIds: ["proven-by-papers", "boundless-study"] },
+  { id: "rise-together", name: "共攀高峰", icon: "users", tier: 3, column: "4", row: "1", maxLevel: 4, cost: 1, effect: "转博后同学的科研能力+1/级", prerequisiteIds: ["proven-by-papers"] },
   { id: "lasting-work", name: "历久弥新", icon: "hourglass", tier: 3, column: "4", row: "3", maxLevel: 5, cost: 1, effect: "转博后未发表论文分数每月衰减率减少3个百分点/级", prerequisiteIds: ["writing-mastery"] },
+  { id: "academic-confidence", name: "学术底气", icon: "award", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 3, effect: "转博时每篇已发表A类论文，使科研增长抵抗降低10个百分点，最低为0", prerequisiteIds: ["boundless-study"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const TEACHER_CHILD_TALENT_NODES = [
@@ -69,6 +70,7 @@ export const TEACHER_CHILD_TALENT_NODES = [
   { id: "mentor-insight", name: "名师点拨", icon: "book-open", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 2, effect: "导师协作分+50%/级", prerequisiteIds: ["family-patronage"] },
   { id: "funding-shield", name: "经费护航", icon: "store", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 3, effect: `科研经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}且足够支付时，购买AI优先使用经费`, prerequisiteIds: ["computing-support", "workspace-renewal"] },
   { id: "learning-by-osmosis", name: "耳濡目染", icon: "graduation-cap", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 6, effect: "转博后科研能力视为科研能力与导师好感的较大值", prerequisiteIds: ["mentor-insight"] },
+  { id: "mentor-expectations", name: "师门厚望", icon: "heart-handshake", tier: 3, column: "4", row: "2", maxLevel: 3, cost: 1, effect: "导师好感增长抵抗降低10个百分点/级，最低为0；下降不变", prerequisiteIds: ["mentor-insight"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const CHOSEN_TALENT_NODES = [
@@ -109,7 +111,7 @@ export const SOCIAL_TALENT_NODES = [
   { id: "junior-delegation", name: "借力后进", icon: "hand-helping", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 2, effect: "麻烦师弟师妹不扣社交", prerequisiteIds: [] },
   { id: "junior-bond", name: "投桃报李", icon: "heart-handshake", tier: 1, column: "2", row: "2", maxLevel: 3, cost: 1, effect: "麻烦师弟师妹默契+1/级", prerequisiteIds: ["junior-delegation"] },
   { id: "paper-camaraderie", name: "珠联璧合", icon: "file-heart", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 2, effect: "合作发表论文提升的默契+1/级", prerequisiteIds: ["junior-bond"] },
-  { id: "overflow-social", name: "人多势众", icon: "user-round-plus", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "人际栏同学溢出转为社交+1", prerequisiteIds: ["senior-mentorship"] },
+  { id: "overflow-social", name: "人多势众", icon: "user-round-plus", tier: 3, column: "4", row: "2", maxLevel: 2, cost: 2, effect: "人际栏同学溢出转为社交+1/级", prerequisiteIds: ["senior-mentorship"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const NORMAL_REVERSED_TALENT_NODES = [

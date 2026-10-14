@@ -238,14 +238,9 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
           aria-valuemin="0" aria-valuemax="${definitions.length || 1}" aria-valuenow="${unlockedCount}"
           aria-valuetext="${unlockedCount}/${definitions.length}">
           <span class="achievement-completion-fill" ${animationBarAttribute(`role:${selectedRoleId}:achievements:progress`)} style="width:${personalPercent}%;" aria-hidden="true"></span>
-          <div class="lobby-profile-achievement-title-block">
-            <span class="lobby-profile-achievement-progress-label">成就</span>
-            <strong class="lobby-profile-achievement-progress-count">${renderAnimatedNumber(`role:${selectedRoleId}:achievements:unlocked`, unlockedCount)}/${renderAnimatedNumber(`role:${selectedRoleId}:achievements:total`, definitions.length)}</strong>
-          </div>
-          <span class="achievement-personal-rate">${Number(personalPercent.toFixed(1))}%</span>
+          <span class="lobby-profile-achievement-progress-label">成就</span>
+          <strong class="lobby-profile-achievement-progress-count">${renderAnimatedNumber(`role:${selectedRoleId}:achievements:unlocked`, unlockedCount)}/${renderAnimatedNumber(`role:${selectedRoleId}:achievements:total`, definitions.length)}</strong>
         </div>
-      </div>
-      <div class="achievement-browse-bar">
         <div class="lobby-role-pagination is-compact">
           <button class="lobby-page-button pager-arrow" type="button" aria-label="上一页" data-action="change-role-achievement-page" data-delta="-1"${pageIndex === 0 ? " disabled" : ""}><i data-lucide="chevron-left" aria-hidden="true"></i></button>
           <span class="achievement-page-index">${pageIndex + 1}/${pages.length}</span>
@@ -410,7 +405,7 @@ const DESIGNED_TALENT_TREES = {
       "M75 32 H225", "M75 160 H225",
       "M75 32 C145 32 155 96 225 96",
       "M225 32 H375", "M225 96 H375", "M225 160 H375",
-      "M375 32 H525", "M375 96 C445 96 455 32 525 32", "M375 160 H525",
+      "M375 32 H525", "M375 96 H525", "M375 160 H525",
     ],
   },
   "teacher-child": {
@@ -421,6 +416,7 @@ const DESIGNED_TALENT_TREES = {
       "M75 96 H225",
       "M225 32 H375", "M225 32 C295 32 305 96 375 96",
       "M225 160 H375", "M375 160 H525",
+      "M375 160 C445 160 455 96 525 96",
       "M375 32 H525", "M375 96 C445 96 455 32 525 32",
     ],
   },

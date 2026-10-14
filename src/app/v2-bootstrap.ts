@@ -266,6 +266,7 @@ function isDebugRelationshipType(value: string | undefined): value is DebugRelat
 
 export function bootstrapApp(root: HTMLDivElement): void {
   const store = createStore();
+  store.enableTalentTestMode();
   const statisticsUploadEnabled = import.meta.env.PROD && window.location.protocol === "https:";
   const statistics = createStatisticsClient({ uploadEnabled: statisticsUploadEnabled, onChange: (rpc) => {
     if (rpc === "get_phd_simulator_v2_activity_stats") {
