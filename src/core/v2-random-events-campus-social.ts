@@ -31,7 +31,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
   const pokerWinRate = Math.min(100, getPokerWinRate(state.eventCounters.pokerCount) + pokerBonus) / 100;
   const pokerWin = getRoll() < pokerWinRate;
   const nextPokerCount = state.eventCounters.pokerCount + 1;
-  const badmintonGrowth = "胜率提升";
+  const badmintonGrowth = "实力提升";
   const currentPokerRate = Math.min(100, getPokerWinRate(state.eventCounters.pokerCount) + pokerBonus);
   const nextPokerRate = Math.min(100, getPokerWinRate(nextPokerCount) + pokerBonus);
   const pokerGrowth = nextPokerRate > currentPokerRate ? `胜率 ${currentPokerRate}%→${nextPokerRate}%` : "";

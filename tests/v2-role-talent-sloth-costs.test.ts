@@ -40,16 +40,16 @@ describe("sloth SAN and resting talents", () => {
   it("adds resting recovery and stacks independent next-action score bonuses", () => {
     const state = sloth();
     state.player.san = 0;
-    state.roleTalents!.levels = { "restful-idle": 3, "coffee-lifeline": 2 };
+    state.roleTalents!.levels = { "restful-idle": 3, "coffee-lifeline": 3 };
     expect(getRoleRestSanGain(state)).toBe(5);
     const twice = applyRoleTalentRest(applyRoleTalentRest(state));
     expect(twice.player.san).toBe(10);
-    expect(getActionEffect(twice, "idea").bonus).toBe(8);
-    expect(getActionEffect(twice, "experiment").bonus).toBe(8);
+    expect(getActionEffect(twice, "idea").bonus).toBe(6);
+    expect(getActionEffect(twice, "experiment").bonus).toBe(6);
     const consumed = consumeNextActionBuffs(twice, "idea");
     expect(getActionEffect(consumed, "idea").bonus).toBe(0);
-    expect(getActionEffect(consumed, "experiment").bonus).toBe(8);
-    expect(getActionEffect(consumed, "writing").bonus).toBe(8);
+    expect(getActionEffect(consumed, "experiment").bonus).toBe(6);
+    expect(getActionEffect(consumed, "writing").bonus).toBe(6);
   });
 
   it("year-summary recovery fills SAN without charging an action or adding a second base rest", () => {
@@ -59,7 +59,7 @@ describe("sloth SAN and resting talents", () => {
     const result = applyRoleTalentRest(state, { yearSummary: true });
     expect(result.player.san).toBe(20);
     expect(result.actionState).toEqual(state.actionState);
-    expect(getActionEffect(result, "writing").bonus).toBe(2);
+    expect(getActionEffect(result, "writing").bonus).toBe(1);
     expect(applyRoleTalentRest({ ...state, roleTalents: { levels: {} } }, { yearSummary: true }).player.san).toBe(4);
   });
 

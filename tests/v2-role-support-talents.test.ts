@@ -67,15 +67,22 @@ describe("upright relationship role talents", () => {
     expect(getReviewerWeights(year, 1).filter(([type]) => type !== "kind").every(([, weight]) => weight === 0)).toBe(true);
   });
 
-  it("uses the fixed PhD snapshot in actual player reviews without changing ordinary reviews", () => {
+  it("uses current PhD social in new reviews without changing already drawn reports", () => {
     const state = base("social");
-    state.roleTalents = { levels: { "kindly-reviewed": 5 }, kindReviewerBonus: 1 };
-    state.player.social = 0;
+    state.degree = "phd";
+    state.roleTalents = { levels: { "kindly-reviewed": 5 } };
+    state.player.social = 20;
     state.papers = [{ ...state.papers[0]!, target: "C", status: "reviewing", reviewMonthsLeft: 0, submittedYear: 3 }];
     const next = resolveDuePaperReviews(state, () => 0.1).state;
     const serialized = JSON.stringify(next.eventQueue);
     expect(serialized).toContain('"reviewerType":"kind"');
     expect(serialized).not.toContain('"reviewerType":"normal"');
+    const withoutBonus = resolveDuePaperReviews({ ...state, player: { ...state.player, social: 0 } }, () => 0.1).state;
+    expect(JSON.stringify(withoutBonus.eventQueue)).not.toBe(serialized);
+    const masters = resolveDuePaperReviews({ ...state, degree: "master" }, () => 0.1).state;
+    expect(JSON.stringify(masters.eventQueue)).toBe(JSON.stringify(withoutBonus.eventQueue));
+    const drawn = { ...next, player: { ...next.player, social: 0 } };
+    expect(resolveDuePaperReviews(drawn, () => 0.1).state.eventQueue).toEqual(next.eventQueue);
     expect(resolvePaperReview(state.papers[0]!, () => 0.1).nextPaper.lastReview?.reports.every((report) => report.reviewerType === "kind")).toBe(false);
   });
 

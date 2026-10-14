@@ -86,12 +86,10 @@ describe("event character names", () => {
     }
   });
 
-  it("marks Li Mu without treating course, theory, model or project titles as people", () => {
+  it("does not treat the name within the course title as a narrative person", () => {
     const event = createRandomEventById(9, makeState(), () => 0.9).event!;
-    expect(event.narrativeNames).toEqual(["李沐"]);
     for (const scene of eventTree(event)) {
-      expect(scene.narrativeNames).toEqual(["李沐"]);
-      expect(getEventNarrativeNames(scene)).toEqual(scene.description.includes("李沐") ? ["李沐"] : []);
+      expect(getEventNarrativeNames(scene)).toEqual([]);
     }
   });
 });

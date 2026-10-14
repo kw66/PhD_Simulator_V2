@@ -195,7 +195,7 @@ describe("ordinary attribute talent reactions", () => {
     expect(next.player.san).toBe(next.sanCap);
     expect(next.actionState.used).toBe(state.actionState.used);
     for (const action of ["idea", "experiment", "writing"] as const) {
-      expect(next.buffs.find(buff => buff.id === `role-rest-${action}`)?.actionEffects?.[action]?.bonus).toBe(4);
+      expect(next.buffs.find(buff => buff.id === `role-rest-${action}`)?.actionEffects?.[action]?.bonus).toBe(2);
     }
   });
 });

@@ -102,7 +102,7 @@ describe("campus result conditions", () => {
     const { choice } = getBranch(state, 7, "打羽毛球");
     expect(choice.outcome).toContain(`羽毛球实力 ${condition}`);
     expect(choice.outcome).toContain(wins ? "获胜" : "落败");
-    expect(choice.outcome).toContain("胜率提升");
+    expect(choice.outcome).toContain("实力提升");
     expect(choice.outcome).not.toContain("SAN倍率");
     expect(choice.effects.eventSupportUpdates).toEqual(wins ? { hasStrongBodyTalent: true } : {});
     expect(choice.effects.illnessProbabilityDelta).toBe(-10);

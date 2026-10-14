@@ -28,7 +28,7 @@ export function getEffectiveResearch(
   if (state.selectedRoleId === "normal-reversed"
     && getRoleTalentLevel(state, "full-san-research") > 0
     && operationStartState.player.san >= operationStartState.sanCap) {
-    effective += 5;
+    effective += operationStartState.player.san / 5;
   }
   return effective;
 }

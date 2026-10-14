@@ -65,9 +65,10 @@ describe("effective talent attributes", () => {
   it("preserves the full-SAN snapshot after payment and allows overflow SAN", () => {
     const initial = stateFor("normal-reversed", { "full-san-research": 1 });
     const paid: GameState = { ...initial, player: { ...initial.player, san: 15 } };
-    expect(getEffectiveResearch(initial)).toBe(23);
+    expect(getEffectiveResearch(initial)).toBe(22);
     expect(getEffectiveResearch(paid)).toBe(18);
-    expect(getEffectiveResearch(paid, initial)).toBe(23);
+    expect(getEffectiveResearch(paid, initial)).toBe(22);
+    expect(getEffectiveResearch({ ...initial, sanCap: 31, player: { ...initial.player, san: 31 } })).toBeCloseTo(24.2);
     expect(getEffectiveResearch({ ...initial, player: { ...initial.player, san: 25 } })).toBe(23);
     expect(previewPlayerAttributeChange(initial, "research", 1).effectiveChange).toBe(0.4);
   });

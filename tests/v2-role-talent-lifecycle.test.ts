@@ -3,6 +3,7 @@ import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { applyPrepublicationPaperDecay, createDraftPaper } from "../src/core/v2-paper-rules";
 import { getPlayerAttributeCap, previewPlayerAttributeChange } from "../src/core/v2-player-attributes";
+import { getRoleKindReviewerBonus } from "../src/core/v2-role-talent-state";
 import {
   initializeRoleTalents, applyRoleTalentAdvisorAssignment, applyRoleTalentPhdTransfer,
   settleRoleTalentMonthStart, settleRoleTalentYearEnd, syncRoleTalentFellows, settleRoleTalentDiseaseMilestones,
@@ -32,14 +33,22 @@ describe("role talent lifecycle", () => {
     }
   });
 
-  it("social transfer first raises cap and stat, then freezes reviewer bonus", () => {
+  it("social reviewer bonus starts after transfer and follows current actual social", () => {
     const before = run("social", { "circle-of-friends": 2, "kindly-reviewed": 2 });
     before.player.social = 20;
     before.fellowProgressState = [fellow("one", 1), fellow("two", 1)];
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
     expect(getPlayerAttributeCap(next, "social")).toBe(24);
     expect(next.player.social).toBeCloseTo(21.6);
-    expect(next.roleTalents?.kindReviewerBonus).toBeCloseTo(0.432);
+    expect(getRoleKindReviewerBonus(before)).toBe(0);
+    expect(getRoleKindReviewerBonus(next)).toBeCloseTo(0.432);
+    expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: 10 } })).toBeCloseTo(0.2);
+    expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: 30 } })).toBeCloseTo(0.6);
+    expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: -1 } })).toBe(0);
+    expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: 100 } })).toBe(1);
+    expect(getRoleKindReviewerBonus({ ...next, selectedRoleId: "normal" })).toBe(0);
+    expect(getRoleKindReviewerBonus({ ...next, roleTalents: { levels: {} } })).toBe(0);
+    expect(applyRoleTalentPhdTransfer(before, next)).toBe(next);
   });
 
   it("advisor family transfer grants real first-author publications and persistent reimbursement uses once", () => {
@@ -74,6 +83,19 @@ describe("role talent lifecycle", () => {
     expect(next.player.san).toBe(state.player.san);
     expect(settleRoleTalentMonthEnd(next)).toBe(next);
     expect(settleRoleTalentMonthEnd({ ...state, totalMonths: 0 }).sanCap).toBe(state.sanCap);
+  });
+
+  it("limits 日渐圆润 to twenty self-generated SAN cap points", () => {
+    let state = month(run("normal-reversed", { "san-cap-reserve": 1 }), 1);
+    state.roleTalents = { ...state.roleTalents!, regularActionBudget: 25, regularActionsSpent: 0 };
+    state = settleRoleTalentMonthEnd(state);
+    expect(state.sanCap).toBe(40);
+    expect(state.roleTalents?.sanCapReserveBonus).toBe(20);
+    const next = settleRoleTalentMonthEnd({ ...state, sanCap: 35, totalMonths: 2, roleTalents: {
+      ...state.roleTalents!, lastMonthEndSettlement: undefined, regularActionBudget: 4, regularActionsSpent: 0,
+    } });
+    expect(next.sanCap).toBe(35);
+    expect(next.roleTalents?.sanCapReserveBonus).toBe(20);
   });
 
   it("reversed genius opens extra slots and counts only published first-author papers at transfer", () => {
@@ -186,7 +208,7 @@ describe("role talent lifecycle", () => {
     expect(next.player.research).toBeCloseTo(21.2);
   });
 
-  it("freezes academic confidence from unique published A papers including coauthored papers before transfer growth", () => {
+  it("freezes academic confidence from pre-transfer papers but activates after transfer growth", () => {
     const before = run("genius", { "academic-confidence": 1, "proven-by-papers": 3, "boundless-study": 5 });
     before.player.research = 20;
     before.papers = [paper("a", "A"), paper("co", "A", true), paper("b", "B"), { ...paper("draft", "A"), status: "draft" }];
@@ -194,7 +216,7 @@ describe("role talent lifecycle", () => {
     expect(previewPlayerAttributeChange(before, "research", -1).effectiveChange).toBe(-0.4);
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
     expect(next.roleTalents?.researchGrowthResistanceReduction).toBe(0.2);
-    expect(next.player.research).toBeCloseTo(21.8);
+    expect(next.player.research).toBeCloseTo(21.2);
     expect(previewPlayerAttributeChange(next, "research", -1).effectiveChange).toBe(-0.4);
     expect(previewPlayerAttributeChange(next, "research", 1).effectiveChange).toBe(0.6);
     const later = { ...next, externalPublications: [...next.externalPublications, paper("later", "A")] };

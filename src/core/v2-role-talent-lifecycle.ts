@@ -6,7 +6,7 @@ import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { formatMoney, roundMoney } from "./v2-money";
 import { describeTalentChange, recordTalentTrigger } from "./v2-talent-history";
 import { applyPlayerAttributeChange, getPlayerAttributeCap } from "./v2-player-attributes";
-import { getRoleTalentLevel, type PlayerAttribute } from "./v2-role-talent-state";
+import { getRoleKindReviewerBonus, getRoleTalentLevel, type PlayerAttribute } from "./v2-role-talent-state";
 import { applyTierResist, createSlothSanBuff } from "./v2-sanity-rules";
 import type { Buff, GameState, Paper } from "./v2-types";
 
@@ -146,7 +146,10 @@ export function applyRoleTalentPhdTransfer(before: GameState, after: GameState):
       state = logTalent(state, { ...state, player: { ...state.player, money: roundMoney(state.player.money + gain) } }, id, name, "转博奖励");
     }
   } else if (state.selectedRoleId === "genius") {
-    // Freeze the publication snapshot before applying simultaneous transfer rewards.
+    // New capacity accommodates this batch; new resistance reductions apply afterward.
+    const extraCap = aPapers * level(state, "boundless-study");
+    state = logTalent(state, { ...state, researchCapacityState: { ...state.researchCapacityState, otherCapBonus: state.researchCapacityState.otherCapBonus + extraCap } }, "boundless-study", "学无止境", `转博时已有${aPapers}篇一作A类论文`);
+    state = logTalent(state, addAttributes(state, { research: aPapers * level(state, "proven-by-papers") }), "proven-by-papers", "以文证道", `转博时已有${aPapers}篇一作A类论文`);
     if (level(state, "academic-confidence")) {
       const count = new Set([...before.papers, ...before.externalPublications]
         .filter((paper) => paper.status === "published" && paper.target === "A").map((paper) => paper.id)).size;
@@ -154,10 +157,6 @@ export function applyRoleTalentPhdTransfer(before: GameState, after: GameState):
       state = { ...state, roleTalents: { ...state.roleTalents!, researchGrowthResistanceReduction: reduction } };
       if (reduction) state = logTalent(state, state, "academic-confidence", "学术底气", `转博时已有${count}篇A类论文`, [`科研增长抵抗降低${Math.round(reduction * 100)}个百分点`]);
     }
-    // Award the cap before the simultaneous research reward so this batch can use it.
-    const extraCap = aPapers * level(state, "boundless-study");
-    state = logTalent(state, { ...state, researchCapacityState: { ...state.researchCapacityState, otherCapBonus: state.researchCapacityState.otherCapBonus + extraCap } }, "boundless-study", "学无止境", `转博时已有${aPapers}篇一作A类论文`);
-    state = logTalent(state, addAttributes(state, { research: aPapers * level(state, "proven-by-papers") }), "proven-by-papers", "以文证道", `转博时已有${aPapers}篇一作A类论文`);
     state = syncRoleTalentFellows(state);
   } else if (state.selectedRoleId === "chosen" && level(state, "complete-potential")) {
     const snapshot = { ...before.player };
@@ -171,9 +170,8 @@ export function applyRoleTalentPhdTransfer(before: GameState, after: GameState):
     state = { ...state, roleTalents: { ...state.roleTalents!, capBonuses: { ...state.roleTalents!.capBonuses, social: (state.roleTalents!.capBonuses?.social ?? 0) + gain } } };
     state = addAttributes(state, { social: gain });
     state = logTalent(old, state, "circle-of-friends", "高朋满座", `转博时有${before.fellowProgressState.length}位同学`);
-    const kindReviewerBonus = Math.min(1, precise(state.player.social * 0.01 * level(state, "kindly-reviewed")));
-    state = { ...state, roleTalents: { ...state.roleTalents!, kindReviewerBonus } };
-    if (kindReviewerBonus) state = logTalent(state, state, "kindly-reviewed", "人缘加持", "按高朋满座结算后的社交固定本局加成", [`心软审稿人概率+${formatMoney(kindReviewerBonus * 100)}个百分点`]);
+    const kindReviewerBonus = getRoleKindReviewerBonus(state);
+    if (kindReviewerBonus) state = logTalent(state, state, "kindly-reviewed", "人缘加持", "转博后随当前社交生效", [`心软审稿人概率+${formatMoney(kindReviewerBonus * 100)}个百分点`]);
   } else if (state.selectedRoleId === "teacher-child") {
     const count = Math.floor(Math.max(0, before.player.favor) / 6) * level(state, "family-patronage");
     for (let i = 0; i < count; i++) {
@@ -311,7 +309,13 @@ export function settleRoleTalentMonthEnd(state: GameState): GameState {
   state = { ...state, roleTalents: { ...state.roleTalents, lastMonthEndSettlement: state.totalMonths } };
   if (state.selectedRoleId === "normal-reversed" && level(state, "san-cap-reserve")) {
     const unused = Math.max(0, (state.roleTalents!.regularActionBudget ?? 1) - (state.roleTalents!.regularActionsSpent ?? 0));
-    if (unused) state = logTalent(state, { ...state, sanCap: state.sanCap + unused }, "san-cap-reserve", "日渐圆润", "月末剩余常规行动", [`未使用${unused}次常规行动`]);
+    const remaining = Math.max(0, 20 - (state.roleTalents!.sanCapReserveBonus ?? 0));
+    const gained = Math.min(unused, remaining);
+    if (gained) state = logTalent(state, {
+      ...state,
+      sanCap: state.sanCap + gained,
+      roleTalents: { ...state.roleTalents!, sanCapReserveBonus: (state.roleTalents!.sanCapReserveBonus ?? 0) + gained },
+    }, "san-cap-reserve", "日渐圆润", "月末剩余常规行动", [`未使用${unused}次常规行动`]);
   }
   if (state.selectedRoleId === "social-reversed") {
     const changed = state.roleTalents!.socialChangedMonth === state.totalMonths;

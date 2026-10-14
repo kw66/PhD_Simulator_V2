@@ -3490,13 +3490,13 @@ function buildGrowthTalentItems(state: GameState, gameGrowthPage = 0): TalentPan
       icon: "🏸",
       name: "羽毛球水平",
       active: true,
-      description: `胜率：SAN×（参加次数 + 3）+ 球拍 40达${BADMINTON_VICTORY_THRESHOLD}`,
+      description: `实力：SAN×（参加次数+3）+球拍40，达${BADMINTON_VICTORY_THRESHOLD}获胜`,
       metrics: [
         { label: "每月 SAN +1", value: `获胜 ${state.eventSupport.hasStrongBodyTalent ? "✅" : "—"}` },
         { label: "参加", value: `${badmintonCount} 次`, animation: { template: "{count} 次", values: { count: badmintonCount } } },
       ],
       progress: {
-        label: "胜率",
+        label: "实力",
         showLabel: true,
         value: Math.min(badmintonStrength, BADMINTON_VICTORY_THRESHOLD),
         max: BADMINTON_VICTORY_THRESHOLD,

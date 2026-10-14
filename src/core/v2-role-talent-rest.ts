@@ -17,7 +17,7 @@ export function applyRoleTalentRest(state: GameState, options: { yearSummary?: b
     : sloth ? getRoleTalentLevel(state, "restful-idle") : 0) : getRoleRestSanGain(state);
   const san = getRecoveredSan(state.player.san, state.sanCap, gain);
   const appliedGain = san - state.player.san;
-  const bonus = sloth ? 2 * getRoleTalentLevel(state, "coffee-lifeline") : 0;
+  const bonus = sloth ? getRoleTalentLevel(state, "coffee-lifeline") : 0;
   const buffs: Buff[] = [];
   if (bonus > 0) {
     for (const action of ["idea", "experiment", "writing"] as const) {

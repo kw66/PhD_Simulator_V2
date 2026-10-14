@@ -65,8 +65,8 @@ export const TEACHER_CHILD_TALENT_NODES = [
   { id: "growing-familiarity", name: "朝夕相处", icon: "calendar-days", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 3, effect: "导师好感每年+1", prerequisiteIds: ["near-the-source"] },
   { id: "family-host", name: "长辈买单", icon: "hand-coins", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 1, effect: "组内团建事件中聚餐必定由导师请客", prerequisiteIds: ["near-the-source"] },
   { id: "family-patronage", name: "长辈提携", icon: "files", tier: 1, column: "2", row: "3", maxLevel: 2, cost: 3, effect: "转博时每6点导师好感赠送1篇一作C类论文/级", prerequisiteIds: ["near-the-source"] },
-  { id: "computing-support", name: "算力后盾", icon: "cpu", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 4, effect: "转博时获得1次显卡报销/级", prerequisiteIds: ["growing-familiarity"] },
-  { id: "workspace-renewal", name: "工位焕新", icon: "monitor", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 4, effect: "转博时获得1次工位报销/级", prerequisiteIds: ["growing-familiarity"] },
+  { id: "computing-support", name: "算力后盾", icon: "cpu", tier: 2, column: "3", row: "1", maxLevel: 3, cost: 3, effect: "转博时获得1次显卡报销/级", prerequisiteIds: ["growing-familiarity"] },
+  { id: "workspace-renewal", name: "工位焕新", icon: "monitor", tier: 2, column: "3", row: "2", maxLevel: 3, cost: 3, effect: "转博时获得1次工位报销/级", prerequisiteIds: ["growing-familiarity"] },
   { id: "mentor-insight", name: "名师点拨", icon: "book-open", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 2, effect: "导师协作分+50%/级", prerequisiteIds: ["family-patronage"] },
   { id: "funding-shield", name: "经费护航", icon: "store", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 3, effect: `科研经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}且足够支付时，购买AI优先使用经费`, prerequisiteIds: ["computing-support", "workspace-renewal"] },
   { id: "learning-by-osmosis", name: "耳濡目染", icon: "graduation-cap", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 6, effect: "转博后科研能力视为科研能力与导师好感的较大值", prerequisiteIds: ["mentor-insight"] },
@@ -106,7 +106,7 @@ export const SOCIAL_TALENT_NODES = [
   { id: "peer-camaraderie", name: "同窗共进", icon: "handshake", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 2, effect: "同门合作事件出现概率+100%", prerequisiteIds: ["supporting-juniors"] },
   { id: "circle-of-friends", name: "高朋满座", icon: "users", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 3, effect: "转博时人际栏每位同学使社交+1/级、社交上限+1/级", prerequisiteIds: ["growing-connections"] },
   { id: "senior-mentorship", name: "师友相助", icon: "graduation-cap", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "师兄师姐指导事件出现概率+100%", prerequisiteIds: ["peer-camaraderie"] },
-  { id: "kindly-reviewed", name: "人缘加持", icon: "heart", tier: 3, column: "4", row: "1", maxLevel: 5, cost: 2, effect: "转博时心软审稿人概率+社交×1%/级，其余类型保持相对比例", prerequisiteIds: ["circle-of-friends"] },
+  { id: "kindly-reviewed", name: "人缘加持", icon: "heart", tier: 3, column: "4", row: "1", maxLevel: 5, cost: 2, effect: "转博后心软审稿人概率+社交×1%/级，其余类型保持相对比例", prerequisiteIds: ["circle-of-friends"] },
   { id: "collective-wisdom", name: "群策群力", icon: "network", tier: 3, column: "4", row: "3", maxLevel: 2, cost: 2, effect: "同学协作分+50%/级", prerequisiteIds: ["senior-mentorship"] },
   { id: "junior-delegation", name: "借力后进", icon: "hand-helping", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 2, effect: "麻烦师弟师妹不扣社交", prerequisiteIds: [] },
   { id: "junior-bond", name: "投桃报李", icon: "heart-handshake", tier: 1, column: "2", row: "2", maxLevel: 3, cost: 1, effect: "麻烦师弟师妹默契+1/级", prerequisiteIds: ["junior-delegation"] },
@@ -121,10 +121,10 @@ export const NORMAL_REVERSED_TALENT_NODES = [
   { id: "restful-idle", name: "睡得好香", icon: "hourglass", tier: 0, column: "1", row: "3", maxLevel: 3, cost: 2, effect: "休息效果+1/级", prerequisiteIds: [] },
   { id: "post-phd-recovery", name: "无所事事", icon: "heart-plus", tier: 1, column: "2", row: "1", maxLevel: 2, cost: 2, effect: "转博后每月SAN+已损SAN的10%/级", prerequisiteIds: ["monthly-san-recovery"] },
   { id: "post-phd-growth", name: "天生我材", icon: "trending-up", tier: 2, column: "3", row: "2", maxLevel: 2, cost: 2, effect: "转博时全属性+50%/级", prerequisiteIds: ["sloth-head-start"] },
-  { id: "coffee-lifeline", name: "困睡醒科", icon: "brain", tier: 1, column: "2", row: "3", maxLevel: 2, cost: 2, effect: "休息后下次想idea、做实验、写论文+2/级，可叠加", prerequisiteIds: ["restful-idle"] },
-  { id: "san-cap-reserve", name: "日渐圆润", icon: "shield", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 2, effect: "每浪费1常规行动点，SAN上限+1", prerequisiteIds: ["post-phd-recovery"] },
+  { id: "coffee-lifeline", name: "困睡醒科", icon: "brain", tier: 1, column: "2", row: "3", maxLevel: 3, cost: 1, effect: "休息后下次想idea、做实验、写论文+1/级，可叠加", prerequisiteIds: ["restful-idle"] },
+  { id: "san-cap-reserve", name: "日渐圆润", icon: "shield", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 2, effect: "每浪费1常规行动点，SAN上限+1，最多+20", prerequisiteIds: ["post-phd-recovery"] },
   { id: "year-summary-recovery", name: "忙里偷闲", icon: "calendar-days", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "学年总结事件中休息会回满SAN", prerequisiteIds: ["coffee-lifeline"] },
-  { id: "full-san-research", name: "满血状态", icon: "brain", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "操作开始前SAN为满时，科研能力视为+5", prerequisiteIds: ["post-phd-growth"] },
+  { id: "full-san-research", name: "满血状态", icon: "brain", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "操作开始前SAN为满时，科研能力视为+SAN/5", prerequisiteIds: ["year-summary-recovery", "san-cap-reserve"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const RICH_REVERSED_TALENT_NODES = [

@@ -1,5 +1,6 @@
 import { getRecoveredSan } from "./v2-san-recovery";
 import { settleRoleTalentPaperRejection } from "./v2-role-talent-lifecycle";
+import { getRoleKindReviewerBonus } from "./v2-role-talent-state";
 import { paySanCost } from "./v2-role-talent-costs";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo, getConferenceReferenceScore } from "./v2-conference-catalog";
@@ -511,7 +512,7 @@ export function resolveDuePaperReviews(
       continue;
     }
 
-    const resolved = resolvePaperReview(paper, random, state.selectedRoleId === "social" ? state.roleTalents?.kindReviewerBonus ?? 0 : 0);
+    const resolved = resolvePaperReview(paper, random, getRoleKindReviewerBonus(state));
     activePapers.push(paper);
     const accepted = resolved.nextPaper.status === "published";
     if (accepted) acceptedPaperIds.push(paper.id);

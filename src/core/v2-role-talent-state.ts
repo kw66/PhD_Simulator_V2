@@ -17,8 +17,6 @@ export interface RoleTalentRunState {
   initialized?: boolean;
   advisorFundingGranted?: boolean;
   phdGranted?: boolean;
-  /** Fixed additional kind-reviewer probability recorded at PhD transfer (0..1). */
-  kindReviewerBonus?: number;
   /** Growth-only reduction fixed from published A papers at PhD transfer (0..0.6). */
   researchGrowthResistanceReduction?: number;
   capBonuses?: Partial<Record<PlayerAttribute, number>>;
@@ -57,6 +55,7 @@ export interface RoleTalentRunState {
   pendingMoneyConversions?: number;
   lastGreedResetMonth?: number;
   greedRandomState?: number;
+  sanCapReserveBonus?: number;
 }
 
 export function getRoleTalentLevel(state: Pick<GameState, "roleTalents">, id: string): number {
@@ -66,4 +65,10 @@ export function getRoleTalentLevel(state: Pick<GameState, "roleTalents">, id: st
 
 export function createRoleTalentRunState(levels: Record<string, number> = {}): RoleTalentRunState {
   return { levels: { ...levels } };
+}
+
+/** Recompute for each new review draw; existing review reports stay unchanged. */
+export function getRoleKindReviewerBonus(state: Pick<GameState, "selectedRoleId" | "degree" | "player" | "roleTalents">): number {
+  if (state.selectedRoleId !== "social" || state.degree !== "phd") return 0;
+  return Math.min(1, Math.max(0, Number((state.player.social * 0.01 * getRoleTalentLevel(state, "kindly-reviewed")).toFixed(10))));
 }

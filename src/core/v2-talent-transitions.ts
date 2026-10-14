@@ -32,7 +32,7 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
     `打工金币收入 +${workGrowth}`, `打工基础SAN消耗 +${workGrowth}`,
   ]);
   if (after.eventCounters.badmintonCount > before.eventCounters.badmintonCount) {
-    const effects = ["胜率提升"];
+    const effects = ["实力提升"];
     if (!before.eventSupport.hasStrongBodyTalent && after.eventSupport.hasStrongBodyTalent) effects.push("首次获胜，每月SAN +1");
     add("badminton-growth", "羽毛球水平", `累计参加${after.eventCounters.badmintonCount}次`, effects);
   }

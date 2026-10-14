@@ -7,24 +7,34 @@ import { getAchievementGlobalPercentage, renderAchievementCard } from "../src/ap
 import { renderRoleRail } from "../src/app/v2-render-setup-screen";
 
 describe("achievement design preview", () => {
-  it("shows only the original six and user-confirmed normal achievements", () => {
-    expect(Object.keys(ROLE_DESIGNED_ACHIEVEMENTS)).toEqual(["normal"]);
+  it("shows only the original six and user-confirmed role achievements", () => {
+    expect(Object.keys(ROLE_DESIGNED_ACHIEVEMENTS)).toEqual(["normal", "genius", "social", "teacher-child", "rich", "normal-reversed", "rich-reversed", "social-reversed", "chosen"]);
     expect(ROLE_DESIGNED_ACHIEVEMENTS.normal!.map(({ title, description }) => [title, description])).toEqual([
-      ["自强不息Ⅰ", "硕士期间科研能力达到6"],
-      ["自强不息Ⅱ", "硕士期间社交能力达到6"],
-      ["自强不息Ⅲ", "硕士期间导师好感达到6"],
+      ["自强不息α", "硕士期间科研能力达到6"],
+      ["自强不息β", "硕士期间社交能力达到6"],
+      ["自强不息γ", "硕士期间导师好感达到6"],
       ["突破极限", "科研|社交|导师好感任一项达到25"],
       ["二次行动", "某个月拥有2个普通行动点"],
       ["走火入魔", "同时触发燃烧生命α、β"],
       ["我有多动症", "某个月行动4次（包括AI行动）"],
       ["医学奇迹", "连续触发10次触底反弹"],
       ["爱看论文", "看20次论文"],
+      ["六边形战士", "科研|社交|好感|金币均达到12"],
+      ["自然风干", "论文的3项分数随时间流逝均衰减至1"],
+      ["食之无味", "一篇论文被连续拒稿3次"],
+      ["人间清醒", "两次达到转博条件，但都拒绝了"],
+      ["真·大多数", "使用0天赋点博士毕业"],
     ]);
     for (const item of ROLE_DESIGNED_ACHIEVEMENTS.normal!) {
       expect(item).toMatchObject({ requiredRoleId: "normal", previewOnly: true, rewardText: "" });
     }
-    expect(getRoleAchievementDefinitions("normal")).toHaveLength(15);
-    for (const role of getRoleOptions().filter(role => role.id !== "normal")) {
+    expect(ROLE_DESIGNED_ACHIEVEMENTS["normal-reversed"]!.slice(0, 1)).toMatchObject([
+      { id: "normal-reversed:deep-sleep", title: "睡得好香", description: "一局内通过主动休息累计回复50点SAN", requiredRoleId: "normal-reversed", previewOnly: true, rewardText: "" },
+    ]);
+    expect(getRoleAchievementDefinitions("normal")).toHaveLength(20);
+    expect(getRoleAchievementDefinitions("normal-reversed")).toHaveLength(4);
+    expect(getRoleAchievementDefinitions("rich")).toHaveLength(4);
+    for (const role of getRoleOptions().filter(role => !ROLE_DESIGNED_ACHIEVEMENTS[role.id])) {
       expect(getRoleAchievementDefinitions(role.id)).toHaveLength(0);
       expect(getRoleLobbyAchievementDefinitions(role.id).every(item => item.id === "unlock:" + role.id)).toBe(true);
     }
@@ -55,11 +65,11 @@ describe("achievement design preview", () => {
     const normalPages = getAchievementDisplayPages("normal");
     account.lobbyRoleAchievementPage = normalPages.findIndex((page) => page.achievements.some((item) => item.id === "normal:self-reliance-i"));
     const normalHtml = renderRoleRail(account, "normal", "achievements");
-    expect(normalHtml).toContain('aria-valuetext="1/15"');
+    expect(normalHtml).toContain('aria-valuetext="1/20"');
     expect(normalHtml).toContain('class="lobby-profile-achievement is-unlocked" data-achievement-id="normal:self-reliance-i"');
     account.lobbyRoleAchievementPage = 0;
     const richHtml = renderRoleRail(account, "rich", "achievements");
-    expect(richHtml).toContain('aria-valuetext="0/1"');
+    expect(richHtml).toContain('aria-valuetext="0/5"');
     expect(richHtml).not.toContain('data-achievement-id="normal:self-reliance-i"');
     expect(richHtml).not.toContain('class="lobby-profile-achievement is-unlocked"');
   });

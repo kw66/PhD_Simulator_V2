@@ -340,7 +340,7 @@ describe("talent trigger history", () => {
     const next = recordTalentTransitions(before, after);
     expect(triggers(next).map((trigger) => trigger.name)).toEqual(["羽毛球水平", "牌局策略"]);
     expect(triggers(next)[0]!.effects).toContain("首次获胜，每月SAN +1");
-    expect(triggers(next)[0]!.effects).toContain("胜率提升");
+    expect(triggers(next)[0]!.effects).toContain("实力提升");
     expect(triggers(next)[1]!.effects).toEqual(["胜率 40%→50%"]);
     expect(next.eventCounters).toBe(after.eventCounters);
     expect(next.player).toBe(after.player);

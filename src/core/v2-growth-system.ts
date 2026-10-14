@@ -6,13 +6,6 @@ export function getBadmintonStrength(san: number, participationCount: number, ha
   return Math.max(0, san) * (Math.max(0, Math.floor(participationCount)) + 3) + (hasRacket ? 40 : 0);
 }
 
-export function getBadmintonWinRate(participationCount: number, hasRacket: boolean): number {
-  return Math.min(
-    ACTIVITY_WIN_RATE_CAP,
-    40 + Math.max(0, Math.floor(participationCount)) * 10 + (hasRacket ? 30 : 0),
-  );
-}
-
 export function getPokerWinRate(participationCount: number): number {
   return Math.min(ACTIVITY_WIN_RATE_CAP, 40 + Math.max(0, Math.floor(participationCount)) * 10);
 }

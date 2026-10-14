@@ -57,7 +57,7 @@ export function resolveYearSummaryChoice(
       const sloth = state.selectedRoleId === "normal-reversed";
       const recovery = sloth && getRoleTalentLevel(state, "year-summary-recovery") > 0 ? "SAN回复至上限"
         : `SAN +${5 + (sloth ? getRoleTalentLevel(state, "restful-idle") : 0)}`;
-      const bonus = sloth ? 2 * getRoleTalentLevel(state, "coffee-lifeline") : 0;
+      const bonus = sloth ? getRoleTalentLevel(state, "coffee-lifeline") : 0;
       const summary = `${recovery}${bonus > 0 ? `；下次想idea、做实验、写论文各+${bonus}分` : ""}`;
       return {
         nextState: state,

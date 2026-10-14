@@ -175,7 +175,6 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
 
   const event: PendingEvent = {
     id: `random-9-y${state.year}-m${state.month}-n${serial}`,
-    narrativeNames: ["李沐"],
     title: "不断学习",
     description: "手头的论文刚忙完一轮，想 idea、做实验、写论文、投稿的循环暂时停了一格。难得有点空闲，你想静下心学一会儿，却发现自己已经很久没有完整读完一段材料了😅。",
     source: "random",
