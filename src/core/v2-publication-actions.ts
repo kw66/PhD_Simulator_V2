@@ -1,4 +1,6 @@
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
+import { recordPersonalSpending } from "./v2-money";
+import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
 import {
   getPaperPromotionCost,
   getPaperPromotionMoneyCost,
@@ -36,7 +38,7 @@ function getPromotionFailure(state: GameState, paperId: string, promotionId: Pap
   const cost = getPaperPromotionCost(promotionId, state);
   const moneyCost = getPaperPromotionMoneyCost(promotionId);
   if (moneyCost > 0) return state.player.money >= moneyCost ? null : `金币不足，需要 ${moneyCost}`;
-  return state.player.san >= cost ? null : `SAN 不足，需要 ${cost}`;
+  return quoteSanPayment(state, cost).allowed ? null : `SAN 不足，需要 ${cost}`;
 }
 
 export function applyPaperPromotion(
@@ -78,18 +80,19 @@ export function applyPaperPromotion(
   if (externalIndex >= 0) nextExternal[externalIndex] = updatedPaper;
 
   const moneyCost = getPaperPromotionMoneyCost(promotionId);
-  const player = moneyCost > 0
-    ? { ...state.player, money: state.player.money - moneyCost }
-    : { ...state.player, san: state.player.san - cost };
+  const payment = quoteSanPayment(state, cost);
+  const paid = moneyCost > 0
+    ? { ...state, player: { ...state.player, money: state.player.money - moneyCost } }
+    : paySanCost(state, cost);
   const result = promotionId === "quantum"
     ? `金币 -${moneyCost}；引用倍率 +${Math.round(bonus * 100)}%`
     : promotionId === "github"
-    ? `SAN -${cost}；当前分 +${Math.floor(paper.publication.effectiveScore * 0.25)}`
+    ? `${formatSanPayment(payment)}；当前分 +${Math.floor(paper.publication.effectiveScore * 0.25)}`
     : promotionId === "arxiv"
-      ? `SAN -${cost}；提前公开`
-    : `SAN -${cost}；引用倍率 +${Math.round(bonus * 100)}%`;
+      ? `${formatSanPayment(payment)}；提前公开`
+    : `${formatSanPayment(payment)}；引用倍率 +${Math.round(bonus * 100)}%`;
   return pushLog(
-    { ...state, papers: nextPapers, externalPublications: nextExternal, player },
+    recordPersonalSpending({ ...paid, papers: nextPapers, externalPublications: nextExternal }, moneyCost),
     `${PROMOTION_LABELS[promotionId]}：${paper.title}；${result}`,
   );
 }

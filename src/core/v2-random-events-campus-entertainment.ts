@@ -1,5 +1,6 @@
-import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
-import { getResearchCap } from "./v2-research-cap-system";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 import { getEntertainmentGrowth } from "./v2-entertainment-growth";
 import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
@@ -8,7 +9,8 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
   const serial = state.totalRandomEventCount;
   const terrariaCount = state.eventCounters.terrariaCount;
   const magicTowerCount = state.eventCounters.magicTowerCount;
-  const { terrariaCost: terrariaBaseCost, magicTowerCost: magicTowerBaseCost, shinyPercent } = getEntertainmentGrowth(state.eventCounters);
+  const { terrariaCost: terrariaBaseCost, magicTowerCost: magicTowerBaseCost, shinyPercent: baseShinyPercent } = getEntertainmentGrowth(state.eventCounters);
+  const shinyPercent = state.selectedRoleId === "chosen" && getRoleTalentLevel(state, "rare-color-fate") > 0 ? 100 : baseShinyPercent;
   const nextTerrariaCount = terrariaCount + 1;
   const nextMagicTowerCount = magicTowerCount + 1;
   const nextGrowth = getEntertainmentGrowth({ ...state.eventCounters, terrariaCount: nextTerrariaCount, magicTowerCount: nextMagicTowerCount, rocoCount: state.eventCounters.rocoCount + 1 });
@@ -22,8 +24,8 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
   const catchesShinyWolf = getRoll() < shinyPercent / 100;
   const gradSimSanGain = playsV2 ? 3 : 2;
   const rocoMoneyGain = catchesShinyWolf ? 4 : 2;
-  const socialResult = applyTierResist(1, state.player.social, getRoll);
-  const researchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
+  const socialResult = previewPlayerAttributeChange(state, "social", 1);
+  const researchResult = previewPlayerAttributeChange(state, "research", 1);
   const introDescription = [
     "改完最后一处代码，你把几组实验在服务器上排好队，检查日志没报错，才往椅背上一靠。结果还得等上好几个小时，💻盯着终端也不会让显卡跑得更快。",
     "你把终端缩到一旁，翻了翻电脑和手机里的游戏。趁实验慢慢跑，🎮自己也该放松一下了。",
@@ -44,7 +46,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
         label: "玩泰拉瑞亚",
         outcome: `${formatTierResistedOutcome("社交", 1, socialResult)}｜${formatActualSanChange(-terrariaBaseCost, state.month, state.eventSupport, state.buffs)}${terrariaGrowth}`,
         effects: {
-          ...(socialResult.effectiveChange > 0 ? { social: socialResult.effectiveChange } : {}),
+          ...({ social: socialResult.effectiveChange, rawSocial: 1 }),
           san: terrariaSanChange,
           counterDeltas: { terrariaCount: 1 },
         },
@@ -54,7 +56,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
         label: "玩魔塔50层",
         outcome: `${formatTierResistedOutcome("科研", 1, researchResult)}｜${formatActualSanChange(-magicTowerBaseCost, state.month, state.eventSupport, state.buffs)}${magicTowerGrowth}`,
         effects: {
-          ...(researchResult.effectiveChange > 0 ? { research: researchResult.effectiveChange } : {}),
+          ...({ research: researchResult.effectiveChange, rawResearch: 1 }),
           san: magicTowerSanChange,
           counterDeltas: { magicTowerCount: 1 },
         },
@@ -135,6 +137,6 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
         ]).join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 

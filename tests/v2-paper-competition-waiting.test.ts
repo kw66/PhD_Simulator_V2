@@ -363,7 +363,7 @@ describe("hidden paper competition lifecycle", () => {
     }
   });
 
-  it("protects both a revealed queued event and the other hidden type across an actual annual reset", () => {
+  it("keeps old-year revealed events queued without spending new-year tickets while hidden types reserve one", () => {
     const waiting = rememberBoth({ ...makeState([makePaper(0, { idea: 8 })]), month: 12, totalMonths: 12 });
     const awake = activatePendingRandomEvents(waiting, () => 0);
     const acrossYear = {
@@ -375,9 +375,9 @@ describe("hidden paper competition lifecycle", () => {
     expect(advanced.pendingRandomEvents).toEqual([{ eventId: 18, serial: 7 }]);
     expect(advanced.eventQueue.filter((event) => event.randomReplay?.eventId === 17)).toHaveLength(1);
     expect(advanced.eventQueue.filter((event) => event.randomReplay?.eventId === 18)).toHaveLength(0);
-    expect(advanced.availableRandomEvents).not.toContain(17);
+    expect(advanced.availableRandomEvents).toContain(17);
     expect(advanced.availableRandomEvents).not.toContain(18);
-    expect(advanced.usedRandomEvents.filter((eventId) => eventId === 17)).toHaveLength(1);
+    expect(advanced.usedRandomEvents.filter((eventId) => eventId === 17)).toHaveLength(0);
     expect(advanced.usedRandomEvents.filter((eventId) => eventId === 18)).toHaveLength(0);
     expect(rememberPendingRandomEvent(advanced, 17, 999)).toEqual(advanced);
   });

@@ -10,6 +10,7 @@ export interface CandidateEventContext {
   hasAuthorshipEligibleDraftPaper?: boolean;
   pendingRandomEvents?: PendingRandomEvent[];
   excludedCategories?: readonly RandomEventCategory[];
+  excludedEventIds?: readonly number[];
 }
 
 export interface CandidateEventBuildResult {
@@ -46,22 +47,6 @@ export function getRandomEventCategory(eventId: number): RandomEventCategory | n
   return RANDOM_EVENT_CATEGORIES[eventId] ?? null;
 }
 
-function uniqueEventIds(eventIds: number[]): number[] {
-  const seen = new Set<number>();
-  const nextIds: number[] = [];
-
-  for (const eventId of eventIds) {
-    if (!Number.isFinite(eventId) || seen.has(eventId)) {
-      continue;
-    }
-
-    seen.add(eventId);
-    nextIds.push(eventId);
-  }
-
-  return nextIds;
-}
-
 export function buildCandidateEventIds(params: {
   context: CandidateEventContext;
   socialUnlockEventId?: number;
@@ -69,9 +54,10 @@ export function buildCandidateEventIds(params: {
   const { context } = params;
   const pendingIds = new Set<number>((context.pendingRandomEvents ?? []).map((event) => event.eventId));
   const candidateEventIds = context.availableRandomEvents.filter((eventId) => (
-    eventId !== DISEASE_EVENT_ID
+    Number.isFinite(eventId)
+    && eventId !== DISEASE_EVENT_ID
     && !pendingIds.has(eventId)
-    && !context.usedRandomEvents.includes(eventId)
+    && !context.excludedEventIds?.includes(eventId)
   ));
   const excludedCategories = new Set(context.excludedCategories ?? []);
   const alternateCategoryCandidates = excludedCategories.size === 0
@@ -82,7 +68,7 @@ export function buildCandidateEventIds(params: {
     });
 
   return {
-    candidateEventIds: uniqueEventIds(alternateCategoryCandidates.length > 0 ? alternateCategoryCandidates : candidateEventIds),
+    candidateEventIds: alternateCategoryCandidates.length > 0 ? alternateCategoryCandidates : candidateEventIds,
   };
 }
 

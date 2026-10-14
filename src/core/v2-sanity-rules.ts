@@ -1,7 +1,23 @@
 import { getAttributeTier } from "./v2-random-event-rules";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { formatMoney } from "./v2-money";
-import type { Buff, EventSupportState } from "./v2-types";
+import type { Buff, EventSupportState, GameState } from "./v2-types";
+
+export const SLOTH_SAN_BUFF_ID = "role-sloth-san";
+
+/** Fixed monthly drains do not inherit illness, season-action or lover modifiers. */
+export function getRoleMonthlySanCost(state: Pick<GameState, "selectedRoleId" | "degree">, baseCost: number): number {
+  if (!Number.isFinite(baseCost) || baseCost <= 0) return 0;
+  return baseCost * (state.selectedRoleId === "normal-reversed" ? state.degree === "phd" ? 3 : 2 : 1);
+}
+
+/** Keep the curse in the ordinary multiplier pool, before fixed discounts. */
+export function createSlothSanBuff(state: Pick<GameState, "selectedRoleId" | "degree">): Buff | null {
+  if (state.selectedRoleId !== "normal-reversed") return null;
+  const multiplier = state.degree === "phd" ? 3 : 2;
+  return { id: SLOTH_SAN_BUFF_ID, name: "极致怠惰", source: "角色天赋", timing: "permanent", remainingMonths: null,
+    activeOperationSanMultiplier: multiplier, description: `SAN消耗×${multiplier}` };
+}
 
 export type SeasonId = "spring" | "summer" | "autumn" | "winter";
 
@@ -152,13 +168,15 @@ export function formatResearchMiscSanChange(
 export function formatTierResistedOutcome(
   label: string,
   rawChange: number,
-  result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount" | "cappedCount">,
+  result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount" | "cappedCount"> & { moneyCost?: number; capIncrease?: number },
 ): string {
   const actual = result.effectiveChange;
   const signedActual = formatSignedEffectChange(Number(formatMoney(actual)), rawChange);
   const detailText = [
     result.resistedCount > 0 ? `抵抗${formatMoney(result.resistedCount)}` : "",
     result.cappedCount && rawChange > 0 ? "上限" : "",
+    result.moneyCost ? `金币 -${formatMoney(result.moneyCost)}` : "",
+    result.capIncrease ? `${label}上限 +${formatMoney(result.capIncrease)}` : "",
   ].filter(Boolean).join("；");
   return `${label} ${signedActual}${detailText ? `（${detailText}）` : ""}`;
 }
@@ -168,6 +186,7 @@ export function applyTierResist(
   currentValue: number,
   _getRoll: () => number = Math.random,
   maximumValue = 20,
+  resistanceReduction = 0,
 ): { effectiveChange: number; resistedCount: number; cappedCount?: number } {
   if (rawChange === 0) {
     return { effectiveChange: 0, resistedCount: 0 };
@@ -182,7 +201,7 @@ export function applyTierResist(
   let cappedCount = 0;
   for (let index = 0; index < absChange; index += 1) {
     const rawStep = round(Math.min(1, absChange - index));
-    const resisted = round(rawStep * getTierResistChance(value));
+    const resisted = round(rawStep * Math.max(0, getTierResistChance(value) - resistanceReduction));
     const retained = round(rawStep - resisted);
     const applied = sign > 0 ? round(Math.min(retained, Math.max(0, maximumValue - value))) : retained;
     resistedCount = round(resistedCount + resisted);

@@ -1,376 +1,417 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createVisitStats } from "../src/app/v2-visit-stats";
+import { createStatisticsClient } from "../src/app/v2-statistics-client";
 import { createStore } from "../src/core/v2-store";
 import { getCalendarForTotalMonths, getMonthLimitByDegree } from "../src/core/v2-progression";
 import { withPassingThesisReview } from "./helpers/v2-thesis-fixtures";
 
-const PREFIX = "phd_simulator_v2";
 const DAY = "2026-09-14";
 const TODAY = Date.parse(`${DAY}T12:00:00+08:00`);
+const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
+const controllers: ReturnType<typeof createVisitStats>[] = [];
+const clients: ReturnType<typeof createStatisticsClient>[] = [];
+type Activity = { p_id: string; p_event: "visit" | "start" | "finish"; p_day: string;
+  p_visitor_id?: string; p_run_key?: string; p_role_id?: string; p_ending?: string };
 
 function createStorage() {
   const values = new Map<string, string>();
-  return {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => { values.set(key, value); },
-  };
+  return { getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); } };
 }
 
 function createBackend() {
-  const counters = new Map<string, number>();
-  const failedIds = new Set<string>();
+  const rows = new Map<string, Activity>();
+  let loseAck = false;
+  let failRead = false;
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    expect(String(input)).toMatch(/^https:\/\/rffmgeacueokudwreyeb\.supabase\.co\/rest\/v1\/rpc\//);
     const payload = JSON.parse(String(init?.body));
-    if (String(input).endsWith("/increment_counter")) {
-      if (failedIds.has(payload.counter_id)) return new Response("unavailable", { status: 503 });
-      counters.set(payload.counter_id, (counters.get(payload.counter_id) ?? 0) + 1);
-      return new Response(null, { status: 204 });
+    if (String(input).endsWith("/record_phd_simulator_v2_stats_batch")) {
+      const records = payload.p_records as { kind: string; payload: Activity }[];
+      for (const row of records) {
+        expect(row.kind).toBe("activity");
+        const key = row.payload.p_event === "visit" ? row.payload.p_id : `${row.payload.p_event}:${row.payload.p_run_key}`;
+        if (!rows.has(key)) rows.set(key, row.payload);
+      }
+      if (loseAck) { loseAck = false; throw new Error("Lost acknowledgement after commit"); }
+      return Response.json(records.map((record) => record.payload.p_id));
     }
-    return Response.json(payload.counter_ids
-      .filter((id: string) => counters.has(id))
-      .map((id: string) => ({ id, count: String(counters.get(id)) })));
+    expect(String(input)).toMatch(/\/get_phd_simulator_v2_activity_stats$/);
+    if (failRead) throw new Error("Offline");
+    const data = [...rows.values()];
+    const visits = data.filter((row) => row.p_event === "visit");
+    const starts = data.filter((row) => row.p_event === "start");
+    const roles: Record<string, { games: number; finished: number; clears: number; phd: number }> = {};
+    for (const row of data.filter((entry) => entry.p_event !== "visit")) {
+      const role = roles[row.p_role_id!] ??= { games: 0, finished: 0, clears: 0, phd: 0 };
+      if (row.p_event === "start") role.games++;
+      else { role.finished++; if (["master", "phd"].includes(row.p_ending!)) role.clears++; if (row.p_ending === "phd") role.phd++; }
+    }
+    return Response.json({ version: 2, day: payload.p_day, views: visits.length, todayViews: visits.filter((row) => row.p_day === payload.p_day).length,
+      visitors: new Set(visits.map((row) => row.p_visitor_id)).size,
+      todayVisitors: new Set(visits.filter((row) => row.p_day === payload.p_day).map((row) => row.p_visitor_id)).size,
+      games: starts.length, todayGames: starts.filter((row) => row.p_day === payload.p_day).length, roles });
   });
-  return { counters, fetch, failedIds };
+  return { rows, fetch, loseNextAck: () => { loseAck = true; }, failReads: () => { failRead = true; } };
 }
 
-afterEach(() => vi.unstubAllGlobals());
+function create(options: Parameters<typeof createVisitStats>[0]) {
+  const result = createVisitStats(options);
+  controllers.push(result);
+  return result;
+}
+function shared(options: Parameters<typeof createStatisticsClient>[0]) {
+  const result = createStatisticsClient(options);
+  clients.push(result);
+  return result;
+}
+function fakeRoot() {
+  const cells = new Map<string, { textContent: string }>();
+  const root = { querySelectorAll: (selector: string) => {
+    const cell = cells.get(selector) ?? { textContent: "" };
+    cells.set(selector, cell);
+    return [cell];
+  } } as unknown as ParentNode;
+  return { root, cells };
+}
+function summary(overrides: Record<string, unknown> = {}) {
+  return { version: 2, day: DAY, views: 20, todayViews: 3, visitors: 10, todayVisitors: 2, games: 8, todayGames: 1,
+    roles: { normal: { games: 8, finished: 4, clears: 3, phd: 2 } }, ...overrides };
+}
 
-describe("V2 visit statistics", () => {
-  it.each(["burnout", "poor", "expelled", "isolated", "overthinking", "delay", "quit", "master", "phd"] as const)("records the real %s ending once through store updates", async (ending) => {
-    const backend = createBackend();
-    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
-    const store = createStore();
-    const records: Promise<void>[] = [];
-    store.subscribe((state) => records.push(stats.trackGamePhase(state.phase, {
-      roleId: state.selectedRoleId, ending: state.ending, disqualifiedByDebug: store.getLobbyState().lastRunExperience?.disqualifiedByDebug,
-    })));
-    store.dispatch("start-game", { roleId: "normal" });
-    const state = store.getState();
-    state.eventQueue = [];
-    state.totalMonths = 1;
-    state.month = 1;
-    if (ending === "burnout") state.player.san = -1;
-    if (ending === "poor") state.player.money = -1;
-    if (ending === "expelled") state.player.favor = -1;
-    if (ending === "isolated") state.player.social = -1;
-    if (ending === "overthinking") state.player.research = -1;
-    if (ending === "master" || ending === "phd" || ending === "delay") {
-      state.degree = ending === "phd" ? "phd" : "master";
-      state.maxMonths = getMonthLimitByDegree(state.degree);
-      state.totalMonths = state.maxMonths;
-      Object.assign(state, getCalendarForTotalMonths(state.totalMonths, state.degree));
-      state.graduationScoreTarget = ending === "phd" ? 7 : 1;
-      state.totalResearchScore = ending === "delay" ? 0 : state.graduationScoreTarget;
-      state.thesis = withPassingThesisReview(state).thesis;
-    }
-    store.dispatch(ending === "quit" ? "quit-game" : "next-month");
-    expect(store.getState()).toMatchObject({ phase: "finished", ending });
-    store.dispatch("set-date-display-mode", { dateDisplayMode: "calendar" });
-    store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
-    store.dispatch("next-month");
-    store.dispatch("reset-game");
-    await Promise.all(records);
-    expect(stats.getDisplayValues().games).toBe("1（1）");
-    expect(backend.counters.get(`${PREFIX}_games_total`)).toBe(1);
-    expect(backend.counters.get(`${PREFIX}_games_${DAY}`)).toBe(1);
-    expect(stats.getRoleDisplayValues("normal")).toEqual({
-      "global-completed-runs": ending === "master" || ending === "phd" ? "1" : "0",
-      "global-played-runs": "1",
-      "phd-rate": ending === "phd" ? "100.0%" : "0.0%",
-    });
-  });
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(TODAY); });
+afterEach(() => {
+  controllers.splice(0).forEach((controller) => controller.dispose());
+  clients.splice(0).forEach((client) => client.dispose());
+  vi.clearAllTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();
+});
 
-  it("separates roles, computes doctoral graduation rate, and restores cached statistics", async () => {
-    const backend = createBackend();
+describe("kwgame activity statistics", () => {
+  it.each([undefined, 1])("replaces a fresh zero-start cache with obsolete response version %s, even under the current cache key", async (version) => {
     const storage = createStorage();
-    const stats = createVisitStats({ recordVisit: true, storage, fetch: backend.fetch, now: () => TODAY });
-    for (const ending of ["master", "phd", "quit"] as const) {
-      await stats.trackGamePhase("playing");
-      await stats.trackGamePhase("finished", { roleId: "normal", ending });
-      await stats.trackGamePhase("finished", { roleId: "normal", ending });
-    }
-    await stats.trackGamePhase("playing");
-    await stats.trackGamePhase("finished", { roleId: "rich", ending: "phd" });
-    expect(stats.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "2", "global-played-runs": "3", "phd-rate": "33.3%" });
-    expect(stats.getRoleDisplayValues("rich")).toEqual({ "global-completed-runs": "1", "global-played-runs": "1", "phd-rate": "100.0%" });
-    expect(stats.getRoleDisplayValues("chosen")).toEqual({ "global-completed-runs": "0", "global-played-runs": "0", "phd-rate": "--" });
-    const cached = createVisitStats({ recordVisit: false, storage, fetch: backend.fetch, now: () => TODAY });
-    expect(cached.getRoleDisplayValues("normal")).toEqual(stats.getRoleDisplayValues("normal"));
-  });
-
-  it("does not publish debug-run counters and keeps unavailable statistics distinct from zero", async () => {
-    const backend = createBackend();
-    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
-    await stats.trackGamePhase("playing");
-    await stats.trackGamePhase("finished", { roleId: "normal", ending: "phd", disqualifiedByDebug: true });
-    expect(backend.fetch).not.toHaveBeenCalled();
-    expect(stats.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "--", "global-played-runs": "--", "phd-rate": "--" });
-    backend.fetch.mockRejectedValue(new Error("offline"));
-    await stats.load();
+    const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: DAY }, "historical-starts-v2"]);
+    storage.setItem("phd_simulator_v2_statistics_v1", JSON.stringify({ version: 1, cache: [[key, {
+      fetchedAt: Date.now(), retryAt: 0,
+      data: summary({ version, games: 0, todayGames: 0, roles: { normal: { games: 0, finished: 55, clears: 8, phd: 7 } } }),
+    }]] }));
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(summary({ games: 118, todayGames: 3,
+      roles: { normal: { games: 55, finished: 55, clears: 8, phd: 7 } } })));
+    const stats = create({ recordVisit: false, storage, fetch });
     expect(stats.getRoleDisplayValues("normal")["global-played-runs"]).toBe("--");
-  });
-
-  it("renders each role into its own statistics cells and does not divide by zero", async () => {
-    const backend = createBackend();
-    backend.counters.set(`${PREFIX}_role_normal_games_total`, 8);
-    backend.counters.set(`${PREFIX}_role_normal_clears_total`, 4);
-    backend.counters.set(`${PREFIX}_role_normal_phd_total`, 2);
-    const stats = createVisitStats({ recordVisit: false, storage: null, fetch: backend.fetch, now: () => TODAY });
     await stats.load();
-    const cells = new Map<string, { textContent: string }>();
-    const root = { querySelectorAll: (selector: string) => {
-      const cell = { textContent: "" };
-      cells.set(selector, cell);
-      return [cell];
-    } } as unknown as ParentNode;
-    stats.render(root);
-    expect(cells.get('[data-role-stat="global-played-runs"][data-role-id="normal"]')?.textContent).toBe("8");
-    expect(cells.get('[data-role-stat="phd-rate"][data-role-id="normal"]')?.textContent).toBe("25.0%");
-    expect(cells.get('[data-role-stat="phd-rate"][data-role-id="rich"]')?.textContent).toBe("--");
+    expect(stats.getDisplayValues().games).toBe("118（3）");
+    expect(stats.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "8", "global-played-runs": "55", "phd-rate": "12.7%" });
+    stats.dispose();
+    const restored = create({ recordVisit: false, storage, fetch });
+    await restored.load();
+    expect(restored.getRoleDisplayValues("normal")["global-played-runs"]).toBe("55");
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("counts a page once and keeps visitor totals independent from the homepage", async () => {
+  it("does not resurrect an obsolete zero cache or lose read backoff when its replacement fails", async () => {
+    const storage = createStorage();
+    const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: DAY }, "historical-starts-v2"]);
+    storage.setItem("phd_simulator_v2_statistics_v1", JSON.stringify({ version: 1, cache: [[key, {
+      fetchedAt: Date.now(), retryAt: 0, data: summary({ version: undefined, games: 0, todayGames: 0 }),
+    }]] }));
+    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValueOnce(new Error("Offline"))
+      .mockImplementation(async () => Response.json(summary()));
+    const stats = create({ recordVisit: false, storage, fetch });
+    await stats.load();
+    expect(stats.getDisplayValues().games).toBe("--（--）");
+    stats.dispose();
+    const restored = create({ recordVisit: false, storage, fetch });
+    await restored.load();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(restored.getDisplayValues().games).toBe("--（--）");
+    await vi.advanceTimersByTimeAsync(60_000);
+    await restored.load();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(restored.getDisplayValues().games).toBe("8（1）");
+  });
+
+  it("records one page visit through a batch and reads all activity counts in one request", async () => {
     const backend = createBackend();
     const storage = createStorage();
-    storage.setItem("kw66_home_visitor_seen_v2", "true");
-    const stats = createVisitStats({ recordVisit: true, storage, fetch: backend.fetch, now: () => TODAY });
+    const stats = create({ recordVisit: true, fetch: backend.fetch, storage });
     expect(stats.getDisplayValues()).toEqual({ visitors: "--（--）", views: "--（--）", games: "--（--）" });
     await Promise.all([stats.load(), stats.load(), stats.load()]);
+    expect(backend.fetch).toHaveBeenCalledTimes(2);
     expect(stats.getDisplayValues()).toEqual({ visitors: "1（1）", views: "1（1）", games: "0（0）" });
-    expect(backend.fetch).toHaveBeenCalledTimes(5);
-    expect([...backend.counters.keys()]).toEqual(expect.arrayContaining([
-      `${PREFIX}_uv_total`, `${PREFIX}_pv_total`, `${PREFIX}_uv_${DAY}`, `${PREFIX}_pv_${DAY}`,
-    ]));
-    expect(backend.counters.size).toBe(4);
+    const visit = [...backend.rows.values()][0]!;
+    expect(visit).toMatchObject({ p_event: "visit", p_day: DAY, p_visitor_id: storage.getItem(VISITOR_KEY) });
+    expect(Object.keys(visit).sort()).toEqual(["p_day", "p_event", "p_id", "p_visitor_id"]);
+    expect(visit.p_visitor_id).toMatch(/^[0-9a-f-]{36}$/);
+    await stats.load();
+    expect(backend.fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("counts refreshes as visits while deduplicating the same browser", async () => {
+  it("counts reloads as visits while keeping a stable device identity and cached aggregate", async () => {
     const backend = createBackend();
     const storage = createStorage();
-    const options = { recordVisit: true, storage, fetch: backend.fetch, now: () => TODAY };
-    await createVisitStats(options).load();
-    const reloaded = createVisitStats(options);
-    expect(reloaded.getDisplayValues()).toEqual({ visitors: "1（1）", views: "1（1）", games: "0（0）" });
+    const options = { recordVisit: true, fetch: backend.fetch, storage };
+    const first = create(options);
+    await first.load();
+    first.dispose();
+    const reloaded = create(options);
     await reloaded.load();
-    expect(reloaded.getDisplayValues()).toEqual({ visitors: "1（1）", views: "2（2）", games: "0（0）" });
-    const otherBrowser = createVisitStats({ ...options, storage: createStorage() });
-    await otherBrowser.load();
-    expect(otherBrowser.getDisplayValues()).toEqual({ visitors: "2（2）", views: "3（3）", games: "0（0）" });
+    expect(reloaded.getDisplayValues().views).toBe("1（1）");
+    await vi.advanceTimersByTimeAsync(30_000);
+    const visits = [...backend.rows.values()];
+    expect(visits).toHaveLength(2);
+    expect(new Set(visits.map((row) => row.p_visitor_id)).size).toBe(1);
+    expect(new Set(visits.map((row) => row.p_id)).size).toBe(2);
+    expect(backend.fetch.mock.calls.filter(([url]) => String(url).includes("/get_"))).toHaveLength(1);
+    const anotherBrowser = create({ ...options, storage: createStorage() });
+    await anotherBrowser.load();
+    expect(anotherBrowser.getDisplayValues()).toEqual({ visitors: "2（2）", views: "3（3）", games: "0（0）" });
   });
 
-  it("uses Beijing midnight and never labels yesterday's cached counts as today's", async () => {
-    const backend = createBackend();
-    const storage = createStorage();
-    const beforeMidnight = Date.parse("2026-09-14T15:59:59Z");
-    const options = { recordVisit: true, storage, fetch: backend.fetch };
-    await createVisitStats({ ...options, now: () => beforeMidnight }).load();
-    const tomorrow = createVisitStats({ ...options, now: () => beforeMidnight + 1000 });
-    expect(tomorrow.getDisplayValues()).toEqual({ visitors: "1（--）", views: "1（--）", games: "0（--）" });
-    await tomorrow.load();
-    expect(tomorrow.getDisplayValues()).toEqual({ visitors: "2（1）", views: "2（1）", games: "0（0）" });
-    expect(backend.counters.get(`${PREFIX}_uv_2026-09-15`)).toBe(1);
-    expect(backend.counters.get(`${PREFIX}_uv_total`)).toBe(2);
-  });
-
-  it("serializes visitor marking across simultaneously opened tabs when Web Locks are available", async () => {
-    let pending = Promise.resolve();
-    vi.stubGlobal("navigator", {
-      locks: {
-        request: (_name: string, callback: () => Promise<void>) => {
-          pending = pending.then(callback);
-          return pending;
-        },
-      },
+  it("serializes first-time device identity creation across simultaneous tabs before uploading visits", async () => {
+    let release!: () => void;
+    let pending: Promise<unknown> = new Promise<void>((resolve) => { release = resolve; });
+    const request = vi.fn((_name: string, callback: () => string) => {
+      const result = pending.then(callback);
+      pending = result;
+      return result;
     });
+    vi.stubGlobal("navigator", { locks: { request } });
     const backend = createBackend();
-    const options = { recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY };
-    await Promise.all([createVisitStats(options).load(), createVisitStats(options).load()]);
-    expect(backend.counters.get(`${PREFIX}_uv_total`)).toBe(1);
-    expect(backend.counters.get(`${PREFIX}_uv_${DAY}`)).toBe(1);
-    expect(backend.counters.get(`${PREFIX}_pv_total`)).toBe(2);
+    const local = createStorage();
+    const setItem = vi.spyOn(local, "setItem");
+    const options = { recordVisit: true, fetch: backend.fetch, storage: local };
+    const first = create(options);
+    const second = create(options);
+    const loading = [first.load(), second.load()];
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls.map(([name]) => name)).toEqual([`${VISITOR_KEY}_lock`, `${VISITOR_KEY}_lock`]);
+    expect(local.getItem(VISITOR_KEY)).toBeNull();
+    expect(backend.fetch).not.toHaveBeenCalled();
+    release();
+    await Promise.all(loading);
+    await vi.advanceTimersByTimeAsync(30_000);
+    const visits = [...backend.rows.values()];
+    expect(visits).toHaveLength(2);
+    expect(new Set(visits.map((row) => row.p_id)).size).toBe(2);
+    expect(new Set(visits.map((row) => row.p_visitor_id)).size).toBe(1);
+    expect(setItem.mock.calls.filter(([key]) => key === VISITOR_KEY)).toHaveLength(1);
   });
 
-  it("refreshes the same open page after Beijing midnight without counting another visit", async () => {
+  it("retries a lost visit acknowledgement after reload using the original record UUID", async () => {
     const backend = createBackend();
-    let timestamp = Date.parse("2026-09-14T15:59:59Z");
-    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => timestamp });
-    await stats.load();
-    const increments = backend.fetch.mock.calls.filter(([url]) => String(url).endsWith("/increment_counter")).length;
-    timestamp += 1000;
-    backend.counters.set(`${PREFIX}_pv_2026-09-15`, 4);
-    backend.counters.set(`${PREFIX}_uv_2026-09-15`, 3);
-    backend.counters.set(`${PREFIX}_games_2026-09-15`, 2);
-    await Promise.all([stats.load(), stats.load()]);
-    expect(stats.getDisplayValues()).toEqual({ visitors: "1（3）", views: "1（4）", games: "0（2）" });
-    expect(backend.fetch.mock.calls.filter(([url]) => String(url).endsWith("/increment_counter"))).toHaveLength(increments);
-    expect(backend.fetch.mock.calls.filter(([url]) => String(url).endsWith("/get_counters"))).toHaveLength(2);
-  });
-
-  it("retries failed display reads without repeating increments and throttles rendering retries", async () => {
-    const backend = createBackend();
-    let timestamp = TODAY;
-    let offline = true;
-    const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
-      offline && String(input).endsWith("/get_counters")
-        ? Promise.reject(new Error("offline")) : backend.fetch(input, init));
-    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch, now: () => timestamp });
-    const targets = new Map<string, { textContent: string }>();
-    const root = { querySelectorAll: (selector: string) => {
-      if (!targets.has(selector)) targets.set(selector, { textContent: "" });
-      return [targets.get(selector)!];
-    } } as unknown as ParentNode;
-    await stats.load();
-    const requests = fetch.mock.calls.length;
-    stats.render(root);
-    stats.render(root);
-    expect(fetch).toHaveBeenCalledTimes(requests);
-    offline = false;
-    timestamp += 60_000;
-    stats.render(root);
-    await stats.load();
-    expect(targets.get('[data-community-stat="views"]')?.textContent).toBe("1（1）");
-    expect(backend.counters.get(`${PREFIX}_pv_total`)).toBe(1);
-    expect(backend.counters.get(`${PREFIX}_uv_total`)).toBe(1);
-    expect(fetch).toHaveBeenCalledTimes(requests + 1);
-  });
-
-  it("reads shared totals without recording local development or preview traffic", async () => {
-    const backend = createBackend();
-    backend.counters.set(`${PREFIX}_uv_total`, 123);
-    backend.counters.set(`${PREFIX}_pv_total`, 456);
-    backend.counters.set(`${PREFIX}_uv_${DAY}`, 7);
-    backend.counters.set(`${PREFIX}_pv_${DAY}`, 8);
     const storage = createStorage();
-    const stats = createVisitStats({ recordVisit: false, storage, fetch: backend.fetch, now: () => TODAY });
+    backend.loseNextAck();
+    const first = create({ recordVisit: true, fetch: backend.fetch, storage });
+    await first.load();
+    const original = [...backend.rows.values()][0]!.p_id;
+    first.dispose();
+    const restored = shared({ fetch: backend.fetch, storage });
+    await restored.flush();
+    expect(backend.rows.size).toBe(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect([...backend.rows.values()].map((row) => row.p_id)).toEqual([original]);
+    const batches = backend.fetch.mock.calls.filter(([url]) => String(url).includes("/record_"));
+    expect(batches).toHaveLength(2);
+    expect(JSON.parse(String(batches[1]![1]?.body)).p_records[0].payload.p_id).toBe(original);
+  });
+
+  it("counts starts immediately, persists run deduplication, and counts unfinished runs as played", async () => {
+    const backend = createBackend();
+    const storage = createStorage();
+    const stats = create({ recordVisit: true, fetch: backend.fetch, storage });
+    const run = { roleId: "normal" as const, ending: null, runKey: JSON.stringify([1, "normal"]) };
+    await stats.trackGamePhase("playing", run);
+    await stats.trackGamePhase("playing", run);
+    await stats.flush();
+    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start"]);
+    stats.dispose();
+    const restored = create({ recordVisit: true, fetch: backend.fetch, storage });
+    await restored.trackGamePhase("playing", run);
+    await restored.flush();
+    await restored.trackGamePhase("setup");
+    await restored.trackGamePhase("playing", { ...run, runKey: JSON.stringify([2, "normal"]) });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start", "start"]);
+    await vi.advanceTimersByTimeAsync(600_000);
+    const readOnly = create({ recordVisit: false, fetch: backend.fetch, storage });
+    await readOnly.load();
+    expect(readOnly.getDisplayValues().games).toBe("2（2）");
+    expect(readOnly.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "0", "global-played-runs": "2", "phd-rate": "--" });
+  });
+
+  it.each(["burnout", "poor", "expelled", "isolated", "overthinking", "delay", "quit", "master", "phd"] as const)(
+    "records the real %s ending once through store updates", async (ending) => {
+      const backend = createBackend();
+      const stats = create({ recordVisit: true, storage: createStorage(), fetch: backend.fetch });
+      const store = createStore();
+      const transitions: Promise<void>[] = [];
+      store.subscribe((state) => transitions.push(stats.trackGamePhase(state.phase, {
+        roleId: state.selectedRoleId, ending: state.ending, runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
+        disqualifiedByDebug: store.getLobbyState().lastRunExperience?.disqualifiedByDebug,
+      })));
+      store.dispatch("start-game", { roleId: "normal" });
+      const state = store.getState();
+      state.eventQueue = [];
+      state.totalMonths = 1;
+      state.month = 1;
+      if (ending === "burnout") state.player.san = -1;
+      if (ending === "poor") state.player.money = -1;
+      if (ending === "expelled") state.player.favor = -1;
+      if (ending === "isolated") state.player.social = -1;
+      if (ending === "overthinking") state.player.research = -1;
+      if (["master", "phd", "delay"].includes(ending)) {
+        state.degree = ending === "phd" ? "phd" : "master";
+        state.maxMonths = getMonthLimitByDegree(state.degree);
+        state.totalMonths = state.maxMonths;
+        Object.assign(state, getCalendarForTotalMonths(state.totalMonths, state.degree));
+        state.graduationScoreTarget = ending === "phd" ? 7 : 1;
+        state.totalResearchScore = ending === "delay" ? 0 : state.graduationScoreTarget;
+        state.thesis = withPassingThesisReview(state).thesis;
+      }
+      store.dispatch(ending === "quit" ? "quit-game" : "next-month");
+      expect(store.getState()).toMatchObject({ phase: "finished", ending });
+      store.dispatch("set-date-display-mode", { dateDisplayMode: "calendar" });
+      store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
+      store.dispatch("next-month");
+      store.dispatch("reset-game");
+      await Promise.all(transitions);
+      await stats.flush();
+      expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start", "finish"]);
+      expect([...backend.rows.values()][1]).toMatchObject({ p_ending: ending, p_role_id: "normal", p_day: DAY });
+      expect(backend.fetch.mock.calls.filter(([url]) => String(url).includes("/record_"))).toHaveLength(1);
+    },
+  );
+
+  it("excludes debug endings while preserving visits and legitimate start counts", async () => {
+    const backend = createBackend();
+    const client = shared({ fetch: backend.fetch, storage: createStorage() });
+    const stats = create({ recordVisit: true, client });
+    const run = { roleId: "normal" as const, ending: null, runKey: JSON.stringify([3, "normal"]) };
+    await stats.trackGamePhase("playing", run);
+    client.markDebug(run.runKey);
+    await stats.trackGamePhase("finished", { ...run, ending: "phd", disqualifiedByDebug: true });
+    await stats.flush();
+    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start"]);
+    const resumed = create({ recordVisit: true, client });
+    await resumed.trackGamePhase("playing", run);
+    await resumed.trackGamePhase("finished", { ...run, ending: "phd" });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start"]);
+  });
+
+  it("does not count missing run identities or a finished state without an active game", async () => {
+    const backend = createBackend();
+    const stats = create({ recordVisit: true, fetch: backend.fetch, storage: createStorage() });
+    await stats.trackGamePhase("finished", { roleId: "normal", ending: "phd", runKey: JSON.stringify([4, "normal"]) });
+    await stats.trackGamePhase("playing", { roleId: "normal", ending: null });
+    await stats.trackGamePhase("finished", { roleId: "normal", ending: "phd" });
+    await stats.flush();
+    expect(backend.rows.size).toBe(0);
+  });
+
+  it("computes doctoral graduation rate from finished runs, including migrated history", async () => {
+    const backend = createBackend();
+    backend.fetch.mockResolvedValue(Response.json(summary({ roles: {
+      normal: { games: 20, finished: 20, clears: 12, phd: 5 }, rich: { games: 3, finished: 0, clears: 0, phd: 0 },
+    } })));
+    const stats = create({ recordVisit: false, fetch: backend.fetch, storage: createStorage() });
     await stats.load();
-    expect(stats.getDisplayValues()).toEqual({ visitors: "123（7）", views: "456（8）", games: "0（0）" });
+    expect(stats.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "12", "global-played-runs": "20", "phd-rate": "25.0%" });
+    expect(stats.getRoleDisplayValues("rich")["phd-rate"]).toBe("--");
+    expect(stats.getRoleDisplayValues("chosen")).toEqual({ "global-completed-runs": "0", "global-played-runs": "0", "phd-rate": "--" });
+    const { root, cells } = fakeRoot();
+    stats.render(root);
+    expect(cells.get('[data-role-stat="global-played-runs"][data-role-id="normal"]')?.textContent).toBe("20");
+    expect(cells.get('[data-role-stat="phd-rate"][data-role-id="normal"]')?.textContent).toBe("25.0%");
+  });
+
+  it("does not read from rendering or normal actions, and refreshes at a later phase boundary", async () => {
+    const backend = createBackend();
+    const stats = create({ recordVisit: false, fetch: backend.fetch, storage: createStorage() });
+    await stats.load();
+    const run = { roleId: "normal" as const, ending: null, runKey: JSON.stringify([5, "normal"]) };
+    await stats.trackGamePhase("playing", run);
+    const { root } = fakeRoot();
+    for (let i = 0; i < 20; i++) { stats.render(root); await stats.trackGamePhase("playing", run); }
+    await vi.advanceTimersByTimeAsync(600_001);
+    stats.render(root);
+    await stats.trackGamePhase("playing", run);
     expect(backend.fetch).toHaveBeenCalledTimes(1);
-    expect(storage.getItem(`${PREFIX}_visitor_seen`)).toBeNull();
-    expect(storage.getItem(`${PREFIX}_visitor_day`)).toBeNull();
-    expect(storage.getItem(`${PREFIX}_visitor_total_day`)).toBeNull();
+    await stats.trackGamePhase("finished", { ...run, ending: "master" });
+    expect(backend.fetch).toHaveBeenCalledTimes(2);
+    await stats.trackGamePhase("finished", { ...run, ending: "master" });
+    expect(backend.fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("does not mark a failed visitor increment as successfully recorded", async () => {
+  it("can load activity counts while the shared research snapshot is frozen", async () => {
     const backend = createBackend();
-    backend.failedIds.add(`${PREFIX}_uv_total`);
-    const storage = createStorage();
-    const options = { recordVisit: true, storage, fetch: backend.fetch, now: () => TODAY };
-    await createVisitStats(options).load();
-    expect(storage.getItem(`${PREFIX}_visitor_total_day`)).toBeNull();
-    expect(storage.getItem(`${PREFIX}_visitor_day`)).toBe(DAY);
-    backend.failedIds.clear();
-    const retried = createVisitStats(options);
-    await retried.load();
-    expect(retried.getDisplayValues()).toEqual({ visitors: "1（1）", views: "2（2）", games: "0（0）" });
+    backend.fetch.mockRejectedValueOnce(new Error("Research statistics unavailable"));
+    const client = shared({ fetch: backend.fetch, storage: createStorage() });
+    await client.startRun("run-1");
+    const stats = create({ recordVisit: false, client });
+    await stats.load();
+    expect(stats.getDisplayValues()).toEqual({ visitors: "0（0）", views: "0（0）", games: "0（0）" });
+    expect(backend.fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("retains a valid cache on failure and leaves unavailable data as placeholders", async () => {
+  it("uses Beijing days and leaves yesterday's cached daily counts as placeholders until explicit loading", async () => {
     const backend = createBackend();
     const storage = createStorage();
-    const options = { recordVisit: true, storage, fetch: backend.fetch, now: () => TODAY };
-    await createVisitStats(options).load();
-    backend.fetch.mockRejectedValue(new Error("offline"));
-    const cached = createVisitStats(options);
-    await cached.load();
-    expect(cached.getDisplayValues()).toEqual({ visitors: "1（1）", views: "1（1）", games: "0（0）" });
-    const unavailable = createVisitStats({ ...options, storage: createStorage() });
+    vi.setSystemTime(Date.parse("2026-09-14T15:59:59Z"));
+    const stats = create({ recordVisit: true, storage, fetch: backend.fetch });
+    await stats.load();
+    await vi.advanceTimersByTimeAsync(1000);
+    const { root } = fakeRoot();
+    stats.render(root);
+    expect(stats.getDisplayValues()).toEqual({ visitors: "1（--）", views: "1（--）", games: "0（--）" });
+    expect(backend.fetch).toHaveBeenCalledTimes(2);
+    await stats.load();
+    expect(stats.getDisplayValues()).toEqual({ visitors: "1（0）", views: "1（0）", games: "0（0）" });
+    expect([...backend.rows.values()]).toHaveLength(1);
+    expect(JSON.parse(String(backend.fetch.mock.calls[2]![1]?.body))).toEqual({ p_day: "2026-09-15" });
+  });
+
+  it("never uploads read-only preview traffic and respects a disabled shared client", async () => {
+    const backend = createBackend();
+    const storage = createStorage();
+    const stats = create({ recordVisit: false, storage, fetch: backend.fetch });
+    await stats.load();
+    await stats.trackGamePhase("playing", { roleId: "normal", ending: null, runKey: JSON.stringify([6, "normal"]) });
+    await stats.trackGamePhase("finished", { roleId: "normal", ending: "phd", runKey: JSON.stringify([6, "normal"]) });
+    await stats.flush();
+    expect(backend.fetch).toHaveBeenCalledTimes(1);
+    expect(backend.rows.size).toBe(0);
+    expect(storage.getItem(VISITOR_KEY)).toBeNull();
+    const client = shared({ enabled: false, fetch: backend.fetch, storage });
+    const disabled = create({ recordVisit: false, client, storage });
+    await disabled.load();
+    expect(disabled.getDisplayValues().views).toBe("--（--）");
+    expect(backend.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([null, {}, summary({ version: undefined }), summary({ version: 1 }), summary({ day: "2026-09-13" }), summary({ games: -1 }),
+    summary({ roles: { normal: { games: 2, finished: 1, clears: 2, phd: 0 } } })])(
+    "rejects invalid aggregates instead of inventing zero counters: %j", async (value) => {
+      const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(value));
+      const stats = create({ recordVisit: false, fetch, storage: createStorage() });
+      await stats.load();
+      expect(stats.getDisplayValues()).toEqual({ visitors: "--（--）", views: "--（--）", games: "--（--）" });
+      expect(stats.getRoleDisplayValues("normal")["phd-rate"]).toBe("--");
+    },
+  );
+
+  it("preserves cached real numbers on failure and tolerates blocked local storage", async () => {
+    const backend = createBackend();
+    const storage = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("full"); } };
+    const stats = create({ recordVisit: true, fetch: backend.fetch, storage });
+    await stats.load();
+    expect(stats.getDisplayValues().views).toBe("1（1）");
+    backend.failReads();
+    await vi.advanceTimersByTimeAsync(600_001);
+    await stats.load();
+    expect(stats.getDisplayValues().views).toBe("1（1）");
+    const unavailable = create({ recordVisit: false, fetch: backend.fetch, storage: createStorage() });
     await unavailable.load();
-    expect(unavailable.getDisplayValues()).toEqual({ visitors: "--（--）", views: "--（--）", games: "--（--）" });
-  });
-
-  it("continues loading when browser storage is blocked", async () => {
-    const backend = createBackend();
-    const stats = createVisitStats({
-      recordVisit: true,
-      fetch: backend.fetch,
-      now: () => TODAY,
-      storage: {
-        getItem: () => { throw new Error("storage blocked"); },
-        setItem: () => { throw new Error("storage blocked"); },
-      },
-    });
-    await stats.load();
-    expect(stats.getDisplayValues()).toEqual({ visitors: "1（1）", views: "1（1）", games: "0（0）" });
-  });
-
-  it("rejects malformed cache and counter data without displaying invented zero counts", async () => {
-    const storage = createStorage();
-    storage.setItem(`${PREFIX}_stats_snapshot`, JSON.stringify({ day: DAY, visitors: -1 }));
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json([{ id: `${PREFIX}_uv_total`, count: "not a number" }]));
-    const stats = createVisitStats({ recordVisit: false, storage, fetch, now: () => TODAY });
-    await stats.load();
-    expect(stats.getDisplayValues()).toEqual({ visitors: "--（--）", views: "--（--）", games: "--（--）" });
-  });
-
-  it("keeps existing visit totals and migrates today's visitor marker without recounting", async () => {
-    const backend = createBackend();
-    backend.counters.set(`${PREFIX}_uv_total`, 123);
-    backend.counters.set(`${PREFIX}_uv_${DAY}`, 7);
-    const storage = createStorage();
-    storage.setItem(`${PREFIX}_visitor_seen`, "true");
-    storage.setItem(`${PREFIX}_visitor_day`, DAY);
-    storage.setItem(`${PREFIX}_stats_snapshot`, JSON.stringify({ day: DAY, visitors: 123, views: 456, todayVisitors: 7, todayViews: 8 }));
-    const stats = createVisitStats({ recordVisit: true, storage, fetch: backend.fetch, now: () => TODAY });
-    expect(stats.getDisplayValues()).toEqual({ visitors: "123（7）", views: "456（8）", games: "--（--）" });
-    await stats.load();
-    expect(backend.counters.get(`${PREFIX}_uv_total`)).toBe(123);
-    expect(stats.getDisplayValues().visitors).toBe("123（7）");
-    expect(stats.getDisplayValues().games).toBe("0（0）");
-    const tomorrow = createVisitStats({ recordVisit: true, storage, fetch: backend.fetch, now: () => TODAY + 86400000 });
-    await tomorrow.load();
-    expect(tomorrow.getDisplayValues().visitors).toBe("124（1）");
-  });
-
-  it("counts completed games once per ending and does not count starts or abandoned runs", async () => {
-    const backend = createBackend();
-    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
-    await stats.load();
-    for (const phase of ["setup", "playing", "playing", "setup", "playing"] as const) await stats.trackGamePhase(phase);
-    expect(stats.getDisplayValues().games).toBe("0（0）");
-    await Promise.all([stats.trackGamePhase("finished"), stats.trackGamePhase("finished"), stats.load()]);
-    expect(stats.getDisplayValues().games).toBe("1（1）");
-    await stats.trackGamePhase("playing");
-    await stats.trackGamePhase("finished");
-    expect(stats.getDisplayValues()).toEqual({ visitors: "1（1）", views: "1（1）", games: "2（2）" });
-    expect(backend.counters.size).toBe(6);
-  });
-
-  it("serializes fast endings after the initial visit and attributes each to its Beijing date", async () => {
-    const backend = createBackend();
-    let timestamp = Date.parse("2026-09-14T15:59:59Z");
-    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => timestamp });
-    const loading = stats.load();
-    await stats.trackGamePhase("playing");
-    const first = stats.trackGamePhase("finished");
-    timestamp += 1000;
-    await stats.trackGamePhase("playing");
-    const second = stats.trackGamePhase("finished");
-    await Promise.all([loading, first, second]);
-    expect(backend.counters.get(`${PREFIX}_games_${DAY}`)).toBe(1);
-    expect(backend.counters.get(`${PREFIX}_games_2026-09-15`)).toBe(1);
-    expect(stats.getDisplayValues().games).toBe("2（1）");
-    expect(backend.counters.get(`${PREFIX}_pv_total`)).toBe(1);
-  });
-
-  it("does not count endings in local development or a finished state without an active game", async () => {
-    const backend = createBackend();
-    const stats = createVisitStats({ recordVisit: false, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
-    await stats.load();
-    await stats.trackGamePhase("playing");
-    await stats.trackGamePhase("finished");
-    expect(backend.fetch).toHaveBeenCalledTimes(1);
-    const restored = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
-    await restored.trackGamePhase("finished");
-    expect(backend.counters.has(`${PREFIX}_games_total`)).toBe(false);
-  });
-
-  it("does not throw or claim a new game count when the statistics service is offline", async () => {
-    const backend = createBackend();
-    const stats = createVisitStats({ recordVisit: true, storage: createStorage(), fetch: backend.fetch, now: () => TODAY });
-    await stats.load();
-    backend.fetch.mockRejectedValue(new Error("offline"));
-    await stats.trackGamePhase("playing");
-    await expect(stats.trackGamePhase("finished")).resolves.toBeUndefined();
-    expect(stats.getDisplayValues().games).toBe("0（0）");
+    expect(unavailable.getDisplayValues().views).toBe("--（--）");
   });
 });

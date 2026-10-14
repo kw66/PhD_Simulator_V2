@@ -4,8 +4,14 @@ import { roundMoney } from "./v2-money";
 import { projectPaperReviewSettlement } from "./v2-publication-system";
 import { createRandomEventById } from "./v2-random-event-router";
 import { previewReadPaperActions } from "./v2-reading-system";
-import { clampResearchToCap } from "./v2-research-cap-system";
-import { getShopEmergencySan, getShopRestSanGain } from "./v2-shop-items-effects";
+import { getPlayerAttributeCap } from "./v2-player-attributes";
+import { applyEventPlayerEffects } from "./v2-event-player-effects";
+import { getActiveOperationAllowance } from "./v2-ai-shop";
+import { replayDeferredEventChoices } from "./v2-engine-event-resolution";
+import { getShopEmergencySan } from "./v2-shop-items-effects";
+import { applyRoleTalentRest } from "./v2-role-talent-rest";
+import { settleGreedCoinGames } from "./v2-role-talent-greed";
+import { settleRoleTalentRescues } from "./v2-role-talent-reactions";
 import type { EventChoice, FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 export type EventChoiceRisk = "certain" | "possible" | null;
@@ -60,6 +66,8 @@ function rebaseValue(current: unknown, previous: unknown, intended: unknown): un
 }
 
 function applyPendingPatch(state: GameState, event: PendingEvent): GameState {
+  if (event.deferredChoices?.length) return replayDeferredEventChoices(state, event.deferredChoices);
+  if (!event.deferredStatePatch?.length) return state;
   const next = structuredClone(state);
   for (const change of event.deferredStatePatch ?? []) {
     if (!["player", "sanCap", "advisorProgressState", "shopState", "actionState", "researchCapacityState", "selectedAdvisorName", "totalMonths"].includes(change.path[0] ?? "")) continue;
@@ -73,32 +81,23 @@ function applyPendingPatch(state: GameState, event: PendingEvent): GameState {
     const key = change.path.at(-1);
     if (valid && key) target[key] = rebaseValue(target[key], change.previousValue, change.value);
   }
-  next.player.san = Math.min(next.sanCap, next.player.san);
-  next.player.research = clampResearchToCap(next.player.research, next.researchCapacityState);
-  next.player.social = Math.min(20, next.player.social);
-  next.player.favor = Math.min(20, next.player.favor);
+  next.player.san = Math.min(next.sanCap < state.sanCap ? next.sanCap : Math.max(next.sanCap, state.player.san), next.player.san);
+  next.player.research = Math.min(Math.max(getPlayerAttributeCap(next, "research"), state.player.research), next.player.research);
+  next.player.social = Math.min(Math.max(getPlayerAttributeCap(next, "social"), state.player.social), next.player.social);
+  next.player.favor = Math.min(Math.max(getPlayerAttributeCap(next, "favor"), state.player.favor), next.player.favor);
   return next;
 }
 
 function projectEffects(state: GameState, effects: EventChoice["effects"]): GameState {
-  const sanCap = Math.max(0, state.sanCap + (effects.sanCapDelta ?? 0));
+  const playerState = applyEventPlayerEffects(state, effects);
   let next: GameState = {
-    ...state, sanCap,
-    player: {
-      san: effects.restoreSanToCap ? sanCap : Math.min(sanCap, state.player.san + (effects.san ?? 0)),
-      research: clampResearchToCap(state.player.research + (effects.research ?? 0), state.researchCapacityState),
-      social: Math.min(20, state.player.social + (effects.social ?? 0)),
-      favor: Math.min(20, state.player.favor + (effects.favor ?? 0)),
-      money: roundMoney(state.player.money + roundMoney(effects.money ?? 0)),
-    },
+    ...playerState,
     advisorProgressState: { ...state.advisorProgressState,
       funding: roundMoney(state.advisorProgressState.funding + roundMoney(effects.advisorProgressStateDeltas?.funding ?? 0)),
     },
   };
-  if (effects.restAction && state.actionState.used < state.actionState.limit) {
-    next.player.san = Math.min(sanCap, next.player.san + getShopRestSanGain(state.shopState));
-    next.actionState = { ...state.actionState, used: state.actionState.used + 1 };
-  }
+  if ((effects.restAction && getActiveOperationAllowance(state, "rest").allowed) || effects.roleTalentRest)
+    next = applyRoleTalentRest(next, { yearSummary: effects.roleTalentRest === "year-summary" });
   if (effects.readPaperActions) {
     next = previewReadPaperActions(next, effects.readPaperActions, {
       consumeMonthlyAction: false, allowSanOverdraw: true, random: () => 0,
@@ -157,7 +156,8 @@ export function getEventChoiceRiskDetails(state: GameState, event: PendingEvent,
   if (state.phase !== "playing") return null;
   const snapshot = structuredClone(state);
   const outcomes = randomChoiceVariants(snapshot, event, choice)
-    .flatMap((variant) => projectChoice(snapshot, event, variant, new Set()));
+    .flatMap((variant) => projectChoice(snapshot, event, variant, new Set()))
+    .map((outcome) => settleRoleTalentRescues(settleGreedCoinGames(outcome)));
   const unsafeOutcomes = outcomes.map(() => false);
   const reasons: EventChoiceRiskReason[] = [];
   for (const { resource, label, consequence, value } of riskResources) {

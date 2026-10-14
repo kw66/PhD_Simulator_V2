@@ -57,6 +57,32 @@ function finishGrantEvent(state: GameState): GameState {
 }
 
 describe("advisor project economy", () => {
+  it("pays advisor projects with gold power without reducing SAN", () => {
+    const state = makeState();
+    state.selectedRoleId = "rich";
+    state.roleTalents = { levels: { "gold-power-alpha": 1 } };
+    state.player.money = 60;
+    state.player.san = 0;
+    const next = advanceAdvisorProject(state, "horizontal", () => 0);
+    expect(next.player.san).toBe(0);
+    expect(next.player.money).toBe(55);
+    expect(next.advisorProgressState.horizontalProgress).toBe(20);
+    expect(next.log.some((entry) => entry.text.includes("金之力α"))).toBe(true);
+  });
+
+  it("can spend the monthly beta waiver on an advisor project", () => {
+    const state = makeState();
+    state.degree = "phd";
+    state.roleTalents = { levels: { "burning-life-beta": 1 } };
+    state.player.san = 0;
+    const next = advanceAdvisorProject(state, "vertical", () => 0);
+    expect(next.player.san).toBe(0);
+    expect(next.sanCap).toBe(state.sanCap - 1);
+    expect(next.roleTalents?.betaUsedMonth).toBe(state.totalMonths);
+    expect(next.advisorProgressState.verticalProgress).toBe(20);
+    expect(advanceAdvisorProject(next, "horizontal", () => 0).sanCap).toBe(next.sanCap);
+  });
+
   it.each([null, ...ADVISOR_GRANTS.map((grant) => grant.id)])("keeps base wages independent of rank %s and bonuses tied only to funding", (award) => {
     for (const funding of [59.99, 60, 60.01]) {
       const advisor = createAdvisorProgressState();

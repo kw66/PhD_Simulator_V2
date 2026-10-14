@@ -1,20 +1,23 @@
-import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { createJuniorDelegationTalent, getJuniorDelegationSocialChange } from "./v2-role-talent-relationships";
+import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import { getFellowName } from "./v2-fellow-progression";
 import type { GameState, PendingEvent } from "./v2-types";
 
-export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
+export function createAdvisorAuthorshipRandomEvent(state: GameState, _getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
   const lowFavor = state.player.favor < 6;
   const argueSanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
   const familiarJunior = state.fellowProgressState.find((profile) => profile.type === "junior");
   const hasJunior = familiarJunior !== undefined;
-  const transferSocialRaw = hasJunior ? -1 : -2;
-  const transferSocialResult = applyTierResist(transferSocialRaw, state.player.social, getRoll);
+  const transferSocialRaw = getJuniorDelegationSocialChange(state, hasJunior ? -1 : -2);
+  const transferSocialResult = previewPlayerAttributeChange(state, "social", transferSocialRaw);
   const transferSocialChange = transferSocialResult.effectiveChange;
-  const pressureFavorResult = applyTierResist(-2, state.player.favor, getRoll);
+  const pressureFavorResult = previewPlayerAttributeChange(state, "favor", -2);
   const pressureFavorChange = pressureFavorResult.effectiveChange;
   const pressureFavorNarrative = getTierResistedNarrative("导师好感", -2, pressureFavorResult);
+  const delegationTalent = createJuniorDelegationTalent(state, _getRoll);
 
   const event: PendingEvent = {
     id: `random-12-y${state.year}-m${state.month}-n${serial}`,
@@ -42,8 +45,8 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
       {
         id: `random-12-transfer-${serial}`,
         label: "转移到师弟师妹",
-        outcome: `条件：${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜结果：${formatTierResistedOutcome("社交", transferSocialRaw, transferSocialResult)}`,
-        effects: transferSocialChange < 0 ? { social: transferSocialChange } : {},
+        outcome: `条件：${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜结果：${formatTierResistedOutcome("社交", transferSocialRaw || -1, transferSocialResult)}${delegationTalent.outcome}`,
+        effects: { social: transferSocialChange, rawSocial: transferSocialRaw, ...delegationTalent.effects },
       },
       {
         id: `random-12-argue-${serial}`,
@@ -57,7 +60,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
         outcome: `金币 +2，${formatTierResistedOutcome("导师好感", -2, pressureFavorResult)}`,
         effects: {
           money: 2,
-          ...(pressureFavorChange < 0 ? { favor: pressureFavorChange } : {}),
+          ...({ favor: pressureFavorChange, rawFavor: -2 }),
         },
       },
     ],
@@ -125,6 +128,6 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, getRoll: Ra
         ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 

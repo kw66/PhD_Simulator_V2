@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { getConferenceActivityOptions } from "./v2-conference-activity-options";
 import type { ConferenceActivityPreview } from "./v2-conference-activity-shared";
 import { getRoleDefinition } from "./v2-progression";
@@ -7,7 +8,7 @@ import type { GameState, PendingEvent } from "./v2-types";
 export function refreshConferenceActivityEvent<Event extends PendingEvent>(state: GameState, event: Event): Event {
   const preview: ConferenceActivityPreview | undefined = event.conferenceActivityPreview;
   if (!preview) return event;
-  const current = { ...state, research: state.player.research, social: state.player.social,
+  const current = { ...state, playerAttributeState: state, research: getEffectiveResearch(state), social: getEffectiveSocial(state),
     playerGender: getRoleDefinition(state.selectedRoleId).gender };
   let rollIndex = 0;
   const getRoll = () => preview.rolls[rollIndex++] ?? 0.5;

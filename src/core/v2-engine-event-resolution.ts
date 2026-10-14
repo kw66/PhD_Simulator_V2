@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import {
   pushLog,
   pushNoOpLog,
@@ -7,8 +8,11 @@ import {
   removeEventQueueItem,
 } from "./v2-event-queue";
 import { enqueueResolvedEventFollowUps } from "./v2-engine-event-resolution-followups";
+import { getPlayerAttributeCap } from "./v2-player-attributes";
+import { getActiveOperationAllowance } from "./v2-ai-shop";
+import { formatEventSanPaymentText } from "./v2-event-player-effects";
+import { settleGreedCoinGames } from "./v2-role-talent-greed";
 import { applyChoiceEffectsToState } from "./v2-engine-event-resolution-state";
-import { clampResearchToCap } from "./v2-research-cap-system";
 import { createRandomEventById } from "./v2-random-event-router";
 import { refreshPaperCompetitionEvent } from "./v2-paper-competition-preview";
 import { refreshPaperReviewEvent } from "./v2-publication-system";
@@ -233,10 +237,10 @@ function applyDeferredStatePatch(state: GameState, patch: DeferredEventStatePatc
   }
   nextState.player = {
     ...nextState.player,
-    san: Math.min(nextState.sanCap, nextState.player.san),
-    research: clampResearchToCap(nextState.player.research, nextState.researchCapacityState),
-    social: Math.min(20, nextState.player.social),
-    favor: Math.min(20, nextState.player.favor),
+    san: Math.min(nextState.sanCap < state.sanCap ? nextState.sanCap : Math.max(nextState.sanCap, state.player.san), nextState.player.san),
+    research: Math.min(Math.max(getPlayerAttributeCap(nextState, "research"), state.player.research), nextState.player.research),
+    social: Math.min(Math.max(getPlayerAttributeCap(nextState, "social"), state.player.social), nextState.player.social),
+    favor: Math.min(Math.max(getPlayerAttributeCap(nextState, "favor"), state.player.favor), nextState.player.favor),
   };
   enforceDeferredRelationshipCapacity(nextState, patch);
   nextState.phase = state.phase;
@@ -334,6 +338,7 @@ function rebuildEventFromCurrentState(
     randomReplay: replay,
     replayContext: queuedEvent.replayContext,
     deferredStatePatch: queuedEvent.deferredStatePatch,
+    deferredChoices: queuedEvent.deferredChoices,
     debugRootEventId: queuedEvent.debugRootEventId,
     ...(queuedEvent.debugReplayable ? {
       debugReplayable: true,
@@ -349,10 +354,12 @@ function suppressDepartedRecruitment<Event extends PendingEvent>(state: GameStat
     description: `对方已经结束学业离校，这次不再开始新的合作。\n\n机制结算\n${outcome}`,
     completionLog: "同学已离校，无事发生。",
     deferredStatePatch: undefined,
+    deferredChoices: undefined,
     choices: result.choices.map((choice) => ({ ...choice, outcome, effects: {} })),
   });
   const choices = event.choices.map((choice) => {
-      if (choice.effects.fellowAdditions?.some((candidate) => hasRecruitLeft(state, candidate))) {
+      if ([...(choice.effects.fellowAdditions ?? []), ...(choice.effects.fellowOverflowCandidates ?? [])]
+        .some((candidate) => hasRecruitLeft(state, candidate))) {
         return {
           ...choice, outcome,
           effects: { enqueueEvents: choice.effects.enqueueEvents?.map(clearResult) },
@@ -368,7 +375,17 @@ function suppressDepartedRecruitment<Event extends PendingEvent>(state: GameStat
 }
 
 export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
-  return suppressDepartedRecruitment(state, resolveQueuedEventPreview(state, queuedEvent));
+  const resolved = suppressDepartedRecruitment(state, resolveQueuedEventPreview(state, queuedEvent));
+  const choices = resolved.choices.map((choice) => {
+    const outcome = formatEventSanPaymentText(choice.outcome, state, choice.effects);
+    return outcome === choice.outcome ? choice : { ...choice, outcome };
+  });
+  const effects = choices.length === 1 && resolved.stage === "result" ? choices[0]!.effects : {};
+  const description = formatEventSanPaymentText(resolved.description, state, effects);
+  const completionLog = resolved.completionLog ? formatEventSanPaymentText(resolved.completionLog, state, effects) : resolved.completionLog;
+  return description === resolved.description && completionLog === resolved.completionLog
+    && choices.every((choice, index) => choice === resolved.choices[index]) ? resolved
+    : { ...resolved, choices, description, completionLog };
 }
 
 function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
@@ -421,6 +438,7 @@ function refreshOccupiedLoverEvent(state: GameState, event: EventQueueItem): Eve
     ...event,
     description: "你已经有了恋人，决定放下这段尚未确认的关系。\n\n机制结算\n已有恋人，本次不新增关系。",
     deferredStatePatch: undefined,
+    deferredChoices: undefined,
     completionLog: "已有恋人，本次不新增关系。",
   };
 }
@@ -474,7 +492,7 @@ export function applyQueuedEventEffects(
   if (state.debugEventReplayEnabled && queuedEvent.debugReplayable && queuedEvent.stage === "act1"
     && activityPreview && queuedEvent.choices.some((choice) => choice.id === choiceId && !choice.disabledReason)) {
     const rootEvent = createConferenceActivityEvent(activityPreview.context, {
-      ...state, research: state.player.research, social: state.player.social,
+      ...state, playerAttributeState: state, research: getEffectiveResearch(state), social: getEffectiveSocial(state),
       playerGender: getRoleDefinition(state.selectedRoleId).gender,
     }, [activityPreview.attendanceSummary]);
     queuedEvent = {
@@ -492,6 +510,8 @@ export function applyQueuedEventEffects(
   if (choice.disabledReason) {
     return state;
   }
+  if ((choice.effects.restAction || resolvedEvent.deferredChoices?.some((entry) => entry.choice.effects.restAction))
+    && !getActiveOperationAllowance(state, "rest").allowed) return state;
 
   choice = deferResearchChoiceEffects(resolvedEvent, choice);
 
@@ -503,7 +523,9 @@ export function applyQueuedEventEffects(
     ? resolvedEvent.deferredStatePatch?.filter((change) => change.path[0] !== "scholarshipState"
       && change.path.join(".") !== "player.money")
     : resolvedEvent.deferredStatePatch;
-  const stateWithDeferredResolution = applyDeferredStatePatch(state, pendingPatch);
+  const stateWithDeferredResolution = resolvedEvent.deferredChoices?.length
+    ? replayDeferredEventChoices(state, resolvedEvent.deferredChoices)
+    : applyDeferredStatePatch(state, pendingPatch);
   const sourceTitle = resolvedEvent.history?.[0]?.title ?? resolvedEvent.title.split(" ➜ ")[0] ?? "事件";
   const previousScene = resolvedEvent.history?.at(-1);
   const activityChoice = resolvedEvent.chainId.endsWith("-activity")
@@ -515,6 +537,7 @@ export function applyQueuedEventEffects(
     resolvedOutcome,
     resolvedEnqueueEvents,
     resolvedPresentation,
+    resolvedFixedRolls,
   } = applyChoiceEffectsToState(
     stateWithDeferredResolution,
     choice,
@@ -549,6 +572,18 @@ export function applyQueuedEventEffects(
   const deferredStatePatch = hasSameChainFollowUp
     ? createDeferredStatePatch(state, resolvedState)
     : undefined;
+  const { enqueueEvents: _enqueued, stayOnEvent: _stay, ...deferredEffects } = choice.effects;
+  const frozenFixedRolls = resolvedFixedRolls;
+  const deferredChoices: PendingEvent["deferredChoices"] = hasSameChainFollowUp ? [
+    ...(resolvedEvent.deferredChoices ?? []),
+    {
+      choice: { ...choice, effects: { ...deferredEffects,
+        ...(frozenFixedRolls ? { fixedEventResolutionRolls: frozenFixedRolls } : {}) } },
+      source: activityChoice && activityChoice !== sourceTitle ? `${sourceTitle} · ${activityChoice}` : sourceTitle,
+      event: { id: resolvedEvent.id, source: resolvedEvent.source, chainId: resolvedEvent.chainId, stage: resolvedEvent.stage,
+        randomReplay: resolvedEvent.randomReplay, fixedTreePreview: resolvedEvent.fixedTreePreview, replayContext: resolvedEvent.replayContext },
+    },
+  ] : undefined;
   const committedState = hasSameChainFollowUp ? state : resolvedState;
   const recordedEvent = resolvedPresentation ? {
     ...resolvedEvent,
@@ -585,9 +620,11 @@ export function applyQueuedEventEffects(
       ? resolvedEvent.replayContext?.rootEvent.id ?? resolvedEvent.debugRootEventId ?? resolvedEvent.id : undefined,
     resolvedEvent.replayContext ?? (resolvedEvent.stage === "act1" ? { rootEvent: resolvedEvent } : undefined),
     resolvedEvent.randomReplay,
+    deferredChoices,
   );
   nextState = followUpResult.nextState;
   if (!followUpResult.hasSameChainFollowUp) {
+    nextState = settleGreedCoinGames(nextState);
     const eventHistoryId = `${resolvedEvent.id}@${state.totalMonths}@${nextState.eventHistory.length}`;
     nextState = {
       ...nextState,
@@ -630,6 +667,13 @@ export function applyQueuedEventEffects(
   nextState = callbacks.evaluateImmediateEndings(nextState);
   if (nextState.phase !== "playing") return nextState;
   return callbacks.runPostQueuePipeline(nextState);
+}
+
+/** Re-evaluate original requests on the latest state; never reuse old caps, resistance or monthly talent usage. */
+export function replayDeferredEventChoices(state: GameState, choices: NonNullable<PendingEvent["deferredChoices"]>): GameState {
+  return choices.reduce((current, entry) => applyChoiceEffectsToState(current, entry.choice, entry.source, {
+    ...entry.event, title: entry.source, description: "", blocking: true, deadlineMonths: 0, choices: [],
+  }).nextState, state);
 }
 
 function deferResearchChoiceEffects(event: EventQueueItem, choice: EventChoice): EventChoice {

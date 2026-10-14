@@ -27,6 +27,7 @@ export const GAME_ACTION_IDS = [
   "promote-paper",
   "read-paper",
   "part-time-work",
+  "invest-money",
   "rest",
   "resolve-event",
   "end-relationship",

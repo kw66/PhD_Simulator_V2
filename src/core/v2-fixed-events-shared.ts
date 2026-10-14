@@ -1,6 +1,7 @@
 import { addOrReplaceBuffs } from "./v2-buffs";
 import { syncRelationshipState } from "./v2-relationship-rules";
 import { appendFixedEventHint } from "./v2-fixed-event-hints";
+import { applyEventPlayerEffects } from "./v2-event-player-effects";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type RandomRollProvider = () => number;
@@ -10,6 +11,9 @@ export interface FixedStateMutation {
   favor?: number;
   social?: number;
   money?: number;
+  rawResearch?: number;
+  rawSocial?: number;
+  rawFavor?: number;
   temporaryIdeaBonus?: number;
 }
 
@@ -68,19 +72,8 @@ export function applyStateMutation(
   mutation: FixedStateMutation,
   buffSource = "事件",
 ): GameState {
+  state = applyEventPlayerEffects(state, mutation);
   const nextPlayer = { ...state.player };
-  if (mutation.san !== undefined) {
-    nextPlayer.san = Math.min(state.sanCap, nextPlayer.san + mutation.san);
-  }
-  if (mutation.favor !== undefined) {
-    nextPlayer.favor = Math.min(20, nextPlayer.favor + mutation.favor);
-  }
-  if (mutation.social !== undefined) {
-    nextPlayer.social = Math.min(20, nextPlayer.social + mutation.social);
-  }
-  if (mutation.money !== undefined) {
-    nextPlayer.money += mutation.money;
-  }
 
   const buffs = mutation.temporaryIdeaBonus !== undefined
     ? addOrReplaceBuffs(state.buffs, [{

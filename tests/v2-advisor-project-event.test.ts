@@ -159,6 +159,7 @@ describe("advisor project random event effects", () => {
     expect(after.advisorProgressState).toEqual({
       ...state.advisorProgressState,
       funding: 53,
+      cumulativeFunding: 80,
       playerProjectCompletions: { horizontal: 1, vertical: 0 },
       playerProjectParticipation: { horizontal: progress > 0, vertical: false },
     });

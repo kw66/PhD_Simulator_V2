@@ -78,12 +78,12 @@ describe("decimal attributes across module boundaries", () => {
     expect(random).toHaveBeenCalledTimes(1);
   });
 
-  it("applies already resolved positive, negative and zero effects without another resistance pass", () => {
+  it("settles original positive, negative and zero requests instead of resisting presentation values", () => {
     const state = stateWithDecimals();
     const random = vi.spyOn(Math, "random");
     const next = applyChoiceEffectsToState(state, { id: "resolved", label: "finish", outcome: "",
-      effects: { research: 0.75, social: -0.5, favor: 0 } }).nextState;
-    expect(next.player).toMatchObject({ research: 7.5, social: 12, favor: 18.25 });
+      effects: { research: 0.75, rawResearch: 1, social: -0.5, rawSocial: -1, favor: 0, rawFavor: 0 } }).nextState;
+    expect(next.player).toMatchObject({ research: 7.55, social: 11.9, favor: 18.25 });
     expect(random).not.toHaveBeenCalled();
   });
 

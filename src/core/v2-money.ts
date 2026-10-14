@@ -1,4 +1,5 @@
 import type { GameState } from "./v2-types";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 
 export function roundMoney(amount: number): number {
   const [coefficient, exponent = "0"] = Math.abs(amount).toString().split("e");
@@ -8,6 +9,24 @@ export function roundMoney(amount: number): number {
 
 export function formatMoney(amount: number): string {
   return String(roundMoney(amount));
+}
+
+export function recordPersonalSpending(state: GameState, amount: number): GameState {
+  const spent = roundMoney(amount);
+  if (!(spent > 0)) return state;
+  let next: GameState = { ...state, personalSpending: roundMoney((state.personalSpending ?? 0) + spent) };
+  if (state.selectedRoleId !== "rich-reversed" || !state.roleTalents) return next;
+  const conversions = state.degree === "phd" && getRoleTalentLevel(state, "post-phd-money-conversion") > 0
+    ? roundMoney((state.roleTalents.moneyConversionRemainder ?? 0) + spent) : 0;
+  const count = Math.floor(conversions);
+  next = { ...next, roleTalents: { ...state.roleTalents,
+    greedQualifiedSpending: roundMoney((state.roleTalents.greedQualifiedSpending ?? 0) + spent),
+    ...(conversions > 0 ? {
+      moneyConversionRemainder: roundMoney(conversions - count),
+      pendingMoneyConversions: (state.roleTalents.pendingMoneyConversions ?? 0) + count,
+    } : {}),
+  } };
+  return next;
 }
 
 export function normalizeGameMoney(state: GameState): GameState {

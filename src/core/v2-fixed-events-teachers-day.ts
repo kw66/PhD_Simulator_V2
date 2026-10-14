@@ -1,4 +1,6 @@
-import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { formatEventSanPaymentText } from "./v2-event-player-effects";
+import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import {
   appendMechanismSettlement,
   applyStateMutation,
@@ -248,18 +250,19 @@ export function resolveTeachersDayFixedEvent(
       }
       if (!highFavor && branchRoll < errandPercent / 100) {
         const sanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
-        const favorResult = applyTierResist(1, state.player.favor, getRoll);
+        const sanSummary = formatEventSanPaymentText(formatActualSanChange(-3, state.month, state.eventSupport, state.buffs), state, { san: sanChange });
+        const favorResult = previewPlayerAttributeChange(state, "favor", 1);
         const favorChange = favorResult.effectiveChange;
         const favorNarrative = getTierResistedNarrative("导师好感", 1, favorResult);
         return {
           nextState: {
-            ...applyStateMutation(state, { san: sanChange, favor: favorChange }),
+            ...applyStateMutation(state, { san: sanChange, favor: favorChange, rawFavor: 1 }),
             eventCounters: {
               ...state.eventCounters,
               teachersDayErrandCount: (state.eventCounters.teachersDayErrandCount ?? 0) + 1,
             },
           },
-          outcome: `报销跑腿：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+          outcome: `报销跑腿：${sanSummary}｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           enqueueEvents: [createTeachersDayResultEvent({
             state,
             resultId: "message-errand",
@@ -270,12 +273,12 @@ export function resolveTeachersDayFixedEvent(
             ].join("\n\n"),
             settlement: [
               `条件：导师好感 < 6；报销跑腿（${errandPercent}%）`,
-              `结果：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}`,
+              `结果：${sanSummary}`,
               `结果：${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
               ...(errandPercent < 100 ? [`报销跑腿 ${errandPercent}%→${Math.min(100, errandPercent + 10)}%`] : []),
             ].join("\n"),
             buttonLabel: "认命",
-            outcome: `报销跑腿：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
+            outcome: `报销跑腿：${sanSummary}｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
           })],
         };
       }
@@ -305,12 +308,12 @@ export function resolveTeachersDayFixedEvent(
           outcome: "教师节礼物信息无效。",
         };
       }
-      const favorResult = applyTierResist(1, state.player.favor, getRoll);
+      const favorResult = previewPlayerAttributeChange(state, "favor", 1);
       const favorChange = favorResult.effectiveChange;
       const favorNarrative = getTierResistedNarrative("导师好感", 1, favorResult);
       return {
         nextState: applyStateMutation(state, {
-          favor: favorChange,
+          favor: favorChange, rawFavor: 1,
           money: -1,
         }),
         outcome: `送${gift.name}：金币 -1｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,
@@ -329,12 +332,12 @@ export function resolveTeachersDayFixedEvent(
       };
     }
     case "teachers-day-stamp": {
-      const favorResult = applyTierResist(2, state.player.favor, getRoll);
+      const favorResult = previewPlayerAttributeChange(state, "favor", 2);
       const favorChange = favorResult.effectiveChange;
       const favorNarrative = getTierResistedNarrative("导师好感", 2, favorResult);
       const outcome = `送邮票：金币 -3｜${formatTierResistedOutcome("导师好感", 2, favorResult)}。`;
       return {
-        nextState: applyStateMutation(state, { favor: favorChange, money: -3 }),
+        nextState: applyStateMutation(state, { favor: favorChange, rawFavor: 2, money: -3 }),
         outcome,
         enqueueEvents: [createTeachersDayResultEvent({
           state,

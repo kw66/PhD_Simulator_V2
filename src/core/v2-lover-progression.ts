@@ -1,10 +1,13 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
+import { getRecoveredSan } from "./v2-san-recovery";
 import { getRelationshipSanCost, addOrReplaceBuffs } from "./v2-buffs";
 import { pushLog, pushMilestoneLog, pushNoOpLog } from "./v2-engine-helpers";
 import { addPaperCollaboration } from "./v2-paper-collaboration";
 import { getLoverName } from "./v2-lover-system";
-import { getResearchCap } from "./v2-research-cap-system";
+import { applyPlayerAttributeChange } from "./v2-player-attributes";
+import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
 import { generateRelationshipResearch } from "./v2-relationship-research";
-import { formatMoney } from "./v2-money";
+import { formatMoney, recordPersonalSpending } from "./v2-money";
 import { applyTierResist } from "./v2-sanity-rules";
 import { describeResistedTalentReward, describeTalentReward, recordTalentTrigger } from "./v2-talent-history";
 import type { GameState, LoverProgressState, LoverTypeId } from "./v2-types";
@@ -45,8 +48,8 @@ export function getLoverRouteProgress(state: GameState, route: LoverRoute): numb
 
 export function getLoverRouteGain(state: GameState, route: LoverRoute): number {
   const lover = state.loverProgressState;
-  if (route === "play") return Math.floor((lover.intimacy + state.player.social) / 2);
-  if (route === "study") return Math.floor((lover.research + state.player.research) / 2);
+  if (route === "play") return Math.floor((lover.intimacy + getEffectiveSocial(state)) / 2);
+  if (route === "study") return Math.floor((lover.research + getEffectiveResearch(state)) / 2);
   return Math.floor(lover.intimacy / 2) + 10;
 }
 
@@ -60,7 +63,7 @@ export function getLoverDateFailure(state: GameState, route: LoverRoute): string
   if (state.loverProgressState.taskUsedThisMonth || state.loverProgressState.lastDateTotalMonths === state.totalMonths) return "本月已约会，下月恢复";
   const cost = getLoverRouteCost(state, route);
   if (state.player.money < cost.money) return `金币不足，需要${cost.money}`;
-  if (state.player.san < cost.san) return `SAN不足，需要${cost.san}`;
+  if (!quoteSanPayment({ ...state, player: { ...state.player, money: state.player.money - cost.money } }, cost.san).allowed) return `SAN不足，需要${cost.san}`;
   return null;
 }
 
@@ -106,6 +109,7 @@ function advanceRoute(
   gain: number,
   source = "约会",
   random: () => number = Math.random,
+  operationStartState: GameState = state,
 ): GameState {
   const original = getRoute(state, route);
   const total = original.progress + gain;
@@ -118,14 +122,14 @@ function advanceRoute(
     const count = original.completed + completion + 1;
     const cycle = (count - 1) % 3;
     const lover = nextState.loverProgressState;
-    const playerResearch = nextState.player.research;
+    const playerResearch = getEffectiveResearch(nextState, operationStartState);
     const intimacyResult = applyTierResist(route === "shopping" ? 2 : 1, lover.intimacy, random);
     const intimacy = lover.intimacy + intimacyResult.effectiveChange;
     const effects = [describeResistedTalentReward("亲密", lover.intimacy, intimacyResult)];
     nextState = { ...nextState, loverProgressState: { ...lover, intimacy } };
     if (route === "play") {
       if (cycle === 0) {
-        const san = Math.min(nextState.sanCap, nextState.player.san + 6);
+        const san = getRecoveredSan(nextState.player.san, nextState.sanCap, 6);
         effects.push(describeTalentReward("SAN", 6, nextState.player.san, san));
         nextState = { ...nextState, player: { ...nextState.player, san } };
       } else if (cycle === 1) {
@@ -159,11 +163,11 @@ function advanceRoute(
       nextState.loverProgressState.research = lover.research + result.effectiveChange;
       effects.push(describeResistedTalentReward("恋人科研", lover.research, result));
     } else if (playerResearch < lover.research) {
-      const before = playerResearch;
-      const result = applyTierResist(1, before, random, getResearchCap(nextState.researchCapacityState));
-      const gain = result.effectiveChange;
+      const before = nextState.player.research;
+      const change = applyPlayerAttributeChange(nextState, "research", 1, "ordinary");
+      const result = change.result;
       effects.push(describeResistedTalentReward("你的科研", before, result));
-      nextState = { ...nextState, player: { ...nextState.player, research: before + gain } };
+      nextState = change.state;
     } else effects.push("双方科研相同，本次不提升科研");
     nextState = recordTalentTrigger(nextState, `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}:${route}:${count}`, {
       name: "恋人", recipient: `你与${getLoverName(state.loverState)}`, reason: `${source}·${ROUTE_LABELS[route]}进度满100，第${count}次`, effects,
@@ -177,10 +181,12 @@ export function advanceLoverDate(state: GameState, route: LoverRoute): GameState
   if (failure) return pushNoOpLog(state, `约会：${failure}`);
   const cost = getLoverRouteCost(state, route);
   const gain = getLoverRouteGain(state, route);
-  const paid = { ...state, player: { ...state.player, san: state.player.san - cost.san, money: state.player.money - cost.money },
-    loverProgressState: { ...state.loverProgressState, lastDateTotalMonths: state.totalMonths, taskUsedThisMonth: true } };
+  const prepared = { ...state, player: { ...state.player, money: state.player.money - cost.money } };
+  const payment = quoteSanPayment(prepared, cost.san);
+  const paid = recordPersonalSpending({ ...paySanCost(prepared, cost.san),
+    loverProgressState: { ...state.loverProgressState, lastDateTotalMonths: state.totalMonths, taskUsedThisMonth: true } }, cost.money);
   return settlePendingLoverHelp(advanceRoute(pushLog(paid,
-    `约会·${ROUTE_LABELS[route]}：进度 +${gain}${cost.money ? `，金币 -${cost.money}` : ""}${cost.san ? `，SAN -${cost.san}` : ""}`), route, gain));
+    `约会·${ROUTE_LABELS[route]}：进度 +${gain}${cost.money ? `，金币 -${cost.money}` : ""}${cost.san ? `，${formatSanPayment(payment)}` : ""}`), route, gain, "约会", Math.random, state));
 }
 
 export function activateLoverMonthlyDiscount(state: GameState): GameState {

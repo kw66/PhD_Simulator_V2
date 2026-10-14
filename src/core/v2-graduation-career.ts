@@ -2,6 +2,8 @@ import { CAREER_DEFINITIONS, calculateMonthlyCareerProgress, type CareerType } f
 import { pushLog } from "./v2-engine-helpers";
 import { isGraduationPreparationUnlocked } from "./v2-thesis-rules";
 import type { GameState } from "./v2-types";
+import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
+import { getRoleMonthlySanCost } from "./v2-sanity-rules";
 
 export const CAREER_PREPARATION_SAN_COST: Record<CareerType, number> = {
   internet: 4,
@@ -9,6 +11,10 @@ export const CAREER_PREPARATION_SAN_COST: Record<CareerType, number> = {
   civilService: 3,
   academic: 2,
 };
+
+export function getCareerPreparationSanCost(state: GameState, type: CareerType): number {
+  return getRoleMonthlySanCost(state, CAREER_PREPARATION_SAN_COST[type]);
+}
 
 export function getCareerPreparationFailure(state: GameState, type?: CareerType): string | null {
   if (state.phase !== "playing" || state.ending !== null) return "当前无法准备应聘";
@@ -25,11 +31,11 @@ export function getCareerPreparationFailure(state: GameState, type?: CareerType)
 export function prepareCareer(state: GameState, type: CareerType, random: () => number = Math.random): GameState {
   if (getCareerPreparationFailure(state, type)) return state;
   const progressGain = calculateMonthlyCareerProgress(state, type, random);
-  const sanCost = CAREER_PREPARATION_SAN_COST[type];
+  const sanCost = getCareerPreparationSanCost(state, type);
+  const payment = quoteSanPayment(state, sanCost, { allowOverdraw: true });
   return pushLog({
-    ...state,
-    player: { ...state.player, san: state.player.san - sanCost },
+    ...paySanCost(state, sanCost, { allowOverdraw: true }),
     careerProgress: { ...state.careerProgress, [type]: state.careerProgress[type] + progressGain },
     careerPreparedMonths: { ...state.careerPreparedMonths, [type]: state.totalMonths },
-  }, `${CAREER_DEFINITIONS[type].name}方向推进：能力 +${progressGain}，SAN -${sanCost}`);
+  }, `${CAREER_DEFINITIONS[type].name}方向推进：能力 +${progressGain}，${formatSanPayment(payment)}`);
 }

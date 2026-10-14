@@ -1903,7 +1903,8 @@ p {
 }
 
 .community-pagination button,
-.community-feedback-close {
+.community-feedback-close,
+.game-confirm-close {
   display: grid;
   place-items: center;
   width: 34px;
@@ -1921,7 +1922,8 @@ p {
 }
 
 .community-pagination .lucide,
-.community-feedback-close .lucide {
+.community-feedback-close .lucide,
+.game-confirm-close .lucide {
   width: 16px;
   height: 16px;
 }
@@ -2303,59 +2305,6 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.lobby-role-card-achievement-display {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  align-content: start;
-  column-gap: 5px;
-  flex: 1;
-  width: 100%;
-  min-height: 28px;
-  margin-top: 8px;
-  padding: 3px 1px 24px;
-  color: var(--role-card-accent);
-}
-
-.lobby-role-card-achievement-display.is-locked {
-  pointer-events: none;
-}
-
-.lobby-role-card-achievement-label {
-  color: var(--setup-label-color);
-  font-size: calc(var(--setup-label-size) - 0.04rem);
-  font-weight: 720;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.lobby-role-card-achievement-icons {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-
-.lobby-role-card-achievement-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
-  color: inherit;
-  font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
-  font-size: 14px;
-  line-height: 1;
-  filter: grayscale(1) saturate(0);
-  opacity: 0.56;
-}
-
-.lobby-role-card-achievement-icon.is-unlocked {
-  filter: none;
-  opacity: 1;
 }
 
 .lobby-role-card-level-badge {
@@ -3484,6 +3433,9 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="group-event-focus"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="game-event-focus"] { --tree-tone: #6c9379; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="swap-breaks-cap"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="reverse-meter-alpha"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="reverse-meter-beta"] { --tree-tone: #6c9379; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="reverse-meter-gamma"] { --tree-tone: #bb718a; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="natural-charisma"] { --tree-tone: #bb718a; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="supporting-juniors"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-connections"] { --tree-tone: #b18a54; }
@@ -3950,9 +3902,10 @@ button.pager-arrow:disabled {
 
 .lobby-profile-achievement-section {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   padding: 0;
 }
 
@@ -3963,7 +3916,69 @@ button.pager-arrow:disabled {
   gap: 14px;
   height: 56px;
   min-height: 56px;
-  padding: 12px 0 10px;
+  padding: 10px 0 8px;
+}
+
+.lobby-profile-achievement-overall-progress {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  overflow: hidden;
+  border: 1px solid rgba(136, 109, 52, 0.25);
+  border-radius: 4px;
+  background: #eee5d0;
+  box-shadow: inset 0 1px 2px rgba(125, 94, 39, 0.08);
+}
+
+.achievement-completion-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(190, 150, 64, 0.31), rgba(219, 187, 104, 0.23));
+  border-right: 1px solid rgba(177, 134, 42, 0.16);
+}
+
+.achievement-completion-fill[style^="width:0%"] { border-right: 0; }
+
+.lobby-profile-achievement-overall-progress > :not(.achievement-completion-fill),
+.lobby-profile-achievement > :not(.achievement-completion-fill) {
+  position: relative;
+  z-index: 1;
+}
+
+.achievement-personal-rate,
+.achievement-global-rate {
+  color: #7c6536;
+  font-family: var(--ui-font-cjk);
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.achievement-global-rate { min-width: 40px; text-align: right; }
+.achievement-global-rate.is-pending { color: #918779; font-weight: 500; }
+
+.achievement-browse-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 2px 0 10px;
+}
+
+.achievement-page-index {
+  min-width: 30px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .lobby-profile-achievement-title-block {
@@ -4010,20 +4025,25 @@ button.pager-arrow:disabled {
   align-content: start;
   align-items: start;
   gap: 7px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #b9a071 transparent;
 }
 
 .lobby-profile-achievement {
   position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 50px;
-  padding: 5px 8px;
+  min-height: 64px;
+  padding: 7px 9px;
   border: 1px solid rgba(58, 62, 57, 0.16);
   border-radius: 3px;
-  background: linear-gradient(180deg, rgba(255, 253, 248, 0.74), rgba(235, 231, 221, 0.74));
+  background: linear-gradient(180deg, #f6f2e8, #ede7da);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
     0 2px 4px rgba(40, 39, 34, 0.08);
@@ -9349,7 +9369,8 @@ button[data-card-icon-action]:focus-visible {
   box-shadow: inset 0 1px 0 rgba(255, 252, 240, 0.68), 0 3px 0 #a18343, 0 7px 11px rgba(92, 70, 30, 0.13);
 }
 
-.community-feedback-overlay {
+.community-feedback-overlay,
+.game-confirm-overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
@@ -9358,7 +9379,8 @@ button[data-card-icon-action]:focus-visible {
   padding: 20px;
 }
 
-.community-feedback-backdrop {
+.community-feedback-backdrop,
+.game-confirm-backdrop {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -9370,7 +9392,8 @@ button[data-card-icon-action]:focus-visible {
   cursor: default;
 }
 
-.community-feedback-dialog {
+.community-feedback-dialog,
+.game-confirm-dialog {
   position: relative;
   z-index: 1;
   display: grid;
@@ -9392,7 +9415,8 @@ button[data-card-icon-action]:focus-visible {
   padding: 0;
 }
 
-.community-feedback-close {
+.community-feedback-close,
+.game-confirm-close {
   flex: 0 0 auto;
   cursor: pointer;
 }
@@ -11501,11 +11525,13 @@ button[data-card-icon-action]:focus-visible {
     font-size: 0.72rem;
   }
 
-  .community-feedback-overlay {
+  .community-feedback-overlay,
+  .game-confirm-overlay {
     padding: 10px;
   }
 
-  .community-feedback-dialog {
+  .community-feedback-dialog,
+  .game-confirm-dialog {
     max-height: calc(100dvh - 20px);
     padding: 16px;
   }

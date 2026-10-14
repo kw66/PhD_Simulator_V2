@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
-import { applyResearchOperationActionState, previewResearchOperation } from "../src/core/v2-research-operation";
+import { previewResearchOperation } from "../src/core/v2-research-operation";
 import { previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { getShopPaperActionModifier } from "../src/core/v2-shop-items";
 import { getShopActionPrice } from "../src/core/v2-shop-transactions";
 import {
+  consumeActiveOperation,
   getActiveOperationAllowance,
   getAiModelForTotalMonths,
   getAiModelTimeline,
@@ -521,11 +522,11 @@ describe("v2 shop transactions", () => {
       actionState: exhaustedActionState,
     }, "writing", 4);
     expect(preview).toMatchObject({ allowed: true, consumesAction: false, usesAiResearchBonus: true, sanCost: 7 });
-    expect(applyResearchOperationActionState({
+    expect(consumeActiveOperation({
       ...state,
       aiShopState,
       actionState: exhaustedActionState,
-    }, "writing")).toEqual({
+    }, "writing")).toMatchObject({
       actionState: { used: 2, limit: 2, aiResearchBonusUsed: true },
     });
 

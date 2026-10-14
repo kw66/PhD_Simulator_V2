@@ -1,3 +1,5 @@
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getAttributeTier } from "./v2-random-event-rules";
 import { BADMINTON_VICTORY_THRESHOLD, getBadmintonStrength, getPokerWinRate } from "./v2-growth-system";
 import {
@@ -5,7 +7,7 @@ import {
   drawInclusiveInt,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
-import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
+import { formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
 import { getAdvisorMeetingAttendancePercent } from "./v2-advisor-progress";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -21,27 +23,29 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
     state.player.san,
     state.eventCounters.badmintonCount,
     state.eventSupport.hasBadmintonRacket,
-  );
+  ) + (state.selectedRoleId === "chosen" ? getRoleTalentLevel(state, "athletic-prodigy") * 20 : 0);
   const badmintonChampion = badmintonStrength >= BADMINTON_VICTORY_THRESHOLD;
 
   const pokerStake = Math.max(0, Math.min(state.player.money, 5));
-  const pokerWinRate = getPokerWinRate(state.eventCounters.pokerCount) / 100;
+  const pokerBonus = state.selectedRoleId === "chosen" ? getRoleTalentLevel(state, "lucky-hand") * 20 : 0;
+  const pokerWinRate = Math.min(100, getPokerWinRate(state.eventCounters.pokerCount) + pokerBonus) / 100;
   const pokerWin = getRoll() < pokerWinRate;
   const nextPokerCount = state.eventCounters.pokerCount + 1;
   const badmintonGrowth = "胜率提升";
-  const currentPokerRate = getPokerWinRate(state.eventCounters.pokerCount);
-  const nextPokerRate = getPokerWinRate(nextPokerCount);
+  const currentPokerRate = Math.min(100, getPokerWinRate(state.eventCounters.pokerCount) + pokerBonus);
+  const nextPokerRate = Math.min(100, getPokerWinRate(nextPokerCount) + pokerBonus);
   const pokerGrowth = nextPokerRate > currentPokerRate ? `胜率 ${currentPokerRate}%→${nextPokerRate}%` : "";
 
-  const ktvSocialRoll = getRoll();
-  const ktvSocialResult = applyTierResist(1, state.player.social, () => ktvSocialRoll);
+  getRoll(); // Keep the recorded event roll sequence stable.
+  const ktvSocialResult = previewPlayerAttributeChange(state, "social", 1);
   const ktvSocialGain = ktvSocialResult.effectiveChange;
   const ktvSocialNarrative = getTierResistedNarrative("社交", 1, ktvSocialResult);
 
   const attendancePercent = getAdvisorMeetingAttendancePercent(state.advisorProgressState);
-  const dinnerAdvisorTreat = getRoll() < attendancePercent / 100;
-  const dinnerFavorRoll = getRoll();
-  const dinnerFavorResult = dinnerAdvisorTreat ? applyTierResist(1, state.player.favor, () => dinnerFavorRoll) : null;
+  const dinnerAttendancePercent = state.selectedRoleId === "teacher-child" && getRoleTalentLevel(state, "family-host") > 0 ? 100 : attendancePercent;
+  const dinnerAdvisorTreat = getRoll() < dinnerAttendancePercent / 100;
+  getRoll(); // Keep the recorded event roll sequence stable.
+  const dinnerFavorResult = dinnerAdvisorTreat ? previewPlayerAttributeChange(state, "favor", 1) : null;
   const dinnerFavorGain = dinnerFavorResult?.effectiveChange ?? 0;
   const dinnerFavorNarrative = dinnerFavorResult
     ? getTierResistedNarrative("导师好感", 1, dinnerFavorResult)
@@ -91,19 +95,19 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         label: "KTV 唱歌",
         outcome: `${formatTierResistedOutcome("社交", 1, ktvSocialResult)}。`,
         effects: {
-          ...(ktvSocialGain > 0 ? { social: ktvSocialGain } : {}),
+          ...({ social: ktvSocialGain, rawSocial: 1 }),
         },
       },
       {
         id: `random-7-dinner-${serial}`,
         label: "聚餐",
         outcome: dinnerAdvisorTreat
-          ? `条件：导师请客（${attendancePercent}%）｜结果：SAN +5｜${formatTierResistedOutcome("导师好感", 1, dinnerFavorResult!)}。`
+          ? `条件：导师请客（${dinnerAttendancePercent}%）｜结果：SAN +5｜${formatTierResistedOutcome("导师好感", 1, dinnerFavorResult!)}。`
           : `条件：AA 聚餐（${100 - attendancePercent}%）｜结果：SAN +5｜金币 -2。`,
         effects: dinnerAdvisorTreat
           ? {
             san: 5,
-            ...(dinnerFavorGain > 0 ? { favor: dinnerFavorGain } : {}),
+            ...({ favor: dinnerFavorGain, rawFavor: 1 }),
           }
           : {
             san: 5,
@@ -184,7 +188,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
             ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 
 export function createFundingCampusRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
@@ -318,7 +322,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
         ].join("\n\n"),
       },
     },
-  });
+  }, state);
   for (const decision of stagedEvent.choices[0]!.effects.enqueueEvents![0]!.choices) {
     const { enqueueEvents, ...rewards } = decision.effects;
     decision.effects = { enqueueEvents };

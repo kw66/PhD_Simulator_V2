@@ -1,3 +1,4 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "./v2-calendar";
 import { ADVISOR_SALARY, ADVISOR_SALARY_BONUS, SCORE_BY_TARGET } from "./v2-content";
 import { pushLog, pushMilestoneLog, pushNoOpLog } from "./v2-engine-helpers";
@@ -9,6 +10,7 @@ import { getRelationshipSanCost } from "./v2-buffs";
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { advanceSharedLabProject, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
+import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
 
 export const ADVISOR_HORIZONTAL_SAN_COST = 5;
 export const ADVISOR_VERTICAL_SAN_COST = 4;
@@ -34,6 +36,7 @@ export function createAdvisorProgressState(): AdvisorProgressState {
   return {
     researchAccumulation: 20,
     funding: 30,
+    cumulativeFunding: 30,
     horizontalProgress: 0,
     verticalProgress: 0,
     playerProjectCompletions: { horizontal: 0, vertical: 0 },
@@ -176,18 +179,18 @@ export function advanceAdvisorProject(
   if (state.phase !== "playing" || !state.selectedAdvisorName) return state;
   if (state.advisorProgressState.lastPlayerProjectTotalMonths === state.totalMonths) return pushNoOpLog(state, "科研项目：本月已推进，下月恢复");
   const sanCost = getAdvisorTaskSanCost(state, projectType);
-  if (state.player.san < sanCost) return pushNoOpLog(state, `科研项目：SAN不足，需要${sanCost}`);
-  const progress = Math.floor(state.player.research + Math.floor(random() * 6));
+  const payment = quoteSanPayment(state, sanCost);
+  if (!payment.allowed) return pushNoOpLog(state, `科研项目：SAN不足，需要${sanCost}`);
+  const progress = Math.floor(getEffectiveResearch(state) + Math.floor(random() * 6));
   const paidState = pushMilestoneLog({
-    ...state,
-    player: { ...state.player, san: state.player.san - sanCost },
+    ...paySanCost(state, sanCost),
     advisorProgressState: {
       ...state.advisorProgressState,
       lastPlayerProjectTotalMonths: state.totalMonths,
       lastProjectTotalMonths: state.totalMonths,
       ...(projectType === "horizontal" ? { lastHorizontalTotalMonths: state.totalMonths } : {}),
     },
-  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：SAN -${sanCost}，进度 +${progress}`, "advisor-project-action");
+  }, `推进${projectType === "horizontal" ? "横向" : "纵向"}项目：${formatSanPayment(payment)}，进度 +${progress}`, "advisor-project-action");
   return advanceSharedLabProject(paidState, projectType, progress, random, "player").state;
 }
 

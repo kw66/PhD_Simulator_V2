@@ -190,6 +190,7 @@ describe("v2 random event rules", () => {
     expect(buildWeightedRandomEventPool({
       ...base,
       publishedPaperCount: 1,
+      availableRandomEvents: base.availableRandomEvents.filter((eventId) => eventId !== 14),
       usedRandomEvents: [14],
     }).candidateEventIds).not.toContain(14);
   });

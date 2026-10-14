@@ -1,4 +1,5 @@
 import { appendFixedEventHint } from "./v2-fixed-event-hints";
+import { formatEventSanPaymentText } from "./v2-event-player-effects";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type RandomRollProvider = () => number;
@@ -24,6 +25,7 @@ export interface ThreeStageRandomEventCopy {
 export function createThreeStageEvent(
   event: PendingEvent,
   copy: ThreeStageRandomEventCopy,
+  state?: GameState,
 ): PendingEvent {
   const choiceEvent: PendingEvent = {
     ...event,
@@ -35,11 +37,12 @@ export function createThreeStageEvent(
     choices: event.choices.map((choice) => {
       const resultCopy = copy.results[choice.id];
       if (!resultCopy) return choice;
+      const outcome = state ? formatEventSanPaymentText(choice.outcome, state, choice.effects) : choice.outcome;
 
       const resultEvent: PendingEvent = {
         id: `${event.id}-result-${choice.id}`,
         title: `${event.title} ➜ ${copy.decisionTitle} ➜ ${resultCopy.title}`,
-        description: `${resultCopy.description}\n\n机制结算\n${choice.outcome}`,
+        description: `${resultCopy.description}\n\n机制结算\n${outcome}`,
         source: event.source,
         blocking: event.blocking,
         deadlineMonths: 0,
@@ -48,7 +51,7 @@ export function createThreeStageEvent(
         ...(event.narrativeNames ? { narrativeNames: [...event.narrativeNames] } : {}),
         ...(event.randomReplay ? { randomReplay: event.randomReplay } : {}),
         removeBuffIdsOnCompletion: event.removeBuffIdsOnCompletion,
-        completionLog: `${choice.label}：${choice.outcome}`,
+        completionLog: `${choice.label}：${outcome}`,
         choices: [
           {
             id: `${choice.id}-finish`,
@@ -61,6 +64,7 @@ export function createThreeStageEvent(
 
       return {
         ...choice,
+        outcome,
         effects: {
           ...choice.effects,
           enqueueEvents: [...(choice.effects.enqueueEvents ?? []), resultEvent],

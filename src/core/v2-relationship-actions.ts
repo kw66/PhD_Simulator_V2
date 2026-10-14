@@ -3,6 +3,7 @@ import { createLoverProgressState } from "./v2-lover-progression";
 import { createLoverState } from "./v2-lover-system";
 import { getFellowRoleLabel } from "./v2-fellow-progression";
 import { ensureFellowFinanceAccounts } from "./v2-fellow-finance";
+import { settleFellowRemovalTalent } from "./v2-role-talent-relationships";
 import type { GameState } from "./v2-types";
 
 function decrementFellowCount(state: GameState, type: "senior" | "junior" | "peer"): GameState["relationshipState"] {
@@ -42,5 +43,5 @@ export function endRelationship(state: GameState, relationshipId: string): GameS
     fellowProgressState: state.fellowProgressState.filter((item) => item.id !== relationshipId),
     buffs: state.buffs.filter((buff) => buff.relationshipId !== relationshipId),
   };
-  return pushLog(nextState, `停止合作：已与${getFellowRoleLabel(profile.type, profile.gender)}停止合作。`);
+  return pushLog(settleFellowRemovalTalent(nextState, profile), `停止合作：已与${getFellowRoleLabel(profile.type, profile.gender)}停止合作。`);
 }

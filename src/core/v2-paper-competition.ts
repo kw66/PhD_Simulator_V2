@@ -1,6 +1,8 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
 import type { GameState, Paper } from "./v2-types";
 import { setPaperTotalScore } from "./v2-paper-collaboration";
 import { formatResearchMiscSanChange, getActualResearchMiscSanChange } from "./v2-sanity-rules";
+import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
 
 export const PAPER_COMPETITION_EVENT_IDS = [17, 18] as const;
 
@@ -103,13 +105,15 @@ export function previewPaperCompetitionResolution(
 
   const paper = currentPaper;
   const score = getAdjustedScore(paper, resolution);
-  const sanCost = Math.abs(getActualResearchMiscSanChange(-resolution.sanCost, state.player.research, state.month, state.eventSupport, state.buffs));
+  const sanCost = Math.abs(getActualResearchMiscSanChange(-resolution.sanCost, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs));
   const san = state.player.san - sanCost;
   if (!Number.isFinite(score) || !Number.isFinite(san)) {
     return { applicable: false, paper, resolvedOutcome: "本次不作处理" };
   }
 
-  const sanSummary = formatResearchMiscSanChange(-resolution.sanCost, state.player.research, state.month, state.eventSupport, state.buffs);
+  const payment = quoteSanPayment(state, sanCost, { allowOverdraw: true });
+  const sanSummary = payment.usesBeta || payment.moneyCost > 0 ? formatSanPayment(payment)
+    : formatResearchMiscSanChange(-resolution.sanCost, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
   return { applicable: true, paper, score, sanCost, resolvedOutcome: formatPaperCompetitionOutcome(paper, resolution, sanCost, sanSummary) };
 }
 
@@ -125,8 +129,7 @@ export function applyPaperCompetitionResolution(
 
   return {
     nextState: {
-      ...state,
-      player: preview.sanCost === 0 ? state.player : { ...state.player, san: state.player.san - preview.sanCost },
+      ...paySanCost(state, preview.sanCost, { allowOverdraw: true }),
       papers: state.papers.map((candidate) => candidate === paper
         ? setPaperTotalScore(paper, resolution.field, score)
         : candidate),

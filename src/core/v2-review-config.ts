@@ -69,17 +69,22 @@ const BORDERLINE_BASE_CONFIG: Record<PaperTarget, { baseRate: number; scoreBasel
   C: { baseRate: 0.8, scoreBaseline: 28, scoreRange: 20 },
 };
 
-export function getReviewerWeights(academicYear = 1): ReadonlyArray<readonly [PaperReviewerType, number]> {
+export function getReviewerWeights(academicYear = 1, kindBonus = 0): ReadonlyArray<readonly [PaperReviewerType, number]> {
   const yearsElapsed = Math.max(0, Math.floor(Number.isFinite(academicYear) ? academicYear : 1) - 1);
-  if (yearsElapsed === 0) return REVIEWER_BASE_WEIGHTS;
   const deltas = new Map(REVIEWER_ANNUAL_WEIGHT_DELTAS);
   const raw = REVIEWER_BASE_WEIGHTS.map(([type, weight]) => [
     type,
     Math.max(0, weight + (deltas.get(type) ?? 0) * yearsElapsed),
   ] as const);
   const total = raw.reduce((sum, [, weight]) => sum + weight, 0);
-  if (total <= 0) return REVIEWER_BASE_WEIGHTS;
-  return raw.map(([type, weight]) => [type, Number((weight / total).toFixed(12))] as const);
+  const normalized = yearsElapsed === 0 || total <= 0 ? REVIEWER_BASE_WEIGHTS
+    : raw.map(([type, weight]) => [type, Number((weight / total).toFixed(12))] as const);
+  const bonus = Number.isFinite(kindBonus) ? Math.max(0, kindBonus) : 0;
+  if (bonus === 0) return normalized;
+  const originalKind = normalized.find(([type]) => type === "kind")?.[1] ?? 0;
+  const kind = Math.min(1, originalKind + bonus);
+  return normalized.map(([type, weight]) => [type, type === "kind" ? kind
+    : originalKind >= 1 ? 0 : weight * (1 - kind) / (1 - originalKind)] as const);
 }
 
 export function getReviewStrictnessMultiplier(target: PaperTarget, influence: number): number {

@@ -1,13 +1,14 @@
 import "../styles/event-ending.css";
+import { getPlayerAttributeCap } from "../core/v2-player-attributes";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
-import { CAREER_DEFINITIONS, type CareerType } from "../core/v2-career-rules";
+import type { CareerOffer } from "../core/v2-career-rules";
+import { ADVISOR_GRANTS, getAdvisorRankLabel } from "../core/v2-advisor-progress";
+import { getFellowName, getFellowRoleLabel } from "../core/v2-fellow-progression";
 import { getCalendarForTotalMonths, getRoleDefinition } from "../core/v2-progression";
 import { getResearchCap } from "../core/v2-research-cap-system";
 import { getAcceptedPaperScore } from "../core/v2-publication-rules";
 import { formatMoney } from "../core/v2-money";
 import { getNextRoleLevelExperience } from "../core/v2-role-experience";
-import { getDesignedTalentNodes } from "./v2-render-setup-screen";
-import { getRoleCardPortraitUrl, hasRoleCardPortrait } from "./v2-role-portrait-assets";
 import type { EndingId, GameState, Paper, RoleExperienceAward } from "../core/v2-types";
 
 interface EndingPresentation {
@@ -73,71 +74,82 @@ function renderEndingShowcase(state: GameState, published: Paper[]): string {
   if (!thesis && !representative) return "";
   const paperScore = representative ? getAcceptedPaperScore({ ...representative,
     journalTarget: representative.journalTarget ?? representative.publication?.journalTarget }) : 0;
+  const thesisAward = thesis?.review?.excellent ? `优秀${thesis.review.degree === "phd" ? "博士" : "硕士"}论文` : "";
   const thesisNotes = thesis ? [
-    thesis.review!.excellent ? `优秀${thesis.review!.degree === "phd" ? "博士" : "硕士"}论文` : thesis.review!.passed ? "" : "已送审",
     thesis.researchPoints.length ? `${thesis.researchPoints.length} 个研究点` : "",
+    state.ending === "master" || state.ending === "phd" ? `毕业线 ${state.graduationScoreTarget ?? "—"}` : "",
+    thesis.review!.passed ? "盲审通过" : "已送审",
   ].filter(Boolean).join(" · ") : "";
   return `<section class="ending-showcase" aria-label="本局代表成果">
-    ${thesis ? `<div class="ending-showcase-item is-thesis"><span class="ending-showcase-kicker">🎓 学位论文</span><strong title="${escapeHtml(thesis.title)}">《${escapeHtml(thesis.title)}》</strong>${thesisNotes ? `<span>${thesisNotes}</span>` : ""}</div>` : ""}
-    ${representative ? `<div class="ending-showcase-item is-paper"><span class="ending-showcase-kicker">📄 ${candidates.length ? "代表作" : "合作代表作"} · ${paperVenue(representative)}</span><strong title="${escapeHtml(representative.title)}">《${escapeHtml(representative.title)}》</strong><span>录用分 ${formatMoney(paperScore)} · 引用 ${formatMoney(representative.publication?.citations ?? 0)}</span></div>` : ""}
+    ${thesis ? `<div class="ending-showcase-item is-thesis">
+      <div class="ending-showcase-heading"><span class="ending-showcase-kicker">🎓 大论文</span>${thesisAward ? `<span class="ending-showcase-badge">${thesisAward}</span>` : ""}</div>
+      <strong class="ending-showcase-title" title="${escapeHtml(thesis.title)}">《${escapeHtml(thesis.title)}》</strong>
+      <span class="ending-showcase-meta">${thesisNotes}</span>
+    </div>` : ""}
+    ${representative ? `<div class="ending-showcase-item is-paper">
+      <div class="ending-showcase-heading"><span class="ending-showcase-kicker">📄 ${candidates.length ? "代表作" : "合作代表作"}</span><span class="ending-showcase-badge">${paperVenue(representative)}</span></div>
+      <strong class="ending-showcase-title" title="${escapeHtml(representative.title)}">《${escapeHtml(representative.title)}》</strong>
+      <span class="ending-showcase-meta">录用分 ${formatMoney(paperScore)} · 引用 ${formatMoney(representative.publication?.citations ?? 0)}</span>
+    </div>` : ""}
   </section>`;
 }
 
-function renderEndingLife(state: GameState, published: Paper[], allocation: Record<string, number>): string {
+function endingOfferTitle(offer: CareerOffer): string {
+  if (offer.type === "civilService") {
+    const [unit = "", ...rank] = offer.name.split(" · ");
+    const units: Record<string, string> = {
+      "乡镇": "乡镇党政机关", "县区": "县区党政机关", "市直": "市直机关", "省直": "省直机关", "中央机关": "中央机关",
+    };
+    return [units[unit] ?? unit, ...rank].join(" · ");
+  }
+  if (offer.type !== "academic") return offer.name;
+  const match = /^academic-(second-tier|non-elite|211|985)-(postdoc|lecturer|associate|professor)$/u.exec(offer.jobId);
+  if (!match) return offer.name;
+  const school = { "second-tier": "二本院校", "non-elite": "双非一本院校", "211": "211 高校", "985": "985 高校" }[match[1]!];
+  const rank = match[2] === "professor" && match[1] === "985" ? "特聘教授"
+    : { postdoc: "博士后", lecturer: "讲师", associate: "副教授", professor: "教授" }[match[2]!];
+  return `${school} · 人工智能学院 · ${rank}`;
+}
+
+function renderEndingLife(state: GameState): string {
+  const grants = state.advisorProgressState.awards.map((award) => ADVISOR_GRANTS.find((grant) => grant.id === award.id)?.name).filter(Boolean);
   const advisor = state.relationshipState.advisorCount > 0 && state.selectedAdvisorName
-    ? `导师 ${state.selectedAdvisorName}${state.advisorProgressState.researchAccumulation > 0 ? ` · 科研积累${formatMoney(state.advisorProgressState.researchAccumulation)}` : ""}` : null;
-  const fellows = state.fellowProgressState.map((profile) =>
-    `${profile.name?.trim() || "同学"} · 科研${formatMoney(profile.research)}/默契${formatMoney(profile.affinity)}`);
+    ? `<div class="ending-highlight is-advisor" data-ending-section="relationships-advisor">
+        <div class="ending-highlight-heading"><span>👨‍🏫 导师：</span><strong>${escapeHtml(state.selectedAdvisorName)}</strong></div>
+        <div class="ending-highlight-tags"><span>${getAdvisorRankLabel(state.advisorProgressState)}</span>${grants.map((grant) => `<span>${escapeHtml(grant!)}</span>`).join("")}</div>
+        <div class="ending-highlight-detail"><span>科研积累 ${formatMoney(state.advisorProgressState.researchAccumulation)}</span><span>累计经费 ${formatMoney(state.advisorProgressState.cumulativeFunding ?? state.advisorProgressState.funding)}</span></div>
+      </div>` : "";
   const lover = state.loverState.active
-    ? `${state.loverState.name?.trim() || "恋人"} · 亲密${formatMoney(state.loverProgressState.intimacy)}` : null;
-  const relationships = [advisor, ...fellows, lover].filter((item): item is string => Boolean(item));
-  const talents = (getDesignedTalentNodes(state.selectedRoleId) ?? [])
-    .filter((node) => (allocation[node.id] ?? node.initialLevel ?? 0) > 0)
-    .map((node) => `${node.name} ${allocation[node.id] ?? node.initialLevel ?? 0}级`);
-  const goods = [
-    state.shopState.gpuLevel > 0 ? `显卡 Lv${state.shopState.gpuLevel}` : null,
-    state.shopState.monitorOwned ? "2K显示器" : null,
-    state.shopState.keyboardOwned ? "机械键盘" : null,
-    state.shopState.chairOwned ? "办公椅" : null,
-    state.coffeeState.machineOwned ? "咖啡机" : null,
-    state.shopState.bikeOwned ? "自行车" : null,
-    state.shopState.ebikeOwned ? "小电驴" : null,
-    ...Object.entries(state.aiShopState.subscriptions)
-      .filter(([, subscription]) => subscription.active)
-      .map(([provider]) => `${provider.toUpperCase()}订阅`),
-  ].filter((item): item is string => Boolean(item));
-  const counters = state.eventCounters;
-  const footprints = [
-    counters.badmintonCount > 0 ? `羽毛球 ${counters.badmintonCount} 次` : null,
-    counters.pokerCount > 0 ? `打牌 ${counters.pokerCount} 次` : null,
-    counters.terrariaCount > 0 ? `泰拉瑞亚 ${counters.terrariaCount} 次` : null,
-    counters.magicTowerCount > 0 ? `魔塔 ${counters.magicTowerCount} 次` : null,
-    counters.rocoCount > 0 ? `洛克王国 ${counters.rocoCount} 次` : null,
-    counters.meetingCount > 0 ? `参会 ${counters.meetingCount} 次` : null,
-    counters.teachersDayErrandCount > 0 ? `教师节跑腿 ${counters.teachersDayErrandCount} 次` : null,
-    state.readingState.readCount > 0 ? `读论文 ${state.readingState.readCount} 次` : null,
-    state.partTimeWorkCount > 0 ? `劳务 ${state.partTimeWorkCount} 次` : null,
-  ].filter((item): item is string => Boolean(item));
-  const projectCount = state.advisorProgressState.playerProjectCompletions.horizontal
-    + state.advisorProgressState.playerProjectCompletions.vertical;
-  const milestones = [
-    published.some((paper) => paper.publication?.highlyCited)
-      ? `ESI高被引 ${published.filter((paper) => paper.publication?.highlyCited).length} 篇` : null,
-    (state.scholarshipState.awardCount ?? 0) > 0 ? `国家奖学金 ${state.scholarshipState.awardCount} 次` : null,
-    projectCount > 0 ? `参与项目 ${projectCount} 项` : null,
-    state.internshipCount > 0 ? `完成实习 ${state.internshipCount} 次` : null,
-  ].filter((item): item is string => Boolean(item));
-  const offers = (Object.entries(state.careerOffers) as Array<[CareerType, NonNullable<typeof state.careerOffers[CareerType]>]>)
-    .map(([type, offer]) => `${CAREER_DEFINITIONS[type].name}：${offer.name}${offer.compensation ? `（${offer.compensation}）` : ""}`);
-  const rows: Array<[string, string, string[]]> = [
-    ["relationships", "人际", relationships], ["talents", "天赋", talents],
-    ["goods", "物品", goods], ["milestones", "经历", milestones],
-    ["footprints", "足迹", footprints], ["offers", "持有 offer", offers],
+    ? `<div class="ending-highlight is-lover" data-ending-section="relationships-lover">
+        <div class="ending-highlight-heading"><span>💕 恋人：</span><strong>${escapeHtml(state.loverState.name?.trim() || "恋人")}</strong></div>
+        <div class="ending-highlight-detail"><span class="ending-highlight-tags"><span>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span></span><span>亲密 ${formatMoney(state.loverProgressState.intimacy)}</span><span>科研 ${formatMoney(state.loverProgressState.research)}</span></div>
+        <div class="ending-highlight-detail"><span>${state.loverState.startTotalMonths !== null ? `相识 ${Math.max(0, state.totalMonths - state.loverState.startTotalMonths + 1)} 个月` : "相识于研究生阶段"}</span></div>
+      </div>` : "";
+  const offer = Object.values(state.careerOffers).find((entry) => entry !== undefined);
+  const offerTitle = offer ? endingOfferTitle(offer).split(" · ") : [];
+  const offerMeta = offer ? [...offerTitle.slice(1), offer.compensation, offer.detail === "博士后岗位" ? "" : offer.detail].filter(Boolean) : [];
+  const destination = offer
+    ? `<div class="ending-highlight is-offer" data-ending-section="offers"><div class="ending-highlight-heading"><span>💼 offer：</span><strong>${escapeHtml(offerTitle[0]!)}</strong></div>${offerMeta.length ? `<div class="ending-highlight-detail">${offerMeta.map((detail) => `<span>${escapeHtml(detail!)}</span>`).join("")}</div>` : ""}</div>` : "";
+  const fellows = state.fellowProgressState.map((profile) =>
+    `<span class="ending-fellow-name"><strong>${escapeHtml(getFellowName(profile))}</strong><span>${getFellowRoleLabel(profile.type, profile.gender)}</span></span>`);
+  const fellowCard = fellows.length
+    ? `<div class="ending-highlight is-fellows" data-ending-section="relationships-fellows"><div class="ending-highlight-heading"><span>🤝 同学</span></div><div class="ending-fellow-names">${fellows.join(" ")}</div></div>` : "";
+  const people = [advisor, destination, fellowCard, lover].filter(Boolean);
+  const counts: Array<[string, string, string]> = [
+    ["joint-training", "联培", state.conferenceEncounterState.jointTrainingReward || state.conferenceEncounterState.bigBullCooperation ? "✓" : "—"],
+    ["internships", "实习", `${state.internshipCount} 次`],
+    ["scholarships", "国奖", `${state.scholarshipState.awardCount ?? 0} 次`],
+    ["reading", "读论文", `${state.readingState.readCount} 次`],
+    ["meetings", "参会", `${state.eventCounters.meetingCount} 次`],
+    ["spending", "花销", `${formatMoney(state.personalSpending ?? 0)} 金币`],
   ];
-  const visibleRows = rows.filter(([, , items]) => items.length > 0);
-  if (!visibleRows.length) return "";
-  return `<section class="ending-life" aria-label="本局生活记录">${visibleRows.map(([id, label, items]) =>
-    `<div class="ending-life-row${items.join("").length > 38 ? " is-wide" : ""}" data-ending-section="${id}"><strong>${label}</strong><div>${items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div></div>`).join("")}</section>`;
+  return `<section class="ending-life" aria-label="本局人际与经历">
+    ${people.length ? `<div class="ending-highlights has-${people.length}">
+      ${people.join("")}
+    </div>` : ""}
+    <div class="ending-record-table" aria-label="本局经历统计">${counts.map(([id, label, value]) =>
+      `<div class="ending-record-cell" data-ending-section="${id}"><span>${label}</span><strong>${value}</strong></div>`).join("")}</div>
+  </section>`;
 }
 
 function renderEndingSummary(state: GameState, published: Paper[]): string {
@@ -159,23 +171,24 @@ function renderEndingSummary(state: GameState, published: Paper[]): string {
   const attributes = [
     ["san", "🧠 SAN", `${formatMoney(state.player.san)}/${formatMoney(state.sanCap)}`, state.ending === "burnout"],
     ["research", "💡 科研", `${formatMoney(state.player.research)}/${formatMoney(getResearchCap(state.researchCapacityState))}`, state.ending === "overthinking"],
-    ["social", "🤝 社交", `${formatMoney(state.player.social)}/20`, state.ending === "isolated"],
-    ["favor", "🎓 导师好感", `${formatMoney(state.player.favor)}/20`, state.ending === "expelled"],
+    ["social", "🤝 社交", `${formatMoney(state.player.social)}/${getPlayerAttributeCap(state, "social")}`, state.ending === "isolated"],
+    ["favor", "👨‍🏫 导师好感", `${formatMoney(state.player.favor)}/${getPlayerAttributeCap(state, "favor")}`, state.ending === "expelled"],
     ["money", "💰 金币", formatMoney(state.player.money), state.ending === "poor"],
   ] as const;
   return `<section class="ending-summary" aria-label="本轮属性与成果">
-    <div class="ending-summary-metrics">${metrics.map(([id, label, value]) => `<div data-ending-stat="${id}"><span>${label}</span><strong>${value}</strong></div>`).join("")}</div>
-    <div class="ending-summary-venues" aria-label="已发表论文分类">${venues.join("")}</div>
+    <div class="ending-summary-research">
+      <div class="ending-summary-metrics">${metrics.map(([id, label, value]) => `<div data-ending-stat="${id}"><span>${label}</span><strong>${value}</strong></div>`).join("")}</div>
+      <div class="ending-summary-venues" aria-label="已发表论文分类">${venues.join("")}</div>
+    </div>
     <div class="ending-summary-attributes">${attributes.map(([id, label, value, failed]) => `<div data-ending-stat="${id}"${failed ? ' class="is-failed"' : ""}><span>${label}</span><strong>${value}</strong></div>`).join("")}</div>
   </section>`;
 }
 
-export function renderEndingScreen(state: GameState, experienceAward?: RoleExperienceAward, talentAllocation: Record<string, number> = {}): string {
+export function renderEndingScreen(state: GameState, experienceAward?: RoleExperienceAward): string {
   const ending = state.ending;
   const copy = ending ? ENDINGS[ending] : {
     title: "本轮结束", icon: "📖", tone: "pause",
   };
-  const graduated = ending === "master" || ending === "phd";
   const degree = state.degree === "phd" ? "博士" : "硕士";
   const target = state.graduationScoreTarget;
   const failureStats = { burnout: ["SAN", state.player.san], poor: ["金币", state.player.money], expelled: ["导师好感", state.player.favor], isolated: ["社交", state.player.social], overthinking: ["科研能力", state.player.research] } as const;
@@ -185,8 +198,8 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
     : ending === "delay" ? target === null ? "毕业要求尚未确定"
       : state.totalResearchScore < target ? `科研分 ${state.totalResearchScore}/${target}，未达标`
         : state.thesis.review?.submitted ? "盲审未通过" : "未完成盲审送审"
-    : graduated ? `毕业线 ${target ?? "—"} · 盲审通过` : "";
-  const cause = failedStat ? state.endingCause?.text.trim() : null;
+    : "";
+  const cause = state.endingCause?.text.trim() || null;
   const role = getRoleDefinition(state.selectedRoleId);
   const calendar = getCalendarForTotalMonths(state.totalMonths, state.degree);
   const date = state.totalMonths > 0 ? `${getAcademicCalendarYear(calendar.year, calendar.month)}年${getAcademicCalendarMonth(calendar.month)}月` : "入学前";
@@ -197,16 +210,16 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
   return `<section class="ending-panel" data-ending="${ending ?? "unknown"}" data-tone="${copy.tone}" aria-labelledby="ending-title">
         <header class="ending-header">
           <div class="ending-header-copy">
-            <div class="ending-heading"><span class="ending-emblem" aria-hidden="true">${copy.icon}</span><h2 id="ending-title">${copy.title}</h2>${reason ? `<span class="ending-result">${escapeHtml(reason)}</span>` : ""}</div>
-            <div class="ending-identity"><span class="ending-player-name">${escapeHtml(identity)}</span><span>${escapeHtml(role.name)}${graduated ? "" : ` · ${degree}`} · 在校${state.totalMonths}个月 · ${date}</span></div>
+            <div class="ending-heading"><span class="ending-emblem" aria-hidden="true">${copy.icon}</span><h2 id="ending-title">${copy.title}</h2><span class="ending-role">${escapeHtml(role.name)}</span></div>
+            <div class="ending-identity"><span class="ending-player-name">${escapeHtml(identity)}</span><span>${degree} · 在校${state.totalMonths}个月 · ${date}</span></div>
           </div>
-          ${hasRoleCardPortrait(state.selectedRoleId) ? `<img class="ending-cover-portrait" src="${escapeHtml(getRoleCardPortraitUrl(state.selectedRoleId))}" alt="" decoding="async">` : ""}
           <button class="event-content-close" type="button" data-ui-close-ending-content aria-label="关闭结局">×</button>
         </header>
+        ${reason ? `<div class="ending-result-row"><strong>结果</strong>${escapeHtml(reason)}</div>` : ""}
         ${cause ? `<div class="ending-cause"><strong>触发事件</strong>${escapeHtml(cause)}</div>` : ""}
         ${renderEndingShowcase(state, published)}
         ${renderEndingSummary(state, published)}
-        ${renderEndingLife(state, published, talentAllocation)}
+        ${renderEndingLife(state)}
         ${award?.disqualifiedByDebug ? `<div class="ending-experience" aria-label="角色经验结算">调试局，本局不结算角色经验</div>` : award ? `<div class="ending-experience" aria-label="角色经验结算">
           <span>本局经验 <strong>+${award.gained}</strong></span>
           <span>等级 <strong>Lv${award.previousLevel}${award.level > award.previousLevel ? ` → Lv${award.level}` : ""}</strong></span>

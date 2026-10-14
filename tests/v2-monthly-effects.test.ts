@@ -181,7 +181,9 @@ describe("monthly effects", () => {
     const baseline = resolveMonthlyEffects(state);
     const dating = { ...state, loverState: activateLover(type, 1, "male"), loverProgressState: createLoverProgressState(type, () => 0) };
     const resolution = resolveMonthlyEffects(dating);
-    expect(resolution).toEqual(baseline);
+    expect(resolution.items).toEqual(baseline.items);
+    expect(resolution.totals).toEqual(baseline.totals);
+    expect(resolution.player).toEqual(baseline.player);
     expect(resolution.player.san).toBe(11);
     expect(resolution.player.money).toBe(state.player.money - 1);
     expect(resolution.items.some((item) => item.id.startsWith("lover-"))).toBe(false);

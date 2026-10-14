@@ -1,10 +1,12 @@
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 import {
   appendMechanismSettlement,
   createFixedEvent,
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
-import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
+import { formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 function createWinterVacationDescription(branchDescription: string, moneyGain: number): string {
@@ -23,6 +25,7 @@ function createWinterVacationResultEvent(params: {
   moneyGain: number;
   sanRecovery: number;
   socialChange: number;
+  rawSocial?: number;
 }): PendingEvent {
   return createFixedEvent({
     id: `winter-vacation-result-y${params.year}-m${params.month}`,
@@ -38,7 +41,7 @@ function createWinterVacationResultEvent(params: {
         effects: {
           ...(params.moneyGain !== 0 ? { money: params.moneyGain } : {}),
           ...(params.sanRecovery !== 0 ? { san: params.sanRecovery } : {}),
-          ...(params.socialChange !== 0 ? { social: params.socialChange } : {}),
+          ...(params.rawSocial !== undefined ? { social: params.socialChange, rawSocial: params.rawSocial } : {}),
         },
       },
     ],
@@ -108,11 +111,11 @@ export function resolveWinterVacationFixedEvent(
   const missingSan = Math.max(0, state.sanCap - state.player.san);
   const sanRecovery = Math.floor(missingSan * 0.2);
   const sanSummary = `SAN +${sanRecovery}（已损SAN20%）`;
-  const redEnvelope = 2;
+  const redEnvelope = 2 + (state.selectedRoleId === "rich" ? getRoleTalentLevel(state, "red-envelope") : 0);
   const branchRoll = getRoll();
 
   if (branchRoll < 0.3) {
-    const socialResult = applyTierResist(1, state.player.social, getRoll);
+    const socialResult = previewPlayerAttributeChange(state, "social", 1);
     const socialChange = socialResult.effectiveChange;
     const socialText = formatTierResistedOutcome("社交", 1, socialResult);
     const socialNarrative = getTierResistedNarrative("社交", 1, socialResult);
@@ -136,6 +139,7 @@ export function resolveWinterVacationFixedEvent(
         moneyGain: redEnvelope,
         sanRecovery,
         socialChange,
+        rawSocial: 1,
       })],
     };
   }

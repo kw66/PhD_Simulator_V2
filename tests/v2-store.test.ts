@@ -109,7 +109,9 @@ describe("session store", () => {
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 0, exp: 0 });
     expect(store.getLobbyState().lastRunExperience?.disqualifiedByDebug).toBe(true);
     expect(renderApp(store.getState(), store.getLobbyState())).toContain("调试局，本局不结算角色经验");
-    expect(values.size).toBe(0);
+    expect(values.has("phd_simulator_v2_role_experience_v1")).toBe(false);
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal)
+      .toMatchObject({ startedRuns: 1, playedRuns: 0, completedRuns: 0, level: 0, exp: 0 });
 
     for (const [level, exp] of [[1, 0], [1, 20]]) {
       store.dispatch("reset-game");

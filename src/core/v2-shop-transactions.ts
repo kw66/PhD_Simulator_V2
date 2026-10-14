@@ -1,3 +1,4 @@
+import { getRecoveredSan } from "./v2-san-recovery";
 import {
   AI_SLOT_IDS,
   createAiBuffs,
@@ -6,7 +7,7 @@ import {
 } from "./v2-ai-shop";
 import { applyAiActivationEffects } from "./v2-ai-activation";
 import { getLabReimbursementKind } from "./v2-lab-reimbursement";
-import { formatMoney, roundMoney } from "./v2-money";
+import { formatMoney, recordPersonalSpending, roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { addOrReplaceBuffs, consumeAiCostCoverage, removeBuffs } from "./v2-buffs";
 import {
@@ -63,7 +64,7 @@ function syncAiBuffs(state: GameState): GameState {
 }
 
 function updateMoney(state: GameState, money: number): GameState {
-  return { ...state, player: { ...state.player, money } };
+  return recordPersonalSpending({ ...state, player: { ...state.player, money } }, state.player.money - money);
 }
 
 function fail(state: GameState, message: string): GameState {
@@ -229,7 +230,7 @@ function buyCoffee(state: GameState): GameState {
   if (state.player.money < coffeePrice) return fail(state, `金币不足，购买冰美式需要 ${coffeePrice} 金币。`);
 
   const coffeeGain = getCoffeeSanGain(coffeeState);
-  const nextSan = Math.min(state.sanCap, state.player.san + coffeeGain);
+  const nextSan = getRecoveredSan(state.player.san, state.sanCap, coffeeGain);
   const actualCoffeeGain = nextSan - state.player.san;
   const nextCoffeeState = {
     ...coffeeState,
@@ -348,7 +349,7 @@ function buyAiMonth(state: GameState, slot: AiSlotId): GameState {
   const model = getAiModelForTotalMonths(state.totalMonths, slot);
   const subscription = getAiState(state).subscriptions[slot];
   if (subscription.active) return fail(state, `${model.name} 本月已经订购。`);
-  const { price, usesGift } = getLoverGiftQuote(state, hasAiReimbursement(state) ? 0 : model.price);
+  const { price, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "buy-ai-month", { aiSlotId: slot })!);
   if (state.player.money < price) return fail(state, `金币不足，${model.name}本月需要 ${price} 金币。`);
   const purchasedState = syncAiBuffs({
     ...payForPurchase(state, price, usesGift),
@@ -368,7 +369,7 @@ function buyAiMonth(state: GameState, slot: AiSlotId): GameState {
   const activated = applyAiActivationEffects(purchasedState, [model]);
   const effectDetails = [...activated.polishDetails, ...activated.readingDetails];
   const effectText = effectDetails.length > 0 ? `；${effectDetails.join("；")}` : "";
-  const costText = usesGift ? "恋人赠礼，本次免费" : hasAiReimbursement(state) ? "导师经费报销" : price === 0 ? "免费" : `金币 -${price}`;
+  const costText = usesGift ? "恋人赠礼，本次免费" : hasAiReimbursement(state) ? "导师经费报销" : price === 0 && model.price > 0 ? "经费护航，金币 -0" : price === 0 ? "免费" : `金币 -${price}`;
   return pushLog(activated.nextState, `商店：购买${model.name}，${costText}，本月生效${effectText}。`);
 }
 
@@ -440,7 +441,7 @@ export function applyShopAction(state: GameState, actionId: ShopActionId, payloa
   const executed = executeShopAction(state, actionId, payload);
   if (fundingCost <= 0 || (executed.shopState === state.shopState
     && executed.coffeeState === state.coffeeState && executed.aiShopState === state.aiShopState)) return executed;
-  const purchased = actionId === "buy-ai-month" ? consumeAiCostCoverage(executed) : executed;
+  const purchased = actionId === "buy-ai-month" && hasAiReimbursement(state) ? consumeAiCostCoverage(executed) : executed;
   const labReimbursements = { ...purchased.shopState.labReimbursements };
   if (kind) labReimbursements[kind] -= 1;
   return pushLog(recordLabFinance({

@@ -1,17 +1,25 @@
+import { getEffectiveSocial } from "./v2-effective-attributes";
 import { addOrReplaceBuffs, advanceBuffDurations, consumeAiCostCoverage, getActiveBuffs, removeBuffs } from "./v2-buffs";
 import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipStatus } from "./v2-internship-system";
 import { getLabPayroll, settleLabPayroll } from "./v2-lab-payroll";
 import { MONTHLY_LIVING_COST } from "./v2-content";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
-import { roundMoney } from "./v2-money";
+import { settleLabResearchGrowth } from "./v2-lab-talent";
+import { settleRoleTalentMonthEnd, settleRoleTalentMonthStart, settleRoleTalentYearEnd } from "./v2-role-talent-lifecycle";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { settleGreedCoinGames } from "./v2-role-talent-greed";
+import { normalizeRoleTalentIllnessProbability } from "./v2-random-event-rules";
+import { recordPersonalSpending, roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
-import { clampResearchToCap } from "./v2-research-cap-system";
+import { applyPlayerAttributeChange } from "./v2-player-attributes";
+import { quoteSanPayment } from "./v2-role-talent-costs";
+import { settleRoleTalentInvestments } from "./v2-role-talent-investments";
 import { getFellowName } from "./v2-fellow-progression";
 import { syncRelationshipState } from "./v2-relationship-rules";
-import { getMonthlySeasonSanModifier, getSeasonByMonth } from "./v2-sanity-rules";
+import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER, getMonthlySeasonSanModifier, getRoleMonthlySanCost, getSeasonByMonth } from "./v2-sanity-rules";
 import { getBikeMonthlySanCost, getBikeSanCapLimit } from "./v2-bike-system";
 import { hasFullGear } from "./v2-meeting-system";
 import { BASE_COFFEE_PRICE, getCoffeeBuyPrice, getCoffeeSanGain } from "./v2-coffee-system";
@@ -19,6 +27,7 @@ import { getChairMonthlyRecovery, getShopEmergencySan } from "./v2-shop-items-ef
 import {
   AI_SLOT_IDS,
   createAiBuffs,
+  canUseAiTalentFunding,
   getAiModelForTotalMonths,
   getAiRenewalPrice,
   hasAiReimbursement,
@@ -39,12 +48,17 @@ export interface MonthlyEffectItem {
   stats: Partial<PlayerStats>;
   appliedStats: Partial<PlayerStats>;
   note?: string;
+  personalSpending?: number;
+  /** A non-stat effect such as an action allowance or an unknown random swap. */
+  label?: string;
 }
 
 export interface MonthlyEffectResolution {
   items: MonthlyEffectItem[];
   totals: PlayerStats;
   player: PlayerStats;
+  settledState?: GameState;
+  recordedPersonalSpending?: number;
 }
 
 export interface AppliedMonthlyEffects {
@@ -52,18 +66,30 @@ export interface AppliedMonthlyEffects {
   resolution: MonthlyEffectResolution;
 }
 
+export function getMonthlyPersonalSpending(resolution: MonthlyEffectResolution): number {
+  return roundMoney(resolution.items.reduce((total, item) => total + (item.personalSpending ?? Math.max(0, -(item.appliedStats.money ?? 0))), 0));
+}
+
 function emptyTotals(): PlayerStats {
   return { san: 0, research: 0, social: 0, favor: 0, money: 0 };
 }
 
-function applyStats(state: GameState, player: PlayerStats, stats: Partial<PlayerStats>): PlayerStats {
-  return {
-    san: Math.min(state.sanCap, player.san + (stats.san ?? 0)),
-    research: clampResearchToCap(player.research + (stats.research ?? 0), state.researchCapacityState),
-    social: Math.min(20, player.social + (stats.social ?? 0)),
-    favor: Math.min(20, player.favor + (stats.favor ?? 0)),
-    money: roundMoney(player.money + roundMoney(stats.money ?? 0)),
-  };
+function applyStats(state: GameState, player: PlayerStats, stats: Partial<PlayerStats>): GameState {
+  let next = { ...state, player: { ...player } };
+  if (stats.money) next.player.money = roundMoney(next.player.money + roundMoney(stats.money));
+  if (stats.san) {
+    if (stats.san > 0) next.player.san = Math.max(player.san, Math.min(state.sanCap, player.san + stats.san));
+    else {
+      const payment = quoteSanPayment(next, getRoleMonthlySanCost(next, -stats.san), { allowOverdraw: true, allowBeta: false });
+      next = recordPersonalSpending({ ...next, player: { ...next.player,
+        san: next.player.san - payment.sanCost, money: roundMoney(next.player.money - payment.moneyCost),
+      } }, payment.moneyCost);
+    }
+  }
+  for (const stat of ["research", "social", "favor"] as const) {
+    if (stats[stat]) next = applyPlayerAttributeChange(next, stat, stats[stat]).state;
+  }
+  return next;
 }
 
 function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, "appliedStats">> {
@@ -77,6 +103,17 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
     source: "基础规则",
     stats: { san: 1 },
   });
+
+  if (state.selectedRoleId === "rich-reversed" && getRoleTalentLevel(state, "money-growth") > 0) effects.push({
+    id: "role-money-growth", name: "聚沙成塔", source: "角色天赋", stats: { money: getRoleTalentLevel(state, "money-growth") },
+  });
+  if (state.selectedRoleId === "normal-reversed") {
+    const recovery = getRoleTalentLevel(state, "monthly-san-recovery");
+    if (recovery > 0) effects.push({ id: "role-monthly-san-recovery", name: "松弛人生", source: "角色天赋", stats: { san: recovery } });
+    const missingRecovery = state.degree === "phd" ? Number((Math.max(0, state.sanCap - state.player.san)
+      * getRoleTalentLevel(state, "post-phd-recovery") / 10).toFixed(10)) : 0;
+    if (missingRecovery > 0) effects.push({ id: "role-missing-san-recovery", name: "无所事事", source: "角色天赋", stats: { san: missingRecovery } });
+  }
 
   if (state.selectedAdvisorName && state.totalMonths > 1) {
     const payroll = getLabPayroll(state);
@@ -202,20 +239,60 @@ function getMonthlyBuffEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
 
 export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution {
   const startingPlayer = { ...state.player };
-  const combinedStats = emptyTotals();
   const totals = emptyTotals();
-  const items = [...getCoreMonthlyEffects(state), ...getMonthlyBuffEffects(state)].map((effect) => {
+  const investment = settleRoleTalentInvestments(state);
+  let settledState = investment.state;
+  let sanDelta = 0;
+  const items: MonthlyEffectItem[] = investment.count > 0 ? [{
+    id: "talent-investment-return", name: "理财能手", source: "角色天赋",
+    stats: { money: investment.principal + investment.interest },
+    appliedStats: { money: investment.principal + investment.interest },
+    note: `${investment.count}笔到期，本金${investment.principal}，利息${investment.interest}`,
+  }] : [];
+  for (const effect of [...getCoreMonthlyEffects(state), ...getMonthlyBuffEffects(state)]) {
     const appliedStats: Partial<PlayerStats> = {};
-    for (const statId of PLAYER_STAT_IDS) {
-      if (!Object.hasOwn(effect.stats, statId)) continue;
-      const delta = statId === "money" ? roundMoney(effect.stats[statId] ?? 0) : effect.stats[statId] ?? 0;
-      appliedStats[statId] = delta;
-      combinedStats[statId] += delta;
+    const before = settledState.player;
+    const spendingBefore = settledState.personalSpending ?? 0;
+    const money = roundMoney(effect.stats.money ?? 0);
+    settledState = { ...settledState, player: { ...settledState.player, money: roundMoney(settledState.player.money + money) } };
+    if (Object.hasOwn(effect.stats, "san")) {
+      const raw = effect.stats.san ?? 0;
+      if (raw < 0) {
+        const payment = quoteSanPayment(settledState, getRoleMonthlySanCost(settledState, -raw), { allowOverdraw: true, allowBeta: false });
+        settledState = recordPersonalSpending({ ...settledState, player: { ...settledState.player,
+          money: roundMoney(settledState.player.money - payment.moneyCost),
+        } }, payment.moneyCost);
+        appliedStats.san = -payment.sanCost;
+      } else appliedStats.san = raw;
+      sanDelta += appliedStats.san;
     }
-    return { ...effect, stats: { ...effect.stats, ...(Object.hasOwn(effect.stats, "money") ? { money: appliedStats.money } : {}) }, appliedStats };
-  });
-
-  let player = applyStats(state, startingPlayer, combinedStats);
+    for (const stat of ["research", "social", "favor"] as const) {
+      if (!Object.hasOwn(effect.stats, stat)) continue;
+      const change = applyPlayerAttributeChange(settledState, stat, effect.stats[stat] ?? 0);
+      settledState = change.state;
+      appliedStats[stat] = change.result.effectiveChange;
+    }
+    // Attribute reactions may restore SAN or change a second attribute. Keep
+    // those committed reactions rather than replacing them with raw buff data.
+    const reactionSan = settledState.player.san - before.san;
+    if (reactionSan !== 0) {
+      sanDelta += reactionSan;
+      appliedStats.san = (appliedStats.san ?? 0) + reactionSan;
+    }
+    for (const stat of ["research", "social", "favor"] as const) {
+      const actual = Number((settledState.player[stat] - before[stat]).toFixed(10));
+      if (actual !== 0 || Object.hasOwn(effect.stats, stat)) appliedStats[stat] = actual;
+    }
+    const moneyDelta = roundMoney(settledState.player.money - before.money);
+    if (Object.hasOwn(effect.stats, "money") || moneyDelta !== 0) appliedStats.money = moneyDelta;
+    items.push({ ...effect, stats: { ...effect.stats, ...(Object.hasOwn(effect.stats, "money") ? { money } : {}) }, appliedStats,
+      personalSpending: roundMoney(Math.max(0, -money) + (settledState.personalSpending ?? 0) - spendingBefore) });
+  }
+  // SAN recovery and drains form one batch: retain recoveries at the cap until
+  // all drains have been paid, and judge negative SAN only after the batch.
+  let player = { ...settledState.player, san: sanDelta > 0
+    ? Math.max(startingPlayer.san, Math.min(settledState.sanCap, startingPlayer.san + sanDelta))
+    : startingPlayer.san + sanDelta };
   for (const statId of PLAYER_STAT_IDS) {
     const delta = player[statId] - startingPlayer[statId];
     totals[statId] = statId === "money" ? roundMoney(delta) : delta;
@@ -235,7 +312,9 @@ export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution
     });
   }
 
-  return { items, totals, player };
+  settledState = { ...settledState, player };
+  return { items, totals, player, settledState,
+    recordedPersonalSpending: roundMoney((settledState.personalSpending ?? 0) - (state.personalSpending ?? 0)) };
 }
 
 function appendMonthlyEffect(
@@ -244,7 +323,8 @@ function appendMonthlyEffect(
   effect: Omit<MonthlyEffectItem, "appliedStats">,
 ): void {
   const before = resolution.player;
-  const player = applyStats(state, before, effect.stats);
+  const settledState = applyStats(state, before, effect.stats);
+  const player = settledState.player;
   const appliedStats: Partial<PlayerStats> = {};
   for (const statId of PLAYER_STAT_IDS) {
     const change = player[statId] - before[statId];
@@ -256,6 +336,9 @@ function appendMonthlyEffect(
     if (statId === "money") resolution.totals.money = roundMoney(resolution.totals.money);
   }
   resolution.player = player;
+  resolution.settledState = settledState;
+  resolution.recordedPersonalSpending = roundMoney((resolution.recordedPersonalSpending ?? 0)
+    + (settledState.personalSpending ?? 0) - (state.personalSpending ?? 0));
   resolution.items.push({ ...effect, appliedStats });
 }
 
@@ -420,14 +503,16 @@ export function applyMonthStartSubscriptions(
       continue;
     }
 
-    const fundingCost = reimbursement ? getAiModelForTotalMonths(nextState.totalMonths, target.slot).price : 0;
+    const modelPrice = getAiModelForTotalMonths(nextState.totalMonths, target.slot).price;
+    const talentFunding = !reimbursement && !usesGift && canUseAiTalentFunding(nextState, modelPrice);
+    const fundingCost = reimbursement || talentFunding ? modelPrice : 0;
     const renewed = renewAiSubscriptionSlot(
       nextState.aiShopState,
       nextState.totalMonths,
       resolution.player.money,
       target.slot,
-      reimbursement || usesGift,
-      reimbursement ? nextState.advisorProgressState.funding : undefined,
+      reimbursement || usesGift || talentFunding,
+      fundingCost > 0 ? nextState.advisorProgressState.funding : undefined,
     );
     nextState = { ...nextState, aiShopState: renewed.state };
     for (const item of renewed.items) {
@@ -435,7 +520,8 @@ export function applyMonthStartSubscriptions(
         ? "模型已更新，自动续费已关闭"
         : item.reason === "insufficient-funding" ? "科研经费不足，本月暂停"
           : item.reason === "insufficient-money" ? "金币不足，本月暂停"
-          : usesGift ? "恋人赠礼，本次免费" : reimbursement ? `导师经费报销，科研经费 -${fundingCost}` : undefined;
+          : usesGift ? "恋人赠礼，本次免费" : reimbursement ? `导师经费报销，科研经费 -${fundingCost}`
+            : talentFunding ? `经费护航，科研经费 -${fundingCost}` : undefined;
       appendMonthlyEffect(nextState, resolution, {
         id: `ai-renewal-${item.slot}`,
         name: `${item.model.name}续费`,
@@ -450,7 +536,7 @@ export function applyMonthStartSubscriptions(
           ...nextState,
           advisorProgressState: { ...nextState.advisorProgressState, funding: roundMoney(nextState.advisorProgressState.funding - fundingCost) },
         }, "student-reimbursement", -fundingCost);
-        if (fundingCost > 0) nextState = consumeAiCostCoverage(nextState);
+        if (fundingCost > 0 && reimbursement) nextState = consumeAiCostCoverage(nextState);
       }
       nextState = { ...nextState, player: { ...resolution.player } };
     }
@@ -488,8 +574,20 @@ export function applyMonthStartSubscriptions(
       note: activated.readingDetails.join("；"),
     }, { ...stats });
   }
-  resolution.player = { ...nextState.player };
-  return { nextState, resolution };
+  const recorded = recordPersonalSpending(nextState, getMonthlyPersonalSpending(resolution) - (resolution.recordedPersonalSpending ?? 0));
+  const settled = settleGreedCoinGames(recorded);
+  const greedStats: Partial<PlayerStats> = {};
+  for (const stat of PLAYER_STAT_IDS) {
+    const delta = Number((settled.player[stat] - nextState.player[stat]).toFixed(10));
+    if (delta !== 0) greedStats[stat] = delta;
+  }
+  if (Object.keys(greedStats).length > 0) appendObservedAiEffect(resolution, {
+    id: "greed-monthly-reactions", name: "贪求天赋", source: "角色天赋", stats: greedStats,
+    note: "本月消费转化及金币游戏结算",
+  }, greedStats);
+  resolution.player = { ...settled.player };
+  resolution.settledState = settled;
+  return { nextState: settled, resolution };
 }
 
 export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
@@ -519,7 +617,7 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
       note: `SAN 上限 +${bikeCapGain}`,
     });
   }
-  const payrollState = settleLabPayroll(state);
+  const payrollState = settleLabPayroll(resolution.settledState ?? state);
   const monthStartState: GameState = {
     ...payrollState,
     player: { ...resolution.player },
@@ -564,10 +662,10 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     resolution: subscriptionSettlement.resolution,
     nextState: {
       ...journalSettlement.state,
-      sanCap: state.sanCap + bikeCapGain,
+      sanCap: journalSettlement.state.sanCap + bikeCapGain,
       relationshipState: syncRelationshipState(
         state.relationshipState,
-        subscriptionSettlement.nextState.player.social,
+        getEffectiveSocial(subscriptionSettlement.nextState),
       ),
     },
   };
@@ -591,15 +689,73 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
 
   const nextTotalMonths = state.totalMonths + 1;
   const calendar = getCalendarForTotalMonths(nextTotalMonths, state.degree);
-  const nextMonthState = {
-    ...settleFellowAcademicYear(state),
+  const inherited = settleLabResearchGrowth(settleFellowAcademicYear(state));
+  const annual = settleRoleTalentYearEnd(inherited);
+  const yearEnd = settleRoleTalentMonthEnd(annual);
+  const lifecycleItems: MonthlyEffectItem[] = [];
+  const observe = (before: GameState, after: GameState, id: string, name: string): void => {
+    const stats: Partial<PlayerStats> = {};
+    for (const stat of PLAYER_STAT_IDS) {
+      const delta = Number((after.player[stat] - before.player[stat]).toFixed(10));
+      if (delta !== 0) stats[stat] = delta;
+    }
+    if (Object.keys(stats).length > 0) lifecycleItems.push({ id, name, source: "角色天赋", stats, appliedStats: { ...stats } });
+  };
+  observe(state, inherited, "annual-lab-growth", "实验室传承");
+  observe(inherited, annual, "annual-role-growth", state.selectedRoleId === "normal" ? "厚积薄发"
+    : state.selectedRoleId === "genius" ? "学而不倦" : "齐头并进");
+  if (yearEnd.sanCap > annual.sanCap) lifecycleItems.push({
+    id: "monthly-role-idle-cap", name: "日渐圆润", source: "角色天赋", stats: {}, appliedStats: {},
+    label: `SAN上限 +${yearEnd.sanCap - annual.sanCap}`, note: "月末未使用常规行动",
+  });
+  const monthEndIllnessDelta = state.totalMonths > 0
+    ? DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[yearEnd.player.san < 6 ? 0 : yearEnd.player.san < 12 ? 1 : yearEnd.player.san < 18 ? 2 : 3]
+    : 0;
+  const beforeMonthlyTalents = {
+    ...yearEnd,
     totalMonths: nextTotalMonths,
     year: calendar.year,
     month: calendar.month,
+    illnessProbability: normalizeRoleTalentIllnessProbability(yearEnd, yearEnd.illnessProbability + monthEndIllnessDelta),
   };
+  // Preview deterministic effects only. Sampling a random permutation here
+  // would change the tooltip on every render and could promise a false result.
+  const nextMonthState = settleRoleTalentMonthStart(beforeMonthlyTalents, undefined, { skipSwaps: true });
+  const hasRandomStagnation = state.selectedRoleId === "social-reversed" && (yearEnd.roleTalents?.socialStagnantMonths ?? 0) >= 2;
+  if (!hasRandomStagnation) observe(beforeMonthlyTalents, nextMonthState, "monthly-role-growth", state.selectedRoleId === "normal"
+    ? nextTotalMonths === 2 ? "满怀干劲" : "满怀干劲+"
+    : state.selectedRoleId === "chosen" ? "否极泰来" : state.selectedRoleId === "rich-reversed" ? "金钱诅咒" : "命运反噬");
+  if (hasRandomStagnation) lifecycleItems.push({
+    id: "monthly-role-stagnation", name: "患得患失", source: "角色天赋", stats: {}, appliedStats: {},
+    label: "科研/好感随机 -1", note: "患得患失：月初科研或导师好感随机降低1点，受抵抗影响",
+  });
+  if (nextMonthState.sanCap > beforeMonthlyTalents.sanCap) lifecycleItems.push({
+    id: "monthly-role-san-cap", name: "触底反弹", source: "角色天赋", stats: {}, appliedStats: {},
+    label: `SAN上限 +${nextMonthState.sanCap - beforeMonthlyTalents.sanCap}`,
+    note: "下个月初恢复SAN上限",
+  });
+  const actionBonus = nextMonthState.roleTalents?.monthlyActionBonus ?? 0;
+  if (state.selectedRoleId === "normal" && state.degree === "phd" && actionBonus > 0) lifecycleItems.push({
+    id: "monthly-role-actions", name: "勤能补拙", source: "角色天赋", stats: {}, appliedStats: {},
+    label: `行动 +${actionBonus}`, note: `下月行动额度${nextMonthState.actionState.limit}次`,
+  });
+  const hasRandomSwap = state.selectedRoleId === "chosen-reversed" && nextTotalMonths > 1
+    && (getRoleTalentLevel(state, "attribute-swap") > 0 || getRoleTalentLevel(state, "san-money-swap") > 0
+      || (state.degree === "phd" && getRoleTalentLevel(state, "post-phd-swap") > 0));
+  if (hasRandomSwap) lifecycleItems.push({
+    id: "monthly-role-random-swap", name: "随机交换", source: "角色天赋", stats: {}, appliedStats: {},
+    label: "随机交换", note: "月初随机确定交换结果，其余数值按交换前属性估算",
+  });
   const resolution = resolveMonthlyEffects(nextMonthState);
+  resolution.items.unshift(...lifecycleItems);
+  for (const item of lifecycleItems) {
+    for (const stat of PLAYER_STAT_IDS) resolution.totals[stat] += item.appliedStats[stat] ?? 0;
+  }
+  if (hasRandomSwap) for (const item of resolution.items) {
+    if (item.id !== "monthly-role-random-swap") item.note = [item.note, "未计入随机交换影响"].filter(Boolean).join("；");
+  }
   const monthStartState: GameState = {
-    ...settleLabPayroll(nextMonthState),
+    ...settleLabPayroll(resolution.settledState ?? nextMonthState),
     player: { ...resolution.player },
     coffeeState: {
       ...nextMonthState.coffeeState,

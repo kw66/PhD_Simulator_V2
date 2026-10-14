@@ -1,4 +1,4 @@
-import { addPaperCollaboration } from "./v2-paper-collaboration";
+import { addPaperCollaboration, getRoleCollaborationScore } from "./v2-paper-collaboration";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
 import { recordFellowMonthlySupport } from "./v2-fellow-monthly-support";
@@ -44,8 +44,9 @@ export function queueAdvisorGuidance(state: GameState): GameState {
 export function settleAdvisorGuidance(state: GameState, random: () => number = Math.random): GameState {
   if (state.phase !== "playing" || !state.selectedAdvisorName) return state;
   let nextState = state;
-  const playerAmount = state.advisorProgressState.pendingGuidanceToPlayer;
-  if (playerAmount != null) {
+  const pendingPlayerAmount = state.advisorProgressState.pendingGuidanceToPlayer;
+  if (pendingPlayerAmount != null) {
+    const playerAmount = getRoleCollaborationScore(state, "advisor", pendingPlayerAmount);
     const paper = applyGuidance(nextState.papers, state.selectedAdvisorName, playerAmount, random);
     if (paper) {
       nextState = {
@@ -82,6 +83,6 @@ export function settleAdvisorGuidance(state: GameState, random: () => number = M
   return nextState;
 }
 
-export function getAdvisorGuidanceAmount(): number {
-  return GUIDANCE_AMOUNT;
+export function getAdvisorGuidanceAmount(state?: GameState): number {
+  return state ? getRoleCollaborationScore(state, "advisor", GUIDANCE_AMOUNT) : GUIDANCE_AMOUNT;
 }

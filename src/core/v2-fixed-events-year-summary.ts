@@ -1,3 +1,5 @@
+import { getEffectiveSocial } from "./v2-effective-attributes";
+import { getPlayerAttributeCap } from "./v2-player-attributes";
 import {
   createFixedEvent,
   type FixedResolutionResult,
@@ -10,8 +12,8 @@ import {
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
-  const socialCapped = state.player.social >= 20;
-  const favorCapped = state.player.favor >= 20;
+  const socialCapped = getEffectiveSocial(state) >= getPlayerAttributeCap(state, "social");
+  const favorCapped = state.player.favor >= getPlayerAttributeCap(state, "favor");
   const sleepHint = state.player.san < 6
     ? "翻到“休养生息”，眼前的字又有点发花，才想起这一年难得睡饱的那几个周末。"
     : state.player.san < 12
@@ -19,7 +21,7 @@ function createYearSummaryChoiceEvent(state: GameState): PendingEvent {
       : "看着“休养生息”，你想起那些按时关电脑的晚上。这一年倒没把精神熬垮。";
   const socialHint = socialCapped
     ? "“广交朋友”旁挤满了名字，几张活动票根都快夹不住了。"
-    : state.player.social < 6
+    : getEffectiveSocial(state) < 6
       ? "“广交朋友”下面只记了几个名字，好在不再每顿饭都一个人吃。"
       : "“广交朋友”旁夹着活动票根，那天从研究方向聊到各自家乡，散场了还舍不得走。";
   const favorHint = favorCapped

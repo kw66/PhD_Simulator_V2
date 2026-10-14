@@ -1,3 +1,4 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
 import type { GameState } from "./v2-types";
 
 export type CareerType = "internet" | "stateOwned" | "civilService" | "academic";
@@ -152,7 +153,7 @@ function randomZeroToFive(random: () => number): number {
 export function calculateMonthlyCareerProgress(
   state: GameState, type: CareerType, random: () => number = Math.random,
 ): number {
-  const research = Math.max(0, state.player.research);
+  const research = Math.max(0, getEffectiveResearch(state));
   switch (type) {
     case "internet": return Math.floor(research * 0.5);
     case "stateOwned": return Math.floor(research * 0.25) + randomZeroToFive(random);

@@ -1,3 +1,6 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { createJuniorDelegationTalent, getJuniorDelegationSocialChange, getFellowOverflowEffects, getFellowOverflowOutcome } from "./v2-role-talent-relationships";
 import { applyTierResist, formatEventSanChange, withoutIllnessSanBuffs, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel, getFellowPronoun, getPlayerHonorific } from "./v2-fellow-progression";
 import { getActiveAiModels } from "./v2-ai-shop";
@@ -28,15 +31,15 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
   const staysForGradSchool = getRoll() < 0.5;
   const recruitmentSeed = `random-1:${serial}:${getRoll()}`;
   const becomesJunior = staysForGradSchool && canAddJunior;
-  const refuseFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const refuseFavorResult = previewPlayerAttributeChange(state, "favor", -1);
   const refuseFavorChange = refuseFavorResult.effectiveChange;
   const refuseFavorNarrative = getTierResistedNarrative("导师好感", -1, refuseFavorResult);
-  const delegateSocialRaw = hasJunior ? -1 : -2;
-  const delegateSocialResult = applyTierResist(delegateSocialRaw, state.player.social, getRoll);
+  const delegateSocialRaw = getJuniorDelegationSocialChange(state, hasJunior ? -1 : -2);
+  const delegateSocialResult = previewPlayerAttributeChange(state, "social", delegateSocialRaw);
   const delegateSocialChange = delegateSocialResult.effectiveChange;
-  const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw, delegateSocialResult);
-  const mentoringSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
-  const mentoringSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
+  const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw || -1, delegateSocialResult);
+  const mentoringSanChange = getActualResearchMiscSanChange(-4, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const mentoringSanSummary = formatResearchMiscSanChange(-4, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
   const mentorshipJunior = createGeneratedFellowProfileAddition("junior", serial, undefined, usedNames, undefined, { ...recruitmentCalendar, fixedYear: 0 }, recruitmentSeed);
   const affinityResult = applyTierResist(2, mentorshipJunior.affinity, getRoll, 20);
   const affinitySummary = formatTierResistedOutcome("默契", 2, affinityResult);
@@ -50,6 +53,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
   const mentorshipJuniorPronoun = getFellowPronoun(mentorshipJunior.gender);
   const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 101, undefined, [], getRoll);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
+  const delegationTalent = createJuniorDelegationTalent(state, getRoll);
 
   const event: PendingEvent = {
     id: `random-1-y${state.year}-m${state.month}-n${serial}`,
@@ -69,13 +73,13 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
         id: `random-1-refuse-${serial}`,
         label: "委婉拒绝",
         outcome: formatTierResistedOutcome("导师好感", -1, refuseFavorResult),
-        effects: refuseFavorChange < 0 ? { favor: refuseFavorChange } : {},
+        effects: { favor: refuseFavorChange, rawFavor: -1 },
       },
       {
         id: `random-1-self-${serial}`,
         label: "亲自指导",
         outcome: staysForGradSchool
-          ? `条件：对方考研进组（50%）${canAddJunior ? "" : `；师弟师妹人数 ${state.relationshipState.juniorCount}，人际栏已满`}｜结果：${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1｜${mentorshipJuniorLabel}科研 +1｜${mentorshipJuniorLabel}${affinitySummary}` : "｜未新增关系"}`
+          ? `条件：对方考研进组（50%）${canAddJunior ? "" : `；师弟师妹人数 ${state.relationshipState.juniorCount}，人际栏已满`}｜结果：${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1｜${mentorshipJuniorLabel}科研 +1｜${mentorshipJuniorLabel}${affinitySummary}` : getFellowOverflowEffects(state).fellowOverflowAttempts ? `｜${getFellowOverflowOutcome(state).split("｜结果：")[1]}` : "｜未新增关系"}`
           : `对方毕业（50%）｜${mentoringSanSummary}`,
         effects: becomesJunior
           ? {
@@ -84,13 +88,14 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
           }
           : {
             san: mentoringSanChange,
+            ...(staysForGradSchool ? getFellowOverflowEffects(state, guidedJunior) : {}),
           },
       },
       {
         id: `random-1-delegate-${serial}`,
         label: "转给师弟师妹",
-        outcome: `${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜${formatTierResistedOutcome("社交", delegateSocialRaw, delegateSocialResult)}`,
-        effects: delegateSocialChange < 0 ? { social: delegateSocialChange } : {},
+        outcome: `${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜${formatTierResistedOutcome("社交", delegateSocialRaw || -1, delegateSocialResult)}${delegationTalent.outcome}`,
+        effects: { social: delegateSocialChange, rawSocial: delegateSocialRaw, ...delegationTalent.effects },
       },
     ],
   };
@@ -157,7 +162,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
               ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 
 function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): PendingEvent {
@@ -167,13 +172,13 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
   const familiarJuniorLabel = familiarJunior ? getFellowRoleLabel(familiarJunior.type, familiarJunior.gender) : "";
   const familiarJuniorName = familiarJunior ? getFellowName(familiarJunior) : familiarJuniorLabel;
   const playerHonorific = getPlayerHonorific(getRoleDefinition(state.selectedRoleId).gender);
-  const refuseFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const refuseFavorResult = previewPlayerAttributeChange(state, "favor", -1);
   const refuseFavorChange = refuseFavorResult.effectiveChange;
   const refuseFavorNarrative = getTierResistedNarrative("导师好感", -1, refuseFavorResult);
-  const delegateSocialRaw = hasJuniorForReview ? -1 : -2;
-  const delegateSocialResult = applyTierResist(delegateSocialRaw, state.player.social, getRoll);
+  const delegateSocialRaw = getJuniorDelegationSocialChange(state, hasJuniorForReview ? -1 : -2);
+  const delegateSocialResult = previewPlayerAttributeChange(state, "social", delegateSocialRaw);
   const delegateSocialChange = delegateSocialResult.effectiveChange;
-  const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw, delegateSocialResult);
+  const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw || -1, delegateSocialResult);
   const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 211, undefined, [], getRoll);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const reviewReadRolls: number[] = [];
@@ -211,6 +216,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
     `下次想 idea +${reviewReadPreview.totalIdeaBonus}分`,
     formatReadingResearchOutcome(reviewReadPreview),
   ].filter(Boolean).join("｜");
+  const delegationTalent = createJuniorDelegationTalent(state, getRoll);
 
   const event: PendingEvent = {
     id: `random-2-y${state.year}-m${state.month}-n${serial}`,
@@ -227,7 +233,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
         id: `random-2-refuse-${serial}`,
         label: "婉言推辞",
         outcome: formatTierResistedOutcome("导师好感", -1, refuseFavorResult),
-        effects: refuseFavorChange < 0 ? { favor: refuseFavorChange } : {},
+        effects: { favor: refuseFavorChange, rawFavor: -1 },
       },
       {
         id: `random-2-self-${serial}`,
@@ -241,8 +247,8 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
       {
         id: `random-2-delegate-${serial}`,
         label: "交给师弟师妹",
-        outcome: `${hasJuniorForReview ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜${formatTierResistedOutcome("社交", delegateSocialRaw, delegateSocialResult)}`,
-        effects: delegateSocialChange < 0 ? { social: delegateSocialChange } : {},
+        outcome: `${hasJuniorForReview ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜${formatTierResistedOutcome("社交", delegateSocialRaw || -1, delegateSocialResult)}${delegationTalent.outcome}`,
+        effects: { social: delegateSocialChange, rawSocial: delegateSocialRaw, ...delegationTalent.effects },
       },
     ],
   };
@@ -303,7 +309,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
               ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 
 function createRandomEvent14(state: GameState, getRoll: RandomRollProvider, recruitmentCalendar: RecruitmentCalendar): PendingEvent {
@@ -317,9 +323,9 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider, recr
   ];
   const roleText = getFellowRoleLabel("junior", juniorGender);
   const eventTitle = roleText === "师弟" ? "指导师弟" : "指导师妹";
-  const shortTermSan = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
-  const shortTermSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
-  const dinnerSocialResult = applyTierResist(1, state.player.social, getRoll);
+  const shortTermSan = getActualResearchMiscSanChange(-5, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const shortTermSanSummary = formatResearchMiscSanChange(-5, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const dinnerSocialResult = previewPlayerAttributeChange(state, "social", 1);
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
   const juniorAddition = createGeneratedFellowProfileAddition("junior", serial, juniorGender, usedNames, undefined, recruitmentCalendar, recruitmentSeed);
   const juniorIntro = `${roleText}${juniorAddition.name ?? ""}`;
@@ -347,27 +353,27 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider, recr
         outcome: `金币 -2｜${formatTierResistedOutcome("社交", 1, dinnerSocialResult)}`,
         effects: {
           money: -2,
-          ...(dinnerSocialResult.effectiveChange > 0 ? { social: dinnerSocialResult.effectiveChange } : {}),
+          ...({ social: dinnerSocialResult.effectiveChange, rawSocial: 1 }),
         },
       },
       {
         id: `random-14-idea-${serial}`,
         label: "认真指导",
-        outcome: canAddJunior ? `${shortTermSanSummary}；${roleText} +1` : "条件：人际栏已满｜结果：无事发生。",
+        outcome: canAddJunior ? `${shortTermSanSummary}；${roleText} +1` : getFellowOverflowOutcome(state),
         effects: canAddJunior ? {
           san: shortTermSan,
           fellowAdditions: [juniorAddition],
-        } : {},
+        } : getFellowOverflowEffects(state, juniorAddition),
       },
       {
         id: `random-14-long-term-${serial}`,
         label: "长期合作",
         outcome: canAddJunior
           ? `${roleText} +1｜SAN -1（每月）｜协作自动推进 +1次（每月）`
-          : "条件：人际栏已满｜结果：无事发生。",
+          : getFellowOverflowOutcome(state),
         effects: canAddJunior ? {
           fellowAdditions: [{ ...juniorAddition, longTermMentoring: true }],
-        } : {},
+        } : getFellowOverflowEffects(state, juniorAddition),
       },
     ],
   };
@@ -419,7 +425,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider, recr
         ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 
 export function createMentoringLabRandomEventById(

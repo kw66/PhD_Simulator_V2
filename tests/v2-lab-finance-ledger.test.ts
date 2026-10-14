@@ -39,12 +39,14 @@ describe("monthly lab finance ledger", () => {
     ] });
     expect(initial.labFinanceLedger).toBeUndefined();
     expect(state.advisorProgressState.funding).toBe(100);
+    expect(state.advisorProgressState.cumulativeFunding).toBe(80);
     expect(getLabFinanceMonthSummary(JSON.parse(JSON.stringify(state)))).toEqual(getLabFinanceMonthSummary(state));
     const nextMonth = { ...state, totalMonths: 5 };
     expect(getLabFinanceMonthSummary(nextMonth)).toEqual({ net: 0, items: [] });
     expect(getLabFinanceMonthSummary(recordLabFinance(nextMonth, "student-wages", -1.5))).toEqual({
       net: -1.5, items: [{ label: "学生工资", amount: -1.5 }],
     });
+    expect(recordLabFinance(nextMonth, "student-wages", -1.5).advisorProgressState.cumulativeFunding).toBe(80);
   });
 
   it("records player and fellow registration once, excluding non-first-author papers", () => {

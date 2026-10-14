@@ -1,3 +1,4 @@
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { type FixedResolutionResult, type RandomRollProvider } from "./v2-fixed-events-shared";
 import {
   createCcigAttendResultEvent,
@@ -7,13 +8,13 @@ import {
 import { createCcigActivityResultEvent } from "./v2-fixed-events-ccig-activity-events";
 import { getCcigLocation, getCcigSelfPayCost } from "./v2-fixed-events-ccig-shared";
 import { combineEffectMultipliers } from "./v2-numeric-modifiers";
-import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
+import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState } from "./v2-types";
 
 export function resolveCcigFixedEvent(
   state: GameState,
   resolution: FixedEventResolution,
-  getRoll: RandomRollProvider,
+  _getRoll: RandomRollProvider,
 ): FixedResolutionResult {
   const eventState = resolution.ccigCalendar ? { ...state, ...resolution.ccigCalendar } : state;
   switch (resolution.kind) {
@@ -31,7 +32,7 @@ export function resolveCcigFixedEvent(
       };
     case "ccig-advisor": {
       const { actualCost } = getCcigSelfPayCost(state);
-      const favorResult = applyTierResist(-1, state.player.favor, getRoll);
+      const favorResult = previewPlayerAttributeChange(state, "favor", -1);
       const favorChange = favorResult.effectiveChange;
       const favorNarrative = getTierResistedNarrative("导师好感", -1, favorResult);
       const nextState = state;
@@ -41,7 +42,7 @@ export function resolveCcigFixedEvent(
         nextState,
         outcome: `${settlement}，${fundingSettlement}，报销通过。`,
         enqueueEvents: [createCcigAttendResultEvent(eventState, "advisor", ["导师报销", settlement, fundingSettlement], favorNarrative, {
-          ...(favorChange < 0 ? { favor: favorChange } : {}),
+          ...({ favor: favorChange, rawFavor: -1 }),
           advisorProgressStateDeltas: { funding: -actualCost },
           labFinanceCategory: "conference-travel",
         })],
@@ -167,7 +168,7 @@ export function resolveCcigFixedEvent(
       // The activity result is its own confirmation stage; defer the meal cost
       // until that final click just like the other activity effects.
       const nextState = state;
-      const socialResult = applyTierResist(1, state.player.social, getRoll);
+      const socialResult = previewPlayerAttributeChange(state, "social", 1);
       const socialGain = socialResult.effectiveChange;
       const socialNarrative = getTierResistedNarrative("社交", 1, socialResult);
       const activityOutcome = `金币 -2，SAN +2，${formatTierResistedOutcome("社交", 1, socialResult)}`;
@@ -185,7 +186,7 @@ export function resolveCcigFixedEvent(
           ].join("\n\n"),
           outcome: `${activityOutcome}。`,
           completionLog,
-          effects: socialGain > 0 ? { money: -2, san: 2, social: socialGain } : { money: -2, san: 2 },
+          effects: { money: -2, san: 2, social: socialGain, rawSocial: 1 },
         })],
       };
     }

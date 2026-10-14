@@ -1,7 +1,8 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
 import { recordFellowMonthlySupport } from "./v2-fellow-monthly-support";
-import { addPaperCollaboration } from "./v2-paper-collaboration";
+import { addPaperCollaboration, getRoleCollaborationScore } from "./v2-paper-collaboration";
 import type { FellowProgressProfile, GameState, Paper, PaperActionType } from "./v2-types";
 
 const SCORE_FIELDS = ["idea", "experiment", "writing"] as const;
@@ -39,17 +40,17 @@ export function advanceFellowCooperation(profile: FellowProgressProfile, amount:
   };
 }
 
-export function advanceFellowCooperationWithLog(state: GameState, fellowId: string, amount: number): GameState {
+export function advanceFellowCooperationWithLog(state: GameState, fellowId: string, amount: number, operationStartState: GameState = state): GameState {
   const profile = state.fellowProgressState.find((fellow) => fellow.id === fellowId);
   if (!profile || amount <= 0) return state;
-  const progressed = advanceFellowCooperation(profile, amount, state.player.research);
+  const progressed = advanceFellowCooperation(profile, amount, getEffectiveResearch(state, operationStartState));
   const nextState = { ...state, fellowProgressState: state.fellowProgressState.map((fellow) => fellow.id === fellowId ? progressed : fellow) };
   const completed = Math.floor((profile.taskProgress + amount) / profile.taskMax);
   if (completed <= 0) return nextState;
   const name = getFellowName(profile);
   const playerHelp = profile.pendingHelpToPlayer != null
-    ? `已有${name}帮你的论文帮助待生效（${Math.floor(profile.pendingHelpToPlayer)}分），不叠加`
-    : `${name}帮你的论文帮助已就绪（${Math.floor(progressed.pendingHelpToPlayer!)}分）`;
+    ? `已有${name}帮你的论文帮助待生效（${getRoleCollaborationScore(state, "fellow", profile.pendingHelpToPlayer)}分），不叠加`
+    : `${name}帮你的论文帮助已就绪（${getRoleCollaborationScore(state, "fellow", progressed.pendingHelpToPlayer!)}分）`;
   const fellowHelp = profile.pendingHelpToFellow != null
     ? `已有你帮${name}的论文帮助待生效（${Math.floor(profile.pendingHelpToFellow)}分），不叠加`
     : `你帮${name}的论文帮助已就绪（${Math.floor(progressed.pendingHelpToFellow!)}分）`;
@@ -64,7 +65,7 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
   for (const original of state.fellowProgressState) {
     let profile = original;
     if (profile.pendingHelpToPlayer != null) {
-      const amount = profile.pendingHelpToPlayer;
+      const amount = getRoleCollaborationScore(state, "fellow", profile.pendingHelpToPlayer);
       const target = selectHelpTarget(getHelpTargets(nextState.papers), profile.type, random);
       if (target) {
         const paper = addPaperCollaboration(target.paper, {

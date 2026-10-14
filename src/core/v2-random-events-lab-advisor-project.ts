@@ -1,5 +1,7 @@
-import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
-import { getResearchCap } from "./v2-research-cap-system";
+import { getEffectiveResearch } from "./v2-effective-attributes";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { createJuniorDelegationTalent, getJuniorDelegationSocialChange } from "./v2-role-talent-relationships";
+import { formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
 import { PROJECT_PROGRESS_MAX } from "./v2-lab-projects";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import {
@@ -10,35 +12,36 @@ import type { GameState, PendingEvent } from "./v2-types";
 
 export function createAdvisorProjectRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
-  const rejectFavorResult = applyTierResist(-2, state.player.favor, getRoll);
+  const rejectFavorResult = previewPlayerAttributeChange(state, "favor", -2);
   const rejectFavorChange = rejectFavorResult.effectiveChange;
   const rejectFavorNarrative = getTierResistedNarrative("导师好感", -2, rejectFavorResult);
-  const horizontalSanChange = getActualResearchMiscSanChange(-8, state.player.research, state.month, state.eventSupport, state.buffs);
-  const horizontalSanSummary = formatResearchMiscSanChange(-8, state.player.research, state.month, state.eventSupport, state.buffs);
-  const verticalSanChange = getActualResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport, state.buffs);
-  const verticalSanSummary = formatResearchMiscSanChange(-6, state.player.research, state.month, state.eventSupport, state.buffs);
-  const shareSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
-  const shareSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
-  const horizontalFavorResult = applyTierResist(1, state.player.favor, getRoll);
+  const horizontalSanChange = getActualResearchMiscSanChange(-8, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const horizontalSanSummary = formatResearchMiscSanChange(-8, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const verticalSanChange = getActualResearchMiscSanChange(-6, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const verticalSanSummary = formatResearchMiscSanChange(-6, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const shareSanChange = getActualResearchMiscSanChange(-2, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const shareSanSummary = formatResearchMiscSanChange(-2, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const horizontalFavorResult = previewPlayerAttributeChange(state, "favor", 1);
   const horizontalFavorChange = horizontalFavorResult.effectiveChange;
   const horizontalFavorNarrative = getTierResistedNarrative("导师好感", 1, horizontalFavorResult);
-  const verticalFavorResult = applyTierResist(1, state.player.favor, getRoll);
+  const verticalFavorResult = previewPlayerAttributeChange(state, "favor", 1);
   const verticalFavorChange = verticalFavorResult.effectiveChange;
   const verticalFavorNarrative = getTierResistedNarrative("导师好感", 1, verticalFavorResult);
-  const verticalResearchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
+  const verticalResearchResult = previewPlayerAttributeChange(state, "research", 1);
   const verticalResearchChange = verticalResearchResult.effectiveChange;
   const verticalResearchNarrative = getTierResistedNarrative("科研", 1, verticalResearchResult);
   const familiarJunior = state.fellowProgressState.find((profile) => profile.type === "junior");
   const hasJunior = familiarJunior !== undefined;
   const familiarJuniorLabel = familiarJunior ? getFellowRoleLabel(familiarJunior.type, familiarJunior.gender) : "";
   const familiarJuniorName = familiarJunior ? getFellowName(familiarJunior) : familiarJuniorLabel;
-  const shareSocialRaw = hasJunior ? -1 : -2;
-  const shareSocialResult = applyTierResist(shareSocialRaw, state.player.social, getRoll);
+  const shareSocialRaw = getJuniorDelegationSocialChange(state, hasJunior ? -1 : -2);
+  const shareSocialResult = previewPlayerAttributeChange(state, "social", shareSocialRaw);
   const shareSocialChange = shareSocialResult.effectiveChange;
-  const shareSocialNarrative = getTierResistedNarrative("社交", shareSocialRaw, shareSocialResult);
+  const shareSocialNarrative = getTierResistedNarrative("社交", shareSocialRaw || -1, shareSocialResult);
   const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 307, undefined, [], getRoll);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const guidanceRolls = Array.from({ length: (state.fellowProgressState.length + 1) * 2 }, () => getRoll());
+  const delegationTalent = createJuniorDelegationTalent(state, getRoll);
   const introDescription = [
     "导师叫你去办公室，先说起组里的开销：“GPU服务器要租，每次实验得花3科研经费。经费不够，实验就得先停一停。”💻你默默看了眼还没跑完的实验列表。",
     "“项目得大家分担，实验室才能正常运转。”平时同学们各做一部分，这次导师想让你牵头，其他人配合。你把电脑往回挪了挪，😅看来今天不只是来讲论文进度的。",
@@ -61,7 +64,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
         outcome: `${horizontalSanSummary}；横向进度 +${PROJECT_PROGRESS_MAX}；${formatTierResistedOutcome("导师好感", 1, horizontalFavorResult)}`,
         effects: {
           san: horizontalSanChange,
-          ...(horizontalFavorChange > 0 ? { favor: horizontalFavorChange } : {}),
+          ...({ favor: horizontalFavorChange, rawFavor: 1 }),
           labProjectProgress: { type: "horizontal", amount: PROJECT_PROGRESS_MAX },
         },
       },
@@ -71,8 +74,8 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
         outcome: `${verticalSanSummary}；纵向进度 +${PROJECT_PROGRESS_MAX}；${formatTierResistedOutcome("导师好感", 1, verticalFavorResult)}；${formatTierResistedOutcome("科研", 1, verticalResearchResult)}`,
         effects: {
           san: verticalSanChange,
-          ...(verticalFavorChange > 0 ? { favor: verticalFavorChange } : {}),
-          ...(verticalResearchChange > 0 ? { research: verticalResearchChange } : {}),
+          ...({ favor: verticalFavorChange, rawFavor: 1 }),
+          ...({ research: verticalResearchChange, rawResearch: 1 }),
           labProjectProgress: { type: "vertical", amount: PROJECT_PROGRESS_MAX, guidanceRolls },
         },
       },
@@ -81,16 +84,17 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
         label: "拒绝承担",
         outcome: `${formatTierResistedOutcome("导师好感", -2, rejectFavorResult)}`,
         effects: {
-          ...(rejectFavorChange < 0 ? { favor: rejectFavorChange } : {}),
+          ...({ favor: rejectFavorChange, rawFavor: -2 }),
         },
       },
       {
         id: `random-4-share-${serial}`,
         label: "让师弟师妹分担",
-        outcome: `${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}；${shareSanSummary}；${formatTierResistedOutcome("社交", shareSocialRaw, shareSocialResult)}`,
+        outcome: `${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}；${shareSanSummary}；${formatTierResistedOutcome("社交", shareSocialRaw || -1, shareSocialResult)}${delegationTalent.outcome}`,
         effects: {
           san: shareSanChange,
-          social: shareSocialChange,
+          social: shareSocialChange, rawSocial: shareSocialRaw,
+          ...delegationTalent.effects,
         },
       },
     ],
@@ -155,6 +159,6 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
               ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 

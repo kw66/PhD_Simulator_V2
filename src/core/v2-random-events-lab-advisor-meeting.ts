@@ -1,9 +1,10 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import {
   createThreeStageEvent,
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
-import { applyTierResist, formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange } from "./v2-sanity-rules";
-import { getResearchCap } from "./v2-research-cap-system";
+import { formatTierResistedOutcome, formatResearchMiscSanChange, getActualResearchMiscSanChange } from "./v2-sanity-rules";
 import { getAdvisorMeetingAttendancePercent } from "./v2-advisor-progress";
 import type { GameState, PendingEvent } from "./v2-types";
 
@@ -21,17 +22,17 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
   const advisorPresentForPrepared = getRoll() < attendancePercent / 100;
   const advisorPresentForSeries = getRoll() < attendancePercent / 100;
   const advisorPresentForSlack = getRoll() < attendancePercent / 100;
-  const preparedSanChange = getActualResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
-  const preparedSanSummary = formatResearchMiscSanChange(-2, state.player.research, state.month, state.eventSupport, state.buffs);
-  const seriesSanChange = getActualResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
-  const seriesSanSummary = formatResearchMiscSanChange(-4, state.player.research, state.month, state.eventSupport, state.buffs);
-  const preparedFavorResult = applyTierResist(1, state.player.favor, getRoll);
+  const preparedSanChange = getActualResearchMiscSanChange(-2, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const preparedSanSummary = formatResearchMiscSanChange(-2, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const seriesSanChange = getActualResearchMiscSanChange(-4, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const seriesSanSummary = formatResearchMiscSanChange(-4, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const preparedFavorResult = previewPlayerAttributeChange(state, "favor", 1);
   const preparedFavorChange = preparedFavorResult.effectiveChange;
-  const researchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
+  const researchResult = previewPlayerAttributeChange(state, "research", 1);
   const researchChange = researchResult.effectiveChange;
-  const seriesFavorResult = applyTierResist(1, state.player.favor, getRoll);
+  const seriesFavorResult = previewPlayerAttributeChange(state, "favor", 1);
   const seriesFavorChange = seriesFavorResult.effectiveChange;
-  const slackFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const slackFavorResult = previewPlayerAttributeChange(state, "favor", -1);
   const slackFavorChange = slackFavorResult.effectiveChange;
 
   const event: PendingEvent = {
@@ -51,7 +52,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
           ? `导师到场（${attendancePercent}%）｜${preparedSanSummary}；${formatTierResistedOutcome("导师好感", 1, preparedFavorResult)}`
           : `导师缺席（${absencePercent}%）｜${preparedSanSummary}`,
         effects: advisorPresentForPrepared
-          ? { san: preparedSanChange, favor: preparedFavorChange }
+          ? { san: preparedSanChange, favor: preparedFavorChange, rawFavor: 1 }
           : { san: preparedSanChange },
       },
       {
@@ -61,8 +62,8 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
           ? `导师到场（${attendancePercent}%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}；${formatTierResistedOutcome("导师好感", 1, seriesFavorResult)}`
           : `导师缺席（${absencePercent}%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}`,
         effects: advisorPresentForSeries
-          ? { san: seriesSanChange, research: researchChange, favor: seriesFavorChange }
-          : { san: seriesSanChange, research: researchChange },
+          ? { san: seriesSanChange, research: researchChange, rawResearch: 1, favor: seriesFavorChange, rawFavor: 1 }
+          : { san: seriesSanChange, research: researchChange, rawResearch: 1 },
       },
       {
         id: `random-6-slack-${serial}`,
@@ -70,7 +71,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
         outcome: advisorPresentForSlack
           ? `导师到场（${attendancePercent}%）｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
           : `导师缺席（${absencePercent}%）`,
-        effects: advisorPresentForSlack && slackFavorChange < 0 ? { favor: slackFavorChange } : {},
+        effects: advisorPresentForSlack && slackFavorChange < 0 ? { favor: slackFavorChange, rawFavor: -1 } : {},
       },
     ],
   };
@@ -120,5 +121,5 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
             ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }

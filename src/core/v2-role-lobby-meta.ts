@@ -1,3 +1,4 @@
+import { ROLE_DESIGNED_ACHIEVEMENTS } from "./v2-achievement-catalog";
 import type {
   RoleAchievementDefinition,
   RoleId,
@@ -156,13 +157,13 @@ export function getRoleProfileSummary(roleId: RoleId): string {
 }
 
 export function getRoleAchievementDefinitions(roleId: RoleId): RoleAchievementDefinition[] {
-  return ROLE_ACHIEVEMENT_TEMPLATES[roleId].map((template) => ({
+  return [...ROLE_ACHIEVEMENT_TEMPLATES[roleId].map((template) => ({
     id: `${roleId}:${template.idSuffix}`,
     icon: template.icon,
     title: template.title,
     description: template.description,
     rewardText: template.rewardText,
-  }));
+  })), ...(ROLE_DESIGNED_ACHIEVEMENTS[roleId] ?? [])];
 }
 
 export function getRoleLobbyAchievementDefinitions(roleId: RoleId): RoleAchievementDefinition[] {

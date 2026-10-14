@@ -33,7 +33,9 @@ describe("v2 progression", () => {
     expect(state.player).toEqual(startingStats);
     expect(state.paperSlotsUnlocked).toBe(1);
     expect(state.actionState.limit).toBe(1);
-    expect(state.buffs).toEqual([]);
+    if (role.id === "normal-reversed") {
+      expect(state.buffs).toEqual([expect.objectContaining({ id: "role-sloth-san", activeOperationSanMultiplier: 2 })]);
+    } else expect(state.buffs).toEqual([]);
     expect(state.researchCapacityState).toEqual(createStartedGameState("normal").researchCapacityState);
   });
 

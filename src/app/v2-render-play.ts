@@ -1,3 +1,5 @@
+import { renderSanPayment } from "./v2-render-san-payment";
+import { getEffectiveResearch, getEffectiveSocial } from "../core/v2-effective-attributes";
 import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import "../styles/workstation-unified.css";
 import "../styles/relationship-unified.css";
@@ -6,7 +8,8 @@ import "../styles/settings-unified.css";
 import "../styles/navigation-effects.css";
 import "../styles/rails-unified.css";
 import { PAPER_TERM_TRANSLATIONS } from "./v2-paper-terms";
-import { AI_SLOT_IDS, createAiBuffs, getActiveOperationAllowance, getAiCollaborationStatus, getAiModelForTotalMonths, hasAiReimbursement } from "../core/v2-ai-shop";
+import { AI_SLOT_IDS, consumeActiveOperation, createAiBuffs, getActiveOperationAllowance, getAiCollaborationStatus, getAiModelForTotalMonths, hasAiReimbursement } from "../core/v2-ai-shop";
+import { formatCompactSanPayment, quoteSanPayment } from "../core/v2-role-talent-costs";
 import { PAPER_SLOT_RESEARCH_THRESHOLDS, SCORE_BY_TARGET } from "../core/v2-content";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import { getCitationStats } from "../core/v2-citation-stats";
@@ -43,6 +46,8 @@ import { getGraduationPreparationYear } from "../core/v2-thesis-rules";
 import { getLabReimbursementCount } from "../core/v2-lab-reimbursement";
 import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2-relationship-activity";
 import { formatMoney, roundMoney } from "../core/v2-money";
+import { getRoleTalentInvestmentDuration, getRoleTalentInvestmentLevel } from "../core/v2-role-talent-investments";
+import { getPlayerAttributeCap, getPlayerResistanceReduction } from "../core/v2-player-attributes";
 import { getAnnualLabSocialRewards, getPlayerAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
 import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverPassiveGains, getLoverRouteCost, getLoverRouteGain, getLoverRouteProgress } from "../core/v2-lover-progression";
 import { previewPartTimeWork } from "../core/v2-part-time-work";
@@ -59,7 +64,7 @@ import {
 import { getPaperCitationMultiplier, getPaperConferencePromotionMultiplier } from "../core/v2-publication-system";
 import { getPublicationTalentChecklist } from "../core/v2-publication-talent";
 import { getAvailablePaperSlotCount, getPaperSubmissionFailure, getWorkstationPaperSlotMap } from "../core/v2-paper-rules";
-import { getPaperScoreBreakdown } from "../core/v2-paper-collaboration";
+import { getPaperScoreBreakdown, getRoleCollaborationScore } from "../core/v2-paper-collaboration";
 import { getPaperHeatTier } from "../core/v2-paper-topics";
 import {
   ADVISOR_GRANTS,
@@ -102,8 +107,8 @@ import {
   getShopExperimentMoneyDiscount,
   getShopPaperActionModifier,
   getShopReadSanDiscount,
-  getShopRestSanGain,
 } from "../core/v2-shop-items-effects";
+import { getRoleRestSanGain } from "../core/v2-role-talent-rest";
 import { getGpuTierDefinition } from "../core/v2-shop-items";
 import type { DateDisplayMode, EventStage, FellowProgressProfile, GameLogEntry, GameState, JournalTarget, LoverTypeId, Paper, PaperActionType, PaperPromotionId, PendingEvent, RoleId } from "../core/v2-types";
 import { getEventNarrativeNames } from "../core/v2-event-narrative";
@@ -123,7 +128,8 @@ import { isEndingSystemLog, renderEndingLog, renderEndingScreen } from "./v2-ren
 import type { EventLayoutSample } from "./v2-event-layout";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl, hasRoleCardPortrait } from "./v2-role-portrait-assets";
-import { getDesignedTalentNodes, renderDesignedGrowthBoard } from "./v2-render-setup-screen";
+import { renderDesignedGrowthBoard } from "./v2-render-setup-screen";
+import { getDesignedTalentNodes } from "../core/v2-role-talent-definitions";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
 const RESEARCH_CHORE_SAN_DISCOUNT = [0, 1, 2, 3] as const;
@@ -180,7 +186,7 @@ function getAvailablePromotionCount(state: GameState): number {
     return count + ids.filter((id) => {
       if (promotions[id] === true) return false;
       if (id === "arxiv" && (paper.target === null || paper.conferenceHandled === true || paper.publication?.preprintExposed === true || paper.publication?.posterExposed === true || (paper.publication?.monthsSincePublish ?? 0) >= 3)) return false;
-      return state.player.san >= getPaperPromotionCost(id, state)
+      return quoteSanPayment(state, getPaperPromotionCost(id, state)).allowed
         && state.player.money >= getPaperPromotionMoneyCost(id);
     }).length;
   }, 0);
@@ -191,9 +197,9 @@ function getAvailableRelationshipActionCount(state: GameState): number {
   const advisorAvailable = Boolean(state.selectedAdvisorName)
     && state.relationshipState.advisorCount > 0
     && state.advisorProgressState.lastPlayerProjectTotalMonths !== state.totalMonths
-    && (["horizontal", "vertical"] as const).some((projectType) => state.player.san >= getAdvisorTaskSanCost(state, projectType));
+    && (["horizontal", "vertical"] as const).some((projectType) => quoteSanPayment(state, getAdvisorTaskSanCost(state, projectType)).allowed);
   const fellowAvailable = state.fellowProgressState.filter((profile) => (
-    !profile.taskUsedThisMonth && state.player.san >= getFellowDiscussionSanCost(state, profile)
+    !profile.taskUsedThisMonth && quoteSanPayment(state, getFellowDiscussionSanCost(state, profile)).allowed
   )).length;
   const loverUsed = state.loverProgressState.taskUsedThisMonth
     || state.loverProgressState.lastDateTotalMonths === state.totalMonths;
@@ -426,19 +432,24 @@ function getAttrTierName(kind: AttrTierId, value: number): string {
   return ["陌生", "认可", "信任", "心腹"][tier];
 }
 
-function getAttrTierTooltip(kind: AttrTierId, value: number, illnessProbability = 0): string {
+function getAttrTierTooltip(kind: AttrTierId, value: number, illnessProbability = 0, effectiveValue = value, state?: GameState): string {
   const tier = getAttrTier(value);
-  const resistance = Math.round(getTierResistChance(value) * 100);
   if (kind === "san") {
     const monthEndChange = DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[tier];
     const signedChange = monthEndChange >= 0 ? `+${monthEndChange}` : String(monthEndChange);
     return `当前疾病概率 ${illnessProbability}%｜月末结算 ${signedChange}%`;
   }
+  const baseResistance = getTierResistChance(value);
+  const growthResistance = Math.round(Math.max(0, baseResistance - (state ? getPlayerResistanceReduction(state, kind, 1) : 0)) * 100);
+  const lossResistance = Math.round(Math.max(0, baseResistance - (state ? getPlayerResistanceReduction(state, kind, -1) : 0)) * 100);
+  const label = kind === "research" ? "科研" : kind === "social" ? "社交" : "好感";
+  const resistanceText = growthResistance === lossResistance
+    ? `${label}增减抵抗${growthResistance}%`
+    : `${label}增长抵抗${growthResistance}%｜下降抵抗${lossResistance}%`;
   if (kind === "research") {
-    return `科研增减抵抗${resistance}%\n科研任务SAN减免${RESEARCH_CHORE_SAN_DISCOUNT[tier]}`;
+    return `${resistanceText}\n科研任务SAN减免${RESEARCH_CHORE_SAN_DISCOUNT[getAttrTier(effectiveValue)]}`;
   }
-  const label = kind === "social" ? "社交" : "好感";
-  return `${label}增减抵抗${resistance}%`;
+  return resistanceText;
 }
 
 function getAttrFillStateClass(value: number, cap: number, lowThreshold: number, dangerThreshold: number): string {
@@ -465,6 +476,8 @@ function renderAttrItem(
   tierKind: AttrTierId,
   fillClassName: string,
   illnessProbability = 0,
+  effectiveValue = value,
+  resistanceState?: GameState,
 ): string {
   const fillStateClass = tierKind === "san"
     ? getAttrFillStateClass(value, cap, 5, 2)
@@ -472,6 +485,10 @@ function renderAttrItem(
   const safePercent = cap > 0 ? ((value + (value > 0 ? 1 : 0)) / (cap + 1)) * 100 : 0;
   const progressClassName = `${fillClassName}${fillStateClass}${value > 0 ? " is-nonzero" : ""}`;
   const displayedValue = formatMoney(value);
+  const effectiveHint = effectiveValue !== value
+    ? `当前能力视为${formatMoney(effectiveValue)}，用于行动效果、条件与档位减免；属性增减、抵抗和结局仍按真实值${displayedValue}计算`
+    : "";
+  const tooltip = [getAttrTierTooltip(tierKind, value, illnessProbability, effectiveValue, resistanceState), effectiveHint].filter(Boolean).join("\n");
 
   return `
     <div
@@ -480,8 +497,8 @@ function renderAttrItem(
       data-stat-value="${displayedValue}"
       data-stat-cap="${formatMoney(cap)}"
       tabindex="0"
-      aria-label="${escapeHtml(`${name} ${displayedValue}/${formatMoney(cap)}，${getAttrTierName(tierKind, value)}，${getAttrTierTooltip(tierKind, value, illnessProbability)}`)}"
-      data-tooltip="${escapeHtml(getAttrTierTooltip(tierKind, value, illnessProbability))}"
+      aria-label="${escapeHtml(`${name} ${displayedValue}/${formatMoney(cap)}，${getAttrTierName(tierKind, value)}，${tooltip}`)}"
+      data-tooltip="${escapeHtml(tooltip)}"
     >
       <div class="new-attr-header">
         <span class="new-attr-icon">${icon}</span>
@@ -522,8 +539,8 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
 
   const items = (Object.keys(labels) as Array<keyof typeof labels>).flatMap((statId) => {
     const sources = resolution.items.flatMap((item) => {
-      const value = item.stats[statId] ?? 0;
-      if (!Object.hasOwn(item.stats, statId)) return [];
+      const value = item.appliedStats[statId] ?? 0;
+      if (!Object.hasOwn(item.appliedStats, statId)) return [];
       const note = item.note ? `（${normalizeGameDisplayText(item.note)}）` : "";
       const displaySource = item.id === "base-san-recovery" || item.id === "debug-buff-base-recovery"
         ? "自然回复"
@@ -538,7 +555,7 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
         : normalizeGameDisplayText(item.name);
       return [`${displaySource}：${displayName} ${formatSignedNumber(statId === "money" ? roundMoney(value) : value)}${note}`];
     });
-    const value = resolution.items.reduce((total, item) => total + (item.stats[statId] ?? 0), 0);
+    const value = resolution.items.reduce((total, item) => total + (item.appliedStats[statId] ?? 0), 0);
     const alwaysShow = statId === "san" || statId === "money";
     if (!alwaysShow && (sources.length === 0 || value === 0)) return [];
     return [{
@@ -552,6 +569,11 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
   if (state.loverState.active && state.loverProgressState.active
     && state.loverProgressState.sanDiscountMonths?.includes(state.totalMonths + 1)) {
     upsertBucketItem(items, "next-month-lover-play-discount", "SAN消耗 -1", "恋人玩耍 · 下个月生效，持续1个月");
+  }
+  for (const effect of resolution.items) {
+    if (!effect.label) continue;
+    upsertBucketItem(items, `next-month-${effect.id}`, effect.label,
+      `${effect.source}：${effect.name}${effect.note ? ` · ${effect.note}` : ""}`);
   }
   return items;
 }
@@ -743,13 +765,13 @@ function renderLeftRail(state: GameState): string {
     <aside class="play-left-rail new-left-container">
       <div class="new-attr-panel" id="new-attr-panel">
         ${renderAttrItem("🧠", "SAN值", state.player.san, state.sanCap, "san", "san", state.illnessProbability)}
-        ${renderAttrItem("💡", "科研能力", state.player.research, Math.max(researchCap, 20), "research", "research")}
-        ${renderAttrItem("🤝", "社交能力", state.player.social, 20, "social", "social")}
-        ${renderAttrItem("👨‍🏫", "导师好感", state.player.favor, 20, "favor", "favor")}
+        ${renderAttrItem("💡", "科研能力", state.player.research, Math.max(researchCap, 20), "research", "research", 0, getEffectiveResearch(state), state)}
+        ${renderAttrItem("🤝", "社交能力", state.player.social, getPlayerAttributeCap(state, "social"), "social", "social", 0, getEffectiveSocial(state), state)}
+        ${renderAttrItem("👨‍🏫", "导师好感", state.player.favor, getPlayerAttributeCap(state, "favor"), "favor", "favor", 0, state.player.favor, state)}
         <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${roundMoney(state.player.money)}" aria-label="${escapeHtml(`${displayName}，${role.name}，金币 ${formatMoney(state.player.money)}`)}">
           <div class="new-attr-header new-identity-money-header">
             <span class="new-player-identity"><span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span><span class="new-player-role" title="${escapeHtml(role.name)}">${escapeHtml(role.name)}</span></span>
-            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}</span>
+            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}${getRoleTalentInvestmentLevel(state) > 0 ? `<button type="button" class="new-investment-button" data-action="invest-money" ${state.player.money < 5 || state.phase !== "playing" ? "disabled" : ""} title="投资5金币，${getRoleTalentInvestmentDuration(state)}个月后返还本金及${getRoleTalentInvestmentLevel(state)}金币利息；持有${state.roleTalents?.investments?.length ?? 0}笔">投资</button>` : ""}</span>
           </div>
         </div>
       </div>
@@ -1531,7 +1553,8 @@ function renderWorkstationPaperResearchActions(
     const experimentCost = type === "experiment"
       ? getResearchExperimentCostBreakdown(state)
       : { total: 0, advisorFunding: 0, playerMoney: 0 };
-    const enabled = prerequisiteMet && preview.allowed && state.player.san >= preview.sanCost
+    const payment = quoteSanPayment(consumeActiveOperation({ ...state, player: { ...state.player, money: state.player.money - experimentCost.playerMoney } }, type), preview.sanCost);
+    const enabled = prerequisiteMet && preview.allowed && payment.allowed
       && state.player.money >= experimentCost.playerMoney;
     const disabledReason = paper === null
       ? "请先新建一篇论文"
@@ -1539,7 +1562,7 @@ function renderWorkstationPaperResearchActions(
         ? type === "experiment" ? "先想出 idea" : "先完成实验"
         : !preview.allowed
           ? "行动点和 AI行动均不可用"
-          : state.player.san < preview.sanCost ? `需要 ${preview.sanCost} SAN`
+          : !payment.allowed ? `需要 ${preview.sanCost} SAN`
             : type === "experiment" && state.player.money < experimentCost.playerMoney ? `金币不足，需自付 ${formatMoney(experimentCost.playerMoney)}` : "";
     const aiClass = preview.usesAiResearchBonus ? " is-ai-bonus" : "";
     const prerequisiteClass = paper !== null && !prerequisiteMet ? " is-prerequisite-locked" : "";
@@ -1548,7 +1571,7 @@ function renderWorkstationPaperResearchActions(
     const moneyText = type === "experiment" && experimentCost.playerMoney > 0
       ? ` · 金币-${formatMoney(experimentCost.playerMoney)}`
       : "";
-    const effectText = `SAN-${paper ? renderAnimatedNumber(`paper:${paper.id}:action:${type}:san-cost`, preview.sanCost) : preview.sanCost}${moneyText}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
+    const effectText = `${renderSanPayment(payment, getActiveOperationAllowance(state, type).usesTalentAction ? 1 : 0, paper ? `paper:${paper.id}:action:${type}` : undefined)}${moneyText}${preview.usesAiResearchBonus ? " · AI行动" : ""}`;
     const fundingHint = experimentCost.total === 0 ? "实验费用已减至0"
       : `${experimentCost.advisorFunding > 0 ? `消耗${formatMoney(experimentCost.advisorFunding)}导师经费` : ""}${experimentCost.playerMoney > 0 ? `${experimentCost.advisorFunding > 0 ? "，差额" : ""}自付${formatMoney(experimentCost.playerMoney)}金币` : ""}`;
     const experimentHint = [fundingHint, enabled ? "" : disabledReason].filter(Boolean).join("\n");
@@ -1787,7 +1810,7 @@ function renderEnhancedWorkstationSection(state: GameState): string {
   const workActionAttributes = workPreview.allowed
     ? 'data-action="part-time-work"'
     : `disabled aria-disabled="true"${workDisabledText ? ` title="${escapeHtml(workDisabledText)}"` : ""}`;
-  const restSanGain = getShopRestSanGain(state.shopState);
+  const restSanGain = getRoleRestSanGain(state);
   const restActionAttributes = state.actionState.used >= state.actionState.limit
       ? 'disabled aria-disabled="true" title="本月行动次数已用尽"'
       : 'data-action="rest"';
@@ -1803,14 +1826,14 @@ function renderEnhancedWorkstationSection(state: GameState): string {
                 <span class="workstation-action-icon" aria-hidden="true">📚</span>
                 <span class="btn-desc">看论文${readPreview.readCount > 1 ? ` ×${renderAnimatedNumber("workstation:read:count", readPreview.readCount)}` : ""}</span>
               </span>
-              <span class="btn-effect">SAN-${renderAnimatedNumber("workstation:read:san-cost", readPreview.sanCost)}</span>
+              <span class="btn-effect">${renderSanPayment(quoteSanPayment(consumeActiveOperation(state, "read"), readPreview.sanCost), getActiveOperationAllowance(state, "read").usesTalentAction ? 1 : 0, "workstation:read")}</span>
             </button>
             <button class="compact-action-btn workstation-main-action-btn is-work" type="button" ${workActionAttributes}>
               <span class="workstation-action-main">
                 <span class="workstation-action-icon" aria-hidden="true">💼</span>
                 <span class="btn-desc">打工</span>
               </span>
-              <span class="btn-effect">SAN-${renderAnimatedNumber("workstation:work:san-cost", workPreview.sanCost)} · 金币+${renderAnimatedNumber("workstation:work:money", workPreview.moneyReward)}</span>
+              <span class="btn-effect">${renderSanPayment(quoteSanPayment(consumeActiveOperation(state, "work"), workPreview.sanCost), getActiveOperationAllowance(state, "work").usesTalentAction ? 1 : 0, "workstation:work")} · 金币+${renderAnimatedNumber("workstation:work:money", workPreview.moneyReward)}</span>
             </button>
             <button class="compact-action-btn workstation-main-action-btn is-rest" type="button" ${restActionAttributes}>
               <span class="workstation-action-main">
@@ -1901,7 +1924,7 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       relationGrowthPerMonth: 0,
       taskRewardText: `结项经费 +${getAdvisorHorizontalReward(state.advisorProgressState)}，每人劳务5%`,
       taskLabel: "做横向",
-      taskCostLabel: `SAN-${getAdvisorTaskSanCost(state)}`,
+      taskCostLabel: formatCompactSanPayment(quoteSanPayment(state, getAdvisorTaskSanCost(state))),
       taskUsedThisMonth: false,
       canInteract: false,
     };
@@ -1929,7 +1952,7 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
         relationGrowthPerMonth: profile.affinity,
         taskRewardText: "双方各获得1次自动帮助，各最多保留1次",
         taskLabel: "科研协作",
-        taskCostLabel: `SAN-${getFellowDiscussionSanCost(state, profile)}`,
+        taskCostLabel: formatCompactSanPayment(quoteSanPayment(state, getFellowDiscussionSanCost(state, profile))),
         taskUsedThisMonth: profile.taskUsedThisMonth,
         canInteract: false,
       } satisfies RelationshipRenderCard,
@@ -2128,11 +2151,11 @@ function relationshipTooltip(hint: string, align: "left" | "right" | "auto" = "a
 }
 
 function getFellowCooperationHint(state: GameState, profile: FellowProgressProfile): string {
-  const research = Math.max(0, state.player.research);
+  const research = Math.max(0, getEffectiveResearch(state));
   const role = getFellowRoleLabel(profile.type, profile.gender);
   const target = profile.type === "senior" ? "idea" : profile.type === "peer" ? "随机项" : "实验";
   const monthlyGain = profile.affinity * (profile.longTermMentoring ? 2 : 1);
-  return `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，每月自动推进+${formatMoney(monthlyGain)}\n满100：${role}帮你论文${target}+${Math.floor(profile.research)}，你帮对方最低项+${Math.floor(research)}`;
+  return `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，每月自动推进+${formatMoney(monthlyGain)}\n满100：${role}帮你论文${target}+${getRoleCollaborationScore(state, "fellow", profile.research)}，你帮对方最低项+${Math.floor(research)}`;
 }
 
 function getFellowInheritanceHint(): string {
@@ -2150,10 +2173,10 @@ function renderFellowCooperationButton(state: GameState, profile: FellowProgress
   const sanCost = getFellowDiscussionSanCost(state, profile);
   const blocked = isGameplayModuleLocked(state) ? "入学后开放"
     : state.phase !== "playing" ? "本轮已结束" : "";
-  const paidReason = blocked || (profile.taskUsedThisMonth ? "本月已协作，下月恢复" : state.player.san < sanCost ? `SAN不足，需要${sanCost}` : "");
+  const paidReason = blocked || (profile.taskUsedThisMonth ? "本月已协作，下月恢复" : !quoteSanPayment(state, sanCost).allowed ? `SAN不足，需要${sanCost}` : "");
   return `
       <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="relationship-task" data-relationship-id="${relationshipId}"${paidReason ? ` disabled aria-disabled="true" aria-label="科研协作：${escapeHtml(paidReason)}"` : ""}>
-        <span class="rel-action-label">${renderRelationshipIcon("🤝")}科研协作</span>${profile.taskUsedThisMonth ? "" : `<span class="rel-action-cost">SAN-${renderAnimatedNumber(`person:${profile.id}:cooperation:san-cost`, sanCost)}</span>`}
+        <span class="rel-action-label">${renderRelationshipIcon("🤝")}科研协作</span>${profile.taskUsedThisMonth ? "" : `<span class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, sanCost), 0, `person:${profile.id}:cooperation`)}</span>`}
       </button>
   `;
 }
@@ -2220,8 +2243,8 @@ function renderAdvisorStatus(state: GameState): string {
           const icon = projectType === "horizontal" ? "🛠️" : "🧪";
           const progress = Math.floor(projectType === "horizontal" ? advisor.horizontalProgress ?? 0 : advisor.verticalProgress ?? 0);
           const projectSanCost = getAdvisorTaskSanCost(state, projectType);
-          const blocked = baseBlocked || (state.player.san < projectSanCost ? `SAN不足，需要${projectSanCost}` : "");
-          const research = Math.max(0, state.player.research);
+          const blocked = baseBlocked || (!quoteSanPayment(state, projectSanCost).allowed ? `SAN不足，需要${projectSanCost}` : "");
+          const research = Math.max(0, getEffectiveResearch(state));
           const reward = projectType === "horizontal" ? `经费+${getAdvisorHorizontalReward(advisor)}，每人发${formatMoney(getAdvisorHorizontalReward(advisor) * 0.05)}金劳务费`
             : "科研积累+10%，全组论文写作协作+10";
           const automaticGain = (advisor.nextProject ?? "horizontal") === projectType ? 10 : 0;
@@ -2233,7 +2256,7 @@ function renderAdvisorStatus(state: GameState): string {
             </div>
             <span class="rel-progress-val">${renderAnimatedNumber(`person:advisor:${projectType}:progress`, progress)}/${PROJECT_PROGRESS_MAX}</span>
             <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="advisor-project" data-project-type="${projectType}" title="不消耗行动点，每月二选一"${blocked ? ` disabled aria-disabled="true" aria-label="推进项目：${escapeHtml(blocked)}"` : ""}>
-              <span class="rel-action-label">${renderRelationshipIcon(icon)}${projectType === "vertical" ? "做纵向" : "做横向"}</span>${advisor.lastPlayerProjectTotalMonths === state.totalMonths ? "" : `<span class="rel-action-cost">SAN-${renderAnimatedNumber(`person:advisor:${projectType}:san-cost`, projectSanCost)}</span>`}
+              <span class="rel-action-label">${renderRelationshipIcon(icon)}${projectType === "vertical" ? "做纵向" : "做横向"}</span>${advisor.lastPlayerProjectTotalMonths === state.totalMonths ? "" : `<span class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, projectSanCost), 0, `person:advisor:${projectType}`)}</span>`}
             </button>
           </div>`;
         }).join("")}
@@ -2253,7 +2276,7 @@ function renderLoverRoutes(state: GameState): string {
       const label = labels[route];
       const progress = clampPercent(getLoverRouteProgress(state, route));
       const cost = getLoverRouteCost(state, route);
-      const costLabel = [cost.money > 0 ? `金币-${renderAnimatedNumber(`${identity}:${route}:money-cost`, cost.money)}` : "", cost.san > 0 ? `SAN-${renderAnimatedNumber(`${identity}:${route}:san-cost`, cost.san)}` : ""].filter(Boolean).join(" / ");
+      const costLabel = [cost.money > 0 ? `金币-${renderAnimatedNumber(`${identity}:${route}:money-cost`, cost.money)}` : "", cost.san > 0 ? renderSanPayment(quoteSanPayment({ ...state, player: { ...state.player, money: state.player.money - cost.money } }, cost.san), 0, `${identity}:${route}`) : ""].filter(Boolean).join(" / ");
   const blocked = isGameplayModuleLocked(state) ? "入学后开放"
         : state.phase !== "playing" ? "本轮已结束"
           : used ? "下月可再次约会"
@@ -2692,7 +2715,8 @@ function renderResearchPromotionActions(state: GameState, paper: Paper): string 
           const cost = getPaperPromotionCost(promotionId, state);
           const moneyCost = getPaperPromotionMoneyCost(promotionId);
           const used = promotions[promotionId] === true;
-          const affordable = state.player.san >= cost && state.player.money >= moneyCost;
+          const payment = quoteSanPayment(state, cost);
+          const affordable = (moneyCost > 0 || payment.allowed) && state.player.money >= moneyCost;
           return `
             <button
               class="research-promotion-btn${used ? " is-used" : ""}"
@@ -2705,7 +2729,7 @@ function renderResearchPromotionActions(state: GameState, paper: Paper): string 
             >
               <span class="research-promotion-topline">
                 <span>${promotionIcons[promotionId]} ${escapeHtml(promotionLabels[promotionId])}${used ? " ✓" : ""}</span>
-                ${used ? "" : `<small>${moneyCost > 0 ? `金币 -${moneyCost}` : `SAN -${renderAnimatedNumber(`paper:${paper.id}:promotion:${promotionId}:san-cost`, cost)}`}</small>`}
+                ${used ? "" : `<small>${moneyCost > 0 ? `金币 -${moneyCost}` : renderSanPayment(payment, 0, `paper:${paper.id}:promotion:${promotionId}`, true)}</small>`}
               </span>
               ${used ? "" : `<small class="research-promotion-effect">${promotionEffects[promotionId]}</small>`}
             </button>
@@ -3687,6 +3711,30 @@ function renderTalentSection(
 }
 
 
+function renderQuitConfirmationOverlay(): string {
+  return `
+    <div class="game-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="quit-confirm-title" aria-describedby="quit-confirm-description">
+      <button class="game-confirm-backdrop" type="button" data-ui-cancel-quit tabindex="-1" aria-label="取消退学"></button>
+      <section class="game-confirm-dialog">
+        <header class="game-confirm-heading">
+          <h2 id="quit-confirm-title"><i data-lucide="log-out" aria-hidden="true"></i>主动退学</h2>
+          <button class="game-confirm-close" type="button" data-ui-cancel-quit aria-label="关闭">
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </header>
+        <div class="game-confirm-copy" id="quit-confirm-description">
+          <p>确定结束这段读研生活吗？</p>
+          <p>确认后将进入<strong>主动退学</strong>结局，可在结局页重新开始</p>
+        </div>
+        <div class="game-confirm-actions">
+          <button class="game-confirm-button" type="button" data-ui-cancel-quit data-quit-initial-focus>继续游戏</button>
+          <button class="game-confirm-button is-quit" type="button" data-ui-confirm-quit>确认退学</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 function renderSettingsSection(state: GameState): string {
   return `
     <div class="settings-panel">
@@ -3696,7 +3744,7 @@ function renderSettingsSection(state: GameState): string {
         </button>
         <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="结束本局并进入退学结局，随后可在结局页重开"${state.totalMonths <= 0 ? ' disabled aria-disabled="true"' : ""}>
           <i data-lucide="log-out" aria-hidden="true"></i>
-          <span>退学重开</span>
+          <span>主动退学</span>
         </button>
         <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
           <i data-lucide="house" aria-hidden="true"></i>
@@ -3799,7 +3847,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
                 openEvent || openHistoryEvent
                   ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null, state.debugEventReplayEnabled === true, state)
                   : activeLogPage?.kind === "ending"
-                    ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state, uiState.roleExperienceAward, uiState.talentAllocation?.[state.selectedRoleId])
+                    ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state, uiState.roleExperienceAward)
                     : "",
               )}
             </div>
@@ -3828,7 +3876,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("talent")}" data-tab-panel="talent"${getTabPanelHidden("talent")}>
-            ${lockedModule ?? renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.labInheritancePage, uiState.loverRewardPage, uiState.internshipPage, uiState.gameGrowthPage, uiState.talentTreeSelectedNodeByPage?.[0] ?? 0, uiState.roleLevel ?? 0, uiState.talentAllocation?.[state.selectedRoleId] ?? {})}
+            ${lockedModule ?? renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.labInheritancePage, uiState.loverRewardPage, uiState.internshipPage, uiState.gameGrowthPage, uiState.talentTreeSelectedNodeByPage?.[0] ?? 0, uiState.roleLevel ?? 0, state.roleTalents?.levels ?? {})}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("settings")}" data-tab-panel="settings"${getTabPanelHidden("settings")}>
@@ -4340,9 +4388,10 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
 }
 
 export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = {}): string {
+  const showQuitConfirmation = state.phase === "playing" && uiState.isQuitConfirmationOpen;
   return `
     <main class="play-page" data-phase="${state.phase}" data-scale-mode="fixed">
-      <section class="play-stage-shell">
+      <section class="play-stage-shell"${showQuitConfirmation ? " inert" : ""}>
         <div class="play-stage-scale">
           <section class="play-stage">
             <section class="play-workbench">
@@ -4356,6 +4405,7 @@ export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = 
         </div>
       </section>
       ${uiState.isFeedbackOpen ? renderGameFeedbackOverlay() : ""}
+      ${showQuitConfirmation ? renderQuitConfirmationOverlay() : ""}
     </main>
   `;
 }

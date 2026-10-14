@@ -82,7 +82,10 @@ describe("shared immediate SAN consumption", () => {
     state.buffs = [modifierBuff({ monthlyStats: { san: -2 } })];
     const original = resolveMonthlyEffects(state);
     const modified = { ...state, buffs: [...state.buffs, modifierBuff({ id: "global", activeOperationSanMultiplier: 2.5, activeOperationSanDelta: -4 })] };
-    expect(resolveMonthlyEffects(modified)).toEqual(original);
+    const actual = resolveMonthlyEffects(modified);
+    expect(actual.items).toEqual(original.items);
+    expect(actual.totals).toEqual(original.totals);
+    expect(actual.player).toEqual(original.player);
     expect(getActualSanChange(-4, 2, state.eventSupport, [modifierBuff({ remainingMonths: 0, activeOperationSanMultiplier: 2, activeOperationSanDelta: -1 })])).toBe(-4);
     expect(getActualSanChange(6, 11, state.eventSupport, modified.buffs)).toBe(6);
   });

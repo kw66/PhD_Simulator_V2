@@ -77,6 +77,97 @@
   outline-offset: 2px;
 }
 
+.game-confirm-dialog {
+  width: min(440px, 100%);
+  gap: 16px;
+  color: #574933;
+}
+
+.game-confirm-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(132, 105, 56, 0.2);
+}
+
+.game-confirm-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.game-confirm-heading h2 .lucide {
+  width: 19px;
+  height: 19px;
+  color: #946d35;
+}
+
+.game-confirm-copy {
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+
+.game-confirm-copy p {
+  margin: 0;
+}
+
+.game-confirm-copy p + p {
+  margin-top: 5px;
+  color: #776950;
+}
+
+.game-confirm-copy strong {
+  color: #7a483e;
+}
+
+.game-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.game-confirm-button {
+  min-height: 36px;
+  padding: 7px 17px;
+  border: 1px solid #b8a787;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #fffaf0, #f0e6d5);
+  color: #574933;
+  box-shadow: inset 0 1px 0 #fffdf7, 0 2px 0 #d6c8ae;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.game-confirm-button.is-quit {
+  border-color: #b88d81;
+  background: linear-gradient(180deg, #f9efea, #efdfd8);
+  color: #7a483e;
+  box-shadow: inset 0 1px 0 #fff9f5, 0 2px 0 #d2b8ae;
+}
+
+.game-confirm-button:hover {
+  border-color: #9b7d4e;
+  background: #f1e2c6;
+}
+
+.game-confirm-button.is-quit:hover {
+  border-color: #a96d60;
+  background: #eddbd2;
+}
+
+.game-confirm-button:focus-visible,
+.game-confirm-close:focus-visible {
+  outline: 2px solid #a6803f;
+  outline-offset: 3px;
+}
+
 @media (max-width: 720px) {
   .settings-panel .settings-quick-actions { gap: 8px; }
   .settings-panel .settings-quick-actions > button { min-height: 44px; }

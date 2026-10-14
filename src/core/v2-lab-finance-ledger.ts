@@ -22,8 +22,13 @@ export function recordLabFinance(state: GameState, category: LabFinanceCategory,
   const change = roundMoney(amount);
   if (!Number.isFinite(change) || change === 0) return state;
   const amounts = state.labFinanceLedger?.totalMonths === state.totalMonths ? state.labFinanceLedger.amounts : {};
+  const isFundingIncome = category === "horizontal-income" || category === "grant-income"
+    || category === "initial-funding" || category === "other";
   return {
     ...state,
+    advisorProgressState: change > 0 && isFundingIncome
+      ? { ...state.advisorProgressState, cumulativeFunding: roundMoney((state.advisorProgressState.cumulativeFunding ?? 30) + change) }
+      : state.advisorProgressState,
     labFinanceLedger: {
       totalMonths: state.totalMonths,
       amounts: { ...amounts, [category]: roundMoney((amounts[category] ?? 0) + change) },

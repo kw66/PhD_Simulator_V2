@@ -129,6 +129,7 @@ export interface RelationshipActivityRecord {
 export interface AdvisorProgressState {
   researchAccumulation: number;
   funding: number;
+  cumulativeFunding: number;
   horizontalProgress?: number;
   verticalProgress?: number;
   playerProjectCompletions: Record<"horizontal" | "vertical", number>;

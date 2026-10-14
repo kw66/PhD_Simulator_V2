@@ -1,3 +1,4 @@
+import { getFellowOverflowEffects, getFellowOverflowOutcome } from "./v2-role-talent-relationships";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import { createFixedEvent } from "./v2-fixed-events-shared";
 import { createThreeStageEvent } from "./v2-random-events-core-shared";
@@ -43,7 +44,7 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
       description,
       outcome: canAddJunior
         ? `${roleLabel} +1`
-        : "无事发生",
+        : getFellowOverflowEffects(state).fellowOverflowAttempts ? getFellowOverflowOutcome(state) : "无事发生",
       choiceId: `mentor-assign-select-${index + 1}-y${state.year}-m${state.month}`,
     };
   });
@@ -58,7 +59,7 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
       id: candidate.choiceId,
       label: candidate.label,
       outcome: candidate.outcome,
-      effects: canAddJunior ? { fellowAdditions: [candidate.addition] } : {},
+      effects: canAddJunior ? { fellowAdditions: [candidate.addition] } : getFellowOverflowEffects(state, candidate.addition),
     })),
   });
 

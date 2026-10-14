@@ -3,6 +3,8 @@ import { getCalendarForTotalMonths } from "./v2-progression";
 import { hasActiveAiCostCoverage } from "./v2-buffs";
 import type { ActiveOperationType, Buff, GameState, Paper, PaperActionType, ReadingEffect } from "./v2-types";
 import type { AiShopState, AiSlotId, AiSubscriptionState } from "./v2-types-economy";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-project-constants";
 
 export interface AiModelActionEffect {
   bonus?: number;
@@ -32,6 +34,12 @@ const RESEARCH_ACTIONS: readonly PaperActionType[] = ["idea", "experiment", "wri
 export function hasAiReimbursement(state: Pick<GameState, "eventSupport" | "buffs" | "totalMonths">): boolean {
   return state.eventSupport.aiCostsCoveredUntilTotalMonths === state.totalMonths
     || hasActiveAiCostCoverage(state.buffs, state.totalMonths);
+}
+
+export function canUseAiTalentFunding(state: GameState, price: number): boolean {
+  return state.selectedRoleId === "teacher-child" && getRoleTalentLevel(state, "funding-shield") > 0
+    && price > 0 && state.advisorProgressState.funding >= LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD
+    && state.advisorProgressState.funding >= price;
 }
 
 /* Models advance at the start of each academic year. */
@@ -249,6 +257,7 @@ export interface ActiveOperationAllowance {
   allowed: boolean;
   consumesAction: boolean;
   usesAiResearchBonus: boolean;
+  usesTalentAction: boolean;
 }
 
 /**
@@ -257,7 +266,7 @@ export interface ActiveOperationAllowance {
  * idea, experiment or writing operation for the month.
  */
 export function getActiveOperationAllowance(
-  state: Pick<GameState, "aiShopState" | "actionState">,
+  state: Pick<GameState, "aiShopState" | "actionState"> & Partial<Pick<GameState, "roleTalents" | "degree" | "totalMonths" | "sanCap">>,
   operation: ActiveOperationType,
 ): ActiveOperationAllowance {
   const isResearch = operation === "idea" || operation === "experiment" || operation === "writing";
@@ -266,10 +275,30 @@ export function getActiveOperationAllowance(
     && isResearch
     && hasAiCollaboration(state.aiShopState)
     && !state.actionState.aiResearchBonusUsed;
+  const usesTalentAction = !hasRegularAction && !usesAiResearchBonus && state.degree === "phd"
+    && (state.roleTalents?.levels["burning-life-alpha"] ?? 0) > 0
+    && state.roleTalents?.alphaUsedMonth !== state.totalMonths && (state.sanCap ?? 0) >= 1;
   return {
-    allowed: hasRegularAction || usesAiResearchBonus,
+    allowed: hasRegularAction || usesAiResearchBonus || usesTalentAction,
     consumesAction: hasRegularAction,
     usesAiResearchBonus,
+    usesTalentAction,
+  };
+}
+
+/** Spend a regular action, the AI research bonus, or finally the monthly alpha action. */
+export function consumeActiveOperation(state: GameState, operation: ActiveOperationType): GameState {
+  const allowance = getActiveOperationAllowance(state, operation);
+  if (!allowance.allowed) return state;
+  const sanCap = state.sanCap - (allowance.usesTalentAction ? 1 : 0);
+  return {
+    ...state,
+    actionState: { ...state.actionState, used: state.actionState.used + (allowance.consumesAction ? 1 : 0),
+      aiResearchBonusUsed: state.actionState.aiResearchBonusUsed || allowance.usesAiResearchBonus },
+    roleTalents: allowance.consumesAction && state.roleTalents ? { ...state.roleTalents,
+      regularActionsSpent: (state.roleTalents.regularActionsSpent ?? 0) + 1 } : state.roleTalents,
+    ...(allowance.usesTalentAction ? { sanCap, player: { ...state.player, san: Math.min(state.player.san, sanCap) },
+      roleTalents: { ...state.roleTalents!, alphaUsedMonth: state.totalMonths } } : {}),
   };
 }
 

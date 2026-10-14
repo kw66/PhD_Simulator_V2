@@ -16,6 +16,7 @@ import type {
   RoleId,
   RoleLobbyDefinition,
   RoleMetaProgress,
+  RoleAchievementDefinition,
   RoleUnlockState,
   DateDisplayMode,
 } from "./v2-types";
@@ -70,6 +71,7 @@ export function createDefaultRoleMetaProgress(roleId: RoleId): RoleMetaProgress 
     exp: 0,
     completedRuns: 0,
     playedRuns: 0,
+    startedRuns: 0,
     unlockedAchievementIds: [],
     historyBest: createZeroHistoryBest(),
     unlocked,
@@ -87,6 +89,7 @@ export function createDefaultAccountProfile(): AccountProfile {
     lobbyRolePage: 0,
     lobbyRoleAchievementPage: 0,
     achievementUnlockedAt: {},
+    talentAllocation: {},
     roleProgress,
   };
 }
@@ -136,7 +139,17 @@ export function changeLobbyRolePage(account: AccountProfile, delta: number, page
 }
 
 export function getRoleAchievementPageCount(roleId: RoleId, pageSize = ROLE_ACHIEVEMENT_PAGE_SIZE): number {
-  return Math.max(1, Math.ceil(getRoleLobbyAchievementDefinitions(roleId).length / pageSize));
+  return getAchievementDisplayPages(roleId, pageSize).length;
+}
+
+export function getAchievementDisplayPages(roleId: RoleId, pageSize = ROLE_ACHIEVEMENT_PAGE_SIZE): Array<{
+  achievements: RoleAchievementDefinition[];
+}> {
+  const achievements = getRoleLobbyAchievementDefinitions(roleId);
+  const size = Number.isFinite(pageSize) ? Math.max(1, Math.floor(pageSize)) : ROLE_ACHIEVEMENT_PAGE_SIZE;
+  return Array.from({ length: Math.max(1, Math.ceil(achievements.length / size)) }, (_, index) => ({
+    achievements: achievements.slice(index * size, (index + 1) * size),
+  }));
 }
 
 export function changeRoleAchievementPage(
@@ -210,10 +223,10 @@ function buildRoleHistoryStatsViewModel(progress: RoleMetaProgress): LobbySelect
 function buildRoleStatisticsViewModel(progress: RoleMetaProgress): LobbySelectedRoleStatisticsViewModel[] {
   return [
     { id: "completed-runs", label: "通关", value: String(progress.completedRuns), tooltip: "当前角色在本设备硕士或博士毕业的局数" },
-    { id: "played-runs", label: "游玩", value: String(progress.playedRuns), tooltip: "当前角色在本设备已达成结局的局数" },
+    { id: "played-runs", label: "游玩", value: String(progress.startedRuns), tooltip: "当前角色在本设备开始新游戏的次数" },
     { id: "global-completed-runs", label: "全球通关", value: "--", tooltip: "当前角色全球硕士或博士毕业的局数" },
-    { id: "global-played-runs", label: "全球游玩", value: "--", tooltip: "当前角色全球已达成结局的局数" },
-    { id: "phd-rate", label: "博士率", value: "--", tooltip: "全球博士毕业局数 ÷ 全球游玩局数" },
+    { id: "global-played-runs", label: "全球游玩", value: "--", tooltip: "当前角色全球开始新游戏的次数" },
+    { id: "phd-rate", label: "博士率", value: "--", tooltip: "全球博士毕业局数 ÷ 全球已达成结局的局数" },
   ];
 }
 

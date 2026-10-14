@@ -37,6 +37,36 @@ function getTalentCard(html: string, id: string): string {
 }
 
 describe("v2 publication growth transparency", () => {
+  it("applies chosen growth resistance reductions to publication rewards", () => {
+    const state = createStartedGameState("chosen");
+    state.roleTalents = { levels: { "lasting-fortune": 3 } };
+    state.player.research = 18;
+    state.player.favor = 18;
+    state.papers = [publishedPaper("C", "Poster")];
+    const next = applyPublicationTalentRewards(state);
+    expect(next.player.research).toBe(19);
+    expect(next.player.favor).toBe(19);
+    expect(next.roleTalents?.growthTotals).toMatchObject({ research: 1, favor: 1 });
+    expect(state.player.research).toBe(18);
+  });
+
+  it("preserves breakthrough cap rewards and respects dynamic social caps", () => {
+    const state = createStartedGameState("normal");
+    state.roleTalents = { levels: { breakthrough: 1 }, capBonuses: { social: 2 } };
+    state.player.research = 20;
+    state.player.favor = 20;
+    state.player.social = 20;
+    state.papers = [publishedPaper("C", "Poster"), { ...publishedPaper("C", "Poster", true), id: "coauthor" }];
+    const next = applyPublicationTalentRewards(state);
+    expect(next.player.research).toBe(20);
+    expect(next.player.favor).toBe(20);
+    expect(next.player.social).toBe(20.4);
+    expect(next.researchCapacityState.otherCapBonus).toBe(1);
+    expect(next.roleTalents?.capBonuses).toEqual({ social: 2, favor: 1 });
+    expect(next.roleTalents?.breakthroughCounts).toEqual({ research: 1, favor: 1 });
+    expect(applyPublicationTalentRewards(next)).toBe(next);
+  });
+
   it.each([false, true])("preserves every publication talent icon while showing completed status %s in its badge", (completed) => {
     const state = { ...createStartedGameState("normal"), month: 1, totalMonths: 1 };
     if (completed) {

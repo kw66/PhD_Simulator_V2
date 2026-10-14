@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { dispatchDebugAction } from "./v2-debug-tools";
 import { appendAcademicYearLog } from "./v2-academic-year-log";
 import { recordTalentTransitions } from "./v2-talent-transitions";
@@ -17,10 +18,11 @@ import {
   hasBlockingQueueEvent,
 } from "./v2-event-queue";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
-import { yearlyResetRandomEventState } from "./v2-random-event-rules";
+import { yearlyResetRandomEventState, normalizeRoleTalentIllnessProbability } from "./v2-random-event-rules";
+import { investRoleTalentMoney } from "./v2-role-talent-investments";
 import { activatePendingRandomEvents } from "./v2-paper-competition-waiting";
 import { refreshPaperCompetitionEvents } from "./v2-paper-competition-preview";
-import { applyMonthlyEffects, applyMonthStartSubscriptions, resolveMonthlyEffects } from "./v2-monthly-effects";
+import { applyMonthlyEffects, applyMonthStartSubscriptions, getMonthlyPersonalSpending, resolveMonthlyEffects } from "./v2-monthly-effects";
 import { getInternshipStatus } from "./v2-internship-system";
 import { applyReadPaperActions, getManualReadPaperCount } from "./v2-reading-system";
 import { applyResearchOperation, createResearchPaper } from "./v2-research-operation";
@@ -40,16 +42,19 @@ import { getConferenceTripId } from "./v2-conference-identity";
 import { settleDueConferenceAttendance } from "./v2-conference-attendance";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyShopAction } from "./v2-shop-transactions";
-import { getShopRestSanGain } from "./v2-shop-items-effects";
 import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER } from "./v2-sanity-rules";
 import { endRelationship } from "./v2-relationship-actions";
 import { recordRelationshipActivityMonth } from "./v2-relationship-activity-history";
 import { recordSanMonth } from "./v2-san-history";
+import { consumeActiveOperation, getActiveOperationAllowance } from "./v2-ai-shop";
+import { settleRoleTalentMonthStart, settleRoleTalentMonthEnd, settleRoleTalentYearEnd, syncRoleTalentFellows, settleRoleTalentDiseaseMilestones } from "./v2-role-talent-lifecycle";
+import { applyRoleTalentRest } from "./v2-role-talent-rest";
+import { settleGreedCoinGames } from "./v2-role-talent-greed";
 import { advanceFellowTask } from "./v2-fellow-actions";
 import { settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { advanceFellowResearch, attendFellowConferences, ensureFellowPapers } from "./v2-fellow-research";
 import { ensureFellowFinanceAccounts } from "./v2-fellow-finance";
-import { formatMoney, normalizeGameMoney } from "./v2-money";
+import { formatMoney, normalizeGameMoney, recordPersonalSpending } from "./v2-money";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { settleLabResearchGrowth } from "./v2-lab-talent";
 import { settleJournalPublicationFees } from "./v2-lab-publication-costs";
@@ -127,21 +132,10 @@ function buildMonthAdvanceLog(
 
 function takeRest(state: GameState): GameState {
   if (state.phase !== "playing" || (isPreEnrollmentState(state) && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)) return state;
-  const sanGain = getShopRestSanGain(state.shopState);
-  if (state.actionState.used >= state.actionState.limit) return pushNoOpLog(state, "本月行动次数已用尽。");
-  const nextSan = Math.min(state.sanCap, state.player.san + sanGain);
-  const appliedGain = nextSan - state.player.san;
-  const chairSanRecovered = state.shopState.chairUpgrade === "hammock" && appliedGain > 0
-    ? Math.max(0, state.shopState.chairSanRecovered ?? 0) + appliedGain
-    : state.shopState.chairSanRecovered;
-  const nextState = {
-    ...state,
-    player: { ...state.player, san: nextSan },
-    actionState: { ...state.actionState, used: state.actionState.used + 1 },
-    shopState: chairSanRecovered === state.shopState.chairSanRecovered
-      ? state.shopState
-      : { ...state.shopState, chairSanRecovered },
-  };
+  if (!getActiveOperationAllowance(state, "rest").allowed) return pushNoOpLog(state, "本月行动次数已用尽。");
+  state = consumeActiveOperation(state, "rest");
+  const nextState = applyRoleTalentRest(state);
+  const appliedGain = nextState.player.san - state.player.san;
   return appliedGain === 0 ? nextState : pushLog(nextState, `休息：你放下手头的事休息了一会儿，SAN +${formatMoney(appliedGain)}。`);
 }
 
@@ -160,13 +154,6 @@ function createAdvancedCalendarState(state: GameState): GameState {
   const randomState = calendar.month === 1 && calendar.year > state.year
     ? yearlyResetRandomEventState(state)
     : state;
-  if (randomState !== state) {
-    const queuedRandomIds = new Set(state.eventQueue.flatMap((event) => (
-      event.source === "random" && event.randomReplay ? [event.randomReplay.eventId] : []
-    )));
-    randomState.availableRandomEvents = randomState.availableRandomEvents.filter((eventId) => !queuedRandomIds.has(eventId));
-    randomState.usedRandomEvents = [...new Set([...randomState.usedRandomEvents, ...queuedRandomIds])];
-  }
   const monthEndIllnessDelta = state.totalMonths > 0
     ? DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[state.player.san < 6 ? 0 : state.player.san < 12 ? 1 : state.player.san < 18 ? 2 : 3]
     : 0;
@@ -176,26 +163,26 @@ function createAdvancedCalendarState(state: GameState): GameState {
     totalMonths: nextTotalMonths,
     year: calendar.year,
     month: calendar.month,
-    illnessProbability: Math.max(0, Math.min(100, state.illnessProbability + monthEndIllnessDelta)),
+    illnessProbability: normalizeRoleTalentIllnessProbability(state, state.illnessProbability + monthEndIllnessDelta),
     actionState: { ...state.actionState, used: 0, aiResearchBonusUsed: false },
     eventQueue: decrementEventQueueDeadlines(state.eventQueue),
   });
-  const decayedPaperState = applyPrepublicationPaperDecay(calendarState);
+  const decayedPaperState = applyPrepublicationPaperDecay(settleRoleTalentMonthStart(calendarState));
   const reviewProgressState = advancePaperReviewDeadlines(decayedPaperState);
   const reviewResolution = resolveDuePaperReviews(reviewProgressState);
   const journalResolution = resolveReadyJournalPapers(reviewResolution.state);
   const monthlyResolution = resolveMonthlyEffects(journalResolution.state);
-  if ([monthlyResolution.player.san, monthlyResolution.player.money, monthlyResolution.player.favor, monthlyResolution.player.social]
+  if (state.selectedRoleId !== "rich-reversed" && [monthlyResolution.player.san, monthlyResolution.player.money, monthlyResolution.player.favor, monthlyResolution.player.social]
     .some((value) => value < 0)) {
     const emergencyRecovery = monthlyResolution.items.find((item) => item.id === "chair-emergency")?.appliedStats.san ?? 0;
-    return evaluateCoreEndings(pushLog({
-      ...journalResolution.state,
+    return evaluateCoreEndings(pushLog(recordPersonalSpending({
+      ...(monthlyResolution.settledState ?? journalResolution.state),
       player: monthlyResolution.player,
       shopState: {
         ...journalResolution.state.shopState,
         chairSanRecovered: (journalResolution.state.shopState.chairSanRecovered ?? 0) + emergencyRecovery,
       },
-    }, buildMonthAdvanceLog(calendar.year, calendar.month, monthlyResolution)));
+    }, Math.max(0, getMonthlyPersonalSpending(monthlyResolution) - (monthlyResolution.recordedPersonalSpending ?? 0))), buildMonthAdvanceLog(calendar.year, calendar.month, monthlyResolution)));
   }
   const monthlyEffects = applyMonthlyEffects(journalResolution.state);
   const monthLog = buildMonthAdvanceLog(calendar.year, calendar.month, monthlyEffects.resolution);
@@ -251,6 +238,7 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
     }));
   if (candidates.length === 0) return state;
   const builderState = {
+    playerAttributeState: state,
     selectedRoleId: state.selectedRoleId,
     internshipCount: state.internshipCount,
     loverProgressState: state.loverProgressState,
@@ -258,8 +246,8 @@ function enqueueAcceptedPaperConferenceEvents(state: GameState): GameState {
     favor: state.player.favor,
     money: state.player.money,
     advisorProgressState: state.advisorProgressState,
-    social: state.player.social,
-    research: state.player.research,
+    social: getEffectiveSocial(state),
+    research: getEffectiveResearch(state),
     researchCapacityState: state.researchCapacityState,
     shopState: state.shopState,
     eventSupport: state.eventSupport,
@@ -354,7 +342,7 @@ function advanceMonth(state: GameState, force = false): GameState {
   if (state.phase !== "playing") return state;
   if (force) state = discardBlockingQueueEvents(state);
   if (hasManualBlockingEvents(state)) return state;
-  state = settleLabResearchGrowth(settleFellowAcademicYear(state));
+  state = settleRoleTalentMonthEnd(settleRoleTalentYearEnd(settleLabResearchGrowth(settleFellowAcademicYear(state))));
   if (state.totalMonths >= state.maxMonths) return finishTrainingIfReady(syncAdvisorResearchAccumulation(state));
 
   const nextState = evaluateCoreEndings(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(
@@ -387,6 +375,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
       debugEventReplayEnabled: state.debugEventReplayEnabled,
     }, "start-game", {
       roleId: state.selectedRoleId,
+      talentAllocation: payload.talentAllocation ?? state.roleTalents?.levels,
     });
   }
   const setupState = dispatchSetupAction(state, actionId, payload, createInitialState);
@@ -414,6 +403,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
     };
   }
   if (nextState.phase !== "playing") return nextState;
+  nextState = settleGreedCoinGames(settleRoleTalentDiseaseMilestones(syncRoleTalentFellows(nextState)));
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
   const helpedState = settlePendingPaperHelp(checkedState);
@@ -423,7 +413,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
   const conferenceState = syncThesisState(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(settledState)));
   const refreshed = refreshPendingEventDecisions(refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingRandomEvents(syncAdvisorResearchAccumulation(conferenceState)))));
   if (debugAction) return refreshed;
-  const evaluated = evaluateCoreEndings(refreshed);
+  const evaluated = evaluateCoreEndings(settleGreedCoinGames(refreshed));
   if (evaluated.phase !== "playing") return evaluated;
   const recorded = recordTalentTransitions(state, evaluated);
   return normalizeGameMoney(recorded);
@@ -434,6 +424,10 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
   if (debugState !== null) return debugState;
 
   switch (actionId) {
+    case "invest-money": {
+      const investment = investRoleTalentMoney(state);
+      return investment.success ? pushLog(investment.state, investment.message) : pushNoOpLog(state, investment.message);
+    }
     case "advance-thesis-point":
       return typeof payload.thesisPointIndex === "number"
         ? advanceThesisResearchPoint(syncThesisState(state), payload.thesisPointIndex) : state;

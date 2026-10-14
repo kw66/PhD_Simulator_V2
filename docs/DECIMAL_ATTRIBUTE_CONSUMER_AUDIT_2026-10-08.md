@@ -1,5 +1,7 @@
 # Decimal attribute consumer audit — 2026-10-08
 
+> Historical audit snapshot: the 25%/50%/75% rates and numerical examples below describe the configuration audited on that date. On 2026-10-13 the user confirmed the current code's 20%/40%/60% rates instead; use `LAB_ECONOMY_AND_STUDENTS.md` for the current rule. The historical examples below are not current expected results.
+
 The confirmed rule is deterministic percentage resistance for research, social and advisor favor. Each raw point retains 100%, 75%, 50% or 25% according to the updated attribute tier; fractional raw remainders retain the same fraction. Resistance does not draw randomness. This supersedes older stochastic resistance examples.
 
 ## Fixes

@@ -294,6 +294,7 @@ describe("v2 before grad school events", () => {
     expect(resolved.nextState.advisorProgressState).toEqual({
       researchAccumulation: 20,
       funding: 30,
+      cumulativeFunding: 30,
       horizontalProgress: 0,
       verticalProgress: 0,
       playerProjectCompletions: { horizontal: 0, vertical: 0 },

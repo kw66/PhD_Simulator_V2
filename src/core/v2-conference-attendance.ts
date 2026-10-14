@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { createConferenceActivityEvent } from "./v2-conference-activity-events";
 import { getConferencePaperPresentationResults } from "./v2-conference-activity-shared";
 import { getConferenceTripId } from "./v2-conference-identity";
@@ -33,8 +34,8 @@ export function settleDueConferenceAttendance(state: GameState): GameState {
       [regionCounter]: nextState.eventCounters[regionCounter] + 1,
     } };
     let rollIndex = 0;
-    const activity = createConferenceActivityEvent(context, { ...nextState,
-      research: nextState.player.research, social: nextState.player.social,
+    const activity = createConferenceActivityEvent(context, { ...nextState, playerAttributeState: nextState,
+      research: getEffectiveResearch(nextState), social: getEffectiveSocial(nextState),
     }, [], () => plan.rolls[rollIndex++] ?? plan.rolls.at(-1) ?? 0);
     nextState = enqueueEventQueueItem(nextState, activity);
   }

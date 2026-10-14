@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { MAX_SAN } from "./v2-content";
 import { createAdvisorProgressState } from "./v2-advisor-progress";
 import { createConferenceCareerState, createConferenceEncounterState } from "./v2-conference-encounters";
@@ -7,7 +8,7 @@ import { createCoffeeState } from "./v2-coffee-system";
 import { createReadingState } from "./v2-reading-system";
 import { createShopState } from "./v2-shop-items";
 import { createAiShopState } from "./v2-ai-shop";
-import { createInitialRandomEventState } from "./v2-random-event-rules";
+import { createInitialRandomEventState, createRandomEventPool } from "./v2-random-event-rules";
 import { getUnlockedPaperSlotCount } from "./v2-paper-rules";
 import { createConferenceLocationSeed } from "./v2-conference-catalog";
 import {
@@ -22,6 +23,9 @@ import { createLoverState } from "./v2-lover-system";
 import { createLoverProgressState } from "./v2-lover-progression";
 import { createResearchCapacityState } from "./v2-research-cap-system";
 import type { GameState, RoleId } from "./v2-types";
+import { createRoleTalentRunState } from "./v2-role-talent-state";
+import { sanitizeRoleTalentAllocation } from "./v2-role-talent-definitions";
+import { initializeRoleTalents } from "./v2-role-talent-lifecycle";
 
 export function createInitialState(): GameState {
   const calendar = getCalendarForTotalMonths(0);
@@ -56,6 +60,7 @@ export function createInitialState(): GameState {
     careerPreparedMonths: {},
     careerLastRecruitmentTotalMonths: null,
     careerOffers: {},
+    personalSpending: 0,
     internshipCount: 0,
     selectedPaperId: null,
     shopState: createShopState(),
@@ -97,14 +102,16 @@ export function createInitialState(): GameState {
 
 export function createStartedGameState(
   roleId: RoleId,
+  talentAllocation: Record<string, number> = {},
 ): GameState {
   const role = getRoleDefinition(roleId);
   const initialPaperSlots = getUnlockedPaperSlotCount(role.startingStats.research);
   const baseState = createInitialState();
   const relationshipState = syncRelationshipState(createRelationshipState(), role.startingStats.social);
 
-  return {
+  const started = initializeRoleTalents({
     ...baseState,
+    roleTalents: createRoleTalentRunState(sanitizeRoleTalentAllocation(roleId, 10, talentAllocation)),
     phase: "playing",
     selectedRoleId: role.id,
     setupSelectedRoleId: role.id,
@@ -118,5 +125,7 @@ export function createStartedGameState(
     relationshipState,
     player: clonePlayer(role.startingStats),
     log: [],
-  };
+  });
+  return { ...started, availableRandomEvents: createRandomEventPool(started), paperSlotsUnlocked: Math.max(started.paperSlotsUnlocked, getUnlockedPaperSlotCount(getEffectiveResearch(started))),
+    relationshipState: syncRelationshipState(started.relationshipState, getEffectiveSocial(started)) };
 }

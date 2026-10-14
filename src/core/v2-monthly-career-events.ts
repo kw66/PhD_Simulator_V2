@@ -8,6 +8,7 @@ import {
   type CareerType,
 } from "./v2-career-rules";
 import { getActualSanChange } from "./v2-sanity-rules";
+import { quoteSanPayment } from "./v2-role-talent-costs";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export const CAREER_INTERVIEW_SAN_COST: Record<CareerType, number> = {
@@ -96,11 +97,11 @@ function createResultEvent(
   experienceGain: number,
   sanChange: number,
 ): PendingEvent {
-  const existing = state.careerOffers[type];
+  const existing = Object.values(state.careerOffers).find((entry) => entry !== undefined);
   const offer = makeOffer(job, score);
   const scene = CAREER_SCENES[type];
   const summary = success
-    ? `${scene.accepted}${job.compensation ? `邮件写明${job.compensation}。` : ""}${existing ? `你已经留着${existing.name}的 offer，两个去向只能在这一方向上保留一个。` : "你把通知放在桌上，想好再回复。"}`
+    ? `${scene.accepted}${job.compensation ? `邮件写明${job.compensation}。` : ""}${existing ? `你已经留着${existing.name}的 offer，手里只能保留一份，需要在两个去向间做选择。` : "你把通知放在桌上，想好再回复。"}`
     : `${scene.rejected}${existing ? `之前拿到的${existing.name} offer 还在，你暂时不用急着做决定。` : ""}`;
   const outcome = `${CAREER_DEFINITIONS[type].name}能力 +${experienceGain}；SAN ${sanChange}；${success ? "面试通过" : "面试未通过"}`;
   const baseEffects = {
@@ -151,7 +152,7 @@ function createDirectionEvent(
     return {
       id: `apply-${job.id}`,
       label: job.name,
-      disabledReason: state.player.san < -sanChange ? `SAN 不足，需要 ${-sanChange}` : undefined,
+      disabledReason: !quoteSanPayment(state, -sanChange).allowed ? `SAN 不足，需要 ${-sanChange}` : undefined,
       outcome: `应聘${job.name}，结果待公布`,
       effects: { enqueueEvents: [result] },
     };

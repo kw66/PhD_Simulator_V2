@@ -1,9 +1,11 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
 import {
   PAPER_SLOT_LIMIT,
   PAPER_SLOT_RESEARCH_THRESHOLDS,
   SCORE_BY_TARGET,
 } from "./v2-content";
 import { getAcademicCalendarYear } from "./v2-calendar";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getConferenceInfo } from "./v2-conference-catalog";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getJournalDefinition } from "./v2-journal-system";
@@ -186,15 +188,18 @@ function decayPrepublicationScore(score: number, decayRate: number): number {
 
 export function applyPrepublicationPaperDecay(state: GameState): GameState {
   if (state.phase !== "playing") return state;
-  return { ...state, papers: state.papers.map(decayUnpublishedPaper) };
+  const reduction = state.selectedRoleId === "genius" && state.degree === "phd"
+    ? getRoleTalentLevel(state, "lasting-work") * 0.03 : 0;
+  return { ...state, papers: state.papers.map((paper) => decayUnpublishedPaper(paper, reduction)) };
 }
 
-export function decayUnpublishedPaper(paper: Paper): Paper {
+export function decayUnpublishedPaper(paper: Paper, reduction = 0): Paper {
   if (paper.status === "published" || paper.status === "journal-reviewing") return paper;
+  const rate = Math.max(0, Number((paper.prepublicationDecayRate - reduction).toFixed(10)));
   return setPaperTotalScores(paper, {
-    idea: decayPrepublicationScore(paper.idea, paper.prepublicationDecayRate),
-    experiment: decayPrepublicationScore(paper.experiment, paper.prepublicationDecayRate),
-    writing: decayPrepublicationScore(paper.writing, paper.prepublicationDecayRate),
+    idea: decayPrepublicationScore(paper.idea, rate),
+    experiment: decayPrepublicationScore(paper.experiment, rate),
+    writing: decayPrepublicationScore(paper.writing, rate),
   });
 }
 
@@ -418,10 +423,11 @@ function createReviewerReport(
   random: () => number,
   influence: number,
   academicYear: number,
+  kindReviewerBonus = 0,
 ): PaperReviewerReport {
   const reviewerRoll = clampRandomRoll(random());
   let cumulative = 0;
-  const reviewerType = getReviewerWeights(academicYear).find(([_type, weight]) => {
+  const reviewerType = getReviewerWeights(academicYear, kindReviewerBonus).find(([_type, weight]) => {
     cumulative += weight;
     return reviewerRoll < cumulative;
   })?.[0] ?? "hostile";
@@ -512,6 +518,7 @@ function formatReviewScore(score: number): string {
 export function resolvePaperReview(
   paper: Paper,
   random: () => number = Math.random,
+  kindReviewerBonus = 0,
 ): {
   nextPaper: Paper;
   scoreGain: number;
@@ -534,6 +541,7 @@ export function resolvePaperReview(
     random,
     reviewInfluence,
     paper.submittedYear ?? 1,
+    kindReviewerBonus,
   ));
   const totalReviewScore = reports.reduce((total, report) => total + report.reviewScore, 0);
   const borderlineChance = totalReviewScore >= 2 || totalReviewScore <= -2
@@ -588,11 +596,11 @@ export function getUnlockedPaperSlotCount(research: number): number {
 }
 
 export function getAvailablePaperSlotCount(
-  state: Pick<GameState, "paperSlotsUnlocked"> & { player: Pick<GameState["player"], "research"> },
+  state: GameState | (Pick<GameState, "paperSlotsUnlocked"> & { player: Pick<GameState["player"], "research"> }),
 ): number {
   return Math.min(
     PAPER_SLOT_LIMIT,
-    Math.max(state.paperSlotsUnlocked, getUnlockedPaperSlotCount(state.player.research)),
+    Math.max(state.paperSlotsUnlocked, getUnlockedPaperSlotCount("selectedRoleId" in state ? getEffectiveResearch(state) : state.player.research)),
   );
 }
 

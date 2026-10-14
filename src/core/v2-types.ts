@@ -102,6 +102,7 @@ export interface SanHistoryEntry {
 
 export type PaperActionType = "idea" | "experiment" | "writing";
 export type ActiveOperationType =
+  | "rest"
   | "read"
   | "work"
   | PaperActionType
@@ -351,6 +352,7 @@ export interface RoleMetaProgress {
   exp: number;
   completedRuns: number;
   playedRuns: number;
+  startedRuns: number;
   unlockedAchievementIds: string[];
   historyBest: RoleHistoryBest;
   unlocked: boolean;
@@ -386,6 +388,7 @@ export interface PublicationTalentState {
 }
 
 export interface AccountProfile {
+  talentAllocation?: Partial<Record<RoleId, Record<string, number>>>;
   dateDisplayMode: DateDisplayMode;
   selectedLobbyRoleId: RoleId;
   lobbyRolePage: number;
@@ -533,6 +536,11 @@ export interface EventChoice {
     social?: number;
     favor?: number;
     money?: number;
+    /** Original requests retained beside presentation deltas; settle against the current state once. */
+    rawResearch?: number;
+    rawSocial?: number;
+    rawFavor?: number;
+    fixedEventResolutionRolls?: number[];
     illnessProbabilityMultiplier?: number;
     illnessProbabilityDelta?: number;
     score?: number;
@@ -562,6 +570,12 @@ export interface EventChoice {
     persistentExtraActionDeltas?: Partial<PersistentExtraActions>;
     relationshipAdditions?: RelationshipKind[];
     fellowAdditions?: FellowProfileAddition[];
+    /** Frozen random selector for the social talent's delegation reward. */
+    juniorDelegationRoll?: number;
+    /** Genuine recruitment attempts rejected because the fellow slots are full. */
+    fellowOverflowAttempts?: number;
+    /** Keep rejected recruits identifiable so graduation cancels a pending overflow reward. */
+    fellowOverflowCandidates?: FellowProfileAddition[];
     mentorshipStacks?: number;
     conferenceEncounterUpdates?: Partial<ConferenceEncounterState>;
     conferenceCareerUpdates?: Partial<ConferenceCareerState>;
@@ -585,6 +599,7 @@ export interface EventChoice {
       guidanceRolls?: number[];
     };
     restoreSanToCap?: boolean;
+    roleTalentRest?: "year-summary";
     triggerInternshipInvite?: boolean;
     triggerJointTrainingInvite?: boolean;
     triggerLoverDevelopment?: LoverTypeId;
@@ -658,6 +673,8 @@ export interface PendingEvent {
   completionLog?: string;
   history?: ResolvedEventStage[];
   deferredStatePatch?: DeferredEventStatePatch;
+  /** Semantic intermediate choices, replayed purely at final confirmation instead of rebasing numeric rewards. */
+  deferredChoices?: Array<{ choice: EventChoice; source: string; event: Pick<PendingEvent, "id" | "source" | "chainId" | "stage" | "randomReplay" | "fixedTreePreview" | "replayContext"> }>;
   fixedResultPreview?: {
     resolution: FixedEventResolution;
     rolls: number[];
@@ -751,6 +768,7 @@ export type LabFinanceCategory = "conference-registration" | "conference-travel"
   | "student-reimbursement" | "horizontal-income" | "grant-income" | "initial-funding" | "other";
 
 export interface GameState extends RandomEventState {
+  roleTalents?: import("./v2-role-talent-state").RoleTalentRunState;
   labFinanceLedger?: { totalMonths: number; amounts: Partial<Record<LabFinanceCategory, number>> };
   blockLinearEvents: boolean;
   debugEventReplayEnabled?: boolean;
@@ -783,6 +801,7 @@ export interface GameState extends RandomEventState {
   careerPreparedMonths: Partial<Record<CareerType, number>>;
   careerLastRecruitmentTotalMonths: number | null;
   careerOffers: Partial<Record<CareerType, CareerOffer>>;
+  personalSpending: number;
   internshipCount: number;
   selectedPaperId: string | null;
   shopState: ShopState;
@@ -828,6 +847,7 @@ export interface DeferredEventStateChange {
 export type DeferredEventStatePatch = DeferredEventStateChange[];
 
 export interface DispatchPayload {
+  talentAllocation?: Record<string, number> | undefined;
   blockLinearEvents?: boolean | undefined;
   roleId?: RoleId | undefined;
   paperId?: string | undefined;

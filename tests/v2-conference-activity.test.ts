@@ -52,7 +52,7 @@ describe("v2 conference activity", () => {
     const tea = options.find((option) => option.id === "tea-break")!;
     expect(tea.label).toBe("茶歇交友");
     expect(tea.outcome).toBe("社交 +0.6（抵抗0.4）。");
-    expect(tea.effects).toEqual({ social: 0.6 });
+    expect(tea.effects).toEqual({ social: 0.6, rawSocial: 1 });
     for (const [id, label, action, effect] of [
       ["idea-networking", "idea交流", "idea", { extraActions: 3 }],
       ["experiment-discussion", "实验交流", "experiment", { extraActions: 3 }],

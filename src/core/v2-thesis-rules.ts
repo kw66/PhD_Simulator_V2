@@ -1,4 +1,6 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
 import { getAcademicCalendarYear } from "./v2-calendar";
+import { paySanCost } from "./v2-role-talent-costs";
 import { generatePaperTopic } from "./v2-paper-topics";
 import { getAcceptedPaperScore } from "./v2-publication-rules";
 import { getActualSanChange } from "./v2-sanity-rules";
@@ -206,12 +208,11 @@ export function advanceThesisResearchPoint(state: GameState, index: number): Gam
   if (getThesisAdvanceFailure(state, index)) return state;
   const nextState = syncThesisState(state);
   return {
-    ...nextState,
-    player: { ...nextState.player, san: nextState.player.san - getThesisAdvanceSanCost(nextState) },
+    ...paySanCost(nextState, getThesisAdvanceSanCost(nextState), { allowOverdraw: true }),
     thesis: withScoreHistory({
       ...nextState.thesis,
       researchPoints: nextState.thesis.researchPoints.map((point, pointIndex) => pointIndex === index ? {
-        ...point, score: point.score + Math.floor(nextState.player.research), lastAdvancedTotalMonths: state.totalMonths,
+        ...point, score: point.score + Math.floor(getEffectiveResearch(nextState)), lastAdvancedTotalMonths: state.totalMonths,
       } : point),
     }, state.totalMonths),
   };

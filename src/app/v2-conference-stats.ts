@@ -1,12 +1,10 @@
 import { getConferenceInfo } from "../core/v2-conference-catalog";
 import type { GameState, PaperAcceptType, PaperTarget } from "../core/v2-types";
 
+import { createStatisticsClient, type StatisticsClient, type StatisticsClientOptions } from "./v2-statistics-client";
+
 export const CONFERENCE_STATS_RULE_VERSION = "v2-review-20261009";
-const RPC_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/rpc";
-const PUBLIC_KEY = "sb_publishable_TRVbO2x2mmuoRw592EqtvQ_FHpqUMkJ";
-const STORAGE_KEY = `phd_simulator_v2_conference_stats_${CONFERENCE_STATS_RULE_VERSION}`;
 const ACCEPT_TYPES: PaperAcceptType[] = ["Poster", "Spotlight", "Oral", "Best Paper Candidate", "Best Paper"];
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_SCORE = 1_000_000;
 export type ConferenceStatsMeanKey = "Reject" | PaperAcceptType;
 
@@ -15,11 +13,6 @@ export interface ConferenceGlobalStats {
   accepted: number;
   counts: Record<PaperAcceptType, number>;
   means: Record<ConferenceStatsMeanKey, number | null>;
-  acceptedMeanScore: number | null;
-  rejectedMeanScore: number | null;
-  p90: number | null;
-  p99: number | null;
-  updatedAt: string | null;
 }
 
 export interface ConferenceGlobalStatsSnapshot {
@@ -34,26 +27,10 @@ interface ConferenceKey {
   p_target: PaperTarget;
 }
 
-interface ReviewRecord extends ConferenceKey {
-  p_id: string;
-  p_accepted: boolean;
-  p_accept_type: PaperAcceptType | null;
-  p_score: number;
-}
-
-interface StoredRecord {
-  run: string;
-  sent: boolean;
-  payload: ReviewRecord;
-}
-
-interface ConferenceStatsOptions {
+interface ConferenceStatsOptions extends StatisticsClientOptions {
   onChange: () => void;
-  enabled?: boolean;
-  fetch?: typeof fetch;
-  storage?: Pick<Storage, "getItem" | "setItem"> | null;
+  client?: StatisticsClient;
 }
-
 interface TrackingOptions { debugUsed?: boolean }
 
 export interface ConferenceStatsController {
@@ -65,6 +42,7 @@ export interface ConferenceStatsController {
   markDebug(): void;
   resetRun(): void;
   flush(): Promise<void>;
+  dispose(): void;
 }
 
 let activeController: ConferenceStatsController | null = null;
@@ -80,13 +58,6 @@ function keyFor(name: string, year: number, target: PaperTarget): ConferenceKey 
   return { p_rule_version: CONFERENCE_STATS_RULE_VERSION, p_conference_name: name, p_conference_year: year, p_target: target };
 }
 
-function validRecord(record: ReviewRecord): boolean {
-  return validKey(record) && typeof record.p_id === "string" && UUID_PATTERN.test(record.p_id)
-    && typeof record.p_accepted === "boolean"
-    && (record.p_accepted ? ACCEPT_TYPES.includes(record.p_accept_type!) : record.p_accept_type === null)
-    && Number.isFinite(record.p_score) && record.p_score >= 0 && record.p_score <= MAX_SCORE;
-}
-
 function parseStats(value: unknown): ConferenceGlobalStats {
   if (!value || typeof value !== "object") throw new Error("Missing conference statistics");
   const data = value as ConferenceGlobalStats;
@@ -100,23 +71,12 @@ function parseStats(value: unknown): ConferenceGlobalStats {
   if (!count(data.submissions) || !count(data.accepted) || data.accepted > data.submissions || !data.counts
     || !ACCEPT_TYPES.every((type) => count(data.counts[type]))
     || ACCEPT_TYPES.reduce((total, type) => total + data.counts[type], 0) !== data.accepted
-    || !meanValid
-    || (data.accepted === 0 ? data.acceptedMeanScore !== null : !score(data.acceptedMeanScore))
-    || (data.submissions === data.accepted ? data.rejectedMeanScore !== null : !score(data.rejectedMeanScore))
-    || (data.submissions === 0 ? data.p90 !== null || data.p99 !== null || data.updatedAt !== null
-      : !score(data.p90) || !score(data.p99) || data.p90! > data.p99!
-        || typeof data.updatedAt !== "string" || !Number.isFinite(Date.parse(data.updatedAt)))) {
+    || !meanValid) {
     throw new Error("Invalid conference statistics");
   }
   return { submissions: data.submissions, accepted: data.accepted,
     counts: Object.fromEntries(ACCEPT_TYPES.map((type) => [type, data.counts[type]])) as Record<PaperAcceptType, number>,
-    means: Object.fromEntries(meanKeys.map((key) => [key, data.means[key]])) as Record<ConferenceStatsMeanKey, number | null>,
-    acceptedMeanScore: data.acceptedMeanScore, rejectedMeanScore: data.rejectedMeanScore,
-    p90: data.p90, p99: data.p99, updatedAt: data.updatedAt };
-}
-
-function browserStorage(): Storage | null {
-  try { return globalThis.localStorage ?? null; } catch { return null; }
+    means: Object.fromEntries(meanKeys.map((key) => [key, data.means[key]])) as Record<ConferenceStatsMeanKey, number | null> };
 }
 
 function runKey(state: GameState): string {
@@ -124,104 +84,28 @@ function runKey(state: GameState): string {
 }
 
 export function createConferenceStats(options: ConferenceStatsOptions): ConferenceStatsController {
-  const storage = options.storage === undefined ? browserStorage() : options.storage;
-  const request = options.fetch ?? globalThis.fetch.bind(globalThis);
   const enabled = options.enabled !== false;
-  const records = new Map<string, StoredRecord>();
-  const debugRuns = new Set<string>();
-  const cache = new Map<string, { snapshot: ConferenceGlobalStatsSnapshot; attemptedAt: number; pending?: Promise<void> }>();
+  const client = options.client ?? createStatisticsClient(options);
   let currentRun: string | null = null;
   let debugUsed = false;
-  let pendingFlush: Promise<void> | null = null;
-  let lastFlushAttempt = -Infinity;
-
-  try {
-    const stored = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "null");
-    if (stored && Array.isArray(stored.records) && Array.isArray(stored.debugRuns)) {
-      for (const run of stored.debugRuns) if (typeof run === "string") debugRuns.add(run);
-      for (const entry of stored.records) {
-        if (!Array.isArray(entry) || entry.length !== 2) continue;
-        const [fingerprint, record] = entry;
-        if (typeof fingerprint === "string" && record && typeof record.run === "string"
-          && typeof record.sent === "boolean" && record.payload && validRecord(record.payload)
-          && !debugRuns.has(record.run)) records.set(fingerprint, record);
-      }
-    }
-  } catch { records.clear(); }
-
-  const persist = (): void => {
-    try { storage?.setItem(STORAGE_KEY, JSON.stringify({ records: [...records], debugRuns: [...debugRuns] })); } catch { return; }
+  const markDebug = (): void => { debugUsed = true; client.markDebug(currentRun); };
+  const syncRun = (state: GameState, tracking: { debugUsed?: boolean }): void => {
+    currentRun = state.phase === "setup" ? null : runKey(state);
+    if (tracking.debugUsed || debugUsed || (currentRun !== null && client.isDebugRun(currentRun))) markDebug();
   };
-  const notify = (): void => { options.onChange(); };
-  const rpc = async (name: string, payload: object): Promise<unknown> => {
-    const response = await request(`${RPC_URL}/${name}`, {
-      method: "POST", headers: { apikey: PUBLIC_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify(payload), signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) throw new Error(`Conference statistics unavailable: ${response.status}`);
-    return response.json();
-  };
+
   const read: ConferenceStatsController["read"] = (name, year, target) => {
-    if (!enabled || !validKey(keyFor(name, year, target))) return { status: "unavailable", data: null };
-    return structuredClone(cache.get(JSON.stringify(keyFor(name, year, target)))?.snapshot ?? { status: "loading", data: null });
+    const key = keyFor(name, year, target);
+    return enabled && validKey(key) ? client.read("get_phd_simulator_v2_conference_stats", key, parseStats) : { status: "unavailable", data: null };
   };
   const load: ConferenceStatsController["load"] = (name, year, target) => {
     const key = keyFor(name, year, target);
-    if (!enabled || !validKey(key)) return Promise.resolve();
-    const serialized = JSON.stringify(key);
-    const existing = cache.get(serialized);
-    if (existing?.pending) return existing.pending;
-    if (existing && Date.now() - existing.attemptedAt < (existing.snapshot.status === "ready" ? 60_000 : 30_000)) return Promise.resolve();
-    const entry = { snapshot: { status: "loading", data: existing?.snapshot.data ?? null } as ConferenceGlobalStatsSnapshot,
-      attemptedAt: Date.now(), pending: undefined as Promise<void> | undefined };
-    cache.set(serialized, entry);
-    entry.pending = rpc("get_phd_simulator_v2_conference_stats", key).then((value) => {
-      entry.snapshot = { status: "ready", data: parseStats(value) };
-    }).catch(() => {
-      entry.snapshot = { status: "unavailable", data: entry.snapshot.data };
-    }).finally(() => { entry.pending = undefined; notify(); });
-    return entry.pending;
+    return enabled && validKey(key) ? client.load("get_phd_simulator_v2_conference_stats", key, parseStats) : Promise.resolve();
   };
-  const markDebug = (): void => {
-    debugUsed = true;
-    if (currentRun !== null) {
-      debugRuns.add(currentRun);
-      for (const [fingerprint, record] of records) if (record.run === currentRun && !record.sent) records.delete(fingerprint);
-      persist();
-    }
-  };
-  const flush = (): Promise<void> => {
-    if (!enabled) return Promise.resolve();
-    if (pendingFlush) return pendingFlush;
-    lastFlushAttempt = Date.now();
-    pendingFlush = (async () => {
-      for (const record of records.values()) {
-        if (record.sent || debugRuns.has(record.run)) continue;
-        try {
-          const result = await rpc("record_phd_simulator_v2_conference_review", record.payload);
-          if (result !== true) continue;
-          record.sent = true;
-          persist();
-          const key = keyFor(record.payload.p_conference_name, record.payload.p_conference_year, record.payload.p_target);
-          const existing = cache.get(JSON.stringify(key));
-          if (existing?.pending) await existing.pending;
-          cache.delete(JSON.stringify(key));
-          await load(key.p_conference_name, key.p_conference_year, key.p_target);
-        } catch { continue; }
-      }
-    })().finally(() => { pendingFlush = null; });
-    return pendingFlush;
-  };
-  const observe: ConferenceStatsController["observe"] = (state, tracking = {}) => {
-    currentRun = runKey(state);
-    if (tracking.debugUsed || debugUsed || debugRuns.has(currentRun)) markDebug();
-    return Date.now() - lastFlushAttempt >= 30_000 ? flush() : Promise.resolve();
-  };
+  const observe: ConferenceStatsController["observe"] = (state, tracking = {}) => { syncRun(state, tracking); return Promise.resolve(); };
   const track: ConferenceStatsController["track"] = (before, after, tracking = {}) => {
-    currentRun = runKey(after);
-    if (tracking.debugUsed || debugUsed || debugRuns.has(currentRun)) markDebug();
-    if (!enabled || debugUsed || before.phase !== "playing" || before === after || runKey(before) !== currentRun) return Promise.resolve();
-    let added = false;
+    syncRun(after, tracking);
+    if (!enabled || debugUsed || currentRun === null || before.phase !== "playing" || before === after || runKey(before) !== currentRun) return Promise.resolve();
     for (const event of before.eventQueue) {
       if (event.source !== "review" || event.stage !== "result" || event.paperReviewPresentation?.kind !== "decision"
         || after.eventQueue.some((remaining) => remaining.id === event.id)) continue;
@@ -236,22 +120,17 @@ export function createConferenceStats(options: ConferenceStatsOptions): Conferen
         || (settlement.accepted ? settled.status !== "published" || settled.publication?.acceptType !== settlement.acceptType
           : settled.status !== "draft" || settled.rejectionCount !== (paper.rejectionCount ?? 0) + 1)) continue;
       const conference = getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear);
-      const fingerprint = JSON.stringify([currentRun, paper.id, paper.createdTotalMonths, paper.submittedMonth,
-        paper.submittedYear, paper.rejectionCount ?? 0]);
-      if (records.has(fingerprint)) continue;
-      let id: string;
-      try { id = globalThis.crypto.randomUUID(); } catch { continue; }
-      const payload: ReviewRecord = { ...keyFor(conference.name, conference.year, paper.target), p_id: id,
-        p_accepted: settlement.accepted, p_accept_type: settlement.acceptType, p_score: settlement.submittedScore };
-      if (!validRecord(payload)) continue;
-      records.set(fingerprint, { run: currentRun, sent: false, payload });
-      added = true;
+      const fingerprint = JSON.stringify([paper.id, paper.createdTotalMonths, paper.submittedMonth, paper.submittedYear, paper.rejectionCount ?? 0]);
+      client.enqueue("conference", currentRun, fingerprint, { ...keyFor(conference.name, conference.year, paper.target),
+        p_accepted: settlement.accepted, p_accept_type: settlement.acceptType, p_score: settlement.submittedScore });
     }
-    if (added) persist();
-    return added || Date.now() - lastFlushAttempt >= 30_000 ? flush() : Promise.resolve();
+    return Promise.resolve();
   };
-  const controller: ConferenceStatsController = { read, load, track, recordReview: track, observe, markDebug,
-    resetRun: () => { currentRun = null; debugUsed = false; }, flush };
+  const controller: ConferenceStatsController = { read, load, track, recordReview: track, observe,
+    markDebug, resetRun: () => { currentRun = null; debugUsed = false; },
+    flush: () => enabled ? client.flush() : Promise.resolve(),
+    dispose: () => { if (!options.client) client.dispose(); },
+  };
   activeController = controller;
   return controller;
 }

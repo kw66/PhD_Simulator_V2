@@ -1,5 +1,6 @@
 import type { GameState, InternshipOffer, InternshipState, Paper } from "./v2-types";
 import { roundMoney } from "./v2-money";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 
 type InternshipContext = Pick<GameState, "internshipState" | "totalMonths">;
 
@@ -146,17 +147,18 @@ export function canTriggerConferenceInternshipInvite(state: InternshipEligibilit
 }
 
 export function getInternshipSalaryPayment(
-  state: InternshipContext & Pick<GameState, "papers" | "externalPublications">,
+  state: InternshipContext & Pick<GameState, "papers" | "externalPublications"> & Partial<Pick<GameState, "selectedRoleId" | "roleTalents">>,
 ): { payment: number } {
   const status = getInternshipStatus(state);
   if (!status.active) return { payment: 0 };
   const income = status.kind === "remote3" ? 1
     : getInternshipMonthlyIncome(getPublishedAPaperCount(state), state.internshipState.offer?.baseMonthlyIncome);
-  return { payment: roundMoney(income) };
+  const bonus = state.selectedRoleId === "rich" ? getRoleTalentLevel(state, "work-pays-off") * 0.5 : 0;
+  return { payment: roundMoney(income * (1 + bonus)) };
 }
 
 export function getInternshipMonthlyStats(
-  state: InternshipContext & Pick<GameState, "papers" | "externalPublications">,
+  state: InternshipContext & Pick<GameState, "papers" | "externalPublications"> & Partial<Pick<GameState, "selectedRoleId" | "roleTalents">>,
 ): { san: number; money: number } {
   const status = getInternshipStatus(state);
   if (!status.active) return { san: 0, money: 0 };

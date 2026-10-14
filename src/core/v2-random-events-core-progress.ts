@@ -1,3 +1,5 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import {
   createThreeStageEvent,
   drawInclusiveInt,
@@ -5,12 +7,10 @@ import {
   type RandomRollProvider,
 } from "./v2-random-events-core-shared";
 import {
-  applyTierResist,
   formatResearchMiscSanChange,
   formatTierResistedOutcome,
   getActualResearchMiscSanChange,
 } from "./v2-sanity-rules";
-import { getResearchCap } from "./v2-research-cap-system";
 import type { GameState, PendingEvent } from "./v2-types";
 
 const LEARNING_LATEST_TOPICS = [
@@ -58,8 +58,8 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
   const serial = state.totalRandomEventCount;
   const stayUpBaseSanChange = -5;
   const recoveryMoneyCost = 3;
-  const stayUpSanChange = getActualResearchMiscSanChange(stayUpBaseSanChange, state.player.research, state.month, state.eventSupport, state.buffs);
-  const stayUpSanSummary = formatResearchMiscSanChange(stayUpBaseSanChange, state.player.research, state.month, state.eventSupport, state.buffs);
+  const stayUpSanChange = getActualResearchMiscSanChange(stayUpBaseSanChange, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const stayUpSanSummary = formatResearchMiscSanChange(stayUpBaseSanChange, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
   const introDescription = [
     "最近电脑总是烫手，风扇却时转时停。你怀疑风扇坏了，又想着“等这轮忙完再说”，顺手把电脑垫高了一点，💻接着赶论文。",
     "今天打开自己的电脑，科研文件却怎么也读不出来，重启也没用。😨你赶紧翻出备份，那些叫着“最新”“最终”的文件，日期却一个比一个早，偏偏少了最近这一批。",
@@ -146,7 +146,7 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
         ].join("\n\n"),
       },
     },
-  });
+  }, state);
 
   return {
     nextState: state,
@@ -156,9 +156,9 @@ export function createDataLossRandomEvent(state: GameState): { nextState: GameSt
 
 export function createLearningRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
-  const basicGain = state.player.research < 6 ? 1 : 0;
+  const basicGain = getEffectiveResearch(state) < 6 ? 1 : 0;
   const basicResearchResult = basicGain > 0
-    ? applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState))
+    ? previewPlayerAttributeChange(state, "research", 1)
     : null;
   const basicOutcome = basicGain > 0
     ? `科研 < 6｜${formatTierResistedOutcome("科研", 1, basicResearchResult!)}。`
@@ -190,8 +190,8 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
         outcome: basicOutcome,
         effects: {
           ...(basicGain > 0
-            ? basicResearchResult && basicResearchResult.effectiveChange > 0
-              ? { research: basicResearchResult.effectiveChange }
+            ? basicResearchResult
+              ? { research: basicResearchResult.effectiveChange, rawResearch: 1 }
               : {}
             : { researchCapacityStateDeltas: { baseCap: 1 } }),
         },
@@ -268,7 +268,7 @@ export function createLearningRandomEvent(state: GameState, getRoll: RandomRollP
         ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 
 export function createCoreProgressRandomEventById(

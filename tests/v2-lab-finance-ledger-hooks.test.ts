@@ -56,6 +56,7 @@ describe("lab finance settlement hooks", () => {
     expect(result.completed).toBe(2);
     expect(result.state.labFinanceLedger?.amounts).toEqual({ other: 2, "horizontal-income": 100, labor: -10 });
     expect(result.state.advisorProgressState.funding).toBe(190);
+    expect(result.state.advisorProgressState.cumulativeFunding).toBe(130);
     expect(advanceSharedLabProject(state, "horizontal", 1).state.labFinanceLedger).toEqual(state.labFinanceLedger);
     expect(state).toEqual(before);
   });
@@ -91,6 +92,7 @@ describe("lab finance settlement hooks", () => {
     const paid = settleAdvisorGrantResult(state, application);
     expect(paid.labFinanceLedger?.amounts).toEqual({ other: 2, "grant-income": 30 });
     expect(paid.advisorProgressState.funding).toBe(130);
+    expect(paid.advisorProgressState.cumulativeFunding).toBe(60);
     expect(settleAdvisorGrantResult(paid, application)).toBe(paid);
     const failedApplication = { ...application, researchSnapshot: 0, resultRoll: 0.9 };
     const failed = settleAdvisorGrantResult({ ...state,

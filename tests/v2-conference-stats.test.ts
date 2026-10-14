@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONFERENCE_STATS_RULE_VERSION, createConferenceStats, getConferenceGlobalStats, loadConferenceGlobalStats } from "../src/app/v2-conference-stats";
+import { createJournalStats } from "../src/app/v2-journal-stats";
+import { createStatisticsClient } from "../src/app/v2-statistics-client";
 import { getConferenceInfo } from "../src/core/v2-conference-catalog";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -12,9 +14,7 @@ const CONFERENCE = getConferenceInfo(3, "A", 1);
 const KEY = [CONFERENCE.name, CONFERENCE.year, "A"] as const;
 const SUMMARY = { submissions: 2, accepted: 1,
   counts: { Poster: 1, Spotlight: 0, Oral: 0, "Best Paper Candidate": 0, "Best Paper": 0 },
-  acceptedMeanScore: 120, rejectedMeanScore: 60,
-  means: { Reject: 60, Poster: 120, Spotlight: null, Oral: null, "Best Paper Candidate": null, "Best Paper": null },
-  p90: 114, p99: 119.4, updatedAt: "2026-10-09T08:00:00Z" };
+  means: { Reject: 60, Poster: 120, Spotlight: null, Oral: null, "Best Paper Candidate": null, "Best Paper": null } };
 
 function storage() {
   const values = new Map<string, string>();
@@ -28,10 +28,10 @@ function backend() {
   let failRead = false;
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const payload = JSON.parse(String(init?.body));
-    if (String(input).endsWith("/record_phd_simulator_v2_conference_review")) {
-      rows.set(payload.p_id, payload);
+    if (String(input).endsWith("/record_phd_simulator_v2_stats_batch")) {
+      for (const record of payload.p_records) rows.set(record.payload.p_id, record.payload);
       if (loseAcknowledgement) { loseAcknowledgement = false; throw new Error("Connection lost after commit"); }
-      return Response.json(true);
+      return Response.json(payload.p_records.map((record: { payload: { p_id: string } }) => record.payload.p_id));
     }
     if (failRead) return new Response("unavailable", { status: 503 });
     return Response.json(SUMMARY);
@@ -60,9 +60,36 @@ function review(accepted = true, seed = 123) {
   return { overview, reviewers, before, after: confirm(before), settlement };
 }
 
-afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+beforeEach(() => { vi.useFakeTimers(); });
+afterEach(() => { vi.clearAllTimers(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("global conference statistics", () => {
+  it("shares the upload queue and debug exclusion with journal results", async () => {
+    const network = backend();
+    const client = createStatisticsClient({ fetch: network.fetch, storage: storage() });
+    const conferences = createConferenceStats({ onChange: vi.fn(), client });
+    const journals = createJournalStats({ onChange: vi.fn(), client });
+    const states = review();
+    const journal = { ...createDraftPaper(1, 0, () => 0), id: "shared-journal", status: "published" as const,
+      journalTarget: "pami" as const, submittedYear: 1, submittedMonth: 3, acceptedTotalMonths: 5,
+      idea: 40, experiment: 40, writing: 45 };
+    const journalAfter = { ...states.after, externalPublications: [...states.after.externalPublications, journal] };
+    await conferences.track(states.before, states.after);
+    await journals.track(states.after, journalAfter);
+    expect(network.fetch).not.toHaveBeenCalled();
+    await client.flush();
+    expect(network.rows.size).toBe(2);
+    expect(network.fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(network.fetch.mock.calls[0]![1]!.body)).p_records.map((row: { kind: string }) => row.kind))
+      .toEqual(["conference", "journal"]);
+    conferences.markDebug();
+    await journals.track(journalAfter, { ...journalAfter, externalPublications: [...journalAfter.externalPublications,
+      { ...journal, id: "another-journal" }] });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(network.fetch).toHaveBeenCalledTimes(1);
+    client.dispose();
+  });
+
   it.each([true, false])("records only final confirmed review outcomes (accepted=%s)", async (accepted) => {
     const network = backend();
     const onChange = vi.fn();
@@ -75,6 +102,8 @@ describe("global conference statistics", () => {
     await stats.track(states.before, projectPaperReviewSettlement(states.before, states.settlement));
     expect(network.rows.size).toBe(0);
     await stats.track(states.before, states.after);
+    expect(network.fetch).not.toHaveBeenCalled();
+    await stats.flush();
     expect(network.rows.size).toBe(1);
     const payload = [...network.rows.values()][0]!;
     expect(payload).toMatchObject({ p_rule_version: CONFERENCE_STATS_RULE_VERSION,
@@ -84,6 +113,8 @@ describe("global conference statistics", () => {
     expect(Object.keys(payload).sort()).toEqual(["p_rule_version", "p_conference_name", "p_conference_year",
       "p_target", "p_accepted", "p_score", "p_accept_type", "p_id"].sort());
     expect(JSON.stringify(payload)).not.toContain("Private paper title");
+    expect(stats.read(...KEY)).toEqual({ status: "loading", data: null });
+    await stats.load(...KEY);
     expect(stats.read(...KEY)).toEqual({ status: "ready", data: SUMMARY });
     expect(onChange).toHaveBeenCalled();
     expect(states.before).toEqual(snapshot);
@@ -96,8 +127,11 @@ describe("global conference statistics", () => {
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
     await Promise.all([stats.track(states.before, states.after), stats.track(states.before, states.after)]);
     await stats.track(states.before, states.after);
+    await stats.flush();
+    stats.dispose();
     const reloaded = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
     await reloaded.track(states.before, states.after);
+    await reloaded.flush();
     expect(network.rows.size).toBe(1);
     expect(network.fetch.mock.calls.filter(([url]) => String(url).includes("/record_"))).toHaveLength(1);
   });
@@ -109,13 +143,17 @@ describe("global conference statistics", () => {
     const states = review();
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
     await stats.track(states.before, states.after);
+    await stats.flush();
     expect(network.rows.size).toBe(1);
     const id = [...network.rows.keys()][0];
+    stats.dispose();
     const reloaded = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
     await reloaded.flush();
+    expect(network.fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect([...network.rows.keys()]).toEqual([id]);
     expect(network.fetch.mock.calls.filter(([url]) => String(url).includes("/record_"))).toHaveLength(2);
-    expect(reloaded.read(...KEY).status).toBe("ready");
+    expect(reloaded.read(...KEY).status).toBe("loading");
   });
 
   it("does not acknowledge false or malformed upload responses", async () => {
@@ -124,8 +162,9 @@ describe("global conference statistics", () => {
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: storage() });
     const states = review();
     await stats.track(states.before, states.after);
-    expect(network.rows.size).toBe(0);
     await stats.flush();
+    expect(network.rows.size).toBe(0);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(network.rows.size).toBe(1);
   });
 
@@ -140,6 +179,7 @@ describe("global conference statistics", () => {
     const overview = resolveDuePaperReviews(resubmitted, () => 0.5).state;
     const before = confirm(confirm(overview));
     await stats.track(before, confirm(before));
+    await stats.flush();
     expect(network.rows.size).toBe(2);
     expect([...network.rows.values()].map((row) => row.p_accepted)).toEqual([false, true]);
   });
@@ -167,6 +207,7 @@ describe("global conference statistics", () => {
     reloaded.resetRun();
     const newRun = review(true, 456);
     await reloaded.track(newRun.before, newRun.after);
+    await reloaded.flush();
     expect(network.rows.size).toBe(1);
   });
 
@@ -176,8 +217,10 @@ describe("global conference statistics", () => {
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: storage() });
     const states = review();
     await stats.track(states.before, states.after);
+    await stats.flush();
     stats.markDebug();
     await stats.flush();
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(network.rows.size).toBe(0);
     expect(network.fetch).toHaveBeenCalledTimes(1);
   });
@@ -193,6 +236,7 @@ describe("global conference statistics", () => {
     await stats.track(newRun.overview, newRun.reviewers);
     await stats.track(newRun.reviewers, newRun.before);
     await stats.track(newRun.before, newRun.after);
+    await stats.flush();
     expect(network.rows.size).toBe(1);
   });
 
@@ -231,7 +275,7 @@ describe("global conference statistics", () => {
     expect(stats.read(KEY[0], KEY[1] + 1, "A").status).toBe("loading");
     expect(stats.read(KEY[0], KEY[1], "B").status).toBe("loading");
     expect(stats.read("ICML", KEY[1], "A").status).toBe("loading");
-    await vi.advanceTimersByTimeAsync(60_001);
+    await vi.advanceTimersByTimeAsync(600_001);
     await stats.load(...KEY);
     expect(network.fetch).toHaveBeenCalledTimes(2);
     const result = stats.read(...KEY);
@@ -239,7 +283,9 @@ describe("global conference statistics", () => {
     expect(stats.read(...KEY).data!.counts.Poster).toBe(1);
   });
 
-  it.each([null, {}, { ...SUMMARY, accepted: 3 }, { ...SUMMARY, p90: 999 }, { ...SUMMARY, p99: "NaN" }])(
+  it.each([null, {}, { ...SUMMARY, accepted: 3 },
+    { ...SUMMARY, means: { ...SUMMARY.means, Reject: null } },
+    { ...SUMMARY, means: { ...SUMMARY.means, Spotlight: 0 } }])(
     "keeps malformed responses unavailable without fabricating zero counts: %j", async (response) => {
       vi.useFakeTimers();
       const network = backend();
@@ -250,34 +296,40 @@ describe("global conference statistics", () => {
       expect(stats.read(...KEY)).toEqual({ status: "unavailable", data: null });
       await stats.load(...KEY);
       expect(network.fetch).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTimeAsync(30_001);
+      await vi.advanceTimersByTimeAsync(60_001);
       await stats.load(...KEY);
       expect(stats.read(...KEY)).toEqual({ status: "ready", data: SUMMARY });
       expect(onChange).toHaveBeenCalledTimes(2);
     },
   );
 
-  it("retains genuine cached data but reports unavailable when refresh fails", async () => {
+  it("retains genuine cached data as ready when refresh fails", async () => {
     vi.useFakeTimers();
     const network = backend();
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: null });
     await stats.load(...KEY);
     network.failReads();
-    await vi.advanceTimersByTimeAsync(60_001);
+    await vi.advanceTimersByTimeAsync(600_001);
     await stats.load(...KEY);
-    expect(stats.read(...KEY)).toEqual({ status: "unavailable", data: SUMMARY });
+    expect(stats.read(...KEY)).toEqual({ status: "ready", data: SUMMARY });
   });
 
-  it("accepts real empty aggregates only with null scores and timestamp", async () => {
+  it("accepts empty aggregates only with null means", async () => {
     const empty = { submissions: 0, accepted: 0,
       counts: { Poster: 0, Spotlight: 0, Oral: 0, "Best Paper Candidate": 0, "Best Paper": 0 },
-      acceptedMeanScore: null, rejectedMeanScore: null,
-      means: { Reject: null, Poster: null, Spotlight: null, Oral: null, "Best Paper Candidate": null, "Best Paper": null },
-      p90: null, p99: null, updatedAt: null };
+      means: { Reject: null, Poster: null, Spotlight: null, Oral: null, "Best Paper Candidate": null, "Best Paper": null } };
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json(empty));
     const stats = createConferenceStats({ onChange: vi.fn(), fetch, storage: null });
     await stats.load(...KEY);
     expect(stats.read(...KEY)).toEqual({ status: "ready", data: empty });
+  });
+
+  it("accepts a conference with no rejections only when its reject mean is null", async () => {
+    const allAccepted = { ...SUMMARY, submissions: 1, means: { ...SUMMARY.means, Reject: null } };
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json(allAccepted));
+    const stats = createConferenceStats({ onChange: vi.fn(), fetch, storage: null });
+    await stats.load(...KEY);
+    expect(stats.read(...KEY)).toEqual({ status: "ready", data: allAccepted });
   });
 
   it("rejects invalid keys without a request and tolerates unavailable storage", async () => {
@@ -289,6 +341,7 @@ describe("global conference statistics", () => {
     expect(network.fetch).not.toHaveBeenCalled();
     const states = review();
     await stats.track(states.before, states.after);
+    await stats.flush();
     expect(network.rows.size).toBe(1);
   });
 
@@ -300,8 +353,6 @@ describe("global conference statistics", () => {
     expect(sql).toContain("enable row level security");
     expect(sql).toContain("revoke all on public.phd_simulator_v2_conference_reviews from public, anon, authenticated");
     expect(sql.match(/security definer\nset search_path = ''/g)).toHaveLength(2);
-    expect(sql).toContain("percentile_cont(0.9)");
-    expect(sql).toContain("percentile_cont(0.99)");
     expect(sql).not.toMatch(/grant\s+(select|insert|update|delete)\b/i);
     expect(sql).not.toMatch(/create extension|pgcrypto|nickname|paper_title/i);
   });

@@ -29,6 +29,35 @@ function published(fellowId: string, target: PaperTarget): Paper {
 }
 
 describe("lab annual growth", () => {
+  it("uses player-only resistance talents for both inheritance attributes", () => {
+    const state = makeState([20, 20, 20]);
+    state.selectedRoleId = "chosen";
+    state.roleTalents = { levels: { "lasting-fortune": 3 } };
+    state.player.research = 18;
+    state.player.social = 18;
+    expect(getPlayerAnnualResearchGrowth(state)).toBe(2);
+    const next = settleLabResearchGrowth(state);
+    expect(next.player.research).toBe(20);
+    expect(next.player.social).toBe(19);
+    expect(next.roleTalents?.growthTotals).toEqual({ research: 2, social: 1 });
+    expect(next.fellowProgressState.every((fellow) => fellow.research === 20)).toBe(true);
+  });
+
+  it("keeps breakthrough changes when rebuilding annual group state", () => {
+    const state = makeState([20, 20, 20]);
+    state.roleTalents = { levels: { breakthrough: 1 } };
+    state.player.research = 19.9;
+    state.player.social = 20;
+    const next = settleLabResearchGrowth(state);
+    expect(next.player.research).toBe(20);
+    expect(next.player.social).toBe(20);
+    expect(next.researchCapacityState.otherCapBonus).toBe(1);
+    expect(next.roleTalents?.capBonuses?.social).toBe(1);
+    expect(next.roleTalents?.breakthroughCounts).toEqual({ research: 1, social: 1 });
+    const following = settleLabResearchGrowth({ ...next, totalMonths: 24, year: 2 });
+    expect(following.player.social).toBe(20.4);
+  });
+
   it.each([[6, 20, 1.6], [11.75, 20, 1.4], [18, 20, 0.8], [6, 6.25, 0.25], [20, 20, 0]])(
     "previews the actual resisted growth at research %s and cap %s", (research, cap, expected) => {
       const state = makeState([20, 20, 20]);

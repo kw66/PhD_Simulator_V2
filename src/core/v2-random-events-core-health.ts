@@ -1,5 +1,6 @@
 import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
-import { getShopRestSanGain } from "./v2-shop-items-effects";
+import { getActiveOperationAllowance } from "./v2-ai-shop";
+import { getRoleRestSanGain } from "./v2-role-talent-rest";
 import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { Buff, EventChoice, GameState, PendingEvent } from "./v2-types";
 
@@ -118,7 +119,7 @@ export function createIllnessRandomEvent(
   const hardCapDelta = -(1 + severity);
   const medicineMoney = -(1 + severity);
   const hospitalMoney = -(3 + severity);
-  const restSanGain = getShopRestSanGain(state.shopState);
+  const restSanGain = getRoleRestSanGain(state);
   const activeOperationSanMultiplier = illnessType === "stomach" ? 1.5 : illnessType === "flu" ? 2 : 2.5;
   const pendingBuffId = `illness-work-penalty-${illnessType}-${state.totalMonths}-${serial}`;
   const illnessBuff: Buff = {
@@ -180,7 +181,7 @@ export function createIllnessRandomEvent(
       {
         id: `illness-${illnessType}-rest-${serial}`,
         label: "休息",
-        ...(state.actionState.used >= state.actionState.limit ? { disabledReason: "本月行动点已用尽，无法休息" } : {}),
+        ...(!getActiveOperationAllowance(state, "rest").allowed ? { disabledReason: "本月行动点已用尽，无法休息" } : {}),
         outcome: `${formatActualSanChange(-ILLNESS_REST_BASE_SAN_COST, state.month, state.eventSupport, illnessBuffs)}｜SAN +${restSanGain}｜行动点 -1｜生病概率 ×0.5｜${clearIllnessOutcome}`,
         effects: { san: restSan, illnessProbabilityMultiplier: 0.5, restAction: true, removeBuffIds: [pendingBuffId] },
       },
@@ -203,5 +204,5 @@ export function createIllnessRandomEvent(
     decisionTitle: "你的选择",
     decisionDescription: copy.decision.join("\n\n"),
     results: Object.fromEntries(event.choices.map((choice) => [choice.id, { title: choice.label, description: resultDescription(choice) }])),
-  });
+  }, state);
 }

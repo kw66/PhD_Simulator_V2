@@ -1,5 +1,6 @@
 import { getResearchCap } from "./v2-research-cap-system";
 import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import type {
   ConferenceCareerState,
   ConferenceEncounterState,
@@ -64,6 +65,7 @@ export function getConferenceActivityChainId(context: Pick<ConferenceActivityCon
 }
 
 export interface ConferenceActivityBuildState {
+  playerAttributeState?: GameState;
   selectedRoleId?: GameState["selectedRoleId"];
   playerGender?: Gender;
   totalMonths?: number;
@@ -108,9 +110,12 @@ export function resolveConferenceActivityAttributes(
     if (rawChange === undefined) continue;
     const maximum = attribute === "research" && state.researchCapacityState
       ? getResearchCap(state.researchCapacityState) : 20;
-    const result = applyTierResist(rawChange, state[attribute], getRoll, maximum);
+    const result = state.playerAttributeState
+      ? previewPlayerAttributeChange(state.playerAttributeState, attribute, rawChange)
+      : applyTierResist(rawChange, state[attribute], getRoll, maximum);
     const label = attribute === "research" ? "科研" : "社交";
     effects[attribute] = result.effectiveChange;
+    effects[attribute === "research" ? "rawResearch" : "rawSocial"] = rawChange;
     outcome = outcome.replace(`${label} ${rawChange >= 0 ? "+" : ""}${rawChange}`,
       formatTierResistedOutcome(label, rawChange, result));
   }

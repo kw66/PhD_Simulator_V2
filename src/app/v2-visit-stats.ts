@@ -1,51 +1,37 @@
-import { getRoleOptions } from "../core/v2-progression";
+﻿import { getRoleOptions } from "../core/v2-progression";
 import type { EndingId, GamePhase, RoleId } from "../core/v2-types";
+import { createStatisticsClient, type StatisticsClient } from "./v2-statistics-client";
 
-const COUNTER_PREFIX = "phd_simulator_v2";
-const STATS_URL = "https://ypefmpeekfucmarbbdov.supabase.co/rest/v1/rpc";
-const STATS_PUBLIC_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlwZWZtcGVla2Z1Y21hcmJiZG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NTA2NTYsImV4cCI6MjA4MTUyNjY1Nn0.XTOQNFuuwfu9nwDTnO9-NEqlzZnzdCVnEmYEJh0rXf8";
-const VISITOR_KEY = `${COUNTER_PREFIX}_visitor_seen`;
-const DAILY_VISITOR_KEY = `${COUNTER_PREFIX}_visitor_day`;
-const TOTAL_VISITOR_DAY_KEY = `${COUNTER_PREFIX}_visitor_total_day`;
-const SNAPSHOT_KEY = `${COUNTER_PREFIX}_stats_snapshot`;
+const STATS_RPC = "get_phd_simulator_v2_activity_stats";
+const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ROLE_IDS = getRoleOptions().map((role) => role.id);
 
-interface RoleCounters {
-  games: number;
-  clears: number;
-  phd: number;
-}
-
+interface RoleCounters { games: number; finished: number; clears: number; phd: number }
 interface RoleRunResult {
   roleId: RoleId;
   ending: EndingId;
+  runKey?: string;
   disqualifiedByDebug?: boolean;
 }
-
-function getRoleCounterIds(roleId: RoleId) {
-  return {
-    games: `${COUNTER_PREFIX}_role_${roleId}_games_total`,
-    clears: `${COUNTER_PREFIX}_role_${roleId}_clears_total`,
-    phd: `${COUNTER_PREFIX}_role_${roleId}_phd_total`,
-  };
-}
-
 interface VisitSnapshot {
+  version: 2;
   day: string;
-  visitors: number;
   views: number;
-  todayVisitors: number;
   todayViews: number;
-  games: number | null;
-  todayGames: number | null;
-  roles: Partial<Record<RoleId, RoleCounters>>;
+  visitors: number;
+  todayVisitors: number;
+  games: number;
+  todayGames: number;
+  roles: Record<RoleId, RoleCounters>;
 }
-
 interface VisitStatsOptions {
   recordVisit: boolean;
+  client?: StatisticsClient;
   storage?: Pick<Storage, "getItem" | "setItem"> | null;
   fetch?: typeof fetch;
   now?: () => number;
+  onChange?: () => void;
 }
 
 function getBeijingDay(timestamp: number): string {
@@ -53,229 +39,134 @@ function getBeijingDay(timestamp: number): string {
 }
 
 function getBrowserStorage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
+  try { return globalThis.localStorage ?? null; } catch { return null; }
 }
 
-function parseCounter(value: unknown): number {
-  const number = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
-  if (typeof number !== "number" || !Number.isSafeInteger(number) || number < 0) {
-    throw new Error("Invalid visit counter");
-  }
-  return number;
-}
-
-function readRoleCounters(value: unknown): Partial<Record<RoleId, RoleCounters>> {
-  if (!value || typeof value !== "object") return {};
-  const records = value as Record<string, unknown>;
-  const roles: Partial<Record<RoleId, RoleCounters>> = {};
-  for (const roleId of ROLE_IDS) {
-    const record = records[roleId];
-    if (!record || typeof record !== "object") continue;
-    try {
-      const counters = record as Record<string, unknown>;
-      roles[roleId] = { games: parseCounter(counters.games), clears: parseCounter(counters.clears), phd: parseCounter(counters.phd) };
-    } catch {
-      continue;
-    }
-  }
-  return roles;
+function parseSnapshot(value: unknown, day: string): VisitSnapshot {
+  if (!value || typeof value !== "object") throw new Error("Missing activity statistics");
+  const data = value as VisitSnapshot;
+  const count = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+  // Older responses omitted proven historical starts. A cache-key change alone
+  // cannot detect a response fetched while the database deployment was pending.
+  if (data.version !== 2 || data.day !== day || !count(data.views) || !count(data.todayViews) || data.todayViews > data.views
+    || !count(data.visitors) || !count(data.todayVisitors) || data.todayVisitors > data.visitors
+    || !count(data.games) || !count(data.todayGames) || data.todayGames > data.games
+    || !data.roles || typeof data.roles !== "object" || Array.isArray(data.roles)) throw new Error("Invalid activity statistics");
+  const roles = Object.fromEntries(ROLE_IDS.map((roleId) => {
+    const role = data.roles[roleId];
+    if (role === undefined) return [roleId, { games: 0, finished: 0, clears: 0, phd: 0 }];
+    if (!role || !count(role.games) || !count(role.finished) || !count(role.clears) || !count(role.phd)
+      || role.phd > role.clears || role.clears > role.finished) throw new Error("Invalid role activity statistics");
+    return [roleId, { games: role.games, finished: role.finished, clears: role.clears, phd: role.phd }];
+  })) as Record<RoleId, RoleCounters>;
+  return { version: 2, day, views: data.views, todayViews: data.todayViews, visitors: data.visitors,
+    todayVisitors: data.todayVisitors, games: data.games, todayGames: data.todayGames, roles };
 }
 
 export function createVisitStats(options: VisitStatsOptions) {
   const storage = options.storage === undefined ? getBrowserStorage() : options.storage;
-  const request = options.fetch ?? globalThis.fetch.bind(globalThis);
+  const client = options.client ?? createStatisticsClient({ storage, fetch: options.fetch });
   const now = options.now ?? Date.now;
   let snapshot: VisitSnapshot | null = null;
   let pendingLoad: Promise<void> | null = null;
   let initialLoadStarted = false;
-  let loadedDay: string | null = null;
-  let lastLoadAttempt = -Infinity;
-  let pendingGameRecords = Promise.resolve();
   let previousPhase: GamePhase = "setup";
+  let currentRun: string | null = null;
+  let disposed = false;
 
-  const readStorage = (key: string): string | null => {
-    try {
-      return storage?.getItem(key) ?? null;
-    } catch {
-      return null;
-    }
+  const readDay = (day: string): VisitSnapshot | null =>
+    client.read(STATS_RPC, { p_day: day }, (value) => parseSnapshot(value, day)).data;
+  const getSnapshot = (): VisitSnapshot | null => {
+    if (disposed) return snapshot;
+    snapshot = readDay(getBeijingDay(now())) ?? snapshot ?? readDay(getBeijingDay(now() - 86_400_000));
+    return snapshot;
   };
-  const writeStorage = (key: string, value: string): void => {
-    try {
-      storage?.setItem(key, value);
-    } catch {
-      return;
-    }
-  };
-
-  try {
-    const cached = JSON.parse(readStorage(SNAPSHOT_KEY) ?? "null");
-    if (cached && typeof cached.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(cached.day)) {
-      snapshot = {
-        day: cached.day,
-        visitors: parseCounter(cached.visitors),
-        views: parseCounter(cached.views),
-        todayVisitors: parseCounter(cached.todayVisitors),
-        todayViews: parseCounter(cached.todayViews),
-        games: cached.games == null ? null : parseCounter(cached.games),
-        todayGames: cached.todayGames == null ? null : parseCounter(cached.todayGames),
-        roles: readRoleCounters(cached.roles),
-      };
-    }
-  } catch {
-    snapshot = null;
-  }
-
-  const rpc = async (endpoint: string, payload: object): Promise<unknown> => {
-    const response = await request(`${STATS_URL}/${endpoint}`, {
-      method: "POST",
-      headers: {
-        apikey: STATS_PUBLIC_KEY,
-        Authorization: `Bearer ${STATS_PUBLIC_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) throw new Error(`Visit statistics unavailable: ${response.status}`);
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
-  };
-
-  const refresh = async (recordVisit: boolean, completedDay?: string, result?: RoleRunResult): Promise<boolean> => {
+  const refresh = async (): Promise<void> => {
+    if (disposed) return;
     const day = getBeijingDay(now());
-    const ids = [`${COUNTER_PREFIX}_uv_total`, `${COUNTER_PREFIX}_pv_total`, `${COUNTER_PREFIX}_uv_${day}`, `${COUNTER_PREFIX}_pv_${day}`, `${COUNTER_PREFIX}_games_total`, `${COUNTER_PREFIX}_games_${day}`,
-      ...ROLE_IDS.flatMap((roleId) => Object.values(getRoleCounterIds(roleId)))];
-    const increment = (id: string): Promise<unknown> => rpc("increment_counter", { counter_id: id });
-    if (recordVisit) {
-      const recordVisitor = async (): Promise<void> => {
-        if (readStorage(TOTAL_VISITOR_DAY_KEY) === null && readStorage(VISITOR_KEY) === "true" && readStorage(DAILY_VISITOR_KEY) === day) {
-          writeStorage(TOTAL_VISITOR_DAY_KEY, day);
-        }
-        const countOnce = async (id: string, key: string, marker: string): Promise<void> => {
-          if (readStorage(key) === marker) return;
-          await increment(id);
-          writeStorage(key, marker);
-        };
-        await Promise.allSettled([
-          countOnce(ids[0], TOTAL_VISITOR_DAY_KEY, day),
-          countOnce(ids[2], DAILY_VISITOR_KEY, day),
-        ]);
-      };
-      const visitorTask = typeof navigator !== "undefined" && navigator.locks
-        ? navigator.locks.request(`${COUNTER_PREFIX}_visitor_lock`, recordVisitor)
-        : recordVisitor();
-      await Promise.allSettled([increment(ids[1]), increment(ids[3]), visitorTask]);
-    }
-    if (completedDay) {
-      const records = [increment(ids[4]), increment(`${COUNTER_PREFIX}_games_${completedDay}`)];
-      if (result?.ending && ROLE_IDS.includes(result.roleId)) {
-        const roleIds = getRoleCounterIds(result.roleId);
-        records.push(increment(roleIds.games));
-        if (result.ending === "master" || result.ending === "phd") records.push(increment(roleIds.clears));
-        if (result.ending === "phd") records.push(increment(roleIds.phd));
-      }
-      await Promise.allSettled(records);
-    }
-    try {
-      const rows = await rpc("get_counters", { counter_ids: ids });
-      if (!Array.isArray(rows)) throw new Error("Invalid visit statistics response");
-      const counters = new Map<string, number>();
-      for (const row of rows) {
-        if (row && ids.includes(row.id)) counters.set(row.id, parseCounter(row.count));
-      }
-      snapshot = {
-        day,
-        visitors: counters.get(ids[0]) ?? 0,
-        views: counters.get(ids[1]) ?? 0,
-        todayVisitors: counters.get(ids[2]) ?? 0,
-        todayViews: counters.get(ids[3]) ?? 0,
-        games: counters.get(ids[4]) ?? 0,
-        todayGames: counters.get(ids[5]) ?? 0,
-        roles: Object.fromEntries(ROLE_IDS.map((roleId) => {
-          const roleIds = getRoleCounterIds(roleId);
-          return [roleId, { games: counters.get(roleIds.games) ?? 0, clears: counters.get(roleIds.clears) ?? 0, phd: counters.get(roleIds.phd) ?? 0 }];
-        })),
-      };
-      writeStorage(SNAPSHOT_KEY, JSON.stringify(snapshot));
-      return true;
-    } catch {
-      return false;
-    }
+    await client.load(STATS_RPC, { p_day: day }, (value) => parseSnapshot(value, day));
+    if (!disposed) { getSnapshot(); options.onChange?.(); }
   };
-
-  const getDisplayValues = (): { visitors: string; views: string; games: string } => {
-    if (!snapshot) return { visitors: "--（--）", views: "--（--）", games: "--（--）" };
-    const isToday = snapshot.day === getBeijingDay(now());
-    return {
-      visitors: `${snapshot.visitors}（${isToday ? snapshot.todayVisitors : "--"}）`,
-      views: `${snapshot.views}（${isToday ? snapshot.todayViews : "--"}）`,
-      games: `${snapshot.games ?? "--"}（${isToday ? snapshot.todayGames ?? "--" : "--"}）`,
+  const recordPageVisit = async (): Promise<void> => {
+    if (!options.recordVisit) return;
+    const getVisitor = (): string => {
+      let visitor: string | null = null;
+      try { visitor = storage?.getItem(VISITOR_KEY) ?? null; } catch { /* Storage may be unavailable. */ }
+      if (visitor && UUID_PATTERN.test(visitor)) return visitor;
+      visitor = globalThis.crypto.randomUUID();
+      try { storage?.setItem(VISITOR_KEY, visitor); } catch { /* Keep this page usable without storage. */ }
+      return visitor;
     };
+    try {
+      const visitor = typeof navigator !== "undefined" && navigator.locks
+        ? await navigator.locks.request(`${VISITOR_KEY}_lock`, getVisitor)
+        : getVisitor();
+      if (disposed) return;
+      const page = globalThis.crypto.randomUUID();
+      client.enqueue("activity", "activity-visit", page, { p_event: "visit", p_day: getBeijingDay(now()), p_visitor_id: visitor });
+    } catch { /* Do not invent an identity when secure randomness is unavailable. */ }
   };
-
   const load = (): Promise<void> => {
+    if (disposed) return Promise.resolve();
     if (pendingLoad) return pendingLoad;
-    const day = getBeijingDay(now());
-    if (loadedDay === day) return Promise.resolve();
-    const recordVisit = options.recordVisit && !initialLoadStarted;
+    const first = !initialLoadStarted;
     initialLoadStarted = true;
-    lastLoadAttempt = now();
-    pendingLoad = refresh(recordVisit).then((success) => {
-      if (success) loadedDay = day;
-    }).finally(() => { pendingLoad = null; });
+    pendingLoad = (async () => {
+      if (first && options.recordVisit) {
+        await recordPageVisit();
+        if (disposed) return;
+        await client.flush();
+      }
+      await refresh();
+    })().finally(() => { pendingLoad = null; });
     return pendingLoad;
   };
-
-  const getRoleDisplayValues = (roleId: RoleId): Record<"global-completed-runs" | "global-played-runs" | "phd-rate", string> => {
-    const counters = snapshot?.roles[roleId];
-    if (!counters) return { "global-completed-runs": "--", "global-played-runs": "--", "phd-rate": "--" };
-    const validRate = counters.games > 0 && counters.phd <= counters.clears && counters.clears <= counters.games;
-    return {
-      "global-completed-runs": String(counters.clears),
-      "global-played-runs": String(counters.games),
-      "phd-rate": validRate ? `${(counters.phd / counters.games * 100).toFixed(1)}%` : "--",
-    };
+  const getDisplayValues = (): { visitors: string; views: string; games: string } => {
+    const data = getSnapshot();
+    if (!data) return { visitors: "--（--）", views: "--（--）", games: "--（--）" };
+    const today = data.day === getBeijingDay(now());
+    return { visitors: `${data.visitors}（${today ? data.todayVisitors : "--"}）`,
+      views: `${data.views}（${today ? data.todayViews : "--"}）`, games: `${data.games}（${today ? data.todayGames : "--"}）` };
   };
-
-  const renderValues = (root: ParentNode): void => {
-    for (const [metric, value] of Object.entries(getDisplayValues())) {
-      root.querySelectorAll(`[data-community-stat="${metric}"]`).forEach((target) => {
-        target.textContent = value;
-      });
-    }
-    for (const roleId of ROLE_IDS) {
-      for (const [metric, value] of Object.entries(getRoleDisplayValues(roleId))) {
-        root.querySelectorAll(`[data-role-stat="${metric}"][data-role-id="${roleId}"]`).forEach((target) => {
-          target.textContent = value;
-        });
-      }
-    }
+  const getRoleDisplayValues = (roleId: RoleId): Record<"global-completed-runs" | "global-played-runs" | "phd-rate", string> => {
+    const counters = getSnapshot()?.roles[roleId];
+    if (!counters) return { "global-completed-runs": "--", "global-played-runs": "--", "phd-rate": "--" };
+    return { "global-completed-runs": String(counters.clears), "global-played-runs": String(counters.games),
+      "phd-rate": counters.finished > 0 ? `${(counters.phd / counters.finished * 100).toFixed(1)}%` : "--" };
   };
 
   return {
     load,
     trackGamePhase(phase: GamePhase, result?: RoleRunResult): Promise<void> {
-      const completed = previousPhase === "playing" && phase === "finished";
+      if (disposed) return Promise.resolve();
+      const run = result?.runKey;
+      const validRun = typeof run === "string" && run.length > 0 && run.length <= 160
+        && result !== undefined && ROLE_IDS.includes(result.roleId);
+      const started = phase === "playing" && validRun && (previousPhase !== "playing" || currentRun !== run);
+      const finished = phase === "finished" && previousPhase === "playing" && validRun && currentRun === run;
+      const changedPhase = phase !== previousPhase;
+      if (options.recordVisit && validRun) {
+        const payload = { p_day: getBeijingDay(now()), p_run_key: run, p_role_id: result.roleId };
+        if (started) client.enqueue("activity", `activity-start:${run}`, "start", { ...payload, p_event: "start" });
+        if (finished && result.ending && !result.disqualifiedByDebug) {
+          client.enqueue("activity", run, "finish", { ...payload, p_event: "finish", p_ending: result.ending });
+        }
+      }
       previousPhase = phase;
-      if (!completed || !options.recordVisit || result?.disqualifiedByDebug) return Promise.resolve();
-      const day = getBeijingDay(now());
-      pendingGameRecords = pendingGameRecords.then(async () => {
-        await load();
-        await refresh(false, day, result);
-      });
-      return pendingGameRecords;
+      if (phase === "setup") currentRun = null;
+      else if (validRun) currentRun = run;
+      return started || (changedPhase && (phase === "setup" || phase === "finished")) ? refresh() : Promise.resolve();
     },
     getDisplayValues,
     getRoleDisplayValues,
+    flush: () => options.recordVisit && !disposed ? client.flush() : Promise.resolve(),
+    dispose() { disposed = true; if (!options.client) client.dispose(); },
     render(root: ParentNode): void {
-      renderValues(root);
-      if (loadedDay !== getBeijingDay(now()) && !pendingLoad && now() - lastLoadAttempt >= 60_000) {
-        void load().then(() => renderValues(root));
+      for (const [metric, value] of Object.entries(getDisplayValues())) {
+        root.querySelectorAll(`[data-community-stat="${metric}"]`).forEach((target) => { target.textContent = value; });
+      }
+      for (const roleId of ROLE_IDS) for (const [metric, value] of Object.entries(getRoleDisplayValues(roleId))) {
+        root.querySelectorAll(`[data-role-stat="${metric}"][data-role-id="${roleId}"]`).forEach((target) => { target.textContent = value; });
       }
     },
   };

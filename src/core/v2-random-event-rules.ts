@@ -4,8 +4,12 @@ import {
   type RandomEventCategory,
 } from "./v2-random-event-pool-builder";
 import { type PendingRandomEvent } from "./v2-paper-competition";
+import { getRoleTalentLevel, type RoleTalentRunState } from "./v2-role-talent-state";
+import type { RoleId } from "./v2-types";
 
 export interface RandomEventState {
+  selectedRoleId?: RoleId;
+  roleTalents?: RoleTalentRunState;
   availableRandomEvents: number[];
   usedRandomEvents: number[];
   illnessProbability: number;
@@ -20,6 +24,7 @@ export interface RandomEventPoolContext extends RandomEventState {
   hasRecoverableDraftPaper?: boolean;
   hasAuthorshipEligibleDraftPaper?: boolean;
   excludedCategories?: readonly RandomEventCategory[];
+  excludedEventIds?: readonly number[];
 }
 
 export interface RandomEventPoolSnapshot {
@@ -40,14 +45,14 @@ const BASE_WEIGHT_REPEAT = 10;
 
 function cloneRandomEventState(state: RandomEventState): RandomEventState {
   return {
+    ...(state.selectedRoleId ? { selectedRoleId: state.selectedRoleId } : {}),
+    ...(state.roleTalents ? { roleTalents: state.roleTalents } : {}),
     availableRandomEvents: [...state.availableRandomEvents],
     usedRandomEvents: [...state.usedRandomEvents],
     ...(state.pendingRandomEvents ? {
       pendingRandomEvents: state.pendingRandomEvents.map((event) => ({ ...event })),
     } : {}),
-    illnessProbability: typeof state.illnessProbability === "number" && Number.isFinite(state.illnessProbability)
-      ? Math.max(0, Math.min(100, Math.floor(state.illnessProbability)))
-      : 0,
+    illnessProbability: normalizeRoleTalentIllnessProbability(state, state.illnessProbability),
     totalRandomEventCount: Number.isFinite(state.totalRandomEventCount)
       ? Math.max(0, Math.floor(state.totalRandomEventCount))
       : 0,
@@ -83,8 +88,38 @@ export function calculateRandomEventCount(roll: number, protectionWindow?: Rando
   return 3;
 }
 
-export function createRandomEventPool(): number[] {
-  return [...BASE_RANDOM_EVENT_IDS];
+export function normalizeRoleTalentIllnessProbability(
+  state: Pick<RandomEventState, "selectedRoleId" | "roleTalents">,
+  value: number,
+): number {
+  const finiteValue = Number.isFinite(value) ? value : 0;
+  const allowsNegative = state.selectedRoleId === "chosen" && getRoleTalentLevel(state, "misfortune-to-fortune") > 0;
+  return Math.min(100, allowsNegative ? finiteValue : Math.max(0, finiteValue));
+}
+
+/** Tickets are a multiset: presenting an event spends one copy, never all copies. */
+export function consumeRandomEventTicket(tickets: readonly number[], eventId: number): number[] {
+  const index = tickets.indexOf(eventId);
+  return index < 0 ? [...tickets] : [...tickets.slice(0, index), ...tickets.slice(index + 1)];
+}
+
+export function createRandomEventPool(state?: Pick<RandomEventState, "selectedRoleId" | "roleTalents">): number[] {
+  const pool: number[] = [...BASE_RANDOM_EVENT_IDS];
+  if (state?.selectedRoleId === "genius") {
+    pool.push(...Array(getRoleTalentLevel(state, "thirst-for-knowledge")).fill(9));
+  }
+  if (state?.selectedRoleId === "chosen-reversed") {
+    pool.push(...Array(getRoleTalentLevel(state, "group-event-focus")).fill(7));
+    pool.push(...Array(getRoleTalentLevel(state, "game-event-focus")).fill(15));
+  }
+  const extraTickets = state?.selectedRoleId === "social"
+    ? [["supporting-juniors", 14], ["peer-camaraderie", 10], ["senior-mentorship", 11]] as const
+    : state?.selectedRoleId === "social-reversed"
+      ? [["junior-event-focus", 14], ["peer-event-focus", 10], ["senior-event-focus", 11]] as const
+      : state?.selectedRoleId === "teacher-child-reversed"
+        ? [["advisor-meeting-focus", 5], ["group-meeting-focus", 6]] as const : [];
+  if (state) for (const [id, eventId] of extraTickets) pool.push(...Array(getRoleTalentLevel(state, id)).fill(eventId));
+  return pool;
 }
 
 export function createInitialRandomEventState(): RandomEventState {
@@ -99,9 +134,10 @@ export function createInitialRandomEventState(): RandomEventState {
 /** Each academic year refills the whole pool; conditional events are checked when drawn. */
 export function yearlyResetRandomEventState(state: RandomEventState): RandomEventState {
   const nextState = cloneRandomEventState(state);
-  const pendingIds = new Set<number>((nextState.pendingRandomEvents ?? []).map((event) => event.eventId));
-  nextState.availableRandomEvents = createRandomEventPool()
-    .filter((eventId) => !pendingIds.has(eventId));
+  nextState.availableRandomEvents = createRandomEventPool(state);
+  for (const pending of nextState.pendingRandomEvents ?? []) {
+    nextState.availableRandomEvents = consumeRandomEventTicket(nextState.availableRandomEvents, pending.eventId);
+  }
   nextState.usedRandomEvents = [];
   return nextState;
 }
@@ -125,7 +161,7 @@ export function buildWeightedRandomEventPool(context: RandomEventPoolContext): R
 function consumeRandomEvent(state: RandomEventState, eventId: number): RandomEventState {
   return {
     ...cloneRandomEventState(state),
-    availableRandomEvents: state.availableRandomEvents.filter((currentEventId) => currentEventId !== eventId),
+    availableRandomEvents: consumeRandomEventTicket(state.availableRandomEvents, eventId),
     usedRandomEvents: [...state.usedRandomEvents],
   };
 }

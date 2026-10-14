@@ -1,6 +1,15 @@
-import type { Paper, PaperActionType, PaperCollaborationEffect, PaperEffectUpdate } from "./v2-types";
+import type { GameState, Paper, PaperActionType, PaperCollaborationEffect, PaperEffectUpdate } from "./v2-types";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 
 const SCORE_FIELDS = ["idea", "experiment", "writing"] as const;
+
+/** Only help received by the player is amplified; preserve fractional input until final scoring. */
+export function getRoleCollaborationScore(state: GameState, source: "advisor" | "fellow", amount: number): number {
+  const talentId = source === "advisor" ? "mentor-insight" : "collective-wisdom";
+  const expectedRole = source === "advisor" ? "teacher-child" : "social";
+  const level = state.selectedRoleId === expectedRole ? getRoleTalentLevel(state, talentId) : 0;
+  return Number.isFinite(amount) ? Math.max(0, Math.floor(amount * (1 + 0.5 * level))) : 0;
+}
 
 function normalizeScore(value: number | undefined): number {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value!)) : 0;

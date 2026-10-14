@@ -24,6 +24,9 @@ export function loadRoleRecords(account: AccountProfile, storage: RecordStorage 
       if (!value || typeof value !== "object") continue;
       const record = value as Record<string, unknown>;
       const playedRuns = count(record.playedRuns);
+      // Every recorded ending proves one historical start. Keep newer unfinished
+      // starts too, without adding already-counted endings again after reload.
+      const startedRuns = Math.max(count(record.startedRuns), playedRuns);
       const completedRuns = count(record.completedRuns);
       if (completedRuns > playedRuns) continue;
       const historyBest = { ...roleProgress[roleId].historyBest };
@@ -34,7 +37,7 @@ export function loadRoleRecords(account: AccountProfile, storage: RecordStorage 
             ? count(history[key]) : nonnegativeNumber(history[key]);
         }
       }
-      roleProgress[roleId] = { ...roleProgress[roleId], playedRuns, completedRuns, historyBest };
+      roleProgress[roleId] = { ...roleProgress[roleId], playedRuns, startedRuns, completedRuns, historyBest };
     }
     return { ...account, roleProgress };
   } catch {
@@ -47,12 +50,27 @@ export function saveRoleRecords(account: AccountProfile, storage: RecordStorage 
     storage?.setItem(STORAGE_KEY, JSON.stringify({
       version: 1,
       roles: Object.fromEntries(Object.entries(account.roleProgress).map(([roleId, progress]) => [
-        roleId, { playedRuns: progress.playedRuns, completedRuns: progress.completedRuns, historyBest: progress.historyBest },
+        roleId, { playedRuns: progress.playedRuns, startedRuns: progress.startedRuns, completedRuns: progress.completedRuns, historyBest: progress.historyBest },
       ])),
     }));
   } catch {
     return;
   }
+}
+
+export function recordRoleStart(account: AccountProfile, previousState: GameState, nextState: GameState): AccountProfile {
+  if (nextState.phase !== "playing" || (previousState.phase === "playing"
+    && previousState.conferenceLocationSeed === nextState.conferenceLocationSeed
+    && previousState.selectedRoleId === nextState.selectedRoleId)) return account;
+  const roleId = nextState.selectedRoleId;
+  const previous = account.roleProgress[roleId];
+  return {
+    ...account,
+    roleProgress: {
+      ...account.roleProgress,
+      [roleId]: { ...previous, startedRuns: previous.startedRuns + 1 },
+    },
+  };
 }
 
 export function recordRoleResult(account: AccountProfile, state: GameState): AccountProfile {

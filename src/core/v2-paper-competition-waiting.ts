@@ -1,11 +1,13 @@
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { createRandomEventById, isRandomEventEligible } from "./v2-random-event-router";
 import type { GameState } from "./v2-types";
+import { consumeRandomEventTicket } from "./v2-random-event-rules";
 
 export function rememberPendingRandomEvent(
   state: GameState,
   eventId: number,
   serial: number,
+  ticketAlreadyReserved = false,
 ): GameState {
   const pending = state.pendingRandomEvents ?? [];
   if (pending.some((event) => event.eventId === eventId)
@@ -13,8 +15,9 @@ export function rememberPendingRandomEvent(
   return {
     ...state,
     pendingRandomEvents: [...pending, { eventId, serial }],
-    availableRandomEvents: state.availableRandomEvents.filter((id) => id !== eventId),
-    usedRandomEvents: state.usedRandomEvents.filter((id) => id !== eventId),
+    availableRandomEvents: ticketAlreadyReserved
+      ? state.availableRandomEvents
+      : consumeRandomEventTicket(state.availableRandomEvents, eventId),
   };
 }
 
@@ -47,8 +50,7 @@ export function activatePendingRandomEvents(
       ...enqueued.nextState,
       pendingRandomEvents: (nextState.pendingRandomEvents ?? [])
         .filter((item) => item.eventId !== pending.eventId),
-      availableRandomEvents: nextState.availableRandomEvents.filter((id) => id !== pending.eventId),
-      usedRandomEvents: [...new Set([...nextState.usedRandomEvents, pending.eventId])],
+      usedRandomEvents: [...nextState.usedRandomEvents, pending.eventId],
     };
   }
   return nextState;

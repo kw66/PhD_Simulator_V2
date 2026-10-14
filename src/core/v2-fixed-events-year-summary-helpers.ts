@@ -1,10 +1,12 @@
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 import {
   appendMechanismSettlement,
   createFixedEvent,
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
-import { applyTierResist, formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
+import { formatTierResistedOutcome, getTierResistedNarrative } from "./v2-sanity-rules";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function getYearSummaryLabel(year: number): string {
@@ -48,13 +50,18 @@ export function createYearSummaryResultEvent(params: {
 export function resolveYearSummaryChoice(
   state: GameState,
   kind: "year-summary-sleep" | "year-summary-social" | "year-summary-favor" | "year-summary-part-time",
-  getRoll: RandomRollProvider,
+  _getRoll: RandomRollProvider,
 ): FixedResolutionResult {
   switch (kind) {
-    case "year-summary-sleep":
+    case "year-summary-sleep": {
+      const sloth = state.selectedRoleId === "normal-reversed";
+      const recovery = sloth && getRoleTalentLevel(state, "year-summary-recovery") > 0 ? "SAN回复至上限"
+        : `SAN +${5 + (sloth ? getRoleTalentLevel(state, "restful-idle") : 0)}`;
+      const bonus = sloth ? 2 * getRoleTalentLevel(state, "coffee-lifeline") : 0;
+      const summary = `${recovery}${bonus > 0 ? `；下次想idea、做实验、写论文各+${bonus}分` : ""}`;
       return {
         nextState: state,
-        outcome: "你划掉了日历上的“休养生息”。SAN +5。",
+        outcome: `你划掉了日历上的“休养生息”。${summary}。`,
         enqueueEvents: [createYearSummaryResultEvent({
           idSuffix: "sleep",
           year: state.year,
@@ -63,13 +70,14 @@ export function resolveYearSummaryChoice(
             "日历上有几天空着，没记任务，也没记进度。你却记得，那几个周末把手机扔到枕头够不着的地方，睡醒了慢悠悠去吃饭，😴回来还有精神绕校园走一圈。原来空白的日子，也不是白过的。",
           ].join("\n\n"),
           closing: "你划掉“休养生息”，肩膀也跟着松下来。😌能在这一堆截止日期里把自己照顾好，也算完成了一件正经事。",
-          outcome: "SAN +5。",
-          settlement: "结果：SAN +5",
-          effects: { san: 5 },
+          outcome: `${summary}。`,
+          settlement: `结果：${summary}`,
+          effects: { san: 5, roleTalentRest: "year-summary" },
         })],
       };
+    }
     case "year-summary-social": {
-      const socialResult = applyTierResist(1, state.player.social, getRoll);
+      const socialResult = previewPlayerAttributeChange(state, "social", 1);
       const socialGain = socialResult.effectiveChange;
       const socialNarrative = getTierResistedNarrative("社交", 1, socialResult);
       return {
@@ -86,12 +94,12 @@ export function resolveYearSummaryChoice(
           closing: "你划掉“广交朋友”，顺手给朋友发了条消息。对方很快回了个表情包，😄和第一次拘谨地交换姓名时判若两人。",
           outcome: formatTierResistedOutcome("社交", 1, socialResult),
           settlement: `结果：${formatTierResistedOutcome("社交", 1, socialResult)}`,
-          effects: socialGain > 0 ? { social: socialGain } : {},
+          effects: { social: socialGain, rawSocial: 1 },
         })],
       };
     }
     case "year-summary-favor": {
-      const favorResult = applyTierResist(1, state.player.favor, getRoll);
+      const favorResult = previewPlayerAttributeChange(state, "favor", 1);
       const favorGain = favorResult.effectiveChange;
       const favorNarrative = getTierResistedNarrative("导师好感", 1, favorResult);
       return {
@@ -108,7 +116,7 @@ export function resolveYearSummaryChoice(
           closing: "你在“取得导师信任”上划了一道。比起年初见面只会点头，如今老师交代事情时，🤝已经少了几句不放心的叮嘱。",
           outcome: formatTierResistedOutcome("导师好感", 1, favorResult),
           settlement: `结果：${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
-          effects: favorGain > 0 ? { favor: favorGain } : {},
+          effects: { favor: favorGain, rawFavor: 1 },
         })],
       };
     }

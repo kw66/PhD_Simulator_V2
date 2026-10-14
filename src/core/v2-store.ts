@@ -10,7 +10,9 @@ import { createInitialState, dispatchAction } from "./v2-engine";
 import { pushNoOpLog } from "./v2-engine-helpers";
 import { achievementRecordsChanged, loadRoleAchievementRecords, recordNewAchievementDates, saveRoleAchievementRecords } from "./v2-achievement-records";
 import { awardRoleExperience, getNextRoleLevelExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
-import { loadRoleRecords, recordRoleResult, saveRoleRecords } from "./v2-role-records";
+import { loadRoleRecords, recordRoleResult, recordRoleStart, saveRoleRecords } from "./v2-role-records";
+import { getTalentUpgradeReason, isRoleTalentImplemented, sanitizeRoleTalentAllocation } from "./v2-role-talent-definitions";
+import { loadRoleTalentAllocation, saveRoleTalentAllocation } from "./v2-role-talent-storage";
 import type { AccountProfile, DispatchPayload, GameActionId, GameState, RoleId } from "./v2-types";
 
 type Listener = (state: GameState) => void;
@@ -75,12 +77,17 @@ function syncSetupSelection(state: GameState, selectedLobbyRoleId: DispatchPaylo
 
 export function createStore(options: { storage?: ExperienceStorage | null } = {}) {
   const storage = options.storage === undefined ? getBrowserStorage() : options.storage;
-  let accountProfile = loadRoleAchievementRecords(loadRoleRecords(loadRoleExperience(createDefaultAccountProfile(), storage), storage), storage);
+  let accountProfile = loadRoleTalentAllocation(loadRoleAchievementRecords(loadRoleRecords(loadRoleExperience(createDefaultAccountProfile(), storage), storage), storage), storage);
   let state = syncSetupSelection(createInitialState(), accountProfile.selectedLobbyRoleId);
   let runUsedDebugPanel = false;
   const listeners = new Set<Listener>();
 
   function commit(nextState: GameState, nextAccountProfile = accountProfile): void {
+    const startedAccountProfile = recordRoleStart(nextAccountProfile, state, nextState);
+    if (startedAccountProfile !== nextAccountProfile) {
+      nextAccountProfile = startedAccountProfile;
+      saveRoleRecords(nextAccountProfile, storage);
+    }
     if (state.phase === "playing" && nextState.phase === "finished") {
       const roleId = nextState.selectedRoleId;
       const previousProgress = nextAccountProfile.roleProgress[roleId];
@@ -127,6 +134,28 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
     },
     getLobbyState() {
       return accountProfile;
+    },
+    upgradeRoleTalent(roleId: RoleId, talentId: string): boolean {
+      if (state.phase !== "setup" || !isRoleOwned(accountProfile, roleId)) return false;
+      const level = accountProfile.roleProgress[roleId].level;
+      const allocation = sanitizeRoleTalentAllocation(roleId, level, accountProfile.talentAllocation?.[roleId]);
+      if (getTalentUpgradeReason(roleId, level, allocation, talentId) !== null) return false;
+      const nextAccountProfile = {
+        ...accountProfile,
+        talentAllocation: { ...accountProfile.talentAllocation, [roleId]: { ...allocation, [talentId]: (allocation[talentId] ?? 0) + 1 } },
+      };
+      saveRoleTalentAllocation(nextAccountProfile, storage);
+      commit(state, nextAccountProfile);
+      return true;
+    },
+    resetRoleTalents(roleId: RoleId): boolean {
+      if (state.phase !== "setup" || !isRoleTalentImplemented(roleId)) return false;
+      const talentAllocation = { ...accountProfile.talentAllocation };
+      delete talentAllocation[roleId];
+      const nextAccountProfile = { ...accountProfile, talentAllocation };
+      saveRoleTalentAllocation(nextAccountProfile, storage);
+      commit(state, nextAccountProfile);
+      return true;
     },
     markCurrentRunAsDebugged(): void {
       if (state.phase === "playing") runUsedDebugPanel = true;
@@ -181,6 +210,7 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
           debugEventReplayEnabled: state.debugEventReplayEnabled,
         }, "start-game", {
           roleId: state.selectedRoleId,
+          talentAllocation: sanitizeRoleTalentAllocation(state.selectedRoleId, accountProfile.roleProgress[state.selectedRoleId].level, accountProfile.talentAllocation?.[state.selectedRoleId]),
         });
         runUsedDebugPanel = false;
         commit(nextState);
@@ -197,6 +227,7 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
         const nextState = dispatchAction(state, actionId, {
           ...payload,
           roleId: nextRoleId,
+          talentAllocation: sanitizeRoleTalentAllocation(nextRoleId, accountProfile.roleProgress[nextRoleId].level, accountProfile.talentAllocation?.[nextRoleId]),
         });
         if (state.phase === "setup" && nextState.phase === "playing") runUsedDebugPanel = false;
         commit(nextState);

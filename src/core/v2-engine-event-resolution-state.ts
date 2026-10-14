@@ -1,3 +1,4 @@
+import { getEffectiveSocial } from "./v2-effective-attributes";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import { scheduleConferenceAttendance } from "./v2-conference-attendance";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
@@ -9,7 +10,10 @@ import { createGrantedPublishedPaper } from "./v2-publication-rules";
 import { applyPaperReviewSettlement } from "./v2-publication-system";
 import { applyPaperCompetitionResolution } from "./v2-paper-competition";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
-import { clampResearchToCap } from "./v2-research-cap-system";
+import { applyEventPlayerEffects } from "./v2-event-player-effects";
+import { getActiveOperationAllowance } from "./v2-ai-shop";
+import { normalizeRoleTalentIllnessProbability } from "./v2-random-event-rules";
+import { applyRoleTalentPhdTransfer, applyRoleTalentAdvisorAssignment } from "./v2-role-talent-lifecycle";
 import { roundMoney } from "./v2-money";
 import { createInitialThesisState } from "./v2-thesis-rules";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
@@ -21,7 +25,8 @@ import { buildJointTrainingContext, createJointTrainingAct1 } from "./v2-joint-t
 import { buildLoverDevelopmentContext, createLoverDevelopmentAct1 } from "./v2-lover-events";
 import { createLoverProgressState } from "./v2-lover-progression";
 import { createLoverState, getLoverName } from "./v2-lover-system";
-import { getShopRestSanGain } from "./v2-shop-items-effects";
+import { applyRoleTalentRest } from "./v2-role-talent-rest";
+import { applyJuniorDelegationTalent, settleFellowRecruitmentTalent } from "./v2-role-talent-relationships";
 import { advanceSharedLabProject } from "./v2-lab-projects";
 import { settleAdvisorGrantResult } from "./v2-advisor-progress";
 import { addPaperCollaboration, applyPaperEffectUpdates, setPaperTotalScores } from "./v2-paper-collaboration";
@@ -32,6 +37,7 @@ export interface ResolvedEventChoiceState {
   resolvedOutcome: string;
   resolvedEnqueueEvents: PendingEvent[];
   resolvedPresentation?: Pick<PendingEvent, "title" | "description" | "completionLog">;
+  resolvedFixedRolls?: number[];
 }
 
 function createTriggeredFollowUpEvents(state: GameState, choice: EventChoice): PendingEvent[] {
@@ -167,17 +173,13 @@ function createBuffsFromEventEffects(choice: EventChoice, state: GameState, sour
 
 function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSource: string, currentEvent?: PendingEvent): GameState {
   const effects = choice.effects;
-  const sanCap = Math.max(0, state.sanCap + (effects.sanCapDelta ?? 0));
+  const canRest = effects.restAction && getActiveOperationAllowance(state, "rest").allowed;
+  state = applyEventPlayerEffects(state, effects);
+  if (canRest || effects.roleTalentRest) state = applyRoleTalentRest(state, { yearSummary: effects.roleTalentRest === "year-summary" });
+  const sanCap = state.sanCap;
   const transferToPhd = effects.transferToPhd === true && state.degree === "master";
   const degree = transferToPhd ? "phd" : state.degree;
-  const player = {
-    san: Math.min(sanCap, state.player.san + (effects.san ?? 0)),
-    research: clampResearchToCap(state.player.research + (effects.research ?? 0), state.researchCapacityState),
-    social: Math.min(20, state.player.social + (effects.social ?? 0)),
-    favor: Math.min(20, state.player.favor + (effects.favor ?? 0)),
-    money: roundMoney(state.player.money + roundMoney(effects.money ?? 0)),
-  };
-  if (effects.restoreSanToCap) player.san = sanCap;
+  const player = { ...state.player };
 
   const eventSupport = { ...state.eventSupport, ...(effects.eventSupportUpdates ?? {}) };
   const shopState = {
@@ -196,23 +198,13 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     reimbursements[effects.labReimbursement] = 1;
     shopState.labReimbursements = reimbursements;
   }
-  let actionState = state.actionState;
-  if (effects.restAction && state.actionState.used < state.actionState.limit) {
-    const restSanGain = getShopRestSanGain(state.shopState);
-    const restedSan = Math.min(sanCap, player.san + restSanGain);
-    const appliedRestGain = restedSan - player.san;
-    player.san = restedSan;
-    actionState = { ...state.actionState, used: state.actionState.used + 1 };
-    if (state.shopState.chairUpgrade === "hammock" && appliedRestGain > 0) {
-      shopState.chairSanRecovered = Math.max(0, shopState.chairSanRecovered ?? 0) + appliedRestGain;
-    }
-  }
-  const illnessProbability = Math.max(0, Math.min(100, applyMultipliersThenAdditions(
+  const actionState = state.actionState;
+  const illnessProbability = normalizeRoleTalentIllnessProbability(state, applyMultipliersThenAdditions(
     state.illnessProbability,
     effects.illnessProbabilityMultiplier === undefined ? [] : [effects.illnessProbabilityMultiplier],
     effects.illnessProbabilityDelta === undefined ? [] : [effects.illnessProbabilityDelta],
     "floor",
-  )));
+  ));
   const eventCounters = { ...state.eventCounters };
   for (const [key, value] of Object.entries(effects.counterDeltas ?? {})) {
     const typedKey = key as keyof typeof eventCounters;
@@ -230,11 +222,12 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       }
     : { ...state.scholarshipState, claimedPaperIds: [...state.scholarshipState.claimedPaperIds] };
 
-  let relationshipState = syncRelationshipState(state.relationshipState, player.social);
+  let relationshipState = syncRelationshipState(state.relationshipState, getEffectiveSocial({ ...state, player }));
   for (const relationshipKind of effects.relationshipAdditions ?? []) {
     relationshipState = tryAddRelationship(relationshipState, relationshipKind).nextState;
   }
   let fellowProgressState = state.fellowProgressState;
+  let failedFellowAdditions = 0;
   const usedFellowNames = fellowProgressState.map((profile) => getFellowName(profile));
   for (const [additionIndex, addition] of (effects.fellowAdditions ?? []).entries()) {
     const relationshipResult = tryAddRelationship(relationshipState, addition.type);
@@ -265,7 +258,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
         }),
       ];
       usedFellowNames.push(fellowProgressState.at(-1)!.name ?? "");
-    }
+    } else failedFellowAdditions += 1;
   }
   if (effects.mentorshipStacks) {
     relationshipState = {
@@ -274,10 +267,6 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     };
   }
   const researchCapacityState = { ...state.researchCapacityState };
-  for (const [key, value] of Object.entries(effects.researchCapacityStateDeltas ?? {})) {
-    const typedKey = key as keyof typeof researchCapacityState;
-    researchCapacityState[typedKey] += value ?? 0;
-  }
   const advisorProgressState = { ...state.advisorProgressState };
   if (effects.recordConferenceRegistrationPayment) {
     advisorProgressState.paidConferenceRegistrationPaperIds = [...new Set([
@@ -448,7 +437,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     careerLastRecruitmentTotalMonths: transferToPhd ? null
       : effects.careerRecruitment?.totalMonths ?? state.careerLastRecruitmentTotalMonths,
     careerOffers: transferToPhd ? {} : effects.careerRecruitment?.offer
-      ? { ...state.careerOffers, [effects.careerRecruitment.offer.type]: effects.careerRecruitment.offer }
+      ? { [effects.careerRecruitment.offer.type]: effects.careerRecruitment.offer }
       : state.careerOffers,
     papers,
     externalPublications,
@@ -471,13 +460,15 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   }, effects.labFinanceCategory ?? "other", advisorProgressState.funding - state.advisorProgressState.funding);
   let resolvedState = effects.scheduleConferenceAttendance
     ? scheduleConferenceAttendance(directlyResolvedState, effects.scheduleConferenceAttendance) : directlyResolvedState;
+  resolvedState = settleFellowRecruitmentTalent(state, resolvedState, Math.max(failedFellowAdditions, effects.fellowOverflowAttempts ?? 0));
+  resolvedState = applyJuniorDelegationTalent(resolvedState, effects.juniorDelegationRoll);
   if (lostLover) {
     resolvedState = pushMilestoneLog(resolvedState, `${getLoverName(state.loverState)}与你结束了恋爱关系。`, "lover-separated");
   }
   if (!state.internshipState.active && directlyResolvedState.internshipState.active
     && directlyResolvedState.internshipState.kind === "remote3") {
     resolvedState = pushMilestoneLog(
-      directlyResolvedState,
+      resolvedState,
       "远程实习安排已确认：下月开始，持续3个月",
       "remote-internship-arranged",
     );
@@ -537,6 +528,7 @@ export function applyChoiceEffectsToState(
   let resolvedOutcome = choice.outcome;
   let resolvedEnqueueEvents: PendingEvent[] = [];
   let resolvedPresentation: ResolvedEventChoiceState["resolvedPresentation"];
+  let resolvedFixedRolls: number[] | undefined;
 
   if (choice.effects.internshipStateUpdates && !choice.effects.triggerInternshipInvite
     && nextState.internshipState === state.internshipState) {
@@ -566,19 +558,24 @@ export function applyChoiceEffectsToState(
 
   if (choice.effects.fixedEventResolution) {
     const rolls: number[] = [];
+    let rollIndex = 0;
     const result = applyFixedEventResolution(nextState, choice.effects.fixedEventResolution, () => {
-      const roll = Math.random();
+      const roll = choice.effects.fixedEventResolutionRolls
+        ? choice.effects.fixedEventResolutionRolls[rollIndex++] ?? 0
+        : Math.random();
       rolls.push(roll);
       return roll;
     });
     nextState = {
       ...result.nextState,
-      relationshipState: syncRelationshipState(result.nextState.relationshipState, result.nextState.player.social),
+      relationshipState: syncRelationshipState(result.nextState.relationshipState, getEffectiveSocial(result.nextState)),
     };
     resolvedOutcome = result.outcome;
+    resolvedFixedRolls = rolls;
     resolvedEnqueueEvents = result.enqueueEvents ?? [];
     if (resolvedEnqueueEvents.some((event) => event.chainId !== "before-grad-school" && event.chainId !== "scholarship" && (event.stage === "result" || event.stage === "act3"))) {
-      while (rolls.length < 8) rolls.push(Math.random());
+      while (rolls.length < 8) rolls.push(choice.effects.fixedEventResolutionRolls
+        ? choice.effects.fixedEventResolutionRolls[rolls.length] ?? 0 : Math.random());
       resolvedEnqueueEvents = resolvedEnqueueEvents.map((event) => event.stage === "result" || event.stage === "act3" ? {
         ...event,
         fixedResultPreview: { resolution: choice.effects.fixedEventResolution!, rolls },
@@ -591,5 +588,7 @@ export function applyChoiceEffectsToState(
     ...createTriggeredFollowUpEvents(nextState, choice),
   ];
 
-  return { nextState, resolvedOutcome, resolvedEnqueueEvents, resolvedPresentation };
+  nextState = applyRoleTalentAdvisorAssignment(applyRoleTalentPhdTransfer(state, nextState));
+
+  return { nextState, resolvedOutcome, resolvedEnqueueEvents, resolvedPresentation, resolvedFixedRolls };
 }

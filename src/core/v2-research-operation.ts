@@ -1,5 +1,6 @@
 import { consumeNextActionBuffs, getActionEffect, getActiveOperationSanCostForState } from "./v2-buffs";
-import { getActiveOperationAllowance } from "./v2-ai-shop";
+import { consumeActiveOperation, getActiveOperationAllowance } from "./v2-ai-shop";
+import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { getQueuedPaperTargetIds } from "./v2-event-queue";
@@ -10,8 +11,9 @@ import { combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { getInternshipExperimentEffect } from "./v2-internship-system";
 import { getLabExperimentMoneyCost } from "./v2-lab-compute";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
-import { roundMoney } from "./v2-money";
+import { recordPersonalSpending, roundMoney } from "./v2-money";
 import type { GameState, PaperActionType } from "./v2-types";
+import { getEffectiveResearch } from "./v2-effective-attributes";
 
 export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
   idea: 2,
@@ -92,20 +94,6 @@ export function previewResearchOperation(
     scoreMultiplier: effect.multiplier,
     extraActions: effect.extraActions + equipmentEffect.extraActions,
     sanCost,
-  };
-}
-
-export function applyResearchOperationActionState(
-  state: GameState,
-  actionType: PaperActionType,
-): Pick<GameState, "actionState"> {
-  const allowance = getActiveOperationAllowance(state, actionType);
-  return {
-    actionState: {
-      ...state.actionState,
-      used: state.actionState.used + (allowance.consumesAction ? 1 : 0),
-      aiResearchBonusUsed: state.actionState.aiResearchBonusUsed || allowance.usesAiResearchBonus,
-    },
   };
 }
 
@@ -190,9 +178,6 @@ export function applyResearchOperation(
 
   const preview = previewResearchOperation(state, actionType, RESEARCH_OPERATION_SAN_COST[actionType]);
   if (!preview.allowed) return pushNoOpLog(state, `${RESEARCH_OPERATION_LABEL[actionType]}：本月行动次数已用尽`);
-  if (state.player.san < preview.sanCost) {
-    return pushNoOpLog(state, `${RESEARCH_OPERATION_LABEL[actionType]}：SAN 不足，需要 ${preview.sanCost}`);
-  }
 
   const experimentCost = actionType === "experiment"
     ? getResearchExperimentCostBreakdown(state)
@@ -202,6 +187,9 @@ export function applyResearchOperation(
   if (state.player.money < playerMoneyCost) {
     return pushNoOpLog(state, `${RESEARCH_OPERATION_LABEL[actionType]}：金币不足，需要 ${playerMoneyCost}`);
   }
+  const preparedState = consumeActiveOperation({ ...state, player: { ...state.player, money: roundMoney(state.player.money - playerMoneyCost) } }, actionType);
+  const payment = quoteSanPayment(preparedState, preview.sanCost);
+  if (!payment.allowed) return pushNoOpLog(state, `${RESEARCH_OPERATION_LABEL[actionType]}：SAN 不足，需要 ${preview.sanCost}`);
 
   const paper = state.papers[eligibility.paperIndex]!;
   const equipmentEffect = getShopPaperActionModifier(state.shopState, actionType);
@@ -211,7 +199,7 @@ export function applyResearchOperation(
   for (let index = 0; index < executionCount; index += 1) {
     const buffEffect = getResearchActionEffect(state, actionType, index === 0);
     score = generateResearchScore(
-      state.player.research,
+      getEffectiveResearch(state, state),
       score,
       buffEffect.multiplier,
       buffEffect.bonus + equipmentEffect.bonus,
@@ -219,21 +207,18 @@ export function applyResearchOperation(
     );
   }
 
-  const actionState = applyResearchOperationActionState(state, actionType);
   const updatedPaper = setPaperOwnScore(paper, actionType, score);
-  const nextState = consumeNextActionBuffs({
-    ...state,
-    ...actionState,
+  const nextState = consumeNextActionBuffs(recordPersonalSpending({
+    ...paySanCost(preparedState, preview.sanCost),
     papers: state.papers.map((entry, index) => index === eligibility.paperIndex ? updatedPaper : entry),
     selectedPaperId: paper.id,
-    player: { ...state.player, san: state.player.san - preview.sanCost, money: roundMoney(state.player.money - playerMoneyCost) },
     advisorProgressState: actionType === "experiment"
       ? { ...state.advisorProgressState, funding: roundMoney(state.advisorProgressState.funding - advisorFundingUsed) }
       : state.advisorProgressState,
-  }, actionType);
+  }, playerMoneyCost), actionType);
   const operationCountText = executionCount > 1 ? `，共 ${executionCount} 次` : "";
   return pushLog(
     recordLabFinance(nextState, "player-experiment", -advisorFundingUsed),
-    `${RESEARCH_OPERATION_LABEL[actionType]}：${paper.title}，${actionType} ${paper[actionType]} → ${updatedPaper[actionType]}${operationCountText}；SAN -${preview.sanCost}${playerMoneyCost > 0 ? `；金币 -${playerMoneyCost}` : ""}`,
+    `${RESEARCH_OPERATION_LABEL[actionType]}：${paper.title}，${actionType} ${paper[actionType]} → ${updatedPaper[actionType]}${operationCountText}；${formatSanPayment(payment)}${playerMoneyCost > 0 ? `；金币 -${playerMoneyCost}` : ""}`,
   );
 }

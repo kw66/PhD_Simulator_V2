@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { createCampusRandomEventById } from "./v2-random-events-campus";
 import { createCoreProgressRandomEventById } from "./v2-random-events-core-progress";
 import { createAdvisorLabRandomEventById } from "./v2-random-events-lab-advisor";
@@ -112,9 +113,9 @@ export function isRandomEventEligible(state: GameState, eventId: number): boolea
     case 8:
       return state.advisorProgressState.funding >= LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD;
     case 10:
-      return state.player.social >= 6 && getRecruitmentAcademicYears("peer", state).length > 0;
+      return getEffectiveSocial(state) >= 6 && getRecruitmentAcademicYears("peer", state).length > 0;
     case 11:
-      return state.player.research >= 6 && getRecruitmentAcademicYears("senior", state).length > 0;
+      return getEffectiveResearch(state) >= 6 && getRecruitmentAcademicYears("senior", state).length > 0;
     case 12:
       return state.papers.some((paper) => paper.status === "draft" && paper.idea + paper.experiment + paper.writing > 0);
     case 14:

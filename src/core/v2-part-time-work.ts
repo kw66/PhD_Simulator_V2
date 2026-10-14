@@ -1,6 +1,8 @@
 import { getActiveOperationSanCostForState } from "./v2-buffs";
 import { pushLog } from "./v2-engine-helpers";
 import type { GameState } from "./v2-types";
+import { consumeActiveOperation, getActiveOperationAllowance } from "./v2-ai-shop";
+import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
 
 const WORKS_PER_TIER = 8;
 const BASE_SAN_COST = 5;
@@ -21,9 +23,9 @@ export function previewPartTimeWork(state: GameState): PartTimeWorkPreview {
   const tier = Math.floor((nextCount - 1) / WORKS_PER_TIER);
   const sanCost = getActiveOperationSanCostForState(state, BASE_SAN_COST + tier, "work");
   const moneyReward = BASE_MONEY_REWARD + tier;
-  const blockedReason = state.actionState.used >= state.actionState.limit
+  const blockedReason = !getActiveOperationAllowance(state, "work").allowed
     ? "action-limit"
-    : state.player.san < sanCost
+    : !quoteSanPayment(consumeActiveOperation(state, "work"), sanCost).allowed
       ? "insufficient-san"
       : "none";
 
@@ -43,14 +45,15 @@ export function applyPartTimeWork(state: GameState): GameState {
   const preview = previewPartTimeWork(state);
   if (!preview.allowed) return state;
 
+  const prepared = consumeActiveOperation(state, "work");
+  const payment = quoteSanPayment(prepared, preview.sanCost);
+  const paid = paySanCost(prepared, preview.sanCost);
   return pushLog({
-    ...state,
+    ...paid,
     partTimeWorkCount: preview.nextCount,
-    actionState: { ...state.actionState, used: state.actionState.used + 1 },
     player: {
-      ...state.player,
-      san: state.player.san - preview.sanCost,
-      money: state.player.money + preview.moneyReward,
+      ...paid.player,
+      money: paid.player.money + preview.moneyReward,
     },
-  }, `打工：第 ${preview.nextCount} 次兼职，SAN -${preview.sanCost}｜金币 +${preview.moneyReward}`);
+  }, `打工：第 ${preview.nextCount} 次兼职，${formatSanPayment(payment)}｜金币 +${preview.moneyReward}`);
 }

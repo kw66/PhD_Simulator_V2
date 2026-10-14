@@ -1,5 +1,5 @@
 import type { AccountProfile, CoffeeMachineUpgradeId, RoleExperienceAward, ShopUpgradeId } from "../core/v2-types";
-import type { TalentAllocation } from "./v2-render-setup-screen";
+import type { TalentAllocation } from "../core/v2-role-talent-definitions";
 import type { ShopTabId } from "./v2-render-shop-panel";
 
 export type PlayTabId = "events" | "workstation" | "relationship" | "shop" | "research" | "talent" | "settings";
@@ -16,6 +16,7 @@ export interface PlayRenderUiState {
   talentAllocation?: TalentAllocation;
   roleLevel?: number;
   isFeedbackOpen?: boolean;
+  isQuitConfirmationOpen?: boolean;
   dateDisplayMode?: AccountProfile["dateDisplayMode"];
   roleExperienceAward?: RoleExperienceAward;
   activePlayTab?: PlayTabId;

@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import type { ConferenceActivityBuildState, ConferenceActivityContext } from "./v2-conference-activity-shared";
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
 import { getConferenceTripId } from "./v2-conference-identity";
@@ -61,7 +62,8 @@ function getConferenceSettlementItems(decision: ReturnType<typeof resolveConfere
   const items = [
     ...(decision.resource === "favor" ? [formatTierResistedOutcome("导师好感", -rawFavorCost, {
       effectiveChange: -decision.actualCost,
-      resistedCount: Number((rawFavorCost - decision.actualCost).toFixed(10)),
+      resistedCount: Number((rawFavorCost - decision.actualCost - (decision.replacementMoneyCost ?? 0) / 2).toFixed(10)),
+      moneyCost: decision.replacementMoneyCost,
     })]
       : decision.actualCost > 0 ? [`金币 -${decision.actualCost}`] : []),
     ...(decision.fundingCost > 0 ? [`科研经费 -${decision.fundingCost}`] : []),
@@ -112,7 +114,7 @@ function createConferenceDecisionAct3(
           effects: {
             recordPlayerConferenceTrip: getConferenceTripId(context),
             ...(decision.resource === "money" && decision.actualCost > 0 ? { money: -decision.actualCost } : {}),
-            ...(decision.resource === "favor" && decision.actualCost > 0 ? { favor: -decision.actualCost } : {}),
+            ...(decision.resource === "favor" ? { favor: -decision.actualCost, rawFavor: -getConferenceBaseCosts(context.region).advisorCost } : {}),
             ...(decision.fundingCost > 0 ? { advisorProgressStateDeltas: { funding: -decision.fundingCost } } : {}),
             labFinanceCategory: "conference-travel",
             scheduleConferenceAttendance: { context, mode: decision.mode, rolls },
@@ -139,6 +141,7 @@ function createConferenceDecisionAct2(
     region: context.region,
     travelAlreadyPaid,
     favor: state.favor,
+    playerAttributeState: state.playerAttributeState,
     social: state.social,
     shopState: state.shopState,
     eventSupport: state.eventSupport,
@@ -223,9 +226,10 @@ export function refreshConferenceDecision<Event extends PendingEvent>(state: Gam
   let rollIndex = 0;
   let rebuilt = createConferenceDecisionAct1(preview.context, {
     ...state,
-    research: state.player.research,
-    social: state.player.social,
+    research: getEffectiveResearch(state),
+    social: getEffectiveSocial(state),
     favor: state.player.favor,
+    playerAttributeState: state,
     money: state.player.money,
     advisorFunding: state.advisorProgressState.funding,
   }, () => preview.rolls[rollIndex++] ?? preview.rolls.at(-1)!);

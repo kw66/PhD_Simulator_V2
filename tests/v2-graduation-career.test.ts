@@ -104,9 +104,6 @@ describe("monthly recruitment", () => {
         expect(collectFixedEventsForState(state, () => 0).filter((event) => event.source === "career"), `${degree} month ${month}`).toHaveLength(1);
         const offered = { ...state, careerOffers: {
           internet: { type: "internet" as const, jobId: "offer-internet", name: "已有大厂 offer", threshold: 45, score: 80 },
-          stateOwned: { type: "stateOwned" as const, jobId: "offer-state", name: "已有央国企 offer", threshold: 30, score: 80 },
-          civilService: { type: "civilService" as const, jobId: "offer-civil", name: "已有公务员 offer", threshold: 25, score: 80 },
-          academic: { type: "academic" as const, jobId: "offer-academic", name: "已有教职 offer", threshold: 30, score: 80 },
         } };
         expect(createCareerRecruitmentEvent(offered, () => 0).choices.map((choice) => choice.id)).toEqual(expected);
         expect(shouldScheduleCareerRecruitment(offered)).toBe(true);
@@ -137,7 +134,7 @@ describe("monthly recruitment", () => {
     expect(shouldScheduleCareerRecruitment(current)).toBe(false);
   });
 
-  it("records failed interviews and lets players keep or replace one offer per track", () => {
+  it("records failed interviews and lets players keep or replace the only offer", () => {
     const initial = readyState();
     let failed = startRecruitment(initial, () => 0.99);
     failed = advanceScene(failed, "choose-internet");
@@ -156,6 +153,16 @@ describe("monthly recruitment", () => {
       current = advanceScene(current, decision);
       expect(current.careerOffers.internet?.jobId === "old").toBe(decision === "keep-offer");
       expect(Object.keys(current.careerOffers)).toEqual(["internet"]);
+    }
+
+    for (const decision of ["keep-offer", "replace-offer"]) {
+      let current = startRecruitment({ ...readyState("phd", 4), careerOffers: { internet: old } }, () => 0);
+      current = advanceScene(current, "choose-stateOwned");
+      current = advanceScene(current, current.eventQueue.find((event) => event.source === "career")!.choices[0]!.id);
+      expect(current.eventQueue.find((event) => event.source === "career")!.choices.map((choice) => choice.id)).toEqual(["replace-offer", "keep-offer"]);
+      current = advanceScene(current, decision);
+      expect(Object.keys(current.careerOffers)).toEqual([decision === "keep-offer" ? "internet" : "stateOwned"]);
+      expect(Object.values(current.careerOffers)).toHaveLength(1);
     }
   });
 

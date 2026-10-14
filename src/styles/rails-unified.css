@@ -206,3 +206,19 @@
     background: #f8f5ec;
   }
 }
+.new-investment-button {
+  margin-left: 6px;
+  padding: 2px 6px;
+  border: 1px solid rgba(151, 113, 47, 0.42);
+  border-radius: 4px;
+  background: #f3dfa7;
+  color: #665128;
+  font: inherit;
+  font-size: 0.8em;
+  cursor: pointer;
+}
+
+.new-investment-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

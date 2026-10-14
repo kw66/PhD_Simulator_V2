@@ -1,26 +1,26 @@
+import { getEffectiveResearch } from "./v2-effective-attributes";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import {
-  applyTierResist,
   formatTierResistedOutcome,
 } from "./v2-sanity-rules";
-import { getResearchCap } from "./v2-research-cap-system";
 import { activateRemoteInternship, hasOngoingInternship, hasRemoteInternshipScore } from "./v2-internship-system";
 import { createThreeStageEvent, type RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 
-export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
+export function createAdvisorTalkRandomEvent(state: GameState, _getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
-  const isHighResearch = state.player.research >= 6;
+  const isHighResearch = getEffectiveResearch(state) >= 6;
   const isHighFavor = state.player.favor >= 6;
   const hasInternshipScore = hasRemoteInternshipScore(state);
   const internshipUnavailable = hasOngoingInternship(state);
   const ideaBonus = 5;
-  const reportFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const reportFavorResult = previewPlayerAttributeChange(state, "favor", -1);
   const reportFavorChange = reportFavorResult.effectiveChange;
-  const askFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const askFavorResult = previewPlayerAttributeChange(state, "favor", -1);
   const askFavorChange = askFavorResult.effectiveChange;
-  const askResearchResult = applyTierResist(1, state.player.research, getRoll, getResearchCap(state.researchCapacityState));
+  const askResearchResult = previewPlayerAttributeChange(state, "research", 1);
   const askResearchChange = askResearchResult.effectiveChange;
-  const internFavorResult = applyTierResist(-1, state.player.favor, getRoll);
+  const internFavorResult = previewPlayerAttributeChange(state, "favor", -1);
   const internFavorChange = internFavorResult.effectiveChange;
 
   const event: PendingEvent = {
@@ -45,7 +45,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
               idea: { bonus: ideaBonus },
             },
           }
-          : reportFavorChange < 0 ? { favor: reportFavorChange } : {},
+          : { favor: reportFavorChange, rawFavor: -1 },
       },
       {
         id: `random-5-ask-${serial}`,
@@ -54,8 +54,8 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
           ? `导师好感 ≥ 6｜${formatTierResistedOutcome("科研", 1, askResearchResult)}`
           : `导师好感 < 6｜${formatTierResistedOutcome("导师好感", -1, askFavorResult)}`,
         effects: isHighFavor
-          ? askResearchChange > 0 ? { research: askResearchChange } : {}
-          : askFavorChange < 0 ? { favor: askFavorChange } : {},
+          ? { research: askResearchChange, rawResearch: 1 }
+          : { favor: askFavorChange, rawFavor: -1 },
       },
       {
         id: `random-5-intern-${serial}`,
@@ -68,7 +68,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
           : `科研分 < 2｜${formatTierResistedOutcome("导师好感", -1, internFavorResult)}`,
         effects: hasInternshipScore || internshipUnavailable
           ? {}
-          : internFavorChange < 0 ? { favor: internFavorChange } : {},
+          : { favor: internFavorChange, rawFavor: -1 },
       },
     ],
   };
@@ -133,7 +133,7 @@ export function createAdvisorTalkRandomEvent(state: GameState, getRoll: RandomRo
             ].join("\n\n"),
       },
     },
-  });
+  }, state);
   const internshipResult = stagedEvent.choices[0]?.effects.enqueueEvents?.[0]?.choices
     .find((choice) => choice.id === `random-5-intern-${serial}`)?.effects.enqueueEvents?.at(-1);
   if (hasInternshipScore && !internshipUnavailable && internshipResult?.choices[0]) {

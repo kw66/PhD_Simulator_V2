@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import {
   formatResearchMiscSanChange,
   getActualResearchMiscSanChange,
@@ -5,6 +6,7 @@ import {
   getActualSanChange,
 } from "./v2-sanity-rules";
 import { canAddRelationship } from "./v2-relationship-rules";
+import { getFellowOverflowEffects, getFellowOverflowOutcome } from "./v2-role-talent-relationships";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowPronoun, getFellowRoleLabel } from "./v2-fellow-progression";
 import {
   createThreeStageEvent,
@@ -18,11 +20,11 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider, recr
   const peerGender = getRoll() < 0.5 ? "male" : "female";
   const recruitmentSeed = `random-10:${serial}:${getRoll()}`;
   const usedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
-  const isLowSocial = state.player.social < 6;
+  const isLowSocial = getEffectiveSocial(state) < 6;
   const canAddPeer = canAddRelationship(state.relationshipState, "peer");
   const exchangeSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
-  const shortSanChange = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
-  const shortSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
+  const shortSanChange = getActualResearchMiscSanChange(-5, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const shortSanSummary = formatResearchMiscSanChange(-5, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
   const ideaBonus = 5;
   const peerAddition = createGeneratedFellowProfileAddition("peer", serial, peerGender, usedNames, undefined, recruitmentCalendar, recruitmentSeed);
   const peerName = peerAddition.name ?? "同门";
@@ -59,19 +61,19 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider, recr
       {
         id: `random-10-short-term-${serial}`,
         label: "尝试合作",
-        outcome: canAddPeer ? `${shortSanSummary}｜同门 +1` : "条件：人际栏已满｜结果：无事发生。",
+        outcome: canAddPeer ? `${shortSanSummary}｜同门 +1` : getFellowOverflowOutcome(state),
         effects: canAddPeer ? {
           san: shortSanChange,
           fellowAdditions: [peerAddition],
-        } : {},
+        } : getFellowOverflowEffects(state, peerAddition),
       },
       {
         id: `random-10-long-term-${serial}`,
         label: "长期合作",
         outcome: canAddPeer
           ? "同门 +1｜SAN -1（每月）｜协作自动推进 +1次（每月）"
-          : "条件：人际栏已满｜结果：无事发生。",
-        effects: canAddPeer ? { fellowAdditions: [{ ...peerAddition, longTermMentoring: true }] } : {},
+          : getFellowOverflowOutcome(state),
+        effects: canAddPeer ? { fellowAdditions: [{ ...peerAddition, longTermMentoring: true }] } : getFellowOverflowEffects(state, peerAddition),
       },
     ],
   };
@@ -127,7 +129,7 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider, recr
         ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 
 function createRandomEvent11(state: GameState, getRoll: RandomRollProvider, recruitmentCalendar: RecruitmentCalendar): PendingEvent {
@@ -142,8 +144,8 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider, recr
   ];
   const eventTitle = roleText === "\u5e08\u59d0" ? "\u5e08\u59d0\u6307\u5bfc" : "\u5e08\u5144\u6307\u5bfc";
   const lightIdeaBonus = 8;
-  const deepSanChange = getActualResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
-  const deepSanSummary = formatResearchMiscSanChange(-5, state.player.research, state.month, state.eventSupport, state.buffs);
+  const deepSanChange = getActualResearchMiscSanChange(-5, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
+  const deepSanSummary = formatResearchMiscSanChange(-5, getEffectiveResearch(state), state.month, state.eventSupport, state.buffs);
   const canAddSenior = canAddRelationship(state.relationshipState, "senior");
   const seniorAddition = createGeneratedFellowProfileAddition("senior", serial, seniorGender, usedNames, undefined, recruitmentCalendar, recruitmentSeed);
   const seniorIntro = `${roleText}${seniorAddition.name ?? ""}`;
@@ -178,19 +180,19 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider, recr
       {
         id: `random-11-deep-${serial}`,
         label: "尝试合作",
-        outcome: canAddSenior ? `${deepSanSummary}｜${roleText} +1` : "条件：人际栏已满｜结果：无事发生。",
+        outcome: canAddSenior ? `${deepSanSummary}｜${roleText} +1` : getFellowOverflowOutcome(state),
         effects: canAddSenior ? {
           san: deepSanChange,
           fellowAdditions: [seniorAddition],
-        } : {},
+        } : getFellowOverflowEffects(state, seniorAddition),
       },
       {
         id: `random-11-mentor-${serial}`,
         label: "长期合作",
         outcome: canAddSenior
           ? `${roleText} +1｜SAN -1（每月）｜协作自动推进 +1次（每月）`
-          : "条件：人际栏已满｜结果：无事发生。",
-        effects: canAddSenior ? { fellowAdditions: [{ ...seniorAddition, longTermMentoring: true }] } : {},
+          : getFellowOverflowOutcome(state),
+        effects: canAddSenior ? { fellowAdditions: [{ ...seniorAddition, longTermMentoring: true }] } : getFellowOverflowEffects(state, seniorAddition),
       },
     ],
   };
@@ -241,7 +243,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider, recr
         ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 
 export function createRelationshipRandomEventById(

@@ -1,3 +1,4 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { hasBlockingQueueEvent } from "./v2-event-queue";
 import { collectFixedEventsForState } from "./v2-fixed-events";
@@ -54,23 +55,29 @@ export function collectRandomEventsForMonth(
   let nextState = state;
   const events: PendingEvent[] = [];
   const selectedCategories = new Set<RandomEventCategory>();
+  const unavailableEventIds = new Set(state.eventQueue.flatMap((event) => (
+    event.source === "random" && event.randomReplay ? [event.randomReplay.eventId] : []
+  )));
 
   for (let index = 0; index < randomEventCount; index += 1) {
     const drawResult = drawRandomEvent(
       {
-        availableRandomEvents: nextState.availableRandomEvents.filter((id) => id !== 11 || nextState.year < 6),
+        selectedRoleId: nextState.selectedRoleId,
+        roleTalents: nextState.roleTalents,
+        availableRandomEvents: nextState.availableRandomEvents,
         usedRandomEvents: nextState.usedRandomEvents,
         illnessProbability: nextState.illnessProbability,
         totalRandomEventCount: nextState.totalRandomEventCount,
         pendingRandomEvents: nextState.pendingRandomEvents,
-        social: nextState.player.social,
-        research: nextState.player.research,
+        social: getEffectiveSocial(nextState),
+        research: getEffectiveResearch(nextState),
         publishedPaperCount: getPublishedPaperCount(nextState),
         hasRecoverableDraftPaper: hasRecoverableDraftPaper(nextState),
         hasAuthorshipEligibleDraftPaper: nextState.papers.some((paper) =>
           paper.status === "draft" && paper.idea + paper.experiment + paper.writing > 0
         ),
         excludedCategories: [...selectedCategories],
+        excludedEventIds: [...unavailableEventIds, ...(nextState.year >= 6 ? [11] : [])],
       },
       getRoll(),
     );
@@ -96,17 +103,16 @@ export function collectRandomEventsForMonth(
       : { nextState, event: null };
     nextState = builtEvent.nextState;
     if (!builtEvent.event) {
-      nextState = rememberPendingRandomEvent(nextState, drawResult.eventId, serial);
+      nextState = rememberPendingRandomEvent(nextState, drawResult.eventId, serial, true);
     }
     if (builtEvent.event) {
       const category = getRandomEventCategory(drawResult.eventId);
       if (category) selectedCategories.add(category);
       nextState = {
         ...nextState,
-        usedRandomEvents: nextState.usedRandomEvents.includes(drawResult.eventId)
-          ? nextState.usedRandomEvents
-          : [...nextState.usedRandomEvents, drawResult.eventId],
+        usedRandomEvents: [...nextState.usedRandomEvents, drawResult.eventId],
       };
+      unavailableEventIds.add(drawResult.eventId);
       events.push({
         ...builtEvent.event,
         randomReplay: {

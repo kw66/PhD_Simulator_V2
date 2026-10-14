@@ -1,6 +1,7 @@
 import { applyTierResist, getTierResistedNarrative } from "./v2-sanity-rules";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { CONFERENCE_TRAVEL_FEES } from "./v2-publication-fees";
-import type { EventCounters, EventSupportState, ShopState } from "./v2-types";
+import type { EventCounters, EventSupportState, ShopState, GameState } from "./v2-types";
 
 export type ConferenceRegionId = "domestic" | "asia" | "west";
 export type ConferenceDecisionMode = "self" | "advisor" | "proxy";
@@ -12,6 +13,7 @@ export interface ConferenceBaseCosts {
 }
 
 export interface ConferenceDecisionInput {
+  playerAttributeState?: GameState;
   mode: ConferenceDecisionMode;
   region: ConferenceRegionId;
   favor: number;
@@ -24,6 +26,7 @@ export interface ConferenceDecisionInput {
 }
 
 export interface ConferenceDecisionCost {
+  replacementMoneyCost?: number;
   mode: ConferenceDecisionMode;
   resource: ConferenceCostResource;
   actualCost: number;
@@ -62,12 +65,15 @@ export function resolveConferenceDecisionCost(
   }
 
   if (input.mode === "advisor") {
-    const favorResult = applyTierResist(-baseCosts.advisorCost, input.favor, getRoll);
+    const favorResult = input.playerAttributeState
+      ? previewPlayerAttributeChange(input.playerAttributeState, "favor", -baseCosts.advisorCost)
+      : applyTierResist(-baseCosts.advisorCost, input.favor, getRoll);
     const actualCost = Math.max(0, -favorResult.effectiveChange);
     return {
       mode: input.mode,
       resource: "favor",
       actualCost,
+      replacementMoneyCost: "moneyCost" in favorResult && typeof favorResult.moneyCost === "number" ? favorResult.moneyCost : 0,
       fundingCost: attendanceCost,
       meetingDiscount: 0,
       countsAsMeeting: true,

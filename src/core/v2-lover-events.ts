@@ -2,6 +2,7 @@ import { createConferenceScholarContact, replaceConferenceScholarContact } from 
 import { activateLover, getOppositeGender } from "./v2-lover-system";
 import { canAddRelationship } from "./v2-relationship-rules";
 import { getResearchCap } from "./v2-research-cap-system";
+import { getPlayerResistanceReduction } from "./v2-player-attributes";
 import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
 import type { ConferenceEncounterState, ConferenceScholarContact, EventChoice, GameState, Gender, LoverTypeId, PendingEvent } from "./v2-types";
 
@@ -18,6 +19,7 @@ export interface LoverDevelopmentContext {
   scholars?: ConferenceEncounterState["scholars"];
   research?: number;
   researchCap?: number;
+  researchResistanceReduction?: number;
   contactAvailable?: boolean;
   setAside?: boolean;
   profileRolls?: [number, number];
@@ -46,6 +48,7 @@ export function buildLoverDevelopmentContext(input: {
     contact: { ...contact }, scholars: { ...encounter.scholars },
     research: input.state?.player.research,
     researchCap: input.state ? getResearchCap(input.state.researchCapacityState) : undefined,
+    researchResistanceReduction: input.state ? getPlayerResistanceReduction(input.state, "research", 1) : 0,
     profileRolls,
   });
 }
@@ -77,7 +80,7 @@ function unavailableText(context: LoverDevelopmentContext): string | undefined {
 function createLoverResult(input: LoverDevelopmentContext, decision: "accept" | "decline"): PendingEvent {
   const context = normalizeContext(input);
   const unavailable = unavailableText(context);
-  const research = applyTierResist(1, context.research ?? 0, () => 0, context.researchCap ?? 20);
+  const research = applyTierResist(1, context.research ?? 0, () => 0, context.researchCap ?? 20, context.researchResistanceReduction ?? 0);
   const rewardText = context.type === "beautiful" ? "SAN上限 +3" : formatTierResistedOutcome("科研", 1, research);
   const replacementUpdates: Partial<ConferenceEncounterState> = {
     scholars: { ...context.scholars, [context.type]: context.replacement },
@@ -88,7 +91,7 @@ function createLoverResult(input: LoverDevelopmentContext, decision: "accept" | 
   const effects: EventChoice["effects"] = unavailable ? {} : decision === "decline"
     ? { conferenceEncounterUpdates: replacementUpdates }
     : {
-      ...(context.type === "beautiful" ? { sanCapDelta: 3 } : { research: research.effectiveChange }),
+      ...(context.type === "beautiful" ? { sanCapDelta: 3 } : { research: research.effectiveChange, rawResearch: 1 }),
       loverStateUpdates: { ...activateLover(context.type, context.totalMonths, context.playerGender),
         name: context.contact.name, contactId: context.contact.id, gender: context.contact.gender },
       activateLoverProgress: context.type,
@@ -206,6 +209,7 @@ export function refreshLoverDevelopmentEvent<Event extends PendingEvent>(state: 
     contactAvailable: !currentContact || currentContact.id === preview.context.contact?.id,
     scholars: { ...state.conferenceEncounterState.scholars },
     research: state.player.research, researchCap: getResearchCap(state.researchCapacityState),
+    researchResistanceReduction: getPlayerResistanceReduction(state, "research", 1),
     contact: currentContact?.id === preview.context.contact?.id && currentContact
       ? { ...preview.context.contact!, encounterCount: currentContact.encounterCount } : preview.context.contact,
   };

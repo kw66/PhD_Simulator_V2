@@ -1,3 +1,6 @@
+import { getRecoveredSan } from "./v2-san-recovery";
+import { settleRoleTalentPaperRejection } from "./v2-role-talent-lifecycle";
+import { paySanCost } from "./v2-role-talent-costs";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo, getConferenceReferenceScore } from "./v2-conference-catalog";
 import { combineEffectMultipliers } from "./v2-numeric-modifiers";
@@ -434,6 +437,9 @@ function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewS
   if (paperIndex < 0) return state;
   const paper = state.papers[paperIndex]!;
   settlement = resolveReviewerSan(state, settlement);
+  state = settlement.reviewerSanChange < 0
+    ? paySanCost(state, -settlement.reviewerSanChange, { allowOverdraw: true })
+    : { ...state, player: { ...state.player, san: getRecoveredSan(state.player.san, state.sanCap, settlement.reviewerSanChange) } };
   const reviewResult = {
     reports: settlement.reports,
     totalReviewScore: settlement.totalReviewScore,
@@ -445,15 +451,11 @@ function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewS
     const rejectedPaper = applyRejectedPaperReview(paper, reviewResult);
     const papers = [...state.papers];
     papers[paperIndex] = rejectedPaper;
-    return {
+    return settleRoleTalentPaperRejection({
       ...state,
       papers,
       selectedPaperId: rejectedPaper.id,
-      player: {
-        ...state.player,
-        san: Math.min(state.sanCap, state.player.san + settlement.reviewerSanChange),
-      },
-    };
+    }, paper);
   }
 
   const publicationEffect = getPublicationBuffEffect(state.buffs);
@@ -476,10 +478,6 @@ function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewS
     externalPublications: publishedPapers,
     selectedPaperId: papers.find((entry) => entry.status === "draft" || entry.status === "journal-reviewing")?.id ?? null,
     totalResearchScore: state.totalResearchScore + settlement.scoreGain,
-    player: {
-      ...state.player,
-      san: Math.min(state.sanCap, state.player.san + settlement.reviewerSanChange),
-    },
   });
   return nextState;
 }
@@ -513,7 +511,7 @@ export function resolveDuePaperReviews(
       continue;
     }
 
-    const resolved = resolvePaperReview(paper, random);
+    const resolved = resolvePaperReview(paper, random, state.selectedRoleId === "social" ? state.roleTalents?.kindReviewerBonus ?? 0 : 0);
     activePapers.push(paper);
     const accepted = resolved.nextPaper.status === "published";
     if (accepted) acceptedPaperIds.push(paper.id);

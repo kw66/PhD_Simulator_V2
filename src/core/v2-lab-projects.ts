@@ -4,11 +4,11 @@ import { creditFellowMoney, ensureFellowFinanceAccounts, getFellowFinanceAccount
 import { roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import type { AdvisorProgressState, GameState } from "./v2-types";
+export { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-project-constants";
 
 export const PROJECT_PROGRESS_MAX = 100;
 const HORIZONTAL_REWARD_BY_RANK = [50, 60, 70, 80, 90, 100] as const;
 const PROJECT_LABOR_SHARE = 0.05;
-export const LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD = 60;
 export type LabProjectType = "horizontal" | "vertical";
 
 function getAdvisorRankIndex(advisor: AdvisorProgressState): number {
@@ -90,7 +90,7 @@ export function advanceSharedLabProject(
       nextState = settleAdvisorGuidance(queueAdvisorGuidance(nextState), random);
       if (previousPending == null && nextState.advisorProgressState.pendingGuidanceToPlayer != null) {
         nextState = pushMilestoneLog(nextState,
-          `导师指导：你的论文写作协作待使用（${getAdvisorGuidanceAmount()}分）`, "advisor-guidance-pending");
+          `导师指导：你的论文写作协作待使用（${getAdvisorGuidanceAmount(nextState)}分）`, "advisor-guidance-pending");
       }
     }
   }

@@ -1,3 +1,4 @@
+import { getEffectiveSocial } from "./v2-effective-attributes";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { formatMoney } from "./v2-money";
 import { getConferenceInfo } from "./v2-conference-catalog";
@@ -233,5 +234,5 @@ export function advanceFellowResearch(state: GameState, random: () => number = M
   };
   if (publications.length === 0) return nextState;
   const rewardedState = applyPublicationTalentRewards(nextState, random);
-  return { ...rewardedState, relationshipState: syncRelationshipState(rewardedState.relationshipState, rewardedState.player.social) };
+  return { ...rewardedState, relationshipState: syncRelationshipState(rewardedState.relationshipState, getEffectiveSocial(rewardedState)) };
 }

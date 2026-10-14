@@ -106,6 +106,94 @@ describe("V2 community messages", () => {
     expect(community.snapshot()).toMatchObject({ status: "ready", page: 0, total: 0, messages: [] });
   });
 
+  it("keeps deleted parent placeholders and replies while cancelling reply targets and restoring drafts", async () => {
+    const { community, setRows } = editingHarness();
+    const reply = { ...ownMessage, id: 22, parent_id: 21 };
+    setRows([ownMessage, reply]);
+    await community.loadPage(0);
+    community.setContent("board", "主留言草稿");
+    community.openReply(22);
+    setRows([{ ...ownMessage, is_deleted: true, content: "该留言已删除" }, reply]);
+    await community.loadPage(0);
+    expect(community.snapshot()).toMatchObject({
+      replyTarget: null, contents: { board: "主留言草稿" },
+      messages: [{ id: 21, is_deleted: true }], replies: [{ id: 22 }],
+    });
+    community.openReply(21);
+    community.openReply(22);
+    expect(community.snapshot().replyTarget).toBeNull();
+  });
+
+  it.each(["deleted", "hidden"])("cancels a selected reply when it becomes %s but its parent remains", async (kind) => {
+    const { community, setRows } = editingHarness();
+    const reply = { ...ownMessage, id: 22, parent_id: 21 };
+    setRows([ownMessage, reply]);
+    await community.loadPage(0);
+    community.setContent("board", "主留言草稿");
+    community.openReply(22);
+    setRows(kind === "hidden" ? [ownMessage] : [ownMessage, { ...reply, is_deleted: true }]);
+    await community.loadPage(0);
+    expect(community.snapshot()).toMatchObject({ replyTarget: null, contents: { board: "主留言草稿" } });
+  });
+
+  it.each([1000, 3])("loads all replies when the server row cap is %i", async (serverLimit) => {
+    const rows = Array.from({ length: serverLimit === 1000 ? 1201 : 8 }, (_, index) => ({
+      ...ownMessage, id: 100 + index, parent_id: 21,
+    }));
+    const offsets: number[] = [];
+    const request = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { headers: { "Content-Range": `*/${rows.length + 1}` } });
+      const url = new URL(String(input));
+      if (url.searchParams.get("parent_id") === "is.null") {
+        return new Response(JSON.stringify([ownMessage]), { headers: { "Content-Range": "0-0/1" } });
+      }
+      expect(url.searchParams.get("order")).toBe("created_at.asc,id.asc");
+      expect(init?.headers).toMatchObject({ Prefer: "count=exact" });
+      const offset = Number(url.searchParams.get("offset"));
+      const limit = Number(url.searchParams.get("limit"));
+      expect(limit).toBeGreaterThan(0);
+      offsets.push(offset);
+      const batch = rows.slice(offset, offset + Math.min(limit, serverLimit));
+      return new Response(JSON.stringify(batch), {
+        headers: { "Content-Range": `${offset}-${offset + batch.length - 1}/${rows.length}` },
+      });
+    });
+    const community = createCommunityMessages({ fetch: request as typeof fetch, storage: null });
+    await community.loadPage(0);
+    expect(community.snapshot().replies.map((reply) => reply.id)).toEqual(rows.map((reply) => reply.id));
+    expect(offsets).toEqual(serverLimit === 1000 ? [0, 500, 1000] : [0, 3, 6]);
+    expect(community.snapshot().status).toBe("ready");
+  });
+
+  it("aborts stale reply loading and never adds its later batches after changing pages", async () => {
+    const pending = deferredResponse();
+    let replySignal: AbortSignal | null = null;
+    const request = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { headers: { "Content-Range": "*/9" } });
+      const url = new URL(String(input));
+      if (url.searchParams.get("parent_id") === "is.null") {
+        const id = url.searchParams.get("offset") === "0" ? 21 : 31;
+        return new Response(JSON.stringify([{ ...ownMessage, id }]), { headers: { "Content-Range": "0-0/6" } });
+      }
+      if (url.searchParams.get("parent_id") === "in.(21)") {
+        replySignal = init?.signal ?? null;
+        return pending.promise;
+      }
+      return new Response("[]", { headers: { "Content-Range": "*/0" } });
+    });
+    const community = createCommunityMessages({ fetch: request as typeof fetch, storage: null });
+    const oldPage = community.loadPage(0);
+    await vi.waitFor(() => expect(replySignal).not.toBeNull());
+    await community.loadPage(1);
+    expect((replySignal as AbortSignal | null)?.aborted).toBe(true);
+    pending.resolve(new Response(JSON.stringify([{ ...ownMessage, id: 22, parent_id: 21 }]), {
+      headers: { "Content-Range": "0-0/3" },
+    }));
+    await oldPage;
+    expect(community.snapshot()).toMatchObject({ status: "ready", page: 1, messages: [{ id: 31 }], replies: [] });
+    expect(request.mock.calls.filter(([input]) => new URL(String(input)).searchParams.get("parent_id") === "in.(21)")).toHaveLength(1);
+  });
+
   it("sends a message, stores the successful nickname, and clears only that draft", async () => {
     const storage = new Map<string, string>();
     const request = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === "POST"
@@ -521,6 +609,58 @@ describe("V2 community message rendering", () => {
   afterAll(async () => {
     await browser?.close();
     await server?.close();
+  });
+
+  it("renders replies below a deleted parent without reply buttons and keeps expansion working", async () => {
+    const page = await browser.newPage();
+    const parent = { ...ownMessage, is_deleted: true, content: "该留言已删除" };
+    const replies = [
+      { ...ownMessage, id: 22, parent_id: 21, content: "仍然可见的回复一" },
+      { ...ownMessage, id: 23, parent_id: 21, content: "仍然可见的回复二" },
+    ];
+    await page.route("**/__deleted_message_test__", (route) => route.fulfill({ contentType: "text/html", body: `
+      <html><head><meta charset="utf-8"></head><body><main id="test-root"></main><script type="module">
+        import { createCommunityMessages, renderCommunityMessages } from '/src/app/v2-community-messages.ts';
+        import { renderLobbyMessageRailView } from '/src/app/v2-render-community.ts';
+        const root = document.getElementById('test-root');
+        root.innerHTML = renderLobbyMessageRailView();
+        const community = createCommunityMessages({ storage: null, fetch: async (input, init) => {
+          if (root.dataset.hiddenThread === 'true') return new Response(init?.method === 'HEAD' ? null : '[]', {
+            headers: { 'Content-Range': '*/0' }
+          });
+          if (init?.method === 'HEAD') return new Response(null, { headers: { 'Content-Range': '*/3' } });
+          const main = new URL(input).searchParams.get('parent_id') === 'is.null';
+          return new Response(JSON.stringify(main ? [${JSON.stringify(parent)}] : ${JSON.stringify(replies)}), {
+            headers: { 'Content-Range': main ? '0-0/1' : '0-1/2' }
+          });
+        }});
+        await community.loadPage(0);
+        window.messageHarness = { community, render: () => renderCommunityMessages(root, community) };
+        window.messageHarness.render();
+      </script></body></html>` }));
+    try {
+      await page.goto(`${server.resolvedUrls!.local[0]}__deleted_message_test__`);
+      await page.waitForFunction(() => Boolean(window.messageHarness));
+      expect(await page.locator('[data-community-message-content="21"]').textContent()).toBe("该留言已删除");
+      expect(await page.locator('[data-community-message-content="22"]').textContent()).toBe(replies[0].content);
+      expect(await page.locator('[data-community-message-content="23"]').count()).toBe(0);
+      expect(await page.locator('[data-community-reply-to]').count()).toBe(0);
+      expect(await page.locator('[data-community-count]').textContent()).toBe("3 条");
+      await page.evaluate(() => { window.messageHarness.community.toggleReplies(21); window.messageHarness.render(); });
+      expect(await page.locator('[data-community-message-content="23"]').textContent()).toBe(replies[1].content);
+      expect(await page.locator('[data-community-toggle-replies="21"]').textContent()).toBe("收起回复");
+      expect(await page.locator('[data-community-reply-to]').count()).toBe(0);
+      await page.evaluate(async () => {
+        document.getElementById("test-root")!.dataset.hiddenThread = "true";
+        await window.messageHarness.community.loadPage(0);
+        window.messageHarness.render();
+      });
+      expect(await page.locator('[data-community-empty]').isVisible()).toBe(true);
+      expect(await page.locator('[data-community-message-content]').count()).toBe(0);
+      expect(await page.locator('[data-community-count]').textContent()).toBe("0 条");
+    } finally {
+      await page.close();
+    }
   });
 
   it("measures actual multiline overflow, preserves full safe content and expansion after rerender", async () => {

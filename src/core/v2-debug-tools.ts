@@ -1,4 +1,6 @@
+import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
+import { getPlayerAttributeCap } from "./v2-player-attributes";
 import { createDebugEnding, isDebugEndingId } from "./v2-debug-endings";
 import { createConferenceActivityEvent } from "./v2-conference-activity-events";
 import { getAcademicCalendarYear } from "./v2-calendar";
@@ -344,7 +346,7 @@ function applyDebugStatChange(state: GameState, statId: DebugStatId, delta: numb
       break;
     case "social":
     case "favor":
-      nextValue = Math.max(0, Math.min(20, current + delta));
+      nextValue = Math.max(0, Math.min(getPlayerAttributeCap(state, statId), current + delta));
       break;
     case "money":
       nextValue = Math.max(0, current + delta);
@@ -361,7 +363,7 @@ function applyDebugStatChange(state: GameState, statId: DebugStatId, delta: numb
       ...state,
       player,
       relationshipState: statId === "social"
-        ? syncRelationshipState(state.relationshipState, player.social)
+        ? syncRelationshipState(state.relationshipState, getEffectiveSocial({ ...state, player }))
         : state.relationshipState,
     },
     `测试调整：${DEBUG_STAT_LABELS[statId]} ${formatSignedValue(nextValue - current)}（${current} → ${nextValue}）。`,
@@ -392,9 +394,9 @@ function shiftDebugMonth(state: GameState, delta: number): GameState {
 function buildConferenceDebugState(state: GameState) {
   return {
     favor: state.player.favor,
-    research: state.player.research,
+    research: getEffectiveResearch(state),
     researchCapacityState: state.researchCapacityState,
-    social: state.player.social,
+    social: getEffectiveSocial(state),
     shopState: state.shopState,
     eventSupport: state.eventSupport,
     eventCounters: state.eventCounters,

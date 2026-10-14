@@ -190,7 +190,7 @@ export function createPaperCompetitionRandomEvent(
     decisionTitle: "如何应对",
     decisionDescription: `${copy.decisionDescription}\n\n涉及论文：**《${paper.title}》**`,
     results,
-  });
+  }, state);
 
   for (const introChoice of stagedEvent.choices) {
     introChoice.label = copy.introButton;

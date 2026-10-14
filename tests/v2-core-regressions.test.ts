@@ -71,7 +71,7 @@ describe("v2 core regression boundaries", () => {
     expect(base.relationshipState.unlockedSlots).toBe(2);
 
     const resolved = resolveEffect(base, "social-slots", { social: 6 });
-    expect(resolved.player.social).toBe(7);
+    expect(resolved.player.social).toBe(6.8);
     expect(resolved.relationshipState.unlockedSlots).toBe(3);
   });
 

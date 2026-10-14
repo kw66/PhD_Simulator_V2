@@ -32,6 +32,7 @@ export function enqueueResolvedEventFollowUps(
   debugRootEventId?: string,
   replayContext?: PendingEvent["replayContext"],
   randomReplay?: PendingEvent["randomReplay"],
+  deferredChoices?: PendingEvent["deferredChoices"],
 ): { nextState: GameState; hasSameChainFollowUp: boolean } {
   let nextState = state;
   let hasSameChainFollowUp = false;
@@ -52,6 +53,7 @@ export function enqueueResolvedEventFollowUps(
             debugRootEventId,
           } : {}),
           ...(shouldAttachDeferredPatch ? { deferredStatePatch } : {}),
+          ...(!attachedDeferredPatch && deferredChoices?.length ? { deferredChoices } : {}),
         }
       : event;
     const stateBeforeEnqueue = nextState;

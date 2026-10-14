@@ -19,6 +19,7 @@ export const MESSAGE_PAGE_SIZE = 5;
 export const MESSAGE_MAX_LENGTH = 2000;
 const OWNERSHIP_KEY = "kwgame_v2_message_ownership";
 const PUBLIC_COLUMNS = "id,nickname,content,source,created_at,parent_id,is_deleted";
+const REPLY_FETCH_SIZE = 500;
 
 export function countMessageCharacters(value: string): number {
   return Array.from(value).length;
@@ -77,7 +78,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
   let draftBeforeReply = "";
   let messages: CommunityMessage[] = [];
   let replies: CommunityMessage[] = [];
-  let replyTarget: { id: number; nickname: string; content: string; source: MessageSource } | null = null;
+  let replyTarget: { id: number; targetId: number; nickname: string; content: string; source: MessageSource } | null = null;
   const expandedReplyIds = new Set<number>();
   const expandedContentIds = new Set<number>();
   let ownership = readOwnership(storage);
@@ -95,6 +96,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
   let notice = "";
   let noticeSource: MessageSource | null = null;
   let loadRevision = 0;
+  let loadController: AbortController | null = null;
 
   const notify = (): void => options.onChange?.();
 
@@ -123,6 +125,9 @@ export function createCommunityMessages(options: MessageOptions = {}) {
       draftBeforeReply = "";
     }
     const revision = ++loadRevision;
+    loadController?.abort();
+    loadController = new AbortController();
+    const loadSignal = loadController.signal;
     status = "loading";
     page = nextPage;
     notify();
@@ -138,13 +143,13 @@ export function createCommunityMessages(options: MessageOptions = {}) {
       const responsePromise = request(url, {
         headers: { apikey: API_KEY, Prefer: "count=exact" },
         cache: "no-store",
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.any([loadSignal, AbortSignal.timeout(8000)]),
       });
       const visibleCountPromise = request(countUrl, {
         method: "HEAD",
         headers: { apikey: API_KEY, Prefer: "count=exact" },
         cache: "no-store",
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.any([loadSignal, AbortSignal.timeout(8000)]),
       }).then((countResponse) => {
         const rangeTotal = countResponse.headers.get("Content-Range")?.split("/")[1];
         return countResponse.ok && rangeTotal && /^\d+$/.test(rangeTotal) ? Number(rangeTotal) : null;
@@ -167,22 +172,35 @@ export function createCommunityMessages(options: MessageOptions = {}) {
         replyUrl.searchParams.set("select", PUBLIC_COLUMNS);
         replyUrl.searchParams.set("parent_id", `in.(${mainMessages.map((message) => message.id).join(",")})`);
         replyUrl.searchParams.set("order", "created_at.asc,id.asc");
-        const replyResponse = await request(replyUrl, {
-          headers: { apikey: API_KEY },
-          cache: "no-store",
-          signal: AbortSignal.timeout(8000),
-        });
-        if (!replyResponse.ok) throw new Error(`Replies unavailable: ${replyResponse.status}`);
-        const replyRows: unknown = await replyResponse.json();
-        if (!Array.isArray(replyRows)) throw new Error("Invalid replies response");
-        pageReplies = replyRows as CommunityMessage[];
+        replyUrl.searchParams.set("limit", String(REPLY_FETCH_SIZE));
+        let offset = 0;
+        while (revision === loadRevision) {
+          replyUrl.searchParams.set("offset", String(offset));
+          const replyResponse = await request(new URL(replyUrl), {
+            headers: { apikey: API_KEY, Prefer: "count=exact" },
+            cache: "no-store",
+            signal: AbortSignal.any([loadSignal, AbortSignal.timeout(8000)]),
+          });
+          if (revision !== loadRevision) return;
+          if (!replyResponse.ok) throw new Error(`Replies unavailable: ${replyResponse.status}`);
+          const replyRows: unknown = await replyResponse.json();
+          if (!Array.isArray(replyRows)) throw new Error("Invalid replies response");
+          pageReplies.push(...replyRows as CommunityMessage[]);
+          offset += replyRows.length;
+          const replyTotal = replyResponse.headers.get("Content-Range")?.split("/")[1];
+          // The server's max_rows can be smaller than our requested limit.
+          // Advance by the returned rows and stop at its exact count, not a short page.
+          if (replyRows.length === 0 || (replyTotal && /^\d+$/.test(replyTotal)
+            ? offset >= Number(replyTotal) : replyRows.length < REPLY_FETCH_SIZE)) break;
+        }
       }
       if (revision !== loadRevision) return;
       const allCount = await visibleCountPromise;
       if (revision !== loadRevision) return;
       messages = mainMessages;
       replies = pageReplies;
-      if (replyTarget && !submitting && !mainMessages.some((message) => message.id === replyTarget?.id)) {
+      if (replyTarget && !submitting && (!mainMessages.some((message) => message.id === replyTarget?.id && !message.is_deleted)
+        || ![...mainMessages, ...pageReplies].some((message) => message.id === replyTarget?.targetId && !message.is_deleted))) {
         contents[replyTarget.source] = draftBeforeReply;
         replyTarget = null;
         draftBeforeReply = "";
@@ -394,10 +412,10 @@ export function createCommunityMessages(options: MessageOptions = {}) {
         ? target
         : messages.find((message) => message.id === target.parent_id);
       if (!parent || parent.is_deleted) return;
-      if (replyTarget?.id === id && replyTarget.source === source) return;
+      if (replyTarget?.targetId === id && replyTarget.source === source) return;
       if (replyTarget) contents[replyTarget.source] = draftBeforeReply;
       draftBeforeReply = contents[source];
-      replyTarget = { id: parent.id, nickname: target.nickname, content: target.content, source };
+      replyTarget = { id: parent.id, targetId: target.id, nickname: target.nickname, content: target.content, source };
       contents[source] = "";
       notice = "";
       notify();
@@ -496,7 +514,7 @@ function createMessageBody(message: CommunityMessage, state: CommunityMessageSta
     item.append(toggle);
   }
   const ownsMessage = state.ownedMessageIds.has(message.id) && !deleted;
-  const canReply = isReply && !deleted;
+  const canReply = isReply && !deleted && state.messages.some((parent) => parent.id === message.parent_id && !parent.is_deleted);
   if (ownsMessage || canReply) {
     const actions = document.createElement("div");
     actions.className = "community-message-actions";
@@ -577,25 +595,26 @@ function createMessageBody(message: CommunityMessage, state: CommunityMessageSta
 function createMessageItem(message: CommunityMessage, replies: CommunityMessage[], state: CommunityMessageState): HTMLElement {
   const expanded = state.expandedReplyIds.has(message.id);
   const item = createMessageBody(message, state);
-  const actions = item.querySelector(".community-message-actions") ?? document.createElement("div");
-  actions.className = "community-message-actions";
-  if (message.is_deleted) return item;
-  const replyButton = document.createElement("button");
-  replyButton.type = "button";
-  replyButton.dataset.communityReplyTo = String(message.id);
-  const replyIcon = document.createElement("i");
-  replyIcon.dataset.lucide = "reply";
-  replyIcon.setAttribute("aria-hidden", "true");
-  replyButton.append(replyIcon, "回复");
-  if (replies.length > 0) {
-    const count = document.createElement("span");
-    count.className = "community-reply-count";
-    count.textContent = `${replies.length} 条`;
-    replyButton.append(count);
-    replyButton.setAttribute("aria-label", `回复，已有 ${replies.length} 条回复`);
+  if (!message.is_deleted) {
+    const actions = item.querySelector(".community-message-actions") ?? document.createElement("div");
+    actions.className = "community-message-actions";
+    const replyButton = document.createElement("button");
+    replyButton.type = "button";
+    replyButton.dataset.communityReplyTo = String(message.id);
+    const replyIcon = document.createElement("i");
+    replyIcon.dataset.lucide = "reply";
+    replyIcon.setAttribute("aria-hidden", "true");
+    replyButton.append(replyIcon, "回复");
+    if (replies.length > 0) {
+      const count = document.createElement("span");
+      count.className = "community-reply-count";
+      count.textContent = `${replies.length} 条`;
+      replyButton.append(count);
+      replyButton.setAttribute("aria-label", `回复，已有 ${replies.length} 条回复`);
+    }
+    actions.append(replyButton);
+    item.querySelector(".community-message-item-head")?.append(actions);
   }
-  actions.append(replyButton);
-  item.querySelector(".community-message-item-head")?.append(actions);
   if (replies.length > 0) {
     const replyList = document.createElement("div");
     replyList.className = "community-replies";
@@ -674,6 +693,7 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
         state,
       )));
     } else {
+      if (state.status === "ready") list.replaceChildren();
       const title = empty.querySelector<HTMLElement>("[data-community-empty-title]");
       const description = empty.querySelector<HTMLElement>("[data-community-empty-description]");
       const retry = empty.querySelector<HTMLButtonElement>("[data-community-retry]");

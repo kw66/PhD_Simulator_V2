@@ -52,6 +52,7 @@ describe("lover completion announcements", () => {
     base.player.san = 20;
     base.loverProgressState.intimacy = 20;
     const next = advanceLoverDate(base, "play");
+    expect(next.personalSpending).toBe(2);
     const effects = next.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
     expect(effects).toContain("SAN +6（20→20）");
     expect(effects).toContain("亲密 +0（20→20，抵抗0.6，上限）");

@@ -1,7 +1,9 @@
 import { addOrReplaceBuffs, getActiveOperationSanCostForState, getActiveOperationSanMultiplier, getReadingEffect } from "./v2-buffs";
 import { pushLog } from "./v2-engine-helpers";
-import { getResearchCap } from "./v2-research-cap-system";
-import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
+import { formatTierResistedOutcome } from "./v2-sanity-rules";
+import { applyPlayerAttributeChange } from "./v2-player-attributes";
+import { consumeActiveOperation, getActiveOperationAllowance } from "./v2-ai-shop";
+import { paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
 import { getShopReadSanDiscount } from "./v2-shop-items-effects";
 import type { Buff, GameState, ReadingState } from "./v2-types";
 
@@ -88,9 +90,9 @@ export function previewReadPaperAction(state: GameState): ReadPaperActionPreview
   const perRead = getReadPaperSanCost(state);
   const baseSanCost = perRead.baseSanCost * readCount;
   const sanCost = perRead.sanCost * readCount;
-  const blockedReason = state.actionState.used >= state.actionState.limit
+  const blockedReason = !getActiveOperationAllowance(state, "read").allowed
     ? "action-limit"
-    : state.player.san < sanCost
+    : !quoteSanPayment(consumeActiveOperation(state, "read"), sanCost).allowed
       ? "insufficient-san"
       : "none";
   return {
@@ -104,14 +106,14 @@ export function previewReadPaperAction(state: GameState): ReadPaperActionPreview
 }
 
 /** Research gained from reading milestones is a normal increase: tier resist, then the research cap. */
-function resistReadingResearch(state: GameState, milestones: number, random: () => number) {
-  return applyTierResist(milestones, state.player.research, random, getResearchCap(state.researchCapacityState));
+function resistReadingResearch(state: GameState, milestones: number) {
+  return applyPlayerAttributeChange(state, "research", milestones, "ordinary");
 }
 
 export function applyReadingCountProgress(
   state: GameState,
   requestedCount: number,
-  random: () => number = Math.random,
+  _random: () => number = Math.random,
 ): ReadingCountProgress {
   const appliedCount = Math.max(0, Math.floor(requestedCount));
   if (appliedCount === 0) {
@@ -121,13 +123,13 @@ export function applyReadingCountProgress(
   const previousReadCount = state.readingState.readCount;
   const readCount = previousReadCount + appliedCount;
   const crossedMilestones = Math.floor(readCount / 10) - Math.floor(previousReadCount / 10);
-  const researchGain = resistReadingResearch(state, crossedMilestones, random).effectiveChange;
+  const change = resistReadingResearch(state, crossedMilestones);
+  const researchGain = change.result.effectiveChange;
 
   return {
     nextState: {
-      ...state,
+      ...change.state,
       readingState: { ...state.readingState, readCount },
-      player: { ...state.player, research: state.player.research + researchGain },
     },
     appliedCount,
     researchGain,
@@ -154,10 +156,11 @@ export function applyReadPaperActions(
   const allowSanOverdraw = options.allowSanOverdraw ?? false;
   const consumeMonthlyActionOnce = options.consumeMonthlyActionOnce ?? false;
   const source = options.source?.trim() || "看论文";
-  const random = options.random ?? Math.random;
   let nextState = state;
   let appliedCount = 0;
   let totalSanCost = 0;
+  let totalMoneyCost = 0;
+  let totalSanCapCost = 0;
   let totalIdeaBonus = 0;
   let researchGain = 0;
   let researchMilestones = 0;
@@ -165,12 +168,11 @@ export function applyReadPaperActions(
   let monthlyActionsUsed = 0;
   let blockedReason: ReadPaperActionResolution["blockedReason"] = "none";
 
-  if (
-    options.consumeMonthlyAction
-    && consumeMonthlyActionOnce
-    && !allowSanOverdraw
-    && state.player.san < getReadPaperSanCost(state).sanCost * count
-  ) {
+  const grouped = count > 0 && ((options.consumeMonthlyAction && consumeMonthlyActionOnce) || allowSanOverdraw);
+  const paymentOptions = { allowOverdraw: allowSanOverdraw, allowBeta: options.consumeMonthlyAction || allowSanOverdraw };
+  const groupedPrepared = grouped && options.consumeMonthlyAction ? consumeActiveOperation(state, "read") : state;
+  const groupedQuote = quoteSanPayment(groupedPrepared, getReadPaperSanCost(state).sanCost * count, paymentOptions);
+  if (grouped && ((options.consumeMonthlyAction && !getActiveOperationAllowance(state, "read").allowed) || !groupedQuote.allowed)) {
     return {
       nextState: state,
       requestedCount: count,
@@ -181,50 +183,55 @@ export function applyReadPaperActions(
       researchMilestones: 0,
       researchResisted: 0,
       monthlyActionsUsed: 0,
-      blockedReason: "insufficient-san",
+      blockedReason: options.consumeMonthlyAction && !getActiveOperationAllowance(state, "read").allowed ? "action-limit" : "insufficient-san",
     };
+  }
+  if (grouped) {
+    nextState = paySanCost(groupedPrepared, getReadPaperSanCost(state).sanCost * count, paymentOptions);
+    totalSanCost = groupedQuote.sanCost;
+    totalMoneyCost = groupedQuote.moneyCost;
+    totalSanCapCost = groupedQuote.sanCapCost + state.sanCap - groupedPrepared.sanCap;
+    monthlyActionsUsed = options.consumeMonthlyAction ? 1 : 0;
   }
 
   for (let index = 0; index < count; index += 1) {
-    const consumesActionThisRead = options.consumeMonthlyAction
+    const consumesActionThisRead = !grouped && options.consumeMonthlyAction
       && (!consumeMonthlyActionOnce || monthlyActionsUsed === 0);
-    if (consumesActionThisRead && nextState.actionState.used >= nextState.actionState.limit) {
+    if (consumesActionThisRead && !getActiveOperationAllowance(nextState, "read").allowed) {
       blockedReason = "action-limit";
       break;
     }
 
     const { sanCost } = getReadPaperSanCost(nextState);
-    if (!allowSanOverdraw && nextState.player.san < sanCost) {
+    const prepared = consumesActionThisRead ? consumeActiveOperation(nextState, "read") : nextState;
+    const payment = quoteSanPayment(prepared, grouped ? 0 : sanCost, paymentOptions);
+    if (!payment.allowed) {
       blockedReason = "insufficient-san";
       break;
     }
+    totalMoneyCost += payment.moneyCost;
+    totalSanCapCost += payment.sanCapCost + nextState.sanCap - prepared.sanCap;
+    nextState = paySanCost(prepared, grouped ? 0 : sanCost, paymentOptions);
 
     const readCount = nextState.readingState.readCount + 1;
     const ideaBonus = getReadingIdeaBonus(readCount);
     const reachesResearchMilestone = readCount > 0 && readCount % 10 === 0;
-    const researchResult = reachesResearchMilestone ? resistReadingResearch(nextState, 1, random) : null;
+    const researchChange = reachesResearchMilestone ? resistReadingResearch(nextState, 1) : null;
+    const researchResult = researchChange?.result ?? null;
     const appliedResearchGain = researchResult?.effectiveChange ?? 0;
-    const nextResearch = nextState.player.research + appliedResearchGain;
+    if (researchChange) nextState = researchChange.state;
 
     nextState = {
       ...nextState,
-      actionState: consumesActionThisRead
-        ? { ...nextState.actionState, used: nextState.actionState.used + 1 }
-        : nextState.actionState,
       readingState: {
         ...nextState.readingState,
         readCount,
-      },
-      player: {
-        ...nextState.player,
-        san: nextState.player.san - sanCost,
-        research: nextResearch,
       },
       buffs: addOrReplaceBuffs(nextState.buffs, [createIdeaBuff(nextState, readCount, ideaBonus, source)]),
     };
 
     appliedCount += 1;
-    totalSanCost += sanCost;
+    totalSanCost += payment.sanCost;
     totalIdeaBonus += ideaBonus;
     researchGain += appliedResearchGain;
     researchMilestones += reachesResearchMilestone ? 1 : 0;
@@ -236,6 +243,8 @@ export function applyReadPaperActions(
     const parts = [
       `看论文 ${appliedCount} 次`,
       `SAN -${totalSanCost}`,
+      totalMoneyCost > 0 ? `金币 -${totalMoneyCost}（金之力α）` : "",
+      totalSanCapCost > 0 ? `SAN上限 -${totalSanCapCost}（燃烧生命）` : "",
       `下次想 idea +${totalIdeaBonus}`,
       formatReadingResearchOutcome({ researchGain, researchMilestones, researchResisted }),
     ].filter(Boolean);

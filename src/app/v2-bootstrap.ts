@@ -107,9 +107,10 @@ import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
 import { createVisitStats } from "./v2-visit-stats";
-import { createConferenceStats, loadConferenceGlobalStats } from "./v2-conference-stats";
-import { createJournalStats, loadJournalGlobalStats } from "./v2-journal-stats";
-import { createThesisStats, loadThesisGlobalStats } from "./v2-thesis-stats";
+import { createConferenceStats } from "./v2-conference-stats";
+import { createJournalStats } from "./v2-journal-stats";
+import { createThesisStats } from "./v2-thesis-stats";
+import { createStatisticsClient } from "./v2-statistics-client";
 import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations, getVisibleValueDelta } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
@@ -141,7 +142,7 @@ import type {
 import {
   renderApp,
 } from "./v2-render";
-import { getDesignedTalentNodes, getTalentUpgradeReason, renderRoleRail, type TalentAllocation } from "./v2-render-setup-screen";
+import { renderRoleRail } from "./v2-render-setup-screen";
 import { getAnnouncementPageIndex } from "./v2-announcements";
 import { bindAnnouncementCollapse, renderAnnouncementPage } from "./v2-render-announcements";
 import { normalizeShopTab, type ShopTabId } from "./v2-render-shop-panel";
@@ -265,10 +266,20 @@ function isDebugRelationshipType(value: string | undefined): value is DebugRelat
 
 export function bootstrapApp(root: HTMLDivElement): void {
   const store = createStore();
-  const visitStats = createVisitStats({ recordVisit: import.meta.env.PROD && window.location.protocol === "https:" });
-  const conferenceStats = createConferenceStats({ onChange: () => render(), enabled: import.meta.env.PROD && window.location.protocol === "https:" });
-  const journalStats = createJournalStats({ onChange: () => render(), enabled: import.meta.env.PROD && window.location.protocol === "https:" });
-  const thesisStats = createThesisStats({ onChange: () => render(), enabled: import.meta.env.PROD && window.location.protocol === "https:" });
+  const statisticsUploadEnabled = import.meta.env.PROD && window.location.protocol === "https:";
+  const statistics = createStatisticsClient({ uploadEnabled: statisticsUploadEnabled, onChange: (rpc) => {
+    if (rpc === "get_phd_simulator_v2_activity_stats") {
+      visitStats.render(root);
+      scheduleAllFixedStageScales();
+    } else if (root.querySelector('[data-conference-stats-name], .journal-run-stats, [data-thesis-stats-degree]')) {
+      render();
+    }
+  } });
+  const visitStats = createVisitStats({ client: statistics, recordVisit: statisticsUploadEnabled });
+  const statisticsOptions = { client: statistics, onChange: () => render() };
+  const conferenceStats = createConferenceStats(statisticsOptions);
+  const journalStats = createJournalStats(statisticsOptions);
+  const thesisStats = createThesisStats(statisticsOptions);
   const community = createCommunityMessages({ onChange: () => syncCommunityView() });
   function syncCommunityView(): void {
     renderCommunityMessages(root, community);
@@ -290,9 +301,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let announcementPageIndex = 0;
   let talentTreePageIndex = 0;
   const talentTreeSelectedNodeByPage: number[] = [0];
-  const talentAllocation: TalentAllocation = {};
   let refreshTalentTree = false;
   let isFeedbackOpen = false;
+  let isQuitConfirmationOpen = false;
   let activeShopTab: ShopTabId = "ai";
   let selectedChairUpgradeId: ShopUpgradeId | null = null;
   let selectedCoffeeUpgradeId: Exclude<CoffeeMachineUpgradeId, null> | null = null;
@@ -917,6 +928,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const shouldAnimatePlayer = !skipNextPlayerAnimation && lastPhase === "playing" && state.phase === "playing";
     skipNextPlayerAnimation = false;
     if (state.phase !== lastPhase) {
+      isQuitConfirmationOpen = false;
       isEndingContentOpen = true;
       labInheritancePage = 0;
       loverRewardPage = 0;
@@ -995,8 +1007,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
       announcementPageIndex,
       talentTreePageIndex,
       talentTreeSelectedNodeByPage,
-      talentAllocation,
+      talentAllocation: store.getLobbyState().talentAllocation,
       isFeedbackOpen,
+      isQuitConfirmationOpen,
       isEventContentOpen,
       isEndingContentOpen,
       activeEventId,
@@ -1182,23 +1195,15 @@ export function bootstrapApp(root: HTMLDivElement): void {
     resetEffectSourceUi();
     eventLayout.update(isEventContentOpen ? renderEventLayoutSamples(getActiveQueueEvent(state), getActiveHistoryEvent(state), state) : []);
     scheduleAllFixedStageScales();
-    for (const element of root.querySelectorAll<HTMLElement>("[data-conference-stats-name]")) {
-      const target = element.dataset.conferenceStatsTarget;
-      if (isPaperTarget(target)) void loadConferenceGlobalStats(element.dataset.conferenceStatsName ?? "", Number(element.dataset.conferenceStatsYear), target);
-    }
-    for (const element of root.querySelectorAll<HTMLElement>("[data-journal-stats-target]")) {
-      const target = element.dataset.journalStatsTarget;
-      if (target === "nature" || target === "nmi" || target === "pami") void loadJournalGlobalStats(target);
-    }
-    for (const element of root.querySelectorAll<HTMLElement>("[data-thesis-stats-degree]")) {
-      const degree = element.dataset.thesisStatsDegree;
-      if (degree === "master" || degree === "phd") void loadThesisGlobalStats(degree);
-    }
     animatePanelValues(shouldAnimatePlayer);
     if (shouldAnimatePlayer && previousRenderedPlayer) {
       animatePlayerStatChanges(previousRenderedPlayer, state.player);
     }
     lastRenderedPlayer = { ...state.player };
+
+    if (isQuitConfirmationOpen) {
+      root.querySelector<HTMLButtonElement>("[data-quit-initial-focus]")?.focus({ preventScroll: true });
+    }
 
     if (!queuedSetupPortraitWarmup && state.phase === "setup") {
       queuedSetupPortraitWarmup = true;
@@ -1211,7 +1216,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
   function executeButtonAction(dataset: DOMStringMap): void {
     const actionId = dataset.action;
     if (!isGameActionId(actionId)) return;
-    if (actionId === "quit-game" && !window.confirm("确定退学并结束本局吗？将进入退学结局，可在结局页重开。")) return;
+    if (actionId === "quit-game") {
+      if (store.getState().phase !== "playing" || store.getState().totalMonths <= 0) return;
+      isQuitConfirmationOpen = true;
+      render();
+      return;
+    }
 
     if (actionId === "next-month" || actionId === "force-next-month") {
       animateEventPanelAfterNextMonth = activePlayTab === "events";
@@ -1258,6 +1268,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activePlayTab = "events";
       activeLogPage = null;
       resetEventContentUiState();
+
     }
     store.dispatch(actionId, {
       roleId: isRoleId(dataset.roleId) ? dataset.roleId : undefined,
@@ -1315,12 +1326,17 @@ export function bootstrapApp(root: HTMLDivElement): void {
   store.subscribe((state) => {
     const before = previousConferenceState;
     previousConferenceState = state;
+    if (state.phase === "playing" && (before.phase !== "playing"
+      || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
+      void statistics.startRun(JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]));
+    }
     void conferenceStats.track(before, state);
     void journalStats.track(before, state);
     void thesisStats.track(before, state);
     debugWindow.update();
     render();
     void visitStats.trackGamePhase(state.phase, {
+      runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
       roleId: state.selectedRoleId,
       ending: state.ending,
       disqualifiedByDebug: store.getLobbyState().lastRunExperience?.disqualifiedByDebug,
@@ -1329,13 +1345,16 @@ export function bootstrapApp(root: HTMLDivElement): void {
       scheduleAllFixedStageScales();
     });
   });
+
+  window.addEventListener("online", () => { void statistics.flush(); });
+  window.addEventListener("pagehide", () => { void statistics.flush(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") void statistics.flush();
+  });
   void visitStats.load().then(() => {
     visitStats.render(root);
     scheduleAllFixedStageScales();
   });
-  window.setInterval(() => {
-    if (!document.hidden) visitStats.render(root);
-  }, 30_000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) visitStats.render(root);
   });
@@ -1420,18 +1439,31 @@ export function bootstrapApp(root: HTMLDivElement): void {
   window.addEventListener("pointerup", finishTimelineDrag);
   window.addEventListener("pointercancel", finishTimelineDrag);
 
+  function closeQuitConfirmation(): void {
+    isQuitConfirmationOpen = false;
+    render();
+    root.querySelector<HTMLButtonElement>('[data-action="quit-game"]')?.focus({ preventScroll: true });
+  }
+
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    if (isQuitConfirmationOpen) {
+      if (target.closest("button[data-ui-cancel-quit]")) {
+        closeQuitConfirmation();
+      } else if (target.closest("button[data-ui-confirm-quit]")) {
+        isQuitConfirmationOpen = false;
+        store.dispatch("quit-game");
+      }
+      return;
+    }
+
     const talentResetButton = target.closest<HTMLButtonElement>("button[data-ui-talent-reset]");
     if (talentResetButton && !talentResetButton.disabled && store.getState().phase === "setup") {
       const roleId = talentResetButton.dataset.uiTalentReset as RoleId;
-      if (getDesignedTalentNodes(roleId)) {
-        delete talentAllocation[roleId];
-        refreshTalentTree = true;
-        render();
-      }
+      refreshTalentTree = true;
+      store.resetRoleTalents(roleId);
       return;
     }
 
@@ -1475,14 +1507,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
       if (Number.isInteger(pageIndex) && nodeIndex >= 0) talentTreeSelectedNodeByPage[pageIndex] = nodeIndex;
       if (alreadySelected && talentTreeNode.dataset.talentId && store.getState().phase === "setup") {
         const roleId = store.getLobbyState().selectedLobbyRoleId;
-        const allocation = talentAllocation[roleId] ?? {};
-        const level = store.getLobbyState().roleProgress[roleId]?.level ?? 0;
         const talentId = talentTreeNode.dataset.talentId;
-        if (getTalentUpgradeReason(roleId, level, allocation, talentId) === null) {
-          talentAllocation[roleId] = { ...allocation, [talentId]: (allocation[talentId] ?? 0) + 1 };
-          refreshTalentTree = true;
-          render();
-        }
+        refreshTalentTree = true;
+        store.upgradeRoleTalent(roleId, talentId);
         return;
       }
       nodes?.forEach((node) => {
@@ -1975,6 +2002,24 @@ export function bootstrapApp(root: HTMLDivElement): void {
   });
 
   window.addEventListener("keydown", (event) => {
+    if (isQuitConfirmationOpen) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeQuitConfirmation();
+      } else if (event.key === "Tab") {
+        const buttons = [...root.querySelectorAll<HTMLButtonElement>(".game-confirm-dialog button")];
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+      return;
+    }
     if (event.key === "Escape" && isHelpOpen && !isFeedbackOpen) {
       isHelpOpen = false;
       render();

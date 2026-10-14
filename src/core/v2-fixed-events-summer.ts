@@ -1,10 +1,11 @@
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import {
   appendMechanismSettlement,
   createFixedEvent,
   type FixedResolutionResult,
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
-import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
+import { formatTierResistedOutcome } from "./v2-sanity-rules";
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 function createSummerVacationResultEvent(params: {
@@ -103,7 +104,7 @@ export function createSummerVacationEvent(state: GameState): PendingEvent {
 export function resolveSummerVacationFixedEvent(
   state: GameState,
   resolution: FixedEventResolution,
-  getRoll: RandomRollProvider,
+  _getRoll: RandomRollProvider,
 ): FixedResolutionResult | null {
   switch (resolution.kind) {
     case "summer-vacation-home": {
@@ -153,7 +154,7 @@ export function resolveSummerVacationFixedEvent(
       const missingSan = Math.max(0, state.sanCap - state.player.san);
       const sanRecovery = Math.floor(missingSan * 0.3);
       const sanSummary = formatSummerSanRecovery(missingSan, 0.3);
-      const socialResult = applyTierResist(1, state.player.social, getRoll);
+      const socialResult = previewPlayerAttributeChange(state, "social", 1);
       const socialText = formatTierResistedOutcome("社交", 1, socialResult);
       const fullSanTier = state.player.san >= 18;
       return {
@@ -177,7 +178,7 @@ export function resolveSummerVacationFixedEvent(
           ].join("\n"),
           effects: {
             money: -3,
-            social: socialResult.effectiveChange,
+            social: socialResult.effectiveChange, rawSocial: 1,
             ...(fullSanTier ? { sanCapDelta: 1 } : {}),
             ...(sanRecovery === 0 ? {} : { san: sanRecovery }),
           },

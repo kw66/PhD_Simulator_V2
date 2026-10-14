@@ -46,6 +46,12 @@ function expectEndingStat(card: string, stat: string, value: string | number): v
   expect(text.replace(/\s+/g, ""), stat).toBe(normalized);
 }
 
+function expectEndingSectionValue(card: string, section: string, value: string): void {
+  const match = card.match(new RegExp(`<div\\b[^>]*data-ending-section="${section}"[^>]*>[\\s\\S]*?<strong[^>]*>([\\s\\S]*?)<\\/strong>`));
+  expect(match, section).not.toBeNull();
+  expect(match![1]!.replace(/<[^>]*>/g, "").trim()).toBe(value);
+}
+
 function publishedPaper(id: string, patch: Partial<Paper> = {}): Paper {
   return attachPaperPublication({ ...createDraftPaper(1, 0, () => 0), id, status: "published", target: "A", ...patch });
 }
@@ -58,9 +64,29 @@ describe("basic ending presentation", () => {
         score: 60, compensation: "年总包 20～35 万" },
     };
     const card = endingCard(renderApp(state));
-    expect(card).toContain("持有 offer");
-    expect(card).toContain("大厂：小型科技公司（年总包 20～35 万）");
+    expect(card).toContain('data-ending-section="offers"');
+    expect(card).toContain("offer：");
+    expect(card).toContain("小型科技公司");
+    expect(card).toContain("年总包 20～35 万");
     expect(card).not.toContain("已入职");
+  });
+
+  it.each([
+    ["internet", "internet-small", "小型科技公司", "年总包 20～35 万", "小型科技公司"],
+    ["stateOwned", "state-local", "地方国企", "年收入 15～25 万", "地方国企"],
+    ["civilService", "civil-town-staff", "乡镇 · 一级科员", "", "乡镇党政机关 · 一级科员"],
+    ["academic", "academic-second-tier-lecturer", "二本讲师", "", "二本院校 · 人工智能学院 · 讲师"],
+  ] as const)("gives %s offer a concrete and balanced ending summary", (type, jobId, name, compensation, displayName) => {
+    const state = finishedState("phd");
+    state.careerOffers = { [type]: { type, jobId, name, threshold: 30, score: 55, ...(compensation ? { compensation } : {}) } };
+    const card = endingCard(renderApp(state));
+    expect(card).toContain("offer：");
+    for (const detail of displayName.split(" · ")) expect(card).toContain(detail);
+    if (compensation) expect(card).toContain(compensation);
+    expect(card).not.toContain("应聘能力 55");
+    expect(card).not.toContain("岗位门槛 30");
+    expect(card).not.toContain(`offer · ${{ internet: "大厂", stateOwned: "央国企", civilService: "公务员", academic: "教职" }[type]}`);
+    expect(card).not.toContain("已收到录用通知");
   });
 
   it("formats fractional final attributes and the failure reason without mutating them", () => {
@@ -195,7 +221,8 @@ describe("basic ending presentation", () => {
     }));
     for (const stat of ["research-score", "first-papers", "coauthor-papers", "citations", "A", "B", "C", "nature", "nmi", "pami"]) expectEndingStat(card, stat, 0);
     expect(card).not.toContain('class="ending-showcase"');
-    expect(card).not.toContain('class="ending-life"');
+    expect(card).toContain('data-ending-section="spending"');
+    expect(card).not.toContain('data-ending-section="talent-points"');
   });
 
   it("features the strongest first-author paper and earned milestones", () => {
@@ -217,17 +244,19 @@ describe("basic ending presentation", () => {
     const card = endingCard(renderApp(state));
     expect(card).toContain("《视觉表征与跨模态检索》");
     expect(card).toContain("优秀博士论文");
+    expect(card).toContain("毕业线 7 · 盲审通过");
+    expect(card).not.toContain('class="ending-result-row"');
     expect(card).toContain("《跨模态表征的长期研究》");
     expect(card).not.toContain("《合作高分论文》");
     expect(card).toContain("录用分 240 · 引用 42");
     expectEndingStat(card, "A", 2);
-    for (const label of ["ESI高被引 1 篇", "国家奖学金 2 次", "参与项目 3 项", "完成实习 1 次"]) {
-      expect(card).toContain(label);
-    }
-    expect(card).toContain("ending-cover-portrait");
+    expectEndingSectionValue(card, "scholarships", "2 次");
+    expectEndingSectionValue(card, "internships", "1 次");
+    expect(card).not.toContain("参与项目");
+    expect(card).not.toContain("ending-cover-portrait");
   });
 
-  it("summarizes current relationships, allocated talents, owned goods and nonzero activities", () => {
+  it("features current relationships and shows only the requested six counters", () => {
     const state = finishedState("phd");
     state.selectedAdvisorName = "<导师>";
     state.relationshipState.advisorCount = 1;
@@ -236,23 +265,52 @@ describe("basic ending presentation", () => {
     })];
     state.loverState = { ...activateLover("smart", 1, "male"), name: "小周" };
     state.loverProgressState.intimacy = 9;
+    state.loverProgressState.research = 7;
+    state.advisorProgressState.cumulativeFunding = 85;
+    state.advisorProgressState.awards = [{ id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2026 }];
     state.shopState.monitorOwned = true;
     state.shopState.keyboardOwned = false;
     state.eventCounters.badmintonCount = 3;
     state.readingState.readCount = 12;
+    state.personalSpending = 19.5;
+    state.conferenceEncounterState.bigBullCooperation = true;
     const card = endingCard(renderApp(state, undefined, {
       talentAllocation: { normal: { "first-month-drive": 2, diligence: 1 } },
     }));
-    expect(card).toContain("导师 &lt;导师&gt;");
-    expect(card).toContain("小林 · 科研8/默契6");
-    expect(card).toContain("小周 · 亲密9");
-    expect(card).toContain("满怀干劲 2级");
-    expect(card).toContain("勤能补拙 1级");
-    expect(card).toContain("2K显示器");
+    expect(card).toContain("导师");
+    expect(card).toContain("&lt;导师&gt;");
+    expect(card).toContain("ending-highlight-tags\"><span>副教授</span><span>青基</span>");
+    expect(card).not.toContain("基金 青基");
+    expect(card).toContain("科研积累 20");
+    expect(card).toContain("累计经费 85");
+    expect(card.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ")).toContain("小林 同门");
+    expect(card).toContain("小周");
+    expect(card).toContain('ending-highlight-tags"><span>聪慧</span>');
+    expect(card).toContain("亲密 9");
+    expect(card).toContain("科研 7");
+    expect(card).toContain(`相识 ${state.totalMonths} 个月`);
+    expect(card).not.toContain("天赋点");
+    expect(card).not.toContain("2K显示器");
     expect(card).not.toContain("机械键盘");
-    expect(card).toContain("羽毛球 3 次");
-    expect(card).toContain("读论文 12 次");
-    expect(card).not.toContain("打牌 0 次");
+    expect(card).not.toContain("羽毛球");
+    expect(card).not.toContain("打牌");
+    expectEndingSectionValue(card, "reading", "12 次");
+    expectEndingSectionValue(card, "spending", "19.5 金币");
+    expectEndingSectionValue(card, "joint-training", "✓");
+    expect(card.match(/class="ending-record-cell"/g)).toHaveLength(6);
+    const advisor = card.indexOf('data-ending-section="relationships-advisor"');
+    const fellows = card.indexOf('data-ending-section="relationships-fellows"');
+    const lover = card.indexOf('data-ending-section="relationships-lover"');
+    expect(advisor).toBeLessThan(fellows);
+    expect(fellows).toBeLessThan(lover);
+  });
+
+  it("shows the lover's established trait as a compact tag", () => {
+    const state = finishedState("master");
+    state.loverState = activateLover("beautiful", 5, "male");
+    const card = endingCard(renderApp(state));
+    expect(card).toContain('class="ending-highlight-tags"><span>活泼</span>');
+    expect(card).not.toContain('class="ending-highlight-tags"><span>聪慧</span>');
   });
 
   it("includes final attribute caps and current relationship names", () => {
@@ -269,10 +327,11 @@ describe("basic ending presentation", () => {
     for (const [stat, value] of Object.entries({ san: "-3/25", research: "24/27", social: "12/20", favor: "9/20", money: 18 })) {
       expectEndingStat(card, stat, value);
     }
-    expect(card).toContain('data-ending-section="relationships"');
+    expect(card).toContain('data-ending-section="relationships-advisor"');
     expect(card).toContain("测试导师");
-    expect(card).toContain("senior");
-    expect(card).toContain("junior");
+    const text = card.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+    expect(text).toContain("senior 师姐");
+    expect(text).toContain("junior 师妹");
     expect(card).not.toContain('data-ending-stat="relationships"');
   });
 
@@ -392,8 +451,7 @@ describe("basic ending presentation", () => {
     expect(state).toEqual(snapshot);
   });
 
-  it("explains graduation and differentiates score failure from missing blind review", () => {
-    expect(endingCard(renderApp(finishedState("phd")))).toContain("毕业线 7 · 盲审通过");
+  it("differentiates score failure from missing blind review", () => {
     expect(endingCard(renderApp({ ...finishedState("delay"), totalResearchScore: 0 }))).toContain("科研分 0/1，未达标");
     expect(endingCard(renderApp(finishedState("delay")))).toContain("未完成盲审送审");
   });

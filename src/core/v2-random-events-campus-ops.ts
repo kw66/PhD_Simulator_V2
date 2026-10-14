@@ -1,4 +1,6 @@
-import { applyTierResist, formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
+import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
 import { createLabGpuFailureBuff } from "./v2-lab-compute";
 import {
   createThreeStageEvent,
@@ -9,11 +11,12 @@ import type { GameState, PendingEvent } from "./v2-types";
 export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRollProvider): PendingEvent {
   const serial = state.totalRandomEventCount;
   const reinstallSanChange = getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
-  const reinstallSuccess = getRoll() < 0.5;
+  const reinstallSuccessPercent = state.selectedRoleId === "chosen" && getRoleTalentLevel(state, "effortless-reinstall") > 0 ? 100 : 50;
+  const reinstallSuccess = getRoll() < reinstallSuccessPercent / 100;
   const taobaoSuccess = getRoll() < 0.5;
-  const reportSocialResult = applyTierResist(-2, state.player.social, getRoll);
+  const reportSocialResult = previewPlayerAttributeChange(state, "social", -2);
   const reportSocialChange = reportSocialResult.effectiveChange;
-  const reinstallSocialResult = applyTierResist(-1, state.player.social, getRoll);
+  const reinstallSocialResult = previewPlayerAttributeChange(state, "social", -1);
   const reinstallSocialChange = reinstallSocialResult.effectiveChange;
   const rentalOutcome = "全组实验费用 +1（每次，持续6个月）";
   const introDescription = [
@@ -43,19 +46,19 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
         id: `random-13-report-${serial}`,
         label: "举报挖矿",
         outcome: formatTierResistedOutcome("社交", -2, reportSocialResult),
-        effects: reportSocialChange < 0 ? { social: reportSocialChange } : {},
+        effects: { social: reportSocialChange, rawSocial: -2 },
       },
       {
         id: `random-13-reinstall-${serial}`,
         label: "自己重装",
         outcome: reinstallSuccess
-          ? `条件：重装成功（50%）｜结果：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。`
+          ? `条件：重装成功（${reinstallSuccessPercent}%）｜结果：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。`
           : `条件：重装失败（50%）｜结果：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}｜${formatTierResistedOutcome("社交", -1, reinstallSocialResult)}｜${rentalOutcome}。`,
         effects: reinstallSuccess
           ? { san: reinstallSanChange }
           : {
             san: reinstallSanChange,
-            ...(reinstallSocialChange < 0 ? { social: reinstallSocialChange } : {}),
+            ...({ social: reinstallSocialChange, rawSocial: -1 }),
             addBuffs: [createLabGpuFailureBuff()],
           },
       },
@@ -120,6 +123,6 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
             ].join("\n\n"),
       },
     },
-  });
+  }, state);
 }
 

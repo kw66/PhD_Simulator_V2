@@ -1,9 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { getConferenceInfo, getConferenceLocation, getConferenceReferenceScore, getRealConferenceYear } from "../src/core/v2-conference-catalog";
+import { createConferenceLocationSeed, getConferenceInfo, getConferenceLocation, getConferenceReferenceScore, getRealConferenceYear } from "../src/core/v2-conference-catalog";
 import { getCcigRealYear } from "../src/core/v2-fixed-events-ccig-shared";
 
 describe("v2 conference catalog", () => {
+  it("keeps distinct persistent run identities when their low 32 random bits coincide", () => {
+    let high = 0x1ffffe;
+    vi.stubGlobal("crypto", { getRandomValues: (values: Uint32Array) => { values[0] = high++; values[1] = 0xffffffff; return values; } });
+    try {
+      const first = createConferenceLocationSeed();
+      const second = createConferenceLocationSeed();
+      expect(second).not.toBe(first);
+      expect(Number.isSafeInteger(first)).toBe(true);
+      expect(Number.isSafeInteger(second)).toBe(true);
+      expect(JSON.parse(JSON.stringify(second))).toBe(second);
+      expect(getConferenceLocation(3, "A", 1, first)).toEqual(getConferenceLocation(3, "A", 1, second));
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("maps the first academic year to the 2023 enrollment calendar", () => {
     expect(getRealConferenceYear(1, 4)).toBe(2023);
     expect(getRealConferenceYear(1, 5)).toBe(2024);

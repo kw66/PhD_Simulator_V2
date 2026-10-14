@@ -703,6 +703,7 @@ describe("v2 publication loop", () => {
     };
     const next = dispatchAction(state, "promote-paper", { paperId: paper.id, promotionId: "quantum" });
     expect(next.player.money).toBe(5);
+    expect(next.personalSpending).toBe(5);
     expect(next.player.san).toBe(state.player.san);
     expect(next.papers[0]?.publication?.promotions?.quantum).toBe(true);
     expect(getPaperCitationMultiplierBreakdown(next, next.papers[0]!).promotion).toBe(1.25);

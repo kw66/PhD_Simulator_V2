@@ -51,6 +51,31 @@ describe("debug ending fixtures", () => {
     expect(high).toMatchObject({ playerName: "小王", debugEventReplayEnabled: true, blockLinearEvents: false });
   });
 
+  it("populates the ending archive fixture with relationships, offers, counts and spending", () => {
+    const state = createDebugEnding(createStartedGameState("normal"), "phd", () => 0.5);
+    const html = renderEndingScreen(state);
+    for (const marker of [
+      'data-ending-section="relationships-advisor"', 'data-ending-section="relationships-lover"',
+      'data-ending-section="relationships-fellows"', 'data-ending-section="offers"',
+      'data-ending-section="internships"', 'data-ending-section="scholarships"',
+      'data-ending-section="joint-training"', 'data-ending-section="reading"',
+      'data-ending-section="spending"', 'data-ending-section="meetings"',
+    ]) expect(html).toContain(marker);
+    expect(html).toContain("调试导师");
+    expect(html).toContain("调试恋人");
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+    expect(text).toContain("林舟 师兄");
+    expect(text).toContain("陈月 师妹");
+    expect(text).toContain("周宁 同门");
+    expect(html).toContain("累计经费 265");
+    expect(html).toContain("86.5 金币");
+    expect(Object.keys(state.careerOffers)).toHaveLength(1);
+    expect(html).toContain("offer");
+    const order = ["relationships-advisor", "offers", "relationships-fellows", "relationships-lover"];
+    expect(order.map((id) => html.indexOf(`data-ending-section="${id}"`))).toEqual([...order.map((id) => html.indexOf(`data-ending-section="${id}"`))].sort((a, b) => a - b));
+    expect(html).toContain("✓");
+  });
+
   it("routes all endings repeatedly through the engine and rejects invalid/setup requests", () => {
     const setup = createInitialState();
     expect(dispatchAction(setup, "debug-trigger-ending", { eventId: "master" })).toEqual(setup);

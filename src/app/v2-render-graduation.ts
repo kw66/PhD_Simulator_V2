@@ -1,6 +1,8 @@
+import { renderSanPayment } from "./v2-render-san-payment";
+import { getEffectiveResearch } from "../core/v2-effective-attributes";
 import { CAREER_DEFINITIONS, CAREER_JOBS, calculateMonthlyCareerProgress, getCareerAbility, getCareerBaseScore, type CareerType } from "../core/v2-career-rules";
 import { getEventChoiceRiskDetails } from "../core/v2-event-choice-risk";
-import { CAREER_PREPARATION_SAN_COST, getCareerPreparationFailure } from "../core/v2-graduation-career";
+import { getCareerPreparationSanCost, getCareerPreparationFailure } from "../core/v2-graduation-career";
 import { formatMoney, roundMoney } from "../core/v2-money";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import {
@@ -15,6 +17,7 @@ import {
 import type { GameState, PendingEvent } from "../core/v2-types";
 import { animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
 import { getThesisGlobalStats } from "./v2-thesis-stats";
+import { formatCompactSanPayment, quoteSanPayment } from "../core/v2-role-talent-costs";
 
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")
@@ -46,6 +49,7 @@ function renderThesisCard(state: GameState): string {
   const baseScale = Math.ceil(reference * 2);
   const identity = `graduation:${state.degree}:thesis`;
   const sanCost = getThesisAdvanceSanCost(state);
+  const paymentText = formatCompactSanPayment(quoteSanPayment(state, sanCost, { allowOverdraw: true }));
   const preview: PendingEvent = {
     id: "thesis-advance-preview", chainId: "thesis-advance-preview", title: "推进毕业论文", description: "",
     source: "thesis", blocking: false, deadlineMonths: 0, stage: "act2",
@@ -66,7 +70,7 @@ function renderThesisCard(state: GameState): string {
       const pointIdentity = `${identity}:point:${index}`;
       const pointScale = Math.max(baseScale, Math.ceil(point.score * 1.2));
       const label = `研究点${formatMoney(index + 1)}`;
-      const hint = disabledReason ?? `推进+${formatMoney(Math.floor(state.player.research))} · SAN-${formatMoney(sanCost)}`;
+      const hint = disabledReason ?? `推进+${formatMoney(Math.floor(getEffectiveResearch(state)))} · ${paymentText}`;
       const riskText = !disabledReason && risk ? `${hint}\n${risk.explanation}` : null;
       const buttonTooltip = riskText
         ? `data-event-risk-tooltip data-tooltip="${escapeHtml(riskText)}" aria-description="${escapeHtml(riskText)}"`
@@ -84,7 +88,7 @@ function renderThesisCard(state: GameState): string {
           ${(["B", "A"] as const).map((grade) => `<span class="graduation-bar-grade is-${grade.toLowerCase()}" style="left:clamp(8px, ${formatMoney(thresholds[grade] / 3 / pointScale * 100)}%, calc(100% - 8px))" aria-hidden="true">${grade}</span>`).join("")}
           </div>
         <strong class="rel-progress-val">${renderAnimatedNumber(`${pointIdentity}:score`, point.score)}</strong>
-        <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="advance-thesis-point" data-thesis-point-index="${index}" ${buttonTooltip}${disabledReason ? ' disabled aria-disabled="true"' : ""}><span>📝推进</span>${riskText ? `<span class="event-choice-risk is-${risk!.risk}" aria-label="${escapeHtml(risk!.explanation)}">${risk!.risk === "certain" ? "！" : "？"}</span>` : ""}<small class="rel-action-cost">SAN-${renderAnimatedNumber(`${pointIdentity}:san-cost`, sanCost)}</small></button>
+        <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="advance-thesis-point" data-thesis-point-index="${index}" ${buttonTooltip}${disabledReason ? ' disabled aria-disabled="true"' : ""}><span>📝推进</span>${riskText ? `<span class="event-choice-risk is-${risk!.risk}" aria-label="${escapeHtml(risk!.explanation)}">${risk!.risk === "certain" ? "！" : "？"}</span>` : ""}<small class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, sanCost, { allowOverdraw: true }), 0, pointIdentity)}</small></button>
       </div>`;
     }).join("")}${state.degree === "master" ? `<div class="graduation-point is-unused" data-graduation-point="2"><span class="rel-detail-label"><span class="rel-inline-icon" aria-hidden="true">🔬</span>研究点3</span><div class="rel-progress-bar graduation-point-bar" role="meter" aria-label="研究点3（硕士无需推进）" aria-valuemin="0" aria-valuemax="${formatMoney(baseScale)}" aria-valuenow="0"></div><strong class="rel-progress-val">0</strong><span class="graduation-unused-action">硕士不需要</span></div>` : ""}</div>
     ${thesis.reviewResolved && review?.reason ? `<p class="graduation-review-reason">${escapeHtml(review.reason)}</p>` : ""}
@@ -94,15 +98,16 @@ function renderThesisCard(state: GameState): string {
 function renderCareerCard(state: GameState): string {
   const unlocked = isGraduationPreparationUnlocked(state);
   const directions: CareerType[] = ["internet", "stateOwned", "civilService", "academic"];
-  const offerCount = Object.keys(state.careerOffers).length;
+  const offerCount = Object.values(state.careerOffers).filter((offer) => offer !== undefined).length;
   return `<section class="graduation-card${unlocked ? "" : " is-locked"} rel-card filled rel-card-compact" data-graduation-card="career" aria-labelledby="graduation-career-title">
     <header class="rel-card-header paper-card-header graduation-career-header"><strong class="rel-name" id="graduation-career-title"><span class="rel-inline-icon" aria-hidden="true">💼</span>找工作</strong><span class="graduation-status">${unlocked ? offerCount ? `已获${offerCount}份 offer` : "已开放" : renderGraduationCountdown(monthsUntilOpening(state), "开放")}</span></header>
     <div class="graduation-careers">${directions.map((type) => {
       const failure = getCareerPreparationFailure(state, type);
-      const cost = CAREER_PREPARATION_SAN_COST[type];
+      const cost = getCareerPreparationSanCost(state, type);
       const choice = { id: "advance", label: "推进", outcome: "", effects: { san: -cost } };
       const risk = failure ? null : getEventChoiceRiskDetails(state, { id: "career-preview", chainId: "career-preview", title: "找工作推进", description: "", source: "career", stage: "act2", blocking: false, deadlineMonths: 0, choices: [choice] }, choice);
-      const actionHint = failure ?? `本方向每月一次，不占行动点；SAN-${cost}${risk ? `\n${risk.explanation}` : ""}`;
+      const paymentText = formatCompactSanPayment(quoteSanPayment(state, cost, { allowOverdraw: true }));
+      const actionHint = failure ?? `本方向每月一次，不占行动点；${paymentText}${risk ? `\n${risk.explanation}` : ""}`;
       const eligible = unlocked && (type !== "academic" || state.degree === "phd");
       const ability = eligible ? getCareerAbility(state, type) : 0;
       const resume = eligible ? getCareerBaseScore(state, type) : 0;
@@ -123,7 +128,7 @@ function renderCareerCard(state: GameState): string {
       <strong class="rel-detail-label" tabindex="0" ${tooltip(progressHint)}><span class="rel-inline-icon" aria-hidden="true">${({ internet: "🏢", stateOwned: "🏛️", civilService: "📋", academic: "🎓" } as const)[type]}</span>${escapeHtml(CAREER_DEFINITIONS[type].name)}${offer ? '<span class="graduation-offer-marker" aria-label="已获 offer">✓</span>' : ""}</strong>
       <div class="rel-progress-bar graduation-career-bar" tabindex="0" role="meter" aria-label="${escapeHtml(CAREER_DEFINITIONS[type].name)}应聘能力" aria-valuemin="0" aria-valuemax="${formatMoney(scale)}" aria-valuenow="${formatMoney(ability)}" ${tooltip(progressHint)}><span class="graduation-bar-fill-track"><span class="rel-progress-fill graduation-career-resume${baseWidth > 0 ? " is-start" : ""}${practiceWidth + interviewWidth === 0 ? " is-end" : ""}" style="width:${formatMoney(baseWidth)}%"></span><span class="rel-progress-fill graduation-career-practice${baseWidth === 0 && practiceWidth > 0 ? " is-start" : ""}${interviewWidth === 0 ? " is-end" : ""}" style="width:${formatMoney(practiceWidth)}%"></span><span class="rel-progress-fill graduation-career-interview${baseWidth + practiceWidth === 0 && interviewWidth > 0 ? " is-start" : ""} is-end" style="width:${formatMoney(interviewWidth)}%"></span></span></div>
       <strong class="rel-progress-val">${renderAnimatedNumber(`graduation:${state.degree}:career:${type}:progress`, ability)}</strong>
-      <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="prepare-career" data-career-type="${type}" ${risk ? "data-event-risk-tooltip" : "data-card-tooltip"} data-tooltip="${escapeHtml(actionHint)}"${failure ? ' disabled aria-disabled="true"' : ""}><span>📈推进</span><span class="graduation-action-gain">${gainLabel}</span>${risk ? `<span class="event-choice-risk is-${risk.risk}" aria-label="${escapeHtml(risk.explanation)}">！</span>` : ""}<small class="rel-action-cost">SAN-${cost}</small></button>
+      <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="prepare-career" data-career-type="${type}" ${risk ? "data-event-risk-tooltip" : "data-card-tooltip"} data-tooltip="${escapeHtml(actionHint)}"${failure ? ' disabled aria-disabled="true"' : ""}><span>📈推进</span><span class="graduation-action-gain">${gainLabel}</span>${risk ? `<span class="event-choice-risk is-${risk.risk}" aria-label="${escapeHtml(risk.explanation)}">！</span>` : ""}<small class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, cost, { allowOverdraw: true }))}</small></button>
     </div>`;
     }).join("")}</div>
   </section>`;
