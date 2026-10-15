@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createFundingCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
@@ -68,7 +69,7 @@ describe("advisor funding reimbursements", () => {
   });
 
   it("schedules only on final confirmation and lets debug replay switch away without a reward", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = makeState(18);
     let state: GameState = { ...initial, debugEventReplayEnabled: true, eventQueue: [createEventQueueItem(makeEvent(initial), 1)] };
     state = resolve(resolve(state), 3);
@@ -88,7 +89,7 @@ describe("advisor funding reimbursements", () => {
   });
 
   it("keeps saved rolls when deferred and schedules relative to the actual resolution month", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = makeState(6);
     let state: GameState = JSON.parse(JSON.stringify({ ...initial, eventQueue: [createEventQueueItem(makeEvent(initial, [0.7, 0.5, 0.2]), 1)] }));
     state.month = 7;

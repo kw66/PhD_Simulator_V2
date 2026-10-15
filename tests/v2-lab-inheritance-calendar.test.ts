@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { dispatchAction } from "../src/core/v2-engine";
@@ -53,7 +54,7 @@ function expectNoPublications(state: GameState): void {
     .some((paper) => paper.status === "published")).toBe(false);
 }
 
-beforeEach(() => vi.spyOn(Math, "random").mockReturnValue(0.99));
+beforeEach(() => vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99));
 afterEach(() => vi.restoreAllMocks());
 
 describe("lab inheritance calendar through the dispatcher", () => {

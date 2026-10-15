@@ -1,3 +1,4 @@
+import { recordAchievementStats } from "./v2-achievement-runtime-types";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import type { GameState } from "./v2-types";
@@ -38,13 +39,13 @@ export function paySanCost(state: GameState, cost: number, options: SanPaymentOp
   const quote = quoteSanPayment(state, cost, options);
   if (!quote.allowed || (quote.sanCost === 0 && quote.moneyCost === 0 && quote.sanCapCost === 0)) return state;
   const sanCap = state.sanCap - quote.sanCapCost;
-  return recordPersonalSpending({
+  return recordAchievementStats(recordPersonalSpending({
     ...state,
     sanCap,
     player: { ...state.player, san: quote.sanCapCost > 0 ? Math.min(sanCap, state.player.san - quote.sanCost) : state.player.san - quote.sanCost,
       money: roundMoney(state.player.money - quote.moneyCost) },
     ...(quote.usesBeta ? { roleTalents: { ...state.roleTalents!, betaUsedMonth: state.totalMonths } } : {}),
-  }, quote.moneyCost);
+  }, quote.moneyCost));
 }
 
 export function formatSanPayment(quote: SanPaymentQuote): string {

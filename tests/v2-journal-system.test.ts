@@ -40,7 +40,8 @@ describe("v2 journal system", () => {
     const base = playingState();
     const paper = { ...createDraftPaper(1, 0), idea: 10, experiment: 100, writing: 15,
       collaborationScores: { idea: 5, experiment: 20, writing: 5 } };
-    const next = submitJournalPaper({ ...base, papers: [paper] }, paper.id, "pami");
+    const sent = submitJournalPaper({ ...base, papers: [paper] }, paper.id, "pami");
+    const next = submitJournalPaper(sent, paper.id, "pami");
     expect(next.externalPublications[0]?.publication).toMatchObject({ effectiveScore: 125 });
     expect(next.totalResearchScore).toBe(base.totalResearchScore + 5);
   });
@@ -59,7 +60,7 @@ describe("v2 journal system", () => {
     const paper = { ...createDraftPaper(1, 0), status: "journal-reviewing" as const, journalTarget: "pami" as const,
       idea: 10, experiment: 100, writing: 15, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40 };
     expect(getJournalScore(paper)).toBe(125);
-    const next = resolveReadyJournalPapers({ ...base, papers: [paper] }).state;
+    const next = submitJournalPaper({ ...base, papers: [paper] }, paper.id, "pami");
     expect(next.externalPublications[0]?.publication?.effectiveScore).toBe(125);
   });
 
@@ -89,8 +90,8 @@ describe("v2 journal system", () => {
     expect(revised.papers[0]?.journalScoreHistory).toEqual([
       { totalMonths: 1, score: 90 }, { totalMonths: 2, score: 95 },
     ]);
-    const accepted = resolveReadyJournalPapers({ ...revised, totalMonths: 3, month: 3,
-      papers: [{ ...revised.papers[0]!, experiment: 65 }] }).state;
+    const accepted = submitJournalPaper({ ...revised, totalMonths: 3, month: 3,
+      papers: [{ ...revised.papers[0]!, experiment: 65 }] }, paper.id, "pami");
     expect(accepted.externalPublications[0]?.journalScoreHistory).toEqual([
       { totalMonths: 1, score: 90 }, { totalMonths: 2, score: 95 }, { totalMonths: 3, score: 130 },
     ]);
@@ -100,7 +101,7 @@ describe("v2 journal system", () => {
     const state = playingState();
     const paper = { ...createDraftPaper(1, 0), idea: 40, experiment: 40, writing: 40 };
     const html = renderApp({ ...state, papers: [paper], selectedPaperId: paper.id }, createDefaultAccountProfile());
-    expect(html).toContain('data-tooltip="送审分 150\n达标分 500"');
+    expect(html).toContain('data-tooltip="送审分 150\n达标分 500\n点击送审，达标后再次点击发表"');
     expect(html).not.toContain("workstation-submit-info-item");
     expect(html).toContain('data-action="submit-journal-paper"');
     expect(html).toContain('data-journal-target="nmi"');
@@ -122,14 +123,17 @@ describe("v2 journal system", () => {
     })).toBe(getJournalScore(paper) + (researched.papers[0]?.idea ?? 40) - 40 + 5 + 2);
   });
 
-  it("automatically archives a journal paper when it reaches the acceptance score", () => {
+  it("requires a second click even when a draft already meets the acceptance score", () => {
     const state = playingState();
     const paper = { ...createDraftPaper(1, 0), heatMultiplier: 1, idea: 42, experiment: 42, writing: 42 };
-    const submitted = dispatchAction({ ...state, papers: [paper], selectedPaperId: paper.id }, "submit-journal-paper", {
+    const reviewing = dispatchAction({ ...state, papers: [paper], selectedPaperId: paper.id }, "submit-journal-paper", {
       paperId: paper.id,
       journalTarget: "pami",
     });
 
+    expect(reviewing.papers[0]?.status).toBe("journal-reviewing");
+    expect(reviewing.externalPublications).toHaveLength(0);
+    const submitted = dispatchAction(reviewing, "submit-journal-paper", { paperId: paper.id, journalTarget: "pami" });
     expect(submitted.papers).toHaveLength(0);
     expect(submitted.totalResearchScore).toBe(state.totalResearchScore + 5);
     expect(submitted.externalPublications[0]).toMatchObject({ status: "published", journalTarget: "pami" });
@@ -155,17 +159,54 @@ describe("v2 journal system", () => {
       ...submitted,
       papers: submitted.papers.map((entry) => ({ ...entry, experiment: 170 })),
     };
-    const resolved = resolveReadyJournalPapers(revised).state;
+    const waiting = resolveReadyJournalPapers(revised).state;
+    expect(waiting.externalPublications).toHaveLength(0);
+    const resolved = submitJournalPaper(waiting, paper.id, "nmi");
 
     expect(resolved.papers).toHaveLength(0);
     expect(resolved.externalPublications[0]?.publication?.effectiveScore).toBe(250);
+  });
+
+  it("keeps an overqualified revision editable past 1000 until its own journal button is clicked", () => {
+    const state = playingState();
+    const paper = { ...createDraftPaper(1, 0), idea: 400, experiment: 400, writing: 400 };
+    const submitted = submitJournalPaper({ ...state, papers: [paper], selectedPaperId: paper.id }, paper.id, "nature");
+    const revised = dispatchAction(submitted, "research-paper", { paperId: paper.id, paperActionType: "writing" });
+    expect(revised.externalPublications).toHaveLength(0);
+    expect(getJournalScore(revised.papers[0]!)).toBeGreaterThan(1200);
+    const waiting = resolveReadyJournalPapers({ ...revised, month: 2, totalMonths: 2 }).state;
+    expect(waiting.papers[0]?.status).toBe("journal-reviewing");
+    expect(waiting.totalResearchScore).toBe(state.totalResearchScore);
+    expect(getJournalSubmissionFailure(waiting.papers[0], "pami")).toContain("撤稿");
+    expect(submitJournalPaper(waiting, paper.id, "pami").externalPublications).toHaveLength(0);
+    const html = renderApp(waiting, createDefaultAccountProfile());
+    expect(html).toContain('aria-label="发表 Nature" data-action="submit-journal-paper"');
+    const published = dispatchAction(waiting, "submit-journal-paper", { paperId: paper.id, journalTarget: "nature" });
+    expect(published.externalPublications[0]?.publication?.effectiveScore).toBe(getJournalScore(waiting.papers[0]!));
+    expect(published.totalResearchScore).toBe(state.totalResearchScore + 20);
+    const again = dispatchAction(published, "submit-journal-paper", { paperId: paper.id, journalTarget: "nature" });
+    expect(again.externalPublications).toHaveLength(1);
+    expect(again.totalResearchScore).toBe(published.totalResearchScore);
+  });
+
+  it("publishes only the confirmed paper and refuses confirmation below its acceptance threshold", () => {
+    const base = playingState();
+    const ready = { ...createDraftPaper(1, 0), status: "journal-reviewing" as const, journalTarget: "pami" as const,
+      idea: 50, experiment: 50, writing: 50 };
+    const other = { ...ready, id: "other" };
+    const low = { ...ready, id: "low", writing: 1 };
+    const state = { ...base, papers: [ready, other, low] };
+    expect(submitJournalPaper(state, "low", "pami").externalPublications).toHaveLength(0);
+    const confirmed = submitJournalPaper(state, ready.id, "pami");
+    expect(confirmed.externalPublications.map(paper => paper.id)).toEqual([ready.id]);
+    expect(confirmed.papers.map(paper => paper.id)).toEqual(["other", "low"]);
   });
 
   it("settles journal citations monthly with the configured 0.05 base rate", () => {
     const state = playingState();
     const paper = { ...createDraftPaper(1, 0), heatMultiplier: 1, idea: 42, experiment: 42, writing: 42 };
     const submitted = submitJournalPaper({ ...state, papers: [paper], selectedPaperId: paper.id }, paper.id, "pami");
-    const firstMonth = settlePublishedPaperCitations(submitted).state;
+    const firstMonth = settlePublishedPaperCitations(submitJournalPaper(submitted, paper.id, "pami")).state;
     expect(firstMonth.externalPublications[0]?.publication).toMatchObject({
       effectiveScore: 126,
       citations: 3,

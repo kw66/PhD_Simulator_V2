@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { createLoverState } from "./v2-lover-system";
 import { getConferenceMentorContact, getConferenceScholarContact } from "./v2-conference-contacts";
 import type { PendingEvent } from "./v2-types";
@@ -97,7 +98,7 @@ export function createConferenceActivityDecisionEvent(
   context: ConferenceActivityContext,
   state: ConferenceActivityBuildState,
   attendanceSummary: string,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
   frozenPreview?: ConferenceActivityPreview,
 ): PendingEvent {
   const rolls = frozenPreview?.rolls ?? Array.from({ length: 32 }, () => getRoll());
@@ -160,7 +161,7 @@ export function createConferenceActivityEvent(
   context: ConferenceActivityContext,
   state: ConferenceActivityBuildState,
   attendanceSettlementItems: string[],
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
   frozenPreview?: ConferenceActivityPreview,
 ): PendingEvent {
   const activityChainId = getConferenceActivityChainId(context);

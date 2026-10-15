@@ -3703,6 +3703,7 @@ button.pager-arrow:disabled {
 
 .lobby-profile-achievement-rail {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   align-content: start;
   align-self: stretch;
   padding: 0 0 0 24px;
@@ -4007,7 +4008,7 @@ button.pager-arrow:disabled {
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   align-items: start;
-  gap: 7px;
+  gap: 4px;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -4022,8 +4023,8 @@ button.pager-arrow:disabled {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 64px;
-  padding: 7px 9px;
+  min-height: 54px;
+  padding: 5px 9px;
   border: 1px solid rgba(58, 62, 57, 0.16);
   border-radius: 3px;
   background: linear-gradient(180deg, #f6f2e8, #ede7da);
@@ -4044,6 +4045,7 @@ button.pager-arrow:disabled {
 
 .lobby-profile-achievement-icon {
   display: grid;
+  align-self: center;
   place-items: center;
   width: 38px;
   height: 38px;
@@ -4074,8 +4076,50 @@ button.pager-arrow:disabled {
 
 .lobby-profile-achievement-copy {
   display: grid;
-  gap: 2px;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
   min-width: 0;
+  min-height: 40px;
+  align-content: center;
+  align-items: center;
+}
+
+.achievement-scope-tags {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 3px;
+  justify-content: flex-end;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.achievement-card-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  align-self: stretch;
+  gap: 6px;
+  min-width: 0;
+  max-width: 96px;
+}
+
+.achievement-scope-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 3px;
+  border: 1px solid #cdbd9b;
+  border-radius: 3px;
+  background: #e9dfc9;
+  color: #75613d;
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .lobby-profile-achievement-condition strong {
@@ -4096,24 +4140,14 @@ button.pager-arrow:disabled {
   font-weight: 620;
   line-height: 1.28;
   overflow-wrap: anywhere;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
 .lobby-profile-achievement .lobby-profile-achievement-reward {
   color: var(--setup-label-color);
-}
-
-.lobby-profile-achievement-date {
-  align-self: start;
-  margin-top: 2px;
-  color: color-mix(in oklab, var(--accent-deep) 72%, var(--ink-soft));
-  font-family: var(--ui-font-cjk);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.lobby-profile-achievement-date.is-unknown {
-  color: var(--ink-soft);
 }
 
 .lobby-profile-achievement-empty {
@@ -5067,6 +5101,12 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 
 .relationship-tooltip[hidden] {
   display: none;
+}
+
+.relationship-tooltip.is-achievement-tooltip {
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #b9a071 transparent;
 }
 
 [data-relationship-tooltip]:focus-visible {

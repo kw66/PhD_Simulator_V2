@@ -9,6 +9,7 @@ import { getResearchCap } from "../core/v2-research-cap-system";
 import { getAcceptedPaperScore } from "../core/v2-publication-rules";
 import { formatMoney } from "../core/v2-money";
 import { getNextRoleLevelExperience } from "../core/v2-role-experience";
+import { getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import type { EndingId, GameState, Paper, RoleExperienceAward } from "../core/v2-types";
 
 interface EndingPresentation {
@@ -95,19 +96,12 @@ function renderEndingShowcase(state: GameState, published: Paper[]): string {
 }
 
 function endingOfferTitle(offer: CareerOffer): string {
-  if (offer.type === "civilService") {
-    const [unit = "", ...rank] = offer.name.split(" · ");
-    const units: Record<string, string> = {
-      "乡镇": "乡镇党政机关", "县区": "县区党政机关", "市直": "市直机关", "省直": "省直机关", "中央机关": "中央机关",
-    };
-    return [units[unit] ?? unit, ...rank].join(" · ");
-  }
   if (offer.type !== "academic") return offer.name;
-  const match = /^academic-(second-tier|non-elite|211|985)-(postdoc|lecturer|associate|professor)$/u.exec(offer.jobId);
+  const match = /^academic-(non-elite|211|985|world)-(lecturer|associate|professor)$/u.exec(offer.jobId);
   if (!match) return offer.name;
-  const school = { "second-tier": "二本院校", "non-elite": "双非一本院校", "211": "211 高校", "985": "985 高校" }[match[1]!];
-  const rank = match[2] === "professor" && match[1] === "985" ? "特聘教授"
-    : { postdoc: "博士后", lecturer: "讲师", associate: "副教授", professor: "教授" }[match[2]!];
+  const school = { "non-elite": "双非高校", "211": "211 高校", "985": "985 高校", world: "世界名校" }[match[1]!];
+  const rank = match[1] === "world" ? "长聘教授"
+    : { lecturer: "讲师", associate: "副教授", professor: "教授" }[match[2]!];
   return `${school} · 人工智能学院 · ${rank}`;
 }
 
@@ -127,7 +121,7 @@ function renderEndingLife(state: GameState): string {
       </div>` : "";
   const offer = Object.values(state.careerOffers).find((entry) => entry !== undefined);
   const offerTitle = offer ? endingOfferTitle(offer).split(" · ") : [];
-  const offerMeta = offer ? [...offerTitle.slice(1), offer.compensation, offer.detail === "博士后岗位" ? "" : offer.detail].filter(Boolean) : [];
+  const offerMeta = offer ? [...offerTitle.slice(1), offer.compensation, offer.detail].filter(Boolean) : [];
   const destination = offer
     ? `<div class="ending-highlight is-offer" data-ending-section="offers"><div class="ending-highlight-heading"><span>💼 offer：</span><strong>${escapeHtml(offerTitle[0]!)}</strong></div>${offerMeta.length ? `<div class="ending-highlight-detail">${offerMeta.map((detail) => `<span>${escapeHtml(detail!)}</span>`).join("")}</div>` : ""}</div>` : "";
   const fellows = state.fellowProgressState.map((profile) =>
@@ -184,7 +178,7 @@ function renderEndingSummary(state: GameState, published: Paper[]): string {
   </section>`;
 }
 
-export function renderEndingScreen(state: GameState, experienceAward?: RoleExperienceAward): string {
+export function renderEndingScreen(state: GameState, experienceAward?: RoleExperienceAward, saveStatus?: string): string {
   const ending = state.ending;
   const copy = ending ? ENDINGS[ending] : {
     title: "本轮结束", icon: "📖", tone: "pause",
@@ -207,6 +201,9 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
   const award = experienceAward?.roleId === state.selectedRoleId ? experienceAward : null;
   const nextLevelExp = award ? getNextRoleLevelExperience(award.level) : null;
   const published = getEndingPublications(state);
+  const achievementIds = new Set(state.runAchievementIds ?? []);
+  const achievements = award?.disqualifiedByDebug ? []
+    : getAllAchievementDefinitions().filter(definition => achievementIds.has(definition.id));
   return `<section class="ending-panel" data-ending="${ending ?? "unknown"}" data-tone="${copy.tone}" aria-labelledby="ending-title">
         <header class="ending-header">
           <div class="ending-header-copy">
@@ -220,14 +217,17 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
         ${renderEndingShowcase(state, published)}
         ${renderEndingSummary(state, published)}
         ${renderEndingLife(state)}
-        ${award?.disqualifiedByDebug ? `<div class="ending-experience" aria-label="角色经验结算">调试局，本局不结算角色经验</div>` : award ? `<div class="ending-experience" aria-label="角色经验结算">
+        ${achievements.length ? `<section class="ending-achievements" aria-label="本局达成成就">${achievements.map(definition => `<span class="ending-achievement" data-ending-achievement-id="${escapeHtml(definition.id)}"><span aria-hidden="true">${escapeHtml(definition.icon)}</span><strong>${escapeHtml(definition.title)}</strong></span>`).join("")}</section>` : ""}
+        ${award?.disqualifiedByDebug ? `<div class="ending-experience" aria-label="角色经验结算">调试局，本局不结算成就、经验及后续统计</div>` : award ? `<div class="ending-experience" aria-label="角色经验结算">
           <span>本局经验 <strong>+${award.gained}</strong></span>
           <span>等级 <strong>Lv${award.previousLevel}${award.level > award.previousLevel ? ` → Lv${award.level}` : ""}</strong></span>
           <span>经验 <strong>${award.exp}/${nextLevelExp ?? "∞"}</strong></span>
-        </div>` : ""}
+        </div>${state.phase === "finished" ? `<small class="ending-experience-note">结算并重开后领取；回溯可继续本局</small>` : ""}` : ""}
         <footer class="ending-actions">
+          ${saveStatus ? `<p class="run-saves-status" role="status">${escapeHtml(saveStatus)}</p>` : ""}
           <div class="ending-buttons">
-            <button class="settings-primary-btn is-restart" type="button" data-action="restart-game"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>再读一次</span></button>
+            <button class="settings-primary-btn is-restart" type="button" data-action="restart-game"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>结算并重开</span></button>
+            <button class="settings-primary-btn is-rewind" type="button" data-ui-open-run-saves><i data-lucide="history" aria-hidden="true"></i><span>我要回溯</span></button>
             <button class="settings-primary-btn is-return" type="button" data-action="reset-game"><i data-lucide="house" aria-hidden="true"></i><span>返回开始页面</span></button>
           </div>
         </footer>

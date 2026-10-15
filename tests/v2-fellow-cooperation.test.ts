@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -88,7 +89,7 @@ describe("fellow completion announcements", () => {
   });
 
   it("keeps monthly completion and actual help in the engine log without routine cooperation spam", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const base = withPending(makeState("senior"), { taskProgress: 99 });
     const next = dispatchAction({ ...base, log: [] }, "next-month");
     const relevant = next.log.filter((entry) => /^(科研协作完成|论文帮助)：/.test(entry.text));
@@ -120,7 +121,7 @@ describe("fellow cooperation completion", () => {
   });
 
   it("settles lover, junior and advisor help in one action when they unlock each other", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const base = withPending(makeState("junior"), { pendingHelpToPlayer: 7 });
     const before = { ...base, selectedAdvisorName: "林老师", papers: [],
       advisorProgressState: { ...base.advisorProgressState, pendingGuidanceToPlayer: 10 },
@@ -347,7 +348,7 @@ describe("cooperation field routing", () => {
 
 describe("engine and research lifecycle retries", () => {
   it("retries after research unlocks another field without consuming the same help twice", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const state = { ...withPending(makeState("junior"), { pendingHelpToPlayer: 20 }), papers: [makePaper(0, 0, 0, 0)] };
     expect(settlePendingFellowHelp(state)).toBe(state);
     const next = dispatchAction(state, "research-paper", { paperId: state.papers[0]!.id, paperActionType: "idea" });
@@ -358,7 +359,7 @@ describe("engine and research lifecycle retries", () => {
   });
 
   it("resumes player help automatically when conference review ends in rejection", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const base = withPending(makeState("senior"), { pendingHelpToPlayer: 20 });
     const submitted = { ...prepareConferenceSubmission(makePaper(0, 1, 1, 1), "A", 1, 1), reviewMonthsLeft: 1 };
     let next = dispatchAction({ ...base, papers: [submitted] }, "next-month");
@@ -416,12 +417,14 @@ describe("engine and research lifecycle retries", () => {
     expect(advanceFellowResearch(next, () => 0).fellowPapers).toEqual(next.fellowPapers);
   });
 
-  it("archives a journal revision when automatic help reaches the acceptance threshold", () => {
+  it("waits for journal confirmation after automatic help reaches the acceptance threshold", () => {
     const base = withPending(makeState("senior"), { pendingHelpToPlayer: 20 });
     const paper = { ...makePaper(0, 40, 40, 40), status: "journal-reviewing" as const,
       journalTarget: "pami" as const, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40,
     };
-    const next = dispatchAction({ ...base, papers: [paper] }, "select-paper", { paperId: paper.id });
+    const revised = dispatchAction({ ...base, papers: [paper] }, "select-paper", { paperId: paper.id });
+    expect(revised.externalPublications).toHaveLength(0);
+    const next = dispatchAction(revised, "submit-journal-paper", { paperId: paper.id, journalTarget: "pami" });
     expect(next.papers).toHaveLength(0);
     const published = next.externalPublications.find((entry) => entry.id === paper.id)!;
     expect(published).toMatchObject({ status: "published", journalTarget: "pami", idea: 60, experiment: 40, writing: 40 });
@@ -430,15 +433,17 @@ describe("engine and research lifecycle retries", () => {
     expect(dispatchAction(next, "select-paper", { paperId: paper.id }).externalPublications).toEqual(next.externalPublications);
   });
 
-  it("credits a journal accepted through monthly cooperation before checking graduation", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+  it("credits a journal only after confirming the monthly cooperation result", () => {
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const base = withPending(makeState("senior"), { taskProgress: 99 });
     const paper = { ...makePaper(0, 40, 40, 40), status: "journal-reviewing" as const,
       journalTarget: "pami" as const, submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40,
     };
-    const next = dispatchAction({ ...base, totalMonths: 35, year: 3, month: 11,
+    const revised = dispatchAction({ ...base, totalMonths: 35, year: 3, month: 11,
       maxMonths: 36, graduationScoreTarget: 5, papers: [paper],
     }, "next-month");
+    expect(revised.externalPublications).toHaveLength(0);
+    const next = dispatchAction(revised, "submit-journal-paper", { paperId: paper.id, journalTarget: "pami" });
     expect(next.externalPublications.find((entry) => entry.id === paper.id)?.status).toBe("published");
     expect(next.totalResearchScore).toBe(5);
     expect(next.ending).not.toBe("delay");
@@ -454,10 +459,12 @@ describe("engine and research lifecycle retries", () => {
       deadlineMonths: 0, chainId: "final-cooperation", stage: "result",
       choices: [{ id: "finish", label: "完成", outcome: "", effects: {} }],
     }, 34);
-    const next = dispatchAction(withPassingThesisReview({ ...base, selectedAdvisorName: "导师",
+    const revised = dispatchAction(withPassingThesisReview({ ...base, selectedAdvisorName: "导师",
       totalMonths: 34, maxMonths: 34, year: 3, month: 10, graduationScoreTarget: 5,
       papers: [paper], eventQueue: [event],
     }), "resolve-event", { eventId: event.id, eventChoiceId: "finish" });
+    expect(revised.externalPublications).toHaveLength(0);
+    const next = dispatchAction(revised, "submit-journal-paper", { paperId: paper.id, journalTarget: "pami" });
     expect(next.externalPublications.find((entry) => entry.id === paper.id)?.status).toBe("published");
     expect(next.phase).toBe("playing");
     expect(next.ending).toBeNull();

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createImageMisuseBuff } from "../src/core/v2-academic-integrity";
@@ -32,7 +33,7 @@ function playingState(overrides: Partial<GameState> = {}): GameState {
 }
 
 function queueScholarship(state: GameState, roll: () => number = () => 0): GameState {
-  vi.spyOn(Math, "random").mockImplementation(roll);
+  vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(roll);
   return { ...state, eventQueue: [createEventQueueItem(createScholarshipEvent(state, roll), 1)] };
 }
 
@@ -83,7 +84,7 @@ describe("image misuse scholarship disqualification", () => {
   it("draws the cutoff on application, preserves it on refresh, and refreshes the displayed SAN cost", () => {
     let state = queueScholarship(playingState(), () => 0);
     state = resolve(state);
-    const random = vi.mocked(Math.random).mockReturnValue(0.99);
+    const random = vi.mocked(gameRandomSource.gameRandom).mockReturnValue(0.99);
     state = resolve(state);
     expect(currentEvent(state).scholarshipContext!.requirement).toBe(4);
     expect(currentEvent(state).description).toContain("结果：SAN -2");
@@ -128,7 +129,7 @@ describe("image misuse scholarship disqualification", () => {
     expect(result.choices[0]!.effects.scholarshipAward).toBeUndefined();
     expect(result.choices[0]!.effects.san).toBe(-2);
     expect(result.description).toContain("结果：SAN -2");
-    expect(result.deferredStatePatch).toBeUndefined();
+    expect(result.deferredStatePatch?.some((change) => change.path[0] === "player" || change.path[0] === "scholarshipState") ?? false).toBe(false);
     expect(preview.player.san).toBe(original.player.san);
     expectUnclaimed(preview, original);
     expect(preview.log).toEqual(original.log);
@@ -147,7 +148,7 @@ describe("image misuse scholarship disqualification", () => {
       expect(paragraphs.length).toBeLessThanOrEqual(2);
     }
     expect(JSON.stringify(completed.log)).toContain("国奖评选：SAN -2；国奖资格取消，金币 +0。");
-    expect(roll).toHaveBeenCalledTimes(2);
+    expect(roll).toHaveBeenCalledTimes(1); // Log identifiers no longer consume a random roll.
   });
 
   it("does not report image misuse when the score misses the cutoff", () => {
@@ -218,7 +219,7 @@ describe("image misuse scholarship disqualification", () => {
     expectUnclaimed(state, original);
     expect(state.player.san).toBe(8);
     expect(state.eventHistory.at(-1)!.stages.at(-1)!.description).toContain("举报");
-    expect(roll).toHaveBeenCalledTimes(2);
+    expect(roll).toHaveBeenCalledTimes(1); // Log identifiers no longer consume a random roll.
   });
 
   it("checks a stale claim id at final confirmation without a prior refresh", () => {
@@ -251,7 +252,7 @@ describe("image misuse scholarship disqualification", () => {
     expectUnclaimed(completed, changed);
     expect(completed.player.san).toBe(7);
     expect(completed.externalPublications).toEqual(changed.externalPublications);
-    expect(roll).toHaveBeenCalledTimes(2);
+    expect(roll).toHaveBeenCalledTimes(1); // Log identifiers no longer consume a random roll.
   });
 
   it.each(["act1", "act2", "result"] as const)("refreshes current achievements during %s while retaining the drawn cutoff", (stage) => {
@@ -286,7 +287,7 @@ describe("image misuse scholarship disqualification", () => {
     expect(state.scholarshipState.scoreBaseline).toBe(7);
     expect(state.scholarshipState.claimedPaperIds).toContain(newPaper.id);
     expect(state.scholarshipState.claimedPaperIds).not.toContain(nonFirst.id);
-    expect(roll).toHaveBeenCalledTimes(2);
+    expect(roll).toHaveBeenCalledTimes(1); // Log identifiers no longer consume a random roll.
   });
 
   it("rechecks gains and losses at confirmation even with the previous result's button id", () => {
@@ -427,7 +428,7 @@ describe("image misuse scholarship disqualification", () => {
     const original = playingState({ buffs: [createImageMisuseBuff()] });
     const queued = queueScholarship(original);
     const decision = resolve(queued);
-    const random = vi.mocked(Math.random);
+    const random = vi.mocked(gameRandomSource.gameRandom);
     random.mockClear();
     const preview = resolve(decision, currentEvent(decision).choices[1]!.id);
     expect(random).not.toHaveBeenCalled();

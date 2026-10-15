@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -45,7 +46,7 @@ describe("lover cohort initialization through dispatch", () => {
     ["smart", 0.3, 6, 10.8, 4],
     ["smart", 0.99, 7.6, 12.4, 6],
   ] as const)("initializes natural %s at roll %s with cohort research %s / %s", (type, roll, firstYearResearch, fourthYearResearch, intimacy) => {
-    vi.spyOn(Math, "random").mockReturnValue(roll);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(roll);
     expect(createLoverProgressState(type, () => roll)).toMatchObject({ research: firstYearResearch, intimacy });
     for (const [year, research] of [[1, firstYearResearch], [4, fourthYearResearch]] as const) {
       const initial = makeState(year);
@@ -76,7 +77,7 @@ describe("lover cohort initialization through dispatch", () => {
     [0.3, 6, 10.8, 4],
     [0.99, 7.6, 12.4, 6],
   ] as const)("uses the current year for debug smart lovers at roll %s", (roll, firstYearResearch, fourthYearResearch, intimacy) => {
-    vi.spyOn(Math, "random").mockReturnValue(roll);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(roll);
     for (const [year, research] of [[1, firstYearResearch], [4, fourthYearResearch]] as const) {
       const initial = makeState(year);
       const added = dispatchAction(initial, "debug-add-relationship", { debugRelationshipType: "lover" });
@@ -100,7 +101,7 @@ describe("lover cohort initialization through dispatch", () => {
   });
 
   it.each(["beautiful", "smart"] as const)("commits the sampled %s profile without rerolling when its result is confirmed", (type) => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const pending = choose(choose(queueConfession(makeState(4), type), "continue"), "accept");
     random.mockReturnValue(0);
     const accepted = choose(pending, "close");
@@ -110,7 +111,7 @@ describe("lover cohort initialization through dispatch", () => {
   });
 
   it.each(["natural-beautiful", "natural-smart", "debug"] as const)("preserves an existing %s lover through unrelated events and actions", (route) => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = makeState(4);
     const accepted = route === "debug"
       ? dispatchAction(initial, "debug-add-relationship", { debugRelationshipType: "lover" })

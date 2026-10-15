@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 export const RANDOM_ADVISOR_NAMES = [
   "李旭霖", "阳沁宏", "李佳择", "庄婉仪", "赵志伟", "陆岩", "刘斌", "储琪",
   "张雅琪", "俞能海", "余涵蕾", "徐寅虎", "罗子祥", "郑啟嘉", "马泽坤", "马梦欣",
@@ -17,7 +18,7 @@ function pickRandom(values: readonly string[], getRoll: () => number): string {
   return values[Math.floor(normalizeRoll(getRoll()) * values.length)] ?? values[0] ?? "";
 }
 
-export function pickRandomAdvisorName(getRoll: () => number = Math.random): string {
+export function pickRandomAdvisorName(getRoll: () => number = gameRandom): string {
   const surname = pickRandom(RANDOM_ADVISOR_SURNAMES, getRoll);
   if (normalizeRoll(getRoll()) >= 0.9) {
     return surname + pickRandom(RANDOM_ADVISOR_GIVEN_CHARS, getRoll);
@@ -43,7 +44,7 @@ export function pickStableRandomName(seed: string | number): string {
 
 export function pickDifferentRandomName(
   currentName: string,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): string {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const nextName = pickRandomAdvisorName(getRoll);

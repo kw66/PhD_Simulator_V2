@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getAttributeTier } from "./v2-random-event-rules";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { formatMoney } from "./v2-money";
@@ -184,7 +185,7 @@ export function formatTierResistedOutcome(
 export function applyTierResist(
   rawChange: number,
   currentValue: number,
-  _getRoll: () => number = Math.random,
+  _getRoll: () => number = gameRandom,
   maximumValue = 20,
   resistanceReduction = 0,
 ): { effectiveChange: number; resistedCount: number; cappedCount?: number } {

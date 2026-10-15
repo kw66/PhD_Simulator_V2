@@ -663,6 +663,34 @@ describe("V2 community message rendering", () => {
     }
   });
 
+  it("counts emoji nicknames consistently through the real mobile composer and rejects an eleventh character", async () => {
+    const page = await browser.newPage({ viewport: { width: 320, height: 760 }, isMobile: true, hasTouch: true });
+    let messagePosts = 0;
+    await page.route("**/*.supabase.co/**", route => {
+      if (route.request().method() === "POST" && route.request().url().includes("/phd_simulator_v2_messages")) messagePosts++;
+      return route.fulfill({ contentType: "application/json", headers: { "Content-Range": "*/0" }, body: "[]" });
+    });
+    try {
+      await page.goto(server.resolvedUrls!.local[0]);
+      await page.locator('[data-ui-role-rail-view="messages"]').click();
+      const nickname = page.locator('[data-community-nickname="board"]');
+      await nickname.fill("😀".repeat(10));
+      expect(await nickname.inputValue()).toBe("😀".repeat(10));
+      expect(await nickname.getAttribute("maxlength")).toBeNull();
+      expect(await page.locator('[data-community-nickname-count="board"]').textContent()).toBe("10/10");
+      expect(await nickname.getAttribute("aria-invalid")).toBe("false");
+      await nickname.fill("😀".repeat(11));
+      expect(await page.locator('[data-community-nickname-count="board"]').textContent()).toBe("11/10");
+      expect(await nickname.getAttribute("aria-invalid")).toBe("true");
+      await page.locator('[data-community-content="board"]').fill("不应发送");
+      await page.locator('[data-community-send="board"]').click();
+      expect(await page.locator('[data-community-notice="board"]').textContent()).toBe("请输入不超过 10 字的昵称");
+      expect(messagePosts).toBe(0);
+    } finally {
+      await page.close();
+    }
+  }, 20_000);
+
   it("measures actual multiline overflow, preserves full safe content and expansion after rerender", async () => {
     const page = await browser.newPage({ viewport: { width: 500, height: 800 } });
     const rows = [

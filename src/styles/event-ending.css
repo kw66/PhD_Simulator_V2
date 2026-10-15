@@ -96,11 +96,17 @@
 .ending-record-cell[data-ending-section="joint-training"] > strong { color: #53795d; }
 .ending-experience { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 14px; margin: 7px 14px 0; color: #88704d; font-size: 10px; font-variant-numeric: tabular-nums; }
 .ending-experience strong { color: #704b22; font-weight: 800; }
+.ending-achievements { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 7px; margin: 9px 14px 0; }
+.ending-achievement { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border: 1px solid #d3ba7a; border-radius: 4px; background: linear-gradient(110deg, #f7e5b5, #fbf4e2); color: #715528; box-shadow: inset 0 1px 0 #fffbec; font-size: 11px; line-height: 1.4; }
+.ending-achievement > span { font-size: 15px; line-height: 1; }
+.ending-achievement > strong { font-size: inherit; font-weight: 700; }
 .ending-panel .ending-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; padding: 9px 14px 11px; border-top: 1px solid #e1d5bf; }
 .ending-buttons { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
 .ending-buttons > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 750; box-shadow: 0 2px 5px rgba(77, 60, 36, .09); }
 .ending-buttons > button.is-restart { border-color: #98ad93; background: #e5eee2; color: #365b43; }
 .ending-buttons > button.is-return { border-color: #d2b986; background: #f8eed9; color: #75582e; }
+.ending-buttons > button.is-rewind { border-color: #b6a388; background: #ede5d7; color: #69573d; }
+.ending-experience-note { display: block; margin-top: 4px; color: #887455; font-size: 11px; text-align: center; }
 @media (max-width: 560px) {
   .ending-panel .ending-header { padding-inline: 30px; }
   .ending-panel h2 { font-size: 24px; }

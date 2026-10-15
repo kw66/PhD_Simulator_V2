@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import type { GameState } from "./v2-types";
 
@@ -32,77 +33,40 @@ export const CAREER_DEFINITIONS: Record<CareerType, CareerDefinition> = {
 };
 
 const internetJobs: CareerJobDefinition[] = [
-  { id: "internet-small", type: "internet", name: "小型科技公司", threshold: 45, compensation: "年总包 20～35 万" },
-  { id: "internet-medium", type: "internet", name: "中型科技公司", threshold: 80, compensation: "年总包 35～55 万" },
-  { id: "internet-leading", type: "internet", name: "头部大厂", threshold: 120, compensation: "年总包 50～80 万" },
-  { id: "internet-talent", type: "internet", name: "人才计划", threshold: 170, compensation: "年总包 80～120 万" },
-  { id: "internet-top-talent", type: "internet", name: "顶尖人才计划", threshold: 260, compensation: "年总包 130～220 万" },
-  { id: "internet-tech-lead", type: "internet", name: "技术带头人", threshold: 380, compensation: "年总包 220～350 万" },
-  { id: "internet-research-vp", type: "internet", name: "研究副总／首席科学家", threshold: 600, compensation: "年总包 350～600 万" },
-  { id: "internet-ai-vp", type: "internet", name: "集团 AI 负责人／技术副总裁", threshold: 850, compensation: "年总包 600 万以上" },
+  { id: "internet-development", type: "internet", name: "大厂开发岗", threshold: 80, compensation: "年总包 20～35 万" },
+  { id: "internet-algorithm", type: "internet", name: "大厂算法岗", threshold: 180, compensation: "年总包 50～80 万" },
+  { id: "internet-talent", type: "internet", name: "人才计划", threshold: 280, compensation: "年总包 80～120 万" },
+  { id: "internet-top-talent", type: "internet", name: "顶尖人才计划", threshold: 400, compensation: "年总包 130～220 万" },
+  { id: "internet-tech-lead", type: "internet", name: "技术负责人", threshold: 650, compensation: "年总包 220～350 万" },
+  { id: "internet-chief-scientist", type: "internet", name: "首席科学家", threshold: 1000, compensation: "年总包 350～600 万" },
 ];
 
 const stateOwnedJobs: CareerJobDefinition[] = [
-  { id: "state-local", type: "stateOwned", name: "地方国企", threshold: 30, compensation: "年收入 15～25 万" },
-  { id: "state-provincial", type: "stateOwned", name: "省属骨干企业", threshold: 60, compensation: "年收入 20～35 万" },
-  { id: "state-research", type: "stateOwned", name: "央企下属研究院", threshold: 95, compensation: "年收入 25～45 万" },
-  { id: "state-headquarters", type: "stateOwned", name: "总部重点研发岗", threshold: 135, compensation: "年收入 35～60 万" },
-  { id: "state-talent", type: "stateOwned", name: "专项引才", threshold: 190, compensation: "年收入 50～80 万" },
-  { id: "state-discipline-lead", type: "stateOwned", name: "学科带头人", threshold: 290, compensation: "年收入 80～120 万" },
-  { id: "state-subsidiary-vp", type: "stateOwned", name: "二级公司技术副总", threshold: 430, compensation: "年收入 120～200 万" },
-  { id: "state-chief-scientist", type: "stateOwned", name: "集团首席科学家", threshold: 620, compensation: "年收入 200 万以上" },
+  { id: "state-local", type: "stateOwned", name: "地方国企技术岗", threshold: 70, compensation: "年收入 15～25 万" },
+  { id: "state-provincial", type: "stateOwned", name: "省属国企研发岗", threshold: 150, compensation: "年收入 20～35 万" },
+  { id: "state-research", type: "stateOwned", name: "央企研究院研发岗", threshold: 210, compensation: "年收入 25～45 万" },
+  { id: "state-headquarters", type: "stateOwned", name: "央企总部业务主管", threshold: 280, compensation: "年收入 35～60 万" },
+  { id: "state-subsidiary-vp", type: "stateOwned", name: "央企二级公司副总经理", threshold: 380, compensation: "年收入 120～200 万" },
+  { id: "state-headquarters-director", type: "stateOwned", name: "央企总部部门负责人", threshold: 550, compensation: "年收入 200 万以上" },
 ];
 
-const civilServiceUnits = [
-  { id: "town", name: "乡镇", threshold: 25 },
-  { id: "county", name: "县区", threshold: 50 },
-  { id: "city", name: "市直", threshold: 75 },
-  { id: "province", name: "省直", threshold: 105 },
-  { id: "central", name: "中央机关", threshold: 145 },
-] as const;
-const civilServiceRanks = [
-  { id: "staff", name: "一级科员", bonus: 0 },
-  { id: "deputy-section", name: "四级主任科员", bonus: 20 },
-  { id: "section", name: "二级主任科员", bonus: 45 },
-  { id: "deputy-division", name: "四级调研员", bonus: 120 },
-  { id: "division", name: "二级调研员", bonus: 220 },
-] as const;
-const civilServiceJobs: CareerJobDefinition[] = civilServiceUnits.flatMap((unit) => civilServiceRanks.map((rank) => ({
-  id: `civil-${unit.id}-${rank.id}`,
-  type: "civilService" as const,
-  name: `${unit.name} · ${rank.name}`,
-  threshold: unit.threshold + rank.bonus,
-  ...(rank.bonus >= 120 ? { detail: "特殊引进岗位" } : {}),
-}))).sort((a, b) => a.threshold - b.threshold);
+const civilServiceJobs: CareerJobDefinition[] = [
+  { id: "civil-town-deputy-section", type: "civilService", name: "乡镇机关 · 四级主任科员", threshold: 80 },
+  { id: "civil-county-deputy-section", type: "civilService", name: "县区机关 · 四级主任科员", threshold: 150 },
+  { id: "civil-city-section", type: "civilService", name: "市直机关 · 二级主任科员", threshold: 210 },
+  { id: "civil-province-section", type: "civilService", name: "省直机关 · 二级主任科员", threshold: 260 },
+  { id: "civil-municipality-section", type: "civilService", name: "直辖市机关 · 二级主任科员", threshold: 330 },
+  { id: "civil-central-deputy-division", type: "civilService", name: "中央部委 · 四级调研员", threshold: 400, detail: "特殊引进岗位" },
+];
 
-const academicGradeThresholds = [30, 55, 90, 145, 230, 380, 650] as const;
-const academicSchools = [
-  { id: "second-tier", name: "二本", lecturerGrade: 1 },
-  { id: "non-elite", name: "双非一本", lecturerGrade: 2 },
-  { id: "211", name: "211", lecturerGrade: 3 },
-  { id: "985", name: "985", lecturerGrade: 4 },
-] as const;
-const academicRanks = [
-  { id: "postdoc", name: "博后", gradeDelta: -1 },
-  { id: "lecturer", name: "讲师", gradeDelta: 0 },
-  { id: "associate", name: "副教授", gradeDelta: 1 },
-  { id: "professor", name: "教授", gradeDelta: 2 },
-] as const;
-const academicRepresentativeIds = new Set([
-  "academic-second-tier-postdoc", "academic-second-tier-lecturer", "academic-non-elite-lecturer",
-  "academic-211-lecturer", "academic-985-lecturer", "academic-985-associate", "academic-985-professor",
-]);
-const academicJobs: CareerJobDefinition[] = academicSchools.flatMap((school) => academicRanks.map((rank) => {
-  const grade = school.lecturerGrade + rank.gradeDelta;
-  return {
-    id: `academic-${school.id}-${rank.id}`,
-    type: "academic" as const,
-    name: `${school.name}${school.id === "985" && rank.id === "professor" ? "特聘教授" : rank.name}`,
-    threshold: academicGradeThresholds[grade]!,
-    ...(rank.id === "postdoc" ? { detail: "博士后岗位" } : {}),
-  };
-})).sort((a, b) => a.threshold - b.threshold
-  || Number(academicRepresentativeIds.has(b.id)) - Number(academicRepresentativeIds.has(a.id)));
+const academicJobs: CareerJobDefinition[] = [
+  { id: "academic-non-elite-lecturer", type: "academic", name: "双非讲师", threshold: 80 },
+  { id: "academic-211-lecturer", type: "academic", name: "211讲师", threshold: 180 },
+  { id: "academic-985-lecturer", type: "academic", name: "985讲师", threshold: 300 },
+  { id: "academic-985-associate", type: "academic", name: "985副教授", threshold: 450 },
+  { id: "academic-985-professor", type: "academic", name: "985教授", threshold: 700 },
+  { id: "academic-world-professor", type: "academic", name: "世界名校长聘教授", threshold: 1100 },
+];
 
 export const CAREER_JOBS: Record<CareerType, CareerJobDefinition[]> = {
   internet: internetJobs,
@@ -151,13 +115,13 @@ function randomZeroToFive(random: () => number): number {
 }
 
 export function calculateMonthlyCareerProgress(
-  state: GameState, type: CareerType, random: () => number = Math.random,
+  state: GameState, type: CareerType, random: () => number = gameRandom,
 ): number {
   const research = Math.max(0, getEffectiveResearch(state));
   switch (type) {
     case "internet": return Math.floor(research * 0.5);
     case "stateOwned": return Math.floor(research * 0.25) + randomZeroToFive(random);
-    case "civilService": return 5 + randomZeroToFive(random);
+    case "civilService": return Math.floor(Math.max(0, state.player.san) / 2) + randomZeroToFive(random);
     case "academic": return state.degree === "phd" ? Math.floor(research * 0.25) : 0;
   }
 }
@@ -169,10 +133,7 @@ export function getCareerCandidates(state: GameState, type: CareerType): CareerJ
   const firstAbove = distinctThresholds.findIndex((threshold) => threshold > ability);
   const center = firstAbove === -1 ? distinctThresholds.length - 1 : Math.max(0, firstAbove - 1);
   const start = Math.min(Math.max(0, center - 1), distinctThresholds.length - 3);
-  return distinctThresholds.slice(start, start + 3).map((threshold) => {
-    const sameGrade = CAREER_JOBS[type].filter((job) => job.threshold === threshold);
-    return sameGrade[Math.max(0, state.totalMonths - 1) % sameGrade.length]!;
-  });
+  return CAREER_JOBS[type].slice(start, start + 3);
 }
 
 const chanceCurves: Record<CareerType, { atThreshold: number; perTenPoints: number }> = {
@@ -186,5 +147,5 @@ export function getCareerSuccessChance(type: CareerType, ability: number, job: C
   if (job.type !== type) return 0;
   const curve = chanceCurves[type];
   const chance = curve.atThreshold + (ability - job.threshold) / 10 * curve.perTenPoints;
-  return Math.round(Math.max(1, Math.min(95, chance)) * 10) / 10;
+  return Math.round(Math.max(0, Math.min(95, chance)) * 10) / 10;
 }

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createConferenceActivityEvent } from "../src/core/v2-conference-activity-events";
 import { refreshConferenceActivityEvent } from "../src/core/v2-conference-activity-refresh";
@@ -62,7 +63,7 @@ describe("conference activity live previews", () => {
     const event = { ...createEventQueueItem(source, 8), history: [{ title: "参会已完成", description: "差旅费已经结算", choices: [], selectedChoiceId: "self" }] };
     const current = { ...state, player: { ...state.player, social: 12 }, eventQueue: [event] };
     const before = structuredClone(current);
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("refresh rerolled"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("refresh rerolled"); });
     const refreshed = refreshPendingEventDecisions(current);
     const updated = refreshed.eventQueue[0]!;
     const final = stage === "result" ? updated : result(stage === "act1" ? decision(updated) : updated, "tea-break");
@@ -115,7 +116,7 @@ describe("conference activity live previews", () => {
       scholars: { smart: { ...contact, encounterCount: 7 } },
     }, player: { ...state.player, social: 18 }, loverState: { ...state.loverState, active: true },
     loverProgressState: { ...state.loverProgressState, intimacy: 12 } };
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("rerolled"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("rerolled"); });
     const updated = refreshConferenceActivityEvent(current, final);
     const effects = updated.choices[0]!.effects;
     expect(effects.conferenceEncounterUpdates?.scholars?.smart).toEqual({ ...contact, encounterCount: 8 });

@@ -38,7 +38,7 @@ describe("graduation cards and blind review in the browser", () => {
     try {
       await page.route("**/__graduation_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
       await page.goto(`${server.resolvedUrls!.local[0]}__graduation_test__`);
-      await page.waitForSelector('[data-action="start-game"]');
+      await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
       await page.evaluate((degree) => {
         const store = (window as GraduationWindow).graduationStore;
         store.dispatch("start-game", { roleId: "normal" });
@@ -166,6 +166,16 @@ describe("graduation cards and blind review in the browser", () => {
       expect(await page.locator('[data-thesis-initial-score="60"]').count()).toBe(1);
       expect(await page.locator('[data-thesis-grade="A"]').count()).toBe(1);
       await page.setViewportSize({ width: 1920, height: 1080 });
+      const civilPractice = page.locator('[data-action="prepare-career"][data-career-type="civilService"]');
+      const sanForPractice = await page.evaluate(() => (window as GraduationWindow).graduationStore.getState().player.san);
+      const practiceHint = `主动推进：+${Math.floor(sanForPractice / 2)}～${Math.floor(sanForPractice / 2) + 5}分`;
+      expect(await civilPractice.textContent()).toBe("📈推进SAN-3");
+      expect(await civilPractice.getAttribute("data-tooltip")).toContain(practiceHint);
+      await civilPractice.hover();
+      expect(await page.locator("#relationship-tooltip").isVisible()).toBe(true);
+      expect(await page.locator("#relationship-tooltip").textContent()).toContain(practiceHint);
+      await page.locator(".graduation-cards").screenshot({ path: `artifacts/graduation/${degree}-career-tooltip.png` });
+      await page.mouse.move(0, 0);
       const beforeCareerSan = await page.evaluate(() => (window as GraduationWindow).graduationStore.getState().player.san);
       await page.locator('[data-action="prepare-career"][data-career-type="internet"]').click();
       expect(await page.locator('[data-tab-panel="workstation"]').isVisible()).toBe(true);
@@ -219,7 +229,7 @@ describe("graduation cards and blind review in the browser", () => {
     try {
       await page.route("**/__graduation_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
       await page.goto(`${server.resolvedUrls!.local[0]}__graduation_test__`);
-      await page.waitForSelector('[data-action="start-game"]');
+      await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
       const base = createStartedGameState("normal");
       const eventState = { ...base, year: 3, month: 1, totalMonths: 25,
         player: { ...base.player, san: 20, research: 20 }, selectedAdvisorName: "王老师" };
@@ -235,9 +245,9 @@ describe("graduation cards and blind review in the browser", () => {
       await page.locator('[data-ui-open-event-id^="career-recruitment-"]:visible').first().click();
       await page.locator('[data-action="resolve-event"][data-event-choice-id="choose-internet"]:visible').first().click();
       expect(await page.locator("#event-content-body").textContent()).toContain("年总包 20～35 万");
-      expect(await page.locator('[data-action="resolve-event"][data-event-choice-id="apply-internet-small"]').textContent()).toBe("小型科技公司");
+      expect(await page.locator('[data-action="resolve-event"][data-event-choice-id="apply-internet-development"]').textContent()).toBe("大厂开发岗");
       await page.locator("#event-content-box").screenshot({ path: "artifacts/graduation/recruitment-jobs.png" });
-      await page.locator('[data-action="resolve-event"][data-event-choice-id="apply-internet-small"]:visible').first().click();
+      await page.locator('[data-action="resolve-event"][data-event-choice-id="apply-internet-development"]:visible').first().click();
       await page.locator("#event-content-box").screenshot({ path: "artifacts/graduation/recruitment-result.png" });
       expect(await page.evaluate(() => {
         const state = (window as GraduationWindow).graduationStore.getState();
@@ -247,7 +257,7 @@ describe("graduation cards and blind review in the browser", () => {
       expect(await page.evaluate(() => {
         const state = (window as GraduationWindow).graduationStore.getState();
         return { san: state.player.san, progress: state.careerProgress.internet, offer: state.careerOffers.internet?.jobId };
-      })).toEqual({ san: 14, progress: 5, offer: "internet-small" });
+      })).toEqual({ san: 14, progress: 5, offer: "internet-development" });
     } finally {
       await page.close();
     }

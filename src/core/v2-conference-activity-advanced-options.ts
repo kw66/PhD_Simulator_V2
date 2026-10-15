@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getConferenceMentorContact, getConferenceScholarContact } from "./v2-conference-contacts";
 import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
 import { resolveConferenceActivityAttributes } from "./v2-conference-activity-shared";
@@ -5,7 +6,7 @@ import type { ConferenceActivityBuildState, ConferenceActivityContext, Conferenc
 
 export function createAdvancedConferenceActivityOptions(
   state: ConferenceActivityBuildState,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
   context?: ConferenceActivityContext,
 ): ConferenceActivityOptionDefinition[] {
   const typeRoll = getRoll();

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -20,7 +21,7 @@ function resolveFirstChoice(state: ReturnType<typeof startGame>, chainId = "teac
 
 describe("debug event scene replay", () => {
   it("counts Teacher's Day errands only on confirmation and not on replay previews", () => {
-    const roll = vi.spyOn(Math, "random").mockReturnValue(0);
+    const roll = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     try {
       const initial = startGame();
       let state = dispatchAction({ ...initial, eventQueue: [], player: { ...initial.player, favor: 1, san: 20 } }, "debug-trigger-event", { eventId: "teachers-day" });

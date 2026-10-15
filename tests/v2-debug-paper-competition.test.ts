@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { dispatchAction } from "../src/core/v2-engine";
@@ -97,7 +98,7 @@ function expectRootTarget(state: GameState, eventId: 17 | 18, paperId: string): 
 }
 
 beforeEach(() => {
-  vi.spyOn(Math, "random").mockReturnValue(0);
+  vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
 });
 
 afterEach(() => {
@@ -191,12 +192,12 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
       ]);
       const snapshot = structuredClone(initial);
       const target = initial.papers[roll === 0 ? 1 : 3]!;
-      vi.mocked(Math.random).mockReturnValue(roll);
+      vi.mocked(gameRandomSource.gameRandom).mockReturnValue(roll);
       const queued = triggerCompetition(initial, eventId);
       expect(queued.eventQueue).toHaveLength(1);
       expectRootTarget(queued, eventId, target.id);
       expectDebugResourcesUnchanged(queued, snapshot);
-      vi.mocked(Math.random).mockReturnValue(roll === 0 ? 0.99 : 0);
+      vi.mocked(gameRandomSource.gameRandom).mockReturnValue(roll === 0 ? 0.99 : 0);
       const decision = resolveCompetition(queued, eventId);
       const result = resolveCompetition(decision, eventId, choiceIndex);
 
@@ -248,7 +249,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
     for (const stage of ["act1", "act2", "result"]) {
       expect(getCompetition(state, eventId).stage).toBe(stage);
       const snapshot = structuredClone(state);
-      vi.mocked(Math.random).mockReturnValue(0.99);
+      vi.mocked(gameRandomSource.gameRandom).mockReturnValue(0.99);
       for (let click = 0; click < 3; click += 1) {
         state = triggerCompetition(state, eventId);
         expect(state).toEqual(snapshot);

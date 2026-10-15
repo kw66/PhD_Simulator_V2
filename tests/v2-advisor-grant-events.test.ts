@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 import { ADVISOR_GRANTS, getAdvisorGrantResultContext, getAdvisorGrantSuccessChance, getAdvisorMonthlySalary, settleAdvisorGrantResult, settleAdvisorMonth } from "../src/core/v2-advisor-progress";
 import { createAdvisorGrantResultEvent } from "../src/core/v2-advisor-grant-events";
@@ -132,7 +133,7 @@ describe("advisor grant result events", () => {
   });
 
   it("recovers an overdue result after a forced debug month and allows later applications", () => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     try {
       const august = queued();
       const september = dispatchAction(august, "force-next-month");
@@ -187,7 +188,7 @@ describe("advisor grant result events", () => {
   it("keeps salary and net monthly money unchanged after promotion", () => {
     const state = playing(11);
     state.advisorProgressState.pendingApplication = { id: "youth", calendarYear: 2024, researchSnapshot: 25, resultRoll: 0.99 };
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     try {
       const august = dispatchAction(state, "next-month");
       expect(august.totalMonths).toBe(12);

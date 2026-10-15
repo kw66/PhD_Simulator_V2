@@ -1,3 +1,4 @@
+import { collectRunStatistics } from "../src/core/v2-run-statistics";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONFERENCE_STATS_RULE_VERSION, createConferenceStats, getConferenceGlobalStats, loadConferenceGlobalStats } from "../src/app/v2-conference-stats";
@@ -64,6 +65,34 @@ beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.clearAllTimers(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("global conference statistics", () => {
+  it("keeps review evidence inside saves and uploads only the selected final branch", async () => {
+    const network = backend();
+    const local = storage();
+    const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
+    const rejected = review(false);
+    const rejectedBranch = collectRunStatistics(rejected.before, rejected.after);
+    expect(rejectedBranch.pendingRunStatistics).toHaveLength(1);
+    await stats.track(rejected.before, rejectedBranch);
+    await stats.track(rejectedBranch, { ...rejectedBranch, phase: "finished" });
+    await stats.flush();
+    expect(network.rows.size).toBe(0);
+    stats.dispose();
+
+    // Restore an earlier monthly save and choose another branch. The rejected
+    // evidence is absent from that save and can never leak through a client queue.
+    const reloaded = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
+    const accepted = review(true);
+    const acceptedBranch = JSON.parse(JSON.stringify(collectRunStatistics(accepted.before, accepted.after))) as GameState;
+    expect(acceptedBranch.pendingRunStatistics).toHaveLength(1);
+    await reloaded.track(acceptedBranch, { ...acceptedBranch, phase: "finished" });
+    await reloaded.flush();
+    expect(network.rows.size).toBe(0);
+    await reloaded.track(acceptedBranch, { ...acceptedBranch, phase: "finished" }, { finalized: true });
+    await reloaded.flush();
+    expect([...network.rows.values()].map((row) => row.p_accepted)).toEqual([true]);
+    reloaded.dispose();
+  });
+
   it("shares the upload queue and debug exclusion with journal results", async () => {
     const network = backend();
     const client = createStatisticsClient({ fetch: network.fetch, storage: storage() });
@@ -74,8 +103,8 @@ describe("global conference statistics", () => {
       journalTarget: "pami" as const, submittedYear: 1, submittedMonth: 3, acceptedTotalMonths: 5,
       idea: 40, experiment: 40, writing: 45 };
     const journalAfter = { ...states.after, externalPublications: [...states.after.externalPublications, journal] };
-    await conferences.track(states.before, states.after);
-    await journals.track(states.after, journalAfter);
+    await finalize(conferences, states.before, states.after);
+    await finalize(journals, states.after, journalAfter);
     expect(network.fetch).not.toHaveBeenCalled();
     await client.flush();
     expect(network.rows.size).toBe(2);
@@ -83,7 +112,7 @@ describe("global conference statistics", () => {
     expect(JSON.parse(String(network.fetch.mock.calls[0]![1]!.body)).p_records.map((row: { kind: string }) => row.kind))
       .toEqual(["conference", "journal"]);
     conferences.markDebug();
-    await journals.track(journalAfter, { ...journalAfter, externalPublications: [...journalAfter.externalPublications,
+    await finalize(journals, journalAfter, { ...journalAfter, externalPublications: [...journalAfter.externalPublications,
       { ...journal, id: "another-journal" }] });
     await vi.advanceTimersByTimeAsync(60_000);
     expect(network.fetch).toHaveBeenCalledTimes(1);
@@ -97,11 +126,11 @@ describe("global conference statistics", () => {
     const states = review(accepted);
     const snapshot = structuredClone(states.before);
     await stats.observe(states.before);
-    await stats.track(states.overview, states.reviewers);
-    await stats.track(states.reviewers, states.before);
-    await stats.track(states.before, projectPaperReviewSettlement(states.before, states.settlement));
+    await finalize(stats, states.overview, states.reviewers);
+    await finalize(stats, states.reviewers, states.before);
+    await finalize(stats, states.before, projectPaperReviewSettlement(states.before, states.settlement));
     expect(network.rows.size).toBe(0);
-    await stats.track(states.before, states.after);
+    await finalize(stats, states.before, states.after);
     expect(network.fetch).not.toHaveBeenCalled();
     await stats.flush();
     expect(network.rows.size).toBe(1);
@@ -125,12 +154,12 @@ describe("global conference statistics", () => {
     const local = storage();
     const states = review();
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
-    await Promise.all([stats.track(states.before, states.after), stats.track(states.before, states.after)]);
-    await stats.track(states.before, states.after);
+    await Promise.all([finalize(stats, states.before, states.after), finalize(stats, states.before, states.after)]);
+    await finalize(stats, states.before, states.after);
     await stats.flush();
     stats.dispose();
     const reloaded = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
-    await reloaded.track(states.before, states.after);
+    await finalize(reloaded, states.before, states.after);
     await reloaded.flush();
     expect(network.rows.size).toBe(1);
     expect(network.fetch.mock.calls.filter(([url]) => String(url).includes("/record_"))).toHaveLength(1);
@@ -142,7 +171,7 @@ describe("global conference statistics", () => {
     const local = storage();
     const states = review();
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
-    await stats.track(states.before, states.after);
+    await finalize(stats, states.before, states.after);
     await stats.flush();
     expect(network.rows.size).toBe(1);
     const id = [...network.rows.keys()][0];
@@ -161,7 +190,7 @@ describe("global conference statistics", () => {
     network.fetch.mockResolvedValueOnce(Response.json(false));
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: storage() });
     const states = review();
-    await stats.track(states.before, states.after);
+    await finalize(stats, states.before, states.after);
     await stats.flush();
     expect(network.rows.size).toBe(0);
     await vi.advanceTimersByTimeAsync(60_000);
@@ -172,13 +201,13 @@ describe("global conference statistics", () => {
     const network = backend();
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: storage() });
     const rejected = review(false);
-    await stats.track(rejected.before, rejected.after);
+    await finalize(stats, rejected.before, rejected.after);
     const paper = rejected.after.papers[0]!;
     const resubmitted = { ...rejected.after, papers: [{ ...prepareConferenceSubmission({ ...paper,
       idea: 100, experiment: 100, writing: 100 }, "A", 3, 1), reviewMonthsLeft: 0 }] };
     const overview = resolveDuePaperReviews(resubmitted, () => 0.5).state;
     const before = confirm(confirm(overview));
-    await stats.track(before, confirm(before));
+    await finalize(stats, before, confirm(before));
     await stats.flush();
     expect(network.rows.size).toBe(2);
     expect([...network.rows.values()].map((row) => row.p_accepted)).toEqual([false, true]);
@@ -189,7 +218,7 @@ describe("global conference statistics", () => {
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: null });
     const states = review();
     vi.spyOn(globalThis.crypto, "randomUUID").mockImplementation(() => { throw new Error("unavailable"); });
-    await stats.track(states.before, states.after);
+    await finalize(stats, states.before, states.after);
     expect(network.fetch).not.toHaveBeenCalled();
   });
 
@@ -198,15 +227,15 @@ describe("global conference statistics", () => {
     const local = storage();
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
     const states = review();
-    await stats.track(states.before, states.after, { debugUsed: true });
-    await stats.track(states.before, states.after, { debugUsed: false });
+    await finalize(stats, states.before, states.after, { debugUsed: true });
+    await finalize(stats, states.before, states.after, { debugUsed: false });
     expect(network.rows.size).toBe(0);
     const reloaded = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: local });
-    await reloaded.track(states.before, states.after);
+    await finalize(reloaded, states.before, states.after);
     expect(network.rows.size).toBe(0);
     reloaded.resetRun();
     const newRun = review(true, 456);
-    await reloaded.track(newRun.before, newRun.after);
+    await finalize(reloaded, newRun.before, newRun.after);
     await reloaded.flush();
     expect(network.rows.size).toBe(1);
   });
@@ -216,7 +245,7 @@ describe("global conference statistics", () => {
     network.fetch.mockRejectedValueOnce(new Error("offline"));
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: storage() });
     const states = review();
-    await stats.track(states.before, states.after);
+    await finalize(stats, states.before, states.after);
     await stats.flush();
     stats.markDebug();
     await stats.flush();
@@ -229,13 +258,13 @@ describe("global conference statistics", () => {
     const network = backend();
     const stats = createConferenceStats({ onChange: vi.fn(), fetch: network.fetch, storage: storage() });
     const oldRun = review(true, 123);
-    await stats.track(oldRun.before, oldRun.after, { debugUsed: true });
+    await finalize(stats, oldRun.before, oldRun.after, { debugUsed: true });
     stats.resetRun();
     const newRun = review(true, 456);
-    await stats.track(oldRun.after, newRun.overview);
-    await stats.track(newRun.overview, newRun.reviewers);
-    await stats.track(newRun.reviewers, newRun.before);
-    await stats.track(newRun.before, newRun.after);
+    await finalize(stats, oldRun.after, newRun.overview);
+    await finalize(stats, newRun.overview, newRun.reviewers);
+    await finalize(stats, newRun.reviewers, newRun.before);
+    await finalize(stats, newRun.before, newRun.after);
     await stats.flush();
     expect(network.rows.size).toBe(1);
   });
@@ -247,8 +276,8 @@ describe("global conference statistics", () => {
     stats.resetRun();
     stats.markDebug();
     const newRun = review(true, 456);
-    await stats.track(oldRun.after, newRun.overview);
-    await stats.track(newRun.before, newRun.after);
+    await finalize(stats, oldRun.after, newRun.overview);
+    await finalize(stats, newRun.before, newRun.after);
     expect(network.fetch).not.toHaveBeenCalled();
   });
 
@@ -256,7 +285,7 @@ describe("global conference statistics", () => {
     const network = backend();
     const stats = createConferenceStats({ onChange: vi.fn(), enabled: false, fetch: network.fetch, storage: storage() });
     const states = review();
-    await stats.track(states.before, states.after);
+    await finalize(stats, states.before, states.after);
     await stats.load(...KEY);
     await stats.flush();
     expect(stats.read(...KEY)).toEqual({ status: "unavailable", data: null });
@@ -340,7 +369,7 @@ describe("global conference statistics", () => {
     await stats.load("CVPR", 1, "A");
     expect(network.fetch).not.toHaveBeenCalled();
     const states = review();
-    await stats.track(states.before, states.after);
+    await finalize(stats, states.before, states.after);
     await stats.flush();
     expect(network.rows.size).toBe(1);
   });
@@ -357,3 +386,9 @@ describe("global conference statistics", () => {
     expect(sql).not.toMatch(/create extension|pgcrypto|nickname|paper_title/i);
   });
 });
+
+// These recorder tests submit a committed final branch; gameplay alone never uploads.
+function finalize(controller: { track(before: GameState, after: GameState, options?: { debugUsed?: boolean; finalized?: boolean }): Promise<void> },
+  before: GameState, after: GameState, options: { debugUsed?: boolean } = {}): Promise<void> {
+  return controller.track(before, { ...collectRunStatistics(before, after), phase: "finished" }, { ...options, finalized: true });
+}

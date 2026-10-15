@@ -1,0 +1,225 @@
+import { describe, expect, it } from "vitest";
+import { createStore } from "../src/core/v2-store";
+import { createRunSaveRepository, createMemoryRunSaveAdapter, type RunSaveAdapter } from "../src/core/v2-run-saves";
+import { ACCOUNT_STORAGE_KEY, loadAccountProfile, saveAccountProfile } from "../src/core/v2-account-storage";
+import { createDefaultAccountProfile } from "../src/core/v2-lobby";
+import { createEventQueueItem } from "../src/core/v2-event-queue";
+import type { GameState, PendingEvent } from "../src/core/v2-types";
+
+type Store = ReturnType<typeof createStore>;
+
+function memoryStorage() {
+  const values = new Map<string, string>();
+  let fail = false;
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      if (fail && key === ACCOUNT_STORAGE_KEY) throw new Error("quota");
+      values.set(key, value);
+    },
+    failAccountWrites(value: boolean) { fail = value; },
+  };
+}
+
+async function harness() {
+  const storage = memoryStorage();
+  const profile = createDefaultAccountProfile();
+  profile.roleProgress.rich.unlocked = true;
+  saveAccountProfile(profile, storage);
+  const adapter = createMemoryRunSaveAdapter();
+  const saves = createRunSaveRepository({ storage, adapter });
+  const store = createStore({ storage, saves });
+  await store.ready();
+  return { store, storage, adapter, saves };
+}
+
+async function reopen(storage: ReturnType<typeof memoryStorage>, adapter: RunSaveAdapter) {
+  const saves = createRunSaveRepository({ storage, adapter });
+  const store = createStore({ storage, saves });
+  await store.ready();
+  return { store, saves };
+}
+
+function finishOpening(store: Store) {
+  for (const choiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
+    const event = store.getState().eventQueue.find(item => item.chainId === "before-grad-school")!;
+    expect(event).toBeDefined();
+    store.dispatch("resolve-event", { eventId: event.id, eventChoiceId: choiceId });
+  }
+  store.dispatch("next-month");
+  expect(store.getState().totalMonths).toBe(1);
+}
+
+function nextMonth(store: Store) {
+  // Exercise normal event confirmation before the ordinary month transition.
+  for (let i = 0; i < 30 && store.getState().eventQueue.length; i += 1) {
+    const event = store.getState().eventQueue[0]!;
+    store.dispatch("resolve-event", { eventId: event.id, eventChoiceId: event.choices[0]!.id });
+  }
+  const previous = store.getState().totalMonths;
+  store.dispatch("next-month");
+  expect(store.getState().totalMonths).toBe(previous + 1);
+}
+
+function awardWindfall(store: Store) {
+  const event: PendingEvent = {
+    id: "save-test-income", chainId: "save-test-income", title: "收入", description: "", source: "system",
+    stage: "result", blocking: true, deadlineMonths: 0,
+    choices: [{ id: "confirm", label: "确定", outcome: "", effects: { money: 100 } }],
+  };
+  store.getState().eventQueue = [createEventQueueItem(event, 1)];
+  store.dispatch("resolve-event", { eventId: event.id, eventChoiceId: "confirm" });
+}
+
+describe("per-role saves integrated with the store", () => {
+  it("resumes latest after lobby return and browser recreation without counting another start", async () => {
+    const { store, storage, adapter } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    store.dispatch("set-linear-event-blocking", { blockLinearEvents: false });
+    const latest = structuredClone(store.getState());
+    const runId = store.getCurrentRunId();
+    store.dispatch("reset-game");
+    expect(store.getState().phase).toBe("setup");
+    expect(store.hasRoleSave("normal")).toBe(true);
+    store.dispatch("start-game", { roleId: "normal" });
+    expect(store.getState()).toEqual(latest);
+    expect(store.getCurrentRunId()).toBe(runId);
+    expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
+    await store.flushSaves();
+    const loaded = (await reopen(storage, adapter)).store;
+    loaded.dispatch("start-game", { roleId: "normal" });
+    expect(loaded.getState()).toEqual(latest);
+    expect(loaded.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
+  });
+
+  it("isolates each role and leaves the other save untouched when settling and restarting", async () => {
+    const { store, saves } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    const normalRun = saves.get("normal")!;
+    store.dispatch("reset-game");
+    store.dispatch("start-game", { roleId: "rich" });
+    finishOpening(store);
+    const richRun = saves.get("rich")!;
+    store.dispatch("quit-game");
+    store.dispatch("restart-game");
+    expect(store.getState().phase).toBe("playing");
+    expect(store.getState().totalMonths).toBe(0);
+    expect(store.getCurrentRunId()).not.toBe(richRun.runId);
+    expect(saves.get("rich")?.months.map(month => month.totalMonths)).toEqual([0]);
+    expect(saves.get("normal")).toEqual(normalRun);
+  });
+
+  it("keeps month starts immutable while latest changes, and truncates the future after rewind", async () => {
+    const { store, saves, storage, adapter } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    const firstMonth = structuredClone(saves.get("normal")!.months.find(item => item.totalMonths === 1)!);
+    store.dispatch("set-linear-event-blocking", { blockLinearEvents: false });
+    nextMonth(store);
+    nextMonth(store);
+    expect(store.getRunSaves().filter(item => item.kind === "month").map(item => item.totalMonths)).toEqual([3, 2, 1, 0]);
+    expect(saves.get("normal")!.months.find(item => item.totalMonths === 1)).toEqual(firstMonth);
+    expect(store.loadRunSave("month:1")).toBe(true);
+    expect(store.getState()).toEqual(firstMonth.state);
+    expect(store.getRunSaves().filter(item => item.kind === "month").map(item => item.totalMonths)).toEqual([1, 0]);
+    await store.flushSaves();
+    const loaded = (await reopen(storage, adapter)).store;
+    loaded.dispatch("start-game", { roleId: "normal" });
+    expect(loaded.getState()).toEqual(firstMonth.state);
+    expect(loaded.getRunSaves().some(item => item.totalMonths > 1)).toBe(false);
+  });
+
+  it("previews but does not reward branch achievements and rewinding discards that branch", async () => {
+    const { store } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    awardWindfall(store);
+    expect(store.getState().achievementProgress?.satisfied).toContain("global:windfall");
+    store.dispatch("quit-game");
+    expect(store.getState().runAchievementIds).toContain("global:windfall");
+    expect(store.getEndingExperienceAward()?.gained).toBeGreaterThan(0);
+    expect(store.getLobbyState().achievementRewardedIds).toEqual([]);
+    expect(store.getLobbyState().roleProgress.normal.exp).toBe(0);
+    expect(store.loadRunSave("month:1")).toBe(true);
+    expect(store.getState().achievementProgress?.satisfied).not.toContain("global:windfall");
+    store.dispatch("quit-game");
+    store.dispatch("restart-game");
+    expect(store.getLobbyState().achievementRewardedIds).not.toContain("global:windfall");
+    expect(store.getLobbyState().achievementUnlockedByRole?.["global:windfall"]).toBeUndefined();
+    expect(store.getLobbyState().achievementRewardedIds).toContain("global:ending-quit");
+    expect(store.getLobbyState().roleProgress.normal.playedRuns).toBe(1);
+  });
+
+  it("retains debug disqualification through rewinds, lobby return and page reload", async () => {
+    const { store, storage, adapter } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    store.markCurrentRunAsDebugged();
+    expect(store.loadRunSave("month:0")).toBe(true);
+    expect(store.isCurrentRunDebugged()).toBe(true);
+    store.dispatch("reset-game");
+    store.dispatch("start-game", { roleId: "normal" });
+    expect(store.isCurrentRunDebugged()).toBe(true);
+    await store.flushSaves();
+    const loaded = (await reopen(storage, adapter)).store;
+    loaded.dispatch("start-game", { roleId: "normal" });
+    expect(loaded.isCurrentRunDebugged()).toBe(true);
+    loaded.dispatch("quit-game");
+    expect(loaded.getEndingExperienceAward()?.disqualifiedByDebug).toBe(true);
+    loaded.dispatch("restart-game");
+    expect(loaded.getLobbyState().achievementRewardedIds).toEqual([]);
+    expect(loaded.getLobbyState().roleProgress.normal.playedRuns).toBe(0);
+    expect(loaded.getFinalizedOutbox()).toEqual([]);
+    expect(loaded.isCurrentRunDebugged()).toBe(false);
+  });
+
+  it("persists finalization atomically and rejects a stale already-finalized UUID save on startup", async () => {
+    const { store, saves, storage } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    awardWindfall(store);
+    store.dispatch("quit-game");
+    const oldRecord = saves.get("normal")!;
+    let finalized = 0;
+    store.subscribeFinalized(() => { finalized += 1; });
+    store.dispatch("restart-game");
+    expect(finalized).toBe(1);
+    const account = structuredClone(store.getLobbyState());
+    const persisted = loadAccountProfile(storage);
+    expect(persisted.settledRuns.normal).toBe(oldRecord.runId);
+    expect(persisted.finalizedOutbox.map(record => record.runId)).toContain(oldRecord.runId);
+    await store.flushSaves();
+    // Simulate durable account reward commit followed by a crash before old IndexedDB deletion.
+    const crashAdapter = createMemoryRunSaveAdapter([oldRecord]);
+    const restored = await reopen(storage, crashAdapter);
+    expect(restored.store.hasRoleSave("normal")).toBe(false);
+    expect(restored.store.getLobbyState().roleProgress).toEqual(account.roleProgress);
+    expect(restored.store.getFinalizedOutbox()).toHaveLength(1);
+    restored.store.acknowledgeFinalizedRun(oldRecord.runId);
+    expect(loadAccountProfile(storage).finalizedOutbox).toEqual([]);
+  });
+
+  it("keeps the ending save and account unchanged if finalization cannot persist", async () => {
+    const { store, storage, saves } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    awardWindfall(store);
+    store.dispatch("quit-game");
+    const beforeAccount = structuredClone(store.getLobbyState());
+    const beforeSave = structuredClone(saves.get("normal"));
+    const beforeState: GameState = structuredClone(store.getState());
+    storage.failAccountWrites(true);
+    store.dispatch("restart-game");
+    expect(store.getState()).toEqual(beforeState);
+    expect(store.getLobbyState()).toEqual(beforeAccount);
+    expect(saves.get("normal")).toEqual(beforeSave);
+    expect(store.getFinalizedOutbox()).toEqual([]);
+    expect(store.getSaveStatus()).not.toBe("");
+    storage.failAccountWrites(false);
+    store.dispatch("restart-game");
+    expect(store.getState().phase).toBe("playing");
+    expect(store.getLobbyState().achievementRewardedIds).toContain("global:windfall");
+  });
+});

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -8,7 +9,7 @@ import { buildFutureTodoPreviewItems } from "../src/app/v2-render-play";
 import type { GameState } from "../src/core/v2-types";
 
 function fixture(): GameState {
-  vi.spyOn(Math, "random").mockReturnValue(0.5);
+  vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
   const base = createStartedGameState("normal");
   const paper = { ...createGrantedPublishedPaper(6, 0, { target: "A", acceptedScore: 100 }),
     id: "early-conference", submittedMonth: 3, submittedYear: 1, acceptedTotalMonths: 6,

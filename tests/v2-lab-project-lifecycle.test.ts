@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queueAdvisorGuidance, settleAdvisorGuidance } from "../src/core/v2-advisor-guidance";
 import { createAdvisorProgressState } from "../src/core/v2-advisor-progress";
@@ -12,7 +13,7 @@ import type { FellowProgressProfile, GameState, Paper } from "../src/core/v2-typ
 
 function seedRandom(seed = 1) {
   let value = seed;
-  return vi.spyOn(Math, "random").mockImplementation(() => {
+  return vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => {
     value = value * 16807 % 2147483647;
     return (value - 1) / 2147483646;
   });
@@ -213,8 +214,8 @@ describe("monthly fellow experiment funding", () => {
     const before = makeState({ totalMonths: 4, month: 4, fellowProgressState: [makeFellow()] });
     const after = nextMonth(before);
     expect(after.advisorProgressState.funding).toBe(25);
-    expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 11, writing: 0 });
-    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +11（经费 -3）");
+    expect(after.fellowPapers?.[0]).toMatchObject({ idea: 9, experiment: 6, writing: 0 });
+    expect(after.fellowProgressState[0]?.monthlyActivity).toContain("实验 +6（经费 -3）");
     expect(after.player.money).toBe(before.player.money);
     expect(after.player.san).toBe(20);
     expect(after.actionState.used).toBe(0);
@@ -250,7 +251,7 @@ describe("monthly fellow experiment funding", () => {
       fellowPapers: reversed ? [...papers].reverse() : papers,
       advisorProgressState: { ...base.advisorProgressState, funding: 6, horizontalProgress: 20, nextProject: "vertical" as const },
     };
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const after = dispatchAction(before, "next-month");
     expect(after.totalMonths).toBe(5);
     expect(after.phase).toBe("playing");
@@ -282,7 +283,7 @@ describe("vertical completion guidance across actions", () => {
     const after = nextMonth(before);
     expect(after.advisorProgressState).toMatchObject({
       funding: 57,
-      verticalProgress: completerLast ? 2 : 0,
+      verticalProgress: completerLast ? 4 : 0,
       researchAccumulation: 22,
       pendingGuidanceToPlayer: null,
     });
@@ -362,7 +363,7 @@ describe("vertical completion guidance across actions", () => {
     expect(second.papers[0]).toEqual(experiment.papers[0]);
     expect(collaborationTotal(second.papers[1]!)).toBe(0);
     const later = nextMonth({ ...second, eventQueue: [] });
-    expect(later.papers[0]).toMatchObject({ writing: 8, collaborationScores: { idea: 0, experiment: 0, writing: 8 } });
+    expect(later.papers[0]).toMatchObject({ writing: 9, collaborationScores: { idea: 0, experiment: 0, writing: 9 } });
     expect(collaborationTotal(later.papers[1]!)).toBe(0);
     expect(later.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
   });
@@ -392,7 +393,7 @@ describe("vertical completion guidance across actions", () => {
     expect(dispatchAction(state, "select-paper", { paperId: submitted.id }).papers).toEqual(state.papers);
   });
 
-  it("archives a journal accepted by vertical-completion guidance in the same month exactly once", () => {
+  it("confirms a journal improved by vertical-completion guidance exactly once", () => {
     const journal = makePaper("journal-paper", {
       status: "journal-reviewing", journalTarget: "pami", idea: 40, experiment: 40, writing: 40,
       submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40,
@@ -401,7 +402,9 @@ describe("vertical completion guidance across actions", () => {
       papers: [journal], fellowProgressState: [], fellowPapers: [],
       advisorProgressState: { ...createAdvisorProgressState(), verticalProgress: 90, nextProject: "vertical" },
     });
-    const after = nextMonth(before);
+    const revised = nextMonth(before);
+    expect(revised.externalPublications).toHaveLength(0);
+    const after = dispatchAction(revised, "submit-journal-paper", { paperId: journal.id, journalTarget: "pami" });
     expect(after.papers).toHaveLength(0);
     expect(after.externalPublications).toHaveLength(1);
     const published = after.externalPublications[0]!;

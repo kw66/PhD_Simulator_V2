@@ -1,3 +1,5 @@
+import { gameRandom } from "./v2-game-random";
+import { recordPersonalIncome } from "./v2-money";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
 import { applyPlayerAttributeChange, getPlayerAttributeCap } from "./v2-player-attributes";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
@@ -33,7 +35,7 @@ function randomSource(state: GameState, injected?: () => number): { roll: () => 
 }
 
 /** Queue reactions until the enclosing action/month batch has fully committed. */
-export function applyGreedAttributeLoss(state: GameState, amount: number, _getRoll: () => number = Math.random): GameState {
+export function applyGreedAttributeLoss(state: GameState, amount: number, _getRoll: () => number = gameRandom): GameState {
   if (state.selectedRoleId !== "rich-reversed" || !state.roleTalents || !(amount > 0)) return state;
   const loss = getRoleTalentLevel(state, "loss-to-money") > 0
     ? precise((state.roleTalents.greedLossRemainder ?? 0) + amount) : 0;
@@ -45,7 +47,7 @@ export function applyGreedAttributeLoss(state: GameState, amount: number, _getRo
       pendingCoinGames: (state.roleTalents.pendingCoinGames ?? 0) + Math.floor(games),
     },
   };
-  return logGreed(state, next, "因祸得财", `三项属性实际下降累计满${Math.floor(loss)}点`);
+  return logGreed(state, recordPersonalIncome(next, Math.floor(loss)), "因祸得财", `三项属性实际下降累计满${Math.floor(loss)}点`);
 }
 
 export function getGreedResetTarget(state: GameState): number {
@@ -107,7 +109,7 @@ export function settleGreedCoinGames(state: GameState, getRoll?: () => number): 
   for (let index = 0; index < count; index += 1) {
     const moneyBefore = next.player.money;
     const money = roundMoney(moneyBefore * (random.roll() < 0.5 ? 1.5 : failureMultiplier));
-    next = { ...next, player: { ...next.player, money } };
+    next = recordPersonalIncome({ ...next, player: { ...next.player, money } }, money - moneyBefore);
     if (money < moneyBefore) next = settleGreedSpendingConversions(recordPersonalSpending(next, moneyBefore - money), random.roll);
   }
   return logGreed(state, random.finish(next), "金币游戏", `本批冻结${count}次判定，消费转化不会追加本批次数`);

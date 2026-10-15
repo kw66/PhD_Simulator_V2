@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolution-state";
@@ -71,11 +72,11 @@ describe("decimal attributes across module boundaries", () => {
       routes: { play: { progress: 0, completed: 0 }, study: { progress: 99, completed: 2 }, shopping: { progress: 0, completed: 0 } } };
     if (recipient === "lover") state.player.research = 8.25;
     expect(getLoverRouteGain(state, "study")).toBe(7);
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const next = advanceLoverDate(state, "study");
     expect(recipient === "player" ? next.player.research : next.loverProgressState.research).toBe(7.55);
     expect(recipient === "lover" ? next.player.research : next.loverProgressState.research).toBe(8.25);
-    expect(random).toHaveBeenCalledTimes(1);
+    expect(random).not.toHaveBeenCalled(); // Log identifiers are deterministic.
   });
 
   it("settles original positive, negative and zero requests instead of resisting presentation values", () => {

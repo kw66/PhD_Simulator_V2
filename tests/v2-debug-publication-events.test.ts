@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -55,7 +56,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it.each(["self", "advisor"] as const)("runs the journal acceptance shortcut through all three scenes and %s payment", (mode) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = startState();
     if (mode === "advisor") initial.selectedAdvisorName = "导师";
     let state = trigger(initial, "journal-accepted");
@@ -87,7 +88,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it("deduplicates repeated journal acceptance triggers while the real fee event is pending", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = startState();
     const once = trigger(initial, "journal-accepted");
     const twice = trigger(once, "journal-accepted");
@@ -98,7 +99,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it.each([["a", "A", 5], ["b", "B", 4], ["c", "C", 3]] as const)("opens grade %s activities with the matching option pool", (suffix, grade, count) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = startState();
     initial.player.social = 6;
     const state = trigger(initial, `conference-activity-${suffix}`);
@@ -113,7 +114,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it("returns to the new decision menu when replay redraws the previously selected gift", () => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     let state = trigger({ ...startState(), debugEventReplayEnabled: true }, "teachers-day");
     state = choose(state, "teachers-day");
     const decision = state.eventQueue.find((event) => event.chainId === "teachers-day")!;
@@ -138,7 +139,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it.each([0, 1, 2])("queues independent same-venue results while the first is at scene %i", (advancedScenes) => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const initial = startState([reviewingPaper("first"), reviewingPaper("second")]);
     let state = trigger(initial, "review-result");
     expect(state.eventQueue.filter((event) => event.source === "review")).toHaveLength(1);
@@ -164,7 +165,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it("appends unique result papers with full slots without replacing drafts or queued decisions", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const initial = startState([createDraftPaper(6, 0, () => 0)]);
     initial.paperSlotsUnlocked = 1;
     let state = initial;
@@ -182,7 +183,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it("queues merged attendance on result confirmation with a three-month decision deadline", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     let state = trigger(trigger(startState([reviewingPaper("first"), reviewingPaper("second")]), "review-result"), "review-result");
     for (const paperId of ["first", "second"]) {
       const chainId = `paper-review-result-${paperId}`;
@@ -213,7 +214,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it("opens an independent activity chain without publishing or paying and supports scene replay", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const initial = startState([createDraftPaper(6, 0, () => 0)]);
     let state = trigger(initial, "conference-activity-c");
     const activity = state.eventQueue.find((event) => event.chainId.endsWith("-activity"))!;
@@ -245,7 +246,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it.each(["a", "b", "c"])("preserves grade %s menus, rolls and contacts when replaying act2 after a JSON roundtrip", (grade) => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = startState();
     initial.player.social = 6;
     let state = trigger(initial, `conference-activity-${grade}`);
@@ -297,7 +298,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it.each(["replay-choice", "restore-then-continue"])("rerolls only on act1 Continue via %s", (route) => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     let state = trigger({ ...startState(), debugEventReplayEnabled: true }, "conference-activity-c");
     const root = state.eventQueue.find((event) => event.chainId.endsWith("-activity"))!;
     random.mockClear();
@@ -357,7 +358,7 @@ describe("debug publication shortcuts", () => {
   });
 
   it("keeps the original attendance shortcut separate from the activity shortcut", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const initial = startState();
     let state = trigger(initial, "conference");
     const attendance = state.eventQueue.find((event) => event.conferencePreview)!;

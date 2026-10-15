@@ -1,67 +1,32 @@
 import {
   changeLobbyRolePage,
   changeRoleAchievementPage,
-  createDefaultAccountProfile,
   isRoleOwned,
   selectLobbyRole,
   setDateDisplayMode,
 } from "./v2-lobby";
 import { createInitialState, dispatchAction } from "./v2-engine";
 import { pushNoOpLog } from "./v2-engine-helpers";
-import { achievementRecordsChanged, loadRoleAchievementRecords, recordNewAchievementDates, saveRoleAchievementRecords } from "./v2-achievement-records";
-import { awardRoleExperience, getNextRoleLevelExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
-import { loadRoleRecords, recordRoleResult, recordRoleStart, saveRoleRecords } from "./v2-role-records";
+import { settleRunAchievements } from "./v2-achievement-runtime";
+import { createAchievementRunProgress } from "./v2-achievement-runtime-types";
+import { awardRoleExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
+import { recordRoleResult, recordRoleStart } from "./v2-role-records";
 import { getTalentUpgradeReason, isRoleTalentImplemented, sanitizeRoleTalentAllocation } from "./v2-role-talent-definitions";
 import { ENABLE_TALENT_TEST_MODE } from "./v2-development-flags";
-import { loadRoleTalentAllocation, saveRoleTalentAllocation } from "./v2-role-talent-storage";
+import { loadAccountProfile, saveAccountProfile, type ExperienceStorage, type FinalizedRunRecord } from "./v2-account-storage";
+import { createRunSaveRepository, type RunSaveRepository } from "./v2-run-saves";
+import { collectRunStatistics } from "./v2-run-statistics";
 import type { AccountProfile, DispatchPayload, GameActionId, GameState, RoleId } from "./v2-types";
 
 type Listener = (state: GameState) => void;
-type ExperienceStorage = Pick<Storage, "getItem" | "setItem">;
-const ROLE_EXPERIENCE_STORAGE_KEY = "phd_simulator_v2_role_experience_v1";
 
 function getBrowserStorage(): ExperienceStorage | null {
   try {
     return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-function loadRoleExperience(account: AccountProfile, storage: ExperienceStorage | null): AccountProfile {
-  try {
-    const saved: unknown = JSON.parse(storage?.getItem(ROLE_EXPERIENCE_STORAGE_KEY) ?? "null");
-    if (!saved || typeof saved !== "object" || !("version" in saved) || saved.version !== 1
-      || !("roles" in saved) || !saved.roles || typeof saved.roles !== "object") return account;
-
-    const roles = saved.roles as Record<string, unknown>;
-    const roleProgress = { ...account.roleProgress };
-    for (const roleId of Object.keys(roleProgress) as RoleId[]) {
-      const value = roles[roleId];
-      if (!value || typeof value !== "object") continue;
-      const { level, exp } = value as Record<string, unknown>;
-      if (!Number.isSafeInteger(level) || !Number.isSafeInteger(exp)
-        || (level as number) < 0 || (level as number) > MAX_ROLE_LEVEL || (exp as number) < 0) continue;
-      const nextLevelExp = getNextRoleLevelExperience(level as number);
-      if (nextLevelExp !== null && (exp as number) >= nextLevelExp) continue;
-      roleProgress[roleId] = { ...roleProgress[roleId], level: level as number, exp: exp as number };
-    }
-    return { ...account, roleProgress };
-  } catch {
-    return account;
-  }
-}
-
-function saveRoleExperience(account: AccountProfile, storage: ExperienceStorage | null): void {
-  try {
-    storage?.setItem(ROLE_EXPERIENCE_STORAGE_KEY, JSON.stringify({
-      version: 1,
-      roles: Object.fromEntries(Object.entries(account.roleProgress).map(([roleId, progress]) => [
-        roleId, { level: progress.level, exp: progress.exp },
-      ])),
-    }));
-  } catch {
-    // Progress remains available for the current session when browser storage is unavailable.
+  } catch (error) {
+    if (typeof window === "undefined") return null;
+    // Blocked browser storage must not be mistaken for intentional memory-only mode.
+    return { getItem() { throw error; }, setItem() { throw error; } };
   }
 }
 
@@ -91,76 +56,186 @@ function applyTalentTestMode(account: AccountProfile): AccountProfile {
   return { ...account, roleProgress };
 }
 
-export function createStore(options: { storage?: ExperienceStorage | null } = {}) {
+export function createStore(options: { storage?: ExperienceStorage | null; saves?: RunSaveRepository } = {}) {
   const storage = options.storage === undefined ? getBrowserStorage() : options.storage;
-  let accountProfile = loadRoleTalentAllocation(loadRoleAchievementRecords(loadRoleRecords(loadRoleExperience(createDefaultAccountProfile(), storage), storage), storage), storage);
+  const loadedAccount = loadAccountProfile(storage);
+  let accountProfile = loadedAccount.account;
+  let settledRuns = loadedAccount.settledRuns;
+  let finalizedOutbox = loadedAccount.finalizedOutbox;
   let state = syncSetupSelection(createInitialState(), accountProfile.selectedLobbyRoleId);
   let runUsedDebugPanel = false;
+  let currentRunId: string | null = null;
+  let countedStartRole: RoleId | null = null;
+  let saveStatus = "";
+  let readyComplete = !options.saves && (options.storage !== undefined || typeof window === "undefined");
+  let readyPromise: Promise<void> | undefined;
   const listeners = new Set<Listener>();
+  const finalizedListeners = new Set<(record: FinalizedRunRecord) => void>();
+  const saves = options.saves ?? createRunSaveRepository({ storage,
+    onError(error) { saveStatus = error.message; queueMicrotask(() => notify()); },
+  });
+  let endingAward: AccountProfile["lastRunExperience"];
 
-  function commit(nextState: GameState, nextAccountProfile = accountProfile): void {
-    const startedAccountProfile = recordRoleStart(nextAccountProfile, state, nextState);
-    if (startedAccountProfile !== nextAccountProfile) {
-      nextAccountProfile = startedAccountProfile;
-      saveRoleRecords(nextAccountProfile, storage);
-    }
-    if (state.phase === "playing" && nextState.phase === "finished") {
-      const roleId = nextState.selectedRoleId;
-      const previousProgress = nextAccountProfile.roleProgress[roleId];
-      if (runUsedDebugPanel) {
-        nextAccountProfile = {
-          ...nextAccountProfile,
-          lastRunExperience: {
-            roleId,
-            gained: 0,
-            previousLevel: previousProgress.level,
-            level: previousProgress.level,
-            exp: previousProgress.exp,
-            disqualifiedByDebug: true,
-          },
-        };
-      } else {
-        const award = awardRoleExperience(previousProgress, nextState.totalResearchScore);
-        nextAccountProfile = {
-          ...nextAccountProfile,
-          roleProgress: { ...nextAccountProfile.roleProgress, [roleId]: award.progress },
-          lastRunExperience: {
-            roleId,
-            gained: award.gained,
-            previousLevel: previousProgress.level,
-            level: award.progress.level,
-            exp: award.progress.exp,
-          },
-        };
-        nextAccountProfile = recordRoleResult(nextAccountProfile, nextState);
-        saveRoleExperience(nextAccountProfile, storage);
-        saveRoleRecords(nextAccountProfile, storage);
-      }
-    }
-    nextAccountProfile = recordNewAchievementDates(accountProfile, nextAccountProfile);
-    if (achievementRecordsChanged(accountProfile, nextAccountProfile)) saveRoleAchievementRecords(nextAccountProfile, storage);
-    accountProfile = nextAccountProfile;
-    state = syncSetupSelection(nextState, accountProfile.selectedLobbyRoleId);
-    listeners.forEach((listener) => listener(state));
+  function notify(): void { listeners.forEach(listener => listener(state)); }
+
+  function persistAccount(next = accountProfile, ids = settledRuns, outbox = finalizedOutbox): boolean {
+    try { saveAccountProfile(next, storage, ids, outbox); return true; }
+    catch { saveStatus = "账户进度未能保存，请释放浏览器存储空间后重试；本局存档仍保留"; return false; }
   }
 
-  return {
+  function endingPreview(nextState: GameState): { account: AccountProfile; state: GameState } {
+    if (nextState.phase !== "finished" || !nextState.ending) {
+      endingAward = undefined;
+      return { account: accountProfile, state: nextState };
+    }
+    const roleId = nextState.selectedRoleId;
+    const previous = accountProfile.roleProgress[roleId];
+    if (runUsedDebugPanel) {
+      endingAward = { roleId, gained: 0, previousLevel: previous.level, level: previous.level,
+        exp: previous.exp, disqualifiedByDebug: true };
+      return { account: accountProfile, state: { ...nextState, runAchievementIds: [] } };
+    }
+    const settled = settleRunAchievements(accountProfile, nextState);
+    const award = awardRoleExperience(settled.account.roleProgress[roleId], nextState.totalResearchScore,
+      1 + (accountProfile.achievementExperienceMultipliers?.[roleId] ?? 0));
+    endingAward = { roleId, gained: award.gained + settled.experienceForCurrentRole,
+      previousLevel: previous.level, level: award.progress.level, exp: award.progress.exp };
+    return { state: settled.state, account: recordRoleResult({ ...settled.account,
+      roleProgress: { ...settled.account.roleProgress, [roleId]: award.progress }, lastRunExperience: endingAward }, nextState) };
+  }
+
+  function saveCurrent(monthStart = false): void {
+    if (state.phase === "setup") return;
+    // The debug month control may jump backwards without using the normal load UI.
+    const futureMonths = saves.list(state.selectedRoleId).filter(save => save.kind === "month" && save.totalMonths > state.totalMonths);
+    if (futureMonths.length && runUsedDebugPanel) {
+      const earlier = saves.list(state.selectedRoleId).find(save => save.kind === "month" && save.totalMonths <= state.totalMonths);
+      if (earlier) saves.rewind(state.selectedRoleId, earlier.id);
+    }
+    const record = saves.commit(state, { runId: currentRunId ?? undefined, debugUsed: runUsedDebugPanel, monthStart });
+    currentRunId = record.runId;
+  }
+
+  function commit(nextState: GameState, nextAccountProfile = accountProfile, options: { newRun?: boolean; restored?: boolean } = {}): void {
+    const previous = state;
+    if (options.newRun) {
+      nextAccountProfile = recordRoleStart(nextAccountProfile, createInitialState(), nextState);
+      countedStartRole = nextState.selectedRoleId;
+    }
+    if (nextAccountProfile !== accountProfile) {
+      persistAccount(nextAccountProfile);
+      accountProfile = nextAccountProfile;
+    }
+    state = syncSetupSelection(nextState, accountProfile.selectedLobbyRoleId);
+    if (state.phase === "finished") state = endingPreview(state).state;
+    else endingAward = undefined;
+    if (!options.restored && state.phase !== "setup" && (state !== previous || options.newRun)) {
+      saveCurrent(!!options.newRun || (previous.phase === "playing" && state.totalMonths > previous.totalMonths));
+    }
+    notify();
+  }
+
+  function restore(roleId: RoleId, snapshotId = "latest"): boolean {
+    const record = snapshotId === "latest" ? saves.get(roleId) : saves.rewind(roleId, snapshotId);
+    if (!record || record.runId === settledRuns[roleId]) return false;
+    currentRunId = record.runId;
+    runUsedDebugPanel = record.debugUsed;
+    countedStartRole = record.debugUsed ? null : roleId;
+    accountProfile = selectLobbyRole(accountProfile, roleId);
+    commit(record.latest.state, accountProfile, { restored: true });
+    return true;
+  }
+
+  function ready(): Promise<void> {
+    return readyPromise ??= saves.ready().then(() => {
+      for (const roleId of Object.keys(accountProfile.roleProgress) as RoleId[]) {
+        const record = saves.get(roleId);
+        if (record && settledRuns[roleId] === record.runId) saves.clear(roleId);
+      }
+      readyComplete = true;
+      notify();
+    });
+  }
+
+  function markCurrentRunAsDebugged(): void {
+    if (state.phase === "setup" || runUsedDebugPanel) return;
+    runUsedDebugPanel = true;
+    if (countedStartRole) {
+      const roleId = countedStartRole;
+      const progress = accountProfile.roleProgress[roleId];
+      accountProfile = { ...accountProfile, roleProgress: { ...accountProfile.roleProgress,
+        [roleId]: { ...progress, startedRuns: Math.max(0, progress.startedRuns - 1) } } };
+      countedStartRole = null;
+      persistAccount();
+    }
+    if (state.phase === "finished") state = endingPreview(state).state;
+    saveCurrent();
+    notify();
+  }
+
+  function finalize(): boolean {
+    if (state.phase !== "finished" || !state.ending || !currentRunId) return false;
+    const roleId = state.selectedRoleId;
+    if (settledRuns[roleId] === currentRunId) return false;
+    const preview = endingPreview(state);
+    const record: FinalizedRunRecord = { runId: currentRunId, state: preview.state, debugUsed: runUsedDebugPanel };
+    const nextAccount = runUsedDebugPanel ? { ...accountProfile, lastRunExperience: endingAward } : preview.account;
+    const nextIds = { ...settledRuns, [roleId]: currentRunId };
+    const nextOutbox = runUsedDebugPanel ? finalizedOutbox : [...finalizedOutbox, record];
+    if (!persistAccount(nextAccount, nextIds, nextOutbox)) { notify(); return false; }
+    accountProfile = nextAccount;
+    settledRuns = nextIds;
+    finalizedOutbox = nextOutbox;
+    saves.clear(roleId);
+    if (!runUsedDebugPanel) finalizedListeners.forEach(listener => listener(structuredClone(record)));
+    return true;
+  }
+
+  const api = {
+    ready,
+    isReady(): boolean { return readyComplete; },
+    getSaveStatus(): string { return saveStatus; },
+    getRunSaves(roleId = state.selectedRoleId) { return saves.list(roleId); },
+    hasRoleSave(roleId: RoleId): boolean { return saves.list(roleId).length > 0; },
+    getCurrentRunId(): string | null { return currentRunId; },
+    getEndingExperienceAward() { return endingAward; },
+    flushSaves(): Promise<void> { return saves.flush(); },
+    loadRunSave(snapshotId: string): boolean { return state.phase !== "setup" && restore(state.selectedRoleId, snapshotId); },
+    getFinalizedOutbox(): FinalizedRunRecord[] { return structuredClone(finalizedOutbox); },
+    acknowledgeFinalizedRun(runId: string): void {
+      const next = finalizedOutbox.filter(record => record.runId !== runId);
+      if (persistAccount(accountProfile, settledRuns, next)) finalizedOutbox = next;
+    },
+    subscribeFinalized(listener: (record: FinalizedRunRecord) => void): () => void {
+      finalizedListeners.add(listener);
+      return () => finalizedListeners.delete(listener);
+    },
     getState(): GameState {
       return state;
     },
     getLobbyState() {
       return accountProfile;
     },
+    recordHelpPageRead(id: string, requiredIds: readonly string[]): void {
+      if (state.phase !== "playing" || runUsedDebugPanel || !requiredIds.includes(id)) return;
+      const run = structuredClone(state.achievementProgress ?? createAchievementRunProgress());
+      const pages = new Set(run.sets["help-pages"] ?? []);
+      if (pages.has(id)) return;
+      pages.add(id);
+      run.sets["help-pages"] = [...pages];
+      if (requiredIds.length > 0 && requiredIds.every(key => pages.has(key)) && !run.satisfied.includes("global:help-collector")) run.satisfied.push("global:help-collector");
+      state = { ...state, achievementProgress: run };
+      saveCurrent();
+    },
     upgradeRoleTalent(roleId: RoleId, talentId: string): boolean {
       if (state.phase !== "setup" || !isRoleOwned(accountProfile, roleId)) return false;
       const level = accountProfile.roleProgress[roleId].level;
-      const allocation = sanitizeRoleTalentAllocation(roleId, level, accountProfile.talentAllocation?.[roleId]);
-      if (getTalentUpgradeReason(roleId, level, allocation, talentId) !== null) return false;
+      const allocation = sanitizeRoleTalentAllocation(roleId, level, accountProfile.talentAllocation?.[roleId], accountProfile.achievementTalentPoints?.[roleId] ?? 0);
+      if (getTalentUpgradeReason(roleId, level, allocation, talentId, accountProfile.achievementTalentPoints?.[roleId] ?? 0) !== null) return false;
       const nextAccountProfile = {
         ...accountProfile,
         talentAllocation: { ...accountProfile.talentAllocation, [roleId]: { ...allocation, [talentId]: (allocation[talentId] ?? 0) + 1 } },
       };
-      saveRoleTalentAllocation(nextAccountProfile, storage);
       commit(state, nextAccountProfile);
       return true;
     },
@@ -169,12 +244,12 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
       const talentAllocation = { ...accountProfile.talentAllocation };
       delete talentAllocation[roleId];
       const nextAccountProfile = { ...accountProfile, talentAllocation };
-      saveRoleTalentAllocation(nextAccountProfile, storage);
       commit(state, nextAccountProfile);
       return true;
     },
-    markCurrentRunAsDebugged(): void {
-      if (state.phase === "playing") runUsedDebugPanel = true;
+    markCurrentRunAsDebugged,
+    isCurrentRunDebugged(): boolean {
+      return runUsedDebugPanel;
     },
     enableTalentTestMode(): void {
       if (!ENABLE_TALENT_TEST_MODE) return;
@@ -188,7 +263,7 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
       return () => listeners.delete(listener);
     },
     dispatch(actionId: GameActionId, payload: DispatchPayload = {}): void {
-      if (actionId === "debug-trigger-ending" && state.phase !== "setup") runUsedDebugPanel = true;
+      if (actionId === "debug-trigger-ending" && state.phase !== "setup") markCurrentRunAsDebugged();
       if (actionId === "select-role" && payload.roleId) {
         if (state.phase === "setup" && payload.roleId === accountProfile.selectedLobbyRoleId) {
           return;
@@ -221,26 +296,31 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
       if (actionId === "reset-game") {
         const nextState = dispatchAction(state, actionId, payload);
         runUsedDebugPanel = false;
+        countedStartRole = null;
+        currentRunId = null;
         commit(nextState);
         return;
       }
 
       if (actionId === "restart-game") {
-        const nextState = dispatchAction({
-          ...createInitialState(),
-          blockLinearEvents: state.blockLinearEvents,
-          debugEventReplayEnabled: state.debugEventReplayEnabled,
-        }, "start-game", {
-          roleId: state.selectedRoleId,
-          talentAllocation: sanitizeRoleTalentAllocation(state.selectedRoleId, accountProfile.roleProgress[state.selectedRoleId].level, accountProfile.talentAllocation?.[state.selectedRoleId]),
+        if (!finalize()) return;
+        const roleId = state.selectedRoleId;
+        const nextState = dispatchAction({ ...createInitialState(), blockLinearEvents: state.blockLinearEvents }, "start-game", {
+          roleId,
+          talentAllocation: sanitizeRoleTalentAllocation(roleId, accountProfile.roleProgress[roleId].level, accountProfile.talentAllocation?.[roleId], accountProfile.achievementTalentPoints?.[roleId] ?? 0),
+          bonusTalentPoints: accountProfile.achievementTalentPoints?.[roleId] ?? 0,
         });
+        currentRunId = null;
         runUsedDebugPanel = false;
-        commit(nextState);
+        commit(nextState, accountProfile, { newRun: true });
         return;
       }
 
       if (actionId === "start-game") {
+        if (state.phase !== "setup") return;
+        if (!readyComplete) { void ready().then(() => api.dispatch(actionId, payload)); return; }
         const nextRoleId = payload.roleId ?? accountProfile.selectedLobbyRoleId;
+        if (restore(nextRoleId)) return;
         if (!isRoleOwned(accountProfile, nextRoleId)) {
           commit(pushNoOpLog(state, "该角色当前仅供展示。"));
           return;
@@ -249,24 +329,19 @@ export function createStore(options: { storage?: ExperienceStorage | null } = {}
         const nextState = dispatchAction(state, actionId, {
           ...payload,
           roleId: nextRoleId,
-          talentAllocation: sanitizeRoleTalentAllocation(nextRoleId, accountProfile.roleProgress[nextRoleId].level, accountProfile.talentAllocation?.[nextRoleId]),
+          talentAllocation: sanitizeRoleTalentAllocation(nextRoleId, accountProfile.roleProgress[nextRoleId].level, accountProfile.talentAllocation?.[nextRoleId], accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0),
+          bonusTalentPoints: accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0,
         });
-        if (state.phase === "setup" && nextState.phase === "playing") runUsedDebugPanel = false;
-        commit(nextState);
+        currentRunId = null;
+        runUsedDebugPanel = false;
+        commit(nextState, accountProfile, { newRun: true });
         return;
       }
 
-      const nextState = dispatchAction(state, actionId, payload);
-      if (actionId === "debug-trigger-ending" && nextState !== state && state.phase === "finished") {
-        const progress = accountProfile.roleProgress[nextState.selectedRoleId];
-        commit(nextState, {
-          ...accountProfile,
-          lastRunExperience: {
-            roleId: nextState.selectedRoleId, gained: 0, previousLevel: progress.level,
-            level: progress.level, exp: progress.exp, disqualifiedByDebug: true,
-          },
-        });
-      } else commit(nextState);
+      if (actionId.startsWith("debug-")) markCurrentRunAsDebugged();
+      const nextState = collectRunStatistics(state, dispatchAction(state, actionId, payload));
+      commit(nextState);
     },
   };
+  return api;
 }

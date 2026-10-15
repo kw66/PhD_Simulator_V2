@@ -236,13 +236,13 @@ export function isRoleTalentImplemented(roleId: RoleId): boolean {
     "normal-reversed", "rich-reversed", "genius-reversed", "social-reversed", "teacher-child-reversed", "chosen-reversed"].includes(roleId);
 }
 
-export function getTalentPointBalance(roleId: RoleId, level: number, allocation: Record<string, number>): number {
+export function getTalentPointBalance(roleId: RoleId, level: number, allocation: Record<string, number>, bonusPoints = 0): number {
   const spent = getDesignedTalentNodes(roleId)?.reduce((sum, node) => sum + (allocation[node.id] ?? 0) * node.cost, 0) ?? 0;
   const validLevel = Number.isFinite(level) ? Math.min(MAX_ROLE_LEVEL, Math.max(0, Math.floor(level))) : 0;
-  return Math.max(0, validLevel * ROLE_TALENT_POINTS_PER_LEVEL - spent);
+  return Math.max(0, validLevel * ROLE_TALENT_POINTS_PER_LEVEL + Math.max(0, Math.floor(bonusPoints)) - spent);
 }
 
-export function getTalentUpgradeReason(roleId: RoleId, level: number, allocation: Record<string, number>, talentId: string): string | null {
+export function getTalentUpgradeReason(roleId: RoleId, level: number, allocation: Record<string, number>, talentId: string, bonusPoints = 0): string | null {
   if (!isRoleTalentImplemented(roleId)) return "该角色天赋暂未开放";
   const nodes = getDesignedTalentNodes(roleId);
   const node = nodes?.find((entry) => entry.id === talentId);
@@ -250,12 +250,12 @@ export function getTalentUpgradeReason(roleId: RoleId, level: number, allocation
   if ((allocation[node.id] ?? node.initialLevel ?? 0) >= node.maxLevel) return "已满级";
   if (node.challenge) return nodes!.some((entry) => entry.challenge && entry.id !== node.id && (allocation[entry.id] ?? 0) > 0) ? "只能选择一个档位" : null;
   if (node.prerequisiteIds.length > 0 && !node.prerequisiteIds.some((id) => (allocation[id] ?? 0) >= 1)) return "需要先点亮相邻前置天赋";
-  if (getTalentPointBalance(roleId, level, allocation) < node.cost) return "天赋点不足";
+  if (getTalentPointBalance(roleId, level, allocation, bonusPoints) < node.cost) return "天赋点不足";
   return null;
 }
 
 /** Treat stored and dispatched allocations as untrusted. Rebuild a valid tree within the real level budget. */
-export function sanitizeRoleTalentAllocation(roleId: RoleId, level: number, raw: unknown): Record<string, number> {
+export function sanitizeRoleTalentAllocation(roleId: RoleId, level: number, raw: unknown, bonusPoints = 0): Record<string, number> {
   if (!isRoleTalentImplemented(roleId) || !raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const source = raw as Record<string, unknown>;
   const allocation: Record<string, number> = {};
@@ -264,7 +264,7 @@ export function sanitizeRoleTalentAllocation(roleId: RoleId, level: number, raw:
     const requested = source[node.id];
     if (!Number.isSafeInteger(requested) || (requested as number) <= 0 || node.fixed) continue;
     for (let next = 0; next < Math.min(node.maxLevel, requested as number); next += 1) {
-      if (getTalentUpgradeReason(roleId, level, allocation, node.id) !== null) break;
+      if (getTalentUpgradeReason(roleId, level, allocation, node.id, bonusPoints) !== null) break;
       allocation[node.id] = (allocation[node.id] ?? 0) + 1;
     }
   }

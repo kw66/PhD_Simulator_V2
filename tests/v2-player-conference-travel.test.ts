@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createConferenceDecisionAct1 } from "../src/core/v2-conference-events";
 import type { ConferenceEventContext } from "../src/core/v2-conference-events";
@@ -125,7 +126,7 @@ describe("player conference travel across paper batches", () => {
   });
 
   it("schedules one conference event for all papers accepted for the same conference", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = makeState();
     let state: GameState = { ...initial,
       advisorProgressState: { ...initial.advisorProgressState, paidConferenceRegistrationPaperIds: ["engine-paper-0", "engine-paper-1"] },
@@ -149,7 +150,7 @@ describe("player conference travel across paper batches", () => {
   });
 
   it("queues one merged attendance decision early and keeps its deadline anchored to acceptance", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = makeState();
     const papers = [0, 1].map((index) => ({
       ...createGrantedPublishedPaper(4, index, { target: "A", acceptedScore: 4 }),

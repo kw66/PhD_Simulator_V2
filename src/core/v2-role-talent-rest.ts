@@ -1,3 +1,4 @@
+import { recordAchievementCounter } from "./v2-achievement-runtime-types";
 import { addOrReplaceBuffs } from "./v2-buffs";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getShopRestSanGain } from "./v2-shop-items-effects";
@@ -27,11 +28,11 @@ export function applyRoleTalentRest(state: GameState, options: { yearSummary?: b
         actionEffects: { [action]: { bonus: previous + bonus } } });
     }
   }
-  return {
+  return recordAchievementCounter({
     ...state, player: { ...state.player, san },
     buffs: buffs.length > 0 ? addOrReplaceBuffs(state.buffs, buffs) : state.buffs,
     shopState: state.shopState.chairUpgrade === "hammock" && appliedGain > 0
       ? { ...state.shopState, chairSanRecovered: Math.max(0, state.shopState.chairSanRecovered ?? 0) + appliedGain }
       : state.shopState,
-  };
+  }, "rest-san", options.yearSummary ? 0 : appliedGain);
 }

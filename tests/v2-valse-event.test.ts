@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -273,7 +274,7 @@ describe("VALSE annual conference", () => {
     { mode: "请导师报销", favor: 6, roll: 0.1, change: -0.8 },
     { mode: "请导师报销", favor: 6, roll: 0.99, change: -0.8 },
   ])("settles $mode once with favor $favor independently of roll $roll", ({ mode, favor, roll, change }) => {
-    vi.spyOn(Math, "random").mockReturnValue(roll);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(roll);
     let state = queuedState();
     state = { ...state, player: { ...state.player, favor } };
     expect(state.eventQueue[0]!.stage).toBe("act1");

@@ -107,7 +107,6 @@ function renderCareerCard(state: GameState): string {
       const choice = { id: "advance", label: "推进", outcome: "", effects: { san: -cost } };
       const risk = failure ? null : getEventChoiceRiskDetails(state, { id: "career-preview", chainId: "career-preview", title: "找工作推进", description: "", source: "career", stage: "act2", blocking: false, deadlineMonths: 0, choices: [choice] }, choice);
       const paymentText = formatCompactSanPayment(quoteSanPayment(state, cost, { allowOverdraw: true }));
-      const actionHint = failure ?? `本方向每月一次，不占行动点；${paymentText}${risk ? `\n${risk.explanation}` : ""}`;
       const eligible = unlocked && (type !== "academic" || state.degree === "phd");
       const ability = eligible ? getCareerAbility(state, type) : 0;
       const resume = eligible ? getCareerBaseScore(state, type) : 0;
@@ -116,6 +115,7 @@ function renderCareerCard(state: GameState): string {
       const minimumGain = calculateMonthlyCareerProgress(state, type, () => 0);
       const maximumGain = calculateMonthlyCareerProgress(state, type, () => 0.999999);
       const gainLabel = minimumGain === maximumGain ? `+${minimumGain}` : `+${minimumGain}～${maximumGain}`;
+      const actionHint = failure ?? `主动推进：${gainLabel}分 · ${paymentText}\n本方向每月一次，不占行动点${risk ? `\n${risk.explanation}` : ""}`;
       const scale = Math.max(ability, ...CAREER_JOBS[type].map((job) => job.threshold));
       const baseWidth = Math.min(100, resume / Math.max(1, scale) * 100);
       const practiceWidth = Math.min(100 - baseWidth, practice / Math.max(1, scale) * 100);
@@ -128,7 +128,7 @@ function renderCareerCard(state: GameState): string {
       <strong class="rel-detail-label" tabindex="0" ${tooltip(progressHint)}><span class="rel-inline-icon" aria-hidden="true">${({ internet: "🏢", stateOwned: "🏛️", civilService: "📋", academic: "🎓" } as const)[type]}</span>${escapeHtml(CAREER_DEFINITIONS[type].name)}${offer ? '<span class="graduation-offer-marker" aria-label="已获 offer">✓</span>' : ""}</strong>
       <div class="rel-progress-bar graduation-career-bar" tabindex="0" role="meter" aria-label="${escapeHtml(CAREER_DEFINITIONS[type].name)}应聘能力" aria-valuemin="0" aria-valuemax="${formatMoney(scale)}" aria-valuenow="${formatMoney(ability)}" ${tooltip(progressHint)}><span class="graduation-bar-fill-track"><span class="rel-progress-fill graduation-career-resume${baseWidth > 0 ? " is-start" : ""}${practiceWidth + interviewWidth === 0 ? " is-end" : ""}" style="width:${formatMoney(baseWidth)}%"></span><span class="rel-progress-fill graduation-career-practice${baseWidth === 0 && practiceWidth > 0 ? " is-start" : ""}${interviewWidth === 0 ? " is-end" : ""}" style="width:${formatMoney(practiceWidth)}%"></span><span class="rel-progress-fill graduation-career-interview${baseWidth + practiceWidth === 0 && interviewWidth > 0 ? " is-start" : ""} is-end" style="width:${formatMoney(interviewWidth)}%"></span></span></div>
       <strong class="rel-progress-val">${renderAnimatedNumber(`graduation:${state.degree}:career:${type}:progress`, ability)}</strong>
-      <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="prepare-career" data-career-type="${type}" ${risk ? "data-event-risk-tooltip" : "data-card-tooltip"} data-tooltip="${escapeHtml(actionHint)}"${failure ? ' disabled aria-disabled="true"' : ""}><span>📈推进</span><span class="graduation-action-gain">${gainLabel}</span>${risk ? `<span class="event-choice-risk is-${risk.risk}" aria-label="${escapeHtml(risk.explanation)}">！</span>` : ""}<small class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, cost, { allowOverdraw: true }))}</small></button>
+      <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="prepare-career" data-career-type="${type}" ${risk ? "data-event-risk-tooltip" : "data-card-tooltip"} data-tooltip="${escapeHtml(actionHint)}"${failure ? ' disabled aria-disabled="true"' : ""}><span>📈推进</span>${risk ? `<span class="event-choice-risk is-${risk.risk}" aria-label="${escapeHtml(risk.explanation)}">！</span>` : ""}<small class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, cost, { allowOverdraw: true }))}</small></button>
     </div>`;
     }).join("")}</div>
   </section>`;
@@ -170,7 +170,7 @@ function renderThesisScoreChart(presentation: NonNullable<PendingEvent["thesisRe
   const monthLabel = (months: number): string => months > 0
     ? `${getAcademicCalendarYear(Math.floor((months - 1) / 12) + 1, (months - 1) % 12 + 1)}/${getAcademicCalendarMonth((months - 1) % 12 + 1)}`
     : "送审";
-  return `<div class="graduation-review-chart-scroll" tabindex="0" role="region" aria-label="研究点和总分变化历程"><svg class="graduation-review-chart" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="毕业论文研究点和总分变化历程">
+  return `<div class="graduation-review-chart-scroll" tabindex="0" role="region" aria-label="研究点和总分变化历程"><svg class="graduation-review-chart" data-score-chart-min-width="${Math.max(250, history.length * 36 + 60)}" data-score-chart-left="${left}" data-score-chart-right="18" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="毕业论文研究点和总分变化历程">
     ${[0, scale / 2, scale].map((value) => `<line class="graduation-review-grid" x1="${left}" y1="${y(value)}" x2="${width - 18}" y2="${y(value)}"/><text x="${left - 7}" y="${y(value) + 4}" text-anchor="end">${formatMoney(value)}</text>`).join("")}
     ${series.map((line) => `<path class="graduation-review-line is-${line.className}" d="${line.values.map((score, index) => `${index ? "L" : "M"}${x(index).toFixed(1)} ${y(score).toFixed(1)}`).join(" ")}"/>${line.values.map((score, index) => `<circle class="graduation-review-dot is-${line.className}" cx="${x(index).toFixed(1)}" cy="${y(score).toFixed(1)}" r="3.5"><title>${monthLabel(history[index]!.totalMonths)} · ${escapeHtml(history[index]!.title)} · ${line.label} ${formatMoney(score)}</title></circle>`).join("")}`).join("")}
     ${ticks.map((index) => `<text x="${x(index).toFixed(1)}" y="${height - 7}" text-anchor="${index === 0 ? "start" : index === history.length - 1 ? "end" : "middle"}">${monthLabel(history[index]!.totalMonths)}</text>`).join("")}

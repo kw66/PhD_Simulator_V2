@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 3).map((entry) => entry.date)).toEqual(["2026-10-13", "2026-10-10", "2026-10-09"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 3).map((entry) => entry.date)).toEqual(["2026-10-16", "2026-10-13", "2026-10-10"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -16,11 +16,16 @@ describe("game announcements", () => {
       expect(html).toContain('data-announcement-toggle');
       for (const change of entry.changes) expect(html).toContain(change.title);
     }
-    const newest = GAME_ANNOUNCEMENTS[0]!.changes.map((change) => change.description).join("\n");
-    for (const text of ["最后一年每月", "四个方向", "面试经验", "Reviewer", "盲审", "人际人物", "持有商品"]) {
+    const newest = GAME_ANNOUNCEMENTS[0]!.changes.map((change) => `${change.title}：${change.description}`).join("\n");
+    for (const text of ["六位正位与六位逆位", "184", "70个月度存档", "结算并重开", "按玩家去重", "当前浏览器", "窄屏布局"]) {
       expect(newest).toContain(text);
     }
-    const latest = GAME_ANNOUNCEMENTS[1]!.changes.map((change) => change.description).join("\n");
+    const ending = GAME_ANNOUNCEMENTS[1]!.changes.map((change) => change.description).join("\n");
+    for (const text of ["最后一年每月", "四个方向", "面试经验", "Reviewer", "盲审", "离校属性", "花销记录"]) {
+      expect(ending).toContain(text);
+    }
+    expect(ending).not.toMatch(/保留角色立绘|已点亮天赋|持有商品/);
+    const latest = GAME_ANNOUNCEMENTS[2]!.changes.map((change) => change.description).join("\n");
     for (const text of ["混合抽4项", "混合抽5项", "不再保底", "固定姓名", "一作A类论文数", "邀请时引用", "社交传承", "0%／20%／40%／60%", "Reviewer", "VALSE", "独立展开"]) {
       expect(latest).toContain(text);
     }
@@ -35,12 +40,12 @@ describe("game announcements", () => {
     expect(GAME_ANNOUNCEMENTS.length).toBeLessThan(25);
   });
 
-  it("keeps unimplemented role and curse designs explicitly marked as previews", () => {
+  it("distinguishes the earlier talent preview from released routes and remaining curse designs", () => {
     const announcement = GAME_ANNOUNCEMENTS.find((entry) => entry.date === "2026-10-04");
     expect(announcement).toBeDefined();
     const preview = announcement!.changes.find((change) => change.title === "角色图鉴与逆位路线");
-    expect(preview?.description).toContain("目前仅供预览");
-    expect(preview?.description).toContain("尚未开放加点和局内效果");
+    expect(preview?.description).toContain("该次更新的天赋树仅供设计预览");
+    expect(preview?.description).toContain("十二位正位与逆位角色的天赋已于10月16日正式开放");
     expect(renderAnnouncementPage(GAME_ANNOUNCEMENTS.indexOf(announcement!))).toContain("未接入实际结算");
   });
 

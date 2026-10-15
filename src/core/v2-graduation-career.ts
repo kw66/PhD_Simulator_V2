@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { CAREER_DEFINITIONS, calculateMonthlyCareerProgress, type CareerType } from "./v2-career-rules";
 import { pushLog } from "./v2-engine-helpers";
 import { isGraduationPreparationUnlocked } from "./v2-thesis-rules";
@@ -28,7 +29,7 @@ export function getCareerPreparationFailure(state: GameState, type?: CareerType)
   return null;
 }
 
-export function prepareCareer(state: GameState, type: CareerType, random: () => number = Math.random): GameState {
+export function prepareCareer(state: GameState, type: CareerType, random: () => number = gameRandom): GameState {
   if (getCareerPreparationFailure(state, type)) return state;
   const progressGain = calculateMonthlyCareerProgress(state, type, random);
   const sanCost = getCareerPreparationSanCost(state, type);

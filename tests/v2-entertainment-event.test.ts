@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { getResolvableQueuedEvent } from "../src/core/v2-engine-event-resolution";
@@ -125,7 +126,7 @@ describe("game relaxation event", () => {
     ["grad-sim", 0, 0, 2, 0], ["grad-sim", 0.9, 0, 3, 0],
     ["kings", 0, 0, -5, 4], ["kings", 0, 0.9, -5, 2],
   ] as const)("settles %s rolls %s/%s only once on final confirmation", (branch, versionRoll, wolfRoll, san, money) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = makeState();
     const event = makeEvent(initial, versionRoll, wolfRoll);
     let state = { ...initial, eventQueue: [createEventQueueItem(event, 1)] };

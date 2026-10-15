@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
@@ -92,7 +93,7 @@ describe("player journal fee events", () => {
   it.each([["pami", 5], ["nmi", 10], ["nature", 20]] as const)("offers the %s fee %s through three stages without early payment", (journal, fee) => {
     const state = makeState(journal);
     const snapshot = structuredClone(state);
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Journal event rerolled"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Journal event rerolled"); });
     expect(JOURNAL_PUBLICATION_FEES[journal]).toBe(fee);
     const root = createJournalFeeEvent(state, state.externalPublications[0]!)!;
     expect(root).toMatchObject({ stage: "act1", blocking: true, deadlineMonths: 0,
@@ -175,7 +176,7 @@ describe("player journal fee events", () => {
     const root = createJournalFeeEvent(state, state.externalPublications[0]!)!;
     const decision = follow(root, "continue");
     const result = follow(decision, mode);
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Refresh rerolled"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Refresh rerolled"); });
     for (const balance of [4.99, 5, 0, 5.25, -1]) {
       if (mode === "self") state.player.money = balance;
       else state.advisorProgressState.funding = balance;

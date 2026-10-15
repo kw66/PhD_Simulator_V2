@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createCustomFellowProgressProfile,
@@ -68,7 +69,7 @@ describe("v2 fellow progression", () => {
   });
 
   it("keeps research stable without a supplied stream even when name collisions change", () => {
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Unexpected global randomness"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Unexpected global randomness"); });
     for (const seed of [0, 1, 7, 23, 100, -4.2]) {
       const profile = createGeneratedFellowProfileAddition("senior", seed, "female", [], undefined, { year: 3 });
       expect(createGeneratedFellowProfileAddition("senior", seed, "female", [], undefined, { year: 3 })).toEqual(profile);
@@ -102,7 +103,7 @@ describe("v2 fellow progression", () => {
     const queued = createEventQueueItem({ ...root, randomReplay: { eventId, serial: state.totalRandomEventCount, rolls } }, 0);
     const fellows = getGeneratedFellows(queued);
     expect(fellows.length).toBeGreaterThan(0);
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Unexpected preview randomness"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Unexpected preview randomness"); });
     const refreshed = getResolvableQueuedEvent({ ...state, player: { ...state.player, san: 0 } }, JSON.parse(JSON.stringify(queued)));
     expect(getGeneratedFellows(refreshed)).toEqual(fellows);
     expect(getGeneratedFellows(getResolvableQueuedEvent(state, refreshed))).toEqual(fellows);
@@ -118,7 +119,7 @@ describe("v2 fellow progression", () => {
     const fellows = getGeneratedFellows(queued);
     expect(new Set(fellows.map((fellow) => fellow.name)).size).toBe(4);
     expect(fellows.every((fellow) => fellow.academicYear === 1 && fellow.research >= 2 && fellow.research <= 5)).toBe(true);
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Unexpected preview randomness"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Unexpected preview randomness"); });
     const refreshed = getResolvableQueuedEvent(state, JSON.parse(JSON.stringify(queued)));
     expect(getGeneratedFellows(refreshed)).toEqual(fellows);
     expect(getGeneratedFellows(getResolvableQueuedEvent(state, refreshed))).toEqual(fellows);
@@ -201,7 +202,7 @@ describe("v2 fellow progression", () => {
   });
 
   it.each([undefined, "", " \t\n "])("stores a generated name for a custom profile with blank input %j", (name) => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.123456);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.123456);
     const profile = createCustomFellowProgressProfile({
       type: "junior", gender: "female", startTotalMonths: 12, research: 4, affinity: 2, name,
     });

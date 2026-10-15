@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getAcademicCalendarMonth } from "../src/core/v2-calendar";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -37,7 +38,7 @@ describe("fellow graduation timing through month advancement", () => {
   );
 
   it.each([1, 2, 3, 4, 5])("keeps a year %s doctoral fellow with seven points even after June", (academicYear) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState(academicYear, 7, "phd", 10);
     const next = dispatchAction(state, "next-month");
     expect(next.totalMonths).toBe(23);
@@ -49,7 +50,7 @@ describe("fellow graduation timing through month advancement", () => {
 
   it.each([[3, 1, "master"], [6, 7, "phd"]] as const)(
     "keeps year %s %s-point %s through June actions and removes them only when leaving June", (academicYear, score, degree) => {
-      vi.spyOn(Math, "random").mockReturnValue(0.5);
+      vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
       const may = makeState(academicYear, score, degree);
       expect(getAcademicCalendarMonth(may.month)).toBe(5);
       const june = dispatchAction(may, "next-month");
@@ -69,7 +70,7 @@ describe("fellow graduation timing through month advancement", () => {
   );
 
   it.each([[2, 2], [3, 3], [3, 7]])("transfers year %s with %s points at June end before considering departure", (academicYear, score) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const june = dispatchAction(makeState(academicYear, score, "master"), "next-month");
     expect(june.fellowProgressState[0]?.degree).toBe("master");
     const july = dispatchAction(june, "next-month");
@@ -90,7 +91,7 @@ describe("fellow graduation timing through month advancement", () => {
     [2, 2, "master", 10, "phd", 2.5 + 1],
     [3, 3, "master", 10, "phd", 2.5 + 1],
   ] as const)("matches preview and actual payroll for year %s score %s %s in month %s", (academicYear, score, degree, month, nextDegree, salary) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState(academicYear, score, degree, month);
     const before = structuredClone(state);
     const payroll = getNextMonthLabPayroll(state);

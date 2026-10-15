@@ -1,3 +1,5 @@
+import { recordPersonalIncome } from "./v2-money";
+import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { applyPlayerAttributeChange } from "./v2-player-attributes";
 import { consumeActiveOperation, getActiveOperationAllowance } from "./v2-ai-shop";
 import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
@@ -34,6 +36,8 @@ export function applyEventPlayerEffects(state: GameState, effects: EventChoice["
     player: { ...state.player, san: (effects.sanCapDelta ?? 0) < 0 ? Math.min(sanCap, state.player.san) : state.player.san,
       money: roundMoney(state.player.money + roundMoney(effects.money ?? 0)) },
   };
+  next = recordAchievementSanCapGain(next, sanCap - state.sanCap);
+  next = recordPersonalIncome(next, effects.money ?? 0);
   next = recordPersonalSpending(next, Math.max(0, -(effects.money ?? 0)));
   if ((effects.san ?? 0) < 0) next = paySanCost(next, -effects.san!, { allowOverdraw: true });
   else if ((effects.san ?? 0) > 0) next = { ...next, player: { ...next.player,

@@ -48,6 +48,24 @@ describe("career preparation", () => {
     expect(prepareCareer(master, "academic")).toBe(master);
     expect(getCareerPreparationFailure(readyState("phd"), "academic")).toBeNull();
   });
+
+  it.each([[0, 10], [0.99, 15]] as const)("uses current SAN before paying for civil-service preparation at roll %s", (roll, gain) => {
+    const state = readyState();
+    state.player.san = 20.9;
+    state.sanCap = 50;
+    const next = prepareCareer(state, "civilService", () => roll);
+    expect(next.careerProgress.civilService).toBe(gain);
+    expect(next.player.san).toBeCloseTo(17.9);
+    expect(next.actionState.used).toBe(state.actionState.used);
+    expect(prepareCareer(next, "civilService", () => roll)).toBe(next);
+  });
+
+  it.each([-5, 0])("does not subtract progress when current SAN is %s", (san) => {
+    const state = readyState();
+    state.player.san = san;
+    expect(prepareCareer(state, "civilService", () => 0).careerProgress.civilService).toBe(0);
+    expect(prepareCareer(state, "civilService", () => 0.99).careerProgress.civilService).toBe(5);
+  });
 });
 
 describe("monthly recruitment", () => {
@@ -147,9 +165,13 @@ describe("monthly recruitment", () => {
 
     const old = { type: "internet" as const, jobId: "old", name: "旧 offer", threshold: 1, score: 1 };
     for (const decision of ["keep-offer", "replace-offer"]) {
-      let current = startRecruitment({ ...initial, careerOffers: { internet: old } }, () => 0);
+      let current = startRecruitment({ ...initial,
+        careerProgress: { ...initial.careerProgress, internet: 100 },
+        careerOffers: { internet: old } }, () => 0);
       current = advanceScene(current, "choose-internet");
       current = advanceScene(current, current.eventQueue.find((event) => event.source === "career")!.choices[1]!.id);
+      expect(current.eventQueue.find((event) => event.source === "career")!.choices.map((choice) => choice.id))
+        .toEqual(["replace-offer", "keep-offer"]);
       current = advanceScene(current, decision);
       expect(current.careerOffers.internet?.jobId === "old").toBe(decision === "keep-offer");
       expect(Object.keys(current.careerOffers)).toEqual(["internet"]);
@@ -163,6 +185,22 @@ describe("monthly recruitment", () => {
       current = advanceScene(current, decision);
       expect(Object.keys(current.careerOffers)).toEqual([decision === "keep-offer" ? "internet" : "stateOwned"]);
       expect(Object.values(current.careerOffers)).toHaveLength(1);
+    }
+  });
+
+  it("never awards a zero-probability offer even when the random draw is zero", () => {
+    for (const type of ["internet", "stateOwned", "civilService", "academic"] as const) {
+      const initial = readyState("phd", 4);
+      let current = startRecruitment(initial, () => 0);
+      current = advanceScene(current, `choose-${type}`);
+      const hardest = current.eventQueue.find((event) => event.source === "career")!.choices.at(-1)!;
+      current = advanceScene(current, hardest.id);
+      expect(current.eventQueue.find((event) => event.source === "career")!.choices.map((choice) => choice.id))
+        .toEqual(["confirm"]);
+      current = advanceScene(current, "confirm");
+      expect(current.careerOffers).toEqual({});
+      expect(current.careerInterviewExperience[type]).toBe(5);
+      expect(shouldScheduleCareerRecruitment(current)).toBe(false);
     }
   });
 

@@ -77,6 +77,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
           money: rocoMoneyGain,
           san: rocoSanChange,
           counterDeltas: { rocoCount: 1 },
+          achievementFacts: catchesShinyWolf ? ["roco-shiny"] : [],
         },
       },
     ],

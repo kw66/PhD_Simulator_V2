@@ -1,3 +1,4 @@
+import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { applyPlayerAttributeChange, previewPlayerAttributeChange } from "./v2-player-attributes";
 import { canAddRelationship } from "./v2-relationship-rules";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
@@ -72,6 +73,7 @@ export function settleFellowRemovalTalent(state: GameState, removed: FellowProgr
     researchCapacityState: { ...state.researchCapacityState, otherCapBonus: state.researchCapacityState.otherCapBonus + researchCap },
     roleTalents: { ...state.roleTalents!, capBonuses: { ...state.roleTalents?.capBonuses,
       favor: (state.roleTalents?.capBonuses?.favor ?? 0) + favorCap } } };
+  state = recordAchievementSanCapGain(state, sanCap);
   const loss = getRoleTalentLevel(state, "fellow-remove-social");
   if (loss) state = applyPlayerAttributeChange(state, "social", -loss).state;
   if (favor) state = applyPlayerAttributeChange(state, "favor", favor).state;

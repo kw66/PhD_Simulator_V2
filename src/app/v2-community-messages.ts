@@ -14,7 +14,7 @@ const API_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/phd_simulator_
 const PUBLIC_API_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/phd_simulator_v2_public_messages";
 const API_KEY = "sb_publishable_TRVbO2x2mmuoRw592EqtvQ_FHpqUMkJ";
 const NICKNAME_KEY = "kwgame_last_nickname";
-const NICKNAME_MAX_LENGTH = 10;
+export const NICKNAME_MAX_LENGTH = 10;
 export const MESSAGE_PAGE_SIZE = 5;
 export const MESSAGE_MAX_LENGTH = 2000;
 const OWNERSHIP_KEY = "kwgame_v2_message_ownership";
@@ -641,6 +641,8 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
   for (const source of ["board", "feedback"] as const) {
     root.querySelectorAll<HTMLInputElement>(`input[data-community-nickname="${source}"]`).forEach((input) => {
       input.value = state.nickname;
+      input.removeAttribute("maxlength");
+      input.setAttribute("aria-invalid", String(countMessageCharacters(state.nickname.trim()) > NICKNAME_MAX_LENGTH));
       input.disabled = state.submitting === source;
     });
     root.querySelectorAll<HTMLElement>(`[data-community-nickname-count="${source}"]`).forEach((target) => {

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -165,7 +166,7 @@ describe("relationship role talent settlements", () => {
     initial.month = 10;
     initial.totalMonths = 10;
     initial.fellowProgressState[0] = { ...initial.fellowProgressState[0]!, academicYear: 6, degree: "phd", initialResearchScore: 100 };
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     try {
       const next = dispatchAction(initial, "next-month");
       expect(next.totalMonths).toBe(11);

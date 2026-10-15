@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -310,7 +311,7 @@ describe("talent trigger history", () => {
   it("records reading and work milestones through real actions", () => {
     const base = state();
     base.readingState.readCount = 9;
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const read = dispatchAction(base, "read-paper");
     vi.restoreAllMocks();
     expect(triggers(read).map((trigger) => trigger.name)).toEqual(["阅读积累"]);

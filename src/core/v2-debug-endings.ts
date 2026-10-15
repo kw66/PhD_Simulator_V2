@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { SCORE_BY_TARGET } from "./v2-content";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { createInitialState } from "./v2-engine-state-factory";
@@ -31,7 +32,7 @@ export function isDebugEndingId(value: string | undefined): value is NonNullable
   return value !== undefined && Object.hasOwn(DEBUG_ENDINGS, value);
 }
 
-export function createDebugEnding(state: GameState, ending: NonNullable<EndingId>, random: () => number = Math.random): GameState {
+export function createDebugEnding(state: GameState, ending: NonNullable<EndingId>, random: () => number = gameRandom): GameState {
   const integer = (minimum: number, maximum: number): number => {
     const roll = random();
     return minimum + Math.floor((Number.isFinite(roll) ? Math.max(0, Math.min(0.999999, roll)) : 0) * (maximum - minimum + 1));

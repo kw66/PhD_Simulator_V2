@@ -219,7 +219,8 @@ describe("decimal research calculations", () => {
     const state = makeState();
     state.player.research = 8.25;
     state.player.social = 12.5;
-    expect(calculateMonthlyCareerProgress(state, "civilService", () => 0)).toBe(5);
-    expect(calculateMonthlyCareerProgress(state, "civilService", () => 0.99)).toBe(10);
+    state.player.san = 15.9;
+    expect(calculateMonthlyCareerProgress(state, "civilService", () => 0)).toBe(7);
+    expect(calculateMonthlyCareerProgress(state, "civilService", () => 0.99)).toBe(12);
   });
 });

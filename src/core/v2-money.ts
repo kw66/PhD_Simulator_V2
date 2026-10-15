@@ -1,3 +1,4 @@
+import { recordAchievementCounter, recordAchievementFact, recordAchievementStats } from "./v2-achievement-runtime-types";
 import type { GameState } from "./v2-types";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 
@@ -47,4 +48,16 @@ export function normalizeGameMoney(state: GameState): GameState {
       : { ...state.advisorProgressState, funding },
     ...(fellowFinanceAccounts !== state.fellowFinanceAccounts ? { fellowFinanceAccounts } : {}),
   };
+}
+
+/** Record an actual income at its source; balances, resets and returned principal are not earnings. */
+export function recordPersonalIncome(state: GameState, amount: number): GameState {
+  if (!Number.isFinite(amount) || amount <= 0) return state;
+  const key = `income:${state.totalMonths}`;
+  let next = recordAchievementCounter(state, key, roundMoney(amount));
+  if (!next.achievementProgress) return next;
+  const run = next.achievementProgress;
+  next = { ...next, achievementProgress: { ...run, counters: { ...run.counters, [key]: roundMoney(run.counters[key] ?? 0) } } };
+  if ((next.achievementProgress!.counters[key] ?? 0) >= 100) next = recordAchievementFact(next, "global:windfall");
+  return recordAchievementStats(next);
 }

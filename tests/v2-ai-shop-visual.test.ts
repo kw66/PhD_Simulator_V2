@@ -32,7 +32,7 @@ it("unifies shop surfaces without changing geometry or wrapping across tabs", as
   try {
     await page.route("**/__ai_shop__", route => route.fulfill({ contentType: "text/html", body: fixture }));
     await page.goto(`${server.resolvedUrls!.local[0]}__ai_shop__`);
-    await page.waitForSelector('[data-action="start-game"]');
+    await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
     await page.evaluate(() => {
       const store = (window as typeof window & { aiPreviewStore: ReturnType<typeof import("../src/core/v2-store").createStore> }).aiPreviewStore;
       store.dispatch("start-game", { roleId: "normal" });

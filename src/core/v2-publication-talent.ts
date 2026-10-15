@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getRecoveredSan } from "./v2-san-recovery";
 import { projectFellowCoauthoredPapers, settleFellowCoauthoredPapers } from "./v2-lab-talent";
 import { settlePublishedImageMisuse } from "./v2-academic-integrity";
@@ -127,7 +128,7 @@ export function projectPublicationTalentRewards(state: GameState): GameState {
   return resolvePublicationTalentRewards(projectFellowCoauthoredPapers(settlePublishedImageMisuse(state))).state;
 }
 
-export function applyPublicationTalentRewards(state: GameState, _random: () => number = Math.random): GameState {
+export function applyPublicationTalentRewards(state: GameState, _random: () => number = gameRandom): GameState {
   const resolved = resolvePublicationTalentRewards(settleFellowCoauthoredPapers(settlePublishedImageMisuse(state)));
   let recordedState = resolved.state;
   for (const { item, effects } of resolved.records) {

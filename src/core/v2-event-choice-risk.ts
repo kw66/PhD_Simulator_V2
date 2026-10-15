@@ -1,3 +1,4 @@
+import { withGameRandomPreview } from "./v2-game-random";
 import { applyFixedEventResolution } from "./v2-fixed-events";
 import { getCcigActivityChainId, getCcigChainId } from "./v2-fixed-events-ccig-shared";
 import { roundMoney } from "./v2-money";
@@ -153,6 +154,10 @@ function randomChoiceVariants(state: GameState, event: PendingEvent, choice: Eve
 }
 
 export function getEventChoiceRiskDetails(state: GameState, event: PendingEvent, choice: EventChoice): EventChoiceRiskDetails | null {
+  return withGameRandomPreview(state, () => getEventChoiceRiskDetailsInternal(state, event, choice));
+}
+
+function getEventChoiceRiskDetailsInternal(state: GameState, event: PendingEvent, choice: EventChoice): EventChoiceRiskDetails | null {
   if (state.phase !== "playing") return null;
   const snapshot = structuredClone(state);
   const outcomes = randomChoiceVariants(snapshot, event, choice)

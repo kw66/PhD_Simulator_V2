@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { addPaperCollaboration, getRoleCollaborationScore } from "./v2-paper-collaboration";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
@@ -41,7 +42,7 @@ export function queueAdvisorGuidance(state: GameState): GameState {
   };
 }
 
-export function settleAdvisorGuidance(state: GameState, random: () => number = Math.random): GameState {
+export function settleAdvisorGuidance(state: GameState, random: () => number = gameRandom): GameState {
   if (state.phase !== "playing" || !state.selectedAdvisorName) return state;
   let nextState = state;
   const pendingPlayerAmount = state.advisorProgressState.pendingGuidanceToPlayer;

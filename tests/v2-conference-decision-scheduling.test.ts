@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildConferenceDecisionEventsForAcceptedPapers,
@@ -91,7 +92,7 @@ describe("conference decision scheduling contract", () => {
     const plans = modes.map((mode) => confirmation(root, mode).choices[0]!.effects.scheduleConferenceAttendance!);
     expect(plans.map((plan) => plan.rolls)).toEqual(modes.map((_, index) =>
       Array.from({ length: 16 }, (_, offset) => (4 + index * 16 + offset) / 100)));
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("preview rerolled"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("preview rerolled"); });
     for (const original of stages(root)) {
       let event = { ...original, id: `queued-${original.id}` };
       for (const totalMonths of [8, 14, 17]) {

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
@@ -79,7 +80,7 @@ describe("conference follow-up invitation refresh", () => {
     const original = structuredClone(root);
     state.totalCitations = 9000;
     state.conferenceEncounterState.bigBull = { ...state.conferenceEncounterState.bigBull!, name: "不会覆盖邀请姓名", level: 2, cooperationCount: 7 };
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("refresh must not reroll"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("refresh must not reroll"); });
     for (const event of [root, act2, result]) {
       expect(event.narrativeNames).toEqual([root.jointTrainingPreview!.context.contact!.name]);
       const refreshed = refreshJointTrainingEvent(state, { ...event, narrativeNames: ["过期姓名"], queueOrder: 7 });
@@ -106,7 +107,7 @@ describe("conference follow-up invitation refresh", () => {
     const root = createJointTrainingAct1(buildJointTrainingContext(base));
     const act2 = next(root, "continue");
     expect(Object.keys(act2.choices.find((choice) => choice.id === "accept")!.effects)).toEqual(["enqueueEvents"]);
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     let state = choose(choose({ ...base, eventQueue: [createEventQueueItem(root, 1)] }, "continue"), "accept");
     expect(state.buffs).toEqual(base.buffs);
     expect(state.conferenceEncounterState.jointTrainingReward).toBeUndefined();
@@ -202,7 +203,7 @@ describe("conference follow-up invitation refresh", () => {
     const root = loverRoot(state, "smart");
     const act2 = next(root, "continue");
     const result = next(act2, "accept");
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("refresh must not reroll"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("refresh must not reroll"); });
     for (const [research, bonus, expected] of [[6, 0, 0.8], [20, 2, 0.4], [21.9, 2, 0.1], [22, 2, 0]] as const) {
       const current = { ...state, player: { ...state.player, research }, researchCapacityState: { ...state.researchCapacityState, otherCapBonus: bonus } };
       for (const event of [root, act2, result]) {
@@ -263,7 +264,7 @@ describe("conference follow-up invitation refresh", () => {
     expect(getRoll).toHaveBeenCalledTimes(2);
     const result = next(next(createLoverDevelopmentAct1(context), "continue"), "accept");
     expect(result.choices[0]!.label).toBe("确定");
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("refresh must not reroll"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("refresh must not reroll"); });
     const refreshed = refreshLoverDevelopmentEvent(state, { ...result, deferredStatePatch: [] });
     expect(refreshed.deferredStatePatch).toBeUndefined();
     expect(refreshed.choices[0]!.effects.loverProgressRolls).toEqual([0.9, 0.1]);
@@ -275,7 +276,7 @@ describe("conference follow-up invitation refresh", () => {
   it("keeps replacement mentors high-level with stable names", () => {
     const levels = new Set<number>();
     const state = makeState();
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("replacement must not reroll"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("replacement must not reroll"); });
     for (let index = 0; index < 30; index += 1) {
       state.conferenceEncounterState.bigBull = createConferenceMentorContact({ id: `mentor-${index}` });
       const context = buildJointTrainingContext(state);

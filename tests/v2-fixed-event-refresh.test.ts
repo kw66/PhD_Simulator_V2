@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { getResolvableQueuedEvent, refreshPendingEventDecisions } from "../src/core/v2-engine-event-resolution";
@@ -8,7 +9,7 @@ import { createEventQueueItem } from "../src/core/v2-event-queue";
 afterEach(() => vi.restoreAllMocks());
 
 function start(eventId: string, roll = 0.4): GameState {
-  vi.spyOn(Math, "random").mockReturnValue(roll);
+  vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(roll);
   const base = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
   return dispatchAction({
     ...base, selectedAdvisorName: "测试导师", year: 2, month: 5, totalMonths: 17, eventQueue: [],
@@ -35,7 +36,7 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     expect(state.eventQueue[0]!.description).toContain("金币 +2");
     expect(state.eventQueue[0]!.description).toContain("SAN +4（已损SAN20%）");
     expect(state.eventQueue[0]!.description).not.toContain("你带恋人");
-    const random = vi.mocked(Math.random);
+    const random = vi.mocked(gameRandomSource.gameRandom);
     random.mockClear();
     state = refreshPendingEventDecisions(JSON.parse(JSON.stringify(state)));
     state = refreshPendingEventDecisions(state);
@@ -53,7 +54,7 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     state = { ...state, player: { ...state.player, social: 5 } };
     state = choose(choose(state));
     expect(state.eventQueue[0]!.description).toContain("社交 +1");
-    const random = vi.mocked(Math.random);
+    const random = vi.mocked(gameRandomSource.gameRandom);
     random.mockClear();
     state = refreshPendingEventDecisions({ ...state, player: { ...state.player, social } });
     expect(state.eventQueue[0]!.description).toContain(`社交 +${gain}`);
@@ -133,7 +134,7 @@ describe("pending fixed-event decisions use current state without rerolling", ()
     state = { ...state, eventQueue: [createEventQueueItem(root, state.totalMonths)] };
     state = choose(choose(state), "self");
     const oldCost = -(state.eventQueue[0]!.choices[0]!.effects.money ?? 0);
-    const random = vi.mocked(Math.random);
+    const random = vi.mocked(gameRandomSource.gameRandom);
     random.mockClear();
     state = refreshPendingEventDecisions({ ...state, eventCounters: { ...state.eventCounters, domesticMeetingCount: 3 } });
     const newCost = -(state.eventQueue[0]!.choices[0]!.effects.money ?? 0);

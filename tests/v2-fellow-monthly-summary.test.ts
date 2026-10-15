@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { settleAdvisorGuidance } from "../src/core/v2-advisor-guidance";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -53,7 +54,7 @@ describe("fellow monthly salary records", () => {
   });
 
   it("retains salary records after the complete engine monthly pipeline", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const state = makeState();
     const advanced = dispatchAction(state, "next-month");
     expect(advanced).toMatchObject({ phase: "playing", totalMonths: 5 });

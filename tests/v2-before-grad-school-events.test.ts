@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -208,7 +209,7 @@ describe("v2 before grad school events", () => {
   });
 
   it("rerolls only the lecturer name and description until the lecturer is confirmed", () => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
 
     try {
       let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });

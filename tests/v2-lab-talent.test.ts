@@ -515,7 +515,8 @@ describe("coauthored paper talent", () => {
     const paper = { ...createDraftPaper(1, 0, () => 0), idea: 50, experiment: 50, writing: 50,
       collaborators: [{ id: "fellow-0", name: "同学0" }],
     };
-    const next = submitJournalPaper({ ...state, papers: [paper] }, paper.id, "pami");
+    const sent = submitJournalPaper({ ...state, papers: [paper] }, paper.id, "pami");
+    const next = submitJournalPaper(sent, paper.id, "pami");
     expect(next.externalPublications.some((entry) => entry.id === paper.id && entry.status === "published")).toBe(true);
     expect(next.fellowProgressState[0]).toMatchObject({ affinity: 2, affinityRewardedPaperIds: [paper.id] });
   });

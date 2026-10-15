@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getConferenceInfo } from "../src/core/v2-conference-catalog";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -106,7 +107,7 @@ function withReview(state: GameState, fellowId = "fellow", score = 100, monthsLe
 }
 
 beforeEach(() => {
-  vi.spyOn(Math, "random").mockReturnValue(0);
+  vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
   vi.spyOn(fellowAi, "subscribeFellowAi").mockImplementation((state) => ({ state, model: null, subscribed: false }));
 });
 afterEach(() => vi.restoreAllMocks());

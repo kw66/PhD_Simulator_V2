@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { applyQueuedEventEffects, getResolvableQueuedEvent, refreshPendingEventDecisions } from "../src/core/v2-engine-event-resolution";
@@ -19,7 +20,7 @@ function choose(state: GameState, label: string): GameState {
 }
 
 function activityState(stage: "act1" | "act2" = "act2", mode = "自费参会"): GameState {
-  vi.spyOn(Math, "random").mockReturnValue(0.4);
+  vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.4);
   const initial = createInitialState();
   let state: GameState = {
     ...initial, phase: "playing", degree: "phd", maxMonths: 70,
@@ -49,7 +50,7 @@ describe("VALSE activity live refresh", () => {
     const paper = publishedPaper();
     const state = { ...pending, [collection]: [paper] };
     const before = structuredClone(state);
-    const random = vi.mocked(Math.random).mockClear();
+    const random = vi.mocked(gameRandomSource.gameRandom).mockClear();
     const refreshed = refreshPendingEventDecisions(state);
     const event = refreshed.eventQueue[0]!;
     expect(event.description).toContain(paper.title);
@@ -162,7 +163,7 @@ describe("VALSE activity live refresh", () => {
     const chosenDecision = structuredClone(state.eventQueue[0]!);
     state = choose(state, label);
     const result = structuredClone(state.eventQueue[0]!);
-    const random = vi.mocked(Math.random).mockClear();
+    const random = vi.mocked(gameRandomSource.gameRandom).mockClear();
     state = refreshPendingEventDecisions({ ...state, papers: [...state.papers, publishedPaper("better", 100)] });
     state = refreshPendingEventDecisions(JSON.parse(JSON.stringify(state)));
     expect(getResolvableQueuedEvent(state, state.eventQueue[0]!)).toEqual(state.eventQueue[0]);

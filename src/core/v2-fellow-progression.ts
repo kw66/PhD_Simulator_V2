@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import type { Degree, FellowProfileAddition, FellowProgressProfile, FellowTaskType, FellowTypeId, Gender } from "./v2-types";
 import { pickRandomAdvisorName, pickStableRandomName } from "./v2-random-name";
 import { generatePaperTopic, type FixedPaperTopic } from "./v2-paper-topics";
@@ -154,7 +155,7 @@ export function createGeneratedFellowProfileAddition(
 }
 
 function createFellowProgressProfileId(type: FellowTypeId, startTotalMonths: number, identitySeed?: string): string {
-  if (identitySeed === undefined) return `${type}-${startTotalMonths}-${Math.random().toString(36).slice(2, 8)}`;
+  if (identitySeed === undefined) return `${type}-${startTotalMonths}-${gameRandom().toString(36).slice(2, 8)}`;
   const random = createRecruitmentRandom(identitySeed, "identity");
   const suffix = Array.from({ length: 2 }, () => Math.floor(random() * 4294967296).toString(36)).join("-");
   return `${type}-${startTotalMonths}-${suffix}`;

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -48,12 +49,13 @@ describe("publication acceptance chronology", () => {
     expect(listTitles(state)).toEqual([last.title, first.title]);
   });
 
-  it("records journal acceptances by slot and preserves stamps during citation settlement", () => {
+  it("records journal acceptances in confirmation order and preserves stamps during citation settlement", () => {
     const papers = [2, 0].map((slot): Paper => ({ ...readyPaper(slot), status: "journal-reviewing", target: null, journalTarget: "pami" }));
-    const state = resolveReadyJournalPapers({ ...playingState(), papers }).state;
-    expect(state.externalPublications.map((paper) => [paper.acceptedTotalMonths, paper.acceptedOrder])).toEqual([[6, 2], [6, 1]]);
+    const first = resolveReadyJournalPapers({ ...playingState(), papers }, papers[0]!.id).state;
+    const state = resolveReadyJournalPapers(first, papers[1]!.id).state;
+    expect(state.externalPublications.map((paper) => [paper.acceptedTotalMonths, paper.acceptedOrder])).toEqual([[6, 1], [6, 2]]);
     const settled = settlePublishedPaperCitations({ ...state, totalMonths: 7 }).state;
-    expect(settled.externalPublications.map((paper) => [paper.acceptedTotalMonths, paper.acceptedOrder])).toEqual([[6, 2], [6, 1]]);
+    expect(settled.externalPublications.map((paper) => [paper.acceptedTotalMonths, paper.acceptedOrder])).toEqual([[6, 1], [6, 2]]);
   });
 
   it("records coauthor acceptances after other results received in the same month", () => {
@@ -68,7 +70,7 @@ describe("publication acceptance chronology", () => {
     const pending = recordPaperAcceptances([readyPaper(0)], 6, [])[0]!;
     const granted = createGrantedPublishedPaper(6, 0, { target: "A", acceptedScore: 30 }, [pending]);
     expect(granted.acceptedOrder).toBe(2);
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     try {
       let state = { ...playingState(), papers: [pending], externalPublications: [granted] };
       state = dispatchAction(state, "debug-add-paper", { debugPaperTarget: "A", debugPaperAuthorship: "first" });

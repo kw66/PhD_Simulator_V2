@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 import { getConferenceInfo } from "../src/core/v2-conference-catalog";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -146,7 +147,7 @@ describe("paper review core presentation metadata", () => {
     const { state, paper, settlement } = fixture(accepted);
     const snapshot = structuredClone(state);
     const settlementSnapshot = structuredClone(settlement);
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Preview drew RNG"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Preview drew RNG"); });
     try {
       const event = createPaperReviewResultEvent(paper, settlement, state);
       refreshPaperReviewEvent(state, event);

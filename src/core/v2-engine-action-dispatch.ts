@@ -32,7 +32,7 @@ export function dispatchSetupAction(
         return pushNoOpLog(state, "请先选择角色。");
       }
       const startedState = {
-        ...createStartedGameState(roleId, payload.talentAllocation),
+        ...createStartedGameState(roleId, payload.talentAllocation, payload.bonusTalentPoints),
         blockLinearEvents: state.blockLinearEvents,
         debugEventReplayEnabled: state.debugEventReplayEnabled,
       };

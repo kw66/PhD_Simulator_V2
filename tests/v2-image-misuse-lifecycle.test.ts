@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { buildBuffDisplayBuckets } from "../src/app/v2-render-buffs";
@@ -8,7 +9,7 @@ import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createScholarshipEvent } from "../src/core/v2-fixed-events-scholarship";
-import { resolveReadyJournalPapers, submitJournalPaper } from "../src/core/v2-journal-system";
+import { submitJournalPaper } from "../src/core/v2-journal-system";
 import { createDraftPaper, prepareConferenceSubmission, withdrawPaper } from "../src/core/v2-paper-rules";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
 import { resolveDuePaperReviews } from "../src/core/v2-publication-system";
@@ -75,7 +76,7 @@ describe("image misuse follows the affected paper", () => {
   });
 
   it("activates the permanent penalty only when conference publication is confirmed", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const state = falsify(makeState());
     const submitted = { ...state, papers: [{ ...prepareConferenceSubmission(state.papers[0]!, "C", 6, 1), reviewMonthsLeft: 0 }] };
     let reviewed = resolveDuePaperReviews(submitted, () => 0).state;
@@ -101,7 +102,7 @@ describe("image misuse follows the affected paper", () => {
     expect(submitted.papers[0]!.status).toBe("journal-reviewing");
     expect(hasScholarshipDisqualification(submitted)).toBe(false);
     const ready = { ...submitted, papers: [{ ...submitted.papers[0]!, idea: 50 }] };
-    const published = resolveReadyJournalPapers(ready).state;
+    const published = submitJournalPaper(ready, "affected", "pami");
     expect(hasScholarshipDisqualification(published)).toBe(true);
     expect(published.externalPublications[0]!.publication!.citationDebuffMultiplier).toBe(0.5);
   });
@@ -113,7 +114,7 @@ describe("image misuse follows the affected paper", () => {
     expect(preview.eventQueue[0]!.title).toContain("获得奖学金");
     expect(hasScholarshipDisqualification(preview)).toBe(false);
     const submitted = submitJournalPaper(preview, "affected", "pami");
-    const published = resolveReadyJournalPapers({ ...submitted, papers: [{ ...submitted.papers[0]!, idea: 50 }] }).state;
+    const published = submitJournalPaper({ ...submitted, papers: [{ ...submitted.papers[0]!, idea: 50 }] }, "affected", "pami");
     expect(hasScholarshipDisqualification(published)).toBe(true);
     const finished = resolve(published);
     expect(finished.player.money).toBe(initial.player.money);

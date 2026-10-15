@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import {
   PAPER_SLOT_LIMIT,
@@ -37,6 +38,7 @@ import type {
   PaperAcceptType,
   PaperTarget,
 } from "./v2-types";
+import { recordPaperDecayAchievements } from "./v2-achievement-research";
 
 export const PAPER_REVIEW_MONTHS = 3;
 
@@ -114,7 +116,7 @@ const REVIEWER_COMMENTS: Record<PaperReviewerType, { Accept: string; Borderline:
 export function createDraftPaper(
   totalMonths: number,
   existingPaperCount: number,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
   calendarYear = 2023,
   fixedTopic?: FixedPaperTopic,
 ): Paper {
@@ -150,7 +152,7 @@ function isZeroProgressDraft(paper: Paper): boolean {
 export function rerollPaperTopic(
   state: GameState,
   paperId: string,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
 ): GameState {
   if (state.phase !== "playing") return state;
   const paperIndex = state.papers.findIndex((paper) => paper.id === paperId);
@@ -190,7 +192,8 @@ export function applyPrepublicationPaperDecay(state: GameState): GameState {
   if (state.phase !== "playing") return state;
   const reduction = state.selectedRoleId === "genius" && state.degree === "phd"
     ? getRoleTalentLevel(state, "lasting-work") * 0.03 : 0;
-  return { ...state, papers: state.papers.map((paper) => decayUnpublishedPaper(paper, reduction)) };
+  const papers = state.papers.map((paper) => decayUnpublishedPaper(paper, reduction));
+  return recordPaperDecayAchievements(state, papers);
 }
 
 export function decayUnpublishedPaper(paper: Paper, reduction = 0): Paper {
@@ -517,7 +520,7 @@ function formatReviewScore(score: number): string {
 
 export function resolvePaperReview(
   paper: Paper,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
   kindReviewerBonus = 0,
 ): {
   nextPaper: Paper;

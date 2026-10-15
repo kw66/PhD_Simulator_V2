@@ -1,8 +1,9 @@
+import { gameRandom } from "./v2-game-random";
 import { applyTierResist } from "./v2-sanity-rules";
 
 export function generateRelationshipResearch(
   academicYear: number,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
   bonus = 0,
 ): number {
   const individualBonus = Math.floor(random() * 4);

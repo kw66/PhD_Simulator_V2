@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getResearchCap } from "./v2-research-cap-system";
 import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
@@ -101,7 +102,7 @@ export type ConferenceActivityPreview = NonNullable<PendingEvent["conferenceActi
 export function resolveConferenceActivityAttributes(
   option: ConferenceActivityOptionDefinition,
   state: ConferenceActivityBuildState,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): ConferenceActivityOptionDefinition {
   const effects = { ...option.effects };
   let outcome = option.outcome;

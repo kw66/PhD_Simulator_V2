@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -54,7 +55,7 @@ describe("v2 advisor names", () => {
   });
 
   it("keeps string and numeric seeds stable without consuming gameplay randomness", () => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.123);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.123);
     const seeds = [0, 1, -7, 12.5, "", "fellow:junior-12", "lover:smart:12:female"];
     const firstNames = seeds.map(pickStableRandomName);
     random.mockReturnValue(0.987);

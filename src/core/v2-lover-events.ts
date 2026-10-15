@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { createConferenceScholarContact, replaceConferenceScholarContact } from "./v2-conference-contacts";
 import { activateLover, getOppositeGender } from "./v2-lover-system";
 import { canAddRelationship } from "./v2-relationship-rules";
@@ -34,7 +35,7 @@ export function buildLoverDevelopmentContext(input: {
   state?: GameState;
   contact?: ConferenceScholarContact;
   origin?: string;
-}, getRoll: () => number = Math.random): LoverDevelopmentContext {
+}, getRoll: () => number = gameRandom): LoverDevelopmentContext {
   const encounter = input.state?.conferenceEncounterState ?? input.conferenceEncounterState;
   const profileRolls: [number, number] = [getRoll(), getRoll()];
   const contact = input.contact ?? encounter.scholars?.[input.type]

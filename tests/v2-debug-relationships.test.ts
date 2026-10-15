@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -50,7 +51,7 @@ describe("v2 debug relationship additions", () => {
   it.each(relationshipTypes)("randomizes each new %s name even when month and occupancy stay the same", (type) => {
     const initial = admittedState();
     const state: GameState = { ...initial, month: 6, totalMonths: 6, eventQueue: [], availableRandomEvents: [] };
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.2);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.2);
     const first = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: type });
     const firstName = type === "lover" ? first.loverState.name : first.fellowProgressState[0]?.name;
     const relationshipId = type === "lover" ? "lover" : first.fellowProgressState[0]!.id;
@@ -175,7 +176,7 @@ describe("v2 debug relationship additions", () => {
   });
 
   it("creates only the smart lover fixtures before and after enrollment using the role's gender", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     for (const state of [startGame("rich"), admittedState()]) {
       const before = structuredClone(state);
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: "lover" });
@@ -203,7 +204,7 @@ describe("v2 debug relationship additions", () => {
       const state: GameState = {
         ...initial, month: totalMonths, totalMonths, eventQueue: [], availableRandomEvents: [],
       };
-      vi.spyOn(Math, "random").mockReturnValueOnce(seed / 0x100000000);
+      vi.spyOn(gameRandomSource, "gameRandom").mockReturnValueOnce(seed / 0x100000000);
       const next = dispatchAction(state, "debug-add-relationship", { debugRelationshipType: type });
       const profile = next.fellowProgressState[0];
 
@@ -228,7 +229,7 @@ describe("v2 debug relationship additions", () => {
   });
 
   it("adds an independent lover when the advisor and all four fellow cards are occupied", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = fillFellowCards(admittedState());
     const before = structuredClone(state);
     expect(before.fellowProgressState).toHaveLength(4);
@@ -301,7 +302,7 @@ describe("v2 natural relationship names", () => {
     { eventId: 11, type: "senior", choice: "deep" },
     { eventId: 14, type: "junior", choice: "idea" },
   ] as const)("stores the generated $type name only when its natural event is confirmed", ({ eventId, type, choice }) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const initial = admittedState();
     for (const roll of [0.25, 0.75]) {
       const serial = 23;

@@ -1,3 +1,4 @@
+import { collectRunStatistics } from "../src/core/v2-run-statistics";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createJournalStats } from "../src/app/v2-journal-stats";
 import { renderJournalAcceptanceEvent } from "../src/app/v2-render-paper-review";
@@ -41,8 +42,8 @@ describe("global journal statistics", () => {
     const local = storage();
     const stats = createJournalStats({ onChange: vi.fn(), fetch, storage: local });
     const [before, after] = acceptedStates();
-    await stats.track(before, after);
-    await stats.track(before, after);
+    await finalize(stats, before, after);
+    await finalize(stats, before, after);
     expect(fetch).not.toHaveBeenCalled();
     await stats.flush();
     expect(rows.size).toBe(1);
@@ -53,7 +54,7 @@ describe("global journal statistics", () => {
     expect(stats.read("pami")).toEqual({ status: "ready", data: { acceptedCount: 12, meanScore: 146.5, meanMonths: 2.3 } });
     stats.dispose();
     const reloaded = createJournalStats({ onChange: vi.fn(), fetch, storage: local });
-    await reloaded.track(before, after);
+    await finalize(reloaded, before, after);
     await reloaded.flush();
     await reloaded.load("pami");
     expect(rows.size).toBe(1);
@@ -65,7 +66,7 @@ describe("global journal statistics", () => {
     const stats = createJournalStats({ onChange: vi.fn(), fetch, storage: storage() });
     const [before, after] = acceptedStates();
     stats.markDebug();
-    await stats.track(before, after);
+    await finalize(stats, before, after);
     await stats.flush();
     expect(fetch).not.toHaveBeenCalled();
     const presentation: JournalAcceptancePresentation = {
@@ -85,8 +86,14 @@ describe("global journal statistics", () => {
     const stats = createJournalStats({ onChange: vi.fn(), fetch, storage: storage() });
     const [before, after] = acceptedStates();
     after.externalPublications[0] = { ...after.externalPublications[0]!, nonFirstAuthor: true, leadAuthorId: "fellow" };
-    await stats.track(before, after);
+    await finalize(stats, before, after);
     await stats.flush();
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+// These recorder tests submit a committed final branch; gameplay alone never uploads.
+function finalize(controller: { track(before: GameState, after: GameState, options?: { debugUsed?: boolean; finalized?: boolean }): Promise<void> },
+  before: GameState, after: GameState, options: { debugUsed?: boolean } = {}): Promise<void> {
+  return controller.track(before, { ...collectRunStatistics(before, after), phase: "finished" }, { ...options, finalized: true });
+}

@@ -71,6 +71,8 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         effects: {
           illnessProbabilityDelta: -10,
           counterDeltas: { badmintonCount: 1 },
+          achievementFacts: badmintonChampion && state.eventCounters.badmintonCount === 0 && !state.eventSupport.hasBadmintonRacket
+            ? ["first-badminton-win"] : [],
           eventSupportUpdates: badmintonChampion && !state.eventSupport.hasStrongBodyTalent ? { hasStrongBodyTalent: true } : {},
         },
       },
@@ -96,6 +98,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
         outcome: `${formatTierResistedOutcome("社交", 1, ktvSocialResult)}。`,
         effects: {
           ...({ social: ktvSocialGain, rawSocial: 1 }),
+          achievementFacts: [`karaoke:${KTV_SONGS.indexOf(ktvSong)}`],
         },
       },
       {

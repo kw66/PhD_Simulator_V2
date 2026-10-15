@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { activateInternship, createInternshipLead, createInternshipOffer, getInternshipMonthlyIncome, getPublishedAPaperCount, hasOngoingInternship, type InternshipLead } from "./v2-internship-system";
 import type { ConferenceCareerState, GameState, InternshipOffer, PendingEvent } from "./v2-types";
 
@@ -21,7 +22,7 @@ const PENDING_OFFER: InternshipOffer = {
 
 export function buildInternshipInviteContext(
   state: InternshipInviteState,
-  _getRoll: () => number = Math.random,
+  _getRoll: () => number = gameRandom,
 ): InternshipInviteContext {
   return refreshInternshipInviteContext(state, {
     offer: PENDING_OFFER,
@@ -208,7 +209,7 @@ export function createInternshipInviteAct1(context: InternshipInviteContext): Pe
   };
 }
 
-export function revealInternshipInviteResult(event: PendingEvent, getRoll: () => number = Math.random): PendingEvent {
+export function revealInternshipInviteResult(event: PendingEvent, getRoll: () => number = gameRandom): PendingEvent {
   const preview = event.internshipInvitePreview;
   if (event.stage !== "result" || !preview?.decision || preview.context.offer.id !== "pending") return event;
   const offer = createInternshipOffer(getRoll, preview.context.lead);
@@ -220,7 +221,7 @@ export function revealInternshipInviteResult(event: PendingEvent, getRoll: () =>
   return preview.decision === "accept" ? createInternshipAcceptResult(context) : createInternshipDeclineResult(context);
 }
 
-export function revealInternshipInviteLead(event: PendingEvent, getRoll: () => number = Math.random): PendingEvent {
+export function revealInternshipInviteLead(event: PendingEvent, getRoll: () => number = gameRandom): PendingEvent {
   const preview = event.internshipInvitePreview;
   if (event.stage !== "act2" || !preview || preview.context.lead) return event;
   const lead = createInternshipLead(getRoll);

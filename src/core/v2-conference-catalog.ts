@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import type { PaperReviewerType, PaperTarget } from "./v2-types";
 import {
@@ -117,15 +118,10 @@ function getDeterministicLocation(
 }
 
 export function createConferenceLocationSeed(): number {
-  const cryptoApi = globalThis.crypto;
-  if (cryptoApi?.getRandomValues) {
-    // This persistent seed also identifies a run for statistics. Keep 53 bits of
-    // entropy; location selection still uses the same low 32-bit mixing below.
-    const values = new Uint32Array(2);
-    cryptoApi.getRandomValues(values);
-    return (values[0]! & 0x1fffff) * 0x1_0000_0000 + values[1]!;
-  }
-  return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+  // The saved gameplay stream owns every run-dependent random value.
+  // Two rolls retain a 53-bit identity for existing statistics deduplication.
+  return Math.floor(gameRandom() * 0x20_0000) * 0x1_0000_0000
+    + Math.floor(gameRandom() * 0x1_0000_0000);
 }
 
 export function getRealConferenceYear(gameYear: number, gameMonth: number): number {

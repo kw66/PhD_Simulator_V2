@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEBUG_EVENT_GROUPS } from "../src/core/v2-debug-tools";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -26,7 +27,7 @@ function inspectScenes(state: GameState, eventId: string, depth = 0): void {
 
 describe.each([0, 0.5, 0.999])("event emoji placement with roll %s", (roll) => {
   it.each(DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons))("keeps $label emoji within the narrative", ({ id }) => {
-    vi.spyOn(Math, "random").mockReturnValue(roll);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(roll);
     const base = createStartedGameState("normal");
     const state = dispatchAction({ ...base, year: 2, month: 6, totalMonths: 18,
       selectedAdvisorName: "测试导师", sanCap: 100, illnessProbability: 0,

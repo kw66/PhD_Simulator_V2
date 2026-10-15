@@ -1,3 +1,5 @@
+import { gameRandom } from "./v2-game-random";
+import { recordAchievementStats } from "./v2-achievement-runtime-types";
 import { applyTierResist } from "./v2-sanity-rules";
 import { getResearchCap } from "./v2-research-cap-system";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
@@ -75,9 +77,10 @@ export function previewPlayerAttributeChange(
 
 export function applyPlayerAttributeChange(
   state: GameState, stat: PlayerAttribute, rawChange: number, source: AttributeChangeSource = "ordinary",
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
   options: { suppressReactions?: boolean } = {},
 ): { state: GameState; result: PlayerAttributeChangeResult } {
+  state = recordAchievementStats(state);
   const result = previewPlayerAttributeChange(state, stat, rawChange, source);
   let next: GameState = { ...state, player: {
     ...state.player, [stat]: round(state.player[stat] + result.effectiveChange),
@@ -97,7 +100,8 @@ export function applyPlayerAttributeChange(
     }
   }
   if (result.moneyCost > 0) next = recordPersonalSpending(next, result.moneyCost);
+  next = recordAchievementStats(next);
   next = ensureResearchCurseBroken(next);
   if (source === "ordinary" && !options.suppressReactions) next = applyRoleAttributeReactions(next, stat, result.effectiveChange, getRoll);
-  return { state: next, result };
+  return { state: recordAchievementStats(next), result };
 }

@@ -383,9 +383,14 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("SAN变化中稿或拒稿均生效");
     expect(help).toContain("实际门槛=基础门槛×会议影响力÷等级均值，四舍五入");
     expect(help).toContain("期刊送审后分数不衰减，仍可修改和接受协作");
-    expect(help).toContain("送审后按不断变化的当前总分判断录用");
+    expect(help).toContain("达到达标分后可继续修改，再次点击该期刊按钮才发表");
     expect(help).not.toContain("PAMI75125");
     expect(help).toContain("有效分门槛");
+    const reviewHelp = getHelpPageText({ activePlayTab: "workstation" }, "毕业盲审");
+    expect(reviewHelp).toContain("参考刻度按各研究点同分计算");
+    expect(reviewHelp).toContain("超过A参考线仍可继续提升");
+    expect(getPlayHelpContext({ activePlayTab: "workstation" }).pages.some((page) => page.title === "研究点刻度")).toBe(false);
+    expect(help).toContain("⌊推进前当前SAN÷2⌋＋随机0～5");
     expect(html).not.toContain('class="workstation-notes"');
     expect(html).not.toContain('data-workstation-note="review"');
     expect(html).toContain('data-help-context="workstation"');

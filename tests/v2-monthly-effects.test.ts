@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -293,7 +294,7 @@ describe("monthly effects", () => {
     expect(previewResearchOperation(state, "experiment", 3).scoreBonus).toBe(0);
     expect(resolveMonthlyEffects(state).items.some((item) => item.id === "internship-monthly")).toBe(false);
     expect(state.internshipCount).toBe(0);
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     let sanTotal = 0;
     let moneyTotal = 0;
     try {

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
@@ -7,7 +8,7 @@ import { resolveDuePaperReviews } from "../src/core/v2-publication-system";
 import type { GameState } from "../src/core/v2-types";
 
 function startCompetition(eventId: 17 | 18 = 17): GameState {
-  vi.spyOn(Math, "random").mockReturnValue(0);
+  vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
   let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
   state = { ...state, eventQueue: [], player: { ...state.player, san: 20 }, totalMonths: 6, month: 6 };
   state = dispatchAction(state, "create-paper", { paperSlotIndex: 0 });

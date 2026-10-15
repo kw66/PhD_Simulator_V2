@@ -1,3 +1,4 @@
+import { withGameRandomPreview } from "./v2-game-random";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import {
   pushLog,
@@ -63,6 +64,7 @@ function buildCompletedEventLog(
 
 const DEFERRED_STATE_EXCLUDED_KEYS: ReadonlySet<keyof GameState> = new Set([
   "phase",
+  "randomState",
   "ending",
   "log",
   "eventQueue",
@@ -375,6 +377,10 @@ function suppressDepartedRecruitment<Event extends PendingEvent>(state: GameStat
 }
 
 export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
+  return withGameRandomPreview(state, () => getResolvableQueuedEventInternal(state, queuedEvent));
+}
+
+function getResolvableQueuedEventInternal(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
   const resolved = suppressDepartedRecruitment(state, resolveQueuedEventPreview(state, queuedEvent));
   const choices = resolved.choices.map((choice) => {
     const outcome = formatEventSanPaymentText(choice.outcome, state, choice.effects);

@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { createAdvancedConferenceActivityOptions } from "./v2-conference-activity-advanced-options";
 import { createBaseConferenceActivityOptions } from "./v2-conference-activity-base-options";
 import type { ConferenceActivityBuildState, ConferenceActivityContext, ConferenceActivityOptionDefinition } from "./v2-conference-activity-shared";
@@ -19,7 +20,7 @@ export function getConferenceActivityOptions(
 export function selectConferenceActivityOptions(
   context: ConferenceActivityContext,
   state: ConferenceActivityBuildState,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): ConferenceActivityOptionDefinition[] {
   const rolls = Array.from({ length: 32 }, () => getRoll());
   const options = getConferenceActivityOptions(context, state, rolls);

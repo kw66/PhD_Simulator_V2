@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -60,7 +61,7 @@ describe("recruitment random stream isolation", () => {
     const queued = choose(queueRecruitment(makeState(), eventId));
     const original = additions(queued.eventQueue[0]!);
     expect(original.length).toBeGreaterThan(0);
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Preview consumed global randomness"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Preview consumed global randomness"); });
     for (const stats of [
       { social: 6, favor: 5, research: 10 },
       { social: 12, favor: 6, research: 12 },
@@ -132,7 +133,7 @@ describe("recruitment random stream isolation", () => {
     expect(additions(refreshed)[0]).toEqual(original);
     expect(event.randomReplay?.rolls).toHaveLength(2);
     const serialized = JSON.parse(JSON.stringify({ ...september, eventQueue: [refreshed] })) as GameState;
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Preview consumed global randomness"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Preview consumed global randomness"); });
     expect(additions(getResolvableQueuedEvent(serialized, serialized.eventQueue[0]!))[0]).toEqual(original);
     expect(random).not.toHaveBeenCalled();
     random.mockReturnValue(0.99);
@@ -167,7 +168,7 @@ describe("recruitment identity during result previews", () => {
       : queueRecruitment(state, eventId);
     const pending = choose(choose(queued), choice);
     const original = structuredClone(previewFellow(pending.eventQueue[0]!));
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Preview consumed global randomness"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Preview consumed global randomness"); });
     const saved = JSON.parse(JSON.stringify(pending)) as GameState;
     const first = getResolvableQueuedEvent(saved, saved.eventQueue[0]!);
     const second = getResolvableQueuedEvent(saved, first);
@@ -186,7 +187,7 @@ describe("recruitment identity during result previews", () => {
   });
 
   it("still rerolls recruits on explicit debug rewind, then freezes the new preview", () => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.1);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.1);
     const pending = choose(choose(queueRecruitment(makeState(), 10)), "-short-term-");
     const original = previewFellow(pending.eventQueue[0]!);
     random.mockReturnValue(0.9);

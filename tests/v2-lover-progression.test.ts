@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -61,7 +62,7 @@ describe("lover completion announcements", () => {
   });
 
   it("keeps one manual completion record between the action and its actual paper help", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const base = withRoute(makeState(), "study", 99);
     const next = advanceLoverDate({ ...base, papers: [makePaper()], log: [] }, "study");
     expect(next.log).toHaveLength(3);
@@ -75,7 +76,7 @@ describe("lover completion announcements", () => {
   });
 
   it("preserves both monthly route completions in engine logs without duplicate talent records", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const base = withRoute(withRoute(makeState(), "play", 99), "study", 99);
     const next = nextMonth({ ...base, papers: [makePaper()], log: [] });
     const completions = next.log.filter((entry) => entry.eventHistoryId?.startsWith("talent:lover:"));
@@ -196,7 +197,7 @@ describe("lover initialization and monthly progression", () => {
   });
 
   it("advances passive routes through the real month pipeline without consuming a manual date", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState();
     state.loverState.startTotalMonths = state.totalMonths;
     const next = nextMonth(state);
@@ -211,7 +212,7 @@ describe("lover initialization and monthly progression", () => {
 
 describe("manual lover dates", () => {
   it.each(LOVER_ROUTES)("charges the %s cost once and shares the monthly limit across all routes", (route) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = { ...makeState(), totalMonths: 14, month: 2, year: 2 };
     const before = structuredClone(state);
     const cost = { play: { money: 2, san: 0 }, study: { money: 0, san: 4 }, shopping: { money: 3, san: 0 } }[route];
@@ -314,7 +315,7 @@ describe("lover route reward cycles", () => {
   });
 
   it("activates the play discount next month, floors costs at zero and expires it the following month", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = { ...makeState(), totalMonths: 26, month: 2, year: 3 };
     const reward = advanceLoverDate(withRoute(state, "play", 99, 2), "play");
     expect(getLoverRouteCost(reward, "study").san).toBe(4);
@@ -333,7 +334,7 @@ describe("lover route reward cycles", () => {
     expect(getLoverRouteCost(later, "study").san).toBe(4);
   });
 
-  it("retains the same fractional study reward with randomness used only for the action log ID", () => {
+  it("retains the same fractional study reward without consuming random rolls for log IDs", () => {
     const thirdStudy = withRoute(makeState(), "study", 99, 2);
     const effectsOf = (state: GameState) => state.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
 
@@ -344,7 +345,7 @@ describe("lover route reward cycles", () => {
       const next = advanceLoverDate(thirdStudy, "study");
       expect(next.player.research).toBe(8.8);
       expect(effectsOf(next)).toContain("你的科研 +0.8（8→8.8，抵抗0.2）");
-      expect(random).toHaveBeenCalledTimes(1);
+      expect(random).not.toHaveBeenCalled(); // Log identifiers are deterministic.
     }
   });
 
@@ -363,7 +364,7 @@ describe("lover route reward cycles", () => {
     const snapshot = structuredClone(state);
     const random = vi.spyOn(Math, "random");
     const next = advanceLoverDate(state, "study");
-    expect(random).toHaveBeenCalledTimes(1);
+    expect(random).not.toHaveBeenCalled(); // Log identifiers are deterministic.
     const effects = next.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
     expect(next.loverProgressState.research).toBe(expected);
     expect(effects).toContain(effect);
@@ -388,7 +389,7 @@ describe("lover route reward cycles", () => {
     const snapshot = structuredClone(state);
     const random = vi.spyOn(Math, "random");
     const next = advanceLoverDate(state, "study");
-    expect(random).toHaveBeenCalledTimes(1);
+    expect(random).not.toHaveBeenCalled(); // Log identifiers are deterministic.
     const effects = next.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
     expect(next.player).toEqual({ ...state.player, research: expected, san: state.player.san - getLoverRouteCost(state, "study").san });
     expect(next.loverProgressState.research).toBe(state.loverProgressState.research);
@@ -405,7 +406,7 @@ describe("lover route reward cycles", () => {
     state.player.research = research;
     state.loverProgressState.research = research;
     state.researchCapacityState = { baseCap: 25, jointTrainingCitationCapBonus: 0, otherCapBonus: 0 };
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const next = advanceLoverDate(state, "study");
     const effects = next.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.effects ?? []));
     expect(next.player).toEqual({ ...state.player, san: state.player.san - getLoverRouteCost(state, "study").san });
@@ -434,7 +435,7 @@ describe("lover route reward cycles", () => {
   });
 
   it("applies next-month discounts before automatic reading in both preview and the engine, then expires", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const base = { ...makeState(), totalMonths: 26, month: 2, year: 3 };
     const purchased = dispatchAction(base, "buy-ai-month", { aiSlotId: "kimi" });
     const subscribed = dispatchAction(purchased, "toggle-ai-subscription", { aiSlotId: "kimi" });
@@ -467,7 +468,7 @@ describe("lover route reward cycles", () => {
     [8, 10, 8, 8, 10], [19, 20, 25, 19.4, 20], [20, 21, 25, 20.4, 21],
     [21, 20, 25, 21, 20], [19, 18, 20, 19, 18.4],
   ])("raises only the lower research with player=%s lover=%s cap=%s", (player, lover, cap, expectedPlayer, expectedLover) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const state = withRoute(makeState(), "study", 99, 2);
     state.player.research = player;
     state.loverProgressState.research = lover;
@@ -507,7 +508,7 @@ describe("lover intimacy percentage resistance", () => {
       const state = withRoute(makeState(), route, 99);
       state.loverProgressState.intimacy = intimacy;
       const snapshot = structuredClone(state);
-      const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Preview consumed randomness"); });
+      const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Preview consumed randomness"); });
       const preview = getLoverNextReward(state, route);
       const gain = Number(preview.split("、亲密 +")[1]);
       expect(getLoverNextReward(state, route)).toBe(preview);
@@ -661,7 +662,7 @@ describe("stored lover paper collaboration", () => {
   });
 
   it("automatically retries stored help when the engine creates a paper", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const pending = advanceLoverDate(withRoute(makeState(), "study", 99), "study");
     const next = dispatchAction(pending, "create-paper", { paperSlotIndex: 0 });
     expect(next.papers).toHaveLength(1);
@@ -670,13 +671,15 @@ describe("stored lover paper collaboration", () => {
     expect(next.actionState).toEqual(pending.actionState);
   });
 
-  it("archives journal revisions accepted through stored help in the engine", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+  it("requires confirmation after stored help brings a journal to its acceptance threshold", () => {
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const base = makeState();
     base.loverProgressState.pendingPaperHelp = { amount: 20, collaboratorId: "lover:7:林青", name: "林青" };
     const paper = makePaper({ idea: 40, experiment: 40, writing: 40, status: "journal-reviewing", journalTarget: "pami",
       submittedIdea: 40, submittedExperiment: 40, submittedWriting: 40 });
-    const next = dispatchAction({ ...base, papers: [paper] }, "select-paper", { paperId: paper.id });
+    const revised = dispatchAction({ ...base, papers: [paper] }, "select-paper", { paperId: paper.id });
+    expect(revised.externalPublications).toHaveLength(0);
+    const next = dispatchAction(revised, "submit-journal-paper", { paperId: paper.id, journalTarget: "pami" });
     expect(next.papers).toHaveLength(0);
     expect(next.externalPublications.find((entry) => entry.id === paper.id)).toMatchObject({
       status: "published", idea: 60, experiment: 40, writing: 40, collaborators: [{ id: "lover:7:林青", name: "林青" }],

@@ -76,7 +76,7 @@ function buildScholarshipAwardEvent(context: ScholarshipOutcomeContext, disquali
         id: `scholarship-claim-y${context.year}-m${context.month}`,
         label: "确定",
         outcome: "国奖资格取消，金币 +0。",
-        effects: {},
+        effects: { achievementFacts: ["reported-scholarship"] },
       }],
     });
   }

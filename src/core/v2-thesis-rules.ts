@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { paySanCost } from "./v2-role-talent-costs";
@@ -145,7 +146,7 @@ function withScoreHistory(thesis: ThesisState, totalMonths: number): ThesisState
   return { ...thesis, scoreHistory: [...(thesis.scoreHistory ?? []), { totalMonths, pointScores, title: thesis.title }] };
 }
 
-export function syncThesisState(state: GameState, random: () => number = Math.random): GameState {
+export function syncThesisState(state: GameState, random: () => number = gameRandom): GameState {
   if (state.phase !== "playing" || !isGraduationPreparationUnlocked(state) || state.thesis.review || state.thesis.reviewResolved) return state;
   if (state.thesis.degree === null) {
     return { ...state, thesis: initializeThesis(state, random) };
@@ -245,7 +246,7 @@ function sampleReport(degree: Degree, points: ThesisResearchPoint[], random: () 
   return { weights, effectiveScore, grade, score: minimum + Math.floor(clampRoll(random) * (maximum - minimum + 1)), comment: comments[grade] };
 }
 
-export function prepareThesisBlindReview(state: GameState, random: () => number = Math.random): GameState {
+export function prepareThesisBlindReview(state: GameState, random: () => number = gameRandom): GameState {
   if (state.phase !== "playing" || state.thesis.review || state.thesis.reviewResolved
     || state.year !== getGraduationPreparationYear(state.degree) || state.month < 8) return state;
   const nextState = syncThesisState(state, random);

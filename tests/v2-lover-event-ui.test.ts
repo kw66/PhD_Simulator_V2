@@ -67,7 +67,7 @@ describe("parallel lover event scenes", () => {
     try {
       await page.route("**/__lover_event_ui__", route => route.fulfill({ contentType: "text/html", body: fixture }));
       await page.goto(`${server.resolvedUrls!.local[0]}__lover_event_ui__`);
-      await page.waitForSelector('[data-action="start-game"]');
+      await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
       const { firstId, secondId, firstName, secondName } = await page.evaluate(() =>
         (window as LoverEventWindow).installParallelLoverEvents());
 

@@ -36,7 +36,7 @@ describe("relationship card layout", () => {
     try {
       await page.route("**/__relationship_visual__", route => route.fulfill({ contentType: "text/html", body: fixture }));
       await page.goto(`${server.resolvedUrls!.local[0]}__relationship_visual__`);
-      await page.waitForSelector('[data-action="start-game"]');
+      await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
       await page.evaluate(() => {
         const store = (window as RelationshipWindow).relationshipVisualStore;
         store.dispatch("start-game", { roleId: "normal" });
@@ -65,7 +65,7 @@ describe("relationship card layout", () => {
     try {
       await page.route("**/__relationship_visual__", route => route.fulfill({ contentType: "text/html", body: fixture }));
       await page.goto(`${server.resolvedUrls!.local[0]}__relationship_visual__`);
-      await page.waitForSelector('[data-action="start-game"]');
+      await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
       const month = await page.evaluate(() => {
         const store = (window as RelationshipWindow).relationshipVisualStore;
         store.dispatch("start-game", { roleId: "normal" });

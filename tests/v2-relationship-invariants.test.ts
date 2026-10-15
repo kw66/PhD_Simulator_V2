@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { getResolvableQueuedEvent } from "../src/core/v2-engine-event-resolution";
@@ -40,7 +41,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("relationship invariants", () => {
   it.each([1, 2, 3, 4, 5, 6])("never drops an existing fellow, lover or advisor while resolving events (seed %i)", (seed) => {
     const random = seededRandom(seed);
-    vi.spyOn(Math, "random").mockImplementation(random);
+    vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(random);
     let state = dispatchAction(createInitialState(), "start-game", { roleId: "normal" });
     let resolvedEvents = 0;
 

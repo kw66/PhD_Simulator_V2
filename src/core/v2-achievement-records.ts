@@ -1,8 +1,10 @@
-import { getRoleAchievementDefinitions, getRoleLobbyAchievementDefinitions } from "./v2-role-lobby-meta";
+import { getAllAchievementDefinitions, getRoleAchievementDefinitions } from "./v2-role-lobby-meta";
+import { isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
+import { COLLECTION_REQUIREMENTS } from "./v2-achievement-collections";
 import type { AccountProfile, RoleId } from "./v2-types";
 
 type AchievementStorage = Pick<Storage, "getItem" | "setItem">;
-const ACHIEVEMENT_STORAGE_KEY = "phd_simulator_v2_role_achievements_v1";
+const ACHIEVEMENT_STORAGE_KEY = "phd_simulator_v2_role_achievements_v2";
 
 function isValidTimestamp(value: unknown): value is string {
   if (typeof value !== "string") return false;
@@ -10,42 +12,64 @@ function isValidTimestamp(value: unknown): value is string {
   return !Number.isNaN(date.getTime()) && date.toISOString() === value;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export function loadRoleAchievementRecords(account: AccountProfile, storage: AchievementStorage | null): AccountProfile {
   try {
     const saved: unknown = JSON.parse(storage?.getItem(ACHIEVEMENT_STORAGE_KEY) ?? "null");
-    if (!saved || typeof saved !== "object" || !("version" in saved) || saved.version !== 1
-      || !("roles" in saved) || !saved.roles || typeof saved.roles !== "object") return account;
-
-    const roles = saved.roles as Record<string, unknown>;
-    const savedDates = "unlockedAt" in saved && saved.unlockedAt && typeof saved.unlockedAt === "object"
-      ? saved.unlockedAt as Record<string, unknown>
-      : {};
+    if (!isRecord(saved) || (saved.version !== 1 && saved.version !== 2) || !isRecord(saved.roles)) return account;
+    const definitions = getAllAchievementDefinitions();
+    const knownIds = new Set(definitions.map(definition => definition.id));
+    const knownRoles = new Set(Object.keys(account.roleProgress));
+    const savedDates = isRecord(saved.unlockedAt) ? saved.unlockedAt : {};
+    const savedRoleDates = isRecord(saved.unlockedByRole) ? saved.unlockedByRole : {};
     const roleProgress = { ...account.roleProgress };
     const achievementUnlockedAt: Record<string, string> = {};
+    const achievementUnlockedByRole: NonNullable<AccountProfile["achievementUnlockedByRole"]> = {};
     for (const roleId of Object.keys(roleProgress) as RoleId[]) {
-      const value = roles[roleId];
-      if (!value || typeof value !== "object") continue;
-      const record = value as Record<string, unknown>;
-      const knownIds = new Set(getRoleAchievementDefinitions(roleId).map((definition) => definition.id));
+      const record = saved.roles[roleId];
+      if (!isRecord(record)) continue;
+      const availableIds = new Set(getRoleAchievementDefinitions(roleId).map(definition => definition.id));
       const unlockedAchievementIds = Array.isArray(record.unlockedAchievementIds)
-        ? record.unlockedAchievementIds.filter((id): id is string => typeof id === "string" && knownIds.has(id))
-        : [];
-      roleProgress[roleId] = {
-        ...roleProgress[roleId],
-        unlocked: roleId === "normal" || record.unlocked === true,
-        unlockedAchievementIds,
-      };
-      for (const definition of getRoleLobbyAchievementDefinitions(roleId)) {
-        const savedDate = savedDates[definition.id];
-        const unlocked = definition.unlocksRoleId
-          ? roleProgress[roleId].unlocked
-          : unlockedAchievementIds.includes(definition.id);
-        if (unlocked && isValidTimestamp(savedDate)) {
-          achievementUnlockedAt[definition.id] = savedDate;
-        }
-      }
+        ? [...new Set(record.unlockedAchievementIds.filter((id): id is string => typeof id === "string" && availableIds.has(id)))] : [];
+      roleProgress[roleId] = { ...roleProgress[roleId],
+        unlocked: roleId === "normal" || record.unlocked === true, unlockedAchievementIds };
     }
-    return { ...account, roleProgress, achievementUnlockedAt };
+    for (const definition of definitions) {
+      const value = savedRoleDates[definition.id];
+      if (!isRecord(value)) continue;
+      const roleDates: Partial<Record<RoleId, string>> = {};
+      for (const [rawRoleId, date] of Object.entries(value)) {
+        const roleId = rawRoleId as RoleId;
+        if (!knownRoles.has(roleId) || !isAchievementAvailableToRole(definition.scope, roleId) || !isValidTimestamp(date)) continue;
+        roleDates[roleId] = date;
+        const progress = roleProgress[roleId];
+        roleProgress[roleId] = { ...progress, unlockedAchievementIds: [...new Set([...progress.unlockedAchievementIds, definition.id])] };
+      }
+      if (Object.keys(roleDates).length > 0) achievementUnlockedByRole[definition.id] = roleDates;
+    }
+    const restored = { ...account, roleProgress, achievementUnlockedByRole };
+    for (const definition of definitions) {
+      const date = savedDates[definition.id];
+      if (isValidTimestamp(date) && isAchievementCompleted(restored, definition)) achievementUnlockedAt[definition.id] = date;
+    }
+    const collectionProgress = { buffs: [], products: [], conferences: [], locations: [], directions: [] } as import("./v2-types").AchievementCollectionProgress;
+    const rawCollection = isRecord(saved.collectionProgress) ? saved.collectionProgress : {};
+    for (const key of Object.keys(collectionProgress) as (keyof typeof collectionProgress)[]) {
+      const raw = rawCollection[key];
+      const available = new Set(COLLECTION_REQUIREMENTS[key].map(item => item.id));
+      collectionProgress[key] = Array.isArray(raw)
+        ? [...new Set(raw.filter((item): item is string => typeof item === "string" && available.has(item)))] : [];
+    }
+    const loadBonuses = (raw: unknown): Partial<Record<RoleId, number>> => isRecord(raw)
+      ? Object.fromEntries(Object.entries(raw).filter(([id, value]) => knownRoles.has(id) && Number.isSafeInteger(value) && (value as number) >= 0)) : {};
+    const achievementRewardedIds = Array.isArray(saved.rewardedIds)
+      ? [...new Set(saved.rewardedIds.filter((id): id is string => typeof id === "string" && knownIds.has(id)))] : [];
+    return { ...account, roleProgress, achievementUnlockedAt, achievementUnlockedByRole,
+      achievementRewardedIds, achievementCollectionProgress: collectionProgress,
+      achievementExperienceMultipliers: loadBonuses(saved.experienceMultipliers), achievementTalentPoints: loadBonuses(saved.talentPoints) };
   } catch {
     return account;
   }
@@ -56,28 +80,30 @@ export function recordNewAchievementDates(
   next: AccountProfile,
   timestamp = new Date().toISOString(),
 ): AccountProfile {
+  if (!isValidTimestamp(timestamp)) return next;
   let dates = next.achievementUnlockedAt;
+  let byRole = next.achievementUnlockedByRole ?? {};
   for (const roleId of Object.keys(next.roleProgress) as RoleId[]) {
-    const before = previous.roleProgress[roleId];
-    const after = next.roleProgress[roleId];
-    for (const definition of getRoleLobbyAchievementDefinitions(roleId)) {
-      const wasUnlocked = definition.unlocksRoleId
-        ? before.unlocked
-        : before.unlockedAchievementIds.includes(definition.id);
-      const isUnlocked = definition.unlocksRoleId
-        ? after.unlocked
-        : after.unlockedAchievementIds.includes(definition.id);
-      if (isUnlocked && !wasUnlocked && !dates[definition.id]) {
-        dates = { ...dates, [definition.id]: timestamp };
-      }
+    const before = previous.roleProgress[roleId].unlockedAchievementIds;
+    for (const definition of getRoleAchievementDefinitions(roleId)) {
+      if (before.includes(definition.id) || !next.roleProgress[roleId].unlockedAchievementIds.includes(definition.id)) continue;
+      if (!dates[definition.id]) dates = { ...dates, [definition.id]: timestamp };
+      if (!byRole[definition.id]?.[roleId]) byRole = { ...byRole,
+        [definition.id]: { ...byRole[definition.id], [roleId]: timestamp } };
     }
   }
-  return dates === next.achievementUnlockedAt ? next : { ...next, achievementUnlockedAt: dates };
+  return dates === next.achievementUnlockedAt && byRole === next.achievementUnlockedByRole ? next
+    : { ...next, achievementUnlockedAt: dates, achievementUnlockedByRole: byRole };
 }
 
 export function achievementRecordsChanged(previous: AccountProfile, next: AccountProfile): boolean {
   if (Object.keys(previous.achievementUnlockedAt).length !== Object.keys(next.achievementUnlockedAt).length
     || Object.entries(next.achievementUnlockedAt).some(([id, date]) => previous.achievementUnlockedAt[id] !== date)) return true;
+  if (JSON.stringify(previous.achievementUnlockedByRole ?? {}) !== JSON.stringify(next.achievementUnlockedByRole ?? {})
+    || JSON.stringify(previous.achievementRewardedIds ?? []) !== JSON.stringify(next.achievementRewardedIds ?? [])
+    || JSON.stringify(previous.achievementCollectionProgress ?? {}) !== JSON.stringify(next.achievementCollectionProgress ?? {})
+    || JSON.stringify(previous.achievementTalentPoints ?? {}) !== JSON.stringify(next.achievementTalentPoints ?? {})
+    || JSON.stringify(previous.achievementExperienceMultipliers ?? {}) !== JSON.stringify(next.achievementExperienceMultipliers ?? {})) return true;
   return (Object.keys(next.roleProgress) as RoleId[]).some((roleId) => {
     const before = previous.roleProgress[roleId];
     const after = next.roleProgress[roleId];
@@ -90,8 +116,13 @@ export function achievementRecordsChanged(previous: AccountProfile, next: Accoun
 export function saveRoleAchievementRecords(account: AccountProfile, storage: AchievementStorage | null): void {
   try {
     storage?.setItem(ACHIEVEMENT_STORAGE_KEY, JSON.stringify({
-      version: 1,
+      version: 2,
       unlockedAt: account.achievementUnlockedAt,
+      unlockedByRole: account.achievementUnlockedByRole ?? {},
+      rewardedIds: account.achievementRewardedIds ?? [],
+      collectionProgress: account.achievementCollectionProgress,
+      experienceMultipliers: account.achievementExperienceMultipliers ?? {},
+      talentPoints: account.achievementTalentPoints ?? {},
       roles: Object.fromEntries(Object.entries(account.roleProgress).map(([roleId, progress]) => [
         roleId, { unlocked: progress.unlocked, unlockedAchievementIds: progress.unlockedAchievementIds },
       ])),

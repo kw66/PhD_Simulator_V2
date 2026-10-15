@@ -1,3 +1,4 @@
+import { recordPersonalIncome } from "./v2-money";
 import { formatMoney, roundMoney } from "./v2-money";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import type { GameState } from "./v2-types";
@@ -39,11 +40,11 @@ export function settleRoleTalentInvestments(state: GameState): { state: GameStat
   const principal = roundMoney(due.reduce((sum, investment) => sum + investment.principal, 0));
   const interest = roundMoney(due.reduce((sum, investment) => sum + investment.interest, 0));
   return {
-    state: due.length === 0 ? state : {
+    state: due.length === 0 ? state : recordPersonalIncome({
       ...state,
       player: { ...state.player, money: roundMoney(state.player.money + principal + interest) },
       roleTalents: { ...state.roleTalents!, investments: investments.filter((investment) => investment.dueAt > state.totalMonths) },
-    },
+    }, interest),
     principal, interest, count: due.length,
   };
 }

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -60,7 +61,7 @@ describe("May player transfer before June graduation", () => {
     [3, "continue-master", "master", "master"],
     [0, "continue-master", "master", "delay"],
   ] as const)("settles third-year score %s choice %s as %s and keeps June playable", (score, choice, degree, ending) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const initial = makeState(32);
     initial.advisorProgressState.funding = 50;
     const may = dispatchAction({ ...initial, totalResearchScore: score }, "next-month");
@@ -98,7 +99,7 @@ describe("May player transfer before June graduation", () => {
   });
 
   it.each([1, 2])("retains the second-year May threshold of two at score %s", (score) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const initial = makeState(20);
     initial.advisorProgressState.funding = 50;
     const may = dispatchAction({ ...initial, totalResearchScore: score }, "next-month");
@@ -117,7 +118,7 @@ describe("May player transfer before June graduation", () => {
   });
 
   it("preserves the May conference when transfer is resolved first and keeps it blocking June", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const may = dispatchAction({ ...makeState(32), totalResearchScore: 3 }, "next-month");
     const settled = chooseTransferStage(chooseTransferStage(chooseTransferStage(may), "transfer-phd"));
     expect(settled.degree).toBe("phd");
@@ -127,7 +128,7 @@ describe("May player transfer before June graduation", () => {
   });
 
   it("does not graduate early when debug skipping the May decisions", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const may = dispatchAction({ ...makeState(32), totalResearchScore: 3 }, "next-month");
     const june = dispatchAction(may, "force-next-month");
     expect(june).toMatchObject({ totalMonths: 34, month: 10, degree: "master", phase: "playing", ending: null });
@@ -136,7 +137,7 @@ describe("May player transfer before June graduation", () => {
   });
 
   it("uses later June achievements for graduation without reopening the failed May transfer", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const may = skipMayConference(dispatchAction({ ...makeState(32), totalResearchScore: 0 }, "next-month"));
     const failed = chooseTransferStage(chooseTransferStage(chooseTransferStage(may), "transfer-phd"));
     const june = dispatchAction(skipRecruitment(failed), "next-month");
@@ -157,7 +158,7 @@ describe("fellow June-end settlement through the engine", () => {
     [6, 7, "phd", "graduation"],
     [6, 6, "phd", "withdrawal"],
   ] as const)("settles year %s score %s %s %s only when leaving June", (academicYear, score, degree, outcome) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState(9);
     const fellow = createCustomFellowProgressProfile({
       type: "peer", gender: "female", name: "林青", research: 0, affinity: 1,

@@ -89,13 +89,15 @@ describe("debug ending fixtures", () => {
 
   it("excludes direct debug dispatches and finished rerolls from progression", () => {
     const store = createStore({ storage: null });
-    store.dispatch("start-game", { roleId: "normal" });
     const originalProgress = structuredClone(store.getLobbyState().roleProgress);
+    store.dispatch("start-game", { roleId: "normal" });
+    const randomState = structuredClone(store.getState().randomState);
     for (const ending of endings) {
       store.dispatch("debug-trigger-ending", { eventId: ending });
       expect(store.getState().ending).toBe(ending);
       expect(store.getLobbyState().roleProgress).toEqual(originalProgress);
-      expect(store.getLobbyState().lastRunExperience).toMatchObject({ gained: 0, disqualifiedByDebug: true });
+      expect(store.getEndingExperienceAward()).toMatchObject({ gained: 0, disqualifiedByDebug: true });
+      expect(store.getState().randomState).toEqual(randomState);
     }
   });
 

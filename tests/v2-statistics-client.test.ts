@@ -88,6 +88,42 @@ afterEach(() => {
 });
 
 describe("shared statistics queue", () => {
+  it("preserves each role's run snapshot across reloads and newer runs of other roles", async () => {
+    const local = storage();
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(runSnapshot(12)));
+    const original = client({ storage: local, fetch });
+    await original.startRun('[123,"normal"]');
+    expect(original.read(READ_RPC, KEY, parse).data?.acceptedCount).toBe(12);
+    original.dispose();
+    await vi.advanceTimersByTimeAsync(11 * 60_000);
+    fetch.mockImplementation(async () => Response.json(runSnapshot(99)));
+    const resumed = client({ storage: local, fetch });
+    await resumed.startRun('[123,"normal"]');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(resumed.read(READ_RPC, KEY, parse).data?.acceptedCount).toBe(12);
+    for (let run = 1; run <= 45; run++) await resumed.startRun(JSON.stringify([run, "rich"]));
+    resumed.dispose();
+    const restored = client({ storage: local, fetch });
+    await restored.startRun('[123,"normal"]');
+    expect(restored.read(READ_RPC, KEY, parse).data?.acceptedCount).toBe(12);
+    const snapshotData = JSON.parse(local.values.get("phd_simulator_v2_statistics_v1")!);
+    expect(snapshotData.runSnapshots).toHaveLength(2);
+    expect(snapshotData.runSnapshots.map((entry: [string, unknown]) => entry[0])).toContain('[45,"rich"]');
+  });
+
+  it("keeps the finalization outbox pending until its upload queue is durable", () => {
+    const failing = client({ storage: { getItem: () => null, setItem: () => { throw new Error("QuotaExceededError"); } } });
+    expect(queue(failing)).toBe(true);
+    expect(failing.persistPending()).toBe(false);
+    expect(client({ storage: null }).persistPending()).toBe(false);
+    const local = storage();
+    const healthy = client({ storage: local });
+    queue(healthy);
+    expect(healthy.persistPending()).toBe(true);
+    expect(JSON.parse(local.values.get("phd_simulator_v2_statistics_v1")!).results).toHaveLength(1);
+    expect(client({ uploadEnabled: false, storage: null }).persistPending()).toBe(true);
+  });
+
   it("batches activity with paper results, preserving start counts while excluding debug endings", async () => {
     const network = backend();
     const local = storage();

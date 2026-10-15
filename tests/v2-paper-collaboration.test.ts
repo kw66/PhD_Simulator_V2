@@ -210,7 +210,9 @@ describe("paper collaboration scores", () => {
       chainId: "help-journal", stage: "result" as const, blocking: true, deadlineMonths: 0,
       choices: [{ id: "confirm", label: "确认", outcome: "修改完成", effects: { paperCollaborations: [assistance(paper, { idea: 130 })] } }],
     };
-    const next = resolveFirst({ ...state, eventQueue: [createEventQueueItem(event, 1)] });
+    const revised = resolveFirst({ ...state, eventQueue: [createEventQueueItem(event, 1)] });
+    expect(revised.externalPublications).toHaveLength(0);
+    const next = submitJournalPaper(revised, paper.id, "nmi");
     expect(next.papers).toHaveLength(0);
     expect(next.externalPublications[0]).toMatchObject({ status: "published", collaborationScores: { idea: 130 }, collaborators: [{ id: "peer-one", name: "林知远" }] });
     expect(next.externalPublications[0]?.publication?.effectiveScore).toBe(250);

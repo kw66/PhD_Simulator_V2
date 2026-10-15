@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getFellowOverflowEffects, getFellowOverflowOutcome } from "./v2-role-talent-relationships";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
 import { createFixedEvent } from "./v2-fixed-events-shared";
@@ -14,7 +15,7 @@ const CANDIDATE_DESCRIPTIONS = [
   "做过简单的课题，能独立复现实验、整理结果。",
 ] as const;
 
-export function createMentorAssignEvent(state: GameState, getNameRoll: () => number = Math.random): PendingEvent {
+export function createMentorAssignEvent(state: GameState, getNameRoll: () => number = gameRandom): PendingEvent {
   const rolls: number[] = [];
   const recordRoll = () => {
     const roll = getNameRoll();

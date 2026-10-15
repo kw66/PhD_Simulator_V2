@@ -12,9 +12,12 @@ export function createLogEntry(
   totalMonths: number,
   text: string,
   metadata: Pick<GameLogEntry, "eventHistoryId"> = {},
+  sequence = 0,
 ): GameLogEntry {
+  let hash = 2166136261;
+  for (const character of text) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
   return {
-    id: `${totalMonths}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `${totalMonths}-${sequence}-${(hash >>> 0).toString(36)}`,
     month: totalMonths,
     text,
     ...metadata,
@@ -37,7 +40,7 @@ export function pushLog(
 
   return {
     ...state,
-    log: [createLogEntry(state.totalMonths, normalizedText, metadata), ...state.log],
+    log: [createLogEntry(state.totalMonths, normalizedText, metadata, state.log.length), ...state.log],
   };
 }
 

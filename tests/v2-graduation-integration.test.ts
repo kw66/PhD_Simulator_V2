@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -48,7 +49,7 @@ describe("graduation preparation engine lifecycle", () => {
     const state = prepared(degree);
     const august = { ...state, year: state.year - 1, month: 12, totalMonths: state.totalMonths - 1,
       thesis: createInitialThesisState() };
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const september = dispatchAction(august, "next-month");
     expect(september).toMatchObject({ degree, year: state.year, month: 1, phase: "playing" });
     expect(september.thesis.researchPoints).toHaveLength(degree === "master" ? 2 : 3);

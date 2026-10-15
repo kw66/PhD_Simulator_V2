@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -84,7 +85,7 @@ describe("summer recruitment generation", () => {
   });
 
   it("defers a terminal peer draw during August and activates it in September through dispatch", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.1);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.1);
     const initial = { ...makeState(3, 12), availableRandomEvents: [10] };
     const drawn = collectRandomEventsForMonth(initial, () => 0.8);
     expect(drawn.events).toHaveLength(0);
@@ -127,7 +128,7 @@ describe("departed candidates in pending events", () => {
   });
 
   it("keeps a surviving June candidate in July and charges the current July SAN cost", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.1);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.1);
     const june = queueEvent(makeState(2, 10), 10);
     const candidate = additions(june.eventQueue[0]!)[0]!;
     const advanced = dispatchAction(june, "next-month");
@@ -150,7 +151,7 @@ describe("departed candidates in pending events", () => {
 
   it.each([[10, 3, 0, "-short-term-"], [10, 6, 0, "-short-term-"], [11, 5, 0, "-deep-"], [14, 4, 3, "-idea-"]] as const)(
     "turns event %s year %s candidate %s into an explicit no-op after June", (eventId, year, serial, choice) => {
-      vi.spyOn(Math, "random").mockReturnValue(0.1);
+      vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.1);
       const june = queueEvent(makeState(year, 10, serial), eventId);
       const original = additions(june.eventQueue[0]!)[0]!;
       expect(original.academicYear).toBe(eventId === 11 || year === 6 ? 6 : 3);

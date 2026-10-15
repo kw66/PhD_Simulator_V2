@@ -28,7 +28,7 @@ describe("statistics requests through the game UI", () => {
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
 
-  it("freezes one startup snapshot, uploads only after confirmation, and refreshes only for a later run", async () => {
+  it("freezes a saved run snapshot and uploads only its explicitly settled final branch", async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const baseUrl = server.resolvedUrls!.local[0]!;
     const origin = new URL(baseUrl).origin;
@@ -93,7 +93,7 @@ describe("statistics requests through the game UI", () => {
         await page.locator('[data-action="resolve-event"]:not([data-event-secondary]):visible').first().click();
       }
       await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 31_000; window.dispatchEvent(new Event("online")); });
-      await expect.poll(paperCount).toBe(1);
+      expect(paperCount()).toBe(0);
       const readsBeforeTabs = requests.filter((name) => name !== "batch");
       await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 660_000; });
       for (const tab of ["settings", "events", "research", "events"]) await page.locator(`[data-ui-play-tab="${tab}"]`).click();
@@ -108,6 +108,16 @@ describe("statistics requests through the game UI", () => {
       await page.locator('[data-ui-play-tab="settings"]').click();
       await page.locator('[data-action="reset-game"]').click();
       await page.locator('[data-action="start-game"]').click();
+      expect(requests.filter((name) => name === "snapshot")).toHaveLength(1);
+      expect(activityCount("start")).toBe(1);
+      expect(paperCount()).toBe(0);
+      await page.evaluate(() => (window as StatisticsWindow).statisticsStore.dispatch("quit-game"));
+      expect(paperCount()).toBe(0);
+      expect(activityCount("finish")).toBe(0);
+      await page.locator('[data-action="restart-game"]').click();
+      await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 31_000; window.dispatchEvent(new Event("online")); });
+      await expect.poll(paperCount).toBe(1);
+      await expect.poll(() => activityCount("finish")).toBe(1);
       await expect.poll(() => requests.filter((name) => name === "snapshot").length).toBe(2);
       expect(requests).not.toContain("unexpected-individual-read");
       expect(errors).toEqual([]);

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAiBuffs, createAiShopState, getAiModelForTotalMonths, getAiModelTimeline, polishUnsubmittedPapers } from "../src/core/v2-ai-shop";
 import { applyFellowAiResearch, getFellowAiBudget, scoreFellowAiModel, subscribeFellowAi } from "../src/core/v2-fellow-ai";
@@ -33,7 +34,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("fellow AI selection and payment", () => {
   it("uses free Doubao with zero budget and never draws global randomness for selection", () => {
     const state = makeState();
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Selection drew randomness"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("Selection drew randomness"); });
     const selected = subscribeFellowAi(state, "fellow", state.fellowPapers![0]!.id, "idea");
     expect(selected.model?.slot).toBe("doubao");
     expect(selected.state.fellowFinanceAccounts?.fellow).toMatchObject({ money: 0, aiSlot: "doubao", aiSubscribedTotalMonths: 4 });

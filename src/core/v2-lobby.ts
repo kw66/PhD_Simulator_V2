@@ -1,7 +1,8 @@
 import { getRoleDefinition, getRoleOptions } from "./v2-progression";
+import { isAchievementCompleted } from "./v2-achievement-scope";
 import {
   getRoleAchievementDefinitions,
-  getRoleLobbyAchievementDefinitions,
+  getAllAchievementDefinitions,
   getRoleProfileSummary,
 } from "./v2-role-lobby-meta";
 import type {
@@ -23,7 +24,7 @@ import type {
 
 export const LOBBY_ROLE_PAGE_SIZE = 10;
 export const LOBBY_ROLE_PAGE_ROW_COUNT = Math.max(1, Math.floor(LOBBY_ROLE_PAGE_SIZE / 2));
-export const ROLE_ACHIEVEMENT_PAGE_SIZE = 9;
+export const ROLE_ACHIEVEMENT_PAGE_SIZE = 11;
 const LOBBY_ROLE_ROWS: ReadonlyArray<ReadonlyArray<RoleId>> = [
   ["normal", "normal-reversed"],
   ["rich", "rich-reversed"],
@@ -89,6 +90,11 @@ export function createDefaultAccountProfile(): AccountProfile {
     lobbyRolePage: 0,
     lobbyRoleAchievementPage: 0,
     achievementUnlockedAt: {},
+    achievementUnlockedByRole: {},
+    achievementRewardedIds: [],
+    achievementCollectionProgress: { buffs: [], products: [], conferences: [], locations: [], directions: [] },
+    achievementExperienceMultipliers: {},
+    achievementTalentPoints: {},
     talentAllocation: {},
     roleProgress,
   };
@@ -111,7 +117,7 @@ export function selectLobbyRole(account: AccountProfile, roleId: RoleId): Accoun
     ...account,
     selectedLobbyRoleId: roleId,
     lobbyRolePage: getLobbyRolePageIndex(roleId),
-    lobbyRoleAchievementPage: 0,
+    lobbyRoleAchievementPage: account.lobbyRoleAchievementPage,
   };
 }
 
@@ -142,14 +148,16 @@ export function getRoleAchievementPageCount(roleId: RoleId, pageSize = ROLE_ACHI
   return getAchievementDisplayPages(roleId, pageSize).length;
 }
 
-export function getAchievementDisplayPages(roleId: RoleId, pageSize = ROLE_ACHIEVEMENT_PAGE_SIZE): Array<{
+export function getAchievementDisplayPages(_roleId: RoleId, pageSize = ROLE_ACHIEVEMENT_PAGE_SIZE): Array<{
   achievements: RoleAchievementDefinition[];
 }> {
-  const achievements = getRoleLobbyAchievementDefinitions(roleId);
+  const achievements = getAllAchievementDefinitions();
   const size = Number.isFinite(pageSize) ? Math.max(1, Math.floor(pageSize)) : ROLE_ACHIEVEMENT_PAGE_SIZE;
-  return Array.from({ length: Math.max(1, Math.ceil(achievements.length / size)) }, (_, index) => ({
-    achievements: achievements.slice(index * size, (index + 1) * size),
-  }));
+  const pages: Array<{ achievements: RoleAchievementDefinition[] }> = [];
+  for (let start = 0; start < achievements.length; start += size) {
+    pages.push({ achievements: achievements.slice(start, start + size) });
+  }
+  return pages.length ? pages : [{ achievements: [] }];
 }
 
 export function changeRoleAchievementPage(
@@ -232,12 +240,11 @@ function buildRoleStatisticsViewModel(progress: RoleMetaProgress): LobbySelected
 
 function buildRoleAchievementsViewModel(
   roleId: RoleId,
-  progress: RoleMetaProgress,
+  account: AccountProfile,
 ): LobbySelectedRoleAchievementViewModel[] {
-  const unlockedIds = new Set(progress.unlockedAchievementIds);
   return getRoleAchievementDefinitions(roleId).map((definition) => ({
     definition,
-    unlocked: unlockedIds.has(definition.id),
+    unlocked: isAchievementCompleted(account, definition),
   }));
 }
 
@@ -253,6 +260,6 @@ export function buildLobbySelectedRoleViewModel(account: AccountProfile, roleId:
     stats: buildRoleStatsViewModel(roleId),
     historyStats: buildRoleHistoryStatsViewModel(progress),
     statistics: buildRoleStatisticsViewModel(progress),
-    roleAchievements: buildRoleAchievementsViewModel(roleId, progress),
+    roleAchievements: buildRoleAchievementsViewModel(roleId, account),
   };
 }

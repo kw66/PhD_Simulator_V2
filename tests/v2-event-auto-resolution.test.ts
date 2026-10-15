@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -24,7 +25,7 @@ function resolve(state: GameState, eventId: string, eventChoiceId: string): Game
 }
 
 beforeEach(() => {
-  vi.spyOn(Math, "random").mockReturnValue(0.3);
+  vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.3);
   vi.spyOn(Date, "now").mockReturnValue(1000);
 });
 afterEach(() => vi.restoreAllMocks());

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { settleAdvisorGuidance } from "../src/core/v2-advisor-guidance";
@@ -263,7 +264,7 @@ describe("advisor project random event effects", () => {
       makePaper(`second-${profile.id}`, { leadAuthorId: profile.id }),
     ]);
     const choice = decisionChoice(makeEvent(state, () => roll), "vertical");
-    vi.spyOn(Math, "random").mockReturnValue(roll === 0 ? 0.999 : 0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(roll === 0 ? 0.999 : 0);
     const after = applyChoiceEffectsToState(state, choice).nextState;
     for (const papers of [after.papers, ...state.fellowProgressState.map((profile) =>
       after.fellowPapers!.filter((paper) => paper.leadAuthorId === profile.id))]) {
@@ -374,7 +375,7 @@ describe("advisor project three-stage settlement", () => {
     const afterIntro = resolve(queueEvent(state));
     const afterDecision = resolve(afterIntro, decisionChoice(currentEvent(afterIntro), type).id);
     const snapshot = structuredClone(afterDecision);
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const renderSummary = (): string => {
       const html = renderApp(afterDecision, undefined, {
         isEventContentOpen: true, activeEventId: currentEvent(afterDecision).id,
@@ -463,7 +464,7 @@ describe("advisor project three-stage settlement", () => {
     const event = makeEvent(state, () => [0.1, 0.5, 0.9][rollIndex++ % 3]!);
     const choice = decisionChoice(event, "vertical");
     const expected = applyChoiceEffectsToState(state, choice).nextState;
-    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const afterIntro = resolve(queueEvent(state, event));
     const afterDecision = resolve(afterIntro, choice.id);
     const firstPreview = getResolvableQueuedEvent(afterDecision, currentEvent(afterDecision));
@@ -509,7 +510,7 @@ describe("advisor project three-stage settlement", () => {
     expect(completed.loverProgressState).toEqual(state.loverProgressState);
   });
 
-  it("accepts a journal after final project confirmation, awards it once and queues unpaid publication fees", () => {
+  it("publishes after project guidance and an explicit journal confirmation, awarding once", () => {
     const state = makeState({
       papers: [makePaper("journal-paper", {
         status: "journal-reviewing", journalTarget: "pami", idea: 40, experiment: 40, writing: 40,
@@ -524,7 +525,9 @@ describe("advisor project three-stage settlement", () => {
     expect(refreshed.externalPublications).toEqual([]);
     expect(refreshed.totalResearchScore).toBe(0);
 
-    const completed = resolve(refreshed);
+    const revised = resolve(refreshed);
+    expect(revised.externalPublications).toHaveLength(0);
+    const completed = dispatchAction(revised, "submit-journal-paper", { paperId: "journal-paper", journalTarget: "pami" });
     expect(completed.papers).toEqual([]);
     expect(completed.externalPublications).toHaveLength(1);
     expect(completed.externalPublications[0]).toMatchObject({

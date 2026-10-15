@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 
 import { createConferenceLocationSeed, getConferenceInfo, getConferenceLocation, getConferenceReferenceScore, getRealConferenceYear } from "../src/core/v2-conference-catalog";
@@ -5,8 +6,9 @@ import { getCcigRealYear } from "../src/core/v2-fixed-events-ccig-shared";
 
 describe("v2 conference catalog", () => {
   it("keeps distinct persistent run identities when their low 32 random bits coincide", () => {
-    let high = 0x1ffffe;
-    vi.stubGlobal("crypto", { getRandomValues: (values: Uint32Array) => { values[0] = high++; values[1] = 0xffffffff; return values; } });
+    const random = vi.spyOn(gameRandomSource, "gameRandom")
+      .mockReturnValueOnce(0x1ffffe / 0x200000).mockReturnValueOnce(0xffffffff / 0x100000000)
+      .mockReturnValueOnce(0x1fffff / 0x200000).mockReturnValueOnce(0xffffffff / 0x100000000);
     try {
       const first = createConferenceLocationSeed();
       const second = createConferenceLocationSeed();
@@ -15,7 +17,7 @@ describe("v2 conference catalog", () => {
       expect(Number.isSafeInteger(second)).toBe(true);
       expect(JSON.parse(JSON.stringify(second))).toBe(second);
       expect(getConferenceLocation(3, "A", 1, first)).toEqual(getConferenceLocation(3, "A", 1, second));
-    } finally { vi.unstubAllGlobals(); }
+    } finally { random.mockRestore(); }
   });
 
   it("maps the first academic year to the 2023 enrollment calendar", () => {

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -79,7 +80,7 @@ describe("campus result conditions", () => {
     [17, "12 ≤ 导师好感 < 18", 7],
     [18, "导师好感 ≥ 18", 9],
   ] as const)("records favor %s with its actual salary tier", (favor, condition, gain) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState();
     state.player.favor = favor;
     const { event, choice, result } = getBranch(state, 8, "发劳务费");
@@ -129,7 +130,7 @@ describe("campus result conditions", () => {
   });
 
   it.each([0.499, 0.5])("keeps attendance-based dinner branches and saved results aligned at roll %s", (roll) => {
-    vi.spyOn(Math, "random").mockReturnValue(roll);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(roll);
     for (const [eventId, label, outcomeLabel] of [
       [7, "聚餐", "导师请客"],
       [13, "自己重装", roll < 0.5 ? "重装成功" : "重装失败"],
@@ -164,7 +165,7 @@ describe("campus result conditions", () => {
   });
 
   it.each([17, 18] as const)("saves the current paper condition in event %s history and logs", (eventId) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState();
     state.papers = [{ ...createDraftPaper(6, 0, () => 0), idea: 40, experiment: 40 }];
     const event = createPaperCompetitionRandomEvent(eventId, state, () => 0)!;

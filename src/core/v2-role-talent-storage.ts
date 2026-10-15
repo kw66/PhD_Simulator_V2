@@ -1,7 +1,7 @@
 import type { AccountProfile, RoleId } from "./v2-types";
 import { sanitizeRoleTalentAllocation, type TalentAllocation } from "./v2-role-talent-definitions";
 
-export const ROLE_TALENT_STORAGE_KEY = "phd_simulator_v2_role_talents_v1";
+export const ROLE_TALENT_STORAGE_KEY = "phd_simulator_v2_role_talents_v2";
 type TalentStorage = Pick<Storage, "getItem" | "setItem">;
 
 export function loadRoleTalentAllocation(account: AccountProfile, storage: TalentStorage | null): AccountProfile {
@@ -11,7 +11,7 @@ export function loadRoleTalentAllocation(account: AccountProfile, storage: Talen
     if (!saved || typeof saved !== "object" || !("version" in saved) || saved.version !== 1
       || !("roles" in saved) || !saved.roles || typeof saved.roles !== "object") return { ...account, talentAllocation };
     for (const roleId of Object.keys(account.roleProgress) as RoleId[]) {
-      const allocation = sanitizeRoleTalentAllocation(roleId, account.roleProgress[roleId].level, (saved.roles as Record<string, unknown>)[roleId]);
+      const allocation = sanitizeRoleTalentAllocation(roleId, account.roleProgress[roleId].level, (saved.roles as Record<string, unknown>)[roleId], account.achievementTalentPoints?.[roleId] ?? 0);
       if (Object.keys(allocation).length > 0) talentAllocation[roleId] = allocation;
     }
   } catch {

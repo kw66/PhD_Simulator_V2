@@ -1,3 +1,5 @@
+import { recordPersonalIncome } from "./v2-money";
+import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { getEffectiveSocial } from "./v2-effective-attributes";
 import { addOrReplaceBuffs, advanceBuffDurations, consumeAiCostCoverage, getActiveBuffs, removeBuffs } from "./v2-buffs";
 import { advanceInternshipMonth, getInternshipMonthlyStats, getInternshipStatus } from "./v2-internship-system";
@@ -76,7 +78,10 @@ function emptyTotals(): PlayerStats {
 
 function applyStats(state: GameState, player: PlayerStats, stats: Partial<PlayerStats>): GameState {
   let next = { ...state, player: { ...player } };
-  if (stats.money) next.player.money = roundMoney(next.player.money + roundMoney(stats.money));
+  if (stats.money) {
+    next.player.money = roundMoney(next.player.money + roundMoney(stats.money));
+    next = recordPersonalIncome(next, stats.money);
+  }
   if (stats.san) {
     if (stats.san > 0) next.player.san = Math.max(player.san, Math.min(state.sanCap, player.san + stats.san));
     else {
@@ -254,7 +259,7 @@ export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution
     const before = settledState.player;
     const spendingBefore = settledState.personalSpending ?? 0;
     const money = roundMoney(effect.stats.money ?? 0);
-    settledState = { ...settledState, player: { ...settledState.player, money: roundMoney(settledState.player.money + money) } };
+    settledState = recordPersonalIncome({ ...settledState, player: { ...settledState.player, money: roundMoney(settledState.player.money + money) } }, money);
     if (Object.hasOwn(effect.stats, "san")) {
       const raw = effect.stats.san ?? 0;
       if (raw < 0) {
@@ -660,14 +665,14 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
   const journalSettlement = resolveReadyJournalPapers(citationSettlement.state);
   return {
     resolution: subscriptionSettlement.resolution,
-    nextState: {
+    nextState: recordAchievementSanCapGain({
       ...journalSettlement.state,
       sanCap: journalSettlement.state.sanCap + bikeCapGain,
       relationshipState: syncRelationshipState(
         state.relationshipState,
         getEffectiveSocial(subscriptionSettlement.nextState),
       ),
-    },
+    }, bikeCapGain),
   };
 }
 

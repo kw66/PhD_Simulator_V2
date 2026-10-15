@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import * as gameRandomSource from "../src/core/v2-game-random";
+import { describe, expect, it, vi } from "vitest";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { dispatchAction } from "../src/core/v2-engine";
 import { getActualResearchMiscSanChange, getActualSanChange } from "../src/core/v2-sanity-rules";
@@ -204,10 +205,9 @@ describe("reviewer SAN consumption", () => {
     const queued = resolveDuePaperReviews(state, () => 0.99).state;
     queued.eventQueue = [];
     queued.papers[0]!.reviewMonthsLeft = 1;
-    const savedRandom = Math.random;
-    Math.random = () => 0.99;
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     let advanced: GameState;
-    try { advanced = dispatchAction(queued, "next-month"); } finally { Math.random = savedRandom; }
+    try { advanced = dispatchAction(queued, "next-month"); } finally { random.mockRestore(); }
     const event = advanced.eventQueue.find((entry) => entry.source === "review")!;
     const settlement = event.choices[0]!.effects.enqueueEvents![0]!.choices[0]!.effects.enqueueEvents![0]!.choices[0]!.effects.paperReviewSettlement!;
     expect(settlement.reviewerSanChange).toBe(discount ? -3 : -6);

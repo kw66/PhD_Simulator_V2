@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 export type PaperHeatTier = "cold" | "steady" | "hot" | "frontier";
 
 export type PaperTopicDomain = "vision" | "audio" | "language" | "machine-learning" | "robotics";
@@ -465,7 +466,7 @@ export function getPaperHeatTierLabel(heatMultiplier: number): string {
 
 export function generatePaperTopic(
   calendarYear: number,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
   fixedTopic?: FixedPaperTopic,
 ): GeneratedPaperTopic {
   const heatMultiplier = fixedTopic?.heatMultiplier ?? pick(PAPER_HEAT_MULTIPLIERS, random);

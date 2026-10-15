@@ -1,0 +1,77 @@
+@media (max-width: 820px) {
+  html { scroll-padding-top: 104px; }
+  .play-page[data-scale-mode="fixed"] .play-workbench { padding: 12px; }
+  .play-page[data-scale-mode="fixed"] .play-stage { overflow: visible; }
+  .play-page[data-scale-mode="fixed"] .play-workbench-body { gap: 10px; }
+  .play-page[data-scale-mode="fixed"] .play-left-rail {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    height: auto;
+    min-height: 0;
+    padding: 0 0 8px;
+  }
+  .play-left-rail .new-attr-panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px 14px;
+    padding: 6px 2px 0;
+  }
+  .play-left-rail .new-attr-item { min-width: 0; margin: 0; padding: 0; }
+  .play-left-rail .new-attr-header { flex-wrap: wrap; gap: 3px; font-size: 12px; }
+  .play-left-rail .new-attr-label { font-size: 12px; }
+  .play-left-rail .new-attr-value { font-size: 12px; margin-left: auto; }
+  .play-left-rail .new-attr-level { font-size: 10px; padding-inline: 4px; margin-left: 2px; }
+  .play-left-rail .new-attr-bar-row { margin-top: 5px; }
+  .play-left-rail .new-currency-item { grid-column: 1 / -1; padding-top: 3px; }
+  .play-left-rail .new-currency-item .new-attr-header { font-size: 13px; min-height: 28px; }
+  .play-left-rail .new-effect-panel,
+  .play-left-rail .new-effect-grid { height: auto; min-height: 0; gap: 5px; }
+  .play-left-rail .new-effect-section,
+  .play-left-rail .new-effect-list { min-height: 0; height: auto; max-height: 126px; }
+  .play-left-rail .new-effect-section { padding: 5px 0; }
+  .play-left-rail .new-effect-section:has(> .new-effect-list:empty),
+  .play-left-rail #new-effect-section-source:has(.new-effect-source-box:empty) { display: none; }
+  .play-left-rail .new-effect-panel:not(:has(.effect-chip)) { display: none; }
+  .play-left-rail .new-effect-panel .new-effect-list .effect-chip { min-height: 32px; line-height: 1.4; white-space: normal; }
+  .play-left-rail .new-effect-source-box { height: auto; max-height: 180px; overflow-y: auto; }
+  .play-page[data-scale-mode="fixed"] .play-right-rail {
+    grid-row: 2;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  .play-page[data-scale-mode="fixed"] .play-center-column { grid-row: 3; padding: 0; }
+  .play-right-rail .new-time-panel { gap: 7px; }
+  .play-right-rail .new-calendar-header { margin-inline: 0; padding-inline: 8px; }
+  .play-right-rail .new-pending-event-content { height: auto; min-height: 0; max-height: 204px; overflow-y: auto; }
+  .play-right-rail .new-time-display-toggle { min-height: 36px; min-width: 36px; }
+  .play-center-column, .center-shell, .center-main-panels { overflow: visible; }
+  .center-main-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 90;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    background: #f4ebd8;
+    box-shadow: 0 3px 8px #79633c22;
+  }
+  .play-page .center-main-tabs > .center-tab-btn { min-height: 44px; padding-inline: 3px; gap: 3px; touch-action: manipulation; }
+  .center-main-tabs > .center-tab-btn > span:not(.center-tab-badge) { white-space: nowrap; }
+  .center-main-tabs .center-tab-badge { min-width: 16px; height: 16px; font-size: 10px; margin-left: 0; }
+  .play-right-rail .todo-nav-btn { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
+  .play-right-rail .pending-event-blocking-toggle { width: 38px; height: 38px; }
+  .play-right-rail .todo-nav-btns { gap: 5px; }
+  .play-right-rail .play-help-toggle { position: static; justify-self: end; min-height: 42px; padding: 8px 12px; margin: 0; }
+  .play-right-rail .play-help-panel { height: auto; max-height: calc(100dvh - 100px); overflow-y: auto; }
+  .play-help-close { min-height: 40px; min-width: 40px; }
+  .relationship-tooltip { font-size: 13px; line-height: 1.6; overflow-y: auto; overscroll-behavior: contain; }
+  .relationship-tooltip.is-touch-tooltip { pointer-events: auto; }
+  .play-page { padding-bottom: env(safe-area-inset-bottom); }
+  .lobby-growth-level-hint::after,
+  .lobby-growth-multiplier-hint::after,
+  .lobby-talent-points-hint::after,
+  .new-attr-item[data-tooltip]::after,
+  .play-tooltip::before,
+  .play-tooltip::after { display: none; }
+}

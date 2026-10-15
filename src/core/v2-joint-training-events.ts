@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { createConferenceMentorContact, replaceConferenceMentorContact } from "./v2-conference-contacts";
 import { getJointTrainingCitationCapBonus } from "./v2-joint-training-system";
 import type { ConferenceMentorContact, EventChoice, GameState, PendingEvent } from "./v2-types";
@@ -17,7 +18,7 @@ export interface JointTrainingContext {
 export function buildJointTrainingContext(
   state: Pick<GameState, "conferenceEncounterState" | "totalCitations">,
   contact?: ConferenceMentorContact,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): JointTrainingContext {
   const mentor = contact ?? state.conferenceEncounterState.bigBull
     ?? createConferenceMentorContact({ id: "joint-training-invite", roll: getRoll() });
@@ -139,7 +140,7 @@ export function createJointTrainingAct1(input: JointTrainingContext): PendingEve
   };
 }
 
-export function revealJointTrainingResult(event: PendingEvent, getRoll: () => number = Math.random): PendingEvent {
+export function revealJointTrainingResult(event: PendingEvent, getRoll: () => number = gameRandom): PendingEvent {
   const preview = event.jointTrainingPreview;
   if (event.stage !== "result" || preview?.decision !== "accept" || preview.context.supportLevel !== undefined) return event;
   const supportLevel = Math.min(2, Math.max(0, Math.floor(getRoll() * 3))) as 0 | 1 | 2;

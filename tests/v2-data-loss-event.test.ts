@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -122,7 +123,7 @@ describe("data loss narrative and choices", () => {
 
 describe("data loss settlement boundaries", () => {
   it.each(["stay-up", "restart", "pay", "fake"] as const)("settles %s only once at final confirmation", (branch) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = makeState();
     const preview = previewResult(initial, branch);
     expect(preview.player).toEqual(initial.player);

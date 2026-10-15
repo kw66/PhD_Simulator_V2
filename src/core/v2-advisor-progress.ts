@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "./v2-calendar";
 import { ADVISOR_SALARY, ADVISOR_SALARY_BONUS, SCORE_BY_TARGET } from "./v2-content";
@@ -174,7 +175,7 @@ export function getAdvisorTaskSanCost(
 export function advanceAdvisorProject(
   state: GameState,
   projectType: "horizontal" | "vertical",
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
 ): GameState {
   if (state.phase !== "playing" || !state.selectedAdvisorName) return state;
   if (state.advisorProgressState.lastPlayerProjectTotalMonths === state.totalMonths) return pushNoOpLog(state, "科研项目：本月已推进，下月恢复");
@@ -240,7 +241,7 @@ export function settleAdvisorGrantResult(state: GameState, application: AdvisorG
   return recordLabFinance(nextState, "grant-income", grant.funding);
 }
 
-export function settleAdvisorMonth(state: GameState, random: () => number = Math.random): GameState {
+export function settleAdvisorMonth(state: GameState, random: () => number = gameRandom): GameState {
   if (state.phase !== "playing" || !state.selectedAdvisorName || state.totalMonths <= 1) return state;
   if ((state.advisorProgressState.lastSettledTotalMonths ?? -1) >= state.totalMonths) return state;
   let nextState = syncAdvisorResearchAccumulation(state);

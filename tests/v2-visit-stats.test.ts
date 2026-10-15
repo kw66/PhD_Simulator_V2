@@ -243,11 +243,15 @@ describe("kwgame activity statistics", () => {
     "records the real %s ending once through store updates", async (ending) => {
       const backend = createBackend();
       const stats = create({ recordVisit: true, storage: createStorage(), fetch: backend.fetch });
-      const store = createStore();
+      const store = createStore({ storage: null });
       const transitions: Promise<void>[] = [];
       store.subscribe((state) => transitions.push(stats.trackGamePhase(state.phase, {
         roleId: state.selectedRoleId, ending: state.ending, runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
         disqualifiedByDebug: store.getLobbyState().lastRunExperience?.disqualifiedByDebug,
+      })));
+      store.subscribeFinalized(({ state, debugUsed }) => transitions.push(stats.trackGamePhase(state.phase, {
+        roleId: state.selectedRoleId, ending: state.ending, runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
+        disqualifiedByDebug: debugUsed, finalized: true,
       })));
       store.dispatch("start-game", { roleId: "normal" });
       const state = store.getState();
@@ -275,14 +279,19 @@ describe("kwgame activity statistics", () => {
       store.dispatch("next-month");
       store.dispatch("reset-game");
       await Promise.all(transitions);
+      expect([...backend.rows.values()].some((row) => row.p_event === "finish")).toBe(false);
+      store.dispatch("start-game", { roleId: "normal" });
+      expect(store.getState().phase).toBe("finished");
+      store.dispatch("restart-game");
+      await Promise.all(transitions);
       await stats.flush();
-      expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start", "finish"]);
+      expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start", "finish", "start"]);
       expect([...backend.rows.values()][1]).toMatchObject({ p_ending: ending, p_role_id: "normal", p_day: DAY });
       expect(backend.fetch.mock.calls.filter(([url]) => String(url).includes("/record_"))).toHaveLength(1);
     },
   );
 
-  it("excludes debug endings while preserving visits and legitimate start counts", async () => {
+  it("excludes debug starts and endings even if the panel is later closed", async () => {
     const backend = createBackend();
     const client = shared({ fetch: backend.fetch, storage: createStorage() });
     const stats = create({ recordVisit: true, client });
@@ -291,12 +300,54 @@ describe("kwgame activity statistics", () => {
     client.markDebug(run.runKey);
     await stats.trackGamePhase("finished", { ...run, ending: "phd", disqualifiedByDebug: true });
     await stats.flush();
-    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start"]);
+    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual([]);
     const resumed = create({ recordVisit: true, client });
     await resumed.trackGamePhase("playing", run);
-    await resumed.trackGamePhase("finished", { ...run, ending: "phd" });
+    await resumed.trackGamePhase("finished", { ...run, ending: "phd", finalized: true });
     await vi.advanceTimersByTimeAsync(60_000);
+    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual([]);
+  });
+
+  it("preserves uploaded starts but blocks later debug counts and does not taint the next clean run", async () => {
+    const backend = createBackend();
+    const client = shared({ fetch: backend.fetch, storage: createStorage() });
+    const stats = create({ recordVisit: true, client });
+    const run = { roleId: "normal" as const, ending: null, runKey: JSON.stringify([31, "normal"]) };
+    await stats.trackGamePhase("playing", run);
+    await stats.flush();
+    expect([...backend.rows.values()].map(row => row.p_event)).toEqual(["start"]);
+    await stats.trackGamePhase("playing", { ...run, disqualifiedByDebug: true });
+    await stats.trackGamePhase("finished", { ...run, ending: "phd", disqualifiedByDebug: true });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect([...backend.rows.values()].map(row => row.p_event)).toEqual(["start"]);
+    await stats.trackGamePhase("setup");
+    const clean = { ...run, runKey: JSON.stringify([32, "normal"]) };
+    await stats.trackGamePhase("playing", clean);
+    await stats.trackGamePhase("finished", { ...clean, ending: "master", finalized: true });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect([...backend.rows.values()].map(row => row.p_event)).toEqual(["start", "start", "finish"]);
+  });
+
+  it("does not finalize on the ending page or returning home, and can settle a restored ending once", async () => {
+    const backend = createBackend();
+    const local = createStorage();
+    const stats = create({ recordVisit: true, storage: local, fetch: backend.fetch });
+    const run = { roleId: "normal" as const, ending: null, runKey: JSON.stringify([9001, "normal"]) };
+    await stats.trackGamePhase("playing", run);
+    await stats.trackGamePhase("finished", { ...run, ending: "phd" });
+    await stats.trackGamePhase("setup");
+    await stats.flush();
     expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start"]);
+    stats.dispose();
+    const resumed = create({ recordVisit: true, storage: local, fetch: backend.fetch });
+    await resumed.trackGamePhase("finished", { ...run, ending: "phd" });
+    await resumed.flush();
+    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start"]);
+    await resumed.trackGamePhase("finished", { ...run, ending: "phd", finalized: true });
+    await resumed.trackGamePhase("finished", { ...run, ending: "phd", finalized: true });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await resumed.flush();
+    expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start", "finish"]);
   });
 
   it("does not count missing run identities or a finished state without an active game", async () => {
@@ -337,9 +388,9 @@ describe("kwgame activity statistics", () => {
     stats.render(root);
     await stats.trackGamePhase("playing", run);
     expect(backend.fetch).toHaveBeenCalledTimes(1);
-    await stats.trackGamePhase("finished", { ...run, ending: "master" });
+    await stats.trackGamePhase("finished", { ...run, ending: "master", finalized: true });
     expect(backend.fetch).toHaveBeenCalledTimes(2);
-    await stats.trackGamePhase("finished", { ...run, ending: "master" });
+    await stats.trackGamePhase("finished", { ...run, ending: "master", finalized: true });
     expect(backend.fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -377,7 +428,7 @@ describe("kwgame activity statistics", () => {
     const stats = create({ recordVisit: false, storage, fetch: backend.fetch });
     await stats.load();
     await stats.trackGamePhase("playing", { roleId: "normal", ending: null, runKey: JSON.stringify([6, "normal"]) });
-    await stats.trackGamePhase("finished", { roleId: "normal", ending: "phd", runKey: JSON.stringify([6, "normal"]) });
+    await stats.trackGamePhase("finished", { roleId: "normal", ending: "phd", runKey: JSON.stringify([6, "normal"]), finalized: true });
     await stats.flush();
     expect(backend.fetch).toHaveBeenCalledTimes(1);
     expect(backend.rows.size).toBe(0);

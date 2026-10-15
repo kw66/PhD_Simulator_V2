@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveSocial } from "./v2-effective-attributes";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { formatMoney } from "./v2-money";
@@ -23,7 +24,7 @@ export function getFellowCurrentPaper(state: GameState, fellowId: string): Paper
   return state.fellowPapers?.find((paper) => paper.leadAuthorId === fellowId && paper.status !== "published");
 }
 
-export function ensureFellowPapers(state: GameState, random: () => number = Math.random): GameState {
+export function ensureFellowPapers(state: GameState, random: () => number = gameRandom): GameState {
   if (state.phase !== "playing") return state;
   if (state.fellowProgressState.some((profile) => !profile.researchTopic)) {
     state = { ...state, fellowProgressState: state.fellowProgressState.map((profile) => {
@@ -76,7 +77,7 @@ export function attendFellowConferences(state: GameState): GameState {
   return settleFellowConferenceFees(state);
 }
 
-export function advanceFellowResearch(state: GameState, random: () => number = Math.random): GameState {
+export function advanceFellowResearch(state: GameState, random: () => number = gameRandom): GameState {
   if (state.phase !== "playing" || state.fellowResearchLastTotalMonths === state.totalMonths) return state;
   if (state.fellowProgressState.length === 0 && !state.fellowPapers?.length) return state;
   let nextState = ensureFellowPapers(state, random);

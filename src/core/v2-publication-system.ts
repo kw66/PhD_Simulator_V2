@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getRecoveredSan } from "./v2-san-recovery";
 import { settleRoleTalentPaperRejection } from "./v2-role-talent-lifecycle";
 import { getRoleKindReviewerBonus } from "./v2-role-talent-state";
@@ -497,7 +498,7 @@ export function applyPaperReviewSettlement(state: GameState, settlement: PaperRe
 
 export function resolveDuePaperReviews(
   state: GameState,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
 ): PaperReviewResolution {
   if (state.phase !== "playing") return { state, logs: [], acceptedPaperIds: [] };
 

@@ -1,4 +1,5 @@
 import { roundMoney } from "./v2-money";
+import { recordAchievementCounter } from "./v2-achievement-runtime-types";
 import type { GameState, LabFinanceCategory } from "./v2-types";
 
 export type { LabFinanceCategory } from "./v2-types";
@@ -18,9 +19,14 @@ const CATEGORY_LABELS: Record<LabFinanceCategory, string> = {
   other: "其他收支",
 };
 
-export function recordLabFinance(state: GameState, category: LabFinanceCategory, amount: number): GameState {
+export function recordLabFinance(state: GameState, category: LabFinanceCategory, amount: number, ownExpense = false): GameState {
   const change = roundMoney(amount);
   if (!Number.isFinite(change) || change === 0) return state;
+  const isPlayerExpense = ownExpense || category === "player-experiment"
+    || category === "student-reimbursement" || category === "conference-travel";
+  if (change < 0 && state.degree === "master" && isPlayerExpense) {
+    state = recordAchievementCounter(state, "master-advisor-funding", -change);
+  }
   const amounts = state.labFinanceLedger?.totalMonths === state.totalMonths ? state.labFinanceLedger.amounts : {};
   const isFundingIncome = category === "horizontal-income" || category === "grant-income"
     || category === "initial-funding" || category === "other";

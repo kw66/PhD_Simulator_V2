@@ -13,6 +13,7 @@ interface RoleRunResult {
   ending: EndingId;
   runKey?: string;
   disqualifiedByDebug?: boolean;
+  finalized?: boolean;
 }
 interface VisitSnapshot {
   version: 2;
@@ -143,11 +144,16 @@ export function createVisitStats(options: VisitStatsOptions) {
       const validRun = typeof run === "string" && run.length > 0 && run.length <= 160
         && result !== undefined && ROLE_IDS.includes(result.roleId);
       const started = phase === "playing" && validRun && (previousPhase !== "playing" || currentRun !== run);
-      const finished = phase === "finished" && previousPhase === "playing" && validRun && currentRun === run;
+      const finished = phase === "finished" && validRun && result.finalized === true;
       const changedPhase = phase !== previousPhase;
-      if (options.recordVisit && validRun) {
+      if (validRun && result.disqualifiedByDebug) {
+        client.markDebug(run);
+        // Clear queued starts from clients created before starts shared the run key.
+        client.markDebug(`activity-start:${run}`);
+      }
+      if (options.recordVisit && validRun && !result.disqualifiedByDebug && !client.isDebugRun(run)) {
         const payload = { p_day: getBeijingDay(now()), p_run_key: run, p_role_id: result.roleId };
-        if (started) client.enqueue("activity", `activity-start:${run}`, "start", { ...payload, p_event: "start" });
+        if (started) client.enqueue("activity", run, "start", { ...payload, p_event: "start" });
         if (finished && result.ending && !result.disqualifiedByDebug) {
           client.enqueue("activity", run, "finish", { ...payload, p_event: "finish", p_ending: result.ending });
         }

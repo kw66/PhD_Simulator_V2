@@ -1,3 +1,6 @@
+import { gameRandom } from "./v2-game-random";
+import { recordPersonalIncome } from "./v2-money";
+import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { applyPlayerAttributeChange, getPlayerAttributeCap } from "./v2-player-attributes";
 import { applyGreedAttributeLoss } from "./v2-role-talent-greed";
 import { getRoleTalentLevel, type PlayerAttribute } from "./v2-role-talent-state";
@@ -50,7 +53,7 @@ export function ensureResearchCurseBroken(state: GameState): GameState {
 }
 
 /** A rescue establishes the reset value exactly, then grants one independent reward batch. */
-export function settleRoleTalentRescues(state: GameState, getRoll: () => number = Math.random): GameState {
+export function settleRoleTalentRescues(state: GameState, getRoll: () => number = gameRandom): GameState {
   state = ensureResearchCurseBroken(state);
   if (state.selectedRoleId !== "teacher-child-reversed" || !state.roleTalents || !level(state, "favor-reset") || state.player.favor >= 0) return state;
   const before = state;
@@ -68,7 +71,7 @@ export function settleRoleTalentRescues(state: GameState, getRoll: () => number 
 }
 
 /** Receive one completed ordinary request; multi-point research gains trigger just once. */
-export function applyRoleAttributeReactions(state: GameState, stat: PlayerAttribute, actual: number, getRoll: () => number = Math.random): GameState {
+export function applyRoleAttributeReactions(state: GameState, stat: PlayerAttribute, actual: number, getRoll: () => number = gameRandom): GameState {
   if (!state.roleTalents || actual === 0) return state;
   if (actual < 0) state = applyGreedAttributeLoss(state, -actual, getRoll);
   if (state.selectedRoleId === "teacher-child-reversed" && stat === "favor" && actual < 0) return settleRoleTalentRescues(state, getRoll);
@@ -76,13 +79,14 @@ export function applyRoleAttributeReactions(state: GameState, stat: PlayerAttrib
     const before = state;
     // Caps precede rewards, so a near-full bar can use its new capacity in this batch.
     if (state.degree === "phd") {
-      state = { ...state, sanCap: state.sanCap + level(state, "research-wellness") };
+      state = recordAchievementSanCapGain({ ...state, sanCap: state.sanCap + level(state, "research-wellness") }, level(state, "research-wellness"));
       state = increaseCap(state, "favor", level(state, "reputation-growth"));
       state = increaseCap(state, "social", level(state, "social-growth"));
     }
     state = { ...state, player: { ...state.player,
       money: roundMoney(state.player.money + 2 * level(state, "knowledge-monetization")),
       san: getRecoveredSan(state.player.san, state.sanCap, 2 * level(state, "work-life-balance")) } };
+    state = recordPersonalIncome(state, 2 * level(state, "knowledge-monetization"));
     if (level(state, "research-network")) {
       state = applyPlayerAttributeChange(state, "social", 1, "ordinary", getRoll).state;
       state = applyPlayerAttributeChange(state, "favor", 1, "ordinary", getRoll).state;
@@ -101,6 +105,7 @@ export function applyRoleAttributeReactions(state: GameState, stat: PlayerAttrib
     if (reward > 0) state = { ...state, player: { ...state.player,
       ...(actual > 0 ? { san: getRecoveredSan(state.player.san, state.sanCap, reward) }
         : { money: roundMoney(state.player.money + reward) }) } };
+    if (actual < 0) state = recordPersonalIncome(state, reward);
     return logReaction(before, state, actual > 0 ? "人前春风" : "人走茶凉", "实际社交变化累计满1点");
   }
   return state;

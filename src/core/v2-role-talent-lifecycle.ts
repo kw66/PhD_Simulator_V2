@@ -1,3 +1,6 @@
+import { gameRandom } from "./v2-game-random";
+import { recordPersonalIncome } from "./v2-money";
+import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { addOrReplaceBuffs } from "./v2-buffs";
 import { PAPER_SLOT_LIMIT, SCORE_BY_TARGET } from "./v2-content";
 import { createGrantedPublishedPaper } from "./v2-publication-rules";
@@ -120,7 +123,7 @@ export function syncRoleTalentFellows(state: GameState): GameState {
     if (boosted.has(fellow.id)) return fellow;
     boosted.add(fellow.id);
     changed = true;
-    const growth = applyTierResist(rank, fellow.research, Math.random, 20).effectiveChange;
+    const growth = applyTierResist(rank, fellow.research, gameRandom, 20).effectiveChange;
     if (growth) effects.push(`${fellow.name ?? "同学"}科研+${formatMoney(growth)}`);
     return { ...fellow, research: precise(fellow.research + growth) };
   });
@@ -143,7 +146,7 @@ export function applyRoleTalentPhdTransfer(before: GameState, after: GameState):
     const wealth = roundMoney(before.player.money * 0.25 * level(state, "wealth-growth"));
     const papers = firstAuthor.length * level(state, "knowledge-is-wealth");
     for (const [id, name, gain] of [["wealth-growth", "财富倍增", wealth], ["knowledge-is-wealth", "书中自有黄金屋", papers]] as const) {
-      state = logTalent(state, { ...state, player: { ...state.player, money: roundMoney(state.player.money + gain) } }, id, name, "转博奖励");
+      state = logTalent(state, recordPersonalIncome({ ...state, player: { ...state.player, money: roundMoney(state.player.money + gain) } }, gain), id, name, "转博奖励");
     }
   } else if (state.selectedRoleId === "genius") {
     // New capacity accommodates this batch; new resistance reductions apply afterward.
@@ -253,13 +256,13 @@ function applySwap(state: GameState, keys: Array<PlayerAttribute | "san" | "mone
   return { ...state, player };
 }
 
-export function settleRoleTalentMonthStart(state: GameState, getRoll: () => number = Math.random, options: { skipSwaps?: boolean } = {}): GameState {
+export function settleRoleTalentMonthStart(state: GameState, getRoll: () => number = gameRandom, options: { skipSwaps?: boolean } = {}): GameState {
   if (!state.roleTalents || state.totalMonths <= 0 || state.roleTalents.lastMonthlySettlement === state.totalMonths) return state;
   state = { ...state, roleTalents: { ...state.roleTalents, lastMonthlySettlement: state.totalMonths, regularActionBudget: 1, regularActionsSpent: 0 } };
   if (state.selectedRoleId === "normal") {
     if (state.totalMonths === 2) state = logTalent(state, recoverSan(state, 2 * level(state, "first-month-drive")), "first-month-drive", "满怀干劲", "入学首月结束");
     if (state.totalMonths > 1 && (state.month === 1 || state.month === 7)) state = logTalent(state, recoverSan(state, level(state, "first-month-drive-plus")), "first-month-drive-plus", "满怀干劲+", "新学期开始");
-    if (level(state, "burnout") && state.sanCap < 8) state = logTalent(state, { ...state, sanCap: state.sanCap + 1 }, "burnout", "触底反弹", "月初SAN上限低于8");
+    if (level(state, "burnout") && state.sanCap < 8) state = logTalent(state, recordAchievementSanCapGain({ ...state, sanCap: state.sanCap + 1 }, 1), "burnout", "触底反弹", "月初SAN上限低于8");
     if (state.degree === "phd") {
       const accumulated = precise((state.roleTalents!.actionRemainder ?? 0) + level(state, "diligence") / 10);
       const extra = Math.floor(accumulated);
@@ -311,11 +314,11 @@ export function settleRoleTalentMonthEnd(state: GameState): GameState {
     const unused = Math.max(0, (state.roleTalents!.regularActionBudget ?? 1) - (state.roleTalents!.regularActionsSpent ?? 0));
     const remaining = Math.max(0, 20 - (state.roleTalents!.sanCapReserveBonus ?? 0));
     const gained = Math.min(unused, remaining);
-    if (gained) state = logTalent(state, {
+    if (gained) state = logTalent(state, recordAchievementSanCapGain({
       ...state,
       sanCap: state.sanCap + gained,
       roleTalents: { ...state.roleTalents!, sanCapReserveBonus: (state.roleTalents!.sanCapReserveBonus ?? 0) + gained },
-    }, "san-cap-reserve", "日渐圆润", "月末剩余常规行动", [`未使用${unused}次常规行动`]);
+    }, gained), "san-cap-reserve", "日渐圆润", "月末剩余常规行动", [`未使用${unused}次常规行动`]);
   }
   if (state.selectedRoleId === "social-reversed") {
     const changed = state.roleTalents!.socialChangedMonth === state.totalMonths;

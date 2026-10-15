@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { formatEventSanPaymentText } from "./v2-event-player-effects";
 import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
@@ -172,7 +173,7 @@ function createTeachersDayChoiceEvent(
 
 export function createTeachersDayEvent(
   state: GameState,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
   giftId?: TeachersDayGiftId,
 ): PendingEvent {
   const gift = getTeachersDayGift(giftId) ?? drawTeachersDayGift(getRoll);

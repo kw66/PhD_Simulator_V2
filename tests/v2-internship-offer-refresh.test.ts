@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "../src/core/v2-engine-state-factory";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
@@ -152,7 +153,7 @@ describe("enterprise internship refresh", () => {
     const context = { ...buildInternshipInviteContext(initial, getRoll), origin: "会场交流" };
     const root = createInternshipInviteAct1(context);
     const state = { ...initial, totalMonths: initial.totalMonths + 2, papers: [publishedPaper()] };
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("refresh must not draw randomness"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("refresh must not draw randomness"); });
     for (const event of [root, decisionOf(root), resultOf(root, "accept"), resultOf(root, "decline")]) {
       const queued = { ...createEventQueueItem(event, 17), deferredStatePatch: [] };
       const snapshot = structuredClone(queued);

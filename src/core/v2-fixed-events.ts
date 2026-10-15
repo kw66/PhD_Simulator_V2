@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import {
   type FixedResolutionResult,
   type RandomRollProvider,
@@ -27,7 +28,7 @@ import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 export function applyFixedEventResolution(
   state: GameState,
   resolution: FixedEventResolution,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): FixedResolutionResult {
   switch (resolution.kind) {
     case "scholarship-apply":
@@ -74,7 +75,7 @@ export function applyFixedEventResolution(
 
 export function collectFixedEventsForState(
   state: GameState,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): PendingEvent[] {
   const events: PendingEvent[] = [];
 

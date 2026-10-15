@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildConferenceDecisionEventsForAcceptedPapers, refreshConferenceDecision } from "../src/core/v2-conference-events";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -38,7 +39,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("conference travel and stable previews", () => {
   it.each(["act1", "act2", "act3"] as const)("ignores registration records at %s without rerolling or changing travel charges", (stage) => {
     const { state, root } = fixture();
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("preview rerolled"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("preview rerolled"); });
     for (const mode of ["self", "advisor", "proxy"]) {
       const previous = stage === "act1" ? root : stage === "act2" ? decision(root) : confirmation(decision(root), mode);
       const originalPreview = previous.conferencePreview!;
@@ -114,7 +115,7 @@ describe("conference travel and stable previews", () => {
     const initialDecision = decision(root);
     const initialConfirmation = confirmation(initialDecision);
     const departed = { ...state, fellowProgressState: [] };
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("preview rerolled"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("preview rerolled"); });
     const selected = refreshConferenceDecision(departed, initialDecision);
     const final = refreshConferenceDecision(departed, initialConfirmation);
     expect(confirmation(selected).choices[0]!.effects).toEqual(initialConfirmation.choices[0]!.effects);
@@ -138,7 +139,7 @@ describe("conference travel and stable previews", () => {
     const selected = decision(root);
     const withoutAcceptance = refreshConferenceDecision({ ...state, fellowPapers: [{ ...paper, status: "reviewing" }] }, selected);
     expect(confirmation(withoutAcceptance).choices[0]!.effects.money).toBeUndefined();
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("preview rerolled"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("preview rerolled"); });
     const refreshed = refreshConferenceDecision(state, withoutAcceptance);
     expect(confirmation(refreshed).choices[0]!.effects.money).toBeUndefined();
     const lowerFavor = refreshConferenceDecision({ ...state, player: { ...state.player, favor: 0 } }, refreshed);

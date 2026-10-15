@@ -1,4 +1,5 @@
-import { ROLE_DESIGNED_ACHIEVEMENTS } from "./v2-achievement-catalog";
+import { ACHIEVEMENT_CATALOG, getRoleEndingAchievements, getDesignedAchievements } from "./v2-achievement-catalog";
+import { getRoleOptions } from "./v2-progression";
 import type {
   RoleAchievementDefinition,
   RoleId,
@@ -17,58 +18,57 @@ const ROLE_UNLOCK_DISPLAY_ACHIEVEMENTS: Partial<Record<RoleId, RoleAchievementDe
     id: "unlock:rich",
     icon: "💰",
     title: "小有积蓄",
-    description: "用正位角色，金币达到30",
+    description: "金币达到30",
     rewardText: "经验+5，解锁富可敌国角色",
     unlocksRoleId: "rich",
+    scope: { roleIds: ["normal"] },
   },
   genius: {
     id: "unlock:genius",
     icon: "🔬",
     title: "初窥门径",
-    description: "用正位角色，科研能力达到12",
+    description: "科研能力达到12",
     rewardText: "经验+5，解锁院士转世角色",
     unlocksRoleId: "genius",
+    scope: { roleIds: ["normal"] },
   },
   "teacher-child": {
     id: "unlock:teacher-child",
     icon: "🌟",
     title: "得到器重",
-    description: "用正位角色，导师好感达到12",
+    description: "导师好感达到12",
     rewardText: "经验+5，解锁导师子女角色",
     unlocksRoleId: "teacher-child",
+    scope: { roleIds: ["normal"] },
   },
   social: {
     id: "unlock:social",
     icon: "🤝",
     title: "人脉初成",
-    description: "用正位角色，社交能力达到12",
+    description: "社交能力达到12",
     rewardText: "经验+5，解锁社交达人角色",
     unlocksRoleId: "social",
+    scope: { roleIds: ["normal"] },
   },
   chosen: {
     id: "unlock:chosen",
     icon: "🏆",
     title: "全面发展",
-    description: "用正位角色，科研|社交|好感|金币达到6",
+    description: "科研|社交|好感|金币达到6",
     rewardText: "经验+5，解锁天选之人角色",
     unlocksRoleId: "chosen",
+    scope: { roleIds: ["normal"] },
   },
   "normal-reversed": {
     id: "unlock:normal-reversed",
     icon: "😴",
     title: "渐生惰性",
-    description: "用正位角色，获得电动按摩椅",
+    description: "获得电动按摩椅",
     rewardText: "经验+5，解锁怠惰·大多数角色",
     unlocksRoleId: "normal-reversed",
+    scope: { roleIds: ["normal"] },
   },
-  "rich-reversed": {
-    id: "unlock:rich-reversed",
-    icon: "🪙",
-    title: "金钱力量",
-    description: "用正位角色，金之力累计消耗20金币",
-    rewardText: "经验+5，解锁贪求·富可敌国角色",
-    unlocksRoleId: "rich-reversed",
-  },
+
 };
 
 const ROLE_PROFILE_SUMMARIES: Record<RoleId, string> = {
@@ -171,11 +171,23 @@ export function getRoleAchievementDefinitions(roleId: RoleId): RoleAchievementDe
     title: template.title,
     description: template.description,
     rewardText: template.rewardText,
-  })), ...(ROLE_DESIGNED_ACHIEVEMENTS[roleId] ?? [])];
+    scope: { roleIds: [roleId] },
+  })), ...getRoleEndingAchievements(roleId), ...getDesignedAchievements(roleId)];
 }
 
 export function getRoleLobbyAchievementDefinitions(roleId: RoleId): RoleAchievementDefinition[] {
-  const unlockAchievement = ROLE_UNLOCK_DISPLAY_ACHIEVEMENTS[roleId];
+  const unlockAchievement = ACHIEVEMENT_CATALOG.find(achievement => achievement.unlocksRoleId === roleId)
+    ?? ROLE_UNLOCK_DISPLAY_ACHIEVEMENTS[roleId];
   const roleAchievements = getRoleAchievementDefinitions(roleId);
   return unlockAchievement ? [unlockAchievement, ...roleAchievements] : roleAchievements;
+}
+
+/** The complete achievement catalogue, including role-specific cards and all shared cards. */
+export function getAllAchievementDefinitions(): RoleAchievementDefinition[] {
+  const definitions = new Map<string, RoleAchievementDefinition>();
+  for (const role of getRoleOptions()) {
+    for (const definition of getRoleAchievementDefinitions(role.id)) definitions.set(definition.id, definition);
+  }
+  for (const definition of ACHIEVEMENT_CATALOG) definitions.set(definition.id, definition);
+  return [...definitions.values()];
 }

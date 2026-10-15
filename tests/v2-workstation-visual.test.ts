@@ -52,7 +52,7 @@ describe("workstation visual layout through real bootstrap", () => {
     page.setDefaultTimeout(5000);
     await page.route("**/__workstation_visual__", route => route.fulfill({ contentType: "text/html", body: fixture }));
     await page.goto(`${server.resolvedUrls!.local[0]}__workstation_visual__`);
-    await page.waitForSelector('[data-action="start-game"]');
+    await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
     const papers = titles.map((title, index) => ({
       ...createDraftPaper(index + 1, 0, () => 0.5), id: `visual-paper-${index}`, paperSlotIndex: index, title,
       idea: 40 + index, experiment: 45 + index, writing: 50 + index,
@@ -168,7 +168,7 @@ describe("workstation visual layout through real bootstrap", () => {
             return { id: card.getAttribute("data-paper-id"), top: bounds.top, left: bounds.left, right: bounds.right,
               overflow: card.scrollWidth - card.clientWidth,
               titleHeight: titleBounds.height, lineHeight: parseFloat(getComputedStyle(title).lineHeight),
-              title: title.textContent, fullTitle: title.getAttribute("title"), metaTop: meta.top, titleBottom: titleBounds.bottom,
+              title: title.textContent, fullTitle: title.getAttribute("title") ?? title.getAttribute("data-tooltip"), metaTop: meta.top, titleBottom: titleBounds.bottom,
               titleLines: new Set(titleRects.map(rect => Math.round(rect.top))).size,
               metaInline: meta.top < lastTitle.bottom && meta.left >= lastTitle.right - 1,
               titleClipped: getComputedStyle(title).overflow === "hidden",

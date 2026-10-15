@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { getRelationshipSanCost } from "./v2-buffs";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
@@ -10,7 +11,7 @@ export function getFellowDiscussionSanCost(state: GameState, profile: FellowProg
   return getRelationshipSanCost(state, getFellowTaskSanCost(profile.taskType));
 }
 
-export function advanceFellowTask(state: GameState, fellowId: string, random: () => number = Math.random): GameState {
+export function advanceFellowTask(state: GameState, fellowId: string, random: () => number = gameRandom): GameState {
   if (state.phase !== "playing") return state;
   const profile = state.fellowProgressState.find((fellow) => fellow.id === fellowId);
   if (!profile || profile.taskUsedThisMonth) return state;

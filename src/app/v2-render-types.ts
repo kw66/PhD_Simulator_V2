@@ -1,5 +1,6 @@
 import type { AccountProfile, CoffeeMachineUpgradeId, RoleExperienceAward, ShopUpgradeId } from "../core/v2-types";
 import type { TalentAllocation } from "../core/v2-role-talent-definitions";
+import type { RunSaveSummary } from "../core/v2-run-saves";
 import type { ShopTabId } from "./v2-render-shop-panel";
 
 export type PlayTabId = "events" | "workstation" | "relationship" | "shop" | "research" | "talent" | "settings";
@@ -9,6 +10,11 @@ export type ShopUpgradeNoticeTab = Extract<ShopTabId, "ai" | "coffee">;
 export type ResearchSortMode = "year" | "citations";
 export type ResearchAuthorshipFilter = "all" | "first" | "coauthor";
 export interface PlayRenderUiState {
+  runSaves?: readonly RunSaveSummary[];
+  saveStatus?: string;
+  isRunSavePanelOpen?: boolean;
+  hasRoleSave?: boolean;
+  isSaveLoading?: boolean;
   activeRoleRailView?: RoleRailViewId;
   announcementPageIndex?: number;
   talentTreePageIndex?: number;

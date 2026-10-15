@@ -1,3 +1,5 @@
+import { gameRandom } from "./v2-game-random";
+import { recordPersonalIncome } from "./v2-money";
 import { getAdvisorGuidanceAmount, queueAdvisorGuidance, settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { creditFellowMoney, ensureFellowFinanceAccounts, getFellowFinanceAccount } from "./v2-fellow-finance";
@@ -24,7 +26,7 @@ export function advanceSharedLabProject(
   state: GameState,
   type: LabProjectType,
   amount: number,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
   contributor: "player" | "other" = "other",
 ): { state: GameState; gain: number; completed: number } {
   const gain = Math.max(0, Math.floor(amount));
@@ -68,6 +70,7 @@ export function advanceSharedLabProject(
           funding: roundMoney(nextState.advisorProgressState.funding + reward - laborCost),
         },
       };
+      nextState = recordPersonalIncome(nextState, laborReward);
       nextState = recordLabFinance(nextState, "horizontal-income", reward);
       nextState = recordLabFinance(nextState, "labor", -laborCost);
       completionSummary = `科研经费 +${reward}，科研经费 -${laborCost}（劳务费）；金币 +${laborReward}${recipientNames.length ? `；${recipientNames.join("、")}各领${laborReward}金币` : ""}`;

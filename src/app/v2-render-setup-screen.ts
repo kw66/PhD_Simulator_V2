@@ -30,13 +30,16 @@ import {
   type TalentAllocation,
 } from "../core/v2-role-talent-definitions";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
-import { getRoleLobbyAchievementDefinitions } from "../core/v2-role-lobby-meta";
+import { getRoleLobbyAchievementDefinitions, getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
+import { getCollectorAchievementKey, getMissingAchievementCollectionItems } from "../core/v2-achievement-collections";
 import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, MAX_ROLE_LEVEL, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 import { renderLobbyMasthead, renderLobbyMessageRailView } from "./v2-render-community";
 import { renderLobbyAnnouncementRailView } from "./v2-render-announcements";
 import { renderAchievementCard } from "./v2-render-achievement-progress";
+import { getAchievementGlobalCompletion } from "./v2-achievement-stats";
+import { getAchievementScopeLabels, isAchievementCompleted } from "../core/v2-achievement-scope";
 import type { RoleRailViewId } from "./v2-render-types";
 
 const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain", "special-dandan", "special-daji"]);
@@ -103,12 +106,9 @@ function getRoleModeClass(roleId: RoleId): string {
 
 function isLobbyAchievementUnlocked(
   accountProfile: AccountProfile,
-  progress: AccountProfile["roleProgress"][RoleId],
   achievement: RoleAchievementDefinition,
 ): boolean {
-  return achievement.unlocksRoleId
-    ? isRoleOwned(accountProfile, achievement.unlocksRoleId)
-    : progress.unlockedAchievementIds.includes(achievement.id);
+  return isAchievementCompleted(accountProfile, achievement);
 }
 
 function renderRoleCardCornerBadge(roleId: RoleId, level: number, owned: boolean): string {
@@ -213,19 +213,44 @@ function renderLobbyPageDots(pageCount: number, currentPage: number, action: str
   `;
 }
 
-function renderAchievementUnlockDate(timestamp: string | undefined): string {
+function formatAchievementUnlockDate(timestamp: string | undefined): string {
   if (!timestamp || Number.isNaN(new Date(timestamp).getTime())) {
-    return '<span class="lobby-profile-achievement-date is-unknown">日期未记录</span>';
+    return "日期未记录";
   }
   const date = new Date(timestamp);
   const label = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
-  return `<time class="lobby-profile-achievement-date" datetime="${escapeHtml(timestamp)}">${label}</time>`;
+  return label;
+}
+
+function renderAchievementHistoryTooltip(
+  definition: RoleAchievementDefinition,
+  accountProfile: AccountProfile,
+): string {
+  const byRole = accountProfile.achievementUnlockedByRole?.[definition.id] ?? {};
+  const entries = Object.entries(byRole)
+    .filter((entry): entry is [RoleId, string] => Boolean(entry[1]))
+    .map(([roleId, timestamp]) => {
+      const role = getRoleDefinition(roleId);
+      const date = formatAchievementUnlockDate(timestamp);
+      return `${role.name}：${date}`;
+    });
+  if (!entries.length && accountProfile.achievementUnlockedAt[definition.id]) {
+    entries.push(`已完成：${formatAchievementUnlockDate(accountProfile.achievementUnlockedAt[definition.id])}`);
+  }
+  const collectionKey = getCollectorAchievementKey(definition.id);
+  if (collectionKey) {
+    const missing = getMissingAchievementCollectionItems(accountProfile, collectionKey);
+    if (missing.length) entries.push(`还差：${missing.map(item => item.label).join("、")}`);
+    else if (!entries.length) entries.push("已收集全部项目");
+  }
+  return entries.join("\n");
 }
 
 function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: AccountProfile): string {
-  const definitions = getRoleLobbyAchievementDefinitions(selectedRoleId);
-  const progress = accountProfile.roleProgress[selectedRoleId];
-  const unlockedCount = definitions.filter((definition) => isLobbyAchievementUnlocked(accountProfile, progress, definition)).length;
+  // The achievement rail is a global catalogue. Role selection only changes the
+  // profile and talent tree; it must never hide achievements from other roles.
+  const definitions = getAllAchievementDefinitions();
+  const unlockedCount = definitions.filter((definition) => isLobbyAchievementUnlocked(accountProfile, definition)).length;
   const personalPercent = definitions.length ? unlockedCount / definitions.length * 100 : 0;
   const pages = getAchievementDisplayPages(selectedRoleId);
   const pageIndex = Math.max(0, Math.min(accountProfile.lobbyRoleAchievementPage, pages.length - 1));
@@ -234,12 +259,12 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
     <section class="lobby-profile-section lobby-profile-achievement-section">
       <div class="lobby-profile-achievement-bar">
         <div class="lobby-profile-achievement-overall-progress" role="progressbar"
-          aria-label="${escapeHtml(getRoleDefinition(selectedRoleId).name)}个人成就"
+          aria-label="全部成就"
           aria-valuemin="0" aria-valuemax="${definitions.length || 1}" aria-valuenow="${unlockedCount}"
           aria-valuetext="${unlockedCount}/${definitions.length}">
-          <span class="achievement-completion-fill" ${animationBarAttribute(`role:${selectedRoleId}:achievements:progress`)} style="width:${personalPercent}%;" aria-hidden="true"></span>
+          <span class="achievement-completion-fill" ${animationBarAttribute("achievements:progress")} style="width:${personalPercent}%;" aria-hidden="true"></span>
           <span class="lobby-profile-achievement-progress-label">成就</span>
-          <strong class="lobby-profile-achievement-progress-count">${renderAnimatedNumber(`role:${selectedRoleId}:achievements:unlocked`, unlockedCount)}/${renderAnimatedNumber(`role:${selectedRoleId}:achievements:total`, definitions.length)}</strong>
+          <strong class="lobby-profile-achievement-progress-count">${renderAnimatedNumber("achievements:unlocked", unlockedCount)}/${renderAnimatedNumber("achievements:total", definitions.length)}</strong>
         </div>
         <div class="lobby-role-pagination is-compact">
           <button class="lobby-page-button pager-arrow" type="button" aria-label="上一页" data-action="change-role-achievement-page" data-delta="-1"${pageIndex === 0 ? " disabled" : ""}><i data-lucide="chevron-left" aria-hidden="true"></i></button>
@@ -249,16 +274,16 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
       </div>
       <div class="lobby-profile-achievement-list">
         ${page.achievements.length ? page.achievements.map((definition) => {
-          const unlocked = isLobbyAchievementUnlocked(accountProfile, progress, definition);
-          return renderAchievementCard(definition, unlocked,
-            unlocked ? renderAchievementUnlockDate(accountProfile.achievementUnlockedAt[definition.id]) : "");
+          const unlocked = isLobbyAchievementUnlocked(accountProfile, definition);
+          const history = renderAchievementHistoryTooltip(definition, accountProfile);
+          return renderAchievementCard(definition, unlocked, "", getAchievementGlobalCompletion(definition.id), history || "尚未完成");
         }).join("") : '<div class="lobby-profile-achievement-empty">该角色的成就尚未设计</div>'}
       </div>
     </section>
   `;
 }
 
-function buildTalentPointSummary(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>): TalentPointSummary {
+function buildTalentPointSummary(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>, bonusPoints = 0): TalentPointSummary {
   const level = getDisplayedRoleLevel(viewModel.progress.level);
   const nextExp = getNextRoleLevelExperience(level);
 
@@ -266,7 +291,7 @@ function buildTalentPointSummary(viewModel: LobbySelectedRoleViewModel, allocati
     level,
     currentExp: viewModel.progress.exp,
     nextExp,
-    availablePoints: allocation ? getTalentPointBalance(viewModel.role.id, viewModel.progress.level, allocation) : level * ROLE_TALENT_POINTS_PER_LEVEL,
+    availablePoints: allocation ? getTalentPointBalance(viewModel.role.id, viewModel.progress.level, allocation, bonusPoints) : level * ROLE_TALENT_POINTS_PER_LEVEL + bonusPoints,
   };
 }
 
@@ -274,6 +299,7 @@ function renderGrowthProgress(
   viewModel: LobbySelectedRoleViewModel,
   pointSummary: TalentPointSummary,
   allocation?: Record<string, number>,
+  experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER,
 ): string {
   const expTarget = pointSummary.nextExp;
   const expProgressPercent = expTarget === null
@@ -288,9 +314,9 @@ function renderGrowthProgress(
             <span class="lobby-growth-inline-label">等级</span>
             <strong class="lobby-growth-inline-value" ${animationNumberAttributes(`role:${viewModel.role.id}:growth:level`, pointSummary.level)}>${pointSummary.level}</strong>
           </span>
-          <span class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}，所有加经验的都乘以这个倍率。" data-tooltip="所有加经验的都乘以这个倍率。">
+          <span class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率${experienceMultiplier.toFixed(1)}，所有加经验的都乘以这个倍率。" data-tooltip="所有加经验的都乘以这个倍率。">
             <span class="lobby-growth-inline-label">经验倍率</span>
-            <strong class="lobby-growth-inline-value">${DEFAULT_ROLE_EXP_GAIN_MULTIPLIER.toFixed(1)}</strong>
+            <strong class="lobby-growth-inline-value">${experienceMultiplier.toFixed(1)}</strong>
           </span>
         </div>
         <div class="lobby-growth-exp-detail-row">
@@ -311,12 +337,12 @@ function renderGrowthProgress(
   `;
 }
 
-function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>): string {
-  const pointSummary = buildTalentPointSummary(viewModel, allocation);
+function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>, bonusPoints = 0, experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, hasRoleSave = false, isSaveLoading = false): string {
+  const pointSummary = buildTalentPointSummary(viewModel, allocation, bonusPoints);
   const unlockAchievement = getRoleLobbyAchievementDefinitions(viewModel.role.id)
     .find((achievement) => achievement.unlocksRoleId === viewModel.role.id);
   const unlockHint = unlockAchievement
-    ? `解锁目标：${unlockAchievement.description}。当前暂不能解锁。`
+    ? `解锁目标：${getAchievementScopeLabels(unlockAchievement.scope).join("／")} · ${unlockAchievement.description}`
     : "该角色的解锁方式尚未开放。";
 
   return `
@@ -324,7 +350,7 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
       <div class="lobby-profile-info-head">
         <h1 class="lobby-profile-art-name">${escapeHtml(viewModel.role.name)}</h1>
         ${viewModel.unlockState.owned
-          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"><span class="lobby-start-button-label">开始游戏</span><i class="lobby-start-button-arrow" data-lucide="arrow-right" aria-hidden="true"></i></button>`
+          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"${isSaveLoading ? ' disabled aria-busy="true"' : ""}><span class="lobby-start-button-label">${isSaveLoading ? "读取中…" : hasRoleSave ? "继续游戏" : "开始游戏"}</span><i class="lobby-start-button-arrow" data-lucide="arrow-right" aria-hidden="true"></i></button>`
           : `<span class="lobby-start-lock" role="group" tabindex="0" aria-label="${escapeHtml(unlockHint)}" data-tooltip="${escapeHtml(unlockHint)}"><button class="lobby-start-button is-disabled" type="button" disabled aria-label="角色尚未解锁"><i data-lucide="lock" aria-hidden="true"></i></button></span>`}
       </div>
       <p class="lobby-profile-summary">${escapeHtml(viewModel.lobby.summary)}</p>
@@ -352,7 +378,7 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
           </div>
         </section>
       </div>
-      ${renderGrowthProgress(viewModel, pointSummary, allocation)}
+      ${renderGrowthProgress(viewModel, pointSummary, allocation, experienceMultiplier)}
     </section>
   `;
 }
@@ -500,7 +526,7 @@ const DESIGNED_TALENT_TREES = {
   },
 } as const;
 
-export function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, selectedNodeIndex: number, allocation?: Record<string, number>, level?: number, showPoints = false): string {
+export function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, selectedNodeIndex: number, allocation?: Record<string, number>, level?: number, showPoints = false, bonusPoints = 0): string {
   const tree = DESIGNED_TALENT_TREES[roleId];
   const nodes: readonly DesignedTalentNode[] = tree.nodes;
   const { paths, viewBoxHeight } = tree;
@@ -508,7 +534,7 @@ export function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_T
     ? selectedNodeIndex : 0;
   const exclusiveChallenge = nodes.every((node) => node.challenge);
   const nodeLabel = (node: DesignedTalentNode) => node.fixed ? "固定生效" : node.challenge ? "四选一" : `${node.cost}天赋点`;
-  const points = allocation && level !== undefined ? getTalentPointBalance(roleId, level, allocation) : null;
+  const points = allocation && level !== undefined ? getTalentPointBalance(roleId, level, allocation, bonusPoints) : null;
   return `
     <section class="lobby-profile-growth-card lobby-profile-section is-designed-growth-card">
       ${!showPoints || points === null ? "" : `<div class="character-talent-points"><span>天赋点 <strong>${points}</strong></span><button type="button" data-ui-talent-reset="${roleId}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置本次测试加点" aria-label="重置本次测试加点"><i data-lucide="rotate-ccw" aria-hidden="true"></i></button></div>`}
@@ -557,9 +583,13 @@ function renderSelectedRoleDetail(
   talentTreeSelectedNodeByPage: readonly number[],
   announcementPageIndex: number,
   talentAllocation?: TalentAllocation,
+  hasRoleSave = false,
+  isSaveLoading = false,
 ): string {
   const viewModel = buildLobbySelectedRoleViewModel(accountProfile, selectedRoleId);
   const allocation = talentAllocation?.[selectedRoleId] ?? accountProfile.talentAllocation?.[selectedRoleId] ?? {};
+  const bonusPoints = accountProfile.achievementTalentPoints?.[selectedRoleId] ?? 0;
+  const experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER + (accountProfile.achievementExperienceMultipliers?.[selectedRoleId] ?? 0);
 
   return `
     <section class="lobby-detail-stage">
@@ -578,10 +608,10 @@ function renderSelectedRoleDetail(
                 alt="${escapeHtml(`${viewModel.role.name}立绘`)}"
               />
             </div>
-            ${renderProfileInfoPanel(viewModel, allocation)}
+            ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading)}
           </section>
           ${hasDesignedTalentTree(selectedRoleId)
-            ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined)
+            ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined, false, bonusPoints)
             : ""}
         </div>
         ${renderRoleRail(accountProfile, selectedRoleId, activeRoleRailView, announcementPageIndex)}
@@ -598,6 +628,8 @@ export function renderSetupScreen(
   talentTreeSelectedNodeByPage: readonly number[] = [0],
   announcementPageIndex = 0,
   talentAllocation?: TalentAllocation,
+  hasRoleSave = false,
+  isSaveLoading = false,
 ): string {
   const selectedRoleId = accountProfile.selectedLobbyRoleId;
   const ownedCount = getRoleOptions().filter((role) => isRoleOwned(accountProfile, role.id)).length;
@@ -632,7 +664,7 @@ export function renderSetupScreen(
 
               <div class="lobby-detail-column">
                 ${renderLobbyMasthead(activeRoleRailView)}
-                ${renderSelectedRoleDetail(accountProfile, selectedRoleId, activeRoleRailView, talentTreePageIndex, talentTreeSelectedNodeByPage, announcementPageIndex, talentAllocation)}
+                ${renderSelectedRoleDetail(accountProfile, selectedRoleId, activeRoleRailView, talentTreePageIndex, talentTreeSelectedNodeByPage, announcementPageIndex, talentAllocation, hasRoleSave, isSaveLoading)}
               </div>
             </section>
           </section>

@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveSocial } from "./v2-effective-attributes";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import { scheduleConferenceAttendance } from "./v2-conference-attendance";
@@ -17,6 +18,7 @@ import { applyRoleTalentPhdTransfer, applyRoleTalentAdvisorAssignment } from "./
 import { roundMoney } from "./v2-money";
 import { createInitialThesisState } from "./v2-thesis-rules";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
+import { recordAchievementCounter } from "./v2-achievement-runtime-types";
 import { applyReadPaperActions, applyReadingCountProgress } from "./v2-reading-system";
 import { canAddRelationship, syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
 import { buildInternshipInviteContext, createInternshipInviteAct1 } from "./v2-internship-events";
@@ -173,6 +175,8 @@ function createBuffsFromEventEffects(choice: EventChoice, state: GameState, sour
 
 function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSource: string, currentEvent?: PendingEvent): GameState {
   const effects = choice.effects;
+  for (const fact of effects.achievementFacts ?? []) state = recordAchievementCounter(state, fact, 1);
+  if ((effects.counterDeltas?.pokerProfit ?? 0) > 0) state = recordAchievementCounter(state, "poker-profit", effects.counterDeltas!.pokerProfit!);
   const canRest = effects.restAction && getActiveOperationAllowance(state, "rest").allowed;
   state = applyEventPlayerEffects(state, effects);
   if (canRest || effects.roleTalentRest) state = applyRoleTalentRest(state, { yearSummary: effects.roleTalentRest === "year-summary" });
@@ -385,7 +389,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     : mergedLoverState;
   let loverProgressRollIndex = 0;
   const loverProgressRandom = effects.loverProgressRolls
-    ? () => effects.loverProgressRolls![loverProgressRollIndex++] ?? 0.5 : Math.random;
+    ? () => effects.loverProgressRolls![loverProgressRollIndex++] ?? 0.5 : gameRandom;
   let loverProgressState = {
     ...(effects.activateLoverProgress ? createLoverProgressState(effects.activateLoverProgress, loverProgressRandom, state.year) : state.loverProgressState),
     ...(effects.loverProgressStateUpdates ?? {}),
@@ -457,7 +461,8 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     eventCounters,
     scholarshipState,
     buffs,
-  }, effects.labFinanceCategory ?? "other", advisorProgressState.funding - state.advisorProgressState.funding);
+  }, effects.labFinanceCategory ?? "other", advisorProgressState.funding - state.advisorProgressState.funding,
+  !!effects.recordJournalFeePayment);
   let resolvedState = effects.scheduleConferenceAttendance
     ? scheduleConferenceAttendance(directlyResolvedState, effects.scheduleConferenceAttendance) : directlyResolvedState;
   resolvedState = settleFellowRecruitmentTalent(state, resolvedState, Math.max(failedFellowAdditions, effects.fellowOverflowAttempts ?? 0));
@@ -480,7 +485,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
       allowSanOverdraw: true,
       writeLog: false,
       source: buffSource,
-      random: () => rolls.shift() ?? Math.random(),
+      random: () => rolls.shift() ?? gameRandom(),
     }).nextState;
   }
   if (!effects.readingCount) return resolvedState;
@@ -516,7 +521,7 @@ export function applyChoiceEffectsToState(
   if (choice.effects.labProjectProgress) {
     const { type, amount, guidanceRolls } = choice.effects.labProjectProgress;
     let rollIndex = 0;
-    const random = guidanceRolls ? () => guidanceRolls[rollIndex++] ?? 0 : Math.random;
+    const random = guidanceRolls ? () => guidanceRolls[rollIndex++] ?? 0 : gameRandom;
     nextState = advanceSharedLabProject(nextState, type, amount, random, "player").state;
   }
   if (choice.effects.paperReviewSettlement) {
@@ -562,7 +567,7 @@ export function applyChoiceEffectsToState(
     const result = applyFixedEventResolution(nextState, choice.effects.fixedEventResolution, () => {
       const roll = choice.effects.fixedEventResolutionRolls
         ? choice.effects.fixedEventResolutionRolls[rollIndex++] ?? 0
-        : Math.random();
+        : gameRandom();
       rolls.push(roll);
       return roll;
     });
@@ -575,7 +580,7 @@ export function applyChoiceEffectsToState(
     resolvedEnqueueEvents = result.enqueueEvents ?? [];
     if (resolvedEnqueueEvents.some((event) => event.chainId !== "before-grad-school" && event.chainId !== "scholarship" && (event.stage === "result" || event.stage === "act3"))) {
       while (rolls.length < 8) rolls.push(choice.effects.fixedEventResolutionRolls
-        ? choice.effects.fixedEventResolutionRolls[rolls.length] ?? 0 : Math.random());
+        ? choice.effects.fixedEventResolutionRolls[rolls.length] ?? 0 : gameRandom());
       resolvedEnqueueEvents = resolvedEnqueueEvents.map((event) => event.stage === "result" || event.stage === "act3" ? {
         ...event,
         fixedResultPreview: { resolution: choice.effects.fixedEventResolution!, rolls },

@@ -1,3 +1,4 @@
+import { createGameRandomState, getActiveGameRandomState, withGameRandom } from "./v2-game-random";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { MAX_SAN } from "./v2-content";
 import { createAdvisorProgressState } from "./v2-advisor-progress";
@@ -103,15 +104,20 @@ export function createInitialState(): GameState {
 export function createStartedGameState(
   roleId: RoleId,
   talentAllocation: Record<string, number> = {},
+  bonusTalentPoints = 0,
 ): GameState {
+  const initial = { ...createInitialState(), randomState: getActiveGameRandomState() ?? createGameRandomState() };
+  return withGameRandom(initial, () => createStartedGameStateInternal(roleId, talentAllocation, bonusTalentPoints, initial));
+}
+
+function createStartedGameStateInternal(roleId: RoleId, talentAllocation: Record<string, number>, bonusTalentPoints: number, baseState: GameState): GameState {
   const role = getRoleDefinition(roleId);
   const initialPaperSlots = getUnlockedPaperSlotCount(role.startingStats.research);
-  const baseState = createInitialState();
   const relationshipState = syncRelationshipState(createRelationshipState(), role.startingStats.social);
 
   const started = initializeRoleTalents({
     ...baseState,
-    roleTalents: createRoleTalentRunState(sanitizeRoleTalentAllocation(roleId, 10, talentAllocation)),
+    roleTalents: createRoleTalentRunState(sanitizeRoleTalentAllocation(roleId, 10, talentAllocation, bonusTalentPoints)),
     phase: "playing",
     selectedRoleId: role.id,
     setupSelectedRoleId: role.id,

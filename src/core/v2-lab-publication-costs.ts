@@ -90,7 +90,7 @@ function resolveConferenceRegistrationFees(state: GameState, paperIds: readonly 
       funding: roundMoney(nextState.advisorProgressState.funding - fee),
       paidConferenceRegistrationPaperIds: [...paid],
     } };
-    nextState = recordLabFinance(nextState, "conference-registration", -fee);
+    nextState = recordLabFinance(nextState, "conference-registration", -fee, !isFellowPaper(paper));
     if (recordLogs) nextState = pushMilestoneLog(nextState,
       `${paper.leadAuthorName ?? "你"}的《${paper.title}》：${venue.name} ${venue.year}录用注册费，科研经费 -${fee}（导师已支付）。`, "conference-registration-fee");
     if (isFellowPaper(paper)) nextState = recordFellowPublicationCost(nextState, paper.leadAuthorId, "registration", fee);

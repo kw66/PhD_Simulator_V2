@@ -1,3 +1,5 @@
+import { createGameRandomState, withGameRandom } from "./v2-game-random";
+import { observeAchievements } from "./v2-achievement-runtime";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { dispatchDebugAction } from "./v2-debug-tools";
 import { appendAcademicYearLog } from "./v2-academic-year-log";
@@ -198,12 +200,12 @@ function createAdvancedCalendarState(state: GameState): GameState {
     ? evaluateCoreEndings(step(current)) : current, monthlyState);
 }
 
-/** A journal revision that reaches its acceptance line is published before a later step can still add help to it. */
+/** Track journal revision scores after each contribution; publication waits for the player's click. */
 function settleReadyJournals(state: GameState): GameState {
   return resolveReadyJournalPapers(state).state;
 }
 
-/** Month-start order after the player's own settlement; applyMonthlyEffects has already settled journals. */
+/** Month-start order after the player's own settlement; applyMonthlyEffects has already tracked journal scores. */
 const MONTH_START_RELATIONSHIP_STEPS: ReadonlyArray<(state: GameState) => GameState> = [
   attendFellowConferences,
   advanceFellowResearch,
@@ -331,7 +333,7 @@ function advanceMonth(state: GameState, force = false): GameState {
     ));
     if (settledState.phase !== "playing") return settledState;
     const queued = enqueueMonthlyEventsForMonth(settledState);
-    return settleLinearEvents(queued.nextState, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
+    return settleLinearEvents(observeAchievements(settledState, queued.nextState), (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
   }
 
   if (state.totalMonths >= state.maxMonths && state.eventQueue.some((event) => event.deadlineMonths <= 0)) return state;
@@ -349,7 +351,7 @@ function advanceMonth(state: GameState, force = false): GameState {
     createAdvancedCalendarState(recordRelationshipActivityMonth(recordSanMonth(state))),
   )));
   if (nextState.phase !== "playing") return nextState;
-  const queuedState = enqueueMonthlyEventsForMonth(nextState).nextState;
+  const queuedState = observeAchievements(nextState, enqueueMonthlyEventsForMonth(nextState).nextState);
   return settleLinearEvents(queuedState, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
 }
 
@@ -367,6 +369,21 @@ function settlePendingPaperHelp(state: GameState): GameState {
 }
 
 export function dispatchAction(state: GameState, actionId: GameActionId, payload: DispatchPayload = {}): GameState {
+  const source = actionId === "restart-game" ? { ...state, randomState: createGameRandomState() } : state;
+  const run = () => {
+    const next = dispatchActionInternal(source, actionId, payload);
+    if (next === source || source.phase === "finished" || actionId === "set-linear-event-blocking" || actionId === "select-paper") return next;
+    return observeAchievements(source, next, actionId, payload);
+  };
+  if (!actionId.startsWith("debug-")) return withGameRandom(source, run);
+  const next = run();
+  // Debug fixtures can rebuild the whole state. Keep the normal run's saved
+  // stream intact while leaving explicit debug rerolls nondeterministic.
+  return next !== source && !next.randomState && source.randomState
+    ? { ...next, randomState: { ...source.randomState } } : next;
+}
+
+function dispatchActionInternal(state: GameState, actionId: GameActionId, payload: DispatchPayload): GameState {
   state = normalizeGameMoney(state);
   if (actionId === "restart-game") {
     return dispatchAction({

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -24,7 +25,7 @@ describe("v2 lover system", () => {
   });
 
   it.each(["beautiful", "smart"] as const)("stores deterministic full names for %s lovers without drawing global randomness", (type) => {
-    const random = vi.spyOn(Math, "random").mockReturnValue(0.123);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.123);
     for (const playerGender of ["male", "female"] as const) {
       const lover = activateLover(type, 10, playerGender);
       expect(lover.name).toBe(pickStableRandomName(`lover:${type}:10:${getOppositeGender(playerGender)}`));

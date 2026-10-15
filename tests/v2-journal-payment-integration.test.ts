@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -17,7 +18,8 @@ function readyState(target: JournalTarget = "pami", month = 8): GameState {
 }
 
 function submit(state: GameState, target: JournalTarget = "pami"): GameState {
-  return dispatchAction(state, "submit-journal-paper", { paperId: `test-${target}`, journalTarget: target });
+  const submitted = dispatchAction(state, "submit-journal-paper", { paperId: `test-${target}`, journalTarget: target });
+  return dispatchAction(submitted, "submit-journal-paper", { paperId: `test-${target}`, journalTarget: target });
 }
 
 function paymentEvent(state: GameState) {
@@ -178,7 +180,7 @@ describe("journal payment through the engine", () => {
   });
 
   it.each(["act1", "act2", "act3"] as const)("force-next-month crosses an ordinary month after discarding %s unpaid payment", (stage) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     let pending = submit(readyState());
     if (stage !== "act1") pending = choosePayment(pending, "continue");
     if (stage === "act3") pending = choosePayment(pending, "advisor");
@@ -262,7 +264,7 @@ describe("journal payment through the engine", () => {
   });
 
   it.each([4, 5])("queues payment only when later revision reaches acceptance with funding %s", (funding) => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const initial = readyState();
     initial.advisorProgressState.funding = funding;
     initial.papers[0] = { ...initial.papers[0]!, idea: 41, experiment: 41, writing: 42 };
@@ -270,7 +272,9 @@ describe("journal payment through the engine", () => {
     expect(reviewing.papers[0]!.status).toBe("journal-reviewing");
     expect(reviewing.advisorProgressState.funding).toBe(funding);
     expect(reviewing.eventQueue).toEqual([]);
-    const published = dispatchAction(reviewing, "research-paper", { paperId: "test-pami", paperActionType: "writing" });
+    const revised = dispatchAction(reviewing, "research-paper", { paperId: "test-pami", paperActionType: "writing" });
+    expect(revised.externalPublications).toHaveLength(0);
+    const published = dispatchAction(revised, "submit-journal-paper", { paperId: "test-pami", journalTarget: "pami" });
     expect(published.externalPublications[0]).toMatchObject({ id: "test-pami", status: "published" });
     expect(published.advisorProgressState.funding).toBe(funding);
     expect(published.advisorProgressState.paidJournalPaperIds ?? []).toEqual([]);
@@ -279,7 +283,7 @@ describe("journal payment through the engine", () => {
   });
 
   it("preserves pending payment across save/load and does not charge again after payment", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const pending = choosePayment(choosePayment(submit(readyState()), "continue"), "advisor");
     const blocked = dispatchAction(JSON.parse(JSON.stringify(pending)) as GameState, "next-month");
     expect(blocked.totalMonths).toBe(8);

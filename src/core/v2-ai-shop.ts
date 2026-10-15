@@ -1,3 +1,4 @@
+import { recordAchievementAction, recordAchievementStats } from "./v2-achievement-runtime-types";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "./v2-calendar";
 import { getCalendarForTotalMonths } from "./v2-progression";
 import { hasActiveAiCostCoverage } from "./v2-buffs";
@@ -291,7 +292,7 @@ export function consumeActiveOperation(state: GameState, operation: ActiveOperat
   const allowance = getActiveOperationAllowance(state, operation);
   if (!allowance.allowed) return state;
   const sanCap = state.sanCap - (allowance.usesTalentAction ? 1 : 0);
-  return {
+  return recordAchievementAction(recordAchievementStats({
     ...state,
     actionState: { ...state.actionState, used: state.actionState.used + (allowance.consumesAction ? 1 : 0),
       aiResearchBonusUsed: state.actionState.aiResearchBonusUsed || allowance.usesAiResearchBonus },
@@ -299,7 +300,7 @@ export function consumeActiveOperation(state: GameState, operation: ActiveOperat
       regularActionsSpent: (state.roleTalents.regularActionsSpent ?? 0) + 1 } : state.roleTalents,
     ...(allowance.usesTalentAction ? { sanCap, player: { ...state.player, san: Math.min(state.player.san, sanCap) },
       roleTalents: { ...state.roleTalents!, alphaUsedMonth: state.totalMonths } } : {}),
-  };
+  }));
 }
 
 /** Convert the active model set into the regular Buff representation. */

@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { describe, expect, it, vi } from "vitest";
 import { createInitialState } from "../src/core/v2-engine-state-factory";
 import {
@@ -313,7 +314,7 @@ describe("thesis point advancement", () => {
   it("rejects invalid indices, uninitialized state, and non-playing phase without drawing RNG", () => {
     const state = syncThesisState(fixture(), () => 0);
     const uninitialized = fixture();
-    const random = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("unexpected RNG"); });
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("unexpected RNG"); });
     try {
       for (const index of [-1, 0.5, 2, NaN]) expect(advanceThesisResearchPoint(state, index)).toBe(state);
       expect(getThesisAdvanceFailure(uninitialized, 0)).not.toBeNull();

@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { createRandomEventById, isRandomEventEligible } from "./v2-random-event-router";
 import type { GameState } from "./v2-types";
@@ -23,7 +24,7 @@ export function rememberPendingRandomEvent(
 
 export function activatePendingRandomEvents(
   state: GameState,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): GameState {
   if (state.phase !== "playing" || !state.pendingRandomEvents?.length) return state;
   let nextState = state;

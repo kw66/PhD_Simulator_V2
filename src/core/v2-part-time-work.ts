@@ -1,3 +1,4 @@
+import { recordPersonalIncome } from "./v2-money";
 import { getActiveOperationSanCostForState } from "./v2-buffs";
 import { pushLog } from "./v2-engine-helpers";
 import type { GameState } from "./v2-types";
@@ -48,12 +49,12 @@ export function applyPartTimeWork(state: GameState): GameState {
   const prepared = consumeActiveOperation(state, "work");
   const payment = quoteSanPayment(prepared, preview.sanCost);
   const paid = paySanCost(prepared, preview.sanCost);
-  return pushLog({
+  return pushLog(recordPersonalIncome({
     ...paid,
     partTimeWorkCount: preview.nextCount,
     player: {
       ...paid.player,
       money: paid.player.money + preview.moneyReward,
     },
-  }, `打工：第 ${preview.nextCount} 次兼职，${formatSanPayment(payment)}｜金币 +${preview.moneyReward}`);
+  }, preview.moneyReward), `打工：第 ${preview.nextCount} 次兼职，${formatSanPayment(payment)}｜金币 +${preview.moneyReward}`);
 }

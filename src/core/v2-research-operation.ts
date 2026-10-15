@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { consumeNextActionBuffs, getActionEffect, getActiveOperationSanCostForState } from "./v2-buffs";
 import { consumeActiveOperation, getActiveOperationAllowance } from "./v2-ai-shop";
 import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
@@ -120,7 +121,7 @@ export function createResearchPaper(state: GameState, slotIndex: number): GameSt
     ...createDraftPaper(
       state.totalMonths,
       sequence - 1,
-      Math.random,
+      gameRandom,
       getAcademicCalendarYear(state.year, state.month),
     ),
     paperSlotIndex: slotIndex,
@@ -169,7 +170,7 @@ export function applyResearchOperation(
   state: GameState,
   paperId: string,
   actionType: PaperActionType,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
 ): GameState {
   if (state.phase !== "playing") return state;
 

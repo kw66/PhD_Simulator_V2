@@ -71,7 +71,7 @@ describe("role talent allocation", () => {
 
   it("loads allocation after experience, persists setup edits and locks edits during a run", () => {
     const storage = memoryStorage();
-    storage.setItem("phd_simulator_v2_role_experience_v1", JSON.stringify({ version: 1, roles: { normal: { level: 3, exp: 0 } } }));
+    storage.setItem("phd_simulator_v2_role_experience_v2", JSON.stringify({ version: 1, roles: { normal: { level: 3, exp: 0 } } }));
     const store = createStore({ storage });
     expect(store.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
     expect(store.upgradeRoleTalent("normal", "diligence")).toBe(true);

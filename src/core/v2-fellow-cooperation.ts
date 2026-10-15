@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
@@ -111,7 +112,7 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
   return nextState;
 }
 
-export function settlePendingFellowHelp(state: GameState, random: () => number = Math.random): GameState {
+export function settlePendingFellowHelp(state: GameState, random: () => number = gameRandom): GameState {
   let current = state;
   while (true) {
     const next = settleFellowHelpPass(current, random);

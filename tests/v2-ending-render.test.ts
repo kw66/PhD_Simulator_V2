@@ -60,22 +60,24 @@ describe("basic ending presentation", () => {
   it("lists retained offers without choosing a job for the player", () => {
     const state = finishedState("master");
     state.careerOffers = {
-      internet: { type: "internet", jobId: "internet-small", name: "小型科技公司", threshold: 45,
-        score: 60, compensation: "年总包 20～35 万" },
+      internet: { type: "internet", jobId: "internet-development", name: "大厂开发岗", threshold: 80,
+        score: 90, compensation: "年总包 20～35 万" },
     };
     const card = endingCard(renderApp(state));
     expect(card).toContain('data-ending-section="offers"');
     expect(card).toContain("offer：");
-    expect(card).toContain("小型科技公司");
+    expect(card).toContain("大厂开发岗");
     expect(card).toContain("年总包 20～35 万");
     expect(card).not.toContain("已入职");
   });
 
   it.each([
-    ["internet", "internet-small", "小型科技公司", "年总包 20～35 万", "小型科技公司"],
-    ["stateOwned", "state-local", "地方国企", "年收入 15～25 万", "地方国企"],
-    ["civilService", "civil-town-staff", "乡镇 · 一级科员", "", "乡镇党政机关 · 一级科员"],
-    ["academic", "academic-second-tier-lecturer", "二本讲师", "", "二本院校 · 人工智能学院 · 讲师"],
+    ["internet", "internet-development", "大厂开发岗", "年总包 20～35 万", "大厂开发岗"],
+    ["stateOwned", "state-local", "地方国企技术岗", "年收入 15～25 万", "地方国企技术岗"],
+    ["civilService", "civil-town-deputy-section", "乡镇机关 · 四级主任科员", "", "乡镇机关 · 四级主任科员"],
+    ["academic", "academic-non-elite-lecturer", "双非讲师", "", "双非高校 · 人工智能学院 · 讲师"],
+    ["academic", "academic-985-professor", "985教授", "", "985 高校 · 人工智能学院 · 教授"],
+    ["academic", "academic-world-professor", "世界名校长聘教授", "", "世界名校 · 人工智能学院 · 长聘教授"],
   ] as const)("gives %s offer a concrete and balanced ending summary", (type, jobId, name, compensation, displayName) => {
     const state = finishedState("phd");
     state.careerOffers = { [type]: { type, jobId, name, threshold: 30, score: 55, ...(compensation ? { compensation } : {}) } };
@@ -147,7 +149,7 @@ describe("basic ending presentation", () => {
     expect(card).not.toContain("学业完成");
     expect(card).not.toContain("毕业条件");
     const actions = card.match(/<footer\b[^>]*class="ending-actions"[^>]*>([\s\S]*?)<\/footer>/)?.[1] ?? "";
-    expect(actions.match(/<button\b/g)).toHaveLength(2);
+    expect(actions.match(/<button\b/g)).toHaveLength(3);
     expect(actions).toContain('data-action="restart-game"');
     expect(actions).toContain('data-action="reset-game"');
     expect(actions).toContain("返回开始页面");

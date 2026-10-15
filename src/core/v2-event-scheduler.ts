@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { hasBlockingQueueEvent } from "./v2-event-queue";
@@ -21,7 +22,7 @@ export type { RandomRollProvider } from "./v2-random-events-core-shared";
 
 export function collectIllnessEventForMonth(
   state: GameState,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): PendingEvent[] {
   if (state.phase !== "playing" || state.illnessProbability <= 0 || getRoll() >= state.illnessProbability / 100) {
     return [];
@@ -31,14 +32,14 @@ export function collectIllnessEventForMonth(
 
 export function collectFixedEventsForMonth(
   state: GameState,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): PendingEvent[] {
   return collectFixedEventsForState(state, getRoll);
 }
 
 export function collectRandomEventsForMonth(
   state: GameState,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): { nextState: GameState; events: PendingEvent[] } {
   if (state.phase !== "playing") {
     return { nextState: state, events: [] };
@@ -129,7 +130,7 @@ export function collectRandomEventsForMonth(
 
 export function enqueueFixedEventsForMonth(
   state: GameState,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): { nextState: GameState; queuedEvents: PendingEvent[] } {
   if (state.phase !== "playing") {
     return { nextState: state, queuedEvents: [] };
@@ -149,7 +150,7 @@ export function enqueueFixedEventsForMonth(
 
 export function enqueueMonthlyEventsForMonth(
   state: GameState,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): { nextState: GameState; queuedEvents: PendingEvent[] } {
   if (state.phase !== "playing") {
     return { nextState: state, queuedEvents: [] };

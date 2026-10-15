@@ -265,10 +265,11 @@ describe("graduation workstation cards", () => {
       expect(row).toMatch(/rel-detail-label[\s\S]*graduation-career-bar[\s\S]*rel-progress-val[\s\S]*<button/);
       const actions = buttons(row, "prepare-career");
       expect(actions).toHaveLength(1);
-      expect(visibleText(actions[0]!)).toBe(`📈推进${["+6", "+3～8", "+5～10", "+3"][index]}SAN-${[4, 2, 3, 2][index]}`);
+      expect(visibleText(actions[0]!)).toBe(`📈推进SAN-${[4, 2, 3, 2][index]}`);
+      expect(actions[0]).toContain(`主动推进：${["+6", "+3～8", "+10～15", "+3"][index]}分`);
       const type = (["internet", "stateOwned", "civilService", "academic"] as const)[index]!;
       expect(row).toContain(`aria-valuenow="${formatMoney(getCareerAbility(state, type))}"`);
-      expect(row).toContain(`aria-valuemax="${[850, 620, 365, 650][index]}"`);
+      expect(row).toContain(`aria-valuemax="${[1000, 550, 400, 1100][index]}"`);
       expect(row).toContain("履历");
       expect(row).toContain("推进");
       expect(row).toContain("面试");
@@ -291,8 +292,8 @@ describe("graduation workstation cards", () => {
     expect(row).toMatch(/graduation-career-practice[^>]*style="width:[1-9]/);
     expect(row).toMatch(/graduation-career-interview[^>]*style="width:[1-9]/);
     expect(row).toContain('aria-valuenow="84"');
-    expect(row).toContain('aria-valuemax="850"');
-    expect(row).toContain('style="width:6.35%"');
+    expect(row).toContain('aria-valuemax="1000"');
+    expect(row).toContain('style="width:5.4%"');
   });
 
   it.each(["monthly", "pending", "finished"] as const)("blocks all career directions for %s", (reason) => {
@@ -344,16 +345,17 @@ describe("graduation workstation cards", () => {
       const cost = [4, 2, 3, 2][index]!;
       expect(action).not.toContain(" disabled");
       expect(action).toContain(`class="rel-action-cost">SAN-${cost}</small>`);
-      expect(action).toContain(`本方向每月一次，不占行动点；SAN-${cost}`);
+      expect(action).toContain(`主动推进：${["+6", "+3～8", `+${Math.floor(san / 2)}～${Math.floor(san / 2) + 5}`, "+3"][index]}分 · SAN-${cost}`);
+      expect(action).toContain("本方向每月一次，不占行动点");
       if (san < cost) {
         expect(action).toContain("data-event-risk-tooltip");
         expect(action).toContain("event-choice-risk is-certain");
         expect(action).toContain(`SAN不足，结算后为${san - cost}`);
-        expect(visibleText(action)).toBe(`📈推进${["+6", "+3～8", "+5～10", "+3"][index]}！SAN-${cost}`);
+        expect(visibleText(action)).toBe(`📈推进！SAN-${cost}`);
       } else {
         expect(action).not.toContain("data-event-risk-tooltip");
         expect(action).not.toContain("event-choice-risk");
-        expect(visibleText(action)).toBe(`📈推进${["+6", "+3～8", "+5～10", "+3"][index]}SAN-${cost}`);
+        expect(visibleText(action)).toBe(`📈推进SAN-${cost}`);
       }
     });
     expect(state).toEqual(before);

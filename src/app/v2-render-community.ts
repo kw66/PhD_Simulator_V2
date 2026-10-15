@@ -1,5 +1,5 @@
 import type { RoleRailViewId } from "./v2-render-types";
-import { MESSAGE_MAX_LENGTH } from "./v2-community-messages";
+import { MESSAGE_MAX_LENGTH, NICKNAME_MAX_LENGTH } from "./v2-community-messages";
 
 function renderMessageComposer(mode: "board" | "feedback"): string {
   const prefix = mode === "board" ? "lobby-message" : "game-feedback";
@@ -13,8 +13,8 @@ function renderMessageComposer(mode: "board" | "feedback"): string {
       <div class="community-compose-top">
         <label for="${prefix}-nickname">昵称</label>
         <div class="community-nickname-wrap">
-          <input id="${prefix}-nickname" type="text" maxlength="10" autocomplete="nickname" placeholder="怎么称呼你" data-community-nickname="${mode}" />
-          <span class="community-nickname-count" data-community-nickname-count="${mode}" aria-hidden="true">0/10</span>
+          <input id="${prefix}-nickname" type="text" autocomplete="nickname" aria-label="昵称，最多${NICKNAME_MAX_LENGTH}字" placeholder="怎么称呼你" data-community-nickname="${mode}" />
+          <span class="community-nickname-count" data-community-nickname-count="${mode}" aria-hidden="true">0/${NICKNAME_MAX_LENGTH}</span>
         </div>
         <button class="community-send-button" type="button" data-community-send="${mode}">
           <i data-lucide="send" aria-hidden="true"></i>

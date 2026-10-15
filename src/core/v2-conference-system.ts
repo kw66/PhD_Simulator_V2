@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { applyTierResist, getTierResistedNarrative } from "./v2-sanity-rules";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { CONFERENCE_TRAVEL_FEES } from "./v2-publication-fees";
@@ -48,7 +49,7 @@ export function getConferenceBaseCosts(region: ConferenceRegionId): ConferenceBa
 
 export function resolveConferenceDecisionCost(
   input: ConferenceDecisionInput,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): ConferenceDecisionCost {
   const baseCosts = getConferenceBaseCosts(input.region);
   const attendanceCost = input.travelAlreadyPaid ? 0 : baseCosts.selfPay;

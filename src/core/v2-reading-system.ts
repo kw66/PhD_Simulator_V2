@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { addOrReplaceBuffs, getActiveOperationSanCostForState, getActiveOperationSanMultiplier, getReadingEffect } from "./v2-buffs";
 import { pushLog } from "./v2-engine-helpers";
 import { formatTierResistedOutcome } from "./v2-sanity-rules";
@@ -113,7 +114,7 @@ function resistReadingResearch(state: GameState, milestones: number) {
 export function applyReadingCountProgress(
   state: GameState,
   requestedCount: number,
-  _random: () => number = Math.random,
+  _random: () => number = gameRandom,
 ): ReadingCountProgress {
   const appliedCount = Math.max(0, Math.floor(requestedCount));
   if (appliedCount === 0) {

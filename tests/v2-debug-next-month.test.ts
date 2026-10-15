@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEBUG_EVENT_GROUPS } from "../src/core/v2-debug-tools";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -7,7 +8,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("debug next month across event stages", () => {
   it.each(DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons))("advances past $label without applying its choices", ({ id }) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const base = createStartedGameState("normal");
     let pending = dispatchAction({ ...base, year: 1, month: 6, totalMonths: 6,
       selectedAdvisorName: "测试导师", sanCap: 100, illnessProbability: 0,

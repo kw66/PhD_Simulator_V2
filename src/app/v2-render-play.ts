@@ -1,4 +1,5 @@
 import { renderSanPayment } from "./v2-render-san-payment";
+import { renderRunSaves } from "./v2-render-run-saves";
 import { getEffectiveResearch, getEffectiveSocial } from "../core/v2-effective-attributes";
 import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import "../styles/workstation-unified.css";
@@ -1362,7 +1363,7 @@ function renderPaperJournalHeader(state: GameState, paper: Paper, selected: bool
     <div class="paper-card-header paper-review-card-header">
       <div class="paper-card-header-main">
         ${renderPaperSelectionToggle(paper, selected, "期刊论文")}
-        <span class="paper-card-status is-journal-reviewing">${escapeHtml(journal.name)} 修改中</span>
+        <span class="paper-card-status is-journal-reviewing">${escapeHtml(journal.name)} ${score >= journal.acceptanceScore ? "待发表" : "修改中"}</span>
         <span class="paper-review-remaining">已修改 ${renderAnimatedNumber(`paper:${paper.id}:workstation:revision-months`, revisedMonths)} 月 · <span class="paper-journal-score" aria-label="期刊修改分数 ${score}/${journal.acceptanceScore}">${renderAnimatedNumber(`paper:${paper.id}:workstation:journal-score`, score)}/${journal.acceptanceScore}</span></span>
         ${renderPaperParticipants(state, paper)}
       </div>
@@ -1647,10 +1648,13 @@ function renderWorkstationPaperActions(
     const journalAttributes = journalFailure === null && paper
       ? `data-action="submit-journal-paper" data-paper-id="${escapeHtml(paper.id)}" data-journal-target="${id}"`
       : "disabled aria-disabled=\"true\"";
-    const hint = `送审分 ${journal.submissionScore}\n达标分 ${journal.acceptanceScore}`;
+    const isRevision = paper?.status === "journal-reviewing" && paper.journalTarget === id;
+    const hint = `送审分 ${journal.submissionScore}\n达标分 ${journal.acceptanceScore}\n${isRevision
+      ? journalFailure ?? "点击确认发表，也可继续提升分数"
+      : "点击送审，达标后再次点击发表"}`;
     return `
       <div class="workstation-submit-target is-${id}" data-card-tooltip data-tooltip="${escapeHtml(hint)}" tabindex="0" aria-label="${escapeHtml(`${name}：${hint}`)}">
-        <button class="paper-journal-btn is-${id}" type="button" aria-label="投稿 ${name}" ${journalAttributes}>
+        <button class="paper-journal-btn is-${id}" type="button" aria-label="${isRevision ? "发表" : "投稿"} ${name}" ${journalAttributes}>
           <strong class="paper-submit-destination">${name}</strong>
         </button>
       </div>
@@ -3735,14 +3739,17 @@ function renderQuitConfirmationOverlay(): string {
   `;
 }
 
-function renderSettingsSection(state: GameState): string {
+function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): string {
   return `
     <div class="settings-panel">
       <div class="settings-quick-actions" id="settings-panel-content">
-        <button class="settings-primary-btn is-debug" type="button" data-ui-open-debug-window title="打开后本局不结算角色经验">
+        <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
+          <i data-lucide="history" aria-hidden="true"></i><span>读取存档</span>
+        </button>
+        <button class="settings-primary-btn is-debug" type="button" data-ui-open-debug-window title="打开后本局不计成就、经验及统计">
           <i data-lucide="wrench" aria-hidden="true"></i><span>打开调试面板</span>
         </button>
-        <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="结束本局并进入退学结局，随后可在结局页重开"${state.totalMonths <= 0 ? ' disabled aria-disabled="true"' : ""}>
+        <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并重开"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
           <i data-lucide="log-out" aria-hidden="true"></i>
           <span>主动退学</span>
         </button>
@@ -3755,6 +3762,8 @@ function renderSettingsSection(state: GameState): string {
           <span>留言反馈</span>
         </button>
       </div>
+      ${renderRunSaves(state, uiState)}
+      ${!uiState.isRunSavePanelOpen && uiState.saveStatus ? `<p class="run-saves-status" role="status">${escapeHtml(uiState.saveStatus)}</p>` : ""}
     </div>
   `;
 }
@@ -3847,7 +3856,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
                 openEvent || openHistoryEvent
                   ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null, state.debugEventReplayEnabled === true, state)
                   : activeLogPage?.kind === "ending"
-                    ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state, uiState.roleExperienceAward)
+                    ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state, uiState.roleExperienceAward, uiState.saveStatus)
                     : "",
               )}
             </div>
@@ -3880,7 +3889,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("settings")}" data-tab-panel="settings"${getTabPanelHidden("settings")}>
-            ${renderSettingsSection(state)}
+            ${renderSettingsSection(state, uiState)}
           </section>
         </div>
       </div>

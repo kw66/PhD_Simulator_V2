@@ -1,3 +1,4 @@
+import { getStatisticsRunKey } from "../core/v2-run-statistics";
 import type { Degree, GameState } from "../core/v2-types";
 
 import { createStatisticsClient, type StatisticsClient, type StatisticsClientOptions } from "./v2-statistics-client";
@@ -23,7 +24,7 @@ interface ThesisStatsOptions extends StatisticsClientOptions {
 export interface ThesisStatsController {
   read(degree: Degree): ThesisGlobalStatsSnapshot;
   load(degree: Degree): Promise<void>;
-  track(before: GameState, after: GameState, options?: { debugUsed?: boolean }): Promise<void>;
+  track(before: GameState, after: GameState, options?: { debugUsed?: boolean; finalized?: boolean }): Promise<void>;
   markDebug(): void;
   resetRun(): void;
   flush(): Promise<void>;
@@ -45,9 +46,6 @@ function parseStats(value: unknown): ThesisGlobalStats {
     excellentCount: stats.excellentCount, notSubmittedCount: stats.notSubmittedCount };
 }
 
-function runKey(state: GameState): string {
-  return JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]);
-}
 
 export function createThesisStats(options: ThesisStatsOptions): ThesisStatsController {
   const enabled = options.enabled !== false;
@@ -55,25 +53,19 @@ export function createThesisStats(options: ThesisStatsOptions): ThesisStatsContr
   let currentRun: string | null = null;
   let debugUsed = false;
   const markDebug = (): void => { debugUsed = true; client.markDebug(currentRun); };
-  const syncRun = (state: GameState, tracking: { debugUsed?: boolean }): void => {
-    currentRun = state.phase === "setup" ? null : runKey(state);
+  const syncRun = (state: GameState, tracking: { debugUsed?: boolean; finalized?: boolean }): void => {
+    currentRun = state.phase === "setup" ? null : getStatisticsRunKey(state);
     if (tracking.debugUsed || debugUsed || (currentRun !== null && client.isDebugRun(currentRun))) markDebug();
   };
 
   const key = (degree: Degree) => ({ p_rule_version: THESIS_STATS_RULE_VERSION, p_degree: degree });
   const valid = (degree: Degree) => enabled && (degree === "master" || degree === "phd");
-  const track: ThesisStatsController["track"] = (before, after, tracking = {}) => {
+  const track: ThesisStatsController["track"] = (_before, after, tracking = {}) => {
     syncRun(after, tracking);
-    if (!enabled || debugUsed || currentRun === null || before.phase !== "playing" || before === after || runKey(before) !== currentRun
-      || before.thesis.reviewResolved || !after.thesis.reviewResolved) return Promise.resolve();
-    const event = before.eventQueue.find((entry) => entry.source === "thesis" && entry.stage === "result"
-      && entry.thesisReviewPresentation?.stage === "decision");
-    const review = event?.thesisReviewPresentation?.review;
-    if (!event || !review || after.eventQueue.some((entry) => entry.id === event.id)
-      || after.thesis.review?.degree !== review.degree || after.thesis.review?.submitted !== review.submitted
-      || after.thesis.review?.passed !== review.passed || after.thesis.review?.excellent !== review.excellent) return Promise.resolve();
-    client.enqueue("thesis", currentRun, review.degree, { p_rule_version: THESIS_STATS_RULE_VERSION, p_degree: review.degree,
-      p_submitted: review.submitted, p_passed: review.passed, p_excellent: review.excellent });
+    if (!enabled || debugUsed || currentRun === null || !tracking.finalized || after.phase !== "finished") return Promise.resolve();
+    for (const record of after.pendingRunStatistics ?? []) {
+      if (record.kind === "thesis") client.enqueue(record.kind, currentRun, record.fingerprint, record.payload);
+    }
     return Promise.resolve();
   };
   const controller: ThesisStatsController = {

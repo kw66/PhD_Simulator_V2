@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import type { GameState, InternshipOffer, InternshipState, Paper } from "./v2-types";
 import { roundMoney } from "./v2-money";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
@@ -32,13 +33,13 @@ function rollIndex(getRoll: () => number, count: number): number {
   return Math.min(count - 1, Math.max(0, Math.floor(getRoll() * count)));
 }
 
-export function createInternshipLead(getRoll: () => number = Math.random): InternshipLead {
+export function createInternshipLead(getRoll: () => number = gameRandom): InternshipLead {
   const companyIndex = rollIndex(getRoll, INTERNSHIP_COMPANIES.length);
   const directionIndex = rollIndex(getRoll, INTERNSHIP_DIRECTIONS.length);
   return { company: INTERNSHIP_COMPANIES[companyIndex]!, direction: INTERNSHIP_DIRECTIONS[directionIndex]!.name };
 }
 
-export function createInternshipOffer(getRoll: () => number = Math.random, lead = createInternshipLead(getRoll)): InternshipOffer {
+export function createInternshipOffer(getRoll: () => number = gameRandom, lead = createInternshipLead(getRoll)): InternshipOffer {
   const companyIndex = INTERNSHIP_COMPANIES.findIndex((company) => company === lead.company);
   const directionIndex = INTERNSHIP_DIRECTIONS.findIndex((direction) => direction.name === lead.direction);
   const positions = INTERNSHIP_DIRECTIONS[directionIndex >= 0 ? directionIndex : 0]!.positions;

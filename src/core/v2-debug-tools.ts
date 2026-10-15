@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
 import { getPlayerAttributeCap } from "./v2-player-attributes";
@@ -594,11 +595,11 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
   let targetEvent = targetScene;
   let nextContext = context;
   const fixedReplayRoot = currentEvent.chainId === "teachers-day"
-    ? createTeachersDayEvent(baseState, Math.random)
+    ? createTeachersDayEvent(baseState, gameRandom)
     : currentEvent.chainId === "mentor-assign"
-      ? createMentorAssignEvent(baseState, Math.random)
+      ? createMentorAssignEvent(baseState, gameRandom)
       : currentEvent.chainId === "before-grad-school"
-        ? createBeforeGradSchoolAct1Event(baseState, Math.random)
+        ? createBeforeGradSchoolAct1Event(baseState, gameRandom)
         : null;
   if (fixedReplayRoot && targetIndex <= 1) {
     targetEvent = fixedReplayRoot;
@@ -625,7 +626,7 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
       ...targetEvent,
       fixedResultPreview: {
         ...targetEvent.fixedResultPreview,
-        rolls: targetEvent.fixedResultPreview.rolls.map(() => Math.random()),
+        rolls: targetEvent.fixedResultPreview.rolls.map(() => gameRandom()),
       },
     };
   }
@@ -673,7 +674,7 @@ function buildDebugEvent(
 ): { nextState: GameState; event: PendingEvent | null } | null {
   switch (eventId) {
     case "scholarship":
-      return { nextState: state, event: createScholarshipEvent(state, Math.random) };
+      return { nextState: state, event: createScholarshipEvent(state, gameRandom) };
     case "teachers-day":
       return { nextState: state, event: createTeachersDayEvent(state) };
     case "winter-vacation":
@@ -736,11 +737,11 @@ function buildDebugEvent(
       return { nextState, event: createAdvisorGrantResultEvent(getAdvisorGrantResultContext(nextState, application)) };
     }
     case "illness-stomach":
-      return { nextState: state, event: createIllnessRandomEvent(state, Math.random, "stomach") };
+      return { nextState: state, event: createIllnessRandomEvent(state, gameRandom, "stomach") };
     case "illness-flu":
-      return { nextState: state, event: createIllnessRandomEvent(state, Math.random, "flu") };
+      return { nextState: state, event: createIllnessRandomEvent(state, gameRandom, "flu") };
     case "illness-fever":
-      return { nextState: state, event: createIllnessRandomEvent(state, Math.random, "fever") };
+      return { nextState: state, event: createIllnessRandomEvent(state, gameRandom, "fever") };
     case "before-grad-school":
       return { nextState: state, event: createBeforeGradSchoolAct1Event(state) };
     case "thesis-progress": {
@@ -776,7 +777,7 @@ function buildDebugEvent(
     }
     default: {
       if (eventId === "career-recruitment") {
-        return { nextState: state, event: createCareerRecruitmentEvent(state, Math.random, true) };
+        return { nextState: state, event: createCareerRecruitmentEvent(state, gameRandom, true) };
       }
 
       const randomMatch = /^random-(\d+)$/u.exec(eventId);
@@ -808,12 +809,12 @@ function buildDebugEvent(
             ...randomState,
             totalRandomEventCount: stableRandomSerial ?? (
               randomState.totalRandomEventCount + 1
-              + Math.floor(Math.random() * 0x1000000)
+              + Math.floor(gameRandom() * 0x1000000)
             ),
           };
           const randomRolls: number[] = [];
           const recordRoll = (): number => {
-            const roll = Math.random();
+            const roll = gameRandom();
             randomRolls.push(roll);
             return roll;
           };
@@ -853,7 +854,7 @@ function triggerDebugEvent(state: GameState, eventId: string): GameState {
       let paperIndex = readyState.papers.length + 1;
       while (reservedIds.has(`debug-draft-${readyState.totalMonths}-${paperIndex}`)) paperIndex += 1;
       const draft = {
-        ...createDraftPaper(readyState.totalMonths, paperIndex - 1, Math.random, getAcademicCalendarYear(readyState.year, readyState.month)),
+        ...createDraftPaper(readyState.totalMonths, paperIndex - 1, gameRandom, getAcademicCalendarYear(readyState.year, readyState.month)),
         id: `debug-draft-${readyState.totalMonths}-${paperIndex}`,
         title: "测试草稿", idea: 4, experiment: 3, writing: 2,
       };
@@ -902,15 +903,15 @@ function addDebugPublishedPaper(
 ): GameState {
   const nonFirstAuthor = authorship === "coauthor";
   const publicationIndex = state.externalPublications.length;
-  const submittedMonth = Math.floor(Math.random() * 12) + 1;
+  const submittedMonth = Math.floor(gameRandom() * 12) + 1;
   const submittedYear = Math.max(1, state.year);
   const calendarYear = getAcademicCalendarYear(submittedYear, submittedMonth);
-  const topic = createDraftPaper(state.totalMonths, publicationIndex, Math.random, calendarYear);
+  const topic = createDraftPaper(state.totalMonths, publicationIndex, gameRandom, calendarYear);
   const acceptTypes: PaperAcceptType[] = target === "A"
     ? ["Poster", "Spotlight", "Oral", "Best Paper Candidate", "Best Paper"]
     : ["Poster", "Oral"];
-  const acceptType = acceptTypes[Math.floor(Math.random() * acceptTypes.length)] ?? "Poster";
-  const randomScore = () => 5 + Math.floor(Math.random() * 36);
+  const acceptType = acceptTypes[Math.floor(gameRandom() * acceptTypes.length)] ?? "Poster";
+  const randomScore = () => 5 + Math.floor(gameRandom() * 36);
   const idea = randomScore();
   const experiment = randomScore();
   const writing = randomScore();
@@ -975,7 +976,7 @@ function addDebugPublishedJournalPaper(
   const submittedMonth = (submittedAt - 1) % 12 + 1;
   const submittedYear = Math.floor((submittedAt - 1) / 12) + 1;
   const calendarYear = getAcademicCalendarYear(submittedYear, submittedMonth);
-  const topic = createDraftPaper(state.totalMonths, publicationIndex, Math.random, calendarYear);
+  const topic = createDraftPaper(state.totalMonths, publicationIndex, gameRandom, calendarYear);
   const journal = getJournalDefinition(journalTarget);
   const reservedIds = new Set([
     ...state.papers.map((paper) => paper.id),
@@ -987,7 +988,7 @@ function addDebugPublishedJournalPaper(
   ]);
   let paperSerial = publicationIndex + 1;
   while (reservedIds.has(`debug-journal-${state.totalMonths}-${paperSerial}`)) paperSerial += 1;
-  const acceptedScore = journal.acceptanceScore + 30 + Math.floor(Math.random() * 36);
+  const acceptedScore = journal.acceptanceScore + 30 + Math.floor(gameRandom() * 36);
   const initialScore = journal.submissionScore + 5;
   const middleScore = Math.floor((initialScore + acceptedScore) / 2);
   const submittedBaseScore = Math.floor(initialScore / 3);
@@ -1085,7 +1086,7 @@ function addDebugRelationship(state: GameState, type: DebugRelationshipType): Ga
         ...activateLover("smart", state.totalMonths, getRoleDefinition(state.selectedRoleId).gender),
         name: pickRandomAdvisorName(),
       },
-      loverProgressState: createLoverProgressState("smart", Math.random, state.year),
+      loverProgressState: createLoverProgressState("smart", gameRandom, state.year),
     }, "测试：已新增恋人，不触发恋爱奖励");
   }
 
@@ -1095,14 +1096,14 @@ function addDebugRelationship(state: GameState, type: DebugRelationshipType): Ga
   if (getRecruitmentAcademicYears(type, state).length === 0) {
     return pushLog(state, "测试：当前没有可招募的在校同学");
   }
-  const seed = Math.floor(Math.random() * 0x100000000);
+  const seed = Math.floor(gameRandom() * 0x100000000);
   const usedNames = [
     ...state.fellowProgressState.map((fellow) => getFellowName(fellow)),
     state.selectedAdvisorName ?? "",
     state.loverState.name ?? "",
   ];
   const profile = createCustomFellowProgressProfile({
-    ...createGeneratedFellowProfileAddition(type, seed, undefined, usedNames, Math.random, { year: state.year, month: state.month }),
+    ...createGeneratedFellowProfileAddition(type, seed, undefined, usedNames, gameRandom, { year: state.year, month: state.month }),
     startTotalMonths: state.totalMonths,
     usedNames,
   });

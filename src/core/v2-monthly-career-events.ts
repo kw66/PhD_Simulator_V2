@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import {
   CAREER_DEFINITIONS,
   getCareerAbility,
@@ -105,6 +106,7 @@ function createResultEvent(
     : `${scene.rejected}${existing ? `之前拿到的${existing.name} offer 还在，你暂时不用急着做决定。` : ""}`;
   const outcome = `${CAREER_DEFINITIONS[type].name}能力 +${experienceGain}；SAN ${sanChange}；${success ? "面试通过" : "面试未通过"}`;
   const baseEffects = {
+    achievementFacts: success ? [`offer:${job.id}`] : [],
     san: sanChange,
     careerRecruitment: { totalMonths: state.totalMonths, type, experienceGain },
   };
@@ -201,7 +203,7 @@ function createRestEvent(state: GameState, chainId: string, hasOpenDirections: b
 
 export function createCareerRecruitmentEvent(
   state: GameState,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
   includeClosedDirections = false,
 ): PendingEvent {
   const chainId = `career-recruitment-${state.totalMonths}`;

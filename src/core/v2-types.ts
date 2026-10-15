@@ -394,8 +394,26 @@ export interface AccountProfile {
   lobbyRolePage: number;
   lobbyRoleAchievementPage: number;
   achievementUnlockedAt: Record<string, string>;
+  /** First completion date for each achievement by role. Shared achievements may have many entries. */
+  achievementUnlockedByRole?: Record<string, Partial<Record<RoleId, string>>>;
+  /** IDs whose one-time reward has already been granted. */
+  achievementRewardedIds?: string[];
+  /** Cross-run collection sets used by collector achievements. */
+  achievementCollectionProgress?: AchievementCollectionProgress;
+  /** Per-role experience multiplier earned from achievements. */
+  achievementExperienceMultipliers?: Partial<Record<RoleId, number>>;
+  /** Per-role bonus talent points earned from achievements. */
+  achievementTalentPoints?: Partial<Record<RoleId, number>>;
   roleProgress: Record<RoleId, RoleMetaProgress>;
   lastRunExperience?: RoleExperienceAward;
+}
+
+export interface AchievementCollectionProgress {
+  buffs: string[];
+  products: string[];
+  conferences: string[];
+  locations: string[];
+  directions: string[];
 }
 
 export interface LobbySelectedRoleStatViewModel {
@@ -417,6 +435,14 @@ export interface LobbySelectedRoleStatisticsViewModel {
   tooltip: string;
 }
 
+export type AchievementAudience = "all" | "upright" | "reversed" | "special" | "cursed";
+
+/** Achievement eligibility and reward recipients share this scope; all means every role. */
+export interface AchievementScope {
+  audiences?: AchievementAudience[];
+  roleIds?: RoleId[];
+}
+
 export interface RoleAchievementDefinition {
   id: string;
   icon: string;
@@ -424,6 +450,7 @@ export interface RoleAchievementDefinition {
   description: string;
   rewardText?: string;
   unlocksRoleId?: RoleId;
+  scope?: AchievementScope;
 }
 
 export interface LobbySelectedRoleAchievementViewModel {
@@ -531,6 +558,8 @@ export interface EventChoice {
   disabledReason?: string;
   cosmetic?: boolean;
   effects: {
+    /** Stable gameplay facts; credited only when the choice is settled. */
+    achievementFacts?: string[];
     san?: number;
     research?: number;
     social?: number;
@@ -768,6 +797,10 @@ export type LabFinanceCategory = "conference-registration" | "conference-travel"
   | "student-reimbursement" | "horizontal-income" | "grant-income" | "initial-funding" | "other";
 
 export interface GameState extends RandomEventState {
+  /** Unsubmitted statistics belong to the saved branch and are discarded on rewind. */
+  pendingRunStatistics?: import("./v2-run-statistics").PendingRunStatistic[];
+  randomState?: import("./v2-game-random").GameRandomState;
+  achievementProgress?: import("./v2-achievement-runtime-types").AchievementRunProgress;
   roleTalents?: import("./v2-role-talent-state").RoleTalentRunState;
   labFinanceLedger?: { totalMonths: number; amounts: Partial<Record<LabFinanceCategory, number>> };
   blockLinearEvents: boolean;
@@ -836,6 +869,8 @@ export interface GameState extends RandomEventState {
   endingCause?: { text: string; totalMonths: number };
   eventQueue: EventQueueItem[];
   eventHistory: ResolvedEventRecord[];
+  /** Achievements completed during the current run, supplied by the store at ending time. */
+  runAchievementIds?: string[];
 }
 
 export interface DeferredEventStateChange {
@@ -847,6 +882,7 @@ export interface DeferredEventStateChange {
 export type DeferredEventStatePatch = DeferredEventStateChange[];
 
 export interface DispatchPayload {
+  bonusTalentPoints?: number;
   talentAllocation?: Record<string, number> | undefined;
   blockLinearEvents?: boolean | undefined;
   roleId?: RoleId | undefined;

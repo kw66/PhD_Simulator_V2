@@ -15,7 +15,14 @@ describe("timeline scrolling through the real app handlers", () => {
   let page: Page;
 
   beforeAll(async () => {
-    server = await createServer({ configFile: false, logLevel: "error", server: { host: "127.0.0.1", port: 0 } });
+    server = await createServer({
+      configFile: false,
+      logLevel: "error",
+      // Other browser suites start their own Vite servers in parallel. Sharing
+      // the optimizer cache can invalidate a dependency while this page loads.
+      cacheDir: "node_modules/.vite-timeline-test",
+      server: { host: "127.0.0.1", port: 0, watch: null, hmr: false },
+    });
     await server.listen();
     browser = await chromium.launch();
     await mkdir("artifacts/timeline", { recursive: true });
@@ -38,9 +45,22 @@ describe("timeline scrolling through the real app handlers", () => {
 
   beforeEach(async () => {
     page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    const startupErrors: string[] = [];
+    page.on("pageerror", error => startupErrors.push(`page: ${error.message}`));
+    page.on("console", message => {
+      if (message.type() === "error") startupErrors.push(`console: ${message.text()}`);
+    });
+    page.on("requestfailed", request => startupErrors.push(`request: ${request.url()} ${request.failure()?.errorText}`));
+    await page.route("**/*", route => new URL(route.request().url()).origin === new URL(server.resolvedUrls!.local[0]!).origin
+      ? route.continue()
+      : route.abort());
     await page.route("**/__timeline_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
     await page.goto(`${server.resolvedUrls!.local[0]}__timeline_test__`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector("[data-action='start-game']");
+    try {
+      await page.waitForSelector("[data-action='start-game']:not(:disabled)");
+    } catch (error) {
+      throw new Error(`Timeline app did not finish starting: ${startupErrors.join("\n") || "no browser errors"}`, { cause: error });
+    }
     await action("start-game", { roleId: "normal" });
     await action("debug-shift-month", { delta: "18" });
     const initialScroll = await page.locator(".event-timeline-track").evaluate(element => {
@@ -77,7 +97,7 @@ describe("timeline scrolling through the real app handlers", () => {
     await action("debug-trigger-ending", { eventId: "master" });
     await page.locator(".event-timeline-marker[data-ui-ending-page]").waitFor();
     await page.locator(".event-timeline-track").screenshot({ path: "artifacts/timeline/strip-ending.png", animations: "disabled" });
-  });
+  }, 30_000);
 
   it("keeps the scrolled viewport when clicking a month cell away from its dot", async () => {
     const before = await scroll();
@@ -122,6 +142,7 @@ describe("timeline scrolling through the real app handlers", () => {
   });
 
   it("shows SAN changes in the month strip and opens a navigable chart", async () => {
+    await action("debug-trigger-ending", { eventId: "quit" });
     await action("restart-game");
     await page.locator(".event-content-buttons button").first().click();
     await page.locator(".event-content-buttons button").nth(1).click();
@@ -167,6 +188,7 @@ describe("timeline scrolling through the real app handlers", () => {
   });
 
   it("fits every recorded SAN month into a long-career chart with sparse axis labels", async () => {
+    await action("debug-trigger-ending", { eventId: "quit" });
     await action("restart-game");
     await page.locator(".event-content-buttons button").first().click();
     await page.locator(".event-content-buttons button").nth(1).click();

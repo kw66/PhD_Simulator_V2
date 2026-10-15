@@ -38,7 +38,7 @@ describe("VALSE pending event through real bootstrap handlers", () => {
     page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     await page.route("**/__valse_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
     await page.goto(`${server.resolvedUrls!.local[0]}__valse_test__`);
-    await page.waitForSelector("[data-action='start-game']");
+    await page.waitForSelector("[data-action='start-game']:not(:disabled)");
     await action("start-game", { roleId: "normal" });
     await action("debug-shift-month", { delta: "33" });
     await action("debug-adjust-stat", { debugStatId: "money", delta: "20" });

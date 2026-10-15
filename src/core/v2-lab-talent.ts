@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { describeResistedTalentReward, recordTalentTrigger, type TalentTriggerRecord } from "./v2-talent-history";
 import { formatMoney } from "./v2-money";
@@ -56,7 +57,7 @@ export function getPlayerAnnualResearchGrowth(state: GameState): number {
   return previewPlayerAttributeChange(state, "research", getAnnualResearchReward(state, getEffectiveResearch(state))).effectiveChange;
 }
 
-export function settleLabResearchGrowth(state: GameState, random: () => number = Math.random): GameState {
+export function settleLabResearchGrowth(state: GameState, random: () => number = gameRandom): GameState {
   if (state.phase !== "playing" || state.month !== 12 || state.totalMonths <= 0) return state;
   const playerKey = `inheritance:player:${state.totalMonths}`;
   const playerReward = getAnnualResearchReward(state, getEffectiveResearch(state));

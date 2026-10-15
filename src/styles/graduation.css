@@ -203,7 +203,6 @@
   padding-inline: 5px;
   white-space: nowrap;
 }
-.graduation-action-gain { color: #4d7d65; font-size: 0.74rem; font-variant-numeric: tabular-nums; }
 
 .graduation-action:focus-visible,
 .graduation-card [tabindex]:focus-visible,

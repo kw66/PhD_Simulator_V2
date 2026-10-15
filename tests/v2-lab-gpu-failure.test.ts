@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { addOrReplaceBuffs, advanceBuffDurations } from "../src/core/v2-buffs";
 import { createDebugBuffs } from "../src/core/v2-debug-tools";
@@ -66,7 +67,7 @@ describe("GPU failure event", () => {
     ["reinstall", 0.499, -3, 0, 0, false], ["reinstall", 0.5, -3, 0, -1, true],
     ["taobao", 0.499, 0, -2, 0, false], ["taobao", 0.5, 0, -2, 0, true],
   ] as const)("settles %s at roll %s only on confirmation", (branch, roll, san, money, social, surcharge) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
     const initial = makeState();
     const event = makeEvent(initial, roll);
     const choice = choiceFor(event, branch);

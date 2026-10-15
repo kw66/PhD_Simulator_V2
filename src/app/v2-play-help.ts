@@ -98,8 +98,8 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
   directPage("支撑论文", `<p>只计自己的一作成果。各方向取最高的2／3篇，合计最高的方向作为大论文方向，缺少的研究点从0开始。</p>
     <p>送审前，同方向新论文高于研究点<b>当前总分</b>才整体替换，不叠加此前提升；每篇只支撑一个研究点。</p>
     <p>其他方向最高2／3篇的总分超过当前所有研究点总分时，整体换方向，旧提升清除，当月次数不重置。</p>`),
-  directPage("研究点刻度", `<p>C／B／A刻度按各研究点同分计算，仅作参考；盲审按专家随机权重评分，超过A参考线仍可继续提升。</p>`),
   directPage("毕业盲审", `<p>硕士3位、博士5位专家，随机权重之和为3，有效分四舍五入。</p>
+    <p>A／B参考刻度按各研究点同分计算，仅作参考；超过A参考线仍可继续提升。</p>
     <table class="panel-tip-table thesis-threshold-table"><thead><tr><th scope="col">有效分门槛</th><th scope="col">C</th><th scope="col">B</th><th scope="col">A</th></tr></thead><tbody>
     <tr><th>硕士</th><td>${THESIS_REVIEW_THRESHOLDS.master.C}</td><td>${THESIS_REVIEW_THRESHOLDS.master.B}</td><td>${THESIS_REVIEW_THRESHOLDS.master.A}</td></tr>
     <tr><th>博士</th><td>${THESIS_REVIEW_THRESHOLDS.phd.C}</td><td>${THESIS_REVIEW_THRESHOLDS.phd.B}</td><td>${THESIS_REVIEW_THRESHOLDS.phd.A}</td></tr></tbody></table>
@@ -108,14 +108,15 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
     `<table class="panel-tip-table"><thead><tr><th>方向</th><th>履历分</th><th>主动推进</th></tr></thead><tbody>
     <tr><th>大厂</th><td>学历20／50＋科研分×4＋每100引用×2＋实习次数×20</td><td>⌊科研能力×0.5⌋</td></tr>
     <tr><th>央国企</th><td>学历20／50＋科研分×2＋国奖次数×20</td><td>⌊科研能力×0.25⌋＋随机0～5</td></tr>
-    <tr><th>公务员</th><td>学历20／50＋科研分＋国奖次数×10</td><td>随机5～10</td></tr>
+    <tr><th>公务员</th><td>学历20／50＋科研分＋国奖次数×10</td><td>⌊推进前当前SAN÷2⌋＋随机0～5，SAN最低按0计</td></tr>
     <tr><th>教职</th><td>科研分×6＋每100引用×3＋参与结项的纵向×2＋横向＋导师帽子</td><td>⌊科研能力×0.25⌋</td></tr>
     </tbody></table>
     <p>学历20／50分别指硕士／博士；教职仅限博士。导师帽子按无、青基、面上、优青、杰青、院士分别加0／5／15／30／40／50分。</p>
+    <p>四个方向各有六档岗位，分数是录用概率的参考线，不是必过线。明显低于要求时录用率截断为0%，最高95%。</p>
     <p>每个方向每月可主动推进一次。招聘窗口：大厂9月至次年3月、央国企10月至次年4月、公务员11月至次年5月、教职12月至次年6月；教职仅限博士。</p>
     <p>毕业学年每月最多参加一场招聘。已有 offer 仍可应聘，但只能保留一份；新机会可替换旧 offer。找工作结果不影响毕业。</p>`),
   directPage("期刊投稿", `<p>期刊送审后分数<b>不衰减</b>，仍可修改和接受协作。</p>
-    <p>送审后按不断变化的当前总分判断录用，达到达标分即发表。玩家一作的版面费在缴费事件最后确认时才扣除。</p>`),
+    <p>点击期刊按钮送审；达到达标分后可继续修改，再次点击该期刊按钮才发表。玩家一作的版面费在缴费事件最后确认时才扣除。</p>`),
 ];
 
 const RELATIONSHIP_PAGES: readonly PlayHelpPage[] = [
@@ -180,6 +181,14 @@ export function getPlayHelpContext(uiState: PlayRenderUiState = {}): PlayHelpCon
 
 export function getPlayHelpPageIndex(context: PlayHelpContext, requested = 0): number {
   return Number.isFinite(requested) ? Math.max(0, Math.min(context.pages.length - 1, Math.floor(requested))) : 0;
+}
+
+export function getAllPlayHelpPageIds(): string[] {
+  const contexts = [getPlayHelpContext({ activePlayTab: "workstation" }), getPlayHelpContext({ activePlayTab: "relationship" }),
+    ...(["events", "research"] as const).map(activePlayTab => getPlayHelpContext({ activePlayTab })),
+    ...(["gear", "life", "ai", "coffee", "rest"] as const).map(activeShopTab => getPlayHelpContext({ activePlayTab: "shop", activeShopTab })),
+    ...(["character", "relation", "equip", "growth", "publication"] as const).map(activeTalentTab => getPlayHelpContext({ activePlayTab: "talent", activeTalentTab }))];
+  return [...new Set(contexts.flatMap(context => context.pages.map((_, index) => `${context.key}:${index}`)))];
 }
 
 export function renderPlayHelpPanel(uiState: PlayRenderUiState = {}): string {

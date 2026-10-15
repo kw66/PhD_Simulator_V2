@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { createAdvisorProgressState } from "./v2-advisor-progress";
 import { ADVISOR_REQUIREMENTS, ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
 import { ENROLLMENT_CALENDAR_YEAR } from "./v2-calendar";
@@ -190,7 +191,7 @@ function createBeforeGradSchoolResultEvent(advisorName: string): PendingEvent {
 
 export function createBeforeGradSchoolAct1Event(
   _state: GameState,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
   studentName?: string,
   advisorNameOverride?: string,
   advisorIntelOverride?: FixedEventAdvisorIntel,
@@ -258,7 +259,7 @@ export function resolveStudentNameConfirmation(
 export function resolveStudentNameReroll(
   state: GameState,
   resolution: FixedEventResolution,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): FixedResolutionResult {
   const currentName = resolution.studentName?.trim();
   const advisorCandidate = resolution.advisorCandidate;
@@ -328,7 +329,7 @@ export function resolveAdvisorConfirmation(
 export function resolveAdvisorReroll(
   state: GameState,
   resolution: FixedEventResolution,
-  getRoll: RandomRollProvider = Math.random,
+  getRoll: RandomRollProvider = gameRandom,
 ): FixedResolutionResult {
   const candidate = resolution.advisorCandidate;
   const currentIntel = resolution.advisorIntel;

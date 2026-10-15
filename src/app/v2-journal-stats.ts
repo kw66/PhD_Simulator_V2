@@ -1,5 +1,5 @@
-import { getJournalScore } from "../core/v2-journal-system";
-import type { GameState, JournalTarget, Paper } from "../core/v2-types";
+import { getStatisticsRunKey } from "../core/v2-run-statistics";
+import type { GameState, JournalTarget } from "../core/v2-types";
 
 import { createStatisticsClient, type StatisticsClient, type StatisticsClientOptions } from "./v2-statistics-client";
 
@@ -23,7 +23,7 @@ interface JournalStatsOptions extends StatisticsClientOptions {
 export interface JournalStatsController {
   read(journal: JournalTarget): JournalGlobalStatsSnapshot;
   load(journal: JournalTarget): Promise<void>;
-  track(before: GameState, after: GameState, options?: { debugUsed?: boolean }): Promise<void>;
+  track(before: GameState, after: GameState, options?: { debugUsed?: boolean; finalized?: boolean }): Promise<void>;
   markDebug(): void;
   resetRun(): void;
   flush(): Promise<void>;
@@ -45,18 +45,6 @@ function parseStats(value: unknown): JournalGlobalStats {
   return { acceptedCount: stats.acceptedCount, meanScore: stats.meanScore, meanMonths: stats.meanMonths };
 }
 
-function runKey(state: GameState): string {
-  return JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]);
-}
-
-function recordFor(paper: Paper): object | null {
-  const journal = paper.journalTarget ?? paper.publication?.journalTarget;
-  const submittedAt = paper.submittedYear && paper.submittedMonth ? (paper.submittedYear - 1) * 12 + paper.submittedMonth : null;
-  const acceptedAt = paper.acceptedTotalMonths;
-  if (paper.status !== "published" || paper.nonFirstAuthor === true || (paper.leadAuthorId && paper.leadAuthorId !== "player")
-    || !journal || submittedAt === null || acceptedAt === undefined || acceptedAt < submittedAt) return null;
-  return { p_rule_version: RULE_VERSION, p_journal: journal, p_score: getJournalScore(paper), p_months: acceptedAt - submittedAt };
-}
 
 export function createJournalStats(options: JournalStatsOptions): JournalStatsController {
   const enabled = options.enabled !== false;
@@ -64,21 +52,18 @@ export function createJournalStats(options: JournalStatsOptions): JournalStatsCo
   let currentRun: string | null = null;
   let debugUsed = false;
   const markDebug = (): void => { debugUsed = true; client.markDebug(currentRun); };
-  const syncRun = (state: GameState, tracking: { debugUsed?: boolean }): void => {
-    currentRun = state.phase === "setup" ? null : runKey(state);
+  const syncRun = (state: GameState, tracking: { debugUsed?: boolean; finalized?: boolean }): void => {
+    currentRun = state.phase === "setup" ? null : getStatisticsRunKey(state);
     if (tracking.debugUsed || debugUsed || (currentRun !== null && client.isDebugRun(currentRun))) markDebug();
   };
 
   const key = (journal: JournalTarget) => ({ p_rule_version: RULE_VERSION, p_journal: journal });
   const valid = (journal: JournalTarget) => enabled && ["nature", "nmi", "pami"].includes(journal);
-  const track: JournalStatsController["track"] = (before, after, tracking = {}) => {
+  const track: JournalStatsController["track"] = (_before, after, tracking = {}) => {
     syncRun(after, tracking);
-    if (!enabled || debugUsed || currentRun === null || before.phase !== "playing" || before === after || runKey(before) !== currentRun) return Promise.resolve();
-    const priorIds = new Set(before.externalPublications.map((paper) => paper.id));
-    for (const paper of after.externalPublications) {
-      if (priorIds.has(paper.id)) continue;
-      const payload = recordFor(paper);
-      if (payload) client.enqueue("journal", currentRun, JSON.stringify([paper.id, paper.createdTotalMonths]), payload);
+    if (!enabled || debugUsed || currentRun === null || !tracking.finalized || after.phase !== "finished") return Promise.resolve();
+    for (const record of after.pendingRunStatistics ?? []) {
+      if (record.kind === "journal") client.enqueue(record.kind, currentRun, record.fingerprint, record.payload);
     }
     return Promise.resolve();
   };

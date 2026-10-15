@@ -45,6 +45,7 @@ export interface StatisticsClient {
   load<T>(rpc: string, key: object, parse: (value: unknown) => T): Promise<void>;
   enqueue(kind: StatisticsKind, run: string, fingerprint: string, payload: object): boolean;
   flush(): Promise<void>;
+  persistPending(): boolean;
   markDebug(run: string | null): void;
   isDebugRun(run: string): boolean;
   dispose(): void;
@@ -142,6 +143,17 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
   const request = options.fetch ?? globalThis.fetch.bind(globalThis);
   const cache = new Map<string, CachedStats>();
   const results = new Map<string, QueuedResult>();
+  const runSnapshots = new Map<string, RunStatistics>();
+  const rememberRunSnapshot = (run: string, snapshot: RunStatistics): void => {
+    // Keep the current run of every role, including roles left suspended for months.
+    // New runs may replace that role's completed snapshot, never another role's save.
+    try {
+      const role = JSON.parse(run)[1];
+      if (typeof role !== "string" || !ROLE_IDS.has(role)) return;
+      for (const key of runSnapshots.keys()) if (key !== run && JSON.parse(key)[1] === role) runSnapshots.delete(key);
+      runSnapshots.set(run, snapshot);
+    } catch { /* Invalid run identities cannot occupy persistent snapshot slots. */ }
+  };
   const debugRuns = new Set<string>();
   const pendingReads = new Map<string, Promise<void>>();
   let pendingUpload: Promise<void> | null = null;
@@ -165,6 +177,14 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     try {
     const saved = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "null");
     if (saved?.version === 1) {
+      if (Array.isArray(saved.runSnapshots)) for (const entry of saved.runSnapshots.slice(-40)) {
+        if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string" || runSnapshots.has(entry[0])) continue;
+        try {
+          const role = JSON.parse(entry[0])[1];
+          if ([...runSnapshots.keys()].some((key) => JSON.parse(key)[1] === role)) continue;
+          rememberRunSnapshot(entry[0], parseRunStatistics(entry[1]));
+        } catch { /* Ignore damaged run snapshots. */ }
+      }
       if (Array.isArray(saved.debugRuns)) for (const run of saved.debugRuns) if (typeof run === "string") debugRuns.add(run);
       if (Array.isArray(saved.results)) for (const entry of saved.results) {
         if (!Array.isArray(entry) || entry.length !== 2) continue;
@@ -194,12 +214,15 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
   };
   mergeStorage();
 
-  const persist = (): void => {
-    if (!enabled || disposed) return;
+  const persist = (): boolean => {
+    if (!enabled) return true;
+    if (disposed || !storage) return false;
     mergeStorage();
     while (cache.size > 128) cache.delete(cache.keys().next().value!);
-    try { storage?.setItem(STORAGE_KEY, JSON.stringify({ version: 1, results: [...results], debugRuns: [...debugRuns], cache: [...cache], nextUploadAt, failures, uploadChangedAt })); }
-    catch { /* Keep the current session functional even when storage is full. */ }
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, runSnapshots: [...runSnapshots], results: [...results], debugRuns: [...debugRuns], cache: [...cache], nextUploadAt, failures, uploadChangedAt }));
+      return true;
+    } catch { return false; }
   };
   const rpc = async (name: string, payload: object): Promise<unknown> => {
     const response = await request(`${RPC_URL}/${name}`, { method: "POST",
@@ -318,12 +341,22 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
       if (!enabled || disposed) return Promise.resolve();
       if (activeRun === run) return runLoad;
       activeRun = run;
+      mergeStorage();
+      const savedSnapshot = runSnapshots.get(run);
+      if (savedSnapshot) {
+        runSnapshot = structuredClone(savedSnapshot);
+        runStatus = "ready";
+        runLoad = Promise.resolve();
+        options.onChange?.(SNAPSHOT_RPC);
+        return runLoad;
+      }
       runSnapshot = null;
       runStatus = "loading";
       runLoad = loadCached(SNAPSHOT_RPC, {}, parseRunStatistics).then(() => {
         if (disposed || activeRun !== run) return;
         const cached = readCached(SNAPSHOT_RPC, {}, parseRunStatistics);
         runSnapshot = cached.data;
+        if (runSnapshot) { rememberRunSnapshot(run, structuredClone(runSnapshot)); persist(); }
         runStatus = cached.data ? "ready" : "unavailable";
         options.onChange?.(SNAPSHOT_RPC);
       });
@@ -347,6 +380,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     },
     load: (name, key, parse) => activeRun === null || name === ACTIVITY_RPC ? loadCached(name, key, parse) : runLoad,
     flush,
+    persistPending: () => !uploadEnabled || persist(),
     enqueue(kind, run, fingerprint, payload) {
       mergeStorage();
       if (!uploadEnabled || disposed || debugRuns.has(run)) return false;

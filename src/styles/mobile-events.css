@@ -1,0 +1,102 @@
+/* Events remain in the normal page flow on phones; every scene can grow to fit. */
+@media (max-width: 820px) {
+  .center-main-panel[data-tab-panel="events"] .event-content-header {
+    gap: 4px;
+    padding: 5px 6px;
+    min-height: 0;
+  }
+  .center-main-panel[data-tab-panel="events"] .event-scene-tabs {
+    flex: 1;
+    gap: 0;
+  }
+  .center-main-panel[data-tab-panel="events"] .event-scene-tab {
+    flex: 1 1 0;
+    min-height: 40px;
+    padding: 4px;
+    white-space: normal;
+    line-height: 1.35;
+    font-size: 12px;
+    overflow: visible;
+  }
+  .event-scene-separator { width: 8px; flex-basis: 8px; }
+  .event-content-header .event-content-close {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+  }
+  .center-main-panel[data-tab-panel="events"] .event-content-body {
+    min-height: 0;
+    padding: 14px 12px;
+    font-size: 14px;
+    line-height: 1.75;
+  }
+  .center-main-panel[data-tab-panel="events"] .event-content-buttons {
+    min-height: 0;
+    gap: 8px;
+    padding: 10px;
+  }
+  .center-main-panel[data-tab-panel="events"] .event-content-buttons .event-choice-btn {
+    flex: 1 1 calc(50% - 4px);
+    width: auto;
+    max-width: calc(50% - 4px);
+    min-height: 44px;
+    padding: 8px 5px;
+  }
+  .center-main-panel[data-tab-panel="events"] .event-content-buttons .event-choice-btn:only-child {
+    max-width: 100%;
+  }
+  .event-content-buttons .event-choice-btn > span { font-size: 13px; line-height: 1.4; }
+  .paper-reviewer-grid, .graduation-reviewer-grid { grid-template-columns: minmax(0, 1fr); }
+  .paper-reviewer-card blockquote, .graduation-reviewer-card blockquote { font-size: 13px; }
+  .journal-chart-scroll, .graduation-review-chart-scroll {
+    min-width: 0;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+  }
+  .event-san-chart-toggle { top: 3px; right: 4px; height: 38px; }
+  .san-chart-heading { flex-wrap: wrap; font-size: 12px; }
+
+  .settings-panel .settings-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .settings-panel .settings-quick-actions > button { min-height: 46px; font-size: 13px; }
+  .run-saves-heading { padding: 5px 8px; gap: 5px; }
+  .run-saves-heading h3 { flex-wrap: wrap; gap: 4px; }
+  .run-saves-close { min-height: 40px; flex-shrink: 0; }
+  .run-saves-note { padding: 6px 8px; border-radius: 4px; background: #f8f2e6; color: #756044; }
+  .run-save-card { gap: 8px; padding: 9px 8px; }
+  .run-save-title, .run-save-detail { column-gap: 7px; }
+  .run-save-detail time { margin-left: 0; }
+  .run-save-load { min-height: 44px; min-width: 48px; padding-inline: 8px; }
+  .run-saves-list { max-height: min(480px, 65dvh); overscroll-behavior-y: contain; }
+  .game-confirm-button, .game-confirm-close { min-height: 44px; min-width: 44px; }
+
+  .ending-panel .ending-header { padding: 12px 8px; }
+  .ending-panel .event-content-close { width: 40px; height: 40px; top: 1px; right: 2px; }
+  .ending-panel .ending-identity { font-size: 12px; gap: 4px 8px; }
+  .ending-showcase-title { font-size: 14px; }
+  .ending-showcase-meta, .ending-showcase-kicker { font-size: 12px; }
+  .ending-showcase-badge { font-size: 11px; }
+  .ending-highlight { padding: 8px; gap: 5px; }
+  .ending-highlight-heading, .ending-highlight-heading strong, .ending-fellow-name strong,
+  .ending-highlight-detail, .ending-highlight-tags > span, .ending-fellow-name > span {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .ending-highlight-detail { gap: 3px 8px; }
+  .ending-summary-metrics > div > span, .ending-summary-venues > span,
+  .ending-record-cell > span, .ending-experience { font-size: 12px; }
+  .ending-summary-metrics > div { gap: 5px; }
+  .ending-buttons { width: 100%; gap: 8px; }
+  .ending-buttons > button { min-height: 44px; flex: 1 1 100%; font-size: 14px; }
+}
+
+@media (max-width: 430px) {
+  .graduation-review-score-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .journal-run-stats-grid > div { padding-inline: 3px; }
+  .journal-run-stats-grid span { text-align: center; }
+  .ending-summary-attributes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ending-summary-attributes > div:last-child { grid-column: 1 / -1; }
+  .ending-highlights, .ending-highlights.has-2, .ending-highlights.has-3 { grid-template-columns: minmax(0, 1fr); }
+}

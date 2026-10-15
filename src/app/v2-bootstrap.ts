@@ -51,6 +51,7 @@ import {
   HeartHandshake,
   HeartPlus,
   HeartPulse,
+  History,
   House,
   Hourglass,
   Infinity,
@@ -111,7 +112,8 @@ import { createConferenceStats } from "./v2-conference-stats";
 import { createJournalStats } from "./v2-journal-stats";
 import { createThesisStats } from "./v2-thesis-stats";
 import { createStatisticsClient } from "./v2-statistics-client";
-import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
+import { createAchievementStats } from "./v2-achievement-stats";
+import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, NICKNAME_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations, getVisibleValueDelta } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
 import { createRelationshipTooltips } from "./v2-relationship-tooltips";
@@ -155,7 +157,13 @@ import {
   type TalentPanelTabId,
 } from "./v2-render-types";
 import { warmRoleDetailPortraits } from "./v2-role-portrait-assets";
-import { getPlayHelpContext, getPlayHelpPageIndex } from "./v2-play-help";
+import { getAllPlayHelpPageIds, getPlayHelpContext, getPlayHelpPageIndex } from "./v2-play-help";
+import { createResponsiveScoreCharts } from "./v2-responsive-score-charts";
+import "../styles/mobile-base.css";
+import "../styles/mobile-lobby.css";
+import "../styles/mobile-panels.css";
+import "../styles/mobile-events.css";
+import "../styles/community-mobile.css";
 
 const ROLE_IDS: ReadonlySet<string> = new Set(getRoleOptions().map((role) => role.id));
 const ROLE_IDS_IN_DISPLAY_ORDER = getRoleOptions().map((role) => role.id);
@@ -281,6 +289,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const conferenceStats = createConferenceStats(statisticsOptions);
   const journalStats = createJournalStats(statisticsOptions);
   const thesisStats = createThesisStats(statisticsOptions);
+  const achievementStats = createAchievementStats({ uploadEnabled: statisticsUploadEnabled,
+    onChange: () => { if (store.getState().phase === "setup") render(); },
+  });
   const community = createCommunityMessages({ onChange: () => syncCommunityView() });
   function syncCommunityView(): void {
     renderCommunityMessages(root, community);
@@ -305,6 +316,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let refreshTalentTree = false;
   let isFeedbackOpen = false;
   let isQuitConfirmationOpen = false;
+  let isRunSavePanelOpen = false;
   let activeShopTab: ShopTabId = "ai";
   let selectedChairUpgradeId: ShopUpgradeId | null = null;
   let selectedCoffeeUpgradeId: Exclude<CoffeeMachineUpgradeId, null> | null = null;
@@ -400,6 +412,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   };
 
   const selectPlayTab = (nextPlayTab: PlayTabId): void => {
+    isRunSavePanelOpen = false;
     if (nextPlayTab === activePlayTab) return;
     rememberTabSliderOrigin("center");
     playTabTransitionDirection = playTabOrder.indexOf(nextPlayTab) > playTabOrder.indexOf(activePlayTab)
@@ -614,9 +627,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
   const eventLayout = createEventLayout(root);
   const relationshipTooltips = createRelationshipTooltips(root);
+  const responsiveScoreCharts = createResponsiveScoreCharts(root);
   const syncAllFixedStageScales = (): void => {
     eventLayout.sync();
     relationshipTooltips.sync();
+    responsiveScoreCharts.sync();
     syncFixedStageScale(
       '.lobby-page[data-scale-mode="fixed"] .lobby-stage-shell',
       '.lobby-page[data-scale-mode="fixed"] .lobby-stage',
@@ -930,6 +945,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     skipNextPlayerAnimation = false;
     if (state.phase !== lastPhase) {
       isQuitConfirmationOpen = false;
+      isRunSavePanelOpen = false;
       isEndingContentOpen = true;
       labInheritancePage = 0;
       loverRewardPage = 0;
@@ -990,6 +1006,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
     syncShopUpgradeNotices(state);
     const shopUpgradeNotices = getShopUpgradeNotices(state);
     const lobby = store.getLobbyState();
+    if (isHelpOpen && state.phase === "playing") {
+      const context = getPlayHelpContext({ activePlayTab, activeShopTab, activeTalentTab });
+      const index = getPlayHelpPageIndex(context, helpPageByContext[context.key]);
+      store.recordHelpPageRead(`${context.key}:${index}`, getAllPlayHelpPageIds());
+    }
     const previousTalentTree = !refreshTalentTree && state.phase === "setup" && lobby.selectedLobbyRoleId === lastRenderedSetupRoleId
       ? root.querySelector<HTMLElement>(".lobby-talent-tree")
       : null;
@@ -1002,6 +1023,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
     root.dataset.phase = state.phase;
     root.innerHTML = renderApp(state, lobby, {
       activePlayTab,
+      runSaves: store.getRunSaves(),
+      saveStatus: store.getSaveStatus(),
+      isRunSavePanelOpen,
+      hasRoleSave: store.hasRoleSave(lobby.selectedLobbyRoleId),
+      isSaveLoading: !store.isReady(),
+      roleExperienceAward: store.getEndingExperienceAward(),
       helpPageByContext,
       isHelpOpen,
       activeRoleRailView,
@@ -1126,6 +1153,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         HeartHandshake,
         HeartPlus,
         HeartPulse,
+        History,
         House,
         Hourglass,
         Infinity,
@@ -1256,6 +1284,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     }
 
     if (actionId === "start-game" || actionId === "restart-game") {
+      isRunSavePanelOpen = false;
       conferenceStats.resetRun();
       journalStats.resetRun();
       thesisStats.resetRun();
@@ -1323,34 +1352,60 @@ export function bootstrapApp(root: HTMLDivElement): void {
     () => { store.markCurrentRunAsDebugged(); conferenceStats.markDebug(); journalStats.markDebug(); thesisStats.markDebug(); },
   );
 
+  const publishFinalizedRun = async (record: ReturnType<typeof store.getFinalizedOutbox>[number]): Promise<void> => {
+    if (record.debugUsed || !statisticsUploadEnabled) { store.acknowledgeFinalizedRun(record.runId); return; }
+    const achievementQueued = achievementStats.recordFinalizedRun(record);
+    const finished = record.state;
+    const runKey = JSON.stringify([finished.conferenceLocationSeed, finished.selectedRoleId]);
+    for (const result of finished.pendingRunStatistics ?? []) {
+      statistics.enqueue(result.kind, runKey, result.fingerprint, result.payload);
+    }
+    await visitStats.trackGamePhase("finished", { runKey, roleId: finished.selectedRoleId,
+      ending: finished.ending, finalized: true, disqualifiedByDebug: false });
+    if (statistics.persistPending() && achievementQueued && achievementStats.persistPending()) store.acknowledgeFinalizedRun(record.runId);
+    void statistics.flush();
+    void achievementStats.flush();
+  };
+  store.subscribeFinalized(record => { void publishFinalizedRun(record); });
+  void store.ready().then(() => {
+    for (const record of store.getFinalizedOutbox()) void publishFinalizedRun(record);
+    render();
+  });
+
   let previousConferenceState = store.getState();
   store.subscribe((state) => {
     const before = previousConferenceState;
     previousConferenceState = state;
-    if (state.phase === "playing" && (before.phase !== "playing"
+    if (state.phase === "setup") void achievementStats.load();
+    if (state.phase !== "setup" && (before.phase === "setup"
       || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
       void statistics.startRun(JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]));
     }
-    void conferenceStats.track(before, state);
-    void journalStats.track(before, state);
-    void thesisStats.track(before, state);
+    const debugUsed = store.isCurrentRunDebugged() || debugWindow.isOpen();
+    void conferenceStats.track(before, state, { debugUsed });
+    void journalStats.track(before, state, { debugUsed });
+    void thesisStats.track(before, state, { debugUsed });
     debugWindow.update();
     render();
     void visitStats.trackGamePhase(state.phase, {
       runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
       roleId: state.selectedRoleId,
       ending: state.ending,
-      disqualifiedByDebug: store.getLobbyState().lastRunExperience?.disqualifiedByDebug,
+      disqualifiedByDebug: debugUsed,
     }).then(() => {
       visitStats.render(root);
       scheduleAllFixedStageScales();
     });
   });
 
-  window.addEventListener("online", () => { void statistics.flush(); });
-  window.addEventListener("pagehide", () => { void statistics.flush(); });
+  window.addEventListener("online", () => {
+    for (const record of store.getFinalizedOutbox()) void publishFinalizedRun(record);
+    void statistics.flush(); void achievementStats.flush();
+    if (store.getState().phase === "setup") void achievementStats.load();
+  });
+  window.addEventListener("pagehide", () => { void store.flushSaves(); void statistics.flush(); void achievementStats.flush(); });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void statistics.flush();
+    if (document.visibilityState === "hidden") { void store.flushSaves(); void statistics.flush(); void achievementStats.flush(); }
   });
   void visitStats.load().then(() => {
     visitStats.render(root);
@@ -1365,7 +1420,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (target instanceof HTMLInputElement && (target.dataset.communityNickname === "board" || target.dataset.communityNickname === "feedback")) {
       community.setNickname(target.value);
       const counter = target.closest(".community-compose")?.querySelector<HTMLElement>("[data-community-nickname-count]");
-      if (counter) counter.textContent = `${target.value.length}/${target.maxLength}`;
+      const length = countMessageCharacters(target.value);
+      if (counter) counter.textContent = `${length}/${NICKNAME_MAX_LENGTH}`;
+      target.setAttribute("aria-invalid", String(countMessageCharacters(target.value.trim()) > NICKNAME_MAX_LENGTH));
     } else if (target instanceof HTMLTextAreaElement && (target.dataset.communityContent === "board" || target.dataset.communityContent === "feedback")) {
       community.setContent(target.dataset.communityContent, target.value);
       const counter = target.closest(".community-compose")?.querySelector<HTMLElement>("[data-community-char-count]");
@@ -1450,6 +1507,30 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    if (target.closest("button[data-ui-open-run-saves]")) {
+      isRunSavePanelOpen = true;
+      activePlayTab = "settings";
+      render();
+      return;
+    }
+    if (target.closest("button[data-ui-close-run-saves]")) {
+      isRunSavePanelOpen = false;
+      if (store.getState().phase === "finished") { activePlayTab = "events"; isEndingContentOpen = true; }
+      render();
+      return;
+    }
+    const loadSaveButton = target.closest<HTMLButtonElement>("button[data-ui-load-run-save]");
+    if (loadSaveButton && !loadSaveButton.disabled) {
+      isRunSavePanelOpen = false;
+      resetEventContentUiState();
+      activeLogPage = null;
+      timelineScrollLeft = 0;
+      skipNextPlayerAnimation = true;
+      activePlayTab = "events";
+      isEndingContentOpen = true;
+      store.loadRunSave(loadSaveButton.dataset.uiLoadRunSave ?? "latest");
+      return;
+    }
     if (isQuitConfirmationOpen) {
       if (target.closest("button[data-ui-cancel-quit]")) {
         closeQuitConfirmation();

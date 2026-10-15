@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import type { ConferenceActivityBuildState, ConferenceActivityContext } from "./v2-conference-activity-shared";
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
@@ -195,7 +196,7 @@ function createConferenceDecisionAct2(
 export function createConferenceDecisionAct1(
   context: ConferenceEventContext,
   state: ConferenceEventBuilderState,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): PendingEvent {
   const rolls: number[] = [];
   const root = buildConferenceDecisionAct1(context, state, () => {
@@ -265,7 +266,7 @@ export function refreshConferenceDecision<Event extends PendingEvent>(state: Gam
 function buildConferenceDecisionAct1(
   context: ConferenceEventContext,
   state: ConferenceEventBuilderState,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): PendingEvent {
   return {
     id: `${context.id}-act1`,
@@ -297,7 +298,7 @@ function buildConferenceDecisionAct1(
 export function buildConferenceDecisionEventsForAcceptedPapers(
   papers: ConferenceAcceptedPaperCandidate[],
   state: ConferenceEventBuilderState,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): PendingEvent[] {
   const groupedContexts = new Map<string, ConferenceEventContext>();
   const seenPaperIds = new Set<string>();

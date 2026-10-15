@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderPlayScreen } from "../src/app/v2-render-play";
@@ -71,7 +72,7 @@ function grantPaperProgress(paperId: string, scores: Partial<Pick<Paper, "idea" 
 }
 
 beforeEach(() => {
-  vi.spyOn(Math, "random").mockReturnValue(0);
+  vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
 });
 
 afterEach(() => {

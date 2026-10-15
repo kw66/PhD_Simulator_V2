@@ -1,9 +1,10 @@
+import { gameRandom } from "./v2-game-random";
 import { getGraduationPreparationYear, prepareThesisBlindReview } from "./v2-thesis-rules";
 import type { GameState, PendingEvent } from "./v2-types";
 
 export function collectThesisEventForMonth(
   state: GameState,
-  random: () => number = Math.random,
+  random: () => number = gameRandom,
 ): { nextState: GameState; event: PendingEvent | null } {
   const id = `thesis-review-${state.degree}-y${state.year}`;
   if (state.phase !== "playing" || state.year !== getGraduationPreparationYear(state.degree) || state.month < 8 || state.thesis.reviewResolved

@@ -41,7 +41,7 @@ describe("decimal display through real attribute animations", () => {
     try {
       await page.route("**/__numeric_display_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
       await page.goto(`${server.resolvedUrls!.local[0]}__numeric_display_test__`);
-      await page.waitForSelector("[data-action='start-game']");
+      await page.waitForSelector("[data-action='start-game']:not(:disabled)");
       await mkdir("artifacts/decimal-display", { recursive: true });
       await page.evaluate(() => {
         const store = (window as NumericTestWindow).numericTestStore;

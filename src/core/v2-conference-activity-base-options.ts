@@ -1,3 +1,4 @@
+import { gameRandom } from "./v2-game-random";
 import { getConferenceActivityTravelSanRecovery, resolveConferenceActivityAttributes } from "./v2-conference-activity-shared";
 import { canTriggerConferenceInternshipInvite, hasOngoingInternship } from "./v2-internship-system";
 import type {
@@ -9,7 +10,7 @@ import type {
 export function createBaseConferenceActivityOptions(
   context: ConferenceActivityContext,
   state: ConferenceActivityBuildState,
-  getRoll: () => number = Math.random,
+  getRoll: () => number = gameRandom,
 ): ConferenceActivityOptionDefinition[] {
   const options: ConferenceActivityOptionDefinition[] = [
     {

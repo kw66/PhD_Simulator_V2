@@ -65,7 +65,12 @@ export function getJournalSubmissionFailure(
   journalTarget: JournalTarget,
 ): string | null {
   if (!paper) return "请先新建一篇论文";
-  if (paper.status !== "draft") return paper.status === "journal-reviewing" ? "论文正在期刊修改中" : "这篇论文当前不能投稿";
+  if (paper.status === "journal-reviewing") {
+    if (paper.journalTarget !== journalTarget) return "更换期刊前需先撤稿";
+    const journal = getJournalDefinition(journalTarget);
+    return getJournalScore(paper) >= journal.acceptanceScore ? null : `继续修改至 ${journal.acceptanceScore} 分后点击发表`;
+  }
+  if (paper.status !== "draft") return "这篇论文当前不能投稿";
   if (paper.idea <= 0 || paper.experiment <= 0 || paper.writing <= 0) return "先完成idea、实验和写作，再投稿期刊";
   const journal = getJournalDefinition(journalTarget);
   const score = getJournalScore(paper);
@@ -90,9 +95,9 @@ export function submitJournalPaper(
   const paperIndex = state.papers.findIndex((paper) => paper.id === paperId);
   const paper = paperIndex >= 0 ? state.papers[paperIndex] : null;
   if (!paper) return pushNoOpLog(state, "投稿期刊：没有找到这篇论文");
-  if (paper.status !== "draft") return pushNoOpLog(state, "投稿期刊：这篇论文当前不能投稿");
   const failure = getJournalSubmissionFailure(paper, journalTarget);
   if (failure) return pushNoOpLog(state, `投稿期刊：${failure}`);
+  if (paper.status === "journal-reviewing") return resolveReadyJournalPapers(state, paper.id).state;
 
   const journal = getJournalDefinition(journalTarget);
   const score = getJournalScore(paper);
@@ -120,7 +125,7 @@ export function submitJournalPaper(
     { ...state, papers, selectedPaperId: paper.id },
     `投稿期刊：${paper.title} 已送审${journal.name}，当前期刊分 ${score}，达到 ${journal.submissionScore} 分送审线后进入持续修改`,
   );
-  return resolveReadyJournalPapers(nextState).state;
+  return nextState;
 }
 
 export interface JournalResolution {
@@ -129,7 +134,8 @@ export interface JournalResolution {
   acceptedPaperIds: string[];
 }
 
-export function resolveReadyJournalPapers(state: GameState): JournalResolution {
+/** Background calls only track scores. Publication requires an explicit paper confirmation. */
+export function resolveReadyJournalPapers(state: GameState, confirmedPaperId?: string): JournalResolution {
   if (state.phase !== "playing") return { state, logs: [], acceptedPaperIds: [] };
 
   let nextState = { ...state, buffs: [...state.buffs] };
@@ -147,7 +153,7 @@ export function resolveReadyJournalPapers(state: GameState): JournalResolution {
     const journal = getJournalDefinition(paper.journalTarget);
     const score = getJournalScore(paper);
     const trackedPaper = recordJournalScore(paper, state.totalMonths);
-    if (score < journal.acceptanceScore) {
+    if (paper.id !== confirmedPaperId || score < journal.acceptanceScore) {
       activePapers.push(trackedPaper);
       continue;
     }

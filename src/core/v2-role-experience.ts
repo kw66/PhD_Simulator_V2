@@ -9,16 +9,17 @@ export function getNextRoleLevelExperience(level: number): number | null {
   return ROLE_LEVEL_EXP_REQUIREMENTS[level] ?? null;
 }
 
-export function getRunExperienceGain(researchScore: number): number {
+export function getRunExperienceGain(researchScore: number, multiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER): number {
   if (!Number.isFinite(researchScore) || researchScore <= 0) return 0;
-  return Math.min(Number.MAX_SAFE_INTEGER, Math.floor(researchScore * DEFAULT_ROLE_EXP_GAIN_MULTIPLIER));
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.floor(researchScore * Math.max(1, multiplier)));
 }
 
 export function awardRoleExperience(
   progress: RoleMetaProgress,
   researchScore: number,
+  multiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER,
 ): { progress: RoleMetaProgress; gained: number } {
-  const gained = getRunExperienceGain(researchScore);
+  const gained = getRunExperienceGain(researchScore, multiplier);
   let level = progress.level;
   let exp = Math.min(Number.MAX_SAFE_INTEGER, progress.exp + gained);
 

@@ -1,3 +1,4 @@
+import { recordPersonalIncome } from "./v2-money";
 import { getRecoveredSan } from "./v2-san-recovery";
 import {
   AI_SLOT_IDS,
@@ -64,7 +65,7 @@ function syncAiBuffs(state: GameState): GameState {
 }
 
 function updateMoney(state: GameState, money: number): GameState {
-  return recordPersonalSpending({ ...state, player: { ...state.player, money } }, state.player.money - money);
+  return recordPersonalIncome(recordPersonalSpending({ ...state, player: { ...state.player, money } }, state.player.money - money), money - state.player.money);
 }
 
 function fail(state: GameState, message: string): GameState {

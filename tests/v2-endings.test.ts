@@ -1,3 +1,4 @@
+import * as gameRandomSource from "../src/core/v2-game-random";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GAME_ACTION_IDS } from "../src/core/v2-action-ids";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
@@ -202,7 +203,7 @@ describe("ending failure boundaries", () => {
   });
 
   it("preserves a negative research value through month-start settlement and freezes subsequent months", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState(9);
     state.player.research = 0;
     state.buffs = [{ id: "research-loss", name: "科研损失", source: "测试", timing: "permanent", remainingMonths: null, monthlyStats: { research: -1 } }];
@@ -224,7 +225,7 @@ describe("ending failure boundaries", () => {
   });
 
   it("honors monthly spike protection before other failures without double counting recovery", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState(9);
     state.player.san = 1;
     state.shopState = { ...state.shopState, chairOwned: true, chairUpgrade: "spike" };
@@ -249,7 +250,7 @@ describe("ending failure boundaries", () => {
   });
 
   it.each(["lover", "fellow", "automatic-coffee", "coffee-subscription"])("stops monthly losses before %s can heal them", (recovery) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeState(9);
     state.player.san = 1;
     state.buffs = [{ id: "monthly-loss", name: "月度压力", source: "测试", timing: "permanent", remainingMonths: null, monthlyStats: { san: -4 } }];
@@ -276,13 +277,16 @@ describe("ending failure boundaries", () => {
 });
 
 describe("forced month advance with journal acceptance", () => {
-  it.each(["lover", "fellow"] as const)("crosses June and July when %s help creates a new unpaid acceptance", (helper) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
-    const initial = withPendingJournalHelp(makeState(10), helper);
-    const paperId = initial.papers[0]!.id;
+  it.each(["lover", "fellow"] as const)("crosses June and July after confirming a journal improved by %s help", (helper) => {
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.99);
+    const pending = withPendingJournalHelp(makeState(10), helper);
+    const helped = dispatchAction(pending, "select-paper", { paperId: pending.papers[0]!.id });
+    expect(helped.externalPublications).toHaveLength(0);
+    const initial = dispatchAction(helped, "submit-journal-paper", { paperId: pending.papers[0]!.id, journalTarget: "pami" });
+    const paperId = pending.papers[0]!.id;
     expect(initial.month).toBe(10);
-    expect(initial.eventQueue).toEqual([]);
-    expect(initial.papers[0]!.status).toBe("journal-reviewing");
+    expect(initial.eventQueue.some(event => event.journalFeePreview)).toBe(true);
+    expect(initial.papers).toHaveLength(0);
     const normal = dispatchAction(initial, "next-month");
     expect(normal).toMatchObject({ phase: "playing", ending: null, totalMonths: 10 });
     expect(normal.externalPublications).toEqual([expect.objectContaining({ id: paperId, status: "published" })]);
@@ -319,7 +323,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   }
 
   it.each(["next-month", "force-next-month"] as const)("keeps final June playable until %s is pressed again", (actionId) => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeGraduationState(limit - 1);
     state.totalResearchScore = state.graduationScoreTarget!;
     state.player.san = 10;
@@ -364,7 +368,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   });
 
   it("allows paper research in final June before settling a delayed graduation", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeGraduationState();
     const paper = createDraftPaper(1, 0, () => 0);
     state.papers = [paper];
@@ -376,7 +380,7 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
   });
 
   it("settles final June without adding a month or ending before due choices", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
     const state = makeGraduationState(limit - 1);
     state.eventQueue = [makeEvent("last-choice", { score: state.graduationScoreTarget! }, { deadlineMonths: 1 })];
     const advanced = dispatchAction(state, "next-month");
@@ -406,18 +410,20 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
     expect(dispatchAction({ ...state, blockLinearEvents: false, eventQueue: [makeEvent("future", {}, { deadlineMonths: 1 })] }, "next-month").ending).toBe("delay");
   });
 
-  it.each(["lover", "fellow"] as const)("credits %s journal help on both final-event and final-month routes", (helper) => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+  it.each(["lover", "fellow"] as const)("credits explicitly confirmed %s journal help before graduation", (helper) => {
+    vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0);
     const state = withPendingJournalHelp(makeGraduationState(), helper);
     state.totalResearchScore = Math.max(0, state.graduationScoreTarget! - 5);
-    for (const route of ["event", "month"] as const) {
+    for (const route of ["event", "selection"] as const) {
       let current = state;
       if (route === "event") {
         current = resolveEvent({ ...state, eventQueue: [makeEvent("last-result")] }, "last-result");
-        expect(current).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
-        expect(current.externalPublications).toHaveLength(1);
         if (helper === "fellow") expect(current.fellowProgressState[0]?.pendingHelpToPlayer).toBeNull();
-      }
+      } else current = dispatchAction(current, "select-paper", { paperId: state.papers[0]!.id });
+      expect(current.externalPublications).toHaveLength(0);
+      expect(current.totalResearchScore).toBe(state.totalResearchScore);
+      current = dispatchAction(current, "submit-journal-paper", { paperId: state.papers[0]!.id, journalTarget: "pami" });
+      expect(current.externalPublications).toHaveLength(1);
       for (const actionId of ["next-month", "force-next-month"] as const) {
         const awaitingPayment = dispatchAction(current, actionId);
         expect(awaitingPayment.advisorProgressState.paidJournalPaperIds ?? []).not.toContain(state.papers[0]!.id);
@@ -445,7 +451,9 @@ describe.each(["master", "phd"] as const)("%s graduation settlement", (degree) =
 
   it("waits for month-end after action-triggered journal publication", () => {
     const state = withPendingJournalHelp(makeGraduationState(), "lover");
-    const next = dispatchAction({ ...state, totalResearchScore: Math.max(0, state.graduationScoreTarget! - 5) }, "select-paper", { paperId: state.papers[0]!.id });
+    const revised = dispatchAction({ ...state, totalResearchScore: Math.max(0, state.graduationScoreTarget! - 5) }, "select-paper", { paperId: state.papers[0]!.id });
+    expect(revised.externalPublications).toHaveLength(0);
+    const next = dispatchAction(revised, "submit-journal-paper", { paperId: state.papers[0]!.id, journalTarget: "pami" });
     expect(next).toMatchObject({ phase: "playing", ending: null, totalMonths: limit, totalResearchScore: Math.max(5, state.graduationScoreTarget!) });
     expect(next.externalPublications).toHaveLength(1);
     expect(next.advisorProgressState.paidJournalPaperIds ?? []).not.toContain(state.papers[0]!.id);

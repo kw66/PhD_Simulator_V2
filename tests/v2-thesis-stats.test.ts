@@ -1,3 +1,4 @@
+import { collectRunStatistics } from "../src/core/v2-run-statistics";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createThesisStats } from "../src/app/v2-thesis-stats";
 import { renderThesisReviewReports } from "../src/app/v2-render-graduation";
@@ -56,10 +57,10 @@ describe("global thesis statistics", () => {
     expect(after.thesis.review).toMatchObject({ degree: "master", submitted: true, passed: true, excellent: true });
     expect(globalThis.crypto.randomUUID).toBeTypeOf("function");
     expect([after.conferenceLocationSeed, after.selectedRoleId]).toEqual([before.conferenceLocationSeed, before.selectedRoleId]);
-    await stats.track(before, { ...before });
+    await finalize(stats, before, { ...before });
     expect(fetch).not.toHaveBeenCalled();
-    await stats.track(before, after);
-    await stats.track(before, after);
+    await finalize(stats, before, after);
+    await finalize(stats, before, after);
     expect(fetch).not.toHaveBeenCalled();
     await stats.flush();
     expect(rows.size).toBe(1);
@@ -81,7 +82,7 @@ describe("global thesis statistics", () => {
     expect(html).not.toContain("统计暂未同步");
     stats.dispose();
     const reloaded = createThesisStats({ onChange: vi.fn(), fetch, storage: local });
-    await reloaded.track(before, after);
+    await finalize(reloaded, before, after);
     await reloaded.flush();
     await reloaded.load("master");
     expect(rows.size).toBe(1);
@@ -100,7 +101,7 @@ describe("global thesis statistics", () => {
     });
     const stats = createThesisStats({ onChange: vi.fn(), fetch, storage: storage() });
     const [before, after] = reviewStates("phd", false);
-    await stats.track(before, after);
+    await finalize(stats, before, after);
     await stats.flush();
     expect(payloads).toHaveLength(1);
     expect(payloads[0]).toMatchObject({ p_degree: "phd", p_submitted: false, p_passed: false, p_excellent: false });
@@ -117,7 +118,7 @@ describe("global thesis statistics", () => {
     const stats = createThesisStats({ onChange: vi.fn(), fetch, storage: storage() });
     const [before, after] = reviewStates();
     stats.markDebug();
-    await stats.track(before, after);
+    await finalize(stats, before, after);
     await stats.flush();
     expect(fetch).not.toHaveBeenCalled();
     const html = renderThesisReviewReports(before.eventQueue[0]!.thesisReviewPresentation!);
@@ -134,3 +135,9 @@ describe("global thesis statistics", () => {
     expect(stats.read("master")).toEqual({ status: "unavailable", data: null });
   });
 });
+
+// These recorder tests submit a committed final branch; gameplay alone never uploads.
+function finalize(controller: { track(before: GameState, after: GameState, options?: { debugUsed?: boolean; finalized?: boolean }): Promise<void> },
+  before: GameState, after: GameState, options: { debugUsed?: boolean } = {}): Promise<void> {
+  return controller.track(before, { ...collectRunStatistics(before, after), phase: "finished" }, { ...options, finalized: true });
+}

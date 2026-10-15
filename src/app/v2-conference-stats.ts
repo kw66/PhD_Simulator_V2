@@ -1,4 +1,4 @@
-import { getConferenceInfo } from "../core/v2-conference-catalog";
+import { getStatisticsRunKey } from "../core/v2-run-statistics";
 import type { GameState, PaperAcceptType, PaperTarget } from "../core/v2-types";
 
 import { createStatisticsClient, type StatisticsClient, type StatisticsClientOptions } from "./v2-statistics-client";
@@ -31,7 +31,7 @@ interface ConferenceStatsOptions extends StatisticsClientOptions {
   onChange: () => void;
   client?: StatisticsClient;
 }
-interface TrackingOptions { debugUsed?: boolean }
+interface TrackingOptions { debugUsed?: boolean; finalized?: boolean }
 
 export interface ConferenceStatsController {
   read(name: string, year: number, target: PaperTarget): ConferenceGlobalStatsSnapshot;
@@ -79,9 +79,6 @@ function parseStats(value: unknown): ConferenceGlobalStats {
     means: Object.fromEntries(meanKeys.map((key) => [key, data.means[key]])) as Record<ConferenceStatsMeanKey, number | null> };
 }
 
-function runKey(state: GameState): string {
-  return JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]);
-}
 
 export function createConferenceStats(options: ConferenceStatsOptions): ConferenceStatsController {
   const enabled = options.enabled !== false;
@@ -89,8 +86,8 @@ export function createConferenceStats(options: ConferenceStatsOptions): Conferen
   let currentRun: string | null = null;
   let debugUsed = false;
   const markDebug = (): void => { debugUsed = true; client.markDebug(currentRun); };
-  const syncRun = (state: GameState, tracking: { debugUsed?: boolean }): void => {
-    currentRun = state.phase === "setup" ? null : runKey(state);
+  const syncRun = (state: GameState, tracking: { debugUsed?: boolean; finalized?: boolean }): void => {
+    currentRun = state.phase === "setup" ? null : getStatisticsRunKey(state);
     if (tracking.debugUsed || debugUsed || (currentRun !== null && client.isDebugRun(currentRun))) markDebug();
   };
 
@@ -103,26 +100,11 @@ export function createConferenceStats(options: ConferenceStatsOptions): Conferen
     return enabled && validKey(key) ? client.load("get_phd_simulator_v2_conference_stats", key, parseStats) : Promise.resolve();
   };
   const observe: ConferenceStatsController["observe"] = (state, tracking = {}) => { syncRun(state, tracking); return Promise.resolve(); };
-  const track: ConferenceStatsController["track"] = (before, after, tracking = {}) => {
+  const track: ConferenceStatsController["track"] = (_before, after, tracking = {}) => {
     syncRun(after, tracking);
-    if (!enabled || debugUsed || currentRun === null || before.phase !== "playing" || before === after || runKey(before) !== currentRun) return Promise.resolve();
-    for (const event of before.eventQueue) {
-      if (event.source !== "review" || event.stage !== "result" || event.paperReviewPresentation?.kind !== "decision"
-        || after.eventQueue.some((remaining) => remaining.id === event.id)) continue;
-      const settlement = event.choices.find((choice) => choice.id === "confirm-review-result")?.effects.paperReviewSettlement;
-      if (!settlement) continue;
-      const paper = before.papers.find((entry) => entry.id === settlement.paperId);
-      if (!paper || paper.status !== "reviewing" || paper.journalTarget || !paper.target
-        || !paper.submittedMonth || !paper.submittedYear || paper.target !== settlement.target) continue;
-      const settled = [...after.papers, ...after.externalPublications].find((entry) => entry.id === paper.id);
-      if (!settled || settled.lastReview?.accepted !== settlement.accepted
-        || settled.lastReview.totalReviewScore !== settlement.totalReviewScore
-        || (settlement.accepted ? settled.status !== "published" || settled.publication?.acceptType !== settlement.acceptType
-          : settled.status !== "draft" || settled.rejectionCount !== (paper.rejectionCount ?? 0) + 1)) continue;
-      const conference = getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear);
-      const fingerprint = JSON.stringify([paper.id, paper.createdTotalMonths, paper.submittedMonth, paper.submittedYear, paper.rejectionCount ?? 0]);
-      client.enqueue("conference", currentRun, fingerprint, { ...keyFor(conference.name, conference.year, paper.target),
-        p_accepted: settlement.accepted, p_accept_type: settlement.acceptType, p_score: settlement.submittedScore });
+    if (!enabled || debugUsed || currentRun === null || !tracking.finalized || after.phase !== "finished") return Promise.resolve();
+    for (const record of after.pendingRunStatistics ?? []) {
+      if (record.kind === "conference") client.enqueue(record.kind, currentRun, record.fingerprint, record.payload);
     }
     return Promise.resolve();
   };
