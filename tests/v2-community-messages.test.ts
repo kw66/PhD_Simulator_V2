@@ -666,12 +666,14 @@ describe("V2 community message rendering", () => {
   it("counts emoji nicknames consistently through the real mobile composer and rejects an eleventh character", async () => {
     const page = await browser.newPage({ viewport: { width: 320, height: 760 }, isMobile: true, hasTouch: true });
     let messagePosts = 0;
+    // This is an input regression, so an external font service must not gate navigation.
+    await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, route => route.abort());
     await page.route("**/*.supabase.co/**", route => {
       if (route.request().method() === "POST" && route.request().url().includes("/phd_simulator_v2_messages")) messagePosts++;
       return route.fulfill({ contentType: "application/json", headers: { "Content-Range": "*/0" }, body: "[]" });
     });
     try {
-      await page.goto(server.resolvedUrls!.local[0]);
+      await page.goto(server.resolvedUrls!.local[0], { waitUntil: "domcontentloaded" });
       await page.locator('[data-ui-role-rail-view="messages"]').click();
       const nickname = page.locator('[data-community-nickname="board"]');
       await nickname.fill("😀".repeat(10));

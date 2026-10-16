@@ -31,7 +31,6 @@ import {
 } from "../core/v2-role-talent-definitions";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
 import { getRoleLobbyAchievementDefinitions, getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
-import { getCollectorAchievementKey, getMissingAchievementCollectionItems } from "../core/v2-achievement-collections";
 import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, MAX_ROLE_LEVEL, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
@@ -226,29 +225,27 @@ function renderAchievementHistoryTooltip(
   definition: RoleAchievementDefinition,
   accountProfile: AccountProfile,
 ): string {
-  const byRole = accountProfile.achievementUnlockedByRole?.[definition.id] ?? {};
+  const byRole = { ...accountProfile.achievementUnlockedByRole?.[definition.id] };
+  for (const roleId of Object.keys(accountProfile.roleProgress) as RoleId[]) {
+    if (accountProfile.roleProgress[roleId].unlockedAchievementIds.includes(definition.id) && !byRole[roleId]) {
+      byRole[roleId] = accountProfile.achievementUnlockedAt[definition.id] ?? "";
+    }
+  }
   const entries = Object.entries(byRole)
-    .filter((entry): entry is [RoleId, string] => Boolean(entry[1]))
+    .sort((a, b) => (a[1] ?? "").localeCompare(b[1] ?? ""))
     .map(([roleId, timestamp]) => {
-      const role = getRoleDefinition(roleId);
+      const role = getRoleDefinition(roleId as RoleId);
       const date = formatAchievementUnlockDate(timestamp);
-      return `${role.name}：${date}`;
+      return `${date}：${role.name}达成`;
     });
   if (!entries.length && accountProfile.achievementUnlockedAt[definition.id]) {
-    entries.push(`已完成：${formatAchievementUnlockDate(accountProfile.achievementUnlockedAt[definition.id])}`);
-  }
-  const collectionKey = getCollectorAchievementKey(definition.id);
-  if (collectionKey) {
-    const missing = getMissingAchievementCollectionItems(accountProfile, collectionKey);
-    if (missing.length) entries.push(`还差：${missing.map(item => item.label).join("、")}`);
-    else if (!entries.length) entries.push("已收集全部项目");
+    entries.push(`${formatAchievementUnlockDate(accountProfile.achievementUnlockedAt[definition.id])}：已达成`);
   }
   return entries.join("\n");
 }
 
 function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: AccountProfile): string {
-  // The achievement rail is a global catalogue. Role selection only changes the
-  // profile and talent tree; it must never hide achievements from other roles.
+  // Keep every achievement visible; selected-role cards are sorted first.
   const definitions = getAllAchievementDefinitions();
   const unlockedCount = definitions.filter((definition) => isLobbyAchievementUnlocked(accountProfile, definition)).length;
   const personalPercent = definitions.length ? unlockedCount / definitions.length * 100 : 0;
@@ -276,7 +273,7 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
         ${page.achievements.length ? page.achievements.map((definition) => {
           const unlocked = isLobbyAchievementUnlocked(accountProfile, definition);
           const history = renderAchievementHistoryTooltip(definition, accountProfile);
-          return renderAchievementCard(definition, unlocked, "", getAchievementGlobalCompletion(definition.id), history || "尚未完成");
+          return renderAchievementCard(definition, unlocked, "", getAchievementGlobalCompletion(definition.id), history || "未达成");
         }).join("") : '<div class="lobby-profile-achievement-empty">该角色的成就尚未设计</div>'}
       </div>
     </section>

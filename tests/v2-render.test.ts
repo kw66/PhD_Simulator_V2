@@ -782,8 +782,8 @@ describe("v2 render lobby shell", () => {
     expect(achievementList).toContain('>—%</span>');
     expect(achievementList).not.toContain("<details");
     expect((achievementList.match(/<article class="lobby-profile-achievement/g) ?? []).length).toBe(11);
-    expect(achievementList).not.toContain("未达成");
-    expect(achievementList).not.toContain("已达成");
+    expect(achievementList.replace(/<[^>]*>/g, "")).not.toContain("未达成");
+    expect(achievementList.replace(/<[^>]*>/g, "")).not.toContain("已达成");
     expect(html).not.toContain("历史最高 0 / 30");
     expect(html).not.toContain("最佳单局：科研");
     expect(html).not.toContain('<span class="lobby-meta-count">0 / 6</span>');
@@ -952,7 +952,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('data-achievement-id="normal:first-pot"');
 
     expect(html).toContain('class="lobby-profile-achievement is-unlocked"');
-    expect(html).toContain('已完成：2026.09.28');
+    expect(html).toContain('2026.09.28：大多数达成');
     expect(html).not.toContain('<time');
     expect(html.replace(/<[^>]*>/g, "")).not.toContain('2026.09.28');
     expect(html).toContain(`class="lobby-profile-achievement-progress-count">1/${getAllAchievementDefinitions().length}</strong>`);
@@ -970,7 +970,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("未解锁");
     expect(html).toContain("逆位");
     expect(html).not.toContain('data-achievement-id="genius-reversed:u01"');
-    for (const achievement of getAchievementDisplayPages("normal")[0]!.achievements) {
+    for (const achievement of getAchievementDisplayPages("genius-reversed")[0]!.achievements) {
       expect(html).toContain(`data-achievement-id="${achievement.id}"`);
     }
     expect(html).toContain('class="lobby-start-lock" role="group" tabindex="0"');
@@ -1435,6 +1435,8 @@ describe("v2 render lobby shell", () => {
     account.roleProgress.rich.unlocked = true;
     account.roleProgress.normal.unlockedAchievementIds = ["normal:first-pot"];
     account.selectedLobbyRoleId = "rich";
+    account.lobbyRoleAchievementPage = getAchievementDisplayPages("rich")
+      .findIndex(page => page.achievements.some(item => item.id === "normal:first-pot"));
 
     const html = renderApp(createInitialState(), account);
     const achievementList = html.match(/<div class="lobby-profile-achievement-list">([\s\S]*?)<\/div>\s*<\/section>/)?.[1] ?? "";
@@ -1446,7 +1448,7 @@ describe("v2 render lobby shell", () => {
     expect(achievementList).toContain("金币达到30");
     expect(achievementList).toContain('class="achievement-scope-tag">大多数</span>');
     expect((achievementList.match(/<article /g) ?? []).length).toBe(
-      getAchievementDisplayPages("rich")[0]!.achievements.length);
+      getAchievementDisplayPages("rich")[account.lobbyRoleAchievementPage]!.achievements.length);
     expect(html).toContain(`class="lobby-profile-achievement-progress-count">1/${getAllAchievementDefinitions().length}</strong>`);
   });
 

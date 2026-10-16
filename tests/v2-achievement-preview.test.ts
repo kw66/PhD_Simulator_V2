@@ -1,7 +1,7 @@
 import { getAchievementScopeLabels, isAchievementAvailableToRole } from "../src/core/v2-achievement-scope";
 import { describe, expect, it } from "vitest";
 import { ACHIEVEMENT_CATALOG } from "../src/core/v2-achievement-catalog";
-import { buildLobbySelectedRoleViewModel, createDefaultAccountProfile, getAchievementDisplayPages, getRoleAchievementPageCount, ROLE_ACHIEVEMENT_PAGE_SIZE } from "../src/core/v2-lobby";
+import { buildLobbySelectedRoleViewModel, createDefaultAccountProfile, getAchievementDisplayPages, getRoleAchievementPageCount, ROLE_ACHIEVEMENT_PAGE_SIZE, selectLobbyRole } from "../src/core/v2-lobby";
 import { getAllAchievementDefinitions, getRoleAchievementDefinitions, getRoleLobbyAchievementDefinitions } from "../src/core/v2-role-lobby-meta";
 import { getCollectorAchievementKey } from "../src/core/v2-achievement-collections";
 import { getRoleOptions } from "../src/core/v2-progression";
@@ -9,6 +9,12 @@ import { getAchievementGlobalPercentage, renderAchievementCard } from "../src/ap
 import { renderRoleRail } from "../src/app/v2-render-setup-screen";
 
 describe("achievement catalog and presentation", () => {
+  it("returns to the prioritized first page when changing characters", () => {
+    const account = createDefaultAccountProfile();
+    account.lobbyRoleAchievementPage = 9;
+    expect(selectLobbyRole(account, "rich").lobbyRoleAchievementPage).toBe(0);
+    expect(selectLobbyRole(account, "normal").lobbyRoleAchievementPage).toBe(9);
+  });
   it("keeps one scoped definition for each confirmed achievement and independent graduation records", () => {
     expect(new Set(ACHIEVEMENT_CATALOG.map(item => item.id)).size).toBe(ACHIEVEMENT_CATALOG.length);
     for (const title of ["突破极限Ⅰ", "突破极限Ⅱ", "六边形战士Ⅰ", "六边形战士Ⅱ", "顶级显卡Ⅰ", "顶级显卡Ⅱ", "完美工位", "羽球高手"]) {
@@ -94,12 +100,17 @@ describe("achievement catalog and presentation", () => {
     }
   });
 
-  it("shows the same complete catalog regardless of the selected role", () => {
+  it("shows the complete catalog with the selected character's exclusive cards first", () => {
     const completeIds = getAllAchievementDefinitions().map(item => item.id);
     for (const role of getRoleOptions()) {
       const pages = getAchievementDisplayPages(role.id);
       const items = pages.flatMap((page) => page.achievements);
-      expect(items.map((item) => item.id)).toEqual(completeIds);
+      expect(items.map((item) => item.id).sort()).toEqual([...completeIds].sort());
+      const priority = (item: typeof items[number]): number => item.scope?.audiences?.length || !item.scope?.roleIds?.length
+        ? 1 : item.scope.roleIds.includes(role.id) ? 0 : 2;
+      expect(items.map(priority)).toEqual(items.map(priority).sort());
+      expect(items.slice(0, 11).some(item => item.id === `${role.id}:ending-master`)).toBe(true);
+      expect(items.slice(0, 11).some(item => item.id === `${role.id}:ending-phd`)).toBe(true);
       expect(pages.slice(0, -1).every((page) => page.achievements.length === ROLE_ACHIEVEMENT_PAGE_SIZE)).toBe(true);
       expect(pages.at(-1)!.achievements.length).toBeGreaterThan(0);
       expect(pages.at(-1)!.achievements.length).toBeLessThanOrEqual(ROLE_ACHIEVEMENT_PAGE_SIZE);
@@ -270,11 +281,18 @@ describe("achievement catalog and presentation", () => {
     const item = ACHIEVEMENT_CATALOG[0];
     const html = renderAchievementCard(item, false, "", { achievedPlayers: 5, eligiblePlayers: 20 });
     expect(html).toContain('style="width:25%"');
-    expect(html).toContain('aria-label="全球达成率 25%（5/20 位符合条件的已结算玩家）"');
+    expect(html).toContain('aria-label="全球达成率 25%（5/20 位已开局玩家，按浏览器去重）"');
     expect(html.indexOf("achievement-completion-fill")).toBeLessThan(html.indexOf("lobby-profile-achievement-copy"));
     expect(renderAchievementCard(item, false)).toContain(">—%</span>");
     const zeroHtml = renderAchievementCard(item, false, "", { achievedPlayers: 0, eligiblePlayers: 20 });
     expect(zeroHtml).toContain(">0%</span>");
     expect(zeroHtml).not.toContain("is-pending");
+    const almostAll = renderAchievementCard(item, false, "", { achievedPlayers: 9999, eligiblePlayers: 10000 });
+    expect(almostAll).toContain(">99.9%</span>");
+    expect(almostAll).not.toContain(">100%</span>");
+    const everyone = renderAchievementCard(item, false, "", { achievedPlayers: 1, eligiblePlayers: 1 });
+    expect(everyone).toContain(">100%</span>");
+    expect(everyone).not.toContain("is-unlocked");
+    expect(everyone).toContain("1/1 位已开局玩家");
   });
 });

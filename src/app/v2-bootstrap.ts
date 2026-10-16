@@ -1382,6 +1382,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
       void statistics.startRun(JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]));
     }
     const debugUsed = store.isCurrentRunDebugged() || debugWindow.isOpen();
+    if (state.phase === "playing" && !debugUsed && (before.phase !== "playing"
+      || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
+      achievementStats.recordStartedPlayer();
+    }
     void conferenceStats.track(before, state, { debugUsed });
     void journalStats.track(before, state, { debugUsed });
     void thesisStats.track(before, state, { debugUsed });

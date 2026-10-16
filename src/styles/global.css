@@ -3950,6 +3950,14 @@ button.pager-arrow:disabled {
 
 .achievement-completion-fill[style^="width:0%"] { border-right: 0; }
 
+/* Global popularity is separate from this player's golden completion state. */
+.lobby-profile-achievement .achievement-completion-fill {
+  background: linear-gradient(90deg, rgba(101, 120, 120, 0.18), rgba(135, 151, 148, 0.12));
+  border-right-color: rgba(101, 120, 120, 0.18);
+}
+
+.lobby-profile-achievement.is-unlocked .achievement-completion-fill { display: none; }
+
 .lobby-profile-achievement-overall-progress > :not(.achievement-completion-fill),
 .lobby-profile-achievement > :not(.achievement-completion-fill) {
   position: relative;
@@ -3957,7 +3965,7 @@ button.pager-arrow:disabled {
 }
 
 .achievement-global-rate {
-  color: #7c6536;
+  color: #61736f;
   font-family: var(--ui-font-cjk);
   font-size: 0.76rem;
   font-weight: 700;
@@ -3967,6 +3975,7 @@ button.pager-arrow:disabled {
 
 .achievement-global-rate { min-width: 40px; text-align: right; }
 .achievement-global-rate.is-pending { color: #918779; font-weight: 500; }
+.lobby-profile-achievement.is-unlocked .achievement-global-rate { color: #7c6536; }
 
 .achievement-page-index {
   min-width: 30px;

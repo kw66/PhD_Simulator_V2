@@ -28,19 +28,23 @@ describe("global achievement statistics in the actual game", () => {
     const origin = new URL(server.resolvedUrls!.local[0]!).origin;
     const errors: string[] = [];
     let reads = 0;
+    const starts: string[] = [];
     const writes: Array<{ p_player_id: string; p_run_id: string; p_role_id: string; p_achievement_ids: string[] }> = [];
     page.on("pageerror", error => errors.push(error.message));
     await page.route("**/*", async route => {
       const url = new URL(route.request().url());
       if (url.origin === origin) { await route.continue(); return; }
-      if (url.pathname.endsWith("/get_phd_simulator_v2_achievement_stats")) {
+      if (url.pathname.endsWith("/get_phd_simulator_v2_achievement_stats_v2")) {
         reads++;
-        await route.fulfill({ json: { version: 1, achievements: getAllAchievementDefinitions().map(definition => ({
+        await route.fulfill({ json: { version: 2, achievements: getAllAchievementDefinitions().map(definition => ({
           id: definition.id, achievedPlayers: 5, eligiblePlayers: 20,
         })) } }); return;
       }
       if (url.pathname.endsWith("/record_phd_simulator_v2_achievement_run")) {
         writes.push(route.request().postDataJSON()); await route.fulfill({ json: true }); return;
+      }
+      if (url.pathname.endsWith("/record_phd_simulator_v2_achievement_start")) {
+        starts.push(route.request().postDataJSON().p_player_id); await route.fulfill({ json: true }); return;
       }
       // Other online features are irrelevant here; never contact a real server.
       await route.abort();
@@ -50,9 +54,22 @@ describe("global achievement statistics in the actual game", () => {
       await expect.poll(() => page.locator('.achievement-global-rate').first().textContent()).toBe("25%");
       expect(await page.locator('.lobby-profile-achievement').count()).toBe(11);
       expect(await page.locator('.lobby-profile-achievement .achievement-completion-fill').first().getAttribute("style")).toBe("width:25%");
+      // Global popularity must never look like this account has unlocked a card.
+      const colors = await page.locator('.lobby-profile-achievement').first().evaluate(card => {
+        const fill = card.querySelector('.achievement-completion-fill')!;
+        const globalFill = getComputedStyle(fill).backgroundImage;
+        card.classList.add('is-unlocked');
+        const completed = { fillDisplay: getComputedStyle(fill).display, background: getComputedStyle(card).backgroundImage };
+        card.classList.remove('is-unlocked');
+        return { globalFill, completed, background: getComputedStyle(card).backgroundImage };
+      });
+      expect(colors.globalFill).toContain('101, 120, 120');
+      expect(colors.completed.fillDisplay).toBe('none');
+      expect(colors.completed.background).not.toBe(colors.background);
       for (let index = 0; index < 3; index++) await page.locator('[data-action="change-role-achievement-page"][data-delta="1"]').click();
       expect(reads).toBe(1);
       await page.locator('[data-action="start-game"]').click();
+      await expect.poll(() => starts.length).toBe(1);
       for (const id of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
         await page.locator(`[data-event-choice-id="${id}"]:visible`).click();
       }
@@ -67,6 +84,7 @@ describe("global achievement statistics in the actual game", () => {
       expect(writes[0]).toMatchObject({ p_run_id: id, p_role_id: "normal" });
       expect(writes[0].p_achievement_ids).toContain("global:ending-quit");
       expect(writes[0].p_player_id).toBe(await page.evaluate(() => localStorage.getItem("phd_simulator_v2_activity_visitor_id")));
+      expect(starts).toEqual([writes[0].p_player_id]);
       await page.evaluate(() => {
         const store = (window as unknown as TestWindow).achievementStore;
         store.markCurrentRunAsDebugged(); store.dispatch("quit-game"); store.dispatch("restart-game");

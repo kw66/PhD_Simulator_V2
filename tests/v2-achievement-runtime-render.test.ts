@@ -14,10 +14,12 @@ function railFor(id: string, account = createDefaultAccountProfile(), role: Role
 }
 
 describe("achievement runtime presentation", () => {
-  it("shows the same catalogue and count while changing the selected role", () => {
+  it("retains the full catalogue while moving selected-role graduation cards to the first page", () => {
     const account = createDefaultAccountProfile();
     for (const role of ["normal", "rich", "genius-reversed", "special-daji"] as const) {
-      expect(renderRoleRail(account, role, "achievements")).toBe(renderRoleRail(account, "normal", "achievements"));
+      const html = renderRoleRail(account, role, "achievements");
+      expect(html).toContain(`data-achievement-id="${role}:ending-master"`);
+      expect(html).toContain(`data-achievement-id="${role}:ending-phd"`);
       expect(getAchievementDisplayPages(role).flatMap(page => page.achievements)).toHaveLength(getAllAchievementDefinitions().length);
     }
   });
@@ -30,8 +32,7 @@ describe("achievement runtime presentation", () => {
     const html = railFor(id, account);
     const card = html.match(new RegExp(`<article[^>]*data-achievement-id="${id}"[\\s\\S]*?</article>`))![0];
     expect(card).toContain("data-card-tooltip");
-    expect(card).toContain("大多数：2026.10.12");
-    expect(card).toContain("富可敌国：2026.10.13");
+    expect(card).toContain("2026.10.12：大多数达成\n2026.10.13：富可敌国达成");
     expect(card).not.toContain("院士转世：2026");
     expect(card.match(/<p /g)).toHaveLength(2);
     const visible = card.replace(/<[^>]*>/g, "");
@@ -43,13 +44,14 @@ describe("achievement runtime presentation", () => {
     const account = createDefaultAccountProfile();
     account.achievementUnlockedAt["global:air-dried"] = "2026-10-12T12:00:00.000Z";
     const html = railFor("global:air-dried", account, "genius");
-    expect(html).toContain("已完成：2026.10.12");
+    expect(html).toContain("2026.10.12：已达成");
     expect(html).not.toContain("院士转世：2026.10.12");
   });
 
-  it("shows remaining collection items instead of a numerical-only progress label", () => {
+  it("shows only the completion state on an unfinished collector card", () => {
     const html = railFor("global:product-collector");
-    expect(html).toContain("还差：");
+    expect(html).toContain('data-tooltip="未达成"');
+    expect(html).not.toContain("还差：");
     expect(html).toContain("data-card-tooltip");
   });
 
@@ -58,6 +60,8 @@ describe("achievement runtime presentation", () => {
     const html = renderAchievementCard({ ...definition, title: '<img src=x>', description: '"quoted" & details' }, true, '<time>2026.10.12</time>');
     expect(html).not.toContain("<img src=x>");
     expect(html).toContain("&lt;img src=x&gt;");
+    const tooltip = html.match(/data-tooltip="([^"]*)"/)?.[1];
+    expect(tooltip).toBe("2026.10.12");
     expect(html).not.toContain("<time>");
   });
 

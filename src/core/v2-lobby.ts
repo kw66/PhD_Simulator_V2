@@ -117,7 +117,7 @@ export function selectLobbyRole(account: AccountProfile, roleId: RoleId): Accoun
     ...account,
     selectedLobbyRoleId: roleId,
     lobbyRolePage: getLobbyRolePageIndex(roleId),
-    lobbyRoleAchievementPage: account.lobbyRoleAchievementPage,
+    lobbyRoleAchievementPage: account.selectedLobbyRoleId === roleId ? account.lobbyRoleAchievementPage : 0,
   };
 }
 
@@ -148,10 +148,15 @@ export function getRoleAchievementPageCount(roleId: RoleId, pageSize = ROLE_ACHI
   return getAchievementDisplayPages(roleId, pageSize).length;
 }
 
-export function getAchievementDisplayPages(_roleId: RoleId, pageSize = ROLE_ACHIEVEMENT_PAGE_SIZE): Array<{
+export function getAchievementDisplayPages(roleId: RoleId, pageSize = ROLE_ACHIEVEMENT_PAGE_SIZE): Array<{
   achievements: RoleAchievementDefinition[];
 }> {
-  const achievements = getAllAchievementDefinitions();
+  const priority = (item: RoleAchievementDefinition): number => {
+    if (item.scope?.audiences?.length || !item.scope?.roleIds?.length) return 1;
+    return item.scope.roleIds.includes(roleId) ? 0 : 2;
+  };
+  // Stable sorting preserves the designed order within each audience group.
+  const achievements = getAllAchievementDefinitions().sort((a, b) => priority(a) - priority(b));
   const size = Number.isFinite(pageSize) ? Math.max(1, Math.floor(pageSize)) : ROLE_ACHIEVEMENT_PAGE_SIZE;
   const pages: Array<{ achievements: RoleAchievementDefinition[] }> = [];
   for (let start = 0; start < achievements.length; start += size) {

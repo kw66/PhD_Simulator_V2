@@ -26,12 +26,12 @@ export function renderAchievementCard(
   hoverText = "",
 ): string {
   const percent = getAchievementGlobalPercentage(globalCompletion);
-  const label = percent === null ? "—%" : percent > 0 && percent < 0.1 ? "<0.1%" : `${Number(percent.toFixed(1))}%`;
-  const status = percent === null ? (globalCompletion?.eligiblePlayers === 0 ? "暂无符合条件的已结算玩家" : "全球达成率暂不可用")
-    : `全球达成率 ${label}（${globalCompletion!.achievedPlayers}/${globalCompletion!.eligiblePlayers} 位符合条件的已结算玩家）`;
+  const label = percent === null ? "—%" : percent > 0 && percent < 0.1 ? "<0.1%"
+    : `${percent < 100 ? Math.min(99.9, Number(percent.toFixed(1))) : 100}%`;
+  const status = percent === null ? (globalCompletion?.eligiblePlayers === 0 ? "暂无已开局玩家" : "全球达成率暂不可用")
+    : `全球达成率 ${label}（${globalCompletion!.achievedPlayers}/${globalCompletion!.eligiblePlayers} 位已开局玩家，按浏览器去重）`;
   const detail = hoverText || dateMarkup.replace(/<[^>]*>/g, "").trim();
-  const tooltip = [`${definition.title}：${definition.description}`, definition.rewardText,
-    `适用对象：${getAchievementScopeLabels(definition.scope).join("、")}`, detail].filter(Boolean).join("\n");
+  const tooltip = detail || (unlocked ? "已达成，日期未记录" : "未达成");
   return `
     <article class="lobby-profile-achievement${unlocked ? " is-unlocked" : ""}" data-achievement-id="${escapeHtml(definition.id)}"${tooltip ? ` data-card-tooltip data-tooltip="${escapeHtml(tooltip)}" tabindex="0"` : ""}>
       <span class="achievement-completion-fill" aria-hidden="true" style="width:${percent ?? 0}%"></span>
@@ -41,7 +41,7 @@ export function renderAchievementCard(
         ${definition.rewardText ? `<p class="lobby-profile-achievement-reward">${escapeHtml(definition.rewardText)}</p>` : ""}
       </div>
       <div class="achievement-card-meta">
-        <span class="achievement-global-rate${percent === null ? " is-pending" : ""}" aria-label="${escapeHtml(status)}" title="${escapeHtml(status)}">${escapeHtml(label)}</span>
+        <span class="achievement-global-rate${percent === null ? " is-pending" : ""}" aria-label="${escapeHtml(status)}">${escapeHtml(label)}</span>
         <div class="achievement-scope-tags" aria-label="适用对象">${getAchievementScopeLabels(definition.scope).map(label => `<span class="achievement-scope-tag">${escapeHtml(label)}</span>`).join("")}</div>
       </div>
     </article>`;

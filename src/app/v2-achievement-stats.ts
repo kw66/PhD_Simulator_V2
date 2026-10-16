@@ -8,7 +8,7 @@ export const ACHIEVEMENT_STATS_STORAGE_KEY = "phd_simulator_v2_achievement_stats
 const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
 const RPC_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/rpc";
 const PUBLIC_KEY = "sb_publishable_TRVbO2x2mmuoRw592EqtvQ_FHpqUMkJ";
-const READ_RPC = "get_phd_simulator_v2_achievement_stats";
+const READ_RPC = "get_phd_simulator_v2_achievement_stats_v2";
 const WRITE_RPC = "record_phd_simulator_v2_achievement_run";
 const CACHE_MS = 10 * 60_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -17,7 +17,7 @@ const ROLES = new Set<string>(getRoleOptions().map(item => item.id));
 type StatsStorage = Pick<Storage, "getItem" | "setItem">;
 export interface AchievementGlobalCompletion { achievedPlayers: number; eligiblePlayers: number }
 export interface AchievementStatisticsSnapshot extends AchievementGlobalCompletion { id: string }
-interface Snapshot { version: 1; achievements: AchievementStatisticsSnapshot[] }
+interface Snapshot { version: 2; achievements: AchievementStatisticsSnapshot[] }
 interface QueuedRun { p_player_id: string; p_run_id: string; p_role_id: RoleId; p_achievement_ids: string[] }
 export interface AchievementStatsOptions {
   enabled?: boolean;
@@ -40,7 +40,7 @@ function browserStorage(): StatsStorage | null {
 }
 function parseSnapshot(value: unknown): Snapshot {
   const data = value as Snapshot;
-  if (!data || data.version !== 1 || !Array.isArray(data.achievements)) throw new Error("Invalid achievement statistics");
+  if (!data || data.version !== 2 || !Array.isArray(data.achievements)) throw new Error("Invalid achievement statistics");
   const seen = new Set<string>();
   const achievements = data.achievements.map(row => {
     if (!row || typeof row.id !== "string" || seen.has(row.id)
@@ -49,7 +49,7 @@ function parseSnapshot(value: unknown): Snapshot {
     seen.add(row.id);
     return { id: row.id, achievedPlayers: row.achievedPlayers, eligiblePlayers: row.eligiblePlayers };
   });
-  return { version: 1, achievements };
+  return { version: 2, achievements };
 }
 function validQueuedRun(value: unknown): value is QueuedRun {
   const row = value as QueuedRun;
@@ -73,6 +73,8 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
   let readRetryAt = 0;
   let queue: QueuedRun[] = [];
   const acknowledgedRuns = new Set<string>();
+  const pendingPlayers = new Set<string>();
+  const acknowledgedPlayers = new Set<string>();
   let disposed = false;
   let loading: Promise<void> | null = null;
   let flushing: Promise<void> | null = null;
@@ -84,6 +86,13 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
     try {
       const saved = JSON.parse(storage?.getItem(ACHIEVEMENT_STATS_STORAGE_KEY) ?? "null");
       if (saved?.version === 1) {
+        if (Array.isArray(saved.acknowledgedPlayers)) for (const id of saved.acknowledgedPlayers) {
+          if (typeof id === "string" && UUID.test(id)) acknowledgedPlayers.add(id);
+        }
+        if (Array.isArray(saved.pendingPlayers)) for (const id of saved.pendingPlayers) {
+          if (typeof id === "string" && UUID.test(id)) pendingPlayers.add(id);
+        }
+        for (const id of acknowledgedPlayers) pendingPlayers.delete(id);
         if (Array.isArray(saved.acknowledgedRuns)) for (const id of saved.acknowledgedRuns) {
           if (typeof id === "string" && UUID.test(id)) acknowledgedRuns.add(id);
         }
@@ -94,7 +103,7 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
         queue = [...pending.values()].filter(row => !acknowledgedRuns.has(row.p_run_id));
         if (saved.snapshot && Number.isFinite(saved.fetchedAt) && saved.fetchedAt <= now()
           && (!snapshot || saved.fetchedAt > fetchedAt)) {
-          snapshot = parseSnapshot(saved.snapshot); fetchedAt = saved.fetchedAt;
+          try { snapshot = parseSnapshot(saved.snapshot); fetchedAt = saved.fetchedAt; } catch { /* Ignore old denominator caches, retain outbox. */ }
         }
       }
     } catch { /* A corrupt cache must not prevent account outbox replay. */ }
@@ -107,7 +116,8 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
       // already acknowledged by the server. Receipts also make account replay safe.
       mergeStorage();
       storage.setItem(ACHIEVEMENT_STATS_STORAGE_KEY, JSON.stringify({ version: 1, pending: queue,
-        acknowledgedRuns: [...acknowledgedRuns], snapshot, fetchedAt }));
+        acknowledgedRuns: [...acknowledgedRuns], pendingPlayers: [...pendingPlayers],
+        acknowledgedPlayers: [...acknowledgedPlayers], snapshot, fetchedAt }));
       return true;
     } catch { return false; }
   };
@@ -136,15 +146,27 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
     } finally { clearTimeout(timeout); }
   };
   const scheduleFlush = (delay = 500): void => {
-    if (!uploads || disposed || timer || queue.length === 0) return;
+    if (!uploads || disposed || timer || (queue.length === 0 && pendingPlayers.size === 0)) return;
     timer = setTimeout(() => { timer = null; void flush(); }, Math.max(delay, uploadRetryAt - now()));
   };
   const flush = (): Promise<void> => {
     mergeStorage();
     if (flushing) return flushing;
-    if (!uploads || disposed || queue.length === 0) return Promise.resolve();
+    if (!uploads || disposed || (queue.length === 0 && pendingPlayers.size === 0)) return Promise.resolve();
     if (now() < uploadRetryAt) { scheduleFlush(); return Promise.resolve(); }
     flushing = (async () => {
+      for (const id of [...pendingPlayers].slice(0, 20)) {
+        if (disposed) break;
+        try {
+          if (await rpc("record_phd_simulator_v2_achievement_start", { p_player_id: id }) !== true) throw new Error("Start was not acknowledged");
+          acknowledgedPlayers.add(id); pendingPlayers.delete(id);
+          failureCount = 0; uploadRetryAt = 0; persistPending();
+        } catch {
+          failureCount++;
+          uploadRetryAt = now() + Math.min(CACHE_MS, 30_000 * 2 ** Math.min(5, failureCount - 1));
+          return;
+        }
+      }
       // Bound each batch so an offline backlog cannot monopolise the connection.
       for (const row of queue.slice(0, 20)) {
         if (disposed) break;
@@ -185,6 +207,14 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
         ? { achievedPlayers: row.achievedPlayers, eligiblePlayers: row.eligiblePlayers } : null };
     },
     load,
+    recordStartedPlayer(): boolean {
+      if (!uploads || disposed) return false;
+      const identity = getPlayerId();
+      if (!identity) return false;
+      mergeStorage();
+      if (!acknowledgedPlayers.has(identity)) pendingPlayers.add(identity);
+      const persisted = persistPending(); scheduleFlush(); return persisted;
+    },
     recordFinalizedRun(record: FinalizedRunRecord): boolean {
       if (!uploads || disposed || record.debugUsed || record.state.phase !== "finished" || !record.state.ending
         || !UUID.test(record.runId) || !ROLES.has(record.state.selectedRoleId)) return false;
