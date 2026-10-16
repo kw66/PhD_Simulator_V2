@@ -46,7 +46,9 @@ describe("game announcements", () => {
     const preview = announcement!.changes.find((change) => change.title === "角色图鉴与逆位路线");
     expect(preview?.description).toContain("该次更新的天赋树仅供设计预览");
     expect(preview?.description).toContain("十二位正位与逆位角色的天赋已于10月16日正式开放");
-    expect(renderAnnouncementPage(GAME_ANNOUNCEMENTS.indexOf(announcement!))).toContain("未接入实际结算");
+    const html = renderAnnouncementPage(GAME_ANNOUNCEMENTS.indexOf(announcement!));
+    expect(html).toContain("特殊角色形态切换仍未开放");
+    expect(html).toContain("投资已随10月16日富可敌国天赋正式生效");
   });
 
   it("adds a third lobby tab without replacing the selected role or start button", () => {

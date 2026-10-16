@@ -55,7 +55,7 @@ describe("monthly browser operation replay", () => {
         store.dispatch("buy-shop-item", { shopItemId: "chair" });
       }
       store.dispatch("read-paper");
-      store.dispatch("research-paper", { paperActionType: "idea" });
+      store.dispatch("research-paper", { paperId: store.getState().papers.find(paper => paper.status === "draft")?.id, paperActionType: "idea" });
       store.dispatch("rest");
       store.dispatch("next-month");
       expect(store.getReplayStatus().failed).toBeUndefined();

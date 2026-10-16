@@ -67,15 +67,15 @@
 
 ## 全球达成率
 
-- 已接入kwgame数据库，卡片使用全球完成玩家数除以符合条件的玩家数；与上方个人成就计数分开
+- 已接入kwgame数据库，卡片使用当前统计纪元的全球完成玩家数除以所有开局玩家数；与上方个人成就计数分开
 - 玩家沿用浏览器中稳定的匿名访客UUID；同一玩家用多个角色完成同一成就，全球分子只计1人，各角色首次完成日期分别记录
-- 分母是至少正式结算过一局合格角色的非调试玩家去重人数；通用成就包含所有角色，角色或类别限定按成就目录对应范围计算。重复结算同角色或多个合格角色不增加该玩家的分母权重
-- 只在“结算并重开”后上报，即使本局没有新增成就也提交空成就列表，以记录分母。结局预览、返回开始页、读档和已撤销分支不会上报
+- 所有成就共用当前纪元开过局的匿名玩家去重人数，不按角色、类别或是否结算筛选。同一浏览器换角色、重开或恢复存档不增加人数；打开调试前已经登记的开局不追溯撤销
+- 有效非调试开局或恢复局时幂等登记玩家；成就结果仅在“结算并重开”后上报，没有新成就也提交空列表。结局预览、返回开始页、读档和已撤销分支不会提交完成记录
 - 上报从账号持久化outbox交给独立成就队列，离线或刷新后重试沿用同一runId；服务端只接受同内容重试，不能追加该局其他分支的成就
 - 全部成就一次读取，缓存十分钟；切换角色、成就分页及单张卡片渲染不请求数据库，没有轮询。读取失败保留可用缓存，无数据或分母为0时显示“—%”
 - 本地奖励仍按成就ID只发一次，全球统计不承担账号登录、云存档或奖励发放
 
-服务端新增`phd_simulator_v2_achievement_catalog`、`phd_simulator_v2_achievement_runs`、`phd_simulator_v2_achievement_completions`三张表，通过`record_phd_simulator_v2_achievement_run`和`get_phd_simulator_v2_achievement_stats`两个RPC写入和读取。匿名用户不能直接读写三表。客户端入口为`v2-achievement-stats.ts`，部署和数据库验证见[在线统计](ONLINE_STATISTICS.md)。
+服务端使用`phd_simulator_v2_achievement_catalog`、`phd_simulator_v2_achievement_runs`、`phd_simulator_v2_achievement_completions`和`phd_simulator_v2_achievement_players`四张表，通过`record_phd_simulator_v2_achievement_start`登记开局玩家、`record_phd_simulator_v2_achievement_run`提交结算，使用`get_phd_simulator_v2_achievement_stats_v2`读取聚合。匿名用户不能直接读写四表。客户端入口为`src/app/v2-achievement-stats.ts`，纪元边界、部署和数据库验证见[在线统计](ONLINE_STATISTICS.md)。
 
 服务端成就资格目录与游戏共享来源。运行`node scripts/sync-achievement-stat-catalog.mjs --check`检查184项成就、20个角色的范围是否一致；修改成就ID或资格范围后应同步数据库目录。
 
