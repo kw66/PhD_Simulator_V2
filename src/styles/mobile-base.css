@@ -1,39 +1,50 @@
 @media (max-width: 820px) {
   html { scroll-padding-top: 104px; }
-  .play-page[data-scale-mode="fixed"] .play-workbench { padding: 12px; }
+  .play-page[data-scale-mode="fixed"] .play-workbench { padding: 10px; }
   .play-page[data-scale-mode="fixed"] .play-stage { overflow: visible; }
-  .play-page[data-scale-mode="fixed"] .play-workbench-body { gap: 10px; }
+  .play-page[data-scale-mode="fixed"] .play-workbench-body { gap: 6px; }
   .play-page[data-scale-mode="fixed"] .play-left-rail {
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    gap: 7px;
     height: auto;
     min-height: 0;
-    padding: 0 0 8px;
+    padding: 0 0 4px;
   }
   .play-left-rail .new-attr-panel {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 9px 14px;
-    padding: 6px 2px 0;
+    gap: 5px 12px;
+    padding: 3px 2px 0;
   }
   .play-left-rail .new-attr-item { min-width: 0; margin: 0; padding: 0; }
   .play-left-rail .new-attr-header { flex-wrap: wrap; gap: 3px; font-size: 12px; }
   .play-left-rail .new-attr-label { font-size: 12px; }
   .play-left-rail .new-attr-value { font-size: 12px; margin-left: auto; }
   .play-left-rail .new-attr-level { font-size: 10px; padding-inline: 4px; margin-left: 2px; }
-  .play-left-rail .new-attr-bar-row { margin-top: 5px; }
+  .play-left-rail .new-attr-bar-row { margin-top: 3px; }
   .play-left-rail .new-currency-item { grid-column: 1 / -1; padding-top: 3px; }
-  .play-left-rail .new-currency-item .new-attr-header { font-size: 13px; min-height: 28px; }
+  .play-left-rail .new-currency-item .new-attr-header { font-size: 13px; min-height: 24px; }
   .play-left-rail .new-effect-panel,
-  .play-left-rail .new-effect-grid { height: auto; min-height: 0; gap: 5px; }
+  .play-left-rail .new-effect-grid { height: auto; min-height: 0; gap: 3px; }
   .play-left-rail .new-effect-section,
   .play-left-rail .new-effect-list { min-height: 0; height: auto; max-height: 126px; }
-  .play-left-rail .new-effect-section { padding: 5px 0; }
+  /* 28px chips + 4px row gaps + 6px padding: keep each row fully visible. */
+  .play-left-rail .new-effect-grid .new-effect-section {
+    flex: 0 0 auto;
+    min-height: 34px;
+    max-height: 130px;
+    padding: 3px 0;
+  }
+  .play-left-rail .new-effect-grid .new-effect-section:nth-child(1) { max-height: 66px; }
+  .play-left-rail .new-effect-grid .new-effect-section:nth-child(3) { max-height: 98px; }
+  .play-left-rail .new-effect-grid .new-effect-section:nth-child(4) { min-height: 34px; max-height: 34px; }
   .play-left-rail .new-effect-section:has(> .new-effect-list:empty),
   .play-left-rail #new-effect-section-source:has(.new-effect-source-box:empty) { display: none; }
   .play-left-rail .new-effect-panel:not(:has(.effect-chip)) { display: none; }
-  .play-left-rail .new-effect-panel .new-effect-list .effect-chip { min-height: 32px; line-height: 1.4; white-space: normal; }
-  .play-left-rail .new-effect-source-box { height: auto; max-height: 180px; overflow-y: auto; }
+  .play-left-rail .new-effect-panel .new-effect-list .effect-chip { min-height: 28px; line-height: 1.4; white-space: normal; }
+  .play-left-rail .new-effect-grid .new-effect-subtitle { min-height: 28px; }
+  .play-left-rail #new-effect-section-source { flex: 0 0 auto; max-height: none; padding: 3px 0; }
+  .play-left-rail #new-effect-section-source .new-effect-source-box { flex: 0 0 auto; height: auto; max-height: 180px; overflow-y: auto; }
   .play-page[data-scale-mode="fixed"] .play-right-rail {
     grid-row: 2;
     height: auto;
@@ -43,7 +54,7 @@
     box-shadow: none;
   }
   .play-page[data-scale-mode="fixed"] .play-center-column { grid-row: 3; padding: 0; }
-  .play-right-rail .new-time-panel { gap: 7px; }
+  .play-right-rail .new-time-panel { gap: 4px; }
   .play-right-rail .new-calendar-header { margin-inline: 0; padding-inline: 8px; }
   .play-right-rail .new-pending-event-content { height: auto; min-height: 0; max-height: 204px; overflow-y: auto; }
   .play-right-rail .new-time-display-toggle { min-height: 36px; min-width: 36px; }
@@ -62,10 +73,27 @@
   .play-right-rail .todo-nav-btn { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
   .play-right-rail .pending-event-blocking-toggle { width: 38px; height: 38px; }
   .play-right-rail .todo-nav-btns { gap: 5px; }
-  .play-right-rail .play-help-toggle { position: static; justify-self: end; min-height: 42px; padding: 8px 12px; margin: 0; }
-  .play-right-rail .play-help-panel { height: auto; max-height: calc(100dvh - 100px); overflow-y: auto; }
+  .play-right-rail .play-help-area { display: block; min-width: 0; width: 100%; }
+  .play-right-rail .play-help-toggle { position: static; width: 100%; min-height: 44px; padding: 4px 10px; margin: 0; }
+  .play-right-rail .play-help-panel { height: auto; max-height: calc(100dvh - 100px); padding: 6px; gap: 5px; overflow-y: auto; }
+  .play-right-rail .play-help-body { line-height: 1.45; }
+  .play-right-rail .play-help-body p { margin-bottom: 5px; }
+  .play-right-rail .play-help-summary,
+  .play-right-rail .play-help-content > :is(p, table),
+  .play-right-rail .play-help-detail-content > :is(p, table) { padding: 5px 8px; }
+  .play-right-rail .play-help-content,
+  .play-right-rail .play-help-detail-content { gap: 4px; }
+  .play-right-rail .play-help-details { margin-top: 5px; }
+  .play-right-rail .play-help-detail-content { padding-top: 4px; }
+  .play-right-rail .new-pending-event-section { gap: 4px; }
+  .play-right-rail .new-pending-event-content { padding-bottom: 3px; }
+  .play-right-rail .play-help-header { padding-block: 2px; }
+  .play-right-rail .new-time-row { padding-block: 3px; }
+  .play-right-rail .new-calendar-header { padding-block: 2px; }
+  .play-left-rail .new-effect-source-box { gap: 3px; }
+  .play-left-rail .effect-source-line { padding-block: 3px; line-height: 1.4; }
   .play-help-close { min-height: 40px; min-width: 40px; }
-  .relationship-tooltip { font-size: 13px; line-height: 1.6; overflow-y: auto; overscroll-behavior: contain; }
+  .relationship-tooltip { font-size: 13px; line-height: 1.45; overflow-y: auto; overscroll-behavior: contain; }
   .relationship-tooltip.is-touch-tooltip { pointer-events: auto; }
   .play-page { padding-bottom: env(safe-area-inset-bottom); }
   .lobby-growth-level-hint::after,

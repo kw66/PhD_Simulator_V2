@@ -3,6 +3,7 @@ import { normalizeShopTab, type ShopTabId } from "./v2-render-shop-panel";
 import type { PlayRenderUiState, TalentPanelTabId } from "./v2-render-types";
 import { ADVISOR_SALARY, ADVISOR_SALARY_BONUS, MONTHLY_LIVING_COST } from "../core/v2-content";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "../core/v2-lab-projects";
+import { ADVISOR_GRANTS } from "../core/v2-advisor-progress";
 
 export const ATTRIBUTE_RESISTANCE_HELP_PAGE: PlayHelpPage = {
   title: "属性与抵抗",
@@ -96,7 +97,10 @@ const TALENT_PAGES: Record<TalentPanelTabId, readonly PlayHelpPage[]> = {
     {
       title: "基金申请",
       summary: "<p>有名额时优先申请稳获批的最高新项目，否则申请下一档。</p>",
-      body: `<p>科研积累不超过申请门槛80%时获批率为0，之后线性升至门槛时100%；申请不扣积累。讲师限1项，晋升后2项，到期释放名额。</p>
+      body: `<p class="play-help-grant-thresholds"><span class="play-help-grant-thresholds-label">申请门槛（科研积累）</span>
+          ${ADVISOR_GRANTS.filter(grant => grant.id !== "academician").map(grant => `<span>${grant.name} <b>${grant.threshold}</b></span>`).join("")}</p>
+        <p>科研积累不超过申请门槛80%时获批率为0，之后线性升至门槛时100%；申请不扣积累。</p>
+        <p>讲师限1项，晋升后2项，到期释放名额。</p>
         <p>院士需先获杰青，积累1000稳获批，沿用上述概率。</p>`,
     },
     {

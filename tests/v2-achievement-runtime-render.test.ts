@@ -16,10 +16,14 @@ function railFor(id: string, account = createDefaultAccountProfile(), role: Role
 describe("achievement runtime presentation", () => {
   it("retains the full catalogue while moving selected-role graduation cards to the first page", () => {
     const account = createDefaultAccountProfile();
-    for (const role of ["normal", "rich", "genius-reversed", "special-daji"] as const) {
+    for (const role of ["normal", "rich", "genius-reversed"] as const) {
       const html = renderRoleRail(account, role, "achievements");
       expect(html).toContain(`data-achievement-id="${role}:ending-master"`);
       expect(html).toContain(`data-achievement-id="${role}:ending-phd"`);
+      expect(getAchievementDisplayPages(role).flatMap(page => page.achievements)).toHaveLength(getAllAchievementDefinitions().length);
+    }
+    for (const role of ["research-captain", "special-daji", "special-finite-life", "special-fading-genius", "cursed-frail", "cursed-debt"] as const) {
+      expect(getAllAchievementDefinitions().some(item => item.id === `${role}:ending-master` || item.id === `${role}:ending-phd`)).toBe(false);
       expect(getAchievementDisplayPages(role).flatMap(page => page.achievements)).toHaveLength(getAllAchievementDefinitions().length);
     }
   });

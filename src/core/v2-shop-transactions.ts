@@ -231,7 +231,7 @@ function buyCoffee(state: GameState): GameState {
   if (state.player.money < coffeePrice) return fail(state, `金币不足，购买冰美式需要 ${coffeePrice} 金币。`);
 
   const coffeeGain = getCoffeeSanGain(coffeeState);
-  const nextSan = getRecoveredSan(state.player.san, state.sanCap, coffeeGain);
+  const nextSan = getRecoveredSan(state.player.san, state.sanCap, coffeeGain, state.selectedRoleId);
   const actualCoffeeGain = nextSan - state.player.san;
   const nextCoffeeState = {
     ...coffeeState,

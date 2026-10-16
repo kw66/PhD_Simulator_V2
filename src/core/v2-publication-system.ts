@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { getCaptainAdvisorCitationMultiplier } from "./v2-captain-state";
 import { getRecoveredSan } from "./v2-san-recovery";
 import { settleRoleTalentPaperRejection } from "./v2-role-talent-lifecycle";
 import { getRoleKindReviewerBonus } from "./v2-role-talent-state";
@@ -441,7 +442,7 @@ function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewS
   settlement = resolveReviewerSan(state, settlement);
   state = settlement.reviewerSanChange < 0
     ? paySanCost(state, -settlement.reviewerSanChange, { allowOverdraw: true })
-    : { ...state, player: { ...state.player, san: getRecoveredSan(state.player.san, state.sanCap, settlement.reviewerSanChange) } };
+    : { ...state, player: { ...state.player, san: getRecoveredSan(state.player.san, state.sanCap, settlement.reviewerSanChange, state.selectedRoleId) } };
   const reviewResult = {
     reports: settlement.reports,
     totalReviewScore: settlement.totalReviewScore,
@@ -605,7 +606,7 @@ export function getPaperCitationMultiplierBreakdown(
     influence,
     promotion,
     citationDebuff,
-    total: heat * influence * promotion * citationDebuff,
+    total: heat * influence * promotion * citationDebuff * getCaptainAdvisorCitationMultiplier(state, paper),
   };
 }
 

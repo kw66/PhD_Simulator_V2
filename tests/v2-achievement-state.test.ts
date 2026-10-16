@@ -22,6 +22,18 @@ function fellow(id: string, research = 12, affinity = 12): GameState["fellowProg
 }
 
 describe("state achievement evidence", () => {
+  it.each(["rewinder", "research-captain", "special-dandan", "special-daji", "cursed-frail", "special-finite-life", "special-fading-genius", "cursed-debt"] as const)(
+    "does not record ordinary graduation achievements for %s", roleId => {
+      for (const ending of ["master", "phd"] as const) {
+        const next = state();
+        next.selectedRoleId = roleId;
+        next.phase = "finished";
+        next.ending = ending;
+        expect(observe(next).satisfied).not.toContain(`${roleId}:ending-${ending}`);
+      }
+    },
+  );
+
   it("retains reached peaks after losses, but master's milestones exclude transfer rewards", () => {
     const first = state(); first.player.research = 6;
     const run = observe(first);

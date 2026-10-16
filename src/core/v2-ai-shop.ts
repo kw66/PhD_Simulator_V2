@@ -300,7 +300,7 @@ export function consumeActiveOperation(state: GameState, operation: ActiveOperat
       regularActionsSpent: (state.roleTalents.regularActionsSpent ?? 0) + 1 } : state.roleTalents,
     ...(allowance.usesTalentAction ? { sanCap, player: { ...state.player, san: Math.min(state.player.san, sanCap) },
       roleTalents: { ...state.roleTalents!, alphaUsedMonth: state.totalMonths } } : {}),
-  }));
+  }), operation === "idea" || operation === "experiment" || operation === "writing");
 }
 
 /** Convert the active model set into the regular Buff representation. */

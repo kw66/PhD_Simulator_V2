@@ -1,5 +1,6 @@
 import { ACHIEVEMENT_CATALOG, getRoleEndingAchievements, getDesignedAchievements } from "./v2-achievement-catalog";
 import { getRoleOptions } from "./v2-progression";
+import { getAchievementUnlockRoleIds } from "./v2-achievement-scope";
 import type {
   RoleAchievementDefinition,
   RoleId,
@@ -184,7 +185,7 @@ export function getRoleAchievementDefinitions(roleId: RoleId): RoleAchievementDe
 }
 
 export function getRoleLobbyAchievementDefinitions(roleId: RoleId): RoleAchievementDefinition[] {
-  const unlockAchievement = ACHIEVEMENT_CATALOG.find(achievement => achievement.unlocksRoleId === roleId)
+  const unlockAchievement = ACHIEVEMENT_CATALOG.find(achievement => getAchievementUnlockRoleIds(achievement).includes(roleId))
     ?? ROLE_UNLOCK_DISPLAY_ACHIEVEMENTS[roleId];
   const roleAchievements = getRoleAchievementDefinitions(roleId);
   return unlockAchievement ? [unlockAchievement, ...roleAchievements] : roleAchievements;

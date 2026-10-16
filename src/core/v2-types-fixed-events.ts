@@ -29,6 +29,7 @@ export type TeachersDayGiftId = "tea" | "mooncake" | "flower";
 
 export interface FixedEventAdvisorCandidate {
   advisorName: string;
+  captainTag?: import("./v2-captain-state").CaptainTag;
 }
 
 export interface FixedEventAdvisorIntel {

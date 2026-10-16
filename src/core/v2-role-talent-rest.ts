@@ -6,6 +6,7 @@ import { getRecoveredSan } from "./v2-san-recovery";
 import type { Buff, GameState } from "./v2-types";
 
 export function getRoleRestSanGain(state: GameState): number {
+  if (state.selectedRoleId === "special-finite-life") return 0;
   return getShopRestSanGain(state.shopState)
     + (state.selectedRoleId === "normal-reversed" ? getRoleTalentLevel(state, "restful-idle") : 0);
 }
@@ -16,7 +17,7 @@ export function applyRoleTalentRest(state: GameState, options: { yearSummary?: b
   const fullRecovery = options.yearSummary && sloth && getRoleTalentLevel(state, "year-summary-recovery") > 0;
   const gain = options.yearSummary ? (fullRecovery ? Math.max(0, state.sanCap - state.player.san)
     : sloth ? getRoleTalentLevel(state, "restful-idle") : 0) : getRoleRestSanGain(state);
-  const san = getRecoveredSan(state.player.san, state.sanCap, gain);
+  const san = getRecoveredSan(state.player.san, state.sanCap, gain, state.selectedRoleId);
   const appliedGain = san - state.player.san;
   const bonus = sloth ? getRoleTalentLevel(state, "coffee-lifeline") : 0;
   const buffs: Buff[] = [];

@@ -1,4 +1,4 @@
-import { isAchievementAvailableToRole } from "./v2-achievement-scope";
+import { getAchievementAudience, isAchievementAvailableToRole } from "./v2-achievement-scope";
 import type { AchievementScope, RoleAchievementDefinition, RoleId } from "./v2-types";
 
 // Achievement definitions; evaluation and one-time ending rewards live in v2-achievement-runtime.
@@ -7,6 +7,8 @@ export interface CatalogAchievement extends RoleAchievementDefinition {
 }
 
 export function getRoleEndingAchievements(roleId: RoleId): CatalogAchievement[] {
+  const audience = getAchievementAudience(roleId);
+  if (audience === "special" || audience === "cursed") return [];
   return [
     { ending: "master", title: "硕士毕业", icon: "🎓" },
     { ending: "phd", title: "博士毕业", icon: "🎓" },
@@ -17,6 +19,13 @@ export function getRoleEndingAchievements(roleId: RoleId): CatalogAchievement[] 
 }
 
 export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
+  { id: "unlock:research-captain", icon: "👑", title: "统御者", description: "解锁全部6个基础正位角色", rewardText: "解锁统御者角色", unlocksRoleId: "research-captain", scope: { audiences: ["all"] } },
+  // Highest difficulty doctorate challenges; rewards apply to every role once.
+  // Each role has its own completion; each reward permanently benefits every role once.
+  { id: "cursed-frail:curse-hell-phd", icon: "💀", title: "病入膏肓", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["cursed-frail"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-fading-genius:curse-hell-phd", icon: "🧠", title: "才思不灭", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["special-fading-genius"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-finite-life:curse-hell-phd", icon: "⏳", title: "向死而生", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["special-finite-life"] }, rewardScope: { audiences: ["all"] } },
+  { id: "cursed-debt:curse-hell-phd", icon: "💸", title: "逆债而行", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["cursed-debt"] }, rewardScope: { audiences: ["all"] } },
   // 正位角色的逆位解锁路线
   { id: "unlock:genius-reversed", icon: "🪨", title: "大智若愚", description: "博士毕业，科研能力始终小于6", rewardText: "经验倍率+1，解锁愚钝·院士转世角色", unlocksRoleId: "genius-reversed", scope: { roleIds: ["genius"] } },
   { id: "unlock:teacher-child-reversed", icon: "🎭", title: "不假师恩", description: "博士毕业，导师好感始终小于6", rewardText: "经验倍率+1，解锁玩世·导师子女角色", unlocksRoleId: "teacher-child-reversed", scope: { roleIds: ["teacher-child"] } },
@@ -29,7 +38,7 @@ export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
   { id: "normal:self-reliance-ii", icon: "🤝", title: "主动破冰", description: "硕士期间社交达6", rewardText: "经验+5", scope: { roleIds: ["normal"] } },
   { id: "normal:self-reliance-iii", icon: "🌟", title: "初获赏识", description: "硕士期间导师好感达6", rewardText: "经验+5", scope: { roleIds: ["normal"] } },
   { id: "normal:self-reliance", icon: "🌱", title: "自立自强", description: "硕士期间科研、社交、导师好感均达6", rewardText: "经验+5", scope: { roleIds: ["normal"] } },
-  { id: "normal:truly-ordinary", icon: "🎓", title: "真·大多数", description: "使用0天赋点博士毕业", rewardText: "经验倍率+1", scope: { roleIds: ["normal"] } },
+  { id: "normal:truly-ordinary", icon: "🎓", title: "真·大多数", description: "使用0天赋点博士毕业", rewardText: "经验倍率+1，解锁全部诅咒角色", unlocksRoleIds: ["cursed-frail", "special-fading-genius", "special-finite-life", "cursed-debt"], scope: { roleIds: ["normal"] } },
   { id: "normal-reversed:zero-talent-master", icon: "🎓", title: "绝地求生·怠惰", description: "使用0天赋点硕士毕业", rewardText: "经验倍率+1", scope: { roleIds: ["normal-reversed"] } },
   { id: "rich-reversed:zero-talent-master", icon: "🎓", title: "绝地求生·贪求", description: "使用0天赋点硕士毕业", rewardText: "经验倍率+1", scope: { roleIds: ["rich-reversed"] } },
   { id: "genius-reversed:zero-talent-master", icon: "🎓", title: "绝地求生·愚钝", description: "使用0天赋点硕士毕业", rewardText: "经验倍率+1", scope: { roleIds: ["genius-reversed"] } },
@@ -63,7 +72,7 @@ export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
   { id: "global:young-genius", icon: "🎓", title: "天才少年", description: "转博时就达到博士毕业要求", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "global:three-a-master", icon: "📚", title: "三A在手", description: "硕士期间一作发表≥3篇A类论文", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "global:collaboration-ten", icon: "🤝", title: "协作共赢", description: "合作发表≥10篇论文", rewardText: "经验+5", scope: { audiences: ["all"] } },
-  { id: "global:collaboration-before-first", icon: "🪜", title: "从协作到领衔", description: "先发合作论文，再发一作", rewardText: "经验+5", scope: { audiences: ["all"] } },
+  { id: "global:collaboration-before-first", icon: "🪜", title: "协作先行", description: "先发合作论文，再发一作", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "genius-reversed:break-research-curse", icon: "🌅", title: "拨云见日", description: "实际破除学术失语诅咒", rewardText: "经验倍率+1", scope: { roleIds: ["genius-reversed"] } },
   { id: "global:excellent-master-thesis", icon: "📜", title: "优秀硕士论文", description: "硕士论文盲审全部获A", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "global:excellent-phd-thesis", icon: "📜", title: "优秀博士论文", description: "博士论文盲审全部获A", rewardText: "经验+5", scope: { audiences: ["all"] } },
@@ -133,6 +142,7 @@ export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
   { id: "global:workaholic", icon: "💼", title: "打工狂人", description: "累计打工15次", rewardText: "经验+5", scope: { audiences: ["all"] } },
 
   // 行动与生活
+  { id: "global:study-fatigue", icon: "📕", title: "不爱学习", description: "累计触发3次厌倦学习", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "global:hyperactive-i", icon: "⏱️", title: "我有多动症Ⅰ", description: "单月行动≥3次（含AI）", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "global:hyperactive-ii", icon: "⚡", title: "我有多动症Ⅱ", description: "单月行动≥4次（含AI）", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "global:deep-sleep", icon: "😴", title: "睡得好香", description: "主动休息累计回复50SAN", rewardText: "经验+5", scope: { audiences: ["all"] } },
@@ -164,11 +174,11 @@ export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
   { id: "global:ending-poor", icon: "💸", title: "穷困潦倒", description: "达成穷困潦倒结局", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "global:ending-lab-bankrupt", icon: "🏚️", title: "实验室破产", description: "达成实验室破产结局", rewardText: "经验+5", scope: { audiences: ["all"] } },
   { id: "global:ending-isolated", icon: "🧍", title: "被孤立", description: "达成被孤立结局", rewardText: "经验+5", scope: { audiences: ["all"] } },
-  { id: "global:buff-collector", icon: "🧪", title: "Buff收集者", description: "跨局跨角色获得过所有Buff", rewardText: "天赋点+1", scope: { audiences: ["all"] } },
-  { id: "global:product-collector", icon: "🛍️", title: "商品收集者", description: "跨局跨角色获得过所有商品", rewardText: "天赋点+1", scope: { audiences: ["all"] } },
-  { id: "global:conference-collector", icon: "🏛️", title: "会议收集者", description: "跨局跨角色中过所有会议的论文", rewardText: "天赋点+1", scope: { audiences: ["all"] } },
-  { id: "global:travel-collector", icon: "🧳", title: "旅行收集者", description: "跨局跨角色去过所有会议地点", rewardText: "天赋点+1", scope: { audiences: ["all"] } },
-  { id: "global:direction-collector", icon: "🧭", title: "方向收集者", description: "跨局跨角色发表过所有研究方向的论文", rewardText: "天赋点+1", scope: { audiences: ["all"] } },
+  { id: "global:buff-collector", icon: "🧪", title: "Buff收集者", description: "跨局跨角色获得过所有Buff", rewardText: "经验倍率+0.2", scope: { audiences: ["all"] } },
+  { id: "global:product-collector", icon: "🛍️", title: "商品收集者", description: "跨局跨角色获得过所有商品", rewardText: "经验倍率+0.2", scope: { audiences: ["all"] } },
+  { id: "global:conference-collector", icon: "🏛️", title: "会议收集者", description: "跨局跨角色中过所有会议的论文", rewardText: "经验倍率+0.2", scope: { audiences: ["all"] } },
+  { id: "global:travel-collector", icon: "🧳", title: "旅行收集者", description: "跨局跨角色去过所有会议地点", rewardText: "经验倍率+0.2", scope: { audiences: ["all"] } },
+  { id: "global:direction-collector", icon: "🧭", title: "方向收集者", description: "跨局跨角色发表过所有研究方向的论文", rewardText: "经验倍率+0.2", scope: { audiences: ["all"] } },
   { id: "global:conference-three-years", icon: "📅", title: "年年赴约", description: "连续3年发表同一个会议", rewardText: "经验+5", scope: { audiences: ["all"] } },
 ];
 

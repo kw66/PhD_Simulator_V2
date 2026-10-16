@@ -141,6 +141,17 @@
 
 .play-right-rail .play-help-summary p { margin: 0; }
 
+.play-right-rail .play-help-summary + .play-help-content { margin-top: 6px; }
+
+.play-right-rail .play-help-content > .play-help-grant-thresholds {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+
+.play-help-grant-thresholds-label { grid-column: 1 / -1; }
+.play-help-grant-thresholds > span:not(.play-help-grant-thresholds-label) { white-space: nowrap; }
+
 .play-right-rail .play-help-details {
   margin-top: 9px;
 }

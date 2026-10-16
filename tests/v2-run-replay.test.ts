@@ -39,6 +39,7 @@ describe("monthly browser operation replay", () => {
     let { store } = fixtureState;
     const { disk, local } = fixtureState;
     enroll(store);
+    let boughtCoffee = false;
     for (let month = 1; month <= 12 && store.getState().phase === "playing"; month++) {
       for (let turn = 0; turn < 50 && store.getState().eventQueue.length; turn++) {
         const event = store.getState().eventQueue[0]!;
@@ -52,11 +53,19 @@ describe("monthly browser operation replay", () => {
       if (store.getState().phase !== "playing") break;
       if (month === 1) {
         store.dispatch("create-paper", { paperSlotIndex: 0 });
-        store.dispatch("buy-shop-item", { shopItemId: "chair" });
       }
-      store.dispatch("read-paper");
-      store.dispatch("research-paper", { paperId: store.getState().papers.find(paper => paper.status === "draft")?.id, paperActionType: "idea" });
-      store.dispatch("rest");
+      // Only one ordinary action is available. Spending it on reading first
+      // used to make both research and rest no-ops, eventually exhausting SAN.
+      if (month === 1 || month === 7) {
+        store.dispatch("research-paper", { paperId: store.getState().papers.find(paper => paper.status === "draft")?.id, paperActionType: "idea" });
+      } else if ((month === 3 || month === 9) && store.getState().player.san >= 12) {
+        store.dispatch("read-paper");
+      } else store.dispatch("rest");
+      if (!boughtCoffee && store.getState().player.money >= 1 && store.getState().player.san < store.getState().sanCap) {
+        const before = store.getState().coffeeState.coffeePurchaseCountThisMonth;
+        store.dispatch("buy-coffee");
+        boughtCoffee = store.getState().coffeeState.coffeePurchaseCountThisMonth > before;
+      }
       store.dispatch("next-month");
       expect(store.getReplayStatus().failed).toBeUndefined();
       await store.flushSaves();
@@ -65,6 +74,9 @@ describe("monthly browser operation replay", () => {
       expect(store.getReplayStatus().failed).toBeUndefined();
     }
     expect(store.getState().totalMonths).toBeGreaterThanOrEqual(12);
+    expect(store.getState().readingState.readCount).toBeGreaterThan(0);
+    expect(store.getState().papers[0]?.idea).toBeGreaterThan(0);
+    expect(boughtCoffee).toBe(true);
     store.dispatch("quit-game");
     expect(store.isCurrentRunDisqualified()).toBe(false);
   });

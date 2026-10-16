@@ -6,6 +6,8 @@ import { hasAiCollaboration } from "./v2-ai-shop";
 import { getCoffeeSanGain } from "./v2-coffee-system";
 import { getAdvisorRankIndex } from "./v2-advisor-progress";
 import { getDesignedTalentNodes } from "./v2-role-talent-definitions";
+import { getRoleEndingAchievements } from "./v2-achievement-catalog";
+import { isCursedRole } from "./v2-curse-system";
 
 function satisfy(run: AchievementRunProgress, id: string): void {
   if (!run.satisfied.includes(id)) run.satisfied.push(id);
@@ -111,12 +113,15 @@ export function evaluateStateAchievements(state: GameState, run: AchievementRunP
 
   if (state.phase === "finished" && state.ending) {
     if (state.ending === "master" || state.ending === "phd") {
-      ids.add(`${state.selectedRoleId}:ending-${state.ending}`);
+      const graduation = getRoleEndingAchievements(state.selectedRoleId).find(item => item.id.endsWith(`:ending-${state.ending}`));
+      if (graduation) ids.add(graduation.id);
       const nodes = getDesignedTalentNodes(state.selectedRoleId) ?? [];
       const paid = nodes.some(node => !node.fixed && node.cost > 0 && (state.roleTalents?.levels[node.id] ?? 0) > 0);
       if (!paid && state.ending === "phd") check(state.selectedRoleId === "normal", "normal:truly-ordinary");
       if (!paid && state.ending === "master" && state.selectedRoleId.endsWith("-reversed")) ids.add(`${state.selectedRoleId}:zero-talent-master`);
       if (state.ending === "phd") {
+        check(isCursedRole(state.selectedRoleId) && state.curseState?.difficulty === 4,
+          `${state.selectedRoleId}:curse-hell-phd`);
         check(peak("research") < 6, "unlock:genius-reversed");
         check(peak("favor") < 6, "unlock:teacher-child-reversed");
         check(peak("social") < 6, "unlock:social-reversed");

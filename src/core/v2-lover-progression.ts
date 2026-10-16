@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { getCaptainLevel, getCaptainLoverId, getCaptainLoverIntimacyCap, getCaptainLoverResearchCap, getCaptainLoverRouteMax, getCaptainLoverHelpQueue, setCaptainLoverHelpQueue, isCaptain } from "./v2-captain-state";
 import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { getRecoveredSan } from "./v2-san-recovery";
@@ -77,7 +78,7 @@ export function getLoverPassiveGains(state: GameState): { play: number; study: n
 }
 
 export function getLoverNextReward(state: GameState, route: LoverRoute): string {
-  const intimacyGain = applyTierResist(route === "shopping" ? 2 : 1, state.loverProgressState.intimacy, () => 0).effectiveChange;
+  const intimacyGain = applyTierResist(route === "shopping" ? 2 : 1, state.loverProgressState.intimacy, () => 0, getCaptainLoverIntimacyCap(state)).effectiveChange;
   const intimacyReward = `、亲密 +${formatMoney(intimacyGain)}`;
   if (route === "shopping") return `下次购物免单${intimacyReward}`;
   const cycle = getRoute(state, route).completed % 3;
@@ -87,6 +88,16 @@ export function getLoverNextReward(state: GameState, route: LoverRoute): string 
 }
 
 export function settlePendingLoverHelp(state: GameState, random: () => number = gameRandom): GameState {
+  let next = state;
+  do {
+    const settled = settlePendingLoverHelpPass(next, random);
+    if (settled === next) return next;
+    next = settled;
+  } while (isCaptain(next));
+  return next;
+}
+
+function settlePendingLoverHelpPass(state: GameState, random: () => number): GameState {
   const help = state.loverProgressState.pendingPaperHelp;
   if (state.phase !== "playing" || !help || !state.loverState.active) return state;
   const targets = state.papers.flatMap((paper) => !paper.nonFirstAuthor && (paper.status === "draft" || paper.status === "journal-reviewing")
@@ -99,10 +110,12 @@ export function settlePendingLoverHelp(state: GameState, random: () => number = 
   const target = lowestTargets[Math.floor(random() * lowestTargets.length)]!;
   const paper = addPaperCollaboration(target.paper, { paperId: target.paper.id,
     collaborator: { id: help.collaboratorId, name: help.name }, scores: { [target.field]: help.amount } });
-  return pushMilestoneLog({ ...state,
+  let nextState: GameState = { ...state,
     papers: state.papers.map((entry) => entry.id === paper.id ? paper : entry),
     loverProgressState: { ...state.loverProgressState, pendingPaperHelp: null },
-  }, `恋人帮助：${help.name}帮你完善《${paper.title}》，${{ idea: "idea", experiment: "实验", writing: "写作" }[target.field]} +${paper[target.field] - target.paper[target.field]}`, "lover-help");
+  };
+  if (isCaptain(state)) nextState = setCaptainLoverHelpQueue(nextState, getCaptainLoverHelpQueue(state).slice(1));
+  return pushMilestoneLog(nextState, `恋人帮助：${help.name}帮你完善《${paper.title}》，${{ idea: "idea", experiment: "实验", writing: "写作" }[target.field]} +${paper[target.field] - target.paper[target.field]}`, "lover-help");
 }
 
 function advanceRoute(
@@ -115,23 +128,24 @@ function advanceRoute(
 ): GameState {
   const original = getRoute(state, route);
   const total = original.progress + gain;
-  const completions = Math.floor(total / LOVER_TASK_MAX);
+  const maximum = getCaptainLoverRouteMax(state);
+  const completions = Math.floor(total / maximum);
   let nextState: GameState = { ...state, loverProgressState: { ...state.loverProgressState,
     routes: { play: getRoute(state, "play"), study: getRoute(state, "study"), shopping: getRoute(state, "shopping"),
-      [route]: { progress: total % LOVER_TASK_MAX, completed: original.completed + completions } },
+      [route]: { progress: total % maximum, completed: original.completed + completions } },
   } };
   for (let completion = 0; completion < completions; completion += 1) {
     const count = original.completed + completion + 1;
     const cycle = (count - 1) % 3;
     const lover = nextState.loverProgressState;
     const playerResearch = getEffectiveResearch(nextState, operationStartState);
-    const intimacyResult = applyTierResist(route === "shopping" ? 2 : 1, lover.intimacy, random);
+    const intimacyResult = applyTierResist(route === "shopping" ? 2 : 1, lover.intimacy, random, getCaptainLoverIntimacyCap(nextState));
     const intimacy = lover.intimacy + intimacyResult.effectiveChange;
     const effects = [describeResistedTalentReward("亲密", lover.intimacy, intimacyResult)];
     nextState = { ...nextState, loverProgressState: { ...lover, intimacy } };
     if (route === "play") {
       if (cycle === 0) {
-        const san = getRecoveredSan(nextState.player.san, nextState.sanCap, 6);
+        const san = getRecoveredSan(nextState.player.san, nextState.sanCap, 6, nextState.selectedRoleId);
         effects.push(describeTalentReward("SAN", 6, nextState.player.san, san));
         nextState = { ...nextState, player: { ...nextState.player, san } };
       } else if (cycle === 1) {
@@ -147,11 +161,17 @@ function advanceRoute(
       effects.push("购物免单 +1");
     } else if (cycle === 0) {
       const stored = lover.pendingPaperHelp;
-      const amount = Math.max(0, lover.research);
-      nextState.loverProgressState.pendingPaperHelp = stored ?? { amount,
-        collaboratorId: `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`, name: getLoverName(state.loverState) };
-      effects.push(stored ? `已有一次论文帮助待生效（${Math.floor(stored.amount)}分），不叠加`
-        : `论文帮助已就绪（最低项 +${Math.floor(amount)}分）`);
+      const amount = Math.max(0, lover.research) * (1 + 0.2 * getCaptainLevel(nextState, getCaptainLoverId(nextState), "teacher-child"));
+      const help = { amount, collaboratorId: `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}`,
+        name: getLoverName(state.loverState) };
+      if (isCaptain(nextState)) {
+        nextState = setCaptainLoverHelpQueue(nextState, [...getCaptainLoverHelpQueue(nextState), help]);
+        effects.push(`论文帮助已保留（最低项 +${Math.floor(amount)}分）`);
+      } else {
+        nextState.loverProgressState.pendingPaperHelp = stored ?? help;
+        effects.push(stored ? `已有一次论文帮助待生效（${Math.floor(stored.amount)}分），不叠加`
+          : `论文帮助已就绪（最低项 +${Math.floor(amount)}分）`);
+      }
     } else if (cycle === 1) {
       const previous = nextState.buffs.find((buff) => buff.id === "lover-study-score");
       const bonus = (previous?.actionEffects?.idea?.bonus ?? 0) + 1;
@@ -161,7 +181,7 @@ function advanceRoute(
       }]) };
       effects.push(`永久idea、实验、写作各 +1分（累计 +${bonus}）`);
     } else if (lover.research < playerResearch) {
-      const result = applyTierResist(1, lover.research, random, 20);
+      const result = applyTierResist(1, lover.research, random, getCaptainLoverResearchCap(nextState));
       nextState.loverProgressState.research = lover.research + result.effectiveChange;
       effects.push(describeResistedTalentReward("恋人科研", lover.research, result));
     } else if (playerResearch < lover.research) {
@@ -172,7 +192,7 @@ function advanceRoute(
       nextState = change.state;
     } else effects.push("双方科研相同，本次不提升科研");
     nextState = recordTalentTrigger(nextState, `lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}:${route}:${count}`, {
-      name: "恋人", recipient: `你与${getLoverName(state.loverState)}`, reason: `${source}·${ROUTE_LABELS[route]}进度满100，第${count}次`, effects,
+      name: "恋人", recipient: `你与${getLoverName(state.loverState)}`, reason: `${source}·${ROUTE_LABELS[route]}进度满${maximum}，第${count}次`, effects,
     });
   }
   return nextState;
@@ -207,11 +227,18 @@ export function advanceLoverMonth(state: GameState): GameState {
     || state.totalMonths <= (state.loverState.startTotalMonths ?? state.totalMonths)
     || state.totalMonths <= (lover.lastAdvancedTotalMonths ?? -1)) return state;
   const gains = getLoverPassiveGains(state);
+  const accumulated = Number(((state.captainState?.loverAdvanceRemainder ?? 0)
+    + 0.1 * getCaptainLevel(state, getCaptainLoverId(state), "chosen")).toFixed(10));
+  const advances = 1 + (isCaptain(state) ? Math.floor(accumulated) : 0);
   let nextState: GameState = { ...activateLoverMonthlyDiscount(state), loverProgressState: { ...lover, taskUsedThisMonth: false, lastAdvancedTotalMonths: state.totalMonths,
     monthlyActivity: `玩耍进度 +${gains.play}，学习进度 +${gains.study}`,
     sanDiscountMonths: (lover.sanDiscountMonths ?? []).filter((month) => month > state.totalMonths) } };
-  nextState = advanceRoute(nextState, "play", gains.play, "每月相处");
-  nextState = advanceRoute(nextState, "study", gains.study, "每月相处");
+  if (isCaptain(nextState)) nextState = { ...nextState, captainState: { ...nextState.captainState!, loverAdvanceRemainder: Number((accumulated - Math.floor(accumulated)).toFixed(10)) } };
+  for (let index = 0; index < advances; index++) {
+    const currentGains = isCaptain(nextState) ? getLoverPassiveGains(nextState) : gains;
+    nextState = advanceRoute(nextState, "play", currentGains.play, "每月相处");
+    nextState = settlePendingLoverHelp(advanceRoute(nextState, "study", currentGains.study, "每月相处"));
+  }
   const rewardDetails = nextState.eventHistory.slice(state.eventHistory.length)
     .flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.name === "恋人"
       ? stage.talentTrigger.effects : []));

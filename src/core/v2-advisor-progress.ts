@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { getCaptainLevel } from "./v2-captain-state";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "./v2-calendar";
 import { ADVISOR_SALARY, ADVISOR_SALARY_BONUS, SCORE_BY_TARGET } from "./v2-content";
@@ -251,14 +252,15 @@ export function settleAdvisorMonth(state: GameState, random: () => number = game
   };
   if (state.totalMonths > 0 && advisor.lastAdvisorProjectTotalMonths !== state.totalMonths) {
     const projectType = advisor.nextProject ?? "horizontal";
-    const result = advanceSharedLabProject({ ...nextState, advisorProgressState: advisor }, projectType, 10, random);
+    const progress = 10 + getCaptainLevel(state, "advisor", "normal");
+    const result = advanceSharedLabProject({ ...nextState, advisorProgressState: advisor }, projectType, progress, random);
     nextState = result.state;
     advisor = {
       ...nextState.advisorProgressState,
       nextProject: projectType === "horizontal" ? "vertical" : "horizontal",
       lastAdvisorProjectTotalMonths: state.totalMonths,
       lastProjectTotalMonths: state.totalMonths,
-      monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度 +10${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导论文" : "（项目完成）" : ""}`,
+      monthlyActivity: `${projectType === "horizontal" ? "横向" : "纵向"}进度 +${progress}${result.completed > 0 ? projectType === "vertical" ? "（项目完成），指导论文" : "（项目完成）" : ""}`,
     };
   }
   const calendarMonth = getAcademicCalendarMonth(state.month);

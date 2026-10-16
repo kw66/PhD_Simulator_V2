@@ -50,6 +50,7 @@ function updateEventFacts(previous: GameState, next: GameState, run: Achievement
       if (hasChoice(record, /terraria/iu)) inc(run, "terraria");
       if (hasChoice(record, /magic-tower/iu)) inc(run, "magic-tower");
     }
+    if (id === "random-19") inc(run, "study-fatigue");
     if (id.startsWith("illness-") && hasChoice(record, /hospital/iu)) inc(run, "hospital");
     if (id === "internship-invite" && hasChoice(record, /decline|reject/iu)) satisfy(run, "global:stay-put");
   }
@@ -62,6 +63,7 @@ function updateEventFacts(previous: GameState, next: GameState, run: Achievement
   if ((run.counters["terraria"] ?? 0) >= 3) satisfy(run, "global:terraria");
   if ((run.counters["magic-tower"] ?? 0) >= 3) satisfy(run, "global:magic-tower");
   if ((run.counters["hospital"] ?? 0) >= 3) satisfy(run, "global:cherish-life");
+  if ((run.counters["study-fatigue"] ?? 0) >= 3) satisfy(run, "global:study-fatigue");
   if ((next.internshipCount ?? 0) >= 3) satisfy(run, "global:three-internships");
   if ((next.conferenceCareerState.rejectedInternshipCount ?? 0) > 0) satisfy(run, "global:stay-put");
   if (next.conferenceEncounterState.jointTrainingReward || next.conferenceEncounterState.bigBullCooperation) satisfy(run, "global:joint-training");

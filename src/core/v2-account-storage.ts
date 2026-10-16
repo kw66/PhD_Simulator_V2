@@ -1,10 +1,12 @@
-import { DATA_EPOCH, isCurrentDataEpoch } from "./v2-data-epoch";
+﻿import { DATA_EPOCH, isCurrentDataEpoch } from "./v2-data-epoch";
 import { createDefaultAccountProfile } from "./v2-lobby";
 import { getRoleOptions } from "./v2-progression";
 import { getNextRoleLevelExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
 import { loadRoleRecords, saveRoleRecords } from "./v2-role-records";
 import { loadRoleAchievementRecords, saveRoleAchievementRecords } from "./v2-achievement-records";
 import { loadRoleTalentAllocation, saveRoleTalentAllocation } from "./v2-role-talent-storage";
+import { reconcileAccountRoleUnlocks } from "./v2-account-role-unlocks";
+import { CURSED_ROLE_IDS, normalizeCurseDifficulty, type CurseDifficulty } from "./v2-curse-system";
 import type { AccountProfile, DateDisplayMode, GameState, RoleId } from "./v2-types";
 
 /** The account layer writes one atomic, epoch-scoped envelope. No legacy data is imported. */
@@ -89,8 +91,18 @@ function loadFromRecords(records: Record<string, string>): AccountProfile {
   if (isRecord(lobby)) {
     if (validDateMode(lobby.dateDisplayMode)) account = { ...account, dateDisplayMode: lobby.dateDisplayMode };
     if (validRole(lobby.selectedLobbyRoleId)) account = { ...account, selectedLobbyRoleId: lobby.selectedLobbyRoleId };
+    const unlocked: Partial<Record<RoleId, CurseDifficulty>> = {};
+    const selected: Partial<Record<RoleId, CurseDifficulty>> = {};
+    for (const roleId of CURSED_ROLE_IDS) {
+      const max = isRecord(lobby.curseDifficultyUnlocked) ? lobby.curseDifficultyUnlocked[roleId] : undefined;
+      if (max === normalizeCurseDifficulty(max)) unlocked[roleId] = max as CurseDifficulty;
+      const choice = isRecord(lobby.curseDifficultyByRole) ? lobby.curseDifficultyByRole[roleId] : undefined;
+      if (choice === normalizeCurseDifficulty(choice)) selected[roleId] = Math.min(choice as number, unlocked[roleId] ?? 1) as CurseDifficulty;
+    }
+    if (Object.keys(unlocked).length) account = { ...account, curseDifficultyUnlocked: unlocked };
+    if (Object.keys(selected).length) account = { ...account, curseDifficultyByRole: selected };
   }
-  return account;
+  return reconcileAccountRoleUnlocks(account);
 }
 
 function parseJson(value: string | undefined): unknown {
@@ -132,7 +144,8 @@ export function saveAccountProfile(
   saveRoleRecords(account, collector);
   saveRoleAchievementRecords(account, collector);
   saveRoleTalentAllocation(account, collector);
-  records[ACCOUNT_LOBBY_STORAGE_KEY] = JSON.stringify({ dateDisplayMode: account.dateDisplayMode, selectedLobbyRoleId: account.selectedLobbyRoleId });
+  records[ACCOUNT_LOBBY_STORAGE_KEY] = JSON.stringify({ dateDisplayMode: account.dateDisplayMode, selectedLobbyRoleId: account.selectedLobbyRoleId,
+    curseDifficultyUnlocked: account.curseDifficultyUnlocked, curseDifficultyByRole: account.curseDifficultyByRole });
   const envelope: Envelope = {
     version: 1,
     epoch: DATA_EPOCH,

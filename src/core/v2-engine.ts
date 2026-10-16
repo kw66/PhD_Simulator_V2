@@ -1,4 +1,5 @@
 import { createGameRandomState, withGameRandom } from "./v2-game-random";
+import { settleCaptainMonth, syncCaptainMembers } from "./v2-captain-runtime";
 import { observeAchievements } from "./v2-achievement-runtime";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { dispatchDebugAction } from "./v2-debug-tools";
@@ -21,6 +22,8 @@ import {
 } from "./v2-event-queue";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
 import { yearlyResetRandomEventState, normalizeRoleTalentIllnessProbability } from "./v2-random-event-rules";
+import { getMonthEndIllnessDelta, settleCurseMonthStart, repayCurseDebt } from "./v2-curse-system";
+import { settleScheduledActionBuffs } from "./v2-study-fatigue";
 import { investRoleTalentMoney } from "./v2-role-talent-investments";
 import { activatePendingRandomEvents } from "./v2-paper-competition-waiting";
 import { refreshPaperCompetitionEvents } from "./v2-paper-competition-preview";
@@ -44,7 +47,6 @@ import { getConferenceTripId } from "./v2-conference-identity";
 import { settleDueConferenceAttendance } from "./v2-conference-attendance";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { applyShopAction } from "./v2-shop-transactions";
-import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER } from "./v2-sanity-rules";
 import { endRelationship } from "./v2-relationship-actions";
 import { recordRelationshipActivityMonth } from "./v2-relationship-activity-history";
 import { recordSanMonth } from "./v2-san-history";
@@ -156,9 +158,7 @@ function createAdvancedCalendarState(state: GameState): GameState {
   const randomState = calendar.month === 1 && calendar.year > state.year
     ? yearlyResetRandomEventState(state)
     : state;
-  const monthEndIllnessDelta = state.totalMonths > 0
-    ? DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[state.player.san < 6 ? 0 : state.player.san < 12 ? 1 : state.player.san < 18 ? 2 : 3]
-    : 0;
+  const monthEndIllnessDelta = getMonthEndIllnessDelta(state);
   const calendarState = appendAcademicYearLog({
     ...state,
     ...randomState,
@@ -169,7 +169,9 @@ function createAdvancedCalendarState(state: GameState): GameState {
     actionState: { ...state.actionState, used: 0, aiResearchBonusUsed: false },
     eventQueue: decrementEventQueueDeadlines(state.eventQueue),
   });
-  const decayedPaperState = applyPrepublicationPaperDecay(settleRoleTalentMonthStart(calendarState));
+  const curseState = evaluateCoreEndings(settleCurseMonthStart(calendarState));
+  if (curseState.phase !== "playing") return curseState;
+  const decayedPaperState = applyPrepublicationPaperDecay(settleScheduledActionBuffs(settleCaptainMonth(settleRoleTalentMonthStart(curseState))));
   const reviewProgressState = advancePaperReviewDeadlines(decayedPaperState);
   const reviewResolution = resolveDuePaperReviews(reviewProgressState);
   const journalResolution = resolveReadyJournalPapers(reviewResolution.state);
@@ -392,6 +394,8 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
       debugEventReplayEnabled: state.debugEventReplayEnabled,
     }, "start-game", {
       roleId: state.selectedRoleId,
+      curseDifficulty: payload.curseDifficulty ?? state.curseState?.difficulty,
+      captainTagLevels: payload.captainTagLevels ?? state.captainState?.levels,
       talentAllocation: payload.talentAllocation ?? state.roleTalents?.levels,
     });
   }
@@ -408,7 +412,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
     if (checkedState.phase !== "playing") return checkedState;
     state = checkedState;
   }
-  let nextState = normalizeGameMoney(ensureFellowFinanceAccounts(dispatchGameAction(ensureFellowPapers(state), actionId, payload)));
+  let nextState = normalizeGameMoney(syncCaptainMembers(ensureFellowFinanceAccounts(dispatchGameAction(ensureFellowPapers(syncCaptainMembers(state)), actionId, payload))));
   if (state.degree === "master" && nextState.degree === "phd") {
     nextState = { ...nextState, thesis: createInitialThesisState(),
       careerProgress: { internet: 0, stateOwned: 0, civilService: 0, academic: 0 },
@@ -441,6 +445,8 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
   if (debugState !== null) return debugState;
 
   switch (actionId) {
+    case "repay-debt":
+      return repayCurseDebt(state, payload.debtRepayment);
     case "invest-money": {
       const investment = investRoleTalentMoney(state);
       return investment.success ? pushLog(investment.state, investment.message) : pushNoOpLog(state, investment.message);

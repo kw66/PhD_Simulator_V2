@@ -63,6 +63,7 @@ function hasRemainingBuffEffects(buff: Buff): boolean {
     || Number.isFinite(buff.activeOperationSanDelta)
     || Number.isFinite(buff.relationshipOperationSanDelta)
     || Number.isFinite(buff.labExperimentMoneyDelta)
+    || Number.isFinite(buff.monthlyActionLimitDelta)
     || buff.scholarshipDisqualified === true
     || hasActionEffect
     || hasNumericRecordValue(buff.paperPolishEffects as Record<string, unknown> | undefined)

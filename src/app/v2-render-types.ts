@@ -21,6 +21,7 @@ export interface PlayRenderUiState {
   talentTreeSelectedNodeByPage?: readonly number[];
   talentAllocation?: TalentAllocation;
   roleLevel?: number;
+  captainTagRoleProgress?: AccountProfile["roleProgress"];
   isFeedbackOpen?: boolean;
   isQuitConfirmationOpen?: boolean;
   dateDisplayMode?: AccountProfile["dateDisplayMode"];

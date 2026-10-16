@@ -85,7 +85,7 @@ export function applyRoleAttributeReactions(state: GameState, stat: PlayerAttrib
     }
     state = { ...state, player: { ...state.player,
       money: roundMoney(state.player.money + 2 * level(state, "knowledge-monetization")),
-      san: getRecoveredSan(state.player.san, state.sanCap, 2 * level(state, "work-life-balance")) } };
+      san: getRecoveredSan(state.player.san, state.sanCap, 2 * level(state, "work-life-balance"), state.selectedRoleId) } };
     state = recordPersonalIncome(state, 2 * level(state, "knowledge-monetization"));
     if (level(state, "research-network")) {
       state = applyPlayerAttributeChange(state, "social", 1, "ordinary", getRoll).state;
@@ -103,7 +103,7 @@ export function applyRoleAttributeReactions(state: GameState, stat: PlayerAttrib
       [key]: precise(accumulated - whole) } };
     const reward = whole * level(state, talent);
     if (reward > 0) state = { ...state, player: { ...state.player,
-      ...(actual > 0 ? { san: getRecoveredSan(state.player.san, state.sanCap, reward) }
+      ...(actual > 0 ? { san: getRecoveredSan(state.player.san, state.sanCap, reward, state.selectedRoleId) }
         : { money: roundMoney(state.player.money + reward) }) } };
     if (actual < 0) state = recordPersonalIncome(state, reward);
     return logReaction(before, state, actual > 0 ? "人前春风" : "人走茶凉", "实际社交变化累计满1点");

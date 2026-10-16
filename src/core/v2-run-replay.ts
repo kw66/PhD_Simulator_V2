@@ -8,10 +8,11 @@ import type { DispatchPayload, GameActionId, GameState } from "./v2-types";
 export type ReplayCommand = { kind: "action"; actionId: GameActionId; payload: DispatchPayload }
   | { kind: "help"; id: string; requiredIds: string[] };
 /** Bump when deterministic gameplay rules change, independently of account epochs. */
-export const REPLAY_RULESET = "20261016-r1";
+export const REPLAY_RULESET = "20261017-r2";
+const SUPPORTED_REPLAY_RULESETS = ["20261016-r1", REPLAY_RULESET] as const;
 export interface RunReplay {
   version: 1;
-  ruleset: typeof REPLAY_RULESET;
+  ruleset: typeof SUPPORTED_REPLAY_RULESETS[number];
   epoch: string;
   savedAt: string;
   initial: GameState;
@@ -69,7 +70,7 @@ export function createRunReplay(initial: GameState, started: GameState, payload:
 export function isRunReplay(value: unknown): value is RunReplay {
   if (!value || typeof value !== "object" || !isCurrentDataEpoch(value)) return false;
   const record = value as RunReplay;
-  return record.version === 1 && record.ruleset === REPLAY_RULESET && record.initial?.phase === "setup" && !!record.initial.randomState
+  return record.version === 1 && SUPPORTED_REPLAY_RULESETS.includes(record.ruleset) && record.initial?.phase === "setup" && !!record.initial.randomState
     && Array.isArray(record.commands) && record.commands.length > 0
     && record.commands.length <= 200_000 && record.commands.every(command => command && (
       command.kind === "help" ? typeof command.id === "string" && Array.isArray(command.requiredIds)

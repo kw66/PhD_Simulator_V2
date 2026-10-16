@@ -34,5 +34,6 @@ export function renderApp(
       dateDisplayMode: playUiState.dateDisplayMode ?? accountProfile.dateDisplayMode,
       roleExperienceAward: playUiState.roleExperienceAward ?? accountProfile.lastRunExperience,
       roleLevel: accountProfile.roleProgress[state.selectedRoleId]?.level ?? 0,
+      captainTagRoleProgress: accountProfile.roleProgress,
     });
 }

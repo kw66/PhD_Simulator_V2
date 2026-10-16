@@ -8,9 +8,12 @@ import { MONTHLY_LIVING_COST } from "./v2-content";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { settleLabResearchGrowth } from "./v2-lab-talent";
 import { settleRoleTalentMonthEnd, settleRoleTalentMonthStart, settleRoleTalentYearEnd } from "./v2-role-talent-lifecycle";
+import { settleScheduledActionBuffs } from "./v2-study-fatigue";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { settleGreedCoinGames } from "./v2-role-talent-greed";
 import { normalizeRoleTalentIllnessProbability } from "./v2-random-event-rules";
+import { getMonthEndIllnessDelta, settleCurseMonthStart } from "./v2-curse-system";
+import { getRecoveredSan } from "./v2-san-recovery";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
@@ -21,7 +24,7 @@ import { quoteSanPayment } from "./v2-role-talent-costs";
 import { settleRoleTalentInvestments } from "./v2-role-talent-investments";
 import { getFellowName } from "./v2-fellow-progression";
 import { syncRelationshipState } from "./v2-relationship-rules";
-import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER, getMonthlySeasonSanModifier, getRoleMonthlySanCost, getSeasonByMonth } from "./v2-sanity-rules";
+import { getMonthlySeasonSanModifier, getRoleMonthlySanCost, getSeasonByMonth } from "./v2-sanity-rules";
 import { getBikeMonthlySanCost, getBikeSanCapLimit } from "./v2-bike-system";
 import { hasFullGear } from "./v2-meeting-system";
 import { BASE_COFFEE_PRICE, getCoffeeBuyPrice, getCoffeeSanGain } from "./v2-coffee-system";
@@ -83,7 +86,7 @@ function applyStats(state: GameState, player: PlayerStats, stats: Partial<Player
     next = recordPersonalIncome(next, stats.money);
   }
   if (stats.san) {
-    if (stats.san > 0) next.player.san = Math.max(player.san, Math.min(state.sanCap, player.san + stats.san));
+    if (stats.san > 0) next.player.san = getRecoveredSan(player.san, state.sanCap, stats.san, state.selectedRoleId);
     else {
       const payment = quoteSanPayment(next, getRoleMonthlySanCost(next, -stats.san), { allowOverdraw: true, allowBeta: false });
       next = recordPersonalSpending({ ...next, player: { ...next.player,
@@ -268,7 +271,7 @@ export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution
           money: roundMoney(settledState.player.money - payment.moneyCost),
         } }, payment.moneyCost);
         appliedStats.san = -payment.sanCost;
-      } else appliedStats.san = raw;
+      } else appliedStats.san = state.selectedRoleId === "special-finite-life" ? 0 : raw;
       sanDelta += appliedStats.san;
     }
     for (const stat of ["research", "social", "favor"] as const) {
@@ -303,7 +306,7 @@ export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution
     totals[statId] = statId === "money" ? roundMoney(delta) : delta;
   }
 
-  const emergencySan = getShopEmergencySan(state.shopState, player.san);
+  const emergencySan = state.selectedRoleId === "special-finite-life" ? player.san : getShopEmergencySan(state.shopState, player.san);
   if (emergencySan !== player.san) {
     const delta = emergencySan - player.san;
     player = { ...player, san: emergencySan };
@@ -698,6 +701,10 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
   const annual = settleRoleTalentYearEnd(inherited);
   const yearEnd = settleRoleTalentMonthEnd(annual);
   const lifecycleItems: MonthlyEffectItem[] = [];
+  if (state.selectedRoleId === "research-captain" && state.captainState) lifecycleItems.push({
+    id: "monthly-captain-labels", name: "统御者", source: "成员标签", stats: {}, appliedStats: {},
+    label: "标签补给与成长", note: "下月按成员标签结算经费、收入和成长；最低者逐次重选，并列随机，未计入下方合计",
+  });
   const observe = (before: GameState, after: GameState, id: string, name: string): void => {
     const stats: Partial<PlayerStats> = {};
     for (const stat of PLAYER_STAT_IDS) {
@@ -713,9 +720,7 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
     id: "monthly-role-idle-cap", name: "日渐圆润", source: "角色天赋", stats: {}, appliedStats: {},
     label: `SAN上限 +${yearEnd.sanCap - annual.sanCap}`, note: "月末未使用常规行动",
   });
-  const monthEndIllnessDelta = state.totalMonths > 0
-    ? DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[yearEnd.player.san < 6 ? 0 : yearEnd.player.san < 12 ? 1 : yearEnd.player.san < 18 ? 2 : 3]
-    : 0;
+  const monthEndIllnessDelta = getMonthEndIllnessDelta(yearEnd);
   const beforeMonthlyTalents = {
     ...yearEnd,
     totalMonths: nextTotalMonths,
@@ -725,11 +730,11 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
   };
   // Preview deterministic effects only. Sampling a random permutation here
   // would change the tooltip on every render and could promise a false result.
-  const nextMonthState = settleRoleTalentMonthStart(beforeMonthlyTalents, undefined, { skipSwaps: true });
+  const nextMonthState = settleScheduledActionBuffs(settleRoleTalentMonthStart(settleCurseMonthStart(beforeMonthlyTalents, false), undefined, { skipSwaps: true }));
   const hasRandomStagnation = state.selectedRoleId === "social-reversed" && (yearEnd.roleTalents?.socialStagnantMonths ?? 0) >= 2;
   if (!hasRandomStagnation) observe(beforeMonthlyTalents, nextMonthState, "monthly-role-growth", state.selectedRoleId === "normal"
     ? nextTotalMonths === 2 ? "满怀干劲" : "满怀干劲+"
-    : state.selectedRoleId === "chosen" ? "否极泰来" : state.selectedRoleId === "rich-reversed" ? "金钱诅咒" : "命运反噬");
+    : state.selectedRoleId === "chosen" ? "否极泰来" : state.selectedRoleId === "special-fading-genius" ? "天才迟暮" : state.selectedRoleId === "rich-reversed" ? "金钱诅咒" : "命运反噬");
   if (hasRandomStagnation) lifecycleItems.push({
     id: "monthly-role-stagnation", name: "患得患失", source: "角色天赋", stats: {}, appliedStats: {},
     label: "科研/好感随机 -1", note: "患得患失：月初科研或导师好感随机降低1点，受抵抗影响",

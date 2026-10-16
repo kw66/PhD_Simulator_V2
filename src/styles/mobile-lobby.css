@@ -14,12 +14,13 @@
   }
 
   .lobby-page .lobby-masthead-main { order: 0; margin: 0 12px; }
-  .lobby-page[data-scale-mode="fixed"] .lobby-role-rail { order: 1; padding: 12px; border: 0; }
+  .lobby-page .lobby-project-links a { min-height: 44px; font-size: 13px; }
+  .lobby-page[data-scale-mode="fixed"] .lobby-role-rail { order: 1; padding: 6px 12px; border: 0; }
   .lobby-page .lobby-profile-main { order: 2; padding: 0 12px; }
-  .lobby-page .lobby-masthead-side { order: 3; padding: 0; margin: 12px 12px 0; }
+  .lobby-page .lobby-masthead-side { order: 3; padding: 0; margin: 6px 12px 0; }
   .lobby-page[data-scale-mode="fixed"] .lobby-profile-achievement-rail {
     order: 4;
-    padding: 12px;
+    padding: 6px 12px;
     height: auto;
     min-height: 0;
     border: 0;
@@ -50,20 +51,20 @@
   .lobby-page[data-scale-mode="fixed"] .lobby-role-row { display: contents; }
   .lobby-page[data-scale-mode="fixed"] .lobby-role-card {
     flex: 0 0 156px;
-    min-height: 112px;
+    min-height: 96px;
     scroll-snap-align: start;
   }
 
   .lobby-page[data-scale-mode="fixed"] .lobby-profile-top {
     grid-template-columns: 94px minmax(0, 1fr);
     grid-template-rows: auto auto auto auto;
-    gap: 12px;
-    padding: 14px 0;
+    gap: 6px 12px;
+    padding: 8px 0;
   }
   .lobby-page[data-scale-mode="fixed"] .lobby-profile-info { display: contents; }
   .lobby-page .lobby-profile-art { grid-column: 1; grid-row: 1 / 3; align-self: center; }
   .lobby-page[data-scale-mode="fixed"] .lobby-profile-portrait { width: 94px; max-height: 168px; }
-  .lobby-page[data-scale-mode="fixed"] .lobby-profile-info-head { grid-column: 2; gap: 10px; min-width: 0; flex-direction: column; align-items: stretch; }
+  .lobby-page[data-scale-mode="fixed"] .lobby-profile-info-head { grid-column: 2; gap: 6px; min-width: 0; flex-direction: column; align-items: stretch; }
   .lobby-page .lobby-profile-art-name { font-size: 21px; line-height: 1.25; }
   .lobby-page .lobby-start-button { min-width: 0; min-height: 44px; }
   .lobby-page .lobby-start-lock { width: 100%; }
@@ -72,7 +73,7 @@
     display: block;
     overflow: visible;
     font-size: 13px;
-    line-height: 1.65;
+    line-height: 1.45;
   }
   .lobby-page .lobby-profile-stat-columns {
     grid-column: 1 / -1;
@@ -81,24 +82,24 @@
   }
   .lobby-page .lobby-profile-stat-column-title { font-size: 14px; }
   .lobby-page .lobby-profile-stat-column,
-  .lobby-page .lobby-profile-stat-stack { gap: 8px; }
-  .lobby-page .lobby-profile-stat-row { gap: 8px; }
+  .lobby-page .lobby-profile-stat-stack { gap: 4px; }
+  .lobby-page .lobby-profile-stat-row { gap: 4px; }
   .lobby-page .lobby-profile-stat-row > span,
   .lobby-page .lobby-profile-stat-row strong { font-size: 13px; }
-  .lobby-page .lobby-profile-growth-summary { grid-column: 1 / -1; gap: 10px; padding-top: 10px; }
-  .lobby-page .lobby-growth-summary-row { flex-wrap: wrap; gap: 8px 12px; }
+  .lobby-page .lobby-profile-growth-summary { grid-column: 1 / -1; gap: 5px; padding-top: 5px; }
+  .lobby-page .lobby-growth-summary-row { flex-wrap: wrap; gap: 4px 12px; }
   .lobby-page .lobby-growth-multiplier-hint { margin-left: 4px; }
   .lobby-page .lobby-talent-reset-button { min-height: 40px; }
   .lobby-page .lobby-profile-top::after { left: 0; right: 0; }
 
-  .lobby-page .lobby-profile-growth-card { padding: 8px 0 0; }
+  .lobby-page .lobby-profile-growth-card { padding: 4px 0 0; }
   .lobby-page .lobby-talent-tree.is-designed-tree {
-    --lobby-talent-node-height: 228px;
-    --lobby-talent-detail-height: 92px;
+    --lobby-talent-node-height: 208px;
+    --lobby-talent-detail-height: 80px;
   }
   .lobby-page .is-designed-tree .lobby-talent-tree-node { width: 52px; min-height: 52px; }
   .lobby-page .lobby-normal-tree-node-level { font-size: 13px; }
-  .lobby-page .lobby-normal-tree-detail p { font-size: 13px; line-height: 1.6; }
+  .lobby-page .lobby-normal-tree-detail p { font-size: 13px; line-height: 1.45; }
   .lobby-page .lobby-normal-tree-detail-heading strong { font-size: 16px; }
 
   .lobby-page .lobby-profile-achievement-section,
@@ -107,18 +108,18 @@
     max-height: none;
     overflow: visible;
   }
-  .lobby-page .lobby-profile-achievement-list { gap: 6px; }
-  .lobby-page .lobby-profile-achievement { min-height: 60px; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 6px; padding: 6px; }
+  .lobby-page .lobby-profile-achievement-list { gap: 4px; }
+  .lobby-page .lobby-profile-achievement { min-height: 54px; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 6px; padding: 4px 6px; }
   .lobby-page .lobby-profile-achievement-icon { width: 32px; height: 36px; font-size: 24px; }
   .lobby-page .lobby-profile-achievement p,
-  .lobby-page .lobby-profile-achievement-condition strong { font-size: 12px; line-height: 1.55; }
+  .lobby-page .lobby-profile-achievement-condition strong { font-size: 12px; line-height: 1.4; }
   .lobby-page .achievement-scope-tag { font-size: 10px; max-width: 78px; }
   .lobby-page .achievement-card-meta { max-width: 78px; }
   .lobby-page .lobby-profile-achievement-bar { gap: 6px; }
   .lobby-page .lobby-profile-rail-tab { min-height: 44px; font-size: 13px; padding-inline: 4px; gap: 5px; }
 
   .lobby-page .lobby-profile-section.lobby-announcement-rail-view { height: auto; }
-  .lobby-page .announcement-body { font-size: 13px; line-height: 1.7; }
+  .lobby-page .announcement-body { font-size: 13px; line-height: 1.5; }
   .lobby-page .announcement-card [data-announcement-toggle] { min-height: 40px; padding-inline: 10px; font-size: 13px; }
   .lobby-page .community-message-feed { min-height: 180px; max-height: 400px; }
   .lobby-page .lobby-message-rail-view { height: auto; min-height: 0; max-height: none; }
@@ -126,4 +127,35 @@
   .lobby-page .community-compose input,
   .lobby-page .community-compose textarea { font-size: 16px; }
   .lobby-page .community-send-button { min-height: 44px; }
+}
+
+@media (max-width: 560px) {
+  .lobby-page .lobby-masthead-main {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 3px 0;
+  }
+
+  .lobby-page .lobby-brand-block { min-height: 28px; padding: 0; }
+  .lobby-page .lobby-brand-block strong { font-size: 18px; line-height: 1.4; gap: 7px; }
+  .lobby-page .lobby-brand-block strong .lucide { width: 20px; height: 20px; flex-basis: 20px; }
+
+  .lobby-page .lobby-project-links {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-self: center;
+    align-self: center;
+    width: min(100%, 360px);
+  }
+  .lobby-page .lobby-project-links a { position: relative; padding: 0 6px; gap: 5px; }
+  .lobby-page .lobby-project-links .lucide { width: 16px; height: 16px; flex-basis: 16px; }
+  .lobby-page .lobby-project-links a + a { border-left: 0; }
+  .lobby-page .lobby-project-links a + a::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    height: 16px;
+    border-left: 1px solid rgba(39, 68, 58, 0.16);
+    transform: translateY(-50%);
+  }
 }

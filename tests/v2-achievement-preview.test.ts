@@ -1,4 +1,4 @@
-import { getAchievementScopeLabels, isAchievementAvailableToRole } from "../src/core/v2-achievement-scope";
+import { getAchievementAudience, getAchievementScopeLabels, getAchievementUnlockRoleIds, isAchievementAvailableToRole } from "../src/core/v2-achievement-scope";
 import { describe, expect, it } from "vitest";
 import { ACHIEVEMENT_CATALOG } from "../src/core/v2-achievement-catalog";
 import { buildLobbySelectedRoleViewModel, createDefaultAccountProfile, getAchievementDisplayPages, getRoleAchievementPageCount, ROLE_ACHIEVEMENT_PAGE_SIZE, selectLobbyRole } from "../src/core/v2-lobby";
@@ -23,8 +23,8 @@ describe("achievement catalog and presentation", () => {
     for (const role of getRoleOptions()) {
       const definitions = getRoleAchievementDefinitions(role.id);
       expect(definitions.every(item => isAchievementAvailableToRole(item.scope, role.id))).toBe(true);
-      expect(definitions.find(item => item.id === `${role.id}:ending-master`)?.scope).toEqual({ roleIds: [role.id] });
-      expect(definitions.find(item => item.id === `${role.id}:ending-phd`)?.scope).toEqual({ roleIds: [role.id] });
+      expect(definitions.find(item => item.id === `${role.id}:ending-master`)?.scope).toEqual(["upright", "reversed"].includes(getAchievementAudience(role.id)) ? { roleIds: [role.id] } : undefined);
+      expect(definitions.find(item => item.id === `${role.id}:ending-phd`)?.scope).toEqual(["upright", "reversed"].includes(getAchievementAudience(role.id)) ? { roleIds: [role.id] } : undefined);
       expect(definitions.some(item => item.id === "global:air-dried")).toBe(true);
       expect(definitions.some(item => item.id === "global:ending-quit")).toBe(true);
     }
@@ -56,7 +56,7 @@ describe("achievement catalog and presentation", () => {
     }
     expect(byTitle("自立自强")).toMatchObject({ description: "硕士期间科研、社交、导师好感均达6",
       rewardText: "经验+5", scope: { roleIds: ["normal"] } });
-    expect(byTitle("真·大多数")).toMatchObject({ rewardText: "经验倍率+1", scope: { roleIds: ["normal"] } });
+    expect(byTitle("真·大多数")).toMatchObject({ rewardText: "经验倍率+1，解锁全部诅咒角色", scope: { roleIds: ["normal"] } });
     expect(byTitle("突破极限Ⅰ").scope).toEqual({ audiences: ["upright"] });
     expect(byTitle("突破极限Ⅱ").scope).toEqual({ audiences: ["all"] });
     expect(byTitle("突破极限Ⅱ").description).toBe("科研|社交|好感任一项达30");
@@ -104,15 +104,15 @@ describe("achievement catalog and presentation", () => {
     const definitions = getAllAchievementDefinitions();
     const completeIds = definitions.map(item => item.id);
     const roles = getRoleOptions();
-    const collectors = definitions.filter(item => getCollectorAchievementKey(item.id));
+    const sharedTalentRewards = definitions.filter(item => item.scope?.audiences?.includes("all") && item.rewardText === "天赋点+1");
     for (const role of getRoleOptions()) {
       const pages = getAchievementDisplayPages(role.id);
       const items = pages.flatMap((page) => page.achievements);
       expect(items.map((item) => item.id).sort()).toEqual([...completeIds].sort());
-      const unlocks = definitions.filter(item => item.unlocksRoleId === role.id);
+      const unlocks = definitions.filter(item => getAchievementUnlockRoleIds(item).includes(role.id));
       const multipliers = definitions.filter(item => item.scope?.roleIds?.length === 1
         && item.scope.roleIds[0] === role.id && item.rewardText?.includes("经验倍率+1"));
-      const prefix = [...unlocks, ...multipliers, ...collectors];
+      const prefix = [...unlocks, ...multipliers, ...sharedTalentRewards];
       expect(items.slice(0, prefix.length).map(item => item.id)).toEqual(prefix.map(item => item.id));
       const remaining = items.slice(prefix.length);
       const firstOther = remaining.findIndex(item => !isAchievementAvailableToRole(item.scope, role.id));
@@ -128,8 +128,8 @@ describe("achievement catalog and presentation", () => {
           && !prefix.some(first => first.id === item.id);
         expect(applicable.filter(inScope).map(item => item.id)).toEqual(definitions.filter(inScope).map(item => item.id));
       }
-      expect(items.slice(0, 11).some(item => item.id === `${role.id}:ending-master`)).toBe(true);
-      expect(items.slice(0, 11).some(item => item.id === `${role.id}:ending-phd`)).toBe(true);
+      expect(items.slice(0, 11).some(item => item.id === `${role.id}:ending-master`)).toBe(["upright", "reversed"].includes(getAchievementAudience(role.id)));
+      expect(items.slice(0, 11).some(item => item.id === `${role.id}:ending-phd`)).toBe(["upright", "reversed"].includes(getAchievementAudience(role.id)));
       expect(pages.slice(0, -1).every((page) => page.achievements.length === ROLE_ACHIEVEMENT_PAGE_SIZE)).toBe(true);
       expect(pages.at(-1)!.achievements.length).toBeGreaterThan(0);
       expect(pages.at(-1)!.achievements.length).toBeLessThanOrEqual(ROLE_ACHIEVEMENT_PAGE_SIZE);
@@ -142,8 +142,8 @@ describe("achievement catalog and presentation", () => {
         expect(html).not.toContain("achievement-category-select");
         expect(html).not.toContain("通用成就");
       }
-      expect(items.some(item => item.id === `${role.id}:ending-master`)).toBe(true);
-      expect(items.some(item => item.id === `${role.id}:ending-phd`)).toBe(true);
+      expect(items.some(item => item.id === `${role.id}:ending-master`)).toBe(["upright", "reversed"].includes(getAchievementAudience(role.id)));
+      expect(items.some(item => item.id === `${role.id}:ending-phd`)).toBe(["upright", "reversed"].includes(getAchievementAudience(role.id)));
       expect(items.some(item => item.id === "normal:self-reliance")).toBe(true);
       expect(items.some(item => item.id === "genius-reversed:zero-talent-master")).toBe(true);
     }
@@ -212,7 +212,7 @@ describe("achievement catalog and presentation", () => {
     for (const [title, description] of [
       ["三A在手", "硕士期间一作发表≥3篇A类论文"],
       ["协作共赢", "合作发表≥10篇论文"],
-      ["从协作到领衔", "先发合作论文，再发一作"],
+      ["协作先行", "先发合作论文，再发一作"],
       ["学会拒绝", "导师项目|审稿|毕设各拒绝1次"],
       ["我爱茶歇", "开会选择茶歇≥3次"],
       ["公费旅游", "开会选择旅游≥3次"],
@@ -286,12 +286,19 @@ describe("achievement catalog and presentation", () => {
       expect(renderAchievementCard(item, false)).toContain(item.rewardText!);
     }
     for (const item of ACHIEVEMENT_CATALOG) {
-      if (item.unlocksRoleId) expect(item.rewardText).toMatch(/^(经验\+5|经验倍率\+1)，解锁.+角色$/);
-      else if (getCollectorAchievementKey(item.id)) expect(item.rewardText).toBe("天赋点+1");
+      if (item.id === "unlock:research-captain") expect(item.rewardText).toBe("解锁统御者角色");
+      else if (item.id.endsWith(":curse-hell-phd")) {
+        expect(item.rewardText).toBe("全角色天赋点+1");
+        expect(item.rewardScope).toEqual({ audiences: ["all"] });
+        expect(item.scope.roleIds).toHaveLength(1);
+      }
+      else if (getAchievementUnlockRoleIds(item).length) expect(item.rewardText).toMatch(/^(经验\+5|经验倍率\+1)，解锁.+角色$/);
+      else if (getCollectorAchievementKey(item.id)) expect(item.rewardText).toBe("经验倍率+0.2");
       else expect(["经验+5", "经验倍率+1"]).toContain(item.rewardText);
       expect(renderAchievementCard(item, false)).toContain(`class="lobby-profile-achievement-reward">${item.rewardText}</p>`);
     }
     for (const role of getRoleOptions()) {
+      if (["special", "cursed"].includes(getAchievementAudience(role.id))) continue;
       for (const ending of ["master", "phd"]) {
         expect(getRoleAchievementDefinitions(role.id).find(item => item.id === `${role.id}:ending-${ending}`))
           .toMatchObject({ rewardText: "经验倍率+1", scope: { roleIds: [role.id] } });
@@ -299,11 +306,11 @@ describe("achievement catalog and presentation", () => {
     }
   });
 
-  it("reserves the five shared talent-point rewards for cross-run collections", () => {
+  it("grants fractional shared experience multipliers for the five cross-run collections", () => {
     const collectorIds = ["global:buff-collector", "global:product-collector", "global:conference-collector", "global:travel-collector", "global:direction-collector"];
-    const talentRewards = ACHIEVEMENT_CATALOG.filter(item => item.rewardText?.includes("天赋点"));
-    expect(talentRewards.map(item => item.id)).toEqual(collectorIds);
-    for (const item of talentRewards) expect(item).toMatchObject({ rewardText: "天赋点+1", scope: { audiences: ["all"] } });
+    const collectorRewards = ACHIEVEMENT_CATALOG.filter(item => getCollectorAchievementKey(item.id));
+    expect(collectorRewards.map(item => item.id)).toEqual(collectorIds);
+    for (const item of collectorRewards) expect(item).toMatchObject({ rewardText: "经验倍率+0.2", scope: { audiences: ["all"] } });
     expect(ACHIEVEMENT_CATALOG.find(item => item.id === "global:conference-three-years"))
       .toMatchObject({ title: "年年赴约", description: "连续3年发表同一个会议", rewardText: "经验+5", scope: { audiences: ["all"] } });
   });

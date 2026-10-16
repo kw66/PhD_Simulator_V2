@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { getCaptainAdvisorGuidanceBonus, getCaptainGuidanceMultiplier } from "./v2-captain-state";
 import { addPaperCollaboration, getRoleCollaborationScore } from "./v2-paper-collaboration";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
@@ -33,11 +34,11 @@ export function queueAdvisorGuidance(state: GameState): GameState {
     ...state,
     advisorProgressState: {
       ...state.advisorProgressState,
-      pendingGuidanceToPlayer: state.advisorProgressState.pendingGuidanceToPlayer ?? GUIDANCE_AMOUNT,
+      pendingGuidanceToPlayer: state.advisorProgressState.pendingGuidanceToPlayer ?? GUIDANCE_AMOUNT + getCaptainAdvisorGuidanceBonus(state),
     },
     fellowProgressState: state.fellowProgressState.map((profile) => ({
       ...profile,
-      pendingGuidanceFromAdvisor: profile.pendingGuidanceFromAdvisor ?? GUIDANCE_AMOUNT,
+      pendingGuidanceFromAdvisor: profile.pendingGuidanceFromAdvisor ?? Math.floor((GUIDANCE_AMOUNT + getCaptainAdvisorGuidanceBonus(state)) * getCaptainGuidanceMultiplier(state, profile)),
     })),
   };
 }
@@ -85,5 +86,5 @@ export function settleAdvisorGuidance(state: GameState, random: () => number = g
 }
 
 export function getAdvisorGuidanceAmount(state?: GameState): number {
-  return state ? getRoleCollaborationScore(state, "advisor", GUIDANCE_AMOUNT) : GUIDANCE_AMOUNT;
+  return state ? getRoleCollaborationScore(state, "advisor", GUIDANCE_AMOUNT + getCaptainAdvisorGuidanceBonus(state)) : GUIDANCE_AMOUNT;
 }

@@ -1,11 +1,12 @@
 import { getAllAchievementDefinitions } from "./v2-role-lobby-meta";
-import { isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
+import { getAchievementUnlockRoleIds, isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
 import { createAchievementRunProgress } from "./v2-achievement-runtime-types";
 import { observeStateAchievements } from "./v2-achievement-state";
 import { observeResearchAchievements } from "./v2-achievement-research";
 import { observeEventAchievements } from "./v2-achievement-events";
 import { COLLECTION_REQUIREMENTS, getCollectorAchievementKey, observeAchievementCollections } from "./v2-achievement-collections";
 import { awardRoleExperience } from "./v2-role-experience";
+import { CAPTAIN_UNLOCK_ACHIEVEMENT_ID, reconcileAccountRoleUnlocks } from "./v2-account-role-unlocks";
 import type { AccountProfile, AchievementCollectionProgress, DispatchPayload, GameActionId, GameState, RoleId } from "./v2-types";
 
 /** Pure evidence update. Called only on committed engine transitions, never scene previews. */
@@ -44,6 +45,8 @@ export function settleRunAchievements(account: AccountProfile, state: GameState,
   const newlyCompleted: string[] = [];
   let experienceForCurrentRole = 0;
   for (const definition of getAllAchievementDefinitions()) {
+    // This account milestone is derived after all ordinary role unlocks settle.
+    if (definition.id === CAPTAIN_UNLOCK_ACHIEVEMENT_ID) continue;
     if (!isAchievementAvailableToRole(definition.scope, roleId)) continue;
     const collector = getCollectorAchievementKey(definition.id);
     if (collector && COLLECTION_REQUIREMENTS[collector].length > 0
@@ -64,23 +67,28 @@ export function settleRunAchievements(account: AccountProfile, state: GameState,
     next.achievementRewardedIds!.push(definition.id);
     if (existed) continue;
     const exp = Number(/经验\+(\d+)/u.exec(definition.rewardText ?? "")?.[1] ?? 0);
-    const multiplier = Number(/经验倍率\+(\d+)/u.exec(definition.rewardText ?? "")?.[1] ?? 0);
+    const multiplier = Number(/经验倍率\+(\d+(?:\.\d+)?)/u.exec(definition.rewardText ?? "")?.[1] ?? 0);
     const points = Number(/天赋点\+(\d+)/u.exec(definition.rewardText ?? "")?.[1] ?? 0);
     for (const recipient of Object.keys(next.roleProgress) as RoleId[]) {
-      if (!isAchievementAvailableToRole(definition.scope, recipient)) continue;
+      if (!isAchievementAvailableToRole(definition.rewardScope ?? definition.scope, recipient)) continue;
       if (exp) {
         // All rewards earned together use the multiplier from before this ending.
         const award = awardRoleExperience(next.roleProgress[recipient], exp, 1 + (account.achievementExperienceMultipliers?.[recipient] ?? 0));
         next.roleProgress[recipient] = award.progress;
         if (recipient === roleId) experienceForCurrentRole += award.gained;
       }
-      if (multiplier) next.achievementExperienceMultipliers![recipient] = (next.achievementExperienceMultipliers![recipient] ?? 0) + multiplier;
+      if (multiplier) next.achievementExperienceMultipliers![recipient] = Number(((next.achievementExperienceMultipliers![recipient] ?? 0) + multiplier).toFixed(10));
       if (points) next.achievementTalentPoints![recipient] = (next.achievementTalentPoints![recipient] ?? 0) + points;
     }
     const legacyUnlocks: Record<string, RoleId> = { "normal:first-pot": "rich", "normal:research-start": "genius",
       "normal:favorite": "teacher-child", "normal:socialite": "social", "normal:all-rounder": "chosen", "normal:chair-upgrade": "normal-reversed" };
-    const unlockId = definition.unlocksRoleId ?? legacyUnlocks[definition.id];
-    if (unlockId) next.roleProgress[unlockId] = { ...next.roleProgress[unlockId], unlocked: true };
+    const unlockIds = getAchievementUnlockRoleIds(definition);
+    for (const unlockId of unlockIds.length ? unlockIds : legacyUnlocks[definition.id] ? [legacyUnlocks[definition.id]] : []) {
+      next.roleProgress[unlockId] = { ...next.roleProgress[unlockId], unlocked: true };
+    }
   }
-  return { account: next, state: { ...state, runAchievementIds: newlyCompleted }, experienceForCurrentRole };
+  const reconciled = reconcileAccountRoleUnlocks(next, timestamp, roleId);
+  if (!account.achievementUnlockedAt[CAPTAIN_UNLOCK_ACHIEVEMENT_ID]
+    && reconciled.achievementUnlockedAt[CAPTAIN_UNLOCK_ACHIEVEMENT_ID]) newlyCompleted.push(CAPTAIN_UNLOCK_ACHIEVEMENT_ID);
+  return { account: reconciled, state: { ...state, runAchievementIds: newlyCompleted }, experienceForCurrentRole };
 }

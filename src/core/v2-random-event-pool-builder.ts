@@ -41,6 +41,7 @@ const RANDOM_EVENT_CATEGORIES: Readonly<Record<number, RandomEventCategory>> = {
   16: "punishment",
   17: "punishment",
   18: "punishment",
+  19: "balance",
 };
 
 export function getRandomEventCategory(eventId: number): RandomEventCategory | null {

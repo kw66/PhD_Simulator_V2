@@ -310,6 +310,11 @@ export interface Buff {
   timing: BuffTiming;
   remainingMonths: number | null;
   monthlyStats?: Partial<PlayerStats>;
+  /** A one-month ordinary-action adjustment, scheduled by an event. AI allowance is unaffected. */
+  monthlyActionLimitDelta?: number;
+  actionLimitAtTotalMonths?: number;
+  /** The clamped adjustment actually applied; restored once when the scheduled month ends. */
+  appliedActionLimitDelta?: number;
   /** Multiplies immediate SAN costs, excluding fixed drains and recovery. */
   activeOperationSanMultiplier?: number;
   activeOperationSanDelta?: number;
@@ -389,6 +394,10 @@ export interface PublicationTalentState {
 }
 
 export interface AccountProfile {
+  /** Highest unlocked challenge per cursed character. Difficulty numbers are 1..4. */
+  curseDifficultyUnlocked?: Partial<Record<RoleId, import("./v2-curse-system").CurseDifficulty>>;
+  /** Last lobby selection per cursed character, clamped to the unlocked challenge. */
+  curseDifficultyByRole?: Partial<Record<RoleId, import("./v2-curse-system").CurseDifficulty>>;
   talentAllocation?: Partial<Record<RoleId, Record<string, number>>>;
   dateDisplayMode: DateDisplayMode;
   selectedLobbyRoleId: RoleId;
@@ -451,7 +460,9 @@ export interface RoleAchievementDefinition {
   description: string;
   rewardText?: string;
   unlocksRoleId?: RoleId;
+  unlocksRoleIds?: readonly RoleId[];
   scope?: AchievementScope;
+  rewardScope?: AchievementScope;
 }
 
 export interface LobbySelectedRoleAchievementViewModel {
@@ -799,6 +810,8 @@ export type LabFinanceCategory = "conference-registration" | "conference-travel"
   | "student-reimbursement" | "horizontal-income" | "grant-income" | "initial-funding" | "other";
 
 export interface GameState extends RandomEventState {
+  captainState?: import("./v2-captain-state").CaptainRunState;
+  curseState?: import("./v2-curse-system").CurseRunState;
   /** Unsubmitted statistics belong to the saved branch and are discarded on rewind. */
   pendingRunStatistics?: import("./v2-run-statistics").PendingRunStatistic[];
   randomState?: import("./v2-game-random").GameRandomState;
@@ -884,6 +897,9 @@ export interface DeferredEventStateChange {
 export type DeferredEventStatePatch = DeferredEventStateChange[];
 
 export interface DispatchPayload {
+  captainTagLevels?: Partial<Record<RoleId, number>>;
+  curseDifficulty?: import("./v2-curse-system").CurseDifficulty;
+  debtRepayment?: number;
   bonusTalentPoints?: number;
   talentAllocation?: Record<string, number> | undefined;
   blockLinearEvents?: boolean | undefined;

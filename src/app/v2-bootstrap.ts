@@ -107,6 +107,7 @@ import { DEBUG_RELATIONSHIP_TYPES, DEBUG_STAT_IDS, GAME_ACTION_IDS } from "../co
 import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
+import { getSelectedCurseDifficulty } from "../core/v2-curse-progress";
 import { createVisitStats } from "./v2-visit-stats";
 import { createConferenceStats } from "./v2-conference-stats";
 import { createJournalStats } from "./v2-journal-stats";
@@ -1301,6 +1302,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     }
     store.dispatch(actionId, {
+      curseDifficulty: actionId === "start-game" || actionId === "restart-game" ? getSelectedCurseDifficulty(store.getLobbyState(), isRoleId(dataset.roleId) ? dataset.roleId : store.getState().selectedRoleId) : undefined,
+      debtRepayment: typeof dataset.delta === "string" ? Number(dataset.delta) : undefined,
       roleId: isRoleId(dataset.roleId) ? dataset.roleId : undefined,
       paperId: typeof dataset.paperId === "string" ? dataset.paperId : undefined,
       paperSlotIndex: typeof dataset.paperSlotIndex === "string" ? Number(dataset.paperSlotIndex) : undefined,
@@ -1585,12 +1588,18 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     const talentTreeNode = target.closest<HTMLButtonElement>("button[data-ui-talent-tree-node]");
     if (talentTreeNode) {
+      if (talentTreeNode.disabled || talentTreeNode.closest('[data-curse-read-only="true"]')) return;
       const page = talentTreeNode.closest<HTMLElement>(".lobby-talent-tree-page");
       const nodes = page?.querySelectorAll<HTMLButtonElement>("button[data-ui-talent-tree-node]");
       const pageIndex = Number(page?.dataset.treePage);
       const nodeIndex = nodes ? [...nodes].indexOf(talentTreeNode) : -1;
       const alreadySelected = talentTreeNode.classList.contains("is-selected");
       if (Number.isInteger(pageIndex) && nodeIndex >= 0) talentTreeSelectedNodeByPage[pageIndex] = nodeIndex;
+      if (talentTreeNode.dataset.curseDifficulty && store.getState().phase === "setup") {
+        refreshTalentTree = true;
+        store.selectCurseDifficulty(store.getLobbyState().selectedLobbyRoleId, Number(talentTreeNode.dataset.curseDifficulty));
+        return;
+      }
       if (alreadySelected && talentTreeNode.dataset.talentId && store.getState().phase === "setup") {
         const roleId = store.getLobbyState().selectedLobbyRoleId;
         const talentId = talentTreeNode.dataset.talentId;

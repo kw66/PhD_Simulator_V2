@@ -1,7 +1,7 @@
 import { DATA_EPOCH, DATA_EPOCH_STARTED_AT, isCurrentDataEpoch } from "./v2-data-epoch";
 import { getAllAchievementDefinitions, getRoleAchievementDefinitions } from "./v2-role-lobby-meta";
 import { isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
-import { COLLECTION_REQUIREMENTS } from "./v2-achievement-collections";
+import { COLLECTION_REQUIREMENTS, getCollectorAchievementKey } from "./v2-achievement-collections";
 import type { AccountProfile, RoleId } from "./v2-types";
 
 type AchievementStorage = Pick<Storage, "getItem" | "setItem">;
@@ -65,13 +65,25 @@ export function loadRoleAchievementRecords(account: AccountProfile, storage: Ach
       collectionProgress[key] = Array.isArray(raw)
         ? [...new Set(raw.filter((item): item is string => typeof item === "string" && available.has(item)))] : [];
     }
-    const loadBonuses = (raw: unknown): Partial<Record<RoleId, number>> => isRecord(raw)
-      ? Object.fromEntries(Object.entries(raw).filter(([id, value]) => knownRoles.has(id) && Number.isSafeInteger(value) && (value as number) >= 0)) : {};
+    const loadBonuses = (raw: unknown, fractional = false): Partial<Record<RoleId, number>> => isRecord(raw)
+      ? Object.fromEntries(Object.entries(raw).filter(([id, value]) => knownRoles.has(id) && typeof value === "number"
+        && Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER && (fractional || Number.isSafeInteger(value)))) : {};
     const achievementRewardedIds = Array.isArray(saved.rewardedIds)
       ? [...new Set(saved.rewardedIds.filter((id): id is string => typeof id === "string" && knownIds.has(id)))] : [];
+    const achievementExperienceMultipliers = loadBonuses(saved.experienceMultipliers, true);
+    const achievementTalentPoints = loadBonuses(saved.talentPoints);
+    // Only the five known, already-paid collectors changed reward. Preserve all
+    // unrelated bonuses and let talent storage sanitize allocations afterwards.
+    if (saved.collectorRewardVersion !== 1) {
+      const paidCollectors = achievementRewardedIds.filter(id => getCollectorAchievementKey(id)).length;
+      if (paidCollectors > 0) for (const roleId of Object.keys(roleProgress) as RoleId[]) {
+        if (achievementTalentPoints[roleId] !== undefined) achievementTalentPoints[roleId] = Math.max(0, achievementTalentPoints[roleId]! - paidCollectors);
+        achievementExperienceMultipliers[roleId] = Number(((achievementExperienceMultipliers[roleId] ?? 0) + paidCollectors * 0.2).toFixed(10));
+      }
+    }
     return { ...account, roleProgress, achievementUnlockedAt, achievementUnlockedByRole,
       achievementRewardedIds, achievementCollectionProgress: collectionProgress,
-      achievementExperienceMultipliers: loadBonuses(saved.experienceMultipliers), achievementTalentPoints: loadBonuses(saved.talentPoints) };
+      achievementExperienceMultipliers, achievementTalentPoints };
   } catch {
     return account;
   }
@@ -119,6 +131,7 @@ export function saveRoleAchievementRecords(account: AccountProfile, storage: Ach
   try {
     storage?.setItem(ROLE_ACHIEVEMENT_STORAGE_KEY, JSON.stringify({
       version: 2,
+      collectorRewardVersion: 1,
       epoch: DATA_EPOCH,
       savedAt: new Date().toISOString(),
       unlockedAt: account.achievementUnlockedAt,

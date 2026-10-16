@@ -5,8 +5,7 @@ import { createAchievementRunProgress } from "../src/core/v2-achievement-runtime
 import { observeAchievements, settleRunAchievements } from "../src/core/v2-achievement-runtime";
 import { COLLECTION_REQUIREMENTS } from "../src/core/v2-achievement-collections";
 import { createStore } from "../src/core/v2-store";
-import { getTalentPointBalance, sanitizeRoleTalentAllocation } from "../src/core/v2-role-talent-definitions";
-import { ACCOUNT_STORAGE_KEY, saveAccountProfile } from "../src/core/v2-account-storage";
+import { ACCOUNT_STORAGE_KEY, loadAccountProfile, saveAccountProfile } from "../src/core/v2-account-storage";
 import type { GameState, RoleId } from "../src/core/v2-types";
 
 const date1 = "2026-10-16T06:00:00.000Z";
@@ -21,6 +20,47 @@ function storage() {
 }
 
 describe("achievement ending transaction", () => {
+  it.each(["cursed-frail", "special-fading-genius", "special-finite-life", "cursed-debt"] as const)(
+    "keeps %s curse achievement in preview and scopes its eventual reward to all roles", role => {
+      const state = { ...ending(role, []), ending: "phd" as const };
+      const observed = observeAchievements(createStartedGameState(role), state);
+      const id = `${role}:curse-hell-phd`;
+      expect(observed.achievementProgress?.satisfied).not.toContain(id);
+      // Future difficulty evidence enters the same ending transaction as other achievements.
+      const first = settleRunAchievements(createDefaultAccountProfile(), ending(role, [id]), date1);
+      expect(first.account.achievementUnlockedByRole?.[id]).toEqual({ [role]: date1 });
+      expect(Object.values(first.account.achievementTalentPoints!)).toHaveLength(Object.keys(first.account.roleProgress).length);
+      expect(Object.values(first.account.achievementTalentPoints!).every(points => points === 1)).toBe(true);
+      const repeated = settleRunAchievements(first.account, ending(role, [id]), date2);
+      expect(repeated.account.achievementTalentPoints).toEqual(first.account.achievementTalentPoints);
+      const wrong = settleRunAchievements(createDefaultAccountProfile(), ending("normal", [id]));
+      expect(wrong.account.achievementTalentPoints).toEqual({});
+    },
+  );
+
+  it("unlocks every curse role from truly ordinary without repeating its multiplier reward", () => {
+    const curses: RoleId[] = ["cursed-frail", "special-fading-genius", "special-finite-life", "cursed-debt"];
+    const original = createDefaultAccountProfile();
+    const wrong = settleRunAchievements(original, ending("rich", ["normal:truly-ordinary"]), date1);
+    expect(curses.every(id => !wrong.account.roleProgress[id].unlocked)).toBe(true);
+    const first = settleRunAchievements(original, ending("normal", ["normal:truly-ordinary"]), date1);
+    expect(curses.every(id => first.account.roleProgress[id].unlocked)).toBe(true);
+    expect(curses.every(id => !original.roleProgress[id].unlocked)).toBe(true);
+    expect(first.account.achievementExperienceMultipliers).toEqual({ normal: 1 });
+    const repeated = settleRunAchievements(first.account, ending("normal", ["normal:truly-ordinary"]), date2);
+    expect(repeated.account.achievementExperienceMultipliers).toEqual({ normal: 1 });
+    expect(repeated.state.runAchievementIds).toEqual([]);
+    // Simulate an account that completed the achievement before curse unlocks were added.
+    const old = structuredClone(first.account);
+    for (const id of curses) old.roleProgress[id].unlocked = false;
+    const memory = storage();
+    saveAccountProfile(old, memory);
+    const loaded = loadAccountProfile(memory).account;
+    expect(curses.every(id => loaded.roleProgress[id].unlocked)).toBe(true);
+    expect(loaded.achievementExperienceMultipliers).toEqual({ normal: 1 });
+    expect(loaded.achievementUnlockedByRole?.["normal:truly-ordinary"]).toEqual({ normal: date1 });
+  });
+
   it("records each completing role once but pays the shared reward just once", () => {
     const first = settleRunAchievements(createDefaultAccountProfile(), ending("normal", ["global:paper-lover"]), date1);
     expect(first.account.roleProgress.normal.exp).toBe(5);
@@ -45,7 +85,7 @@ describe("achievement ending transaction", () => {
     expect(right.account.roleProgress.genius.exp).toBe(0);
   });
 
-  it("combines cross-role collections, grants all roles one point, and never regrants", () => {
+  it("combines cross-role collections, grants all roles 0.2 multiplier, and never regrants", () => {
     const half = Math.floor(COLLECTION_REQUIREMENTS.products.length / 2);
     const state = ending("normal", []);
     state.achievementProgress!.collections.products = COLLECTION_REQUIREMENTS.products.slice(0, half).map(item => item.id);
@@ -54,13 +94,12 @@ describe("achievement ending transaction", () => {
     const other = ending("rich", []);
     other.achievementProgress!.collections.products = COLLECTION_REQUIREMENTS.products.slice(half).map(item => item.id);
     const second = settleRunAchievements(first.account, other);
-    expect(Object.values(second.account.achievementTalentPoints!)).toHaveLength(20);
-    expect(Object.values(second.account.achievementTalentPoints!).every(value => value === 1)).toBe(true);
+    expect(Object.values(second.account.achievementExperienceMultipliers!)).toHaveLength(Object.keys(second.account.roleProgress).length);
+    expect(Object.values(second.account.achievementExperienceMultipliers!).every(value => value === 0.2)).toBe(true);
+    expect(second.account.achievementTalentPoints).toEqual({});
     const third = settleRunAchievements(second.account, other);
-    expect(third.account.achievementTalentPoints).toEqual(second.account.achievementTalentPoints);
+    expect(third.account.achievementExperienceMultipliers).toEqual(second.account.achievementExperienceMultipliers);
     expect(third.state.runAchievementIds).toEqual([]);
-    expect(getTalentPointBalance("normal", 0, {}, second.account.achievementTalentPoints!.normal)).toBe(1);
-    expect(sanitizeRoleTalentAllocation("normal", 0, { "first-month-drive": 1 }, 1)).toEqual({ "first-month-drive": 1 });
   });
 
   it("uses the previous multiplier for simultaneous experience rewards", () => {
@@ -72,10 +111,46 @@ describe("achievement ending transaction", () => {
     expect(result.account.roleProgress.normal.exp).toBe(15);
   });
 
+  it("accumulates all five fractional rewards exactly and applies them to later experience", () => {
+    const state = ending("normal", []);
+    for (const key of Object.keys(COLLECTION_REQUIREMENTS) as (keyof typeof COLLECTION_REQUIREMENTS)[]) {
+      state.achievementProgress!.collections[key] = COLLECTION_REQUIREMENTS[key].map(item => item.id);
+    }
+    const collected = settleRunAchievements(createDefaultAccountProfile(), state);
+    expect(Object.values(collected.account.achievementExperienceMultipliers!).every(value => value === 1)).toBe(true);
+    expect(collected.account.achievementTalentPoints).toEqual({});
+    expect(collected.state.runAchievementIds).toHaveLength(5);
+    const later = settleRunAchievements(collected.account, ending("normal", ["global:paper-lover"]));
+    expect(later.experienceForCurrentRole).toBe(10);
+    const repeated = settleRunAchievements(later.account, state);
+    expect(repeated.account.achievementExperienceMultipliers).toEqual(later.account.achievementExperienceMultipliers);
+    expect(repeated.state.runAchievementIds).toEqual([]);
+  });
+
+  it("removes legacy collector talent points before sanitizing saved allocations", async () => {
+    const account = createDefaultAccountProfile();
+    account.achievementRewardedIds = ["global:product-collector"];
+    account.achievementTalentPoints = { normal: 1 };
+    account.talentAllocation = { normal: { "first-month-drive": 1 } };
+    const memory = storage();
+    saveAccountProfile(account, memory);
+    const envelope = JSON.parse(memory.getItem(ACCOUNT_STORAGE_KEY)!);
+    const achievementsKey = Object.keys(envelope.records).find(key => key.includes("role_achievements"))!;
+    const achievements = JSON.parse(envelope.records[achievementsKey]);
+    delete achievements.collectorRewardVersion;
+    envelope.records[achievementsKey] = JSON.stringify(achievements);
+    memory.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(envelope));
+    const loaded = createStore({ storage: memory });
+    await loaded.ready();
+    expect(loaded.getLobbyState().achievementTalentPoints?.normal).toBe(0);
+    expect(loaded.getLobbyState().achievementExperienceMultipliers?.normal).toBe(0.2);
+    expect(loaded.getLobbyState().talentAllocation?.normal).toBeUndefined();
+  });
+
   it("persists collectors, role dates, one-time rewards and spendable bonus talent points", async () => {
     const account = settleRunAchievements(createDefaultAccountProfile(), ending("normal", ["normal:first-pot", "global:paper-lover"]), date1).account;
     account.achievementTalentPoints = { normal: 2 };
-    account.achievementExperienceMultipliers = { normal: 2 };
+    account.achievementExperienceMultipliers = { normal: 2.2 };
     const memory = storage();
     saveAccountProfile(account, memory);
     expect(memory.getItem(ACCOUNT_STORAGE_KEY)).not.toBeNull();
@@ -85,7 +160,7 @@ describe("achievement ending transaction", () => {
     expect(loaded.getLobbyState().achievementUnlockedByRole).toEqual(account.achievementUnlockedByRole);
     expect(loaded.getLobbyState().achievementRewardedIds).toEqual(account.achievementRewardedIds);
     expect(loaded.getLobbyState().achievementTalentPoints).toEqual({ normal: 2 });
-    expect(loaded.getLobbyState().achievementExperienceMultipliers).toEqual({ normal: 2 });
+    expect(loaded.getLobbyState().achievementExperienceMultipliers).toEqual({ normal: 2.2 });
     expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
     expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
     expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(false);

@@ -649,7 +649,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain(">🔬</span>");
     expect(html).toContain(">🌟</span>");
     expect(html).toContain('data-achievement-id="normal:ending-master"');
-    expect(html).toContain('data-achievement-id="global:buff-collector"');
+    expect(html).toContain('data-achievement-id="normal:self-reliance-i"');
     expect(html).toContain('class="lobby-role-card-level-badge is-locked" aria-label="未解锁"');
     expect(html).toContain('data-lucide="lock"');
     expect(html).not.toContain('class="lobby-role-card-lock"');
@@ -1116,7 +1116,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("data-ui-talent-effect-page-delta");
   });
 
-  it.each(["rewinder", "research-captain", "special-dandan", "special-daji"] as const)("does not render a talent-tree placeholder for %s", (roleId) => {
+  it.each(["rewinder", "special-dandan", "special-daji"] as const)("does not render a talent-tree placeholder for %s", (roleId) => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = roleId;
     const html = renderApp(createInitialState(), account);
@@ -1136,6 +1136,10 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("data-selection-mode=\"exclusive\"");
     expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(4);
     expect(html.match(/<path d=/g)).toBeNull();
+    expect(html).not.toContain('class="lobby-normal-tree-node-level"');
+    expect(html).not.toContain("前一难度博士毕业后解锁下一难度");
+    for (const difficulty of ["简单", "中等", "困难", "地狱"]) expect(html).toContain(`（${difficulty}）</strong>`);
+    expect(html).not.toContain('最高难度博士毕业：');
     for (const effect of effects) {
       expect(html).toContain(effect);
     }
@@ -1412,11 +1416,11 @@ describe("v2 render lobby shell", () => {
       "normal:chair-upgrade",
     ]);
     expect(normalAchievements.slice(0, 6).every((achievement) => achievement.rewardText?.startsWith("经验+5，解锁"))).toBe(true);
-    expect(normalAchievements.slice(6).filter(achievement => !achievement.unlocksRoleId).every((achievement) =>
+    expect(normalAchievements.slice(6).filter(achievement => !achievement.unlocksRoleId && !achievement.unlocksRoleIds?.length).every((achievement) =>
       ["normal:ending-master", "normal:ending-phd"].includes(achievement.id) ? achievement.rewardText === "经验倍率+1"
         : ["normal:self-reliance", "normal:truly-ordinary"].includes(achievement.id)
           ? ["经验+5", "经验倍率+1"].includes(achievement.rewardText ?? "")
-          : achievement.rewardText === (achievement.id.endsWith("-collector") && achievement.id !== "global:help-collector" ? "天赋点+1" : "经验+5"))).toBe(true);
+          : achievement.rewardText === (achievement.id.endsWith("-collector") && achievement.id !== "global:help-collector" ? "经验倍率+0.2" : "经验+5"))).toBe(true);
     expect(reversedAchievements.length).toBeGreaterThan(9);
     expect(reversedAchievements[0]).toMatchObject({
       id: "unlock:normal-reversed",

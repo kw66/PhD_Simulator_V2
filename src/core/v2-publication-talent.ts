@@ -97,7 +97,7 @@ function resolvePublicationTalentRewards(state: GameState) {
     const effects: string[] = [];
     if (item.reward.san !== 0) {
       const before = rewardedState.player.san;
-      rewardedState = { ...rewardedState, player: { ...rewardedState.player, san: getRecoveredSan(before, state.sanCap, item.reward.san) } };
+      rewardedState = { ...rewardedState, player: { ...rewardedState.player, san: getRecoveredSan(before, state.sanCap, item.reward.san, state.selectedRoleId) } };
       effects.push(describeTalentReward("SAN", item.reward.san, before, rewardedState.player.san));
     }
     for (const stat of ["favor", "social", "research"] as const) {

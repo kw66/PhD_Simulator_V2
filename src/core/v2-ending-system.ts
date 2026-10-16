@@ -3,6 +3,7 @@ import { getShopEmergencySan } from "./v2-shop-items-effects";
 import { formatMoney, normalizeGameMoney } from "./v2-money";
 import type { EndingId, GameState } from "./v2-types";
 import { settleRoleTalentRescues } from "./v2-role-talent-reactions";
+import { hasUnpaidCurseDebt } from "./v2-curse-system";
 
 function finishWithCause(state: GameState, ending: EndingId, message: string): GameState {
   if (state.phase !== "playing") return state;
@@ -22,7 +23,7 @@ export function evaluateCoreEndings(state: GameState): GameState {
   if (state.selectedAdvisorName && state.totalMonths > 0 && state.advisorProgressState.funding < 0) {
     return finishWithCause(state, "lab-bankrupt", "实验室科研经费已跌破0，无法付清必要支出，本轮提前结束。");
   }
-  const protectedSan = getShopEmergencySan(state.shopState, state.player.san);
+  const protectedSan = state.selectedRoleId === "special-finite-life" ? state.player.san : getShopEmergencySan(state.shopState, state.player.san);
   const protectedState = protectedSan === state.player.san
     ? state
     : pushMilestoneLog({
@@ -47,7 +48,7 @@ export function finishTrainingIfReady(state: GameState): GameState {
   const target = state.graduationScoreTarget;
   const thesisPassed = state.thesis.degree === state.degree && state.thesis.reviewResolved
     && state.thesis.review?.passed === true;
-  const graduated = target !== null && state.totalResearchScore >= target && thesisPassed;
+  const graduated = target !== null && state.totalResearchScore >= target && thesisPassed && !hasUnpaidCurseDebt(state);
   const ending = graduated ? state.degree : "delay";
   const label = graduated ? state.degree === "phd" ? "博士毕业" : "硕士毕业" : "延期毕业";
   const scoreSummary = target === null
@@ -57,7 +58,8 @@ export function finishTrainingIfReady(state: GameState): GameState {
     : state.thesis.review?.submitted ? "盲审未通过" : "未完成盲审送审";
   const excellent = graduated && state.thesis.review?.excellent
     ? `，优秀${state.degree === "phd" ? "博士" : "硕士"}论文` : "";
-  return pushLog({ ...state, phase: "finished", ending }, `${label}：${scoreSummary}，${thesisSummary}${excellent}。`);
+  const debtSummary = hasUnpaidCurseDebt(state) ? `，债务尚未结清（${state.curseState!.debt}金币）` : "";
+  return pushLog({ ...state, phase: "finished", ending }, `${label}：${scoreSummary}，${thesisSummary}${excellent}${debtSummary}。`);
 }
 
 export function quitGame(state: GameState): GameState {

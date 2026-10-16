@@ -8,6 +8,7 @@ import {
 import { createInitialState, dispatchAction } from "./v2-engine";
 import { pushNoOpLog } from "./v2-engine-helpers";
 import { settleRunAchievements } from "./v2-achievement-runtime";
+import { settleCurseDifficultyProgress } from "./v2-curse-progress";
 import { applyHelpRead, createRunReplay, replayStateDigest, verifyRunReplay, REPLAY_RULESET, type RunReplay, type ReplayAnchor } from "./v2-run-replay";
 import { awardRoleExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
 import { recordRoleResult, recordRoleStart } from "./v2-role-records";
@@ -16,6 +17,8 @@ import { ENABLE_TALENT_TEST_MODE } from "./v2-development-flags";
 import { loadAccountProfile, saveAccountProfile, type ExperienceStorage, type FinalizedRunRecord } from "./v2-account-storage";
 import { createRunSaveRepository, type RunSaveRepository } from "./v2-run-saves";
 import { collectRunStatistics } from "./v2-run-statistics";
+import { CAPTAIN_PREREQUISITE_ROLE_IDS } from "./v2-account-role-unlocks";
+import { getSelectedCurseDifficulty, selectCurseDifficulty } from "./v2-curse-progress";
 import type { AccountProfile, DispatchPayload, GameActionId, GameState, RoleId } from "./v2-types";
 
 type Listener = (state: GameState) => void;
@@ -223,7 +226,8 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     const disqualified = runUsedDebugPanel || !!replay?.failed;
     const preview = endingPreview(state);
     const record: FinalizedRunRecord = { runId: currentRunId, state: preview.state, debugUsed: runUsedDebugPanel };
-    const nextAccount = disqualified ? { ...accountProfile, lastRunExperience: endingAward } : preview.account;
+    const nextAccount = disqualified ? { ...accountProfile, lastRunExperience: endingAward }
+      : settleCurseDifficultyProgress(preview.account, preview.state);
     const nextIds = { ...settledRuns, [roleId]: currentRunId };
     const nextOutbox = disqualified ? finalizedOutbox : [...finalizedOutbox, record];
     if (!persistAccount(nextAccount, nextIds, nextOutbox)) { notify(); return false; }
@@ -259,6 +263,13 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     },
     getLobbyState() {
       return accountProfile;
+    },
+    selectCurseDifficulty(roleId: RoleId, difficulty: number): boolean {
+      if (state.phase !== "setup") return false;
+      const next = selectCurseDifficulty(accountProfile, roleId, difficulty);
+      if (next === accountProfile) return false;
+      commit(state, next);
+      return true;
     },
     recordHelpPageRead(id: string, requiredIds: readonly string[]): void {
       if (state.phase !== "playing" || runUsedDebugPanel || !requiredIds.includes(id)) return;
@@ -353,6 +364,8 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
         const initial = { ...createInitialState(), blockLinearEvents: state.blockLinearEvents };
         const startPayload = {
           roleId,
+          curseDifficulty: getSelectedCurseDifficulty(accountProfile, roleId),
+          captainTagLevels: Object.fromEntries(CAPTAIN_PREREQUISITE_ROLE_IDS.map(id => [id, accountProfile.roleProgress[id].level])),
           talentAllocation: sanitizeRoleTalentAllocation(roleId, accountProfile.roleProgress[roleId].level, accountProfile.talentAllocation?.[roleId], accountProfile.achievementTalentPoints?.[roleId] ?? 0),
           bonusTalentPoints: accountProfile.achievementTalentPoints?.[roleId] ?? 0,
         };
@@ -377,6 +390,8 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
         const startPayload = {
           ...payload,
           roleId: nextRoleId,
+          curseDifficulty: getSelectedCurseDifficulty(accountProfile, nextRoleId),
+          captainTagLevels: Object.fromEntries(CAPTAIN_PREREQUISITE_ROLE_IDS.map(id => [id, accountProfile.roleProgress[id].level])),
           talentAllocation: sanitizeRoleTalentAllocation(nextRoleId, accountProfile.roleProgress[nextRoleId].level, accountProfile.talentAllocation?.[nextRoleId], accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0),
           bonusTalentPoints: accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0,
         };

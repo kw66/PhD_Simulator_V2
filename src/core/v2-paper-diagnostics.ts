@@ -23,6 +23,12 @@ export function captureResearchContext(state: GameState) {
     totalMonths: state.totalMonths,
     degree: state.degree,
     talents: { ...state.roleTalents?.levels },
+    ...(state.curseState ? { curse: { difficulty: state.curseState.difficulty, debt: state.curseState.debt } } : {}),
+    ...(state.captainState ? { captain: { levels: { ...state.captainState.levels },
+      // Relationship ids contain no names; omit the lover identity, which includes a name.
+      tags: Object.entries(state.captainState.tags).map(([id, tag]) => ({
+        member: id === "advisor" ? "advisor" : id.startsWith("lover:") ? "lover" : "fellow", tag,
+      })) } } : {}),
     attributes: { ...state.player, effectiveResearch: getEffectiveResearch(state), effectiveSocial: getEffectiveSocial(state),
       researchCap: getPlayerAttributeCap(state, "research"), socialCap: getPlayerAttributeCap(state, "social"),
       favorCap: getPlayerAttributeCap(state, "favor"), sanCap: state.sanCap },

@@ -13,6 +13,7 @@ import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 import { getRecruitmentAcademicYears, type RecruitmentCalendar } from "./v2-recruitment-eligibility";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
+import { createStudyFatigueEvent, isStudyFatigueEligible, STUDY_FATIGUE_EVENT_ID } from "./v2-study-fatigue";
 
 function appendFellowCapacityHint(event: PendingEvent): PendingEvent {
   const hint = "小提示：可先关闭事件，去人际栏停止合作腾出位置，再回来确认；结果会按当前空位更新。";
@@ -66,6 +67,8 @@ export function getRandomEventAppearanceCondition(eventId: number): string | nul
       return "存在一作论文，且 idea 分数 > 0（草稿或审稿中）";
     case 18:
       return "存在一作论文，且实验分数 > 0（草稿或审稿中）";
+    case STUDY_FATIGUE_EVENT_ID:
+      return "连续3个月亲自想idea、做实验或写论文（含AI行动）";
     default:
       return null;
   }
@@ -77,6 +80,8 @@ export function createRandomEventById(
   getRoll: RandomRollProvider,
   recruitmentCalendar: RecruitmentCalendar = state,
 ): { nextState: GameState; event: PendingEvent | null } {
+  if (eventId === STUDY_FATIGUE_EVENT_ID) return { nextState: state,
+    event: appendRandomEventAppearanceCondition(eventId, createStudyFatigueEvent(state)) };
   if ((eventId === 10 || eventId === 11)
     && getRecruitmentAcademicYears(eventId === 10 ? "peer" : "senior", recruitmentCalendar).length === 0) {
     return { nextState: state, event: null };
@@ -110,6 +115,8 @@ export function createRandomEventById(
 
 export function isRandomEventEligible(state: GameState, eventId: number): boolean {
   switch (eventId) {
+    case STUDY_FATIGUE_EVENT_ID:
+      return isStudyFatigueEligible(state);
     case 8:
       return state.advisorProgressState.funding >= LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD;
     case 10:

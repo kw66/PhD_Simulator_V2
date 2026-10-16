@@ -10,6 +10,7 @@ import { getAttributeTier } from "./v2-random-event-rules";
 import { applyTierResist } from "./v2-sanity-rules";
 import type { FellowProgressProfile, GameState } from "./v2-types";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { getCaptainResearchCap, getCaptainAffinityCap, getCaptainLoverResearchCap } from "./v2-captain-state";
 
 export const FELLOW_RESEARCH_CAP = 20;
 
@@ -50,7 +51,7 @@ export function getAnnualLabSocialRewards(state: GameState): { fellowAffinity: n
 }
 
 export function getFellowAnnualResearchGrowth(state: GameState, profile: FellowProgressProfile): number {
-  return Math.min(getAnnualResearchReward(state, profile.research), Math.max(0, FELLOW_RESEARCH_CAP - profile.research));
+  return Math.min(getAnnualResearchReward(state, profile.research), Math.max(0, getCaptainResearchCap(state, profile) - profile.research));
 }
 
 export function getPlayerAnnualResearchGrowth(state: GameState): number {
@@ -69,16 +70,16 @@ export function settleLabResearchGrowth(state: GameState, random: () => number =
     if ((profile.lastAnnualGrowthTotalMonths ?? -1) >= state.totalMonths) return profile;
     const inheritance = fellowRewards[index]!;
     const reward = 2 + inheritance;
-    const result = applyTierResist(reward, profile.research, random, FELLOW_RESEARCH_CAP);
+    const result = applyTierResist(reward, profile.research, random, getCaptainResearchCap(state, profile));
     const growth = result.effectiveChange;
-    const affinityResult = applyTierResist(socialRewards.fellowAffinity, profile.affinity, random, 20);
+    const affinityResult = applyTierResist(socialRewards.fellowAffinity, profile.affinity, random, getCaptainAffinityCap(state, profile));
     const affinitySummary = describeResistedTalentReward("默契", profile.affinity, affinityResult);
     triggers.push({ key: `inheritance:${profile.id}:${state.totalMonths}`, record: {
       name: "年度科研成长", recipient: getFellowName(profile), reason,
       effects: [describeResistedTalentReward("科研", profile.research, result),
         ...(socialRewards.fellowAffinity > 0 ? [affinitySummary] : [])],
       details: [`原始奖励：自然成长 +2，实验室传承 +${inheritance}，合计 +${reward}；合并后逐点抵抗并受科研上限限制`,
-        ...(socialRewards.fellowAffinity > 0 ? [`社交档位 ${socialRewards.fellowAffinity}；默契原始 +${socialRewards.fellowAffinity}，逐点抵抗并受上限20限制`] : []),
+        ...(socialRewards.fellowAffinity > 0 ? [`社交档位 ${socialRewards.fellowAffinity}；默契原始 +${socialRewards.fellowAffinity}，逐点抵抗并受上限${getCaptainAffinityCap(state, profile)}限制`] : []),
         ...(result.cappedCount ? [`档位抵抗 ${formatMoney(result.resistedCount)} 点，上限限制 ${formatMoney(result.cappedCount)} 点`] : [])],
     } });
     return {
@@ -109,7 +110,7 @@ export function settleLabResearchGrowth(state: GameState, random: () => number =
   let loverProgressState = state.loverProgressState;
   if (state.loverState.active && loverProgressState.active
     && (loverProgressState.lastAnnualGrowthTotalMonths ?? -1) < state.totalMonths) {
-    const result = applyTierResist(2, loverProgressState.research, random, FELLOW_RESEARCH_CAP);
+    const result = applyTierResist(2, loverProgressState.research, random, getCaptainLoverResearchCap(state));
     triggers.push({ key: `annual-research:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}:${state.totalMonths}`, record: {
       name: "年度科研成长", recipient: getLoverName(state.loverState), reason,
       effects: [describeResistedTalentReward("科研", loverProgressState.research, result)],
@@ -151,7 +152,7 @@ function resolveFellowCoauthoredPapers(state: GameState, recordLogs: boolean): G
       : !paper.leadAuthorId && paper.nonFirstAuthor !== true && paper.collaborators?.some((person) => person.id === profile.id)))
       .map((paper) => paper.id));
     if (newIds.size === 0) return profile;
-    const affinityResult = applyTierResist(newIds.size * affinityPerPaper, profile.affinity, undefined, 20);
+    const affinityResult = applyTierResist(newIds.size * affinityPerPaper, profile.affinity, undefined, getCaptainAffinityCap(state, profile));
     const affinity = profile.affinity + affinityResult.effectiveChange;
     const affinitySummary = describeResistedTalentReward("默契", profile.affinity, affinityResult);
     triggers.push({ key: `cooperation:${profile.id}:${JSON.stringify([...newIds].sort())}`, record: {

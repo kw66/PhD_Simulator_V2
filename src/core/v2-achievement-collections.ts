@@ -30,6 +30,7 @@ const BUFF_REQUIREMENTS: CollectionItem[] = [
   { id: "reading:automaticReads", label: "自动看论文" },
   { id: "paper-polish", label: "自动科研" },
   { id: "monthly:san", label: "每月SAN变化" },
+  { id: "actions:limit", label: "普通行动点调整" },
   { id: "san:multiplier", label: "SAN消耗倍率" },
   { id: "san:delta", label: "SAN消耗固定调整" },
   { id: "relationship:san", label: "人际操作SAN消耗调整" },
@@ -94,6 +95,7 @@ function getNormalizedActiveBuffIds(buffs: readonly Buff[]): string[] {
     const record = (id: string, value: number | undefined, neutral = 0) => {
       if (value !== undefined && Number.isFinite(value) && value !== neutral) ids.add(id);
     };
+    record("actions:limit", buff.monthlyActionLimitDelta);
     for (const action of ACTIONS) {
       const effect = buff.actionEffects?.[action.id];
       for (const key of ["bonus", "multiplier", "extraActions", "sanDelta"] as const) {

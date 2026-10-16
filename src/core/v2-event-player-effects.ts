@@ -6,6 +6,7 @@ import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-
 import { getReadPaperSanCost } from "./v2-reading-system";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
 import type { EventChoice, GameState } from "./v2-types";
+import { getRecoveredSan } from "./v2-san-recovery";
 
 /** Keep result copy consistent with resource replacement without changing the original request. */
 export function formatEventSanPaymentText(text: string, state: GameState, effects: EventChoice["effects"]): string {
@@ -41,8 +42,8 @@ export function applyEventPlayerEffects(state: GameState, effects: EventChoice["
   next = recordPersonalSpending(next, Math.max(0, -(effects.money ?? 0)));
   if ((effects.san ?? 0) < 0) next = paySanCost(next, -effects.san!, { allowOverdraw: true });
   else if ((effects.san ?? 0) > 0) next = { ...next, player: { ...next.player,
-    san: Math.max(next.player.san, Math.min(next.sanCap, next.player.san + effects.san!)) } };
-  if (effects.restoreSanToCap) next = { ...next, player: { ...next.player, san: next.sanCap } };
+    san: getRecoveredSan(next.player.san, next.sanCap, effects.san!, next.selectedRoleId) } };
+  if (effects.restoreSanToCap && next.selectedRoleId !== "special-finite-life") next = { ...next, player: { ...next.player, san: next.sanCap } };
   for (const stat of ["research", "social", "favor"] as const) {
     const rawKey = { research: "rawResearch", social: "rawSocial", favor: "rawFavor" }[stat] as "rawResearch" | "rawSocial" | "rawFavor";
     const raw = effects[rawKey] ?? effects[stat];

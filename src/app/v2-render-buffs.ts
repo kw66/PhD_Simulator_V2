@@ -251,6 +251,18 @@ function addPublicationEffects(effects: Map<string, AccumulatedEffect>, buff: Bu
 }
 
 function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): void {
+  if (buff.monthlyActionLimitDelta !== undefined) {
+    const active = buff.appliedActionLimitDelta !== undefined;
+    addEffect(effects, {
+      id: `${buff.timing}:rule:monthly-action-limit:${active ? "current" : "next"}`,
+      timing: buff.timing,
+      operation: "sum",
+      value: buff.monthlyActionLimitDelta,
+      source: getSourceText(buff),
+      category: "action",
+      renderLabel: value => `${active ? "本月" : "下月"}普通行动 ${formatSignedNumber(value)}`,
+    });
+  }
   if (buff.scholarshipDisqualified === true) {
     addEffect(effects, {
       id: `${buff.timing}:rule:scholarship-disqualified`,

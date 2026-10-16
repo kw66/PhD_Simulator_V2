@@ -28,6 +28,7 @@ export const GAME_ACTION_IDS = [
   "read-paper",
   "part-time-work",
   "invest-money",
+  "repay-debt",
   "rest",
   "resolve-event",
   "end-relationship",

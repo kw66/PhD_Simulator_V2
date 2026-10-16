@@ -2,6 +2,8 @@ import { getRoleOptions } from "./v2-progression";
 import { DATA_EPOCH, isCurrentDataEpoch } from "./v2-data-epoch";
 import { isRunReplay, truncateRunReplay, type RunReplay } from "./v2-run-replay";
 import type { GameState, RoleId } from "./v2-types";
+import { isCursedRole } from "./v2-curse-system";
+import { CAPTAIN_TAG_IDS } from "./v2-captain-state";
 
 export const RUN_SAVE_VERSION = 2;
 export const MAX_RUN_MONTH_SAVES = 70;
@@ -102,6 +104,32 @@ function validState(value: unknown, roleId: RoleId): value is GameState {
     || !Number.isInteger(value.month) || Number(value.month) < 0 || Number(value.month) > 12
     || !["master", "phd"].includes(String(value.degree))) return false;
   if (!object(value.player) || !["san", "research", "social", "favor", "money"].every(key => Number.isFinite(value.player && (value.player as Record<string, unknown>)[key]))) return false;
+  if (roleId === "research-captain") {
+    const captain = value.captainState;
+    if (!object(captain) || !object(captain.levels) || !object(captain.tags)
+      || !CAPTAIN_TAG_IDS.every(tag => nonnegativeInteger((captain.levels as Record<string, unknown>)[tag]) && Number((captain.levels as Record<string, unknown>)[tag]) <= 10)
+      || !Object.values(captain.tags).every(tag => CAPTAIN_TAG_IDS.includes(tag as typeof CAPTAIN_TAG_IDS[number]))
+      || !Array.isArray(captain.initializedMembers) || !captain.initializedMembers.every(id => typeof id === "string")
+      || !object(captain.actionRemainders) || !object(captain.cooperationRemainders)
+      || ![...Object.values(captain.actionRemainders), ...Object.values(captain.cooperationRemainders), captain.loverAdvanceRemainder]
+        .every(remainder => typeof remainder === "number" && Number.isFinite(remainder) && remainder >= 0 && remainder < 1)
+      || (captain.lastMonthlySettlement !== undefined && !nonnegativeInteger(captain.lastMonthlySettlement))) return false;
+    const validHelpAmount = (amount: unknown): boolean => typeof amount === "number" && Number.isFinite(amount) && amount >= 0;
+    if (captain.pendingFellowHelp !== undefined && (!object(captain.pendingFellowHelp)
+      || !Object.values(captain.pendingFellowHelp).every(queue => object(queue)
+        && Array.isArray(queue.player) && queue.player.every(validHelpAmount)
+        && Array.isArray(queue.fellow) && queue.fellow.every(validHelpAmount)))) return false;
+    if (captain.pendingLoverHelp !== undefined && (!object(captain.pendingLoverHelp)
+      || !Object.values(captain.pendingLoverHelp).every(queue => Array.isArray(queue) && queue.every(help => object(help)
+        && validHelpAmount(help.amount) && typeof help.collaboratorId === "string" && typeof help.name === "string")))) return false;
+  }
+  if (isCursedRole(roleId)) {
+    const curse = value.curseState;
+    if (!object(curse) || !Number.isInteger(curse.difficulty) || Number(curse.difficulty) < 1 || Number(curse.difficulty) > 4
+      || !Number.isFinite(curse.debt) || Number(curse.debt) < 0
+      || !nonnegativeInteger(curse.lastSettledTotalMonths) || curse.lastSettledTotalMonths > Math.max(1, Number(value.totalMonths))
+      || (roleId !== "cursed-debt" && curse.debt !== 0)) return false;
+  }
   return ["papers", "externalPublications", "eventQueue", "eventHistory", "log", "buffs", "availableRandomEvents", "usedRandomEvents"]
     .every(key => Array.isArray(value[key]))
     && ["thesis", "actionState", "relationshipState", "eventSupport", "shopState", "aiShopState", "advisorProgressState"]
@@ -127,6 +155,9 @@ export function validateRunSaveRecord(value: unknown): value is RunSaveRecord {
     if (!validSnapshot(snapshot, roleId) || snapshot.id !== `month:${snapshot.totalMonths}`
       || snapshot.totalMonths > (value.latest as RunSaveSnapshot).totalMonths || months.has(snapshot.totalMonths)) return false;
     months.add(snapshot.totalMonths);
+    if (isCursedRole(roleId) && snapshot.state.curseState?.difficulty !== (value.latest as RunSaveSnapshot).state.curseState?.difficulty) return false;
+    if (roleId === "research-captain" && CAPTAIN_TAG_IDS.some(tag => snapshot.state.captainState?.levels[tag]
+      !== (value.latest as RunSaveSnapshot).state.captainState?.levels[tag])) return false;
     return true;
   });
 }

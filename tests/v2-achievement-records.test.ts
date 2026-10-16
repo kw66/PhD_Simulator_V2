@@ -65,7 +65,7 @@ describe("role achievement records", () => {
     account.achievementUnlockedAt = { "global:deep-sleep": FIRST };
     account.achievementUnlockedByRole = { "global:deep-sleep": { normal: FIRST } };
     account.achievementRewardedIds = ["global:deep-sleep"];
-    account.achievementExperienceMultipliers = { normal: 2, rich: 1 };
+    account.achievementExperienceMultipliers = { normal: 2.2, rich: 0.2 };
     account.achievementTalentPoints = { normal: 1, rich: 1 };
     account.achievementCollectionProgress = { buffs: [COLLECTION_REQUIREMENTS.buffs[0]!.id], products: [COLLECTION_REQUIREMENTS.products[0]!.id], conferences: [], locations: [], directions: [] };
     const storage = memoryStorage();
@@ -100,8 +100,25 @@ describe("role achievement records", () => {
     expect(restored.achievementRewardedIds).toEqual(["global:deep-sleep"]);
     expect(restored.achievementCollectionProgress?.buffs).toEqual([buff]);
     expect(restored.achievementCollectionProgress?.products).toEqual([]);
-    expect(restored.achievementExperienceMultipliers).toEqual({ normal: 2 });
+    expect(restored.achievementExperienceMultipliers).toEqual({ normal: 2, social: 1.5 });
     expect(restored.achievementTalentPoints).toEqual({ normal: 1, rich: 0 });
+  });
+
+  it("converts only paid legacy collector rewards once and preserves unrelated bonuses", () => {
+    const saved = { version: 2, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT, roles: {},
+      rewardedIds: ["global:product-collector", "global:conference-collector", "global:paper-lover"],
+      experienceMultipliers: { normal: 2, rich: 1 }, talentPoints: { normal: 5, rich: 2 } };
+    const converted = loadRoleAchievementRecords(createDefaultAccountProfile(), memoryStorage(saved));
+    expect(converted.achievementExperienceMultipliers?.normal).toBe(2.4);
+    expect(converted.achievementExperienceMultipliers?.rich).toBe(1.4);
+    expect(converted.achievementExperienceMultipliers?.genius).toBe(0.4);
+    expect(converted.achievementTalentPoints).toEqual({ normal: 3, rich: 0 });
+    expect(converted.achievementRewardedIds).toEqual(saved.rewardedIds);
+    const storage = memoryStorage();
+    saveRoleAchievementRecords(converted, storage);
+    const reloaded = loadRoleAchievementRecords(createDefaultAccountProfile(), storage);
+    expect(reloaded.achievementExperienceMultipliers).toEqual(converted.achievementExperienceMultipliers);
+    expect(reloaded.achievementTalentPoints).toEqual(converted.achievementTalentPoints);
   });
 
   it("does not accept dates without completion evidence or infer achievements from owning targets", () => {

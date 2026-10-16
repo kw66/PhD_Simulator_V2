@@ -1,5 +1,5 @@
 import { getRoleDefinition, getRoleOptions } from "./v2-progression";
-import { isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
+import { getAchievementUnlockRoleIds, isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
 import {
   getRoleAchievementDefinitions,
   getAllAchievementDefinitions,
@@ -157,7 +157,7 @@ export function getAchievementDisplayPages(roleId: RoleId, pageSize = ROLE_ACHIE
     const available = eligibleRoles.some(role => role.id === roleId);
     const exclusive = available && eligibleRoles.length === 1;
     const universal = eligibleRoles.length === roles.length;
-    const priority = item.unlocksRoleId === roleId ? 0
+    const priority = getAchievementUnlockRoleIds(item).includes(roleId) ? 0
       : exclusive && /经验倍率\+1(?:\D|$)/u.test(item.rewardText ?? "") ? 1
       : universal && /天赋点\+1(?:\D|$)/u.test(item.rewardText ?? "") ? 2
       : available ? 3 : 4;

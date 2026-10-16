@@ -51,8 +51,9 @@ export function recordAchievementSanCapGain(state: GameState, gain: number): Gam
   return recordAchievementStats(recordAchievementCounter(state, "san-cap-gain", gain));
 }
 
-export function recordAchievementAction(state: GameState): GameState {
-  const next = recordAchievementCounter(state, `actions:${state.totalMonths}`, 1);
+export function recordAchievementAction(state: GameState, research = false): GameState {
+  const counted = research ? recordAchievementCounter(state, `research-actions:${state.totalMonths}`, 1) : state;
+  const next = recordAchievementCounter(counted, `actions:${state.totalMonths}`, 1);
   const run = next.achievementProgress!;
   return { ...next, achievementProgress: { ...run, peaks: { ...run.peaks,
     "monthly-actions": Math.max(run.peaks["monthly-actions"] ?? 0, run.counters[`actions:${state.totalMonths}`] ?? 0),

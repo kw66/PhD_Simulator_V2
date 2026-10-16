@@ -278,6 +278,7 @@ export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
       { id: "random-16", label: "数据丢失" },
       { id: "random-17", label: "被抢发idea" },
       { id: "random-18", label: "新sota" },
+      { id: "random-19", label: "厌倦学习" },
     ],
   },
   {

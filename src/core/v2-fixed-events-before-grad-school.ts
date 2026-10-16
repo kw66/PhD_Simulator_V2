@@ -1,4 +1,7 @@
 import { gameRandom } from "./v2-game-random";
+import { rollCaptainTag } from "./v2-captain-runtime";
+import { isCaptain, type CaptainTag } from "./v2-captain-state";
+import { getRoleDefinition } from "./v2-progression";
 import { createAdvisorProgressState } from "./v2-advisor-progress";
 import { ADVISOR_REQUIREMENTS, ADVISOR_SALARY, SCORE_BY_TARGET } from "./v2-content";
 import { ENROLLMENT_CALENDAR_YEAR } from "./v2-calendar";
@@ -107,6 +110,8 @@ function createDifferentAdvisorIntel(
 function createAdvisorInfoEvent(
   advisorName: string,
   intel: FixedEventAdvisorIntel,
+  captainTag?: CaptainTag,
+  captainLevel = 0,
 ): PendingEvent {
   return createFixedEvent({
     id: "before-grad-school-advisor-info",
@@ -128,7 +133,8 @@ function createAdvisorInfoEvent(
         ].join("；") + " 📝",
       ].join("\n"),
       `工资：硕士 ${ADVISOR_SALARY.master} 金币｜博士 ${ADVISOR_SALARY.phd} 金币\n科研分：论文录用，C 类 +${SCORE_BY_TARGET.C}｜B 类 +${SCORE_BY_TARGET.B}｜A 类 +${SCORE_BY_TARGET.A}\n毕业：硕士 ${ADVISOR_REQUIREMENTS.masterGrad} 分｜博士 ${ADVISOR_REQUIREMENTS.phdGrad} 分\n转博士：第 2 年 ${ADVISOR_REQUIREMENTS.phdYear2} 分｜第 3 年 ${ADVISOR_REQUIREMENTS.phdYear3} 分`,
-      "小提示：换导师只会刷新姓名和介绍，对游戏数值没有影响。",
+      captainTag ? `导师标签：${getRoleDefinition(captainTag).name} Lv${captainLevel}；换导师会重新抽取标签`
+        : "小提示：换导师只会刷新姓名和介绍，对游戏数值没有影响。",
     ].join("\n\n"),
     chainId: "before-grad-school",
     stage: "act2",
@@ -136,7 +142,7 @@ function createAdvisorInfoEvent(
       {
         id: "before-grad-school-reroll",
         label: "换个导师",
-        cosmetic: true,
+        cosmetic: !captainTag,
         outcome: "",
         effects: {
           stayOnEvent: true,
@@ -144,6 +150,7 @@ function createAdvisorInfoEvent(
             kind: "advisor-reroll",
             advisorCandidate: {
               advisorName,
+              captainTag,
             },
             advisorIntel: intel,
           },
@@ -158,6 +165,7 @@ function createAdvisorInfoEvent(
             kind: "advisor-confirm",
             advisorCandidate: {
               advisorName,
+              captainTag,
             },
           },
         },
@@ -195,10 +203,12 @@ export function createBeforeGradSchoolAct1Event(
   studentName?: string,
   advisorNameOverride?: string,
   advisorIntelOverride?: FixedEventAdvisorIntel,
+  captainTagOverride?: CaptainTag,
 ): PendingEvent {
   const advisorName = advisorNameOverride ?? pickRandomAdvisorName(getRoll);
   const advisorIntel = advisorIntelOverride ?? createRandomAdvisorIntel(getRoll);
   const candidateName = studentName ?? pickRandomAdvisorName(getRoll);
+  const captainTag = isCaptain(_state) ? captainTagOverride ?? rollCaptainTag(getRoll) : undefined;
   return createFixedEvent({
     id: "before-grad-school-qualification",
     narrativeNames: [candidateName],
@@ -220,7 +230,7 @@ export function createBeforeGradSchoolAct1Event(
             kind: "student-name-confirm",
             studentName: candidateName,
           },
-          enqueueEvents: [createAdvisorInfoEvent(advisorName, advisorIntel)],
+          enqueueEvents: [createAdvisorInfoEvent(advisorName, advisorIntel, captainTag, captainTag ? _state.captainState!.levels[captainTag] : 0)],
         },
       },
       {
@@ -235,6 +245,7 @@ export function createBeforeGradSchoolAct1Event(
             studentName: candidateName,
             advisorCandidate: {
               advisorName,
+              captainTag,
             },
             advisorIntel,
           },
@@ -274,6 +285,7 @@ export function resolveStudentNameReroll(
     pickDifferentRandomName(currentName, getRoll),
     advisorCandidate.advisorName,
     advisorIntel,
+    advisorCandidate.captainTag,
   );
   const eventId = "before-grad-school-qualification";
   return {
@@ -317,6 +329,8 @@ export function resolveAdvisorConfirmation(
     graduationScoreTarget: getGraduationScoreTarget("master", candidate.advisorName),
     relationshipState,
     advisorProgressState: createAdvisorProgressState(),
+    ...(isCaptain(state) && candidate.captainTag ? { captainState: { ...state.captainState!,
+      tags: { ...state.captainState!.tags, advisor: candidate.captainTag } } } : {}),
   };
 
   return {
@@ -342,7 +356,8 @@ export function resolveAdvisorReroll(
 
   const advisorName = createDifferentAdvisorName(candidate.advisorName, getRoll);
   const advisorIntel = createDifferentAdvisorIntel(currentIntel, getRoll);
-  const refreshedEvent = createAdvisorInfoEvent(advisorName, advisorIntel);
+  const captainTag = isCaptain(state) ? rollCaptainTag(getRoll) : undefined;
+  const refreshedEvent = createAdvisorInfoEvent(advisorName, advisorIntel, captainTag, captainTag ? state.captainState!.levels[captainTag] : 0);
   const eventId = "before-grad-school-advisor-info";
 
   return {

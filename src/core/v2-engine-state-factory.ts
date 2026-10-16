@@ -1,4 +1,5 @@
 import { createGameRandomState, getActiveGameRandomState, withGameRandom } from "./v2-game-random";
+import { initializeCaptain } from "./v2-captain-runtime";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { MAX_SAN } from "./v2-content";
 import { createAdvisorProgressState } from "./v2-advisor-progress";
@@ -27,6 +28,7 @@ import type { GameState, RoleId } from "./v2-types";
 import { createRoleTalentRunState } from "./v2-role-talent-state";
 import { sanitizeRoleTalentAllocation } from "./v2-role-talent-definitions";
 import { initializeRoleTalents } from "./v2-role-talent-lifecycle";
+import { initializeCurse, type CurseDifficulty } from "./v2-curse-system";
 
 export function createInitialState(): GameState {
   const calendar = getCalendarForTotalMonths(0);
@@ -105,9 +107,11 @@ export function createStartedGameState(
   roleId: RoleId,
   talentAllocation: Record<string, number> = {},
   bonusTalentPoints = 0,
+  curseDifficulty: CurseDifficulty = 1,
+  captainTagLevels: Partial<Record<RoleId, number>> = {},
 ): GameState {
   const initial = { ...createInitialState(), randomState: getActiveGameRandomState() ?? createGameRandomState() };
-  return withGameRandom(initial, () => createStartedGameStateInternal(roleId, talentAllocation, bonusTalentPoints, initial));
+  return withGameRandom(initial, () => initializeCaptain(initializeCurse(createStartedGameStateInternal(roleId, talentAllocation, bonusTalentPoints, initial), curseDifficulty), captainTagLevels));
 }
 
 function createStartedGameStateInternal(roleId: RoleId, talentAllocation: Record<string, number>, bonusTalentPoints: number, baseState: GameState): GameState {

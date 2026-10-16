@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { getCaptainProjectMax } from "./v2-captain-state";
 import { recordPersonalIncome } from "./v2-money";
 import { getAdvisorGuidanceAmount, queueAdvisorGuidance, settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { pushMilestoneLog } from "./v2-engine-helpers";
@@ -34,8 +35,9 @@ export function advanceSharedLabProject(
   state = ensureFellowFinanceAccounts(state);
   const field = type === "horizontal" ? "horizontalProgress" : "verticalProgress";
   const total = Math.floor(state.advisorProgressState[field] ?? 0) + gain;
-  const completed = Math.floor(total / PROJECT_PROGRESS_MAX);
-  const remainder = total % PROJECT_PROGRESS_MAX;
+  const maximum = getCaptainProjectMax(state, type);
+  const completed = Math.floor(total / maximum);
+  const remainder = total % maximum;
   const participatedBefore = state.advisorProgressState.playerProjectParticipation[type];
   const playerCompleted = contributor === "player" ? completed : completed > 0 && participatedBefore ? 1 : 0;
   let nextState: GameState = {

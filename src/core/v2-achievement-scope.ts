@@ -3,6 +3,10 @@ import type { AccountProfile, AchievementAudience, AchievementScope, RoleAchieve
 
 const SPECIAL_ROLES = new Set<RoleId>(["rewinder", "research-captain", "special-dandan", "special-daji"]);
 const CURSED_ROLES = new Set<RoleId>(["cursed-frail", "cursed-debt", "special-finite-life", "special-fading-genius"]);
+
+export function getAchievementUnlockRoleIds(definition: RoleAchievementDefinition): readonly RoleId[] {
+  return [...new Set([...(definition.unlocksRoleId ? [definition.unlocksRoleId] : []), ...(definition.unlocksRoleIds ?? [])])];
+}
 const AUDIENCE_LABELS: Record<AchievementAudience, string> = {
   all: "通用", upright: "正位", reversed: "逆位", special: "特殊", cursed: "诅咒",
 };

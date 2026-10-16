@@ -39,7 +39,7 @@ const riskResources: {
   value: (state: GameState) => number | null;
 }[] = [
   { resource: "funding", label: "实验室科研经费", consequence: "实验室破产", value: (state) => state.selectedAdvisorName && state.totalMonths > 0 ? roundMoney(state.advisorProgressState.funding) : null },
-  { resource: "san", label: "SAN", consequence: "不堪重负", value: (state) => getShopEmergencySan(state.shopState, state.player.san) },
+  { resource: "san", label: "SAN", consequence: "不堪重负", value: (state) => state.selectedRoleId === "special-finite-life" ? state.player.san : getShopEmergencySan(state.shopState, state.player.san) },
   { resource: "money", label: "金币", consequence: "穷困潦倒", value: (state) => roundMoney(state.player.money) },
   { resource: "favor", label: "导师好感", consequence: "逐出师门", value: (state) => state.player.favor },
   { resource: "social", label: "社交能力", consequence: "被孤立", value: (state) => state.player.social },
@@ -83,6 +83,7 @@ function applyPendingPatch(state: GameState, event: PendingEvent): GameState {
     if (valid && key) target[key] = rebaseValue(target[key], change.previousValue, change.value);
   }
   next.player.san = Math.min(next.sanCap < state.sanCap ? next.sanCap : Math.max(next.sanCap, state.player.san), next.player.san);
+  if (state.selectedRoleId === "special-finite-life") next.player.san = Math.min(state.player.san, next.player.san);
   next.player.research = Math.min(Math.max(getPlayerAttributeCap(next, "research"), state.player.research), next.player.research);
   next.player.social = Math.min(Math.max(getPlayerAttributeCap(next, "social"), state.player.social), next.player.social);
   next.player.favor = Math.min(Math.max(getPlayerAttributeCap(next, "favor"), state.player.favor), next.player.favor);

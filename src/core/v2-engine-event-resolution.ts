@@ -244,6 +244,7 @@ function applyDeferredStatePatch(state: GameState, patch: DeferredEventStatePatc
     social: Math.min(Math.max(getPlayerAttributeCap(nextState, "social"), state.player.social), nextState.player.social),
     favor: Math.min(Math.max(getPlayerAttributeCap(nextState, "favor"), state.player.favor), nextState.player.favor),
   };
+  if (state.selectedRoleId === "special-finite-life") nextState.player.san = Math.min(state.player.san, nextState.player.san);
   enforceDeferredRelationshipCapacity(nextState, patch);
   nextState.phase = state.phase;
   nextState.ending = state.ending;

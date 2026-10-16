@@ -69,7 +69,6 @@ import { getPaperScoreBreakdown, getRoleCollaborationScore } from "../core/v2-pa
 import { getPaperHeatTier } from "../core/v2-paper-topics";
 import {
   ADVISOR_GRANTS,
-  PROJECT_PROGRESS_MAX,
   getActiveAdvisorGrants,
   getAdvisorGrantLimit,
   getAdvisorMeetingAttendancePercent,
@@ -130,7 +129,10 @@ import type { EventLayoutSample } from "./v2-event-layout";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl, hasRoleCardPortrait } from "./v2-role-portrait-assets";
 import { renderDesignedGrowthBoard } from "./v2-render-setup-screen";
+import { renderCaptainTags } from "./v2-render-captain-tags";
 import { getDesignedTalentNodes } from "../core/v2-role-talent-definitions";
+import { getMonthEndIllnessDelta } from "../core/v2-curse-system";
+import { getCaptainAffinityCap, getCaptainCooperationMax, getCaptainLevel, getCaptainLoverId, getCaptainLoverIntimacyCap, getCaptainLoverResearchCap, getCaptainLoverRouteMax, getCaptainProjectMax, getCaptainResearchCap, getCaptainTag, isCaptain } from "../core/v2-captain-state";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
 const RESEARCH_CHORE_SAN_DISCOUNT = [0, 1, 2, 3] as const;
@@ -436,7 +438,7 @@ function getAttrTierName(kind: AttrTierId, value: number): string {
 function getAttrTierTooltip(kind: AttrTierId, value: number, illnessProbability = 0, effectiveValue = value, state?: GameState): string {
   const tier = getAttrTier(value);
   if (kind === "san") {
-    const monthEndChange = DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[tier];
+    const monthEndChange = state ? getMonthEndIllnessDelta(state) : DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[tier];
     const signedChange = monthEndChange >= 0 ? `+${monthEndChange}` : String(monthEndChange);
     return `当前疾病概率 ${illnessProbability}%｜月末结算 ${signedChange}%`;
   }
@@ -765,7 +767,7 @@ function renderLeftRail(state: GameState): string {
   return `
     <aside class="play-left-rail new-left-container">
       <div class="new-attr-panel" id="new-attr-panel">
-        ${renderAttrItem("🧠", "SAN值", state.player.san, state.sanCap, "san", "san", state.illnessProbability)}
+        ${renderAttrItem("🧠", "SAN值", state.player.san, state.sanCap, "san", "san", state.illnessProbability, state.player.san, state)}
         ${renderAttrItem("💡", "科研能力", state.player.research, Math.max(researchCap, 20), "research", "research", 0, getEffectiveResearch(state), state)}
         ${renderAttrItem("🤝", "社交能力", state.player.social, getPlayerAttributeCap(state, "social"), "social", "social", 0, getEffectiveSocial(state), state)}
         ${renderAttrItem("👨‍🏫", "导师好感", state.player.favor, getPlayerAttributeCap(state, "favor"), "favor", "favor", 0, state.player.favor, state)}
@@ -1950,7 +1952,7 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
         ],
         knownMonths: Math.max(0, state.totalMonths - profile.startTotalMonths),
         taskProgress: profile.taskProgress,
-        taskMax: 100,
+        taskMax: getCaptainCooperationMax(state, isCaptain(state) ? { ...profile, taskMax: 100 } : profile),
         relationProgress: 0,
         relationMax: 0,
         relationGrowthPerMonth: profile.affinity,
@@ -1978,8 +1980,8 @@ function buildRelationshipCards(state: GameState): Array<RelationshipRenderCard 
       displayType: "恋人",
       displayName: getLoverName(state.loverState),
       detailItems: [
-        { label: "科研", value: state.loverProgressState.research, max: 20 },
-        { label: "亲密度", value: state.loverProgressState.intimacy, max: 20 },
+        { label: "科研", value: state.loverProgressState.research, max: getCaptainLoverResearchCap(state) },
+        { label: "亲密度", value: state.loverProgressState.intimacy, max: getCaptainLoverIntimacyCap(state) },
       ],
       knownMonths: Math.max(0, state.totalMonths - (state.loverState.startTotalMonths ?? state.totalMonths)),
       taskProgress: state.loverProgressState.taskProgress,
@@ -2158,8 +2160,9 @@ function getFellowCooperationHint(state: GameState, profile: FellowProgressProfi
   const research = Math.max(0, getEffectiveResearch(state));
   const role = getFellowRoleLabel(profile.type, profile.gender);
   const target = profile.type === "senior" ? "idea" : profile.type === "peer" ? "随机项" : "实验";
-  const monthlyGain = profile.affinity * (profile.longTermMentoring ? 2 : 1);
-  return `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，每月自动推进+${formatMoney(monthlyGain)}\n满100：${role}帮你论文${target}+${getRoleCollaborationScore(state, "fellow", profile.research)}，你帮对方最低项+${Math.floor(research)}`;
+  const monthlyGain = profile.affinity * ((profile.longTermMentoring ? 2 : 1) + 0.1 * getCaptainLevel(state, profile.id, "chosen"));
+  const maximum = getCaptainCooperationMax(state, isCaptain(state) ? { ...profile, taskMax: 100 } : profile);
+  return `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，每月自动推进+${formatMoney(monthlyGain)}\n满${maximum}：${role}帮你论文${target}+${getRoleCollaborationScore(state, "fellow", profile.research)}，你帮对方最低项+${Math.floor(research)}`;
 }
 
 function getFellowInheritanceHint(): string {
@@ -2251,14 +2254,15 @@ function renderAdvisorStatus(state: GameState): string {
           const research = Math.max(0, getEffectiveResearch(state));
           const reward = projectType === "horizontal" ? `经费+${getAdvisorHorizontalReward(advisor)}，每人发${formatMoney(getAdvisorHorizontalReward(advisor) * 0.05)}金劳务费`
             : "科研积累+10%，全组论文写作协作+10";
-          const automaticGain = (advisor.nextProject ?? "horizontal") === projectType ? 10 : 0;
-          const hint = `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，导师下月自动推进+${automaticGain}\n满100：${reward}`;
+          const automaticGain = (advisor.nextProject ?? "horizontal") === projectType ? 10 + getCaptainLevel(state, "advisor", "normal") : 0;
+          const maximum = getCaptainProjectMax(state, projectType);
+          const hint = `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，导师下月自动推进+${automaticGain}\n满${maximum}：${reward}`;
           return `<div class="rel-advisor-project-row" data-advisor-project="${projectType}">
             <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icon)}${label}</span>
-            <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${PROJECT_PROGRESS_MAX}" aria-valuenow="${formatMoney(Math.min(progress, PROJECT_PROGRESS_MAX))}">
-              <div class="rel-progress-fill project-${projectType}" ${animationBarAttribute(`person:advisor:${projectType}:progress`)} style="width:${clampPercent(progress / PROJECT_PROGRESS_MAX * 100)}%"></div>
+            <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${maximum}" aria-valuenow="${formatMoney(Math.min(progress, maximum))}">
+              <div class="rel-progress-fill project-${projectType}" ${animationBarAttribute(`person:advisor:${projectType}:progress`)} style="width:${clampPercent(progress / maximum * 100)}%"></div>
             </div>
-            <span class="rel-progress-val">${renderAnimatedNumber(`person:advisor:${projectType}:progress`, progress)}/${PROJECT_PROGRESS_MAX}</span>
+            <span class="rel-progress-val">${renderAnimatedNumber(`person:advisor:${projectType}:progress`, progress)}/${maximum}</span>
             <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="advisor-project" data-project-type="${projectType}" title="不消耗行动点，每月二选一"${blocked ? ` disabled aria-disabled="true" aria-label="推进项目：${escapeHtml(blocked)}"` : ""}>
               <span class="rel-action-label">${renderRelationshipIcon(icon)}${projectType === "vertical" ? "做纵向" : "做横向"}</span>${advisor.lastPlayerProjectTotalMonths === state.totalMonths ? "" : `<span class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, projectSanCost), 0, `person:advisor:${projectType}`)}</span>`}
             </button>
@@ -2278,7 +2282,8 @@ function renderLoverRoutes(state: GameState): string {
   return `<div class="rel-lover-routes" aria-label="约会每月三选一">
     ${LOVER_ROUTES.map((route) => {
       const label = labels[route];
-      const progress = clampPercent(getLoverRouteProgress(state, route));
+      const maximum = getCaptainLoverRouteMax(state);
+      const progress = Math.max(0, Math.min(maximum, getLoverRouteProgress(state, route)));
       const cost = getLoverRouteCost(state, route);
       const costLabel = [cost.money > 0 ? `金币-${renderAnimatedNumber(`${identity}:${route}:money-cost`, cost.money)}` : "", cost.san > 0 ? renderSanPayment(quoteSanPayment({ ...state, player: { ...state.player, money: state.player.money - cost.money } }, cost.san), 0, `${identity}:${route}`) : ""].filter(Boolean).join(" / ");
   const blocked = isGameplayModuleLocked(state) ? "入学后开放"
@@ -2288,13 +2293,13 @@ function renderLoverRoutes(state: GameState): string {
       const gain = getLoverRouteGain(state, route);
       const reward = getLoverNextReward(state, route).replace("永久idea、实验、写作各+1分", "论文三项分数永久+1");
       const passiveGain = route === "shopping" ? 0 : passiveGains[route];
-      const hint = `主动推进+${formatMoney(gain)}，每月自动推进+${formatMoney(passiveGain)}\n下次满100：${reward}`;
+      const hint = `主动推进+${formatMoney(gain)}，每月自动推进+${formatMoney(passiveGain)}\n下次满${maximum}：${reward}`;
       return `<div class="rel-lover-route" data-lover-route="${route}">
         <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icons[route])}${label}</span>
-        <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${formatMoney(progress)}">
-          <div class="rel-progress-fill task lover-${route}" ${animationBarAttribute(`${identity}:${route}:progress`)} style="width:${progress}%"></div>
+        <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${maximum}" aria-valuenow="${formatMoney(progress)}">
+          <div class="rel-progress-fill task lover-${route}" ${animationBarAttribute(`${identity}:${route}:progress`)} style="width:${clampPercent(progress / maximum * 100)}%"></div>
         </div>
-        <span class="rel-progress-val">${renderAnimatedNumber(`${identity}:${route}:progress`, progress)}/100</span>
+        <span class="rel-progress-val">${renderAnimatedNumber(`${identity}:${route}:progress`, progress)}/${maximum}</span>
         <button class="btn-sm rel-action-btn rel-cooperation-btn" type="button" data-action="lover-${route}"${blocked ? ` disabled aria-disabled="true" aria-label="${label}：${escapeHtml(blocked)}"` : ""}>
           <span class="rel-action-label">${renderRelationshipIcon(icons[route])}${label}</span>${used || !costLabel ? "" : `<span class="rel-action-cost">${costLabel}</span>`}
         </button>
@@ -2336,6 +2341,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
   const identity = card.type === "lover" ? `person:lover:${state.loverState.startTotalMonths}:${getLoverName(state.loverState)}` : `person:${card.relationshipId}`;
   const fellow = state.fellowProgressState.find((profile) => profile.id === card.relationshipId);
   const advisor = card.type === "advisor";
+  const captainTag = getCaptainTag(state, card.type === "lover" ? getCaptainLoverId(state) : card.relationshipId);
   const monthFinance = advisor ? getLabFinanceMonthSummary(state) : undefined;
   const signedMoney = (amount: number): string => `${roundMoney(amount) > 0 ? "+" : ""}${formatMoney(amount)}`;
   const monthFinanceHint = monthFinance?.items.filter((item) => roundMoney(item.amount) !== 0)
@@ -2352,7 +2358,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
   const knownHint = fellow ? getFellowInheritanceHint()
     : "每学年末（8月）科研+2";
   const attributes: RelationshipRenderCard["detailItems"] = fellow
-    ? [{ label: "科研", value: fellow.research, max: 20 }, { label: "默契", value: fellow.affinity, max: 20 }]
+    ? [{ label: "科研", value: fellow.research, max: getCaptainResearchCap(state, fellow) }, { label: "默契", value: fellow.affinity, max: getCaptainAffinityCap(state, fellow) }]
     : card.detailItems.map((item) => ({ ...item, label: item.label === "亲密度" ? "亲密" : item.label }));
   const renderAttributes = (): string => attributes.map((item) => {
     const kind = item.label === "科研" ? "research" : card.type === "lover" ? "intimacy" : "affinity";
@@ -2370,6 +2376,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
           <div class="rel-header-main">
             <span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
             <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
+            ${captainTag ? `<span class="rel-type rel-captain-tag">${escapeHtml(getRoleDefinition(captainTag).name)} Lv${state.captainState!.levels[captainTag]}</span>` : ""}
             ${fellow?.longTermMentoring ? `<span class="rel-type rel-mentoring-mark" ${relationshipTooltip("长期合作：每月SAN-1，协作额外推进1次。", "left")} aria-label="长期合作">长期合作</span>` : ""}
             ${fellowAi ? `<span class="rel-type rel-ai-label" ${relationshipTooltip(`本月订阅${fellowAi.name}`)}>AI</span>` : ""}
             ${card.type === "lover" ? `<span class="rel-type rel-lover-trait" ${relationshipTooltip(getLoverTraitHint(state.loverState.type))}>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span>` : ""}
@@ -3684,6 +3691,7 @@ function renderTalentSection(
   characterSelectedNodeIndex = 0,
   roleLevel = 0,
   talentAllocation: Record<string, number> = {},
+  _captainTagRoleProgress?: PlayRenderUiState["captainTagRoleProgress"],
 ): string {
   const tabId = normalizeTalentPanelTab(activeTalentTab);
   const items = tabId === "relation"
@@ -3708,7 +3716,7 @@ function renderTalentSection(
         </div>
       </div>
       <div class="talent-items-list" id="talent-items-list" data-talent-panel-tab="${tabId}">
-        ${tabId === "publication" ? renderPublicationTalentCards(state) : tabId === "character" ? (getDesignedTalentNodes(state.selectedRoleId) ? renderDesignedGrowthBoard(state.selectedRoleId as Parameters<typeof renderDesignedGrowthBoard>[0], characterSelectedNodeIndex, talentAllocation, roleLevel) : '<p class="talent-panel-empty">暂无角色天赋树</p>') : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
+        ${tabId === "publication" ? renderPublicationTalentCards(state) : tabId === "character" ? (state.selectedRoleId === "research-captain" ? renderCaptainTags({}, characterSelectedNodeIndex, state.captainState?.levels) : getDesignedTalentNodes(state.selectedRoleId) ? renderDesignedGrowthBoard(state.selectedRoleId as Parameters<typeof renderDesignedGrowthBoard>[0], state.curseState ? state.curseState.difficulty - 1 : characterSelectedNodeIndex, talentAllocation, roleLevel, false, 0, state.curseState ? { unlockedDifficulty: state.curseState.difficulty, readOnly: true } : undefined) : '<p class="talent-panel-empty">暂无角色天赋树</p>') : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
       </div>
     </div>
   `;
@@ -3762,6 +3770,7 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
           <span>留言反馈</span>
         </button>
       </div>
+      ${state.selectedRoleId === "cursed-debt" && state.curseState ? `<section class="curse-debt-panel"><div><strong>待偿债务 ${state.curseState.debt.toLocaleString("zh-CN", { maximumFractionDigits: 2 })} 金币</strong><span>月利率2% · 毕业前需结清</span></div><div class="curse-debt-actions"><button type="button" class="settings-primary-btn" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || state.curseState.debt <= 0 ? " disabled" : ""}>偿还1金币</button><button type="button" class="settings-primary-btn" data-action="repay-debt"${state.phase !== "playing" || state.player.money <= 0 || state.curseState.debt <= 0 ? " disabled" : ""}>尽力还款</button></div></section>` : ""}
       ${renderRunSaves(state, uiState)}
       ${!uiState.isRunSavePanelOpen && uiState.saveStatus ? `<p class="run-saves-status" role="status">${escapeHtml(uiState.saveStatus)}</p>` : ""}
     </div>
@@ -3885,7 +3894,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           </section>
 
           <section class="center-main-panel${getTabActiveClass("talent")}" data-tab-panel="talent"${getTabPanelHidden("talent")}>
-            ${lockedModule ?? renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.labInheritancePage, uiState.loverRewardPage, uiState.internshipPage, uiState.gameGrowthPage, uiState.talentTreeSelectedNodeByPage?.[0] ?? 0, uiState.roleLevel ?? 0, state.roleTalents?.levels ?? {})}
+            ${lockedModule ?? renderTalentSection(state, uiState.activeTalentTab, uiState.advisorSalaryStartIndex, uiState.labInheritancePage, uiState.loverRewardPage, uiState.internshipPage, uiState.gameGrowthPage, uiState.talentTreeSelectedNodeByPage?.[0] ?? 0, uiState.roleLevel ?? 0, state.roleTalents?.levels ?? {}, uiState.captainTagRoleProgress)}
           </section>
 
           <section class="center-main-panel${getTabActiveClass("settings")}" data-tab-panel="settings"${getTabPanelHidden("settings")}>

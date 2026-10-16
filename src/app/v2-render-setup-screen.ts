@@ -7,6 +7,7 @@ import {
   LOBBY_ROLE_PAGE_ROW_COUNT,
 } from "../core/v2-lobby";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
+import { getAchievementUnlockRoleIds } from "../core/v2-achievement-scope";
 import {
   FRAIL_TALENT_NODES,
   FADING_GENIUS_TALENT_NODES,
@@ -40,6 +41,9 @@ import { renderAchievementCard } from "./v2-render-achievement-progress";
 import { getAchievementGlobalCompletion } from "./v2-achievement-stats";
 import { getAchievementScopeLabels, isAchievementCompleted } from "../core/v2-achievement-scope";
 import type { RoleRailViewId } from "./v2-render-types";
+import { renderCaptainTags } from "./v2-render-captain-tags";
+import { getSelectedCurseDifficulty, getUnlockedCurseDifficulty } from "../core/v2-curse-progress";
+import { isCursedRole } from "../core/v2-curse-system";
 
 const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain", "special-dandan", "special-daji"]);
 const CURSED_ROLE_IDS = new Set<RoleId>(["cursed-frail", "cursed-debt", "special-finite-life", "special-fading-genius"]);
@@ -299,6 +303,8 @@ function renderGrowthProgress(
   experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER,
 ): string {
   const expTarget = pointSummary.nextExp;
+  const usesTalentPoints = viewModel.role.id !== "research-captain" && !isCursedRole(viewModel.role.id);
+  const passiveLevelHint = isCursedRole(viewModel.role.id) ? "选择已解锁的诅咒难度，无需加点" : "标签等级跟随六个基础角色等级，无需加点";
   const expProgressPercent = expTarget === null
     ? 100
     : Math.max(0, Math.min(100, Math.round((pointSummary.currentExp / expTarget) * 100)));
@@ -307,7 +313,7 @@ function renderGrowthProgress(
     <div class="lobby-profile-growth-summary">
       <div class="lobby-growth-summary-row">
         <div class="lobby-growth-level-group">
-          <span class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级${pointSummary.level}，每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点" data-tooltip="每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点">
+          <span class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级${pointSummary.level}${usesTalentPoints ? `，每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点` : ""}" data-tooltip="${usesTalentPoints ? `每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点` : passiveLevelHint}">
             <span class="lobby-growth-inline-label">等级</span>
             <strong class="lobby-growth-inline-value" ${animationNumberAttributes(`role:${viewModel.role.id}:growth:level`, pointSummary.level)}>${pointSummary.level}</strong>
           </span>
@@ -316,12 +322,12 @@ function renderGrowthProgress(
             <strong class="lobby-growth-inline-value">${experienceMultiplier.toFixed(1)}</strong>
           </span>
         </div>
-        <div class="lobby-growth-exp-detail-row">
+        ${usesTalentPoints ? `<div class="lobby-growth-exp-detail-row">
           <div class="lobby-talent-allocation-meta">
             <span class="lobby-talent-points-hint" role="note" tabindex="0" aria-label="天赋点${pointSummary.availablePoints}，每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点。" data-tooltip="每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点，用于解锁天赋。">天赋点 <strong class="lobby-talent-points-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</strong></span>
             <button class="lobby-talent-reset-button" type="button" data-ui-talent-reset="${viewModel.role.id}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置天赋点"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span></button>
           </div>
-        </div>
+        </div>` : ""}
       </div>
       <div class="lobby-growth-exp-row">
         <span class="lobby-growth-inline-label lobby-growth-exp-label" role="note" tabindex="0" aria-label="经验，每局增加科研分乘经验倍率的经验。" data-tooltip="每局增加科研分✖经验倍率的经验。">经验</span>
@@ -337,7 +343,7 @@ function renderGrowthProgress(
 function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>, bonusPoints = 0, experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, hasRoleSave = false, isSaveLoading = false): string {
   const pointSummary = buildTalentPointSummary(viewModel, allocation, bonusPoints);
   const unlockAchievement = getRoleLobbyAchievementDefinitions(viewModel.role.id)
-    .find((achievement) => achievement.unlocksRoleId === viewModel.role.id);
+    .find((achievement) => getAchievementUnlockRoleIds(achievement).includes(viewModel.role.id));
   const unlockHint = unlockAchievement
     ? `解锁目标：${getAchievementScopeLabels(unlockAchievement.scope).join("／")} · ${unlockAchievement.description}`
     : "该角色的解锁方式尚未开放。";
@@ -523,35 +529,36 @@ const DESIGNED_TALENT_TREES = {
   },
 } as const;
 
-export function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, selectedNodeIndex: number, allocation?: Record<string, number>, level?: number, showPoints = false, bonusPoints = 0): string {
+export function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_TREES, selectedNodeIndex: number, allocation?: Record<string, number>, level?: number, showPoints = false, bonusPoints = 0, curseOptions?: { unlockedDifficulty: number; readOnly?: boolean }): string {
   const tree = DESIGNED_TALENT_TREES[roleId];
   const nodes: readonly DesignedTalentNode[] = tree.nodes;
   const { paths, viewBoxHeight } = tree;
   const activeIndex = Number.isInteger(selectedNodeIndex) && selectedNodeIndex >= 0 && selectedNodeIndex < nodes.length
     ? selectedNodeIndex : 0;
   const exclusiveChallenge = nodes.every((node) => node.challenge);
-  const nodeLabel = (node: DesignedTalentNode) => node.fixed ? "固定生效" : node.challenge ? "四选一" : `${node.cost}天赋点`;
+  const challengeDifficultyNames = ["简单", "中等", "困难", "地狱"];
+  const nodeLabel = (node: DesignedTalentNode) => node.fixed ? "固定生效" : node.challenge ? challengeDifficultyNames[node.tier] : `${node.cost}天赋点`;
   const points = allocation && level !== undefined ? getTalentPointBalance(roleId, level, allocation, bonusPoints) : null;
   return `
     <section class="lobby-profile-growth-card lobby-profile-section is-designed-growth-card">
-      ${!showPoints || points === null ? "" : `<div class="character-talent-points"><span>天赋点 <strong>${points}</strong></span><button type="button" data-ui-talent-reset="${roleId}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置本次测试加点" aria-label="重置本次测试加点"><i data-lucide="rotate-ccw" aria-hidden="true"></i></button></div>`}
-      <div class="lobby-talent-tree is-designed-tree is-${roleId}-tree${nodes.some((node) => node.fixed) ? " is-fixed-tree" : ""}${exclusiveChallenge ? " is-cursed-choice-tree" : ""}" role="group" aria-label="${exclusiveChallenge ? "挑战档位预览，四选一" : "天赋树预览"}" data-active-page="0" ${exclusiveChallenge ? 'data-selection-mode="exclusive"' : 'data-prerequisite-mode="any" data-prerequisite-min-level="1"'}>
+      ${!showPoints || points === null || exclusiveChallenge ? "" : `<div class="character-talent-points"><span>天赋点 <strong>${points}</strong></span><button type="button" data-ui-talent-reset="${roleId}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置本次测试加点" aria-label="重置本次测试加点"><i data-lucide="rotate-ccw" aria-hidden="true"></i></button></div>`}
+      <div class="lobby-talent-tree is-designed-tree is-${roleId}-tree${nodes.some((node) => node.fixed) ? " is-fixed-tree" : ""}${exclusiveChallenge ? " is-cursed-choice-tree" : ""}" role="group" aria-label="${exclusiveChallenge ? "诅咒难度，逐级挑战" : "天赋树预览"}" data-active-page="0" ${exclusiveChallenge ? `data-selection-mode="exclusive"${curseOptions?.readOnly ? ' data-curse-read-only="true"' : ""}` : 'data-prerequisite-mode="any" data-prerequisite-min-level="1"'}>
         <div class="lobby-talent-tree-pages">
           <div class="lobby-talent-tree-page is-active is-designed-page" data-tree-page="0">
             <svg class="lobby-normal-tree-connections" viewBox="0 0 600 ${viewBoxHeight}" preserveAspectRatio="none" aria-hidden="true">
               ${paths.map((path) => `<path d="${path}" />`).join("")}
             </svg>
             ${nodes.map((node, index) => `
-              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}${node.fixed ? " is-fixed" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-talent-id="${node.id}" data-tier="${node.fixed ? "fixed" : node.tier}" data-fixed="${node.fixed ? "true" : "false"}" aria-label="${escapeHtml(`${node.name}：${node.effect}，${nodeLabel(node)}${isRoleTalentImplemented(roleId) ? "" : "，仅预览"}`)}" aria-pressed="${index === activeIndex}" style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-initial-level="${node.initialLevel ?? 0}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}" data-current-level="${allocation?.[node.id] ?? node.initialLevel ?? 0}">
+              <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}${node.fixed ? " is-fixed" : ""}${node.challenge && node.tier + 1 > (curseOptions?.unlockedDifficulty ?? 4) ? " is-locked" : ""}" type="button" data-ui-talent-tree-node="0-${index}" ${node.challenge ? `data-curse-difficulty="${node.tier + 1}"` : `data-talent-id="${node.id}"`} data-tier="${node.fixed ? "fixed" : node.tier}" data-fixed="${node.fixed ? "true" : "false"}" aria-label="${escapeHtml(`${node.name}：${node.effect}，${nodeLabel(node)}${node.challenge || isRoleTalentImplemented(roleId) ? "" : "，仅预览"}`)}" aria-pressed="${index === activeIndex}"${node.challenge && node.tier + 1 > (curseOptions?.unlockedDifficulty ?? 4) ? ' disabled aria-disabled="true" title="完成前一难度博士毕业后解锁"' : ""} style="grid-column:${node.column};grid-row:${node.row}" data-cost="${node.cost}" data-initial-level="${node.initialLevel ?? 0}" data-prerequisite-ids="${node.prerequisiteIds.join(" ")}" data-current-level="${allocation?.[node.id] ?? node.initialLevel ?? 0}">
                 <span class="lobby-talent-tree-node-ring"><i data-lucide="${node.icon}" aria-hidden="true"></i></span>
-                ${node.fixed ? "" : `<span class="lobby-normal-tree-node-level">${node.challenge ? ["简单", "中等", "困难", "地狱"][node.tier] : `${allocation?.[node.id] ?? node.initialLevel ?? 0}/${node.maxLevel}`}</span>`}
+                ${node.fixed || node.challenge ? "" : `<span class="lobby-normal-tree-node-level">${allocation?.[node.id] ?? node.initialLevel ?? 0}/${node.maxLevel}</span>`}
               </button>
             `).join("")}
             <div class="lobby-normal-tree-details" aria-live="polite">
               ${nodes.map((node, index) => `
                 <div class="lobby-normal-tree-detail" data-detail-index="${index}"${index === activeIndex ? "" : " hidden"}>
-                  <div class="lobby-normal-tree-detail-heading"><strong>${escapeHtml(node.name)}</strong></div>
-                  <p>${escapeHtml(node.effect)}<span class="lobby-normal-tree-detail-cost">${nodeLabel(node)}</span></p>
+                  <div class="lobby-normal-tree-detail-heading"><strong>${escapeHtml(node.name)}${node.challenge ? `（${challengeDifficultyNames[node.tier]}）` : ""}</strong></div>
+                  <p>${escapeHtml(node.effect)}${node.challenge ? node.tier < challengeDifficultyNames.length - 1 ? "；博士毕业解锁下一难度" : "" : `<span class="lobby-normal-tree-detail-cost">${nodeLabel(node)}</span>`}</p>
                 </div>
               `).join("")}
             </div>
@@ -607,8 +614,8 @@ function renderSelectedRoleDetail(
             </div>
             ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading)}
           </section>
-          ${hasDesignedTalentTree(selectedRoleId)
-            ? renderDesignedGrowthBoard(selectedRoleId, talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined, false, bonusPoints)
+          ${selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
+            ? renderDesignedGrowthBoard(selectedRoleId, isCursedRole(selectedRoleId) ? getSelectedCurseDifficulty(accountProfile, selectedRoleId) - 1 : talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined, false, bonusPoints, isCursedRole(selectedRoleId) ? { unlockedDifficulty: getUnlockedCurseDifficulty(accountProfile, selectedRoleId) } : undefined)
             : ""}
         </div>
         ${renderRoleRail(accountProfile, selectedRoleId, activeRoleRailView, announcementPageIndex)}

@@ -116,6 +116,8 @@ export function createDebugEnding(state: GameState, ending: NonNullable<EndingId
     ...base,
     phase: "playing",
     selectedRoleId: state.selectedRoleId,
+    curseState: state.curseState ? { ...state.curseState } : undefined,
+    captainState: state.captainState ? structuredClone(state.captainState) : undefined,
     setupSelectedRoleId: state.selectedRoleId,
     playerName: state.playerName ?? "调试同学",
     selectedAdvisorName: advisorName,

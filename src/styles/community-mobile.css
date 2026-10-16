@@ -10,8 +10,8 @@
   .community-feedback-dialog {
     width: min(540px, 100%);
     max-height: calc(100dvh - 20px);
-    padding: 12px;
-    gap: 8px;
+    padding: 8px;
+    gap: 5px;
     overscroll-behavior: contain;
     scroll-padding-block: 12px;
   }
@@ -69,14 +69,14 @@
 
   .community-content-wrap textarea,
   .lobby-message-rail-view .community-content-wrap textarea {
-    height: 108px;
-    min-height: 108px;
-    padding: 8px 10px 28px;
+    height: 88px;
+    min-height: 88px;
+    padding: 5px 8px 24px;
     resize: none;
   }
 
   .community-feedback-dialog .community-content-wrap textarea {
-    min-height: 108px;
+    min-height: 88px;
   }
 
   .community-message-list {
@@ -85,7 +85,7 @@
   }
 
   .lobby-message-rail-view .community-message-feed {
-    height: clamp(260px, 42dvh, 420px);
+    height: clamp(220px, 36dvh, 360px);
     min-height: 0;
   }
 
@@ -95,7 +95,7 @@
   }
 
   .community-message-item {
-    padding: 9px;
+    padding: 6px;
   }
 
   .community-message-item-head {
@@ -112,7 +112,7 @@
   .community-message-item p,
   .community-reply-item p {
     font-size: 0.82rem;
-    line-height: 1.6;
+    line-height: 1.45;
   }
 
   .community-message-actions {

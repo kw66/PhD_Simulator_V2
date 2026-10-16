@@ -181,10 +181,10 @@ export const SOCIAL_REVERSED_TALENT_NODES = [
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const FRAIL_TALENT_NODES = [
-  { id: "illness-surface", name: "病在腠理", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "疾病倍率：+9%、+6%、+3%、+0%", prerequisiteIds: [], challenge: true },
-  { id: "illness-skin", name: "病入肌肤", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "疾病倍率：+18%、+12%、+6%、+0%", prerequisiteIds: [], challenge: true },
-  { id: "illness-organs", name: "病入脏腑", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "疾病倍率：+27%、+18%、+9%、+0%", prerequisiteIds: [], challenge: true },
-  { id: "illness-terminal", name: "病入膏肓", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "疾病倍率：+36%、+24%、+12%、+0%", prerequisiteIds: [], challenge: true },
+  { id: "illness-surface", name: "病在腠理", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+9%、+6%、+3%、+0%", prerequisiteIds: [], challenge: true },
+  { id: "illness-skin", name: "病入肌肤", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+18%、+12%、+6%、+0%", prerequisiteIds: [], challenge: true },
+  { id: "illness-organs", name: "病入脏腑", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+27%、+18%、+9%、+0%", prerequisiteIds: [], challenge: true },
+  { id: "illness-terminal", name: "病入膏肓", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+36%、+24%、+12%、+0%", prerequisiteIds: [], challenge: true },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const FADING_GENIUS_TALENT_NODES = [
@@ -237,12 +237,14 @@ export function isRoleTalentImplemented(roleId: RoleId): boolean {
 }
 
 export function getTalentPointBalance(roleId: RoleId, level: number, allocation: Record<string, number>, bonusPoints = 0): number {
+  if (roleId === "research-captain") return 0;
   const spent = getDesignedTalentNodes(roleId)?.reduce((sum, node) => sum + (allocation[node.id] ?? 0) * node.cost, 0) ?? 0;
   const validLevel = Number.isFinite(level) ? Math.min(MAX_ROLE_LEVEL, Math.max(0, Math.floor(level))) : 0;
   return Math.max(0, validLevel * ROLE_TALENT_POINTS_PER_LEVEL + Math.max(0, Math.floor(bonusPoints)) - spent);
 }
 
 export function getTalentUpgradeReason(roleId: RoleId, level: number, allocation: Record<string, number>, talentId: string, bonusPoints = 0): string | null {
+  if (roleId === "research-captain") return "标签等级跟随对应角色等级，无需加点";
   if (!isRoleTalentImplemented(roleId)) return "该角色天赋暂未开放";
   const nodes = getDesignedTalentNodes(roleId);
   const node = nodes?.find((entry) => entry.id === talentId);

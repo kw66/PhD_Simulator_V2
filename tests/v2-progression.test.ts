@@ -26,13 +26,17 @@ describe("v2 progression", () => {
     expect(getRoleDefinition("cursed-debt").name).toBe("寒门负重");
   });
 
-  it.each(getRoleOptions())("所有角色统一白板开局：$id", (role) => {
+  it.each(getRoleOptions())("共享基础属性，并应用特殊角色的开局规则：$id", (role) => {
     const startingStats = { san: 20, research: 1, social: 1, favor: 1, money: 1 };
     const state = createStartedGameState(role.id);
     expect(role.startingStats).toEqual(startingStats);
-    expect(state.player).toEqual(startingStats);
-    expect(state.paperSlotsUnlocked).toBe(1);
-    expect(state.actionState.limit).toBe(1);
+    expect(state.player).toEqual({ ...startingStats,
+      ...(role.id === "special-finite-life" ? { san: 400 } : {}),
+      ...(role.id === "special-fading-genius" ? { research: 20 } : {}),
+    });
+    expect(state.sanCap).toBe(role.id === "special-finite-life" ? 400 : 20);
+    expect(state.paperSlotsUnlocked).toBe(role.id === "special-fading-genius" ? 4 : 1);
+    expect(state.actionState.limit).toBe(role.id === "research-captain" ? 0 : 1);
     if (role.id === "normal-reversed") {
       expect(state.buffs).toEqual([expect.objectContaining({ id: "role-sloth-san", activeOperationSanMultiplier: 2 })]);
     } else expect(state.buffs).toEqual([]);

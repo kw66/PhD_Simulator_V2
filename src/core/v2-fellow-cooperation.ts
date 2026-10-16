@@ -3,6 +3,7 @@ import { getEffectiveResearch } from "./v2-effective-attributes";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
 import { recordFellowMonthlySupport } from "./v2-fellow-monthly-support";
+import { getCaptainCooperationMax, getCaptainFellowHelpQueue, isCaptain } from "./v2-captain-state";
 import { addPaperCollaboration, getRoleCollaborationScore } from "./v2-paper-collaboration";
 import type { FellowProgressProfile, GameState, Paper, PaperActionType } from "./v2-types";
 
@@ -42,13 +43,32 @@ export function advanceFellowCooperation(profile: FellowProgressProfile, amount:
 }
 
 export function advanceFellowCooperationWithLog(state: GameState, fellowId: string, amount: number, operationStartState: GameState = state): GameState {
-  const profile = state.fellowProgressState.find((fellow) => fellow.id === fellowId);
-  if (!profile || amount <= 0) return state;
-  const progressed = advanceFellowCooperation(profile, amount, getEffectiveResearch(state, operationStartState));
-  const nextState = { ...state, fellowProgressState: state.fellowProgressState.map((fellow) => fellow.id === fellowId ? progressed : fellow) };
+  const original = state.fellowProgressState.find((fellow) => fellow.id === fellowId);
+  if (!original) return state;
+  // The stored taskMax is the displayed effective cap; always derive captain
+  // discounts from the base cap, never subtract them again on the next advance.
+  const taskMax = getCaptainCooperationMax(state, isCaptain(state) ? { ...original, taskMax: 100 } : original);
+  const profile = original.taskMax === taskMax ? original : { ...original, taskMax };
+  if (amount <= 0) return profile === original ? state : {
+    ...state, fellowProgressState: state.fellowProgressState.map((fellow) => fellow.id === fellowId ? profile : fellow),
+  };
+  const playerResearch = getEffectiveResearch(state, operationStartState);
+  let progressed = advanceFellowCooperation(profile, amount, playerResearch);
+  let nextState = { ...state, fellowProgressState: state.fellowProgressState.map((fellow) => fellow.id === fellowId ? progressed : fellow) };
   const completed = Math.floor((profile.taskProgress + amount) / profile.taskMax);
   if (completed <= 0) return nextState;
   const name = getFellowName(profile);
+  if (isCaptain(state)) {
+    const pending = getCaptainFellowHelpQueue(state, profile);
+    const queue = { player: [...pending.player, ...Array<number>(completed).fill(Math.max(0, profile.research))],
+      fellow: [...pending.fellow, ...Array<number>(completed).fill(Math.max(0, playerResearch))] };
+    progressed = { ...progressed, pendingHelpToPlayer: queue.player[0] ?? null, pendingHelpToFellow: queue.fellow[0] ?? null };
+    nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === fellowId ? progressed : fellow),
+      captainState: { ...state.captainState!, pendingFellowHelp: { ...state.captainState!.pendingFellowHelp, [fellowId]: queue } } };
+    return pushMilestoneLog(nextState,
+      `科研协作完成：${name}，协作进度满${profile.taskMax}${completed > 1 ? `（${completed}次）` : ""}；新增${completed}次双向论文帮助，分别保留待生效`,
+      "fellow-cooperation");
+  }
   const playerHelp = profile.pendingHelpToPlayer != null
     ? `已有${name}帮你的论文帮助待生效（${getRoleCollaborationScore(state, "fellow", profile.pendingHelpToPlayer)}分），不叠加`
     : `${name}帮你的论文帮助已就绪（${getRoleCollaborationScore(state, "fellow", progressed.pendingHelpToPlayer!)}分）`;
@@ -65,6 +85,10 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
   let nextState = state;
   for (const original of state.fellowProgressState) {
     let profile = original;
+    const pending = isCaptain(state) ? getCaptainFellowHelpQueue(state, profile) : undefined;
+    let queue = pending;
+    let consumedPlayer = false;
+    let consumedFellow = false;
     if (profile.pendingHelpToPlayer != null) {
       const amount = getRoleCollaborationScore(state, "fellow", profile.pendingHelpToPlayer);
       const target = selectHelpTarget(getHelpTargets(nextState.papers), profile.type, random);
@@ -75,6 +99,7 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
           scores: { [target.field]: amount },
         });
         if (paper !== target.paper) {
+          consumedPlayer = true;
           profile = { ...profile, pendingHelpToPlayer: null, helpedPlayerCount: (profile.helpedPlayerCount ?? 0) + 1 };
           profile = recordFellowMonthlySupport(profile, state.totalMonths,
             `帮助你完善《${paper.title}》：${SCORE_LABELS[target.field]} +${paper[target.field] - target.paper[target.field]}`);
@@ -82,7 +107,7 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
             `论文帮助：${getFellowName(profile)}帮你完善《${paper.title}》，${SCORE_LABELS[target.field]}+${paper[target.field] - target.paper[target.field]}`, "fellow-help");
         }
       }
-      if (amount < 1) profile = { ...profile, pendingHelpToPlayer: null };
+      if (amount < 1) { profile = { ...profile, pendingHelpToPlayer: null }; consumedPlayer = true; }
     }
     if (profile.pendingHelpToFellow != null) {
       const amount = profile.pendingHelpToFellow;
@@ -96,6 +121,7 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
           scores: { [target.field]: amount },
         });
         if (paper !== target.paper) {
+          consumedFellow = true;
           profile = { ...profile, pendingHelpToFellow: null, helpedFellowCount: (profile.helpedFellowCount ?? 0) + 1 };
           profile = recordFellowMonthlySupport(profile, state.totalMonths,
             `获得你的帮助《${paper.title}》：${SCORE_LABELS[target.field]} +${paper[target.field] - target.paper[target.field]}`);
@@ -103,7 +129,14 @@ function settleFellowHelpPass(state: GameState, random: () => number): GameState
             `论文帮助：你帮${getFellowName(profile)}完善《${paper.title}》，${SCORE_LABELS[target.field]}+${paper[target.field] - target.paper[target.field]}`, "fellow-help");
         }
       }
-      if (amount < 1) profile = { ...profile, pendingHelpToFellow: null };
+      if (amount < 1) { profile = { ...profile, pendingHelpToFellow: null }; consumedFellow = true; }
+    }
+    if (queue && (consumedPlayer || consumedFellow)) {
+      queue = { player: consumedPlayer ? queue.player.slice(1) : queue.player,
+        fellow: consumedFellow ? queue.fellow.slice(1) : queue.fellow };
+      profile = { ...profile, pendingHelpToPlayer: queue.player[0] ?? null, pendingHelpToFellow: queue.fellow[0] ?? null };
+      nextState = { ...nextState, captainState: { ...nextState.captainState!,
+        pendingFellowHelp: { ...nextState.captainState!.pendingFellowHelp, [profile.id]: queue } } };
     }
     if (profile !== original) {
       nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id ? profile : fellow) };

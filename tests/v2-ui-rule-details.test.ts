@@ -4,6 +4,7 @@ import { renderApp } from "../src/app/v2-render";
 import { getPlayHelpContext, renderPlayHelpPanel } from "../src/app/v2-play-help";
 import type { PlayRenderUiState } from "../src/app/v2-render-types";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
+import { ADVISOR_GRANTS } from "../src/core/v2-advisor-progress";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { attachPaperPublication } from "../src/core/v2-publication-rules";
@@ -332,6 +333,10 @@ describe("v2 research rule details and publication metrics", () => {
     expect(grantPage).toBeDefined();
     expect(grantPage!.body).not.toContain("<table");
     const help = getHelpPageText(uiState, "基金申请");
+    expect(help).toContain("申请门槛（科研积累）");
+    for (const grant of ADVISOR_GRANTS.filter(grant => grant.id !== "academician")) {
+      expect(help).toContain(`${grant.name}${grant.threshold}`);
+    }
     expect(help).toContain("有名额时优先申请稳获批的最高新项目，否则申请下一档");
     expect(help).toContain("不超过申请门槛80%时获批率为0，之后线性升至门槛时100%；申请不扣积累");
     expect(help).toContain("讲师限1项，晋升后2项，到期释放名额");
