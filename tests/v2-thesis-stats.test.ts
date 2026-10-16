@@ -1,3 +1,4 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { collectRunStatistics } from "../src/core/v2-run-statistics";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createThesisStats } from "../src/app/v2-thesis-stats";
@@ -46,7 +47,7 @@ describe("global thesis statistics", () => {
         for (const record of payload.p_records) rows.set(record.payload.p_id, record.payload);
         return Response.json(payload.p_records.map((record: { payload: { p_id: string } }) => record.payload.p_id));
       }
-      return Response.json({ submittedCount: 30, passedCount: 18, excellentCount: 3, notSubmittedCount: 4 });
+      return Response.json({ epoch: DATA_EPOCH, submittedCount: 30, passedCount: 18, excellentCount: 3, notSubmittedCount: 4 });
     });
     const local = storage();
     const stats = createThesisStats({ onChange: vi.fn(), fetch, storage: local });
@@ -97,7 +98,7 @@ describe("global thesis statistics", () => {
         payloads.push(...records.map((record) => record.payload));
         return Response.json(records.map((record) => record.payload.p_id));
       }
-      return Response.json({ submittedCount: 0, passedCount: 0, excellentCount: 0, notSubmittedCount: 1 });
+      return Response.json({ epoch: DATA_EPOCH, submittedCount: 0, passedCount: 0, excellentCount: 0, notSubmittedCount: 1 });
     });
     const stats = createThesisStats({ onChange: vi.fn(), fetch, storage: storage() });
     const [before, after] = reviewStates("phd", false);

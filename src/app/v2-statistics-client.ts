@@ -1,4 +1,6 @@
 import { getRoleOptions } from "../core/v2-progression";
+import { DATA_EPOCH, isCurrentDataEpoch } from "../core/v2-data-epoch";
+import { validStatisticsContext } from "./v2-statistics-context";
 
 export const STATISTICS_CACHE_MS = 10 * 60_000;
 export const ACTIVITY_RETENTION_DAYS = 30;
@@ -7,7 +9,8 @@ const UPLOAD_INTERVAL_MS = 30_000;
 const BATCH_DELAY_MS = 500;
 const MAX_BATCH_SIZE = 50;
 const SNAPSHOT_RPC = "get_phd_simulator_v2_stats_snapshot";
-const STORAGE_KEY = "phd_simulator_v2_statistics_v1";
+export const STATISTICS_STORAGE_KEY = "phd_simulator_v2_statistics_v2";
+const STORAGE_KEY = STATISTICS_STORAGE_KEY;
 const RPC_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/rpc";
 const PUBLIC_KEY = "sb_publishable_TRVbO2x2mmuoRw592EqtvQ_FHpqUMkJ";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -123,6 +126,7 @@ function validPayload(kind: StatisticsKind, value: unknown): value is Payload {
       || (p.p_event === "finish" && typeof p.p_ending === "string" && ENDINGS.has(p.p_ending));
   }
   const score = typeof p.p_score === "number" && Number.isFinite(p.p_score) && p.p_score >= 0 && p.p_score <= 1_000_000;
+  if ((kind === "conference" || kind === "journal") && !validStatisticsContext(p.p_context, p.p_score)) return false;
   if (kind === "conference") return p.p_rule_version === "v2-review-20261009"
     && typeof p.p_conference_name === "string" && /^[A-Za-z0-9][A-Za-z0-9 .&()/+-]{0,63}$/.test(p.p_conference_name)
     && Number.isInteger(p.p_conference_year) && Number(p.p_conference_year) >= 2000 && Number(p.p_conference_year) <= 2100
@@ -176,7 +180,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     if (!enabled || disposed) return;
     try {
     const saved = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "null");
-    if (saved?.version === 1) {
+    if (saved?.version === 1 && isCurrentDataEpoch(saved)) {
       if (Array.isArray(saved.runSnapshots)) for (const entry of saved.runSnapshots.slice(-40)) {
         if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string" || runSnapshots.has(entry[0])) continue;
         try {
@@ -220,7 +224,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     mergeStorage();
     while (cache.size > 128) cache.delete(cache.keys().next().value!);
     try {
-      storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, runSnapshots: [...runSnapshots], results: [...results], debugRuns: [...debugRuns], cache: [...cache], nextUploadAt, failures, uploadChangedAt }));
+      storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: new Date().toISOString(), runSnapshots: [...runSnapshots], results: [...results], debugRuns: [...debugRuns], cache: [...cache], nextUploadAt, failures, uploadChangedAt }));
       return true;
     } catch { return false; }
   };
@@ -243,7 +247,10 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
       }
       throw new Error(`Statistics unavailable: ${response.status}`);
     }
-    return response.json();
+    const data: unknown = await response.json();
+    if (name.startsWith("get_phd_simulator_v2_") && (!data || typeof data !== "object"
+      || (data as Record<string, unknown>).epoch !== DATA_EPOCH)) throw new Error("Statistics epoch mismatch");
+    return data;
   };
   // Discard the earlier activity snapshot that excluded proven historical starts.
   // Paper snapshots keep their existing cache identity and remain frozen per run.
@@ -298,7 +305,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
         while (batch.length > 0) {
           let response: unknown;
           try {
-            response = await rpc("record_phd_simulator_v2_stats_batch", { p_records: batch.map(([, row]) => ({ kind: row.kind, payload: row.payload })) });
+            response = await rpc("record_phd_simulator_v2_stats_batch", { p_epoch: DATA_EPOCH, p_records: batch.map(([, row]) => ({ kind: row.kind, payload: row.payload })) });
           } catch (error) {
             if (!(error instanceof ActivityDateRejection)) throw error;
             const rejected = new Set(error.ids);

@@ -1,11 +1,14 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 ﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createVisitStats } from "../src/app/v2-visit-stats";
 import { createStatisticsClient } from "../src/app/v2-statistics-client";
+import { replayStateDigest } from "../src/core/v2-run-replay";
+import { createRunSaveRepository } from "../src/core/v2-run-saves";
 import { createStore } from "../src/core/v2-store";
 import { getCalendarForTotalMonths, getMonthLimitByDegree } from "../src/core/v2-progression";
 import { withPassingThesisReview } from "./helpers/v2-thesis-fixtures";
 
-const DAY = "2026-09-14";
+const DAY = "2026-10-17";
 const TODAY = Date.parse(`${DAY}T12:00:00+08:00`);
 const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
 const controllers: ReturnType<typeof createVisitStats>[] = [];
@@ -47,7 +50,7 @@ function createBackend() {
       if (row.p_event === "start") role.games++;
       else { role.finished++; if (["master", "phd"].includes(row.p_ending!)) role.clears++; if (row.p_ending === "phd") role.phd++; }
     }
-    return Response.json({ version: 2, day: payload.p_day, views: visits.length, todayViews: visits.filter((row) => row.p_day === payload.p_day).length,
+    return Response.json({ version: 2, epoch: DATA_EPOCH, day: payload.p_day, views: visits.length, todayViews: visits.filter((row) => row.p_day === payload.p_day).length,
       visitors: new Set(visits.map((row) => row.p_visitor_id)).size,
       todayVisitors: new Set(visits.filter((row) => row.p_day === payload.p_day).map((row) => row.p_visitor_id)).size,
       games: starts.length, todayGames: starts.filter((row) => row.p_day === payload.p_day).length, roles });
@@ -75,7 +78,7 @@ function fakeRoot() {
   return { root, cells };
 }
 function summary(overrides: Record<string, unknown> = {}) {
-  return { version: 2, day: DAY, views: 20, todayViews: 3, visitors: 10, todayVisitors: 2, games: 8, todayGames: 1,
+  return { version: 2, epoch: DATA_EPOCH, day: DAY, views: 20, todayViews: 3, visitors: 10, todayVisitors: 2, games: 8, todayGames: 1,
     roles: { normal: { games: 8, finished: 4, clears: 3, phd: 2 } }, ...overrides };
 }
 
@@ -243,7 +246,9 @@ describe("kwgame activity statistics", () => {
     "records the real %s ending once through store updates", async (ending) => {
       const backend = createBackend();
       const stats = create({ recordVisit: true, storage: createStorage(), fetch: backend.fetch });
-      const store = createStore({ storage: null });
+      const saves = createRunSaveRepository({ storage: null });
+      const store = createStore({ storage: null, saves });
+      await store.ready();
       const transitions: Promise<void>[] = [];
       store.subscribe((state) => transitions.push(stats.trackGamePhase(state.phase, {
         roleId: state.selectedRoleId, ending: state.ending, runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
@@ -272,6 +277,10 @@ describe("kwgame activity statistics", () => {
         state.totalResearchScore = ending === "delay" ? 0 : state.graduationScoreTarget;
         state.thesis = withPassingThesisReview(state).thesis;
       }
+      const replay = structuredClone(saves.get("normal")!.replay!);
+      replay.checkpoints.at(-1)!.digest = replayStateDigest(state);
+      saves.commit(state, { runId: store.getCurrentRunId()!, replay });
+      store.loadRunSave("latest");
       store.dispatch(ending === "quit" ? "quit-game" : "next-month");
       expect(store.getState()).toMatchObject({ phase: "finished", ending });
       store.dispatch("set-date-display-mode", { dateDisplayMode: "calendar" });
@@ -408,7 +417,7 @@ describe("kwgame activity statistics", () => {
   it("uses Beijing days and leaves yesterday's cached daily counts as placeholders until explicit loading", async () => {
     const backend = createBackend();
     const storage = createStorage();
-    vi.setSystemTime(Date.parse("2026-09-14T15:59:59Z"));
+    vi.setSystemTime(Date.parse("2026-10-17T15:59:59Z"));
     const stats = create({ recordVisit: true, storage, fetch: backend.fetch });
     await stats.load();
     await vi.advanceTimersByTimeAsync(1000);
@@ -419,7 +428,7 @@ describe("kwgame activity statistics", () => {
     await stats.load();
     expect(stats.getDisplayValues()).toEqual({ visitors: "1（0）", views: "1（0）", games: "0（0）" });
     expect([...backend.rows.values()]).toHaveLength(1);
-    expect(JSON.parse(String(backend.fetch.mock.calls[2]![1]?.body))).toEqual({ p_day: "2026-09-15" });
+    expect(JSON.parse(String(backend.fetch.mock.calls[2]![1]?.body))).toEqual({ p_day: "2026-10-18" });
   });
 
   it("never uploads read-only preview traffic and respects a disabled shared client", async () => {

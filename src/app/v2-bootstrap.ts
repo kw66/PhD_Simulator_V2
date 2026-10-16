@@ -1292,7 +1292,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       if (debugWindow.isOpen()) journalStats.markDebug();
       if (debugWindow.isOpen()) thesisStats.markDebug();
     }
-    if (actionId.startsWith("debug-")) { conferenceStats.markDebug(); journalStats.markDebug(); thesisStats.markDebug(); }
+    if (actionId.startsWith("debug-") || actionId === "force-next-month") { conferenceStats.markDebug(); journalStats.markDebug(); thesisStats.markDebug(); }
     if (actionId === "debug-trigger-ending") {
       isEndingContentOpen = true;
       activePlayTab = "events";
@@ -1381,7 +1381,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
       void statistics.startRun(JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]));
     }
-    const debugUsed = store.isCurrentRunDebugged() || debugWindow.isOpen();
+    const debugUsed = store.isCurrentRunDisqualified() || debugWindow.isOpen();
     if (state.phase === "playing" && !debugUsed && (before.phase !== "playing"
       || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
       achievementStats.recordStartedPlayer();

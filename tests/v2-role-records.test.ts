@@ -1,15 +1,29 @@
+import { DATA_EPOCH, DATA_EPOCH_STARTED_AT } from "../src/core/v2-data-epoch";
 import { dispatchAction } from "../src/core/v2-engine";
 import { ACCOUNT_STORAGE_KEY, saveAccountProfile } from "../src/core/v2-account-storage";
 import { describe, expect, it } from "vitest";
 import { createDefaultAccountProfile, buildLobbySelectedRoleViewModel } from "../src/core/v2-lobby";
-import { loadRoleRecords, saveRoleRecords } from "../src/core/v2-role-records";
+import { ROLE_RECORDS_STORAGE_KEY, loadRoleRecords, saveRoleRecords } from "../src/core/v2-role-records";
 import { createStore } from "../src/core/v2-store";
+import { createMemoryRunSaveAdapter, createRunSaveRepository } from "../src/core/v2-run-saves";
+import { replayStateDigest } from "../src/core/v2-run-replay";
 import { getCalendarForTotalMonths, getMonthLimitByDegree } from "../src/core/v2-progression";
 import { withPassingThesisReview } from "./helpers/v2-thesis-fixtures";
 
 function createStorage() {
   const values = new Map<string, string>();
   return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
+}
+
+// These fixtures exercise account settlement rather than replay validation. Give
+// their synthetic terminal/publication state an explicit trusted checkpoint;
+// dedicated replay tests cover ordinary state edits being disqualified.
+function trustFixture(store: ReturnType<typeof createStore>, saves: ReturnType<typeof createRunSaveRepository>) {
+  const state = store.getState();
+  const replay = structuredClone(saves.get(state.selectedRoleId)!.replay!);
+  replay.checkpoints.at(-1)!.digest = replayStateDigest(state);
+  saves.commit(state, { runId: store.getCurrentRunId()!, replay });
+  expect(store.loadRunSave("latest")).toBe(true);
 }
 
 describe("role history and run statistics", () => {
@@ -28,9 +42,11 @@ describe("role history and run statistics", () => {
     expect(view.statistics[4].tooltip).toContain("已达成结局");
   });
 
-  it.each(["master", "phd", "quit", "burnout", "poor", "expelled", "isolated", "overthinking", "delay"] as const)("records the %s result once and persists its start separately", (ending) => {
+  it.each(["master", "phd", "quit", "burnout", "poor", "expelled", "isolated", "overthinking", "delay"] as const)("records the %s result once and persists its start separately", async (ending) => {
     const storage = createStorage();
-    const store = createStore({ storage });
+    const saves = createRunSaveRepository({ storage, adapter: createMemoryRunSaveAdapter() });
+    const store = createStore({ storage, saves });
+    await store.ready();
     store.dispatch("start-game", { roleId: "normal" });
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 0 });
     const state = store.getState();
@@ -51,6 +67,7 @@ describe("role history and run statistics", () => {
       state.totalResearchScore = ending === "delay" ? 0 : state.graduationScoreTarget;
       state.thesis = withPassingThesisReview(state).thesis;
     }
+    trustFixture(store, saves);
     store.dispatch(ending === "quit" ? "quit-game" : "next-month");
     expect(store.getState()).toMatchObject({ phase: "finished", ending });
     const completedRuns = Number(ending === "master" || ending === "phd");
@@ -67,9 +84,11 @@ describe("role history and run statistics", () => {
     expect(store.getLobbyState().roleProgress.rich).toMatchObject({ startedRuns: 0, playedRuns: 0 });
   });
 
-  it("deduplicates player publications, includes coauthored work and preserves best records across runs", () => {
+  it("deduplicates player publications, includes coauthored work and preserves best records across runs", async () => {
     const storage = createStorage();
-    const store = createStore({ storage });
+    const saves = createRunSaveRepository({ storage, adapter: createMemoryRunSaveAdapter() });
+    const store = createStore({ storage, saves });
+    await store.ready();
     store.dispatch("start-game", { roleId: "normal" });
     // Build publication fixtures outside the store: store debug actions invalidate this run.
     let fixture = dispatchAction(store.getState(), "debug-add-paper", { debugJournalTarget: "nature", debugPaperAuthorship: "first" });
@@ -87,6 +106,7 @@ describe("role history and run statistics", () => {
     state.externalPublications.push({ ...published[0], id: "fellow-only", leadAuthorId: "fellow", nonFirstAuthor: false });
     state.totalCitations = 15;
     const score = state.totalResearchScore;
+    trustFixture(store, saves);
     store.dispatch("quit-game");
     expect(store.getLobbyState().roleProgress.normal.historyBest.researchScore).toBe(0);
     store.dispatch("restart-game");
@@ -128,7 +148,7 @@ describe("role history and run statistics", () => {
   it("sanitizes stored records and tolerates blocked storage", () => {
     const account = createDefaultAccountProfile();
     const storage = createStorage();
-    storage.setItem("phd_simulator_v2_role_records_v1", JSON.stringify({ version: 1, roles: { normal: { playedRuns: 2, completedRuns: 1, historyBest: { hIndex: -3, natureCount: 1.5, totalCitations: "not a number", representativeScore: 50 } }, rich: { playedRuns: 1, completedRuns: 4 } } }));
+    storage.setItem(ROLE_RECORDS_STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT, roles: { normal: { playedRuns: 2, completedRuns: 1, historyBest: { hIndex: -3, natureCount: 1.5, totalCitations: "not a number", representativeScore: 50 } }, rich: { playedRuns: 1, completedRuns: 4 } } }));
     expect(loadRoleRecords(account, storage).roleProgress.normal).toMatchObject({ startedRuns: 2, playedRuns: 2, completedRuns: 1, historyBest: { hIndex: 0, natureCount: 0, totalCitations: 0, representativeScore: 50 } });
     expect(loadRoleRecords(account, storage).roleProgress.rich.completedRuns).toBe(0);
     const blocked = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
@@ -146,7 +166,7 @@ describe("role history and run statistics", () => {
 
   it("carries proven historical starts forward once and preserves newer unfinished starts", () => {
     const storage = createStorage();
-    storage.setItem("phd_simulator_v2_role_records_v1", JSON.stringify({ version: 1, roles: {
+    storage.setItem(ROLE_RECORDS_STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT, roles: {
       normal: { playedRuns: 9, completedRuns: 4, startedRuns: 0 },
       rich: { playedRuns: 3, completedRuns: 1, startedRuns: 5 },
     } }));

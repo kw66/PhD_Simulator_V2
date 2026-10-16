@@ -365,6 +365,7 @@ export interface RoleExperienceAward {
   level: number;
   exp: number;
   disqualifiedByDebug?: boolean;
+  disqualifiedByIntegrity?: boolean;
 }
 
 export interface RoleHistoryBest {
@@ -491,6 +492,7 @@ export interface Paper {
   experiment: number;
   writing: number;
   collaborationScores?: Partial<Record<PaperActionType, number>>;
+  researchDiagnostics?: import("./v2-paper-diagnostics").PaperResearchDiagnostics;
   collaborators?: PaperCollaborator[];
   submittedCollaborationScores?: Partial<Record<PaperActionType, number>> | null;
   status: PaperStatus;

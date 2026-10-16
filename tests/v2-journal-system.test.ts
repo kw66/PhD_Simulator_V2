@@ -177,7 +177,7 @@ describe("v2 journal system", () => {
     const waiting = resolveReadyJournalPapers({ ...revised, month: 2, totalMonths: 2 }).state;
     expect(waiting.papers[0]?.status).toBe("journal-reviewing");
     expect(waiting.totalResearchScore).toBe(state.totalResearchScore);
-    expect(getJournalSubmissionFailure(waiting.papers[0], "pami")).toContain("撤稿");
+    expect(getJournalSubmissionFailure(waiting.papers[0], "pami")).toBe("已投期刊，不能更换投稿目标");
     expect(submitJournalPaper(waiting, paper.id, "pami").externalPublications).toHaveLength(0);
     const html = renderApp(waiting, createDefaultAccountProfile());
     expect(html).toContain('aria-label="发表 Nature" data-action="submit-journal-paper"');
@@ -221,7 +221,7 @@ describe("v2 journal system", () => {
     expect(settled.externalPublications[0]?.publication?.citations).toBeGreaterThan(0);
   });
 
-  it("withdraws journal revision and restores the submission-time scores", () => {
+  it("rejects journal withdrawal, disposal and transfer to a conference without losing revisions", () => {
     const state = playingState();
     const paper = { ...createDraftPaper(1, 0), idea: 40, experiment: 40, writing: 40 };
     const submitted = submitJournalPaper({ ...state, papers: [paper], selectedPaperId: paper.id }, paper.id, "nmi");
@@ -232,26 +232,22 @@ describe("v2 journal system", () => {
         : entry),
     };
     const withdrawn = withdrawPaper(modified, paper.id);
-    expect(withdrawn.papers).toHaveLength(1);
-    expect(withdrawn.papers[0]).toMatchObject({
-      status: "draft",
-      journalTarget: null,
-      idea: 40,
-      experiment: 40,
-      writing: 40,
-      submittedIdea: null,
-      submittedExperiment: null,
-      submittedWriting: null,
-    });
-    expect(withdrawn.log[0]?.text).toContain("从子刊NMI撤回");
-    expect(withdrawn.log[0]?.text).toContain("恢复投稿时分数 120");
+    expect(withdrawn.papers).toEqual(modified.papers);
+    expect(withdrawn.player).toEqual(modified.player);
+    expect(withdrawn.actionState).toEqual(modified.actionState);
+    expect(withdrawn.log[0]?.text).toContain("已投期刊，不能撤稿");
+    const dispatched = dispatchAction(modified, "withdraw-paper", { paperId: paper.id });
+    expect(dispatched.papers).toEqual(modified.papers);
+    const conference = dispatchAction(dispatched, "submit-paper", { paperId: paper.id, paperTarget: "A" });
+    expect(conference.papers).toEqual(modified.papers);
+    expect(conference.papers[0]?.status).toBe("journal-reviewing");
 
     const discarded = discardDraftPaper(submitted, paper.id);
     expect(discarded.papers).toHaveLength(1);
-    expect(discarded.log[0]?.text).toContain("正在期刊修改中，请使用撤稿");
+    expect(discarded.log[0]?.text).toContain("已投期刊，不能丢弃或撤稿");
   });
 
-  it("shows journal revision progress in the header and uses a withdrawal action", () => {
+  it("shows journal revision progress without withdrawal or disposal actions", () => {
     const state = playingState();
     const paper = { ...createDraftPaper(1, 0), idea: 40, experiment: 40, writing: 40 };
     const submitted = submitJournalPaper({ ...state, papers: [paper], selectedPaperId: paper.id }, paper.id, "nmi");
@@ -262,7 +258,7 @@ describe("v2 journal system", () => {
     expect(html).toContain("子刊NMI 修改中");
     expect(html).toContain("已修改 3 月 · ");
     expect(html).toContain('class="paper-journal-score" aria-label="期刊修改分数 120/250">120/250</span>');
-    expect(html).toContain(`data-action="withdraw-paper" data-paper-id="${paper.id}"`);
+    expect(html).not.toContain(`data-action="withdraw-paper" data-paper-id="${paper.id}"`);
     expect(html).not.toContain(`data-action="discard-paper" data-paper-id="${paper.id}"`);
     const journalCard = html.match(/<article class="paper-card[^>]*is-journal-reviewing[\s\S]*?<\/article>/u)?.[0] ?? "";
     expect(journalCard).toContain('class="paper-score-strip"');

@@ -1,10 +1,12 @@
 import { getRoleOptions } from "./v2-progression";
+import { DATA_EPOCH, isCurrentDataEpoch } from "./v2-data-epoch";
+import { isRunReplay, truncateRunReplay, type RunReplay } from "./v2-run-replay";
 import type { GameState, RoleId } from "./v2-types";
 
-export const RUN_SAVE_VERSION = 1;
+export const RUN_SAVE_VERSION = 2;
 export const MAX_RUN_MONTH_SAVES = 70;
 export const RUN_SAVE_DATABASE_NAME = "phd_simulator_v2_runs";
-export const RUN_SAVE_JOURNAL_PREFIX = "phd_simulator_v2_run_journal_v1:";
+export const RUN_SAVE_JOURNAL_PREFIX = "phd_simulator_v2_run_journal_v2:";
 const ROLE_IDS = new Set(getRoleOptions().map(role => role.id));
 
 export interface RunSaveSnapshot {
@@ -12,15 +14,19 @@ export interface RunSaveSnapshot {
   savedAt: string;
   totalMonths: number;
   state: GameState;
+  replayIndex?: number;
 }
 
 export interface RunSaveRecord {
+  epoch: string;
+  savedAt: string;
   version: typeof RUN_SAVE_VERSION;
   roleId: RoleId;
   runId: string;
   debugUsed: boolean;
   latest: RunSaveSnapshot;
   months: RunSaveSnapshot[];
+  replay?: RunReplay;
 }
 
 export interface RunSaveSummary {
@@ -52,6 +58,9 @@ export interface RunSaveAdapter {
 type JournalStorage = Pick<Storage, "getItem" | "setItem">;
 interface SaveJournal {
   version: 1;
+  epoch: string;
+  savedAt: string;
+  replay?: RunReplay;
   revision: number;
   runId: string | null;
   debugUsed: boolean;
@@ -65,7 +74,7 @@ export interface RunSaveRepository {
   ready(): Promise<void>;
   get(roleId: RoleId): RunSaveRecord | undefined;
   list(roleId: RoleId): RunSaveSummary[];
-  commit(state: GameState, options?: { runId?: string; debugUsed?: boolean; monthStart?: boolean }): RunSaveRecord;
+  commit(state: GameState, options?: { runId?: string; debugUsed?: boolean; monthStart?: boolean; replay?: RunReplay }): RunSaveRecord;
   rewind(roleId: RoleId, snapshotId: string): RunSaveRecord | null;
   clear(roleId: RoleId): void;
   flush(): Promise<void>;
@@ -80,7 +89,8 @@ function freeze<T>(value: T): T {
   return value;
 }
 /** Month checkpoints are immutable; only the latest state needs a defensive copy. */
-const expose = (record: RunSaveRecord): RunSaveRecord => ({ ...record, latest: clone(record.latest), months: [...record.months] });
+const expose = (record: RunSaveRecord): RunSaveRecord => ({ ...record, latest: clone(record.latest), months: [...record.months],
+  ...(record.replay ? { replay: clone(record.replay) } : {}) });
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const nonnegativeInteger = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 
@@ -105,11 +115,13 @@ function validSnapshot(value: unknown, roleId: RoleId): value is RunSaveSnapshot
 }
 
 export function validateRunSaveRecord(value: unknown): value is RunSaveRecord {
-  if (!object(value) || value.version !== RUN_SAVE_VERSION || !ROLE_IDS.has(value.roleId as RoleId)
+  if (!object(value) || !isCurrentDataEpoch(value) || value.version !== RUN_SAVE_VERSION || !ROLE_IDS.has(value.roleId as RoleId)
     || typeof value.runId !== "string" || !value.runId || typeof value.debugUsed !== "boolean") return false;
   const roleId = value.roleId as RoleId;
   if (!validSnapshot(value.latest, roleId) || value.latest.id !== "latest"
     || !Array.isArray(value.months) || value.months.length > MAX_RUN_MONTH_SAVES) return false;
+  if (value.replay !== undefined && (!isRunReplay(value.replay)
+    || !Number.isSafeInteger(value.latest.replayIndex) || value.latest.replayIndex !== value.replay.commands.length)) return false;
   const months = new Set<number>();
   return value.months.every(snapshot => {
     if (!validSnapshot(snapshot, roleId) || snapshot.id !== `month:${snapshot.totalMonths}`
@@ -242,7 +254,7 @@ export function createRunSaveRepository(options: {
   }
 
   function applyJournal(roleId: RoleId, value: unknown): boolean {
-    if (!object(value) || value.version !== 1 || !nonnegativeInteger(value.revision)
+    if (!object(value) || !isCurrentDataEpoch(value) || value.version !== 1 || !nonnegativeInteger(value.revision)
       || typeof value.debugUsed !== "boolean" || !Array.isArray(value.pendingMonths)
       || !(value.truncateAfter === null || nonnegativeInteger(value.truncateAfter))) return false;
     if (value.runId === null && value.latest === null && value.pendingMonths.length === 0) {
@@ -259,6 +271,7 @@ export function createRunSaveRepository(options: {
       .map(month => [month.totalMonths, month]));
     for (const month of journal.pendingMonths) months.set(month.totalMonths, month);
     const record: RunSaveRecord = {
+      epoch: DATA_EPOCH, savedAt: journal.savedAt, replay: journal.replay,
       version: RUN_SAVE_VERSION, roleId, runId: journal.runId!,
       debugUsed: journal.debugUsed || (base?.runId === journal.runId && base.debugUsed) || false,
       latest: journal.latest!, months: [...months.values()].sort((a, b) => a.totalMonths - b.totalMonths).slice(-MAX_RUN_MONTH_SAVES),
@@ -282,7 +295,7 @@ export function createRunSaveRepository(options: {
                 records.set(record.roleId, copy);
               }
             }
-            else report("corrupt", "有一份存档格式损坏或版本不支持，已跳过，其他角色存档不受影响");
+            else if (isCurrentDataEpoch(record)) report("corrupt", "有一份存档格式损坏或版本不支持，已跳过，其他角色存档不受影响");
           }
         } catch (cause) { report("unavailable", "暂时无法读取存档数据库，正在尝试恢复最新进度", cause); }
         for (const roleId of ROLE_IDS) {
@@ -315,7 +328,9 @@ export function createRunSaveRepository(options: {
       const sameRun = previous?.runId === id;
       const oldJournal = journals.get(roleId);
       const compatibleJournal = oldJournal?.runId === id ? oldJournal : undefined;
-      const latest: RunSaveSnapshot = { id: "latest", savedAt: now(), totalMonths: state.totalMonths, state: clone(state) };
+      const replay = commitOptions.replay ?? (sameRun ? previous?.replay : undefined);
+      const latest: RunSaveSnapshot = { id: "latest", savedAt: now(), totalMonths: state.totalMonths, state: clone(state),
+        ...(replay ? { replayIndex: replay.commands.length } : {}) };
       const months = sameRun ? [...previous.months] : [];
       const pendingMonths = compatibleJournal ? [...compatibleJournal.pendingMonths] : [];
       if (commitOptions.monthStart && !months.some(month => month.totalMonths === state.totalMonths)) {
@@ -325,13 +340,15 @@ export function createRunSaveRepository(options: {
       }
       months.sort((a, b) => a.totalMonths - b.totalMonths);
       const record: RunSaveRecord = {
+        epoch: DATA_EPOCH, savedAt: new Date().toISOString(), ...(replay ? { replay: clone(replay) } : {}),
         version: RUN_SAVE_VERSION, roleId, runId: id,
         debugUsed: !!commitOptions.debugUsed || (sameRun && previous.debugUsed) || false,
         latest, months: months.slice(-MAX_RUN_MONTH_SAVES),
       };
       if (!validateRunSaveRecord(record)) throw new Error("存档时间线无效，请通过读档操作回溯月份");
       records.set(roleId, record);
-      enqueue(roleId, record, { version: 1, revision: ++revision, runId: id, debugUsed: record.debugUsed,
+      enqueue(roleId, record, { version: 1, epoch: DATA_EPOCH, savedAt: record.savedAt, replay: record.replay,
+        revision: ++revision, runId: id, debugUsed: record.debugUsed,
         latest, pendingMonths: pendingMonths.slice(-MAX_RUN_MONTH_SAVES), truncateAfter: compatibleJournal?.truncateAfter ?? null });
       return expose(record);
     },
@@ -340,18 +357,20 @@ export function createRunSaveRepository(options: {
       if (!previous) return null;
       const snapshot = snapshotId === "latest" ? previous.latest : previous.months.find(month => month.id === snapshotId);
       if (!snapshot) return null;
-      const record: RunSaveRecord = { ...previous, latest: { ...clone(snapshot), id: "latest", savedAt: now() },
+      const replay = previous.replay && snapshot.replayIndex !== undefined ? truncateRunReplay(previous.replay, snapshot.replayIndex) : previous.replay;
+      const record: RunSaveRecord = { ...previous, replay, latest: { ...clone(snapshot), id: "latest", savedAt: now() },
         months: previous.months.filter(month => month.totalMonths <= snapshot.totalMonths) };
       const oldJournal = journals.get(roleId);
       records.set(roleId, record);
-      enqueue(roleId, record, { version: 1, revision: ++revision, runId: record.runId, debugUsed: record.debugUsed,
+      enqueue(roleId, record, { version: 1, epoch: DATA_EPOCH, savedAt: record.savedAt, replay,
+        revision: ++revision, runId: record.runId, debugUsed: record.debugUsed,
         latest: record.latest, pendingMonths: (oldJournal?.pendingMonths ?? []).filter(month => month.totalMonths <= snapshot.totalMonths),
         truncateAfter: Math.min(oldJournal?.truncateAfter ?? Infinity, snapshot.totalMonths) });
       return expose(record);
     },
     clear(roleId) {
       records.delete(roleId);
-      enqueue(roleId, null, { version: 1, revision: ++revision, runId: null, debugUsed: false, latest: null, pendingMonths: [], truncateAfter: null });
+      enqueue(roleId, null, { version: 1, epoch: DATA_EPOCH, savedAt: new Date().toISOString(), revision: ++revision, runId: null, debugUsed: false, latest: null, pendingMonths: [], truncateAfter: null });
     },
     async flush() {
       await writes;

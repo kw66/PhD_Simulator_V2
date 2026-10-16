@@ -732,7 +732,7 @@ function buildEffectBuckets(state: GameState): {
   if (!hasScholarshipDisqualification(state)
     && state.papers.some((paper) => paper.imageMisusePending === true && paper.status !== "published")) {
     upsertBucketItem(permanent, "pending-image-misuse", "举报风险（待生效）",
-      "涉事论文发表后，国奖入选会被举报取消；发表前丢弃或撤稿可避免生效。涉事论文引用减半。", true, "publication");
+      "涉事论文发表后，国奖入选会被举报取消；草稿丢弃或会议撤稿可避免生效，期刊不能撤稿。涉事论文引用减半。", true, "publication");
   }
   for (const [target, items] of [
     [permanent, permanentBuffItems],
@@ -1517,7 +1517,7 @@ function getWorkstationPaperByPanelIndex(state: GameState, panelIndex: number): 
 }
 
 function renderPaperReviewAction(paper: Paper): string {
-  if (paper.status === "reviewing" || paper.status === "journal-reviewing") {
+  if (paper.status === "reviewing") {
     return `<button class="paper-withdraw-btn" data-card-icon-action type="button" title="撤稿" aria-label="撤稿" data-action="withdraw-paper" data-paper-id="${escapeHtml(paper.id)}"><span aria-hidden="true">📥</span></button>`;
   }
   return "";

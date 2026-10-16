@@ -1,8 +1,9 @@
+import { DATA_EPOCH, isCurrentDataEpoch } from "./v2-data-epoch";
 import { calculateHIndex } from "./v2-citation-stats";
 import type { AccountProfile, GameState, RoleHistoryBest, RoleId } from "./v2-types";
 
 type RecordStorage = Pick<Storage, "getItem" | "setItem">;
-const STORAGE_KEY = "phd_simulator_v2_role_records_v1";
+export const ROLE_RECORDS_STORAGE_KEY = "phd_simulator_v2_role_records_v2";
 
 function nonnegativeNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
@@ -14,8 +15,8 @@ function count(value: unknown): number {
 
 export function loadRoleRecords(account: AccountProfile, storage: RecordStorage | null): AccountProfile {
   try {
-    const saved: unknown = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "null");
-    if (!saved || typeof saved !== "object" || !("version" in saved) || saved.version !== 1
+    const saved: unknown = JSON.parse(storage?.getItem(ROLE_RECORDS_STORAGE_KEY) ?? "null");
+    if (!saved || typeof saved !== "object" || !("version" in saved) || saved.version !== 1 || !isCurrentDataEpoch(saved)
       || !("roles" in saved) || !saved.roles || typeof saved.roles !== "object") return account;
     const roles = saved.roles as Record<string, unknown>;
     const roleProgress = { ...account.roleProgress };
@@ -47,8 +48,10 @@ export function loadRoleRecords(account: AccountProfile, storage: RecordStorage 
 
 export function saveRoleRecords(account: AccountProfile, storage: RecordStorage | null): void {
   try {
-    storage?.setItem(STORAGE_KEY, JSON.stringify({
+    storage?.setItem(ROLE_RECORDS_STORAGE_KEY, JSON.stringify({
       version: 1,
+      epoch: DATA_EPOCH,
+      savedAt: new Date().toISOString(),
       roles: Object.fromEntries(Object.entries(account.roleProgress).map(([roleId, progress]) => [
         roleId, { playedRuns: progress.playedRuns, startedRuns: progress.startedRuns, completedRuns: progress.completedRuns, historyBest: progress.historyBest },
       ])),

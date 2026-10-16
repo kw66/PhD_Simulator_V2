@@ -66,7 +66,7 @@ export function getJournalSubmissionFailure(
 ): string | null {
   if (!paper) return "请先新建一篇论文";
   if (paper.status === "journal-reviewing") {
-    if (paper.journalTarget !== journalTarget) return "更换期刊前需先撤稿";
+    if (paper.journalTarget !== journalTarget) return "已投期刊，不能更换投稿目标";
     const journal = getJournalDefinition(journalTarget);
     return getJournalScore(paper) >= journal.acceptanceScore ? null : `继续修改至 ${journal.acceptanceScore} 分后点击发表`;
   }

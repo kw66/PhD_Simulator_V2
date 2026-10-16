@@ -1,3 +1,4 @@
+import { saveAccountProfile } from "../src/core/v2-account-storage";
 import { describe, expect, it } from "vitest";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { getTalentPointBalance, getTalentUpgradeReason, sanitizeRoleTalentAllocation } from "../src/core/v2-role-talent-definitions";
@@ -69,9 +70,19 @@ describe("role talent allocation", () => {
     expect(() => saveRoleTalentAllocation(account, { getItem: () => null, setItem: () => { throw new Error("blocked"); } })).not.toThrow();
   });
 
+  it("rejects prior-epoch talent allocations even when stored under the current key", () => {
+    const storage = memoryStorage();
+    const account = createDefaultAccountProfile();
+    account.roleProgress.normal.level = 10;
+    storage.setItem(ROLE_TALENT_STORAGE_KEY, JSON.stringify({ version: 1, roles: { normal: { "first-month-drive": 6 } } }));
+    expect(loadRoleTalentAllocation(account, storage).talentAllocation).toEqual({});
+  });
+
   it("loads allocation after experience, persists setup edits and locks edits during a run", () => {
     const storage = memoryStorage();
-    storage.setItem("phd_simulator_v2_role_experience_v2", JSON.stringify({ version: 1, roles: { normal: { level: 3, exp: 0 } } }));
+    const account = createDefaultAccountProfile();
+    account.roleProgress.normal.level = 3;
+    saveAccountProfile(account, storage);
     const store = createStore({ storage });
     expect(store.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
     expect(store.upgradeRoleTalent("normal", "diligence")).toBe(true);

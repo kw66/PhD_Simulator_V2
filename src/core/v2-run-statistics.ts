@@ -1,6 +1,7 @@
 import { getConferenceInfo } from "./v2-conference-catalog";
 import { getJournalScore } from "./v2-journal-system";
 import type { GameState, Paper } from "./v2-types";
+import { capturePaperDiagnostics, captureResearchContext } from "./v2-paper-diagnostics";
 
 /** Branch-local evidence. Never enqueue it for upload until explicit settlement. */
 export interface PendingRunStatistic {
@@ -26,6 +27,14 @@ function journalRecord(paper: Paper): Record<string, unknown> | null {
 export function collectRunStatistics(before: GameState, after: GameState): GameState {
   if (before === after || before.phase !== "playing" || after.phase === "setup"
     || getStatisticsRunKey(before) !== getStatisticsRunKey(after)) return after;
+  let capturedSubmission = false;
+  const papers = after.papers.map((paper) => {
+    const prior = before.papers.find((entry) => entry.id === paper.id);
+    if (!prior || prior.status !== "draft" || !["reviewing", "journal-reviewing"].includes(paper.status)) return paper;
+    capturedSubmission = true;
+    return { ...paper, researchDiagnostics: { ...paper.researchDiagnostics, submission: captureResearchContext(before) } };
+  });
+  if (capturedSubmission) after = { ...after, papers };
   const records = [...(after.pendingRunStatistics ?? [])];
   const append = (kind: PendingRunStatistic["kind"], fingerprint: string, payload: Record<string, unknown>): void => {
     if (!records.some((row) => row.kind === kind && row.fingerprint === fingerprint)) records.push({ kind, fingerprint, payload });
@@ -46,13 +55,14 @@ export function collectRunStatistics(before: GameState, after: GameState): GameS
     const conference = getConferenceInfo(paper.submittedMonth, paper.target, paper.submittedYear);
     append("conference", JSON.stringify([paper.id, paper.createdTotalMonths, paper.submittedMonth, paper.submittedYear, paper.rejectionCount ?? 0]),
       { p_rule_version: "v2-review-20261009", p_conference_name: conference.name, p_conference_year: conference.year,
-        p_target: paper.target, p_accepted: settlement.accepted, p_accept_type: settlement.acceptType, p_score: settlement.submittedScore });
+        p_target: paper.target, p_accepted: settlement.accepted, p_accept_type: settlement.acceptType, p_score: settlement.submittedScore,
+        p_context: capturePaperDiagnostics(before, paper, true) });
   }
   const priorIds = new Set(before.externalPublications.map((paper) => paper.id));
   for (const paper of after.externalPublications) {
     if (priorIds.has(paper.id)) continue;
     const payload = journalRecord(paper);
-    if (payload) append("journal", JSON.stringify([paper.id, paper.createdTotalMonths]), payload);
+    if (payload) append("journal", JSON.stringify([paper.id, paper.createdTotalMonths]), { ...payload, p_context: capturePaperDiagnostics(before, paper) });
   }
   if (!before.thesis.reviewResolved && after.thesis.reviewResolved) {
     const event = before.eventQueue.find((entry) => entry.source === "thesis" && entry.stage === "result"

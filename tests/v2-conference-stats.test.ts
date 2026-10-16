@@ -1,3 +1,4 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { collectRunStatistics } from "../src/core/v2-run-statistics";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,7 +36,7 @@ function backend() {
       return Response.json(payload.p_records.map((record: { payload: { p_id: string } }) => record.payload.p_id));
     }
     if (failRead) return new Response("unavailable", { status: 503 });
-    return Response.json(SUMMARY);
+    return Response.json({ ...SUMMARY, epoch: DATA_EPOCH });
   });
   return { rows, fetch, loseNextAcknowledgement: () => { loseAcknowledgement = true; }, failReads: () => { failRead = true; } };
 }
@@ -140,7 +141,7 @@ describe("global conference statistics", () => {
       p_accepted: accepted, p_score: accepted ? 300 : 3, p_accept_type: states.settlement.acceptType });
     expect(payload.p_id).toMatch(/^[0-9a-f-]{36}$/);
     expect(Object.keys(payload).sort()).toEqual(["p_rule_version", "p_conference_name", "p_conference_year",
-      "p_target", "p_accepted", "p_score", "p_accept_type", "p_id"].sort());
+      "p_target", "p_accepted", "p_score", "p_accept_type", "p_id", "p_context"].sort());
     expect(JSON.stringify(payload)).not.toContain("Private paper title");
     expect(stats.read(...KEY)).toEqual({ status: "loading", data: null });
     await stats.load(...KEY);
@@ -347,7 +348,7 @@ describe("global conference statistics", () => {
     const empty = { submissions: 0, accepted: 0,
       counts: { Poster: 0, Spotlight: 0, Oral: 0, "Best Paper Candidate": 0, "Best Paper": 0 },
       means: { Reject: null, Poster: null, Spotlight: null, Oral: null, "Best Paper Candidate": null, "Best Paper": null } };
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json(empty));
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({ ...empty, epoch: DATA_EPOCH }));
     const stats = createConferenceStats({ onChange: vi.fn(), fetch, storage: null });
     await stats.load(...KEY);
     expect(stats.read(...KEY)).toEqual({ status: "ready", data: empty });
@@ -355,7 +356,7 @@ describe("global conference statistics", () => {
 
   it("accepts a conference with no rejections only when its reject mean is null", async () => {
     const allAccepted = { ...SUMMARY, submissions: 1, means: { ...SUMMARY.means, Reject: null } };
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json(allAccepted));
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({ ...allAccepted, epoch: DATA_EPOCH }));
     const stats = createConferenceStats({ onChange: vi.fn(), fetch, storage: null });
     await stats.load(...KEY);
     expect(stats.read(...KEY)).toEqual({ status: "ready", data: allAccepted });

@@ -1,10 +1,11 @@
+import { DATA_EPOCH, DATA_EPOCH_STARTED_AT } from "../src/core/v2-data-epoch";
 import { describe, expect, it } from "vitest";
 import { achievementRecordsChanged, loadRoleAchievementRecords, recordNewAchievementDates, saveRoleAchievementRecords } from "../src/core/v2-achievement-records";
 import { COLLECTION_REQUIREMENTS } from "../src/core/v2-achievement-collections";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
-const FIRST = "2026-09-28T01:30:00.000Z";
-const SECOND = "2026-10-15T13:00:00.000Z";
+const FIRST = "2026-10-16T06:30:00.000Z";
+const SECOND = "2026-10-16T07:00:00.000Z";
 function memoryStorage(initial?: unknown) {
   let value = initial === undefined ? null : JSON.stringify(initial);
   return { getItem: (_key: string) => value, setItem: (_key: string, next: string) => { value = next; } };
@@ -78,7 +79,7 @@ describe("role achievement records", () => {
 
   it("filters unknown IDs, ineligible roles, invalid timestamps and malformed collections/bonuses", () => {
     const buff = COLLECTION_REQUIREMENTS.buffs[0]!.id;
-    const saved = { version: 2,
+    const saved = { version: 2, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT,
       roles: { normal: { unlocked: false, unlockedAchievementIds: ["normal:first-pot", "normal:first-pot", "unknown", 42] },
         rich: { unlocked: true, unlockedAchievementIds: ["normal:first-pot"] },
         imaginary: { unlocked: true, unlockedAchievementIds: ["global:deep-sleep"] } },
@@ -104,12 +105,30 @@ describe("role achievement records", () => {
   });
 
   it("does not accept dates without completion evidence or infer achievements from owning targets", () => {
-    const saved = { version: 2, roles: { "genius-reversed": { unlocked: true } },
+    const saved = { version: 2, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT, roles: { "genius-reversed": { unlocked: true } },
       unlockedAt: { "unlock:genius-reversed": FIRST, "global:deep-sleep": FIRST }, unlockedByRole: {} };
     const restored = loadRoleAchievementRecords(createDefaultAccountProfile(), memoryStorage(saved));
     expect(restored.roleProgress["genius-reversed"].unlocked).toBe(true);
     expect(restored.achievementUnlockedAt).toEqual({});
     expect(restored.achievementUnlockedByRole).toEqual({});
+  });
+
+  it("rejects an old achievement date even inside a current envelope", () => {
+    const saved = { version: 2, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT,
+      roles: { normal: { unlockedAchievementIds: ["normal:first-pot"] } },
+      unlockedAt: { "normal:first-pot": "2026-10-16T05:25:28.999Z" },
+      unlockedByRole: { "normal:first-pot": { normal: "2026-10-16T05:25:28.999Z" } } };
+    const restored = loadRoleAchievementRecords(createDefaultAccountProfile(), memoryStorage(saved));
+    expect(restored.roleProgress.normal.unlockedAchievementIds).toEqual([]);
+    expect(restored.achievementUnlockedAt).toEqual({});
+    expect(restored.achievementUnlockedByRole).toEqual({});
+  });
+
+  it("rejects old achievement containers including unlocks, rewards and collection progress", () => {
+    const account = createDefaultAccountProfile();
+    const saved = { version: 2, roles: { rich: { unlocked: true } }, rewardedIds: ["global:deep-sleep"],
+      talentPoints: { normal: 9 }, experienceMultipliers: { normal: 9 }, collectionProgress: { products: ["all"] } };
+    expect(loadRoleAchievementRecords(account, memoryStorage(saved))).toBe(account);
   });
 
   it.each([null, [], { version: 2, roles: [] }, { version: 99, roles: {} }, { version: 2 }])("ignores invalid container %j", saved => {

@@ -15,6 +15,7 @@ import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
 import type { GameState, PaperActionType } from "./v2-types";
 import { getEffectiveResearch } from "./v2-effective-attributes";
+import { captureResearchContext } from "./v2-paper-diagnostics";
 
 export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
   idea: 2,
@@ -208,7 +209,16 @@ export function applyResearchOperation(
     );
   }
 
-  const updatedPaper = setPaperOwnScore(paper, actionType, score);
+  const updatedPaper = {
+    ...setPaperOwnScore(paper, actionType, score),
+    ...(paper.nonFirstAuthor || (paper.leadAuthorId && paper.leadAuthorId !== "player") ? {} : { researchDiagnostics: {
+      ...paper.researchDiagnostics,
+      lastOperations: { ...paper.researchDiagnostics?.lastOperations, [actionType]: {
+        context: captureResearchContext(state), previousOwn: getPaperScoreBreakdown(paper, actionType).own,
+        nextOwn: score, multiplier: preview.scoreMultiplier, bonus: preview.scoreBonus, executions: executionCount,
+      } },
+    } }),
+  };
   const nextState = consumeNextActionBuffs(recordPersonalSpending({
     ...paySanCost(preparedState, preview.sanCost),
     papers: state.papers.map((entry, index) => index === eligibility.paperIndex ? updatedPaper : entry),

@@ -202,7 +202,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
   const nextLevelExp = award ? getNextRoleLevelExperience(award.level) : null;
   const published = getEndingPublications(state);
   const achievementIds = new Set(state.runAchievementIds ?? []);
-  const achievements = award?.disqualifiedByDebug ? []
+  const achievements = award?.disqualifiedByDebug || award?.disqualifiedByIntegrity ? []
     : getAllAchievementDefinitions().filter(definition => achievementIds.has(definition.id));
   return `<section class="ending-panel" data-ending="${ending ?? "unknown"}" data-tone="${copy.tone}" aria-labelledby="ending-title">
         <header class="ending-header">
@@ -218,7 +218,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
         ${renderEndingSummary(state, published)}
         ${renderEndingLife(state)}
         ${achievements.length ? `<section class="ending-achievements" aria-label="本局达成成就">${achievements.map(definition => `<span class="ending-achievement" data-ending-achievement-id="${escapeHtml(definition.id)}"><span aria-hidden="true">${escapeHtml(definition.icon)}</span><strong>${escapeHtml(definition.title)}</strong></span>`).join("")}</section>` : ""}
-        ${award?.disqualifiedByDebug ? `<div class="ending-experience" aria-label="角色经验结算">调试局，本局不结算成就、经验及后续统计</div>` : award ? `<div class="ending-experience" aria-label="角色经验结算">
+        ${award?.disqualifiedByIntegrity ? `<div class="ending-experience" aria-label="角色经验结算">操作检查未通过，本局不结算成就、经验及后续统计</div>` : award?.disqualifiedByDebug ? `<div class="ending-experience" aria-label="角色经验结算">调试局，本局不结算成就、经验及后续统计</div>` : award ? `<div class="ending-experience" aria-label="角色经验结算">
           <span>本局经验 <strong>+${award.gained}</strong></span>
           <span>等级 <strong>Lv${award.previousLevel}${award.level > award.previousLevel ? ` → Lv${award.level}` : ""}</strong></span>
           <span>经验 <strong>${award.exp}/${nextLevelExp ?? "∞"}</strong></span>

@@ -3,6 +3,7 @@ import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import { getAllAchievementDefinitions } from "../src/core/v2-role-lobby-meta";
 import type { createStore } from "../src/core/v2-store";
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 
 type TestWindow = Window & { achievementStore: ReturnType<typeof createStore> };
 
@@ -36,7 +37,7 @@ describe("global achievement statistics in the actual game", () => {
       if (url.origin === origin) { await route.continue(); return; }
       if (url.pathname.endsWith("/get_phd_simulator_v2_achievement_stats_v2")) {
         reads++;
-        await route.fulfill({ json: { version: 2, achievements: getAllAchievementDefinitions().map(definition => ({
+        await route.fulfill({ json: { version: 2, epoch: DATA_EPOCH, achievements: getAllAchievementDefinitions().map(definition => ({
           id: definition.id, achievedPlayers: 5, eligiblePlayers: 20,
         })) } }); return;
       }

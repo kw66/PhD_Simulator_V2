@@ -1,3 +1,4 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createStatisticsClient } from "../src/app/v2-statistics-client";
 
@@ -32,7 +33,8 @@ function storage() {
 function parse(value: unknown): typeof SUMMARY {
   if (!value || typeof value !== "object" || !("acceptedCount" in value)
     || typeof value.acceptedCount !== "number") throw new Error("Invalid aggregate");
-  return value as typeof SUMMARY;
+  const data = value as typeof SUMMARY;
+  return { acceptedCount: data.acceptedCount, meanScore: data.meanScore, meanMonths: data.meanMonths };
 }
 
 function parseConference(value: unknown): typeof CONFERENCE_SUMMARY {
@@ -46,7 +48,7 @@ function parseThesis(value: unknown): typeof THESIS_SUMMARY {
 }
 
 function runSnapshot(acceptedCount = 12) {
-  return { version: 1,
+  return { version: 1, epoch: DATA_EPOCH,
     conference: [{ name: "CVPR", year: 2026, target: "A", stats: CONFERENCE_SUMMARY }],
     journals: { pami: { ...SUMMARY, acceptedCount }, nmi: { acceptedCount: 0, meanScore: null, meanMonths: null },
       nature: { acceptedCount: 0, meanScore: null, meanMonths: null } },
@@ -64,7 +66,7 @@ function backend() {
       for (const row of body.p_records) rows.set(row.payload.p_id, row);
       return Response.json(body.p_records.map((row) => row.payload.p_id));
     }
-    return Response.json(SUMMARY);
+    return Response.json({ ...SUMMARY, epoch: DATA_EPOCH });
   });
   return { rows, batches, fetch };
 }
@@ -79,7 +81,7 @@ function queue(target: Client, kind: Kind = "journal", fingerprint: string = kin
   return target.enqueue(kind, run, fingerprint, PAYLOADS[kind]);
 }
 
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-13T00:00:00Z")); });
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-17T00:00:00Z")); });
 afterEach(() => {
   for (const target of clients.splice(0)) target.dispose();
   vi.clearAllTimers();
@@ -106,7 +108,7 @@ describe("shared statistics queue", () => {
     const restored = client({ storage: local, fetch });
     await restored.startRun('[123,"normal"]');
     expect(restored.read(READ_RPC, KEY, parse).data?.acceptedCount).toBe(12);
-    const snapshotData = JSON.parse(local.values.get("phd_simulator_v2_statistics_v1")!);
+    const snapshotData = JSON.parse(local.values.get("phd_simulator_v2_statistics_v2")!);
     expect(snapshotData.runSnapshots).toHaveLength(2);
     expect(snapshotData.runSnapshots.map((entry: [string, unknown]) => entry[0])).toContain('[45,"rich"]');
   });
@@ -120,7 +122,7 @@ describe("shared statistics queue", () => {
     const healthy = client({ storage: local });
     queue(healthy);
     expect(healthy.persistPending()).toBe(true);
-    expect(JSON.parse(local.values.get("phd_simulator_v2_statistics_v1")!).results).toHaveLength(1);
+    expect(JSON.parse(local.values.get("phd_simulator_v2_statistics_v2")!).results).toHaveLength(1);
     expect(client({ uploadEnabled: false, storage: null }).persistPending()).toBe(true);
   });
 
@@ -129,7 +131,7 @@ describe("shared statistics queue", () => {
     const local = storage();
     const stats = client({ fetch: network.fetch, storage: local });
     const run = '[123,"normal"]';
-    const base = { p_day: "2026-10-13", p_run_key: run, p_role_id: "normal" };
+    const base = { p_day: "2026-11-17", p_run_key: run, p_role_id: "normal" };
     expect(stats.enqueue("activity", `activity-start:${run}`, "start", { ...base, p_event: "start" })).toBe(true);
     expect(stats.enqueue("activity", run, "finish", { ...base, p_event: "finish", p_ending: "phd" })).toBe(true);
     expect(queue(stats, "journal", "paper", run)).toBe(true);
@@ -143,7 +145,7 @@ describe("shared statistics queue", () => {
   });
 
   it("reads lobby activity without disturbing the frozen paper snapshot", async () => {
-    const activity = { games: 3 };
+    const activity = { games: 3, epoch: DATA_EPOCH };
     const fetch = vi.fn<typeof globalThis.fetch>(async (url) => Response.json(String(url).endsWith(SNAPSHOT_RPC) ? runSnapshot() : activity));
     const stats = client({ fetch, storage: storage() });
     await stats.startRun("run-1");
@@ -160,11 +162,11 @@ describe("shared statistics queue", () => {
     const local = storage();
     const name = "get_phd_simulator_v2_activity_stats";
     const key = { p_day: "2026-10-13" };
-    local.values.set("phd_simulator_v2_statistics_v1", JSON.stringify({ version: 1, cache: [
+    local.values.set("phd_simulator_v2_statistics_v2", JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: new Date().toISOString(), cache: [
       [JSON.stringify([name, key]), { data: { games: 0 }, fetchedAt: Date.now(), retryAt: 0 }],
       [JSON.stringify([SNAPSHOT_RPC, {}]), { data: runSnapshot(), fetchedAt: Date.now(), retryAt: 0 }],
     ] }));
-    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ games: 118 }));
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ games: 118, epoch: DATA_EPOCH }));
     const stats = client({ fetch, storage: local, uploadEnabled: false });
     const parseActivity = (value: unknown) => value as { games: number };
     expect(stats.read(name, key, parseActivity).data).toBeNull();
@@ -300,7 +302,7 @@ describe("shared statistics queue", () => {
     await stats.flush();
     expect(batches).toHaveLength(2);
     expect(batches[1]).toEqual(batches[0]!.filter((row) => row.kind !== "activity"));
-    const saved = JSON.parse(local.values.get("phd_simulator_v2_statistics_v1")!);
+    const saved = JSON.parse(local.values.get("phd_simulator_v2_statistics_v2")!);
     expect(saved.results.filter(([, row]: [string, { rejected?: string }]) => row.rejected === "future-date")).toHaveLength(2);
     expect(saved.results.every(([, row]: [string, { payload?: unknown }]) => row.payload === undefined)).toBe(true);
     stats.dispose();
@@ -474,23 +476,23 @@ describe("shared statistics queue", () => {
   it("expires old activity uploads and receipts while preserving paper results and the 30-day boundary", async () => {
     const network = backend();
     const local = storage();
-    vi.setSystemTime(new Date("2026-09-12T00:00:00Z"));
+    vi.setSystemTime(new Date("2026-10-17T00:00:00Z"));
     const old = client({ fetch: network.fetch, storage: local });
-    const visit = { p_event: "visit", p_day: "2026-09-12", p_visitor_id: "f550d4f6-2d3d-454b-9a16-000000000001" };
+    const visit = { p_event: "visit", p_day: "2026-10-17", p_visitor_id: "f550d4f6-2d3d-454b-9a16-000000000001" };
     expect(old.enqueue("activity", "activity-visit", "acknowledged", visit)).toBe(true);
     await old.flush();
     expect(old.enqueue("activity", "activity-visit", "unsent", visit)).toBe(true);
     expect(queue(old)).toBe(true);
     old.dispose();
     network.batches.length = 0;
-    vi.setSystemTime(new Date("2026-10-13T00:00:00Z"));
+    vi.setSystemTime(new Date("2026-11-17T00:00:00Z"));
     const restored = client({ fetch: network.fetch, storage: local });
     expect(restored.enqueue("activity", "activity-visit", "expired", visit)).toBe(false);
-    expect(restored.enqueue("activity", "activity-visit", "boundary", { ...visit, p_day: "2026-09-13" })).toBe(true);
+    expect(restored.enqueue("activity", "activity-visit", "boundary", { ...visit, p_day: "2026-10-18" })).toBe(true);
     await restored.flush();
     expect(network.batches[0]!.map((row) => row.kind)).toEqual(["journal", "activity"]);
-    const saved = JSON.parse(local.values.get("phd_simulator_v2_statistics_v1")!);
-    expect(saved.results.some(([, row]: [string, { activityDay?: string }]) => row.activityDay === "2026-09-12")).toBe(false);
+    const saved = JSON.parse(local.values.get("phd_simulator_v2_statistics_v2")!);
+    expect(saved.results.some(([, row]: [string, { activityDay?: string }]) => row.activityDay === "2026-10-17")).toBe(false);
   });
 
   it("stops scheduled background uploads when disposed", async () => {

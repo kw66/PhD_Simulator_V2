@@ -8,7 +8,7 @@ import {
 import { createInitialState, dispatchAction } from "./v2-engine";
 import { pushNoOpLog } from "./v2-engine-helpers";
 import { settleRunAchievements } from "./v2-achievement-runtime";
-import { createAchievementRunProgress } from "./v2-achievement-runtime-types";
+import { applyHelpRead, createRunReplay, replayStateDigest, verifyRunReplay, REPLAY_RULESET, type RunReplay, type ReplayAnchor } from "./v2-run-replay";
 import { awardRoleExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
 import { recordRoleResult, recordRoleStart } from "./v2-role-records";
 import { getTalentUpgradeReason, isRoleTalentImplemented, sanitizeRoleTalentAllocation } from "./v2-role-talent-definitions";
@@ -66,6 +66,8 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
   let runUsedDebugPanel = false;
   let currentRunId: string | null = null;
   let countedStartRole: RoleId | null = null;
+  let replay: RunReplay | undefined;
+  let replayAnchor: ReplayAnchor | undefined;
   let saveStatus = "";
   let readyComplete = !options.saves && (options.storage !== undefined || typeof window === "undefined");
   let readyPromise: Promise<void> | undefined;
@@ -90,9 +92,9 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     }
     const roleId = nextState.selectedRoleId;
     const previous = accountProfile.roleProgress[roleId];
-    if (runUsedDebugPanel) {
+    if (runUsedDebugPanel || replay?.failed) {
       endingAward = { roleId, gained: 0, previousLevel: previous.level, level: previous.level,
-        exp: previous.exp, disqualifiedByDebug: true };
+        exp: previous.exp, ...(runUsedDebugPanel ? { disqualifiedByDebug: true } : { disqualifiedByIntegrity: true }) };
       return { account: accountProfile, state: { ...nextState, runAchievementIds: [] } };
     }
     const settled = settleRunAchievements(accountProfile, nextState);
@@ -106,14 +108,33 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
 
   function saveCurrent(monthStart = false): void {
     if (state.phase === "setup") return;
+    if (!runUsedDebugPanel && (monthStart || state.phase === "finished")) checkReplay();
     // The debug month control may jump backwards without using the normal load UI.
     const futureMonths = saves.list(state.selectedRoleId).filter(save => save.kind === "month" && save.totalMonths > state.totalMonths);
     if (futureMonths.length && runUsedDebugPanel) {
       const earlier = saves.list(state.selectedRoleId).find(save => save.kind === "month" && save.totalMonths <= state.totalMonths);
       if (earlier) saves.rewind(state.selectedRoleId, earlier.id);
     }
-    const record = saves.commit(state, { runId: currentRunId ?? undefined, debugUsed: runUsedDebugPanel, monthStart });
+    const record = saves.commit(state, { runId: currentRunId ?? undefined, debugUsed: runUsedDebugPanel, monthStart, replay });
     currentRunId = record.runId;
+  }
+
+  function checkReplay(): boolean {
+    if (runUsedDebugPanel) return false;
+    if (!replay || !replayAnchor) return false;
+    const checked = verifyRunReplay(replay, replayAnchor, state);
+    if (!checked) {
+      saveStatus = `第${state.totalMonths}个月的操作检查未通过，本局可继续或回溯，但不结算经验、成就和后续统计`;
+      return false;
+    }
+    replayAnchor = checked;
+    return true;
+  }
+
+  function beginReplay(initial: GameState, next: GameState, payload: DispatchPayload): void {
+    replay = createRunReplay(initial, next, payload);
+    replayAnchor = { state: structuredClone(replay.initial), index: 0 };
+    saveStatus = "";
   }
 
   function commit(nextState: GameState, nextAccountProfile = accountProfile, options: { newRun?: boolean; restored?: boolean } = {}): void {
@@ -127,6 +148,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       accountProfile = nextAccountProfile;
     }
     state = syncSetupSelection(nextState, accountProfile.selectedLobbyRoleId);
+    if (state.phase === "finished" && !runUsedDebugPanel && !options.restored) checkReplay();
     if (state.phase === "finished") state = endingPreview(state).state;
     else endingAward = undefined;
     if (!options.restored && state.phase !== "setup" && (state !== previous || options.newRun)) {
@@ -141,7 +163,27 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     currentRunId = record.runId;
     runUsedDebugPanel = record.debugUsed;
     countedStartRole = record.debugUsed ? null : roleId;
+    replay = record.replay ? structuredClone(record.replay) : undefined;
+    replayAnchor = undefined;
+    if (replay && !record.debugUsed) {
+      const point = replay.checkpoints.at(-1);
+      const snapshot = point && [record.latest, ...record.months].find(item => item.replayIndex === point.index
+        && replayStateDigest(item.state) === point.digest);
+      if (snapshot && point) replayAnchor = { state: structuredClone(snapshot.state), index: point.index };
+      else if (!point) replayAnchor = { state: structuredClone(replay.initial), index: 0 };
+      else replay.failed ??= { totalMonths: record.latest.totalMonths, reason: "月度检查点损坏" };
+      if (replayAnchor) verifyRunReplay(replay, replayAnchor, record.latest.state, false);
+    }
+    if (!replay) {
+      // Current-epoch files without an operation record cannot grant rewards.
+      replay = { version: 1, ruleset: REPLAY_RULESET, epoch: record.epoch, savedAt: record.savedAt,
+        initial: { ...createInitialState(), randomState: record.latest.state.randomState },
+        commands: [{ kind: "action", actionId: "start-game", payload: { roleId } }], checkpoints: [],
+        failed: { totalMonths: record.latest.totalMonths, reason: "缺少操作记录" } };
+    }
+    if (replay.failed) saves.commit(record.latest.state, { runId: record.runId, debugUsed: record.debugUsed, replay });
     accountProfile = selectLobbyRole(accountProfile, roleId);
+    if (replay.failed && !runUsedDebugPanel) saveStatus = "存档操作检查未通过，本局不结算经验、成就和后续统计";
     commit(record.latest.state, accountProfile, { restored: true });
     return true;
   }
@@ -177,17 +219,19 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     if (state.phase !== "finished" || !state.ending || !currentRunId) return false;
     const roleId = state.selectedRoleId;
     if (settledRuns[roleId] === currentRunId) return false;
+    if (!runUsedDebugPanel) checkReplay();
+    const disqualified = runUsedDebugPanel || !!replay?.failed;
     const preview = endingPreview(state);
     const record: FinalizedRunRecord = { runId: currentRunId, state: preview.state, debugUsed: runUsedDebugPanel };
-    const nextAccount = runUsedDebugPanel ? { ...accountProfile, lastRunExperience: endingAward } : preview.account;
+    const nextAccount = disqualified ? { ...accountProfile, lastRunExperience: endingAward } : preview.account;
     const nextIds = { ...settledRuns, [roleId]: currentRunId };
-    const nextOutbox = runUsedDebugPanel ? finalizedOutbox : [...finalizedOutbox, record];
+    const nextOutbox = disqualified ? finalizedOutbox : [...finalizedOutbox, record];
     if (!persistAccount(nextAccount, nextIds, nextOutbox)) { notify(); return false; }
     accountProfile = nextAccount;
     settledRuns = nextIds;
     finalizedOutbox = nextOutbox;
     saves.clear(roleId);
-    if (!runUsedDebugPanel) finalizedListeners.forEach(listener => listener(structuredClone(record)));
+    if (!disqualified) finalizedListeners.forEach(listener => listener(structuredClone(record)));
     return true;
   }
 
@@ -218,13 +262,10 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     },
     recordHelpPageRead(id: string, requiredIds: readonly string[]): void {
       if (state.phase !== "playing" || runUsedDebugPanel || !requiredIds.includes(id)) return;
-      const run = structuredClone(state.achievementProgress ?? createAchievementRunProgress());
-      const pages = new Set(run.sets["help-pages"] ?? []);
-      if (pages.has(id)) return;
-      pages.add(id);
-      run.sets["help-pages"] = [...pages];
-      if (requiredIds.length > 0 && requiredIds.every(key => pages.has(key)) && !run.satisfied.includes("global:help-collector")) run.satisfied.push("global:help-collector");
-      state = { ...state, achievementProgress: run };
+      const next = applyHelpRead(state, id, requiredIds);
+      if (next === state) return;
+      replay?.commands.push({ kind: "help", id, requiredIds: [...requiredIds] });
+      state = next;
       saveCurrent();
     },
     upgradeRoleTalent(roleId: RoleId, talentId: string): boolean {
@@ -251,6 +292,9 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     isCurrentRunDebugged(): boolean {
       return runUsedDebugPanel;
     },
+    isCurrentRunDisqualified(): boolean { return runUsedDebugPanel || !!replay?.failed; },
+    getReplayStatus() { return { failed: replay?.failed, actionCount: replay?.commands.length ?? 0,
+      verifiedThrough: replay?.checkpoints.at(-1)?.index ?? 0 }; },
     enableTalentTestMode(): void {
       if (!ENABLE_TALENT_TEST_MODE) return;
       accountProfile = applyTalentTestMode(accountProfile);
@@ -298,6 +342,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
         runUsedDebugPanel = false;
         countedStartRole = null;
         currentRunId = null;
+        replay = undefined; replayAnchor = undefined;
         commit(nextState);
         return;
       }
@@ -305,11 +350,14 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       if (actionId === "restart-game") {
         if (!finalize()) return;
         const roleId = state.selectedRoleId;
-        const nextState = dispatchAction({ ...createInitialState(), blockLinearEvents: state.blockLinearEvents }, "start-game", {
+        const initial = { ...createInitialState(), blockLinearEvents: state.blockLinearEvents };
+        const startPayload = {
           roleId,
           talentAllocation: sanitizeRoleTalentAllocation(roleId, accountProfile.roleProgress[roleId].level, accountProfile.talentAllocation?.[roleId], accountProfile.achievementTalentPoints?.[roleId] ?? 0),
           bonusTalentPoints: accountProfile.achievementTalentPoints?.[roleId] ?? 0,
-        });
+        };
+        const nextState = dispatchAction(initial, "start-game", startPayload);
+        beginReplay(initial, nextState, startPayload);
         currentRunId = null;
         runUsedDebugPanel = false;
         commit(nextState, accountProfile, { newRun: true });
@@ -326,20 +374,25 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
           return;
         }
 
-        const nextState = dispatchAction(state, actionId, {
+        const startPayload = {
           ...payload,
           roleId: nextRoleId,
           talentAllocation: sanitizeRoleTalentAllocation(nextRoleId, accountProfile.roleProgress[nextRoleId].level, accountProfile.talentAllocation?.[nextRoleId], accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0),
           bonusTalentPoints: accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0,
-        });
+        };
+        const nextState = dispatchAction(state, actionId, startPayload);
+        beginReplay(state, nextState, startPayload);
         currentRunId = null;
         runUsedDebugPanel = false;
         commit(nextState, accountProfile, { newRun: true });
         return;
       }
 
-      if (actionId.startsWith("debug-")) markCurrentRunAsDebugged();
+      if (actionId.startsWith("debug-") || actionId === "force-next-month") markCurrentRunAsDebugged();
       const nextState = collectRunStatistics(state, dispatchAction(state, actionId, payload));
+      if (state.phase === "playing" && nextState !== state && !runUsedDebugPanel) {
+        replay?.commands.push({ kind: "action", actionId, payload: structuredClone(payload) });
+      }
       commit(nextState);
     },
   };

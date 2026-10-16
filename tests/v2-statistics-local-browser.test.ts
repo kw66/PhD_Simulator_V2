@@ -1,3 +1,4 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
@@ -35,7 +36,7 @@ describe("statistics on the actual local development configuration", () => {
         }
         if (url.pathname.endsWith("/get_phd_simulator_v2_activity_stats")) {
           reads.push("activity");
-          await route.fulfill({ json: { version: 2, day: request.postDataJSON().p_day,
+          await route.fulfill({ json: { version: 2, epoch: DATA_EPOCH, day: request.postDataJSON().p_day,
             visitors: 120, todayVisitors: 3, views: 210, todayViews: 4, games: 100, todayGames: 5,
             roles: Object.fromEntries(getRoleOptions().map((role) => [role.id, { games: 55, finished: 55, clears: 8, phd: 7 }])) } });
           return;
@@ -44,7 +45,7 @@ describe("statistics on the actual local development configuration", () => {
           reads.push("snapshot");
           const journal = { acceptedCount: 4, meanScore: 150, meanMonths: 3 };
           const thesis = { submittedCount: 10, passedCount: 8, excellentCount: 2, notSubmittedCount: 1 };
-          await route.fulfill({ json: { version: 1, conference: [], journals: { pami: journal, nmi: journal, nature: journal },
+          await route.fulfill({ json: { version: 1, epoch: DATA_EPOCH, conference: [], journals: { pami: journal, nmi: journal, nature: journal },
             theses: { master: thesis, phd: thesis } } });
           return;
         }

@@ -1,3 +1,4 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { collectRunStatistics } from "../src/core/v2-run-statistics";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createJournalStats } from "../src/app/v2-journal-stats";
@@ -37,7 +38,7 @@ describe("global journal statistics", () => {
         for (const record of payload.p_records) rows.set(record.payload.p_id, record.payload);
         return Response.json(payload.p_records.map((record: { payload: { p_id: string } }) => record.payload.p_id));
       }
-      return Response.json({ acceptedCount: 12, meanScore: 146.5, meanMonths: 2.3 });
+      return Response.json({ epoch: DATA_EPOCH, acceptedCount: 12, meanScore: 146.5, meanMonths: 2.3 });
     });
     const local = storage();
     const stats = createJournalStats({ onChange: vi.fn(), fetch, storage: local });

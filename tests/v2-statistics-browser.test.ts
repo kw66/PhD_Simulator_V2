@@ -1,10 +1,15 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import type { createStore } from "../src/core/v2-store";
+import type { createRunSaveRepository } from "../src/core/v2-run-saves";
 import { getRoleOptions } from "../src/core/v2-progression";
 
-type StatisticsWindow = typeof window & { statisticsStore: ReturnType<typeof createStore> };
+type StatisticsWindow = typeof window & {
+  statisticsStore: ReturnType<typeof createStore>;
+  statisticsSaves: ReturnType<typeof createRunSaveRepository>;
+};
 
 describe("statistics requests through the game UI", () => {
   let server: ViteDevServer;
@@ -19,7 +24,8 @@ describe("statistics requests through the game UI", () => {
           return code.replace(/const RPC_URL = "[^"]+";/, 'const RPC_URL = "/__mock_statistics";');
         }
         if (path.endsWith("/src/app/v2-bootstrap.ts")) return code
-          .replace("const store = createStore();", "const store = createStore(); window.statisticsStore = store;")
+          .replace("const store = createStore();", "const statisticsSaves = createRunSaveRepository(); const store = createStore({ saves: statisticsSaves }); window.statisticsStore = store; window.statisticsSaves = statisticsSaves;")
+          .replace('import { createStore }', 'import { createRunSaveRepository } from "../core/v2-run-saves";\nimport { createStore }')
           .replace('const statisticsUploadEnabled = import.meta.env.PROD && window.location.protocol === "https:";', "const statisticsUploadEnabled = true;");
       },
     }] });
@@ -46,7 +52,7 @@ describe("statistics requests through the game UI", () => {
         requests.push("snapshot");
         const journal = { acceptedCount: 4, meanScore: 150, meanMonths: 3 };
         const thesis = { submittedCount: 10, passedCount: 8, excellentCount: 2, notSubmittedCount: 1 };
-        await route.fulfill({ json: { version: 1, conference: [], journals: { pami: journal, nmi: journal, nature: journal }, theses: { master: thesis, phd: thesis } } });
+        await route.fulfill({ json: { version: 1, epoch: DATA_EPOCH, conference: [], journals: { pami: journal, nmi: journal, nature: journal }, theses: { master: thesis, phd: thesis } } });
       } else if (url.pathname.endsWith("/__mock_statistics/record_phd_simulator_v2_stats_batch")) {
         requests.push("batch");
         const body = route.request().postDataJSON() as { p_records: Array<{ kind: string; payload: { p_id: string; p_event?: string } }> };
@@ -54,7 +60,7 @@ describe("statistics requests through the game UI", () => {
         await route.fulfill({ json: body.p_records.map((row) => row.payload.p_id) });
       } else if (url.pathname.endsWith("/__mock_statistics/get_phd_simulator_v2_activity_stats")) {
         requests.push("activity");
-        await route.fulfill({ json: { day: route.request().postDataJSON().p_day,
+        await route.fulfill({ json: { epoch: DATA_EPOCH, day: route.request().postDataJSON().p_day,
           version: 2, visitors: 120, todayVisitors: 3, views: 210, todayViews: 4, games: activityCount("start"), todayGames: activityCount("start"),
           roles: Object.fromEntries(getRoleOptions().map((role) => [role.id, { games: 55, finished: 55, clears: 8, phd: 7 }])) } });
       } else if (url.pathname.startsWith("/__mock_statistics/")) {
@@ -69,7 +75,7 @@ describe("statistics requests through the game UI", () => {
       expect(requests).not.toContain("snapshot");
       await page.locator('[data-action="start-game"]').click();
       await expect.poll(() => requests.filter((name) => name === "snapshot").length).toBe(1);
-      await page.waitForFunction(() => JSON.parse(localStorage.getItem("phd_simulator_v2_statistics_v1") ?? "{}").cache?.length > 0);
+      await page.waitForFunction(() => JSON.parse(localStorage.getItem("phd_simulator_v2_statistics_v2") ?? "{}").cache?.length > 0);
       await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 31_000; window.dispatchEvent(new Event("online")); });
       await expect.poll(() => activityCount("start")).toBe(1);
       await page.evaluate(async () => {
@@ -77,13 +83,23 @@ describe("statistics requests through the game UI", () => {
         const browserImport = new Function("path", "return import(path)");
         const { createDraftPaper, prepareConferenceSubmission } = await browserImport(`${root}/v2-paper-rules.ts`);
         const { resolveDuePaperReviews } = await browserImport(`${root}/v2-publication-system.ts`);
+        const { replayStateDigest } = await browserImport(`${root}/v2-run-replay.ts`);
         const store = (window as StatisticsWindow).statisticsStore;
+        const saves = (window as StatisticsWindow).statisticsSaves;
         const state = store.getState();
         const paper = { ...prepareConferenceSubmission({ ...createDraftPaper(3, 0, () => 0), idea: 100, experiment: 100, writing: 100 }, "A", 3, 1), reviewMonthsLeft: 0 };
         Object.assign(state, { year: 1, month: 6, totalMonths: 6, eventQueue: [], availableRandomEvents: [], pendingRandomEvents: [], papers: [paper] });
         state.player.money = 100;
         state.advisorProgressState.funding = 100;
         Object.assign(state, resolveDuePaperReviews(state, () => 0.5).state);
+        // This network integration fixture starts from a synthetic accepted-paper
+        // checkpoint. Saved-state tampering is exercised by the replay tests.
+        const replay = structuredClone(saves.get(state.selectedRoleId)!.replay!);
+        replay.checkpoints.at(-1)!.digest = replayStateDigest(state);
+        replay.checkpoints.at(-1)!.totalMonths = state.totalMonths;
+        saves.commit(state, { runId: store.getCurrentRunId()!, replay, monthStart: true });
+        if (!store.loadRunSave("latest")) throw new Error("Unable to load synthetic statistics checkpoint");
+        if (store.getReplayStatus().failed) throw new Error(JSON.stringify(store.getReplayStatus()));
         store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
       });
       await page.locator('[data-ui-play-tab="events"]').click();
@@ -112,6 +128,7 @@ describe("statistics requests through the game UI", () => {
       expect(activityCount("start")).toBe(1);
       expect(paperCount()).toBe(0);
       await page.evaluate(() => (window as StatisticsWindow).statisticsStore.dispatch("quit-game"));
+      expect(await page.evaluate(() => (window as StatisticsWindow).statisticsStore.getReplayStatus().failed)).toBeUndefined();
       expect(paperCount()).toBe(0);
       expect(activityCount("finish")).toBe(0);
       await page.locator('[data-action="restart-game"]').click();

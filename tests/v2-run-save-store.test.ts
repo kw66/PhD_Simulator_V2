@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createStore } from "../src/core/v2-store";
+import { replayStateDigest } from "../src/core/v2-run-replay";
 import { createRunSaveRepository, createMemoryRunSaveAdapter, type RunSaveAdapter } from "../src/core/v2-run-saves";
 import { ACCOUNT_STORAGE_KEY, loadAccountProfile, saveAccountProfile } from "../src/core/v2-account-storage";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
@@ -61,13 +62,22 @@ function nextMonth(store: Store) {
   expect(store.getState().totalMonths).toBe(previous + 1);
 }
 
-function awardWindfall(store: Store) {
+function awardWindfall(store: Store, saves: ReturnType<typeof createRunSaveRepository>) {
   const event: PendingEvent = {
     id: "save-test-income", chainId: "save-test-income", title: "收入", description: "", source: "system",
     stage: "result", blocking: true, deadlineMonths: 0,
     choices: [{ id: "confirm", label: "确定", outcome: "", effects: { money: 100 } }],
   };
   store.getState().eventQueue = [createEventQueueItem(event, 1)];
+  // Inject this test-only income event as an explicit trusted fixture checkpoint.
+  // Give it a distinct operation index so the real month-start checkpoint remains
+  // available for the rewind assertions below. Replay corruption has its own tests.
+  const state = store.getState();
+  const replay = structuredClone(saves.get(state.selectedRoleId)!.replay!);
+  replay.commands.push({ kind: "help", id: "fixture-boundary", requiredIds: [] });
+  replay.checkpoints.push({ index: replay.commands.length, digest: replayStateDigest(state), totalMonths: state.totalMonths });
+  saves.commit(state, { runId: store.getCurrentRunId()!, replay });
+  expect(store.loadRunSave("latest")).toBe(true);
   store.dispatch("resolve-event", { eventId: event.id, eventChoiceId: "confirm" });
 }
 
@@ -132,10 +142,10 @@ describe("per-role saves integrated with the store", () => {
   });
 
   it("previews but does not reward branch achievements and rewinding discards that branch", async () => {
-    const { store } = await harness();
+    const { store, saves } = await harness();
     store.dispatch("start-game", { roleId: "normal" });
     finishOpening(store);
-    awardWindfall(store);
+    awardWindfall(store, saves);
     expect(store.getState().achievementProgress?.satisfied).toContain("global:windfall");
     store.dispatch("quit-game");
     expect(store.getState().runAchievementIds).toContain("global:windfall");
@@ -179,7 +189,7 @@ describe("per-role saves integrated with the store", () => {
     const { store, saves, storage } = await harness();
     store.dispatch("start-game", { roleId: "normal" });
     finishOpening(store);
-    awardWindfall(store);
+    awardWindfall(store, saves);
     store.dispatch("quit-game");
     const oldRecord = saves.get("normal")!;
     let finalized = 0;
@@ -205,7 +215,7 @@ describe("per-role saves integrated with the store", () => {
     const { store, storage, saves } = await harness();
     store.dispatch("start-game", { roleId: "normal" });
     finishOpening(store);
-    awardWindfall(store);
+    awardWindfall(store, saves);
     store.dispatch("quit-game");
     const beforeAccount = structuredClone(store.getLobbyState());
     const beforeSave = structuredClone(saves.get("normal"));

@@ -188,7 +188,7 @@ describe("paper collaboration scores", () => {
     expect(["idea", "experiment", "writing"].some((field) => getPaperScoreBreakdown(queued.papers[0]!, field as PaperActionType).own > 1)).toBe(true);
   });
 
-  it("keeps journal revision work additive, decay-free and restores the split on withdrawal", () => {
+  it("keeps journal revision additive and decay-free while refusing withdrawal", () => {
     const paper = makePaper({ idea: 40, experiment: 40, writing: 40, collaborationScores: { idea: 10, experiment: 10, writing: 10 } });
     const submitted = submitJournalPaper(makeState(paper), paper.id, "nmi");
     const helped = addPaperCollaboration(submitted.papers[0]!, assistance(paper, { idea: 10 }));
@@ -198,7 +198,8 @@ describe("paper collaboration scores", () => {
     const decayed = applyPrepublicationPaperDecay(researched);
     expect(decayed.papers[0]).toEqual(researched.papers[0]);
     const withdrawn = withdrawPaper(decayed, paper.id).papers[0]!;
-    expect(withdrawn).toMatchObject({ idea: 40, experiment: 40, writing: 40, collaborationScores: { idea: 10, experiment: 10, writing: 10 } });
+    expect(withdrawn).toEqual(decayed.papers[0]);
+    expect(withdrawn).toMatchObject({ status: "journal-reviewing", collaborationScores: { idea: 20, experiment: 10, writing: 10 } });
     expect(withdrawn.collaborators).toEqual(helped.collaborators);
   });
 

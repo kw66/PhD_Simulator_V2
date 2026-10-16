@@ -5,6 +5,7 @@ import { getAllAchievementDefinitions } from "../src/core/v2-role-lobby-meta";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { ACCOUNT_STORAGE_KEY, saveAccountProfile } from "../src/core/v2-account-storage";
 import { createMemoryRunSaveAdapter, createRunSaveRepository } from "../src/core/v2-run-saves";
+import { replayStateDigest } from "../src/core/v2-run-replay";
 
 function memoryStorage() {
   const values = new Map<string, string>();
@@ -25,7 +26,12 @@ async function fixture(level = 0, exp = 0, rewardsClaimed = false) {
   return { storage, adapter, saves, store };
 }
 function researchScore(f: Awaited<ReturnType<typeof fixture>>, score = 20) {
-  f.saves.commit({ ...f.store.getState(), totalResearchScore: score }, { runId: f.store.getCurrentRunId()! });
+  // Synthetic trusted checkpoint for experience arithmetic tests. Separate
+  // replay tests ensure changing only the saved state is rejected.
+  const state = { ...f.store.getState(), totalResearchScore: score };
+  const replay = structuredClone(f.saves.get(state.selectedRoleId)!.replay!);
+  replay.checkpoints.at(-1)!.digest = replayStateDigest(state);
+  f.saves.commit(state, { runId: f.store.getCurrentRunId()!, replay });
   expect(f.store.loadRunSave("latest")).toBe(true);
 }
 function rendered(store: ReturnType<typeof createStore>) {
@@ -84,6 +90,22 @@ describe("session store", () => {
     expect(store.getCurrentRunId()).not.toBe(runId);
     expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
     expect(store.getFinalizedOutbox()).toEqual([]);
+  });
+
+  it("excludes forced month advances even when invoked without opening the debug window", async () => {
+    const { store } = await fixture();
+    store.dispatch("start-game", { roleId: "normal" });
+    const originalMonth = store.getRunSaves().find(save => save.kind === "month")!;
+    store.dispatch("force-next-month");
+    expect(store.isCurrentRunDebugged()).toBe(true);
+    expect(store.loadRunSave(originalMonth.id)).toBe(true);
+    expect(store.isCurrentRunDebugged()).toBe(true);
+    store.dispatch("quit-game");
+    expect(store.getEndingExperienceAward()).toMatchObject({ gained: 0, disqualifiedByDebug: true });
+    store.dispatch("restart-game");
+    expect(store.getFinalizedOutbox()).toEqual([]);
+    expect(store.getLobbyState().achievementRewardedIds).toEqual([]);
+    expect(store.isCurrentRunDebugged()).toBe(false);
   });
 
   it("starts at the lobby with only the base role playable", () => {

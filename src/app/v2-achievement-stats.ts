@@ -3,8 +3,9 @@ import { isAchievementAvailableToRole } from "../core/v2-achievement-scope";
 import { getRoleOptions } from "../core/v2-progression";
 import { getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import type { RoleId } from "../core/v2-types";
+import { DATA_EPOCH, isCurrentDataEpoch } from "../core/v2-data-epoch";
 
-export const ACHIEVEMENT_STATS_STORAGE_KEY = "phd_simulator_v2_achievement_stats_v1";
+export const ACHIEVEMENT_STATS_STORAGE_KEY = "phd_simulator_v2_achievement_stats_v2";
 const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
 const RPC_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/rpc";
 const PUBLIC_KEY = "sb_publishable_TRVbO2x2mmuoRw592EqtvQ_FHpqUMkJ";
@@ -17,7 +18,7 @@ const ROLES = new Set<string>(getRoleOptions().map(item => item.id));
 type StatsStorage = Pick<Storage, "getItem" | "setItem">;
 export interface AchievementGlobalCompletion { achievedPlayers: number; eligiblePlayers: number }
 export interface AchievementStatisticsSnapshot extends AchievementGlobalCompletion { id: string }
-interface Snapshot { version: 2; achievements: AchievementStatisticsSnapshot[] }
+interface Snapshot { version: 2; epoch: typeof DATA_EPOCH; achievements: AchievementStatisticsSnapshot[] }
 interface QueuedRun { p_player_id: string; p_run_id: string; p_role_id: RoleId; p_achievement_ids: string[] }
 export interface AchievementStatsOptions {
   enabled?: boolean;
@@ -40,7 +41,8 @@ function browserStorage(): StatsStorage | null {
 }
 function parseSnapshot(value: unknown): Snapshot {
   const data = value as Snapshot;
-  if (!data || data.version !== 2 || !Array.isArray(data.achievements)) throw new Error("Invalid achievement statistics");
+  if (!data || data.epoch !== DATA_EPOCH
+    || data.version !== 2 || !Array.isArray(data.achievements)) throw new Error("Invalid achievement statistics");
   const seen = new Set<string>();
   const achievements = data.achievements.map(row => {
     if (!row || typeof row.id !== "string" || seen.has(row.id)
@@ -49,7 +51,7 @@ function parseSnapshot(value: unknown): Snapshot {
     seen.add(row.id);
     return { id: row.id, achievedPlayers: row.achievedPlayers, eligiblePlayers: row.eligiblePlayers };
   });
-  return { version: 2, achievements };
+  return { version: 2, epoch: DATA_EPOCH, achievements };
 }
 function validQueuedRun(value: unknown): value is QueuedRun {
   const row = value as QueuedRun;
@@ -85,7 +87,7 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
   const mergeStorage = (): void => {
     try {
       const saved = JSON.parse(storage?.getItem(ACHIEVEMENT_STATS_STORAGE_KEY) ?? "null");
-      if (saved?.version === 1) {
+      if (saved?.version === 1 && isCurrentDataEpoch(saved)) {
         if (Array.isArray(saved.acknowledgedPlayers)) for (const id of saved.acknowledgedPlayers) {
           if (typeof id === "string" && UUID.test(id)) acknowledgedPlayers.add(id);
         }
@@ -115,7 +117,7 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
       // A stale tab must neither erase another tab's outbox nor restore a run
       // already acknowledged by the server. Receipts also make account replay safe.
       mergeStorage();
-      storage.setItem(ACHIEVEMENT_STATS_STORAGE_KEY, JSON.stringify({ version: 1, pending: queue,
+      storage.setItem(ACHIEVEMENT_STATS_STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: new Date(now()).toISOString(), pending: queue,
         acknowledgedRuns: [...acknowledgedRuns], pendingPlayers: [...pendingPlayers],
         acknowledgedPlayers: [...acknowledgedPlayers], snapshot, fetchedAt }));
       return true;
@@ -158,7 +160,7 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
       for (const id of [...pendingPlayers].slice(0, 20)) {
         if (disposed) break;
         try {
-          if (await rpc("record_phd_simulator_v2_achievement_start", { p_player_id: id }) !== true) throw new Error("Start was not acknowledged");
+          if (await rpc("record_phd_simulator_v2_achievement_start", { p_player_id: id, p_epoch: DATA_EPOCH }) !== true) throw new Error("Start was not acknowledged");
           acknowledgedPlayers.add(id); pendingPlayers.delete(id);
           failureCount = 0; uploadRetryAt = 0; persistPending();
         } catch {
@@ -171,7 +173,7 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
       for (const row of queue.slice(0, 20)) {
         if (disposed) break;
         try {
-          if (await rpc(WRITE_RPC, row) !== true) throw new Error("Achievement run was not acknowledged");
+          if (await rpc(WRITE_RPC, { ...row, p_epoch: DATA_EPOCH }) !== true) throw new Error("Achievement run was not acknowledged");
           acknowledgedRuns.add(row.p_run_id);
           queue = queue.filter(item => item.p_run_id !== row.p_run_id);
           failureCount = 0; uploadRetryAt = 0;

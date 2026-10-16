@@ -103,7 +103,7 @@ describe("paper competition regression", () => {
     expect(state.log[0]!.text).toContain("已录用");
   });
 
-  it("restores the valid preview if a journal target is withdrawn before confirmation", () => {
+  it("cannot restore competition effects by withdrawing a journal target", () => {
     let state = startCompetition();
     state = { ...state, papers: state.papers.map((paper) => ({ ...paper, idea: 100, experiment: 100, writing: 100 })) };
     state = advanceEvent(advanceEvent(state), 3);
@@ -112,9 +112,9 @@ describe("paper competition regression", () => {
     expect(state.eventQueue[0]!.description).toContain("目标论文已进入期刊修改");
     expect(state.eventQueue[0]!.description).not.toContain("SAN -6");
     state = dispatchAction(state, "withdraw-paper", { paperId });
-    expect(state.eventQueue[0]!.description).toContain("SAN -4｜idea×1.25（100→125）");
-    expect(state.eventQueue[0]!.description).toContain("新方案比原来又向前走了一步");
-    expect(state.eventQueue[0]!.description).not.toContain("已不再受这次竞争影响");
+    expect(state.papers[0]!.status).toBe("journal-reviewing");
+    expect(state.eventQueue[0]!.description).toContain("目标论文已进入期刊修改");
+    expect(state.eventQueue[0]!.description).not.toContain("SAN -4｜idea×1.25（100→125）");
     expect(state.eventQueue[0]!.description.match(/涉及论文：/g)).toHaveLength(1);
     expect(state.eventQueue[0]!.description.match(/机制结算/g)).toHaveLength(1);
     expect(dispatchAction(state, "select-paper", { paperId })).toEqual(state);

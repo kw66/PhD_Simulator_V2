@@ -1,3 +1,4 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACHIEVEMENT_STATS_STORAGE_KEY, createAchievementStats, getAchievementGlobalCompletion } from "../src/app/v2-achievement-stats";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -9,7 +10,7 @@ const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
 const PLAYER = "10000000-0000-4000-8000-000000000001";
 const RUN = "20000000-0000-4000-8000-000000000001";
 const controllers: ReturnType<typeof createAchievementStats>[] = [];
-const snapshot = { version: 2, achievements: [{ id: "global:paper-lover", achievedPlayers: 2, eligiblePlayers: 5 }] };
+const snapshot = { version: 2, epoch: DATA_EPOCH, achievements: [{ id: "global:paper-lover", achievedPlayers: 2, eligiblePlayers: 5 }] };
 function storage() {
   const data = new Map<string, string>();
   return { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } };
@@ -21,7 +22,7 @@ function finalized(roleId: RoleId = "normal", ids: string[] = ["global:paper-lov
 function create(options: Parameters<typeof createAchievementStats>[0]) {
   const controller = createAchievementStats(options); controllers.push(controller); return controller;
 }
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-16T01:00:00Z")); });
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-16T06:00:00Z")); });
 afterEach(() => { controllers.splice(0).forEach(controller => controller.dispose()); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("global achievement statistics", () => {
@@ -38,7 +39,7 @@ describe("global achievement statistics", () => {
     restored.recordStartedPlayer(); await restored.flush();
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(String(fetch.mock.calls[0][0])).toContain("record_phd_simulator_v2_achievement_start");
-    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ p_player_id: PLAYER });
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ p_player_id: PLAYER, p_epoch: DATA_EPOCH });
     expect(JSON.parse(saved.getItem(ACHIEVEMENT_STATS_STORAGE_KEY)!).pendingPlayers).toEqual([]);
   });
 
@@ -48,12 +49,12 @@ describe("global achievement statistics", () => {
     first.recordStartedPlayer(); await first.flush(); first.dispose();
     const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(true));
     const restored = create({ storage: saved, fetch }); await restored.flush();
-    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ p_player_id: PLAYER });
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ p_player_id: PLAYER, p_epoch: DATA_EPOCH });
   });
 
   it("invalidates old denominator snapshots while preserving pending finalization uploads", async () => {
     const saved = storage();
-    saved.setItem(ACHIEVEMENT_STATS_STORAGE_KEY, JSON.stringify({ version: 1, fetchedAt: Date.now(),
+    saved.setItem(ACHIEVEMENT_STATS_STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: new Date().toISOString(), fetchedAt: Date.now(),
       snapshot: { ...snapshot, version: 1 }, pending: [{ p_player_id: PLAYER, p_run_id: RUN, p_role_id: "normal", p_achievement_ids: [] }] }));
     const fetch = vi.fn<typeof globalThis.fetch>(async input => Response.json(String(input).includes("get_") ? snapshot : true));
     const client = create({ storage: saved, fetch });
@@ -96,7 +97,7 @@ describe("global achievement statistics", () => {
   });
 
   it("rejects invalid server counts and retries no faster than one minute", async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ version: 2, achievements: [{ id: "global:paper-lover", achievedPlayers: 6, eligiblePlayers: 5 }] }));
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ version: 2, epoch: DATA_EPOCH, achievements: [{ id: "global:paper-lover", achievedPlayers: 6, eligiblePlayers: 5 }] }));
     const client = create({ fetch, storage: storage() });
     await client.load(); await client.load();
     expect(fetch).toHaveBeenCalledTimes(1); expect(client.read("global:paper-lover").data).toBeNull();
@@ -179,7 +180,7 @@ describe("global achievement statistics", () => {
   });
 
   it("accepts zero-player snapshots without inventing a percentage", async () => {
-    const client = create({ storage: storage(), fetch: vi.fn(async () => Response.json({ version: 2, achievements: [{ id: "global:paper-lover", achievedPlayers: 0, eligiblePlayers: 0 }] })) });
+    const client = create({ storage: storage(), fetch: vi.fn(async () => Response.json({ version: 2, epoch: DATA_EPOCH, achievements: [{ id: "global:paper-lover", achievedPlayers: 0, eligiblePlayers: 0 }] })) });
     await client.load(); expect(client.read("global:paper-lover")).toEqual({ status: "ready", data: { achievedPlayers: 0, eligiblePlayers: 0 } });
   });
 

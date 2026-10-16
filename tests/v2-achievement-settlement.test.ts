@@ -9,7 +9,7 @@ import { getTalentPointBalance, sanitizeRoleTalentAllocation } from "../src/core
 import { ACCOUNT_STORAGE_KEY, saveAccountProfile } from "../src/core/v2-account-storage";
 import type { GameState, RoleId } from "../src/core/v2-types";
 
-const date1 = "2026-10-16T01:00:00.000Z";
+const date1 = "2026-10-16T06:00:00.000Z";
 const date2 = "2026-10-17T01:00:00.000Z";
 function ending(role: RoleId, ids: string[]): GameState {
   return { ...createStartedGameState(role), phase: "finished", ending: "quit",

@@ -72,7 +72,7 @@ describe("image misuse follows the affected paper", () => {
     expect(hasScholarshipDisqualification(state)).toBe(false);
     expect(settlePublishedImageMisuse(state)).toBe(state);
     expect(renderApp(state)).toContain("举报风险（待生效）");
-    expect(renderApp(state)).toContain("发表前丢弃或撤稿可避免生效");
+    expect(renderApp(state)).toContain("草稿丢弃或会议撤稿可避免生效，期刊不能撤稿");
   });
 
   it("activates the permanent penalty only when conference publication is confirmed", () => {
@@ -122,17 +122,27 @@ describe("image misuse follows the affected paper", () => {
     expect(finished.eventHistory.at(-1)!.stages.at(-1)!.title).toContain("资格取消");
   });
 
-  it.each(["reviewing", "journal-reviewing"] as const)("withdraws %s risk but retains the paper citation penalty", (status) => {
+  it("withdraws conference risk but retains the paper citation penalty", () => {
     const state = falsify(makeState());
-    const submitted = status === "reviewing"
-      ? { ...state, papers: [prepareConferenceSubmission(state.papers[0]!, "C", 6, 1)] }
-      : submitJournalPaper(state, "affected", "pami");
+    const submitted = { ...state, papers: [prepareConferenceSubmission(state.papers[0]!, "C", 6, 1)] };
     const withdrawn = withdrawPaper(submitted, "affected");
     expect(withdrawn.papers[0]).toMatchObject({ status: "draft", imageMisusePending: false, citationDebuffMultiplierOnPublish: 0.5 });
     expect(renderApp(withdrawn)).not.toContain("举报风险（待生效）");
     const published = publishConference(withdrawn);
     expect(hasScholarshipDisqualification(published)).toBe(false);
     expect(published.externalPublications[0]!.publication!.citationDebuffMultiplier).toBe(0.5);
+  });
+
+  it("cannot clear journal misconduct risk by withdrawing or transferring the paper", () => {
+    const submitted = submitJournalPaper(falsify(makeState()), "affected", "pami");
+    const attempted = dispatchAction(submitted, "withdraw-paper", { paperId: "affected" });
+    expect(attempted.papers).toEqual(submitted.papers);
+    expect(attempted.papers[0]).toMatchObject({ status: "journal-reviewing", imageMisusePending: true });
+    expect(renderApp(attempted)).toContain("举报风险（待生效）");
+    const transfer = dispatchAction(attempted, "submit-paper", { paperId: "affected", paperTarget: "C" });
+    expect(transfer.papers).toEqual(submitted.papers);
+    const published = submitJournalPaper({ ...transfer, papers: [{ ...transfer.papers[0]!, idea: 50 }] }, "affected", "pami");
+    expect(hasScholarshipDisqualification(published)).toBe(true);
   });
 
   it("can discard a falsified draft without transferring its risk to a new paper", () => {

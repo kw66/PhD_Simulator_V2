@@ -1,15 +1,16 @@
+import { DATA_EPOCH, DATA_EPOCH_STARTED_AT, isCurrentDataEpoch } from "./v2-data-epoch";
 import { getAllAchievementDefinitions, getRoleAchievementDefinitions } from "./v2-role-lobby-meta";
 import { isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
 import { COLLECTION_REQUIREMENTS } from "./v2-achievement-collections";
 import type { AccountProfile, RoleId } from "./v2-types";
 
 type AchievementStorage = Pick<Storage, "getItem" | "setItem">;
-const ACHIEVEMENT_STORAGE_KEY = "phd_simulator_v2_role_achievements_v2";
+export const ROLE_ACHIEVEMENT_STORAGE_KEY = "phd_simulator_v2_role_achievements_v3";
 
 function isValidTimestamp(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const date = new Date(value);
-  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value && date.getTime() >= Date.parse(DATA_EPOCH_STARTED_AT);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -18,8 +19,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function loadRoleAchievementRecords(account: AccountProfile, storage: AchievementStorage | null): AccountProfile {
   try {
-    const saved: unknown = JSON.parse(storage?.getItem(ACHIEVEMENT_STORAGE_KEY) ?? "null");
-    if (!isRecord(saved) || (saved.version !== 1 && saved.version !== 2) || !isRecord(saved.roles)) return account;
+    const saved: unknown = JSON.parse(storage?.getItem(ROLE_ACHIEVEMENT_STORAGE_KEY) ?? "null");
+    if (!isRecord(saved) || saved.version !== 2 || !isCurrentDataEpoch(saved) || !isRecord(saved.roles)) return account;
     const definitions = getAllAchievementDefinitions();
     const knownIds = new Set(definitions.map(definition => definition.id));
     const knownRoles = new Set(Object.keys(account.roleProgress));
@@ -33,7 +34,8 @@ export function loadRoleAchievementRecords(account: AccountProfile, storage: Ach
       if (!isRecord(record)) continue;
       const availableIds = new Set(getRoleAchievementDefinitions(roleId).map(definition => definition.id));
       const unlockedAchievementIds = Array.isArray(record.unlockedAchievementIds)
-        ? [...new Set(record.unlockedAchievementIds.filter((id): id is string => typeof id === "string" && availableIds.has(id)))] : [];
+        ? [...new Set(record.unlockedAchievementIds.filter((id): id is string => typeof id === "string" && availableIds.has(id)
+          && (isValidTimestamp(savedDates[id]) || (isRecord(savedRoleDates[id]) && isValidTimestamp(savedRoleDates[id][roleId])))))] : [];
       roleProgress[roleId] = { ...roleProgress[roleId],
         unlocked: roleId === "normal" || record.unlocked === true, unlockedAchievementIds };
     }
@@ -115,8 +117,10 @@ export function achievementRecordsChanged(previous: AccountProfile, next: Accoun
 
 export function saveRoleAchievementRecords(account: AccountProfile, storage: AchievementStorage | null): void {
   try {
-    storage?.setItem(ACHIEVEMENT_STORAGE_KEY, JSON.stringify({
+    storage?.setItem(ROLE_ACHIEVEMENT_STORAGE_KEY, JSON.stringify({
       version: 2,
+      epoch: DATA_EPOCH,
+      savedAt: new Date().toISOString(),
       unlockedAt: account.achievementUnlockedAt,
       unlockedByRole: account.achievementUnlockedByRole ?? {},
       rewardedIds: account.achievementRewardedIds ?? [],

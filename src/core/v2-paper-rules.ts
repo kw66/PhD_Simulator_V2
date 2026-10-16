@@ -9,7 +9,6 @@ import { getAcademicCalendarYear } from "./v2-calendar";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getConferenceInfo } from "./v2-conference-catalog";
 import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
-import { getJournalDefinition } from "./v2-journal-system";
 import { generatePaperTopic, type FixedPaperTopic } from "./v2-paper-topics";
 import { setPaperTotalScores } from "./v2-paper-collaboration";
 import {
@@ -172,7 +171,7 @@ export function discardDraftPaper(state: GameState, paperId: string): GameState 
   const paper = paperIndex >= 0 ? state.papers[paperIndex] : null;
   if (!paper || paper.status !== "draft") {
     return paper?.status === "journal-reviewing"
-      ? pushNoOpLog(state, `丢弃：${paper.title} 正在期刊修改中，请使用撤稿`)
+      ? pushNoOpLog(state, `丢弃：${paper.title} 已投期刊，不能丢弃或撤稿`)
       : state;
   }
   const papers = state.papers.filter((entry) => entry.id !== paperId);
@@ -269,37 +268,7 @@ export function withdrawPaper(state: GameState, paperId: string): GameState {
   const paperIndex = state.papers.findIndex((paper) => paper.id === paperId);
   const paper = paperIndex >= 0 ? state.papers[paperIndex] : null;
   if (!paper) return pushNoOpLog(state, "撤稿：没有找到这篇论文");
-  if (paper.status === "journal-reviewing") {
-    const journalName = paper.journalTarget ? getJournalDefinition(paper.journalTarget).name : "期刊";
-    const restoredPaper: Paper = {
-      ...paper,
-      ...(paper.imageMisusePending ? { imageMisusePending: false } : {}),
-      idea: paper.submittedIdea ?? paper.idea,
-      experiment: paper.submittedExperiment ?? paper.experiment,
-      writing: paper.submittedWriting ?? paper.writing,
-      ...(paper.collaborationScores ? { collaborationScores: { ...(paper.submittedCollaborationScores ?? {}) } } : {}),
-      status: "draft",
-      target: null,
-      journalTarget: null,
-      reviewMonthsLeft: 0,
-      submittedIdea: null,
-      submittedExperiment: null,
-      submittedWriting: null,
-      submittedCollaborationScores: null,
-      submittedMonth: null,
-      submittedYear: null,
-      conferenceHandled: false,
-      publication: null,
-      lastReview: null,
-    };
-    const papers = [...state.papers];
-    papers[paperIndex] = restoredPaper;
-    const restoredScore = restoredPaper.idea + restoredPaper.experiment + restoredPaper.writing;
-    return pushLog(
-      { ...state, papers, selectedPaperId: restoredPaper.id },
-      `撤稿：${paper.title} 已从${journalName}撤回，恢复投稿时分数 ${restoredScore}`,
-    );
-  }
+  if (paper.status === "journal-reviewing") return pushNoOpLog(state, `撤稿：${paper.title} 已投期刊，不能撤稿`);
   if (paper.status !== "reviewing") return pushNoOpLog(state, `撤稿：${paper.title} 当前不在审稿中`);
 
   const target = paper.target;

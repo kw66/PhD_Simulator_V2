@@ -1,3 +1,4 @@
+import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { describe, expect, it } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -41,7 +42,7 @@ function content(state: GameState) {
 describe("paper review presentation", () => {
   it("introduces the conference before the paper, with real stats and separate rule references", async () => {
     const stats = createConferenceStats({ onChange: () => {}, storage: null,
-      fetch: async () => new Response(JSON.stringify({ submissions: 100, accepted: 40,
+      fetch: async () => new Response(JSON.stringify({ epoch: DATA_EPOCH, submissions: 100, accepted: 40,
         counts: { Poster: 30, Spotlight: 3, Oral: 5, "Best Paper Candidate": 1, "Best Paper": 1 },
         acceptedMeanScore: 85, rejectedMeanScore: 45,
         means: { Reject: 45, Poster: 80, Spotlight: 82, Oral: 85, "Best Paper Candidate": 90, "Best Paper": 95 },
