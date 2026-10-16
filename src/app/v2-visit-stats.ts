@@ -88,6 +88,7 @@ export function createVisitStats(options: VisitStatsOptions) {
     await client.load(STATS_RPC, { p_day: day }, (value) => parseSnapshot(value, day));
     if (!disposed) { getSnapshot(); options.onChange?.(); }
   };
+  const unsubscribeActivityWrites = client.subscribeActivityWrites(refresh);
   const recordPageVisit = async (): Promise<void> => {
     if (!options.recordVisit) return;
     const getVisitor = (): string => {
@@ -166,7 +167,7 @@ export function createVisitStats(options: VisitStatsOptions) {
     getDisplayValues,
     getRoleDisplayValues,
     flush: () => options.recordVisit && !disposed ? client.flush() : Promise.resolve(),
-    dispose() { disposed = true; if (!options.client) client.dispose(); },
+    dispose() { disposed = true; unsubscribeActivityWrites(); if (!options.client) client.dispose(); },
     render(root: ParentNode): void {
       for (const [metric, value] of Object.entries(getDisplayValues())) {
         root.querySelectorAll(`[data-community-stat="${metric}"]`).forEach((target) => { target.textContent = value; });

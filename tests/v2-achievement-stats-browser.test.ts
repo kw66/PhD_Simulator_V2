@@ -67,6 +67,15 @@ describe("global achievement statistics in the actual game", () => {
       expect(colors.globalFill).toContain('101, 120, 120');
       expect(colors.completed.fillDisplay).toBe('none');
       expect(colors.completed.background).not.toBe(colors.background);
+      await page.locator('[data-action="select-role"][data-role-id="rich"]').click();
+      await expect.poll(() => page.locator('.lobby-profile-achievement').first().getAttribute('data-achievement-id')).toBe('normal:first-pot');
+      expect(await page.locator('.lobby-profile-achievement').evaluateAll(cards =>
+        cards.slice(0, 4).map(card => card.getAttribute('data-achievement-id')))).toEqual([
+        'normal:first-pot', 'rich:ending-master', 'rich:ending-phd', 'unlock:rich-reversed',
+      ]);
+      expect(await page.locator('.lobby-profile-achievement').count()).toBe(11);
+      await page.locator('[data-action="select-role"][data-role-id="normal"]').click();
+      await expect.poll(() => page.locator('.lobby-profile-achievement').first().getAttribute('data-achievement-id')).toBe('normal:ending-master');
       for (let index = 0; index < 3; index++) await page.locator('[data-action="change-role-achievement-page"][data-delta="1"]').click();
       expect(reads).toBe(1);
       await page.locator('[data-action="start-game"]').click();

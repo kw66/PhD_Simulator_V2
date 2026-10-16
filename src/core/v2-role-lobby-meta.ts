@@ -11,6 +11,7 @@ interface RoleAchievementTemplate {
   title: string;
   description: string;
   rewardText?: string;
+  unlocksRoleId?: RoleId;
 }
 
 const ROLE_UNLOCK_DISPLAY_ACHIEVEMENTS: Partial<Record<RoleId, RoleAchievementDefinition>> = {
@@ -98,6 +99,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
   normal: [
     {
       idSuffix: "first-pot",
+      unlocksRoleId: "rich",
       icon: "💰",
       title: "小有积蓄",
       description: "金币达到30",
@@ -105,6 +107,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "research-start",
+      unlocksRoleId: "genius",
       icon: "🔬",
       title: "初窥门径",
       description: "科研能力达到12",
@@ -112,6 +115,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "favorite",
+      unlocksRoleId: "teacher-child",
       icon: "🌟",
       title: "得到器重",
       description: "导师好感达到12",
@@ -119,6 +123,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "socialite",
+      unlocksRoleId: "social",
       icon: "🤝",
       title: "人脉初成",
       description: "社交能力达到12",
@@ -126,6 +131,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "all-rounder",
+      unlocksRoleId: "chosen",
       icon: "🏆",
       title: "全面发展",
       description: "科研|社交|好感|金币达到6",
@@ -133,6 +139,7 @@ const ROLE_ACHIEVEMENT_TEMPLATES: Record<RoleId, readonly RoleAchievementTemplat
     },
     {
       idSuffix: "chair-upgrade",
+      unlocksRoleId: "normal-reversed",
       icon: "😴",
       title: "渐生惰性",
       description: "获得电动按摩椅",
@@ -171,6 +178,7 @@ export function getRoleAchievementDefinitions(roleId: RoleId): RoleAchievementDe
     title: template.title,
     description: template.description,
     rewardText: template.rewardText,
+    unlocksRoleId: template.unlocksRoleId,
     scope: { roleIds: [roleId] },
   })), ...getRoleEndingAchievements(roleId), ...getDesignedAchievements(roleId)];
 }

@@ -90,6 +90,60 @@ afterEach(() => {
 });
 
 describe("kwgame activity statistics", () => {
+  it("replaces an older activity read still in flight when the start upload completes", async () => {
+    const backend = createBackend();
+    const stats = create({ recordVisit: true, fetch: backend.fetch, storage: createStorage() });
+    await stats.load();
+    await vi.advanceTimersByTimeAsync(600_001);
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    backend.fetch.mockImplementationOnce(async () => {
+      await gate;
+      return Response.json(summary({ games: 0, todayGames: 0,
+        roles: { normal: { games: 0, finished: 0, clears: 0, phd: 0 } } }));
+    });
+    const oldRead = stats.load();
+    const tracking = stats.trackGamePhase("playing", {
+      roleId: "normal", ending: null, runKey: JSON.stringify([92, "normal"]),
+    });
+    const upload = stats.flush();
+    await vi.waitFor(() => expect([...backend.rows.values()].some(row => row.p_event === "start")).toBe(true));
+    release();
+    await Promise.all([oldRead, tracking, upload]);
+    expect(stats.getRoleDisplayValues("normal")["global-played-runs"]).toBe("1");
+    expect(backend.fetch.mock.calls.filter(([url]) => String(url).includes("/get_"))).toHaveLength(3);
+  });
+
+  it.each([false, true])("refreshes a cached zero after an unfinished start is acknowledged (shared client=%s)", async (useSharedClient) => {
+    const backend = createBackend();
+    const storage = createStorage();
+    const client = useSharedClient ? shared({ fetch: backend.fetch, storage }) : undefined;
+    const stats = create({ recordVisit: true, fetch: backend.fetch, storage, client });
+    await stats.load();
+    expect(stats.getRoleDisplayValues("normal")["global-played-runs"]).toBe("0");
+    const run = { roleId: "normal" as const, ending: null, runKey: JSON.stringify([91, "normal"]) };
+    await stats.trackGamePhase("playing", run);
+    await stats.trackGamePhase("setup");
+    // The start shares the batch throttle with the page visit; the old cached
+    // value must update on acknowledgement, without waiting ten minutes or ending.
+    await vi.advanceTimersByTimeAsync(30_000);
+    await stats.flush();
+    expect(stats.getDisplayValues().games).toBe("1（1）");
+    expect(stats.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "0", "global-played-runs": "1", "phd-rate": "--" });
+    expect([...backend.rows.values()].filter(row => row.p_event === "finish")).toHaveLength(0);
+    expect(backend.fetch.mock.calls.filter(([url]) => String(url).includes("/get_"))).toHaveLength(2);
+    // Continuing the same save, rendering and returning home neither count nor read again.
+    await stats.trackGamePhase("playing", run);
+    await stats.trackGamePhase("setup");
+    await vi.advanceTimersByTimeAsync(30_000);
+    await stats.flush();
+    expect(stats.getRoleDisplayValues("normal")["global-played-runs"]).toBe("1");
+    expect(backend.fetch.mock.calls.filter(([url]) => String(url).includes("/get_"))).toHaveLength(2);
+    await stats.trackGamePhase("finished", { ...run, ending: "master", finalized: true });
+    await stats.flush();
+    expect(stats.getRoleDisplayValues("normal")).toEqual({ "global-completed-runs": "1", "global-played-runs": "1", "phd-rate": "0.0%" });
+  });
+
   it.each([undefined, 1])("replaces a fresh zero-start cache with obsolete response version %s, even under the current cache key", async (version) => {
     const storage = createStorage();
     const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: DAY }, "historical-starts-v2"]);

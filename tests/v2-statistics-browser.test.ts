@@ -62,7 +62,10 @@ describe("statistics requests through the game UI", () => {
         requests.push("activity");
         await route.fulfill({ json: { epoch: DATA_EPOCH, day: route.request().postDataJSON().p_day,
           version: 2, visitors: 120, todayVisitors: 3, views: 210, todayViews: 4, games: activityCount("start"), todayGames: activityCount("start"),
-          roles: Object.fromEntries(getRoleOptions().map((role) => [role.id, { games: 55, finished: 55, clears: 8, phd: 7 }])) } });
+          roles: Object.fromEntries(getRoleOptions().map((role) => [role.id, {
+            games: role.id === "normal" ? activityCount("start") : 0,
+            finished: role.id === "normal" ? activityCount("finish") : 0, clears: 0, phd: 0,
+          }])) } });
       } else if (url.pathname.startsWith("/__mock_statistics/")) {
         requests.push("unexpected-individual-read");
         await route.fulfill({ status: 404, json: {} });
@@ -72,12 +75,19 @@ describe("statistics requests through the game UI", () => {
       await page.goto(`${baseUrl}?start=setup`);
       await expect.poll(() => activityCount("visit")).toBe(1);
       await expect.poll(() => requests.filter((name) => name === "activity").length).toBe(1);
+      expect(await page.locator('[data-role-stat="global-played-runs"][data-role-id="normal"]').textContent()).toBe("0");
       expect(requests).not.toContain("snapshot");
       await page.locator('[data-action="start-game"]').click();
       await expect.poll(() => requests.filter((name) => name === "snapshot").length).toBe(1);
       await page.waitForFunction(() => JSON.parse(localStorage.getItem("phd_simulator_v2_statistics_v2") ?? "{}").cache?.length > 0);
       await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 31_000; window.dispatchEvent(new Event("online")); });
       await expect.poll(() => activityCount("start")).toBe(1);
+      await page.evaluate(() => (window as StatisticsWindow).statisticsStore.dispatch("reset-game"));
+      await expect.poll(() => page.locator('[data-role-stat="global-played-runs"][data-role-id="normal"]').textContent()).toBe("1");
+      await expect.poll(() => page.locator('[data-role-stat="played-runs"][data-role-id="normal"]').textContent()).toBe("1");
+      expect(activityCount("finish")).toBe(0);
+      await page.locator('[data-action="start-game"]').click();
+      expect(activityCount("start")).toBe(1);
       await page.evaluate(async () => {
         const root = "/src/core";
         const browserImport = new Function("path", "return import(path)");

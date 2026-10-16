@@ -648,8 +648,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain(">💰</span>");
     expect(html).toContain(">🔬</span>");
     expect(html).toContain(">🌟</span>");
-    expect(html).toContain(">🤝</span>");
-    expect(html).toContain(">😴</span>");
+    expect(html).toContain('data-achievement-id="normal:ending-master"');
+    expect(html).toContain('data-achievement-id="global:buff-collector"');
     expect(html).toContain('class="lobby-role-card-level-badge is-locked" aria-label="未解锁"');
     expect(html).toContain('data-lucide="lock"');
     expect(html).not.toContain('class="lobby-role-card-lock"');
@@ -663,7 +663,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("我命由我不由天");
     expect(html).toContain("SAN");
     expect(html).toContain("科研能力");
-    expect(html).toContain("社交能力");
+    expect(html).toContain("社交");
     expect(html).toContain("导师好感");
     expect(html).toContain("金币");
     expect(html).not.toContain('<h2 class="lobby-profile-stat-column-title">预览</h2>');

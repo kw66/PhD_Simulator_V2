@@ -23,7 +23,7 @@ const ACTIVITY_RPC = "get_phd_simulator_v2_activity_stats";
 type StatisticsStorage = Pick<Storage, "getItem" | "setItem">;
 type Payload = Record<string, unknown> & { p_id: string };
 export interface StatisticsSnapshot<T> { status: "loading" | "ready" | "unavailable"; data: T | null }
-interface CachedStats { data: unknown; fetchedAt: number; retryAt: number }
+interface CachedStats { data: unknown; fetchedAt: number; retryAt: number; stale?: boolean }
 interface QueuedResult { kind: StatisticsKind; run: string; id: string; payload?: Payload; activityDay?: string; rejected?: "future-date" }
 
 class ActivityDateRejection extends Error {
@@ -51,6 +51,7 @@ export interface StatisticsClient {
   persistPending(): boolean;
   markDebug(run: string | null): void;
   isDebugRun(run: string): boolean;
+  subscribeActivityWrites(listener: () => Promise<void>): () => void;
   dispose(): void;
 }
 
@@ -147,6 +148,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
   const request = options.fetch ?? globalThis.fetch.bind(globalThis);
   const cache = new Map<string, CachedStats>();
   const results = new Map<string, QueuedResult>();
+  const activityWriteListeners = new Set<() => Promise<void>>();
   const runSnapshots = new Map<string, RunStatistics>();
   const rememberRunSnapshot = (run: string, snapshot: RunStatistics): void => {
     // Keep the current run of every role, including roles left suspended for months.
@@ -256,6 +258,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
   // Paper snapshots keep their existing cache identity and remain frozen per run.
   const cacheKey = (name: string, key: object): string => JSON.stringify(
     name === ACTIVITY_RPC ? [name, key, "historical-starts-v2"] : [name, key]);
+  const activityCachePrefix = `["${ACTIVITY_RPC}",`;
   const readCached: StatisticsClient["read"] = (name, key, parse) => {
     if (!enabled || disposed) return { status: "unavailable", data: null };
     const entry = cache.get(cacheKey(name, key));
@@ -275,11 +278,12 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     if (pending) return pending;
     const previous = readCached(name, key, parse).data;
     const entry = cache.get(id);
-    if (entry && (entry.retryAt > Date.now() || (previous !== null && Date.now() - entry.fetchedAt < STATISTICS_CACHE_MS))) return Promise.resolve();
+    if (entry && (entry.retryAt > Date.now() || (!entry.stale && previous !== null && Date.now() - entry.fetchedAt < STATISTICS_CACHE_MS))) return Promise.resolve();
     const work = rpc(name, key).then((value) => {
       cache.set(id, { data: parse(value), fetchedAt: Date.now(), retryAt: 0 });
     }).catch(() => {
-      cache.set(id, { data: previous, fetchedAt: entry?.fetchedAt ?? 0, retryAt: Date.now() + READ_RETRY_MS });
+      cache.set(id, { data: previous, fetchedAt: entry?.fetchedAt ?? 0, retryAt: Date.now() + READ_RETRY_MS,
+        ...(entry?.stale ? { stale: true } : {}) });
     }).finally(() => {
       pendingReads.delete(id);
       persist();
@@ -300,6 +304,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     if (Date.now() < nextUploadAt) { schedule(); return Promise.resolve(); }
     if (uploadTimer !== null) { clearTimeout(uploadTimer); uploadTimer = null; }
     let batch = [...results.entries()].filter(([, row]) => row.payload && !debugRuns.has(row.run)).slice(0, MAX_BATCH_SIZE);
+    let activityChanged = false;
     pendingUpload = (async () => {
       try {
         while (batch.length > 0) {
@@ -325,6 +330,8 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
           }
           if (!Array.isArray(response) || response.some((id) => typeof id !== "string")) throw new Error("Invalid statistics acknowledgement");
           const acknowledged = new Set(response);
+          activityChanged ||= batch.some(([, row]) => acknowledged.has(row.id) && row.kind === "activity"
+            && (row.payload?.p_event === "start" || row.payload?.p_event === "finish"));
           for (const [key, row] of batch) if (acknowledged.has(row.id) && results.get(key) === row) {
             // Keep a small receipt; replaying the same result must not create a new UUID.
             results.set(key, { kind: row.kind, run: row.run, id: row.id, ...(row.activityDay ? { activityDay: row.activityDay } : {}) });
@@ -340,7 +347,21 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
       }
       uploadChangedAt = Date.now();
       persist();
-    })().finally(() => { pendingUpload = null; schedule(); });
+    })().finally(async () => {
+      if (activityChanged && !disposed) {
+        // A read started before the write may still return the old aggregate.
+        // Let it finish, then invalidate only activity, keeping paper snapshots frozen.
+        await Promise.allSettled([...pendingReads.entries()]
+          .filter(([key]) => key.startsWith(activityCachePrefix)).map(([, pending]) => pending));
+        for (const [key, entry] of cache) if (key.startsWith(activityCachePrefix)) {
+          cache.set(key, { ...entry, fetchedAt: Date.now(), retryAt: 0, stale: true });
+        }
+        persist();
+        await Promise.allSettled([...activityWriteListeners].map(listener => Promise.resolve().then(listener)));
+      }
+      pendingUpload = null;
+      schedule();
+    });
     return pendingUpload;
   };
   const client: StatisticsClient = {
@@ -414,7 +435,11 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
       persist();
     },
     isDebugRun: (run) => debugRuns.has(run),
-    dispose() { disposed = true; if (uploadTimer !== null) clearTimeout(uploadTimer); uploadTimer = null; },
+    subscribeActivityWrites(listener) {
+      activityWriteListeners.add(listener);
+      return () => { activityWriteListeners.delete(listener); };
+    },
+    dispose() { disposed = true; activityWriteListeners.clear(); if (uploadTimer !== null) clearTimeout(uploadTimer); uploadTimer = null; },
   };
   schedule();
   return client;

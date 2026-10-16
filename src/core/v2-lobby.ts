@@ -1,5 +1,5 @@
 import { getRoleDefinition, getRoleOptions } from "./v2-progression";
-import { isAchievementCompleted } from "./v2-achievement-scope";
+import { isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
 import {
   getRoleAchievementDefinitions,
   getAllAchievementDefinitions,
@@ -151,12 +151,22 @@ export function getRoleAchievementPageCount(roleId: RoleId, pageSize = ROLE_ACHI
 export function getAchievementDisplayPages(roleId: RoleId, pageSize = ROLE_ACHIEVEMENT_PAGE_SIZE): Array<{
   achievements: RoleAchievementDefinition[];
 }> {
-  const priority = (item: RoleAchievementDefinition): number => {
-    if (item.scope?.audiences?.length || !item.scope?.roleIds?.length) return 1;
-    return item.scope.roleIds.includes(roleId) ? 0 : 2;
-  };
-  // Stable sorting preserves the designed order within each audience group.
-  const achievements = getAllAchievementDefinitions().sort((a, b) => priority(a) - priority(b));
+  const roles = getRoleOptions();
+  const ranked = getAllAchievementDefinitions().map((item) => {
+    const eligibleRoles = roles.filter(role => isAchievementAvailableToRole(item.scope, role.id));
+    const available = eligibleRoles.some(role => role.id === roleId);
+    const exclusive = available && eligibleRoles.length === 1;
+    const universal = eligibleRoles.length === roles.length;
+    const priority = item.unlocksRoleId === roleId ? 0
+      : exclusive && /经验倍率\+1(?:\D|$)/u.test(item.rewardText ?? "") ? 1
+      : universal && /天赋点\+1(?:\D|$)/u.test(item.rewardText ?? "") ? 2
+      : available ? 3 : 4;
+    return { item, priority, breadth: eligibleRoles.length };
+  });
+  // Within ordinary applicable cards, narrower scopes come first. Ties keep catalog order.
+  ranked.sort((a, b) => a.priority - b.priority
+    || (a.priority === 3 ? a.breadth - b.breadth : 0));
+  const achievements = ranked.map(({ item }) => item);
   const size = Number.isFinite(pageSize) ? Math.max(1, Math.floor(pageSize)) : ROLE_ACHIEVEMENT_PAGE_SIZE;
   const pages: Array<{ achievements: RoleAchievementDefinition[] }> = [];
   for (let start = 0; start < achievements.length; start += size) {

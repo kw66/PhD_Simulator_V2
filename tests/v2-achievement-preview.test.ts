@@ -100,15 +100,34 @@ describe("achievement catalog and presentation", () => {
     }
   });
 
-  it("shows the complete catalog with the selected character's exclusive cards first", () => {
-    const completeIds = getAllAchievementDefinitions().map(item => item.id);
+  it("prioritizes unlocks, personal multipliers, shared talent points, then narrower applicable scopes", () => {
+    const definitions = getAllAchievementDefinitions();
+    const completeIds = definitions.map(item => item.id);
+    const roles = getRoleOptions();
+    const collectors = definitions.filter(item => getCollectorAchievementKey(item.id));
     for (const role of getRoleOptions()) {
       const pages = getAchievementDisplayPages(role.id);
       const items = pages.flatMap((page) => page.achievements);
       expect(items.map((item) => item.id).sort()).toEqual([...completeIds].sort());
-      const priority = (item: typeof items[number]): number => item.scope?.audiences?.length || !item.scope?.roleIds?.length
-        ? 1 : item.scope.roleIds.includes(role.id) ? 0 : 2;
-      expect(items.map(priority)).toEqual(items.map(priority).sort());
+      const unlocks = definitions.filter(item => item.unlocksRoleId === role.id);
+      const multipliers = definitions.filter(item => item.scope?.roleIds?.length === 1
+        && item.scope.roleIds[0] === role.id && item.rewardText?.includes("经验倍率+1"));
+      const prefix = [...unlocks, ...multipliers, ...collectors];
+      expect(items.slice(0, prefix.length).map(item => item.id)).toEqual(prefix.map(item => item.id));
+      const remaining = items.slice(prefix.length);
+      const firstOther = remaining.findIndex(item => !isAchievementAvailableToRole(item.scope, role.id));
+      const applicable = remaining.slice(0, firstOther);
+      expect(firstOther).toBeGreaterThanOrEqual(0);
+      expect(applicable.every(item => isAchievementAvailableToRole(item.scope, role.id))).toBe(true);
+      expect(remaining.slice(firstOther).every(item => !isAchievementAvailableToRole(item.scope, role.id))).toBe(true);
+      const scopeSizes = applicable.map(item => roles.filter(candidate => isAchievementAvailableToRole(item.scope, candidate.id)).length);
+      expect(scopeSizes).toEqual([...scopeSizes].sort((a, b) => a - b));
+      for (const size of new Set(scopeSizes)) {
+        const inScope = (item: typeof items[number]) => isAchievementAvailableToRole(item.scope, role.id)
+          && roles.filter(candidate => isAchievementAvailableToRole(item.scope, candidate.id)).length === size
+          && !prefix.some(first => first.id === item.id);
+        expect(applicable.filter(inScope).map(item => item.id)).toEqual(definitions.filter(inScope).map(item => item.id));
+      }
       expect(items.slice(0, 11).some(item => item.id === `${role.id}:ending-master`)).toBe(true);
       expect(items.slice(0, 11).some(item => item.id === `${role.id}:ending-phd`)).toBe(true);
       expect(pages.slice(0, -1).every((page) => page.achievements.length === ROLE_ACHIEVEMENT_PAGE_SIZE)).toBe(true);
@@ -128,6 +147,23 @@ describe("achievement catalog and presentation", () => {
       expect(items.some(item => item.id === "normal:self-reliance")).toBe(true);
       expect(items.some(item => item.id === "genius-reversed:zero-talent-master")).toBe(true);
     }
+  });
+
+  it("puts a role's incoming unlock first even when another character earns it", () => {
+    const ids = (roleId: "rich" | "genius-reversed" | "normal") => getAchievementDisplayPages(roleId)
+      .flatMap(page => page.achievements.map(item => item.id));
+    expect(ids("rich").slice(0, 4)).toEqual([
+      "normal:first-pot", "rich:ending-master", "rich:ending-phd", "unlock:rich-reversed",
+    ]);
+    expect(ids("genius-reversed").slice(0, 5)).toEqual([
+      "unlock:genius-reversed", "genius-reversed:ending-master", "genius-reversed:ending-phd",
+      "genius-reversed:zero-talent-master", "genius-reversed:break-research-curse",
+    ]);
+    expect(ids("normal").slice(0, 3)).toEqual([
+      "normal:ending-master", "normal:ending-phd", "normal:truly-ordinary",
+    ]);
+    expect(ids("rich").indexOf("upright:breakthrough-i")).toBeLessThan(ids("rich").indexOf("global:breakthrough-ii"));
+    expect(ids("rich").indexOf("global:breakthrough-ii")).toBeLessThan(ids("rich").indexOf("normal:research-start"));
   });
 
   it("shows five upright doctorate challenges on source roles and target unlock mirrors", () => {

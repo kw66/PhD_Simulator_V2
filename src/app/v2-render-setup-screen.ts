@@ -245,7 +245,7 @@ function renderAchievementHistoryTooltip(
 }
 
 function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: AccountProfile): string {
-  // Keep every achievement visible; selected-role cards are sorted first.
+  // Keep every achievement visible; lobby pagination prioritizes unlocks, rewards and scope.
   const definitions = getAllAchievementDefinitions();
   const unlockedCount = definitions.filter((definition) => isLobbyAchievementUnlocked(accountProfile, definition)).length;
   const personalPercent = definitions.length ? unlockedCount / definitions.length * 100 : 0;
