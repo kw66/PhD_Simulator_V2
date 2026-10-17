@@ -19,9 +19,10 @@ describe("cursed character run rules", () => {
   it.each([1, 2, 3, 4] as const)("fixes difficulty %s at start without allocating talents", difficulty => {
     const fading = createStartedGameState("special-fading-genius", {}, 0, difficulty);
     expect(fading.curseState?.difficulty).toBe(difficulty);
-    expect(fading.player.research).toBe([20, 17, 14, 11][difficulty - 1]);
+    expect(fading.player.research).toBe([18, 16, 14, 12][difficulty - 1]);
+    expect(fading.paperSlotsUnlocked).toBe([4, 3, 3, 3][difficulty - 1]);
     const finite = createStartedGameState("special-finite-life", {}, 0, difficulty);
-    expect(finite.player.san).toBe([400, 300, 200, 100][difficulty - 1]);
+    expect(finite.player.san).toBe([300, 200, 120, 80][difficulty - 1]);
     expect(finite.sanCap).toBe(finite.player.san);
     expect(createStartedGameState("cursed-debt", {}, 0, difficulty).curseState?.debt).toBe([60, 80, 100, 120][difficulty - 1]);
   });
@@ -31,7 +32,7 @@ describe("cursed character run rules", () => {
     expect(initializeCurse(createStartedGameState("cursed-frail"), 999).curseState?.difficulty).toBe(1);
   });
   it.each([1, 2, 3, 4] as const)("replaces illness percentage points at difficulty %s", difficulty => {
-    for (const [san, expected] of [[5, 9], [6, 6], [12, 3], [18, 0]]) {
+    for (const [san, expected] of [[5, 9], [6, 6], [12, 3], [17.99, 3], [18, 1], [19, 1], [20, 1]]) {
       const state = month(createStartedGameState("cursed-frail", {}, 0, difficulty), 1);
       expect(getMonthEndIllnessDelta({ ...state, player: { ...state.player, san: san! } })).toBe(expected! * difficulty);
     }
@@ -39,26 +40,38 @@ describe("cursed character run rules", () => {
   });
   it("starts decay after September and resists each loss normally", () => {
     const state = createStartedGameState("special-fading-genius");
-    expect(settleCurseMonthStart(month(state, 1)).player.research).toBe(20);
+    expect(settleCurseMonthStart(month(state, 1)).player.research).toBe(18);
     const october = settleCurseMonthStart(month(state, 2));
-    expect(october.player.research).toBe(19.6);
+    expect(october.player.research).toBe(17.8);
     expect(settleCurseMonthStart(october)).toBe(october);
-    const depleted = { ...month(state, 2), player: { ...state.player, research: 1 } };
+    const depleted = { ...month(state, 2), player: { ...state.player, research: 0.5 } };
+    expect(settleCurseMonthStart(depleted).player.research).toBe(0);
     expect(evaluateCoreEndings(settleCurseMonthStart(depleted)).phase).toBe("playing");
     expect(evaluateCoreEndings(settleCurseMonthStart({ ...month(depleted, 3), player: { ...depleted.player, research: 0 } })).ending).toBe("overthinking");
+  });
+  it.each([[18, 17.8], [17.9, 17.6], [12, 11.7], [11.9, 11.5], [6, 5.6], [5.9, 5.4]])(
+    "applies half-point decay at the current research tier: %s to %s", (research, expected) => {
+      const state = month(createStartedGameState("special-fading-genius"), 2);
+      const result = settleCurseMonthStart({ ...state, player: { ...state.player, research } });
+      expect(result.player.research).toBe(expected);
+    },
+  );
+  it("keeps the ordinary high-SAN illness reduction", () => {
+    const state = month(createStartedGameState("normal"), 1);
+    expect(getMonthEndIllnessDelta({ ...state, player: { ...state.player, san: 18 } })).toBe(-2);
   });
   it("blocks direct recovery, full restoration and rest while allowing cap changes", () => {
     const initial = createStartedGameState("special-finite-life");
     const spent = { ...initial, player: { ...initial.player, san: 100 } };
-    expect(getRecoveredSan(100, 400, 99, "special-finite-life")).toBe(100);
+    expect(getRecoveredSan(100, 300, 99, "special-finite-life")).toBe(100);
     const changed = applyEventPlayerEffects(spent, { san: 999, restoreSanToCap: true, sanCapDelta: 3 });
     expect(changed.player.san).toBe(100);
-    expect(changed.sanCap).toBe(403);
+    expect(changed.sanCap).toBe(303);
     expect(applyRoleTalentRest(spent).player.san).toBe(100);
     expect(applyEventPlayerEffects(spent, { san: -5 }).player.san).toBe(95);
     const wounded = applyEventPlayerEffects(initial, { sanCapDelta: -2 });
-    expect(wounded.player.san).toBe(398);
-    expect(applyEventPlayerEffects(wounded, { sanCapDelta: 2 }).player.san).toBe(398);
+    expect(wounded.player.san).toBe(298);
+    expect(applyEventPlayerEffects(wounded, { sanCapDelta: 2 }).player.san).toBe(298);
   });
   it("does not permit the emergency chair to resurrect finite life", () => {
     const state = createStartedGameState("special-finite-life");
@@ -121,14 +134,14 @@ describe("cursed character run rules", () => {
   it("previews decline exactly without mutating the live branch", () => {
     const state = month(createStartedGameState("special-fading-genius"), 1);
     const before = structuredClone(state);
-    expect(previewNextMonthEffects(state).player.research).toBe(19.6);
+    expect(previewNextMonthEffects(state).player.research).toBe(17.8);
     expect(state).toEqual(before);
   });
   it("runs decay and debt exactly once through the real month transition", () => {
     const fading = month(createStartedGameState("special-fading-genius"), 1);
     const december = dispatchAction({ ...fading, player: { ...fading.player, money: 100 } }, "next-month");
     expect(december.totalMonths).toBe(2);
-    expect(december.player.research).toBe(19.6);
+    expect(december.player.research).toBe(17.8);
     const debt = month(createStartedGameState("cursed-debt"), 1);
     const withMoney = { ...debt, player: { ...debt.player, money: 100 } };
     previewNextMonthEffects(withMoney);

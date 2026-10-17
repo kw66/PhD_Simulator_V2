@@ -3,6 +3,7 @@ import { recordPersonalSpending, roundMoney } from "./v2-money";
 import { applyPlayerAttributeChange } from "./v2-player-attributes";
 import { DISEASE_MONTH_END_CHANGE_BY_SAN_TIER } from "./v2-sanity-rules";
 import { getUnlockedPaperSlotCount } from "./v2-paper-rules";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { GameState, RoleId } from "./v2-types";
 
 export type CurseDifficulty = 1 | 2 | 3 | 4;
@@ -23,10 +24,12 @@ export function initializeCurse(state: GameState, difficulty: unknown = 1): Game
   if (!isCursedRole(state.selectedRoleId)) return state;
   const rank = normalizeCurseDifficulty(difficulty);
   const curseState: CurseRunState = { difficulty: rank, debt: state.selectedRoleId === "cursed-debt" ? [60, 80, 100, 120][rank - 1]! : 0, lastSettledTotalMonths: 1 };
+  const rebalanced = usesGameplayRulesFrom("20261017-r6");
   let next = { ...state, curseState };
-  if (state.selectedRoleId === "special-fading-genius") next = { ...next, player: { ...state.player, research: [20, 17, 14, 11][rank - 1]! } };
+  if (state.selectedRoleId === "special-fading-genius") next = { ...next, player: { ...state.player,
+    research: (rebalanced ? [18, 16, 14, 12] : [20, 17, 14, 11])[rank - 1]! } };
   if (state.selectedRoleId === "special-finite-life") {
-    const san = [400, 300, 200, 100][rank - 1]!;
+    const san = (rebalanced ? [300, 200, 120, 80] : [400, 300, 200, 100])[rank - 1]!;
     next = { ...next, sanCap: san, player: { ...state.player, san } };
   }
   return { ...next, paperSlotsUnlocked: Math.max(next.paperSlotsUnlocked, getUnlockedPaperSlotCount(next.player.research)) };
@@ -37,7 +40,7 @@ export function getMonthEndIllnessDelta(state: GameState): number {
   if (state.totalMonths <= 0) return 0;
   const tier = state.player.san < 6 ? 0 : state.player.san < 12 ? 1 : state.player.san < 18 ? 2 : 3;
   return state.selectedRoleId === "cursed-frail"
-    ? [9, 6, 3, 0][tier]! * (state.curseState?.difficulty ?? 1)
+    ? [9, 6, 3, usesGameplayRulesFrom("20261017-r6") ? 1 : 0][tier]! * (state.curseState?.difficulty ?? 1)
     : DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[tier];
 }
 
@@ -47,7 +50,7 @@ export function settleCurseMonthStart(state: GameState, writeLog = true): GameSt
   if (!curse || state.totalMonths <= 1 || curse.lastSettledTotalMonths >= state.totalMonths) return state;
   let next = { ...state, curseState: { ...curse, lastSettledTotalMonths: state.totalMonths } };
   if (state.selectedRoleId === "special-fading-genius") {
-    next = applyPlayerAttributeChange(next, "research", -1).state as typeof next;
+    next = applyPlayerAttributeChange(next, "research", usesGameplayRulesFrom("20261017-r6") ? -0.5 : -1).state as typeof next;
     if (writeLog) next = pushLog(next, `天才迟暮：科研 ${state.player.research}→${next.player.research}。`) as typeof next;
   }
   if (state.selectedRoleId === "cursed-debt" && curse.debt > 0) {

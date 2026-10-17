@@ -181,24 +181,24 @@ export const SOCIAL_REVERSED_TALENT_NODES = [
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const FRAIL_TALENT_NODES = [
-  { id: "illness-surface", name: "病在腠理", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+9%、+6%、+3%、+0%", prerequisiteIds: [], challenge: true },
-  { id: "illness-skin", name: "病入肌肤", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+18%、+12%、+6%、+0%", prerequisiteIds: [], challenge: true },
-  { id: "illness-organs", name: "病入脏腑", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+27%、+18%、+9%、+0%", prerequisiteIds: [], challenge: true },
-  { id: "illness-terminal", name: "病入膏肓", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+36%、+24%、+12%、+0%", prerequisiteIds: [], challenge: true },
+  { id: "illness-surface", name: "病在腠理", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+9%、+6%、+3%、+1%", prerequisiteIds: [], challenge: true },
+  { id: "illness-skin", name: "病入肌肤", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+18%、+12%、+6%、+2%", prerequisiteIds: [], challenge: true },
+  { id: "illness-organs", name: "病入脏腑", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+27%、+18%、+9%、+3%", prerequisiteIds: [], challenge: true },
+  { id: "illness-terminal", name: "病入膏肓", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+36%、+24%、+12%、+4%", prerequisiteIds: [], challenge: true },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const FADING_GENIUS_TALENT_NODES = [
-  { id: "fading-genius-20", name: "初现遗忘", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "初始科研20；每月科研-1", prerequisiteIds: [], challenge: true },
-  { id: "fading-genius-17", name: "思绪渐乱", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "初始科研17；每月科研-1", prerequisiteIds: [], challenge: true },
-  { id: "fading-genius-14", name: "旧识渐失", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "初始科研14；每月科研-1", prerequisiteIds: [], challenge: true },
-  { id: "fading-genius-11", name: "才思将尽", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "初始科研11；每月科研-1", prerequisiteIds: [], challenge: true },
+  { id: "fading-genius-20", name: "初现遗忘", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "初始科研18；每月科研-0.5", prerequisiteIds: [], challenge: true },
+  { id: "fading-genius-17", name: "思绪渐乱", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "初始科研16；每月科研-0.5", prerequisiteIds: [], challenge: true },
+  { id: "fading-genius-14", name: "旧识渐失", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "初始科研14；每月科研-0.5", prerequisiteIds: [], challenge: true },
+  { id: "fading-genius-11", name: "才思将尽", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "初始科研12；每月科研-0.5", prerequisiteIds: [], challenge: true },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const FINITE_LIFE_TALENT_NODES = [
-  { id: "finite-life-400", name: "尚有时日", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 400；不可回复", prerequisiteIds: [], challenge: true },
-  { id: "finite-life-300", name: "时日渐短", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 300；不可回复", prerequisiteIds: [], challenge: true },
-  { id: "finite-life-200", name: "暮色渐深", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 200；不可回复", prerequisiteIds: [], challenge: true },
-  { id: "finite-life-100", name: "命悬一线", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 100；不可回复", prerequisiteIds: [], challenge: true },
+  { id: "finite-life-400", name: "尚有时日", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 300；不可回复", prerequisiteIds: [], challenge: true },
+  { id: "finite-life-300", name: "时日渐短", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 200；不可回复", prerequisiteIds: [], challenge: true },
+  { id: "finite-life-200", name: "暮色渐深", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 120；不可回复", prerequisiteIds: [], challenge: true },
+  { id: "finite-life-100", name: "命悬一线", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 80；不可回复", prerequisiteIds: [], challenge: true },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const DEBT_TALENT_NODES = [
