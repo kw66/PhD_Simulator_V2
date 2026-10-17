@@ -20,6 +20,51 @@ function storage() {
 }
 
 describe("achievement ending transaction", () => {
+  it.each(["research-captain", "cursed-frail"] as const)("only settles hard shared milestones for %s", role => {
+    const before = createStartedGameState(role);
+    const observed = observeAchievements(before, { ...before, player: { ...before.player, research: 30 } });
+    const result = settleRunAchievements(createDefaultAccountProfile(), { ...observed, phase: "finished", ending: "quit" }, date2);
+    expect(result.state.runAchievementIds).toContain("global:breakthrough-ii");
+    expect(result.state.runAchievementIds).not.toContain("global:wisdom-god-ii");
+    expect(result.account.achievementUnlockedByRole?.["global:wisdom-god-ii"]).toBeUndefined();
+    expect(result.account.achievementUnlockedByRole?.["global:breakthrough-ii"]).toEqual({ [role]: date2 });
+    const ordinary = settleRunAchievements(createDefaultAccountProfile(), ending("normal", ["global:wisdom-god-ii"]), date2);
+    expect(ordinary.account.achievementUnlockedByRole?.["global:wisdom-god-ii"]).toEqual({ normal: date2 });
+    // Eligibility is narrower, but the existing all-role reward is unchanged.
+    expect(ordinary.account.roleProgress[role].exp).toBe(5);
+  });
+
+  it("preserves already rewarded special-role dates across loading without paying twice", () => {
+    const account = createDefaultAccountProfile();
+    const id = "global:paper-lover";
+    account.achievementRewardedIds = [id];
+    account.achievementUnlockedAt[id] = date1;
+    account.achievementUnlockedByRole = { [id]: { "research-captain": date1 } };
+    account.roleProgress["research-captain"].unlockedAchievementIds = [id];
+    account.roleProgress.normal.exp = 5;
+    const memory = storage();
+    saveAccountProfile(account, memory);
+    const loaded = loadAccountProfile(memory).account;
+    expect(loaded.achievementUnlockedByRole?.[id]).toEqual({ "research-captain": date1 });
+    expect(loaded.achievementUnlockedAt[id]).toBe(date1);
+    expect(loaded.roleProgress["research-captain"].unlockedAchievementIds).toContain(id);
+    const again = settleRunAchievements(loaded, ending("normal", [id]), date2);
+    expect(again.account.roleProgress.normal.exp).toBe(5);
+    expect(again.account.achievementUnlockedByRole?.[id]).toEqual({ "research-captain": date1, normal: date2 });
+  });
+
+  it("includes special and cursed runs when completing shared collections", () => {
+    const half = Math.floor(COLLECTION_REQUIREMENTS.products.length / 2);
+    const captain = ending("research-captain", []);
+    captain.achievementProgress!.collections.products = COLLECTION_REQUIREMENTS.products.slice(0, half).map(item => item.id);
+    const first = settleRunAchievements(createDefaultAccountProfile(), captain, date1);
+    const cursed = ending("cursed-frail", []);
+    cursed.achievementProgress!.collections.products = COLLECTION_REQUIREMENTS.products.slice(half).map(item => item.id);
+    const second = settleRunAchievements(first.account, cursed, date2);
+    expect(second.state.runAchievementIds).toContain("global:product-collector");
+    expect(Object.values(second.account.achievementExperienceMultipliers!).every(value => value === 0.2)).toBe(true);
+  });
+
   it.each(["cursed-frail", "special-fading-genius", "special-finite-life", "cursed-debt"] as const)(
     "keeps %s curse achievement in preview and scopes its eventual reward to all roles", role => {
       const state = { ...ending(role, []), ending: "phd" as const };

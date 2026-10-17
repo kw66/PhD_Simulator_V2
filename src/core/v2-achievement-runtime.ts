@@ -6,7 +6,7 @@ import { observeResearchAchievements } from "./v2-achievement-research";
 import { observeEventAchievements } from "./v2-achievement-events";
 import { COLLECTION_REQUIREMENTS, getCollectorAchievementKey, observeAchievementCollections } from "./v2-achievement-collections";
 import { awardRoleExperience } from "./v2-role-experience";
-import { CAPTAIN_UNLOCK_ACHIEVEMENT_ID, reconcileAccountRoleUnlocks } from "./v2-account-role-unlocks";
+import { CAPTAIN_UNLOCK_ACHIEVEMENT_ID, REWINDER_UNLOCK_ACHIEVEMENT_ID, reconcileAccountRoleUnlocks } from "./v2-account-role-unlocks";
 import type { AccountProfile, AchievementCollectionProgress, DispatchPayload, GameActionId, GameState, RoleId } from "./v2-types";
 
 /** Pure evidence update. Called only on committed engine transitions, never scene previews. */
@@ -46,7 +46,7 @@ export function settleRunAchievements(account: AccountProfile, state: GameState,
   let experienceForCurrentRole = 0;
   for (const definition of getAllAchievementDefinitions()) {
     // This account milestone is derived after all ordinary role unlocks settle.
-    if (definition.id === CAPTAIN_UNLOCK_ACHIEVEMENT_ID) continue;
+    if (definition.id === CAPTAIN_UNLOCK_ACHIEVEMENT_ID || definition.id === REWINDER_UNLOCK_ACHIEVEMENT_ID) continue;
     if (!isAchievementAvailableToRole(definition.scope, roleId)) continue;
     const collector = getCollectorAchievementKey(definition.id);
     if (collector && COLLECTION_REQUIREMENTS[collector].length > 0
@@ -88,7 +88,8 @@ export function settleRunAchievements(account: AccountProfile, state: GameState,
     }
   }
   const reconciled = reconcileAccountRoleUnlocks(next, timestamp, roleId);
-  if (!account.achievementUnlockedAt[CAPTAIN_UNLOCK_ACHIEVEMENT_ID]
-    && reconciled.achievementUnlockedAt[CAPTAIN_UNLOCK_ACHIEVEMENT_ID]) newlyCompleted.push(CAPTAIN_UNLOCK_ACHIEVEMENT_ID);
+  for (const id of [CAPTAIN_UNLOCK_ACHIEVEMENT_ID, REWINDER_UNLOCK_ACHIEVEMENT_ID]) {
+    if (!account.achievementUnlockedAt[id] && reconciled.achievementUnlockedAt[id]) newlyCompleted.push(id);
+  }
   return { account: reconciled, state: { ...state, runAchievementIds: newlyCompleted }, experienceForCurrentRole };
 }

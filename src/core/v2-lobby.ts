@@ -33,7 +33,6 @@ const LOBBY_ROLE_ROWS: ReadonlyArray<ReadonlyArray<RoleId>> = [
   ["social", "social-reversed"],
   ["chosen", "chosen-reversed"],
   ["research-captain", "rewinder"],
-  ["special-dandan", "special-daji"],
   ["special-finite-life", "special-fading-genius"],
   ["cursed-frail", "cursed-debt"],
 ];

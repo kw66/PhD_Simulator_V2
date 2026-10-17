@@ -13,7 +13,12 @@ import type { GameState, RoleId } from "./v2-types";
 const precise = (value: number): number => Number(value.toFixed(10));
 export function initializeCaptain(state: GameState, levels: Partial<Record<RoleId, number>> = {}): GameState {
   if (state.selectedRoleId !== "research-captain") return state;
-  return { ...state, captainState: createCaptainRunState(levels), actionState: { ...state.actionState, limit: 0 } };
+  return { ...state,
+    captainState: createCaptainRunState(levels),
+    // 统御者开局就能容纳四位同门；普通角色仍按社交能力逐步解锁。
+    relationshipState: { ...state.relationshipState, unlockedSlots: 5 },
+    actionState: { ...state.actionState, limit: 0 },
+  };
 }
 export function rollCaptainTag(random: () => number = gameRandom): CaptainTag {
   return CAPTAIN_TAG_IDS[Math.max(0, Math.min(CAPTAIN_TAG_IDS.length - 1, Math.floor(random() * CAPTAIN_TAG_IDS.length)))]!;
@@ -22,7 +27,9 @@ export function rollCaptainTag(random: () => number = gameRandom): CaptainTag {
 /** Reconcile only newly joined identities. Rendering and replaying a loaded state never reapplies grants. */
 export function syncCaptainMembers(state: GameState, random: () => number = gameRandom): GameState {
   if (!isCaptain(state)) return state;
-  let next: GameState = state;
+  let next: GameState = state.relationshipState.unlockedSlots >= 5 ? state : {
+    ...state, relationshipState: { ...state.relationshipState, unlockedSlots: 5 },
+  };
   for (const id of getCaptainActiveMembers(state)) {
     const captain = next.captainState!;
     if (captain.initializedMembers.includes(id)) continue;

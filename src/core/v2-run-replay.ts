@@ -8,8 +8,8 @@ import type { DispatchPayload, GameActionId, GameState } from "./v2-types";
 export type ReplayCommand = { kind: "action"; actionId: GameActionId; payload: DispatchPayload }
   | { kind: "help"; id: string; requiredIds: string[] };
 /** Bump when deterministic gameplay rules change, independently of account epochs. */
-export const REPLAY_RULESET = "20261017-r2";
-const SUPPORTED_REPLAY_RULESETS = ["20261016-r1", REPLAY_RULESET] as const;
+export const REPLAY_RULESET = "20261017-r3";
+const SUPPORTED_REPLAY_RULESETS = ["20261016-r1", "20261017-r2", REPLAY_RULESET] as const;
 export interface RunReplay {
   version: 1;
   ruleset: typeof SUPPORTED_REPLAY_RULESETS[number];

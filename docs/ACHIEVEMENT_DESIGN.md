@@ -78,6 +78,10 @@
 
 服务端使用`phd_simulator_v2_achievement_catalog`、`phd_simulator_v2_achievement_runs`、`phd_simulator_v2_achievement_completions`和`phd_simulator_v2_achievement_players`四张表，通过`record_phd_simulator_v2_achievement_start`登记开局玩家、`record_phd_simulator_v2_achievement_run`提交结算，使用`get_phd_simulator_v2_achievement_stats_v2`读取聚合。匿名用户不能直接读写四表。客户端入口为`src/app/v2-achievement-stats.ts`，纪元边界、部署和数据库验证见[在线统计](ONLINE_STATISTICS.md)。
 
-服务端成就资格目录与游戏共享来源。运行`node scripts/sync-achievement-stat-catalog.mjs --check`检查184项成就、20个角色的范围是否一致；修改成就ID或资格范围后应同步数据库目录。
+服务端成就资格目录与游戏共享来源。运行`node scripts/sync-achievement-stat-catalog.mjs --check`检查175项成就、18个角色的范围是否一致；修改成就ID或资格范围后应同步数据库目录。
+
+轮回者解锁按正式完成的不同成就ID计数，达到24项后解锁图鉴；重复角色记录不重复计数，各角色毕业成就分别计算。该解锁成就不计入自身条件，不额外发经验。当前轮回能力仅展示设计，尚不能开局。
+
+2026-10-17：常规通用成就限定正位、逆位。特殊与诅咒角色仅参与突破极限Ⅱ、自然之巅、未来院士、诺奖之始、万引大佬、四种登峰造极、五类跨局收集及统御者解锁；各诅咒的专属最高难度成就保留。成就ID和既有领取记录保持不变，适用范围影响新达成资格。
 
 运行 `node artifacts/check-achievement-scopes.mjs --docs-only` 可从当前规范目录重新生成清单，不启动浏览器；去掉该参数会追加卡片布局检查。

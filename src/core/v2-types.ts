@@ -56,8 +56,6 @@ export type RoleId =
   | "rich-reversed"
   | "teacher-child-reversed"
   | "chosen-reversed"
-  | "special-dandan"
-  | "special-daji"
   | "special-finite-life"
   | "special-fading-genius"
   | "cursed-frail"

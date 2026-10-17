@@ -244,7 +244,7 @@ export function getTalentPointBalance(roleId: RoleId, level: number, allocation:
 }
 
 export function getTalentUpgradeReason(roleId: RoleId, level: number, allocation: Record<string, number>, talentId: string, bonusPoints = 0): string | null {
-  if (roleId === "research-captain") return "标签等级跟随对应角色等级，无需加点";
+  if (roleId === "research-captain") return "统御者标签不可加点";
   if (!isRoleTalentImplemented(roleId)) return "该角色天赋暂未开放";
   const nodes = getDesignedTalentNodes(roleId);
   const node = nodes?.find((entry) => entry.id === talentId);

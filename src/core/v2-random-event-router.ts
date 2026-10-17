@@ -11,6 +11,7 @@ import { getPublishedPaperCount } from "./v2-publication-rules";
 import { getPaperCompetitionCandidates } from "./v2-paper-competition";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-projects";
 import { getRecruitmentAcademicYears, type RecruitmentCalendar } from "./v2-recruitment-eligibility";
+import { isCaptain } from "./v2-captain-state";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
 import { createStudyFatigueEvent, isStudyFatigueEligible, STUDY_FATIGUE_EVENT_ID } from "./v2-study-fatigue";
@@ -37,8 +38,12 @@ function appendFellowCapacityHint(event: PendingEvent): PendingEvent {
 function appendRandomEventAppearanceCondition(
   eventId: number,
   event: PendingEvent,
+  state?: GameState,
 ): PendingEvent {
   if (eventId === 10 || eventId === 11 || eventId === 14) event = appendFellowCapacityHint(event);
+  // 统御者的三件组内人际事件不受普通角色的属性、论文和学年门槛限制，
+  // 因而不应把这些门槛以“出现条件”再次展示给玩家。
+  if (state && isCaptain(state) && [10, 11, 14].includes(eventId)) return event;
   const condition = getRandomEventAppearanceCondition(eventId);
   if (!condition || event.stage !== "act1" || /(?:备注|小提示)：出现条件：/u.test(event.description)) {
     return event;
@@ -81,23 +86,32 @@ export function createRandomEventById(
   recruitmentCalendar: RecruitmentCalendar = state,
 ): { nextState: GameState; event: PendingEvent | null } {
   if (eventId === STUDY_FATIGUE_EVENT_ID) return { nextState: state,
-    event: appendRandomEventAppearanceCondition(eventId, createStudyFatigueEvent(state)) };
-  if ((eventId === 10 || eventId === 11)
+    event: appendRandomEventAppearanceCondition(eventId, createStudyFatigueEvent(state), state) };
+  const captainRelationshipEvent = isCaptain(state) && [10, 11, 14].includes(eventId);
+  if (!captainRelationshipEvent && (eventId === 10 || eventId === 11)
     && getRecruitmentAcademicYears(eventId === 10 ? "peer" : "senior", recruitmentCalendar).length === 0) {
     return { nextState: state, event: null };
   }
+  // 统御者可在普通招募日历之外结识同门。没有严格对应的在读年级时，
+  // 使用最近的仍在读年级；不生成七年级或已经过了六月离校点的成员。
+  const captainRecruitmentCalendar = captainRelationshipEvent && (eventId === 10 || eventId === 11)
+    && getRecruitmentAcademicYears(eventId === 10 ? "peer" : "senior", recruitmentCalendar).length === 0
+    ? { ...recruitmentCalendar, fixedYear: eventId === 10
+      ? (recruitmentCalendar.year <= 3 ? 2 : 5)
+      : (recruitmentCalendar.month === 11 || recruitmentCalendar.month === 12 ? 5 : 6) }
+    : recruitmentCalendar;
   if (isPaperCompetitionEventId(eventId)) {
     const event = createPaperCompetitionRandomEvent(eventId, state, getRoll);
-    return { nextState: state, event: event ? appendRandomEventAppearanceCondition(eventId, event) : null };
+    return { nextState: state, event: event ? appendRandomEventAppearanceCondition(eventId, event, state) : null };
   }
 
   // Each category module maps its own event ids; ids never overlap.
-  const categorizedEvent = createMentoringLabRandomEventById(eventId, state, getRoll, recruitmentCalendar)
+  const categorizedEvent = createMentoringLabRandomEventById(eventId, state, getRoll, captainRecruitmentCalendar)
     ?? createAdvisorLabRandomEventById(eventId, state, getRoll)
-    ?? createRelationshipRandomEventById(eventId, state, getRoll, recruitmentCalendar)
+    ?? createRelationshipRandomEventById(eventId, state, getRoll, captainRecruitmentCalendar)
     ?? createCampusRandomEventById(eventId, state, getRoll);
   if (categorizedEvent) {
-    return { nextState: state, event: appendRandomEventAppearanceCondition(eventId, categorizedEvent) };
+    return { nextState: state, event: appendRandomEventAppearanceCondition(eventId, categorizedEvent, state) };
   }
 
   const progressEvent = createCoreProgressRandomEventById(eventId, state, getRoll);
@@ -105,7 +119,7 @@ export function createRandomEventById(
     return {
       nextState: progressEvent.nextState,
       event: progressEvent.event
-        ? appendRandomEventAppearanceCondition(eventId, progressEvent.event)
+        ? appendRandomEventAppearanceCondition(eventId, progressEvent.event, state)
         : null,
     };
   }
@@ -114,6 +128,7 @@ export function createRandomEventById(
 }
 
 export function isRandomEventEligible(state: GameState, eventId: number): boolean {
+  if (isCaptain(state) && [10, 11, 14].includes(eventId)) return true;
   switch (eventId) {
     case STUDY_FATIGUE_EVENT_ID:
       return isStudyFatigueEligible(state);

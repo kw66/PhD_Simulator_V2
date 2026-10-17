@@ -1,7 +1,7 @@
 import { getRoleDefinition } from "./v2-progression";
 import type { AccountProfile, AchievementAudience, AchievementScope, RoleAchievementDefinition, RoleId } from "./v2-types";
 
-const SPECIAL_ROLES = new Set<RoleId>(["rewinder", "research-captain", "special-dandan", "special-daji"]);
+const SPECIAL_ROLES = new Set<RoleId>(["rewinder", "research-captain"]);
 const CURSED_ROLES = new Set<RoleId>(["cursed-frail", "cursed-debt", "special-finite-life", "special-fading-genius"]);
 
 export function getAchievementUnlockRoleIds(definition: RoleAchievementDefinition): readonly RoleId[] {

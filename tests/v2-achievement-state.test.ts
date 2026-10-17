@@ -22,7 +22,7 @@ function fellow(id: string, research = 12, affinity = 12): GameState["fellowProg
 }
 
 describe("state achievement evidence", () => {
-  it.each(["rewinder", "research-captain", "special-dandan", "special-daji", "cursed-frail", "special-finite-life", "special-fading-genius", "cursed-debt"] as const)(
+  it.each(["rewinder", "research-captain", "cursed-frail", "special-finite-life", "special-fading-genius", "cursed-debt"] as const)(
     "does not record ordinary graduation achievements for %s", roleId => {
       for (const ending of ["master", "phd"] as const) {
         const next = state();

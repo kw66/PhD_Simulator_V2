@@ -22,7 +22,7 @@ describe("achievement runtime presentation", () => {
       expect(html).toContain(`data-achievement-id="${role}:ending-phd"`);
       expect(getAchievementDisplayPages(role).flatMap(page => page.achievements)).toHaveLength(getAllAchievementDefinitions().length);
     }
-    for (const role of ["research-captain", "special-daji", "special-finite-life", "special-fading-genius", "cursed-frail", "cursed-debt"] as const) {
+    for (const role of ["research-captain", "special-finite-life", "special-fading-genius", "cursed-frail", "cursed-debt"] as const) {
       expect(getAllAchievementDefinitions().some(item => item.id === `${role}:ending-master` || item.id === `${role}:ending-phd`)).toBe(false);
       expect(getAchievementDisplayPages(role).flatMap(page => page.achievements)).toHaveLength(getAllAchievementDefinitions().length);
     }

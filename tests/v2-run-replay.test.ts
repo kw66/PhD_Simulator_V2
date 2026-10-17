@@ -13,7 +13,7 @@ function storage() {
   return { values, getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); } };
 }
-async function fixture(roleId: RoleId = "normal") {
+async function fixture(roleId: RoleId = "normal", seed?: number) {
   const disk = createMemoryRunSaveAdapter();
   const local = storage();
   const account = createDefaultAccountProfile();
@@ -22,6 +22,7 @@ async function fixture(roleId: RoleId = "normal") {
   const saves = createRunSaveRepository({ storage: local, adapter: disk });
   const store = createStore({ storage: local, saves });
   await store.ready();
+  if (seed !== undefined) store.getState().randomState = { seed, cursor: 0 };
   store.dispatch("start-game", { roleId });
   return { store, saves, disk, local };
 }
@@ -35,7 +36,9 @@ function enroll(store: ReturnType<typeof createStore>) {
 
 describe("monthly browser operation replay", () => {
   it("replays a full academic year of ordinary events, shopping, research and reloads", async () => {
-    const fixtureState = await fixture();
+    // A reproducible route tests replay fidelity without randomly selecting an
+    // event that requires a different strategy from this scripted playthrough.
+    const fixtureState = await fixture("normal", 1700000000);
     let { store } = fixtureState;
     const { disk, local } = fixtureState;
     enroll(store);
@@ -48,7 +51,8 @@ describe("monthly browser operation replay", () => {
           store.dispatch("resolve-event", { eventId: event.id, eventChoiceId: choice.id });
           if (!store.getState().eventQueue.some(item => item.id === event.id)) { advanced = true; break; }
         }
-        expect(advanced).toBe(true);
+        expect(advanced, JSON.stringify({ month, id: event.id, stage: event.stage, title: event.title,
+          choices: event.choices.map(choice => choice.id), log: store.getState().log.slice(-3) })).toBe(true);
       }
       if (store.getState().phase !== "playing") break;
       if (month === 1) {

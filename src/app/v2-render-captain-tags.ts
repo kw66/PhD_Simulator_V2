@@ -102,7 +102,7 @@ export function renderCaptainTags(roleProgress: Partial<AccountProfile["roleProg
                 <div class="lobby-normal-tree-detail-heading"><strong>统御者 · 特殊</strong></div>
                 <div class="captain-tag-effects">
                   <p>自身行动点为0，仍可使用AI行动；导师、恋人、同学随机获得六类标签</p>
-                  <p>${runLevels ? "标签等级在本局开局时确定" : "标签等级取开局时对应角色等级"}，无需加点；末条效果按人际栏对应标签人数叠加；导师更名可重抽标签</p>
+                  <p>三个人际事件无视触发条件，且每学年第1个月必定触发</p>
                 </div>
               </div>
             </div>

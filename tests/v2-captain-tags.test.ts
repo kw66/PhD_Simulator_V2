@@ -39,6 +39,8 @@ describe("统御者 passive label display", () => {
     expect(html).not.toContain("每级+2天赋点");
     expect(html).not.toContain('class="lobby-talent-points-hint"');
     expect(html).toContain("自身行动点为0");
+    expect(html).toContain("三个人际事件无视触发条件，且每学年第1个月必定触发");
+    expect(html).not.toContain("末条效果按人际栏对应标签人数叠加");
     expect(html).toContain('data-captain-special="true"');
     expect(html).toContain('class="lobby-normal-tree-node-level">8/10');
     expect(html).not.toContain("个体效果");
@@ -47,7 +49,7 @@ describe("统御者 passive label display", () => {
 
   it("does not derive points or allow allocations, even from a forged stored allocation", () => {
     expect(getTalentPointBalance("research-captain", 10, {}, 100)).toBe(0);
-    expect(getTalentUpgradeReason("research-captain", 10, {}, "normal", 100)).toContain("无需加点");
+    expect(getTalentUpgradeReason("research-captain", 10, {}, "normal", 100)).toContain("不可加点");
     expect(sanitizeRoleTalentAllocation("research-captain", 10, { normal: 10 }, 100)).toEqual({});
   });
 });

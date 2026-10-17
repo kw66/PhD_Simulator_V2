@@ -7,6 +7,7 @@ import { createRandomEventById, isRandomEventEligible } from "./v2-random-event-
 import {
   calculateRandomEventCount,
   drawRandomEvent,
+  consumeRandomEventTicket,
 } from "./v2-random-event-rules";
 import { getRandomEventCategory, type RandomEventCategory } from "./v2-random-event-pool-builder";
 import { createIllnessRandomEvent } from "./v2-random-events-core-health";
@@ -17,6 +18,54 @@ import { collectThesisEventForMonth } from "./v2-monthly-thesis-events";
 import { syncThesisState } from "./v2-thesis-rules";
 import type { RandomRollProvider } from "./v2-random-events-core-shared";
 import type { GameState, PendingEvent } from "./v2-types";
+import { isCaptain } from "./v2-captain-state";
+
+/** 统御者每学年首月固定见到的三件组内人际事件。 */
+export const CAPTAIN_ANNUAL_RELATIONSHIP_EVENT_IDS = [14, 10, 11] as const;
+
+function isCaptainAnnualOpeningMonth(state: Pick<GameState, "selectedRoleId" | "month" | "totalMonths">): boolean {
+  return state.selectedRoleId === "research-captain" && state.month === 1 && state.totalMonths >= 1;
+}
+
+function collectCaptainAnnualRelationshipEvents(
+  state: GameState,
+  getRoll: RandomRollProvider,
+): { nextState: GameState; events: PendingEvent[] } {
+  if (!isCaptainAnnualOpeningMonth(state)) return { nextState: state, events: [] };
+  let nextState = state;
+  const events: PendingEvent[] = [];
+  for (const eventId of CAPTAIN_ANNUAL_RELATIONSHIP_EVENT_IDS) {
+    // Consume only one annual ticket, even if a previous year's deferred scene
+    // is already present. Resolving that scene must not expose a duplicate.
+    if (nextState.usedRandomEvents.includes(eventId)) continue;
+    if (nextState.eventQueue.some((event) => event.randomReplay?.eventId === eventId)) {
+      nextState = { ...nextState,
+        availableRandomEvents: consumeRandomEventTicket(nextState.availableRandomEvents, eventId),
+        usedRandomEvents: [...nextState.usedRandomEvents, eventId],
+        pendingRandomEvents: nextState.pendingRandomEvents?.filter((pending) => pending.eventId !== eventId),
+      };
+      continue;
+    }
+    const serial = nextState.totalRandomEventCount + 1;
+    const rolls: number[] = [];
+    const recordRoll = (): number => {
+      const roll = getRoll();
+      rolls.push(roll);
+      return roll;
+    };
+    const built = createRandomEventById(eventId, { ...nextState, totalRandomEventCount: serial }, recordRoll, nextState);
+    if (!built.event) continue;
+    nextState = {
+      ...built.nextState,
+      availableRandomEvents: consumeRandomEventTicket(nextState.availableRandomEvents, eventId),
+      usedRandomEvents: [...nextState.usedRandomEvents, eventId],
+      pendingRandomEvents: nextState.pendingRandomEvents?.filter((pending) => pending.eventId !== eventId),
+      totalRandomEventCount: serial,
+    };
+    events.push({ ...built.event, randomReplay: { eventId, serial, rolls } });
+  }
+  return { nextState, events };
+}
 
 export type { RandomRollProvider } from "./v2-random-events-core-shared";
 
@@ -40,6 +89,7 @@ export function collectFixedEventsForMonth(
 export function collectRandomEventsForMonth(
   state: GameState,
   getRoll: RandomRollProvider = gameRandom,
+  excludedEventIds: readonly number[] = [],
 ): { nextState: GameState; events: PendingEvent[] } {
   if (state.phase !== "playing") {
     return { nextState: state, events: [] };
@@ -78,7 +128,7 @@ export function collectRandomEventsForMonth(
           paper.status === "draft" && paper.idea + paper.experiment + paper.writing > 0
         ),
         excludedCategories: [...selectedCategories],
-        excludedEventIds: [...unavailableEventIds, ...(nextState.year >= 6 ? [11] : [])],
+        excludedEventIds: [...unavailableEventIds, ...excludedEventIds, ...(nextState.year >= 6 && !isCaptain(nextState) ? [11] : [])],
       },
       getRoll(),
     );
@@ -166,9 +216,12 @@ export function enqueueMonthlyEventsForMonth(
     illnessCollection.nextState,
     collectFixedEventsForMonth(illnessCollection.nextState, getRoll),
   );
+  const captainEvents = collectCaptainAnnualRelationshipEvents(fixedCollection.nextState, getRoll);
+  const captainCollection = enqueuePendingEvents(captainEvents.nextState, captainEvents.events);
   const randomCollection = collectRandomEventsForMonth(
-    fixedCollection.nextState,
+    captainCollection.nextState,
     getRoll,
+    isCaptainAnnualOpeningMonth(state) ? CAPTAIN_ANNUAL_RELATIONSHIP_EVENT_IDS : [],
   );
   const randomEnqueueCollection = enqueuePendingEvents(
     randomCollection.nextState,
@@ -177,6 +230,7 @@ export function enqueueMonthlyEventsForMonth(
 
   return {
     nextState: randomEnqueueCollection.nextState,
-    queuedEvents: [...thesisCollection.queuedEvents, ...illnessCollection.queuedEvents, ...fixedCollection.queuedEvents, ...randomEnqueueCollection.queuedEvents],
+    queuedEvents: [...thesisCollection.queuedEvents, ...illnessCollection.queuedEvents, ...fixedCollection.queuedEvents,
+      ...captainCollection.queuedEvents, ...randomEnqueueCollection.queuedEvents],
   };
 }

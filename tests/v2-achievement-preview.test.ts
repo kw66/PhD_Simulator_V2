@@ -25,8 +25,9 @@ describe("achievement catalog and presentation", () => {
       expect(definitions.every(item => isAchievementAvailableToRole(item.scope, role.id))).toBe(true);
       expect(definitions.find(item => item.id === `${role.id}:ending-master`)?.scope).toEqual(["upright", "reversed"].includes(getAchievementAudience(role.id)) ? { roleIds: [role.id] } : undefined);
       expect(definitions.find(item => item.id === `${role.id}:ending-phd`)?.scope).toEqual(["upright", "reversed"].includes(getAchievementAudience(role.id)) ? { roleIds: [role.id] } : undefined);
-      expect(definitions.some(item => item.id === "global:air-dried")).toBe(true);
-      expect(definitions.some(item => item.id === "global:ending-quit")).toBe(true);
+      const ordinary = ["upright", "reversed"].includes(getAchievementAudience(role.id));
+      expect(definitions.some(item => item.id === "global:air-dried")).toBe(ordinary);
+      expect(definitions.some(item => item.id === "global:ending-quit")).toBe(ordinary);
     }
     expect(ACHIEVEMENT_CATALOG.find(item => item.title === "智慧之神Ⅰ")?.description).toBe("科研达15");
     expect(ACHIEVEMENT_CATALOG.find(item => item.title === "铁杆师生Ⅰ")?.description).toBe("导师好感达15");
@@ -65,9 +66,9 @@ describe("achievement catalog and presentation", () => {
       expect(byTitle(title)).toMatchObject({ id: `${roleId}:zero-talent-master`, description: "使用0天赋点硕士毕业", rewardText: "经验倍率+1", scope: { roleIds: [roleId] } });
     }
     expect(byTitle("医学奇迹").description).toBe("累计提升40点生命上限");
-    expect(byTitle("医学奇迹").scope).toEqual({ audiences: ["all"] });
+    expect(byTitle("医学奇迹").scope).toEqual({ audiences: ["upright", "reversed"] });
     expect(byTitle("命悬一线").description).toBe("生命上限不超过6");
-    expect(byTitle("命悬一线").scope).toEqual({ audiences: ["all"] });
+    expect(byTitle("命悬一线").scope).toEqual({ audiences: ["upright", "reversed"] });
     expect(byTitle("我有多动症Ⅰ").description).toBe("单月行动≥3次（含AI）");
     expect(byTitle("我有多动症Ⅱ").description).toBe("单月行动≥4次（含AI）");
     expect(byTitle("打工狂人").description).toBe("累计打工15次");
@@ -77,8 +78,9 @@ describe("achievement catalog and presentation", () => {
     expect(ACHIEVEMENT_CATALOG.some(item => ["高级显卡", "二次行动"].includes(item.title))).toBe(false);
     for (const role of getRoleOptions()) {
       const titles = getRoleAchievementDefinitions(role.id).map(item => item.title);
-      expect(titles).toContain("命悬一线");
-      expect(titles).toContain("医学奇迹");
+      const ordinary = ["upright", "reversed"].includes(getAchievementAudience(role.id));
+      expect(titles.includes("命悬一线")).toBe(ordinary);
+      expect(titles.includes("医学奇迹")).toBe(ordinary);
       if (isAchievementAvailableToRole({ audiences: ["upright"] }, role.id)) {
         const start = titles.indexOf("突破极限Ⅰ");
         expect(titles.slice(start, start + 2)).toEqual(["突破极限Ⅰ", "突破极限Ⅱ"]);
@@ -191,11 +193,11 @@ describe("achievement catalog and presentation", () => {
     const find = (title: string) => ACHIEVEMENT_CATALOG.find(item => item.title === title)!;
     for (const [name, attribute] of [["智慧之神", "科研"], ["交际花", "社交"], ["铁杆师生", "导师好感"]]) {
       expect(find(`${name}Ⅰ`)).toMatchObject({ description: `${attribute}达15`, scope: { audiences: ["upright"] } });
-      expect(find(`${name}Ⅱ`)).toMatchObject({ description: `${attribute}达20`, scope: { audiences: ["all"] } });
+      expect(find(`${name}Ⅱ`)).toMatchObject({ description: `${attribute}达20`, scope: { audiences: ["upright", "reversed"] } });
     }
     for (const [name, attribute, first, second] of [["家财万贯", "金币", 60, 200], ["超厚血条", "SAN上限", 36, 60]] as const) {
       expect(find(`${name}Ⅰ`)).toMatchObject({ description: `${attribute}达到${first}`, scope: { audiences: ["upright"] } });
-      expect(find(`${name}Ⅱ`)).toMatchObject({ description: `${attribute}达到${second}`, scope: { audiences: ["all"] } });
+      expect(find(`${name}Ⅱ`)).toMatchObject({ description: `${attribute}达到${second}`, scope: { audiences: ["upright", "reversed"] } });
     }
     for (const [name, description] of [
       ["优秀硕士论文", "硕士论文盲审全部获A"], ["优秀博士论文", "博士论文盲审全部获A"],
@@ -203,8 +205,10 @@ describe("achievement catalog and presentation", () => {
       ["鞭策导师Ⅰ", "导师评上三级教授"], ["鞭策导师Ⅱ", "导师评上院士"],
       ["最佳之作", "一作发表A类Best Paper"], ["自然之子", "一作发表NMI"], ["自然之巅", "一作发表Nature"],
       ["万引大佬", "总引用达到10000"], ["高分论文Ⅰ", "论文非协作分达100"], ["高分论文Ⅱ", "论文非协作分达150"],
-    ]) expect(find(name)).toMatchObject({ description, rewardText: "经验+5", scope: { audiences: ["all"] } });
-    expect(find("百折不挠").scope).toEqual({ audiences: ["all"] });
+    ]) expect(find(name)).toMatchObject({ description, rewardText: "经验+5", scope: { audiences:
+      ["自然之巅", "未来院士", "诺奖之始", "万引大佬"].includes(name)
+        ? ["all"] : ["upright", "reversed"] } });
+    expect(find("百折不挠").scope).toEqual({ audiences: ["upright", "reversed"] });
   });
 
   it("covers the newly catalogued system routes, event choices and career endings", () => {
@@ -232,7 +236,7 @@ describe("achievement catalog and presentation", () => {
       ["央企有我", "取得央企总部业务主管及以上offer"],
       ["金榜题名", "取得省直二级主任科员及以上offer"],
       ["站上讲台", "取得211讲师及以上offer"],
-    ]) expect(find(title)).toMatchObject({ description, rewardText: "经验+5", scope: { audiences: ["all"] } });
+    ]) expect(find(title)).toMatchObject({ description, rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] } });
     expect(find("拨云见日")).toMatchObject({ description: "实际破除学术失语诅咒", rewardText: "经验倍率+1", scope: { roleIds: ["genius-reversed"] } });
     expect(find("登峰造极·大厂").description).toContain("首席科学家");
     expect(ACHIEVEMENT_CATALOG.filter(item => item.title.startsWith("登峰造极"))).toHaveLength(4);
@@ -243,7 +247,7 @@ describe("achievement catalog and presentation", () => {
     expect(find("诺奖之始").description).toBe("论文总分达1000");
     for (const [title, description] of [["别样心动", "分手后交往另一类型恋人"],
       ["另开眼界", "参加联培"], ["职场熟客", "完成3段实习"]]) {
-      expect(find(title)).toMatchObject({ description, scope: { audiences: ["all"] }, rewardText: "经验+5" });
+      expect(find(title)).toMatchObject({ description, scope: { audiences: ["upright", "reversed"] }, rewardText: "经验+5" });
     }
   });
 
@@ -287,6 +291,7 @@ describe("achievement catalog and presentation", () => {
     }
     for (const item of ACHIEVEMENT_CATALOG) {
       if (item.id === "unlock:research-captain") expect(item.rewardText).toBe("解锁统御者角色");
+        else if (item.id === "unlock:rewinder") expect(item.rewardText).toBe("解锁轮回者角色");
       else if (item.id.endsWith(":curse-hell-phd")) {
         expect(item.rewardText).toBe("全角色天赋点+1");
         expect(item.rewardScope).toEqual({ audiences: ["all"] });
@@ -312,7 +317,7 @@ describe("achievement catalog and presentation", () => {
     expect(collectorRewards.map(item => item.id)).toEqual(collectorIds);
     for (const item of collectorRewards) expect(item).toMatchObject({ rewardText: "经验倍率+0.2", scope: { audiences: ["all"] } });
     expect(ACHIEVEMENT_CATALOG.find(item => item.id === "global:conference-three-years"))
-      .toMatchObject({ title: "年年赴约", description: "连续3年发表同一个会议", rewardText: "经验+5", scope: { audiences: ["all"] } });
+      .toMatchObject({ title: "年年赴约", description: "连续3年发表同一个会议", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] } });
   });
 
   it("distinguishes missing statistics from measured zero and never invents a rate", () => {

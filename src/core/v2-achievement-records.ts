@@ -24,6 +24,10 @@ export function loadRoleAchievementRecords(account: AccountProfile, storage: Ach
     const definitions = getAllAchievementDefinitions();
     const knownIds = new Set(definitions.map(definition => definition.id));
     const knownRoles = new Set(Object.keys(account.roleProgress));
+    // Narrowing future eligibility must not erase a previously paid shared
+    // completion or its per-role date. Scoped role challenges remain strict.
+    const previouslyPaidShared = new Set(Array.isArray(saved.rewardedIds)
+      ? saved.rewardedIds.filter((id): id is string => typeof id === "string" && id.startsWith("global:") && knownIds.has(id)) : []);
     const savedDates = isRecord(saved.unlockedAt) ? saved.unlockedAt : {};
     const savedRoleDates = isRecord(saved.unlockedByRole) ? saved.unlockedByRole : {};
     const roleProgress = { ...account.roleProgress };
@@ -32,7 +36,7 @@ export function loadRoleAchievementRecords(account: AccountProfile, storage: Ach
     for (const roleId of Object.keys(roleProgress) as RoleId[]) {
       const record = saved.roles[roleId];
       if (!isRecord(record)) continue;
-      const availableIds = new Set(getRoleAchievementDefinitions(roleId).map(definition => definition.id));
+      const availableIds = new Set([...getRoleAchievementDefinitions(roleId).map(definition => definition.id), ...previouslyPaidShared]);
       const unlockedAchievementIds = Array.isArray(record.unlockedAchievementIds)
         ? [...new Set(record.unlockedAchievementIds.filter((id): id is string => typeof id === "string" && availableIds.has(id)
           && (isValidTimestamp(savedDates[id]) || (isRecord(savedRoleDates[id]) && isValidTimestamp(savedRoleDates[id][roleId])))))] : [];
@@ -45,7 +49,8 @@ export function loadRoleAchievementRecords(account: AccountProfile, storage: Ach
       const roleDates: Partial<Record<RoleId, string>> = {};
       for (const [rawRoleId, date] of Object.entries(value)) {
         const roleId = rawRoleId as RoleId;
-        if (!knownRoles.has(roleId) || !isAchievementAvailableToRole(definition.scope, roleId) || !isValidTimestamp(date)) continue;
+        if (!knownRoles.has(roleId) || (!isAchievementAvailableToRole(definition.scope, roleId)
+          && !previouslyPaidShared.has(definition.id)) || !isValidTimestamp(date)) continue;
         roleDates[roleId] = date;
         const progress = roleProgress[roleId];
         roleProgress[roleId] = { ...progress, unlockedAchievementIds: [...new Set([...progress.unlockedAchievementIds, definition.id])] };

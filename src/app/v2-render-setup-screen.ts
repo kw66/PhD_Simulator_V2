@@ -42,10 +42,12 @@ import { getAchievementGlobalCompletion } from "./v2-achievement-stats";
 import { getAchievementScopeLabels, isAchievementCompleted } from "../core/v2-achievement-scope";
 import type { RoleRailViewId } from "./v2-render-types";
 import { renderCaptainTags } from "./v2-render-captain-tags";
+import { renderRewinderPreview } from "./v2-render-rewinder";
+import { getRewinderAchievementCount, REWINDER_REQUIRED_ACHIEVEMENTS } from "../core/v2-account-role-unlocks";
 import { getSelectedCurseDifficulty, getUnlockedCurseDifficulty } from "../core/v2-curse-progress";
 import { isCursedRole } from "../core/v2-curse-system";
 
-const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain", "special-dandan", "special-daji"]);
+const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain"]);
 const CURSED_ROLE_IDS = new Set<RoleId>(["cursed-frail", "cursed-debt", "special-finite-life", "special-fading-genius"]);
 function hasDesignedTalentTree(roleId: RoleId): roleId is keyof typeof DESIGNED_TALENT_TREES {
   return Object.hasOwn(DESIGNED_TALENT_TREES, roleId);
@@ -303,8 +305,9 @@ function renderGrowthProgress(
   experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER,
 ): string {
   const expTarget = pointSummary.nextExp;
-  const usesTalentPoints = viewModel.role.id !== "research-captain" && !isCursedRole(viewModel.role.id);
-  const passiveLevelHint = isCursedRole(viewModel.role.id) ? "选择已解锁的诅咒难度，无需加点" : "标签等级跟随六个基础角色等级，无需加点";
+  const usesTalentPoints = !SPECIAL_ROLE_IDS.has(viewModel.role.id) && !isCursedRole(viewModel.role.id);
+  const passiveLevelHint = isCursedRole(viewModel.role.id) ? "选择已解锁的诅咒难度，无需加点" : "";
+  const levelTooltip = usesTalentPoints ? `每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点` : passiveLevelHint;
   const expProgressPercent = expTarget === null
     ? 100
     : Math.max(0, Math.min(100, Math.round((pointSummary.currentExp / expTarget) * 100)));
@@ -313,7 +316,7 @@ function renderGrowthProgress(
     <div class="lobby-profile-growth-summary">
       <div class="lobby-growth-summary-row">
         <div class="lobby-growth-level-group">
-          <span class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级${pointSummary.level}${usesTalentPoints ? `，每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点` : ""}" data-tooltip="${usesTalentPoints ? `每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点` : passiveLevelHint}">
+          <span class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级${pointSummary.level}${usesTalentPoints ? `，每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点` : ""}"${levelTooltip ? ` data-tooltip="${levelTooltip}"` : ""}>
             <span class="lobby-growth-inline-label">等级</span>
             <strong class="lobby-growth-inline-value" ${animationNumberAttributes(`role:${viewModel.role.id}:growth:level`, pointSummary.level)}>${pointSummary.level}</strong>
           </span>
@@ -352,7 +355,9 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
     <section class="lobby-profile-info">
       <div class="lobby-profile-info-head">
         <h1 class="lobby-profile-art-name">${escapeHtml(viewModel.role.name)}</h1>
-        ${viewModel.unlockState.owned
+        ${viewModel.unlockState.owned && viewModel.role.id === "rewinder"
+          ? '<button class="lobby-start-button is-disabled" type="button" disabled aria-label="轮回能力尚未实装"><span class="lobby-start-button-label">玩法待实装</span></button>'
+          : viewModel.unlockState.owned
           ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"${isSaveLoading ? ' disabled aria-busy="true"' : ""}><span class="lobby-start-button-label">${isSaveLoading ? "读取中…" : hasRoleSave ? "继续游戏" : "开始游戏"}</span><i class="lobby-start-button-arrow" data-lucide="arrow-right" aria-hidden="true"></i></button>`
           : `<span class="lobby-start-lock" role="group" tabindex="0" aria-label="${escapeHtml(unlockHint)}" data-tooltip="${escapeHtml(unlockHint)}"><button class="lobby-start-button is-disabled" type="button" disabled aria-label="角色尚未解锁"><i data-lucide="lock" aria-hidden="true"></i></button></span>`}
       </div>
@@ -614,7 +619,7 @@ function renderSelectedRoleDetail(
             </div>
             ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading)}
           </section>
-          ${selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
+          ${selectedRoleId === "rewinder" ? `<div class="rewinder-unlock-progress" role="note" style="text-align:center;font-size:0.75rem;color:var(--ink-soft)">已完成 ${Math.min(REWINDER_REQUIRED_ACHIEVEMENTS, getRewinderAchievementCount(accountProfile))}/${REWINDER_REQUIRED_ACHIEVEMENTS} 个不同成就 · 轮回能力待实装</div>${renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 5)}` : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
             ? renderDesignedGrowthBoard(selectedRoleId, isCursedRole(selectedRoleId) ? getSelectedCurseDifficulty(accountProfile, selectedRoleId) - 1 : talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined, false, bonusPoints, isCursedRole(selectedRoleId) ? { unlockedDifficulty: getUnlockedCurseDifficulty(accountProfile, selectedRoleId) } : undefined)
             : ""}
         </div>

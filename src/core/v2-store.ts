@@ -381,6 +381,10 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
         if (state.phase !== "setup") return;
         if (!readyComplete) { void ready().then(() => api.dispatch(actionId, payload)); return; }
         const nextRoleId = payload.roleId ?? accountProfile.selectedLobbyRoleId;
+        if (nextRoleId === "rewinder") {
+          commit(pushNoOpLog(state, "轮回者已开放能力预览，轮回玩法尚未实装。"));
+          return;
+        }
         if (restore(nextRoleId)) return;
         if (!isRoleOwned(accountProfile, nextRoleId)) {
           commit(pushNoOpLog(state, "该角色当前仅供展示。"));

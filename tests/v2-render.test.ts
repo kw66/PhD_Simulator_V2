@@ -632,7 +632,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-stage"');
     expect(html).toContain('class="lobby-stage-scale"');
     expect(html).toContain("角色图鉴");
-    expect(html).toContain("已收录 1 / 20");
+    expect(html).toContain("已收录 1 / 18");
     expect(html).toContain("大多数");
     expect(html).toContain("院士转世");
     expect(html).toContain("怠惰·大多数");
@@ -1107,21 +1107,26 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("忙里偷闲");
   });
 
-  it("does not invent effects for placeholder talent trees", () => {
+  it("shows the rewinder inheritance design without allocation controls", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "rewinder";
     const html = renderApp(createInitialState(), account);
     expect(html).not.toContain("lobby-talent-effects");
-    expect(html).not.toContain("lobby-normal-tree-detail");
+    expect(html).toContain("is-rewinder-tree");
+    expect(html).toContain("设计预览");
+    expect(html).toContain("轮回能力待实装");
+    expect(html).not.toContain('data-ui-talent-reset=');
+    expect(html).not.toContain('data-talent-id=');
     expect(html).not.toContain("data-ui-talent-effect-page-delta");
   });
 
-  it.each(["rewinder", "special-dandan", "special-daji"] as const)("does not render a talent-tree placeholder for %s", (roleId) => {
+  it.each(["rewinder"] as const)("renders six passive design explanations for %s", (roleId) => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = roleId;
     const html = renderApp(createInitialState(), account);
-    expect(html).not.toContain('class="lobby-profile-growth-card');
-    expect(html).not.toContain('data-ui-talent-tree-node=');
+    expect(html).toContain('class="lobby-profile-growth-card');
+    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(6);
+    expect(html).toContain("已完成 0/24 个不同成就");
   });
 
   it.each([
@@ -1819,12 +1824,12 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('aria-label="第2页"');
     expect(html).toContain('aria-current="page" disabled');
     expect(html).toContain("天选之人");
-    expect((html.match(/data-action="select-role"/g) ?? []).length).toBe(10);
-    expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(5);
+    expect((html.match(/data-action="select-role"/g) ?? []).length).toBe(8);
+    expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(4);
     expect(html).toContain("有限人生");
     expect(html).toContain("天才迟暮");
-    expect(html).toContain("百变旦旦");
-    expect(html).toContain("魅力妲己");
+    expect(html).not.toContain("百变旦旦");
+    expect(html).not.toContain("魅力妲己");
     expect(html).toContain("体弱多病");
     expect(html).toContain("寒门负重");
     expect(html).toContain('class="lobby-role-card-mode-band is-special"');
@@ -5633,16 +5638,15 @@ describe("v2 render lobby shell", () => {
     const header = card.match(/<div class="rel-header-main">([\s\S]*?)<\/div>/)?.[1] ?? "";
     const row = card.match(/<div class="rel-fellow-academic-row rel-attributes-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(header).not.toContain("rel-wallet");
-    expect(row).not.toContain("rel-ai-label");
+    expect(row).toContain("rel-ai-label");
     expect(row).toContain('<strong>2.56</strong>');
     expect(row).toContain('class="rel-detail-item rel-wallet"');
     expect(row).toContain('data-tooltip="用于生活费、自费实验和订阅AI"');
-    const aiLabel = header.match(/<span class="rel-type rel-ai-label"[^>]*>AI<\/span>/)?.[0] ?? "";
+    const aiLabel = row.match(/<span class="rel-type rel-ai-label"[^>]*>AI<\/span>/)?.[0] ?? "";
     expect(aiLabel).toContain(`data-tooltip="本月订阅${getAiModelForTotalMonths(state.totalMonths, aiSlot).name}"`);
     expect(aiLabel).toContain('tabindex="0"');
     expect(row.indexOf('attr-level-affinity')).toBeLessThan(row.indexOf('rel-wallet'));
-    expect(header.indexOf('rel-name')).toBeLessThan(header.indexOf('rel-ai-label'));
-    expect(header.indexOf('rel-ai-label')).toBeLessThan(header.indexOf('rel-academic-label'));
+    expect(row.indexOf('rel-wallet')).toBeLessThan(row.indexOf('rel-ai-label'));
     expect(card.match(/class="rel-fellow-academic-row rel-attributes-row"/g)).toHaveLength(1);
     expect(card.match(/class="rel-monthly-activity"/g)).toHaveLength(1);
     expect(state).toEqual(before);

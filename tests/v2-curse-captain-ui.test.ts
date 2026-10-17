@@ -52,7 +52,7 @@ describe("curse and captain UI", () => {
     const state = { ...enroll("research-captain"), captainState: run };
     const html = renderApp(state, account, { activePlayTab: "talent", activeTalentTab: "character", captainTagRoleProgress: account.roleProgress });
     expect(html).toContain("大多数 Lv2");
-    expect(html).toContain("标签等级在本局开局时确定");
+    expect(html).not.toContain("标签等级在本局开局时确定");
   });
 
   it("uses captain progress caps and tags in relationship cards", () => {

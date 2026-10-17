@@ -2378,7 +2378,6 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
             <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
             ${captainTag ? `<span class="rel-type rel-captain-tag">${escapeHtml(getRoleDefinition(captainTag).name)} Lv${state.captainState!.levels[captainTag]}</span>` : ""}
             ${fellow?.longTermMentoring ? `<span class="rel-type rel-mentoring-mark" ${relationshipTooltip("长期合作：每月SAN-1，协作额外推进1次。", "left")} aria-label="长期合作">长期合作</span>` : ""}
-            ${fellowAi ? `<span class="rel-type rel-ai-label" ${relationshipTooltip(`本月订阅${fellowAi.name}`)}>AI</span>` : ""}
             ${card.type === "lover" ? `<span class="rel-type rel-lover-trait" ${relationshipTooltip(getLoverTraitHint(state.loverState.type))}>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span>` : ""}
             ${fellow || card.type === "lover" ? `<span class="rel-academic-label" ${relationshipTooltip(knownHint, "right")}>${renderRelationshipIcon("🎓")}${escapeHtml(fellow ? getFellowAcademicLabel(state, fellow) : getStudentAcademicLabel(state.year, state.degree))}</span>` : ""}
             ${fellow ? `<span class="rel-detail-item rel-research-score" ${relationshipTooltip(fellow.degree === "phd" ? "第六年6月毕业，要求科研分≥7" : "第三年6月硕士毕业，要求科研分≥1", "right")}>科研分 <strong class="rel-detail-value">${getFellowResearchScore(state, fellow)}</strong></span>` : ""}
@@ -2392,7 +2391,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
       ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip(`用于工资、实验、论文和报销，低于0破产\n经费＜${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：同学只做横向，不做纵向\n经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：硕士工资+0.5、博士+1，可触发导师经费事件`, "left")}>${renderRelationshipIcon("💰")}科研经费 <strong aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", roundMoney(state.advisorProgressState.funding), formatMoney(state.advisorProgressState.funding))}</strong></span><span class="rel-finance-summary" ${relationshipTooltip(monthFinanceHint)}>${renderRelationshipIcon("📊")}经费收支 <strong>${signedMoney(monthFinance!.net)}</strong></span><span ${relationshipTooltip(payrollHint, "right")}>${renderRelationshipIcon("💸")}学生工资 <strong>${formatMoney(payroll.total)}</strong></span></div>` : ""}
       ${fellow ? `<div class="rel-fellow-academic-row rel-attributes-row">
         ${renderAttributes()}
-        <span class="rel-detail-item rel-wallet" ${relationshipTooltip("用于生活费、自费实验和订阅AI", "right")}>${renderRelationshipIcon("💰")}<strong>${formatMoney(finance?.money ?? 0)}</strong></span>
+        <span class="rel-detail-item rel-wallet" ${relationshipTooltip("用于生活费、自费实验和订阅AI", "right")}>${renderRelationshipIcon("💰")}<strong>${formatMoney(finance?.money ?? 0)}</strong>${fellowAi ? `<span class="rel-type rel-ai-label" ${relationshipTooltip(`本月订阅${fellowAi.name}`, "right")}>AI</span>` : ""}</span>
       </div>${renderFellowPaper(state, fellow)}` : ""}
       ${advisor ? renderAdvisorStatus(state) : card.type === "lover" ? renderLoverRoutes(state) : `<div class="rel-progress-section rel-resource-row">
         <div class="rel-progress-item">

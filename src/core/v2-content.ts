@@ -121,22 +121,6 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
     startingStats: { ...BASE_ROLE_STARTING_STATS },
   },
   {
-    id: "special-dandan",
-    mode: "upright",
-    gender: "male",
-    name: "百变旦旦",
-    icon: "🎭",
-    startingStats: { ...BASE_ROLE_STARTING_STATS },
-  },
-  {
-    id: "special-daji",
-    mode: "upright",
-    gender: "female",
-    name: "魅力妲己",
-    icon: "💃",
-    startingStats: { ...BASE_ROLE_STARTING_STATS },
-  },
-  {
     id: "cursed-frail",
     mode: "reversed",
     gender: "male",

@@ -17,11 +17,11 @@ describe("v2 progression", () => {
     expect(getRoleDefinition("research-captain").name).toBe("统御者");
     expect(getRoleDefinition("genius-reversed").name).toBe("愚钝·院士转世");
     expect(getRoleDefinition("social-reversed").name).toBe("嫉妒·社交达人");
-    expect(getRoleOptions()).toHaveLength(20);
+    expect(getRoleOptions()).toHaveLength(18);
     expect(getRoleDefinition("special-finite-life").name).toBe("有限人生");
     expect(getRoleDefinition("special-fading-genius").name).toBe("天才迟暮");
-    expect(getRoleDefinition("special-dandan").name).toBe("百变旦旦");
-    expect(getRoleDefinition("special-daji").name).toBe("魅力妲己");
+    expect(getRoleOptions().map(role => role.id)).not.toContain("special-dandan");
+    expect(getRoleOptions().map(role => role.id)).not.toContain("special-daji");
     expect(getRoleDefinition("cursed-frail").name).toBe("体弱多病");
     expect(getRoleDefinition("cursed-debt").name).toBe("寒门负重");
   });
