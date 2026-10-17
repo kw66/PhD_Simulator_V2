@@ -15,10 +15,10 @@ const ROLE_CARD_PORTRAIT_URLS: Record<RoleId, string> = {
   "rich-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/04_rich_reversed_final_card.webp", import.meta.url).href,
   "teacher-child-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/05_teacher_child_reversed_final_card.webp", import.meta.url).href,
   "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/06_chosen_reversed_final_card.webp", import.meta.url).href,
-  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/card/09_finite_life_v3_final_card.webp", import.meta.url).href,
-  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/card/10_fading_genius_v3_final_card.webp", import.meta.url).href,
-  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/card/11_cursed_frail_v3_final_card.webp", import.meta.url).href,
-  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/card/12_cursed_debt_v3_final_card.webp", import.meta.url).href,
+  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/card/09_finite_life_v4_final_card.webp", import.meta.url).href,
+  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/card/10_fading_genius_v4_final_card.webp", import.meta.url).href,
+  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/card/11_cursed_frail_v4_final_card.webp", import.meta.url).href,
+  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/card/12_cursed_debt_v4_final_card.webp", import.meta.url).href,
 };
 
 const ROLE_DETAIL_PORTRAIT_URLS: Record<RoleId, string> = {
@@ -36,10 +36,10 @@ const ROLE_DETAIL_PORTRAIT_URLS: Record<RoleId, string> = {
   "rich-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/04_rich_reversed_final_detail.webp", import.meta.url).href,
   "teacher-child-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/05_teacher_child_reversed_final_detail.webp", import.meta.url).href,
   "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/06_chosen_reversed_final_detail.webp", import.meta.url).href,
-  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/detail/09_finite_life_v3_final_detail.webp", import.meta.url).href,
-  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/detail/10_fading_genius_v3_final_detail.webp", import.meta.url).href,
-  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/detail/11_cursed_frail_v3_final_detail.webp", import.meta.url).href,
-  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/detail/12_cursed_debt_v3_final_detail.webp", import.meta.url).href,
+  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/detail/09_finite_life_v4_final_detail.webp", import.meta.url).href,
+  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/detail/10_fading_genius_v4_final_detail.webp", import.meta.url).href,
+  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/detail/11_cursed_frail_v4_final_detail.webp", import.meta.url).href,
+  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/detail/12_cursed_debt_v4_final_detail.webp", import.meta.url).href,
 };
 
 const WARMED_DETAIL_PORTRAITS = new Set<RoleId>();
