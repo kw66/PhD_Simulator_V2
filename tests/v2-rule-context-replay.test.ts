@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
-import { withGameplayRuleset, usesCurrentGameplayRules } from "../src/core/v2-rule-context";
+import { CURRENT_GAMEPLAY_RULESET, withGameplayRuleset, usesCurrentGameplayRules } from "../src/core/v2-rule-context";
 import { createRunReplay, executeReplayCommand, isRunReplay, replayStateDigest, verifyRunReplay,
   type ReplayCommand } from "../src/core/v2-run-replay";
 import { queueAdvisorGuidance } from "../src/core/v2-advisor-guidance";
@@ -56,7 +56,13 @@ describe("versioned gameplay operation replay", () => {
       remainder: syncCaptainMembers(joined).captainState!.loverAdvanceRemainder,
     }));
     expect(legacy).toEqual({ pending: 15, activity: "玩耍进度 +5，学习进度 +10", remainder: 0.7 });
-    expect(withGameplayRuleset("20261017-r4", () => queueAdvisorGuidance(state)).advisorProgressState.pendingGuidanceToPlayer).toBe(30);
+    for (const currentRules of ["20261017-r4", CURRENT_GAMEPLAY_RULESET] as const) {
+      expect(withGameplayRuleset(currentRules, () => ({
+        pending: queueAdvisorGuidance(state).advisorProgressState.pendingGuidanceToPlayer,
+        activity: advanceLoverMonth(state).loverProgressState.monthlyActivity,
+        remainder: syncCaptainMembers(joined).captainState!.loverAdvanceRemainder,
+      }))).toEqual({ pending: 30, activity: "玩耍进度 +10，学习进度 +20（推进2次）", remainder: 0 });
+    }
     expect(advanceLoverMonth(state).loverProgressState.monthlyActivity).toBe("玩耍进度 +10，学习进度 +20（推进2次）");
     expect(syncCaptainMembers(joined).captainState!.loverAdvanceRemainder).toBe(0);
   });
@@ -100,7 +106,7 @@ describe("versioned gameplay operation replay", () => {
     expect(isRunReplay(invalid)).toBe(false);
   });
 
-  it("appends r4 operations to a loaded r3 store and deterministically restores and rewinds them", async () => {
+  it("appends current operations to a loaded r3 store and deterministically restores and rewinds them", async () => {
     const data = new Map<string, string>();
     const storage = { getItem: (key: string) => data.get(key) ?? null,
       setItem: (key: string, value: string) => { data.set(key, value); } };
@@ -130,7 +136,7 @@ describe("versioned gameplay operation replay", () => {
     const continued = saves.get("research-captain")!.replay!;
     expect(continued.ruleset).toBe("20261017-r3");
     expect(continued.commands[0]).not.toHaveProperty("ruleset");
-    expect(continued.commands.at(-1)).toMatchObject({ kind: "action", ruleset: "20261017-r4" });
+    expect(continued.commands.at(-1)).toMatchObject({ kind: "action", ruleset: CURRENT_GAMEPLAY_RULESET });
     await store.flushSaves();
     store = createStore({ storage, saves: createRunSaveRepository({ storage, adapter }) });
     await store.ready();

@@ -5,6 +5,7 @@ import {
   ROLE_DEFINITIONS,
 } from "./v2-content";
 import type { Degree, RoleDefinition, RoleId } from "./v2-types";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 function getMaxYearsByDegree(_degree: Degree): number {
   return 6;
@@ -38,6 +39,10 @@ export function getRoleDefinition(roleId: RoleId): RoleDefinition {
   const role = ROLE_DEFINITIONS.find((item) => item.id === roleId);
   if (!role) {
     throw new Error(`Unknown role: ${roleId}`);
+  }
+  // Historical events used male honorifics and generated female partners for these roles.
+  if ((roleId === "cursed-frail" || roleId === "special-fading-genius") && !usesGameplayRulesFrom("20261017-r5")) {
+    return { ...role, gender: "male" };
   }
   return role;
 }

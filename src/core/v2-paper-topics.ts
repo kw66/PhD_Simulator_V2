@@ -28,8 +28,7 @@ const TOPIC_YEARS = [2023, 2024, 2025, 2026, 2027, 2028, 2029] as const;
 /**
  * A compact catalog of distinct research directions. The year tiers model
  * relative attention, not whether a mature direction remains publishable.
- * Later-year entries are game extrapolations documented in
- * docs/PAPER_TOPIC_RESEARCH.md.
+ * Later-year entries are game extrapolations, not predictions of real rankings.
  */
 const PAPER_TOPICS: readonly PaperTopicDefinition[] = [
   // Vision: core recognition, restoration, 3D and video

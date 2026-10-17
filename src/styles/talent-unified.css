@@ -220,22 +220,23 @@
   .talent-panel .talent-item-row { min-height: 176px; }
 }
 
-.is-designed-tree .lobby-talent-tree-node[data-current-level="0"]:not(.is-fixed) {
+/* Passive tags work at Lv0; a chosen curse is active without spending talent points. */
+.is-designed-tree:not(.is-captain-tag-tree) .lobby-talent-tree-node[data-current-level="0"]:not([data-curse-difficulty].is-selected):not(.is-fixed) {
   --tree-tone: #898985;
 }
 
-.is-designed-tree .lobby-talent-tree-node[data-current-level="0"]:not(.is-fixed) .lobby-talent-tree-node-ring {
+.is-designed-tree:not(.is-captain-tag-tree) .lobby-talent-tree-node[data-current-level="0"]:not([data-curse-difficulty].is-selected):not(.is-fixed) .lobby-talent-tree-node-ring {
   background: radial-gradient(circle at 32% 24%, #d8d8d3, #858783 56%, #666963);
   box-shadow: inset 0 1px 2px #f1f1ed, inset 0 -3px 5px #5e615d, 0 2px 5px #66696355;
 }
 
-.is-designed-tree .lobby-talent-tree-node[data-current-level="0"]:not(.is-fixed) .lobby-talent-tree-node-ring::before,
-.is-designed-tree .lobby-talent-tree-node[data-current-level="0"].is-selected:not(.is-fixed) .lobby-talent-tree-node-ring::before {
+.is-designed-tree:not(.is-captain-tag-tree) .lobby-talent-tree-node[data-current-level="0"]:not([data-curse-difficulty].is-selected):not(.is-fixed) .lobby-talent-tree-node-ring::before,
+.is-designed-tree:not(.is-captain-tag-tree) .lobby-talent-tree-node[data-current-level="0"]:not([data-curse-difficulty].is-selected).is-selected:not(.is-fixed) .lobby-talent-tree-node-ring::before {
   border-color: #81847f;
   box-shadow: 0 0 5px #777a7655, inset 0 0 4px #777a764d;
 }
 
-.is-designed-tree .lobby-talent-tree-node[data-current-level="0"].is-selected:not(.is-fixed) .lobby-talent-tree-node-ring::before {
+.is-designed-tree:not(.is-captain-tag-tree) .lobby-talent-tree-node[data-current-level="0"]:not([data-curse-difficulty].is-selected).is-selected:not(.is-fixed) .lobby-talent-tree-node-ring::before {
   border-color: #515b59;
   box-shadow: 0 0 0 2px #c1c4bd, 0 0 7px #777a7655;
 }

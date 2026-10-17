@@ -123,7 +123,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
     id: "cursed-frail",
     mode: "reversed",
-    gender: "male",
+    gender: "female",
     name: "体弱多病",
     icon: "🩹",
     startingStats: { ...BASE_ROLE_STARTING_STATS },
@@ -139,7 +139,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
   {
     id: "special-fading-genius",
     mode: "reversed",
-    gender: "male",
+    gender: "female",
     name: "天才迟暮",
     icon: "🕯️",
     startingStats: { ...BASE_ROLE_STARTING_STATS },

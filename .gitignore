@@ -37,6 +37,17 @@ test-results/
 progress.md
 tools/
 
+# Local agent guidance and internal design/review notes are not release files.
+/AGENTS.md
+/.impeccable.md
+/docs/*
+!/docs/ONLINE_STATISTICS.md
+!/docs/SAVE_SYSTEM.md
+!/docs/DATA_EPOCH.md
+/scripts/audit-event-review-snapshots.mjs
+/scripts/sync-event-review-snapshots.mjs
+/src/assets/ai/doubao.svg
+
 # Keep only the optimized role portraits used by the game. Original artwork
 # remains available locally without making the public repository unnecessarily large.
 /art/*
