@@ -44,7 +44,6 @@ import { getAchievementScopeLabels, isAchievementCompleted } from "../core/v2-ac
 import type { RoleRailViewId } from "./v2-render-types";
 import { renderCaptainTags } from "./v2-render-captain-tags";
 import { renderRewinderPreview } from "./v2-render-rewinder";
-import { getRewinderAchievementCount, REWINDER_REQUIRED_ACHIEVEMENTS } from "../core/v2-account-role-unlocks";
 import { getSelectedCurseDifficulty, getUnlockedCurseDifficulty } from "../core/v2-curse-progress";
 import { isCursedRole } from "../core/v2-curse-system";
 
@@ -553,7 +552,7 @@ export function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_T
   const points = allocation && level !== undefined ? getTalentPointBalance(roleId, level, allocation, bonusPoints) : null;
   return `
     <section class="lobby-profile-growth-card lobby-profile-section is-designed-growth-card">
-      ${!showPoints || points === null || exclusiveChallenge ? "" : `<div class="character-talent-points"><span>天赋点 <strong>${points}</strong></span><button type="button" data-ui-talent-reset="${roleId}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置本次测试加点" aria-label="重置本次测试加点"><i data-lucide="rotate-ccw" aria-hidden="true"></i></button></div>`}
+      ${!showPoints || points === null || exclusiveChallenge ? "" : `<div class="character-talent-points"><span>天赋点 <strong>${points}</strong></span><button type="button" data-ui-talent-reset="${roleId}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置天赋点" aria-label="重置天赋点"><i data-lucide="rotate-ccw" aria-hidden="true"></i></button></div>`}
       <div class="lobby-talent-tree is-designed-tree is-${roleId}-tree${nodes.some((node) => node.fixed) ? " is-fixed-tree" : ""}${exclusiveChallenge ? " is-cursed-choice-tree" : ""}" role="group" aria-label="${exclusiveChallenge ? "诅咒难度，逐级挑战" : "天赋树预览"}" data-active-page="0" ${exclusiveChallenge ? `data-selection-mode="exclusive"${curseOptions?.readOnly ? ' data-curse-read-only="true"' : ""}` : 'data-prerequisite-mode="any" data-prerequisite-min-level="1"'}>
         <div class="lobby-talent-tree-pages">
           <div class="lobby-talent-tree-page is-active is-designed-page" data-tree-page="0">
@@ -627,7 +626,7 @@ function renderSelectedRoleDetail(
             </div>
             ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading, roleHistoryPageIndex)}
           </section>
-          ${selectedRoleId === "rewinder" ? `<div class="rewinder-unlock-progress" role="note" style="text-align:center;font-size:0.75rem;color:var(--ink-soft)">已完成 ${Math.min(REWINDER_REQUIRED_ACHIEVEMENTS, getRewinderAchievementCount(accountProfile))}/${REWINDER_REQUIRED_ACHIEVEMENTS} 个不同成就</div>${renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 3)}` : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
+          ${selectedRoleId === "rewinder" ? renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 3) : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
             ? renderDesignedGrowthBoard(selectedRoleId, isCursedRole(selectedRoleId) ? getSelectedCurseDifficulty(accountProfile, selectedRoleId) - 1 : talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined, false, bonusPoints, isCursedRole(selectedRoleId) ? { unlockedDifficulty: getUnlockedCurseDifficulty(accountProfile, selectedRoleId) } : undefined)
             : ""}
         </div>
@@ -640,7 +639,7 @@ function renderSelectedRoleDetail(
 export function renderSetupScreen(
   _state: GameState,
   accountProfile: AccountProfile,
-  activeRoleRailView: RoleRailViewId = "achievements",
+  activeRoleRailView: RoleRailViewId = "announcements",
   talentTreePageIndex = 0,
   talentTreeSelectedNodeByPage: readonly number[] = [0],
   announcementPageIndex = 0,

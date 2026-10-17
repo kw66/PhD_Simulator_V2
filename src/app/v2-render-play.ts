@@ -1,5 +1,6 @@
 import { renderSanPayment } from "./v2-render-san-payment";
-import { formatEventResultResistance } from "./v2-event-result-display";
+import { getTalentTriggerDisplay } from "./v2-talent-trigger-display";
+import { formatEventRecoveryDisplay, formatEventResultResistance } from "./v2-event-result-display";
 import { renderRunSaves } from "./v2-render-run-saves";
 import { getEffectiveResearch, getEffectiveSocial } from "../core/v2-effective-attributes";
 import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
@@ -1159,7 +1160,8 @@ function renderEventContentBox(
   const displayEvent = historicalPage ?? currentEvent;
   if (!displayEvent) return "";
   const priorStage = (isCompleted ? completedStages : history)[displayPageIndex - 1];
-  const displayDescription = formatEventResultResistance(displayEvent.description, priorStage?.selectedChoiceId);
+  const displayDescription = formatEventRecoveryDisplay(
+    formatEventResultResistance(displayEvent.description, priorStage?.selectedChoiceId), state?.selectedRoleId);
   const paperReviewPresentation = displayEvent.paperReviewPresentation;
   const journalAcceptancePresentation = displayEvent.journalAcceptancePresentation;
   const displayStage: EventStage = "stage" in displayEvent
@@ -1267,10 +1269,10 @@ export function renderEventLayoutSamples(
   state?: GameState,
 ): EventLayoutSample[] {
   if (completedEvent) {
-    return completedEvent.stages.map((_, index) => ({ key: `history:${index}`, html: renderEventContentBox(null, completedEvent, index) }));
+    return completedEvent.stages.map((_, index) => ({ key: `history:${index}`, html: renderEventContentBox(null, completedEvent, index, false, state) }));
   }
   if (!currentEvent) return [];
-  const samples = (currentEvent.history ?? []).map((_, index) => ({ key: `history:${index}`, html: renderEventContentBox(currentEvent, null, index) }));
+  const samples = (currentEvent.history ?? []).map((_, index) => ({ key: `history:${index}`, html: renderEventContentBox(currentEvent, null, index, false, state) }));
   const seen = new Set<PendingEvent>();
   const visit = (event: PendingEvent, history: NonNullable<PendingEvent["history"]>, branch = ""): void => {
     if (seen.has(event)) return;
@@ -4137,7 +4139,7 @@ function getEventLogPresentation(
   if (!entry.eventHistoryId) return monthAdvancePresentation;
   const record = eventHistory.find((event) => event.id === entry.eventHistoryId);
   if (!record) return monthAdvancePresentation;
-  const talentTrigger = record.stages.find((stage) => stage.talentTrigger)?.talentTrigger;
+  const talentTrigger = getTalentTriggerDisplay(record, eventHistory);
   if (talentTrigger) {
     return {
       title: parsed.title,
@@ -4174,6 +4176,7 @@ function getEventLogPresentation(
 function renderLogList(
   page: LogPage | null,
   eventHistory: readonly GameState["eventHistory"][number][],
+  roleId?: GameState["selectedRoleId"],
 ): string {
   if (!page || page.entries.length === 0) {
     return `<div class="no-logs">暂无日志</div>`;
@@ -4193,7 +4196,7 @@ function renderLogList(
       return `
         <${entryTag} class="${getLogEntryClassName(entry.text)}${canReplay ? " event-history-log-entry" : ""}"${entryTypeAttributes}${eventHistoryAttributes}>
           <div class="event"><span class="log-entry-title${result ? "" : " log-entry-title-only"}">${escapeHtml(normalizeGameDisplayText(title))}</span></div>
-          ${result ? `<div class="result">${renderLogResultHtml(result)}</div>` : ""}
+          ${result ? `<div class="result">${renderLogResultHtml(formatEventRecoveryDisplay(result, roleId))}</div>` : ""}
         </${entryTag}>
       `;
     })
@@ -4331,7 +4334,7 @@ function renderEventLogSection(
       </div>
       ${eventContentHtml}
       ${page?.kind === "ending" ? "" : `<div class="log-content event-log-content" id="log-content">
-        ${renderLogList(page, eventHistory)}
+        ${renderLogList(page, eventHistory, state.selectedRoleId)}
       </div>`}
     </div>
   `;

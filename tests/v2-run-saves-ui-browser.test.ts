@@ -60,6 +60,7 @@ describe("run save controls in the game", () => {
     await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     try {
       await page.goto(base);
+      await page.locator('[data-ui-role-rail-view="achievements"]').click();
       const list = page.locator('.lobby-profile-achievement-list');
       await list.waitFor();
       const next = page.locator('[data-action="change-role-achievement-page"][data-delta="1"]');

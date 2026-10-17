@@ -96,7 +96,10 @@ export function createRelationshipTooltips(root: HTMLElement) {
     if (active && !(event.relatedTarget instanceof Node && active.contains(event.relatedTarget))
       && document.activeElement !== active) hide();
   });
-  root.addEventListener("focusout", () => hide());
+  root.addEventListener("focusout", (event) => {
+    // A tap may open a new card before the previously focused tab loses focus.
+    if (active && event.target instanceof Node && active.contains(event.target)) hide();
+  });
   document.addEventListener("pointerdown", (event) => {
     if (active && !(event.target instanceof Node && (active.contains(event.target) || tooltip.contains(event.target)))) hide();
   });

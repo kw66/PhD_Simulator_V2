@@ -20,6 +20,8 @@ describe("mobile navigation and readable status", () => {
     await page.route("**/*", route => new URL(route.request().url()).origin === new URL(url).origin ? route.continue() : route.abort());
     try {
       await page.goto(url);
+      expect(await page.locator('[data-ui-role-rail-view="announcements"]').getAttribute('aria-selected')).toBe('true');
+      await page.locator('[data-ui-role-rail-view="achievements"]').tap();
       await page.locator('.lobby-profile-achievement').first().tap();
       expect(await page.locator('#relationship-tooltip').isVisible()).toBe(true);
       const bounds = await page.locator('#relationship-tooltip').boundingBox();

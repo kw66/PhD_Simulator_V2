@@ -310,7 +310,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let shopTabTransitionDirection: "from-left" | "from-right" | null = null;
   let helpPageByContext: Record<string, number> = {};
   let isHelpOpen = false;
-  let activeRoleRailView: RoleRailViewId = "achievements";
+  let activeRoleRailView: RoleRailViewId = "announcements";
   let announcementPageIndex = 0;
   let roleHistoryPageIndex = 0;
   let talentTreePageIndex = 0;
@@ -956,7 +956,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       helpPageByContext = {};
       isHelpOpen = false;
       if (state.phase === "playing") {
-        activeRoleRailView = "achievements";
+        activeRoleRailView = "announcements";
         isFeedbackOpen = false;
         activePlayTab = "events";
         activeShopTab = "ai";
@@ -978,7 +978,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         activeLogPage = null;
         isSanChartOpen = false;
       } else if (state.phase === "setup") {
-        activeRoleRailView = "achievements";
+        activeRoleRailView = "announcements";
         announcementPageIndex = 0;
         talentTreePageIndex = 0;
         talentTreeSelectedNodeByPage.length = 1;

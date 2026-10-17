@@ -1736,6 +1736,54 @@ p {
   padding-top: 0;
 }
 
+.lobby-message-external {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--setup-divider);
+}
+
+.lobby-xiaohongshu-note {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.lobby-xiaohongshu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 22px;
+  border: 1px solid #d4a697;
+  border-radius: 7px;
+  background: #f5e7de;
+  color: #8f453c;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.lobby-xiaohongshu-button:hover {
+  background: #ecd5c8;
+}
+
+.lobby-xiaohongshu-button:focus-visible {
+  outline: 2px solid #8f453c;
+  outline-offset: 3px;
+}
+
+.lobby-xiaohongshu-button .lucide {
+  width: 16px;
+  height: 16px;
+}
+
 .lobby-message-rail-view .lobby-live-metrics {
   width: 100%;
   min-height: 52px;

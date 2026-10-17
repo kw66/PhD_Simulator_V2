@@ -52,6 +52,7 @@ describe("global achievement statistics in the actual game", () => {
     });
     try {
       await page.goto(server.resolvedUrls!.local[0]!);
+      await page.locator('[data-ui-role-rail-view="achievements"]').click();
       await expect.poll(() => page.locator('.achievement-global-rate').first().textContent()).toBe("25%");
       expect(await page.locator('.lobby-profile-achievement').count()).toBe(11);
       expect(await page.locator('.lobby-profile-achievement .achievement-completion-fill').first().getAttribute("style")).toBe("width:25%");

@@ -139,8 +139,9 @@ export function renderLobbyMasthead(activeRoleRailView: RoleRailViewId): string 
 export function renderLobbyMessageRailView(): string {
   return `
     <section class="lobby-profile-section lobby-message-rail-view" aria-labelledby="lobby-message-rail-title">
-      <div class="lobby-live-metrics" aria-label="玩家访问数据">
-        ${renderVisitMetrics()}
+      <div class="lobby-message-external">
+        <a class="lobby-xiaohongshu-button" href="https://xhslink.cn/o/8cxWuL6opss" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle" aria-hidden="true"></i><span>小红书评论</span><span aria-hidden="true">↗</span></a>
+        <span class="lobby-xiaohongshu-note">喜欢的话，点个赞、收藏一下 ♡</span>
       </div>
       ${renderCompactMessagePanel("board", "lobby-message-rail-title")}
     </section>

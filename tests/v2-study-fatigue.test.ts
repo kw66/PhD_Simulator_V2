@@ -33,6 +33,28 @@ function finish(option: number): { before: GameState; after: GameState } {
 }
 
 describe("厌倦学习", () => {
+  it("shows blocked SAN recovery in finite-life results and history without rewriting the saved event", () => {
+    const initial = { ...state(), selectedRoleId: "special-finite-life" as const };
+    const queued = { ...initial, eventQueue: [createEventQueueItem(createStudyFatigueEvent(initial), 0)] };
+    const result = choose(choose(queued));
+    expect(result.player.san).toBe(initial.player.san);
+    const stored = JSON.stringify(result);
+    const html = renderApp(result, undefined, { isEventContentOpen: true, activeEventId: result.eventQueue[0]!.id });
+    expect(html).toContain("SAN +0（不可回复）");
+    expect(html).not.toContain("SAN +6");
+    expect(JSON.stringify(result)).toBe(stored);
+    const completed = choose(result);
+    expect(completed.player.san).toBe(initial.player.san);
+    const history = completed.eventHistory.find(event => event.chainId === "random-19")!;
+    const historical = renderApp(completed, undefined, { isEventContentOpen: true, activeEventHistoryId: history.id });
+    expect(historical).toContain("SAN +0（不可回复）");
+    expect(historical).not.toContain("SAN +6");
+    expect(renderApp(completed)).not.toContain("SAN +6");
+    const ordinary = choose(choose({ ...state(), eventQueue: [createEventQueueItem(createStudyFatigueEvent(state()), 0)] }));
+    expect(choose(ordinary).player.san).toBe(16);
+    expect(renderApp(ordinary, undefined, { isEventContentOpen: true, activeEventId: ordinary.eventQueue[0]!.id })).toContain("SAN +6");
+  });
+
   it("quotes social resistance in the friends option while preserving old replay copy", () => {
     const initial = state();
     initial.player.social = 18;

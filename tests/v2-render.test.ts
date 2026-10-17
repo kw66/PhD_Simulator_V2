@@ -39,7 +39,7 @@ import { animationNumberAttributes, renderAnimatedNumber } from "../src/app/v2-r
 import type { AdvisorGrantId, GameState, PendingEvent, RelationshipKind } from "../src/core/v2-types";
 
 function renderApp(...args: Parameters<typeof renderAppWithAnimations>): string {
-  return renderAppWithAnimations(...args)
+  return renderAppWithAnimations(args[0], args[1], { activeRoleRailView: "achievements", ...args[2] })
     .replace(/<span class="rel-inline-icon" aria-hidden="true">[^<]*<\/span>/g, "")
     .replace(/<span class="animated-number" data-animate-key="[^"]*" data-animate-number="[^"]*">([^<]*)<\/span>/g, "$1")
     .replace(/ data-animate-(?:key|number|bar)="[^"]*"/g, "");
@@ -605,7 +605,7 @@ describe("v2 explicit render animation markers", () => {
     account.roleProgress.normal.level = 2;
     account.roleProgress.normal.exp = 12;
     account.roleProgress.normal.historyBest.representativeScore = 50;
-    const html = renderAppWithAnimations(createInitialState(), account);
+    const html = renderAppWithAnimations(createInitialState(), account, { activeRoleRailView: "achievements" });
     const numbers = readAnimationNumbers(html);
     expect(numbers.get("role:normal:card:level")).toBe(2);
     expect(numbers.get("role:normal:growth:level")).toBe(2);
@@ -876,11 +876,9 @@ describe("v2 render lobby shell", () => {
     expect(masthead).toContain('data-ui-role-rail-view="achievements"');
     expect(masthead).toContain('data-ui-role-rail-view="messages"');
     expect(masthead).not.toContain('class="lobby-live-metrics"');
-    const metrics = messageRailHtml.match(/<div class="lobby-live-metrics"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
-    expect([...metrics.matchAll(/data-community-stat="([^"]+)"/g)].map((match) => match[1])).toEqual(["views", "visitors", "games"]);
-    expect(metrics).toContain('<strong data-community-stat="views">--（--）</strong>');
-    expect(metrics).toContain('<strong data-community-stat="visitors">--（--）</strong>');
-    expect(metrics).toContain('<strong data-community-stat="games">--（--）</strong>');
+    expect(messageRailHtml).not.toContain('class="lobby-live-metrics"');
+    expect(messageRailHtml).toContain('href="https://xhslink.cn/o/8cxWuL6opss" target="_blank" rel="noopener noreferrer"');
+    expect(messageRailHtml).toContain("小红书评论");
     expect(rolesHtml).not.toContain('data-community-stat="current-online"');
     expect(rolesHtml).not.toContain('data-community-stat="views"');
     expect(rolesHtml).not.toContain("当前在线");
@@ -1127,7 +1125,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-profile-growth-card');
     expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
     for (const category of ["属性轮回", "天赋轮回", "人际轮回", "轮回者 · 特殊"]) expect(html).toContain(category);
-    expect(html).toContain("已完成 0/24 个不同成就");
+    expect(html).not.toContain("rewinder-unlock-progress");
   });
 
   it.each([
