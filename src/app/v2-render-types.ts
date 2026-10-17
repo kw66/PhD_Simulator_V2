@@ -17,6 +17,7 @@ export interface PlayRenderUiState {
   isSaveLoading?: boolean;
   activeRoleRailView?: RoleRailViewId;
   announcementPageIndex?: number;
+  roleHistoryPageIndex?: number;
   talentTreePageIndex?: number;
   talentTreeSelectedNodeByPage?: readonly number[];
   talentAllocation?: TalentAllocation;

@@ -378,6 +378,12 @@ export interface RoleHistoryBest {
   natureCount: number;
   representativeCitations: number;
   representativeScore: number;
+  /** Per-field maxima from finalized endings, rather than in-run peaks. */
+  sanCap: number;
+  research: number;
+  social: number;
+  favor: number;
+  money: number;
 }
 
 export interface ScholarshipState {
@@ -392,6 +398,7 @@ export interface PublicationTalentState {
 }
 
 export interface AccountProfile {
+  rewinderArchive?: import("./v2-rewinder-state").RewinderArchive;
   /** Highest unlocked challenge per cursed character. Difficulty numbers are 1..4. */
   curseDifficultyUnlocked?: Partial<Record<RoleId, import("./v2-curse-system").CurseDifficulty>>;
   /** Last lobby selection per cursed character, clamped to the unlocked challenge. */
@@ -670,6 +677,7 @@ export interface EventChoice {
 }
 
 export interface ResolvedEventStage {
+  rewinderPresentation?: import("./v2-rewinder-state").RewinderPresentation;
   thesisReviewPresentation?: ThesisReviewPresentation;
   title: string;
   description: string;
@@ -696,6 +704,7 @@ export interface ResolvedEventRecord {
 }
 
 export interface PendingEvent {
+  rewinderPresentation?: import("./v2-rewinder-state").RewinderPresentation;
   thesisReviewPresentation?: ThesisReviewPresentation;
   id: string;
   continuationSourceId?: string;
@@ -808,6 +817,7 @@ export type LabFinanceCategory = "conference-registration" | "conference-travel"
   | "student-reimbursement" | "horizontal-income" | "grant-income" | "initial-funding" | "other";
 
 export interface GameState extends RandomEventState {
+  rewinderState?: import("./v2-rewinder-state").RewinderRunState;
   captainState?: import("./v2-captain-state").CaptainRunState;
   curseState?: import("./v2-curse-system").CurseRunState;
   /** Unsubmitted statistics belong to the saved branch and are discarded on rewind. */
@@ -895,6 +905,8 @@ export interface DeferredEventStateChange {
 export type DeferredEventStatePatch = DeferredEventStateChange[];
 
 export interface DispatchPayload {
+  rewinderArchive?: import("./v2-rewinder-state").RewinderArchive;
+  rewinderPersonKey?: string;
   captainTagLevels?: Partial<Record<RoleId, number>>;
   curseDifficulty?: import("./v2-curse-system").CurseDifficulty;
   debtRepayment?: number;

@@ -168,7 +168,7 @@ async function run(roleId: RoleId, withTalents: boolean, phd: boolean) {
     attributes: ended.player, citations: ended.totalCitations, actions: store.getReplayStatus().actionCount,
     papers: ended.papers.map(paper => ({ status: paper.status, idea: paper.idea, experiment: paper.experiment, writing: paper.writing })),
     achievements: achievements.length, reloads, rewinds, award: store.getEndingExperienceAward() };
-  store.dispatch("restart-game");
+  store.dispatch("settle-and-return");
   expect(store.getCurrentRunId()).not.toBe(runId);
   expect(store.getFinalizedOutbox()).toHaveLength(1);
   expect(store.getLobbyState().lastRunExperience).toBeDefined();

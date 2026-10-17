@@ -102,7 +102,7 @@
   .ending-record-cell > span, .ending-experience { font-size: 12px; }
   .ending-summary-metrics > div { gap: 5px; }
   .ending-buttons { width: 100%; gap: 5px; }
-  .ending-buttons > button { min-height: 44px; flex: 1 1 calc(50% - 3px); font-size: 14px; }
+  .ending-buttons > button { min-height: 44px; flex: 1 1 auto; padding-inline: 8px; font-size: 14px; white-space: nowrap; }
   .ending-panel .ending-actions { margin-top: 5px; padding-block: 6px; }
   .ending-panel .ending-showcase { gap: 5px; margin-top: 6px; }
   .ending-panel .ending-summary,

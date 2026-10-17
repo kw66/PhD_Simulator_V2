@@ -69,15 +69,18 @@ export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
 
   // 学业与论文
   { id: "global:advisor-funding-user", icon: "💳", title: "经费大户", description: "硕士期间自身累计使用100导师经费", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
+  { id: "global:advisor-spending-thousand", icon: "💸", title: "经费燃烧", description: "导师累计花掉1000科研经费", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:clear-minded", icon: "🧭", title: "人间清醒", description: "两次达到转博条件，但都拒绝了", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:young-genius", icon: "🎓", title: "天才少年", description: "转博时就达到博士毕业要求", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:three-a-master", icon: "📚", title: "三A在手", description: "硕士期间一作发表≥3篇A类论文", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:collaboration-ten", icon: "🤝", title: "协作共赢", description: "合作发表≥10篇论文", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:collaboration-before-first", icon: "🪜", title: "协作先行", description: "先发合作论文，再发一作", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
-  { id: "genius-reversed:break-research-curse", icon: "🌅", title: "拨云见日", description: "实际破除学术失语诅咒", rewardText: "经验倍率+1", scope: { roleIds: ["genius-reversed"] } },
-  { id: "global:excellent-master-thesis", icon: "📜", title: "优秀硕士论文", description: "硕士论文盲审全部获A", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
-  { id: "global:excellent-phd-thesis", icon: "📜", title: "优秀博士论文", description: "博士论文盲审全部获A", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
+  { id: "genius-reversed:break-research-curse", icon: "🌅", title: "拨云见日", description: "游戏内破除学术失语诅咒", rewardText: "经验倍率+1", scope: { roleIds: ["genius-reversed"] } },
+  { id: "global:excellent-master-thesis", icon: "📜", title: "优秀硕士论文", description: "硕士论文盲审获3A", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
+  { id: "global:excellent-phd-thesis", icon: "📜", title: "优秀博士论文", description: "博士论文盲审获5A", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:academic-star", icon: "🌟", title: "学术之星", description: "毕业时发表≥5篇A类论文", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
+  { id: "global:slow-research", icon: "🐌", title: "慢科研", description: "博士毕业时仅发表2篇一作论文", rewardText: "经验+5", scope: { audiences: ["all"] } },
+  { id: "global:no-first-conference-graduation", icon: "🛤️", title: "另辟蹊径", description: "未发表过一作会议论文并毕业", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:model-student", icon: "🏅", title: "三好学生", description: "连续拿到3年奖学金", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:paper-lover", icon: "📚", title: "爱看论文", description: "看20次论文", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:paper-machine", icon: "📚", title: "论文机器", description: "发表论文达到10篇", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
@@ -159,6 +162,7 @@ export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
 
   // 其他结局
   { id: "global:career-start", icon: "🧭", title: "初入职场", description: "取得任意offer", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
+  { id: "global:career-rejections-six", icon: "📨", title: "求职不易", description: "一局内找工作被拒6次", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:career-internet", icon: "💻", title: "大厂上岸", description: "取得大厂算法岗及以上offer", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:career-state", icon: "🏢", title: "央企有我", description: "取得央企总部业务主管及以上offer", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },
   { id: "global:career-civil", icon: "🏛️", title: "金榜题名", description: "取得省直二级主任科员及以上offer", rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] }, rewardScope: { audiences: ["all"] } },

@@ -101,7 +101,7 @@ describe("independent debug window", () => {
     for (const delta of DEBUG_MONTH_DELTAS) expect(html).toContain(`data-action="debug-shift-month" data-delta="${delta}"`);
     expect(html.match(/data-action="debug-add-paper"/g)).toHaveLength(12);
     expect(html.match(/data-action="debug-add-relationship"/g)).toHaveLength(4);
-    for (const action of ["force-next-month", "debug-add-all-buffs", "restart-game", "reset-game"]) {
+    for (const action of ["force-next-month", "debug-add-all-buffs", "reset-game"]) {
       expect(html).toContain(`data-action="${action}"`);
     }
     expect(html).toContain('data-action="debug-toggle-event-replay" data-debug-event-replay-enabled="true"');
@@ -160,7 +160,8 @@ describe("independent debug window", () => {
 
   it.each(["playing", "setup", "finished"] as const)("keeps session buttons at the top and available during %s", (phase) => {
     const html = renderDebugPanel({ ...createStartedGameState("normal"), phase }, true);
-    for (const action of ["restart-game", "reset-game"]) {
+    expect(html).not.toContain('data-action="restart-game"');
+    for (const action of ["reset-game"]) {
       expect(html.indexOf(`data-action="${action}"`)).toBeLessThan(html.indexOf('<fieldset'));
       expect(html).not.toContain(`data-action="${action}" disabled`);
       expect(html.match(new RegExp(`data-action="${action}"`, "g"))).toHaveLength(1);
@@ -173,7 +174,7 @@ describe("independent debug window", () => {
     state.log = [{ id: "unsafe", month: 0, text: '<script>alert("test")</script>' }];
     const disconnected = renderDebugPanel(state, false);
     expect(disconnected).toContain('<fieldset class="debug-popup-tools" disabled>');
-    expect(disconnected).toContain('data-action="restart-game" disabled');
+    expect(disconnected).toContain('data-action="reset-game" disabled');
     expect(disconnected).toContain("主游戏已断开");
     expect(disconnected).toContain("正在尝试重连");
     expect(disconnected).toContain('data-debug-reconnect');

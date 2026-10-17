@@ -200,7 +200,7 @@ describe("achievement catalog and presentation", () => {
       expect(find(`${name}Ⅱ`)).toMatchObject({ description: `${attribute}达到${second}`, scope: { audiences: ["upright", "reversed"] } });
     }
     for (const [name, description] of [
-      ["优秀硕士论文", "硕士论文盲审全部获A"], ["优秀博士论文", "博士论文盲审全部获A"],
+      ["优秀硕士论文", "硕士论文盲审获3A"], ["优秀博士论文", "博士论文盲审获5A"],
       ["横向之王", "完成10次横向项目"], ["纵向之王", "完成10次纵向项目"],
       ["鞭策导师Ⅰ", "导师评上三级教授"], ["鞭策导师Ⅱ", "导师评上院士"],
       ["最佳之作", "一作发表A类Best Paper"], ["自然之子", "一作发表NMI"], ["自然之巅", "一作发表Nature"],
@@ -237,10 +237,10 @@ describe("achievement catalog and presentation", () => {
       ["金榜题名", "取得省直二级主任科员及以上offer"],
       ["站上讲台", "取得211讲师及以上offer"],
     ]) expect(find(title)).toMatchObject({ description, rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] } });
-    expect(find("拨云见日")).toMatchObject({ description: "实际破除学术失语诅咒", rewardText: "经验倍率+1", scope: { roleIds: ["genius-reversed"] } });
+    expect(find("拨云见日")).toMatchObject({ description: "游戏内破除学术失语诅咒", rewardText: "经验倍率+1", scope: { roleIds: ["genius-reversed"] } });
     expect(find("登峰造极·大厂").description).toContain("首席科学家");
     expect(ACHIEVEMENT_CATALOG.filter(item => item.title.startsWith("登峰造极"))).toHaveLength(4);
-    expect(ACHIEVEMENT_CATALOG.filter(item => item.id.startsWith("global:career-")).every(item =>
+    expect(ACHIEVEMENT_CATALOG.filter(item => item.id.startsWith("global:career-") && item.id !== "global:career-rejections-six").every(item =>
       item.description.startsWith("取得") && !/毕业|保留/.test(item.description))).toBe(true);
     expect(find("学术之星").description).toBe("毕业时发表≥5篇A类论文");
     expect(find("未来院士").description).toBe("发表≥2篇Nature");

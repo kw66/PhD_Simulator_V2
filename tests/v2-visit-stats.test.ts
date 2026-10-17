@@ -345,10 +345,10 @@ describe("kwgame activity statistics", () => {
       expect([...backend.rows.values()].some((row) => row.p_event === "finish")).toBe(false);
       store.dispatch("start-game", { roleId: "normal" });
       expect(store.getState().phase).toBe("finished");
-      store.dispatch("restart-game");
+      store.dispatch("settle-and-return");
       await Promise.all(transitions);
       await stats.flush();
-      expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start", "finish", "start"]);
+      expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start", "finish"]);
       expect([...backend.rows.values()][1]).toMatchObject({ p_ending: ending, p_role_id: "normal", p_day: DAY });
       expect(backend.fetch.mock.calls.filter(([url]) => String(url).includes("/record_"))).toHaveLength(1);
     },

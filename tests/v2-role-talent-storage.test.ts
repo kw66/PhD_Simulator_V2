@@ -94,7 +94,7 @@ describe("role talent allocation", () => {
     expect(refreshed.upgradeRoleTalent("normal", "diligence")).toBe(false);
     expect(refreshed.resetRoleTalents("normal")).toBe(false);
     expect(refreshed.getState().roleTalents?.levels).not.toBe(refreshed.getLobbyState().talentAllocation?.normal);
-    refreshed.dispatch("restart-game");
+    refreshed.dispatch("settle-and-return");
     expect(refreshed.getState().roleTalents?.levels).toEqual({ "first-month-drive": 2, diligence: 1 });
     refreshed.dispatch("reset-game");
     expect(refreshed.resetRoleTalents("normal")).toBe(true);

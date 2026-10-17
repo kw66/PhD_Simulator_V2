@@ -39,7 +39,7 @@ function rendered(store: ReturnType<typeof createStore>) {
 }
 
 describe("session store", () => {
-  it("previews achievements without paying, and finalizes once only when restarting the finished run", async () => {
+  it("previews achievements without paying, and finalizes once on returning to setup", async () => {
     const f = await fixture(); const { store } = f;
     store.dispatch("start-game", { roleId: "normal" });
     const original = structuredClone(store.getLobbyState());
@@ -52,13 +52,21 @@ describe("session store", () => {
     expect(store.getState().phase).toBe("finished");
     expect(store.getCurrentRunId()).toBe(runId);
     expect(store.getLobbyState()).toEqual(original);
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
+    expect(store.getState().phase).toBe("setup");
+    expect(store.getCurrentRunId()).toBeNull();
+    expect(store.hasRoleSave("normal")).toBe(false);
+    expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
     expect(store.getCurrentRunId()).not.toBe(runId);
     expect(store.getLobbyState().achievementRewardedIds).toContain("global:ending-quit");
     const date = store.getLobbyState().achievementUnlockedByRole?.["global:ending-quit"]?.normal;
     expect(date).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
     const exp = store.getLobbyState().roleProgress.normal.exp;
-    store.dispatch("quit-game"); store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
+    expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
+    store.dispatch("start-game", { roleId: "normal" });
+    expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(2);
+    store.dispatch("quit-game"); store.dispatch("settle-and-return");
     expect(store.getLobbyState().roleProgress.normal.exp).toBe(exp);
     await store.flushSaves();
     const restored = createStore({ storage: f.storage, saves: createRunSaveRepository({ storage: f.storage, adapter: f.adapter }) });
@@ -85,10 +93,10 @@ describe("session store", () => {
     expect(store.getLobbyState().roleProgress.normal).toEqual(original);
     expect(store.getState().runAchievementIds ?? []).toEqual([]);
     expect(store.getLobbyState().achievementRewardedIds).toEqual([]);
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.isCurrentRunDebugged()).toBe(false);
     expect(store.getCurrentRunId()).not.toBe(runId);
-    expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
+    expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(0);
     expect(store.getFinalizedOutbox()).toEqual([]);
   });
 
@@ -102,7 +110,7 @@ describe("session store", () => {
     expect(store.isCurrentRunDebugged()).toBe(true);
     store.dispatch("quit-game");
     expect(store.getEndingExperienceAward()).toMatchObject({ gained: 0, disqualifiedByDebug: true });
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getFinalizedOutbox()).toEqual([]);
     expect(store.getLobbyState().achievementRewardedIds).toEqual([]);
     expect(store.isCurrentRunDebugged()).toBe(false);
@@ -130,10 +138,11 @@ describe("session store", () => {
     expect(createStore({ storage: null }).getLobbyState().dateDisplayMode).toBe("calendar");
   });
 
-  it("does not restart an unfinished run, and setup return resumes its exact progress", async () => {
+  it("does not settle or restart an unfinished run, and setup return resumes its exact progress", async () => {
     const f = await fixture(); const { store } = f; store.dispatch("start-game", { roleId: "normal" });
     researchScore(f, 4); const id = store.getCurrentRunId();
     store.dispatch("restart-game"); expect(store.getState().totalResearchScore).toBe(4);
+    store.dispatch("settle-and-return"); expect(store.getState().totalResearchScore).toBe(4);
     store.dispatch("reset-game"); expect(store.getState().phase).toBe("setup");
     store.dispatch("start-game", { roleId: "normal" });
     expect(store.getState().totalResearchScore).toBe(4); expect(store.getCurrentRunId()).toBe(id);
@@ -148,7 +157,7 @@ describe("session store", () => {
     expect(store.getEndingExperienceAward()).toMatchObject({ gained: 20, previousLevel: 0, level: 1, exp: 0 });
     expect(rendered(store)).toContain("本局经验 <strong>+20</strong>");
     store.dispatch("quit-game"); expect(store.getLobbyState()).toEqual(before);
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 1, exp: 0 });
     await store.flushSaves();
     const restored = createStore({ storage: f.storage }); await restored.ready();
@@ -161,11 +170,12 @@ describe("session store", () => {
     store.dispatch("start-game", { roleId: "normal" });
     store.dispatch("debug-add-paper", { debugJournalTarget: "nature", debugPaperAuthorship: "first" });
     expect(store.isCurrentRunDebugged()).toBe(true);
-    store.dispatch("quit-game"); expect(store.getEndingExperienceAward()?.gained).toBe(0); store.dispatch("restart-game");
+    store.dispatch("quit-game"); expect(store.getEndingExperienceAward()?.gained).toBe(0); store.dispatch("settle-and-return");
     for (const [level, exp] of [[1, 0], [1, 20]]) {
+      store.dispatch("start-game", { roleId: "normal" });
       researchScore(f); const before = structuredClone(store.getLobbyState()); store.dispatch("quit-game");
       expect(store.getLobbyState()).toEqual(before); expect(store.getEndingExperienceAward()?.gained).toBe(20);
-      store.dispatch("restart-game"); expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level, exp });
+      store.dispatch("settle-and-return"); expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level, exp });
     }
   });
 
@@ -175,8 +185,9 @@ describe("session store", () => {
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 9, exp: 819 });
     expect(store.getEndingExperienceAward()).toMatchObject({ level: 10, exp: 19 });
     expect(rendered(store)).toContain("经验 <strong>19/∞</strong>");
-    store.dispatch("restart-game"); expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 10, exp: 19 });
-    researchScore(f); store.dispatch("quit-game"); store.dispatch("restart-game");
+    store.dispatch("settle-and-return"); expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 10, exp: 19 });
+    store.dispatch("start-game", { roleId: "normal" });
+    researchScore(f); store.dispatch("quit-game"); store.dispatch("settle-and-return");
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ level: 10, exp: 39 });
     const restored = createStore({ storage: f.storage }); await restored.ready();
     expect(restored.getLobbyState().roleProgress.normal).toMatchObject({ level: 10, exp: 39 });

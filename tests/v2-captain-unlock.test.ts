@@ -80,7 +80,7 @@ describe("统御者 account unlock", () => {
     store.markCurrentRunAsDebugged();
     store.dispatch("debug-trigger-ending", { eventId: "phd" });
     expect(store.getState().phase).toBe("finished");
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getLobbyState().roleProgress.chosen.unlocked).toBe(false);
     expect(loadAccountProfile(storage).account.roleProgress["research-captain"].unlocked).toBe(false);
   });

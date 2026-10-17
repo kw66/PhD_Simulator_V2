@@ -2662,6 +2662,31 @@ button.pager-arrow:disabled {
   max-width: none;
 }
 
+.lobby-profile-history-heading { position: relative; }
+.lobby-profile-history-pager {
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 44px;
+  height: 28px;
+  padding: 2px 3px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--setup-label-color);
+  font: 650 11px/1 var(--ui-font-cjk);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.lobby-profile-history-pager:hover { background: rgba(184, 139, 58, .12); color: var(--setup-heading-color); }
+.lobby-profile-history-pager:focus-visible { outline: 2px solid var(--setup-label-color); outline-offset: 1px; }
+.lobby-profile-history-pager .lucide { width: 13px; height: 13px; }
+
 .lobby-profile-stat-row {
   display: flex;
   align-items: baseline;

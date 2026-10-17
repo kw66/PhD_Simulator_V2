@@ -38,7 +38,7 @@ describe("run save presentation", () => {
     expect(html).toContain('data-phase="finished"');
     expect(html).toContain('class="center-main-panel active" data-tab-panel="settings"');
     expect(html).toContain("返回结局");
-    expect(html).toContain("结算并重开");
+    expect(html).toContain("结算并返回");
     expect(html).toContain("我要回溯");
     expect(state.phase).toBe("finished");
   });

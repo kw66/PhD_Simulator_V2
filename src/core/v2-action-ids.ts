@@ -7,6 +7,8 @@ export type DebugRelationshipType = typeof DEBUG_RELATIONSHIP_TYPES[number];
 export const GAME_ACTION_IDS = [
   "start-game",
   "restart-game",
+  "settle-and-return",
+  "toggle-rewinder-person",
   "reset-game",
   "quit-game",
   "select-role",

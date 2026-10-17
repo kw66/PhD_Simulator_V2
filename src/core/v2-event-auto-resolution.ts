@@ -10,6 +10,7 @@ function getLinearChoice(event: PendingEvent): EventChoice | null {
 }
 
 export function isLinearEvent(state: GameState, event: EventQueueItem): boolean {
+  if (event.rewinderPresentation) return false;
   const visiting = new Set<PendingEvent>();
   const visit = (current: PendingEvent): boolean => {
     if (visiting.has(current)) return false;

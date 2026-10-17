@@ -141,10 +141,12 @@ describe("statistics requests through the game UI", () => {
       expect(await page.evaluate(() => (window as StatisticsWindow).statisticsStore.getReplayStatus().failed)).toBeUndefined();
       expect(paperCount()).toBe(0);
       expect(activityCount("finish")).toBe(0);
-      await page.locator('[data-action="restart-game"]').click();
+      await page.locator('[data-action="settle-and-return"]').click();
       await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 31_000; window.dispatchEvent(new Event("online")); });
       await expect.poll(paperCount).toBe(1);
       await expect.poll(() => activityCount("finish")).toBe(1);
+      expect(activityCount("start")).toBe(1);
+      await page.locator('[data-action="start-game"]').click();
       await expect.poll(() => requests.filter((name) => name === "snapshot").length).toBe(2);
       expect(requests).not.toContain("unexpected-individual-read");
       expect(errors).toEqual([]);

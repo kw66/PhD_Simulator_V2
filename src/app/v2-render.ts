@@ -28,6 +28,7 @@ export function renderApp(
       playUiState.talentAllocation,
       playUiState.hasRoleSave,
       playUiState.isSaveLoading,
+      playUiState.roleHistoryPageIndex,
     )
     : renderPlayScreen(state, {
       ...playUiState,

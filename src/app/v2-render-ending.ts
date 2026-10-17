@@ -222,13 +222,12 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
           <span>本局经验 <strong>+${award.gained}</strong></span>
           <span>等级 <strong>Lv${award.previousLevel}${award.level > award.previousLevel ? ` → Lv${award.level}` : ""}</strong></span>
           <span>经验 <strong>${award.exp}/${nextLevelExp ?? "∞"}</strong></span>
-        </div>${state.phase === "finished" ? `<small class="ending-experience-note">结算并重开后领取；回溯可继续本局</small>` : ""}` : ""}
+        </div>${state.phase === "finished" ? `<small class="ending-experience-note">结算后领取；回溯可继续本局</small>` : ""}` : ""}
         <footer class="ending-actions">
           ${saveStatus ? `<p class="run-saves-status" role="status">${escapeHtml(saveStatus)}</p>` : ""}
           <div class="ending-buttons">
-            <button class="settings-primary-btn is-restart" type="button" data-action="restart-game"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>结算并重开</span></button>
+            <button class="settings-primary-btn is-return" type="button" data-action="settle-and-return"><i data-lucide="house" aria-hidden="true"></i><span>结算并返回</span></button>
             <button class="settings-primary-btn is-rewind" type="button" data-ui-open-run-saves><i data-lucide="history" aria-hidden="true"></i><span>我要回溯</span></button>
-            <button class="settings-primary-btn is-return" type="button" data-action="reset-game"><i data-lucide="house" aria-hidden="true"></i><span>返回开始页面</span></button>
           </div>
         </footer>
     </section>`;

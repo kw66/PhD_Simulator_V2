@@ -36,7 +36,7 @@ describe("role history and run statistics", () => {
     const view = buildLobbySelectedRoleViewModel(account, "normal");
     expect(view.historyStats.map((stat) => stat.id)).toEqual(["research-score", "total-citations", "h-index", "nature-count", "representative"]);
     expect(view.historyStats[2].value).toBe("7");
-    expect(view.statistics.map((stat) => stat.label)).toEqual(["通关", "游玩", "全球通关", "全球游玩", "博士率"]);
+    expect(view.statistics.map((stat) => stat.label)).toEqual(["个人通关", "个人游玩", "全球通关", "全球游玩", "博士率"]);
     expect(view.statistics.map((stat) => stat.value)).toEqual(["4", "12", "--", "--", "--"]);
     expect(view.statistics[1].tooltip).toContain("开始新游戏");
     expect(view.statistics[4].tooltip).toContain("已达成结局");
@@ -78,9 +78,9 @@ describe("role history and run statistics", () => {
     store.dispatch("start-game", { roleId: "normal" });
     expect(store.getState()).toMatchObject({ phase: "finished", ending });
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 0 });
-    store.dispatch("restart-game");
-    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 2, playedRuns: 1, completedRuns });
-    expect(createStore({ storage }).getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 2, playedRuns: 1, completedRuns });
+    store.dispatch("settle-and-return");
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 1, completedRuns });
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 1, completedRuns });
     expect(store.getLobbyState().roleProgress.rich).toMatchObject({ startedRuns: 0, playedRuns: 0 });
   });
 
@@ -109,13 +109,14 @@ describe("role history and run statistics", () => {
     trustFixture(store, saves);
     store.dispatch("quit-game");
     expect(store.getLobbyState().roleProgress.normal.historyBest.researchScore).toBe(0);
-    store.dispatch("restart-game");
-    expect(store.getLobbyState().roleProgress.normal.historyBest).toEqual({ researchScore: score, totalCitations: 15, hIndex: 2, natureCount: 1, representativeScore: 80, representativeCitations: 9 });
+    store.dispatch("settle-and-return");
+    expect(store.getLobbyState().roleProgress.normal.historyBest).toMatchObject({ researchScore: score, totalCitations: 15, hIndex: 2, natureCount: 1, representativeScore: 80, representativeCitations: 9 });
+    store.dispatch("start-game", { roleId: "normal" });
     store.dispatch("quit-game");
     expect(store.getLobbyState().roleProgress.normal.playedRuns).toBe(1);
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     const restored = createStore({ storage }).getLobbyState().roleProgress.normal;
-    expect(restored).toMatchObject({ startedRuns: 3, playedRuns: 2, completedRuns: 0, historyBest: { hIndex: 2, totalCitations: 15, natureCount: 1, representativeScore: 80 } });
+    expect(restored).toMatchObject({ startedRuns: 2, playedRuns: 2, completedRuns: 0, historyBest: { hIndex: 2, totalCitations: 15, natureCount: 1, representativeScore: 80 } });
   });
 
   it("counts clean starts once and removes the current start when debugging opens", () => {
@@ -125,13 +126,69 @@ describe("role history and run statistics", () => {
     store.dispatch("start-game", { roleId: "normal" });
     store.dispatch("change-lobby-role-page", { delta: 1 });
     expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
     store.markCurrentRunAsDebugged();
     store.dispatch("debug-add-paper", { debugJournalTarget: "nature" });
     store.dispatch("quit-game");
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 0, playedRuns: 0, completedRuns: 0, historyBest: { hIndex: 0, researchScore: 0, natureCount: 0 } });
     expect(createStore({ storage }).getLobbyState().roleProgress.normal.startedRuns).toBe(0);
+  });
+
+  it("persists independent ending attribute maxima only after clean settlement", async () => {
+    const storage = createStorage();
+    const saves = createRunSaveRepository({ storage, adapter: createMemoryRunSaveAdapter() });
+    const store = createStore({ storage, saves });
+    await store.ready();
+    store.dispatch("start-game", { roleId: "normal" });
+    const state = store.getState();
+    state.sanCap = 36;
+    Object.assign(state.player, { research: 15.4, social: 12.6, favor: 9.2, money: 60.5 });
+    trustFixture(store, saves);
+    store.dispatch("quit-game");
+    const zero = { sanCap: 0, research: 0, social: 0, favor: 0, money: 0 };
+    expect(store.getLobbyState().roleProgress.normal.historyBest).toMatchObject(zero);
+    store.dispatch("reset-game");
+    store.dispatch("start-game", { roleId: "normal" });
+    expect(store.getState().phase).toBe("finished");
+    expect(store.getLobbyState().roleProgress.normal.historyBest).toMatchObject(zero);
+    store.dispatch("settle-and-return");
+    const first = { sanCap: 36, research: 15.4, social: 12.6, favor: 9.2, money: 60.5 };
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal.historyBest).toMatchObject(first);
+
+    store.dispatch("start-game", { roleId: "normal" });
+    const next = store.getState();
+    next.sanCap = 24;
+    // A past high SAN-cap entry must not override the actual ending value.
+    next.sanHistory = [{ totalMonths: 0, san: 80, sanCap: 100 }];
+    Object.assign(next.player, { research: 20.8, social: 10, favor: 18.4, money: -1 });
+    trustFixture(store, saves);
+    store.dispatch("quit-game");
+    store.dispatch("settle-and-return");
+    const best = { ...first, research: 20.8, favor: 18.4 };
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal.historyBest).toMatchObject(best);
+    expect(store.getLobbyState().roleProgress.rich.historyBest).toMatchObject(zero);
+
+    store.dispatch("start-game", { roleId: "normal" });
+    store.markCurrentRunAsDebugged();
+    store.getState().sanCap = 200;
+    Object.assign(store.getState().player, { research: 200, social: 200, favor: 200, money: 200 });
+    store.dispatch("quit-game");
+    store.dispatch("settle-and-return");
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal.historyBest).toMatchObject(best);
+  });
+
+  it("defaults missing ending attributes to zero and sanitizes persisted values", () => {
+    const storage = createStorage();
+    storage.setItem(ROLE_RECORDS_STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT, roles: {
+      normal: { playedRuns: 3, completedRuns: 2, historyBest: { researchScore: 80 } },
+      rich: { playedRuns: 1, completedRuns: 0, historyBest: { sanCap: 30.5, research: -1, social: "20", favor: null, money: 120.4 } },
+    } }));
+    const account = loadRoleRecords(createDefaultAccountProfile(), storage);
+    expect(account.roleProgress.normal.historyBest).toMatchObject({ researchScore: 80, sanCap: 0, research: 0, social: 0, favor: 0, money: 0 });
+    expect(account.roleProgress.rich.historyBest).toMatchObject({ sanCap: 30.5, research: 0, social: 0, favor: 0, money: 120.4 });
+    saveRoleRecords(account, storage);
+    expect(loadRoleRecords(createDefaultAccountProfile(), storage).roleProgress).toEqual(account.roleProgress);
   });
 
   it("does not count an unavailable role or a setup action as a new start", () => {
@@ -158,7 +215,7 @@ describe("role history and run statistics", () => {
     expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
     expect(store.getLobbyState().roleProgress.normal.playedRuns).toBe(0);
     const before = structuredClone(store.getLobbyState());
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getState()).toMatchObject({ phase: "finished", ending: "quit" });
     expect(store.getLobbyState()).toEqual(before);
     expect(store.getSaveStatus()).not.toBe("");
@@ -183,8 +240,8 @@ describe("role history and run statistics", () => {
     expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(10);
     store.dispatch("quit-game");
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 10, playedRuns: 9 });
-    store.dispatch("restart-game");
-    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 11, playedRuns: 10 });
-    expect(createStore({ storage }).getLobbyState().roleProgress.normal.startedRuns).toBe(11);
+    store.dispatch("settle-and-return");
+    expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 10, playedRuns: 10 });
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal.startedRuns).toBe(10);
   });
 });

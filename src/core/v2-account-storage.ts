@@ -6,6 +6,7 @@ import { loadRoleRecords, saveRoleRecords } from "./v2-role-records";
 import { loadRoleAchievementRecords, saveRoleAchievementRecords } from "./v2-achievement-records";
 import { loadRoleTalentAllocation, saveRoleTalentAllocation } from "./v2-role-talent-storage";
 import { reconcileAccountRoleUnlocks } from "./v2-account-role-unlocks";
+import { normalizeRewinderArchive } from "./v2-rewinder";
 import { CURSED_ROLE_IDS, normalizeCurseDifficulty, type CurseDifficulty } from "./v2-curse-system";
 import type { AccountProfile, DateDisplayMode, GameState, RoleId } from "./v2-types";
 
@@ -89,6 +90,7 @@ function loadFromRecords(records: Record<string, string>): AccountProfile {
   account = loadRoleTalentAllocation(loadRoleAchievementRecords(loadRoleRecords(loadRoleExperience(account, storage), storage), storage), storage);
   const lobby = parseJson(records[ACCOUNT_LOBBY_STORAGE_KEY]);
   if (isRecord(lobby)) {
+    if (lobby.rewinderArchive !== undefined) account = { ...account, rewinderArchive: normalizeRewinderArchive(lobby.rewinderArchive) };
     if (validDateMode(lobby.dateDisplayMode)) account = { ...account, dateDisplayMode: lobby.dateDisplayMode };
     if (validRole(lobby.selectedLobbyRoleId)) account = { ...account, selectedLobbyRoleId: lobby.selectedLobbyRoleId };
     const unlocked: Partial<Record<RoleId, CurseDifficulty>> = {};
@@ -145,7 +147,8 @@ export function saveAccountProfile(
   saveRoleAchievementRecords(account, collector);
   saveRoleTalentAllocation(account, collector);
   records[ACCOUNT_LOBBY_STORAGE_KEY] = JSON.stringify({ dateDisplayMode: account.dateDisplayMode, selectedLobbyRoleId: account.selectedLobbyRoleId,
-    curseDifficultyUnlocked: account.curseDifficultyUnlocked, curseDifficultyByRole: account.curseDifficultyByRole });
+    curseDifficultyUnlocked: account.curseDifficultyUnlocked, curseDifficultyByRole: account.curseDifficultyByRole,
+    rewinderArchive: account.rewinderArchive });
   const envelope: Envelope = {
     version: 1,
     epoch: DATA_EPOCH,

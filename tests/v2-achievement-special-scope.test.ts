@@ -9,7 +9,7 @@ describe("achievement audience policy", () => {
     "global:breakthrough-ii", "global:nature-summit", "global:future-academician", "global:nobel-beginning",
     "global:ten-thousand-citations", "global:career-apex-internet", "global:career-apex-state",
     "global:career-apex-civil", "global:career-apex-academic", "global:buff-collector", "global:product-collector",
-    "global:conference-collector", "global:travel-collector", "global:direction-collector", "unlock:research-captain", "unlock:rewinder",
+    "global:conference-collector", "global:travel-collector", "global:direction-collector", "unlock:research-captain", "unlock:rewinder", "global:slow-research",
   ]);
 
   it("limits ordinary global achievements to upright and reversed roles", () => {

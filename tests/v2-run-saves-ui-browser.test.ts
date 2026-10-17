@@ -22,6 +22,37 @@ describe("run save controls in the game", () => {
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
 
+  it.each([390, 1440])("pages personal ending history without changing row count or mixing roles at %ipx", async width => {
+    const page = await browser.newPage({ viewport: { width, height: 960 } });
+    const base = server.resolvedUrls!.local[0]!;
+    const origin = new URL(base).origin;
+    await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    try {
+      await page.goto(base);
+      await page.waitForFunction(() => (window as unknown as SaveWindow).saveStore.isReady());
+      await page.evaluate(() => {
+        const store = (window as unknown as SaveWindow).saveStore;
+        Object.assign(store.getLobbyState().roleProgress.normal.historyBest,
+          { sanCap: 36, research: 15.4, social: 12.6, favor: 9.2, money: 60.5 });
+      });
+      const history = page.locator('[data-role-history-page]');
+      const beforeHeight = await history.evaluate(element => element.getBoundingClientRect().height);
+      await page.locator('[data-ui-role-history-page]').click();
+      expect(await history.getAttribute('data-role-history-page')).toBe('1');
+      expect(await history.locator('[data-role-history-stat]').count()).toBe(5);
+      expect(await history.locator('strong').allTextContents()).toEqual(['36', '15.4', '12.6', '9.2', '60.5']);
+      expect(await history.locator('[data-role-history-stat]').evaluateAll(rows => rows.every(row => row.scrollWidth <= row.clientWidth))).toBe(true);
+      expect(Math.abs(await history.evaluate(element => element.getBoundingClientRect().height) - beforeHeight)).toBeLessThan(1);
+      await page.screenshot({ path: `artifacts/personal-ending-history-${width}.png` });
+      await page.evaluate(() => (window as unknown as SaveWindow).saveStore.dispatch('select-role', { roleId: 'rich' }));
+      expect(await history.locator('strong').allTextContents()).toEqual(['0', '0', '0', '0', '0']);
+      await page.locator('[data-ui-role-history-page]').click();
+      expect(await history.getAttribute('data-role-history-page')).toBe('0');
+      expect(await history.locator('[data-role-history-stat]').count()).toBe(5);
+      expect(await history.textContent()).toContain('代表作（分）');
+    } finally { await page.close(); }
+  }, 30_000);
+
   it("fills each complete achievement page equally without clipping the last card", async () => {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     const base = server.resolvedUrls!.local[0]!;
@@ -97,7 +128,8 @@ describe("run save controls in the game", () => {
       await page.locator('[data-ui-close-run-saves]:visible').click();
       await page.locator('[data-action="quit-game"]:visible').click();
       await page.locator('[data-ui-confirm-quit]').click();
-      expect(await page.locator('[data-action="restart-game"]').textContent()).toContain("结算并重开");
+      expect(await page.locator('[data-action="settle-and-return"]').textContent()).toContain("结算并返回");
+      expect(await page.locator('[data-action="restart-game"]').count()).toBe(0);
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getLobbyState().roleProgress.normal.exp)).toBe(0);
       await page.locator('[data-ui-open-run-saves]:visible').click();
       expect(await page.locator('[data-tab-panel="settings"]').isVisible()).toBe(true);
@@ -116,8 +148,12 @@ describe("run save controls in the game", () => {
       await page.locator('[data-ui-play-tab="settings"]').click();
       await page.locator('[data-action="quit-game"]:visible').click();
       await page.locator('[data-ui-confirm-quit]').click();
-      await page.locator('[data-action="restart-game"]').click();
+      await page.locator('[data-action="settle-and-return"]').click();
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getLobbyState().roleProgress.normal.exp)).toBe(5);
+      expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getCurrentRunId())).toBeNull();
+      expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.hasRoleSave("normal"))).toBe(false);
+      expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getLobbyState().roleProgress.normal.startedRuns)).toBe(1);
+      await page.locator('[data-action="start-game"]').click();
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getCurrentRunId())).not.toBe(firstRun.id);
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getRunSaves().map(save => save.id))).toEqual(["latest", "month:0"]);
       expect(errors).toEqual([]);

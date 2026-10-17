@@ -9,6 +9,7 @@ import { createInitialState, dispatchAction } from "./v2-engine";
 import { pushNoOpLog } from "./v2-engine-helpers";
 import { settleRunAchievements } from "./v2-achievement-runtime";
 import { settleCurseDifficultyProgress } from "./v2-curse-progress";
+import { settleRewinderArchive } from "./v2-rewinder";
 import { applyHelpRead, createRunReplay, replayStateDigest, verifyRunReplay, REPLAY_RULESET, type RunReplay, type ReplayAnchor } from "./v2-run-replay";
 import { awardRoleExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
 import { recordRoleResult, recordRoleStart } from "./v2-role-records";
@@ -227,7 +228,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     const preview = endingPreview(state);
     const record: FinalizedRunRecord = { runId: currentRunId, state: preview.state, debugUsed: runUsedDebugPanel };
     const nextAccount = disqualified ? { ...accountProfile, lastRunExperience: endingAward }
-      : settleCurseDifficultyProgress(preview.account, preview.state);
+      : settleRewinderArchive(settleCurseDifficultyProgress(preview.account, preview.state), preview.state);
     const nextIds = { ...settledRuns, [roleId]: currentRunId };
     const nextOutbox = disqualified ? finalizedOutbox : [...finalizedOutbox, record];
     if (!persistAccount(nextAccount, nextIds, nextOutbox)) { notify(); return false; }
@@ -348,8 +349,11 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
         return;
       }
 
-      if (actionId === "reset-game") {
-        const nextState = dispatchAction(state, actionId, payload);
+      if (actionId === "restart-game") return;
+
+      if (actionId === "reset-game" || actionId === "settle-and-return") {
+        if (actionId === "settle-and-return" && !finalize()) return;
+        const nextState = dispatchAction(state, "reset-game", payload);
         runUsedDebugPanel = false;
         countedStartRole = null;
         currentRunId = null;
@@ -358,33 +362,10 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
         return;
       }
 
-      if (actionId === "restart-game") {
-        if (!finalize()) return;
-        const roleId = state.selectedRoleId;
-        const initial = { ...createInitialState(), blockLinearEvents: state.blockLinearEvents };
-        const startPayload = {
-          roleId,
-          curseDifficulty: getSelectedCurseDifficulty(accountProfile, roleId),
-          captainTagLevels: Object.fromEntries(CAPTAIN_PREREQUISITE_ROLE_IDS.map(id => [id, accountProfile.roleProgress[id].level])),
-          talentAllocation: sanitizeRoleTalentAllocation(roleId, accountProfile.roleProgress[roleId].level, accountProfile.talentAllocation?.[roleId], accountProfile.achievementTalentPoints?.[roleId] ?? 0),
-          bonusTalentPoints: accountProfile.achievementTalentPoints?.[roleId] ?? 0,
-        };
-        const nextState = dispatchAction(initial, "start-game", startPayload);
-        beginReplay(initial, nextState, startPayload);
-        currentRunId = null;
-        runUsedDebugPanel = false;
-        commit(nextState, accountProfile, { newRun: true });
-        return;
-      }
-
       if (actionId === "start-game") {
         if (state.phase !== "setup") return;
         if (!readyComplete) { void ready().then(() => api.dispatch(actionId, payload)); return; }
         const nextRoleId = payload.roleId ?? accountProfile.selectedLobbyRoleId;
-        if (nextRoleId === "rewinder") {
-          commit(pushNoOpLog(state, "轮回者已开放能力预览，轮回玩法尚未实装。"));
-          return;
-        }
         if (restore(nextRoleId)) return;
         if (!isRoleOwned(accountProfile, nextRoleId)) {
           commit(pushNoOpLog(state, "该角色当前仅供展示。"));
@@ -396,6 +377,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
           roleId: nextRoleId,
           curseDifficulty: getSelectedCurseDifficulty(accountProfile, nextRoleId),
           captainTagLevels: Object.fromEntries(CAPTAIN_PREREQUISITE_ROLE_IDS.map(id => [id, accountProfile.roleProgress[id].level])),
+          rewinderArchive: nextRoleId === "rewinder" ? accountProfile.rewinderArchive : undefined,
           talentAllocation: sanitizeRoleTalentAllocation(nextRoleId, accountProfile.roleProgress[nextRoleId].level, accountProfile.talentAllocation?.[nextRoleId], accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0),
           bonusTalentPoints: accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0,
         };
@@ -410,7 +392,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       if (actionId.startsWith("debug-") || actionId === "force-next-month") markCurrentRunAsDebugged();
       const nextState = collectRunStatistics(state, dispatchAction(state, actionId, payload));
       if (state.phase === "playing" && nextState !== state && !runUsedDebugPanel) {
-        replay?.commands.push({ kind: "action", actionId, payload: structuredClone(payload) });
+        replay?.commands.push({ kind: "action", actionId, payload: structuredClone(payload), ruleset: REPLAY_RULESET });
       }
       commit(nextState);
     },

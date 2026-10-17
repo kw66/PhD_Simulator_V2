@@ -103,7 +103,7 @@ describe("per-role saves integrated with the store", () => {
     expect(loaded.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
   });
 
-  it("isolates each role and leaves the other save untouched when settling and restarting", async () => {
+  it("settles to setup without another start or save and leaves the other role untouched", async () => {
     const { store, saves } = await harness();
     store.dispatch("start-game", { roleId: "normal" });
     finishOpening(store);
@@ -113,12 +113,17 @@ describe("per-role saves integrated with the store", () => {
     finishOpening(store);
     const richRun = saves.get("rich")!;
     store.dispatch("quit-game");
-    store.dispatch("restart-game");
-    expect(store.getState().phase).toBe("playing");
+    store.dispatch("settle-and-return");
+    expect(store.getState().phase).toBe("setup");
     expect(store.getState().totalMonths).toBe(0);
     expect(store.getCurrentRunId()).not.toBe(richRun.runId);
-    expect(saves.get("rich")?.months.map(month => month.totalMonths)).toEqual([0]);
+    expect(saves.get("rich")).toBeUndefined();
+    expect(store.getCurrentRunId()).toBeNull();
+    expect(store.getLobbyState().roleProgress.rich.startedRuns).toBe(1);
     expect(saves.get("normal")).toEqual(normalRun);
+    store.dispatch("start-game", { roleId: "rich" });
+    expect(store.getLobbyState().roleProgress.rich.startedRuns).toBe(2);
+    expect(saves.get("rich")?.months.map(month => month.totalMonths)).toEqual([0]);
   });
 
   it("keeps month starts immutable while latest changes, and truncates the future after rewind", async () => {
@@ -155,7 +160,7 @@ describe("per-role saves integrated with the store", () => {
     expect(store.loadRunSave("month:1")).toBe(true);
     expect(store.getState().achievementProgress?.satisfied).not.toContain("global:windfall");
     store.dispatch("quit-game");
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getLobbyState().achievementRewardedIds).not.toContain("global:windfall");
     expect(store.getLobbyState().achievementUnlockedByRole?.["global:windfall"]).toBeUndefined();
     expect(store.getLobbyState().achievementRewardedIds).toContain("global:ending-quit");
@@ -178,7 +183,7 @@ describe("per-role saves integrated with the store", () => {
     expect(loaded.isCurrentRunDebugged()).toBe(true);
     loaded.dispatch("quit-game");
     expect(loaded.getEndingExperienceAward()?.disqualifiedByDebug).toBe(true);
-    loaded.dispatch("restart-game");
+    loaded.dispatch("settle-and-return");
     expect(loaded.getLobbyState().achievementRewardedIds).toEqual([]);
     expect(loaded.getLobbyState().roleProgress.normal.playedRuns).toBe(0);
     expect(loaded.getFinalizedOutbox()).toEqual([]);
@@ -194,7 +199,7 @@ describe("per-role saves integrated with the store", () => {
     const oldRecord = saves.get("normal")!;
     let finalized = 0;
     store.subscribeFinalized(() => { finalized += 1; });
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(finalized).toBe(1);
     const account = structuredClone(store.getLobbyState());
     const persisted = loadAccountProfile(storage);
@@ -221,15 +226,16 @@ describe("per-role saves integrated with the store", () => {
     const beforeSave = structuredClone(saves.get("normal"));
     const beforeState: GameState = structuredClone(store.getState());
     storage.failAccountWrites(true);
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getState()).toEqual(beforeState);
     expect(store.getLobbyState()).toEqual(beforeAccount);
     expect(saves.get("normal")).toEqual(beforeSave);
     expect(store.getFinalizedOutbox()).toEqual([]);
     expect(store.getSaveStatus()).not.toBe("");
     storage.failAccountWrites(false);
-    store.dispatch("restart-game");
-    expect(store.getState().phase).toBe("playing");
+    store.dispatch("settle-and-return");
+    expect(store.getState().phase).toBe("setup");
+    expect(store.hasRoleSave("normal")).toBe(false);
     expect(store.getLobbyState().achievementRewardedIds).toContain("global:windfall");
   });
 });

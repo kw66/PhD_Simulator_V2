@@ -161,7 +161,7 @@ describe("automatic linear event resolution", () => {
     store.dispatch("set-linear-event-blocking", { blockLinearEvents: false });
     store.dispatch("start-game", { roleId: "normal" });
     expect(store.getState().blockLinearEvents).toBe(false);
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getState().blockLinearEvents).toBe(false);
     store.dispatch("reset-game");
     store.dispatch("start-game", { roleId: "normal" });

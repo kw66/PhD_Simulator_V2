@@ -9,6 +9,8 @@ import { createStudyFatigueEvent, isStudyFatigueEligible, settleScheduledActionB
 import { createRandomEventById, isRandomEventEligible } from "../src/core/v2-random-event-router";
 import { applyResearchOperation, createResearchPaper } from "../src/core/v2-research-operation";
 import type { Buff, GameState } from "../src/core/v2-types";
+import { renderApp } from "../src/app/v2-render";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 
 function state(): GameState {
   const s = createInitialState();
@@ -31,6 +33,28 @@ function finish(option: number): { before: GameState; after: GameState } {
 }
 
 describe("厌倦学习", () => {
+  it("quotes social resistance in the friends option while preserving old replay copy", () => {
+    const initial = state();
+    initial.player.social = 18;
+    const decision = createStudyFatigueEvent(initial).choices[0]!.effects.enqueueEvents![0]!;
+    expect(decision.choices[2]!.outcome).toContain("社交 +0.4（抵抗0.6）");
+    const legacy = withGameplayRuleset("20261017-r3", () => createStudyFatigueEvent(initial));
+    expect(legacy.choices[0]!.effects.enqueueEvents![0]!.choices[2]!.outcome).toContain("社交 +1");
+  });
+
+  it.each([[0, "科研 -0.4（抵抗0.6）"], [3, "科研 -1（抵抗1）"]])("shows resisted research in current and historical results without rewriting the saved event: %i", (option, expected) => {
+    const initial = state();
+    const before = { ...initial, player: { ...initial.player, research: 18 } };
+    const queued = { ...before, eventQueue: [createEventQueueItem(createStudyFatigueEvent(before), 0)] };
+    const result = choose(choose(queued), Number(option));
+    const source = JSON.stringify(result);
+    const event = result.eventQueue[0]!;
+    expect(renderApp(result, undefined, { isEventContentOpen: true, activeEventId: event.id })).toContain(expected);
+    expect(JSON.stringify(result)).toBe(source);
+    const completed = choose(result);
+    expect(renderApp(completed, undefined, { isEventContentOpen: true, activeEventHistoryId: completed.eventHistory.at(-1)!.id })).toContain(expected);
+  });
+
   it("requires three completed consecutive months of the player's research, not ordinary resting", () => {
     let s = state();
     for (const month of [1, 2, 3]) s = consumeActiveOperation({ ...s, totalMonths: month, actionState: { ...s.actionState, used: 0 } }, "idea");

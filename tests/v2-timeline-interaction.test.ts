@@ -143,7 +143,8 @@ describe("timeline scrolling through the real app handlers", () => {
 
   it("shows SAN changes in the month strip and opens a navigable chart", async () => {
     await action("debug-trigger-ending", { eventId: "quit" });
-    await action("restart-game");
+    await action("settle-and-return");
+    await action("start-game");
     await page.locator(".event-content-buttons button").first().click();
     await page.locator(".event-content-buttons button").nth(1).click();
     await page.locator(".event-content-buttons button").first().click();
@@ -189,7 +190,8 @@ describe("timeline scrolling through the real app handlers", () => {
 
   it("fits every recorded SAN month into a long-career chart with sparse axis labels", async () => {
     await action("debug-trigger-ending", { eventId: "quit" });
-    await action("restart-game");
+    await action("settle-and-return");
+    await action("start-game");
     await page.locator(".event-content-buttons button").first().click();
     await page.locator(".event-content-buttons button").nth(1).click();
     await page.locator(".event-content-buttons button").first().click();

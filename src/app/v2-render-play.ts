@@ -1,4 +1,5 @@
 import { renderSanPayment } from "./v2-render-san-payment";
+import { formatEventResultResistance } from "./v2-event-result-display";
 import { renderRunSaves } from "./v2-render-run-saves";
 import { getEffectiveResearch, getEffectiveSocial } from "../core/v2-effective-attributes";
 import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
@@ -130,9 +131,12 @@ import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber,
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl, hasRoleCardPortrait } from "./v2-role-portrait-assets";
 import { renderDesignedGrowthBoard } from "./v2-render-setup-screen";
 import { renderCaptainTags } from "./v2-render-captain-tags";
+import { renderRewinderPreview } from "./v2-render-rewinder";
+import { renderRewinderEvent } from "./v2-render-rewinder-event";
+import { getAdvisorGuidanceAmount } from "../core/v2-advisor-guidance";
 import { getDesignedTalentNodes } from "../core/v2-role-talent-definitions";
 import { getMonthEndIllnessDelta } from "../core/v2-curse-system";
-import { getCaptainAffinityCap, getCaptainCooperationMax, getCaptainLevel, getCaptainLoverId, getCaptainLoverIntimacyCap, getCaptainLoverResearchCap, getCaptainLoverRouteMax, getCaptainProjectMax, getCaptainResearchCap, getCaptainTag, isCaptain } from "../core/v2-captain-state";
+import { getCaptainAdvisorGuidanceBonus, getCaptainGuidanceMultiplier, getCaptainAffinityCap, getCaptainCooperationMax, getCaptainLevel, getCaptainLoverId, getCaptainLoverIntimacyCap, getCaptainLoverResearchCap, getCaptainLoverRouteMax, getCaptainProjectMax, getCaptainResearchCap, getCaptainTag, isCaptain } from "../core/v2-captain-state";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
 const RESEARCH_CHORE_SAN_DISCOUNT = [0, 1, 2, 3] as const;
@@ -1154,6 +1158,8 @@ function renderEventContentBox(
     : (displayPageIndex < currentPageIndex ? history[displayPageIndex] : null);
   const displayEvent = historicalPage ?? currentEvent;
   if (!displayEvent) return "";
+  const priorStage = (isCompleted ? completedStages : history)[displayPageIndex - 1];
+  const displayDescription = formatEventResultResistance(displayEvent.description, priorStage?.selectedChoiceId);
   const paperReviewPresentation = displayEvent.paperReviewPresentation;
   const journalAcceptancePresentation = displayEvent.journalAcceptancePresentation;
   const displayStage: EventStage = "stage" in displayEvent
@@ -1208,13 +1214,15 @@ function renderEventContentBox(
         <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情">×</button>
       </div>
       <div class="event-content-body" id="event-content-body">
-        ${displayEvent.thesisReviewPresentation
+        ${displayEvent.rewinderPresentation
+          ? renderRewinderEvent(displayEvent.rewinderPresentation, historicalPage === null && !isCompleted ? state : undefined)
+          : displayEvent.thesisReviewPresentation
           ? renderThesisReviewReports(displayEvent.thesisReviewPresentation, renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state)))
           : paperReviewPresentation
           ? renderPaperReviewEvent(paperReviewPresentation, historicalPage !== null, renderEventSettlementSummary)
           : journalAcceptancePresentation
           ? renderJournalAcceptanceEvent(journalAcceptancePresentation, renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state)))
-          : renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state))}
+          : renderEventDescriptionHtml(displayDescription, getEventNarrativeNames(displayEvent, state))}
       </div>
       ${displayEvent.choices.length > 0 ? `
         <div class="event-content-buttons" id="event-content-buttons">
@@ -1268,7 +1276,7 @@ export function renderEventLayoutSamples(
     if (seen.has(event)) return;
     seen.add(event);
     samples.push({ key: `${event.id}:${history.map((stage) => stage.selectedChoiceId).join("/")}:${branch}`,
-      html: renderEventContentBox({ ...event, history, queueOrder: currentEvent.queueOrder }, null, null) });
+      html: renderEventContentBox({ ...event, history, queueOrder: currentEvent.queueOrder }, null, null, false, state) });
     const stage = { title: event.title, description: event.description, narrativeNames: getEventNarrativeNames(event, state), choices: event.choices,
       paperReviewPresentation: event.paperReviewPresentation, journalAcceptancePresentation: event.journalAcceptancePresentation,
       selectedChoiceId: "" };
@@ -2162,7 +2170,8 @@ function getFellowCooperationHint(state: GameState, profile: FellowProgressProfi
   const target = profile.type === "senior" ? "idea" : profile.type === "peer" ? "随机项" : "实验";
   const monthlyGain = profile.affinity * ((profile.longTermMentoring ? 2 : 1) + 0.1 * getCaptainLevel(state, profile.id, "chosen"));
   const maximum = getCaptainCooperationMax(state, isCaptain(state) ? { ...profile, taskMax: 100 } : profile);
-  return `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，每月自动推进+${formatMoney(monthlyGain)}\n满${maximum}：${role}帮你论文${target}+${getRoleCollaborationScore(state, "fellow", profile.research)}，你帮对方最低项+${Math.floor(research)}`;
+  const frequency = getCaptainLevel(state, profile.id, "chosen") > 0 ? "月均自动推进" : "每月自动推进";
+  return `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，${frequency}+${formatMoney(monthlyGain)}\n满${maximum}：${role}帮你论文${target}+${getRoleCollaborationScore(state, "fellow", profile.research)}，你帮对方最低项+${Math.floor(research)}`;
 }
 
 function getFellowInheritanceHint(): string {
@@ -2228,7 +2237,7 @@ function renderAdvisorStatus(state: GameState): string {
       ? `${pendingGrant.name}结果已公布`
       : `${pendingGrant.name}申请·${(8 - calendarMonth + 12) % 12 || 12}月后公布`
     : `${monthsToApplication}月后可申请${applicationGrant.name}${limited ? "·限项" : ""}`;
-  const accumulationHint = "纵向项目满100，科研积累+10%\n发表论文按科研分提升科研积累";
+  const accumulationHint = `纵向项目满${getCaptainProjectMax(state, "vertical")}，科研积累+10%\n发表论文按科研分提升科研积累`;
   const progressBar = (label: string, value: number, max: number): string => `
     <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${formatMoney(max)}" aria-valuenow="${formatMoney(Math.min(value, max))}" aria-valuetext="${formatMoney(value)}/${formatMoney(max)}">
       <div class="rel-progress-fill task ${label === "科研积累" ? "research" : "funding"}" ${animationBarAttribute(`person:advisor:${label === "科研积累" ? "research" : "funding"}`)} style="width:${clampPercent(value / max * 100)}%"></div>
@@ -2252,8 +2261,9 @@ function renderAdvisorStatus(state: GameState): string {
           const projectSanCost = getAdvisorTaskSanCost(state, projectType);
           const blocked = baseBlocked || (!quoteSanPayment(state, projectSanCost).allowed ? `SAN不足，需要${projectSanCost}` : "");
           const research = Math.max(0, getEffectiveResearch(state));
+          const fellowGuidance = isCaptain(state) ? state.fellowProgressState.map(profile => `${getFellowName(profile)}+${Math.floor((10 + getCaptainAdvisorGuidanceBonus(state)) * getCaptainGuidanceMultiplier(state, profile))}`).join("、") : "同学论文写作协作+10";
           const reward = projectType === "horizontal" ? `经费+${getAdvisorHorizontalReward(advisor)}，每人发${formatMoney(getAdvisorHorizontalReward(advisor) * 0.05)}金劳务费`
-            : "科研积累+10%，全组论文写作协作+10";
+            : `科研积累+10%，你的论文写作协作+${getAdvisorGuidanceAmount(state)}${fellowGuidance ? `；${fellowGuidance}` : ""}`;
           const automaticGain = (advisor.nextProject ?? "horizontal") === projectType ? 10 + getCaptainLevel(state, "advisor", "normal") : 0;
           const maximum = getCaptainProjectMax(state, projectType);
           const hint = `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，导师下月自动推进+${automaticGain}\n满${maximum}：${reward}`;
@@ -2292,8 +2302,10 @@ function renderLoverRoutes(state: GameState): string {
             : isDevelopmentPreEnrollmentPreview(state) ? null : getLoverDateFailure(state, route);
       const gain = getLoverRouteGain(state, route);
       const reward = getLoverNextReward(state, route).replace("永久idea、实验、写作各+1分", "论文三项分数永久+1");
-      const passiveGain = route === "shopping" ? 0 : passiveGains[route];
-      const hint = `主动推进+${formatMoney(gain)}，每月自动推进+${formatMoney(passiveGain)}\n下次满${maximum}：${reward}`;
+      const extraAdvances = getCaptainLevel(state, getCaptainLoverId(state), "chosen") * 0.1;
+      const passiveGain = route === "shopping" ? 0 : passiveGains[route] * (1 + extraAdvances);
+      const frequency = extraAdvances > 0 && route !== "shopping" ? "月均自动推进" : "每月自动推进";
+      const hint = `主动推进+${formatMoney(gain)}，${frequency}+${formatMoney(passiveGain)}\n下次满${maximum}：${reward}`;
       return `<div class="rel-lover-route" data-lover-route="${route}">
         <span class="rel-detail-label" ${relationshipTooltip(hint)}>${renderRelationshipIcon(icons[route])}${label}</span>
         <div class="rel-progress-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${maximum}" aria-valuenow="${formatMoney(progress)}">
@@ -3715,7 +3727,7 @@ function renderTalentSection(
         </div>
       </div>
       <div class="talent-items-list" id="talent-items-list" data-talent-panel-tab="${tabId}">
-        ${tabId === "publication" ? renderPublicationTalentCards(state) : tabId === "character" ? (state.selectedRoleId === "research-captain" ? renderCaptainTags({}, characterSelectedNodeIndex, state.captainState?.levels) : getDesignedTalentNodes(state.selectedRoleId) ? renderDesignedGrowthBoard(state.selectedRoleId as Parameters<typeof renderDesignedGrowthBoard>[0], state.curseState ? state.curseState.difficulty - 1 : characterSelectedNodeIndex, talentAllocation, roleLevel, false, 0, state.curseState ? { unlockedDifficulty: state.curseState.difficulty, readOnly: true } : undefined) : '<p class="talent-panel-empty">暂无角色天赋树</p>') : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
+        ${tabId === "publication" ? renderPublicationTalentCards(state) : tabId === "character" ? (state.selectedRoleId === "rewinder" ? renderRewinderPreview(characterSelectedNodeIndex) : state.selectedRoleId === "research-captain" ? renderCaptainTags({}, characterSelectedNodeIndex, state.captainState?.levels) : getDesignedTalentNodes(state.selectedRoleId) ? renderDesignedGrowthBoard(state.selectedRoleId as Parameters<typeof renderDesignedGrowthBoard>[0], state.curseState ? state.curseState.difficulty - 1 : characterSelectedNodeIndex, talentAllocation, roleLevel, false, 0, state.curseState ? { unlockedDifficulty: state.curseState.difficulty, readOnly: true } : undefined) : '<p class="talent-panel-empty">暂无角色天赋树</p>') : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
       </div>
     </div>
   `;
@@ -3756,7 +3768,7 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
         <button class="settings-primary-btn is-debug" type="button" data-ui-open-debug-window title="打开后本局不计成就、经验及统计">
           <i data-lucide="wrench" aria-hidden="true"></i><span>打开调试面板</span>
         </button>
-        <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并重开"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
+        <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
           <i data-lucide="log-out" aria-hidden="true"></i>
           <span>主动退学</span>
         </button>

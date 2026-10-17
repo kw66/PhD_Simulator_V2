@@ -1,5 +1,6 @@
 import { createGameRandomState, withGameRandom } from "./v2-game-random";
 import { settleCaptainMonth, syncCaptainMembers } from "./v2-captain-runtime";
+import { prepareRewinderYear, completeRewinderYear, isRewinderYearEnd, toggleRewinderPerson } from "./v2-rewinder";
 import { observeAchievements } from "./v2-achievement-runtime";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { dispatchDebugAction } from "./v2-debug-tools";
@@ -146,10 +147,14 @@ function takeRest(state: GameState): GameState {
 function resolveQueuedEvent(state: GameState, eventId: string | undefined, choiceId: string | undefined): GameState {
   const event = eventId ? getCurrentEvent(state.eventQueue, eventId) : getCurrentQueueEvent(state);
   if (!event) return state;
-  return applyQueuedEventEffects(state, event, choiceId, {
+  const isRewinder = !!event.rewinderPresentation && !!state.rewinderState?.pending && choiceId === "confirm-rewinder-year";
+  const prepared = isRewinder ? completeRewinderYear(state) : state;
+  const updatedEvent = prepared.eventQueue.find(item => item.id === event.id) ?? event;
+  const result = applyQueuedEventEffects(prepared, updatedEvent, choiceId, {
     evaluateImmediateEndings: evaluateCoreEndings,
     runPostQueuePipeline: (nextState) => nextState,
   });
+  return isRewinder && result.phase === "playing" && !result.eventQueue.some(item => item.id === event.id) ? advanceMonth(result) : result;
 }
 
 function createAdvancedCalendarState(state: GameState): GameState {
@@ -308,6 +313,7 @@ function advanceMonth(state: GameState, force = false): GameState {
   if (state.phase !== "playing") return state;
   state = evaluateCoreEndings(settleJournalPublicationFees(state));
   if (state.phase !== "playing") return state;
+  if (force && state.rewinderState?.pending) state = completeRewinderYear(state);
   if (force) state = discardBlockingQueueEvents(state);
   if (hasManualBlockingEvents(state)) return pushNoOpLog(state, "必须先处理待办事件。");
   state = settleLinearEvents(state, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
@@ -346,7 +352,10 @@ function advanceMonth(state: GameState, force = false): GameState {
   if (state.phase !== "playing") return state;
   if (force) state = discardBlockingQueueEvents(state);
   if (hasManualBlockingEvents(state)) return state;
-  state = settleRoleTalentMonthEnd(settleRoleTalentYearEnd(settleLabResearchGrowth(settleFellowAcademicYear(state))));
+  if (state.rewinderState?.monthEndProcessed !== state.totalMonths) {
+    state = settleRoleTalentMonthEnd(settleRoleTalentYearEnd(settleLabResearchGrowth(settleFellowAcademicYear(state))));
+  }
+  if (isRewinderYearEnd(state)) return prepareRewinderYear(syncAdvisorResearchAccumulation(state));
   if (state.totalMonths >= state.maxMonths) return finishTrainingIfReady(syncAdvisorResearchAccumulation(state));
 
   const nextState = evaluateCoreEndings(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(
@@ -371,7 +380,9 @@ function settlePendingPaperHelp(state: GameState): GameState {
 }
 
 export function dispatchAction(state: GameState, actionId: GameActionId, payload: DispatchPayload = {}): GameState {
-  const source = actionId === "restart-game" ? { ...state, randomState: createGameRandomState() } : state;
+  // Leaving a run must not carry its consumed random cursor into the next start.
+  const source = actionId === "restart-game" || actionId === "reset-game"
+    ? { ...state, randomState: createGameRandomState() } : state;
   const run = () => {
     const next = dispatchActionInternal(source, actionId, payload);
     if (next === source || source.phase === "finished" || actionId === "set-linear-event-blocking" || actionId === "select-paper") return next;
@@ -548,6 +559,8 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
       return applyShopAction(state, actionId, payload);
     case "next-month":
       return advanceMonth(state);
+    case "toggle-rewinder-person":
+      return toggleRewinderPerson(state, payload.rewinderPersonKey);
     case "force-next-month":
       return advanceMonth(discardBlockingQueueEvents(state), true);
     default:

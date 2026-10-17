@@ -120,6 +120,33 @@ describe("captain run integration", () => {
     expect(getPaperCitationMultiplier(state, { ...paper, collaborators: [{ id: "advisor", name: "导师" }] })).toBeCloseTo(baseMultiplier * 2);
   });
 
+  it("retains repeated vertical-project guidance without eligible drafts and restores it once", () => {
+    let state = base(["teacher-child"]);
+    state = { ...state, papers: [], fellowPapers: [],
+      captainState: { ...state.captainState!, tags: { advisor: "teacher-child", f0: "teacher-child" },
+        initializedMembers: ["advisor", "f0"] } };
+    const completed = advanceSharedLabProject(state, "vertical", 150, () => 0);
+    expect(completed.completed).toBe(3);
+    expect(completed.state.advisorProgressState.pendingGuidanceToPlayer).toBe(60);
+    expect(completed.state.fellowProgressState[0]!.pendingGuidanceFromAdvisor).toBe(180);
+    // A later roster change changes only the next reward, not saved awards.
+    const changed = { ...completed.state, captainState: { ...completed.state.captainState!,
+      tags: { advisor: "normal" as const, f0: "teacher-child" as const } } };
+    const queued = queueAdvisorGuidance(changed);
+    expect(queued.advisorProgressState.pendingGuidanceToPlayer).toBe(75);
+    expect(queued.fellowProgressState[0]!.pendingGuidanceFromAdvisor).toBe(225);
+    const restored: GameState = JSON.parse(JSON.stringify(queued));
+    const next = settleAdvisorGuidance({ ...restored,
+      papers: [{ ...createDraftPaper(1, 0, () => 0), idea: 1, experiment: 1 }],
+      fellowPapers: [{ ...createDraftPaper(1, 1, () => 0), idea: 1, experiment: 1, leadAuthorId: "f0" }] }, () => 0);
+    expect(next.papers[0]!.collaborationScores!.writing).toBe(75);
+    expect(next.fellowPapers![0]!.collaborationScores!.writing).toBe(225);
+    expect(next.advisorProgressState.pendingGuidanceToPlayer).toBeNull();
+    expect(next.fellowProgressState[0]!.pendingGuidanceFromAdvisor).toBeNull();
+    expect(settleAdvisorGuidance(next)).toBe(next);
+    expect(restored.advisorProgressState.pendingGuidanceToPlayer).toBe(75);
+  });
+
   it("applies lover caps once and accumulates extra passive advances without shopping", () => {
     let state = base();
     state = { ...state, loverState: { ...activateLover("smart", 1, "female"), name: "恋人" },
@@ -129,8 +156,10 @@ describe("captain run integration", () => {
       levels: { ...state.captainState!.levels, chosen: 5 } } };
     const first = advanceLoverMonth(state);
     expect(first.loverProgressState.routes!.study.progress).toBe(10);
+    expect(first.loverProgressState.monthlyActivity).toBe("玩耍进度 +5，学习进度 +10");
     const second = advanceLoverMonth({ ...first, totalMonths: 3, month: 3 });
     expect(second.loverProgressState.routes!.study.progress).toBe(30);
+    expect(second.loverProgressState.monthlyActivity).toBe("玩耍进度 +10，学习进度 +20（推进2次）");
     expect(second.loverProgressState.routes!.shopping.progress).toBe(0);
     expect(advanceLoverMonth(second)).toBe(second);
     const genius = syncCaptainMembers({ ...state, captainState: { ...state.captainState!, tags: { advisor: "normal", [id]: "genius" }, initializedMembers: ["advisor"] } });
@@ -142,6 +171,20 @@ describe("captain run integration", () => {
     const state = syncCaptainMembers(base(["chosen"]), () => 0.99);
     expect(getCaptainCooperationMax(state, state.fellowProgressState[0]!)).toBe(80);
     expect(getCaptainCooperationMax(structuredClone(state), state.fellowProgressState[0]!)).toBe(80);
+  });
+
+  it("does not pass an old lover's fractional automatic advance to a new relationship", () => {
+    let state = base();
+    state = { ...state,
+      loverState: { ...activateLover("smart", 2, "female"), name: "新恋人" },
+      loverProgressState: createLoverProgressState("smart", () => 0),
+      captainState: { ...state.captainState!, initializedMembers: ["advisor", "lover:1:旧恋人"],
+        loverAdvanceRemainder: 0.7 } };
+    const joined = syncCaptainMembers(state, () => 0.99);
+    expect(joined.captainState!.loverAdvanceRemainder).toBe(0);
+    const saved = { ...joined, captainState: { ...joined.captainState!, loverAdvanceRemainder: 0.3 } };
+    expect(syncCaptainMembers(JSON.parse(JSON.stringify(saved))).captainState!.loverAdvanceRemainder).toBe(0.3);
+    expect(state.captainState!.loverAdvanceRemainder).toBe(0.7);
   });
 
   it("shows and persists advisor candidate labels and rerolls them only with the advisor", () => {

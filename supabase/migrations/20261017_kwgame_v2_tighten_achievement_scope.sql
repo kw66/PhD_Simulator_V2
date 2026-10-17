@@ -14,7 +14,7 @@ where id like 'global:%'
     'global:career-apex-internet', 'global:career-apex-state',
     'global:career-apex-civil', 'global:career-apex-academic',
     'global:buff-collector', 'global:product-collector', 'global:conference-collector',
-    'global:travel-collector', 'global:direction-collector'
+    'global:travel-collector', 'global:direction-collector', 'global:slow-research'
   );
 
 update public.phd_simulator_v2_achievement_catalog
@@ -30,6 +30,6 @@ where id in (
   'global:career-apex-internet', 'global:career-apex-state',
   'global:career-apex-civil', 'global:career-apex-academic',
   'global:buff-collector', 'global:product-collector', 'global:conference-collector',
-  'global:travel-collector', 'global:direction-collector'
+  'global:travel-collector', 'global:direction-collector', 'global:slow-research'
 );
 commit;

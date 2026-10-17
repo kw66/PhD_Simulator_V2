@@ -99,7 +99,7 @@ describe("轮回者 account milestone", () => {
     expect(store.getLobbyState().roleProgress.rewinder.unlocked).toBe(false);
     store.markCurrentRunAsDebugged();
     store.dispatch("debug-trigger-ending", { eventId: "phd" });
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getLobbyState().roleProgress.rewinder.unlocked).toBe(false);
     expect(getRewinderAchievementCount(loadAccountProfile(storage).account)).toBe(23);
   });

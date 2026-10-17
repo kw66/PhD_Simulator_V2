@@ -611,6 +611,7 @@ export function applyQueuedEventEffects(
       paperReviewPresentation: resolvedEvent.paperReviewPresentation,
       journalAcceptancePresentation: resolvedEvent.journalAcceptancePresentation,
       thesisReviewPresentation: resolvedEvent.thesisReviewPresentation,
+      rewinderPresentation: resolvedEvent.rewinderPresentation,
       choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason }) => ({ id, label, outcome, disabledReason })),
       selectedChoiceId: choice.id,
       replayEvent: sceneSource,

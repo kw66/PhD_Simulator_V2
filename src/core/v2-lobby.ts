@@ -46,6 +46,11 @@ function createZeroHistoryBest(): RoleHistoryBest {
     natureCount: 0,
     representativeCitations: 0,
     representativeScore: 0,
+    sanCap: 0,
+    research: 0,
+    social: 0,
+    favor: 0,
+    money: 0,
   };
 }
 
@@ -244,8 +249,8 @@ function buildRoleHistoryStatsViewModel(progress: RoleMetaProgress): LobbySelect
 
 function buildRoleStatisticsViewModel(progress: RoleMetaProgress): LobbySelectedRoleStatisticsViewModel[] {
   return [
-    { id: "completed-runs", label: "通关", value: String(progress.completedRuns), tooltip: "当前角色在本设备硕士或博士毕业的局数" },
-    { id: "played-runs", label: "游玩", value: String(progress.startedRuns), tooltip: "当前角色在本设备开始新游戏的次数" },
+    { id: "completed-runs", label: "个人通关", value: String(progress.completedRuns), tooltip: "当前角色在本设备硕士或博士毕业的局数" },
+    { id: "played-runs", label: "个人游玩", value: String(progress.startedRuns), tooltip: "当前角色在本设备开始新游戏的次数" },
     { id: "global-completed-runs", label: "全球通关", value: "--", tooltip: "当前角色全球硕士或博士毕业的局数" },
     { id: "global-played-runs", label: "全球游玩", value: "--", tooltip: "当前角色全球开始新游戏的次数" },
     { id: "phd-rate", label: "博士率", value: "--", tooltip: "全球博士毕业局数 ÷ 全球已达成结局的局数" },

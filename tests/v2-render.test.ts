@@ -680,7 +680,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toMatch(/<span>代表作（分）<\/span>\s*<strong>0<\/strong>/);
     expect(html).not.toContain(">通关次数</span>");
     expect(html).toContain(">h 指数</span>");
-    for (const label of ["通关", "游玩", "全球通关", "全球游玩", "博士率"]) expect(html).toContain(`>${label}</span>`);
+    for (const label of ["个人通关", "个人游玩", "全球通关", "全球游玩", "博士率"]) expect(html).toContain(`>${label}</span>`);
     expect(html).not.toContain("总引用");
     expect(html).not.toContain("Nature数量");
     expect(html).not.toContain("代表作引用");
@@ -1113,19 +1113,20 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(createInitialState(), account);
     expect(html).not.toContain("lobby-talent-effects");
     expect(html).toContain("is-rewinder-tree");
-    expect(html).toContain("设计预览");
-    expect(html).toContain("轮回能力待实装");
+    expect(html).toContain('aria-label="轮回者能力"');
+    expect(html).not.toContain("轮回能力待实装");
     expect(html).not.toContain('data-ui-talent-reset=');
     expect(html).not.toContain('data-talent-id=');
     expect(html).not.toContain("data-ui-talent-effect-page-delta");
   });
 
-  it.each(["rewinder"] as const)("renders six passive design explanations for %s", (roleId) => {
+  it.each(["rewinder"] as const)("renders three inheritance categories and a special overview for %s", (roleId) => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = roleId;
     const html = renderApp(createInitialState(), account);
     expect(html).toContain('class="lobby-profile-growth-card');
-    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(6);
+    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
+    for (const category of ["属性轮回", "天赋轮回", "人际轮回", "轮回者 · 特殊"]) expect(html).toContain(category);
     expect(html).toContain("已完成 0/24 个不同成就");
   });
 
@@ -6084,7 +6085,7 @@ describe("v2 render lobby shell", () => {
     expect(card).toContain('data-tooltip="推进纵向项目 +10"');
     expect(card).not.toContain('rel-card-footnote');
     expect(card).toContain('满100：经费+50，每人发2.5金劳务费');
-    expect(card).toContain('科研积累+10%，全组论文写作协作+10');
+    expect(card).toContain('科研积累+10%，你的论文写作协作+10；同学论文写作协作+10');
     const help = getHelpText({ activePlayTab: "relationship" });
     expect(help).toContain('同学也会自动推进项目');
     expect(help).toContain('若没有可修改论文，写作协作奖励会各暂存一次');
@@ -6226,7 +6227,7 @@ describe("v2 render lobby shell", () => {
       expect(help).not.toContain('横向基础SAN-5');
       expect(row).not.toMatch(/横向需经费|经费&gt;0/);
       expect(row).not.toContain('disabled aria-disabled="true"');
-      expect(row).toContain(type === "horizontal" ? '满100：经费+50，每人发2.5金劳务费' : '满100：科研积累+10%，全组论文写作协作+10');
+      expect(row).toContain(type === "horizontal" ? '满100：经费+50，每人发2.5金劳务费' : '满100：科研积累+10%，你的论文写作协作+10；同学论文写作协作+10');
     }
   });
 
@@ -7163,7 +7164,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('data-phase="finished"');
     expect(html).toContain('<h2 id="ending-title">硕士毕业</h2>');
     expect(html).not.toContain('class="ending-result-row"');
-    expect(html).toContain('data-action="restart-game"');
+    expect(html).toContain('data-action="settle-and-return"');
     expect(html).toContain('data-action="reset-game"');
     expect(html).toContain("data-ui-ending-page");
     expect(html).toContain("data-ui-close-ending-content");

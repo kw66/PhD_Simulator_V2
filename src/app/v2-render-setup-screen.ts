@@ -6,6 +6,7 @@ import {
   isRoleOwned,
   LOBBY_ROLE_PAGE_ROW_COUNT,
 } from "../core/v2-lobby";
+import { formatMoney } from "../core/v2-money";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
 import { getAchievementUnlockRoleIds } from "../core/v2-achievement-scope";
 import {
@@ -343,8 +344,13 @@ function renderGrowthProgress(
   `;
 }
 
-function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>, bonusPoints = 0, experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, hasRoleSave = false, isSaveLoading = false): string {
+function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>, bonusPoints = 0, experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, hasRoleSave = false, isSaveLoading = false, roleHistoryPageIndex = 0): string {
   const pointSummary = buildTalentPointSummary(viewModel, allocation, bonusPoints);
+  const historyPage = roleHistoryPageIndex === 1 ? 1 : 0;
+  const historyStats = historyPage === 0 ? viewModel.historyStats : ([
+    ["sanCap", "SAN上限"], ["research", "科研能力"], ["social", "社交能力"],
+    ["favor", "导师好感"], ["money", "金币"],
+  ] as const).map(([id, label]) => ({ id, label, value: formatMoney(viewModel.progress.historyBest[id] ?? 0) }));
   const unlockAchievement = getRoleLobbyAchievementDefinitions(viewModel.role.id)
     .find((achievement) => getAchievementUnlockRoleIds(achievement).includes(viewModel.role.id));
   const unlockHint = unlockAchievement
@@ -355,19 +361,20 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
     <section class="lobby-profile-info">
       <div class="lobby-profile-info-head">
         <h1 class="lobby-profile-art-name">${escapeHtml(viewModel.role.name)}</h1>
-        ${viewModel.unlockState.owned && viewModel.role.id === "rewinder"
-          ? '<button class="lobby-start-button is-disabled" type="button" disabled aria-label="轮回能力尚未实装"><span class="lobby-start-button-label">玩法待实装</span></button>'
-          : viewModel.unlockState.owned
+        ${viewModel.unlockState.owned
           ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"${isSaveLoading ? ' disabled aria-busy="true"' : ""}><span class="lobby-start-button-label">${isSaveLoading ? "读取中…" : hasRoleSave ? "继续游戏" : "开始游戏"}</span><i class="lobby-start-button-arrow" data-lucide="arrow-right" aria-hidden="true"></i></button>`
           : `<span class="lobby-start-lock" role="group" tabindex="0" aria-label="${escapeHtml(unlockHint)}" data-tooltip="${escapeHtml(unlockHint)}"><button class="lobby-start-button is-disabled" type="button" disabled aria-label="角色尚未解锁"><i data-lucide="lock" aria-hidden="true"></i></button></span>`}
       </div>
       <p class="lobby-profile-summary">${escapeHtml(viewModel.lobby.summary)}</p>
       <div class="lobby-profile-stat-columns">
         <section class="lobby-profile-stat-column">
-          <h2 class="lobby-profile-stat-column-title">历史</h2>
-          <div class="lobby-profile-stat-stack lobby-profile-history-stack">
-            ${viewModel.historyStats.map((stat) => `
-              <div class="lobby-profile-stat-row">
+          <div class="lobby-profile-history-heading">
+            <h2 class="lobby-profile-stat-column-title">历史</h2>
+            <button class="lobby-profile-history-pager" type="button" data-ui-role-history-page aria-label="${historyPage === 0 ? "查看属性历史，第2页" : "查看科研历史，第1页"}"><span>${historyPage + 1}/2</span><i data-lucide="${historyPage === 0 ? "chevron-right" : "chevron-left"}" aria-hidden="true"></i></button>
+          </div>
+          <div class="lobby-profile-stat-stack lobby-profile-history-stack" data-role-history-page="${historyPage}" aria-live="polite">
+            ${historyStats.map((stat) => `
+              <div class="lobby-profile-stat-row" data-role-history-stat="${stat.id}">
                 <span>${escapeHtml(stat.label)}</span>
                 <strong>${renderAnimatedNumber(`role:${viewModel.role.id}:history:${stat.id === "representative" ? "representative:score" : stat.id}`, Number(stat.value), stat.value)}</strong>
               </div>
@@ -594,6 +601,7 @@ function renderSelectedRoleDetail(
   talentAllocation?: TalentAllocation,
   hasRoleSave = false,
   isSaveLoading = false,
+  roleHistoryPageIndex = 0,
 ): string {
   const viewModel = buildLobbySelectedRoleViewModel(accountProfile, selectedRoleId);
   const allocation = talentAllocation?.[selectedRoleId] ?? accountProfile.talentAllocation?.[selectedRoleId] ?? {};
@@ -617,9 +625,9 @@ function renderSelectedRoleDetail(
                 alt="${escapeHtml(`${viewModel.role.name}立绘`)}"
               />
             </div>
-            ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading)}
+            ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading, roleHistoryPageIndex)}
           </section>
-          ${selectedRoleId === "rewinder" ? `<div class="rewinder-unlock-progress" role="note" style="text-align:center;font-size:0.75rem;color:var(--ink-soft)">已完成 ${Math.min(REWINDER_REQUIRED_ACHIEVEMENTS, getRewinderAchievementCount(accountProfile))}/${REWINDER_REQUIRED_ACHIEVEMENTS} 个不同成就 · 轮回能力待实装</div>${renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 5)}` : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
+          ${selectedRoleId === "rewinder" ? `<div class="rewinder-unlock-progress" role="note" style="text-align:center;font-size:0.75rem;color:var(--ink-soft)">已完成 ${Math.min(REWINDER_REQUIRED_ACHIEVEMENTS, getRewinderAchievementCount(accountProfile))}/${REWINDER_REQUIRED_ACHIEVEMENTS} 个不同成就</div>${renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 3)}` : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
             ? renderDesignedGrowthBoard(selectedRoleId, isCursedRole(selectedRoleId) ? getSelectedCurseDifficulty(accountProfile, selectedRoleId) - 1 : talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined, false, bonusPoints, isCursedRole(selectedRoleId) ? { unlockedDifficulty: getUnlockedCurseDifficulty(accountProfile, selectedRoleId) } : undefined)
             : ""}
         </div>
@@ -639,6 +647,7 @@ export function renderSetupScreen(
   talentAllocation?: TalentAllocation,
   hasRoleSave = false,
   isSaveLoading = false,
+  roleHistoryPageIndex = 0,
 ): string {
   const selectedRoleId = accountProfile.selectedLobbyRoleId;
   const ownedCount = getRoleOptions().filter((role) => isRoleOwned(accountProfile, role.id)).length;
@@ -673,7 +682,7 @@ export function renderSetupScreen(
 
               <div class="lobby-detail-column">
                 ${renderLobbyMasthead(activeRoleRailView)}
-                ${renderSelectedRoleDetail(accountProfile, selectedRoleId, activeRoleRailView, talentTreePageIndex, talentTreeSelectedNodeByPage, announcementPageIndex, talentAllocation, hasRoleSave, isSaveLoading)}
+                ${renderSelectedRoleDetail(accountProfile, selectedRoleId, activeRoleRailView, talentTreePageIndex, talentTreeSelectedNodeByPage, announcementPageIndex, talentAllocation, hasRoleSave, isSaveLoading, roleHistoryPageIndex)}
               </div>
             </section>
           </section>

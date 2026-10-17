@@ -17,9 +17,10 @@ describe("game announcements", () => {
       for (const change of entry.changes) expect(html).toContain(change.title);
     }
     const release = GAME_ANNOUNCEMENTS[0]!.changes.map((change) => `${change.title}：${change.description}`).join("\n");
+    for (const text of ["轮回者正式实装", "24个不同成就", "结算并返回", "个人历史", "慢科研", "求职不易", "3A", "5A", "协作奖励被覆盖"]) expect(release).toContain(text);
     for (const text of ["统御者", "普通行动点为0", "开局锁定", "四类诅咒", "正式结算", "调试局不计", "厌倦学习", "经验倍率+0.2", "存档"]) expect(release).toContain(text);
     const newest = GAME_ANNOUNCEMENTS[1]!.changes.map((change) => `${change.title}：${change.description}`).join("\n");
-    for (const text of ["六位正位与六位逆位", "184", "70个月度存档", "结算并重开", "按玩家去重", "当前浏览器", "窄屏布局"]) {
+    for (const text of ["六位正位与六位逆位", "184", "70个月度存档", "结算并返回", "按玩家去重", "当前浏览器", "窄屏布局"]) {
       expect(newest).toContain(text);
     }
     const ending = GAME_ANNOUNCEMENTS[2]!.changes.map((change) => change.description).join("\n");

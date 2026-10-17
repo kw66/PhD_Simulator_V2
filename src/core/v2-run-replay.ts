@@ -3,13 +3,14 @@ import { GAME_ACTION_IDS } from "./v2-action-ids";
 import { dispatchAction } from "./v2-engine";
 import { createAchievementRunProgress } from "./v2-achievement-runtime-types";
 import { collectRunStatistics } from "./v2-run-statistics";
+import { CURRENT_GAMEPLAY_RULESET, SUPPORTED_GAMEPLAY_RULESETS, withGameplayRuleset, type GameplayRuleset } from "./v2-rule-context";
 import type { DispatchPayload, GameActionId, GameState } from "./v2-types";
 
-export type ReplayCommand = { kind: "action"; actionId: GameActionId; payload: DispatchPayload }
+export type ReplayCommand = { kind: "action"; actionId: GameActionId; payload: DispatchPayload; ruleset?: GameplayRuleset }
   | { kind: "help"; id: string; requiredIds: string[] };
 /** Bump when deterministic gameplay rules change, independently of account epochs. */
-export const REPLAY_RULESET = "20261017-r3";
-const SUPPORTED_REPLAY_RULESETS = ["20261016-r1", "20261017-r2", REPLAY_RULESET] as const;
+export const REPLAY_RULESET = CURRENT_GAMEPLAY_RULESET;
+const SUPPORTED_REPLAY_RULESETS = SUPPORTED_GAMEPLAY_RULESETS;
 export interface RunReplay {
   version: 1;
   ruleset: typeof SUPPORTED_REPLAY_RULESETS[number];
@@ -53,17 +54,19 @@ export function applyHelpRead(state: GameState, id: string, requiredIds: readonl
   return { ...state, achievementProgress: run };
 }
 
-export function executeReplayCommand(state: GameState, command: ReplayCommand): GameState {
+export function executeReplayCommand(state: GameState, command: ReplayCommand, defaultRuleset: GameplayRuleset = REPLAY_RULESET): GameState {
   if (command.kind === "help") return applyHelpRead(state, command.id, command.requiredIds);
-  const next = dispatchAction(state, command.actionId, command.payload);
-  return command.actionId === "start-game" ? next : collectRunStatistics(state, next);
+  return withGameplayRuleset(command.ruleset ?? defaultRuleset, () => {
+    const next = dispatchAction(state, command.actionId, command.payload);
+    return command.actionId === "start-game" ? next : collectRunStatistics(state, next);
+  });
 }
 
 export function createRunReplay(initial: GameState, started: GameState, payload: DispatchPayload): RunReplay {
   return {
     version: 1, ruleset: REPLAY_RULESET, epoch: DATA_EPOCH, savedAt: new Date().toISOString(),
     initial: structuredClone({ ...initial, randomState: { seed: started.randomState!.seed, cursor: 0 } }),
-    commands: [{ kind: "action", actionId: "start-game", payload: structuredClone(payload) }], checkpoints: [],
+    commands: [{ kind: "action", actionId: "start-game", payload: structuredClone(payload), ruleset: REPLAY_RULESET }], checkpoints: [],
   };
 }
 
@@ -75,7 +78,8 @@ export function isRunReplay(value: unknown): value is RunReplay {
     && record.commands.length <= 200_000 && record.commands.every(command => command && (
       command.kind === "help" ? typeof command.id === "string" && Array.isArray(command.requiredIds)
         && command.requiredIds.every(id => typeof id === "string")
-        : command.kind === "action" && GAME_ACTION_IDS.includes(command.actionId) && !!command.payload && typeof command.payload === "object"))
+        : command.kind === "action" && GAME_ACTION_IDS.includes(command.actionId) && !!command.payload && typeof command.payload === "object"
+          && (command.ruleset === undefined || SUPPORTED_REPLAY_RULESETS.includes(command.ruleset))))
     && record.commands[0]?.kind === "action" && record.commands[0].actionId === "start-game"
     && Array.isArray(record.checkpoints) && record.checkpoints.every((point, index) => point
       && Number.isSafeInteger(point.index) && point.index > 0 && point.index <= record.commands.length
@@ -92,8 +96,8 @@ export function verifyRunReplay(replay: RunReplay, anchor: ReplayAnchor, actual:
     let expected = structuredClone(anchor.state);
     for (const command of replay.commands.slice(anchor.index)) {
       if (command.kind === "action" && (command.actionId.startsWith("debug-")
-        || ["force-next-month", "restart-game", "reset-game"].includes(command.actionId))) throw new Error("非正常游戏操作");
-      expected = executeReplayCommand(expected, command);
+        || ["force-next-month", "restart-game", "reset-game", "settle-and-return"].includes(command.actionId))) throw new Error("非正常游戏操作");
+      expected = executeReplayCommand(expected, command, replay.ruleset);
     }
     const digest = replayStateDigest(actual);
     if (replayStateDigest(expected) !== digest) throw new Error("操作复算与当前状态不一致");

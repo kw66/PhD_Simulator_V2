@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { usesCurrentGameplayRules } from "./v2-rule-context";
 import { getCaptainLevel, getCaptainLoverId, getCaptainLoverIntimacyCap, getCaptainLoverResearchCap, getCaptainLoverRouteMax, getCaptainLoverHelpQueue, setCaptainLoverHelpQueue, isCaptain } from "./v2-captain-state";
 import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
@@ -234,11 +235,16 @@ export function advanceLoverMonth(state: GameState): GameState {
     monthlyActivity: `玩耍进度 +${gains.play}，学习进度 +${gains.study}`,
     sanDiscountMonths: (lover.sanDiscountMonths ?? []).filter((month) => month > state.totalMonths) } };
   if (isCaptain(nextState)) nextState = { ...nextState, captainState: { ...nextState.captainState!, loverAdvanceRemainder: Number((accumulated - Math.floor(accumulated)).toFixed(10)) } };
+  const totalGains = { play: 0, study: 0 };
   for (let index = 0; index < advances; index++) {
     const currentGains = isCaptain(nextState) ? getLoverPassiveGains(nextState) : gains;
+    totalGains.play += currentGains.play;
+    totalGains.study += currentGains.study;
     nextState = advanceRoute(nextState, "play", currentGains.play, "每月相处");
     nextState = settlePendingLoverHelp(advanceRoute(nextState, "study", currentGains.study, "每月相处"));
   }
+  if (usesCurrentGameplayRules()) nextState = { ...nextState, loverProgressState: { ...nextState.loverProgressState,
+    monthlyActivity: `玩耍进度 +${totalGains.play}，学习进度 +${totalGains.study}${advances > 1 ? `（推进${advances}次）` : ""}` } };
   const rewardDetails = nextState.eventHistory.slice(state.eventHistory.length)
     .flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger?.name === "恋人"
       ? stage.talentTrigger.effects : []));

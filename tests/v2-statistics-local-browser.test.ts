@@ -107,7 +107,7 @@ describe("statistics on the actual local development configuration", () => {
       }
       await page.locator('[data-action="quit-game"]').click();
       await page.locator('[data-ui-confirm-quit]').click();
-      await page.locator('[data-action="reset-game"]').first().click();
+      await page.locator('[data-action="settle-and-return"]').click();
       expect(await roleStat("played-runs").textContent()).toBe("1");
       expect(await roleStat("global-played-runs").textContent()).toBe("55");
       expect(await roleStat("global-completed-runs").textContent()).toBe("8");

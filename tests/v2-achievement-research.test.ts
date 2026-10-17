@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { evaluateResearchAchievements, observeResearchAchievements } from "../src/core/v2-achievement-research";
+import { evaluateEndingResearchAchievements, evaluateResearchAchievements, observeResearchAchievements } from "../src/core/v2-achievement-research";
 import { createAchievementRunProgress } from "../src/core/v2-achievement-runtime-types";
 import { createInitialState } from "../src/core/v2-engine-state-factory";
 import { applyPrepublicationPaperDecay, createDraftPaper, submitPaper, withdrawPaper } from "../src/core/v2-paper-rules";
 import { submitJournalPaper } from "../src/core/v2-journal-system";
 import { dispatchAction } from "../src/core/v2-engine";
 import { resolveDuePaperReviews } from "../src/core/v2-publication-system";
+import { observeAchievements, settleRunAchievements } from "../src/core/v2-achievement-runtime";
+import { createDefaultAccountProfile } from "../src/core/v2-lobby";
+import { createStore } from "../src/core/v2-store";
 import type { GameState, Paper, PaperReviewerReport } from "../src/core/v2-types";
 
 function state(papers: Paper[] = []): GameState {
@@ -22,6 +25,69 @@ function published(id: string, overrides: Partial<Paper> = {}): Paper {
 }
 
 describe("research achievement evidence", () => {
+  it.each([0, 1, 2, 3])("slow research requires exactly two published first-author papers at doctorate graduation: %i", count => {
+    const current: GameState = { ...state(Array.from({ length: count }, (_, index) => published(`first-${index}`))),
+      degree: "phd", phase: "finished", ending: "phd" };
+    expect(evaluateEndingResearchAchievements(current).includes("global:slow-research")).toBe(count === 2);
+    expect(evaluateEndingResearchAchievements({ ...current, ending: "master" })).not.toContain("global:slow-research");
+    expect(evaluateEndingResearchAchievements({ ...current, ending: "quit" })).not.toContain("global:slow-research");
+    expect(evaluateEndingResearchAchievements({ ...current, phase: "playing", ending: null })).not.toContain("global:slow-research");
+  });
+
+  it("slow research deduplicates published papers and excludes coauthors and unfinished submissions", () => {
+    const first = published("conference-first");
+    const journal = published("journal-first", { journalTarget: "pami" });
+    const current: GameState = { ...state([first, paper("reviewing", { status: "reviewing" }),
+      published("coauthor", { nonFirstAuthor: true }), published("fellow-led", { leadAuthorId: "fellow-1" })]),
+      externalPublications: [first, journal], degree: "phd", phase: "finished", ending: "phd" };
+    expect(evaluateEndingResearchAchievements(current)).toContain("global:slow-research");
+  });
+
+  it("settles old graduation saves without observed evidence, paying all roles only once across characters", () => {
+    const account = createDefaultAccountProfile();
+    const playing = { ...state([published("one"), published("two")]), degree: "phd" as const };
+    expect(settleRunAchievements(account, playing).account).toBe(account);
+    const finished = observeAchievements(playing, { ...playing, phase: "finished", ending: "phd" });
+    expect(finished.achievementProgress?.satisfied).not.toContain("global:slow-research");
+    expect(account.achievementUnlockedAt["global:slow-research"]).toBeUndefined();
+    // Old saves contain no evidence for the newly added final-state challenge.
+    finished.achievementProgress = createAchievementRunProgress();
+    const first = settleRunAchievements(account, finished, "2026-10-17T00:00:00.000Z");
+    expect(Object.values(first.account.roleProgress).every(role => role.exp === 5)).toBe(true);
+    const repeated = settleRunAchievements(first.account, { ...finished, selectedRoleId: "research-captain" }, "2026-10-18T00:00:00.000Z");
+    expect(Object.values(repeated.account.roleProgress).every(role => role.exp === 5)).toBe(true);
+    expect(repeated.account.achievementUnlockedByRole?.["global:slow-research"]).toEqual({
+      normal: "2026-10-17T00:00:00.000Z", "research-captain": "2026-10-18T00:00:00.000Z",
+    });
+  });
+
+  it("does not change observed evidence for existing finished saves", () => {
+    const finished: GameState = { ...state([published("one", { target: "B" }), published("two", { target: "B" })]),
+      degree: "phd", phase: "finished", ending: "phd" };
+    const run = createAchievementRunProgress();
+    // Evidence the previous version already recorded for these two publications.
+    run.counters = { "research:rejected:one": 0, "research:rejected:two": 0 };
+    run.satisfied = ["global:double-hit"];
+    const original = structuredClone(run);
+    observeResearchAchievements(finished, finished, run);
+    expect(run).toEqual(original);
+    const originalState = structuredClone(finished);
+    settleRunAchievements(createDefaultAccountProfile(), finished);
+    expect(finished).toEqual(originalState);
+  });
+
+  it("does not grant slow research from a debug doctorate ending", () => {
+    const store = createStore({ storage: null });
+    store.dispatch("start-game", { roleId: "normal" });
+    store.markCurrentRunAsDebugged();
+    Object.assign(store.getState(), { phase: "finished", ending: "phd", degree: "phd",
+      papers: [published("one"), published("two")] });
+    store.dispatch("settle-and-return");
+    expect(store.getState().phase).toBe("setup");
+    expect(store.getLobbyState().achievementRewardedIds).not.toContain("global:slow-research");
+    expect(store.getLobbyState().lastRunExperience?.gained).toBe(0);
+  });
+
   it("integrates real dispatch: five journals require five submissions and explicit acceptances", () => {
     let current: GameState = { ...state(Array.from({ length: 5 }, (_, i) => paper(`dispatch-${i}`, { idea: 100, experiment: 100, writing: 100 }))),
       totalMonths: 1, month: 1, eventQueue: [], availableRandomEvents: [], pendingRandomEvents: [],

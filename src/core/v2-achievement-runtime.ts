@@ -2,7 +2,8 @@ import { getAllAchievementDefinitions } from "./v2-role-lobby-meta";
 import { getAchievementUnlockRoleIds, isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
 import { createAchievementRunProgress } from "./v2-achievement-runtime-types";
 import { observeStateAchievements } from "./v2-achievement-state";
-import { observeResearchAchievements } from "./v2-achievement-research";
+import { evaluateEndingResearchAchievements, observeResearchAchievements } from "./v2-achievement-research";
+import { evaluateEndingChallenges } from "./v2-achievement-ending-challenges";
 import { observeEventAchievements } from "./v2-achievement-events";
 import { COLLECTION_REQUIREMENTS, getCollectorAchievementKey, observeAchievementCollections } from "./v2-achievement-collections";
 import { awardRoleExperience } from "./v2-role-experience";
@@ -41,7 +42,7 @@ export function settleRunAchievements(account: AccountProfile, state: GameState,
     achievementExperienceMultipliers: { ...account.achievementExperienceMultipliers },
     achievementTalentPoints: { ...account.achievementTalentPoints },
   };
-  const candidates = new Set(run.satisfied);
+  const candidates = new Set([...run.satisfied, ...evaluateEndingResearchAchievements(state), ...evaluateEndingChallenges(state)]);
   const newlyCompleted: string[] = [];
   let experienceForCurrentRole = 0;
   for (const definition of getAllAchievementDefinitions()) {

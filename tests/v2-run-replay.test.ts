@@ -106,7 +106,7 @@ describe("monthly browser operation replay", () => {
     expect(store.getReplayStatus().failed?.reason).toContain("不一致");
     expect(store.getEndingExperienceAward()).toMatchObject({ gained: 0, disqualifiedByIntegrity: true });
     expect(store.getState().runAchievementIds).toEqual([]);
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getLobbyState().roleProgress.normal.exp).toBe(account.roleProgress.normal.exp);
     expect(store.getLobbyState().achievementRewardedIds).toEqual(account.achievementRewardedIds);
     expect(store.getFinalizedOutbox()).toEqual([]);

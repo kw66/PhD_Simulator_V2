@@ -47,7 +47,7 @@ export function renderDebugPanel(state: GameState | null, connected: boolean, co
   ))).join("");
   return `<main class="debug-popup">
     <header class="debug-popup-header"><h1>🛠️ 调试面板</h1>
-      <div class="debug-popup-buttons debug-popup-session"><button type="button" data-action="restart-game" ${connected && state ? "" : "disabled"}>↻ 重开</button><button type="button" data-action="reset-game" ${connected && state ? "" : "disabled"}>⌂ 返回开始页</button></div>
+      <div class="debug-popup-buttons debug-popup-session"><button type="button" data-action="reset-game" ${connected && state ? "" : "disabled"}>⌂ 返回开始页</button></div>
       <div class="debug-popup-connection"><span data-debug-connection role="status">${status}</span>${!connected && (connectionStatus === "disconnected" || connectionStatus === "connecting") ? '<button type="button" data-debug-reconnect>↻ 重新连接</button>' : ""}</div>
     </header>
     <fieldset class="debug-popup-tools" ${playable ? "" : "disabled"}>

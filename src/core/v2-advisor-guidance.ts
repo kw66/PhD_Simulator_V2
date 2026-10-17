@@ -1,5 +1,6 @@
 import { gameRandom } from "./v2-game-random";
-import { getCaptainAdvisorGuidanceBonus, getCaptainGuidanceMultiplier } from "./v2-captain-state";
+import { usesCurrentGameplayRules } from "./v2-rule-context";
+import { getCaptainAdvisorGuidanceBonus, getCaptainGuidanceMultiplier, isCaptain } from "./v2-captain-state";
 import { addPaperCollaboration, getRoleCollaborationScore } from "./v2-paper-collaboration";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
@@ -30,15 +31,21 @@ function applyGuidance(
 
 export function queueAdvisorGuidance(state: GameState): GameState {
   if (state.phase !== "playing" || !state.selectedAdvisorName) return state;
+  // A captain's automatic projects can complete repeatedly before a writing
+  // target exists. Preserve every award at its earned value, including the
+  // receiving fellow's multiplier at that moment.
+  const retain = (pending: number | null | undefined, amount: number): number => isCaptain(state) && usesCurrentGameplayRules()
+    ? (pending ?? 0) + amount : pending ?? amount;
+  const amount = GUIDANCE_AMOUNT + getCaptainAdvisorGuidanceBonus(state);
   return {
     ...state,
     advisorProgressState: {
       ...state.advisorProgressState,
-      pendingGuidanceToPlayer: state.advisorProgressState.pendingGuidanceToPlayer ?? GUIDANCE_AMOUNT + getCaptainAdvisorGuidanceBonus(state),
+      pendingGuidanceToPlayer: retain(state.advisorProgressState.pendingGuidanceToPlayer, amount),
     },
     fellowProgressState: state.fellowProgressState.map((profile) => ({
       ...profile,
-      pendingGuidanceFromAdvisor: profile.pendingGuidanceFromAdvisor ?? Math.floor((GUIDANCE_AMOUNT + getCaptainAdvisorGuidanceBonus(state)) * getCaptainGuidanceMultiplier(state, profile)),
+      pendingGuidanceFromAdvisor: retain(profile.pendingGuidanceFromAdvisor, Math.floor(amount * getCaptainGuidanceMultiplier(state, profile))),
     })),
   };
 }

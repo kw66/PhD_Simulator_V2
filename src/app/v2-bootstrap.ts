@@ -312,6 +312,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let isHelpOpen = false;
   let activeRoleRailView: RoleRailViewId = "achievements";
   let announcementPageIndex = 0;
+  let roleHistoryPageIndex = 0;
   let talentTreePageIndex = 0;
   const talentTreeSelectedNodeByPage: number[] = [0];
   let refreshTalentTree = false;
@@ -1034,6 +1035,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       isHelpOpen,
       activeRoleRailView,
       announcementPageIndex,
+      roleHistoryPageIndex,
       talentTreePageIndex,
       talentTreeSelectedNodeByPage,
       talentAllocation: store.getLobbyState().talentAllocation,
@@ -1089,7 +1091,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     bindAnnouncementCollapse(root);
     if (state.phase === "finished") {
       for (const button of root.querySelectorAll<HTMLButtonElement>("button[data-action]")) {
-        if (["restart-game", "reset-game", "set-date-display-mode"].includes(button.dataset.action ?? "")) continue;
+        if (["settle-and-return", "reset-game", "set-date-display-mode"].includes(button.dataset.action ?? "")) continue;
         button.disabled = true;
         button.setAttribute("aria-disabled", "true");
       }
@@ -1268,7 +1270,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeEventChainId = replaySourceEvent?.chainId ?? null;
       activeEventRootId = replaySourceEvent ? getEventRootId(replaySourceEvent) : null;
     }
-    if (actionId === "restart-game") {
+    if (actionId === "settle-and-return") {
       skipNextPlayerAnimation = true;
     }
     if (actionId === "upgrade-shop-item" && dataset.shopUpgradeId?.startsWith("chair-")) {
@@ -1284,7 +1286,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       selectedCoffeeUpgradeId = null;
     }
 
-    if (actionId === "start-game" || actionId === "restart-game") {
+    if (actionId === "start-game") {
       isRunSavePanelOpen = false;
       conferenceStats.resetRun();
       journalStats.resetRun();
@@ -1302,7 +1304,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
     }
     store.dispatch(actionId, {
-      curseDifficulty: actionId === "start-game" || actionId === "restart-game" ? getSelectedCurseDifficulty(store.getLobbyState(), isRoleId(dataset.roleId) ? dataset.roleId : store.getState().selectedRoleId) : undefined,
+      curseDifficulty: actionId === "start-game" ? getSelectedCurseDifficulty(store.getLobbyState(), isRoleId(dataset.roleId) ? dataset.roleId : store.getState().selectedRoleId) : undefined,
       debtRepayment: typeof dataset.delta === "string" ? Number(dataset.delta) : undefined,
       roleId: isRoleId(dataset.roleId) ? dataset.roleId : undefined,
       paperId: typeof dataset.paperId === "string" ? dataset.paperId : undefined,
@@ -1318,6 +1320,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       eventChoiceId: typeof dataset.eventChoiceId === "string" ? dataset.eventChoiceId : undefined,
       eventHistoryIndex: typeof dataset.eventHistoryIndex === "string" ? Number(dataset.eventHistoryIndex) : undefined,
       relationshipId: typeof dataset.relationshipId === "string" ? dataset.relationshipId : undefined,
+      rewinderPersonKey: typeof dataset.rewinderPersonKey === "string" ? dataset.rewinderPersonKey : undefined,
       projectType: dataset.projectType === "horizontal" || dataset.projectType === "vertical" ? dataset.projectType : undefined,
       debugStatId: isDebugStatId(dataset.debugStatId) ? dataset.debugStatId : undefined,
       debugPaperTarget: isPaperTarget(dataset.debugPaperTarget) ? dataset.debugPaperTarget : undefined,
@@ -1342,7 +1345,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         store.dispatch("next-month");
       }
     }
-    if (actionId === "start-game" || actionId === "restart-game") {
+    if (actionId === "start-game") {
       const openingEvent = store.getState().eventQueue.find((event) => event.chainId === "before-grad-school");
       if (openingEvent) openEventContent(openingEvent.id);
       if (debugWindow.isOpen()) store.markCurrentRunAsDebugged();
@@ -1545,6 +1548,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
         isQuitConfirmationOpen = false;
         store.dispatch("quit-game");
       }
+      return;
+    }
+
+    if (target.closest("button[data-ui-role-history-page]") && store.getState().phase === "setup") {
+      roleHistoryPageIndex = roleHistoryPageIndex === 0 ? 1 : 0;
+      render();
+      root.querySelector<HTMLButtonElement>("button[data-ui-role-history-page]")?.focus({ preventScroll: true });
       return;
     }
 

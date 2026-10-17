@@ -235,7 +235,7 @@ describe("achievement ending transaction", () => {
     store.dispatch("quit-game");
     expect(store.getLobbyState().achievementRewardedIds).not.toContain("global:help-collector");
     expect(store.getState().runAchievementIds).toContain("global:help-collector");
-    store.dispatch("restart-game");
+    store.dispatch("settle-and-return");
     expect(store.getLobbyState().achievementRewardedIds).toContain("global:help-collector");
     store.markCurrentRunAsDebugged();
     store.recordHelpPageRead("a", ["a"]);
@@ -251,7 +251,7 @@ describe("achievement ending transaction", () => {
     const recorded = structuredClone(normal.getLobbyState());
     normal.dispatch("quit-game");
     expect(normal.getLobbyState()).toEqual(recorded);
-    normal.dispatch("restart-game");
+    normal.dispatch("settle-and-return");
     expect(normal.getLobbyState().achievementRewardedIds).toContain("global:ending-quit");
     const debug = createStore({ storage: null });
     debug.dispatch("start-game", { roleId: "normal" });
@@ -261,7 +261,7 @@ describe("achievement ending transaction", () => {
     expect(debug.getState().runAchievementIds ?? []).toEqual([]);
     expect(debug.getEndingExperienceAward()?.gained).toBe(0);
     expect(debug.getLobbyState().lastRunExperience).toBeUndefined();
-    debug.dispatch("restart-game");
+    debug.dispatch("settle-and-return");
     expect(debug.getLobbyState().lastRunExperience?.gained).toBe(0);
     expect(debug.getLobbyState().achievementCollectionProgress).toEqual(createAchievementRunProgress().collections);
   });

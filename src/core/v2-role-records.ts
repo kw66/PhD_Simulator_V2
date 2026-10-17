@@ -92,6 +92,11 @@ export function recordRoleResult(account: AccountProfile, state: GameState): Acc
     natureCount: published.filter((paper) => (paper.publication?.journalTarget ?? paper.journalTarget) === "nature").length,
     representativeCitations: Math.max(0, ...citations),
     representativeScore: Math.max(0, ...published.map((paper) => nonnegativeNumber(paper.publication?.effectiveScore))),
+    sanCap: nonnegativeNumber(state.sanCap),
+    research: nonnegativeNumber(state.player.research),
+    social: nonnegativeNumber(state.player.social),
+    favor: nonnegativeNumber(state.player.favor),
+    money: nonnegativeNumber(state.player.money),
   };
   const historyBest = { ...previous.historyBest };
   for (const key of Object.keys(current) as (keyof RoleHistoryBest)[]) {

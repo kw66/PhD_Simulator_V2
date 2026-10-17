@@ -86,10 +86,10 @@ describe("global achievement statistics in the actual game", () => {
       await page.evaluate(() => (window as unknown as TestWindow).achievementStore.dispatch("quit-game"));
       expect(writes).toHaveLength(0);
       const id = await page.evaluate(() => (window as unknown as TestWindow).achievementStore.getCurrentRunId());
-      await page.locator('[data-action="reset-game"]:visible').click();
+      await page.evaluate(() => (window as unknown as TestWindow).achievementStore.dispatch("reset-game"));
       await page.locator('[data-action="start-game"]').click();
       expect(writes).toHaveLength(0);
-      await page.locator('[data-action="restart-game"]').click();
+      await page.locator('[data-action="settle-and-return"]').click();
       await expect.poll(() => writes.length).toBe(1);
       expect(writes[0]).toMatchObject({ p_run_id: id, p_role_id: "normal" });
       expect(writes[0].p_achievement_ids).toContain("global:ending-quit");
@@ -97,7 +97,8 @@ describe("global achievement statistics in the actual game", () => {
       expect(starts).toEqual([writes[0].p_player_id]);
       await page.evaluate(() => {
         const store = (window as unknown as TestWindow).achievementStore;
-        store.markCurrentRunAsDebugged(); store.dispatch("quit-game"); store.dispatch("restart-game");
+        store.dispatch("start-game", { roleId: "normal" });
+        store.markCurrentRunAsDebugged(); store.dispatch("quit-game"); store.dispatch("settle-and-return");
       });
       await page.evaluate(() => window.dispatchEvent(new Event("online")));
       expect(writes).toHaveLength(1);

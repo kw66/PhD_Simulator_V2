@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { usesCurrentGameplayRules } from "./v2-rule-context";
 import { applyTierResist } from "./v2-sanity-rules";
 import { applyPlayerAttributeChange } from "./v2-player-attributes";
 import { creditFellowMoney, getFellowFinanceAccount } from "./v2-fellow-finance";
@@ -40,7 +41,10 @@ export function syncCaptainMembers(state: GameState, random: () => number = game
     if (id === "advisor") continue;
     if (id === getCaptainLoverId(next)) {
       const lover = next.loverProgressState;
-      next = { ...next, loverProgressState: { ...lover,
+      next = { ...next,
+        // The extra advance belongs to this relationship, not its occupied slot.
+        ...(usesCurrentGameplayRules() ? { captainState: { ...next.captainState!, loverAdvanceRemainder: 0 } } : {}),
+        loverProgressState: { ...lover,
         ...(tag === "genius" ? { research: precise(lover.research + applyTierResist(rank, lover.research, random, getCaptainLoverResearchCap(next)).effectiveChange) } : {}),
         ...(tag === "social" ? { intimacy: precise(lover.intimacy + applyTierResist(rank, lover.intimacy, random, getCaptainLoverIntimacyCap(next)).effectiveChange) } : {}),
       } };

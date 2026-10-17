@@ -1,6 +1,6 @@
 # 全部成就清单
 
-更新：2026-10-17。由 `getAllAchievementDefinitions()` 自动生成，共175项；十二个正位/逆位角色各有独立硕士、博士毕业成就。
+更新：2026-10-17。由 `getAllAchievementDefinitions()` 自动生成，共179项；十二个正位/逆位角色各有独立硕士、博士毕业成就。
 
 - 不论选中哪个角色，开始页展示同一完整目录；卡片对象标签决定完成资格，原通用奖励仍发给全体角色
 - 本地达成记录与结局统一结算已接入；同一成就可记录多个符合条件角色的首次完成日期，奖励按成就ID仅发一次
@@ -49,14 +49,17 @@
 | upright:great-fortune-i | 家财万贯Ⅰ | 正位 | 金币达到60 | 经验+5 |
 | global:great-fortune-ii | 家财万贯Ⅱ | 正位/逆位 | 金币达到200 | 经验+5 |
 | global:advisor-funding-user | 经费大户 | 正位/逆位 | 硕士期间自身累计使用100导师经费 | 经验+5 |
+| global:advisor-spending-thousand | 经费燃烧 | 正位/逆位 | 导师累计花掉1000科研经费 | 经验+5 |
 | global:clear-minded | 人间清醒 | 正位/逆位 | 两次达到转博条件，但都拒绝了 | 经验+5 |
 | global:young-genius | 天才少年 | 正位/逆位 | 转博时就达到博士毕业要求 | 经验+5 |
 | global:three-a-master | 三A在手 | 正位/逆位 | 硕士期间一作发表≥3篇A类论文 | 经验+5 |
 | global:collaboration-ten | 协作共赢 | 正位/逆位 | 合作发表≥10篇论文 | 经验+5 |
 | global:collaboration-before-first | 协作先行 | 正位/逆位 | 先发合作论文，再发一作 | 经验+5 |
-| global:excellent-master-thesis | 优秀硕士论文 | 正位/逆位 | 硕士论文盲审全部获A | 经验+5 |
-| global:excellent-phd-thesis | 优秀博士论文 | 正位/逆位 | 博士论文盲审全部获A | 经验+5 |
+| global:excellent-master-thesis | 优秀硕士论文 | 正位/逆位 | 硕士论文盲审获3A | 经验+5 |
+| global:excellent-phd-thesis | 优秀博士论文 | 正位/逆位 | 博士论文盲审获5A | 经验+5 |
 | global:academic-star | 学术之星 | 正位/逆位 | 毕业时发表≥5篇A类论文 | 经验+5 |
+| global:slow-research | 慢科研 | 通用 | 博士毕业时仅发表2篇一作论文 | 经验+5 |
+| global:no-first-conference-graduation | 另辟蹊径 | 正位/逆位 | 未发表过一作会议论文并毕业 | 经验+5 |
 | global:model-student | 三好学生 | 正位/逆位 | 连续拿到3年奖学金 | 经验+5 |
 | global:paper-lover | 爱看论文 | 正位/逆位 | 看20次论文 | 经验+5 |
 | global:paper-machine | 论文机器 | 正位/逆位 | 发表论文达到10篇 | 经验+5 |
@@ -130,6 +133,7 @@
 | global:magic-tower | 穞堵臸猭畍 | 正位/逆位 | 玩魔塔3次 | 经验+5 |
 | global:terraria | 300颗够吗 | 正位/逆位 | 玩泰拉瑞亚3次 | 经验+5 |
 | global:career-start | 初入职场 | 正位/逆位 | 取得任意offer | 经验+5 |
+| global:career-rejections-six | 求职不易 | 正位/逆位 | 一局内找工作被拒6次 | 经验+5 |
 | global:career-internet | 大厂上岸 | 正位/逆位 | 取得大厂算法岗及以上offer | 经验+5 |
 | global:career-state | 央企有我 | 正位/逆位 | 取得央企总部业务主管及以上offer | 经验+5 |
 | global:career-civil | 金榜题名 | 正位/逆位 | 取得省直二级主任科员及以上offer | 经验+5 |
@@ -173,7 +177,7 @@
 | genius-reversed:ending-master | 硕士毕业 | 愚钝·院士转世 | 达成硕士毕业结局 | 经验倍率+1 |
 | genius-reversed:ending-phd | 博士毕业 | 愚钝·院士转世 | 达成博士毕业结局 | 经验倍率+1 |
 | genius-reversed:zero-talent-master | 绝地求生·愚钝 | 愚钝·院士转世 | 使用0天赋点硕士毕业 | 经验倍率+1 |
-| genius-reversed:break-research-curse | 拨云见日 | 愚钝·院士转世 | 实际破除学术失语诅咒 | 经验倍率+1 |
+| genius-reversed:break-research-curse | 拨云见日 | 愚钝·院士转世 | 游戏内破除学术失语诅咒 | 经验倍率+1 |
 | social-reversed:ending-master | 硕士毕业 | 嫉妒·社交达人 | 达成硕士毕业结局 | 经验倍率+1 |
 | social-reversed:ending-phd | 博士毕业 | 嫉妒·社交达人 | 达成博士毕业结局 | 经验倍率+1 |
 | social-reversed:zero-talent-master | 绝地求生·嫉妒 | 嫉妒·社交达人 | 使用0天赋点硕士毕业 | 经验倍率+1 |

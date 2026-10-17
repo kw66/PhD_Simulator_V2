@@ -163,3 +163,16 @@ export function evaluateResearchAchievements(state: GameState, run: AchievementR
   add("global:conference-three-years", [...conferenceYears.values()].some(years => [...years].some(year => years.has(year + 1) && years.has(year + 2))));
   return [...new Set(result)];
 }
+
+/** Final-state challenges are evaluated only by ending preview/settlement.
+ * Keep them out of observed evidence so old saved runs retain the same replay digest. */
+export function evaluateEndingResearchAchievements(state: GameState): string[] {
+  if (state.phase !== "finished" || (state.ending !== "master" && state.ending !== "phd")) return [];
+  const firstAuthors = allPapers(state).filter(paper => paper.status === "published" && isFirstAuthor(paper));
+  const result: string[] = [];
+  if (state.ending === "phd" && firstAuthors.length === 2) result.push("global:slow-research");
+  if (!firstAuthors.some(paper => !paper.journalTarget && !paper.publication?.journalTarget)) {
+    result.push("global:no-first-conference-graduation");
+  }
+  return result;
+}
