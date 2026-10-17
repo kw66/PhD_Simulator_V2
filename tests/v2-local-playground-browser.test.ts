@@ -11,7 +11,8 @@ describe("local playground on the actual development configuration", () => {
   let browser: Browser;
   beforeAll(async () => {
     server = await createServer({
-      mode: "development", logLevel: "error", cacheDir: "node_modules/.vite-local-playground-test",
+      // Source fixtures use root-relative imports even when CI publishes under a repository base.
+      base: "/", mode: "development", logLevel: "error", cacheDir: "node_modules/.vite-local-playground-test",
       server: { host: "127.0.0.1", port: 0, hmr: false, watch: null },
       plugins: [{ name: "observe-playground-store", transform(code, id) {
         if (id.replaceAll("\\", "/").endsWith("/src/app/v2-bootstrap.ts")) {
