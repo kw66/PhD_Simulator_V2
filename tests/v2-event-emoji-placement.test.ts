@@ -26,16 +26,17 @@ function inspectScenes(state: GameState, eventId: string, depth = 0): void {
 }
 
 describe.each([0, 0.5, 0.999])("event emoji placement with roll %s", (roll) => {
-  it.each(DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons))("keeps $label emoji within the narrative", ({ id }) => {
+  it.each(DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons))("keeps $label emoji within the narrative", ({ id, roleId }) => {
     vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(roll);
-    const base = createStartedGameState("normal");
+    const base = createStartedGameState(roleId ?? "normal");
     const state = dispatchAction({ ...base, year: 2, month: 6, totalMonths: 18,
       selectedAdvisorName: "测试导师", sanCap: 100, illnessProbability: 0,
       player: { ...base.player, san: 100, money: 1000, favor: 15, social: 15, research: 15 },
       advisorProgressState: { ...base.advisorProgressState, funding: 10000 },
       eventQueue: [], availableRandomEvents: [], pendingRandomEvents: [],
     }, "debug-trigger-event", { eventId: id });
-    const root = state.eventQueue.find((event) => event.replayContext?.debugEventId === id);
+    const root = state.eventQueue.find((event) => event.replayContext?.debugEventId === id
+      || (id === "rewinder-year" && event.rewinderPresentation));
     expect(root).toBeDefined();
     inspectScenes(state, root!.id);
   });

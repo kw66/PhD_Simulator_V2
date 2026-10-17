@@ -3,6 +3,7 @@ import { pushLog, pushNoOpLog } from "./v2-engine-helpers";
 import { attachPaperPublication, recordPaperAcceptances } from "./v2-publication-rules";
 import type { GameState, JournalTarget, Paper } from "./v2-types";
 import { applyPublicationTalentRewards } from "./v2-publication-talent";
+import { applyPaperMastery } from "./v2-paper-mastery";
 import { settleJournalPublicationFees } from "./v2-lab-publication-costs";
 
 export interface JournalDefinition {
@@ -195,5 +196,6 @@ export function resolveReadyJournalPapers(state: GameState, confirmedPaperId?: s
   };
   let loggedState = resolvedState;
   for (const log of logs) loggedState = pushLog(loggedState, `期刊结果：${log}`);
-  return { state: settleJournalPublicationFees(applyPublicationTalentRewards(loggedState)), logs, acceptedPaperIds };
+  const rewardedState = applyPublicationTalentRewards(loggedState);
+  return { state: settleJournalPublicationFees(acceptedPaperIds.length ? applyPaperMastery(rewardedState) : rewardedState), logs, acceptedPaperIds };
 }

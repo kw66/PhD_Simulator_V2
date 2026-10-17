@@ -24,17 +24,40 @@ describe("rewinder annual event display", () => {
     const preview = getRewinderPreview(state)!;
     const html = renderRewinderEvent(preview, state);
     expect(html).toContain("19.4 / 20");
-    expect(html).toContain("林清");
-    expect(html).toContain('data-action="toggle-rewinder-person"');
-    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain('data-rewinder-act="attributes"');
+    expect(html).not.toContain('data-action="toggle-rewinder-person"');
     expect(html).not.toContain("金币");
+    const people = renderRewinderEvent(preview, state, "relationships");
+    expect(people).toContain("林清");
+    expect(people).toContain('data-action="toggle-rewinder-person"');
+    expect(people).toContain('aria-pressed="false"');
     const selected = toggleRewinderPerson(state, preview.candidates[0]!.key);
-    expect(renderRewinderEvent(preview, selected)).toContain('aria-pressed="true"');
-    expect(renderRewinderEvent(preview)).not.toContain('data-action="toggle-rewinder-person"');
+    expect(renderRewinderEvent(preview, selected, "relationships")).toContain('class="rewinder-person is-selected"');
+    expect(renderRewinderEvent(preview, undefined, "relationships")).not.toContain('data-action="toggle-rewinder-person"');
     const full = renderApp(state, undefined, { activePlayTab: "events", isEventContentOpen: true,
       activeEventId: state.eventQueue.find(event => event.rewinderPresentation)?.id });
     expect(full).toContain("rewinder-event");
-    expect(full).toContain('data-action="resolve-event"');
+    expect(full).toContain("继续 · 成长");
+    expect(full).not.toContain('data-event-choice-id="confirm-rewinder-year"');
+    const lastAct = renderApp(state, undefined, { activePlayTab: "events", isEventContentOpen: true,
+      activeRewinderAct: "relationships", activeEventId: state.eventQueue.find(event => event.rewinderPresentation)?.id });
+    expect(lastAct).toContain('data-event-choice-id="confirm-rewinder-year"');
+  });
+
+  it("shows one scene at a time and omits removed growth and career inheritance", () => {
+    const state = fixture();
+    const preview = getRewinderPreview(state)!;
+    const attributes = renderRewinderEvent(preview, state);
+    expect(attributes.match(/data-ui-rewinder-act=/g)).toHaveLength(3);
+    expect(attributes).toContain("当前值 +");
+    expect(attributes).toContain("保持");
+    expect(attributes).not.toContain("rewinder-comparison-grid is-growth");
+    const growth = renderRewinderEvent(preview, state, "growth");
+    expect(growth).toContain('data-rewinder-act="growth"');
+    expect(growth).toContain("读论文");
+    expect(growth).toContain("洛克王国");
+    expect(growth).not.toContain("rewinder-stat-grid");
+    expect(growth).not.toMatch(/参会|实习|联培|undefined/);
   });
 
   it("keeps the same four read-only abilities available inside a run", () => {

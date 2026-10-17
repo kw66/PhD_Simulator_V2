@@ -87,17 +87,21 @@ describe("registration at acceptance confirmation", () => {
       expect(event.choices[0]!.disabledReason).toBeUndefined();
     }
     expect(state.advisorProgressState.funding).toBe(100);
+    expect(state.paperMasteryState).toBeUndefined();
     for (const [index, paperId] of ["second", "first"].entries()) {
       const event = state.eventQueue.find((entry) => entry.chainId === `paper-review-result-${paperId}`)!;
       state = chooseReview(state, paperId);
       expect(state.advisorProgressState.funding).toBe(100 - index - 1);
       expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["second", "first"].slice(0, index + 1));
       expect(state.player.money).toBe(30);
+      expect(state.paperMasteryState?.count).toBe(index + 1);
+      expect(state.paperMasteryState?.rewardedPaperIds).toEqual(["second", "first"].slice(0, index + 1));
       expect(state.externalPublications.find((entry) => entry.id === paperId))
         .toMatchObject({ acceptedTotalMonths: 6, conferenceAvailableAtTotalMonths: 9, conferenceHandled: false });
       expect(state.eventHistory.find((entry) => entry.chainId === event.chainId)?.stages).toHaveLength(3);
       const repeated = dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: event.choices[0]!.id });
       expect(repeated.advisorProgressState).toEqual(state.advisorProgressState);
+      expect(repeated.paperMasteryState).toEqual(state.paperMasteryState);
     }
     expect(state.eventQueue.filter((event) => event.source === "review")).toHaveLength(0);
     expect(settleConferenceRegistrationFees(state)).toBe(state);

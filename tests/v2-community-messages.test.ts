@@ -611,6 +611,26 @@ describe("V2 community message rendering", () => {
     await server?.close();
   });
 
+  it("shows the local read-only notice and disables message writing in the real app", async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const writes: string[] = [];
+    await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, route => route.abort());
+    await page.route("**/*.supabase.co/**", route => {
+      const request = route.request();
+      if (request.method() === "POST" && !request.url().includes("/get_")) writes.push(request.url());
+      return route.fulfill({ contentType: "application/json", headers: { "Content-Range": "*/0" }, body: "[]" });
+    });
+    try {
+      await page.goto(server.resolvedUrls!.local[0], { waitUntil: "domcontentloaded" });
+      await page.locator('[data-ui-role-rail-view="messages"]').click();
+      expect(await page.locator('[data-community-nickname="board"]').isDisabled()).toBe(true);
+      expect(await page.locator('[data-community-content="board"]').isDisabled()).toBe(true);
+      expect(await page.locator('[data-community-send="board"]').isDisabled()).toBe(true);
+      expect(await page.locator('[data-community-notice="board"]').textContent()).toContain("本地预览不上传数据");
+      expect(writes).toEqual([]);
+    } finally { await page.close(); }
+  }, 20_000);
+
   it("renders replies below a deleted parent without reply buttons and keeps expansion working", async () => {
     const page = await browser.newPage();
     const parent = { ...ownMessage, is_deleted: true, content: "该留言已删除" };
@@ -666,6 +686,9 @@ describe("V2 community message rendering", () => {
   it("counts emoji nicknames consistently through the real mobile composer and rejects an eleventh character", async () => {
     const page = await browser.newPage({ viewport: { width: 320, height: 760 }, isMobile: true, hasTouch: true });
     let messagePosts = 0;
+    // Exercise the published composer; this test intercepts every external request.
+    await page.route("**/src/app/v2-remote-access.ts", route => route.fulfill({ contentType: "application/javascript",
+      body: "export function isRemoteWriteEnabled() { return true; }" }));
     // This is an input regression, so an external font service must not gate navigation.
     await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, route => route.abort());
     await page.route("**/*.supabase.co/**", route => {

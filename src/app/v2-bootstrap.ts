@@ -113,6 +113,8 @@ import { createConferenceStats } from "./v2-conference-stats";
 import { createJournalStats } from "./v2-journal-stats";
 import { createThesisStats } from "./v2-thesis-stats";
 import { createStatisticsClient } from "./v2-statistics-client";
+import { isRemoteWriteEnabled } from "./v2-remote-access";
+import type { RewinderAct } from "./v2-render-rewinder-event";
 import { createAchievementStats } from "./v2-achievement-stats";
 import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, NICKNAME_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations, getVisibleValueDelta } from "./v2-value-animations";
@@ -160,6 +162,7 @@ import {
 import { warmRoleDetailPortraits } from "./v2-role-portrait-assets";
 import { getAllPlayHelpPageIds, getPlayHelpContext, getPlayHelpPageIndex } from "./v2-play-help";
 import { createResponsiveScoreCharts } from "./v2-responsive-score-charts";
+import { bindLobbyPortrait } from "./v2-lobby-portrait";
 import "../styles/mobile-base.css";
 import "../styles/mobile-lobby.css";
 import "../styles/mobile-panels.css";
@@ -275,8 +278,7 @@ function isDebugRelationshipType(value: string | undefined): value is DebugRelat
 
 export function bootstrapApp(root: HTMLDivElement): void {
   const store = createStore();
-  store.enableTalentTestMode();
-  const statisticsUploadEnabled = import.meta.env.PROD && window.location.protocol === "https:";
+  const statisticsUploadEnabled = isRemoteWriteEnabled();
   const statistics = createStatisticsClient({ uploadEnabled: statisticsUploadEnabled, onChange: (rpc) => {
     if (rpc === "get_phd_simulator_v2_activity_stats") {
       visitStats.render(root);
@@ -293,7 +295,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const achievementStats = createAchievementStats({ uploadEnabled: statisticsUploadEnabled,
     onChange: () => { if (store.getState().phase === "setup") render(); },
   });
-  const community = createCommunityMessages({ onChange: () => syncCommunityView() });
+  const community = createCommunityMessages({ writeEnabled: statisticsUploadEnabled, onChange: () => syncCommunityView() });
   function syncCommunityView(): void {
     renderCommunityMessages(root, community);
     createIcons({
@@ -435,6 +437,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let activeEventChainId: string | null = null;
   let activeEventRootId: string | null = null;
   let activeEventHistoryIndex: number | null = null;
+  let activeRewinderAct: RewinderAct = "attributes";
   let activeLogPage: number | null = null;
   let timelineScrollLeft = 0;
   const syncTimelineLabels = (track: HTMLElement): void => {
@@ -630,6 +633,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const eventLayout = createEventLayout(root);
   const relationshipTooltips = createRelationshipTooltips(root);
   const responsiveScoreCharts = createResponsiveScoreCharts(root);
+  bindLobbyPortrait(root);
   const syncAllFixedStageScales = (): void => {
     eventLayout.sync();
     relationshipTooltips.sync();
@@ -721,6 +725,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
   const resetEventContentUiState = (): void => {
     eventLayout.reset();
+    activeRewinderAct = "attributes";
     isEventContentOpen = false;
     activeEventId = null;
     activeEventHistoryId = null;
@@ -770,6 +775,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (state.phase === "finished") activeLogPage = state.totalMonths;
     eventLayout.reset();
     activeEventId = nextEvent.id;
+    activeRewinderAct = "attributes";
     activeEventHistoryId = null;
     activeEventChainId = nextEvent.chainId;
     activeEventRootId = getEventRootId(nextEvent);
@@ -790,6 +796,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     eventLayout.reset();
     activeEventId = null;
     activeEventHistoryId = historyEvent.id;
+    activeRewinderAct = "attributes";
     activeEventChainId = null;
     activeEventRootId = null;
     activeEventHistoryIndex = null;
@@ -1046,6 +1053,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeEventId,
       activeEventHistoryId,
       activeEventHistoryIndex,
+      activeRewinderAct,
       activeLogPage,
       isSanChartOpen,
       activePendingPage,
@@ -1338,6 +1346,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
       aiSlotId: typeof dataset.aiSlotId === "string" ? dataset.aiSlotId as AiSlotId : undefined,
       supportItemId: typeof dataset.supportItemId === "string" ? dataset.supportItemId as SupportItemId : undefined,
     });
+    if (actionId === "debug-trigger-event" && dataset.eventId === "rewinder-year") {
+      const event = store.getState().eventQueue.find(item => item.rewinderPresentation);
+      if (event) openEventContent(event.id);
+    }
     if (actionId === "resolve-event" && dataset.eventChoiceId === "before-grad-school-finish") {
       const afterEnrollmentConfirmation = store.getState();
       if (afterEnrollmentConfirmation.phase === "playing" && isPreEnrollmentState(afterEnrollmentConfirmation)) {
@@ -1516,6 +1528,16 @@ export function bootstrapApp(root: HTMLDivElement): void {
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    const rewinderButton = target.closest<HTMLButtonElement>("button[data-ui-rewinder-act]");
+    const rewinderAct = rewinderButton?.dataset.uiRewinderAct;
+    if (rewinderAct === "attributes" || rewinderAct === "growth" || rewinderAct === "relationships") {
+      activeRewinderAct = rewinderAct;
+      render();
+      root.querySelector<HTMLElement>("#event-content-body")?.scrollTo({ top: 0 });
+      root.querySelector<HTMLButtonElement>(`.rewinder-event button[data-ui-rewinder-act="${rewinderAct}"]`)?.focus({ preventScroll: true });
+      return;
+    }
 
     if (target.closest("button[data-ui-open-run-saves]")) {
       isRunSavePanelOpen = true;

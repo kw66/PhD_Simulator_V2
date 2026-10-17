@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { formatEventSanPaymentText } from "./v2-event-player-effects";
 import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
@@ -71,12 +72,17 @@ function getTeachersDayGift(giftId: TeachersDayGiftId | undefined): TeachersDayG
 }
 
 export function getTeachersDayErrandPercent(state: GameState): number {
-  return Math.min(100, 40 + (state.eventCounters.teachersDayErrandCount ?? 0) * 10);
+  return usesGameplayRulesFrom("20261018-r7")
+    ? 50
+    : Math.min(100, 40 + (state.eventCounters.teachersDayErrandCount ?? 0) * 10);
 }
 
 function getTeachersDayMessageHint(state: GameState): string {
   if (state.player.favor >= 6) {
     return "和老师聊得熟了，问候也能接上研究想法。有空也许会聊新思路，忙起来可能只回一句谢谢。";
+  }
+  if (usesGameplayRulesFrom("20261018-r7")) {
+    return "待报销的票据还在，老师也许会顺口叫你搭把手，也可能只回一句谢谢；两种回复各占一半。";
   }
   if (state.eventCounters.teachersDayErrandCount > 0) {
     return getTeachersDayErrandPercent(state) >= 100
@@ -276,7 +282,8 @@ export function resolveTeachersDayFixedEvent(
               `条件：导师好感 < 6；报销跑腿（${errandPercent}%）`,
               `结果：${sanSummary}`,
               `结果：${formatTierResistedOutcome("导师好感", 1, favorResult)}`,
-              ...(errandPercent < 100 ? [`报销跑腿 ${errandPercent}%→${Math.min(100, errandPercent + 10)}%`] : []),
+              ...(!usesGameplayRulesFrom("20261018-r7") && errandPercent < 100
+                ? [`报销跑腿 ${errandPercent}%→${Math.min(100, errandPercent + 10)}%`] : []),
             ].join("\n"),
             buttonLabel: "认命",
             outcome: `报销跑腿：${sanSummary}｜${formatTierResistedOutcome("导师好感", 1, favorResult)}。`,

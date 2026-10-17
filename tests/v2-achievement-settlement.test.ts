@@ -219,7 +219,6 @@ describe("achievement ending transaction", () => {
     memory.setItem("phd_simulator_v2_role_achievements_v1", JSON.stringify({ version: 1, roles: { rich: { unlocked: true } } }));
     memory.setItem("phd_simulator_v2_role_talents_v1", JSON.stringify({ version: 1, roles: { normal: { "first-month-drive": 3 } } }));
     const store = createStore({ storage: memory });
-    store.enableTalentTestMode();
     expect(store.getLobbyState().roleProgress.normal.level).toBe(0);
     expect(store.getLobbyState().roleProgress.rich.unlocked).toBe(false);
     expect(store.getLobbyState().talentAllocation).toEqual({});

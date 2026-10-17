@@ -16,7 +16,7 @@ describe("global achievement statistics in the actual game", () => {
         name: "achievement-network-fixture", transform(code, id) {
           if (id.replaceAll("\\", "/").endsWith("/src/app/v2-bootstrap.ts")) return code
             .replace("const store = createStore();", "const store = createStore(); window.achievementStore = store;")
-            .replace('const statisticsUploadEnabled = import.meta.env.PROD && window.location.protocol === "https:";', "const statisticsUploadEnabled = true;");
+          .replace('const statisticsUploadEnabled = isRemoteWriteEnabled();', "const statisticsUploadEnabled = true;");
         },
       }],
     });

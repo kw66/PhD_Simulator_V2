@@ -10,6 +10,14 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-10-18",
+    title: "论文熟手与成长天赋调整",
+    changes: [
+      { category: "更新", title: "新增成长天赋：论文熟手", description: "每发表一篇玩家一作论文，按想idea、做实验、写论文顺序循环获得永久+1分。会议、期刊及赠送的一作论文均计入，每篇只奖励一次。成长页显示累计加成与下一篇奖励。" },
+      { category: "平衡", title: "移除跑腿熟手", description: "教师节发祝福且导师好感不足6时，跑腿与普通回复均固定为50%，不再随跑腿次数增加。跑腿退出成长页和轮回继承，本世次数仍用于成就统计。" },
+    ],
+  },
+  {
     date: "2026-10-17",
     title: "轮回者实装、角色修复与个人纪录",
     changes: [
@@ -87,7 +95,7 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
     date: "2026-10-06",
     title: "校园日常积累",
     changes: [
-      { category: "更新", title: "日常活动留下成长", description: "教师节跑腿积累熟练度，游戏放松中的捕捉机会与SAN消耗也会随参与次数变化。成长信息集中在天赋卡中，让重复遇到的校园事件产生不同体验。" },
+      { category: "更新", title: "日常活动留下成长", description: "游戏放松中的捕捉机会与SAN消耗会随参与次数变化。成长信息集中在天赋卡中，让重复遇到的校园事件产生不同体验。" },
       { category: "优化", title: "学年目标与假期生活", description: "学年总结改为核对年初目标，回顾休息、交友、导师信任和兼职；假期与固定事件补充生活化剧情。相关奖励、出现提示和结果文字一并整理。" },
     ],
   },

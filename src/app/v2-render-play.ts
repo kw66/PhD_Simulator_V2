@@ -23,7 +23,8 @@ import type { ConferenceRegionId } from "../core/v2-conference-system";
 import { getCurrentEvent, getEventQueuePriority, getSortedEventQueue } from "../core/v2-event-queue";
 import { canAutoResolveLinearEvent, isEventBlocking, isLinearEvent } from "../core/v2-event-auto-resolution";
 import { isTransientUiHintLog } from "../core/v2-engine-helpers";
-import { getTeachersDayResultPreviews, getTeachersDayErrandPercent } from "../core/v2-fixed-events-teachers-day";
+import { getTeachersDayResultPreviews } from "../core/v2-fixed-events-teachers-day";
+import { getPaperMasteryCount, getPaperMasteryBonuses, PAPER_MASTERY_ACTIONS, PAPER_MASTERY_LABELS } from "../core/v2-paper-mastery";
 import { getEntertainmentGrowth } from "../core/v2-entertainment-growth";
 import { hasFullGear, hasPerfectWorkstation } from "../core/v2-meeting-system";
 import {
@@ -133,7 +134,7 @@ import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl, hasRoleCardPortrait }
 import { renderDesignedGrowthBoard } from "./v2-render-setup-screen";
 import { renderCaptainTags } from "./v2-render-captain-tags";
 import { renderRewinderPreview } from "./v2-render-rewinder";
-import { renderRewinderEvent } from "./v2-render-rewinder-event";
+import { renderRewinderEvent, type RewinderAct } from "./v2-render-rewinder-event";
 import { getAdvisorGuidanceAmount } from "../core/v2-advisor-guidance";
 import { getDesignedTalentNodes } from "../core/v2-role-talent-definitions";
 import { getMonthEndIllnessDelta } from "../core/v2-curse-system";
@@ -1135,6 +1136,7 @@ function renderEventContentBox(
   activeHistoryIndex: number | null,
   debugEventReplayEnabled = false,
   state?: GameState,
+  rewinderAct: RewinderAct = "attributes",
 ): string {
   if (!currentEvent && !completedEvent) {
     return `
@@ -1198,7 +1200,7 @@ function renderEventContentBox(
     ];
 
   return `
-    <div class="event-content-box${paperReviewPresentation ? " is-paper-review-result" : journalAcceptancePresentation ? " is-journal-acceptance" : displayEvent.thesisReviewPresentation ? " is-thesis-review" : ""}" id="event-content-box">
+    <div class="event-content-box${displayEvent.rewinderPresentation ? " is-rewinder-result" : paperReviewPresentation ? " is-paper-review-result" : journalAcceptancePresentation ? " is-journal-acceptance" : displayEvent.thesisReviewPresentation ? " is-thesis-review" : ""}" id="event-content-box">
       <div class="event-content-header">
         <div class="event-scene-tabs" aria-label="${escapeHtml(displayEvent.title)}事件幕次">
           ${sceneTabs.map((scene, index) => `
@@ -1217,7 +1219,7 @@ function renderEventContentBox(
       </div>
       <div class="event-content-body" id="event-content-body">
         ${displayEvent.rewinderPresentation
-          ? renderRewinderEvent(displayEvent.rewinderPresentation, historicalPage === null && !isCompleted ? state : undefined)
+          ? renderRewinderEvent(displayEvent.rewinderPresentation, historicalPage === null && !isCompleted ? state : undefined, rewinderAct)
           : displayEvent.thesisReviewPresentation
           ? renderThesisReviewReports(displayEvent.thesisReviewPresentation, renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state)))
           : paperReviewPresentation
@@ -1228,10 +1230,11 @@ function renderEventContentBox(
       </div>
       ${displayEvent.choices.length > 0 ? `
         <div class="event-content-buttons" id="event-content-buttons">
-          ${displayEvent.choices.map((choice) => {
+          ${displayEvent.rewinderPresentation && rewinderAct !== "attributes" ? `<button class="event-choice-btn event-action-btn is-rewinder-back" type="button" data-ui-rewinder-act="${rewinderAct === "growth" ? "attributes" : "growth"}"><span>上一幕</span></button>` : ""}
+          ${displayEvent.rewinderPresentation && rewinderAct !== "relationships" ? `<button class="event-choice-btn event-action-btn" type="button" data-ui-rewinder-act="${rewinderAct === "attributes" ? "growth" : "relationships"}"><span>${rewinderAct === "attributes" ? "继续 · 成长" : "继续 · 人际"}</span></button>` : displayEvent.choices.map((choice) => {
             const disabledReason = choice.disabledReason?.trim() ?? "";
             const secondary = isSecondaryEventChoice(choice);
-            const choiceLabel = !secondary && displayEvent.choices.filter((entry) => !isSecondaryEventChoice(entry)).length === 1
+            const choiceLabel = displayEvent.rewinderPresentation ? "完成轮回" : !secondary && displayEvent.choices.filter((entry) => !isSecondaryEventChoice(entry)).length === 1
               ? displayStage === "act1" ? "继续" : displayStage === "act3" || displayStage === "result" ? "确定" : choice.label
               : choice.label;
             const riskChoice = riskEvent?.choices.find((candidate) => candidate.id === choice.id);
@@ -1268,6 +1271,11 @@ export function renderEventLayoutSamples(
   completedEvent: GameState["eventHistory"][number] | null,
   state?: GameState,
 ): EventLayoutSample[] {
+  // Measure all three scenes up front so navigating does not resize the dialog.
+  if (currentEvent?.rewinderPresentation || completedEvent?.stages.some(stage => stage.rewinderPresentation)) {
+    return (["attributes", "growth", "relationships"] as const).map(act => ({ key: `rewinder:${act}`,
+      html: renderEventContentBox(currentEvent, completedEvent, null, false, state, act) }));
+  }
   if (completedEvent) {
     return completedEvent.stages.map((_, index) => ({ key: `history:${index}`, html: renderEventContentBox(null, completedEvent, index, false, state) }));
   }
@@ -3472,7 +3480,9 @@ function buildGrowthTalentItems(state: GameState, gameGrowthPage = 0): TalentPan
     state.eventSupport.hasBadmintonRacket,
   );
   const pokerRate = getPokerWinRate(pokerCount);
-  const errandCount = state.eventCounters.teachersDayErrandCount;
+  const masteryCount = getPaperMasteryCount(state);
+  const masteryBonuses = getPaperMasteryBonuses(state);
+  const nextMastery = PAPER_MASTERY_LABELS[PAPER_MASTERY_ACTIONS[masteryCount % 3]!];
   return [
     {
       id: "reading-growth",
@@ -3548,13 +3558,13 @@ function buildGrowthTalentItems(state: GameState, gameGrowthPage = 0): TalentPan
     },
     buildGameGrowthTalentItem(state, gameGrowthPage),
     {
-      id: "errand-growth", icon: "🧾", name: "跑腿熟手", active: true,
+      id: "paper-mastery", icon: "📝", name: "论文熟手", active: true,
       metrics: [
-        { label: "跑腿", value: `${errandCount} 次` },
-        { label: "跑腿概率", value: `${getTeachersDayErrandPercent(state)}%` },
+        { label: "论文积累", value: `${masteryCount} 次` },
+        ...PAPER_MASTERY_ACTIONS.map(action => ({ label: PAPER_MASTERY_LABELS[action], value: `+${masteryBonuses[action]}分` })),
       ],
-      progress: { label: "熟练度", showLabel: true, value: Math.min(errandCount, 6), max: 6, valueLabel: `${Math.min(errandCount, 6)}/6` },
-      description: "每次跑腿，概率+10个百分点，最高100%",
+      detail: `下一篇一作：永久${nextMastery} +1分`,
+      description: "每发表一篇一作论文，依次永久获得想idea、做实验、写论文 +1分，循环累加。",
     },
   ];
 }
@@ -3876,7 +3886,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
                 logPages,
                 uiState.isSanChartOpen === true,
                 openEvent || openHistoryEvent
-                  ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null, state.debugEventReplayEnabled === true, state)
+                  ? renderEventContentBox(openEvent, openHistoryEvent, uiState.activeEventHistoryIndex ?? null, state.debugEventReplayEnabled === true, state, uiState.activeRewinderAct)
                   : activeLogPage?.kind === "ending"
                     ? uiState.isEndingContentOpen === false ? renderEndingLog(state) : renderEndingScreen(state, uiState.roleExperienceAward, uiState.saveStatus)
                     : "",

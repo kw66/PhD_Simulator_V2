@@ -177,6 +177,23 @@ describe("rewinder yearly, replay and account integration", () => {
       .toEqual({ 2: settled.rewinderArchive?.years[2] });
   });
 
+  it("discards removed meeting and career fields from stored archives before preview or restoration", () => {
+    const past = record(nearYearEnd());
+    const stored = { ...past, growth: { ...past.growth, growth: { ...past.growth.growth,
+      meetingCount: 99, domesticMeetingCount: 99, asiaMeetingCount: 99, westMeetingCount: 99,
+      internshipCount: 99, hasInternshipExperience: true, hasJointTrainingExperience: true,
+    } } };
+    const cleaned = normalizeRewinderArchive({ years: { 1: stored } });
+    expect(cleaned.years[1]).toEqual(past);
+    const pending = dispatchAction(initializeRewinder(nearYearEnd(), { years: { 1: stored } }), "next-month");
+    const next = confirm(pending);
+    expect(next.eventCounters.meetingCount).toBe(0);
+    expect(next.internshipCount).toBe(0);
+    expect(next.conferenceCareerState.hasInternshipExperience).not.toBe(true);
+    expect(next.conferenceEncounterState.bigBullCooperation).not.toBe(true);
+    expect(next.rewinderState?.records.years[1]?.growth.growth).not.toHaveProperty("internshipCount");
+  });
+
   it("replays a real full year, preserves pending saves, and archives only on explicit settlement", async () => {
     const { store, storage, adapter } = await fixture(archive());
     const originalArchive = structuredClone(store.getLobbyState().rewinderArchive);

@@ -3,6 +3,7 @@ import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attribu
 import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
 import { getPlayerAttributeCap } from "./v2-player-attributes";
 import { createDebugEnding, isDebugEndingId } from "./v2-debug-endings";
+import { createDebugRewinderYear } from "./v2-debug-rewinder";
 import { createConferenceActivityEvent } from "./v2-conference-activity-events";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { getConferenceInfo, getConferenceLocation } from "./v2-conference-catalog";
@@ -172,6 +173,8 @@ export const DEBUG_BUFF_IDS: readonly string[] = createDebugBuffs().map((buff) =
 export interface DebugButtonSpec {
   id: string;
   label: string;
+  roleId?: GameState["selectedRoleId"];
+  description?: string;
 }
 
 export interface DebugButtonGroup {
@@ -238,6 +241,11 @@ export const DEBUG_COMPLETED_EVENT_IDS = [
 ] as const;
 
 export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
+  {
+    title: "角色专属",
+    buttons: [{ id: "rewinder-year", label: "轮回者·学年轮回", roleId: "rewinder",
+      description: "轮回者开局后可用；替换当前调试进度为第一学年末，包含示例往世属性、成长、导师、同学和恋人。" }],
+  },
   {
     title: "固定事件",
     buttons: [
@@ -840,6 +848,7 @@ function buildDebugEvent(
 }
 
 function triggerDebugEvent(state: GameState, eventId: string): GameState {
+  if (eventId === "rewinder-year") return createDebugRewinderYear(state);
   const replayState = state;
   const randomMatch = /^random-(\d+)$/u.exec(eventId);
   const randomId = randomMatch ? Number(randomMatch[1]) : NaN;

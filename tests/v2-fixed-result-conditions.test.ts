@@ -151,8 +151,7 @@ describe("fixed result conditions", () => {
       const result = resolution.enqueueEvents![0]!;
       expect(settlementOf(result)).toContain("条件：");
       const branch = rollValue >= 0.5 ? "普通回复" : favor >= 6 ? "分享想法" : "报销跑腿";
-      const percent = favor >= 6 ? 50 : rollValue >= 0.5 ? 60 : 40;
-      expect(settlementOf(result)).toContain(`条件：导师好感 ${favor >= 6 ? "≥" : "<"} 6；${branch}（${percent}%）`);
+      expect(settlementOf(result)).toContain(`条件：导师好感 ${favor >= 6 ? "≥" : "<"} 6；${branch}（50%）`);
       expect(result.id).toContain(rollValue < 0.5 ? favor >= 6 ? "message-idea" : "message-errand" : "message-plain");
       expect(roll).toHaveBeenCalledTimes(1);
     }
@@ -165,7 +164,7 @@ describe("fixed result conditions", () => {
       const resolution = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => rollValue);
       const result = resolution.enqueueEvents![0]!;
       expect(resolution.nextState).toBe(state);
-      expect(settlementOf(result).trim()).toBe(`条件：导师好感 ${favor >= 6 ? "≥" : "<"} 6；普通回复（${favor >= 6 ? 50 : 60}%）\n结果：无事发生`);
+      expect(settlementOf(result).trim()).toBe(`条件：导师好感 ${favor >= 6 ? "≥" : "<"} 6；普通回复（50%）\n结果：无事发生`);
       expect(result.completionLog).toContain("无事发生");
       const html = renderApp({
         ...state,
@@ -175,7 +174,7 @@ describe("fixed result conditions", () => {
         eventQueue: [{ ...result, queueOrder: 1 }],
       }, undefined, { activePlayTab: "events", activeEventId: result.id, isEventContentOpen: true });
       expect(html).toContain('<span class="event-settlement-item">无事发生</span>');
-      expect(html).toContain(`<span class="event-settlement-item">普通回复（${favor >= 6 ? 50 : 60}%）</span>`);
+      expect(html).toContain('<span class="event-settlement-item">普通回复（50%）</span>');
       expect(html).not.toContain("数值变化 0");
       expect(html).not.toContain("仅回复祝福概率");
     }

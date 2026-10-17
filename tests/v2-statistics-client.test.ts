@@ -114,12 +114,12 @@ describe("shared statistics queue", () => {
   });
 
   it("keeps the finalization outbox pending until its upload queue is durable", () => {
-    const failing = client({ storage: { getItem: () => null, setItem: () => { throw new Error("QuotaExceededError"); } } });
+    const failing = client({ uploadEnabled: true, storage: { getItem: () => null, setItem: () => { throw new Error("QuotaExceededError"); } } });
     expect(queue(failing)).toBe(true);
     expect(failing.persistPending()).toBe(false);
-    expect(client({ storage: null }).persistPending()).toBe(false);
+    expect(client({ uploadEnabled: true, storage: null }).persistPending()).toBe(false);
     const local = storage();
-    const healthy = client({ storage: local });
+    const healthy = client({ uploadEnabled: true, storage: local });
     queue(healthy);
     expect(healthy.persistPending()).toBe(true);
     expect(JSON.parse(local.values.get("phd_simulator_v2_statistics_v2")!).results).toHaveLength(1);

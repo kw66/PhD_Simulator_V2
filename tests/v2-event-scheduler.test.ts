@@ -13,6 +13,7 @@ import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolutio
 import { createScholarshipEvent, resolveScholarshipApplication } from "../src/core/v2-fixed-events-scholarship";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { createTeachersDayEvent, resolveTeachersDayFixedEvent } from "../src/core/v2-fixed-events-teachers-day";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createCareerRecruitmentEvent } from "../src/core/v2-monthly-career-events";
 import { advanceThesisResearchPoint, syncThesisState } from "../src/core/v2-thesis-rules";
 import { createFundingCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
@@ -228,7 +229,7 @@ describe("v2 event scheduler", () => {
       () => 0.99,
     );
 
-    expect(lowFavorResult.enqueueEvents?.[0]?.description).toContain("条件：导师好感 < 6；普通回复（60%）");
+    expect(lowFavorResult.enqueueEvents?.[0]?.description).toContain("条件：导师好感 < 6；普通回复（50%）");
     expect(lowFavorResult.enqueueEvents?.[0]?.description).not.toContain("无直接数值变化");
     expect(highFavorResult.enqueueEvents?.[0]?.description).toContain("条件：导师好感 ≥ 6；普通回复（50%）");
     expect(highFavorResult.enqueueEvents?.[0]?.description).not.toContain("无直接数值变化");
@@ -258,27 +259,27 @@ describe("v2 event scheduler", () => {
     expect(result.enqueueEvents?.[0]?.completionLog).toBe("报销跑腿：SAN -3｜导师好感 +1。");
     expect(result.outcome).toContain("报销跑腿");
     expect(result.enqueueEvents?.[0]?.description.split("机制结算")[0]).not.toMatch(/透明概率|好感\s*[≥<]|\d+%/u);
-    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("条件：导师好感 < 6；报销跑腿（40%）");
+    expect(result.enqueueEvents?.[0]?.description.split("机制结算")[1]).toContain("条件：导师好感 < 6；报销跑腿（50%）");
   });
 
-  it.each([0, 1, 2, 3, 4, 5, 6, 9])("uses completed errands to set Teacher's Day odds after %i errands", (count) => {
+  it.each([0, 1, 2, 3, 4, 5, 6, 9])("keeps Teacher's Day odds at 50 percent after %i errands while tracking the achievement count", (count) => {
     const initial = createInitialState();
     const state = {
       ...initial,
       player: { ...initial.player, favor: 1 },
       eventCounters: { ...initial.eventCounters, teachersDayErrandCount: count },
     };
-    const percent = Math.min(100, 40 + count * 10);
-    const errand = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => percent / 100 - 0.000001);
-    expect(errand.enqueueEvents?.[0]?.description).toContain(`报销跑腿（${percent}%）`);
+    const errand = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => 0.499999);
+    expect(errand.enqueueEvents?.[0]?.description).toContain("报销跑腿（50%）");
     expect(errand.nextState.eventCounters.teachersDayErrandCount).toBe(count + 1);
     expect(state.eventCounters.teachersDayErrandCount).toBe(count);
-    if (percent < 100) {
-      expect(errand.enqueueEvents?.[0]?.description).toContain(`报销跑腿 ${percent}%→${percent + 10}%`);
-      const reply = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => percent / 100);
-      expect(reply.enqueueEvents?.[0]?.description).toContain(`普通回复（${100 - percent}%）`);
-      expect(reply.nextState.eventCounters.teachersDayErrandCount).toBe(count);
-    }
+    expect(errand.enqueueEvents?.[0]?.description).not.toContain("%→");
+    const reply = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => 0.5);
+    expect(reply.enqueueEvents?.[0]?.description).toContain("普通回复（50%）");
+    expect(reply.nextState.eventCounters.teachersDayErrandCount).toBe(count);
+    const decision = createTeachersDayEvent(state, () => 0).choices[0]!.effects.enqueueEvents![0]!;
+    expect(decision.description).toContain("两种回复各占一半");
+    expect(decision.description).not.toContain("老师渐渐叫顺了口");
     const gift = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-gift", teachersDayGift: "tea" }, () => 0);
     expect(gift.nextState.eventCounters.teachersDayErrandCount).toBe(count);
     const familiar = resolveTeachersDayFixedEvent({ ...state, player: { ...state.player, favor: 6 } }, { kind: "teachers-day-message" }, () => 0);
@@ -288,6 +289,29 @@ describe("v2 event scheduler", () => {
     const familiarReply = resolveTeachersDayFixedEvent({ ...state, player: { ...state.player, favor: 6 } }, { kind: "teachers-day-message" }, () => 0.5);
     expect(familiarReply.enqueueEvents?.[0]?.description).toContain("普通回复（50%）");
     expect(familiarReply.nextState.eventCounters.teachersDayErrandCount).toBe(count);
+  });
+
+  it.each([0, 2, 6])("retains the legacy errand odds and narrative for r6 operation replay after %i errands", (count) => {
+    withGameplayRuleset("20261017-r6", () => {
+      const initial = createInitialState();
+      const state = { ...initial, player: { ...initial.player, favor: 1 },
+        eventCounters: { ...initial.eventCounters, teachersDayErrandCount: count } };
+      const percent = Math.min(100, 40 + count * 10);
+      const errand = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => percent / 100 - 0.000001);
+      expect(errand.enqueueEvents![0]!.description).toContain(`报销跑腿（${percent}%）`);
+      expect(errand.nextState.eventCounters.teachersDayErrandCount).toBe(count + 1);
+      if (percent < 100) {
+        expect(errand.enqueueEvents![0]!.description).toContain(`报销跑腿 ${percent}%→${percent + 10}%`);
+        const reply = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-message" }, () => percent / 100);
+        expect(reply.enqueueEvents![0]!.description).toContain(`普通回复（${100 - percent}%）`);
+      } else {
+        expect(errand.enqueueEvents![0]!.description).not.toContain("%→");
+      }
+      const decision = createTeachersDayEvent(state, () => 0).choices[0]!.effects.enqueueEvents![0]!;
+      expect(decision.description).toContain(count === 0 ? "也可能只回一句谢谢。"
+        : count < 6 ? "老师渐渐叫顺了口" : "如今你一发消息");
+      expect(decision.description).not.toContain("两种回复各占一半");
+    });
   });
 
   it("hints at Teacher's Day branches through familiarity without numerical odds", () => {

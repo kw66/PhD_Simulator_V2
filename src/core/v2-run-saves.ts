@@ -170,12 +170,12 @@ export function createMemoryRunSaveAdapter(initial: RunSaveRecord[] = []): RunSa
   };
 }
 
-export function createIndexedDbRunSaveAdapter(factory: IDBFactory = globalThis.indexedDB): RunSaveAdapter {
+export function createIndexedDbRunSaveAdapter(factory: IDBFactory = globalThis.indexedDB, databaseName = RUN_SAVE_DATABASE_NAME): RunSaveAdapter {
   let database: Promise<IDBDatabase> | undefined;
   const writtenMonths = new Map<RoleId, Map<string, RunSaveSnapshot>>();
   const open = () => database ??= new Promise<IDBDatabase>((resolve, reject) => {
     if (!factory) { reject(new Error("浏览器不支持 IndexedDB")); return; }
-    const request = factory.open(RUN_SAVE_DATABASE_NAME, RUN_SAVE_VERSION);
+    const request = factory.open(databaseName, RUN_SAVE_VERSION);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains("runs")) request.result.createObjectStore("runs", { keyPath: "roleId" });
       if (!request.result.objectStoreNames.contains("months")) {
@@ -240,6 +240,7 @@ export function createIndexedDbRunSaveAdapter(factory: IDBFactory = globalThis.i
 
 export function createRunSaveRepository(options: {
   storage?: JournalStorage | null;
+  databaseName?: string;
   adapter?: RunSaveAdapter;
   onError?: (error: RunSaveStorageError) => void;
   now?: () => string;
@@ -254,7 +255,7 @@ export function createRunSaveRepository(options: {
     catch (cause) { storage = null; report("unavailable", "浏览器禁止读取本地存储，关闭页面后可能无法恢复最新进度", cause); }
   }
   const adapter = options.adapter ?? (options.storage === null || typeof window === "undefined"
-    ? createMemoryRunSaveAdapter() : createIndexedDbRunSaveAdapter());
+    ? createMemoryRunSaveAdapter() : createIndexedDbRunSaveAdapter(undefined, options.databaseName));
   const now = options.now ?? (() => new Date().toISOString());
   const runId = options.createRunId ?? (() => globalThis.crypto.randomUUID());
   const records = new Map<RoleId, RunSaveRecord>();

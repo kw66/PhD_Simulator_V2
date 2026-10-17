@@ -1,4 +1,6 @@
 import { getPlayerAttributeCap } from "./v2-player-attributes";
+import { getPaperMasteryCount } from "./v2-paper-mastery";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { GameState } from "./v2-types";
 
 export const REWINDER_ATTRIBUTE_KEYS = [
@@ -6,18 +8,26 @@ export const REWINDER_ATTRIBUTE_KEYS = [
 ] as const;
 
 /** Only the counters that change future growth rewards are carried across lives. */
-export const REWINDER_GROWTH_COUNTER_KEYS = [
-  "readCount", "partTimeWorkCount", "badmintonCount", "pokerCount", "teachersDayErrandCount",
-  "terrariaCount", "magicTowerCount", "rocoCount", "meetingCount", "domesticMeetingCount",
-  "asiaMeetingCount", "westMeetingCount", "internshipCount",
+const COMMON_GROWTH_COUNTER_KEYS = [
+  "readCount", "partTimeWorkCount", "badmintonCount", "pokerCount",
+  "terrariaCount", "magicTowerCount", "rocoCount",
 ] as const;
+export const REWINDER_GROWTH_COUNTER_KEYS = [...COMMON_GROWTH_COUNTER_KEYS, "paperMasteryCount"] as const;
+const LEGACY_GROWTH_COUNTER_KEYS = [
+  "teachersDayErrandCount", "meetingCount", "domesticMeetingCount", "asiaMeetingCount", "westMeetingCount", "internshipCount",
+] as const;
+
+/** Replay must preserve the exact counters saved before the r7 growth redesign. */
+export function getRewinderGrowthCounterKeys() {
+  return usesGameplayRulesFrom("20261018-r7")
+    ? REWINDER_GROWTH_COUNTER_KEYS : [...COMMON_GROWTH_COUNTER_KEYS, ...LEGACY_GROWTH_COUNTER_KEYS];
+}
 
 export interface RewinderGrowthSnapshot {
   attributes: Record<typeof REWINDER_ATTRIBUTE_KEYS[number], number>;
-  growth: Record<typeof REWINDER_GROWTH_COUNTER_KEYS[number], number> & {
-    hasInternshipExperience: boolean;
-    hasJointTrainingExperience: boolean;
-  };
+  growth: Record<typeof COMMON_GROWTH_COUNTER_KEYS[number], number>
+    & Partial<Record<"paperMasteryCount" | typeof LEGACY_GROWTH_COUNTER_KEYS[number], number>>
+    & { hasInternshipExperience?: boolean; hasJointTrainingExperience?: boolean };
 }
 
 const finite = (value: number): number => Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -36,14 +46,16 @@ export function captureRewinderGrowth(state: GameState): RewinderGrowthSnapshot 
     growth: {
       readCount: count(state.readingState.readCount), partTimeWorkCount: count(state.partTimeWorkCount),
       badmintonCount: count(state.eventCounters.badmintonCount), pokerCount: count(state.eventCounters.pokerCount),
-      teachersDayErrandCount: count(state.eventCounters.teachersDayErrandCount),
       terrariaCount: count(state.eventCounters.terrariaCount), magicTowerCount: count(state.eventCounters.magicTowerCount),
-      rocoCount: count(state.eventCounters.rocoCount), meetingCount: count(state.eventCounters.meetingCount),
-      domesticMeetingCount: count(state.eventCounters.domesticMeetingCount),
-      asiaMeetingCount: count(state.eventCounters.asiaMeetingCount), westMeetingCount: count(state.eventCounters.westMeetingCount),
-      internshipCount: count(state.internshipCount),
-      hasInternshipExperience: !!state.conferenceCareerState.hasInternshipExperience || state.internshipCount > 0,
-      hasJointTrainingExperience: state.conferenceEncounterState.bigBullCooperation || !!state.conferenceEncounterState.jointTrainingReward,
+      rocoCount: count(state.eventCounters.rocoCount),
+      ...(usesGameplayRulesFrom("20261018-r7") ? { paperMasteryCount: getPaperMasteryCount(state) } : {
+        teachersDayErrandCount: count(state.eventCounters.teachersDayErrandCount),
+        meetingCount: count(state.eventCounters.meetingCount), domesticMeetingCount: count(state.eventCounters.domesticMeetingCount),
+        asiaMeetingCount: count(state.eventCounters.asiaMeetingCount), westMeetingCount: count(state.eventCounters.westMeetingCount),
+        internshipCount: count(state.internshipCount),
+        hasInternshipExperience: !!state.conferenceCareerState.hasInternshipExperience || state.internshipCount > 0,
+        hasJointTrainingExperience: state.conferenceEncounterState.bigBullCooperation || !!state.conferenceEncounterState.jointTrainingReward,
+      }),
     },
   };
 }
@@ -51,11 +63,14 @@ export function captureRewinderGrowth(state: GameState): RewinderGrowthSnapshot 
 /** Merge individual maxima, never select one whole life at the expense of another. */
 export function mergeRewinderGrowth(current: RewinderGrowthSnapshot, historical?: RewinderGrowthSnapshot): RewinderGrowthSnapshot {
   const attributes = { ...current.attributes };
-  const growth = { ...current.growth };
+  const growth: RewinderGrowthSnapshot["growth"] = Object.fromEntries(getRewinderGrowthCounterKeys().map(key => [key,
+    Math.max(count(current.growth[key] ?? 0), count(historical?.growth[key] ?? 0)),
+  ])) as Record<typeof COMMON_GROWTH_COUNTER_KEYS[number], number>;
   for (const key of REWINDER_ATTRIBUTE_KEYS) attributes[key] = Math.max(finite(attributes[key]), finite(historical?.attributes[key] ?? 0));
-  for (const key of REWINDER_GROWTH_COUNTER_KEYS) growth[key] = Math.max(count(growth[key]), count(historical?.growth[key] ?? 0));
-  growth.hasInternshipExperience = !!growth.hasInternshipExperience || !!historical?.growth.hasInternshipExperience;
-  growth.hasJointTrainingExperience = !!growth.hasJointTrainingExperience || !!historical?.growth.hasJointTrainingExperience;
+  if (!usesGameplayRulesFrom("20261018-r7")) {
+    growth.hasInternshipExperience = !!current.growth.hasInternshipExperience || !!historical?.growth.hasInternshipExperience;
+    growth.hasJointTrainingExperience = !!current.growth.hasJointTrainingExperience || !!historical?.growth.hasJointTrainingExperience;
+  }
   return { attributes, growth };
 }
 
@@ -82,17 +97,24 @@ export function applyRewinderGrowth(state: GameState, historical: RewinderGrowth
     },
     readingState: { ...state.readingState, readCount: growth.readCount },
     partTimeWorkCount: growth.partTimeWorkCount,
+    ...((growth.paperMasteryCount ?? 0) > getPaperMasteryCount(state) ? { paperMasteryState: {
+      count: growth.paperMasteryCount!,
+      rewardedPaperIds: [...(state.paperMasteryState?.rewardedPaperIds ?? [])],
+    } } : {}),
     eventCounters: {
       ...state.eventCounters,
       badmintonCount: growth.badmintonCount, pokerCount: growth.pokerCount,
-      teachersDayErrandCount: growth.teachersDayErrandCount,
       terrariaCount: growth.terrariaCount, magicTowerCount: growth.magicTowerCount, rocoCount: growth.rocoCount,
-      meetingCount: growth.meetingCount, domesticMeetingCount: growth.domesticMeetingCount,
-      asiaMeetingCount: growth.asiaMeetingCount, westMeetingCount: growth.westMeetingCount,
+      ...(!usesGameplayRulesFrom("20261018-r7") ? {
+        teachersDayErrandCount: growth.teachersDayErrandCount!,
+        meetingCount: growth.meetingCount!, domesticMeetingCount: growth.domesticMeetingCount!,
+        asiaMeetingCount: growth.asiaMeetingCount!, westMeetingCount: growth.westMeetingCount!,
+      } : {}),
     },
-    internshipCount: growth.internshipCount,
-    conferenceCareerState: { ...state.conferenceCareerState, hasInternshipExperience: growth.hasInternshipExperience },
-    // The experience prevents re-awarding a past training invitation, but adds no old buff or reward object.
-    conferenceEncounterState: { ...state.conferenceEncounterState, bigBullCooperation: growth.hasJointTrainingExperience },
+    ...(!usesGameplayRulesFrom("20261018-r7") ? {
+      internshipCount: growth.internshipCount!,
+      conferenceCareerState: { ...state.conferenceCareerState, hasInternshipExperience: growth.hasInternshipExperience! },
+      conferenceEncounterState: { ...state.conferenceEncounterState, bigBullCooperation: growth.hasJointTrainingExperience! },
+    } : {}),
   };
 }

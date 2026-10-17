@@ -17,6 +17,7 @@ import { enqueueEventQueueItem } from "./v2-event-queue";
 import type { GameState, Paper, PaperAcceptType, PaperReviewerReport, PaperReviewResult, PaperReviewScoreChange, PaperReviewScores, PaperReviewScoreSnapshot, PaperReviewSettlement, PaperTarget, PendingEvent } from "./v2-types";
 import { getJournalDefinition } from "./v2-journal-system";
 import { applyPublicationTalentRewards, projectPublicationTalentRewards } from "./v2-publication-talent";
+import { applyPaperMastery } from "./v2-paper-mastery";
 import { formatEventSanChange, getActualSanChange, getIllnessSanIncrease } from "./v2-sanity-rules";
 import { getConferenceRegistrationFee, projectConferenceRegistrationFees, settleConferenceRegistrationFees } from "./v2-lab-publication-costs";
 
@@ -488,13 +489,13 @@ function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewS
 export function projectPaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement): GameState {
   const nextState = resolvePaperReviewSettlement(state, settlement);
   if (nextState === state || !settlement.accepted) return nextState;
-  return projectPublicationTalentRewards(projectConferenceRegistrationFees(nextState, [settlement.paperId]));
+  return applyPaperMastery(projectPublicationTalentRewards(projectConferenceRegistrationFees(nextState, [settlement.paperId])), false);
 }
 
 export function applyPaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement): GameState {
   const nextState = resolvePaperReviewSettlement(state, settlement);
   if (nextState === state || !settlement.accepted) return nextState;
-  return applyPublicationTalentRewards(settleConferenceRegistrationFees(nextState, [settlement.paperId]));
+  return applyPaperMastery(applyPublicationTalentRewards(settleConferenceRegistrationFees(nextState, [settlement.paperId])));
 }
 
 export function resolveDuePaperReviews(

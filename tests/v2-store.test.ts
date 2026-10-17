@@ -125,9 +125,8 @@ describe("session store", () => {
     store.dispatch("start-game", { roleId: "normal" }); expect(store.getState().phase).toBe("playing");
   });
 
-  it("keeps the former talent test profile disabled", () => {
-    const store = createStore({ storage: null }); const original = structuredClone(store.getLobbyState());
-    store.enableTalentTestMode(); expect(store.getLobbyState()).toEqual(original);
+  it("does not grant test levels without the local development build flag", () => {
+    const store = createStore({ storage: null });
     expect(Object.values(store.getLobbyState().roleProgress).every(role => role.level === 0)).toBe(true);
   });
 

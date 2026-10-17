@@ -8825,11 +8825,19 @@ button[data-card-icon-action]:focus-visible {
 }
 
 .talent-panel .talent-item-row[data-talent-item-id="reading-growth"] .talent-item-metrics,
-.talent-panel .talent-item-row[data-talent-item-id="errand-growth"] .talent-item-metrics,
 .talent-panel .talent-item-row[data-talent-item-id="game-growth"] .talent-item-metrics,
 .talent-panel .talent-item-row[data-talent-item-id="badminton-growth"] .talent-item-metrics,
 .talent-panel .talent-item-row[data-talent-item-id="poker-growth"] .talent-item-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.talent-panel .talent-item-row[data-talent-item-id="paper-mastery"] {
+  gap: 5px;
+}
+
+.talent-panel .talent-item-row[data-talent-item-id="paper-mastery"] .talent-item-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex-shrink: 0;
 }
 
 .talent-panel .talent-item-row[data-talent-item-id="chair"] .talent-item-metrics,

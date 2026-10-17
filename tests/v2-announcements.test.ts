@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 4).map((entry) => entry.date)).toEqual(["2026-10-17", "2026-10-16", "2026-10-13", "2026-10-10"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 5).map((entry) => entry.date)).toEqual(["2026-10-18", "2026-10-17", "2026-10-16", "2026-10-13", "2026-10-10"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -16,19 +16,21 @@ describe("game announcements", () => {
       expect(html).toContain('data-announcement-toggle');
       for (const change of entry.changes) expect(html).toContain(change.title);
     }
-    const release = GAME_ANNOUNCEMENTS[0]!.changes.map((change) => `${change.title}：${change.description}`).join("\n");
+    const mastery = GAME_ANNOUNCEMENTS[0]!.changes.map((change) => `${change.title}：${change.description}`).join("\n");
+    for (const text of ["论文熟手", "一作", "顺序循环", "永久+1分", "50%", "移除跑腿熟手"]) expect(mastery).toContain(text);
+    const release = GAME_ANNOUNCEMENTS[1]!.changes.map((change) => `${change.title}：${change.description}`).join("\n");
     for (const text of ["轮回者正式实装", "24个不同成就", "结算并返回", "个人历史", "慢科研", "求职不易", "3A", "5A", "协作奖励被覆盖"]) expect(release).toContain(text);
     for (const text of ["统御者", "普通行动点为0", "开局锁定", "四类诅咒", "正式结算", "调试局不计", "厌倦学习", "经验倍率+0.2", "存档"]) expect(release).toContain(text);
-    const newest = GAME_ANNOUNCEMENTS[1]!.changes.map((change) => `${change.title}：${change.description}`).join("\n");
+    const newest = GAME_ANNOUNCEMENTS[2]!.changes.map((change) => `${change.title}：${change.description}`).join("\n");
     for (const text of ["六位正位与六位逆位", "184", "70个月度存档", "结算并返回", "按玩家去重", "当前浏览器", "窄屏布局"]) {
       expect(newest).toContain(text);
     }
-    const ending = GAME_ANNOUNCEMENTS[2]!.changes.map((change) => change.description).join("\n");
+    const ending = GAME_ANNOUNCEMENTS[3]!.changes.map((change) => change.description).join("\n");
     for (const text of ["最后一年每月", "四个方向", "面试经验", "Reviewer", "盲审", "离校属性", "花销记录"]) {
       expect(ending).toContain(text);
     }
     expect(ending).not.toMatch(/保留角色立绘|已点亮天赋|持有商品/);
-    const latest = GAME_ANNOUNCEMENTS[3]!.changes.map((change) => change.description).join("\n");
+    const latest = GAME_ANNOUNCEMENTS[4]!.changes.map((change) => change.description).join("\n");
     for (const text of ["混合抽4项", "混合抽5项", "不再保底", "固定姓名", "一作A类论文数", "邀请时引用", "社交传承", "0%／20%／40%／60%", "Reviewer", "VALSE", "独立展开"]) {
       expect(latest).toContain(text);
     }

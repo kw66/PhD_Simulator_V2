@@ -7,16 +7,17 @@ import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 afterEach(() => vi.restoreAllMocks());
 
 describe("debug next month across event stages", () => {
-  it.each(DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons))("advances past $label without applying its choices", ({ id }) => {
+  it.each(DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons))("advances past $label without applying its choices", ({ id, roleId }) => {
     vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.5);
-    const base = createStartedGameState("normal");
+    const base = createStartedGameState(roleId ?? "normal");
     let pending = dispatchAction({ ...base, year: 1, month: 6, totalMonths: 6,
       selectedAdvisorName: "测试导师", sanCap: 100, illnessProbability: 0,
       player: { ...base.player, san: 100, money: 1000, favor: 10, social: 15, research: 15 },
       advisorProgressState: { ...base.advisorProgressState, funding: 10000 },
       eventQueue: [], availableRandomEvents: [], pendingRandomEvents: [],
     }, "debug-trigger-event", { eventId: id });
-    const root = pending.eventQueue.find((event) => event.replayContext?.debugEventId === id);
+    const root = pending.eventQueue.find((event) => event.replayContext?.debugEventId === id
+      || (id === "rewinder-year" && event.rewinderPresentation));
     expect(root).toBeDefined();
     for (let stage = 0; stage < 3; stage += 1) {
       const current = pending.eventQueue.find((event) => event.chainId === root!.chainId);

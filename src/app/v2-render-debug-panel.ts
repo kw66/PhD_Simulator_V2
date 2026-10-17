@@ -8,8 +8,8 @@ function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
-function button(label: string, action: string, attributes: Record<string, string | number> = {}): string {
-  return `<button type="button" data-action="${action}" ${Object.entries(attributes).map(([key, value]) => `data-${key}="${escapeHtml(String(value))}"`).join(" ")}>${escapeHtml(label)}</button>`;
+function button(label: string, action: string, attributes: Record<string, string | number> = {}, disabled = false): string {
+  return `<button type="button" data-action="${action}" ${Object.entries(attributes).map(([key, value]) => `data-${key}="${escapeHtml(String(value))}"`).join(" ")}${disabled ? ' disabled aria-disabled="true"' : ""}>${escapeHtml(label)}</button>`;
 }
 
 export type DebugConnectionStatus = "connecting" | "disconnected" | "closed" | "unavailable";
@@ -79,7 +79,9 @@ export function renderDebugPanel(state: GameState | null, connected: boolean, co
       </section>
       <section class="debug-popup-card debug-popup-events" aria-label="事件触发">
         <h2>🔔 事件触发 <span>待处理 ${state?.eventQueue.length ?? 0}</span></h2>
-        ${DEBUG_EVENT_GROUPS.map((group) => `<section class="debug-popup-event-group"><div class="debug-popup-event-buttons debug-popup-buttons"><h3>${escapeHtml(group.title)}</h3>${group.buttons.map((item) => button(`${item.label}${DEBUG_COMPLETED_EVENT_IDS.includes(item.id as typeof DEBUG_COMPLETED_EVENT_IDS[number]) ? " ✓" : ""}`, "debug-trigger-event", { "event-id": item.id })).join("")}</div></section>`).join("")}
+        ${DEBUG_EVENT_GROUPS.map((group) => `<section class="debug-popup-event-group"><div class="debug-popup-event-buttons debug-popup-buttons"><h3>${escapeHtml(group.title)}</h3>${group.buttons.map((item) => button(`${item.label}${DEBUG_COMPLETED_EVENT_IDS.includes(item.id as typeof DEBUG_COMPLETED_EVENT_IDS[number]) ? " ✓" : ""}`, "debug-trigger-event", { "event-id": item.id,
+          ...(item.description ? { "card-tooltip": "", tooltip: item.description } : {}),
+        }, item.roleId !== undefined && state?.selectedRoleId !== item.roleId)).join("")}</div></section>`).join("")}
       </section>
     </fieldset>
     <fieldset class="debug-popup-tools debug-popup-endings" ${connected && state && state.phase !== "setup" ? "" : "disabled"}>

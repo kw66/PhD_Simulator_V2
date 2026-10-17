@@ -268,14 +268,14 @@ describe("event choice immediate ending risk", () => {
     expect(risk({ ...state(), phase: "finished" }, event({ san: -100 }))).toBeNull();
   });
 
-  it("classifies teachers errands from both actual branches and current errand probability", () => {
+  it("keeps teachers errands a possible risk regardless of completed errand count", () => {
     const current = state();
     current.player.san = 0;
     const pending = event({ fixedEventResolution: { kind: "teachers-day-message" } }, "act2");
     pending.chainId = "teachers-day";
     expect(risk(current, pending)).toBe("possible");
     current.eventCounters.teachersDayErrandCount = 6;
-    expect(risk(current, pending)).toBe("certain");
+    expect(risk(current, pending)).toBe("possible");
     current.player.favor = 6;
     expect(risk(current, pending)).toBeNull();
   });

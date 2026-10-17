@@ -758,11 +758,11 @@ describe("minimal game engine", () => {
   });
 
   it("makes every debug event button observable when paper prerequisites are met", () => {
-    const eventIds = DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons.map((button) => button.id));
+    const buttons = DEBUG_EVENT_GROUPS.flatMap((group) => group.buttons);
 
-    for (const eventId of eventIds) {
+    for (const { id: eventId, roleId } of buttons) {
       const paper = { ...createDraftPaper(0, 0, () => 0), idea: 4, experiment: 4, writing: 4 };
-      const state = { ...startGame(), eventQueue: [], papers: [paper] };
+      const state = { ...startGame(), ...(roleId ? { selectedRoleId: roleId } : {}), eventQueue: [], papers: [paper] };
       const next = dispatchAction(state, "debug-trigger-event", { eventId });
       expect(next, eventId).not.toEqual(state);
       expect(next.log[0]?.text ?? "", eventId).not.toMatch(/失败|无法生成/u);

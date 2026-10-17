@@ -6786,12 +6786,11 @@ describe("v2 render lobby shell", () => {
       expect(card).toContain(name);
       expect(card).toContain(`<strong>${value}</strong>`);
       expect(card).toContain("data-ui-game-growth-page");
-      const errand = getTalentCardHtml(full, "errand-growth");
-      expect(errand).toContain("60%");
-      expect(errand).toContain("2 次");
-      expect(errand).toContain("每次跑腿，概率+10个百分点，最高100%");
-      expect(errand).toContain("熟练度");
-      expect(errand).not.toContain("教师节发祝福且导师好感&lt;6时生效");
+      const paperMastery = getTalentCardHtml(full, "paper-mastery");
+      expect(paperMastery).toContain("论文熟手");
+      expect(paperMastery).toContain("下一篇一作：永久想idea +1分");
+      expect(full).not.toContain("errand-growth");
+      expect(full).not.toContain("跑腿熟手");
     }
   });
 

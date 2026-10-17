@@ -69,7 +69,7 @@ describe("rewinder attribute and growth inheritance", () => {
     expect(applyReadingCountProgress(applyRewinderGrowth(current, roundCount), 1).researchGain).toBe(0);
   });
 
-  it("keeps only permitted experience, excluding cash, items, buffs, training reward and active internship", () => {
+  it("inherits growth without importing past meetings, internships, training or their rewards", () => {
     const past = rewinder();
     past.player.money = 999;
     past.shopState.keyboardOwned = true;
@@ -79,6 +79,8 @@ describe("rewinder attribute and growth inheritance", () => {
     past.eventCounters.pokerCount = 8;
     past.eventCounters.pokerProfit = 99;
     past.eventCounters.domesticMeetingCount = 6;
+    past.eventCounters.asiaMeetingCount = 1;
+    past.eventCounters.westMeetingCount = 1;
     past.eventCounters.meetingCount = 8;
     past.internshipCount = 3;
     past.internshipState = { ...past.internshipState, active: true, remainingMonths: 3 };
@@ -88,15 +90,27 @@ describe("rewinder attribute and growth inheritance", () => {
     const current = rewinder();
     current.buffs = [{ id: "current", name: "current", source: "current", remainingMonths: 2, timing: "monthly" }];
     const restored = applyRewinderGrowth(current, captureRewinderGrowth(past));
-    expect(restored.eventCounters).toMatchObject({ pokerCount: 8, pokerProfit: 0, domesticMeetingCount: 6, meetingCount: 8 });
-    expect(restored.internshipCount).toBe(3);
-    expect(restored.conferenceCareerState.hasInternshipExperience).toBe(true);
-    expect(restored.conferenceEncounterState.bigBullCooperation).toBe(true);
+    expect(restored.eventCounters).toMatchObject({ pokerCount: 8, pokerProfit: 0, domesticMeetingCount: 0, asiaMeetingCount: 0, westMeetingCount: 0, meetingCount: 0 });
+    expect(restored.internshipCount).toBe(0);
+    expect(restored.conferenceCareerState.hasInternshipExperience).not.toBe(true);
+    expect(restored.conferenceEncounterState.bigBullCooperation).not.toBe(true);
     expect(restored.conferenceEncounterState.jointTrainingReward).toBeUndefined();
     for (const key of ["shopState", "coffeeState", "eventSupport", "internshipState", "buffs", "papers", "externalPublications", "publicationTalentState", "achievementProgress"] as const) {
       expect(restored[key]).toEqual(current[key]);
     }
     expect(restored.player.money).toBe(current.player.money);
+    // This life's actual experiences remain intact when growth is restored.
+    current.eventCounters = { ...current.eventCounters, meetingCount: 5, domesticMeetingCount: 1, asiaMeetingCount: 2, westMeetingCount: 2 };
+    current.internshipCount = 1;
+    current.conferenceCareerState.hasInternshipExperience = true;
+    current.conferenceEncounterState.bigBullCooperation = true;
+    const experienced = applyRewinderGrowth(current, captureRewinderGrowth(past));
+    for (const key of ["meetingCount", "domesticMeetingCount", "asiaMeetingCount", "westMeetingCount"] as const) {
+      expect(experienced.eventCounters[key]).toBe(current.eventCounters[key]);
+    }
+    for (const key of ["internshipCount", "conferenceCareerState", "conferenceEncounterState"] as const) {
+      expect(experienced[key]).toEqual(current[key]);
+    }
   });
 
   it("does not alter other characters or consume random state", () => {

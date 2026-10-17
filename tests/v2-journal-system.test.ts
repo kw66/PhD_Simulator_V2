@@ -41,9 +41,12 @@ describe("v2 journal system", () => {
     const paper = { ...createDraftPaper(1, 0), idea: 10, experiment: 100, writing: 15,
       collaborationScores: { idea: 5, experiment: 20, writing: 5 } };
     const sent = submitJournalPaper({ ...base, papers: [paper] }, paper.id, "pami");
+    expect(sent.paperMasteryState).toBeUndefined();
     const next = submitJournalPaper(sent, paper.id, "pami");
     expect(next.externalPublications[0]?.publication).toMatchObject({ effectiveScore: 125 });
     expect(next.totalResearchScore).toBe(base.totalResearchScore + 5);
+    expect(next.paperMasteryState).toEqual({ count: 1, rewardedPaperIds: [paper.id] });
+    expect(next.buffs.find(buff => buff.id === "paper-mastery")?.actionEffects?.idea?.bonus).toBe(1);
   });
 
   it("keeps all three components required before submission even when the total reaches the threshold", () => {

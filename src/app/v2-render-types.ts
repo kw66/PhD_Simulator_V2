@@ -2,6 +2,7 @@ import type { AccountProfile, CoffeeMachineUpgradeId, RoleExperienceAward, ShopU
 import type { TalentAllocation } from "../core/v2-role-talent-definitions";
 import type { RunSaveSummary } from "../core/v2-run-saves";
 import type { ShopTabId } from "./v2-render-shop-panel";
+import type { RewinderAct } from "./v2-render-rewinder-event";
 
 export type PlayTabId = "events" | "workstation" | "relationship" | "shop" | "research" | "talent" | "settings";
 export type RoleRailViewId = "achievements" | "messages" | "announcements";
@@ -35,6 +36,7 @@ export interface PlayRenderUiState {
   activeEventId?: string | null;
   activeEventHistoryId?: string | null;
   activeEventHistoryIndex?: number | null;
+  activeRewinderAct?: RewinderAct;
   activeLogPage?: number | null;
   isSanChartOpen?: boolean;
   activePendingPage?: number | null;

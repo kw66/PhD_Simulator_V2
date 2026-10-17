@@ -46,6 +46,9 @@ import { renderCaptainTags } from "./v2-render-captain-tags";
 import { renderRewinderPreview } from "./v2-render-rewinder";
 import { getSelectedCurseDifficulty, getUnlockedCurseDifficulty } from "../core/v2-curse-progress";
 import { isCursedRole } from "../core/v2-curse-system";
+import { ENABLE_LOCAL_PLAYGROUND } from "../core/v2-development-flags";
+import { renderLobbyPortrait } from "./v2-lobby-portrait";
+import "../styles/lobby-profile-layout.css";
 
 const SPECIAL_ROLE_IDS = new Set<RoleId>(["rewinder", "research-captain"]);
 const CURSED_ROLE_IDS = new Set<RoleId>(["cursed-frail", "cursed-debt", "special-finite-life", "special-fading-genius"]);
@@ -307,6 +310,8 @@ function renderGrowthProgress(
   const expTarget = pointSummary.nextExp;
   const usesTalentPoints = !SPECIAL_ROLE_IDS.has(viewModel.role.id) && !isCursedRole(viewModel.role.id);
   const passiveLevelHint = isCursedRole(viewModel.role.id) ? "选择已解锁的诅咒难度，无需加点" : "";
+  const passiveTalentHint = viewModel.role.id === "research-captain" ? "标签等级跟随对应基础角色等级"
+    : viewModel.role.id === "rewinder" ? "每学年末继承往世积累" : "选择已解锁的诅咒难度";
   const levelTooltip = usesTalentPoints ? `每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点` : passiveLevelHint;
   const expProgressPercent = expTarget === null
     ? 100
@@ -330,7 +335,7 @@ function renderGrowthProgress(
             <span class="lobby-talent-points-hint" role="note" tabindex="0" aria-label="天赋点${pointSummary.availablePoints}，每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点。" data-tooltip="每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点，用于解锁天赋。">天赋点 <strong class="lobby-talent-points-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</strong></span>
             <button class="lobby-talent-reset-button" type="button" data-ui-talent-reset="${viewModel.role.id}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置天赋点"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span></button>
           </div>
-        </div>` : ""}
+        </div>` : `<div class="lobby-growth-exp-detail-row"><span class="lobby-talent-passive-hint" role="note" tabindex="0" data-tooltip="${passiveTalentHint}">无需加点</span></div>`}
       </div>
       <div class="lobby-growth-exp-row">
         <span class="lobby-growth-inline-label lobby-growth-exp-label" role="note" tabindex="0" aria-label="经验，每局增加科研分乘经验倍率的经验。" data-tooltip="每局增加科研分✖经验倍率的经验。">经验</span>
@@ -612,18 +617,7 @@ function renderSelectedRoleDetail(
       <section class="lobby-profile-card${viewModel.unlockState.owned ? " is-owned" : " is-locked"}">
         <div class="lobby-profile-main">
           <section class="lobby-profile-top">
-            <div class="lobby-profile-art">
-              <img
-                class="lobby-profile-portrait"
-                src="${escapeHtml(getRoleDetailPortraitUrl(viewModel.role.id))}"
-                width="432"
-                height="774"
-                loading="eager"
-                decoding="async"
-                fetchpriority="high"
-                alt="${escapeHtml(`${viewModel.role.name}立绘`)}"
-              />
-            </div>
+            ${renderLobbyPortrait(getRoleDetailPortraitUrl(viewModel.role.id), viewModel.role.name)}
             ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading, roleHistoryPageIndex)}
           </section>
           ${selectedRoleId === "rewinder" ? renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 3) : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
@@ -663,7 +657,7 @@ export function renderSetupScreen(
                   <div class="lobby-panel-header">
                     <div class="lobby-panel-title-block">
                       <h2><i data-lucide="book-open" aria-hidden="true"></i>角色图鉴</h2>
-                      <span class="lobby-role-owned-count lobby-meta-count">已收录 ${ownedCount} / ${getRoleOptions().length}</span>
+                      <span class="lobby-role-owned-count lobby-meta-count">已收录 ${ownedCount} / ${getRoleOptions().length}${ENABLE_LOCAL_PLAYGROUND ? ' · <span data-local-playground title="全角色满级、诅咒全难度解锁；独立测试存档，不上传数据">本地测试</span>' : ""}</span>
                     </div>
                     <div class="lobby-panel-header-meta">
                       ${renderRolePager(accountProfile)}

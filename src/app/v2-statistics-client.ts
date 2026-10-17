@@ -1,6 +1,7 @@
 import { getRoleOptions } from "../core/v2-progression";
 import { DATA_EPOCH, isCurrentDataEpoch } from "../core/v2-data-epoch";
 import { validStatisticsContext } from "./v2-statistics-context";
+import { isRemoteWriteEnabled } from "./v2-remote-access";
 
 export const STATISTICS_CACHE_MS = 10 * 60_000;
 export const ACTIVITY_RETENTION_DAYS = 30;
@@ -143,7 +144,7 @@ function validPayload(kind: StatisticsKind, value: unknown): value is Payload {
 
 export function createStatisticsClient(options: StatisticsClientOptions = {}): StatisticsClient {
   const enabled = options.enabled !== false;
-  const uploadEnabled = enabled && options.uploadEnabled !== false;
+  const uploadEnabled = enabled && (options.uploadEnabled ?? (options.fetch !== undefined || isRemoteWriteEnabled()));
   const storage = options.storage === undefined ? browserStorage() : options.storage;
   const request = options.fetch ?? globalThis.fetch.bind(globalThis);
   const cache = new Map<string, CachedStats>();

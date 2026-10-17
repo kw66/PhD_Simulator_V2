@@ -1,5 +1,5 @@
-export const CURRENT_GAMEPLAY_RULESET = "20261017-r6";
-export const SUPPORTED_GAMEPLAY_RULESETS = ["20261016-r1", "20261017-r2", "20261017-r3", "20261017-r4", "20261017-r5", CURRENT_GAMEPLAY_RULESET] as const;
+export const CURRENT_GAMEPLAY_RULESET = "20261018-r7";
+export const SUPPORTED_GAMEPLAY_RULESETS = ["20261016-r1", "20261017-r2", "20261017-r3", "20261017-r4", "20261017-r5", "20261017-r6", CURRENT_GAMEPLAY_RULESET] as const;
 export type GameplayRuleset = typeof SUPPORTED_GAMEPLAY_RULESETS[number];
 let replayRuleset: GameplayRuleset | undefined;
 

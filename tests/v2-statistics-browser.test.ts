@@ -26,7 +26,7 @@ describe("statistics requests through the game UI", () => {
         if (path.endsWith("/src/app/v2-bootstrap.ts")) return code
           .replace("const store = createStore();", "const statisticsSaves = createRunSaveRepository(); const store = createStore({ saves: statisticsSaves }); window.statisticsStore = store; window.statisticsSaves = statisticsSaves;")
           .replace('import { createStore }', 'import { createRunSaveRepository } from "../core/v2-run-saves";\nimport { createStore }')
-          .replace('const statisticsUploadEnabled = import.meta.env.PROD && window.location.protocol === "https:";', "const statisticsUploadEnabled = true;");
+          .replace('const statisticsUploadEnabled = isRemoteWriteEnabled();', "const statisticsUploadEnabled = true;");
       },
     }] });
     await server.listen();

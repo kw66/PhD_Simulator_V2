@@ -1,4 +1,5 @@
-import { captureRewinderGrowth, mergeRewinderGrowth, applyRewinderGrowth, REWINDER_ATTRIBUTE_KEYS, REWINDER_GROWTH_COUNTER_KEYS } from "./v2-rewinder-growth";
+import { captureRewinderGrowth, mergeRewinderGrowth, applyRewinderGrowth, REWINDER_ATTRIBUTE_KEYS, getRewinderGrowthCounterKeys } from "./v2-rewinder-growth";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { captureRewinderRelationships, mergeRewinderRelationships, applyRewinderAdvisor, restoreRewinderRelationship, isRewinderRelationshipsSnapshot } from "./v2-rewinder-relationships";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { getEffectiveSocial } from "./v2-effective-attributes";
@@ -22,15 +23,20 @@ export function normalizeRewinderArchive(value: unknown): RewinderArchive {
     const record = value.years[year];
     if (!object(record) || !object(record.growth) || !object(record.growth.attributes) || !object(record.growth.growth)
       || !isRewinderRelationshipsSnapshot(record.relationships)) continue;
-    const { attributes, growth } = record.growth;
+    const { attributes } = record.growth;
+    const modernGrowth = usesGameplayRulesFrom("20261018-r7");
+    const counterKeys = getRewinderGrowthCounterKeys();
+    const growth: Record<string, unknown> = modernGrowth
+      ? { ...record.growth.growth, paperMasteryCount: record.growth.growth.paperMasteryCount ?? 0 } : record.growth.growth;
     if (!REWINDER_ATTRIBUTE_KEYS.every(key => validNumber(attributes[key]))
-      || !REWINDER_GROWTH_COUNTER_KEYS.every(key => validNumber(growth[key]) && Number.isSafeInteger(growth[key]))
-      || typeof growth.hasInternshipExperience !== "boolean" || typeof growth.hasJointTrainingExperience !== "boolean") continue;
+      || !counterKeys.every(key => validNumber(growth[key]) && Number.isSafeInteger(growth[key]))
+      || (!modernGrowth && (typeof growth.hasInternshipExperience !== "boolean" || typeof growth.hasJointTrainingExperience !== "boolean"))) continue;
     archive.years[year] = {
       growth: {
         attributes: Object.fromEntries(REWINDER_ATTRIBUTE_KEYS.map(key => [key, attributes[key]])) as RewinderYearRecord["growth"]["attributes"],
-        growth: { ...Object.fromEntries(REWINDER_GROWTH_COUNTER_KEYS.map(key => [key, growth[key]])),
-          hasInternshipExperience: growth.hasInternshipExperience, hasJointTrainingExperience: growth.hasJointTrainingExperience } as RewinderYearRecord["growth"]["growth"],
+        growth: { ...Object.fromEntries(counterKeys.map(key => [key, growth[key]])), ...(!modernGrowth ? {
+          hasInternshipExperience: growth.hasInternshipExperience, hasJointTrainingExperience: growth.hasJointTrainingExperience,
+        } : {}) } as RewinderYearRecord["growth"]["growth"],
       },
       relationships: structuredClone(record.relationships),
     };

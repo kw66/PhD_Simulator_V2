@@ -1,0 +1,126 @@
+/* The selected illustration is framed independently from the small role picker. */
+.lobby-page .lobby-profile-art > .lobby-portrait-card {
+  --portrait-frame-width: 4px;
+  --portrait-image-height: 346px;
+  position: relative;
+  isolation: isolate;
+  display: block;
+  justify-self: center;
+  box-sizing: content-box;
+  width: min(calc(100% - 2 * var(--portrait-frame-width)), calc(var(--portrait-image-height) * 432 / 774));
+  margin: 0;
+  padding: 0;
+  border: var(--portrait-frame-width) solid #eee1c4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #e5d7b7;
+  color: inherit;
+  box-shadow: 0 0 0 1px rgba(136, 111, 63, .43), 0 5px 12px rgba(40, 47, 36, .18);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: center 65%;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.lobby-page .lobby-profile-art > .lobby-portrait-card > .lobby-profile-portrait {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  aspect-ratio: 432 / 774;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 5px;
+  user-select: none;
+}
+
+.lobby-page .lobby-portrait-card::before,
+.lobby-page .lobby-portrait-card::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.lobby-page .lobby-portrait-card::before {
+  inset: 1px;
+  border: 1px solid rgba(255, 248, 224, .47);
+  border-radius: 5px;
+}
+
+.lobby-page .lobby-portrait-card::after {
+  inset: -20% -80%;
+  background: linear-gradient(112deg, transparent 39%, rgba(255, 249, 224, .24) 48%, rgba(255, 255, 244, .42) 50%, rgba(255, 249, 224, .16) 53%, transparent 62%);
+  opacity: 0;
+  transform: translateX(-60%);
+}
+
+.lobby-page .lobby-profile-art > .lobby-portrait-card:focus-visible {
+  outline: 2px solid var(--accent-deep);
+  outline-offset: 4px;
+  border-color: #f8e8bd;
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .lobby-page .lobby-profile-art > .lobby-portrait-card:hover {
+    transform: translateY(-2px) rotate(-.65deg);
+    border-color: #f7e8c9;
+    box-shadow: 0 0 0 1px rgba(147, 115, 54, .6), 0 8px 17px rgba(40, 47, 36, .22);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lobby-page .lobby-profile-art > .lobby-portrait-card:active {
+    transform: translateY(1px) rotate(.35deg);
+    box-shadow: 0 0 0 1px rgba(136, 111, 63, .55), 0 3px 8px rgba(40, 47, 36, .17);
+  }
+}
+
+.lobby-page .lobby-portrait-card.is-shimmer-a::after {
+  animation: lobby-portrait-sheen-a 650ms ease-out;
+}
+
+.lobby-page .lobby-portrait-card.is-shimmer-b::after {
+  animation: lobby-portrait-sheen-b 650ms ease-out;
+}
+
+@keyframes lobby-portrait-sheen-a {
+  0% { opacity: 0; transform: translateX(-60%); }
+  18% { opacity: .8; }
+  80% { opacity: .5; }
+  100% { opacity: 0; transform: translateX(60%); }
+}
+
+@keyframes lobby-portrait-sheen-b {
+  0% { opacity: 0; transform: translateX(-60%); }
+  18% { opacity: .8; }
+  80% { opacity: .5; }
+  100% { opacity: 0; transform: translateX(60%); }
+}
+
+@media (max-width: 820px) {
+  .lobby-page .lobby-profile-art > .lobby-portrait-card {
+    --portrait-frame-width: 3px;
+    --portrait-image-height: 162px;
+    border-radius: 7px;
+    box-shadow: 0 0 0 1px rgba(136, 111, 63, .4), 0 3px 8px rgba(40, 47, 36, .17);
+  }
+
+  .lobby-page .lobby-profile-art > .lobby-portrait-card > .lobby-profile-portrait {
+    width: 100%;
+    max-height: none;
+    border-radius: 3px;
+  }
+
+  .lobby-page .lobby-portrait-card::before { border-radius: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-page .lobby-profile-art > .lobby-portrait-card {
+    transition: none;
+    transform: none;
+  }
+
+  .lobby-page .lobby-portrait-card::after { animation: none; }
+}

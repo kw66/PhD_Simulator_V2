@@ -37,6 +37,7 @@ import { refreshLoverDevelopmentEvent } from "./v2-lover-events";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
 import { hasRecruitLeft } from "./v2-recruitment-eligibility";
+import { applyPaperMastery } from "./v2-paper-mastery";
 import type {
   DeferredEventStatePatch,
   EventChoice,
@@ -49,6 +50,19 @@ import type {
 interface EventResolutionCallbacks {
   evaluateImmediateEndings: (state: GameState) => GameState;
   runPostQueuePipeline: (state: GameState) => GameState;
+}
+
+function getPublishedFirstAuthorPaperIds(state: GameState): Set<string> {
+  return new Set([...state.papers, ...state.externalPublications]
+    .filter((paper) => paper.status === "published"
+      && paper.nonFirstAuthor !== true
+      && (!paper.leadAuthorId || paper.leadAuthorId === "player"))
+    .map((paper) => paper.id));
+}
+
+function hasNewPaperMasteryPublication(before: GameState, after: GameState): boolean {
+  const previous = getPublishedFirstAuthorPaperIds(before);
+  return [...getPublishedFirstAuthorPaperIds(after)].some((id) => !previous.has(id));
 }
 
 function buildCompletedEventLog(
@@ -670,6 +684,12 @@ export function applyQueuedEventEffects(
           ...remainingLogs.filter((entry) => previousLogIds.has(entry.id)),
         ],
       };
+    }
+
+    // Paper mastery is a final settlement reward. Intermediate scenes keep
+    // their deferred paper changes and cannot create buffs or talent logs.
+    if (hasNewPaperMasteryPublication(state, nextState)) {
+      nextState = applyPaperMastery(nextState);
     }
   }
   nextState = callbacks.evaluateImmediateEndings(nextState);

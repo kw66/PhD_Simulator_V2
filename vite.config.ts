@@ -10,8 +10,13 @@ function resolveBasePath(): string {
     : "/";
 }
 
-export default defineConfig({
+export default defineConfig(({ command, mode, isPreview }) => ({
   base: resolveBasePath(),
+  // Only a source development server can grant local test progression.
+  // Production builds (including --mode development) always compile this away.
+  define: {
+    __LOCAL_PLAYGROUND__: command === "serve" && !isPreview && mode !== "test",
+  },
   server: {
     host: LOCAL_HOST,
     port: LOCAL_PORT,
@@ -27,4 +32,4 @@ export default defineConfig({
     fileParallelism: process.env.CI !== "true",
     maxWorkers: 4,
   },
-});
+}));

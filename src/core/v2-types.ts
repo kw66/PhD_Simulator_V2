@@ -885,6 +885,7 @@ export interface GameState extends RandomEventState {
   eventCounters: EventCounters;
   scholarshipState: ScholarshipState;
   publicationTalentState?: PublicationTalentState;
+  paperMasteryState?: import("./v2-paper-mastery").PaperMasteryState;
   buffs: Buff[];
   player: PlayerStats;
   log: GameLogEntry[];

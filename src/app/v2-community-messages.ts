@@ -1,3 +1,5 @@
+import { isRemoteWriteEnabled } from "./v2-remote-access";
+
 export type MessageSource = "board" | "feedback";
 
 export interface CommunityMessage {
@@ -20,6 +22,7 @@ export const MESSAGE_MAX_LENGTH = 2000;
 const OWNERSHIP_KEY = "kwgame_v2_message_ownership";
 const PUBLIC_COLUMNS = "id,nickname,content,source,created_at,parent_id,is_deleted";
 const REPLY_FETCH_SIZE = 500;
+const READ_ONLY_NOTICE = "本地预览不上传数据；留言仅供查看，请到正式网站发送。";
 
 export function countMessageCharacters(value: string): number {
   return Array.from(value).length;
@@ -52,6 +55,7 @@ type MessageStatus = "idle" | "loading" | "ready" | "error";
 
 interface MessageOptions {
   fetch?: typeof fetch;
+  writeEnabled?: boolean;
   storage?: Pick<Storage, "getItem" | "setItem"> | null;
   onChange?: () => void;
 }
@@ -67,6 +71,7 @@ function browserStorage(): Storage | null {
 
 export function createCommunityMessages(options: MessageOptions = {}) {
   const request = options.fetch ?? globalThis.fetch.bind(globalThis);
+  const writeEnabled = options.writeEnabled ?? (options.fetch !== undefined || isRemoteWriteEnabled());
   const storage = options.storage === undefined ? browserStorage() : options.storage;
   let nickname = "";
   try {
@@ -216,6 +221,12 @@ export function createCommunityMessages(options: MessageOptions = {}) {
   };
 
   const submit = async (source: MessageSource): Promise<boolean> => {
+    if (!writeEnabled) {
+      noticeSource = source;
+      notice = READ_ONLY_NOTICE;
+      notify();
+      return false;
+    }
     if (submitting || savingEdit) return false;
     const target = replyTarget?.source === source ? replyTarget : null;
     const submittedNickname = nickname.trim();
@@ -290,6 +301,11 @@ export function createCommunityMessages(options: MessageOptions = {}) {
   };
 
   const saveEdit = async (): Promise<boolean> => {
+    if (!writeEnabled) {
+      editNotice = READ_ONLY_NOTICE;
+      notify();
+      return false;
+    }
     if (!editTarget || savingEdit || submitting) return false;
     const target = editTarget;
     const content = editContent.trim();
@@ -336,6 +352,11 @@ export function createCommunityMessages(options: MessageOptions = {}) {
   };
 
   const deleteMessage = async (id: number): Promise<boolean> => {
+    if (!writeEnabled) {
+      messageNotice = { id, text: READ_ONLY_NOTICE };
+      notify();
+      return false;
+    }
     if (deletingMessageId !== null || savingEdit || submitting) return false;
     ownership = readOwnership(storage);
     const message = [...messages, ...replies].find((entry) => entry.id === id);
@@ -378,7 +399,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     saveEdit,
     deleteMessage,
     openEdit(id: number, source: MessageSource = "board"): void {
-      if (savingEdit || submitting || editTarget) return;
+      if (!writeEnabled || savingEdit || submitting || editTarget) return;
       ownership = readOwnership(storage);
       const message = [...messages, ...replies].find((entry) => entry.id === id);
       if (!message || message.is_deleted || !ownership?.ids.includes(id)) return;
@@ -405,7 +426,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
       notify();
     },
     openReply(id: number, source: MessageSource = "board"): void {
-      if (submitting) return;
+      if (!writeEnabled || submitting) return;
       const target = [...messages, ...replies].find((message) => message.id === id);
       if (!target || target.is_deleted) return;
       const parent = target.parent_id === null
@@ -440,6 +461,7 @@ export function createCommunityMessages(options: MessageOptions = {}) {
     },
     snapshot() {
       return {
+        writeEnabled,
         nickname,
         contents: { ...contents },
         messages: [...messages],
@@ -524,14 +546,14 @@ function createMessageBody(message: CommunityMessage, state: CommunityMessageSta
       edit.className = "community-edit-button";
       edit.dataset.communityEdit = String(message.id);
       edit.textContent = "编辑";
-      edit.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null;
+      edit.disabled = !state.writeEnabled || state.editTarget !== null || state.savingEdit || state.submitting !== null;
       actions.append(edit);
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "community-delete-button";
       remove.dataset.communityDelete = String(message.id);
       remove.textContent = state.deletingMessageId === message.id ? "删除中…" : "删除";
-      remove.disabled = state.editTarget !== null || state.savingEdit || state.submitting !== null || state.deletingMessageId !== null;
+      remove.disabled = !state.writeEnabled || state.editTarget !== null || state.savingEdit || state.submitting !== null || state.deletingMessageId !== null;
       actions.append(remove);
       if (state.messageNotice?.id === message.id) {
         const notice = document.createElement("span");
@@ -547,7 +569,7 @@ function createMessageBody(message: CommunityMessage, state: CommunityMessageSta
       reply.className = "community-reply-to-button";
       reply.dataset.communityReplyTo = String(message.id);
       reply.textContent = "回复";
-      reply.disabled = state.submitting !== null || state.savingEdit || state.deletingMessageId !== null;
+      reply.disabled = !state.writeEnabled || state.submitting !== null || state.savingEdit || state.deletingMessageId !== null;
       actions.append(reply);
     }
     header.append(actions);
@@ -601,6 +623,7 @@ function createMessageItem(message: CommunityMessage, replies: CommunityMessage[
     const replyButton = document.createElement("button");
     replyButton.type = "button";
     replyButton.dataset.communityReplyTo = String(message.id);
+    replyButton.disabled = !state.writeEnabled;
     const replyIcon = document.createElement("i");
     replyIcon.dataset.lucide = "reply";
     replyIcon.setAttribute("aria-hidden", "true");
@@ -643,7 +666,7 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
       input.value = state.nickname;
       input.removeAttribute("maxlength");
       input.setAttribute("aria-invalid", String(countMessageCharacters(state.nickname.trim()) > NICKNAME_MAX_LENGTH));
-      input.disabled = state.submitting === source;
+      input.disabled = !state.writeEnabled || state.submitting === source;
     });
     root.querySelectorAll<HTMLElement>(`[data-community-nickname-count="${source}"]`).forEach((target) => {
       target.textContent = `${countMessageCharacters(state.nickname)}/${NICKNAME_MAX_LENGTH}`;
@@ -652,7 +675,7 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
       input.value = state.contents[source];
       input.removeAttribute("maxlength");
       input.setAttribute("aria-invalid", String(countMessageCharacters(state.contents[source].trim()) > MESSAGE_MAX_LENGTH));
-      input.disabled = state.submitting === source;
+      input.disabled = !state.writeEnabled || state.submitting === source;
       input.placeholder = state.replyTarget?.source === source
         ? `回复 ${state.replyTarget.nickname}` : "说点什么吧";
     });
@@ -660,12 +683,12 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
       target.textContent = `${countMessageCharacters(state.contents[source])}/${MESSAGE_MAX_LENGTH}`;
     });
     root.querySelectorAll<HTMLButtonElement>(`button[data-community-send="${source}"]`).forEach((button) => {
-      button.disabled = state.submitting !== null || state.savingEdit;
+      button.disabled = !state.writeEnabled || state.submitting !== null || state.savingEdit;
       const label = button.querySelector("span");
       if (label) label.textContent = state.replyTarget?.source === source ? "回复" : "发送";
     });
     root.querySelectorAll<HTMLElement>(`[data-community-notice="${source}"]`).forEach((target) => {
-      target.textContent = state.noticeSource === source ? state.notice : "";
+      target.textContent = !state.writeEnabled ? READ_ONLY_NOTICE : state.noticeSource === source ? state.notice : "";
     });
   }
   root.querySelectorAll<HTMLButtonElement>("button[data-community-cancel-reply]").forEach((button) => {

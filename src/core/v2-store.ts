@@ -14,9 +14,10 @@ import { applyHelpRead, createRunReplay, replayStateDigest, verifyRunReplay, REP
 import { awardRoleExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
 import { recordRoleResult, recordRoleStart } from "./v2-role-records";
 import { getTalentUpgradeReason, isRoleTalentImplemented, sanitizeRoleTalentAllocation } from "./v2-role-talent-definitions";
-import { ENABLE_TALENT_TEST_MODE } from "./v2-development-flags";
+import { ENABLE_LOCAL_PLAYGROUND } from "./v2-development-flags";
 import { loadAccountProfile, saveAccountProfile, type ExperienceStorage, type FinalizedRunRecord } from "./v2-account-storage";
-import { createRunSaveRepository, type RunSaveRepository } from "./v2-run-saves";
+import { createRunSaveRepository, RUN_SAVE_DATABASE_NAME, type RunSaveRepository } from "./v2-run-saves";
+import { CURSED_ROLE_IDS } from "./v2-curse-system";
 import { collectRunStatistics } from "./v2-run-statistics";
 import { CAPTAIN_PREREQUISITE_ROLE_IDS } from "./v2-account-role-unlocks";
 import { getSelectedCurseDifficulty, selectCurseDifficulty } from "./v2-curse-progress";
@@ -45,11 +46,10 @@ function syncSetupSelection(state: GameState, selectedLobbyRoleId: DispatchPaylo
   };
 }
 
-function applyTalentTestMode(account: AccountProfile): AccountProfile {
-  if (!ENABLE_TALENT_TEST_MODE) return account;
+function applyLocalPlaygroundProgress(account: AccountProfile): AccountProfile {
+  if (!ENABLE_LOCAL_PLAYGROUND) return account;
   const roleProgress = { ...account.roleProgress };
   for (const roleId of Object.keys(roleProgress) as RoleId[]) {
-    if (!isRoleTalentImplemented(roleId)) continue;
     roleProgress[roleId] = {
       ...roleProgress[roleId],
       unlocked: true,
@@ -57,13 +57,21 @@ function applyTalentTestMode(account: AccountProfile): AccountProfile {
       exp: 0,
     };
   }
-  return { ...account, roleProgress };
+  const curseDifficultyUnlocked = { ...account.curseDifficultyUnlocked };
+  for (const roleId of CURSED_ROLE_IDS) curseDifficultyUnlocked[roleId] = 4;
+  return { ...account, roleProgress, curseDifficultyUnlocked };
 }
 
 export function createStore(options: { storage?: ExperienceStorage | null; saves?: RunSaveRepository } = {}) {
-  const storage = options.storage === undefined ? getBrowserStorage() : options.storage;
+  const browserStorage = options.storage === undefined ? getBrowserStorage() : options.storage;
+  // Keep test progression and crash-recovery journals apart from real accounts,
+  // including when a production preview later uses the same browser origin.
+  const storage: ExperienceStorage | null = browserStorage && ENABLE_LOCAL_PLAYGROUND ? {
+    getItem: key => browserStorage.getItem(`local_playground:${key}`),
+    setItem: (key, value) => browserStorage.setItem(`local_playground:${key}`, value),
+  } : browserStorage;
   const loadedAccount = loadAccountProfile(storage);
-  let accountProfile = loadedAccount.account;
+  let accountProfile = applyLocalPlaygroundProgress(loadedAccount.account);
   let settledRuns = loadedAccount.settledRuns;
   let finalizedOutbox = loadedAccount.finalizedOutbox;
   let state = syncSetupSelection(createInitialState(), accountProfile.selectedLobbyRoleId);
@@ -78,6 +86,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
   const listeners = new Set<Listener>();
   const finalizedListeners = new Set<(record: FinalizedRunRecord) => void>();
   const saves = options.saves ?? createRunSaveRepository({ storage,
+    databaseName: ENABLE_LOCAL_PLAYGROUND ? `${RUN_SAVE_DATABASE_NAME}_local_playground` : undefined,
     onError(error) { saveStatus = error.message; queueMicrotask(() => notify()); },
   });
   let endingAward: AccountProfile["lastRunExperience"];
@@ -307,12 +316,6 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     isCurrentRunDisqualified(): boolean { return runUsedDebugPanel || !!replay?.failed; },
     getReplayStatus() { return { failed: replay?.failed, actionCount: replay?.commands.length ?? 0,
       verifiedThrough: replay?.checkpoints.at(-1)?.index ?? 0 }; },
-    enableTalentTestMode(): void {
-      if (!ENABLE_TALENT_TEST_MODE) return;
-      accountProfile = applyTalentTestMode(accountProfile);
-      state = syncSetupSelection(state, accountProfile.selectedLobbyRoleId);
-      listeners.forEach((listener) => listener(state));
-    },
     subscribe(listener: Listener): () => void {
       listeners.add(listener);
       listener(state);

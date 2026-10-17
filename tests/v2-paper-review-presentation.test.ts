@@ -164,11 +164,11 @@ describe("paper review presentation", () => {
     const history = confirmed.eventHistory.find((entry) => entry.chainId === decision.eventQueue[0]!.chainId)!;
     expect(history.stages.at(-1)?.paperReviewPresentation).not.toHaveProperty("talentRewards");
     const triggers = confirmed.eventHistory.flatMap((entry) => entry.stages.flatMap((stage) => stage.talentTrigger ? [stage.talentTrigger] : []));
-    expect(triggers.map((trigger) => trigger.name)).toEqual(["研究之始", "初露锋芒", "越挫越勇"]);
+    expect(triggers.map((trigger) => trigger.name)).toEqual(["研究之始", "初露锋芒", "越挫越勇", "论文熟手"]);
     const historicalHtml = renderApp(confirmed, undefined, { activePlayTab: "events", activeEventHistoryId: history.id, isEventContentOpen: true });
     expect(historicalHtml).toContain("结算记录");
     expect(historicalHtml.match(/class="paper-review-settlement"[\s\S]*?<\/section>/)?.[0]).not.toContain("天赋");
-    const repeated = { ...state, publicationTalentState: confirmed.publicationTalentState };
+    const repeated = { ...state, publicationTalentState: confirmed.publicationTalentState, paperMasteryState: confirmed.paperMasteryState };
     expect(advance(advance(advance(repeated))).eventHistory.flatMap((entry) => entry.stages).some((stage) => stage.talentTrigger)).toBe(false);
   });
 

@@ -4,6 +4,7 @@ import { getRoleOptions } from "../core/v2-progression";
 import { getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import type { RoleId } from "../core/v2-types";
 import { DATA_EPOCH, isCurrentDataEpoch } from "../core/v2-data-epoch";
+import { isRemoteWriteEnabled } from "./v2-remote-access";
 
 export const ACHIEVEMENT_STATS_STORAGE_KEY = "phd_simulator_v2_achievement_stats_v2";
 const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
@@ -69,7 +70,7 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
   const request = options.fetch ?? globalThis.fetch;
   const now = options.now ?? Date.now;
   const enabled = options.enabled !== false;
-  const uploads = enabled && options.uploadEnabled !== false;
+  const uploads = enabled && (options.uploadEnabled ?? (options.fetch !== undefined || isRemoteWriteEnabled()));
   let snapshot: Snapshot | null = null;
   let fetchedAt = 0;
   let readRetryAt = 0;
