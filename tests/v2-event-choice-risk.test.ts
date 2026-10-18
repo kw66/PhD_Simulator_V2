@@ -10,6 +10,8 @@ import { applyFixedEventResolution } from "../src/core/v2-fixed-events";
 import { createConferenceDecisionAct1 } from "../src/core/v2-conference-events";
 import { createDraftPaper, prepareConferenceSubmission } from "../src/core/v2-paper-rules";
 import { PUBLICATION_TALENT_DEFINITIONS } from "../src/core/v2-publication-talent";
+import { createScholarshipEvent, resolveScholarshipApplication } from "../src/core/v2-fixed-events-scholarship";
+import { createImageMisuseBuff } from "../src/core/v2-academic-integrity";
 import type { EventChoice, FixedEventResolution, GameState, PaperReviewSettlement, PendingEvent } from "../src/core/v2-types";
 
 function state(): GameState {
@@ -345,6 +347,38 @@ describe("event choice immediate ending risk", () => {
       const pending = randomDecision(current, eventId, 0.999999);
       expect(getEventChoiceRisk(current, pending, pending.choices.find((choice) => choice.label === label)!)).toBe("certain");
     }
+  });
+
+  it.each(["eligible", "already-awarded", "disqualified"] as const)("uses only payable scholarship money for gold replacement: %s", eligibility => {
+    const current = state();
+    current.selectedRoleId = "rich";
+    current.month = 2;
+    current.totalMonths = 14;
+    current.totalResearchScore = 10;
+    current.player.san = 0;
+    current.player.money = 44;
+    current.roleTalents = { levels: { "gold-power-alpha": 1 }, initialized: true };
+    const root = createScholarshipEvent(current, () => 0);
+    const decision = root.choices[0]!.effects.enqueueEvents![0]!;
+    const application = decision.choices[0]!;
+    const result = resolveScholarshipApplication(current, application.effects.fixedEventResolution!, () => 0).enqueueEvents![0]!;
+    if (eligibility === "already-awarded") current.scholarshipState.lastAwardYear = current.year;
+    if (eligibility === "disqualified") current.buffs = [createImageMisuseBuff()];
+    const snapshot = structuredClone({ current, decision, result });
+    const expected = eligibility === "eligible" ? null : "certain";
+    expect(getEventChoiceRisk(current, decision, application)).toBe(expected);
+    // Existing scenes must also be safe to inspect before their next refresh.
+    expect(getEventChoiceRisk(current, result, result.choices[0]!)).toBe(expected);
+    const queued = createEventQueueItem(result, current.totalMonths);
+    const pending = { ...current, eventQueue: [queued] };
+    const refreshed = getResolvableQueuedEvent(pending, queued);
+    expect(getEventChoiceRisk(pending, refreshed, refreshed.choices[0]!)).toBe(expected);
+    if (expected) expect(refreshed.choices[0]!.outcome).not.toContain("金之力");
+    expect({ current, decision, result }).toEqual(snapshot);
+    const settled = dispatchAction(pending, "resolve-event", { eventId: queued.id, eventChoiceId: queued.choices[0]!.id });
+    expect(settled.player.san).toBe(expected ? -2 : 0);
+    expect(settled.player.money).toBe(expected ? 44 : 48);
+    expect(settled.phase).toBe(expected ? "finished" : "playing");
   });
 
   it("keeps state and event unchanged and never consumes RNG across repeated calls", () => {

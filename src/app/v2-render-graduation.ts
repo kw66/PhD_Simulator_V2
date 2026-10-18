@@ -18,6 +18,7 @@ import type { GameState, PendingEvent } from "../core/v2-types";
 import { animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
 import { getThesisGlobalStats } from "./v2-thesis-stats";
 import { formatCompactSanPayment, quoteSanPayment } from "../core/v2-role-talent-costs";
+import "../styles/event-choice-risk.css";
 
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")
@@ -75,6 +76,8 @@ function renderThesisCard(state: GameState): string {
       const buttonTooltip = riskText
         ? `data-event-risk-tooltip data-tooltip="${escapeHtml(riskText)}" aria-description="${escapeHtml(riskText)}"`
         : tooltip(hint);
+      const riskState = !disabledReason && unlocked && !frozen && state.phase === "playing"
+        ? (risk?.risk ?? "safe") : null;
       const totalPercent = Math.min(100, Math.max(0, point.score / pointScale * 100));
       const initialPercent = Math.min(totalPercent, Math.max(0, point.initialScore / pointScale * 100));
       const supportHint = `${point.supportPaperTitle ?? "暂无支撑论文"}\n原始分 ${formatMoney(point.initialScore)} · 改进分 ${formatMoney(Math.max(0, point.score - point.initialScore))}`;
@@ -88,7 +91,7 @@ function renderThesisCard(state: GameState): string {
           ${(["B", "A"] as const).map((grade) => `<span class="graduation-bar-grade is-${grade.toLowerCase()}" style="left:clamp(8px, ${formatMoney(thresholds[grade] / 3 / pointScale * 100)}%, calc(100% - 8px))" aria-hidden="true">${grade}</span>`).join("")}
           </div>
         <strong class="rel-progress-val">${renderAnimatedNumber(`${pointIdentity}:score`, point.score)}</strong>
-        <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="advance-thesis-point" data-thesis-point-index="${index}" ${buttonTooltip}${disabledReason ? ' disabled aria-disabled="true"' : ""}><span>📝推进</span>${riskText ? `<span class="event-choice-risk is-${risk!.risk}" aria-label="${escapeHtml(risk!.explanation)}">${risk!.risk === "certain" ? "！" : "？"}</span>` : ""}<small class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, sanCost, { allowOverdraw: true }), 0, pointIdentity)}</small></button>
+        <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="advance-thesis-point" data-thesis-point-index="${index}"${riskState ? ` data-event-risk-state="${riskState}"` : ""} ${buttonTooltip}${disabledReason ? ' disabled aria-disabled="true"' : ""}><span>📝推进</span>${riskText ? `<span class="event-choice-risk is-${risk!.risk}" aria-label="${escapeHtml(risk!.explanation)}">${risk!.risk === "certain" ? "！" : "？"}</span>` : ""}<small class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, sanCost, { allowOverdraw: true }), 0, pointIdentity)}</small></button>
       </div>`;
     }).join("")}${state.degree === "master" ? `<div class="graduation-point is-unused" data-graduation-point="2"><span class="rel-detail-label"><span class="rel-inline-icon" aria-hidden="true">🔬</span>研究点3</span><div class="rel-progress-bar graduation-point-bar" role="meter" aria-label="研究点3（硕士无需推进）" aria-valuemin="0" aria-valuemax="${formatMoney(baseScale)}" aria-valuenow="0"></div><strong class="rel-progress-val">0</strong><span class="graduation-unused-action">硕士不需要</span></div>` : ""}</div>
     ${thesis.reviewResolved && review?.reason ? `<p class="graduation-review-reason">${escapeHtml(review.reason)}</p>` : ""}
@@ -108,6 +111,7 @@ function renderCareerCard(state: GameState): string {
       const risk = failure ? null : getEventChoiceRiskDetails(state, { id: "career-preview", chainId: "career-preview", title: "找工作推进", description: "", source: "career", stage: "act2", blocking: false, deadlineMonths: 0, choices: [choice] }, choice);
       const paymentText = formatCompactSanPayment(quoteSanPayment(state, cost, { allowOverdraw: true }));
       const eligible = unlocked && (type !== "academic" || state.degree === "phd");
+      const riskState = eligible && state.phase === "playing" && !failure ? (risk?.risk ?? "safe") : null;
       const ability = eligible ? getCareerAbility(state, type) : 0;
       const resume = eligible ? getCareerBaseScore(state, type) : 0;
       const interview = eligible ? Math.min(state.careerProgress[type], state.careerInterviewExperience[type] ?? 0) : 0;
@@ -128,7 +132,7 @@ function renderCareerCard(state: GameState): string {
       <strong class="rel-detail-label" tabindex="0" ${tooltip(progressHint)}><span class="rel-inline-icon" aria-hidden="true">${({ internet: "🏢", stateOwned: "🏛️", civilService: "📋", academic: "🎓" } as const)[type]}</span>${escapeHtml(CAREER_DEFINITIONS[type].name)}${offer ? '<span class="graduation-offer-marker" aria-label="已获 offer">✓</span>' : ""}</strong>
       <div class="rel-progress-bar graduation-career-bar" tabindex="0" role="meter" aria-label="${escapeHtml(CAREER_DEFINITIONS[type].name)}应聘能力" aria-valuemin="0" aria-valuemax="${formatMoney(scale)}" aria-valuenow="${formatMoney(ability)}" ${tooltip(progressHint)}><span class="graduation-bar-fill-track"><span class="rel-progress-fill graduation-career-resume${baseWidth > 0 ? " is-start" : ""}${practiceWidth + interviewWidth === 0 ? " is-end" : ""}" style="width:${formatMoney(baseWidth)}%"></span><span class="rel-progress-fill graduation-career-practice${baseWidth === 0 && practiceWidth > 0 ? " is-start" : ""}${interviewWidth === 0 ? " is-end" : ""}" style="width:${formatMoney(practiceWidth)}%"></span><span class="rel-progress-fill graduation-career-interview${baseWidth + practiceWidth === 0 && interviewWidth > 0 ? " is-start" : ""} is-end" style="width:${formatMoney(interviewWidth)}%"></span></span></div>
       <strong class="rel-progress-val">${renderAnimatedNumber(`graduation:${state.degree}:career:${type}:progress`, ability)}</strong>
-      <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="prepare-career" data-career-type="${type}" ${risk ? "data-event-risk-tooltip" : "data-card-tooltip"} data-tooltip="${escapeHtml(actionHint)}"${failure ? ' disabled aria-disabled="true"' : ""}><span>📈推进</span>${risk ? `<span class="event-choice-risk is-${risk.risk}" aria-label="${escapeHtml(risk.explanation)}">！</span>` : ""}<small class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, cost, { allowOverdraw: true }))}</small></button>
+      <button type="button" class="btn-sm rel-action-btn rel-cooperation-btn graduation-action" data-action="prepare-career" data-career-type="${type}"${riskState ? ` data-event-risk-state="${riskState}"` : ""} ${risk ? "data-event-risk-tooltip" : "data-card-tooltip"} data-tooltip="${escapeHtml(actionHint)}"${failure ? ' disabled aria-disabled="true"' : ""}><span>📈推进</span>${risk ? `<span class="event-choice-risk is-${risk.risk}" aria-label="${escapeHtml(risk.explanation)}">${risk.risk === "certain" ? "！" : "？"}</span>` : ""}<small class="rel-action-cost">${renderSanPayment(quoteSanPayment(state, cost, { allowOverdraw: true }))}</small></button>
     </div>`;
     }).join("")}</div>
   </section>`;

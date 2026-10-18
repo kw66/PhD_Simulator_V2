@@ -3,7 +3,7 @@ import { withRewinderChoiceRandom } from "./v2-rewinder-event-replay";
 import { getEffectiveSocial } from "./v2-effective-attributes";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import { scheduleConferenceAttendance } from "./v2-conference-attendance";
-import { hasScholarshipDisqualification } from "./v2-academic-integrity";
+import { resolveScholarshipAwardChoice } from "./v2-academic-integrity";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { createCustomFellowProgressProfile, getFellowName, getUniqueFellowName } from "./v2-fellow-progression";
 import { applyFixedEventResolution } from "./v2-fixed-events";
@@ -506,19 +506,7 @@ export function applyChoiceEffectsToState(
 function applyChoiceEffectsInternal(
   state: GameState, choice: EventChoice, buffSource: string, currentEvent?: PendingEvent,
 ): ResolvedEventChoiceState {
-  const scholarshipAward = choice.effects.scholarshipAward;
-  if (scholarshipAward) {
-    const disqualified = hasScholarshipDisqualification(state);
-    const alreadyAwarded = (state.scholarshipState.lastAwardYear ?? 0) >= scholarshipAward.year;
-    if (disqualified || alreadyAwarded) {
-      const { money: _money, scholarshipAward: _award, ...effects } = choice.effects;
-      choice = {
-        ...choice,
-        outcome: disqualified ? "国奖资格取消，金币 +0。" : "本年度奖学金已领取。",
-        effects,
-      };
-    }
-  }
+  choice = resolveScholarshipAwardChoice(state, choice);
   if (choice.effects.paperCompetitionResolution) {
     return {
       ...applyPaperCompetitionResolution(state, choice.effects.paperCompetitionResolution),

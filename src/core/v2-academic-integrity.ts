@@ -1,5 +1,5 @@
 import { addOrReplaceBuffs, getActiveBuffs } from "./v2-buffs";
-import type { Buff, GameState } from "./v2-types";
+import type { Buff, EventChoice, GameState } from "./v2-types";
 
 export function createImageMisuseBuff(): Buff {
   return {
@@ -15,6 +15,17 @@ export function createImageMisuseBuff(): Buff {
 
 export function hasScholarshipDisqualification(state: Pick<GameState, "buffs">): boolean {
   return getActiveBuffs(state.buffs).some((buff) => buff.scholarshipDisqualified === true);
+}
+
+/** Preview and settlement must agree on whether a pending award still pays. */
+export function resolveScholarshipAwardChoice(state: GameState, choice: EventChoice): EventChoice {
+  const award = choice.effects.scholarshipAward;
+  if (!award) return choice;
+  const disqualified = hasScholarshipDisqualification(state);
+  if (!disqualified && (state.scholarshipState.lastAwardYear ?? 0) < award.year) return choice;
+  const { money: _money, scholarshipAward: _award, ...effects } = choice.effects;
+  return { ...choice, effects,
+    outcome: disqualified ? "国奖资格取消，金币 +0。" : "本年度奖学金已领取。" };
 }
 
 export function settlePublishedImageMisuse(state: GameState): GameState {

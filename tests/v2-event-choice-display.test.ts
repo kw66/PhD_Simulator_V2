@@ -6,6 +6,8 @@ import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createRandomEventById } from "../src/core/v2-random-event-router";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { getConferenceInfo } from "../src/core/v2-conference-catalog";
+import { renderGraduationCards } from "../src/app/v2-render-graduation";
+import { syncThesisState } from "../src/core/v2-thesis-rules";
 import type { GameState, PendingEvent } from "../src/core/v2-types";
 
 function state(): GameState {
@@ -44,12 +46,14 @@ describe("event navigation and risk display", () => {
       expect(button).toContain('金币不足，结算后为-1，将进入失败结局：穷困潦倒。');
       expect(button).not.toContain('title=');
       expect(button).toContain('is-certain');
+      expect(button).toContain('data-event-risk-state="certain"');
       expect(button).not.toContain('disabled');
       expect(button).toContain('data-action="resolve-event"');
       expect(current).toEqual(before);
       expect(random).not.toHaveBeenCalled();
       const exact = renderEvent({ ...current, player: { ...current.player, money: 2 } }, event);
       expect(exact).not.toContain('event-choice-risk');
+      expect(exact).toContain('data-event-risk-state="safe"');
     } finally { random.mockRestore(); }
   });
 
@@ -64,6 +68,40 @@ describe("event navigation and risk display", () => {
     expect(button).toContain('金币可能不足（结算后-2～0），可能进入失败结局：穷困潦倒。');
     expect(button).toContain('data-event-risk-tooltip');
     expect(button).toContain('is-possible');
+    expect(button).toContain('data-event-risk-state="possible"');
+  });
+
+  it("leaves introductions, unavailable choices and viewed history neutral", () => {
+    const current = state();
+    const event: PendingEvent = { id: "neutral", chainId: "neutral", title: "开场", description: "正文",
+      stage: "act1", source: "fixed", blocking: true, deadlineMonths: 0,
+      choices: [{ id: "go", label: "继续", outcome: "", effects: {} }] };
+    expect(renderEvent(current, event)).not.toContain('data-event-risk-state=');
+    expect(renderEvent(current, { ...event, stage: "act2", choices: [{ ...event.choices[0]!, disabledReason: "尚未开放" }] }))
+      .not.toContain('data-event-risk-state=');
+    const queued = createEventQueueItem({ ...event, stage: "act3", history: [{
+      title: "此前选择", description: "正文", selectedChoiceId: "go",
+      choices: [{ id: "go", label: "已作选择", outcome: "结果" }],
+    }] }, 0);
+    const html = renderApp({ ...current, eventQueue: [queued] }, undefined, {
+      isEventContentOpen: true, activeEventId: event.id, activeEventHistoryIndex: 0,
+    });
+    const button = html.match(/<button\s+class="event-choice-btn[\s\S]*?<\/button>/u)![0];
+    expect(button).toContain('is-selected');
+    expect(button).not.toContain('data-event-risk-state=');
+  });
+
+  it("uses the same safety colors for available thesis and career progress", () => {
+    const current = syncThesisState({ ...state(), year: 3, month: 1, totalMonths: 25 }, () => 0.5);
+    current.player.san = 20;
+    const actions = (html: string) => [...html.matchAll(/<button\b[^>]*class="[^"]*graduation-action[^"]*"[^>]*>[\s\S]*?<\/button>/gu)]
+      .map(match => match[0]).filter(button => !button.includes(' disabled'));
+    expect(actions(renderGraduationCards(current)).length).toBeGreaterThan(0);
+    expect(actions(renderGraduationCards(current)).every(button => button.includes('data-event-risk-state="safe"'))).toBe(true);
+    current.player.san = 0;
+    expect(actions(renderGraduationCards(current)).every(button => button.includes('data-event-risk-state="certain"'))).toBe(true);
+    expect(renderGraduationCards({ ...current, year: 2, month: 12, totalMonths: 24 }))
+      .not.toContain('data-event-risk-state=');
   });
 });
 

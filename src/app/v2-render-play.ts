@@ -21,6 +21,7 @@ import { getEventChoiceRiskDetails } from "../core/v2-event-choice-risk";
 import { getResolvableQueuedEvent } from "../core/v2-engine-event-resolution";
 import { canRewindPendingEvent } from "../core/v2-rewinder-event-replay";
 import "../styles/rewinder-event-replay.css";
+import "../styles/event-choice-risk.css";
 import type { ConferenceRegionId } from "../core/v2-conference-system";
 import { getCurrentEvent, getEventQueuePriority, getSortedEventQueue } from "../core/v2-event-queue";
 import { canAutoResolveLinearEvent, isEventBlocking, isLinearEvent } from "../core/v2-event-auto-resolution";
@@ -1252,6 +1253,12 @@ function renderEventContentBox(
               ? getEventChoiceRiskDetails(state, riskEvent, riskChoice) : null;
             const risk = riskDetails?.risk;
             const riskText = riskDetails?.explanation ?? "";
+            // An introduction or return button is navigation; it cannot
+            // promise that the later decision is safe.
+            const riskEvaluated = state?.phase === "playing" && !!riskEvent && !!riskChoice
+              && !isCompleted && !historicalPage && !disabledReason && !secondary
+              && !displayEvent.rewinderPresentation && displayStage !== "act1";
+            const riskState = risk ?? (riskEvaluated ? "safe" : null);
             const canReplay = (debugReplayable || rewinderReplayable) && disabledReason === "";
             const isDisabled = !canReplay && (historicalPage !== null || disabledReason !== "");
             const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"`
@@ -1266,6 +1273,7 @@ function renderEventContentBox(
                 class="event-choice-btn event-action-btn${choice.id === selectedChoiceId ? " is-selected" : ""}"
                 type="button"
                 ${secondary ? "data-event-secondary" : ""}
+                ${riskState ? `data-event-risk-state="${riskState}"` : ""}
                 ${buttonAttributes}
               ><span>${escapeHtml(normalizeGameDisplayText(choiceLabel))}</span>${risk ? `<span class="event-choice-risk is-${risk}" aria-label="${escapeHtml(riskText)}">${risk === "certain" ? "！" : "？"}</span>` : ""}${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
             `;

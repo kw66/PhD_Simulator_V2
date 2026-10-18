@@ -1,5 +1,5 @@
 import { DATA_EPOCH } from "../src/core/v2-data-epoch";
-﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createVisitStats } from "../src/app/v2-visit-stats";
 import { createStatisticsClient } from "../src/app/v2-statistics-client";
 import { replayStateDigest } from "../src/core/v2-run-replay";
@@ -146,7 +146,7 @@ describe("kwgame activity statistics", () => {
 
   it.each([undefined, 1])("replaces a fresh zero-start cache with obsolete response version %s, even under the current cache key", async (version) => {
     const storage = createStorage();
-    const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: DAY }, "historical-starts-v2"]);
+    const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: DAY }, "activity-20261016-monthly-replay-v1"]);
     storage.setItem("phd_simulator_v2_statistics_v1", JSON.stringify({ version: 1, cache: [[key, {
       fetchedAt: Date.now(), retryAt: 0,
       data: summary({ version, games: 0, todayGames: 0, roles: { normal: { games: 0, finished: 55, clears: 8, phd: 7 } } }),
@@ -167,7 +167,7 @@ describe("kwgame activity statistics", () => {
 
   it("does not resurrect an obsolete zero cache or lose read backoff when its replacement fails", async () => {
     const storage = createStorage();
-    const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: DAY }, "historical-starts-v2"]);
+    const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: DAY }, "activity-20261016-monthly-replay-v1"]);
     storage.setItem("phd_simulator_v2_statistics_v1", JSON.stringify({ version: 1, cache: [[key, {
       fetchedAt: Date.now(), retryAt: 0, data: summary({ version: undefined, games: 0, todayGames: 0 }),
     }]] }));

@@ -6,7 +6,7 @@ import {
   type RandomRollProvider,
 } from "./v2-fixed-events-shared";
 import { formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
-import { hasScholarshipDisqualification } from "./v2-academic-integrity";
+import { hasScholarshipDisqualification, resolveScholarshipAwardChoice } from "./v2-academic-integrity";
 import type { FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 type ScholarshipOutcomeContext = NonNullable<PendingEvent["scholarshipContext"]>;
@@ -46,7 +46,12 @@ function getEligiblePublishedPaperIds(state: GameState): string[] {
 }
 
 function buildScholarshipResultEvent(state: GameState, context: ScholarshipOutcomeContext): PendingEvent {
-  const result = buildScholarshipAwardEvent(context, hasScholarshipDisqualification(state));
+  let result = buildScholarshipAwardEvent(context, hasScholarshipDisqualification(state));
+  const choices = result.choices.map(choice => resolveScholarshipAwardChoice(state, choice));
+  if (choices.some((choice, index) => choice !== result.choices[index])) {
+    result = { ...result, choices, title: "国奖评选 ➜ 申报决定 ➜ 已领取",
+      description: appendMechanismSettlement("本年度国奖已领取，申报材料已归档。", "结果：本年度奖学金已领取，金币 +0") };
+  }
   const san = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
   const sanSummary = formatActualSanChange(-2, state.month, state.eventSupport, state.buffs);
   return {

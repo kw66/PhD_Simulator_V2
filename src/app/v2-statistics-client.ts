@@ -255,10 +255,11 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
       || (data as Record<string, unknown>).epoch !== DATA_EPOCH)) throw new Error("Statistics epoch mismatch");
     return data;
   };
-  // Discard the earlier activity snapshot that excluded proven historical starts.
-  // Paper snapshots keep their existing cache identity and remain frozen per run.
+  // Keep activity snapshots in the same namespace as the server data epoch.
+  // This also discards responses cached by the superseded historical-starts
+  // endpoint, which did not read the current epoch counters.
   const cacheKey = (name: string, key: object): string => JSON.stringify(
-    name === ACTIVITY_RPC ? [name, key, "historical-starts-v2"] : [name, key]);
+    name === ACTIVITY_RPC ? [name, key, `activity-${DATA_EPOCH}`] : [name, key]);
   const activityCachePrefix = `["${ACTIVITY_RPC}",`;
   const readCached: StatisticsClient["read"] = (name, key, parse) => {
     if (!enabled || disposed) return { status: "unavailable", data: null };

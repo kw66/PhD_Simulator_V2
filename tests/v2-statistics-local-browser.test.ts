@@ -63,7 +63,7 @@ describe("statistics on the actual local development configuration", () => {
         if (sessionStorage.getItem("statistics-cache-seeded")) return;
         sessionStorage.setItem("statistics-cache-seeded", "1");
         const day = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
-        const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: day }, "historical-starts-v2"]);
+        const key = JSON.stringify(["get_phd_simulator_v2_activity_stats", { p_day: day }, "activity-20261016-monthly-replay-v1"]);
         localStorage.setItem("phd_simulator_v2_statistics_v1", JSON.stringify({ version: 1, cache: [[key, {
           fetchedAt: Date.now(), retryAt: 0, data: { day,
             visitors: 120, todayVisitors: 3, views: 210, todayViews: 4, games: 0, todayGames: 0,

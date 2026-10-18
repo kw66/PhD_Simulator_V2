@@ -3,6 +3,8 @@ import { applyFixedEventResolution } from "./v2-fixed-events";
 import { getCcigActivityChainId, getCcigChainId } from "./v2-fixed-events-ccig-shared";
 import { roundMoney } from "./v2-money";
 import { projectPaperReviewSettlement } from "./v2-publication-system";
+import { applyPaperCompetitionResolution } from "./v2-paper-competition";
+import { resolveScholarshipAwardChoice } from "./v2-academic-integrity";
 import { createRandomEventById } from "./v2-random-event-router";
 import { previewReadPaperActions } from "./v2-reading-system";
 import { getPlayerAttributeCap } from "./v2-player-attributes";
@@ -91,6 +93,10 @@ function applyPendingPatch(state: GameState, event: PendingEvent): GameState {
 }
 
 function projectEffects(state: GameState, effects: EventChoice["effects"]): GameState {
+  // Competition costs include current research discounts and SAN replacements.
+  if (effects.paperCompetitionResolution) {
+    return applyPaperCompetitionResolution(state, effects.paperCompetitionResolution).nextState;
+  }
   const playerState = applyEventPlayerEffects(state, effects);
   let next: GameState = {
     ...playerState,
@@ -119,8 +125,10 @@ function fixedBranchRolls(resolution: FixedEventResolution): number[] {
 }
 
 function projectChoice(state: GameState, event: PendingEvent, choice: EventChoice, visited: Set<PendingEvent>): GameState[] {
-  const projected = projectEffects(applyPendingPatch(state, event), choice.effects);
-  if (visited.has(event) || event.stage === "act1") return [projected];
+  const pending = applyPendingPatch(state, event);
+  choice = resolveScholarshipAwardChoice(pending, choice);
+  const projected = projectEffects(pending, choice.effects);
+  if (choice.effects.paperCompetitionResolution || visited.has(event) || event.stage === "act1") return [projected];
   const nextVisited = new Set([...visited, event]);
   const resolution = choice.effects.fixedEventResolution;
   const resolutionChainId = resolution?.kind.startsWith("ccig-")

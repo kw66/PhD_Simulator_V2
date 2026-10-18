@@ -1,5 +1,6 @@
-﻿import { getRoleOptions } from "../core/v2-progression";
+import { getRoleOptions } from "../core/v2-progression";
 import type { EndingId, GamePhase, RoleId } from "../core/v2-types";
+import { DATA_EPOCH } from "../core/v2-data-epoch";
 import { createStatisticsClient, type StatisticsClient } from "./v2-statistics-client";
 
 const STATS_RPC = "get_phd_simulator_v2_activity_stats";
@@ -17,6 +18,7 @@ interface RoleRunResult {
 }
 interface VisitSnapshot {
   version: 2;
+  epoch: typeof DATA_EPOCH;
   day: string;
   views: number;
   todayViews: number;
@@ -49,7 +51,7 @@ function parseSnapshot(value: unknown, day: string): VisitSnapshot {
   const count = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
   // Older responses omitted proven historical starts. A cache-key change alone
   // cannot detect a response fetched while the database deployment was pending.
-  if (data.version !== 2 || data.day !== day || !count(data.views) || !count(data.todayViews) || data.todayViews > data.views
+  if (data.version !== 2 || data.epoch !== DATA_EPOCH || data.day !== day || !count(data.views) || !count(data.todayViews) || data.todayViews > data.views
     || !count(data.visitors) || !count(data.todayVisitors) || data.todayVisitors > data.visitors
     || !count(data.games) || !count(data.todayGames) || data.todayGames > data.games
     || !data.roles || typeof data.roles !== "object" || Array.isArray(data.roles)) throw new Error("Invalid activity statistics");
@@ -60,7 +62,7 @@ function parseSnapshot(value: unknown, day: string): VisitSnapshot {
       || role.phd > role.clears || role.clears > role.finished) throw new Error("Invalid role activity statistics");
     return [roleId, { games: role.games, finished: role.finished, clears: role.clears, phd: role.phd }];
   })) as Record<RoleId, RoleCounters>;
-  return { version: 2, day, views: data.views, todayViews: data.todayViews, visitors: data.visitors,
+  return { version: 2, epoch: DATA_EPOCH, day, views: data.views, todayViews: data.todayViews, visitors: data.visitors,
     todayVisitors: data.todayVisitors, games: data.games, todayGames: data.todayGames, roles };
 }
 

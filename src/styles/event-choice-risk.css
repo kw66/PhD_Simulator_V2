@@ -1,0 +1,106 @@
+/* Color belongs to actionable, evaluated choices. Keep navigation and history
+   neutral, and retain the punctuation so risk never relies on color alone. */
+button[data-event-risk-state="safe"] {
+  --event-risk-color: #397554;
+  --event-risk-surface: #e5f0e5;
+  --event-risk-hover: #d5e8d6;
+}
+
+button[data-event-risk-state="possible"] {
+  --event-risk-color: #a07820;
+  --event-risk-surface: #fff0c7;
+  --event-risk-hover: #fae4a6;
+}
+
+button[data-event-risk-state="certain"] {
+  --event-risk-color: #b04440;
+  --event-risk-surface: #f9ded8;
+  --event-risk-hover: #f3c9c0;
+}
+
+.center-main-panel[data-tab-panel="events"] .event-content-buttons .event-choice-btn[data-event-risk-state]:not(:disabled):not(.is-selected),
+.event-content-buttons .event-choice-btn[data-event-risk-state]:not(:disabled):not(.is-selected),
+.graduation-card .graduation-action[data-event-risk-state]:not(:disabled) {
+  border-color: var(--event-risk-color);
+  background: var(--event-risk-surface);
+  color: #35362f;
+  box-shadow: inset 0 0 0 1px var(--event-risk-color), 0 2px 4px rgba(68, 54, 33, 0.07);
+}
+
+.center-main-panel[data-tab-panel="events"] .event-content-buttons .event-choice-btn[data-event-risk-state]:hover:not(:disabled):not(.is-selected),
+.event-content-buttons .event-choice-btn[data-event-risk-state]:hover:not(:disabled):not(.is-selected),
+.graduation-card .graduation-action[data-event-risk-state]:hover:not(:disabled) {
+  border-color: var(--event-risk-color);
+  background: var(--event-risk-hover);
+  box-shadow: inset 0 0 0 1px var(--event-risk-color), 0 3px 7px rgba(68, 54, 33, 0.13);
+}
+
+button[data-event-risk-state]:focus-visible {
+  outline: 2px solid var(--event-risk-color);
+  outline-offset: 3px;
+}
+
+.event-content-buttons .event-choice-btn > .event-choice-risk,
+.graduation-action .event-choice-risk {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 23px;
+  width: 23px;
+  height: 22px;
+  padding: 5px 0 0;
+  margin: 0;
+  color: var(--event-risk-color);
+  font-family: Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.5em;
+  isolation: isolate;
+}
+
+.event-choice-risk.is-certain { --event-risk-color: #a23531; }
+.event-choice-risk.is-possible { --event-risk-color: #91670f; }
+
+/* The nested triangles draw a clear border without replacing the ? / ! text. */
+.event-choice-risk::before,
+.event-choice-risk::after {
+  position: absolute;
+  content: "";
+  inset: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  z-index: -2;
+}
+
+.event-choice-risk::before { background: currentColor; }
+.event-choice-risk::after {
+  inset: 3px 3px 2px;
+  z-index: -1;
+  background: var(--event-risk-surface, #fff6e2);
+}
+
+.graduation-action .event-choice-risk {
+  flex-basis: 19px;
+  width: 19px;
+  height: 18px;
+  padding-top: 4px;
+  font-size: 12px;
+}
+
+.graduation-action .event-choice-risk::after { inset: 3px 3px 2px; }
+
+@media (max-width: 820px) {
+  .graduation-card .graduation-action[data-event-risk-state] {
+    gap: 2px;
+    padding-inline: 3px;
+  }
+  .graduation-action .event-choice-risk {
+    flex-basis: 15px;
+    width: 15px;
+    height: 15px;
+    padding-top: 3px;
+    font-size: 10px;
+  }
+  .graduation-action .event-choice-risk::after { inset: 2px 2px 1.5px; }
+}
