@@ -4,7 +4,7 @@
 
 这个月是赶论文、帮实验室做项目，还是先休息恢复状态？论文、导师、同学与生活开支会相互影响，一次选择的结果也可能在几个月后才显现。
 
-[🎮 开始游戏](https://kw66.github.io/PhD_Simulator_V2/) · [📚 体验 V1](https://kw66.github.io/PhD_Simulator/) · [🕹️ 游戏合集](https://kw66.github.io/games/) · [💬 小红书评论](https://xhslink.cn/o/50Fl73BfNA2)
+[🎮 开始游戏](https://kw66.github.io/PhD_Simulator_V2/) · [📚 体验 V1](https://kw66.github.io/PhD_Simulator/) · [🕹️ 游戏合集](https://kw66.github.io/games/) · [💬 小红书评论](https://xhslink.cn/o/ApT7nOda3CF)
 
 <p align="center">
   <img src="./assets/readme-cover.webp" alt="研究生模拟器 v2.0 封面" width="92%">
