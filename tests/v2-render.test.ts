@@ -877,7 +877,7 @@ describe("v2 render lobby shell", () => {
     expect(masthead).toContain('data-ui-role-rail-view="messages"');
     expect(masthead).not.toContain('class="lobby-live-metrics"');
     expect(messageRailHtml).not.toContain('class="lobby-live-metrics"');
-    expect(messageRailHtml).toContain('href="https://xhslink.cn/o/8cxWuL6opss" target="_blank" rel="noopener noreferrer"');
+    expect(messageRailHtml).toContain('href="https://xhslink.cn/o/50Fl73BfNA2" target="_blank" rel="noopener noreferrer"');
     expect(messageRailHtml).toContain("小红书评论");
     expect(rolesHtml).not.toContain('data-community-stat="current-online"');
     expect(rolesHtml).not.toContain('data-community-stat="views"');
