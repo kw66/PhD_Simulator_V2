@@ -8,16 +8,20 @@
     min-width: 0;
   }
 
-  .workstation-section { --workstation-card-min-height: 152px; }
-  .workstation-section .workstation-action-points { flex-direction: row; gap: 8px; min-height: 36px; }
+  .workstation-section { --workstation-card-min-height: 132px; }
+  .workstation-section .workstation-action-points { display: none; }
+  .workstation-main-row .workstation-main-actions { grid-row: 1; gap: 4px; }
+  .workstation-main-actions .compact-action-btn { min-height: 46px; padding: 4px; }
+  .workstation-section .workstation-paper-grid { grid-auto-rows: auto; }
+  .workstation-section .paper-slot-card.paper-card-empty { min-height: 76px; }
 
   .workstation-section,
   .relationship-section,
-  .research-section { gap: 6px; }
+  .research-section { gap: 4px; }
 
   .workstation-section .workstation-paper-grid,
   .workstation-section .graduation-cards,
-  .relationship-section .rel-card-grid { gap: 6px; }
+  .relationship-section .rel-card-grid { gap: 4px; }
 
   .relationship-section .rel-card.filled.rel-card-compact { gap: 3px; }
 
@@ -29,7 +33,7 @@
 
   .workstation-section .workstation-submit-heading { grid-row: span 3; }
   .workstation-section .workstation-submit-target > :is(.paper-submit-option, .paper-journal-btn) {
-    min-height: 42px;
+    min-height: 40px;
     padding: 5px 3px;
     gap: 3px;
   }
@@ -49,7 +53,7 @@
   }
 
   .relationship-section .rel-card-grid {
-    --workstation-card-min-height: 144px;
+    --workstation-card-min-height: 96px;
     --rel-progress-columns: 5.5em minmax(12px, 1fr) 5ch 110px;
   }
   .relationship-section .rel-card-grid > .rel-card:is(.locked, .empty) {
@@ -105,7 +109,7 @@
 
   .shop-panel > .shop-tab-btns > .shop-tab-btn,
   .talent-panel > .talent-header-row .panel-switch-btn {
-    min-height: 44px;
+    min-height: 40px;
     padding-inline: 2px;
     gap: 3px;
     white-space: nowrap;
@@ -117,14 +121,14 @@
     grid-auto-rows: auto;
     height: auto;
     max-height: none;
-    gap: 6px;
+    gap: 4px;
     padding-block: 2px 4px;
   }
 
   /* Let content determine height instead of retaining desktop grid row heights. */
-  .shop-panel .shop-items-list { margin-top: 6px; }
-  .shop-panel .shop-item-row { height: auto; min-height: 0; max-height: none; padding: 7px 10px; gap: 4px; }
-  .talent-panel .talent-item-row { min-height: 0; padding: 8px 10px; gap: 5px; }
+  .shop-panel .shop-items-list { margin-top: 4px; }
+  .shop-panel .shop-item-row { height: auto; min-height: 0; max-height: none; padding: 6px 8px; gap: 4px; }
+  .talent-panel .talent-item-row { min-height: 0; padding: 6px 8px; gap: 5px; }
   .talent-panel .talent-item-row > .talent-item-desc { margin-top: 0; padding-top: 4px; }
   .talent-panel .lobby-talent-tree.is-designed-tree {
     --lobby-talent-node-height: 208px;
@@ -133,10 +137,10 @@
   .talent-panel .lobby-normal-tree-detail p { line-height: 1.45; }
 
   .shop-panel[data-shop-tab] .shop-items-list > .shop-item-row :is(.shop-item-btn, .shop-subscription-toggle) {
-    min-height: 42px;
+    min-height: 40px;
   }
 
-  .talent-panel .talent-item-row.publication-talent-card { min-height: 84px; }
+  .talent-panel .talent-item-row.publication-talent-card { min-height: 72px; }
   .talent-panel .talent-item-row { overflow-wrap: anywhere; }
 
   .research-section .research-sort-controls .research-sort-btn {
@@ -159,8 +163,8 @@
   .research-section .research-paper-authors { margin-top: 5px; }
   .research-section .research-paper-venue { margin-block: 3px 5px; }
   .research-section .research-metric-item,
-  .research-section .research-metric-grid-expanded .research-metric-item { min-height: 44px; padding: 4px 5px; }
-  .research-section .research-promotion-block { margin-top: 6px; padding-top: 5px; }
+  .research-section .research-metric-grid-expanded .research-metric-item { min-height: 40px; padding: 4px 5px; }
+  .research-section .research-promotion-block { margin-top: 4px; padding-top: 5px; }
 }
 
 @media (max-width: 380px) {

@@ -42,53 +42,30 @@ button[data-event-risk-state]:focus-visible {
 
 .event-content-buttons .event-choice-btn > .event-choice-risk,
 .graduation-action .event-choice-risk {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 23px;
-  width: 23px;
-  height: 22px;
-  padding: 5px 0 0;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 24px;
+  padding: 0;
   margin: 0;
   color: var(--event-risk-color);
-  font-family: Arial, sans-serif;
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.5em;
-  isolation: isolate;
+  font-family: var(--ui-font-cjk), Arial, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 950;
+  line-height: .95;
+  letter-spacing: 0;
 }
 
 .event-choice-risk.is-certain { --event-risk-color: #a23531; }
 .event-choice-risk.is-possible { --event-risk-color: #91670f; }
 
-/* The nested triangles draw a clear border without replacing the ? / ! text. */
-.event-choice-risk::before,
-.event-choice-risk::after {
-  position: absolute;
-  content: "";
-  inset: 0;
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  z-index: -2;
-}
-
-.event-choice-risk::before { background: currentColor; }
-.event-choice-risk::after {
-  inset: 3px 3px 2px;
-  z-index: -1;
-  background: var(--event-risk-surface, #fff6e2);
-}
-
 .graduation-action .event-choice-risk {
-  flex-basis: 19px;
   width: 19px;
-  height: 18px;
-  padding-top: 4px;
-  font-size: 12px;
+  height: 22px;
+  font-size: 1.05rem;
 }
-
-.graduation-action .event-choice-risk::after { inset: 3px 3px 2px; }
 
 @media (max-width: 820px) {
   .graduation-card .graduation-action[data-event-risk-state] {
@@ -96,11 +73,9 @@ button[data-event-risk-state]:focus-visible {
     padding-inline: 3px;
   }
   .graduation-action .event-choice-risk {
-    flex-basis: 15px;
-    width: 15px;
-    height: 15px;
-    padding-top: 3px;
-    font-size: 10px;
+    flex-basis: 18px;
+    width: 18px;
+    height: 20px;
+    font-size: 1rem;
   }
-  .graduation-action .event-choice-risk::after { inset: 2px 2px 1.5px; }
 }

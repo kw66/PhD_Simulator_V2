@@ -14,7 +14,7 @@
   .center-main-panel[data-tab-panel="events"] .event-scene-tab {
     width: 100%;
     max-width: none;
-    min-height: 36px;
+    min-height: 32px;
     padding: 4px;
     white-space: normal;
     line-height: 1.35;
@@ -23,14 +23,14 @@
   }
   .event-scene-separator { width: 8px; flex-basis: 8px; }
   .event-content-header .event-content-close {
-    flex: 0 0 40px;
-    width: 40px;
-    height: 40px;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
   }
   .center-main-panel[data-tab-panel="events"] .event-content-body {
     min-height: 0;
     padding: 8px 10px;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.45;
   }
   .center-main-panel[data-tab-panel="events"] .event-content-buttons {
@@ -42,13 +42,25 @@
     flex: 1 1 calc(50% - 2.5px);
     width: auto;
     max-width: calc(50% - 2.5px);
-    min-height: 44px;
+    min-height: 40px;
     padding: 5px;
   }
   .center-main-panel[data-tab-panel="events"] .event-content-buttons .event-choice-btn:only-child {
     max-width: 100%;
   }
   .event-content-buttons .event-choice-btn > span { font-size: 13px; line-height: 1.4; }
+  .center-main-panel[data-tab-panel="events"] .event-content-buttons[data-mobile-columns="3"] {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .center-main-panel[data-tab-panel="events"] .event-content-buttons[data-mobile-columns="3"] > .event-choice-btn {
+    width: 100%;
+    max-width: none;
+    padding-inline: 4px;
+    gap: 2px;
+  }
+  .event-content-buttons .event-choice-btn > .event-choice-risk { font-size: 20px; font-weight: 900; line-height: 1; }
   .center-main-panel[data-tab-panel="events"] .event-description-story { margin-bottom: 0.45em; }
   .center-main-panel[data-tab-panel="events"] .event-description-paper { padding: 5px 8px; margin-bottom: 0.45em; }
   .center-main-panel[data-tab-panel="events"] .event-description-details > div { padding: 5px 8px; gap: 3px 8px; }

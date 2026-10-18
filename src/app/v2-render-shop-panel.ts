@@ -512,7 +512,7 @@ function renderShopTabButtons(activeTab: ShopTabId, upgradeNoticeTabs: readonly 
         data-ui-shop-tab="${tab.id}"
         aria-pressed="${tab.id === activeTab ? "true" : "false"}"
       >
-        <span class="shop-tab-icon" aria-hidden="true"><i data-lucide="${tab.icon}"></i></span>
+        <span class="shop-tab-icon" aria-hidden="true">${tab.id === "rest" ? "🪑" : `<i data-lucide="${tab.icon}"></i>`}</span>
         <span>${tab.label}</span>
         ${upgradeBadge}
       </button>

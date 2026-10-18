@@ -415,7 +415,7 @@ describe("v2 explicit render animation markers", () => {
       const bars = [...html.matchAll(/data-animate-bar="([^"]+)"/g)].map((entry) => entry[1]);
       expect(new Set(bars).size).toBe(bars.length);
       const playerPanel = html.split('id="new-attr-panel">')[1]?.split('id="new-effect-panel"')[0] ?? "";
-      expect(playerPanel).not.toContain("data-animate-");
+      expect([...readAnimationNumbers(playerPanel).keys()]).toEqual(["player:actions:remaining", "player:actions:limit"]);
       expect(html.match(/<[^>]+data-animate-key[^>]+>/g)?.every((tag) => /^<(?:span|strong)\b/.test(tag))).toBe(true);
     }
   });
@@ -3491,7 +3491,7 @@ describe("v2 render lobby shell", () => {
       isEventContentOpen: true,
       activeEventId: state.eventQueue[0]?.id ?? null,
     });
-    const eventButtonsBlock = html.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const eventButtonsBlock = html.match(/<div class="event-content-buttons" id="event-content-buttons"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
 
     expect(html).toContain('class="event-content-close"');
     expect(html).toContain('<span class="new-time-item new-time-enrollment" id="new-time-month">入学前</span>');
@@ -3528,7 +3528,7 @@ describe("v2 render lobby shell", () => {
       expect(current.stage).toBe(`act${scene}`);
       const html = renderApp(state, undefined, { isEventContentOpen: true, activeEventId: current.id });
       const panel = html.split('id="event-content-box">')[1]!.split('class="event-content-buttons"')[0]!;
-      const buttons = html.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+      const buttons = html.match(/<div class="event-content-buttons" id="event-content-buttons"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
       expect(panel.match(/class="event-scene-tab(?: is-active)?"/g)).toHaveLength(scene);
       expect(panel.match(/aria-current="step"/g)).toHaveLength(1);
       expect(buttons.match(/class="event-choice-btn event-action-btn"/g)).toHaveLength(scene === 2 ? 2 : 1);
@@ -3712,7 +3712,7 @@ describe("v2 render lobby shell", () => {
       isEventContentOpen: true,
       activeEventId: "disabled-choice-event",
     });
-    const eventButtonsBlock = html.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const eventButtonsBlock = html.match(/<div class="event-content-buttons" id="event-content-buttons"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
 
     expect(eventButtonsBlock).toContain('disabled aria-disabled="true"');
     expect(eventButtonsBlock).toContain('title="金币不足 4，无法处理。"');
@@ -3790,7 +3790,7 @@ describe("v2 render lobby shell", () => {
       activeEventId: "act2-event",
       activeEventHistoryIndex: 0,
     });
-    const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(historyHtml).toContain("Act 1");
     expect(historyHtml).toContain('class="event-scene-tab is-active"');
     expect(historyHtml).not.toContain("当时结果");
@@ -4338,7 +4338,7 @@ describe("v2 render lobby shell", () => {
       activeEventId: "single-current",
       activeEventHistoryIndex: 0,
     });
-    const historyButtons = html.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const historyButtons = html.match(/<div class="event-content-buttons" id="event-content-buttons"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
 
     expect(historyButtons).toMatch(/\sdisabled\s/);
     expect(historyButtons).toContain("is-selected");
@@ -4409,7 +4409,7 @@ describe("v2 render lobby shell", () => {
       isEventContentOpen: true,
       activeEventHistoryId: completedEvent?.id ?? null,
     });
-    const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const historyButtons = historyHtml.match(/<div class="event-content-buttons" id="event-content-buttons"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
     expect(historyHtml).toContain(">读研之始</button>");
     expect(historyHtml).toContain(">导师信息</button>");
     expect(historyHtml).toContain(">正式录取</button>");

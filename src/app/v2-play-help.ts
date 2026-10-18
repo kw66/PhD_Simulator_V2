@@ -191,6 +191,12 @@ export function getAllPlayHelpPageIds(): string[] {
   return [...new Set(contexts.flatMap(context => context.pages.map((_, index) => `${context.key}:${index}`)))];
 }
 
+export function renderPlayHelpInlineToggle(uiState: PlayRenderUiState = {}): string {
+  const context = getPlayHelpContext(uiState);
+  if (context.pages.length === 0) return "";
+  return `<button class="play-help-toggle play-help-inline-toggle" type="button" data-ui-help-toggle aria-controls="play-help-panel" aria-expanded="${uiState.isHelpOpen === true}" aria-label="小提示" title="小提示"><span aria-hidden="true">💡</span></button>`;
+}
+
 export function renderPlayHelpPanel(uiState: PlayRenderUiState = {}): string {
   const context = getPlayHelpContext(uiState);
   if (context.pages.length === 0) return "";
@@ -203,7 +209,6 @@ export function renderPlayHelpPanel(uiState: PlayRenderUiState = {}): string {
       </details>`
     : `${page.summary ? `<div class="play-help-summary">${page.summary}</div>` : ""}<div class="play-help-content">${page.body}</div>`;
   return `<div class="play-help-area">
-    <button class="play-help-toggle btn-sm" type="button" data-ui-help-toggle aria-controls="play-help-panel" aria-expanded="${uiState.isHelpOpen === true}">💡 小提示</button>
     <section class="play-help-panel${uiState.isHelpOpen ? " is-open" : ""}" id="play-help-panel" aria-label="${context.label}" data-help-context="${context.key}" data-help-page-index="${index}" data-help-page-count="${context.pages.length}">
       <div class="play-help-header">
         <strong class="play-help-topic">💡 ${page.title}</strong>

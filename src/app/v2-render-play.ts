@@ -129,7 +129,7 @@ import { buildBuffDisplayBuckets, getLabExperimentMoneySource } from "./v2-rende
 import { hasScholarshipDisqualification } from "../core/v2-academic-integrity";
 import { renderGameFeedbackOverlay } from "./v2-render-community";
 import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "../core/v2-development-flags";
-import { renderPlayHelpPanel } from "./v2-play-help";
+import { renderPlayHelpInlineToggle, renderPlayHelpPanel } from "./v2-play-help";
 import { isEndingSystemLog, renderEndingLog, renderEndingScreen } from "./v2-render-ending";
 import type { EventLayoutSample } from "./v2-event-layout";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
@@ -774,6 +774,7 @@ function renderLeftRail(state: GameState): string {
   const effectBuckets = buildEffectBuckets(state);
   const role = getRoleDefinition(state.selectedRoleId);
   const playerName = state.playerName?.trim();
+  const remainingActions = Math.max(0, state.actionState.limit - state.actionState.used);
   const displayName = playerName || "？？？";
 
   return `
@@ -786,6 +787,7 @@ function renderLeftRail(state: GameState): string {
         <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${roundMoney(state.player.money)}" aria-label="${escapeHtml(`${displayName}，${role.name}，金币 ${formatMoney(state.player.money)}`)}">
           <div class="new-attr-header new-identity-money-header">
             <span class="new-player-identity"><span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span><span class="new-player-role" title="${escapeHtml(role.name)}">${escapeHtml(role.name)}</span></span>
+            <span class="new-player-action-points" aria-label="行动点 ${remainingActions}/${state.actionState.limit}" title="行动点：剩余 / 上限"><span aria-hidden="true">👣</span>${renderAnimatedNumber("player:actions:remaining", remainingActions)}/${renderAnimatedNumber("player:actions:limit", state.actionState.limit)}</span>
             <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}${getRoleTalentInvestmentLevel(state) > 0 ? `<button type="button" class="new-investment-button" data-action="invest-money" ${state.player.money < 5 || state.phase !== "playing" ? "disabled" : ""} title="投资5金币，${getRoleTalentInvestmentDuration(state)}个月后返还本金及${getRoleTalentInvestmentLevel(state)}金币利息；持有${state.roleTalents?.investments?.length ?? 0}笔">投资</button>` : ""}</span>
           </div>
         </div>
@@ -1240,7 +1242,7 @@ function renderEventContentBox(
           : renderEventDescriptionHtml(displayDescription, getEventNarrativeNames(displayEvent, state))}
       </div>
       ${displayEvent.choices.length > 0 ? `
-        <div class="event-content-buttons" id="event-content-buttons">
+        <div class="event-content-buttons" id="event-content-buttons" data-mobile-columns="${displayEvent.choices.length === 3 && !displayEvent.rewinderPresentation && displayEvent.choices.every(choice => [...normalizeGameDisplayText(choice.label)].length <= 6) ? 3 : 2}">
           ${displayEvent.rewinderPresentation && rewinderAct !== "attributes" ? `<button class="event-choice-btn event-action-btn is-rewinder-back" type="button" data-ui-rewinder-act="${rewinderAct === "growth" ? "attributes" : "growth"}"><span>上一幕</span></button>` : ""}
           ${displayEvent.rewinderPresentation && rewinderAct !== "relationships" ? `<button class="event-choice-btn event-action-btn" type="button" data-ui-rewinder-act="${rewinderAct === "attributes" ? "growth" : "relationships"}"><span>${rewinderAct === "attributes" ? "继续 · 成长" : "继续 · 人际"}</span></button>` : displayEvent.choices.map((choice) => {
             const disabledReason = choice.disabledReason?.trim() ?? "";
@@ -4403,8 +4405,9 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
                 title="切换为${dateDisplayMode === "academic" ? "公历日期" : "学年月份"}"
               ><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
               ${seasonLabel ? `<span class="new-time-item new-time-season play-tooltip" id="new-time-season" tabindex="0" aria-label="${escapeHtml(getSeasonEffectText(state))}" data-tooltip="${escapeHtml(getSeasonEffectText(state))}">${seasonLabel}</span>` : ""}
-              <span class="new-time-item new-time-remaining" id="new-time-remaining">${getRemainingMonthsText(state)}</span>
             `}
+          ${renderPlayHelpInlineToggle(uiState)}
+          ${preEnrollment ? "" : `<span class="new-time-item new-time-remaining" id="new-time-remaining">${getRemainingMonthsText(state)}</span>`}
         </div>
         <div
           class="new-calendar-section new-pending-event-section"
