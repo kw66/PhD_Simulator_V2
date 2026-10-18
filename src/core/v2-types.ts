@@ -801,8 +801,8 @@ export interface PendingEvent {
   debugRootEventId?: string;
   /** Root description for replaying this pending chain; never a full game snapshot. */
   replayContext?: { rootEvent: PendingEvent; debugEventId?: string };
-  /** Normal rewinder ability: fixed randomness for each pending event choice path. */
-  rewinderReplay?: import("./v2-rewinder-event-replay").RewinderEventReplayContext;
+  /** Fixed randomness for pending event choices for all roles; serialized key retained for recorded runs. */
+  rewinderReplay?: import("./v2-event-replay").EventReplayContext;
 }
 
 export interface EventQueueItem extends PendingEvent {

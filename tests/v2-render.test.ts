@@ -878,7 +878,8 @@ describe("v2 render lobby shell", () => {
     expect(masthead).not.toContain('class="lobby-live-metrics"');
     expect(messageRailHtml).not.toContain('class="lobby-live-metrics"');
     expect(messageRailHtml).toContain('href="https://xhslink.cn/o/ApT7nOda3CF" target="_blank" rel="noopener noreferrer"');
-    expect(messageRailHtml).toContain("小红书评论");
+    expect(messageRailHtml).toContain("<span>小红书</span>");
+    expect(messageRailHtml).toContain("大家帮忙去小红书3连一下");
     expect(rolesHtml).not.toContain('data-community-stat="current-online"');
     expect(rolesHtml).not.toContain('data-community-stat="views"');
     expect(rolesHtml).not.toContain("当前在线");
@@ -1126,7 +1127,7 @@ describe("v2 render lobby shell", () => {
     expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
     for (const category of ["属性轮回", "天赋轮回", "人际轮回", "轮回者 · 特殊"]) expect(html).toContain(category);
     expect(html).not.toContain("局内轮回");
-    expect(html).toContain("事件可回退");
+    expect(html).not.toContain("事件可回退");
     expect(html).not.toContain("rewinder-unlock-progress");
   });
 

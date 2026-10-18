@@ -68,7 +68,7 @@ describe("rewinder annual event display", () => {
     expect(html).not.toContain("暂无角色天赋树");
   });
 
-  it("keeps the special rule in the first row and folds event rewind into its description", () => {
+  it("keeps the special rule in the first row without the universal event ability", () => {
     const html = renderRewinderPreview(3, 12);
     const nodes = html.match(/<button[^>]*data-rewinder-rule="\d+"[^>]*>/g)!;
     expect(nodes).toHaveLength(4);
@@ -77,8 +77,8 @@ describe("rewinder annual event display", () => {
     expect(nodes[3]).toContain('aria-pressed="true"');
     expect(html).toContain("第12次轮回");
     expect(html).not.toContain("局内轮回");
-    expect(html).toContain("事件可回退");
-    expect(html).toContain("结果固定");
+    expect(html).not.toContain("事件可回退");
+    expect(html).not.toContain("结果固定");
     expect(renderRewinderPreview(4, NaN)).toContain('data-rewinder-cycle="1"');
   });
 

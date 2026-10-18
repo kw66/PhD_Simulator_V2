@@ -198,11 +198,11 @@ describe("graduation cards and blind review in the browser", () => {
       expect(await page.locator(".graduation-review-chart").count()).toBe(1);
       expect(await page.locator(".graduation-review-score-grid > div").count()).toBe(degree === "master" ? 3 : 4);
       await page.screenshot({ path: `artifacts/graduation/${degree}-act1.png` });
-      await page.locator("#event-content-buttons button").first().click();
+      await page.locator('#event-content-buttons [data-action="resolve-event"]').click();
       expect(await page.locator(".graduation-reviewer-card").count()).toBe(degree === "master" ? 3 : 5);
       expect(await page.locator("#event-content-body").textContent()).toContain("专家意见");
       await page.screenshot({ path: `artifacts/graduation/${degree}-act2.png` });
-      await page.locator("#event-content-buttons button").first().click();
+      await page.locator('#event-content-buttons [data-action="resolve-event"]').click();
       expect(await page.locator(".graduation-review-decision").count()).toBe(1);
       expect(await page.locator("#event-content-body").textContent()).toContain(`优秀${degree === "master" ? "硕士" : "博士"}论文`);
       await page.screenshot({ path: `artifacts/graduation/${degree}-act3.png` });
@@ -213,7 +213,8 @@ describe("graduation cards and blind review in the browser", () => {
         expect(await page.locator(".graduation-review-event").evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
       }
       await page.setViewportSize({ width: 1920, height: 1080 });
-      await page.locator("#event-content-buttons button").first().click();
+      await page.locator('#event-content-buttons [data-action="resolve-event"]').click();
+      expect(await page.evaluate(() => (window as GraduationWindow).graduationStore.getState().thesis.reviewResolved)).toBe(true);
       await page.locator('[data-ui-play-tab="workstation"]').click();
       expect(await page.locator(".graduation-excellent").count()).toBe(0);
       expect(await points.first().isDisabled()).toBe(true);

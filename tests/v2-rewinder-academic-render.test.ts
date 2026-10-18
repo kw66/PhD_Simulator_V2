@@ -76,7 +76,7 @@ describe("academic archive pages", () => {
     expect(html).toContain("第4学年 · 一年一生");
     expect(html).toContain("第8次轮回");
     expect(html).toContain("逐年挑战，年末归档，承接前一年成果");
-    expect(html).toContain("事件可回退，结果固定");
+    expect(html).not.toContain("事件可回退，结果固定");
     expect(html).toContain("grid-column:4;grid-row:1");
     expect(html).not.toContain("局内轮回");
     expect(html).not.toContain("正式结算后留给下一世");

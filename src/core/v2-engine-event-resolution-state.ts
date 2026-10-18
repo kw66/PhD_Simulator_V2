@@ -1,5 +1,6 @@
 import { gameRandom } from "./v2-game-random";
-import { withRewinderChoiceRandom } from "./v2-rewinder-event-replay";
+import { withEventChoiceRandom } from "./v2-event-replay";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getEffectiveSocial } from "./v2-effective-attributes";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import { scheduleConferenceAttendance } from "./v2-conference-attendance";
@@ -499,7 +500,11 @@ export function applyChoiceEffectsToState(
   buffSource = "事件",
   currentEvent?: PendingEvent,
 ): ResolvedEventChoiceState {
-  return withRewinderChoiceRandom(state, currentEvent, choice.id,
+  // Name/advisor redraw buttons explicitly request a new candidate, not a replayed choice.
+  if (choice.effects.stayOnEvent && usesGameplayRulesFrom("20261019-r10")) {
+    return applyChoiceEffectsInternal(state, choice, buffSource, currentEvent);
+  }
+  return withEventChoiceRandom(state, currentEvent, choice.id,
     () => applyChoiceEffectsInternal(state, choice, buffSource, currentEvent));
 }
 

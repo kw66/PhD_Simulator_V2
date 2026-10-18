@@ -9,6 +9,7 @@ export const GAME_ACTION_IDS = [
   "restart-game",
   "settle-and-return",
   "toggle-rewinder-person",
+  "replay-event",
   "rewinder-replay-event",
   "toggle-rewinder-archive-person",
   "select-rewinder-archive-papers",

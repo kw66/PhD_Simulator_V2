@@ -19,8 +19,7 @@ import { getCitationStats } from "../core/v2-citation-stats";
 import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-catalog";
 import { getEventChoiceRiskDetails } from "../core/v2-event-choice-risk";
 import { getResolvableQueuedEvent } from "../core/v2-engine-event-resolution";
-import { canRewindPendingEvent } from "../core/v2-rewinder-event-replay";
-import "../styles/rewinder-event-replay.css";
+import { canRewindPendingEvent } from "../core/v2-event-replay";
 import "../styles/event-choice-risk.css";
 import type { ConferenceRegionId } from "../core/v2-conference-system";
 import { getCurrentEvent, getEventQueuePriority, getSortedEventQueue } from "../core/v2-event-queue";
@@ -769,7 +768,20 @@ function buildEffectBuckets(state: GameState): {
   };
 }
 
-function renderLeftRail(state: GameState): string {
+function renderMobileStatus(state: GameState, uiState: PlayRenderUiState): string {
+  const actions = Math.max(0, state.actionState.limit - state.actionState.used);
+  const date = isPreEnrollmentState(state) ? "入学前" : `${state.year}年 · ${getAcademicCalendarMonth(state.month)}月`;
+  const moneyLabel = Math.abs(state.player.money) >= 10_000
+    ? state.player.money.toLocaleString("zh-CN", { notation: "compact", maximumFractionDigits: 1 }) : formatMoney(state.player.money);
+  return `<button type="button" class="mobile-status-toggle" data-ui-mobile-status aria-expanded="${uiState.isMobileStatusOpen === true}" aria-controls="mobile-status-panel" aria-label="查看属性与效果，SAN ${formatMoney(state.player.san)}/${formatMoney(state.sanCap)}，金币 ${formatMoney(state.player.money)}，行动点 ${actions}/${state.actionState.limit}，${date}">
+    <span class="mobile-status-resource${state.player.san < 6 ? " is-low" : ""}"><span aria-hidden="true">🧠</span><strong>${renderAnimatedNumber("mobile:san", state.player.san)}</strong><small>/${formatMoney(state.sanCap)}</small></span>
+    <span class="mobile-status-resource${state.player.money <= 0 ? " is-low" : ""}"><span aria-hidden="true">💰</span><strong>${renderAnimatedNumber("mobile:money", state.player.money, moneyLabel)}</strong></span>
+    <span class="mobile-status-resource"><span aria-hidden="true">👣</span><strong>${renderAnimatedNumber("mobile:actions", actions)}</strong><small>/${state.actionState.limit}</small></span>
+    <span class="mobile-status-date">${date}</span><span class="mobile-status-chevron" aria-hidden="true">⌃</span>
+  </button>`;
+}
+
+function renderLeftRail(state: GameState, uiState: PlayRenderUiState): string {
   const researchCap = getResearchCap(state.researchCapacityState);
   const effectBuckets = buildEffectBuckets(state);
   const role = getRoleDefinition(state.selectedRoleId);
@@ -778,7 +790,8 @@ function renderLeftRail(state: GameState): string {
   const displayName = playerName || "？？？";
 
   return `
-    <aside class="play-left-rail new-left-container">
+    <aside class="play-left-rail new-left-container" id="mobile-status-panel"${uiState.isMobileStatusOpen ? ' role="dialog" aria-modal="true" aria-label="属性与效果"' : ""}>
+      <div class="mobile-status-heading"><strong>属性与效果</strong></div>
       <div class="new-attr-panel" id="new-attr-panel">
         ${renderAttrItem("🧠", "SAN值", state.player.san, state.sanCap, "san", "san", state.illnessProbability, state.player.san, state)}
         ${renderAttrItem("💡", "科研能力", state.player.research, Math.max(researchCap, 20), "research", "research", 0, getEffectiveResearch(state), state)}
@@ -817,6 +830,7 @@ function renderLeftRail(state: GameState): string {
           <div class="new-effect-source-box" id="new-effect-source-box"></div>
         </div>
       </div>
+      <button type="button" class="mobile-status-close" data-ui-mobile-close>收起属性 <span aria-hidden="true">⌄</span></button>
     </aside>
   `;
 }
@@ -1185,10 +1199,11 @@ function renderEventContentBox(
   const debugReplayable = debugEventReplayEnabled
     && currentEvent?.replayContext !== undefined
     && historicalPage !== null;
-  const rewinderReplayable = !!state && !!currentEvent && !isCompleted && historicalPage !== null
+  const pendingReplayable = !!state && !!currentEvent && !isCompleted && historicalPage !== null
     && canRewindPendingEvent(state, currentEvent, displayPageIndex);
-  const rewinderReturnIndex = !state || !currentEvent || isCompleted ? -1 : history.reduce((last, stage, index) =>
-    stage.choices.filter(choice => !isSecondaryEventChoice(choice)).length > 1 && canRewindPendingEvent(state, currentEvent, index) ? index : last, -1);
+  const returnIndex = !state || !currentEvent || isCompleted || historicalPage !== null
+    || displayEvent.rewinderPresentation || (displayStage !== "act3" && displayStage !== "result") ? -1
+    : history.reduce((last, _stage, index) => canRewindPendingEvent(state, currentEvent, index) ? index : last, -1);
   const selectedChoiceId = historicalPage?.selectedChoiceId ?? null;
   const riskEvent = state && currentEvent && !isCompleted
     ? historicalPage?.replayEvent
@@ -1229,7 +1244,6 @@ function renderEventContentBox(
         </div>
         <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情">×</button>
       </div>
-      ${rewinderReturnIndex >= 0 ? `<div class="rewinder-choice-return"><span><i data-lucide="rotate-ccw" aria-hidden="true"></i><strong>局内轮回</strong><small>同一选项，结果不变</small></span>${historicalPage === null ? `<button type="button" data-action="rewinder-replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${rewinderReturnIndex}">返回选择</button>` : '<small>选择下方选项，改走另一条路</small>'}</div>` : ""}
       <div class="event-content-body" id="event-content-body">
         ${displayEvent.rewinderPresentation
           ? renderRewinderEvent({ ...displayEvent.rewinderPresentation, cycleNumber: displayEvent.rewinderPresentation.cycleNumber ?? state?.rewinderState?.cycleNumber }, historicalPage === null && !isCompleted ? state : undefined, rewinderAct)
@@ -1243,6 +1257,7 @@ function renderEventContentBox(
       </div>
       ${displayEvent.choices.length > 0 ? `
         <div class="event-content-buttons" id="event-content-buttons" data-mobile-columns="${displayEvent.choices.length === 3 && !displayEvent.rewinderPresentation && displayEvent.choices.every(choice => [...normalizeGameDisplayText(choice.label)].length <= 6) ? 3 : 2}">
+          ${returnIndex >= 0 ? `<button class="event-choice-btn event-action-btn is-event-rewind" type="button" data-action="replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${returnIndex}" title="返回选择，同一选项结果固定"><span>回溯</span></button>` : ""}
           ${displayEvent.rewinderPresentation && rewinderAct !== "attributes" ? `<button class="event-choice-btn event-action-btn is-rewinder-back" type="button" data-ui-rewinder-act="${rewinderAct === "growth" ? "attributes" : "growth"}"><span>上一幕</span></button>` : ""}
           ${displayEvent.rewinderPresentation && rewinderAct !== "relationships" ? `<button class="event-choice-btn event-action-btn" type="button" data-ui-rewinder-act="${rewinderAct === "attributes" ? "growth" : "relationships"}"><span>${rewinderAct === "attributes" ? "继续 · 成长" : "继续 · 人际"}</span></button>` : displayEvent.choices.map((choice) => {
             const disabledReason = choice.disabledReason?.trim() ?? "";
@@ -1261,12 +1276,12 @@ function renderEventContentBox(
               && !isCompleted && !historicalPage && !disabledReason && !secondary
               && !displayEvent.rewinderPresentation && displayStage !== "act1";
             const riskState = risk ?? (riskEvaluated ? "safe" : null);
-            const canReplay = (debugReplayable || rewinderReplayable) && disabledReason === "";
+            const canReplay = (debugReplayable || pendingReplayable) && disabledReason === "";
             const isDisabled = !canReplay && (historicalPage !== null || disabledReason !== "");
             const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"`
               : riskText ? ` data-event-risk-tooltip data-tooltip="${escapeHtml(riskText)}" aria-description="${escapeHtml(riskText)}"` : "";
             const buttonAttributes = canReplay
-              ? `data-action="${rewinderReplayable ? "rewinder-replay-event" : "debug-replay-event"}" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
+              ? `data-action="${pendingReplayable ? "replay-event" : "debug-replay-event"}" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
               : isDisabled
               ? `disabled aria-disabled="true"${titleAttribute}`
               : `data-action="resolve-event" data-event-id="${escapeHtml(currentEventId)}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`;
@@ -3824,6 +3839,7 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
 
 function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): string {
   const blockingEventCount = state.eventQueue.filter((event) => isEventBlocking(state, event)).length;
+  const remainingActions = Math.max(0, state.actionState.limit - state.actionState.used);
   const aiResearchActionAvailable = state.phase === "playing" && !isGameplayModuleLocked(state)
     && getActiveOperationAllowance(state, "idea").usesAiResearchBonus;
   const aiResearchActionCount = aiResearchActionAvailable ? 1 : 0;
@@ -3874,7 +3890,7 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
     <section class="play-center-column game-main-area">
       ${renderPlayCenterPortraits(state)}
       <div class="center-shell" id="center-shell">
-        <div class="center-main-tabs" id="center-main-tabs">
+        <div class="center-main-tabs" id="center-main-tabs" data-mobile-more-open="${uiState.isMobileMoreOpen === true}">
           <button class="center-tab-btn${getTabActiveClass("events")}" type="button" aria-pressed="${getTabAriaPressed("events")}" data-ui-play-tab="events" data-tooltip="查看事件、待办和游戏日志">
             <span class="center-tab-icon" aria-hidden="true"><i data-lucide="bell"></i></span>
             <span>事件</span>
@@ -3882,9 +3898,11 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
           <button class="center-tab-btn${getTabActiveClass("workstation")}" type="button" aria-pressed="${getTabAriaPressed("workstation")}" data-ui-play-tab="workstation" data-tooltip="管理论文、科研操作和投稿"><span class="center-tab-icon" aria-hidden="true"><i data-lucide="microscope"></i></span><span>科研</span>${renderTabBadge(researchActionCount, "available", researchActionLabel)}</button>
           <button class="center-tab-btn${getTabActiveClass("relationship")}" type="button" aria-pressed="${getTabAriaPressed("relationship")}" data-ui-play-tab="relationship" data-tooltip="查看导师、同学和恋人"><span class="center-tab-icon" aria-hidden="true"><i data-lucide="users-round"></i></span><span>人际</span>${renderTabBadge(relationshipActionCount, "available", `${relationshipActionCount} 个可用操作`)}</button>
           <button class="center-tab-btn${getTabActiveClass("shop")}" type="button" aria-pressed="${getTabAriaPressed("shop")}" data-ui-play-tab="shop" data-tooltip="购买装备、咖啡和 AI"><span class="center-tab-icon" aria-hidden="true"><i data-lucide="shopping-cart"></i></span><span>商店</span>${shopUpgradeBadge}</button>
+          <div class="mobile-secondary-tabs" id="mobile-secondary-tabs" role="group" aria-label="更多栏目">
           <button class="center-tab-btn${getTabActiveClass("research")}" type="button" aria-pressed="${getTabAriaPressed("research")}" data-ui-play-tab="research" data-tooltip="查看论文成果、引用和宣传"><span class="center-tab-icon" aria-hidden="true"><i data-lucide="trophy"></i></span><span>成果</span>${renderTabBadge(availablePromotionCount, "available", `${availablePromotionCount} 个可推广操作`)}</button>
           <button class="center-tab-btn${getTabActiveClass("talent")}" type="button" aria-pressed="${getTabAriaPressed("talent")}" data-ui-play-tab="talent" data-tooltip="查看角色、关系、装备和成长"><span class="center-tab-icon" aria-hidden="true"><i data-lucide="sprout"></i></span><span>天赋</span></button>
           <button class="center-tab-btn${getTabActiveClass("settings")}" type="button" aria-pressed="${getTabAriaPressed("settings")}" data-ui-play-tab="settings" data-tooltip="调整游戏设置"><span class="center-tab-icon" aria-hidden="true"><i data-lucide="settings"></i></span><span>设置</span></button>
+          </div>
           <button
             class="center-tab-btn center-tab-btn-next"
             type="button"
@@ -3894,6 +3912,8 @@ function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): s
             <span class="center-tab-next-label">下一月</span>
             <span class="center-tab-next-arrow" aria-hidden="true">→</span>
           </button>
+          <button type="button" class="mobile-more-toggle${["research", "talent", "settings"].includes(activePlayTab) ? " is-active" : ""}" data-ui-mobile-more aria-expanded="${uiState.isMobileMoreOpen === true}" aria-controls="mobile-secondary-tabs"><span aria-hidden="true">•••</span><span>${activePlayTab === "research" ? "成果" : activePlayTab === "talent" ? "天赋" : activePlayTab === "settings" ? "设置" : "更多"}</span></button>
+          <button type="button" class="mobile-month-summary${blockingEventCount > 0 ? " has-pending" : ""}" data-ui-mobile-pending aria-label="${state.phase === "finished" ? "查看本轮结局" : blockingEventCount > 0 ? `处理 ${blockingEventCount} 个本月待办` : "查看本月事件"}"><strong>${state.phase === "finished" ? "本轮已结束" : blockingEventCount > 0 ? `${blockingEventCount} 个到期待办 ›` : "可进入下一月"}</strong><span>${state.phase === "finished" ? "可查看结局与各栏目" : `剩余 ${remainingActions} 行动点`}</span></button>
         </div>
 
         <div class="center-main-panels" id="center-main-panels">
@@ -4455,13 +4475,15 @@ export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = 
   const showQuitConfirmation = state.phase === "playing" && uiState.isQuitConfirmationOpen;
   const showAcademicArchive = isAcademicArchivePending(state);
   return `
-    <main class="play-page" data-phase="${state.phase}" data-scale-mode="fixed">
-      <section class="play-stage-shell"${showQuitConfirmation || showAcademicArchive ? " inert" : ""}>
+    <main class="play-page" data-phase="${state.phase}" data-scale-mode="fixed" data-mobile-status-open="${uiState.isMobileStatusOpen === true}" data-mobile-more-open="${uiState.isMobileMoreOpen === true}">
+      <section class="play-stage-shell"${showQuitConfirmation || showAcademicArchive || uiState.isFeedbackOpen ? " inert" : ""}>
+        ${renderMobileStatus(state, uiState)}
         <div class="play-stage-scale">
           <section class="play-stage">
             <section class="play-workbench">
               <div class="play-workbench-body">
-                ${renderLeftRail(state)}
+                <button type="button" class="mobile-shell-backdrop" data-ui-mobile-close aria-label="收起面板" tabindex="-1"></button>
+                ${renderLeftRail(state, uiState)}
                 ${renderCenterShell(state, uiState)}
                 ${renderRightRail(state, uiState)}
               </div>

@@ -1,7 +1,7 @@
 import { createGameRandomState, withGameRandom } from "./v2-game-random";
 import { settleCaptainMonth, syncCaptainMembers } from "./v2-captain-runtime";
 import { prepareRewinderYear, completeRewinderYear, isRewinderYearEnd, toggleRewinderPerson } from "./v2-rewinder";
-import { replayRewinderEvent } from "./v2-rewinder-event-replay";
+import { replayPendingEvent } from "./v2-event-replay";
 import { isAcademicYearEnd, prepareAcademicArchive, toggleAcademicPerson, selectAcademicSource, completeAcademicArchive } from "./v2-rewinder-academic";
 import { observeAchievements } from "./v2-achievement-runtime";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
@@ -463,7 +463,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
   const helpedState = settlePendingPaperHelp(checkedState);
-  const settledState = actionId === "resolve-event" || actionId === "rewinder-replay-event"
+  const settledState = actionId === "resolve-event" || actionId === "replay-event" || actionId === "rewinder-replay-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;
   const conferenceState = syncThesisState(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(settledState)));
@@ -552,8 +552,9 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
       return takeRest(state);
     case "resolve-event":
       return resolveQueuedEvent(state, payload.eventId, payload.eventChoiceId);
+    case "replay-event":
     case "rewinder-replay-event":
-      return replayRewinderEvent(state, payload, resolveQueuedEvent);
+      return replayPendingEvent(state, payload, resolveQueuedEvent);
     case "end-relationship":
       return payload.relationshipId && state.phase === "playing"
         ? endRelationship(state, payload.relationshipId)

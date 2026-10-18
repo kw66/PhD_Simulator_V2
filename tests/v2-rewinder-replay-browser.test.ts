@@ -13,7 +13,7 @@ import { bootstrapApp } from '/src/app/v2-bootstrap.ts';
 bootstrapApp(document.getElementById('app'));
 </script></body></html>`;
 
-describe("rewinder choices through the real browser handlers", () => {
+describe("universal event choices through the real browser handlers", () => {
   let server: ViteDevServer;
   let browser: Browser;
   beforeAll(async () => {
@@ -32,7 +32,7 @@ describe("rewinder choices through the real browser handlers", () => {
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
 
-  it.each([1440, 390])("reselects pending branches with fixed outcomes and locks confirmed history at %ipx", async width => {
+  it.each([1440, 390, 320].flatMap(width => (["normal", "rewinder"] as const).map(roleId => ({ width, roleId }))))("reselects $roleId branches with fixed outcomes and locks confirmed history at $width px", async ({ width, roleId }) => {
     const page = await browser.newPage({ viewport: { width, height: width < 600 ? 844 : 1000 },
       isMobile: width < 600, hasTouch: width < 600, reducedMotion: "reduce" });
     page.setDefaultTimeout(8_000);
@@ -50,13 +50,13 @@ describe("rewinder choices through the real browser handlers", () => {
     try {
       await page.goto(`${origin}/__rewinder_replay_test__`);
       await page.locator('[data-action="start-game"]').waitFor();
-      await page.evaluate(() => {
+      await page.evaluate(roleId => {
         const store = (window as RewinderWindow).rewinderReplayStore;
         // Account setup only: the complete run below uses ordinary UI actions.
-        store.getLobbyState().roleProgress.rewinder.unlocked = true;
+        store.getLobbyState().roleProgress[roleId].unlocked = true;
         store.getState().randomState = { seed: 1700000000, cursor: 0 };
-        store.dispatch("select-role", { roleId: "rewinder" });
-      });
+        store.dispatch("select-role", { roleId });
+      }, roleId);
       await page.locator('[data-action="start-game"]:visible').click();
       for (const choiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
         await page.locator(`[data-event-choice-id="${choiceId}"]:visible`).click();
@@ -74,19 +74,21 @@ describe("rewinder choices through the real browser handlers", () => {
       });
       await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"]`).click();
       const originalText = await page.locator("#event-content-body").textContent();
-      const returnButton = page.locator('.rewinder-choice-return [data-action="rewinder-replay-event"]');
-      expect(await returnButton.textContent()).toBe("返回选择");
+      const returnButton = page.locator('#event-content-buttons .is-event-rewind');
+      expect(await returnButton.textContent()).toBe("回溯");
       expect(await page.locator('#event-content-box [data-action="debug-replay-event"]').count()).toBe(0);
-      const fit = await page.locator(".rewinder-choice-return").evaluate(bar => {
+      const fit = await page.locator("#event-content-buttons").evaluate(bar => {
         const box = bar.getBoundingClientRect();
-        const button = bar.querySelector("button")!.getBoundingClientRect();
+        const button = bar.querySelector(".is-event-rewind")!.getBoundingClientRect();
+        const confirm = bar.querySelector('[data-action="resolve-event"]')!.getBoundingClientRect();
         return { overflow: bar.scrollWidth - bar.clientWidth, right: box.right, viewport: innerWidth,
-          buttonInside: button.left >= box.left && button.right <= box.right + 1 };
+          sameRow: Math.abs(confirm.y - button.y) < 1, buttonInside: button.left >= box.left && button.right <= box.right + 1 };
       });
       expect(fit.overflow).toBeLessThanOrEqual(1);
       expect(fit.right).toBeLessThanOrEqual(fit.viewport + 1);
       expect(fit.buttonInside).toBe(true);
-      await page.locator("#event-content-box").screenshot({ path: `artifacts/rewinder-event-replay/${width}-result.png` });
+      expect(fit.sameRow).toBe(true);
+      await page.locator("#event-content-box").screenshot({ path: `artifacts/rewinder-event-replay/${roleId}-${width}-result.png` });
 
       await returnButton.click();
       expect(await page.locator('#event-content-buttons [data-action="resolve-event"]').count()).toBe(3);
@@ -98,9 +100,9 @@ describe("rewinder choices through the real browser handlers", () => {
 
       // Historical tabs expose the same normal ability directly on each choice.
       await page.locator('[data-ui-event-scene-index="1"]').click();
-      expect(await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"]`).getAttribute("data-action")).toBe("rewinder-replay-event");
+      expect(await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"]`).getAttribute("data-action")).toBe("replay-event");
       expect(await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"] [aria-label="已选择"]`).count()).toBe(1);
-      await page.locator("#event-content-box").screenshot({ path: `artifacts/rewinder-event-replay/${width}-history-choices.png` });
+      await page.locator("#event-content-box").screenshot({ path: `artifacts/rewinder-event-replay/${roleId}-${width}-history-choices.png` });
       await page.locator(`#event-content-buttons button[data-event-choice-id="${alternateId}"]`).click();
       await page.locator('[data-ui-event-scene-index="1"]').click();
       await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"]`).click();
@@ -122,7 +124,7 @@ describe("rewinder choices through the real browser handlers", () => {
       await page.locator('[data-ui-open-event-history-id*="teachers-day-result-"]').first().click();
       for (const index of [0, 1, 2]) {
         await page.locator(`[data-ui-event-scene-index="${index}"]`).click();
-        expect(await page.locator('#event-content-box [data-action="rewinder-replay-event"]').count()).toBe(0);
+        expect(await page.locator('#event-content-box [data-action="replay-event"]').count()).toBe(0);
         expect(await page.locator('#event-content-buttons button:not(:disabled)').count()).toBe(0);
       }
       expect(errors).toEqual([]);

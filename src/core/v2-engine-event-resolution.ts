@@ -1,5 +1,5 @@
 import { withGameRandomPreview } from "./v2-game-random";
-import { prepareRewinderEventReplay } from "./v2-rewinder-event-replay";
+import { prepareEventReplay, withEventChoiceRandom } from "./v2-event-replay";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import {
   pushLog,
@@ -511,7 +511,7 @@ export function applyQueuedEventEffects(
   if (queuedEvent.chainId === "scholarship" && !state.eventQueue.some((event) => event.id === queuedEvent.id)) {
     return state;
   }
-  queuedEvent = prepareRewinderEventReplay(state, queuedEvent);
+  queuedEvent = prepareEventReplay(state, queuedEvent);
   const activityPreview = queuedEvent.conferenceActivityPreview;
   if (state.debugEventReplayEnabled && queuedEvent.debugReplayable && queuedEvent.stage === "act1"
     && activityPreview && queuedEvent.choices.some((choice) => choice.id === choiceId && !choice.disabledReason)) {
@@ -582,7 +582,7 @@ export function applyQueuedEventEffects(
     };
   }
 
-  const followUpEvents = [...resolvedEnqueueEvents, ...(choice.effects.enqueueEvents ?? [])].map((event) => {
+  const followUpEvents = withEventChoiceRandom(state, resolvedEvent, choice.id, () => [...resolvedEnqueueEvents, ...(choice.effects.enqueueEvents ?? [])].map((event) => {
     if (resolvedEvent.stage === "act1" && resolvedEvent.chainId === "internship-invite") {
       return revealInternshipInviteLead(event);
     }
@@ -590,7 +590,7 @@ export function applyQueuedEventEffects(
     if (resolvedEvent.chainId === "internship-invite") return revealInternshipInviteResult(event);
     if (resolvedEvent.chainId === "joint-training") return revealJointTrainingResult(event);
     return event;
-  });
+  }), "reveal");
   // Every intermediate scene is a preview. Carry its cumulative effects
   // forward, and commit only when the final confirmation closes this chain.
   const hasSameChainFollowUp = followUpEvents.some((event) => event.chainId === resolvedEvent.chainId);

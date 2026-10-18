@@ -10,7 +10,7 @@ const REWINDER_RULES = [
   { name: "人际轮回", icon: "users-round", tone: "#8c83a2", column: 3, row: 1,
     lines: ["人际与成果随档案延续"] },
   { name: "轮回者 · 特殊", icon: "hourglass", tone: "#38577f", column: 4, row: 1,
-    lines: ["逐年挑战，年末归档，承接前一年成果", "事件可回退，结果固定"] },
+    lines: ["逐年挑战，年末归档，承接前一年成果"] },
 ] as const;
 
 /** The four fixed rules use the same read-only board in the lobby and in a run. */

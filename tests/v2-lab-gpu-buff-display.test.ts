@@ -14,7 +14,7 @@ function createPlayingState(buffs: Buff[]): GameState {
 
 function renderBuffSidebar(state: GameState): string {
   const html = renderApp(state, undefined, { activePlayTab: "workstation" });
-  const sidebar = html.match(/<aside class="play-left-rail[^"]*">[\s\S]*?<\/aside>/)?.[0];
+  const sidebar = html.match(/<aside class="play-left-rail[^"]*"[^>]*>[\s\S]*?<\/aside>/)?.[0];
   expect(sidebar).toBeDefined();
   return sidebar!;
 }

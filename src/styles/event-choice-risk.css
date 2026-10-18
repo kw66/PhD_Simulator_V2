@@ -40,12 +40,41 @@ button[data-event-risk-state]:focus-visible {
   outline-offset: 3px;
 }
 
+/* Reserve matching space on both sides of the label. Risk punctuation is an
+   annotation, so adding it must not move the button's centered text. */
+.center-main-panel[data-tab-panel="events"] .event-content-buttons button.event-choice-btn:has(> .event-choice-risk),
+.event-content-buttons .event-choice-btn:has(> .event-choice-risk) {
+  position: relative;
+  padding-inline: 26px;
+}
+
+.event-content-buttons .event-choice-btn:has(> .event-choice-risk) > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.event-content-buttons .event-choice-btn:has(> .event-choice-risk) > :is(svg, [data-lucide="check"]) {
+  position: absolute;
+  inset-inline-start: 4px;
+}
+
+.graduation-card button.graduation-action:has(> .event-choice-risk) {
+  position: relative;
+  padding-inline: 18px;
+  flex-wrap: wrap;
+  align-content: center;
+  row-gap: 0;
+}
+
 .event-content-buttons .event-choice-btn > .event-choice-risk,
 .graduation-action .event-choice-risk {
+  position: absolute;
+  inset-inline-end: 3px;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 22px;
   width: 22px;
   height: 24px;
   padding: 0;
@@ -62,19 +91,28 @@ button[data-event-risk-state]:focus-visible {
 .event-choice-risk.is-possible { --event-risk-color: #91670f; }
 
 .graduation-action .event-choice-risk {
-  width: 19px;
+  inset-inline-end: 1px;
+  width: 16px;
   height: 22px;
   font-size: 1.05rem;
 }
 
 @media (max-width: 820px) {
-  .graduation-card .graduation-action[data-event-risk-state] {
-    gap: 2px;
-    padding-inline: 3px;
+  .center-main-panel[data-tab-panel="events"] .event-content-buttons button.event-choice-btn:has(> .event-choice-risk),
+  .event-content-buttons .event-choice-btn:has(> .event-choice-risk) {
+    padding-inline: 17px;
+  }
+  .event-content-buttons .event-choice-btn > .event-choice-risk {
+    inset-inline-end: 0;
+    width: 16px;
+  }
+  .graduation-card button.graduation-action:has(> .event-choice-risk) {
+    column-gap: 2px;
+    padding-inline: 16px;
   }
   .graduation-action .event-choice-risk {
-    flex-basis: 18px;
-    width: 18px;
+    inset-inline-end: 0;
+    width: 15px;
     height: 20px;
     font-size: 1rem;
   }

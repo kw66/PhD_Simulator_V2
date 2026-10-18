@@ -145,9 +145,9 @@ describe("timeline scrolling through the real app handlers", () => {
     await action("debug-trigger-ending", { eventId: "quit" });
     await action("settle-and-return");
     await action("start-game");
-    await page.locator(".event-content-buttons button").first().click();
-    await page.locator(".event-content-buttons button").nth(1).click();
-    await page.locator(".event-content-buttons button").first().click();
+    for (const choiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
+      await page.locator(`.event-content-buttons [data-event-choice-id="${choiceId}"]`).click();
+    }
     await action("debug-adjust-stat", { debugStatId: "san", delta: "-5" });
     await action("force-next-month");
     await action("debug-adjust-stat", { debugStatId: "san", delta: "-4" });
@@ -192,9 +192,9 @@ describe("timeline scrolling through the real app handlers", () => {
     await action("debug-trigger-ending", { eventId: "quit" });
     await action("settle-and-return");
     await action("start-game");
-    await page.locator(".event-content-buttons button").first().click();
-    await page.locator(".event-content-buttons button").nth(1).click();
-    await page.locator(".event-content-buttons button").first().click();
+    for (const choiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
+      await page.locator(`.event-content-buttons [data-event-choice-id="${choiceId}"]`).click();
+    }
     for (let month = 0; month < 60; month += 1) {
       if (month === 15 || month === 30 || month === 45) {
         await action("debug-adjust-stat", { debugStatId: "san", delta: "-4" });

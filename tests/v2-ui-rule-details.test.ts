@@ -243,7 +243,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("PAMI/NMI/Nature的OA版面费为5/10/20");
     expect(help).toContain("玩家一作发表后进入“期刊中稿→缴费方式→缴费确认”");
     expect(help).toContain("可选自费或导师经费，最终确认时扣款");
-    expect(help).toContain("不能返回重选");
+    expect(help).toContain("确认前可回溯重选");
     expect(help).toContain("不足时按钮显示失败预警");
     expect(help).toContain("同学一作发表时自动扣科研经费，不扣同学钱包");
     expect(help).not.toMatch(/不生成期刊缴费待办|玩家与同学一作均在发表时立即自动扣/);

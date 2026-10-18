@@ -3,7 +3,8 @@ import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createTeachersDayEvent } from "../src/core/v2-fixed-events-teachers-day";
 import { createEntertainmentCampusRandomEvent } from "../src/core/v2-random-events-campus-entertainment";
-import { canRewindPendingEvent } from "../src/core/v2-rewinder-event-replay";
+import { canRewindPendingEvent } from "../src/core/v2-event-replay";
+import { getRoleOptions } from "../src/core/v2-progression";
 import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createStore } from "../src/core/v2-store";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
@@ -11,9 +12,9 @@ import { saveAccountProfile } from "../src/core/v2-account-storage";
 import { createMemoryRunSaveAdapter, createRunSaveRepository } from "../src/core/v2-run-saves";
 import type { EventQueueItem, GameState } from "../src/core/v2-types";
 
-function base(): GameState {
+function base(roleId: GameState["selectedRoleId"] = "rewinder"): GameState {
   const initial = { ...createInitialState(), randomState: { seed: 1700000000, cursor: 0 } };
-  const started = dispatchAction(initial, "start-game", { roleId: "rewinder" });
+  const started = dispatchAction(initial, "start-game", { roleId });
   return dispatchAction({ ...started, month: 6, totalMonths: 6, selectedAdvisorName: "测试导师", eventQueue: [],
     player: { ...started.player, san: 20, favor: 8, research: 6, money: 30 } }, "resolve-event", { eventId: "fixture-initialize" });
 }
@@ -30,7 +31,7 @@ function choose(state: GameState, chainId: string, index = 0): GameState {
 }
 
 function rewind(state: GameState, chainId: string, targetIndex = 1, eventChoiceId?: string): GameState {
-  return dispatchAction(state, "rewinder-replay-event", {
+  return dispatchAction(state, "replay-event", {
     eventId: current(state, chainId).id, eventHistoryIndex: targetIndex, eventChoiceId,
   });
 }
@@ -40,7 +41,35 @@ function gameplay(state: GameState) {
   return rest;
 }
 
-describe("rewinder pending event choices", () => {
+describe("universal pending event choices", () => {
+  it.each(getRoleOptions().map(role => role.id))("allows %s to revisit every branch without rerolls or repeated settlement", roleId => {
+    const original = base(roleId);
+    const root = createTeachersDayEvent(original, () => 0);
+    const decision = choose({ ...original, eventQueue: [createEventQueueItem(root, 1)] }, root.chainId);
+    const first = choose(decision, root.chainId, 1);
+    expect(canRewindPendingEvent(first, current(first, root.chainId), 1)).toBe(true);
+    const alternate = choose(rewind(first, root.chainId), root.chainId, 2);
+    const repeated = choose(rewind(JSON.parse(JSON.stringify(alternate)), root.chainId), root.chainId, 1);
+    expect(current(repeated, root.chainId)).toEqual(current(first, root.chainId));
+    expect(gameplay(repeated)).toEqual(gameplay(decision));
+    expect(choose(repeated, root.chainId)).toEqual(choose(first, root.chainId));
+  });
+
+  it("preserves r9 normal-role event randomness and the recorded rewinder action", () => {
+    for (const roleId of ["normal", "rewinder"] as const) {
+      const original = base(roleId);
+      const root = createTeachersDayEvent(original, () => 0);
+      withGameplayRuleset("20261018-r9", () => {
+        const decision = choose({ ...original, eventQueue: [createEventQueueItem(root, 1)] }, root.chainId);
+        const result = choose(decision, root.chainId, 1);
+        const event = current(result, root.chainId);
+        expect(!!event.rewinderReplay).toBe(roleId === "rewinder");
+        const replayed = dispatchAction(result, "rewinder-replay-event", { eventId: event.id, eventHistoryIndex: 1 });
+        expect(replayed).toEqual(roleId === "rewinder" ? decision : result);
+      });
+    }
+  });
+
   it("lets ordinary rewinder runs inspect every Teacher's Day branch repeatedly without rerolls or rewards", () => {
     const original = base();
     const chain = "teachers-day";
@@ -106,27 +135,29 @@ describe("rewinder pending event choices", () => {
     expect(choose(repeated, chain)).toEqual(choose(choose(decision, chain, 2), chain));
   });
 
-  it("rejects other roles, old months, invalid targets, other chains and already confirmed events", () => {
+  it("rejects invalid targets, other chains and already confirmed events", () => {
     const original = base();
     const root = createTeachersDayEvent(original, () => 0);
     const result = choose(choose({ ...original, eventQueue: [createEventQueueItem(root, 1)] }, root.chainId), root.chainId);
     const event = current(result, root.chainId);
     const invalidStates: GameState[] = [
-      { ...result, selectedRoleId: "normal" }, { ...result, phase: "finished", ending: "burnout" },
-      { ...result, totalMonths: result.totalMonths + 1 },
+      { ...result, phase: "finished", ending: "burnout" },
     ];
     for (const state of invalidStates) expect(canRewindPendingEvent(state, event, 1)).toBe(false);
+    const nextMonth = { ...result, totalMonths: result.totalMonths + 1 };
+    expect(canRewindPendingEvent(nextMonth, event, 1)).toBe(true);
+    expect(withGameplayRuleset("20261018-r9", () => canRewindPendingEvent(nextMonth, event, 1))).toBe(false);
     for (const index of [-1, 0.5, NaN, 99]) expect(canRewindPendingEvent(result, event, index)).toBe(false);
     for (const payload of [{ eventId: "missing", eventHistoryIndex: 1 },
       { eventId: event.id, eventHistoryIndex: 1, eventChoiceId: "not-a-choice" }]) {
-      expect(dispatchAction(result, "rewinder-replay-event", payload)).toEqual(result);
+      expect(dispatchAction(result, "replay-event", payload)).toEqual(result);
     }
     const tampered = { ...event, history: event.history!.map((stage, index) => index !== 1 ? stage : {
       ...stage, replayEvent: { ...stage.replayEvent!, chainId: "unrelated-chain" },
     }) };
     expect(canRewindPendingEvent({ ...result, eventQueue: [tampered] }, tampered, 1)).toBe(false);
     const finished = choose(result, root.chainId);
-    expect(dispatchAction(finished, "rewinder-replay-event", { eventId: event.id, eventHistoryIndex: 1 })).toEqual(finished);
+    expect(dispatchAction(finished, "replay-event", { eventId: event.id, eventHistoryIndex: 1 })).toEqual(finished);
   });
 
   it("keeps pre-r8 replay event shapes unchanged", () => {
@@ -138,12 +169,12 @@ describe("rewinder pending event choices", () => {
     expect(canRewindPendingEvent(pending, current(pending, root.chainId), 0)).toBe(false);
   });
 
-  it("saves, reloads and verifies normal rewinds without debug disqualification", async () => {
+  it.each(["normal", "rewinder"] as const)("saves, reloads and verifies %s rewinds without debug disqualification", async roleId => {
     const values = new Map<string, string>();
     const storage = { getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => { values.set(key, value); } };
     const account = createDefaultAccountProfile();
-    account.roleProgress.rewinder.unlocked = true;
+    account.roleProgress[roleId].unlocked = true;
     saveAccountProfile(account, storage);
     const adapter = createMemoryRunSaveAdapter();
     const repository = () => createRunSaveRepository({ storage, adapter });
@@ -151,7 +182,7 @@ describe("rewinder pending event choices", () => {
     let store = createStore({ storage, saves });
     await store.ready();
     store.getState().randomState = { seed: 1700000000, cursor: 0 };
-    store.dispatch("start-game", { roleId: "rewinder" });
+    store.dispatch("start-game", { roleId });
     for (const eventChoiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
       const event = current(store.getState(), "before-grad-school");
       store.dispatch("resolve-event", { eventId: event.id, eventChoiceId });
@@ -165,16 +196,16 @@ describe("rewinder pending event choices", () => {
     select(); select(1);
     const result = structuredClone(current(store.getState(), chain));
     const choiceId = result.history![1]!.selectedChoiceId;
-    store.dispatch("rewinder-replay-event", { eventId: result.id, eventHistoryIndex: 1, eventChoiceId: choiceId });
+    store.dispatch("replay-event", { eventId: result.id, eventHistoryIndex: 1, eventChoiceId: choiceId });
     expect(current(store.getState(), chain)).toEqual(result);
     await store.flushSaves();
-    expect(saves.get("rewinder")!.replay!.commands.at(-1)).toMatchObject({ actionId: "rewinder-replay-event" });
+    expect(saves.get(roleId)!.replay!.commands.at(-1)).toMatchObject({ actionId: "replay-event" });
     saves = repository();
     store = createStore({ storage, saves });
-    await store.ready(); store.dispatch("start-game", { roleId: "rewinder" });
+    await store.ready(); store.dispatch("start-game", { roleId });
     expect(current(store.getState(), chain)).toEqual(result);
     expect(store.getReplayStatus().failed).toBeUndefined();
-    store.dispatch("rewinder-replay-event", { eventId: result.id, eventHistoryIndex: 1 });
+    store.dispatch("replay-event", { eventId: result.id, eventHistoryIndex: 1 });
     select(1); select();
     expect(store.getState().eventHistory.filter(event => event.chainId === chain)).toHaveLength(1);
     store.dispatch("quit-game");

@@ -31,6 +31,8 @@ export interface PlayRenderUiState {
   dateDisplayMode?: AccountProfile["dateDisplayMode"];
   roleExperienceAward?: RoleExperienceAward;
   activePlayTab?: PlayTabId;
+  isMobileMoreOpen?: boolean;
+  isMobileStatusOpen?: boolean;
   helpPageByContext?: Readonly<Record<string, number>>;
   isHelpOpen?: boolean;
   isEventContentOpen?: boolean;

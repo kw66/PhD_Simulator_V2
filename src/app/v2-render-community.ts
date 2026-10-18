@@ -140,8 +140,8 @@ export function renderLobbyMessageRailView(): string {
   return `
     <section class="lobby-profile-section lobby-message-rail-view" aria-labelledby="lobby-message-rail-title">
       <div class="lobby-message-external">
-        <a class="lobby-xiaohongshu-button" href="https://xhslink.cn/o/ApT7nOda3CF" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle" aria-hidden="true"></i><span>小红书评论</span><span aria-hidden="true">↗</span></a>
-        <span class="lobby-xiaohongshu-note">大家去小红书帮忙点赞收藏评论一下</span>
+        <a class="lobby-xiaohongshu-button" href="https://xhslink.cn/o/ApT7nOda3CF" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle" aria-hidden="true"></i><span>小红书</span><span aria-hidden="true">↗</span></a>
+        <span class="lobby-xiaohongshu-note">大家帮忙去小红书3连一下</span>
       </div>
       ${renderCompactMessagePanel("board", "lobby-message-rail-title")}
     </section>

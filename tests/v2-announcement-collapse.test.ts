@@ -24,6 +24,8 @@ const fixture = `<!doctype html><html><head><style>
   window.announcementHarness = {
     render(page) {
       root.innerHTML = renderAnnouncementPage(page);
+      // Overflow behavior must not depend on the length of the latest release copy.
+      root.querySelector('[data-announcement-text]').textContent = 'A long announcement for checking wrapping, expansion, and preserved reading preferences. '.repeat(8);
       this.bind();
     },
     bind() { dispose = bindAnnouncementCollapse(root); },
