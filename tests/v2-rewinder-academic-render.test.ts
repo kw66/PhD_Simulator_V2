@@ -75,11 +75,17 @@ describe("academic archive pages", () => {
     const html = renderRewinderPreview(3, 8, 4);
     expect(html).toContain("第4学年 · 一年一生");
     expect(html).toContain("第8次轮回");
-    expect(html).toContain("逐学年挑战，打造理想结局");
-    expect(html).toContain("事件可回退，选择结果固定");
+    expect(html).toContain("逐年挑战，年末归档，承接前一年成果");
+    expect(html).toContain("事件可回退，结果固定");
     expect(html).toContain("grid-column:4;grid-row:1");
     expect(html).not.toContain("局内轮回");
     expect(html).not.toContain("正式结算后留给下一世");
+  });
+
+  it("keeps the setup talent preview free of the cycle banner", () => {
+    const html = renderRewinderPreview(3, 1, 1, false);
+    expect(html).not.toContain("rewinder-cycle-banner");
+    expect(html).toContain("rewinder-preview-card is-setup-preview");
   });
 
   it("shows storage failure inside the modal and freezes chosen records while allowing a save retry", () => {

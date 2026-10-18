@@ -78,7 +78,7 @@ describe("rewinder annual event display", () => {
     expect(html).toContain("第12次轮回");
     expect(html).not.toContain("局内轮回");
     expect(html).toContain("事件可回退");
-    expect(html).toContain("选择结果固定");
+    expect(html).toContain("结果固定");
     expect(renderRewinderPreview(4, NaN)).toContain('data-rewinder-cycle="1"');
   });
 
