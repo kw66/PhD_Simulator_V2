@@ -71,12 +71,14 @@ describe("academic archive pages", () => {
     expect(renderApp(setup, account, { rewinderStartYear: 1 })).toContain("开始第1学年");
   });
 
-  it("keeps the fixed-event rewind below the special node while explaining the chapter rules", () => {
+  it("keeps the compact special rule in the first talent row", () => {
     const html = renderRewinderPreview(3, 8, 4);
     expect(html).toContain("第4学年 · 一年一生");
     expect(html).toContain("第8次轮回");
-    expect(html).toContain("9月开局，8月结算并归档");
-    expect(html).toContain("grid-column:4;grid-row:2");
+    expect(html).toContain("逐学年挑战，打造理想结局");
+    expect(html).toContain("事件可回退，选择结果固定");
+    expect(html).toContain("grid-column:4;grid-row:1");
+    expect(html).not.toContain("局内轮回");
     expect(html).not.toContain("正式结算后留给下一世");
   });
 

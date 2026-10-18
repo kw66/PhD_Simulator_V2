@@ -45,9 +45,9 @@
   align-content: start;
 }
 
-/* Fewer nodes occupy the same canvas without pulling the description upward. */
+/* Rewinder rules stay on one compact row; the special node contains the in-run rewind rule. */
 .lobby-page .is-rewinder-tree .lobby-talent-tree-node {
-  grid-row: 1 / 3 !important;
+  grid-row: 1 !important;
 }
 
 @media (min-width: 821px) {

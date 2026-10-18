@@ -61,25 +61,24 @@ describe("rewinder annual event display", () => {
     expect(growth).not.toMatch(/参会|实习|联培|undefined/);
   });
 
-  it("keeps all five read-only abilities available inside a run", () => {
+  it("keeps the four compact read-only abilities available inside a run", () => {
     const html = renderApp(fixture(), undefined, { activePlayTab: "talent", activeTalentTab: "character" });
-    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(5);
+    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
     expect(html).not.toContain("玩法待实装");
     expect(html).not.toContain("暂无角色天赋树");
   });
 
-  it("preserves existing node indexes and shows a fixed rewind ability below the special node", () => {
-    const html = renderRewinderPreview(4, 12);
+  it("keeps the special rule in the first row and folds event rewind into its description", () => {
+    const html = renderRewinderPreview(3, 12);
     const nodes = html.match(/<button[^>]*data-rewinder-rule="\d+"[^>]*>/g)!;
-    expect(nodes).toHaveLength(5);
+    expect(nodes).toHaveLength(4);
     expect(nodes[3]).toContain('data-ui-talent-tree-node="0-3"');
     expect(nodes[3]).toContain('grid-column:4;grid-row:1');
-    expect(nodes[4]).toContain('data-ui-talent-tree-node="0-4"');
-    expect(nodes[4]).toContain('grid-column:4;grid-row:2');
-    expect(nodes[4]).toContain('aria-pressed="true"');
+    expect(nodes[3]).toContain('aria-pressed="true"');
     expect(html).toContain("第12次轮回");
-    expect(html).toContain("局内轮回");
-    expect(html).toContain("同一选项的结果固定");
+    expect(html).not.toContain("局内轮回");
+    expect(html).toContain("事件可回退");
+    expect(html).toContain("选择结果固定");
     expect(renderRewinderPreview(4, NaN)).toContain('data-rewinder-cycle="1"');
   });
 

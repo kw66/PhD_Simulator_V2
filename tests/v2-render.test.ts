@@ -1123,8 +1123,10 @@ describe("v2 render lobby shell", () => {
     account.selectedLobbyRoleId = roleId;
     const html = renderApp(createInitialState(), account);
     expect(html).toContain('class="lobby-profile-growth-card');
-    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(5);
-    for (const category of ["属性轮回", "天赋轮回", "人际轮回", "轮回者 · 特殊", "局内轮回"]) expect(html).toContain(category);
+    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
+    for (const category of ["属性轮回", "天赋轮回", "人际轮回", "轮回者 · 特殊"]) expect(html).toContain(category);
+    expect(html).not.toContain("局内轮回");
+    expect(html).toContain("事件可回退");
     expect(html).not.toContain("rewinder-unlock-progress");
   });
 
