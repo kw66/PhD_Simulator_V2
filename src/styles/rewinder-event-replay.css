@@ -1,0 +1,32 @@
+.rewinder-choice-return {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  background: linear-gradient(100deg, #e6eef3, #f4f1e7);
+  color: #3d5f73;
+  border-bottom: 1px solid #bccbd0;
+  flex-shrink: 0;
+}
+.rewinder-choice-return > span { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rewinder-choice-return svg { width: 17px; height: 17px; }
+.rewinder-choice-return small { color: #627880; font-size: 12px; }
+.rewinder-choice-return button {
+  padding: 6px 13px;
+  border: 1px solid #7995a3;
+  border-radius: 7px;
+  background: #f7faf9;
+  color: #31576f;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rewinder-choice-return button:hover { background: #e0eaf0; }
+.rewinder-choice-return button:focus-visible { outline: 2px solid #416a85; outline-offset: 2px; }
+@media (max-width: 480px) {
+  .rewinder-choice-return { padding: 8px 10px; font-size: 12px; }
+  .rewinder-choice-return > span { gap: 5px; }
+  .rewinder-choice-return > span small { flex-basis: 100%; }
+}

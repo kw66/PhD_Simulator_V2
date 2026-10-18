@@ -19,6 +19,8 @@ import { getCitationStats } from "../core/v2-citation-stats";
 import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-catalog";
 import { getEventChoiceRiskDetails } from "../core/v2-event-choice-risk";
 import { getResolvableQueuedEvent } from "../core/v2-engine-event-resolution";
+import { canRewindPendingEvent } from "../core/v2-rewinder-event-replay";
+import "../styles/rewinder-event-replay.css";
 import type { ConferenceRegionId } from "../core/v2-conference-system";
 import { getCurrentEvent, getEventQueuePriority, getSortedEventQueue } from "../core/v2-event-queue";
 import { canAutoResolveLinearEvent, isEventBlocking, isLinearEvent } from "../core/v2-event-auto-resolution";
@@ -134,6 +136,9 @@ import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl, hasRoleCardPortrait }
 import { renderDesignedGrowthBoard } from "./v2-render-setup-screen";
 import { renderCaptainTags } from "./v2-render-captain-tags";
 import { renderRewinderPreview } from "./v2-render-rewinder";
+import { renderAcademicArchive } from "./v2-render-rewinder-academic";
+import { isAcademicArchivePending } from "../core/v2-rewinder-academic";
+import { getAcademicDisplayCounters } from "../core/v2-rewinder-academic-record";
 import { renderRewinderEvent, type RewinderAct } from "./v2-render-rewinder-event";
 import { getAdvisorGuidanceAmount } from "../core/v2-advisor-guidance";
 import { getDesignedTalentNodes } from "../core/v2-role-talent-definitions";
@@ -1177,6 +1182,10 @@ function renderEventContentBox(
   const debugReplayable = debugEventReplayEnabled
     && currentEvent?.replayContext !== undefined
     && historicalPage !== null;
+  const rewinderReplayable = !!state && !!currentEvent && !isCompleted && historicalPage !== null
+    && canRewindPendingEvent(state, currentEvent, displayPageIndex);
+  const rewinderReturnIndex = !state || !currentEvent || isCompleted ? -1 : history.reduce((last, stage, index) =>
+    stage.choices.filter(choice => !isSecondaryEventChoice(choice)).length > 1 && canRewindPendingEvent(state, currentEvent, index) ? index : last, -1);
   const selectedChoiceId = historicalPage?.selectedChoiceId ?? null;
   const riskEvent = state && currentEvent && !isCompleted
     ? historicalPage?.replayEvent
@@ -1217,9 +1226,10 @@ function renderEventContentBox(
         </div>
         <button class="event-content-close" type="button" data-ui-close-event-content aria-label="关闭事件详情">×</button>
       </div>
+      ${rewinderReturnIndex >= 0 ? `<div class="rewinder-choice-return"><span><i data-lucide="rotate-ccw" aria-hidden="true"></i><strong>局内轮回</strong><small>同一选项，结果不变</small></span>${historicalPage === null ? `<button type="button" data-action="rewinder-replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${rewinderReturnIndex}">返回选择</button>` : '<small>选择下方选项，改走另一条路</small>'}</div>` : ""}
       <div class="event-content-body" id="event-content-body">
         ${displayEvent.rewinderPresentation
-          ? renderRewinderEvent(displayEvent.rewinderPresentation, historicalPage === null && !isCompleted ? state : undefined, rewinderAct)
+          ? renderRewinderEvent({ ...displayEvent.rewinderPresentation, cycleNumber: displayEvent.rewinderPresentation.cycleNumber ?? state?.rewinderState?.cycleNumber }, historicalPage === null && !isCompleted ? state : undefined, rewinderAct)
           : displayEvent.thesisReviewPresentation
           ? renderThesisReviewReports(displayEvent.thesisReviewPresentation, renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state)))
           : paperReviewPresentation
@@ -1242,12 +1252,12 @@ function renderEventContentBox(
               ? getEventChoiceRiskDetails(state, riskEvent, riskChoice) : null;
             const risk = riskDetails?.risk;
             const riskText = riskDetails?.explanation ?? "";
-            const canReplay = debugReplayable && disabledReason === "";
+            const canReplay = (debugReplayable || rewinderReplayable) && disabledReason === "";
             const isDisabled = !canReplay && (historicalPage !== null || disabledReason !== "");
             const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"`
               : riskText ? ` data-event-risk-tooltip data-tooltip="${escapeHtml(riskText)}" aria-description="${escapeHtml(riskText)}"` : "";
             const buttonAttributes = canReplay
-              ? `data-action="debug-replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
+              ? `data-action="${rewinderReplayable ? "rewinder-replay-event" : "debug-replay-event"}" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
               : isDisabled
               ? `disabled aria-disabled="true"${titleAttribute}`
               : `data-action="resolve-event" data-event-id="${escapeHtml(currentEventId)}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`;
@@ -3206,7 +3216,8 @@ function buildLoverTalentItem(state: GameState, requestedPage = 0): TalentPanelI
 }
 
 function buildRelationTalentItems(state: GameState, requestedSalaryStart?: number | null, labInheritancePage = 0, loverRewardPage = 0, internshipPage = 0): TalentPanelItem[] {
-  const publicationTotals = getFellowPublicationTotals(state);
+  const academicCounters = state.rewinderState?.academic ? getAcademicDisplayCounters(state) : null;
+  const publicationTotals = academicCounters ? { playerLed: academicCounters.playerLedPublications, fellowLed: academicCounters.fellowLedPublications } : getFellowPublicationTotals(state);
   const inheritancePage = labInheritancePage === 1 ? 1 : 0;
   const socialRewards = getAnnualLabSocialRewards(state);
   const jointReward = state.conferenceEncounterState.jointTrainingReward;
@@ -3265,7 +3276,7 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
       labInheritancePager: { page: inheritancePage },
       metrics: inheritancePage === 0 ? [
         { label: "你的当前奖励", value: `+${formatMoney(getPlayerAnnualResearchGrowth(state))}` },
-        { label: "当前同学累计", value: "+" + formatMoney(state.fellowProgressState.reduce((total, profile) => total + (profile.annualResearchGrowthTotal ?? 0), 0)), tooltip: "当前同学每学年科研成长的累计值" },
+        { label: academicCounters ? "同学成长累计" : "当前同学累计", value: "+" + formatMoney(academicCounters?.labResearchGrowth ?? state.fellowProgressState.reduce((total, profile) => total + (profile.annualResearchGrowthTotal ?? 0), 0)), tooltip: academicCounters ? "历年归档保留的科研成长与本学年新增成长" : "当前同学每学年科研成长的累计值" },
       ] : [
         { label: "同学默契原始", value: `+${socialRewards.fellowAffinity}/人` },
         { label: "你的社交原始", value: `+${socialRewards.playerSocial}` },
@@ -3739,7 +3750,7 @@ function renderTalentSection(
         </div>
       </div>
       <div class="talent-items-list" id="talent-items-list" data-talent-panel-tab="${tabId}">
-        ${tabId === "publication" ? renderPublicationTalentCards(state) : tabId === "character" ? (state.selectedRoleId === "rewinder" ? renderRewinderPreview(characterSelectedNodeIndex) : state.selectedRoleId === "research-captain" ? renderCaptainTags({}, characterSelectedNodeIndex, state.captainState?.levels) : getDesignedTalentNodes(state.selectedRoleId) ? renderDesignedGrowthBoard(state.selectedRoleId as Parameters<typeof renderDesignedGrowthBoard>[0], state.curseState ? state.curseState.difficulty - 1 : characterSelectedNodeIndex, talentAllocation, roleLevel, false, 0, state.curseState ? { unlockedDifficulty: state.curseState.difficulty, readOnly: true } : undefined) : '<p class="talent-panel-empty">暂无角色天赋树</p>') : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
+        ${tabId === "publication" ? renderPublicationTalentCards(state) : tabId === "character" ? (state.selectedRoleId === "rewinder" ? renderRewinderPreview(characterSelectedNodeIndex, state.rewinderState?.cycleNumber, state.rewinderState?.academic?.startYear ?? state.year) : state.selectedRoleId === "research-captain" ? renderCaptainTags({}, characterSelectedNodeIndex, state.captainState?.levels) : getDesignedTalentNodes(state.selectedRoleId) ? renderDesignedGrowthBoard(state.selectedRoleId as Parameters<typeof renderDesignedGrowthBoard>[0], state.curseState ? state.curseState.difficulty - 1 : characterSelectedNodeIndex, talentAllocation, roleLevel, false, 0, state.curseState ? { unlockedDifficulty: state.curseState.difficulty, readOnly: true } : undefined) : '<p class="talent-panel-empty">暂无角色天赋树</p>') : items.map((item) => renderTalentPanelItem(item, tabId !== "growth")).join("")}
       </div>
     </div>
   `;
@@ -4431,9 +4442,10 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
 
 export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = {}): string {
   const showQuitConfirmation = state.phase === "playing" && uiState.isQuitConfirmationOpen;
+  const showAcademicArchive = isAcademicArchivePending(state);
   return `
     <main class="play-page" data-phase="${state.phase}" data-scale-mode="fixed">
-      <section class="play-stage-shell"${showQuitConfirmation ? " inert" : ""}>
+      <section class="play-stage-shell"${showQuitConfirmation || showAcademicArchive ? " inert" : ""}>
         <div class="play-stage-scale">
           <section class="play-stage">
             <section class="play-workbench">
@@ -4448,6 +4460,7 @@ export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = 
       </section>
       ${uiState.isFeedbackOpen ? renderGameFeedbackOverlay() : ""}
       ${showQuitConfirmation ? renderQuitConfirmationOverlay() : ""}
+      ${showAcademicArchive ? renderAcademicArchive(state, uiState.academicArchiveAct, uiState.saveStatus) : ""}
     </main>
   `;
 }

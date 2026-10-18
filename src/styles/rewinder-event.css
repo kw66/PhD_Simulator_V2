@@ -1,8 +1,14 @@
 .rewinder-event { display: grid; gap: 9px; color: var(--ink, #293b39); }
-.rewinder-event-heading { display: grid; gap: 4px; padding: 12px 14px 11px; border: 1px solid #d7bd87; border-radius: 9px; background: radial-gradient(circle at 90% 0, rgba(255, 252, 234, .92), transparent 42%), linear-gradient(125deg, #f8eac7, #fff9e9 72%); box-shadow: inset 0 1px 0 #fffdf3; }
+.rewinder-event-heading { position: relative; isolation: isolate; display: flex; align-items: center; gap: 19px; overflow: hidden; padding: 18px 19px; border: 1px solid #ceb67f; border-radius: 9px; background: radial-gradient(ellipse at 10% 50%, rgba(231, 203, 139, .48), transparent 30%), radial-gradient(circle at 90% 0, rgba(255, 252, 234, .92), transparent 42%), linear-gradient(125deg, #f8eac7, #fff9e9 72%); box-shadow: inset 0 1px 0 #fffdf3; }
+.rewinder-event-heading::after { content: ""; position: absolute; z-index: -1; top: -85px; right: -24px; width: 220px; height: 220px; border: 1px solid rgba(186, 150, 84, .2); border-radius: 50%; box-shadow: 0 0 0 18px rgba(186, 150, 84, .045), 0 0 0 38px rgba(186, 150, 84, .035); pointer-events: none; }
+.rewinder-hero-copy { display: grid; flex: 1 1 0; gap: 5px; min-width: 0; }
+.rewinder-time-orbit { position: relative; display: grid; place-items: center; flex: 0 0 68px; width: 68px; height: 68px; border: 1px solid rgba(163, 127, 60, .62); border-radius: 50%; color: #94743a; background: radial-gradient(circle, #fff9e9 37%, rgba(246, 229, 190, .52) 70%); box-shadow: inset 0 0 0 6px #f7edcf, inset 0 0 0 7px rgba(170, 138, 74, .32), 0 0 0 5px rgba(182, 149, 88, .08); }
+.rewinder-time-orbit::before { content: ""; position: absolute; inset: -8px; border: 1px dashed rgba(170, 138, 74, .45); border-radius: 50%; transform: rotate(15deg); }
+.rewinder-time-orbit::after { content: ""; position: absolute; top: -3px; left: 12px; width: 6px; height: 6px; border: 1px solid #d5bb7f; border-radius: 50%; background: #fff7da; box-shadow: 43px 49px 0 -1px #c4a363, -15px 40px 0 -2px #c4a363; }
+.rewinder-time-orbit > span { font-family: Georgia, "Times New Roman", serif; font-size: 30px; line-height: 1; }
 .rewinder-hero-kicker { color: #9a7540; font-size: 9px; font-weight: 800; letter-spacing: .14em; }
 .rewinder-hero-main { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.rewinder-hero-main strong { color: #4c483d; font-size: 17px; letter-spacing: .01em; }
+.rewinder-hero-main strong { color: #5e4c2f; font-size: 22px; font-weight: 800; letter-spacing: .03em; }
 .rewinder-hero-main > span { color: #876e45; font-size: 11px; white-space: nowrap; }
 .rewinder-hero-main i { color: #b18b4f; font-style: normal; padding-inline: 3px; }
 .rewinder-event-heading p { margin: 1px 0 0; color: #756b57; font-size: 10px; line-height: 1.5; }
@@ -16,6 +22,10 @@
 .rewinder-act-title strong { color: #4d544a; font-size: 14px; }
 .rewinder-act-title small { color: #7c877e; font-size: 10px; font-weight: 400; }
 .rewinder-scene { display: grid; gap: 10px; min-width: 0; padding: 11px; border: 1px solid #d9d8cd; border-radius: 9px; background: #fcfbf5; }
+@media (prefers-reduced-motion: no-preference) {
+  .rewinder-scene { animation: rewinder-scene-appear 150ms ease-out both; }
+}
+@keyframes rewinder-scene-appear { from { opacity: .65; } to { opacity: 1; } }
 .rewinder-scene-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 4px; border-bottom: 1px solid #e5e4d8; }
 .rewinder-scene-heading strong { color: #55684f; font-size: 12px; }
 .rewinder-scene-heading span { color: #879081; font-size: 10px; }
@@ -66,8 +76,13 @@
 .event-content-buttons .event-choice-btn.is-rewinder-back { flex: 0 1 110px; min-width: 0; border-color: #c6b895; background: #f5efe0; color: #807052; }
 @media (max-width: 520px) {
   .rewinder-event { gap: 7px; }
-  .rewinder-event-heading { padding: 10px 11px; }
-  .rewinder-hero-main strong { font-size: 14px; }
+  .rewinder-event-heading { gap: 14px; padding: 13px; }
+  .rewinder-time-orbit { flex-basis: 46px; width: 46px; height: 46px; box-shadow: inset 0 0 0 4px #f7edcf, inset 0 0 0 5px rgba(170, 138, 74, .32), 0 0 0 3px rgba(182, 149, 88, .08); }
+  .rewinder-time-orbit::before { inset: -5px; }
+  .rewinder-time-orbit::after { left: 9px; width: 4px; height: 4px; box-shadow: 27px 33px 0 -1px #c4a363; }
+  .rewinder-time-orbit > span { font-size: 22px; }
+  .rewinder-hero-main { flex-wrap: wrap; gap: 3px 6px; }
+  .rewinder-hero-main strong { font-size: 18px; }
   .rewinder-hero-main > span { font-size: 10px; }
   .rewinder-act-tab { min-height: 48px; padding: 6px; gap: 5px; }
   .rewinder-act-index { flex-basis: 22px; width: 22px; height: 22px; font-size: 9px; }

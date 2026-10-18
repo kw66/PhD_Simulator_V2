@@ -2,6 +2,8 @@ import { pushNoOpLog } from "./v2-engine-helpers";
 import { createStartedGameState } from "./v2-engine-state-factory";
 import { createBeforeGradSchoolAct1Event } from "./v2-fixed-events-before-grad-school";
 import { enqueueEventQueueItem } from "./v2-event-queue";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { initializeAcademicRun } from "./v2-rewinder-academic";
 import type {
   DispatchPayload,
   GameActionId,
@@ -31,11 +33,17 @@ export function dispatchSetupAction(
       if (!roleId) {
         return pushNoOpLog(state, "请先选择角色。");
       }
-      const startedState = {
-        ...createStartedGameState(roleId, payload.talentAllocation, payload.bonusTalentPoints, payload.curseDifficulty, payload.captainTagLevels, payload.rewinderArchive),
+      let startedState = {
+        ...createStartedGameState(roleId, payload.talentAllocation, payload.bonusTalentPoints, payload.curseDifficulty, payload.captainTagLevels, payload.rewinderArchive, payload.rewinderCycleNumber),
         blockLinearEvents: state.blockLinearEvents,
         debugEventReplayEnabled: state.debugEventReplayEnabled,
       };
+      if (roleId === "rewinder" && usesGameplayRulesFrom("20261018-r9")) {
+        const academic = initializeAcademicRun(startedState, payload.rewinderAcademicArchive, payload.rewinderStartYear ?? 1);
+        if (!academic) return state;
+        startedState = { ...academic, blockLinearEvents: state.blockLinearEvents, debugEventReplayEnabled: state.debugEventReplayEnabled };
+        if ((payload.rewinderStartYear ?? 1) > 1) return startedState;
+      }
       return enqueueEventQueueItem(
         startedState,
         createBeforeGradSchoolAct1Event(startedState),

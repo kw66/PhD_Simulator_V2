@@ -33,6 +33,7 @@ export function enqueueResolvedEventFollowUps(
   replayContext?: PendingEvent["replayContext"],
   randomReplay?: PendingEvent["randomReplay"],
   deferredChoices?: PendingEvent["deferredChoices"],
+  rewinderReplay?: PendingEvent["rewinderReplay"],
 ): { nextState: GameState; hasSameChainFollowUp: boolean } {
   let nextState = state;
   let hasSameChainFollowUp = false;
@@ -48,6 +49,7 @@ export function enqueueResolvedEventFollowUps(
           history: resolvedHistory,
           ...(replayContext ? { replayContext } : {}),
           ...(randomReplay ? { randomReplay } : {}),
+          ...(rewinderReplay ? { rewinderReplay: { ...rewinderReplay, path: [...rewinderReplay.path, choice.id] } } : {}),
           ...(debugRootEventId ? {
             debugReplayable: true,
             debugRootEventId,

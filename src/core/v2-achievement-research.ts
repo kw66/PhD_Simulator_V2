@@ -132,8 +132,10 @@ export function evaluateResearchAchievements(state: GameState, run: AchievementR
   add("global:ten-thousand-citations", state.totalCitations >= 10000);
   add("global:cannot-be-buried", publications.some(paper => paper.target === "C" && (paper.publication?.citations ?? 0) > 100));
   const rejected = Object.entries(run.counters).filter(([key]) => key.startsWith("research:rejected:")).map(([, count]) => count);
-  add("global:tasteless", rejected.some(count => count >= 3));
-  add("global:never-give-up", rejected.reduce((sum, count) => sum + count, 0) >= 10);
+  const inheritedRejections = state.rewinderState?.academic ? run.counters["rewinder-rejections:offset"] ?? 0 : 0;
+  const mostRejected = Math.max(0, ...rejected, state.rewinderState?.academic ? run.counters["rewinder-rejections:single-max"] ?? 0 : 0);
+  add("global:tasteless", mostRejected >= 3);
+  add("global:never-give-up", inheritedRejections + rejected.reduce((sum, count) => sum + count, 0) >= 10);
   const firstSubmissions = (run.sets["research:submissions"] ?? []).slice(0, 5);
   add("global:perfect-start", firstSubmissions.length === 5 && firstSubmissions.every(key => run.sets["research:accepted-submissions"]?.includes(key) && !run.sets["research:unsuccessful-submissions"]?.includes(key)));
   for (const paper of papers) {

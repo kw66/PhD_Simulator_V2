@@ -112,9 +112,10 @@ export function createStartedGameState(
   curseDifficulty: CurseDifficulty = 1,
   captainTagLevels: Partial<Record<RoleId, number>> = {},
   rewinderArchive?: RewinderArchive,
+  rewinderCycleNumber = 1,
 ): GameState {
   const initial = { ...createInitialState(), randomState: getActiveGameRandomState() ?? createGameRandomState() };
-  return withGameRandom(initial, () => initializeRewinder(initializeCaptain(initializeCurse(createStartedGameStateInternal(roleId, talentAllocation, bonusTalentPoints, initial), curseDifficulty), captainTagLevels), rewinderArchive));
+  return withGameRandom(initial, () => initializeRewinder(initializeCaptain(initializeCurse(createStartedGameStateInternal(roleId, talentAllocation, bonusTalentPoints, initial), curseDifficulty), captainTagLevels), rewinderArchive, rewinderCycleNumber));
 }
 
 function createStartedGameStateInternal(roleId: RoleId, talentAllocation: Record<string, number>, bonusTalentPoints: number, baseState: GameState): GameState {

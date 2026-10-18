@@ -3,6 +3,7 @@ import type { TalentAllocation } from "../core/v2-role-talent-definitions";
 import type { RunSaveSummary } from "../core/v2-run-saves";
 import type { ShopTabId } from "./v2-render-shop-panel";
 import type { RewinderAct } from "./v2-render-rewinder-event";
+import type { AcademicArchiveAct } from "./v2-render-rewinder-academic";
 
 export type PlayTabId = "events" | "workstation" | "relationship" | "shop" | "research" | "talent" | "settings";
 export type RoleRailViewId = "achievements" | "messages" | "announcements";
@@ -19,6 +20,7 @@ export interface PlayRenderUiState {
   activeRoleRailView?: RoleRailViewId;
   announcementPageIndex?: number;
   roleHistoryPageIndex?: number;
+  rewinderStartYear?: number;
   talentTreePageIndex?: number;
   talentTreeSelectedNodeByPage?: readonly number[];
   talentAllocation?: TalentAllocation;
@@ -37,6 +39,7 @@ export interface PlayRenderUiState {
   activeEventHistoryId?: string | null;
   activeEventHistoryIndex?: number | null;
   activeRewinderAct?: RewinderAct;
+  academicArchiveAct?: AcademicArchiveAct;
   activeLogPage?: number | null;
   isSanChartOpen?: boolean;
   activePendingPage?: number | null;

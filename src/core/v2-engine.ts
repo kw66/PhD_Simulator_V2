@@ -1,6 +1,8 @@
 import { createGameRandomState, withGameRandom } from "./v2-game-random";
 import { settleCaptainMonth, syncCaptainMembers } from "./v2-captain-runtime";
 import { prepareRewinderYear, completeRewinderYear, isRewinderYearEnd, toggleRewinderPerson } from "./v2-rewinder";
+import { replayRewinderEvent } from "./v2-rewinder-event-replay";
+import { isAcademicYearEnd, prepareAcademicArchive, toggleAcademicPerson, selectAcademicSource, completeAcademicArchive } from "./v2-rewinder-academic";
 import { observeAchievements } from "./v2-achievement-runtime";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { dispatchDebugAction } from "./v2-debug-tools";
@@ -355,6 +357,11 @@ function advanceMonth(state: GameState, force = false): GameState {
   if (state.rewinderState?.monthEndProcessed !== state.totalMonths) {
     state = settleRoleTalentMonthEnd(settleRoleTalentYearEnd(settleLabResearchGrowth(settleFellowAcademicYear(state))));
   }
+  if (state.rewinderState?.academic) {
+    state = evaluateCoreEndings(state);
+    if (state.phase !== "playing") return state;
+  }
+  if (isAcademicYearEnd(state)) return prepareAcademicArchive(recordRelationshipActivityMonth(syncAdvisorResearchAccumulation(state)));
   if (isRewinderYearEnd(state)) return prepareRewinderYear(syncAdvisorResearchAccumulation(state));
   if (state.totalMonths >= state.maxMonths) return finishTrainingIfReady(syncAdvisorResearchAccumulation(state));
 
@@ -411,8 +418,24 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
     });
   }
   const setupState = dispatchSetupAction(state, actionId, payload, createInitialState);
-  if (setupState !== null) return setupState;
+  if (setupState !== null) {
+    if (actionId === "start-game" && setupState !== state && setupState.rewinderState?.academic
+      && setupState.rewinderState.academic.startYear > 1) {
+      const september = createAdvancedCalendarState(setupState);
+      if (september.phase !== "playing") return september;
+      const queued = enqueueMonthlyEventsForMonth(syncThesisState(september)).nextState;
+      return settleLinearEvents(queued, (current, eventId, eventChoiceId) => dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
+    }
+    return setupState;
+  }
   if (actionId === "debug-trigger-ending") return dispatchDebugAction(state, actionId, payload) ?? state;
+  if (state.rewinderState?.academic?.pending || state.rewinderState?.academic?.completed) {
+    if (actionId === "toggle-rewinder-archive-person") return toggleAcademicPerson(state, payload.rewinderPersonKey);
+    if (actionId === "select-rewinder-archive-papers") return selectAcademicSource(state, "paperSource", payload.rewinderPaperSource);
+    if (actionId === "select-rewinder-archive-coffee") return selectAcademicSource(state, "coffeeSource", payload.rewinderCoffeeSource);
+    if (actionId === "confirm-rewinder-archive") return completeAcademicArchive(state);
+    return state;
+  }
   if (state.phase === "finished") return state;
   if (actionId === "set-linear-event-blocking" && state.phase !== "playing") return dispatchGameAction(state, actionId, payload);
   if (state.phase !== "playing") return dispatchDebugAction(state, actionId, payload) ?? state;
@@ -424,6 +447,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
     state = checkedState;
   }
   let nextState = normalizeGameMoney(syncCaptainMembers(ensureFellowFinanceAccounts(dispatchGameAction(ensureFellowPapers(syncCaptainMembers(state)), actionId, payload))));
+  if (nextState.rewinderState?.academic?.pending) return nextState;
   if (state.degree === "master" && nextState.degree === "phd") {
     nextState = { ...nextState, thesis: createInitialThesisState(),
       careerProgress: { internet: 0, stateOwned: 0, civilService: 0, academic: 0 },
@@ -439,7 +463,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
   const helpedState = settlePendingPaperHelp(checkedState);
-  const settledState = actionId === "resolve-event"
+  const settledState = actionId === "resolve-event" || actionId === "rewinder-replay-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;
   const conferenceState = syncThesisState(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(settledState)));
@@ -528,6 +552,8 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
       return takeRest(state);
     case "resolve-event":
       return resolveQueuedEvent(state, payload.eventId, payload.eventChoiceId);
+    case "rewinder-replay-event":
+      return replayRewinderEvent(state, payload, resolveQueuedEvent);
     case "end-relationship":
       return payload.relationshipId && state.phase === "playing"
         ? endRelationship(state, payload.relationshipId)

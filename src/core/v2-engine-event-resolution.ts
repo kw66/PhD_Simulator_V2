@@ -1,4 +1,5 @@
 import { withGameRandomPreview } from "./v2-game-random";
+import { prepareRewinderEventReplay } from "./v2-rewinder-event-replay";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import {
   pushLog,
@@ -354,6 +355,7 @@ function rebuildEventFromCurrentState(
     history: queuedEvent.history,
     randomReplay: replay,
     replayContext: queuedEvent.replayContext,
+    ...(queuedEvent.rewinderReplay ? { rewinderReplay: queuedEvent.rewinderReplay } : {}),
     deferredStatePatch: queuedEvent.deferredStatePatch,
     deferredChoices: queuedEvent.deferredChoices,
     debugRootEventId: queuedEvent.debugRootEventId,
@@ -509,6 +511,7 @@ export function applyQueuedEventEffects(
   if (queuedEvent.chainId === "scholarship" && !state.eventQueue.some((event) => event.id === queuedEvent.id)) {
     return state;
   }
+  queuedEvent = prepareRewinderEventReplay(state, queuedEvent);
   const activityPreview = queuedEvent.conferenceActivityPreview;
   if (state.debugEventReplayEnabled && queuedEvent.debugReplayable && queuedEvent.stage === "act1"
     && activityPreview && queuedEvent.choices.some((choice) => choice.id === choiceId && !choice.disabledReason)) {
@@ -574,6 +577,7 @@ export function applyQueuedEventEffects(
         ...event,
         deferredStatePatch: pendingPatch,
         replayContext: event.replayContext ?? resolvedEvent.replayContext,
+        ...(resolvedEvent.rewinderReplay ? { rewinderReplay: resolvedEvent.rewinderReplay } : {}),
       }),
     };
   }
@@ -602,7 +606,8 @@ export function applyQueuedEventEffects(
         ...(frozenFixedRolls ? { fixedEventResolutionRolls: frozenFixedRolls } : {}) } },
       source: activityChoice && activityChoice !== sourceTitle ? `${sourceTitle} · ${activityChoice}` : sourceTitle,
       event: { id: resolvedEvent.id, source: resolvedEvent.source, chainId: resolvedEvent.chainId, stage: resolvedEvent.stage,
-        randomReplay: resolvedEvent.randomReplay, fixedTreePreview: resolvedEvent.fixedTreePreview, replayContext: resolvedEvent.replayContext },
+        randomReplay: resolvedEvent.randomReplay, fixedTreePreview: resolvedEvent.fixedTreePreview, replayContext: resolvedEvent.replayContext,
+        ...(resolvedEvent.rewinderReplay ? { rewinderReplay: resolvedEvent.rewinderReplay } : {}) },
     },
   ] : undefined;
   const committedState = hasSameChainFollowUp ? state : resolvedState;
@@ -643,6 +648,7 @@ export function applyQueuedEventEffects(
     resolvedEvent.replayContext ?? (resolvedEvent.stage === "act1" ? { rootEvent: resolvedEvent } : undefined),
     resolvedEvent.randomReplay,
     deferredChoices,
+    resolvedEvent.rewinderReplay,
   );
   nextState = followUpResult.nextState;
   if (!followUpResult.hasSameChainFollowUp) {

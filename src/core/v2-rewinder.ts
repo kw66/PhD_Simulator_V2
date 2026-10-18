@@ -1,5 +1,6 @@
 import { captureRewinderGrowth, mergeRewinderGrowth, applyRewinderGrowth, REWINDER_ATTRIBUTE_KEYS, getRewinderGrowthCounterKeys } from "./v2-rewinder-growth";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { normalizeRewinderCycleNumber } from "./v2-rewinder-cycle";
 import { captureRewinderRelationships, mergeRewinderRelationships, applyRewinderAdvisor, restoreRewinderRelationship, isRewinderRelationshipsSnapshot } from "./v2-rewinder-relationships";
 import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { getEffectiveSocial } from "./v2-effective-attributes";
@@ -44,9 +45,12 @@ export function normalizeRewinderArchive(value: unknown): RewinderArchive {
   return archive;
 }
 
-export function initializeRewinder(state: GameState, history?: RewinderArchive): GameState {
+export function initializeRewinder(state: GameState, history?: RewinderArchive, cycleNumber = 1): GameState {
   if (state.selectedRoleId !== "rewinder") return state;
-  return { ...state, rewinderState: { history: normalizeRewinderArchive(history), records: { years: {} }, restoredKeys: [], completedYears: [] } };
+  return { ...state, rewinderState: {
+    ...(usesGameplayRulesFrom("20261018-r8") ? { cycleNumber: normalizeRewinderCycleNumber(cycleNumber) } : {}),
+    history: normalizeRewinderArchive(history), records: { years: {} }, restoredKeys: [], completedYears: [],
+  } };
 }
 
 function capture(state: GameState): RewinderYearRecord {
@@ -89,7 +93,9 @@ export function getRewinderPreview(state: GameState): (RewinderPresentation & { 
     const reason = run.restoredKeys.includes(candidate.key) ? "本世已重逢" : restoreRewinderRelationship(occupied, historical.relationships, candidate.key).reason;
     return { ...candidate, selected, ...(reason ? { disabledReason: reason } : {}) };
   }) : [];
-  return { year, before, after, candidates };
+  return { year, before, after, candidates,
+    ...(usesGameplayRulesFrom("20261018-r8") ? { cycleNumber: normalizeRewinderCycleNumber(run.cycleNumber) } : {}),
+  };
 }
 
 export function toggleRewinderPerson(state: GameState, key?: string): GameState {
@@ -102,7 +108,7 @@ export function toggleRewinderPerson(state: GameState, key?: string): GameState 
 }
 
 export function isRewinderYearEnd(state: GameState): boolean {
-  return state.selectedRoleId === "rewinder" && state.phase === "playing" && state.totalMonths > 0
+  return !state.rewinderState?.academic && state.selectedRoleId === "rewinder" && state.phase === "playing" && state.totalMonths > 0
     && (state.month === 12 || state.totalMonths >= state.maxMonths)
     && !state.rewinderState?.completedYears.includes(state.year);
 }
@@ -117,7 +123,8 @@ export function prepareRewinderYear(state: GameState): GameState {
     id: `rewinder-year-${state.year}-${state.totalMonths}`, chainId: `rewinder-year-${state.year}`,
     title: `第${state.year}学年 · 轮回`, description: "这一学年走到尽头，往世的积累再次与你相遇。",
     source: "system", stage: "result", deadlineMonths: 0, blocking: true,
-    rewinderPresentation: { year: preview.year, before: preview.before, after: preview.after },
+    rewinderPresentation: { year: preview.year, before: preview.before, after: preview.after,
+      ...(preview.cycleNumber === undefined ? {} : { cycleNumber: preview.cycleNumber }) },
     choices: [{ id: "confirm-rewinder-year", label: "完成轮回", outcome: `保存第${state.year}学年轮回记录`, effects: {} }],
   };
   return enqueuePendingEvents(next, [event]).nextState;
@@ -143,7 +150,8 @@ export function completeRewinderYear(state: GameState): GameState {
     rewinderState: { ...run, pending: undefined, restoredKeys, completedYears: [...run.completedYears, preview.year],
       records: { years: { ...run.records.years, [preview.year]: saved } } },
     eventQueue: next.eventQueue.map(event => event.chainId !== `rewinder-year-${preview.year}` ? event : {
-      ...event, rewinderPresentation: { year: preview.year, before: preview.before, after },
+      ...event, rewinderPresentation: { year: preview.year, before: preview.before, after,
+        ...(preview.cycleNumber === undefined ? {} : { cycleNumber: preview.cycleNumber }) },
     }),
   };
 }

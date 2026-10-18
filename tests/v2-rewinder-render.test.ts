@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { renderRewinderEvent } from "../src/app/v2-render-rewinder-event";
+import { renderRewinderPreview } from "../src/app/v2-render-rewinder";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { captureRewinderGrowth } from "../src/core/v2-rewinder-growth";
@@ -60,10 +61,35 @@ describe("rewinder annual event display", () => {
     expect(growth).not.toMatch(/参会|实习|联培|undefined/);
   });
 
-  it("keeps the same four read-only abilities available inside a run", () => {
+  it("keeps all five read-only abilities available inside a run", () => {
     const html = renderApp(fixture(), undefined, { activePlayTab: "talent", activeTalentTab: "character" });
-    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
+    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(5);
     expect(html).not.toContain("玩法待实装");
     expect(html).not.toContain("暂无角色天赋树");
+  });
+
+  it("preserves existing node indexes and shows a fixed rewind ability below the special node", () => {
+    const html = renderRewinderPreview(4, 12);
+    const nodes = html.match(/<button[^>]*data-rewinder-rule="\d+"[^>]*>/g)!;
+    expect(nodes).toHaveLength(5);
+    expect(nodes[3]).toContain('data-ui-talent-tree-node="0-3"');
+    expect(nodes[3]).toContain('grid-column:4;grid-row:1');
+    expect(nodes[4]).toContain('data-ui-talent-tree-node="0-4"');
+    expect(nodes[4]).toContain('grid-column:4;grid-row:2');
+    expect(nodes[4]).toContain('aria-pressed="true"');
+    expect(html).toContain("第12次轮回");
+    expect(html).toContain("局内轮回");
+    expect(html).toContain("同一选项的结果固定");
+    expect(renderRewinderPreview(4, NaN)).toContain('data-rewinder-cycle="1"');
+  });
+
+  it("shows the frozen cycle number across all three annual scenes and historical records", () => {
+    const preview = { ...getRewinderPreview(fixture())!, cycleNumber: 7 };
+    for (const act of ["attributes", "growth", "relationships"] as const) {
+      const html = renderRewinderEvent(preview, undefined, act);
+      expect(html).toContain('data-rewinder-cycle="7"');
+      expect(html).toContain("第7次轮回");
+      expect(html).toContain("第1学年 · 往世回响");
+    }
   });
 });

@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { withRewinderChoiceRandom } from "./v2-rewinder-event-replay";
 import { getEffectiveSocial } from "./v2-effective-attributes";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import { scheduleConferenceAttendance } from "./v2-conference-attendance";
@@ -497,6 +498,13 @@ export function applyChoiceEffectsToState(
   choice: EventChoice,
   buffSource = "事件",
   currentEvent?: PendingEvent,
+): ResolvedEventChoiceState {
+  return withRewinderChoiceRandom(state, currentEvent, choice.id,
+    () => applyChoiceEffectsInternal(state, choice, buffSource, currentEvent));
+}
+
+function applyChoiceEffectsInternal(
+  state: GameState, choice: EventChoice, buffSource: string, currentEvent?: PendingEvent,
 ): ResolvedEventChoiceState {
   const scholarshipAward = choice.effects.scholarshipAward;
   if (scholarshipAward) {

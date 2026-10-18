@@ -44,6 +44,8 @@ import { getAchievementScopeLabels, isAchievementCompleted } from "../core/v2-ac
 import type { RoleRailViewId } from "./v2-render-types";
 import { renderCaptainTags } from "./v2-render-captain-tags";
 import { renderRewinderPreview } from "./v2-render-rewinder";
+import { getNextRewinderCycleNumber } from "../core/v2-rewinder-cycle";
+import { getAvailableAcademicYears } from "../core/v2-rewinder-academic";
 import { getSelectedCurseDifficulty, getUnlockedCurseDifficulty } from "../core/v2-curse-progress";
 import { isCursedRole } from "../core/v2-curse-system";
 import { ENABLE_LOCAL_PLAYGROUND } from "../core/v2-development-flags";
@@ -311,7 +313,7 @@ function renderGrowthProgress(
   const usesTalentPoints = !SPECIAL_ROLE_IDS.has(viewModel.role.id) && !isCursedRole(viewModel.role.id);
   const passiveLevelHint = isCursedRole(viewModel.role.id) ? "选择已解锁的诅咒难度，无需加点" : "";
   const passiveTalentHint = viewModel.role.id === "research-captain" ? "标签等级跟随对应基础角色等级"
-    : viewModel.role.id === "rewinder" ? "每学年末继承往世积累" : "选择已解锁的诅咒难度";
+    : viewModel.role.id === "rewinder" ? "每次挑战一个学年，8月归档，9月承接上一年成果" : "选择已解锁的诅咒难度";
   const levelTooltip = usesTalentPoints ? `每级+${ROLE_TALENT_POINTS_PER_LEVEL}天赋点` : passiveLevelHint;
   const expProgressPercent = expTarget === null
     ? 100
@@ -348,7 +350,7 @@ function renderGrowthProgress(
   `;
 }
 
-function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>, bonusPoints = 0, experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, hasRoleSave = false, isSaveLoading = false, roleHistoryPageIndex = 0): string {
+function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocation?: Record<string, number>, bonusPoints = 0, experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, hasRoleSave = false, isSaveLoading = false, roleHistoryPageIndex = 0, rewinderStartYear = 1): string {
   const pointSummary = buildTalentPointSummary(viewModel, allocation, bonusPoints);
   const historyPage = roleHistoryPageIndex === 1 ? 1 : 0;
   const historyStats = historyPage === 0 ? viewModel.historyStats : ([
@@ -366,7 +368,7 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
       <div class="lobby-profile-info-head">
         <h1 class="lobby-profile-art-name">${escapeHtml(viewModel.role.name)}</h1>
         ${viewModel.unlockState.owned
-          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"${isSaveLoading ? ' disabled aria-busy="true"' : ""}><span class="lobby-start-button-label">${isSaveLoading ? "读取中…" : hasRoleSave ? "继续游戏" : "开始游戏"}</span><i class="lobby-start-button-arrow" data-lucide="arrow-right" aria-hidden="true"></i></button>`
+          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"${viewModel.role.id === "rewinder" ? ` data-rewinder-start-year="${rewinderStartYear}"` : ""}${isSaveLoading ? ' disabled aria-busy="true"' : ""}><span class="lobby-start-button-label">${isSaveLoading ? "读取中…" : hasRoleSave ? viewModel.role.id === "rewinder" ? "继续本学年" : "继续游戏" : viewModel.role.id === "rewinder" ? `开始第${rewinderStartYear}学年` : "开始游戏"}</span><i class="lobby-start-button-arrow" data-lucide="arrow-right" aria-hidden="true"></i></button>`
           : `<span class="lobby-start-lock" role="group" tabindex="0" aria-label="${escapeHtml(unlockHint)}" data-tooltip="${escapeHtml(unlockHint)}"><button class="lobby-start-button is-disabled" type="button" disabled aria-label="角色尚未解锁"><i data-lucide="lock" aria-hidden="true"></i></button></span>`}
       </div>
       <p class="lobby-profile-summary">${escapeHtml(viewModel.lobby.summary)}</p>
@@ -606,21 +608,25 @@ function renderSelectedRoleDetail(
   hasRoleSave = false,
   isSaveLoading = false,
   roleHistoryPageIndex = 0,
+  rewinderStartYear?: number,
 ): string {
   const viewModel = buildLobbySelectedRoleViewModel(accountProfile, selectedRoleId);
   const allocation = talentAllocation?.[selectedRoleId] ?? accountProfile.talentAllocation?.[selectedRoleId] ?? {};
   const bonusPoints = accountProfile.achievementTalentPoints?.[selectedRoleId] ?? 0;
   const experienceMultiplier = DEFAULT_ROLE_EXP_GAIN_MULTIPLIER + (accountProfile.achievementExperienceMultipliers?.[selectedRoleId] ?? 0);
+  const availableYears = getAvailableAcademicYears(accountProfile.rewinderAcademicArchive);
+  const selectedYear = rewinderStartYear !== undefined && availableYears.includes(rewinderStartYear)
+    ? rewinderStartYear : availableYears.at(-1) ?? 1;
 
   return `
     <section class="lobby-detail-stage">
       <section class="lobby-profile-card${viewModel.unlockState.owned ? " is-owned" : " is-locked"}">
         <div class="lobby-profile-main">
           <section class="lobby-profile-top">
-            ${renderLobbyPortrait(getRoleDetailPortraitUrl(viewModel.role.id), viewModel.role.name)}
-            ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading, roleHistoryPageIndex)}
+            ${renderLobbyPortrait(getRoleDetailPortraitUrl(viewModel.role.id), viewModel.role.name, viewModel.role.id)}
+            ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading, roleHistoryPageIndex, selectedYear)}
           </section>
-          ${selectedRoleId === "rewinder" ? renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 3) : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
+          ${selectedRoleId === "rewinder" ? `<section class="rewinder-year-picker" aria-label="选择挑战学年"><div class="rewinder-year-picker-heading"><strong>学年轮回</strong><span>${hasRoleSave ? "本学年尚未结束，继续当前进度" : "上一年决定起点，这一年由你重写"}</span></div><div class="rewinder-year-options">${Array.from({ length: 6 }, (_, index) => index + 1).map(year => `<button type="button" data-ui-rewinder-start-year="${year}" aria-pressed="${year === selectedYear}"${hasRoleSave || !availableYears.includes(year) ? ` disabled title="${hasRoleSave ? "请先完成当前学年" : `完成第${year - 1}学年归档后解锁`}"` : ""}><span>第${year}学年</span><small>${year === 6 || (accountProfile.rewinderAcademicArchive?.years[year - 1]?.identity.maxMonths ?? Infinity) <= year * 12 ? "毕业终章" : accountProfile.rewinderAcademicArchive?.years[year] ? "已有归档" : availableYears.includes(year) ? "可挑战" : "未解锁"}</small></button>`).join("")}</div></section>${renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 3, getNextRewinderCycleNumber(accountProfile), selectedYear)}` : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
             ? renderDesignedGrowthBoard(selectedRoleId, isCursedRole(selectedRoleId) ? getSelectedCurseDifficulty(accountProfile, selectedRoleId) - 1 : talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined, false, bonusPoints, isCursedRole(selectedRoleId) ? { unlockedDifficulty: getUnlockedCurseDifficulty(accountProfile, selectedRoleId) } : undefined)
             : ""}
         </div>
@@ -641,6 +647,7 @@ export function renderSetupScreen(
   hasRoleSave = false,
   isSaveLoading = false,
   roleHistoryPageIndex = 0,
+  rewinderStartYear?: number,
 ): string {
   const selectedRoleId = accountProfile.selectedLobbyRoleId;
   const ownedCount = getRoleOptions().filter((role) => isRoleOwned(accountProfile, role.id)).length;
@@ -675,7 +682,7 @@ export function renderSetupScreen(
 
               <div class="lobby-detail-column">
                 ${renderLobbyMasthead(activeRoleRailView)}
-                ${renderSelectedRoleDetail(accountProfile, selectedRoleId, activeRoleRailView, talentTreePageIndex, talentTreeSelectedNodeByPage, announcementPageIndex, talentAllocation, hasRoleSave, isSaveLoading, roleHistoryPageIndex)}
+                ${renderSelectedRoleDetail(accountProfile, selectedRoleId, activeRoleRailView, talentTreePageIndex, talentTreeSelectedNodeByPage, announcementPageIndex, talentAllocation, hasRoleSave, isSaveLoading, roleHistoryPageIndex, rewinderStartYear)}
               </div>
             </section>
           </section>

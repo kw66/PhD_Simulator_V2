@@ -10,7 +10,8 @@ import { captureRewinderRelationships } from "../src/core/v2-rewinder-relationsh
 import { getRewinderPreview, initializeRewinder, normalizeRewinderArchive, settleRewinderArchive } from "../src/core/v2-rewinder";
 import { getCalendarForTotalMonths, getGraduationScoreTarget, getMonthLimitByDegree } from "../src/core/v2-progression";
 import { prepareThesisBlindReview, syncThesisState, THESIS_REVIEW_THRESHOLDS } from "../src/core/v2-thesis-rules";
-import { executeReplayCommand, replayStateDigest, verifyRunReplay } from "../src/core/v2-run-replay";
+import { createRunReplay, executeReplayCommand, replayStateDigest, verifyRunReplay } from "../src/core/v2-run-replay";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { activateLover } from "../src/core/v2-lover-system";
 import { createLoverProgressState } from "../src/core/v2-lover-progression";
 import type { RewinderArchive, RewinderYearRecord } from "../src/core/v2-rewinder-state";
@@ -39,16 +40,26 @@ function confirm(state: GameState): GameState {
   return dispatchAction(state, "resolve-event", { eventId: event.id, eventChoiceId: "confirm-rewinder-year" });
 }
 
-async function fixture(history: RewinderArchive = { years: {} }) {
+async function fixture(history: RewinderArchive = { years: {} }, settledRuns = 0) {
   const values = new Map<string, string>();
   const storage = { getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); } };
   const account = createDefaultAccountProfile();
   account.roleProgress.rewinder.unlocked = true;
+  account.roleProgress.rewinder.playedRuns = settledRuns;
   account.rewinderArchive = history;
   saveAccountProfile(account, storage);
   const adapter = createMemoryRunSaveAdapter();
   const saves = createRunSaveRepository({ storage, adapter });
+  await saves.ready();
+  // These fixtures represent an already-running r8 life. New starts now use academic chapters.
+  const initial = { ...createInitialState(), randomState: { seed: 1700000000, cursor: 0 } };
+  const payload = { roleId: "rewinder" as const, rewinderArchive: history, rewinderCycleNumber: settledRuns + 1 };
+  const oldStart = withGameplayRuleset("20261018-r8", () => dispatchAction(initial, "start-game", payload));
+  const replay = createRunReplay(initial, oldStart, payload);
+  replay.ruleset = "20261018-r8";
+  replay.commands[0] = { kind: "action", actionId: "start-game", payload, ruleset: "20261018-r8" };
+  saves.commit(oldStart, { replay, monthStart: true });
   const store = createStore({ storage, saves });
   await store.ready();
   store.getState().randomState = { seed: 1700000000, cursor: 0 };
@@ -105,7 +116,7 @@ describe("rewinder yearly, replay and account integration", () => {
   it("freezes history without applying it at start, then restores only the matching August record once", () => {
     const historical = archive();
     const initial = createInitialState(); initial.randomState = { seed: 17, cursor: 0 };
-    const started = dispatchAction(initial, "start-game", { roleId: "rewinder", rewinderArchive: historical });
+    const started = withGameplayRuleset("20261018-r8", () => dispatchAction(initial, "start-game", { roleId: "rewinder", rewinderArchive: historical }));
     expect(started.player.research).toBeLessThan(18);
     historical.years[1]!.growth.attributes.research = 99;
     expect(started.rewinderState!.history.years[1]!.growth.attributes.research).toBe(18);
@@ -195,9 +206,12 @@ describe("rewinder yearly, replay and account integration", () => {
   });
 
   it("replays a real full year, preserves pending saves, and archives only on explicit settlement", async () => {
-    const { store, storage, adapter } = await fixture(archive());
+    const { store, storage, adapter } = await fixture(archive(), 6);
+    expect(store.getState().rewinderState?.cycleNumber).toBe(7);
     const originalArchive = structuredClone(store.getLobbyState().rewinderArchive);
     playYear(store);
+    expect(getRewinderPreview(store.getState())?.cycleNumber).toBe(7);
+    expect(store.getState().eventQueue.find(event => event.rewinderPresentation)?.rewinderPresentation?.cycleNumber).toBe(7);
     expect(store.getLobbyState().rewinderArchive).toEqual(originalArchive);
     getRewinderPreview(store.getState());
     await store.flushSaves();
@@ -205,6 +219,7 @@ describe("rewinder yearly, replay and account integration", () => {
     const restored = createStore({ storage, saves: restoredSaves });
     await restored.ready(); restored.dispatch("start-game", { roleId: "rewinder" });
     expect(restored.getState()).toEqual(store.getState());
+    expect(restored.getState().rewinderState?.cycleNumber).toBe(7);
     confirmStore(restored);
     expect(restored.getState().totalMonths).toBe(13);
     expect(restored.getReplayStatus().failed).toBeUndefined();
@@ -228,8 +243,10 @@ describe("rewinder yearly, replay and account integration", () => {
     expect(loadAccountProfile(storage).account.rewinderArchive?.years[1]).toEqual(completedRecord);
     expect(restored.hasRoleSave("rewinder")).toBe(false);
     restored.dispatch("start-game", { roleId: "rewinder" });
-    expect(restored.getState().rewinderState?.history.years[1]).toEqual(completedRecord);
+    expect(restored.getState().rewinderState?.academic?.startYear).toBe(1);
+    expect(restored.getLobbyState().rewinderArchive?.years[1]).toEqual(completedRecord);
     expect(restored.getState().rewinderState?.records.years).toEqual({});
+    expect(restored.getState().rewinderState?.cycleNumber).toBe(8);
   });
 
   it("rewinding before the annual event removes the abandoned record and later saves", async () => {

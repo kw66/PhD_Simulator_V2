@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dispatchAction } from "../src/core/v2-engine";
+import { createInitialState, dispatchAction } from "../src/core/v2-engine";
+import { getAcademicArchivePreview } from "../src/core/v2-rewinder-academic";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { getRewinderPreview } from "../src/core/v2-rewinder";
 import { renderDebugPanel } from "../src/app/v2-render-debug-panel";
@@ -10,7 +11,7 @@ describe("rewinder annual debug preview", () => {
     const normal = createStartedGameState("normal");
     const button = (state: typeof normal) => renderDebugPanel(state, true).match(/<button[^>]*data-event-id="rewinder-year"[^>]*>/)![0];
     expect(button(normal)).toContain("disabled");
-    expect(button(normal)).toContain("替换当前调试进度为第一学年末");
+    expect(button(normal)).toContain("预览8月结束后的属性定格、成长成果和人际定稿");
     expect(button(createStartedGameState("rewinder"))).not.toContain("disabled");
     const refused = dispatchAction(normal, "debug-trigger-event", { eventId: "rewinder-year" });
     expect(refused.selectedRoleId).toBe("normal");
@@ -19,7 +20,7 @@ describe("rewinder annual debug preview", () => {
     expect(refused.eventQueue).toEqual(normal.eventQueue);
   });
 
-  it("previews inheritance, restores selected people and records the confirmation once", () => {
+  it("keeps an already-running legacy life's annual preview functional", () => {
     const original = createStartedGameState("rewinder");
     const before = structuredClone(original);
     let pending = dispatchAction(original, "debug-trigger-event", { eventId: "rewinder-year" });
@@ -45,19 +46,33 @@ describe("rewinder annual debug preview", () => {
     expect(getRewinderPreview(repeated)?.candidates.every(candidate => !candidate.selected)).toBe(true);
   });
 
+  it("previews the three-act archive for new academic runs without modifying the source run", () => {
+    const original = dispatchAction(createInitialState(), "start-game", { roleId: "rewinder" });
+    const before = structuredClone(original);
+    const pending = dispatchAction(original, "debug-trigger-event", { eventId: "rewinder-year" });
+    expect(original).toEqual(before);
+    expect(pending).toMatchObject({ year: 1, month: 12, totalMonths: 12 });
+    expect(pending.eventQueue).toEqual([]);
+    const preview = getAcademicArchivePreview(pending)!;
+    expect(preview.best.attributes.research).toBe(18);
+    expect(preview.candidates.filter(person => person.kind === "fellow")).toHaveLength(2);
+    expect(preview.canConfirm).toBe(true);
+    expect(pending.rewinderState?.academic?.completed).toBeUndefined();
+  });
+
   it("never saves demonstration history into the player's cross-run archive", () => {
     const store = createStore({ storage: null });
     store.getLobbyState().roleProgress.rewinder.unlocked = true;
     const archive = structuredClone(store.getLobbyState().rewinderArchive);
+    const academicArchive = structuredClone(store.getLobbyState().rewinderAcademicArchive);
     store.dispatch("start-game", { roleId: "rewinder" });
     store.dispatch("debug-trigger-event", { eventId: "rewinder-year" });
     expect(store.isCurrentRunDisqualified()).toBe(true);
-    const event = store.getState().eventQueue.find(item => item.rewinderPresentation)!;
-    store.dispatch("resolve-event", { eventId: event.id, eventChoiceId: "confirm-rewinder-year" });
-    store.dispatch("quit-game");
-    store.dispatch("settle-and-return");
+    expect(getAcademicArchivePreview(store.getState())).not.toBeNull();
+    store.dispatch("confirm-rewinder-archive");
     expect(store.getState().phase).toBe("setup");
     expect(store.getLobbyState().rewinderArchive).toEqual(archive);
+    expect(store.getLobbyState().rewinderAcademicArchive).toEqual(academicArchive);
     expect(store.getFinalizedOutbox()).toEqual([]);
   });
 });

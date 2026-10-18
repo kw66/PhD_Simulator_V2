@@ -1111,7 +1111,7 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(createInitialState(), account);
     expect(html).not.toContain("lobby-talent-effects");
     expect(html).toContain("is-rewinder-tree");
-    expect(html).toContain('aria-label="轮回者能力"');
+    expect(html).toContain('aria-label="轮回者能力 · 第1次轮回"');
     expect(html).not.toContain("轮回能力待实装");
     expect(html).not.toContain('data-ui-talent-reset=');
     expect(html).not.toContain('data-talent-id=');
@@ -1123,8 +1123,8 @@ describe("v2 render lobby shell", () => {
     account.selectedLobbyRoleId = roleId;
     const html = renderApp(createInitialState(), account);
     expect(html).toContain('class="lobby-profile-growth-card');
-    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
-    for (const category of ["属性轮回", "天赋轮回", "人际轮回", "轮回者 · 特殊"]) expect(html).toContain(category);
+    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(5);
+    for (const category of ["属性轮回", "天赋轮回", "人际轮回", "轮回者 · 特殊", "局内轮回"]) expect(html).toContain(category);
     expect(html).not.toContain("rewinder-unlock-progress");
   });
 
@@ -1139,7 +1139,7 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(createInitialState(), account);
     expect(html).toContain("data-selection-mode=\"exclusive\"");
     expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(4);
-    expect(html.match(/<path d=/g)).toBeNull();
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g) ?? null).toBeNull();
     expect(html).not.toContain('class="lobby-normal-tree-node-level"');
     expect(html).not.toContain("前一难度博士毕业后解锁下一难度");
     for (const difficulty of ["简单", "中等", "困难", "地狱"]) expect(html).toContain(`（${difficulty}）</strong>`);
@@ -1158,7 +1158,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("is-chosen-reversed-tree");
     expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
     expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(10);
-    expect(html.match(/<path d=/g)).toHaveLength(8);
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(8);
     expect(html).toContain('<path d="M75 160 H225" />');
     expect(html).toContain('<path d="M225 160 H375" />');
     for (const [id, row, column, cost, level, effect, prerequisites, icon] of [
@@ -1196,7 +1196,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("is-social-reversed-tree");
     expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
     expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(9);
-    expect(html.match(/<path d=/g)).toHaveLength(8);
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(8);
     for (const path of [
       "M75 32 H225", "M75 96 H225",
       "M225 96 C295 96 305 32 375 32", "M225 96 H375", "M225 96 C295 96 305 160 375 160",
@@ -1236,7 +1236,7 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(state, account);
     expect(html).toContain("is-teacher-child-reversed-tree");
     expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(12);
-    expect(html.match(/<path d=/g)).toHaveLength(10);
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(10);
     for (const path of [
       "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
       "M225 160 H375", "M225 32 H375",

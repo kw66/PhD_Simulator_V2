@@ -243,8 +243,8 @@ export const DEBUG_COMPLETED_EVENT_IDS = [
 export const DEBUG_EVENT_GROUPS: DebugButtonGroup[] = [
   {
     title: "角色专属",
-    buttons: [{ id: "rewinder-year", label: "轮回者·学年轮回", roleId: "rewinder",
-      description: "轮回者开局后可用；替换当前调试进度为第一学年末，包含示例往世属性、成长、导师、同学和恋人。" }],
+    buttons: [{ id: "rewinder-year", label: "轮回者·三幕归档", roleId: "rewinder",
+      description: "轮回者开局后可用；预览8月结束后的属性定格、成长成果和人际定稿，调试预览不会写入正式学年档案。" }],
   },
   {
     title: "固定事件",

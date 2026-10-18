@@ -115,6 +115,8 @@ import { createThesisStats } from "./v2-thesis-stats";
 import { createStatisticsClient } from "./v2-statistics-client";
 import { isRemoteWriteEnabled } from "./v2-remote-access";
 import type { RewinderAct } from "./v2-render-rewinder-event";
+import type { AcademicArchiveAct } from "./v2-render-rewinder-academic";
+import { getAvailableAcademicYears, isAcademicArchivePending } from "../core/v2-rewinder-academic";
 import { createAchievementStats } from "./v2-achievement-stats";
 import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, NICKNAME_MAX_LENGTH, refreshCommunityComposerLayout, refreshCommunityContentOverflow, renderCommunityMessages } from "./v2-community-messages";
 import { createValueAnimations, getVisibleValueDelta } from "./v2-value-animations";
@@ -438,6 +440,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let activeEventRootId: string | null = null;
   let activeEventHistoryIndex: number | null = null;
   let activeRewinderAct: RewinderAct = "attributes";
+  let academicArchiveAct: AcademicArchiveAct = 0;
+  let academicArchiveWasOpen = false;
+  let rewinderStartYear: number | undefined;
   let activeLogPage: number | null = null;
   let timelineScrollLeft = 0;
   const syncTimelineLabels = (track: HTMLElement): void => {
@@ -1015,6 +1020,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
     syncShopUpgradeNotices(state);
     const shopUpgradeNotices = getShopUpgradeNotices(state);
     const lobby = store.getLobbyState();
+    const academicArchiveOpen = isAcademicArchivePending(state);
+    if (academicArchiveOpen && !academicArchiveWasOpen) academicArchiveAct = 0;
+    academicArchiveWasOpen = academicArchiveOpen;
     if (isHelpOpen && state.phase === "playing") {
       const context = getPlayHelpContext({ activePlayTab, activeShopTab, activeTalentTab });
       const index = getPlayHelpPageIndex(context, helpPageByContext[context.key]);
@@ -1024,6 +1032,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
       ? root.querySelector<HTMLElement>(".lobby-talent-tree")
       : null;
     const previousTimelineTrack = root.querySelector<HTMLElement>(".event-timeline-track");
+    const previousArchiveBody = root.querySelector<HTMLElement>(".academic-archive-body");
+    const previousArchiveAct = previousArchiveBody?.dataset.academicActPage;
+    const previousArchiveScroll = previousArchiveBody?.scrollTop ?? 0;
+    const previousArchiveButton = document.activeElement instanceof HTMLButtonElement
+      && document.activeElement.closest(".academic-archive-overlay") ? { ...document.activeElement.dataset } : undefined;
     if (state.phase === "setup") {
       timelineScrollLeft = 0;
     } else if (previousTimelineTrack && previousTimelineTrack.clientWidth > 0) {
@@ -1043,6 +1056,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeRoleRailView,
       announcementPageIndex,
       roleHistoryPageIndex,
+      rewinderStartYear: state.phase === "setup" && lobby.selectedLobbyRoleId === "rewinder" && store.hasRoleSave("rewinder")
+        ? store.getRunSaves("rewinder").find(save => save.kind === "latest")?.year ?? rewinderStartYear : rewinderStartYear,
       talentTreePageIndex,
       talentTreeSelectedNodeByPage,
       talentAllocation: store.getLobbyState().talentAllocation,
@@ -1054,6 +1069,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeEventHistoryId,
       activeEventHistoryIndex,
       activeRewinderAct,
+      academicArchiveAct,
       activeLogPage,
       isSanChartOpen,
       activePendingPage,
@@ -1078,6 +1094,19 @@ export function bootstrapApp(root: HTMLDivElement): void {
       // Keep the preview stable when a different part of the setup screen rerenders.
       previousTalentTree.querySelector(".lobby-talent-tree-page.is-entering")?.classList.remove("is-entering");
       root.querySelector(".lobby-talent-tree")?.replaceWith(previousTalentTree);
+    }
+    if (academicArchiveOpen) {
+      const archiveBody = root.querySelector<HTMLElement>(".academic-archive-body");
+      const sameAct = previousArchiveAct === archiveBody?.dataset.academicActPage;
+      if (sameAct && archiveBody) archiveBody.scrollTop = previousArchiveScroll;
+      const restoreFocus = sameAct && previousArchiveButton?.action
+        ? [...root.querySelectorAll<HTMLButtonElement>(".academic-archive-overlay button[data-action]")].find(button =>
+          button.dataset.action === previousArchiveButton.action
+          && button.dataset.rewinderPersonKey === previousArchiveButton.rewinderPersonKey
+          && button.dataset.rewinderPaperSource === previousArchiveButton.rewinderPaperSource
+          && button.dataset.rewinderCoffeeSource === previousArchiveButton.rewinderCoffeeSource)
+        : undefined;
+      (restoreFocus ?? root.querySelector<HTMLElement>("#academic-archive-title"))?.focus({ preventScroll: true });
     }
     refreshTalentTree = false;
     lastRenderedSetupRoleId = state.phase === "setup" ? lobby.selectedLobbyRoleId : null;
@@ -1266,7 +1295,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (actionId === "next-month" || actionId === "force-next-month") {
       animateEventPanelAfterNextMonth = activePlayTab === "events";
     }
-    if (actionId === "debug-replay-event") {
+    if (actionId === "debug-replay-event" || actionId === "rewinder-replay-event") {
       selectPlayTab("events");
       isEventContentOpen = true;
       activeEventHistoryId = null;
@@ -1279,6 +1308,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeEventRootId = replaySourceEvent ? getEventRootId(replaySourceEvent) : null;
     }
     if (actionId === "settle-and-return") {
+      skipNextPlayerAnimation = true;
+    }
+    if (actionId === "confirm-rewinder-archive") {
+      rewinderStartYear = undefined;
+      refreshTalentTree = true;
       skipNextPlayerAnimation = true;
     }
     if (actionId === "upgrade-shop-item" && dataset.shopUpgradeId?.startsWith("chair-")) {
@@ -1329,6 +1363,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
       eventHistoryIndex: typeof dataset.eventHistoryIndex === "string" ? Number(dataset.eventHistoryIndex) : undefined,
       relationshipId: typeof dataset.relationshipId === "string" ? dataset.relationshipId : undefined,
       rewinderPersonKey: typeof dataset.rewinderPersonKey === "string" ? dataset.rewinderPersonKey : undefined,
+      rewinderStartYear: actionId === "start-game" && typeof dataset.rewinderStartYear === "string" ? Number(dataset.rewinderStartYear) : undefined,
+      rewinderPaperSource: dataset.rewinderPaperSource === "current" || dataset.rewinderPaperSource === "previous" ? dataset.rewinderPaperSource : undefined,
+      rewinderCoffeeSource: dataset.rewinderCoffeeSource === "current" || dataset.rewinderCoffeeSource === "previous" ? dataset.rewinderCoffeeSource : undefined,
       projectType: dataset.projectType === "horizontal" || dataset.projectType === "vertical" ? dataset.projectType : undefined,
       debugStatId: isDebugStatId(dataset.debugStatId) ? dataset.debugStatId : undefined,
       debugPaperTarget: isPaperTarget(dataset.debugPaperTarget) ? dataset.debugPaperTarget : undefined,
@@ -1472,6 +1509,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (event.button !== 0) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
+
     const track = target.closest<HTMLElement>(".event-timeline-track");
     if (!track) return;
     timelineDrag = {
@@ -1529,6 +1567,27 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    const academicActButton = target.closest<HTMLButtonElement>("button[data-ui-academic-archive-act]");
+    if (academicActButton && isAcademicArchivePending(store.getState())) {
+      const nextAct = Number(academicActButton.dataset.uiAcademicArchiveAct);
+      if (nextAct === 0 || nextAct === 1 || nextAct === 2) {
+        academicArchiveAct = nextAct;
+        render();
+        root.querySelector<HTMLElement>("#academic-archive-title")?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    const academicYearButton = target.closest<HTMLButtonElement>("button[data-ui-rewinder-start-year]");
+    if (academicYearButton && !academicYearButton.disabled && store.getState().phase === "setup") {
+      const nextYear = Number(academicYearButton.dataset.uiRewinderStartYear);
+      if (getAvailableAcademicYears(store.getLobbyState().rewinderAcademicArchive).includes(nextYear)) {
+        rewinderStartYear = nextYear;
+        refreshTalentTree = true;
+        render();
+        root.querySelector<HTMLButtonElement>(`button[data-ui-rewinder-start-year="${nextYear}"]`)?.focus({ preventScroll: true });
+      }
+      return;
+    }
     const rewinderButton = target.closest<HTMLButtonElement>("button[data-ui-rewinder-act]");
     const rewinderAct = rewinderButton?.dataset.uiRewinderAct;
     if (rewinderAct === "attributes" || rewinderAct === "growth" || rewinderAct === "relationships") {
@@ -2129,6 +2188,19 @@ export function bootstrapApp(root: HTMLDivElement): void {
   });
 
   window.addEventListener("keydown", (event) => {
+    if (isAcademicArchivePending(store.getState())) {
+      if (event.key === "Tab") {
+        const buttons = [...root.querySelectorAll<HTMLElement>(".academic-archive-overlay button:not(:disabled), .academic-archive-overlay summary")];
+        const first = buttons[0];
+        const last = buttons.at(-1);
+        if (event.shiftKey && (document.activeElement === first || document.activeElement?.id === "academic-archive-title")) {
+          event.preventDefault(); last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first?.focus();
+        }
+      }
+      return;
+    }
     if (isQuitConfirmationOpen) {
       if (event.key === "Escape") {
         event.preventDefault();

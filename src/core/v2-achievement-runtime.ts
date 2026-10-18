@@ -22,13 +22,35 @@ export function observeAchievements(previous: GameState, next: GameState, action
   return { ...next, achievementProgress: run };
 }
 
-/** The complete ending transaction. A new role adds a date, but never regrants the shared reward. */
-export function settleRunAchievements(account: AccountProfile, state: GameState, timestamp = new Date().toISOString()): {
+interface AchievementSettlement {
   account: AccountProfile; state: GameState; experienceForCurrentRole: number;
-} {
+}
+
+/** The complete ending transaction. A new role adds a date, but never regrants the shared reward. */
+export function settleRunAchievements(account: AccountProfile, state: GameState, timestamp = new Date().toISOString()): AchievementSettlement {
   if (state.phase !== "finished" || !state.ending) return { account, state, experienceForCurrentRole: 0 };
+  return settleAchievementEvidence(account, state, timestamp, true);
+}
+
+/** A confirmed academic archive settles achievements without inventing an ending. */
+export function settleAcademicYearAchievements(account: AccountProfile, state: GameState, timestamp = new Date().toISOString()): AchievementSettlement {
+  if (state.phase !== "playing" || state.ending || state.selectedRoleId !== "rewinder" || !state.rewinderState?.academic?.completed) {
+    return { account, state, experienceForCurrentRole: 0 };
+  }
+  return settleAchievementEvidence(account, state, timestamp, false);
+}
+
+function requiresEnding(id: string): boolean {
+  return /:(?:ending-|zero-talent-master$|curse-hell-phd$)/u.test(id)
+    || ["normal:truly-ordinary", "global:slow-research", "global:academic-star", "global:no-first-conference-graduation",
+      "unlock:genius-reversed", "unlock:teacher-child-reversed", "unlock:social-reversed", "unlock:rich-reversed", "unlock:chosen-reversed"].includes(id);
+}
+
+function settleAchievementEvidence(account: AccountProfile, state: GameState, timestamp: string, ending: boolean): AchievementSettlement {
   const roleId = state.selectedRoleId;
-  const run = state.achievementProgress ?? createAchievementRunProgress();
+  // Re-evaluate retained counters and real current facts, never fabricate missing
+  // lifetime history. Keep this derived evidence out of the replay state.
+  const run = (ending ? state : observeAchievements(state, state)).achievementProgress ?? createAchievementRunProgress();
   const collection = { ...createAchievementRunProgress().collections };
   for (const key of Object.keys(collection) as (keyof AchievementCollectionProgress)[]) {
     const known = new Set(COLLECTION_REQUIREMENTS[key].map(item => item.id));
@@ -42,7 +64,9 @@ export function settleRunAchievements(account: AccountProfile, state: GameState,
     achievementExperienceMultipliers: { ...account.achievementExperienceMultipliers },
     achievementTalentPoints: { ...account.achievementTalentPoints },
   };
-  const candidates = new Set([...run.satisfied, ...evaluateEndingResearchAchievements(state), ...evaluateEndingChallenges(state)]);
+  const candidates = new Set(ending
+    ? [...run.satisfied, ...evaluateEndingResearchAchievements(state), ...evaluateEndingChallenges(state)]
+    : run.satisfied.filter(id => !requiresEnding(id)));
   const newlyCompleted: string[] = [];
   let experienceForCurrentRole = 0;
   for (const definition of getAllAchievementDefinitions()) {

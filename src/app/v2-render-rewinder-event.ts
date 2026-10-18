@@ -3,7 +3,8 @@ import { formatMoney } from "../core/v2-money";
 import { getFellowName } from "../core/v2-fellow-progression";
 import { getLoverName } from "../core/v2-lover-system";
 import { getRewinderPreview } from "../core/v2-rewinder";
-import type { RewinderYearRecord } from "../core/v2-rewinder-state";
+import { normalizeRewinderCycleNumber } from "../core/v2-rewinder-cycle";
+import type { RewinderPresentation, RewinderYearRecord } from "../core/v2-rewinder-state";
 import type { GameState } from "../core/v2-types";
 import "../styles/rewinder-event.css";
 
@@ -61,9 +62,10 @@ const acts: ReadonlyArray<{ id: RewinderAct; title: string; subtitle: string }> 
 ];
 
 /** Historical stages use frozen comparisons; only a live annual event offers choices. */
-export function renderRewinderEvent(presentation: { year: number; before: RewinderYearRecord; after: RewinderYearRecord }, state?: GameState, act: RewinderAct = "attributes"): string {
+export function renderRewinderEvent(presentation: RewinderPresentation, state?: GameState, act: RewinderAct = "attributes"): string {
   const live = state ? getRewinderPreview(state) : null;
   const { year, before, after } = live ?? presentation;
+  const cycle = normalizeRewinderCycleNumber((live ?? presentation).cycleNumber);
   const values = before.growth.attributes;
   const inherited = after.growth.attributes;
   const people = live?.candidates ?? [];
@@ -90,8 +92,8 @@ export function renderRewinderEvent(presentation: { year: number; before: Rewind
       ? `<div class="rewinder-scene-heading"><strong>积累，自有回响</strong><span>与往世同一学年的行动次数逐项取高</span></div><div class="rewinder-comparison-grid is-growth">${Object.entries(growthLabels).map(([rawKey, label]) => { const key = rawKey as keyof typeof growthLabels; return comparison(label, before.growth.growth[key] ?? 0, after.growth.growth[key] ?? 0); }).join("")}</div>`
       : `${advisorHtml}${relationshipsHtml}`;
 
-  return `<section class="rewinder-event" data-rewinder-act="${act}" aria-label="第${year}学年轮回对比">
-    <header class="rewinder-event-heading"><div class="rewinder-hero-kicker">学年轮回 · 第 ${year} 年</div><div class="rewinder-hero-main"><strong>往世回响</strong><span>本世 <i aria-hidden="true">→</i> 轮回后</span></div><p>这一学年走到尽头，往世的积累再次与你相遇。</p></header>
+  return `<section class="rewinder-event" data-rewinder-act="${act}" data-rewinder-cycle="${cycle}" aria-label="第${cycle}次轮回 · 第${year}学年轮回对比">
+    <header class="rewinder-event-heading"><div class="rewinder-time-orbit" aria-hidden="true"><span>${cycle}</span></div><div class="rewinder-hero-copy"><div class="rewinder-hero-kicker">第${year}学年 · 往世回响</div><div class="rewinder-hero-main"><strong>第${cycle}次轮回</strong><span>本世 <i aria-hidden="true">→</i> 轮回后</span></div><p>这一学年走到尽头，往世的积累再次与你相遇。</p></div></header>
     <nav class="rewinder-act-nav" aria-label="轮回三幕">${acts.map((item, index) => `<button type="button" class="rewinder-act-tab${act === item.id ? " is-active" : ""}" data-ui-rewinder-act="${item.id}" aria-pressed="${act === item.id}"><span class="rewinder-act-index">0${index + 1}</span><span class="rewinder-act-title"><strong>${item.title}</strong><small>${item.subtitle}</small></span></button>`).join("")}</nav>
     <section class="rewinder-scene rewinder-scene-${act}" aria-label="${acts.find(item => item.id === act)!.title}">${content}</section>
   </section>`;

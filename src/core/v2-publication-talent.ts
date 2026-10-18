@@ -71,7 +71,7 @@ export const PUBLICATION_TALENT_DEFINITIONS: readonly PublicationTalentDefinitio
 export function getPublicationTalentChecklist(state: GameState): PublicationTalentChecklistItem[] {
   return PUBLICATION_TALENT_DEFINITIONS.map((definition) => ({
     ...definition,
-    completed: definition.isComplete(state),
+    completed: definition.isComplete(state) || !!state.rewinderState?.academic && !!state.publicationTalentState?.claimedIds.includes(definition.id),
   }));
 }
 

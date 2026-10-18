@@ -7,9 +7,11 @@ import {
 } from "./v2-lobby";
 import { createInitialState, dispatchAction } from "./v2-engine";
 import { pushNoOpLog } from "./v2-engine-helpers";
-import { settleRunAchievements } from "./v2-achievement-runtime";
+import { settleRunAchievements, settleAcademicYearAchievements } from "./v2-achievement-runtime";
+import { getAvailableAcademicYears, storeAcademicArchive } from "./v2-rewinder-academic";
 import { settleCurseDifficultyProgress } from "./v2-curse-progress";
 import { settleRewinderArchive } from "./v2-rewinder";
+import { getNextRewinderCycleNumber } from "./v2-rewinder-cycle";
 import { applyHelpRead, createRunReplay, replayStateDigest, verifyRunReplay, REPLAY_RULESET, type RunReplay, type ReplayAnchor } from "./v2-run-replay";
 import { awardRoleExperience, MAX_ROLE_LEVEL } from "./v2-role-experience";
 import { recordRoleResult, recordRoleStart } from "./v2-role-records";
@@ -249,6 +251,28 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     return true;
   }
 
+  function finalizeAcademicYear(): boolean {
+    const completed = state.rewinderState?.academic?.completed;
+    if (state.phase !== "playing" || !completed || !currentRunId || state.selectedRoleId !== "rewinder") return false;
+    if (settledRuns.rewinder === currentRunId) return false;
+    const verified = !runUsedDebugPanel && checkReplay();
+    let nextAccount = accountProfile;
+    if (verified) {
+      const settled = settleAcademicYearAchievements(accountProfile, state);
+      const progress = settled.account.roleProgress.rewinder;
+      nextAccount = { ...settled.account,
+        rewinderAcademicArchive: storeAcademicArchive(accountProfile.rewinderAcademicArchive, completed),
+        roleProgress: { ...settled.account.roleProgress, rewinder: { ...progress, playedRuns: progress.playedRuns + 1 } },
+      };
+    }
+    const ids = { ...settledRuns, rewinder: currentRunId };
+    if (!persistAccount(nextAccount, ids, finalizedOutbox)) { notify(); return false; }
+    accountProfile = nextAccount;
+    settledRuns = ids;
+    saves.clear("rewinder");
+    return true;
+  }
+
   const api = {
     ready,
     isReady(): boolean { return readyComplete; },
@@ -375,16 +399,23 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
           return;
         }
 
+        const startYear = payload.rewinderStartYear ?? 1;
+        if (nextRoleId === "rewinder" && !getAvailableAcademicYears(accountProfile.rewinderAcademicArchive).includes(startYear)) return;
+
         const startPayload = {
           ...payload,
           roleId: nextRoleId,
           curseDifficulty: getSelectedCurseDifficulty(accountProfile, nextRoleId),
           captainTagLevels: Object.fromEntries(CAPTAIN_PREREQUISITE_ROLE_IDS.map(id => [id, accountProfile.roleProgress[id].level])),
           rewinderArchive: nextRoleId === "rewinder" ? accountProfile.rewinderArchive : undefined,
+          rewinderCycleNumber: nextRoleId === "rewinder" ? getNextRewinderCycleNumber(accountProfile) : undefined,
+          rewinderAcademicArchive: nextRoleId === "rewinder" ? accountProfile.rewinderAcademicArchive : undefined,
+          rewinderStartYear: nextRoleId === "rewinder" ? startYear : undefined,
           talentAllocation: sanitizeRoleTalentAllocation(nextRoleId, accountProfile.roleProgress[nextRoleId].level, accountProfile.talentAllocation?.[nextRoleId], accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0),
           bonusTalentPoints: accountProfile.achievementTalentPoints?.[nextRoleId] ?? 0,
         };
         const nextState = dispatchAction(state, actionId, startPayload);
+        if (nextState === state) return;
         beginReplay(state, nextState, startPayload);
         currentRunId = null;
         runUsedDebugPanel = false;
@@ -398,6 +429,15 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
         replay?.commands.push({ kind: "action", actionId, payload: structuredClone(payload), ruleset: REPLAY_RULESET });
       }
       commit(nextState);
+      if (actionId === "confirm-rewinder-archive" && finalizeAcademicYear()) {
+        const setup = dispatchAction(state, "reset-game");
+        runUsedDebugPanel = false;
+        countedStartRole = null;
+        currentRunId = null;
+        replay = undefined;
+        replayAnchor = undefined;
+        commit(setup);
+      }
     },
   };
   return api;

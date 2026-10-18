@@ -1,4 +1,5 @@
 import { createDefaultAccountProfile } from "../core/v2-lobby";
+import { getNextRewinderCycleNumber } from "../core/v2-rewinder-cycle";
 import type { AccountProfile, GameState } from "../core/v2-types";
 import { renderPlayScreen } from "./v2-render-play";
 import { renderSetupScreen } from "./v2-render-setup-screen";
@@ -17,6 +18,9 @@ export function renderApp(
   accountProfile: AccountProfile = createDefaultAccountProfile(),
   playUiState: PlayRenderUiState = {},
 ): string {
+  // Older lives have no frozen counter; derive their display without changing save/replay state.
+  const displayState = state.selectedRoleId === "rewinder" && state.rewinderState && state.rewinderState.cycleNumber === undefined
+    ? { ...state, rewinderState: { ...state.rewinderState, cycleNumber: getNextRewinderCycleNumber(accountProfile) } } : state;
   return state.phase === "setup"
     ? renderSetupScreen(
       state,
@@ -29,8 +33,9 @@ export function renderApp(
       playUiState.hasRoleSave,
       playUiState.isSaveLoading,
       playUiState.roleHistoryPageIndex,
+      playUiState.rewinderStartYear,
     )
-    : renderPlayScreen(state, {
+    : renderPlayScreen(displayState, {
       ...playUiState,
       dateDisplayMode: playUiState.dateDisplayMode ?? accountProfile.dateDisplayMode,
       roleExperienceAward: playUiState.roleExperienceAward ?? accountProfile.lastRunExperience,

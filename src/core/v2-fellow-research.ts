@@ -57,11 +57,13 @@ export function ensureFellowPapers(state: GameState, random: () => number = game
   if (missing.length === 0) return state;
   const existing = [...(state.fellowPapers ?? []), ...state.externalPublications];
   const added = missing.map((profile) => {
+    const prefix = state.rewinderState?.academic
+      ? `fellow-paper-${profile.id}-year${state.year}` : `fellow-paper-${profile.id}`;
     let sequence = 1;
-    while (existing.some((paper) => paper.id === `fellow-paper-${profile.id}-${sequence}`)) sequence += 1;
+    while (existing.some((paper) => paper.id === `${prefix}-${sequence}`)) sequence += 1;
     return {
       ...createDraftPaper(state.totalMonths, sequence - 1, random, getAcademicCalendarYear(state.year, state.month), getFellowResearchTopic(profile)),
-      id: `fellow-paper-${profile.id}-${sequence}`,
+      id: `${prefix}-${sequence}`,
       leadAuthorId: profile.id,
       leadAuthorName: getFellowName(profile),
       createdTotalMonths: state.totalMonths,

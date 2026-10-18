@@ -398,6 +398,7 @@ export interface PublicationTalentState {
 }
 
 export interface AccountProfile {
+  rewinderAcademicArchive?: import("./v2-rewinder-academic-record").AcademicArchive;
   rewinderArchive?: import("./v2-rewinder-state").RewinderArchive;
   /** Highest unlocked challenge per cursed character. Difficulty numbers are 1..4. */
   curseDifficultyUnlocked?: Partial<Record<RoleId, import("./v2-curse-system").CurseDifficulty>>;
@@ -723,7 +724,7 @@ export interface PendingEvent {
   history?: ResolvedEventStage[];
   deferredStatePatch?: DeferredEventStatePatch;
   /** Semantic intermediate choices, replayed purely at final confirmation instead of rebasing numeric rewards. */
-  deferredChoices?: Array<{ choice: EventChoice; source: string; event: Pick<PendingEvent, "id" | "source" | "chainId" | "stage" | "randomReplay" | "fixedTreePreview" | "replayContext"> }>;
+  deferredChoices?: Array<{ choice: EventChoice; source: string; event: Pick<PendingEvent, "id" | "source" | "chainId" | "stage" | "randomReplay" | "fixedTreePreview" | "replayContext" | "rewinderReplay"> }>;
   fixedResultPreview?: {
     resolution: FixedEventResolution;
     rolls: number[];
@@ -800,6 +801,8 @@ export interface PendingEvent {
   debugRootEventId?: string;
   /** Root description for replaying this pending chain; never a full game snapshot. */
   replayContext?: { rootEvent: PendingEvent; debugEventId?: string };
+  /** Normal rewinder ability: fixed randomness for each pending event choice path. */
+  rewinderReplay?: import("./v2-rewinder-event-replay").RewinderEventReplayContext;
 }
 
 export interface EventQueueItem extends PendingEvent {
@@ -906,7 +909,12 @@ export interface DeferredEventStateChange {
 export type DeferredEventStatePatch = DeferredEventStateChange[];
 
 export interface DispatchPayload {
+  rewinderAcademicArchive?: import("./v2-rewinder-academic-record").AcademicArchive;
+  rewinderStartYear?: number;
+  rewinderPaperSource?: "current" | "previous";
+  rewinderCoffeeSource?: "current" | "previous";
   rewinderArchive?: import("./v2-rewinder-state").RewinderArchive;
+  rewinderCycleNumber?: number;
   rewinderPersonKey?: string;
   captainTagLevels?: Partial<Record<RoleId, number>>;
   curseDifficulty?: import("./v2-curse-system").CurseDifficulty;
