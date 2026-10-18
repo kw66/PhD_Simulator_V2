@@ -77,7 +77,7 @@ describe("workstation visual layout through real bootstrap", () => {
     await settleLayout(page);
   }
 
-  it.each([1920, 390])("keeps an empty paper card the same height after creation at %ipx", async width => {
+  it.each([1920, 390])("keeps desktop paper slots equal-height and mobile empty slots compact at %ipx", async width => {
     const page = await browser.newPage({ viewport: { width, height: width === 390 ? 844 : 1080 }, reducedMotion: "reduce" });
     try {
       await openWorkstation(page);
@@ -89,11 +89,43 @@ describe("workstation visual layout through real bootstrap", () => {
       });
       const slot = page.locator('[data-paper-slot-index="0"].paper-slot-card');
       await slot.locator('[data-action="create-paper"]').waitFor();
+      await settleLayout(page);
       const before = await slot.evaluate(card => card.getBoundingClientRect().height);
+      if (width <= 820) {
+        expect(before).toBeGreaterThan(0);
+        expect(before).toBeLessThanOrEqual(110);
+      }
       await slot.locator('[data-action="create-paper"]').click();
       await page.locator('[data-paper-slot-index="0"].paper-card-filled').waitFor();
+      await settleLayout(page);
       const after = await slot.evaluate(card => card.getBoundingClientRect().height);
-      expect(after).toBeCloseTo(before, 0);
+      if (width > 820) expect(after).toBeCloseTo(before, 0);
+      else expect(after).toBeGreaterThan(before);
+      expect(await slot.locator(".paper-score-strip > span").count()).toBe(4);
+      expect(await slot.locator(".paper-collaboration-score-strip > span").count()).toBe(3);
+      const content = await slot.evaluate(card => {
+        const bounds = card.getBoundingClientRect();
+        const selectors = [".paper-card-header", ".paper-title", ".paper-topic-meta", ".paper-score-strip > span", ".paper-collaboration-score-strip > span"];
+        return {
+          horizontalOverflow: card.scrollWidth - card.clientWidth,
+          verticalOverflow: card.scrollHeight - card.clientHeight,
+          blocks: selectors.flatMap(selector => [...card.querySelectorAll<HTMLElement>(selector)].map(element => {
+            const rect = element.getBoundingClientRect();
+            return { selector, width: rect.width, height: rect.height,
+              contained: rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1
+                && rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1,
+            };
+          })),
+        };
+      });
+      expect(content.horizontalOverflow).toBeLessThanOrEqual(1);
+      expect(content.verticalOverflow).toBeLessThanOrEqual(1);
+      expect(content.blocks).toHaveLength(10);
+      for (const block of content.blocks) {
+        expect(block.width, block.selector).toBeGreaterThan(0);
+        expect(block.height, block.selector).toBeGreaterThan(0);
+        expect(block.contained, `${width}px ${block.selector} stays inside the card`).toBe(true);
+      }
     } finally {
       await page.close();
     }
