@@ -139,14 +139,12 @@ for (const engine of [chromium, webkit]) {
           await page.locator(`[data-event-choice-id="${id}"]:visible`).tap();
         }
         for (const tab of ["workstation", "research", "relationship", "shop", "talent", "events", "settings"]) {
-          if (["research", "talent", "settings"].includes(tab)) await page.locator('[data-ui-mobile-more]').tap();
           await page.locator(`[data-ui-play-tab="${tab}"]`).tap();
           expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
           await page.screenshot({ path: `artifacts/release-storage/${engine.name()}-mobile-${tab}.png`, fullPage: true, animations: "disabled" });
         }
         await page.locator('[data-ui-open-run-saves]:visible').tap();
         expect(await page.locator('.run-save-card').count()).toBeGreaterThan(0);
-        await page.locator('[data-ui-mobile-more]').tap();
         await page.locator('[data-ui-play-tab="research"]').tap();
         expect(await page.locator('.run-saves').count()).toBe(0);
         expect(errors).toEqual([]);

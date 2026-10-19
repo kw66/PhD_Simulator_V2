@@ -7259,14 +7259,6 @@ button[data-card-icon-action]:focus-visible {
   gap: 16px;
 }
 
-.mobile-secondary-tabs { display: contents; }
-.mobile-status-toggle,
-.mobile-status-heading,
-.mobile-status-close,
-.mobile-shell-backdrop,
-.mobile-more-toggle,
-.mobile-month-summary { display: none; }
-
 .center-main-tabs {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -14131,7 +14123,7 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
   box-shadow: none;
 }
 
-.center-main-tabs .center-tab-btn:not(.center-tab-btn-next),
+.center-main-tabs > .center-tab-btn:not(.center-tab-btn-next),
 .shop-panel > .shop-tab-btns > .shop-tab-btn,
 .talent-tab-switches > .panel-switch-btn {
   position: relative;
@@ -14170,7 +14162,7 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
   border-radius: 0;
 }
 
-.center-main-tabs .center-tab-btn.active,
+.center-main-tabs > .center-tab-btn.active,
 .shop-panel > .shop-tab-btns > .shop-tab-btn.active,
 .talent-tab-switches > .panel-switch-btn.active {
   border-color: transparent;
@@ -14180,7 +14172,7 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
   font-weight: 800;
 }
 
-.center-main-tabs .center-tab-btn:not(.center-tab-btn-next) > .center-tab-icon,
+.center-main-tabs > .center-tab-btn:not(.center-tab-btn-next) > .center-tab-icon,
 .shop-panel > .shop-tab-btns .shop-tab-icon,
 .talent-tab-switches .talent-tab-icon {
   width: 17px;

@@ -14,7 +14,7 @@
   box-shadow: inset 0 1px 0 #fffaf0, 0 2px 4px rgba(95, 73, 34, 0.13);
 }
 
-.center-main-tabs .center-tab-btn:not(.center-tab-btn-next) {
+.center-main-tabs > .center-tab-btn:not(.center-tab-btn-next) {
   min-height: 40px;
   border: 0;
   background: transparent;
@@ -23,12 +23,12 @@
   font-size: 0.82rem;
 }
 
-.center-main-tabs .center-tab-btn:not(.center-tab-btn-next).active {
+.center-main-tabs > .center-tab-btn:not(.center-tab-btn-next).active {
   color: #574624;
   box-shadow: none;
 }
 
-.center-main-tabs .center-tab-btn:not(.center-tab-btn-next) .center-tab-icon {
+.center-main-tabs > .center-tab-btn:not(.center-tab-btn-next) .center-tab-icon {
   width: 17px;
   height: 17px;
   flex-basis: 17px;
@@ -42,7 +42,7 @@
 }
 
 @media (hover: hover) {
-  .center-main-tabs .center-tab-btn:not(.center-tab-btn-next):not(.active):hover:not(:disabled) {
+  .center-main-tabs > .center-tab-btn:not(.center-tab-btn-next):not(.active):hover:not(:disabled) {
     background: rgba(176, 141, 66, 0.1);
     color: #604b26;
     box-shadow: none;

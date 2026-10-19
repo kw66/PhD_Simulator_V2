@@ -11,10 +11,9 @@ export interface GameAnnouncement {
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
     date: "2026-10-19",
-    title: "事件回溯与移动端单手操作",
+    title: "事件回溯与选项显示优化",
     changes: [
       { category: "更新", title: "所有角色均可回溯事件", description: "事件第三幕新增回溯按钮，可返回选择、查看不同走向；同一选项结果固定，点击确定后结算。" },
-      { category: "优化", title: "移动端单手操作", description: "常用栏目与下一月固定在底部，顶部常驻SAN、金币、行动点和日期，点击展开完整属性与效果。到期待办可直接打开处理，成果、天赋和设置收进更多。" },
       { category: "修复", title: "选项文字居中", description: "风险感叹号与问号独立显示，不再挤偏按钮文字。" },
     ],
   },

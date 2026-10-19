@@ -89,8 +89,7 @@ describe("mobile play panels", () => {
       const beforeMoney = await page.evaluate(() => (window as MobileWindow).mobilePanelsStore.getState().player.money);
       await buy.tap();
       expect(await page.evaluate(() => (window as MobileWindow).mobilePanelsStore.getState().player.money)).toBeLessThan(beforeMoney);
-      await page.locator('[data-ui-mobile-more]').tap();
-      await page.locator('#mobile-secondary-tabs [data-ui-play-tab="talent"]').tap();
+      await page.locator('[data-ui-play-tab="talent"]').tap();
       for (const tab of ["character", "relation", "equip", "growth", "publication"]) {
         await page.locator(`[data-ui-talent-tab="${tab}"]`).tap();
         expect(await page.locator('.talent-item-row').evaluateAll(cards => cards.every(card => card.scrollWidth <= card.clientWidth + 1))).toBe(true);
@@ -100,8 +99,7 @@ describe("mobile play panels", () => {
       const next = page.locator('[data-ui-lab-inheritance-page="1"]');
       await next.tap();
       expect(await page.locator('[data-ui-lab-inheritance-page="0"]').isEnabled()).toBe(true);
-      await page.locator('[data-ui-mobile-more]').tap();
-      await page.locator('#mobile-secondary-tabs [data-ui-play-tab="research"]').tap();
+      await page.locator('[data-ui-play-tab="research"]').tap();
       await page.locator('.research-paper-row').first().tap();
       const promote = page.locator('[data-action="promote-paper"][data-promotion-id="github"]');
       expect(await promote.evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThanOrEqual(48);
@@ -110,9 +108,6 @@ describe("mobile play panels", () => {
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.screenshot({ path: `artifacts/mobile-panels/verified-${width}.png`, fullPage: true });
       expect(errors).toEqual([]);
-    } finally {
-      await page.screenshot({ path: `artifacts/mobile-panels/final-${width}.png` });
-      await page.close();
-    }
+    } finally { await page.close(); }
   }, 40_000);
 });

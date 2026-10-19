@@ -125,7 +125,6 @@ import { createRelationshipTooltips } from "./v2-relationship-tooltips";
 import { createDebugWindow } from "./v2-debug-window";
 import { RESEARCH_PAGE_SIZE, renderEventLayoutSamples, renderRelationTalentCard } from "./v2-render-play";
 import { getCurrentEvent, getEventRootId, getSortedEventQueue } from "../core/v2-event-queue";
-import { isEventBlocking } from "../core/v2-event-auto-resolution";
 import { getRoleOptions, isPreEnrollmentState } from "../core/v2-progression";
 import { getAttributeTier } from "../core/v2-random-event-rules";
 import { getAvailablePaperSlotCount } from "../core/v2-paper-rules";
@@ -170,7 +169,6 @@ import "../styles/mobile-base.css";
 import "../styles/mobile-lobby.css";
 import "../styles/mobile-panels.css";
 import "../styles/mobile-events.css";
-import "../styles/mobile-navigation.css";
 import "../styles/community-mobile.css";
 
 const ROLE_IDS: ReadonlySet<string> = new Set(getRoleOptions().map((role) => role.id));
@@ -310,8 +308,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let queuedSetupPortraitWarmup = false;
   let fixedStageScaleFrame = 0;
   let activePlayTab: PlayTabId = "events";
-  let isMobileMoreOpen = false;
-  let isMobileStatusOpen = false;
   const playTabOrder: readonly PlayTabId[] = ["events", "workstation", "relationship", "shop", "research", "talent", "settings"];
   let playTabTransitionDirection: "from-left" | "from-right" | null = null;
   const shopTabOrder: readonly ShopTabId[] = ["ai", "coffee", "gear", "life", "rest"];
@@ -423,19 +419,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
 
   const selectPlayTab = (nextPlayTab: PlayTabId): void => {
     isRunSavePanelOpen = false;
-    isMobileMoreOpen = false;
-    isMobileStatusOpen = false;
-    isHelpOpen = false;
     if (nextPlayTab === activePlayTab) return;
     rememberTabSliderOrigin("center");
     playTabTransitionDirection = playTabOrder.indexOf(nextPlayTab) > playTabOrder.indexOf(activePlayTab)
       ? "from-right"
       : "from-left";
     activePlayTab = nextPlayTab;
-  };
-  const scrollToMobileContent = (): void => {
-    if (!window.matchMedia("(max-width: 820px)").matches) return;
-    window.requestAnimationFrame(() => root.querySelector<HTMLElement>("#center-main-panels")?.scrollIntoView({ block: "start", behavior: "instant" }));
   };
   let advisorSalaryStartIndex: number | null = null;
   let labInheritancePage = 0;
@@ -797,7 +786,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeEventRootId = getEventRootId(nextEvent);
     activeEventHistoryIndex = null;
     render();
-    scrollToMobileContent();
   };
 
   const openEventHistoryContent = (eventHistoryId: string): void => {
@@ -962,7 +950,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const render = (): void => {
     const state = store.getState();
     const previousRenderedPlayer = lastRenderedPlayer;
-    const phaseChanged = state.phase !== lastPhase;
     const salaryContext = `${state.phase}:${state.selectedAdvisorName}:${state.advisorProgressState.awards.map((award) => award.id).join(",")}`;
     if (salaryContext !== advisorSalaryContext) {
       advisorSalaryStartIndex = null;
@@ -971,8 +958,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const shouldAnimatePlayer = !skipNextPlayerAnimation && lastPhase === "playing" && state.phase === "playing";
     skipNextPlayerAnimation = false;
     if (state.phase !== lastPhase) {
-      isMobileMoreOpen = false;
-      isMobileStatusOpen = false;
       isQuitConfirmationOpen = false;
       isRunSavePanelOpen = false;
       isEndingContentOpen = true;
@@ -1036,10 +1021,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const shopUpgradeNotices = getShopUpgradeNotices(state);
     const lobby = store.getLobbyState();
     const academicArchiveOpen = isAcademicArchivePending(state);
-    if (academicArchiveOpen || isQuitConfirmationOpen || isFeedbackOpen) {
-      isMobileMoreOpen = false;
-      isMobileStatusOpen = false;
-    }
     if (academicArchiveOpen && !academicArchiveWasOpen) academicArchiveAct = 0;
     academicArchiveWasOpen = academicArchiveOpen;
     if (isHelpOpen && state.phase === "playing") {
@@ -1051,7 +1032,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
       ? root.querySelector<HTMLElement>(".lobby-talent-tree")
       : null;
     const previousTimelineTrack = root.querySelector<HTMLElement>(".event-timeline-track");
-    const previousMobileStatusScroll = root.querySelector<HTMLElement>(".play-left-rail")?.scrollTop ?? 0;
     const previousArchiveBody = root.querySelector<HTMLElement>(".academic-archive-body");
     const previousArchiveAct = previousArchiveBody?.dataset.academicActPage;
     const previousArchiveScroll = previousArchiveBody?.scrollTop ?? 0;
@@ -1065,8 +1045,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     root.dataset.phase = state.phase;
     root.innerHTML = renderApp(state, lobby, {
       activePlayTab,
-      isMobileMoreOpen,
-      isMobileStatusOpen,
       runSaves: store.getRunSaves(),
       saveStatus: store.getSaveStatus(),
       isRunSavePanelOpen,
@@ -1116,10 +1094,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
       // Keep the preview stable when a different part of the setup screen rerenders.
       previousTalentTree.querySelector(".lobby-talent-tree-page.is-entering")?.classList.remove("is-entering");
       root.querySelector(".lobby-talent-tree")?.replaceWith(previousTalentTree);
-    }
-    if (isMobileStatusOpen) {
-      const statusPanel = root.querySelector<HTMLElement>(".play-left-rail");
-      if (statusPanel) statusPanel.scrollTop = previousMobileStatusScroll;
     }
     if (academicArchiveOpen) {
       const archiveBody = root.querySelector<HTMLElement>(".academic-archive-body");
@@ -1299,7 +1273,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (isQuitConfirmationOpen) {
       root.querySelector<HTMLButtonElement>("[data-quit-initial-focus]")?.focus({ preventScroll: true });
     }
-    if (phaseChanged && state.phase === "finished") scrollToMobileContent();
 
     if (!queuedSetupPortraitWarmup && state.phase === "setup") {
       queuedSetupPortraitWarmup = true;
@@ -1320,8 +1293,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
     }
 
     if (actionId === "next-month" || actionId === "force-next-month") {
-      isMobileMoreOpen = false;
-      isMobileStatusOpen = false;
       animateEventPanelAfterNextMonth = activePlayTab === "events";
     }
     if (actionId === "debug-replay-event" || actionId === "replay-event" || actionId === "rewinder-replay-event") {
@@ -1592,56 +1563,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
     root.querySelector<HTMLButtonElement>('[data-action="quit-game"]')?.focus({ preventScroll: true });
   }
 
-  function closeMobilePanels(): void {
-    const statusWasOpen = isMobileStatusOpen;
-    isMobileMoreOpen = false;
-    isMobileStatusOpen = false;
-    render();
-    root.querySelector<HTMLButtonElement>(statusWasOpen ? "[data-ui-mobile-status]" : "[data-ui-mobile-more]")?.focus({ preventScroll: true });
-  }
-
-  window.matchMedia("(max-width: 820px)").addEventListener("change", () => {
-    isMobileMoreOpen = false;
-    isMobileStatusOpen = false;
-    render();
-  });
-
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-
-    if (target.closest("[data-ui-mobile-close]")) {
-      closeMobilePanels();
-      return;
-    }
-    if (target.closest("[data-ui-mobile-status]")) {
-      isMobileStatusOpen = !isMobileStatusOpen;
-      isMobileMoreOpen = false;
-      isHelpOpen = false;
-      render();
-      root.querySelector<HTMLButtonElement>(isMobileStatusOpen ? ".mobile-status-close" : "[data-ui-mobile-status]")?.focus({ preventScroll: true });
-      return;
-    }
-    if (target.closest("[data-ui-mobile-more]")) {
-      isMobileMoreOpen = !isMobileMoreOpen;
-      isMobileStatusOpen = false;
-      isHelpOpen = false;
-      render();
-      root.querySelector<HTMLButtonElement>(isMobileMoreOpen ? "#mobile-secondary-tabs button" : "[data-ui-mobile-more]")?.focus({ preventScroll: true });
-      return;
-    }
-    if (target.closest("[data-ui-mobile-pending]")) {
-      const state = store.getState();
-      const pending = getSortedEventQueue(state.eventQueue).find(event => isEventBlocking(state, event));
-      if (state.phase === "playing" && pending) openEventContent(pending.id);
-      else {
-        selectPlayTab("events");
-        if (state.phase === "finished") isEndingContentOpen = true;
-        render();
-        scrollToMobileContent();
-      }
-      return;
-    }
 
     const academicActButton = target.closest<HTMLButtonElement>("button[data-ui-academic-archive-act]");
     if (academicActButton && isAcademicArchivePending(store.getState())) {
@@ -1975,7 +1899,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
         selectedCoffeeUpgradeId = null;
       }
       render();
-      scrollToMobileContent();
       return;
     }
 
@@ -2300,22 +2223,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
       isHelpOpen = false;
       render();
       root.querySelector<HTMLButtonElement>(".play-help-toggle")?.focus({ preventScroll: true });
-      return;
-    }
-    if (isMobileMoreOpen || isMobileStatusOpen) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeMobilePanels();
-      } else if (event.key === "Tab") {
-        const selector = isMobileStatusOpen
-          ? '.play-left-rail button:not(:disabled), .play-left-rail [tabindex="0"]'
-          : '#mobile-secondary-tabs button, [data-ui-mobile-more]';
-        const controls = [...root.querySelectorAll<HTMLElement>(selector)].filter(node => node.getClientRects().length > 0);
-        const first = controls[0];
-        const last = controls.at(-1);
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-      }
       return;
     }
     if (event.key !== "Escape" || !isFeedbackOpen) return;
