@@ -121,7 +121,7 @@ export function renderLobbyMasthead(activeRoleRailView: RoleRailViewId): string 
     <header class="lobby-masthead">
       <div class="lobby-masthead-main">
         <div class="lobby-brand-block">
-          <strong><i data-lucide="graduation-cap" aria-hidden="true"></i><span>研究生模拟器v2.0</span></strong>
+          <strong><i data-lucide="graduation-cap" aria-hidden="true"></i><span>研究生模拟器 v2.0</span></strong>
         </div>
         <nav class="lobby-project-links" aria-label="项目链接">
           <a href="https://xhslink.com/m/A2DFslJF4mb" target="_blank" rel="noreferrer"><i data-lucide="user-round" aria-hidden="true"></i><span>开发者</span></a>

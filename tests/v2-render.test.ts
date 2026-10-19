@@ -864,7 +864,7 @@ describe("v2 render lobby shell", () => {
     const messageRailHtml = renderApp(state, account, { activeRoleRailView: "messages" });
 
     expect(rolesHtml).toContain('class="lobby-masthead"');
-    expect(rolesHtml).toContain("研究生模拟器v2.0");
+    expect(rolesHtml).toContain("研究生模拟器 v2.0");
     expect(rolesHtml).not.toContain('data-ui-lobby-view="roles"');
     expect(rolesHtml).not.toContain('data-ui-lobby-view="info"');
     expect(rolesHtml).not.toContain('data-ui-lobby-view="messages"');
