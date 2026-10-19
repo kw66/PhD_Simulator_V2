@@ -432,6 +432,30 @@ describe("kwgame activity statistics", () => {
     expect([...backend.rows.values()].map(row => row.p_event)).toEqual(["start", "start", "finish"]);
   });
 
+  it.each([false, true])("counts a restored clean month once after debug use (start uploaded=%s)", async (uploaded) => {
+    const backend = createBackend();
+    const local = createStorage();
+    const client = shared({ fetch: backend.fetch, storage: local });
+    const stats = create({ recordVisit: true, client });
+    const run = { roleId: "normal" as const, ending: null, runKey: JSON.stringify([51, "normal"]) };
+    await stats.trackGamePhase("playing", run);
+    if (uploaded) await stats.flush();
+    await stats.trackGamePhase("playing", { ...run, disqualifiedByDebug: true });
+    await stats.trackGamePhase("finished", { ...run, ending: "phd", disqualifiedByDebug: true, finalized: true });
+    stats.restoreRun(run.runKey, { debugUsed: false });
+    await stats.trackGamePhase("playing", run);
+    await stats.trackGamePhase("finished", { ...run, ending: "master", finalized: true });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await stats.flush();
+    expect([...backend.rows.values()].map(row => row.p_event)).toEqual(["start", "finish"]);
+    expect([...backend.rows.values()].find(row => row.p_event === "finish")?.p_ending).toBe("master");
+    stats.dispose();
+    const reloaded = create({ recordVisit: true, client: shared({ fetch: backend.fetch, storage: local }) });
+    await reloaded.trackGamePhase("finished", { ...run, ending: "master", finalized: true });
+    await reloaded.flush();
+    expect([...backend.rows.values()]).toHaveLength(2);
+  });
+
   it("does not finalize on the ending page or returning home, and can settle a restored ending once", async () => {
     const backend = createBackend();
     const local = createStorage();

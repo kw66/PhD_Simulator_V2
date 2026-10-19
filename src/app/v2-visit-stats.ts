@@ -141,6 +141,17 @@ export function createVisitStats(options: VisitStatsOptions) {
 
   return {
     load,
+    restoreRun(run: string, qualification: { debugUsed: boolean }): void {
+      if (disposed) return;
+      if (qualification.debugUsed) client.markDebug(run);
+      else {
+        client.restoreRunQualification(run);
+        // A debug branch may have removed an unsent start. Its original receipt,
+        // when already uploaded, still prevents a duplicate after the rewind.
+        previousPhase = "setup";
+        currentRun = null;
+      }
+    },
     trackGamePhase(phase: GamePhase, result?: RoleRunResult): Promise<void> {
       if (disposed) return Promise.resolve();
       const run = result?.runKey;

@@ -17,6 +17,7 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
       { category: "平衡", title: "先开始科研，再遇到竞争", description: "首篇一作论文获得分数后，被抢发idea和新sota才会进入随机抽取范围，筹备期不再提前积攒这两个事件。" },
       { category: "更新", title: "所有角色均可回溯事件", description: "事件第三幕新增回溯按钮，可返回选择、查看不同走向；同一选项结果固定，点击确定后结算。" },
       { category: "修复", title: "选项文字居中", description: "风险感叹号与问号独立显示，不再挤偏按钮文字。" },
+      { category: "修复", title: "调试标记随存档恢复", description: "仅打开调试面板不影响成绩，使用调试工具后才标记当前进度；读回使用前的月份可恢复成就、经验与统计资格。" },
     ],
   },
   {

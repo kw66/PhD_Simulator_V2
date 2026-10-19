@@ -316,7 +316,7 @@ describe("independent debug window", () => {
     expect(root.innerHTML).toContain('data-debug-value="money">1</b>');
   });
 
-  it("preserves the event replay switch across reconnect and resynchronizes the host", () => {
+  it("uses the restored host switch without resending an earlier click on reconnect", () => {
     const { root, host, handlers, rootHandlers } = createPopupFixture();
     class ToggleButton {
       dataset = { action: "debug-toggle-event-replay", debugEventReplayEnabled: "true" };
@@ -337,18 +337,15 @@ describe("independent debug window", () => {
       type: "debug-action",
       data: { action: "debug-toggle-event-replay", debugEventReplayEnabled: "true" },
     }, "https://example.test");
+    const sent = host.postMessage.mock.calls.length;
     handlers.get("message")!({ ...state, source: host, origin: "https://example.test", data: { channel: "channel", type: "debug-disconnected" } });
     handlers.get("message")!({
       source: host,
       origin: "https://example.test",
       data: { channel: "channel", type: "debug-state", state: { ...state, debugEventReplayEnabled: false }, revision: 1, hostId: "second" },
     });
-    expect(root.innerHTML).toContain("事件回退 <b>开启</b>");
-    expect(host.postMessage).toHaveBeenLastCalledWith({
-      channel: "channel",
-      type: "debug-action",
-      data: { action: "debug-toggle-event-replay", debugEventReplayEnabled: "true" },
-    }, "https://example.test");
+    expect(root.innerHTML).toContain("事件回退 <b>关闭</b>");
+    expect(host.postMessage).toHaveBeenCalledTimes(sent);
   });
 
   it("allows manual retry while disabled and resumes the heartbeat after page restoration", () => {

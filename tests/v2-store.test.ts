@@ -75,14 +75,14 @@ describe("session store", () => {
     expect(f.storage.values.has(ACCOUNT_STORAGE_KEY)).toBe(true);
   });
 
-  it("debug exclusion survives returning to setup, resuming, and rewinding until actual finalization", async () => {
+  it("debug exclusion survives returning to setup and resuming affected progress until finalization", async () => {
     const f = await fixture(); const { store } = f;
     const original = structuredClone(store.getLobbyState().roleProgress.normal);
     store.dispatch("start-game", { roleId: "normal" });
     const runId = store.getCurrentRunId();
-    const monthSave = store.getRunSaves().find(save => save.kind === "month")!;
-    store.markCurrentRunAsDebugged(); store.markCurrentRunAsDebugged();
-    expect(store.loadRunSave(monthSave.id)).toBe(true);
+    store.dispatch("debug-adjust-stat", { debugStatId: "money", delta: 1 });
+    store.markCurrentRunAsDebugged();
+    expect(store.loadRunSave("latest")).toBe(true);
     expect(store.isCurrentRunDebugged()).toBe(true);
     store.dispatch("reset-game"); store.dispatch("start-game", { roleId: "normal" });
     expect(store.getCurrentRunId()).toBe(runId);
@@ -100,19 +100,20 @@ describe("session store", () => {
     expect(store.getFinalizedOutbox()).toEqual([]);
   });
 
-  it("excludes forced month advances even when invoked without opening the debug window", async () => {
+  it("excludes forced month advances but allows a clean rewind to restore settlement", async () => {
     const { store } = await fixture();
     store.dispatch("start-game", { roleId: "normal" });
     const originalMonth = store.getRunSaves().find(save => save.kind === "month")!;
     store.dispatch("force-next-month");
     expect(store.isCurrentRunDebugged()).toBe(true);
     expect(store.loadRunSave(originalMonth.id)).toBe(true);
-    expect(store.isCurrentRunDebugged()).toBe(true);
+    expect(store.isCurrentRunDisqualified()).toBe(false);
     store.dispatch("quit-game");
-    expect(store.getEndingExperienceAward()).toMatchObject({ gained: 0, disqualifiedByDebug: true });
+    expect(store.getEndingExperienceAward()?.disqualifiedByDebug).toBeUndefined();
+    expect(store.getEndingExperienceAward()?.disqualifiedByIntegrity).toBeUndefined();
     store.dispatch("settle-and-return");
-    expect(store.getFinalizedOutbox()).toEqual([]);
-    expect(store.getLobbyState().achievementRewardedIds).toEqual([]);
+    expect(store.getFinalizedOutbox()).toHaveLength(1);
+    expect(store.getLobbyState().achievementRewardedIds).toContain("global:ending-quit");
     expect(store.isCurrentRunDebugged()).toBe(false);
   });
 

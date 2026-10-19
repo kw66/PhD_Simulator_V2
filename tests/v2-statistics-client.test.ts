@@ -436,6 +436,49 @@ describe("shared statistics queue", () => {
     expect(network.batches[0]!.map((row) => row.kind)).toEqual(["thesis"]);
   });
 
+  it("restores a clean snapshot's qualification without reviving debug results or uploaded receipts", async () => {
+    const network = backend();
+    const local = storage();
+    const stats = client({ fetch: network.fetch, storage: local });
+    queue(stats, "conference", "uploaded");
+    await stats.flush();
+    queue(stats, "journal", "discarded-debug-branch");
+    stats.markDebug("run-1");
+    stats.markDebug("activity-start:run-1");
+    expect(queue(stats, "thesis", "blocked-debug-branch")).toBe(false);
+    stats.restoreRunQualification("run-1");
+    expect(stats.isDebugRun("run-1")).toBe(false);
+    expect(stats.isDebugRun("activity-start:run-1")).toBe(false);
+    expect(queue(stats, "conference", "uploaded")).toBe(false);
+    expect(queue(stats, "thesis", "clean-snapshot")).toBe(true);
+    stats.dispose();
+    const restored = client({ fetch: network.fetch, storage: local });
+    expect(restored.isDebugRun("run-1")).toBe(false);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await restored.flush();
+    expect(network.batches.flat().map((row) => row.kind)).toEqual(["conference", "thesis"]);
+    expect(network.rows.size).toBe(2);
+  });
+
+  it("keeps a restored qualification newer than stale tab exclusions, then honors new debug use", async () => {
+    const network = backend();
+    const local = storage();
+    const first = client({ fetch: network.fetch, storage: local });
+    first.markDebug("run-1");
+    const stale = client({ fetch: network.fetch, storage: local });
+    expect(stale.isDebugRun("run-1")).toBe(true);
+    first.restoreRunQualification("run-1");
+    expect(stale.persistPending()).toBe(true);
+    expect(stale.isDebugRun("run-1")).toBe(false);
+    expect(queue(stale, "journal", "clean")).toBe(true);
+    stale.markDebug("run-1");
+    expect(queue(first, "thesis", "debug-again")).toBe(false);
+    first.restoreRunQualification("run-1");
+    expect(queue(first, "conference", "clean-again")).toBe(true);
+    await first.flush();
+    expect(network.batches.flat().map((row) => row.kind)).toEqual(["conference"]);
+  });
+
   it("makes no requests or storage mutations when disabled, even with pending saved results", async () => {
     const network = backend();
     const local = storage();

@@ -25,6 +25,7 @@ export interface JournalStatsController {
   load(journal: JournalTarget): Promise<void>;
   track(before: GameState, after: GameState, options?: { debugUsed?: boolean; finalized?: boolean }): Promise<void>;
   markDebug(): void;
+  restoreRun(state: GameState, options: { debugUsed: boolean }): void;
   resetRun(): void;
   flush(): Promise<void>;
   dispose(): void;
@@ -71,6 +72,12 @@ export function createJournalStats(options: JournalStatsOptions): JournalStatsCo
     read: (journal) => valid(journal) ? client.read("get_phd_simulator_v2_journal_stats", key(journal), parseStats) : { status: "unavailable", data: null },
     load: (journal) => valid(journal) ? client.load("get_phd_simulator_v2_journal_stats", key(journal), parseStats) : Promise.resolve(),
     track,
+    restoreRun: (state, tracking) => {
+      currentRun = state.phase === "setup" ? null : getStatisticsRunKey(state);
+      debugUsed = tracking.debugUsed;
+      if (debugUsed) markDebug();
+      else if (currentRun !== null) client.restoreRunQualification(currentRun);
+    },
     markDebug, resetRun: () => { currentRun = null; debugUsed = false; },
     flush: () => enabled ? client.flush() : Promise.resolve(),
     dispose: () => { if (!options.client) client.dispose(); },

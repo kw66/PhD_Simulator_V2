@@ -167,13 +167,16 @@ describe("per-role saves integrated with the store", () => {
     expect(store.getLobbyState().roleProgress.normal.playedRuns).toBe(1);
   });
 
-  it("retains debug disqualification through rewinds, lobby return and page reload", async () => {
-    const { store, storage, adapter } = await harness();
+  it("keeps debug qualification on affected saves but restores normal settlement from an earlier month", async () => {
+    const { store, storage, adapter, saves } = await harness();
     store.dispatch("start-game", { roleId: "normal" });
     finishOpening(store);
-    store.markCurrentRunAsDebugged();
-    expect(store.loadRunSave("month:0")).toBe(true);
+    const cleanMoney = store.getState().player.money;
+    store.dispatch("debug-adjust-stat", { debugStatId: "money", delta: 100 });
     expect(store.isCurrentRunDebugged()).toBe(true);
+    store.dispatch("force-next-month");
+    expect(saves.get("normal")?.months.find(month => month.totalMonths === 1)?.debugUsed).toBe(false);
+    expect(saves.get("normal")?.months.find(month => month.totalMonths === 2)?.debugUsed).toBe(true);
     store.dispatch("reset-game");
     store.dispatch("start-game", { roleId: "normal" });
     expect(store.isCurrentRunDebugged()).toBe(true);
@@ -181,13 +184,64 @@ describe("per-role saves integrated with the store", () => {
     const loaded = (await reopen(storage, adapter)).store;
     loaded.dispatch("start-game", { roleId: "normal" });
     expect(loaded.isCurrentRunDebugged()).toBe(true);
+    expect(loaded.loadRunSave("month:2")).toBe(true);
+    expect(loaded.isCurrentRunDebugged()).toBe(true);
     loaded.dispatch("quit-game");
     expect(loaded.getEndingExperienceAward()?.disqualifiedByDebug).toBe(true);
+    expect(loaded.loadRunSave("month:1")).toBe(true);
+    expect(loaded.isCurrentRunDisqualified()).toBe(false);
+    expect(loaded.getState().player.money).toBe(cleanMoney);
+    expect(loaded.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
+    expect(loaded.getRunSaves().some(save => save.totalMonths > 1)).toBe(false);
+    expect(loaded.loadRunSave("month:1")).toBe(true);
+    expect(loaded.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
+    await loaded.flushSaves();
+    const clean = (await reopen(storage, adapter)).store;
+    clean.dispatch("start-game", { roleId: "normal" });
+    expect(clean.isCurrentRunDisqualified()).toBe(false);
+    clean.dispatch("quit-game");
+    expect(clean.getEndingExperienceAward()?.disqualifiedByDebug).toBeUndefined();
+    expect(clean.getEndingExperienceAward()?.disqualifiedByIntegrity).toBeUndefined();
+    clean.dispatch("settle-and-return");
+    expect(clean.getLobbyState().achievementRewardedIds).toContain("global:ending-quit");
+    expect(clean.getLobbyState().roleProgress.normal.playedRuns).toBe(1);
+    expect(clean.getFinalizedOutbox()).toHaveLength(1);
+  });
+
+  it("still excludes a debug branch when the player continues and settles without a clean rewind", async () => {
+    const { store } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    store.dispatch("debug-adjust-stat", { debugStatId: "money", delta: 100 });
+    store.dispatch("quit-game");
+    expect(store.getEndingExperienceAward()?.disqualifiedByDebug).toBe(true);
+    store.dispatch("settle-and-return");
+    expect(store.getLobbyState().achievementRewardedIds).toEqual([]);
+    expect(store.getLobbyState().roleProgress.normal.playedRuns).toBe(0);
+    expect(store.getFinalizedOutbox()).toEqual([]);
+  });
+
+  it.each([false, true])("recovers pre-fix snapshots without clearing real debug changes: actual tools %s", async usedTool => {
+    const { store, storage, saves } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    finishOpening(store);
+    if (usedTool) store.dispatch("debug-adjust-stat", { debugStatId: "money", delta: 100 });
+    else store.markCurrentRunAsDebugged(); // Simulate the old popup-open behavior.
+    const legacy = structuredClone(saves.get("normal")!);
+    delete legacy.latest.debugUsed;
+    legacy.months.forEach(month => { delete month.debugUsed; });
+    await store.flushSaves();
+    const adapter = createMemoryRunSaveAdapter([legacy]);
+    const loaded = (await reopen(storage, adapter)).store;
+    loaded.dispatch("start-game", { roleId: "normal" });
+    expect(loaded.isCurrentRunDebugged()).toBe(usedTool);
+    expect(loaded.loadRunSave("month:1")).toBe(true);
+    expect(loaded.isCurrentRunDisqualified()).toBe(false);
+    expect(loaded.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
+    loaded.dispatch("quit-game");
+    expect(loaded.getEndingExperienceAward()?.disqualifiedByDebug).toBeUndefined();
     loaded.dispatch("settle-and-return");
-    expect(loaded.getLobbyState().achievementRewardedIds).toEqual([]);
-    expect(loaded.getLobbyState().roleProgress.normal.playedRuns).toBe(0);
-    expect(loaded.getFinalizedOutbox()).toEqual([]);
-    expect(loaded.isCurrentRunDebugged()).toBe(false);
+    expect(loaded.getFinalizedOutbox()).toHaveLength(1);
   });
 
   it("persists finalization atomically and rejects a stale already-finalized UUID save on startup", async () => {

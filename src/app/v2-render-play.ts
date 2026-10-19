@@ -3798,7 +3798,7 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
         <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
           <i data-lucide="history" aria-hidden="true"></i><span>读取存档</span>
         </button>
-        <button class="settings-primary-btn is-debug" type="button" data-ui-open-debug-window title="打开后本局不计成就、经验及统计">
+        <button class="settings-primary-btn is-debug" type="button" data-ui-open-debug-window title="查看不影响成绩；使用调试按钮后的进度不计成就、经验及统计，可读取此前存档恢复">
           <i data-lucide="wrench" aria-hidden="true"></i><span>打开调试面板</span>
         </button>
         <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>

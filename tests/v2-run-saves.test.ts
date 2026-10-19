@@ -48,7 +48,7 @@ describe("per-role run save repository", () => {
     expect(restored.months.map(item => item.totalMonths)).toEqual([0, 1]);
   });
 
-  it("retains a debug flag for the whole run and enforces the 70-month limit", () => {
+  it("retains a debug flag on the continuing branch and enforces the 70-month limit", () => {
     const repository = createRunSaveRepository({ storage: null, adapter: createMemoryRunSaveAdapter(), createRunId: () => "run-a" });
     repository.commit(state(0), { monthStart: true, debugUsed: true });
     for (let month = 1; month <= MAX_RUN_MONTH_SAVES + 10; month += 1) repository.commit(state(month), { monthStart: true });
@@ -56,6 +56,36 @@ describe("per-role run save repository", () => {
     expect(record.debugUsed).toBe(true);
     expect(record.months).toHaveLength(MAX_RUN_MONTH_SAVES);
     expect(record.months[0]?.totalMonths).toBe(11);
+  });
+
+  it("stores qualification per snapshot and restores a clean branch across an interrupted disk write", async () => {
+    const disk = createMemoryRunSaveAdapter();
+    const journal = storage();
+    let blocked = false;
+    const adapter = { load: () => disk.load(), write: async (...args: Parameters<typeof disk.write>) => {
+      if (blocked) throw new Error("interrupted disk");
+      await disk.write(...args);
+    } };
+    const first = createRunSaveRepository({ storage: journal, adapter, createRunId: () => "run-a" });
+    await first.ready();
+    first.commit(state(1), { monthStart: true });
+    first.commit(state(1), { debugUsed: true });
+    first.commit(state(2), { monthStart: true });
+    expect(first.get("normal")?.months.map(month => month.debugUsed)).toEqual([false, true]);
+    await first.flush();
+    blocked = true;
+    const restored = first.rewind("normal", "month:1")!;
+    expect(restored.debugUsed).toBe(false);
+    expect(restored.latest.debugUsed).toBe(false);
+    first.commit(state(1));
+    await first.flush();
+    blocked = false;
+    const recovered = createRunSaveRepository({ storage: journal, adapter });
+    await recovered.ready();
+    expect(recovered.get("normal")?.debugUsed).toBe(false);
+    expect(recovered.get("normal")?.months.map(month => month.totalMonths)).toEqual([1]);
+    recovered.commit(state(2), { monthStart: true });
+    expect(recovered.get("normal")?.months.every(month => month.debugUsed === false)).toBe(true);
   });
 
   it("clear removes only the selected role's record", () => {

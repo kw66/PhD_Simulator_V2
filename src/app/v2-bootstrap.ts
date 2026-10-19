@@ -1333,9 +1333,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
       conferenceStats.resetRun();
       journalStats.resetRun();
       thesisStats.resetRun();
-      if (debugWindow.isOpen()) conferenceStats.markDebug();
-      if (debugWindow.isOpen()) journalStats.markDebug();
-      if (debugWindow.isOpen()) thesisStats.markDebug();
     }
     if (actionId.startsWith("debug-") || actionId === "force-next-month") { conferenceStats.markDebug(); journalStats.markDebug(); thesisStats.markDebug(); }
     if (actionId === "debug-trigger-ending") {
@@ -1397,14 +1394,12 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (actionId === "start-game") {
       const openingEvent = store.getState().eventQueue.find((event) => event.chainId === "before-grad-school");
       if (openingEvent) openEventContent(openingEvent.id);
-      if (debugWindow.isOpen()) store.markCurrentRunAsDebugged();
     }
   }
 
   const debugWindow = createDebugWindow(
     () => store.getState(),
     executeButtonAction,
-    () => { store.markCurrentRunAsDebugged(); conferenceStats.markDebug(); journalStats.markDebug(); thesisStats.markDebug(); },
   );
 
   const publishFinalizedRun = async (record: ReturnType<typeof store.getFinalizedOutbox>[number]): Promise<void> => {
@@ -1428,17 +1423,29 @@ export function bootstrapApp(root: HTMLDivElement): void {
   });
 
   let previousConferenceState = store.getState();
+  let previousRunDisqualified = store.isCurrentRunDisqualified();
   store.subscribe((state) => {
     const before = previousConferenceState;
     previousConferenceState = state;
+    const wasDisqualified = previousRunDisqualified;
+    const debugUsed = store.isCurrentRunDisqualified();
+    previousRunDisqualified = debugUsed;
+    const runKey = JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]);
+    if (state.phase !== "setup" && !debugUsed && (wasDisqualified || before.phase === "setup"
+      || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
+      statistics.restoreRunQualification(runKey);
+      conferenceStats.restoreRun(state, { debugUsed });
+      journalStats.restoreRun(state, { debugUsed });
+      thesisStats.restoreRun(state, { debugUsed });
+      visitStats.restoreRun(runKey, { debugUsed });
+    }
     if (state.phase === "setup") void achievementStats.load();
     if (state.phase !== "setup" && (before.phase === "setup"
       || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
       void statistics.startRun(JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]));
     }
-    const debugUsed = store.isCurrentRunDisqualified() || debugWindow.isOpen();
     if (state.phase === "playing" && !debugUsed && (before.phase !== "playing"
-      || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
+      || wasDisqualified || before.conferenceLocationSeed !== state.conferenceLocationSeed || before.selectedRoleId !== state.selectedRoleId)) {
       achievementStats.recordStartedPlayer();
     }
     void conferenceStats.track(before, state, { debugUsed });

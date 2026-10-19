@@ -18,7 +18,7 @@ import { recordRoleResult, recordRoleStart } from "./v2-role-records";
 import { getTalentUpgradeReason, isRoleTalentImplemented, sanitizeRoleTalentAllocation } from "./v2-role-talent-definitions";
 import { ENABLE_LOCAL_PLAYGROUND } from "./v2-development-flags";
 import { loadAccountProfile, saveAccountProfile, type ExperienceStorage, type FinalizedRunRecord } from "./v2-account-storage";
-import { createRunSaveRepository, RUN_SAVE_DATABASE_NAME, type RunSaveRepository } from "./v2-run-saves";
+import { createRunSaveRepository, getSnapshotDebugUsed, RUN_SAVE_DATABASE_NAME, type RunSaveRepository } from "./v2-run-saves";
 import { CURSED_ROLE_IDS } from "./v2-curse-system";
 import { collectRunStatistics } from "./v2-run-statistics";
 import { CAPTAIN_PREREQUISITE_ROLE_IDS } from "./v2-account-role-unlocks";
@@ -173,10 +173,21 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
   }
 
   function restore(roleId: RoleId, snapshotId = "latest"): boolean {
-    const record = snapshotId === "latest" ? saves.get(roleId) : saves.rewind(roleId, snapshotId);
+    const previousDebugUsed = saves.get(roleId)?.debugUsed ?? false;
+    let record = snapshotId === "latest" ? saves.get(roleId) : saves.rewind(roleId, snapshotId);
     if (!record || record.runId === settledRuns[roleId]) return false;
+    if (record.latest.debugUsed === undefined) {
+      record = saves.commit(record.latest.state, { runId: record.runId,
+        debugUsed: getSnapshotDebugUsed(record, record.latest), replay: record.replay });
+    }
     currentRunId = record.runId;
     runUsedDebugPanel = record.debugUsed;
+    if (previousDebugUsed && !runUsedDebugPanel) {
+      const progress = accountProfile.roleProgress[roleId];
+      accountProfile = { ...accountProfile, roleProgress: { ...accountProfile.roleProgress,
+        [roleId]: { ...progress, startedRuns: progress.startedRuns + 1 } } };
+      persistAccount();
+    }
     countedStartRole = record.debugUsed ? null : roleId;
     replay = record.replay ? structuredClone(record.replay) : undefined;
     replayAnchor = undefined;
@@ -198,6 +209,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     }
     if (replay.failed) saves.commit(record.latest.state, { runId: record.runId, debugUsed: record.debugUsed, replay });
     accountProfile = selectLobbyRole(accountProfile, roleId);
+    if (!runUsedDebugPanel && !replay.failed) saveStatus = "";
     if (replay.failed && !runUsedDebugPanel) saveStatus = "存档操作检查未通过，本局不结算经验、成就和后续统计";
     commit(record.latest.state, accountProfile, { restored: true });
     return true;

@@ -97,7 +97,6 @@ export function bootstrapDebugWindow(root: HTMLDivElement, channel: string): voi
   let hostId: string | undefined;
   let connectionStatus: DebugConnectionStatus = "connecting";
   let lastReceived = Date.now();
-  let replayPreference: boolean | null = null;
   const render = (): void => {
     const focused = root.querySelector<HTMLButtonElement>("button:focus");
     const focusKey = focused ? JSON.stringify({ ...focused.dataset }) : null;
@@ -124,26 +123,13 @@ export function bootstrapDebugWindow(root: HTMLDivElement, channel: string): voi
     if (event.data.type !== "debug-state" || !event.data.state) return;
     lastReceived = Date.now();
     if (connected && revision === event.data.revision && hostId === event.data.hostId) return;
-    const receivedState = event.data.state as GameState;
-    const replayNeedsSync = replayPreference !== null
-      && receivedState.debugEventReplayEnabled !== replayPreference;
-    if (replayPreference !== null && receivedState.debugEventReplayEnabled === replayPreference) {
-      replayPreference = null;
-    }
-    state = replayPreference === null
-      ? receivedState
-      : { ...receivedState, debugEventReplayEnabled: replayPreference };
+    // The host may have loaded an earlier save; viewing/reconnecting must never
+    // replay an old tool action onto the restored branch.
+    state = event.data.state as GameState;
     revision = event.data.revision;
     hostId = event.data.hostId;
     connected = true;
     render();
-    if (replayNeedsSync && replayPreference !== null) {
-      const data = {
-        action: "debug-toggle-event-replay",
-        debugEventReplayEnabled: String(replayPreference),
-      };
-      host.postMessage({ channel, type: "debug-action", data }, origin);
-    }
   });
   root.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
@@ -156,11 +142,6 @@ export function bootstrapDebugWindow(root: HTMLDivElement, channel: string): voi
     if (!button || button.matches(":disabled")) return;
     const data = { ...button.dataset };
     if (isDebugWindowActionData(data)) {
-      if (data.action === "debug-toggle-event-replay") {
-        replayPreference = data.debugEventReplayEnabled === "true";
-        if (state) state = { ...state, debugEventReplayEnabled: replayPreference };
-        render();
-      }
       host.postMessage({ channel, type: "debug-action", data }, origin);
     }
   });

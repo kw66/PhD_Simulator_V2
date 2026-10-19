@@ -1,6 +1,6 @@
 import { getRoleOptions } from "./v2-progression";
 import { DATA_EPOCH, isCurrentDataEpoch } from "./v2-data-epoch";
-import { isRunReplay, truncateRunReplay, type RunReplay } from "./v2-run-replay";
+import { isRunReplay, truncateRunReplay, verifyRunReplay, type RunReplay } from "./v2-run-replay";
 import type { GameState, RoleId } from "./v2-types";
 import { isCursedRole } from "./v2-curse-system";
 import { CAPTAIN_TAG_IDS } from "./v2-captain-state";
@@ -17,6 +17,8 @@ export interface RunSaveSnapshot {
   totalMonths: number;
   state: GameState;
   replayIndex?: number;
+  /** Qualification belongs to this branch position, not to every month of the run. */
+  debugUsed?: boolean;
 }
 
 export interface RunSaveRecord {
@@ -138,8 +140,18 @@ function validState(value: unknown, roleId: RoleId): value is GameState {
 
 function validSnapshot(value: unknown, roleId: RoleId): value is RunSaveSnapshot {
   return object(value) && typeof value.id === "string" && typeof value.savedAt === "string"
+    && (value.debugUsed === undefined || typeof value.debugUsed === "boolean")
     && Number.isFinite(Date.parse(value.savedAt)) && nonnegativeInteger(value.totalMonths)
     && validState(value.state, roleId) && value.state.totalMonths === value.totalMonths;
+}
+
+/** Older saves stored only a run-wide flag; recover clean snapshots by replaying their recorded actions. */
+export function getSnapshotDebugUsed(record: RunSaveRecord, snapshot: RunSaveSnapshot): boolean {
+  if (snapshot.debugUsed !== undefined) return snapshot.debugUsed;
+  if (!record.debugUsed) return false;
+  if (!record.replay || snapshot.replayIndex === undefined) return true;
+  const replay = truncateRunReplay(clone(record.replay), snapshot.replayIndex);
+  return !verifyRunReplay(replay, { state: clone(replay.initial), index: 0 }, snapshot.state, false);
 }
 
 export function validateRunSaveRecord(value: unknown): value is RunSaveRecord {
@@ -305,7 +317,7 @@ export function createRunSaveRepository(options: {
     const record: RunSaveRecord = {
       epoch: DATA_EPOCH, savedAt: journal.savedAt, replay: journal.replay,
       version: RUN_SAVE_VERSION, roleId, runId: journal.runId!,
-      debugUsed: journal.debugUsed || (base?.runId === journal.runId && base.debugUsed) || false,
+      debugUsed: journal.latest!.debugUsed ?? journal.debugUsed,
       latest: journal.latest!, months: [...months.values()].sort((a, b) => a.totalMonths - b.totalMonths).slice(-MAX_RUN_MONTH_SAVES),
     };
     if (!validateRunSaveRecord(record)) return false;
@@ -361,7 +373,8 @@ export function createRunSaveRepository(options: {
       const oldJournal = journals.get(roleId);
       const compatibleJournal = oldJournal?.runId === id ? oldJournal : undefined;
       const replay = commitOptions.replay ?? (sameRun ? previous?.replay : undefined);
-      const latest: RunSaveSnapshot = { id: "latest", savedAt: now(), totalMonths: state.totalMonths, state: clone(state),
+      const debugUsed = commitOptions.debugUsed ?? (sameRun ? previous.debugUsed : false);
+      const latest: RunSaveSnapshot = { id: "latest", savedAt: now(), totalMonths: state.totalMonths, state: clone(state), debugUsed,
         ...(replay ? { replayIndex: replay.commands.length } : {}) };
       const months = sameRun ? [...previous.months] : [];
       const pendingMonths = compatibleJournal ? [...compatibleJournal.pendingMonths] : [];
@@ -374,7 +387,7 @@ export function createRunSaveRepository(options: {
       const record: RunSaveRecord = {
         epoch: DATA_EPOCH, savedAt: new Date().toISOString(), ...(replay ? { replay: clone(replay) } : {}),
         version: RUN_SAVE_VERSION, roleId, runId: id,
-        debugUsed: !!commitOptions.debugUsed || (sameRun && previous.debugUsed) || false,
+        debugUsed,
         latest, months: months.slice(-MAX_RUN_MONTH_SAVES),
       };
       if (!validateRunSaveRecord(record)) throw new Error("存档时间线无效，请通过读档操作回溯月份");
@@ -390,7 +403,8 @@ export function createRunSaveRepository(options: {
       const snapshot = snapshotId === "latest" ? previous.latest : previous.months.find(month => month.id === snapshotId);
       if (!snapshot) return null;
       const replay = previous.replay && snapshot.replayIndex !== undefined ? truncateRunReplay(previous.replay, snapshot.replayIndex) : previous.replay;
-      const record: RunSaveRecord = { ...previous, replay, latest: { ...clone(snapshot), id: "latest", savedAt: now() },
+      const debugUsed = getSnapshotDebugUsed(previous, snapshot);
+      const record: RunSaveRecord = { ...previous, replay, debugUsed, latest: { ...clone(snapshot), id: "latest", savedAt: now(), debugUsed },
         months: previous.months.filter(month => month.totalMonths <= snapshot.totalMonths) };
       const oldJournal = journals.get(roleId);
       records.set(roleId, record);

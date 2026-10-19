@@ -26,6 +26,7 @@ type Payload = Record<string, unknown> & { p_id: string };
 export interface StatisticsSnapshot<T> { status: "loading" | "ready" | "unavailable"; data: T | null }
 interface CachedStats { data: unknown; fetchedAt: number; retryAt: number; stale?: boolean }
 interface QueuedResult { kind: StatisticsKind; run: string; id: string; payload?: Payload; activityDay?: string; rejected?: "future-date" }
+interface DebugQualification { revision: number; debugUsed: boolean }
 
 class ActivityDateRejection extends Error {
   readonly ids: string[];
@@ -51,6 +52,8 @@ export interface StatisticsClient {
   flush(): Promise<void>;
   persistPending(): boolean;
   markDebug(run: string | null): void;
+  /** Only call after loading an authoritative clean snapshot. Does not recreate discarded results. */
+  restoreRunQualification(run: string): void;
   isDebugRun(run: string): boolean;
   subscribeActivityWrites(listener: () => Promise<void>): () => void;
   dispose(): void;
@@ -162,6 +165,8 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     } catch { /* Invalid run identities cannot occupy persistent snapshot slots. */ }
   };
   const debugRuns = new Set<string>();
+  // Clean revisions are tombstones: an older tab must not restore a stale debug exclusion.
+  const debugQualifications = new Map<string, DebugQualification>();
   const pendingReads = new Map<string, Promise<void>>();
   let pendingUpload: Promise<void> | null = null;
   let uploadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -192,7 +197,25 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
           rememberRunSnapshot(entry[0], parseRunStatistics(entry[1]));
         } catch { /* Ignore damaged run snapshots. */ }
       }
-      if (Array.isArray(saved.debugRuns)) for (const run of saved.debugRuns) if (typeof run === "string") debugRuns.add(run);
+      if (Array.isArray(saved.debugQualifications)) for (const entry of saved.debugQualifications) {
+        if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string"
+          || !entry[1] || !Number.isSafeInteger(entry[1].revision) || entry[1].revision < 0
+          || typeof entry[1].debugUsed !== "boolean") continue;
+        const [run, incoming] = entry as [string, DebugQualification];
+        const current = debugQualifications.get(run);
+        if (!current || incoming.revision > current.revision
+          || (incoming.revision === current.revision && incoming.debugUsed)) {
+          debugQualifications.set(run, { revision: incoming.revision, debugUsed: incoming.debugUsed });
+          if (incoming.debugUsed) debugRuns.add(run);
+          else debugRuns.delete(run);
+        }
+      }
+      if (Array.isArray(saved.debugRuns)) for (const run of saved.debugRuns) {
+        if (typeof run === "string" && !debugQualifications.has(run)) {
+          debugRuns.add(run);
+          debugQualifications.set(run, { revision: 0, debugUsed: true });
+        }
+      }
       if (Array.isArray(saved.results)) for (const entry of saved.results) {
         if (!Array.isArray(entry) || entry.length !== 2) continue;
         const [key, value] = entry;
@@ -227,7 +250,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     mergeStorage();
     while (cache.size > 128) cache.delete(cache.keys().next().value!);
     try {
-      storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: new Date().toISOString(), runSnapshots: [...runSnapshots], results: [...results], debugRuns: [...debugRuns], cache: [...cache], nextUploadAt, failures, uploadChangedAt }));
+      storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: new Date().toISOString(), runSnapshots: [...runSnapshots], results: [...results], debugRuns: [...debugRuns], debugQualifications: [...debugQualifications], cache: [...cache], nextUploadAt, failures, uploadChangedAt }));
       return true;
     } catch { return false; }
   };
@@ -432,9 +455,22 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
       mergeStorage();
       if (!enabled || disposed || run === null || debugRuns.has(run)) return;
       debugRuns.add(run);
+      debugQualifications.set(run, { revision: (debugQualifications.get(run)?.revision ?? 0) + 1, debugUsed: true });
       for (const [key, row] of results) if (row.run === run && row.payload) results.delete(key);
       if (!hasPending() && uploadTimer !== null) { clearTimeout(uploadTimer); uploadTimer = null; }
       persist();
+    },
+    restoreRunQualification(run) {
+      mergeStorage();
+      if (!enabled || disposed) return;
+      let changed = false;
+      for (const key of [run, `activity-start:${run}`]) {
+        if (!debugRuns.has(key)) continue;
+        debugRuns.delete(key);
+        debugQualifications.set(key, { revision: (debugQualifications.get(key)?.revision ?? 0) + 1, debugUsed: false });
+        changed = true;
+      }
+      if (changed) persist();
     },
     isDebugRun: (run) => debugRuns.has(run),
     subscribeActivityWrites(listener) {

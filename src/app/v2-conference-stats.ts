@@ -40,6 +40,7 @@ export interface ConferenceStatsController {
   recordReview(before: GameState, after: GameState, options?: TrackingOptions): Promise<void>;
   observe(state: GameState, options?: TrackingOptions): Promise<void>;
   markDebug(): void;
+  restoreRun(state: GameState, options: { debugUsed: boolean }): void;
   resetRun(): void;
   flush(): Promise<void>;
   dispose(): void;
@@ -109,6 +110,12 @@ export function createConferenceStats(options: ConferenceStatsOptions): Conferen
     return Promise.resolve();
   };
   const controller: ConferenceStatsController = { read, load, track, recordReview: track, observe,
+    restoreRun: (state, tracking) => {
+      currentRun = state.phase === "setup" ? null : getStatisticsRunKey(state);
+      debugUsed = tracking.debugUsed;
+      if (debugUsed) markDebug();
+      else if (currentRun !== null) client.restoreRunQualification(currentRun);
+    },
     markDebug, resetRun: () => { currentRun = null; debugUsed = false; },
     flush: () => enabled ? client.flush() : Promise.resolve(),
     dispose: () => { if (!options.client) client.dispose(); },

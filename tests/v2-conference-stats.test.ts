@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONFERENCE_STATS_RULE_VERSION, createConferenceStats, getConferenceGlobalStats, loadConferenceGlobalStats } from "../src/app/v2-conference-stats";
 import { createJournalStats } from "../src/app/v2-journal-stats";
+import { createThesisStats } from "../src/app/v2-thesis-stats";
 import { createStatisticsClient } from "../src/app/v2-statistics-client";
 import { getConferenceInfo } from "../src/core/v2-conference-catalog";
 import { dispatchAction } from "../src/core/v2-engine";
@@ -66,6 +67,39 @@ beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.clearAllTimers(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("global conference statistics", () => {
+  it.each([
+    ["conference", createConferenceStats, { p_rule_version: CONFERENCE_STATS_RULE_VERSION,
+      p_conference_name: CONFERENCE.name, p_conference_year: CONFERENCE.year, p_target: "A",
+      p_accepted: true, p_accept_type: "Poster", p_score: 120 }],
+    ["journal", createJournalStats, { p_rule_version: "v2-journal-20261012", p_journal: "pami", p_score: 125, p_months: 2 }],
+    ["thesis", createThesisStats, { p_rule_version: "v2-thesis-20261013", p_degree: "master",
+      p_submitted: true, p_passed: true, p_excellent: false }],
+  ] as const)("restores %s upload eligibility only from an explicit clean snapshot", async (kind, create, payload) => {
+    const network = backend();
+    const stats = create({ onChange: vi.fn(), fetch: network.fetch, storage: storage() });
+    const state = createStartedGameState("normal");
+    const ending = (fingerprint: string): GameState => ({ ...state, phase: "finished",
+      pendingRunStatistics: [{ kind, fingerprint, payload }] });
+    await stats.track(state, state);
+    stats.markDebug();
+    await stats.track(state, ending("debug-branch"), { finalized: true });
+    await stats.flush();
+    expect(network.fetch).not.toHaveBeenCalled();
+    // Ordinary tracking must not itself pardon a debug branch.
+    await stats.track(state, ending("still-debug"), { finalized: true, debugUsed: false });
+    expect(network.fetch).not.toHaveBeenCalled();
+    stats.restoreRun(state, { debugUsed: false });
+    await stats.track(state, ending("clean-snapshot"), { finalized: true });
+    await stats.flush();
+    expect(network.rows.size).toBe(1);
+    expect([...network.rows.values()][0]).toMatchObject(payload);
+    stats.restoreRun(state, { debugUsed: true });
+    await stats.track(state, ending("loaded-debug-snapshot"), { finalized: true });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(network.rows.size).toBe(1);
+    stats.dispose();
+  });
+
   it("keeps review evidence inside saves and uploads only the selected final branch", async () => {
     const network = backend();
     const local = storage();
