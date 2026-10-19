@@ -90,6 +90,47 @@ afterEach(() => {
 });
 
 describe("kwgame activity statistics", () => {
+  it("recovers all role statistics after a master-only achievement reconciliation is repaired", async () => {
+    const storage = createStorage();
+    const normal = { games: 59, finished: 27, clears: 2, phd: 1 };
+    const broken = summary({ games: 63, roles: { normal,
+      genius: { games: 0, finished: 0, clears: 1, phd: 0 },
+      chosen: { games: 4, finished: 3, clears: 0, phd: 0 },
+    } });
+    const repaired = summary({ games: 64, roles: { normal,
+      genius: { games: 1, finished: 1, clears: 1, phd: 0 },
+      chosen: { games: 4, finished: 3, clears: 0, phd: 0 },
+    } });
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json(broken))
+      .mockImplementation(async () => Response.json(repaired));
+    const stats = create({ recordVisit: false, storage, fetch });
+    await stats.load();
+    expect(stats.getRoleDisplayValues("normal")["global-played-runs"]).toBe("--");
+    expect(stats.getRoleDisplayValues("genius")["global-completed-runs"]).toBe("--");
+    expect(stats.getDisplayValues().games).toBe("--（--）");
+
+    // Keep the retry limit and validation intact; correcting the server should
+    // recover the entire snapshot without clearing progress or browser storage.
+    await stats.load();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await stats.load();
+    expect(stats.getRoleDisplayValues("genius")).toEqual({
+      "global-completed-runs": "1", "global-played-runs": "1", "phd-rate": "0.0%",
+    });
+    expect(stats.getRoleDisplayValues("normal")).toEqual({
+      "global-completed-runs": "2", "global-played-runs": "59", "phd-rate": "3.7%",
+    });
+    expect(stats.getDisplayValues().games).toBe("64（1）");
+
+    stats.dispose();
+    const restored = create({ recordVisit: false, storage, fetch });
+    await restored.load();
+    expect(restored.getRoleDisplayValues("genius")["global-played-runs"]).toBe("1");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("replaces an older activity read still in flight when the start upload completes", async () => {
     const backend = createBackend();
     const stats = create({ recordVisit: true, fetch: backend.fetch, storage: createStorage() });
