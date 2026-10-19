@@ -1,4 +1,5 @@
 import type { PendingRandomEvent } from "./v2-paper-competition";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export interface CandidateEventContext {
   availableRandomEvents: number[];
@@ -8,6 +9,7 @@ export interface CandidateEventContext {
   publishedPaperCount?: number;
   hasRecoverableDraftPaper?: boolean;
   hasAuthorshipEligibleDraftPaper?: boolean;
+  hasStartedPaperResearch?: boolean;
   pendingRandomEvents?: PendingRandomEvent[];
   excludedCategories?: readonly RandomEventCategory[];
   excludedEventIds?: readonly number[];
@@ -57,6 +59,7 @@ export function buildCandidateEventIds(params: {
   const candidateEventIds = context.availableRandomEvents.filter((eventId) => (
     Number.isFinite(eventId)
     && eventId !== DISEASE_EVENT_ID
+    && !(usesGameplayRulesFrom("20261019-r11") && context.hasStartedPaperResearch === false && (eventId === 17 || eventId === 18))
     && !pendingIds.has(eventId)
     && !context.excludedEventIds?.includes(eventId)
   ));

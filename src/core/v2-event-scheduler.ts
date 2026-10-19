@@ -13,6 +13,7 @@ import { getRandomEventCategory, type RandomEventCategory } from "./v2-random-ev
 import { createIllnessRandomEvent } from "./v2-random-events-core-health";
 import { hasRecoverableDraftPaper } from "./v2-random-events-core-shared";
 import { rememberPendingRandomEvent } from "./v2-paper-competition-waiting";
+import { hasStartedPaperResearch } from "./v2-paper-competition";
 import { getPublishedPaperCount } from "./v2-publication-rules";
 import { collectThesisEventForMonth } from "./v2-monthly-thesis-events";
 import { syncThesisState } from "./v2-thesis-rules";
@@ -124,6 +125,7 @@ export function collectRandomEventsForMonth(
         research: getEffectiveResearch(nextState),
         publishedPaperCount: getPublishedPaperCount(nextState),
         hasRecoverableDraftPaper: hasRecoverableDraftPaper(nextState),
+        hasStartedPaperResearch: hasStartedPaperResearch(nextState),
         hasAuthorshipEligibleDraftPaper: nextState.papers.some((paper) =>
           paper.status === "draft" && paper.idea + paper.experiment + paper.writing > 0
         ),

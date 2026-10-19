@@ -17,7 +17,7 @@ describe("game announcements", () => {
       for (const change of entry.changes) expect(html).toContain(change.title);
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
-    for (const text of ["所有角色均可回溯事件", "同一选项结果固定", "选项文字居中"]) expect(textForDate("2026-10-19")).toContain(text);
+    for (const text of ["解锁即有10天赋点", "每升一级再增加1点", "已有加点保留", "首篇一作论文获得分数后", "被抢发idea和新sota", "所有角色均可回溯事件", "同一选项结果固定", "选项文字居中"]) expect(textForDate("2026-10-19")).toContain(text);
     const mastery = textForDate("2026-10-18");
     for (const text of ["论文熟手", "一作", "顺序循环", "永久+1分", "50%", "移除跑腿熟手"]) expect(mastery).toContain(text);
     const release = textForDate("2026-10-17");

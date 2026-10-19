@@ -9,6 +9,7 @@ import { collectRandomEventsForMonth } from "../src/core/v2-event-scheduler";
 import {
   activatePendingRandomEvents,
   rememberPendingRandomEvent,
+  releasePrematurePaperCompetitions,
 } from "../src/core/v2-paper-competition-waiting";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import {
@@ -17,6 +18,8 @@ import {
   yearlyResetRandomEventState,
 } from "../src/core/v2-random-event-rules";
 import type { GameState, Paper, PendingEvent } from "../src/core/v2-types";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
+import { hasStartedPaperResearch } from "../src/core/v2-paper-competition";
 
 const COMPETITIONS = [
   { eventId: 17, field: "idea", sanCost: 2 },
@@ -80,20 +83,53 @@ afterEach(() => {
 });
 
 describe("hidden paper competition lifecycle", () => {
-  it("includes both competition events in a fresh pool even without papers", () => {
+  it("keeps annual tickets but excludes competition draws before the first scored paper", () => {
     expect(createRandomEventPool()).toEqual(expect.arrayContaining([17, 18]));
     expect(createRandomEventPool()).toContain(16);
     const state = makeState();
     expect(buildWeightedRandomEventPool({
-      ...state, social: 4, research: 4, hasRecoverableDraftPaper: false,
-    }).candidateEventIds).toEqual([17, 18]);
+      ...state, social: 4, research: 4, hasRecoverableDraftPaper: false, hasStartedPaperResearch: false,
+    }).candidateEventIds).toEqual([]);
   });
 
-  it.each(COMPETITIONS)("draws $eventId once, then hides it without a target, UI, log or blocking queue", ({ eventId }) => {
+  it.each(COMPETITIONS)("does not draw or reserve $eventId during preparation, even across many months", ({ eventId, field }) => {
+    let state: GameState = { ...makeState([makePaper(0)]), availableRandomEvents: [eventId] };
+    for (let month = 6; month <= 10; month++) {
+      state = { ...state, totalMonths: month, month };
+      const drawn = collectRandomEventsForMonth(state, () => 0.8);
+      expect(drawn.events).toEqual([]);
+      expect(drawn.nextState.pendingRandomEvents ?? []).toEqual([]);
+      expect(drawn.nextState.totalRandomEventCount).toBe(7);
+      expect(drawn.nextState.availableRandomEvents).toEqual([eventId]);
+      state = drawn.nextState;
+    }
+    const paper = { ...state.papers[0]!, [field]: 1 };
+    const progressed = { ...state, papers: [paper] };
+    expect(activatePendingRandomEvents(progressed).eventQueue).toEqual([]);
+    const drawn = collectRandomEventsForMonth(progressed, () => 0.8);
+    expect(drawn.events).toHaveLength(1);
+    expect(drawn.events[0]?.randomReplay?.eventId).toBe(eventId);
+  });
+
+  it("uses any first-author score to begin research and remembers it after the paper is discarded", () => {
+    for (const field of ["idea", "experiment", "writing"] as const) {
+      expect(hasStartedPaperResearch(makeState([makePaper(0, { [field]: 1 })]))).toBe(true);
+    }
+    expect(hasStartedPaperResearch(makeState([makePaper(0, { idea: 10, nonFirstAuthor: true })]))).toBe(false);
+    const state = makeState([makePaper(0, { idea: 8 })]);
+    const discarded = dispatchAction(state, "discard-paper", { paperId: state.papers[0]!.id });
+    expect(discarded.papers).toEqual([]);
+    expect(discarded.paperResearchStarted).toBe(true);
+    expect(hasStartedPaperResearch(JSON.parse(JSON.stringify(discarded)))).toBe(true);
+    const drawn = collectRandomEventsForMonth({ ...discarded, availableRandomEvents: [17] }, () => 0.8);
+    expect(drawn.nextState.pendingRandomEvents).toEqual([{ eventId: 17, serial: 8 }]);
+  });
+
+  it.each(COMPETITIONS)("preserves the pre-r11 recorded $eventId draw without a target", ({ eventId }) => {
     const state = { ...makeState(), availableRandomEvents: [eventId] };
     const snapshot = structuredClone(state);
     const getRoll = vi.fn().mockReturnValueOnce(0.8).mockReturnValue(0);
-    const drawn = collectRandomEventsForMonth(state, getRoll);
+    const drawn = withGameplayRuleset("20261019-r10", () => collectRandomEventsForMonth(state, getRoll));
     expect(drawn.events).toHaveLength(0);
     expect(drawn.nextState.pendingRandomEvents).toEqual([{ eventId, serial: 8 }]);
     expect(drawn.nextState.totalRandomEventCount).toBe(8);
@@ -109,6 +145,42 @@ describe("hidden paper competition lifecycle", () => {
       ...drawn.nextState, pendingRandomEvents: [],
     }));
     expect(state).toEqual(snapshot);
+  });
+
+  it("releases old preparation reservations before the first score without changing draw serials", () => {
+    const paper = makePaper(0);
+    const waiting = rememberBoth(makeState([paper]));
+    const snapshot = structuredClone(waiting);
+    const researched = dispatchAction(waiting, "research-paper", { paperId: paper.id, paperActionType: "idea" });
+    expect(researched.papers[0]!.idea).toBeGreaterThan(0);
+    expect(researched.paperResearchStarted).toBe(true);
+    expect(researched.eventQueue).toEqual([]);
+    expect(researched.pendingRandomEvents).toEqual([]);
+    expect(researched.availableRandomEvents).toEqual([17, 18]);
+    expect(researched.totalRandomEventCount).toBe(waiting.totalRandomEventCount);
+    expect(waiting).toEqual(snapshot);
+    const repeated = releasePrematurePaperCompetitions(researched);
+    expect(repeated).toBe(researched);
+    const legacy = withGameplayRuleset("20261019-r10", () => dispatchAction(waiting, "research-paper", {
+      paperId: paper.id, paperActionType: "idea",
+    }));
+    expect(legacy.eventQueue[0]?.randomReplay?.eventId).toBe(17);
+  });
+
+  it("restores no duplicate tickets and preserves already visible competitions and unrelated waits", () => {
+    const state = {
+      ...rememberBoth(makeState()),
+      availableRandomEvents: [17],
+      pendingRandomEvents: [{ eventId: 17, serial: 6 }, { eventId: 18, serial: 7 }, { eventId: 19, serial: 5 }],
+      eventQueue: [createEventQueueItem({ ...grantPaperProgress("discarded", {}), chainId: "random-18" }, 1)],
+    };
+    const released = releasePrematurePaperCompetitions(state);
+    expect(released.availableRandomEvents).toEqual([17]);
+    expect(released.pendingRandomEvents).toEqual([{ eventId: 18, serial: 7 }, { eventId: 19, serial: 5 }]);
+    expect(released.eventQueue).toBe(state.eventQueue);
+    expect(released.usedRandomEvents).toBe(state.usedRandomEvents);
+    expect(releasePrematurePaperCompetitions(released)).toBe(released);
+    expect(releasePrematurePaperCompetitions({ ...state, paperResearchStarted: true }).pendingRandomEvents).toBe(state.pendingRandomEvents);
   });
 
   it.each(COMPETITIONS)("queues $eventId immediately when its draw already has an eligible paper", ({ eventId, field }) => {
@@ -183,7 +255,7 @@ describe("hidden paper competition lifecycle", () => {
 
   it.each(COMPETITIONS)("wakes $eventId immediately through the actual $field research action", ({ eventId, field, sanCost }) => {
     const paper = makePaper(0, field === "experiment" ? { idea: 4 } : {});
-    const waiting = rememberPendingRandomEvent(makeState([paper]), eventId, 7);
+    const waiting = rememberPendingRandomEvent({ ...makeState([paper]), paperResearchStarted: true }, eventId, 7);
     const researched = dispatchAction(waiting, "research-paper", { paperId: paper.id, paperActionType: field });
     expect(researched.papers[0]![field]).toBeGreaterThan(0);
     expect(researched.player.san).toBe(waiting.player.san - sanCost);
@@ -199,7 +271,7 @@ describe("hidden paper competition lifecycle", () => {
   });
 
   it("allows rest and month advance while the only events are hidden", () => {
-    const waiting = rememberBoth(makeState());
+    const waiting = rememberBoth({ ...makeState(), paperResearchStarted: true });
     waiting.player.san = 10;
     const rested = dispatchAction(waiting, "rest");
     expect(rested.player.san).toBe(12);
@@ -213,7 +285,7 @@ describe("hidden paper competition lifecycle", () => {
   });
 
   it("does not wake on an empty new paper but wakes as soon as that paper gains idea", () => {
-    const waiting = rememberPendingRandomEvent(makeState(), 17, 7);
+    const waiting = rememberPendingRandomEvent({ ...makeState(), paperResearchStarted: true }, 17, 7);
     const created = dispatchAction(waiting, "create-paper", { paperSlotIndex: 0 });
     expect(created.papers).toHaveLength(1);
     expect(created.papers[0]!.idea).toBe(0);
@@ -228,7 +300,7 @@ describe("hidden paper competition lifecycle", () => {
 
   it("activates both eligible types in the same event-granted progress update without losing other queued events", () => {
     const paper = makePaper(0);
-    const waiting = rememberBoth(makeState([paper]));
+    const waiting = rememberBoth({ ...makeState([paper]), paperResearchStarted: true });
     const grant = grantPaperProgress(paper.id, { idea: 8, experiment: 12 });
     const unrelated = { ...grantPaperProgress(paper.id, {}), id: "other-event", chainId: "other-event" };
     const queued = {
@@ -301,7 +373,7 @@ describe("hidden paper competition lifecycle", () => {
   });
 
   it("preserves hidden opportunities through the actual December-to-new-year month action", () => {
-    const waiting = { ...rememberBoth(makeState()), year: 1, month: 12, totalMonths: 12 };
+    const waiting = { ...rememberBoth(makeState()), paperResearchStarted: true, year: 1, month: 12, totalMonths: 12 };
     const advanced = dispatchAction(waiting, "next-month");
     expect(advanced).toMatchObject({ year: 2, month: 1, totalMonths: 13, totalRandomEventCount: 7 });
     expect(advanced.pendingRandomEvents).toEqual(waiting.pendingRandomEvents);
@@ -355,7 +427,7 @@ describe("hidden paper competition lifecycle", () => {
   });
 
   it("keeps each replay bound to its own event when debug reveals both hidden competitions", () => {
-    const initial = rememberBoth(makeState());
+    const initial = rememberBoth({ ...makeState(), paperResearchStarted: true });
     const awake = dispatchAction(initial, "debug-trigger-event", { eventId: "random-17" });
     expect(awake.eventQueue).toHaveLength(2);
     for (const event of awake.eventQueue) {

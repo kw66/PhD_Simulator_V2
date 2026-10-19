@@ -699,7 +699,7 @@ describe("v2 render lobby shell", () => {
     const talentPointsIndex = html.indexOf('class="lobby-talent-points-value"');
     expect(talentPointsIndex).toBeGreaterThan(html.indexOf('class="lobby-growth-summary-row"'));
     expect(talentPointsIndex).toBeLessThan(growthCardIndex);
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">0</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">10</strong>');
     expect(html).toContain('class="lobby-profile-achievement-rail"');
     expect(html).toContain('class="lobby-profile-portrait"');
     expect(html).toContain('alt="大多数立绘"');
@@ -724,7 +724,8 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("天赋加点");
     expect(html).not.toContain("天赋路线");
     expect(html).toContain("经验倍率");
-    expect(html).toContain('class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级0，每级+2天赋点" data-tooltip="每级+2天赋点"');
+    expect(html).toContain('class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级0，每级+1天赋点" data-tooltip="每级+1天赋点"');
+    expect(html).toContain('data-tooltip="解锁后获得10点天赋点，每升一级+1点，用于解锁天赋。"');
     expect(html).toContain('class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率1.0，所有加经验的都乘以这个倍率。" data-tooltip="所有加经验的都乘以这个倍率。"');
     expect(html).toContain('class="lobby-growth-inline-label lobby-growth-exp-label" role="note" tabindex="0"');
     expect(html).not.toContain('class="lobby-growth-help"');
@@ -738,7 +739,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("lobby-growth-exp-note");
     expect(html).not.toContain("当前倍率为");
     expect(html).toContain('class="lobby-talent-points-hint" role="note" tabindex="0"');
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">0</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">10</strong>');
     expect(html).toContain('<i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span>');
     expect(html).toContain('class="lobby-page-dot is-active"');
     expect(html).toContain('class="lobby-talent-tree is-designed-tree is-normal-tree" role="group" aria-label="天赋树预览"');
@@ -1001,7 +1002,7 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(createInitialState(), account);
 
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-normal-tree" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">12</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">16</strong>');
     expect((tree.match(/data-tree-page="\d"/g) ?? []).length).toBe(1);
     expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(9);
     expect(tree).not.toContain('data-ui-talent-tree-page-delta');
@@ -1501,11 +1502,12 @@ describe("v2 render lobby shell", () => {
   it("shows the four-tier rich talent design with shared funding prerequisites and gold powers without spending points", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "rich";
+    account.roleProgress.rich.unlocked = true;
     account.roleProgress.rich.level = 4;
     const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [9] });
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-rich-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">8</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">14</strong>');
     expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(10);
     expect((tree.match(/<path d=/g) ?? []).length).toBe(9);
     expect(tree).toContain('<path d="M225 96 H525" />');
@@ -1548,11 +1550,12 @@ describe("v2 render lobby shell", () => {
   it("shows the four-tier genius research and paper-score paths without spending points", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "genius";
+    account.roleProgress.genius.unlocked = true;
     account.roleProgress.genius.level = 5;
     const html = renderApp(createInitialState(), account, { talentTreeSelectedNodeByPage: [9] });
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-genius-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">10</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">15</strong>');
     expect((tree.match(/data-ui-talent-tree-node="0-\d+"/g) ?? []).length).toBe(11);
     expect((tree.match(/<path d=/g) ?? []).length).toBe(9);
     expect(tree).toContain('<path d="M75 32 C145 32 155 96 225 96" />');
@@ -1597,6 +1600,7 @@ describe("v2 render lobby shell", () => {
   it("previews teacher-child talents with dining, reimbursement, collaboration and favor resistance branches", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "teacher-child";
+    account.roleProgress["teacher-child"].unlocked = true;
     account.roleProgress["teacher-child"].level = 5;
     const state = createInitialState();
     const originalAccount = JSON.stringify(account);
@@ -1604,7 +1608,7 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(state, account, { talentTreeSelectedNodeByPage: [7] });
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-teacher-child-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">10</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">15</strong>');
     expect((tree.match(/data-ui-talent-tree-node="0-\d+"/g) ?? []).length).toBe(10);
     expect((tree.match(/<path d=/g) ?? []).length).toBe(10);
     expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
@@ -1645,6 +1649,7 @@ describe("v2 render lobby shell", () => {
   it("previews ten chosen talents with cross-connected event branches and negative disease growth", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "chosen";
+    account.roleProgress.chosen.unlocked = true;
     account.roleProgress.chosen.level = 10;
     const state = createInitialState();
     const originalAccount = JSON.stringify(account);
@@ -1708,6 +1713,7 @@ describe("v2 render lobby shell", () => {
   it("previews twelve social talents with exact costs, caps and connected branches without allocating points", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "social";
+    account.roleProgress.social.unlocked = true;
     account.roleProgress.social.level = 10;
     const state = createInitialState();
     const originalAccount = JSON.stringify(account);
@@ -1768,7 +1774,7 @@ describe("v2 render lobby shell", () => {
     expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-4"');
     expect(html).toContain('class="lobby-normal-tree-detail" data-detail-index="4"');
     expect(html).toContain('data-detail-index="0" hidden');
-    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">6</strong>');
+    expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">13</strong>');
     expect(account.roleProgress.normal.level).toBe(3);
   });
 

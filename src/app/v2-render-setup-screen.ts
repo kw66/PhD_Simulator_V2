@@ -33,7 +33,7 @@ import {
 } from "../core/v2-role-talent-definitions";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
 import { getRoleLobbyAchievementDefinitions, getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
-import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, MAX_ROLE_LEVEL, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
+import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, MAX_ROLE_LEVEL, ROLE_INITIAL_TALENT_POINTS, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 import { renderLobbyMasthead, renderLobbyMessageRailView } from "./v2-render-community";
@@ -299,7 +299,7 @@ function buildTalentPointSummary(viewModel: LobbySelectedRoleViewModel, allocati
     level,
     currentExp: viewModel.progress.exp,
     nextExp,
-    availablePoints: allocation ? getTalentPointBalance(viewModel.role.id, viewModel.progress.level, allocation, bonusPoints) : level * ROLE_TALENT_POINTS_PER_LEVEL + bonusPoints,
+    availablePoints: viewModel.unlockState.owned ? getTalentPointBalance(viewModel.role.id, viewModel.progress.level, allocation ?? {}, bonusPoints) : 0,
   };
 }
 
@@ -334,7 +334,7 @@ function renderGrowthProgress(
         </div>
         ${usesTalentPoints ? `<div class="lobby-growth-exp-detail-row">
           <div class="lobby-talent-allocation-meta">
-            <span class="lobby-talent-points-hint" role="note" tabindex="0" aria-label="天赋点${pointSummary.availablePoints}，每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点。" data-tooltip="每级获得${ROLE_TALENT_POINTS_PER_LEVEL}点天赋点，用于解锁天赋。">天赋点 <strong class="lobby-talent-points-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</strong></span>
+            <span class="lobby-talent-points-hint" role="note" tabindex="0" aria-label="天赋点${pointSummary.availablePoints}，解锁后获得${ROLE_INITIAL_TALENT_POINTS}点天赋点，每升一级+${ROLE_TALENT_POINTS_PER_LEVEL}点。" data-tooltip="解锁后获得${ROLE_INITIAL_TALENT_POINTS}点天赋点，每升一级+${ROLE_TALENT_POINTS_PER_LEVEL}点，用于解锁天赋。">天赋点 <strong class="lobby-talent-points-value">${renderAnimatedNumber(`role:${viewModel.role.id}:growth:available-points`, pointSummary.availablePoints)}</strong></span>
             <button class="lobby-talent-reset-button" type="button" data-ui-talent-reset="${viewModel.role.id}"${Object.keys(allocation ?? {}).length === 0 ? " disabled" : ""} title="重置天赋点"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>重置</span></button>
           </div>
         </div>` : `<div class="lobby-growth-exp-detail-row"><span class="lobby-talent-passive-hint" role="note" tabindex="0" data-tooltip="${passiveTalentHint}">无需加点</span></div>`}

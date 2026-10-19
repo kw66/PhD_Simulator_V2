@@ -2,6 +2,7 @@ import { createGameRandomState, withGameRandom } from "./v2-game-random";
 import { settleCaptainMonth, syncCaptainMembers } from "./v2-captain-runtime";
 import { prepareRewinderYear, completeRewinderYear, isRewinderYearEnd, toggleRewinderPerson } from "./v2-rewinder";
 import { replayPendingEvent } from "./v2-event-replay";
+import { syncPaperResearchStarted } from "./v2-paper-competition";
 import { isAcademicYearEnd, prepareAcademicArchive, toggleAcademicPerson, selectAcademicSource, completeAcademicArchive } from "./v2-rewinder-academic";
 import { observeAchievements } from "./v2-achievement-runtime";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
@@ -28,7 +29,7 @@ import { yearlyResetRandomEventState, normalizeRoleTalentIllnessProbability } fr
 import { getMonthEndIllnessDelta, settleCurseMonthStart, repayCurseDebt } from "./v2-curse-system";
 import { settleScheduledActionBuffs } from "./v2-study-fatigue";
 import { investRoleTalentMoney } from "./v2-role-talent-investments";
-import { activatePendingRandomEvents } from "./v2-paper-competition-waiting";
+import { activatePendingRandomEvents, releasePrematurePaperCompetitions } from "./v2-paper-competition-waiting";
 import { refreshPaperCompetitionEvents } from "./v2-paper-competition-preview";
 import { applyMonthlyEffects, applyMonthStartSubscriptions, getMonthlyPersonalSpending, resolveMonthlyEffects } from "./v2-monthly-effects";
 import { getInternshipStatus } from "./v2-internship-system";
@@ -446,6 +447,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
     if (checkedState.phase !== "playing") return checkedState;
     state = checkedState;
   }
+  state = syncPaperResearchStarted(releasePrematurePaperCompetitions(state));
   let nextState = normalizeGameMoney(syncCaptainMembers(ensureFellowFinanceAccounts(dispatchGameAction(ensureFellowPapers(syncCaptainMembers(state)), actionId, payload))));
   if (nextState.rewinderState?.academic?.pending) return nextState;
   if (state.degree === "master" && nextState.degree === "phd") {
@@ -466,7 +468,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
   const settledState = actionId === "resolve-event" || actionId === "replay-event" || actionId === "rewinder-replay-event"
     || (helpedState.papers !== state.papers && helpedState.papers.some((paper) => paper.status === "journal-reviewing"))
     ? resolveReadyJournalPapers(helpedState).state : helpedState;
-  const conferenceState = syncThesisState(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(settledState)));
+  const conferenceState = syncPaperResearchStarted(syncThesisState(settleDueConferenceAttendance(enqueueAcceptedPaperConferenceEvents(settledState))));
   const refreshed = refreshPendingEventDecisions(refreshPaperReviewEvents(refreshPaperCompetitionEvents(activatePendingRandomEvents(syncAdvisorResearchAccumulation(conferenceState)))));
   if (debugAction) return refreshed;
   const evaluated = evaluateCoreEndings(settleGreedCoinGames(refreshed));

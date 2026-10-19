@@ -1,9 +1,10 @@
 import { saveAccountProfile } from "../src/core/v2-account-storage";
 import { describe, expect, it } from "vitest";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
-import { getTalentPointBalance, getTalentUpgradeReason, sanitizeRoleTalentAllocation } from "../src/core/v2-role-talent-definitions";
+import { getTalentPointBalance, getTalentUpgradeReason, isRoleTalentImplemented, sanitizeRoleTalentAllocation } from "../src/core/v2-role-talent-definitions";
 import { loadRoleTalentAllocation, ROLE_TALENT_STORAGE_KEY, saveRoleTalentAllocation } from "../src/core/v2-role-talent-storage";
 import { createStore } from "../src/core/v2-store";
+import { getRoleOptions } from "../src/core/v2-progression";
 
 function memoryStorage() {
   const data = new Map<string, string>();
@@ -27,12 +28,16 @@ describe("role talent allocation", () => {
     expect(sanitizeRoleTalentAllocation("social", 10, social)).toEqual(social);
   });
 
-  it("uses the actual role level and unlocks a successor with one prerequisite level", () => {
-    expect(getTalentPointBalance("normal", 0, {})).toBe(0);
-    expect(getTalentPointBalance("normal", 2, { "first-month-drive": 1 })).toBe(3);
+  it("grants ten initial points plus one per level and unlocks a successor with one prerequisite level", () => {
+    for (const { id } of getRoleOptions().filter(role => isRoleTalentImplemented(role.id))) {
+      expect(getTalentPointBalance(id, 0, {})).toBe(10);
+      expect(getTalentPointBalance(id, 1, {})).toBe(11);
+      expect(getTalentPointBalance(id, 10, {}, 3)).toBe(23);
+    }
+    expect(getTalentPointBalance("normal", 2, { "first-month-drive": 1 })).toBe(11);
     expect(getTalentUpgradeReason("normal", 2, {}, "diligence")).not.toBeNull();
     expect(getTalentUpgradeReason("normal", 2, { "first-month-drive": 1 }, "diligence")).toBeNull();
-    expect(getTalentUpgradeReason("normal", 1, { "first-month-drive": 2 }, "diligence")).toBe("天赋点不足");
+    expect(getTalentUpgradeReason("normal", 1, { "first-month-drive": 2, "self-determination": 9 }, "diligence")).toBe("天赋点不足");
     expect(getTalentUpgradeReason("normal", 10, { "first-month-drive": 3 }, "first-month-drive")).toBe("已满级");
   });
 
@@ -48,9 +53,9 @@ describe("role talent allocation", () => {
   it("rejects foreign nodes, fractional levels, orphan successors and over-budget allocations", () => {
     expect(sanitizeRoleTalentAllocation("normal", 1, {
       "first-month-drive": 999, diligence: 10, heiress: 1, "burning-life-alpha": 1,
-    })).toEqual({ "first-month-drive": 2 });
+    })).toEqual({ "first-month-drive": 3, diligence: 8 });
     expect(sanitizeRoleTalentAllocation("normal", 10, { "first-month-drive": 0.5, diligence: 2, breakthrough: 1 })).toEqual({});
-    expect(sanitizeRoleTalentAllocation("normal", 0, { "first-month-drive": 1 })).toEqual({});
+    expect(sanitizeRoleTalentAllocation("normal", 0, { "first-month-drive": 1 })).toEqual({ "first-month-drive": 1 });
     expect(sanitizeRoleTalentAllocation("normal", 10, null)).toEqual({});
   });
 
@@ -68,6 +73,32 @@ describe("role talent allocation", () => {
     storage.setItem(ROLE_TALENT_STORAGE_KEY, "broken");
     expect(loadRoleTalentAllocation(account, storage).talentAllocation).toEqual({});
     expect(() => saveRoleTalentAllocation(account, { getItem: () => null, setItem: () => { throw new Error("blocked"); } })).not.toThrow();
+  });
+
+  it("keeps existing allocations while recalculating the larger low-level budget", () => {
+    const storage = memoryStorage();
+    const account = createDefaultAccountProfile();
+    account.roleProgress.normal.level = 3;
+    account.achievementTalentPoints = { normal: 2 };
+    account.talentAllocation = { normal: { "first-month-drive": 3, "self-determination": 5 } };
+    saveRoleTalentAllocation(account, storage);
+    const loaded = loadRoleTalentAllocation(account, storage);
+    expect(loaded.talentAllocation).toEqual(account.talentAllocation);
+    expect(getTalentPointBalance("normal", 3, loaded.talentAllocation!.normal!, loaded.achievementTalentPoints!.normal)).toBe(7);
+  });
+
+  it("lets a fresh player spend the starting budget but keeps locked roles uneditable", () => {
+    const store = createStore({ storage: null });
+    expect(store.getLobbyState().roleProgress.normal.level).toBe(0);
+    expect(store.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
+    for (let point = 0; point < 9; point += 1) expect(store.upgradeRoleTalent("normal", "self-determination")).toBe(true);
+    expect(store.upgradeRoleTalent("normal", "self-determination")).toBe(false);
+    expect(store.upgradeRoleTalent("rich", "heiress")).toBe(false);
+    expect(store.getLobbyState().talentAllocation?.rich).toBeUndefined();
+    store.dispatch("start-game", { roleId: "normal" });
+    expect(store.getState().roleTalents?.levels).toEqual({ "first-month-drive": 1, "self-determination": 9 });
+    store.dispatch("quit-game");
+    expect(store.isCurrentRunDisqualified()).toBe(false);
   });
 
   it("rejects prior-epoch talent allocations even when stored under the current key", () => {

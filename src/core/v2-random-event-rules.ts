@@ -23,6 +23,7 @@ export interface RandomEventPoolContext extends RandomEventState {
   publishedPaperCount?: number;
   hasRecoverableDraftPaper?: boolean;
   hasAuthorshipEligibleDraftPaper?: boolean;
+  hasStartedPaperResearch?: boolean;
   excludedCategories?: readonly RandomEventCategory[];
   excludedEventIds?: readonly number[];
 }

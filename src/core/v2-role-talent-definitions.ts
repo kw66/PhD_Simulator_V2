@@ -1,5 +1,5 @@
 import type { RoleId } from "./v2-types";
-import { MAX_ROLE_LEVEL, ROLE_TALENT_POINTS_PER_LEVEL } from "./v2-role-experience";
+import { MAX_ROLE_LEVEL, ROLE_INITIAL_TALENT_POINTS, ROLE_TALENT_POINTS_PER_LEVEL } from "./v2-role-experience";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-project-constants";
 
 export type TalentAllocation = Partial<Record<RoleId, Record<string, number>>>;
@@ -240,7 +240,7 @@ export function getTalentPointBalance(roleId: RoleId, level: number, allocation:
   if (roleId === "research-captain") return 0;
   const spent = getDesignedTalentNodes(roleId)?.reduce((sum, node) => sum + (allocation[node.id] ?? 0) * node.cost, 0) ?? 0;
   const validLevel = Number.isFinite(level) ? Math.min(MAX_ROLE_LEVEL, Math.max(0, Math.floor(level))) : 0;
-  return Math.max(0, validLevel * ROLE_TALENT_POINTS_PER_LEVEL + Math.max(0, Math.floor(bonusPoints)) - spent);
+  return Math.max(0, ROLE_INITIAL_TALENT_POINTS + validLevel * ROLE_TALENT_POINTS_PER_LEVEL + Math.max(0, Math.floor(bonusPoints)) - spent);
 }
 
 export function getTalentUpgradeReason(roleId: RoleId, level: number, allocation: Record<string, number>, talentId: string, bonusPoints = 0): string | null {

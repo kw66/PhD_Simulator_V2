@@ -3,6 +3,25 @@ import { enqueuePendingEvents } from "./v2-event-enqueue";
 import { createRandomEventById, isRandomEventEligible } from "./v2-random-event-router";
 import type { GameState } from "./v2-types";
 import { consumeRandomEventTicket } from "./v2-random-event-rules";
+import { hasStartedPaperResearch, isPaperCompetitionEventId } from "./v2-paper-competition";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
+
+/** Release hidden draws from preparation in saves created before the research gate. */
+export function releasePrematurePaperCompetitions(state: GameState): GameState {
+  if (!usesGameplayRulesFrom("20261019-r11") || state.phase !== "playing"
+    || !state.pendingRandomEvents?.length || hasStartedPaperResearch(state)) return state;
+  const released = new Set(state.pendingRandomEvents.filter(({ eventId }) =>
+    isPaperCompetitionEventId(eventId) && !state.eventQueue.some(event =>
+      event.chainId === `random-${eventId}` || event.randomReplay?.eventId === eventId))
+    .map(({ eventId }) => eventId));
+  if (released.size === 0) return state;
+  return {
+    ...state,
+    pendingRandomEvents: state.pendingRandomEvents.filter(({ eventId }) => !released.has(eventId)),
+    availableRandomEvents: [...state.availableRandomEvents, ...[...released].filter(eventId =>
+      !state.availableRandomEvents.includes(eventId) && !state.usedRandomEvents.includes(eventId))],
+  };
+}
 
 export function rememberPendingRandomEvent(
   state: GameState,

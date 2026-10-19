@@ -820,6 +820,8 @@ export type LabFinanceCategory = "conference-registration" | "conference-travel"
   | "student-reimbursement" | "horizontal-income" | "grant-income" | "initial-funding" | "other";
 
 export interface GameState extends RandomEventState {
+  /** Set once a player's first-author paper has any score; discarding it does not undo research. */
+  paperResearchStarted?: boolean;
   rewinderState?: import("./v2-rewinder-state").RewinderRunState;
   captainState?: import("./v2-captain-state").CaptainRunState;
   curseState?: import("./v2-curse-system").CurseRunState;

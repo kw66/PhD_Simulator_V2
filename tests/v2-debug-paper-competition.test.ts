@@ -238,6 +238,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
   it.each(["empty", "eligible", "hidden"] as const)("keeps repeated clicks idempotent throughout every act from %s", (source) => {
     const initial = makeState(source === "eligible" ? [makePaper(0)] : []);
     if (source === "hidden") {
+      initial.paperResearchStarted = true;
       initial.pendingRandomEvents = [{ eventId, serial: 6 }];
       initial.availableRandomEvents = [otherEventId];
     }
@@ -273,6 +274,7 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
 
   it.each(["both", "other-only"] as const)("activates coexisting hidden opportunities once with consistent root targets: %s", (hidden) => {
     const initial = makeState();
+    initial.paperResearchStarted = true;
     initial.pendingRandomEvents = hidden === "both"
       ? [{ eventId, serial: 6 }, { eventId: otherEventId, serial: 7 }]
       : [{ eventId: otherEventId, serial: 7 }];
@@ -303,8 +305,8 @@ describe.each(COMPETITIONS)("debug paper competition $eventId: $field", ({ event
     }
   });
 
-  it("keeps normal scheduling hidden until conditions or an explicit debug click supply a target", () => {
-    const initial = { ...makeState(), availableRandomEvents: [eventId] };
+  it("keeps post-start scheduling hidden until conditions or an explicit debug click supply a target", () => {
+    const initial = { ...makeState(), paperResearchStarted: true, availableRandomEvents: [eventId] };
     const snapshot = structuredClone(initial);
     const getRoll = vi.fn().mockReturnValueOnce(0.8).mockReturnValue(0);
     const drawn = collectRandomEventsForMonth(initial, getRoll);

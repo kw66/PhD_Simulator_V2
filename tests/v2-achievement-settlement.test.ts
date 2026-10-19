@@ -189,7 +189,7 @@ describe("achievement ending transaction", () => {
     await loaded.ready();
     expect(loaded.getLobbyState().achievementTalentPoints?.normal).toBe(0);
     expect(loaded.getLobbyState().achievementExperienceMultipliers?.normal).toBe(0.2);
-    expect(loaded.getLobbyState().talentAllocation?.normal).toBeUndefined();
+    expect(loaded.getLobbyState().talentAllocation?.normal).toEqual({ "first-month-drive": 1 });
   });
 
   it("persists collectors, role dates, one-time rewards and spendable bonus talent points", async () => {
@@ -208,9 +208,12 @@ describe("achievement ending transaction", () => {
     expect(loaded.getLobbyState().achievementExperienceMultipliers).toEqual({ normal: 2.2 });
     expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
     expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
+    expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
+    for (let point = 0; point < 9; point += 1) expect(loaded.upgradeRoleTalent("normal", "self-determination")).toBe(true);
+    expect(loaded.upgradeRoleTalent("normal", "self-determination")).toBe(false);
     expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(false);
     loaded.dispatch("start-game", { roleId: "normal" });
-    expect(loaded.getState().roleTalents?.levels["first-month-drive"]).toBe(2);
+    expect(loaded.getState().roleTalents?.levels["first-month-drive"]).toBe(3);
   });
 
   it("starts normal progression without loading former test-mode levels, unlocks or allocations", () => {

@@ -3,6 +3,7 @@ import type { GameState, Paper } from "./v2-types";
 import { setPaperTotalScore } from "./v2-paper-collaboration";
 import { formatResearchMiscSanChange, getActualResearchMiscSanChange } from "./v2-sanity-rules";
 import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export const PAPER_COMPETITION_EVENT_IDS = [17, 18] as const;
 
@@ -30,6 +31,17 @@ export interface PaperCompetitionPreview {
 
 export function isPaperCompetitionEventId(eventId: number): eventId is PaperCompetitionEventId {
   return eventId === 17 || eventId === 18;
+}
+
+export function hasStartedPaperResearch(state: Pick<GameState, "paperResearchStarted" | "papers" | "externalPublications">): boolean {
+  return state.paperResearchStarted === true || [...state.papers, ...state.externalPublications].some(paper =>
+    paper.nonFirstAuthor !== true && [paper.idea, paper.experiment, paper.writing].some(score => Number.isFinite(score) && score > 0));
+}
+
+export function syncPaperResearchStarted(state: GameState): GameState {
+  if (!usesGameplayRulesFrom("20261019-r11") || state.phase !== "playing"
+    || state.paperResearchStarted || !hasStartedPaperResearch(state)) return state;
+  return { ...state, paperResearchStarted: true };
 }
 
 function isEligiblePaper(paper: Paper, field: PaperCompetitionResolution["field"]): boolean {
