@@ -60,7 +60,6 @@
     padding-inline: 4px;
     gap: 2px;
   }
-  .event-content-buttons .event-choice-btn > .event-choice-risk { font-size: 20px; font-weight: 900; line-height: 1; }
   .center-main-panel[data-tab-panel="events"] .event-description-story { margin-bottom: 0.45em; }
   .center-main-panel[data-tab-panel="events"] .event-description-paper { padding: 5px 8px; margin-bottom: 0.45em; }
   .center-main-panel[data-tab-panel="events"] .event-description-details > div { padding: 5px 8px; gap: 3px 8px; }
@@ -82,16 +81,12 @@
   .settings-panel .settings-quick-actions > button { min-height: 44px; font-size: 13px; }
   .settings-panel { padding-top: 4px; }
   .run-saves { margin-top: 8px; gap: 5px; }
-  .run-saves-list { gap: 4px; }
-  .run-save-detail { margin-top: 3px; line-height: 1.4; }
+  .run-saves-list { grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 5px; }
   .run-saves-heading { padding: 5px 8px; gap: 5px; }
   .run-saves-heading h3 { flex-wrap: wrap; gap: 4px; }
   .run-saves-close { min-height: 40px; flex-shrink: 0; }
   .run-saves-note { padding: 6px 8px; border-radius: 4px; background: #f8f2e6; color: #756044; }
-  .run-save-card { min-height: 56px; gap: 6px; padding: 5px 8px; }
-  .run-save-title, .run-save-detail { column-gap: 7px; }
-  .run-save-detail time { margin-left: 0; }
-  .run-save-load { min-height: 44px; min-width: 48px; padding-inline: 8px; }
+  .run-save-card { min-height: 86px; gap: 3px; padding: 6px 4px; }
   .run-saves-list { max-height: min(480px, 65dvh); overscroll-behavior-y: contain; }
   .game-confirm-button, .game-confirm-close { min-height: 44px; min-width: 44px; }
   .game-confirm-dialog { gap: 8px; }

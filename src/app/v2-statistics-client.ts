@@ -120,6 +120,12 @@ function validPayload(kind: StatisticsKind, value: unknown): value is Payload {
   if (!value || typeof value !== "object") return false;
   const p = value as Payload;
   if (typeof p.p_id !== "string" || !UUID_PATTERN.test(p.p_id)) return false;
+  if (p.p_total_months !== undefined || (kind === "activity" && p.p_degree !== undefined)) {
+    if (kind !== "activity" || p.p_event !== "finish"
+      || !Number.isSafeInteger(p.p_total_months) || Number(p.p_total_months) < 0 || Number(p.p_total_months) > 70
+      || (p.p_degree !== "master" && p.p_degree !== "phd")
+      || ((p.p_ending === "master" || p.p_ending === "phd") && p.p_degree !== p.p_ending)) return false;
+  }
   if (p.p_finalized_run_id !== undefined) {
     if (typeof p.p_finalized_run_id !== "string" || !UUID_PATTERN.test(p.p_finalized_run_id)
       || typeof p.p_fingerprint !== "string" || p.p_fingerprint.length < 1 || p.p_fingerprint.length > 1024

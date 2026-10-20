@@ -1,4 +1,5 @@
 import { enqueueEventQueueItem } from "./v2-event-queue";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type {
   DeferredEventStatePatch,
   EventChoice,
@@ -34,6 +35,7 @@ export function enqueueResolvedEventFollowUps(
   randomReplay?: PendingEvent["randomReplay"],
   deferredChoices?: PendingEvent["deferredChoices"],
   rewinderReplay?: PendingEvent["rewinderReplay"],
+  remainingDeadlineMonths?: number,
 ): { nextState: GameState; hasSameChainFollowUp: boolean } {
   let nextState = state;
   let hasSameChainFollowUp = false;
@@ -46,6 +48,9 @@ export function enqueueResolvedEventFollowUps(
     let eventWithHistory = event.chainId === resolvedChainId
       ? {
           ...event,
+          // Only a continuation within the unfinished task inherits its deadline.
+          ...(event.stage !== "act1" && remainingDeadlineMonths !== undefined && usesGameplayRulesFrom("20261020-r12")
+            ? { deadlineMonths: remainingDeadlineMonths } : {}),
           history: resolvedHistory,
           ...(replayContext ? { replayContext } : {}),
           ...(randomReplay ? { randomReplay } : {}),

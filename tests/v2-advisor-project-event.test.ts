@@ -7,7 +7,7 @@ import { dispatchAction } from "../src/core/v2-engine";
 import { getResolvableQueuedEvent, refreshPendingEventDecisions } from "../src/core/v2-engine-event-resolution";
 import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolution-state";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
-import { createEventQueueItem } from "../src/core/v2-event-queue";
+import { createEventQueueItem, decrementEventQueueDeadlines } from "../src/core/v2-event-queue";
 import { settleLinearEvents } from "../src/core/v2-event-auto-resolution";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { ensureFellowPapers } from "../src/core/v2-fellow-research";
@@ -445,7 +445,12 @@ describe("advisor project three-stage settlement", () => {
       .toBeLessThan(renderedLog.indexOf(`回看导师项目`));
     if (type === "vertical") expect(renderedLog).toMatch(/class="[^"]*log-[^"]*"[^>]*>论文写作协作 \+10<\/span>/u);
     expect(completed.log.find((entry) => entry.eventHistoryId)?.text).not.toMatch(/科研经费|金币|科研积累|论文写作协作/u);
-    const automatic = settleLinearEvents({ ...refreshed, blockLinearEvents: false }, (current, eventId, eventChoiceId) =>
+    const earlyAutomatic = settleLinearEvents({ ...refreshed, blockLinearEvents: false }, (current, eventId, eventChoiceId) =>
+      dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
+    expect(settlementState(earlyAutomatic)).toEqual(settlementState(refreshed));
+    expect(currentEvent(earlyAutomatic).deadlineMonths).toBe(1);
+    const automatic = settleLinearEvents({ ...refreshed, blockLinearEvents: false,
+      eventQueue: decrementEventQueueDeadlines(refreshed.eventQueue) }, (current, eventId, eventChoiceId) =>
       dispatchAction(current, "resolve-event", { eventId, eventChoiceId }));
     expect(settlementState(automatic)).toEqual(settlementState(completed));
     expect(automatic.log.filter((entry) => entry.text.startsWith(`${type === "horizontal" ? "横向" : "纵向"}项目完成：`)).map((entry) => entry.text))

@@ -1470,7 +1470,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
       statistics.enqueue(result.kind, runKey, result.fingerprint, result.payload, record.runId);
     }
     await visitStats.trackGamePhase("finished", { runKey, roleId: finished.selectedRoleId,
-      ending: finished.ending, finalized: true, finalizedRunId: record.runId, disqualifiedByDebug: false });
+      ending: finished.ending, totalMonths: finished.totalMonths, degree: finished.degree,
+      finalized: true, finalizedRunId: record.runId, disqualifiedByDebug: false });
     if (statistics.persistPending() && achievementQueued && achievementStats.persistPending()) store.acknowledgeFinalizedRun(record.runId);
     void statistics.flush();
     void achievementStats.flush();

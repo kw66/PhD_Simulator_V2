@@ -1931,7 +1931,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("后续计划");
     expect(html).not.toContain('data-ui-layout-toggle="debug-event-rail"');
     expect(html).not.toContain('data-ui-layout-toggle="debug-bottom-bar"');
-    expect(html).toContain('data-ui-open-debug-window');
+    expect(html).not.toContain('data-ui-open-debug-window');
     expect(html).toContain('data-ui-open-feedback');
     expect(html).not.toContain('id="debug-bottom-bar"');
     expect(html).not.toContain('class="debug-bottom-stat-grid"');
@@ -1993,7 +1993,7 @@ describe("v2 render lobby shell", () => {
     }
   });
 
-  it("keeps the main layout free of debug tools and exposes the popup opener in settings", () => {
+  it("keeps the main layout and settings free of accidental debug openers", () => {
     let state = dispatchAction(createInitialState(), "select-role", { roleId: "normal" });
     state = dispatchAction(state, "start-game", { roleId: "normal" });
 
@@ -2009,8 +2009,8 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('data-action="force-next-month"');
 
     const settings = html.match(/<section[^>]*data-tab-panel="settings"[^>]*>[\s\S]*?<\/section>/)?.[0] ?? "";
-    expect(settings).toMatch(/<button[^>]*type="button"[^>]*data-ui-open-debug-window/);
-    expect(settings.match(/data-ui-open-debug-window/g) ?? []).toHaveLength(1);
+    expect(settings).not.toContain('data-ui-open-debug-window');
+    expect(settings).not.toContain("打开调试面板");
     expect(settings).toContain('data-action="quit-game"');
     expect(settings).not.toContain('data-action="restart-game"');
     expect(settings).toContain('data-action="reset-game"');
@@ -2035,7 +2035,7 @@ describe("v2 render lobby shell", () => {
     expect(getTabHtml("events")).not.toContain("is-blocking");
     expect(html).toMatch(/class="center-tab-btn center-tab-btn-next"[\s\S]*?data-action="next-month"/);
     expect(html.match(/<button[\s\S]*?class="center-tab-btn center-tab-btn-next"[\s\S]*?<\/button>/)?.[0]).not.toContain("disabled");
-    expect(getTabHtml("workstation")).not.toContain("center-tab-badge is-available");
+    expect(getTabHtml("workstation")).toContain(`aria-label="行动点 ${state.actionState.limit - state.actionState.used} · AI行动 0 次 · 可投稿 0 篇"`);
     expect(getTabHtml("relationship")).toContain("center-tab-badge is-available");
     expect(getTabHtml("shop")).not.toContain("center-tab-badge is-available");
 
@@ -2070,6 +2070,8 @@ describe("v2 render lobby shell", () => {
 
     expect(readButton).toBe("");
     expect(html).toContain("入学后开放");
+    const researchTab = html.match(/<button[^>]*data-ui-play-tab="workstation"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(researchTab).not.toContain("center-tab-badge");
   });
 
   it("shows the enrollment lock before workstation action conditions", () => {
@@ -2858,6 +2860,32 @@ describe("v2 render lobby shell", () => {
     expect(hammockHtml).toContain("SAN+5");
   });
 
+  it("updates the research badge as regular action points are spent", () => {
+    let state = createEnrolledTestState();
+    state.eventQueue = [];
+    state.player.san = 20;
+    state.actionState = { ...state.actionState, limit: 2, used: 0 };
+    const getResearchTab = (current: GameState): string => (
+      renderApp(current, createDefaultAccountProfile())
+        .match(/<button[^>]*data-ui-play-tab="workstation"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? ""
+    );
+
+    expect(getResearchTab(state)).toContain('aria-label="行动点 2 · AI行动 0 次 · 可投稿 0 篇">2</span>');
+    state = dispatchAction(state, "read-paper");
+    expect(getResearchTab(state)).toContain('aria-label="行动点 1 · AI行动 0 次 · 可投稿 0 篇">1</span>');
+    state = dispatchAction(state, "read-paper");
+    expect(getResearchTab(state)).not.toContain("center-tab-badge");
+  });
+
+  it("keeps submission reminders alongside remaining research actions", () => {
+    const state = createEnrolledTestState();
+    state.actionState = { ...state.actionState, limit: 2, used: 1 };
+    state.papers = [{ ...createDraftPaper(1, state.totalMonths), idea: 1, experiment: 1, writing: 1 }];
+    const tab = renderApp(state, createDefaultAccountProfile())
+      .match(/<button[^>]*data-ui-play-tab="workstation"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(tab).toContain('aria-label="行动点 1 · AI行动 0 次 · 可投稿 1 篇">2</span>');
+  });
+
   it("shows the green AI action count after regular action points are exhausted", () => {
     const base = createEnrolledTestState();
     const state = {
@@ -2874,7 +2902,7 @@ describe("v2 render lobby shell", () => {
       },
     };
     const html = renderApp(state, createDefaultAccountProfile());
-    expect(html).toContain('aria-label="AI行动 1 次 · 可投稿 0 篇"');
+    expect(html).toContain('aria-label="行动点 0 · AI行动 1 次 · 可投稿 0 篇"');
     expect(html).toMatch(/data-ui-play-tab="workstation"[\s\S]*class="center-tab-badge is-available"[^>]*>1<\/span>/);
   });
 

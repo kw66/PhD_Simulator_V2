@@ -1,5 +1,6 @@
 import { appendFixedEventHint } from "./v2-fixed-event-hints";
 import { formatEventSanPaymentText } from "./v2-event-player-effects";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export type RandomRollProvider = () => number;
@@ -27,13 +28,14 @@ export function createThreeStageEvent(
   copy: ThreeStageRandomEventCopy,
   state?: GameState,
 ): PendingEvent {
+  const deadlineMonths = usesGameplayRulesFrom("20261020-r12") ? event.deadlineMonths : 0;
   const choiceEvent: PendingEvent = {
     ...event,
     id: `${event.id}-choice`,
     title: `${event.title} ➜ ${copy.decisionTitle}`,
     description: copy.decisionDescription,
     stage: "act2",
-    deadlineMonths: 0,
+    deadlineMonths,
     choices: event.choices.map((choice) => {
       const resultCopy = copy.results[choice.id];
       if (!resultCopy) return choice;
@@ -45,7 +47,7 @@ export function createThreeStageEvent(
         description: `${resultCopy.description}\n\n机制结算\n${outcome}`,
         source: event.source,
         blocking: event.blocking,
-        deadlineMonths: 0,
+        deadlineMonths,
         chainId: event.chainId,
         stage: "result",
         ...(event.narrativeNames ? { narrativeNames: [...event.narrativeNames] } : {}),

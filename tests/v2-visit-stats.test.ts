@@ -349,8 +349,9 @@ describe("kwgame activity statistics", () => {
         roleId: state.selectedRoleId, ending: state.ending, runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
         disqualifiedByDebug: store.getLobbyState().lastRunExperience?.disqualifiedByDebug,
       })));
-      store.subscribeFinalized(({ state, debugUsed }) => transitions.push(stats.trackGamePhase(state.phase, {
+      store.subscribeFinalized(({ state, debugUsed, runId }) => transitions.push(stats.trackGamePhase(state.phase, {
         roleId: state.selectedRoleId, ending: state.ending, runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
+        totalMonths: state.totalMonths, degree: state.degree, finalizedRunId: runId,
         disqualifiedByDebug: debugUsed, finalized: true,
       })));
       store.dispatch("start-game", { roleId: "normal" });
@@ -378,6 +379,7 @@ describe("kwgame activity statistics", () => {
       store.loadRunSave("latest");
       store.dispatch(ending === "quit" ? "quit-game" : "next-month");
       expect(store.getState()).toMatchObject({ phase: "finished", ending });
+      const finalMonth = store.getState().totalMonths;
       store.dispatch("set-date-display-mode", { dateDisplayMode: "calendar" });
       store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
       store.dispatch("next-month");
@@ -390,7 +392,8 @@ describe("kwgame activity statistics", () => {
       await Promise.all(transitions);
       await stats.flush();
       expect([...backend.rows.values()].map((row) => row.p_event)).toEqual(["start", "finish"]);
-      expect([...backend.rows.values()][1]).toMatchObject({ p_ending: ending, p_role_id: "normal", p_day: DAY });
+      expect([...backend.rows.values()][1]).toMatchObject({ p_ending: ending, p_role_id: "normal", p_day: DAY,
+        p_total_months: finalMonth, p_degree: ending === "phd" ? "phd" : "master" });
       expect(backend.fetch.mock.calls.filter(([url]) => String(url).includes("/record_"))).toHaveLength(1);
     },
   );

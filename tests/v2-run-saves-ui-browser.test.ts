@@ -3,6 +3,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import type { createStore } from "../src/core/v2-store";
+import { createInitialState } from "../src/core/v2-engine";
+import { renderRunSaves } from "../src/app/v2-render-run-saves";
+import type { RunSaveSummary } from "../src/core/v2-run-saves";
 
 type SaveWindow = Window & { saveStore: ReturnType<typeof createStore> };
 
@@ -22,6 +25,46 @@ describe("run save controls in the game", () => {
     browser = await chromium.launch();
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
+
+  it.each([360, 390, 1440])("fits compact save tiles in multiple columns at %ipx", async width => {
+    const page = await browser.newPage({ viewport: { width, height: 960 } });
+    const base = server.resolvedUrls!.local[0]!;
+    const origin = new URL(base).origin;
+    await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    try {
+      await page.goto(base);
+      await startGameFromLobby(page);
+      for (const id of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
+        await page.locator(`[data-event-choice-id="${id}"]:visible`).click();
+      }
+      await page.locator('[data-ui-play-tab="settings"]').click();
+      const months: RunSaveSummary[] = Array.from({ length: 24 }, (_, index) => {
+        const month = 24 - index;
+        return { id: `month:${month}`, kind: "month", totalMonths: month, year: Math.floor((month - 1) / 12) + 1,
+          month: ((month - 1) % 12) + 1, phase: "playing", playerName: "陆林涵", degree: "master",
+          san: 7, sanCap: 20, researchScore: index * 4, savedAt: "2026-10-20T15:03:00.000Z" };
+      });
+      const html = renderRunSaves(createInitialState(), { isRunSavePanelOpen: true,
+        runSaves: [{ ...months[0]!, id: "latest", kind: "latest", sameAsMonthId: "month:24" }, ...months] });
+      await page.locator(".settings-panel").evaluate((element, markup) => { element.innerHTML = markup; }, html);
+      const saves = page.locator(".run-saves");
+      await saves.scrollIntoViewIfNeeded();
+      expect(await page.locator(".run-save-card").count()).toBe(24);
+      const layout = await page.locator(".run-saves-list").evaluate(element => {
+        const cards = [...element.querySelectorAll<HTMLElement>(".run-save-card")];
+        const firstTop = cards[0]!.getBoundingClientRect().top;
+        return { columns: cards.filter(card => Math.abs(card.getBoundingClientRect().top - firstTop) < 1).length,
+          overflow: element.scrollWidth > element.clientWidth,
+          heights: cards.map(card => card.getBoundingClientRect().height),
+          clipped: cards.some(card => card.scrollWidth > card.clientWidth) };
+      });
+      expect(layout.columns).toBeGreaterThanOrEqual(width < 720 ? 3 : 4);
+      expect(layout.overflow).toBe(false);
+      expect(layout.clipped).toBe(false);
+      expect(Math.max(...layout.heights)).toBeLessThanOrEqual(94);
+      await saves.screenshot({ path: `artifacts/run-saves-compact-${width}.png` });
+    } finally { await page.close(); }
+  }, 30_000);
 
   it.each([390, 1440])("pages personal ending history without changing row count or mixing roles at %ipx", async width => {
     const page = await browser.newPage({ viewport: { width, height: 960 } });
@@ -112,7 +155,7 @@ describe("run save controls in the game", () => {
 
       await page.locator('[data-ui-play-tab="settings"]').click();
       await page.locator('[data-ui-open-run-saves]:visible').click();
-      expect(await page.locator('.run-save-card').count()).toBe(3);
+      expect(await page.locator('.run-save-card').count()).toBe(2);
       expect(await page.locator('.run-saves').textContent()).toContain("回溯会删除");
       await page.screenshot({ path: "artifacts/run-saves-ui.png" });
       // The read-save view is ordinary settings content, not a modal tab lock.

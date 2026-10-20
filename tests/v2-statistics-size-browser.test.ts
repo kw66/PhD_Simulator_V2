@@ -62,7 +62,7 @@ describe("long-run statistics through the browser Fetch transport", () => {
           p_submitted: true, p_passed: true, p_excellent: true }, finalizedRunId);
         const day = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
         client.enqueue("activity", run, "finish", { p_event: "finish", p_day: day,
-          p_run_key: run, p_role_id: "normal", p_ending: "phd" }, finalizedRunId);
+          p_run_key: run, p_role_id: "normal", p_ending: "phd", p_total_months: 70, p_degree: "phd" }, finalizedRunId);
         for (let batch = 0; batch < 5; batch++) {
           await client.flush();
           const now = Date.now; Date.now = () => now() + 31_000;
@@ -79,7 +79,7 @@ describe("long-run statistics through the browser Fetch transport", () => {
       expect(records).toHaveLength(10);
       expect(new Set(records.map(row => row.payload.p_id)).size).toBe(10);
       expect(records.find(row => row.kind === "thesis")?.payload).toMatchObject({ p_passed: true, p_excellent: true });
-      expect(records.find(row => row.kind === "activity")?.payload).toMatchObject({ p_ending: "phd" });
+      expect(records.find(row => row.kind === "activity")?.payload).toMatchObject({ p_ending: "phd", p_total_months: 70, p_degree: "phd" });
       expect(new Set(records.map(row => row.payload.p_finalized_run_id)).size).toBe(1);
     } finally { await page.close(); }
   }, 20_000);

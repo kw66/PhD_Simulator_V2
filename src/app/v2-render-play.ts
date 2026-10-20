@@ -3798,9 +3798,6 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
         <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
           <i data-lucide="history" aria-hidden="true"></i><span>读取存档</span>
         </button>
-        <button class="settings-primary-btn is-debug" type="button" data-ui-open-debug-window title="查看不影响成绩；使用调试按钮后的进度不计成就、经验及统计，可读取此前存档恢复">
-          <i data-lucide="wrench" aria-hidden="true"></i><span>打开调试面板</span>
-        </button>
         <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
           <i data-lucide="log-out" aria-hidden="true"></i>
           <span>主动退学</span>
@@ -3824,11 +3821,15 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
 
 function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): string {
   const blockingEventCount = state.eventQueue.filter((event) => isEventBlocking(state, event)).length;
-  const aiResearchActionAvailable = state.phase === "playing" && !isGameplayModuleLocked(state)
+  const researchActionsAvailable = state.phase === "playing" && !isGameplayModuleLocked(state);
+  const remainingResearchActions = researchActionsAvailable
+    ? Math.max(0, state.actionState.limit - state.actionState.used) : 0;
+  const aiResearchActionAvailable = researchActionsAvailable
     && getActiveOperationAllowance(state, "idea").usesAiResearchBonus;
   const aiResearchActionCount = aiResearchActionAvailable ? 1 : 0;
-  const researchActionCount = aiResearchActionCount + getSubmittablePaperCount(state);
-  const researchActionLabel = `AI行动 ${aiResearchActionCount} 次 · 可投稿 ${getSubmittablePaperCount(state)} 篇`;
+  const submittablePaperCount = getSubmittablePaperCount(state);
+  const researchActionCount = remainingResearchActions + aiResearchActionCount + submittablePaperCount;
+  const researchActionLabel = `行动点 ${remainingResearchActions} · AI行动 ${aiResearchActionCount} 次 · 可投稿 ${submittablePaperCount} 篇`;
   const relationshipActionCount = getAvailableRelationshipActionCount(state);
   const availablePromotionCount = getAvailablePromotionCount(state);
   const activeEventId = uiState.isEventContentOpen ? (uiState.activeEventId ?? null) : null;

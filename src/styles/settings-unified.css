@@ -3,7 +3,7 @@
 }
 
 .settings-panel .settings-quick-actions {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -15,19 +15,19 @@
 .run-saves-close { border: 0; padding: 3px 5px; background: transparent; color: #715936; font: inherit; font-size: 12px; cursor: pointer; }
 .run-saves-note, .run-saves-status { margin: 0; padding: 0 3px; font-size: 12px; line-height: 1.55; color: #897151; }
 .run-saves-status { color: #935941; }
-.run-saves-list { display: flex; flex-direction: column; gap: 7px; max-height: 405px; overflow-y: auto; padding: 1px 5px 3px 1px; }
-.run-save-card { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-height: 65px; padding: 9px 11px; border: 1px solid #d8c9ac; border-radius: 5px; background: #f8f2e6; }
-.run-save-card.is-latest { border-color: #c4aa73; background: #f4e7ca; }
-.run-save-copy { min-width: 0; flex: 1; }
-.run-save-title, .run-save-detail { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 12px; row-gap: 3px; }
-.run-save-title { font-size: 13px; }
-.run-save-title > span { color: #877457; font-size: 12px; }
-.run-save-detail { margin-top: 5px; font-size: 12px; color: #8a775c; }
-.run-save-detail time { margin-left: auto; font-size: 11px; }
-.run-save-load { flex-shrink: 0; min-width: 50px; padding: 6px 10px; border: 1px solid #baa06c; border-radius: 5px; background: linear-gradient(#f9edcf, #ebd7a8); color: #6d5229; font-size: 12px; font-weight: 700; cursor: pointer; }
-.run-save-load:hover { background: #e8d1a1; }
-.run-save-load:focus-visible, .run-saves-close:focus-visible { outline: 2px solid #a6803f; outline-offset: 2px; }
-.run-saves-empty { padding: 24px; text-align: center; color: #8a775c; font-size: 13px; }
+.run-saves-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); align-content: start; gap: 7px; max-height: 405px; overflow-y: auto; padding: 2px 5px 4px 2px; }
+.run-save-item { min-width: 0; }
+.run-save-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 100%; min-width: 0; min-height: 92px; padding: 8px 5px; border: 1px solid #d8c9ac; border-radius: 5px; background: #f8f2e6; color: #615037; font: inherit; text-align: center; cursor: pointer; box-shadow: inset 0 1px 0 #fffcf6; }
+.run-save-card.is-latest { border-color: #b79b63; background: #f4e7ca; }
+.run-save-card:hover { border-color: #ac8a51; background: #f0dfbd; }
+.run-save-title { display: block; max-width: 100%; font-size: 12px; line-height: 1.35; white-space: nowrap; }
+.run-save-position { display: flex; align-items: center; justify-content: center; gap: 5px; color: #877457; font-size: 11px; line-height: 1.3; }
+.run-save-timing { color: #92754a; }
+.run-save-card.is-latest .run-save-timing { color: #806025; font-weight: 700; }
+.run-save-detail { display: grid; gap: 1px; color: #8a775c; font-size: 11px; line-height: 1.3; }
+.run-save-detail > span { white-space: nowrap; }
+.run-save-card:focus-visible, .run-saves-close:focus-visible { outline: 2px solid #a6803f; outline-offset: 2px; }
+.run-saves-empty { grid-column: 1 / -1; padding: 24px; text-align: center; color: #8a775c; font-size: 13px; }
 
 .settings-panel .settings-quick-actions > button {
   min-width: 0;

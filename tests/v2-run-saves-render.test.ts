@@ -25,11 +25,31 @@ describe("run save presentation", () => {
     });
     expect(html).toContain("1/70个月");
     expect(html).toContain("2023年10月");
-    expect(html).toContain("SAN 18/20 · 科研分 8");
+    expect(html).toContain("SAN 18/20");
+    expect(html).toContain("科研分 8");
     expect(html).toContain('data-ui-load-run-save="latest"');
     expect(html).toContain('data-ui-load-run-save="month:2"');
     expect(html).toContain("回溯会删除该时间点之后的存档与本局成就进度");
     expect(html).not.toContain("手动存档");
+    expect(html).not.toContain('class="run-save-load"');
+  });
+
+  it("presents identical latest and month progress once while retaining the month load target", () => {
+    const html = renderRunSaves(createInitialState(), {
+      isRunSavePanelOpen: true,
+      runSaves: [{ ...saved, sameAsMonthId: "month:2" }, { ...saved, id: "month:2", kind: "month" }],
+    });
+    expect(html.match(/data-ui-load-run-save=/g)).toHaveLength(1);
+    expect(html).toContain('data-ui-load-run-save="month:2"');
+    expect(html).toContain('class="run-save-card is-latest"');
+    expect(html).toContain("1/70个月");
+  });
+
+  it("does not hide latest progress if its matching month is missing", () => {
+    const html = renderRunSaves(createInitialState(), {
+      isRunSavePanelOpen: true, runSaves: [{ ...saved, sameAsMonthId: "month:2" }],
+    });
+    expect(html).toContain('data-ui-load-run-save="latest"');
   });
 
   it("opens load settings from an ending without changing the finished run", () => {

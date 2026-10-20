@@ -48,6 +48,30 @@ describe("per-role run save repository", () => {
     expect(restored.months.map(item => item.totalMonths)).toEqual([0, 1]);
   });
 
+  it("marks only an identical branch position for compact presentation without deleting snapshots", () => {
+    const repository = createRunSaveRepository({ storage: null, adapter: createMemoryRunSaveAdapter(), createRunId: () => "run-a" });
+    const current = state(1);
+    repository.commit(current, { monthStart: true });
+    expect(repository.list("normal")[0]?.sameAsMonthId).toBe("month:1");
+    expect(repository.list("normal").map(save => save.id)).toEqual(["latest", "month:1"]);
+    // The card's displayed metrics can match while other saved progress differs.
+    const changed = structuredClone(current);
+    changed.player.money += 1;
+    repository.commit(changed);
+    expect(repository.list("normal")[0]?.sameAsMonthId).toBeUndefined();
+    expect(repository.get("normal")?.months).toHaveLength(1);
+    repository.rewind("normal", "month:1");
+    expect(repository.list("normal")[0]?.sameAsMonthId).toBe("month:1");
+  });
+
+  it("keeps otherwise identical latest progress separate when debug qualification differs", () => {
+    const repository = createRunSaveRepository({ storage: null, adapter: createMemoryRunSaveAdapter() });
+    const current = state(1);
+    repository.commit(current, { monthStart: true, debugUsed: false });
+    repository.commit(current, { debugUsed: true });
+    expect(repository.list("normal")[0]?.sameAsMonthId).toBeUndefined();
+  });
+
   it("retains a debug flag on the continuing branch and enforces the 70-month limit", () => {
     const repository = createRunSaveRepository({ storage: null, adapter: createMemoryRunSaveAdapter(), createRunId: () => "run-a" });
     repository.commit(state(0), { monthStart: true, debugUsed: true });

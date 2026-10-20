@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { buildConferenceDecisionEventsForAcceptedPapers } from "./v2-conference-events";
 import { getPlayerAttributeCap } from "./v2-player-attributes";
@@ -644,6 +645,7 @@ function replayDebugEventScene(state: GameState, targetIndex: number, choiceId?:
     ...baseState,
     eventQueue: baseState.eventQueue.map((event) => event.id !== currentEvent.id ? event : {
       ...targetEvent,
+      ...(usesGameplayRulesFrom("20261020-r12") ? { deadlineMonths: currentEvent.deadlineMonths } : {}),
       history: history.slice(0, targetIndex),
       debugReplayable: true,
       debugRootEventId: context.rootEvent.id,

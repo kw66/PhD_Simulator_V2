@@ -1,5 +1,5 @@
 import { getRoleOptions } from "../core/v2-progression";
-import type { EndingId, GamePhase, RoleId } from "../core/v2-types";
+import type { Degree, EndingId, GamePhase, RoleId } from "../core/v2-types";
 import { DATA_EPOCH } from "../core/v2-data-epoch";
 import { createStatisticsClient, type StatisticsClient } from "./v2-statistics-client";
 
@@ -17,6 +17,9 @@ interface RoleRunResult {
   finalized?: boolean;
   /** Stable account outbox identity shared with achievement finalization. */
   finalizedRunId?: string;
+  /** Actual game month at final settlement; absent for historical receipts. */
+  totalMonths?: number;
+  degree?: Degree;
 }
 interface VisitSnapshot {
   version: 2;
@@ -171,7 +174,10 @@ export function createVisitStats(options: VisitStatsOptions) {
         const payload = { p_day: getBeijingDay(now()), p_run_key: run, p_role_id: result.roleId };
         if (started) client.enqueue("activity", run, "start", { ...payload, p_event: "start" });
         if (finished && result.ending && !result.disqualifiedByDebug) {
-          client.enqueue("activity", run, "finish", { ...payload, p_event: "finish", p_ending: result.ending }, result.finalizedRunId);
+          client.enqueue("activity", run, "finish", { ...payload, p_event: "finish", p_ending: result.ending,
+            ...(result.totalMonths !== undefined || result.degree !== undefined
+              ? { p_total_months: result.totalMonths, p_degree: result.degree } : {}),
+          }, result.finalizedRunId);
         }
       }
       previousPhase = phase;

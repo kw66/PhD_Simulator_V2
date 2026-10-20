@@ -191,6 +191,49 @@ describe("shared statistics queue", () => {
     expect(network.rows.size).toBe(1);
   });
 
+  it.each([0, 1, 34, 70])("preserves actual settled month %s through reload and deduplicated retries", async (months) => {
+    const network = backend();
+    const local = storage();
+    const stats = client({ fetch: network.fetch, storage: local });
+    const run = JSON.stringify([123, "normal"]);
+    const finalId = crypto.randomUUID();
+    const payload = { p_event: "finish", p_day: "2026-11-17", p_run_key: run, p_role_id: "normal",
+      p_ending: "quit", p_total_months: months, p_degree: months > 34 ? "phd" : "master" };
+    expect(stats.enqueue("activity", run, "finish", payload, finalId)).toBe(true);
+    stats.dispose();
+    const restored = client({ fetch: network.fetch, storage: local });
+    await restored.flush();
+    expect([...network.rows.values()][0]!.payload).toMatchObject({ ...payload, p_finalized_run_id: finalId });
+    expect(restored.enqueue("activity", run, "finish", payload, finalId)).toBe(false);
+    expect(network.rows.size).toBe(1);
+  });
+
+  it.each([
+    { p_total_months: -1 }, { p_total_months: 71 }, { p_total_months: 1.5 },
+    { p_total_months: "7" }, { p_total_months: null }, { p_degree: undefined },
+    { p_degree: "unknown" }, { p_total_months: undefined },
+    { p_event: "start", p_ending: undefined }, { p_ending: "phd", p_degree: "master" },
+  ])("rejects invalid settlement metadata without blocking other results: %j", async (override) => {
+    const network = backend();
+    const stats = client({ fetch: network.fetch, storage: storage() });
+    const run = JSON.stringify([123, "normal"]);
+    expect(stats.enqueue("activity", run, "finish", { p_event: "finish", p_day: "2026-11-17",
+      p_run_key: run, p_role_id: "normal", p_ending: "quit", p_total_months: 7, p_degree: "master", ...override }, crypto.randomUUID())).toBe(false);
+    expect(queue(stats)).toBe(true);
+    await stats.flush();
+    expect(network.rows.size).toBe(1);
+  });
+
+  it("keeps historical finish months unknown instead of inventing zero", async () => {
+    const network = backend();
+    const stats = client({ fetch: network.fetch, storage: storage() });
+    const run = JSON.stringify([123, "normal"]);
+    expect(stats.enqueue("activity", run, "finish", { p_event: "finish", p_day: "2026-11-17",
+      p_run_key: run, p_role_id: "normal", p_ending: "quit" })).toBe(true);
+    await stats.flush();
+    expect([...network.rows.values()][0]!.payload).not.toHaveProperty("p_total_months");
+  });
+
   it("persists confirmations immediately and combines three statistic kinds into one delayed request", async () => {
     const network = backend();
     const local = storage();

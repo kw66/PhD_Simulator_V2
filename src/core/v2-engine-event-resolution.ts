@@ -1,5 +1,6 @@
 import { withGameRandomPreview } from "./v2-game-random";
 import { prepareEventReplay, withEventChoiceRandom } from "./v2-event-replay";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import {
   pushLog,
@@ -349,6 +350,7 @@ function rebuildEventFromCurrentState(
 
   return {
     ...rebuiltWithStableIds,
+    ...(usesGameplayRulesFrom("20261020-r12") ? { deadlineMonths: queuedEvent.deadlineMonths } : {}),
     id: queuedEvent.id,
     continuationSourceId: queuedEvent.continuationSourceId,
     queueOrder: queuedEvent.queueOrder,
@@ -472,6 +474,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
   if (event.stage !== "result" || !(event.randomReplay || event.fixedTreePreview) || !source || source.stage !== "act2") return event;
   const decision: EventQueueItem = {
     ...source,
+    ...(usesGameplayRulesFrom("20261020-r12") ? { deadlineMonths: event.deadlineMonths } : {}),
     queueOrder: event.queueOrder,
     history: event.history?.slice(0, -1),
     replayContext: event.replayContext,
@@ -649,6 +652,7 @@ export function applyQueuedEventEffects(
     resolvedEvent.randomReplay,
     deferredChoices,
     resolvedEvent.rewinderReplay,
+    resolvedEvent.stage === "act1" || resolvedEvent.stage === "act2" ? resolvedEvent.deadlineMonths : undefined,
   );
   nextState = followUpResult.nextState;
   if (!followUpResult.hasSameChainFollowUp) {

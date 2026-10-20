@@ -77,6 +77,14 @@ describe("debug qualification through the real popup and save controls", () => {
       await page.goto(server.resolvedUrls!.local[0]!);
       await startGame(page);
       await page.locator('[data-ui-play-tab="settings"]').click();
+      expect(await page.locator('[data-ui-open-debug-window]').count()).toBe(0);
+      // Developer fixtures retain explicit debug access; ordinary settings expose no opener.
+      await page.evaluate(() => {
+        const button = document.createElement("button");
+        button.setAttribute("data-ui-open-debug-window", "");
+        button.textContent = "开发测试入口";
+        document.querySelector("#app")!.append(button);
+      });
       const [popup] = await Promise.all([
         page.waitForEvent("popup"), page.locator('[data-ui-open-debug-window]').click(),
       ]);

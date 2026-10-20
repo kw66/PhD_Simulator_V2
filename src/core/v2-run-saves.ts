@@ -36,6 +36,8 @@ export interface RunSaveRecord {
 export interface RunSaveSummary {
   id: string;
   kind: "latest" | "month";
+  /** Present the same branch position once without removing either stored snapshot. */
+  sameAsMonthId?: string;
   savedAt: string;
   totalMonths: number;
   year: number;
@@ -357,8 +359,15 @@ export function createRunSaveRepository(options: {
     list(roleId) {
       const record = records.get(roleId);
       if (!record) return [];
+      const sameMonth = record.months.find(snapshot => snapshot.totalMonths === record.latest.totalMonths);
+      const sameAsMonthId = sameMonth
+        && sameMonth.replayIndex === record.latest.replayIndex
+        && getSnapshotDebugUsed(record, sameMonth) === getSnapshotDebugUsed(record, record.latest)
+        && JSON.stringify(sameMonth.state) === JSON.stringify(record.latest.state)
+        ? sameMonth.id : undefined;
       return [record.latest, ...[...record.months].reverse()].map(snapshot => ({
         id: snapshot.id, kind: snapshot.id === "latest" ? "latest" : "month", savedAt: snapshot.savedAt,
+        ...(snapshot.id === "latest" && sameAsMonthId ? { sameAsMonthId } : {}),
         totalMonths: snapshot.totalMonths, year: snapshot.state.year, month: snapshot.state.month,
         phase: snapshot.state.phase, playerName: snapshot.state.playerName, degree: snapshot.state.degree,
         san: snapshot.state.player.san, sanCap: snapshot.state.sanCap, researchScore: snapshot.state.totalResearchScore,

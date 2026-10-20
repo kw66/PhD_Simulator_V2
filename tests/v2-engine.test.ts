@@ -856,7 +856,7 @@ describe("minimal game engine", () => {
     expect(blocked.totalMonths).toBe(14);
   });
 
-  it("turns a deferred event into a current-month task once the player starts it", () => {
+  it("keeps a deferred event's deadline when the player opens its choice scene", () => {
     let state: ReturnType<typeof startGame> = {
       ...startGame(),
       eventQueue: [],
@@ -868,7 +868,7 @@ describe("minimal game engine", () => {
 
     state = resolveCurrent(state);
     expect(state.eventQueue[0]?.stage).toBe("act2");
-    expect(state.eventQueue[0]?.deadlineMonths).toBe(0);
+    expect(state.eventQueue[0]?.deadlineMonths).toBe(1);
   });
 
   it("opens and resolves the game-relaxation choice scene", () => {
