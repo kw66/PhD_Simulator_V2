@@ -1,5 +1,8 @@
 export function createRelationshipTooltips(root: HTMLElement) {
   const triggers = "[data-relationship-tooltip], [data-card-tooltip], [data-event-risk-tooltip], .center-tab-btn[data-tooltip], .shop-tab-btn[data-tooltip], .panel-switch-btn[data-tooltip], .center-tab-badge[aria-label], [title]:not(.play-tooltip):not([data-tooltip])";
+  const touchTriggers = `${triggers}, [data-tooltip]`;
+  const actionControls = "button, a[href], input, textarea, select, [role='button'], [contenteditable='true']";
+  const tapTravelLimit = 12;
   const tooltip = document.createElement("div");
   tooltip.id = "relationship-tooltip";
   tooltip.className = "relationship-tooltip";
@@ -10,10 +13,31 @@ export function createRelationshipTooltips(root: HTMLElement) {
   let previousDescription: string | null = null;
   let hoverExitTimer: ReturnType<typeof setTimeout> | undefined;
   let touchPinned = false;
+  let lastTouchTime = -Infinity;
+  let touchGesture: { pointerId: number; element: HTMLElement; x: number; y: number; moved: boolean } | null = null;
+
+  const findTrigger = (target: EventTarget | null, touch: boolean): HTMLElement | null => {
+    let element = target instanceof Element ? target.closest<HTMLElement>(touch ? touchTriggers : triggers) : null;
+    while (element && root.contains(element)) {
+      // A decorative child can have an empty data-tooltip. Use its enclosing
+      // note instead of opening an empty tooltip or ignoring the tap.
+      if ((element.dataset.tooltip || element.getAttribute("title") || element.getAttribute("aria-label"))?.trim()) return element;
+      element = element.parentElement?.closest<HTMLElement>(touch ? touchTriggers : triggers) ?? null;
+    }
+    return null;
+  };
+
+  const findTapTrigger = (target: EventTarget | null): HTMLElement | null => {
+    const element = findTrigger(target, true);
+    // Explanatory notes are tappable; ordinary actions still execute on the
+    // first tap, even when the button or one of its children has a hint.
+    return element && !(target instanceof Element && target.closest(actionControls)) && !element.closest(actionControls) ? element : null;
+  };
 
   const hide = (): void => {
     clearTimeout(hoverExitTimer);
     if (active) {
+      active.removeAttribute("data-shared-tooltip-open");
       if (previousDescription === null) active.removeAttribute("aria-describedby");
       else active.setAttribute("aria-describedby", previousDescription);
     }
@@ -29,7 +53,7 @@ export function createRelationshipTooltips(root: HTMLElement) {
       hide();
       return;
     }
-    tooltip.textContent = active.dataset.tooltip ?? active.getAttribute("aria-label") ?? "";
+    tooltip.textContent = active.dataset.tooltip || active.getAttribute("aria-label") || "";
     const achievement = active.hasAttribute("data-achievement-id");
     tooltip.classList.toggle("is-achievement-tooltip", achievement);
     const anchor = active.getBoundingClientRect();
@@ -59,14 +83,14 @@ export function createRelationshipTooltips(root: HTMLElement) {
 
   const show = (target: EventTarget | null, touch = false): void => {
     clearTimeout(hoverExitTimer);
-    const element = target instanceof Element ? target.closest<HTMLElement>(touch ? `${triggers}, [data-tooltip]` : triggers) : null;
-    if (!element || !root.contains(element)) {
+    const element = findTrigger(target, touch);
+    if (!element) {
       if (active?.hasAttribute("data-achievement-id")) hoverExitTimer = setTimeout(hide, 120);
       else hide();
       return;
     }
     if (element.hasAttribute("title")) {
-      element.dataset.tooltip ??= element.getAttribute("title") ?? "";
+      if (!element.dataset.tooltip?.trim()) element.dataset.tooltip = element.getAttribute("title") ?? "";
       element.setAttribute("data-card-tooltip", "");
       element.removeAttribute("title");
     }
@@ -75,13 +99,26 @@ export function createRelationshipTooltips(root: HTMLElement) {
       active = element;
       previousDescription = element.getAttribute("aria-describedby");
       element.setAttribute("aria-describedby", [previousDescription, tooltip.id].filter(Boolean).join(" "));
+      element.setAttribute("data-shared-tooltip-open", "");
     }
     tooltip.hidden = false;
     sync();
   };
 
-  root.addEventListener("mouseover", (event) => { if (!touchPinned) show(event.target); });
-  root.addEventListener("focusin", (event) => show(event.target));
+  const toggleTouchTooltip = (element: HTMLElement): void => {
+    if (touchPinned && active === element) { hide(); return; }
+    show(element, true);
+    if (active !== element) return;
+    touchPinned = true;
+    tooltip.classList.add("is-touch-tooltip");
+  };
+
+  root.addEventListener("mouseover", (event) => {
+    if (!touchPinned && Date.now() - lastTouchTime > 800) show(event.target);
+  });
+  root.addEventListener("focusin", (event) => {
+    if (!touchPinned && Date.now() - lastTouchTime > 800) show(event.target);
+  });
   root.addEventListener("mouseout", (event) => {
     if (touchPinned) return;
     if (active && !(event.relatedTarget instanceof Node && active.contains(event.relatedTarget))
@@ -98,24 +135,54 @@ export function createRelationshipTooltips(root: HTMLElement) {
   });
   root.addEventListener("focusout", (event) => {
     // A tap may open a new card before the previously focused tab loses focus.
-    if (active && event.target instanceof Node && active.contains(event.target)) hide();
+    if (!touchPinned && active && event.target instanceof Node && active.contains(event.target)) hide();
   });
   document.addEventListener("pointerdown", (event) => {
     if (active && !(event.target instanceof Node && (active.contains(event.target) || tooltip.contains(event.target)))) hide();
+    if (event.pointerType !== "touch") {
+      if (event.pointerType === "mouse") root.classList.remove("uses-touch-tooltips");
+      return;
+    }
+    lastTouchTime = Date.now();
+    root.classList.add("uses-touch-tooltips");
+    const element = event.isPrimary ? findTapTrigger(event.target) : null;
+    touchGesture = element ? { pointerId: event.pointerId, element, x: event.clientX, y: event.clientY, moved: false } : null;
   });
-  root.addEventListener("pointerup", (event) => {
+  document.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "mouse") root.classList.remove("uses-touch-tooltips");
+    if (!touchGesture || event.pointerId !== touchGesture.pointerId) return;
+    if (Math.hypot(event.clientX - touchGesture.x, event.clientY - touchGesture.y) > tapTravelLimit) touchGesture.moved = true;
+  });
+  document.addEventListener("pointercancel", () => { touchGesture = null; });
+  document.addEventListener("pointerup", (event) => {
     if (event.pointerType !== "touch") return;
-    const element = event.target instanceof Element ? event.target.closest<HTMLElement>(`${triggers}, [data-tooltip]`) : null;
-    if (!element || element.closest("button, a, input, textarea, select")) return;
-    if (touchPinned && active === element) { hide(); return; }
-    show(element, true);
-    touchPinned = true;
-    tooltip.classList.add("is-touch-tooltip");
+    lastTouchTime = Date.now();
+    const gesture = touchGesture;
+    touchGesture = null;
+    if (!gesture || event.pointerId !== gesture.pointerId || gesture.moved
+      || Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > tapTravelLimit
+      || findTapTrigger(event.target) !== gesture.element) return;
+    toggleTouchTooltip(gesture.element);
+  });
+  root.addEventListener("click", (event) => {
+    // Modern touch browsers already handled pointerup. Keep click-only input
+    // (including accessibility activation) usable without double toggling.
+    if (Date.now() - lastTouchTime <= 800 || !window.matchMedia("(hover: none)").matches) return;
+    const element = findTapTrigger(event.target);
+    if (element) {
+      root.classList.add("uses-touch-tooltips");
+      toggleTouchTooltip(element);
+    }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") hide();
   });
-  window.addEventListener("scroll", sync, true);
+  window.addEventListener("scroll", (event) => {
+    touchGesture = null;
+    if (touchPinned) {
+      if (!(event.target instanceof Node && tooltip.contains(event.target))) hide();
+    } else sync();
+  }, true);
   window.addEventListener("resize", hide);
   return { sync };
 }

@@ -1,3 +1,4 @@
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
@@ -92,7 +93,7 @@ describe("run save controls in the game", () => {
     await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     try {
       await page.goto(base);
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       for (const id of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
         await page.locator(`[data-event-choice-id="${id}"]:visible`).click();
       }
@@ -105,7 +106,7 @@ describe("run save controls in the game", () => {
       await page.reload();
       await page.waitForFunction(() => (window as unknown as SaveWindow).saveStore.isReady());
       expect(await page.locator('[data-action="start-game"]').textContent()).toContain("继续游戏");
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       expect(await page.evaluate(() => JSON.stringify((window as unknown as SaveWindow).saveStore.getState()))).toBe(firstRun.state);
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getLobbyState().roleProgress.normal.startedRuns)).toBe(1);
 
@@ -139,7 +140,7 @@ describe("run save controls in the game", () => {
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getRunSaves().map(save => save.id))).toEqual(["latest", "month:0"]);
       await page.evaluate(async () => { await (window as unknown as SaveWindow).saveStore.flushSaves(); });
       await page.reload();
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getCurrentRunId())).toBe(firstRun.id);
       // Replaying the exact saved opening reproduces the original first month.
       for (const id of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
@@ -154,7 +155,7 @@ describe("run save controls in the game", () => {
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getCurrentRunId())).toBeNull();
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.hasRoleSave("normal"))).toBe(false);
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getLobbyState().roleProgress.normal.startedRuns)).toBe(1);
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getCurrentRunId())).not.toBe(firstRun.id);
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getRunSaves().map(save => save.id))).toEqual(["latest", "month:0"]);
       expect(errors).toEqual([]);

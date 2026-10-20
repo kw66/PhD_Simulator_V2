@@ -89,7 +89,7 @@ describe("achievement runtime presentation", () => {
     account.achievementExperienceMultipliers = { normal: 2 };
     const html = renderSetupScreen(createInitialState(), account);
     expect(html).toContain('aria-label="天赋点15，');
-    expect(html).toContain('aria-label="经验倍率3.0，');
+    expect(html).toContain('aria-label="经验倍率3.0"');
   });
 
   it("only displays the initial talent budget after the selected role is unlocked", () => {

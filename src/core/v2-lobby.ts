@@ -1,4 +1,7 @@
 import { getRoleDefinition, getRoleOptions } from "./v2-progression";
+import { getRoleHistoryBest } from "./v2-role-records";
+import { isCursedRole } from "./v2-curse-system";
+import { getSelectedCurseDifficulty } from "./v2-curse-progress";
 import { getAchievementUnlockRoleIds, isAchievementAvailableToRole, isAchievementCompleted } from "./v2-achievement-scope";
 import {
   getRoleAchievementDefinitions,
@@ -269,7 +272,10 @@ function buildRoleAchievementsViewModel(
 
 export function buildLobbySelectedRoleViewModel(account: AccountProfile, roleId: RoleId): LobbySelectedRoleViewModel {
   const role = getRoleDefinition(roleId);
-  const progress = account.roleProgress[roleId];
+  const storedProgress = account.roleProgress[roleId];
+  const progress = isCursedRole(roleId)
+    ? { ...storedProgress, historyBest: getRoleHistoryBest(account, roleId) }
+    : storedProgress;
 
   return {
     role,
@@ -278,6 +284,7 @@ export function buildLobbySelectedRoleViewModel(account: AccountProfile, roleId:
     unlockState: buildRoleUnlockState(account, roleId),
     stats: buildRoleStatsViewModel(roleId),
     historyStats: buildRoleHistoryStatsViewModel(progress),
+    historyLabel: isCursedRole(roleId) ? `历史 · ${["简单", "中等", "困难", "地狱"][getSelectedCurseDifficulty(account, roleId) - 1]}` : "历史",
     statistics: buildRoleStatisticsViewModel(progress),
     roleAchievements: buildRoleAchievementsViewModel(roleId, account),
   };

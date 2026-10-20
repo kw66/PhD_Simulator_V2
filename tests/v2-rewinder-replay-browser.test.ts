@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import type { createStore } from "../src/core/v2-store";
@@ -57,7 +58,7 @@ describe("universal event choices through the real browser handlers", () => {
         store.getState().randomState = { seed: 1700000000, cursor: 0 };
         store.dispatch("select-role", { roleId });
       }, roleId);
-      await page.locator('[data-action="start-game"]:visible').click();
+      await startGameFromLobby(page);
       for (const choiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
         await page.locator(`[data-event-choice-id="${choiceId}"]:visible`).click();
       }

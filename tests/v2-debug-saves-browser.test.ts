@@ -1,3 +1,4 @@
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
@@ -20,7 +21,7 @@ async function qualification(page: Page) {
 }
 
 async function startGame(page: Page) {
-  await page.locator('[data-action="start-game"]').click();
+  await startGameFromLobby(page);
   for (const id of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
     await page.locator(`[data-event-choice-id="${id}"]:visible`).click();
   }
@@ -92,7 +93,7 @@ describe("debug qualification through the real popup and save controls", () => {
       await expect.poll(() => page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getState().totalMonths)).toBe(2);
       await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.flushSaves());
       await page.reload();
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       expect(await qualification(page)).toEqual(dirty);
       await expect.poll(() => popup.locator('[data-debug-connection]').textContent()).toBe("已连接主游戏");
       // Loading the debug-created month does not clear its exclusion.
@@ -107,7 +108,7 @@ describe("debug qualification through the real popup and save controls", () => {
         expect(await qualification(page)).toEqual(clean);
         await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.flushSaves());
         await page.reload();
-        await page.locator('[data-action="start-game"]').click();
+        await startGameFromLobby(page);
         expect(await qualification(page)).toEqual(clean);
         // A reconnect/heartbeat while resuming the clean month cannot reapply tools.
         await expect.poll(() => popup.locator('[data-debug-connection]').textContent()).toBe("已连接主游戏");
@@ -133,7 +134,7 @@ describe("debug qualification through the real popup and save controls", () => {
         expect(achievements).toEqual([]);
       }
       // An already open panel alone also leaves the next new run clean.
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       expect(await qualification(page)).toEqual(clean);
       expect(errors).toEqual([]);
     } finally { await context.close(); }

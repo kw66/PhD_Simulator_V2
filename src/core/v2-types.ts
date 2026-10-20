@@ -357,7 +357,10 @@ export interface RoleMetaProgress {
   playedRuns: number;
   startedRuns: number;
   unlockedAchievementIds: string[];
+  /** Ordinary-role records; cursed roles retain pre-split records here without guessing their difficulty. */
   historyBest: RoleHistoryBest;
+  /** Independent personal records for each cursed challenge, stored only in the local account. */
+  historyBestByCurseDifficulty?: Partial<Record<import("./v2-curse-system").CurseDifficulty, RoleHistoryBest>>;
   unlocked: boolean;
 }
 
@@ -483,6 +486,7 @@ export interface LobbySelectedRoleViewModel {
   unlockState: RoleUnlockState;
   stats: LobbySelectedRoleStatViewModel[];
   historyStats: LobbySelectedRoleHistoryStatViewModel[];
+  historyLabel?: string;
   statistics: LobbySelectedRoleStatisticsViewModel[];
   roleAchievements: LobbySelectedRoleAchievementViewModel[];
 }

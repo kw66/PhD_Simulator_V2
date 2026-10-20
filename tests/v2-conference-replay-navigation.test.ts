@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright";
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { createServer, type ViteDevServer } from "vite";
 
 const fixture = `<!doctype html><html><body><div id="app"></div><script type="module">
@@ -59,7 +60,7 @@ describe("conference replay through real bootstrap handlers", () => {
       await page.route("**/__conference_replay_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
       await page.goto(`${server.resolvedUrls!.local[0]}__conference_replay_test__`);
       await page.waitForSelector("[data-action='start-game']:not(:disabled)");
-      await action(page, "start-game", { roleId: "normal" });
+      await startGameFromLobby(page);
       await action(page, "debug-toggle-event-replay", { debugEventReplayEnabled: "true" });
       await trackRandom(page, 0);
       await action(page, "debug-trigger-event", { eventId: "conference-activity-c" });

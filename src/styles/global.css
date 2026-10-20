@@ -5202,6 +5202,17 @@ button.pending-event-blocking-toggle.play-tooltip::after {
   scrollbar-color: #b9a071 transparent;
 }
 
+.relationship-tooltip.is-touch-tooltip {
+  pointer-events: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch hints use the viewport overlay, so sticky :hover cannot duplicate it. */
+.uses-touch-tooltips [data-tooltip]::after,
+[data-shared-tooltip-open]::after {
+  display: none !important;
+}
+
 [data-relationship-tooltip]:focus-visible {
   outline: 1px solid var(--accent-deep);
   outline-offset: 3px;

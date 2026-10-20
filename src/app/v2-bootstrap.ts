@@ -165,6 +165,10 @@ import { warmRoleDetailPortraits } from "./v2-role-portrait-assets";
 import { getAllPlayHelpPageIds, getPlayHelpContext, getPlayHelpPageIndex } from "./v2-play-help";
 import { createResponsiveScoreCharts } from "./v2-responsive-score-charts";
 import { bindLobbyPortrait } from "./v2-lobby-portrait";
+import { getStartTalentReminderPoints, renderStartTalentReminder } from "./v2-start-talent-reminder";
+import { createRoleLevelStats } from "./v2-role-level-stats";
+import { renderRoleLevelStatsOverlay } from "./v2-render-role-level-stats";
+import "../styles/role-level-stats.css";
 import "../styles/mobile-base.css";
 import "../styles/mobile-lobby.css";
 import "../styles/mobile-panels.css";
@@ -297,6 +301,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
   const achievementStats = createAchievementStats({ uploadEnabled: statisticsUploadEnabled,
     onChange: () => { if (store.getState().phase === "setup") render(); },
   });
+  const roleLevelStats = createRoleLevelStats({ uploadEnabled: statisticsUploadEnabled,
+    onChange: () => { if (isRoleLevelStatsOpen) render(); },
+  });
   const community = createCommunityMessages({ writeEnabled: statisticsUploadEnabled, onChange: () => syncCommunityView() });
   function syncCommunityView(): void {
     renderCommunityMessages(root, community);
@@ -322,6 +329,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
   let refreshTalentTree = false;
   let isFeedbackOpen = false;
   let isQuitConfirmationOpen = false;
+  let isRoleLevelStatsOpen = false;
+  let pendingTalentStart: { dataset: DOMStringMap; points: number; continuing: boolean } | null = null;
   let isRunSavePanelOpen = false;
   let activeShopTab: ShopTabId = "ai";
   let selectedChairUpgradeId: ShopUpgradeId | null = null;
@@ -959,6 +968,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
     skipNextPlayerAnimation = false;
     if (state.phase !== lastPhase) {
       isQuitConfirmationOpen = false;
+      isRoleLevelStatsOpen = false;
+      pendingTalentStart = null;
       isRunSavePanelOpen = false;
       isEndingContentOpen = true;
       labInheritancePage = 0;
@@ -1090,6 +1101,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
       researchSortMode,
       researchAuthorshipFilter,
     });
+    if (pendingTalentStart && state.phase === "setup") {
+      root.querySelector<HTMLElement>(".lobby-page")?.setAttribute("inert", "");
+      root.insertAdjacentHTML("beforeend", renderStartTalentReminder(pendingTalentStart.points, pendingTalentStart.continuing));
+    }
+    if (isRoleLevelStatsOpen && state.phase === "setup") {
+      root.querySelector<HTMLElement>(".lobby-page")?.setAttribute("inert", "");
+      root.insertAdjacentHTML("beforeend", renderRoleLevelStatsOverlay(lobby, roleLevelStats.read(lobby.selectedLobbyRoleId)));
+    }
     if (previousTalentTree) {
       // Keep the preview stable when a different part of the setup screen rerenders.
       previousTalentTree.querySelector(".lobby-talent-tree-page.is-entering")?.classList.remove("is-entering");
@@ -1273,6 +1292,9 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (isQuitConfirmationOpen) {
       root.querySelector<HTMLButtonElement>("[data-quit-initial-focus]")?.focus({ preventScroll: true });
     }
+    if (pendingTalentStart) {
+      root.querySelector<HTMLButtonElement>("[data-talent-reminder-initial-focus]")?.focus({ preventScroll: true });
+    }
 
     if (!queuedSetupPortraitWarmup && state.phase === "setup") {
       queuedSetupPortraitWarmup = true;
@@ -1282,9 +1304,19 @@ export function bootstrapApp(root: HTMLDivElement): void {
     }
   };
 
-  function executeButtonAction(dataset: DOMStringMap): void {
+  function executeButtonAction(dataset: DOMStringMap, skipTalentReminder = false): void {
     const actionId = dataset.action;
     if (!isGameActionId(actionId)) return;
+    if (actionId === "start-game" && !skipTalentReminder && store.getState().phase === "setup") {
+      const roleId = isRoleId(dataset.roleId) ? dataset.roleId : store.getLobbyState().selectedLobbyRoleId;
+      const continuing = store.hasRoleSave(roleId);
+      const points = getStartTalentReminderPoints(store.getLobbyState(), roleId, continuing, store.getRoleSaveTalentState(roleId));
+      if (points !== null) {
+        pendingTalentStart = { dataset: { ...dataset }, points, continuing };
+        render();
+        return;
+      }
+    }
     if (actionId === "quit-game") {
       if (store.getState().phase !== "playing" || store.getState().totalMonths <= 0) return;
       isQuitConfirmationOpen = true;
@@ -1408,10 +1440,10 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const finished = record.state;
     const runKey = JSON.stringify([finished.conferenceLocationSeed, finished.selectedRoleId]);
     for (const result of finished.pendingRunStatistics ?? []) {
-      statistics.enqueue(result.kind, runKey, result.fingerprint, result.payload);
+      statistics.enqueue(result.kind, runKey, result.fingerprint, result.payload, record.runId);
     }
     await visitStats.trackGamePhase("finished", { runKey, roleId: finished.selectedRoleId,
-      ending: finished.ending, finalized: true, disqualifiedByDebug: false });
+      ending: finished.ending, finalized: true, finalizedRunId: record.runId, disqualifiedByDebug: false });
     if (statistics.persistPending() && achievementQueued && achievementStats.persistPending()) store.acknowledgeFinalizedRun(record.runId);
     void statistics.flush();
     void achievementStats.flush();
@@ -1419,12 +1451,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
   store.subscribeFinalized(record => { void publishFinalizedRun(record); });
   void store.ready().then(() => {
     for (const record of store.getFinalizedOutbox()) void publishFinalizedRun(record);
+    void roleLevelStats.syncAccount(store.getLobbyState());
     render();
   });
 
   let previousConferenceState = store.getState();
   let previousRunDisqualified = store.isCurrentRunDisqualified();
   store.subscribe((state) => {
+    void roleLevelStats.syncAccount(store.getLobbyState());
     const before = previousConferenceState;
     previousConferenceState = state;
     const wasDisqualified = previousRunDisqualified;
@@ -1469,7 +1503,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     void statistics.flush(); void achievementStats.flush();
     if (store.getState().phase === "setup") void achievementStats.load();
   });
-  window.addEventListener("pagehide", () => { void store.flushSaves(); void statistics.flush(); void achievementStats.flush(); });
+  window.addEventListener("pagehide", () => { void store.flushSaves(); void statistics.flush(); void achievementStats.flush(); void roleLevelStats.flush(); });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") { void store.flushSaves(); void statistics.flush(); void achievementStats.flush(); }
   });
@@ -1570,9 +1604,55 @@ export function bootstrapApp(root: HTMLDivElement): void {
     root.querySelector<HTMLButtonElement>('[data-action="quit-game"]')?.focus({ preventScroll: true });
   }
 
+  function closeTalentReminder(goToTree = false): void {
+    pendingTalentStart = null;
+    render();
+    const target = root.querySelector<HTMLButtonElement>(goToTree
+      ? '.lobby-talent-tree-node[data-fixed="false"]:not(:disabled)'
+      : '[data-action="start-game"]');
+    target?.focus({ preventScroll: !goToTree });
+    if (goToTree) target?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  function closeRoleLevelStats(): void {
+    isRoleLevelStatsOpen = false;
+    render();
+    root.querySelector<HTMLButtonElement>("[data-ui-open-level-stats]")?.focus({ preventScroll: true });
+  }
+
   root.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    if (isRoleLevelStatsOpen) {
+      if (target.closest("[data-ui-close-level-stats]")) closeRoleLevelStats();
+      return;
+    }
+    if (target.closest("[data-ui-open-level-stats]") && store.getState().phase === "setup") {
+      isRoleLevelStatsOpen = true;
+      void roleLevelStats.load();
+      render();
+      root.querySelector<HTMLElement>(".role-level-stats-dialog")?.focus({ preventScroll: true });
+      return;
+    }
+
+    if (pendingTalentStart) {
+      if (target.closest("button[data-ui-restart-allocate-talents]")) {
+        const roleId = pendingTalentStart.dataset.roleId;
+        pendingTalentStart = null;
+        if (isRoleId(roleId) && store.retireUnallocatedRoleSave(roleId)) closeTalentReminder(true);
+        else render();
+      } else if (target.closest("button[data-ui-go-allocate-talents]")) {
+        closeTalentReminder(true);
+      } else if (target.closest("button[data-ui-close-talent-reminder]")) {
+        closeTalentReminder();
+      } else if (target.closest("button[data-ui-start-without-talents]")) {
+        const { dataset } = pendingTalentStart;
+        pendingTalentStart = null;
+        executeButtonAction(dataset, true);
+      }
+      return;
+    }
 
     const academicActButton = target.closest<HTMLButtonElement>("button[data-ui-academic-archive-act]");
     if (academicActButton && isAcademicArchivePending(store.getState())) {
@@ -2195,6 +2275,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
   });
 
   window.addEventListener("keydown", (event) => {
+    if (isRoleLevelStatsOpen) {
+      if (event.key === "Escape") { event.preventDefault(); closeRoleLevelStats(); }
+      else if (event.key === "Tab") {
+        event.preventDefault();
+        root.querySelector<HTMLButtonElement>(".role-level-stats-close")?.focus();
+      }
+      return;
+    }
     if (isAcademicArchivePending(store.getState())) {
       if (event.key === "Tab") {
         const buttons = [...root.querySelectorAll<HTMLElement>(".academic-archive-overlay button:not(:disabled), .academic-archive-overlay summary")];
@@ -2208,10 +2296,11 @@ export function bootstrapApp(root: HTMLDivElement): void {
       }
       return;
     }
-    if (isQuitConfirmationOpen) {
+    if (isQuitConfirmationOpen || pendingTalentStart) {
       if (event.key === "Escape") {
         event.preventDefault();
-        closeQuitConfirmation();
+        if (pendingTalentStart) closeTalentReminder();
+        else closeQuitConfirmation();
       } else if (event.key === "Tab") {
         const buttons = [...root.querySelectorAll<HTMLButtonElement>(".game-confirm-dialog button")];
         const first = buttons[0];

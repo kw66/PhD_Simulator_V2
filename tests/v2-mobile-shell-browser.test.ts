@@ -1,3 +1,4 @@
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
@@ -29,7 +30,7 @@ describe("mobile navigation and readable status", () => {
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
       await page.locator('.lobby-profile-achievement').first().tap();
       expect(await page.locator('#relationship-tooltip').isVisible()).toBe(false);
-      await page.locator('[data-action="start-game"]').tap();
+      await startGameFromLobby(page, true);
       const metrics = await page.evaluate(() => {
         const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
         return { documentWidth: document.documentElement.scrollWidth, statusHeight: rect('.play-left-rail').height,

@@ -291,6 +291,19 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     getSaveStatus(): string { return saveStatus; },
     getRunSaves(roleId = state.selectedRoleId) { return saves.list(roleId); },
     hasRoleSave(roleId: RoleId): boolean { return saves.list(roleId).length > 0; },
+    getRoleSaveTalentState(roleId: RoleId) {
+      const saved = saves.get(roleId)?.latest.state;
+      return saved ? { phase: saved.phase, levels: { ...saved.roleTalents?.levels } } : null;
+    },
+    retireUnallocatedRoleSave(roleId: RoleId): boolean {
+      if (!readyComplete || state.phase !== "setup" || !isRoleTalentImplemented(roleId)) return false;
+      const saved = saves.get(roleId)?.latest.state;
+      if (!saved || saved.phase !== "playing" || Object.values(saved.roleTalents?.levels ?? {}).some(level => level > 0)) return false;
+      if (!restore(roleId)) return false;
+      api.dispatch("quit-game");
+      api.dispatch("settle-and-return");
+      return state.phase === "setup" && !saves.get(roleId);
+    },
     getCurrentRunId(): string | null { return currentRunId; },
     getEndingExperienceAward() { return endingAward; },
     flushSaves(): Promise<void> { return saves.flush(); },

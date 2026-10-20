@@ -1,0 +1,230 @@
+.role-level-stats-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.role-level-stats-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: rgba(36, 38, 32, 0.44);
+  backdrop-filter: blur(3px);
+  cursor: default;
+}
+
+.role-level-stats-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(510px, 100%);
+  box-sizing: border-box;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 22px 26px 18px;
+  border: 1px solid #cbb98c;
+  border-radius: 8px;
+  color: #253632;
+  background: #f6efdf;
+  box-shadow: inset 0 1px 0 #fffaf0, 0 5px 0 rgba(132, 105, 56, 0.64), 0 22px 48px rgba(24, 29, 25, 0.3);
+}
+
+.role-level-stats-header,
+.role-level-stats-chart-heading,
+.role-level-stats-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.role-level-stats-eyebrow {
+  margin: 0 0 2px;
+  color: #83714d;
+  font-size: 12px;
+}
+
+.role-level-stats-header h2 {
+  margin: 0;
+  font-size: 23px;
+  letter-spacing: 0.04em;
+}
+
+.role-level-stats-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #d5c7a6;
+  border-radius: 50%;
+  color: #6e6044;
+  background: #eee5cf;
+  font: inherit;
+  font-size: 25px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.role-level-stats-close:hover,
+.role-level-stats-close:focus-visible {
+  border-color: #a08240;
+  background: #e7d8b4;
+}
+
+.role-level-stats-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 20px 0 18px;
+  padding: 14px 0;
+  border-block: 1px solid #ddd0ae;
+}
+
+.role-level-stats-summary > div {
+  display: grid;
+  gap: 3px;
+  text-align: center;
+}
+
+.role-level-stats-summary > div + div {
+  border-left: 1px solid #ddd0ae;
+}
+
+.role-level-stats-summary strong {
+  font-size: 24px;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.role-level-stats-summary span,
+.role-level-stats-chart-heading {
+  color: #776a50;
+  font-size: 12px;
+}
+
+.role-level-stats-own {
+  padding: 3px 8px;
+  border: 1px solid #b99a55;
+  border-radius: 3px;
+  color: #70551f;
+  background: #eadab0;
+  font-weight: 700;
+}
+
+.role-level-stats-chart {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: 7px;
+  height: 170px;
+  margin: 12px 0 15px;
+}
+
+.role-level-stats-column {
+  display: grid;
+  grid-template-rows: 18px minmax(0, 1fr) 22px;
+  gap: 3px;
+  min-width: 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.role-level-stats-count {
+  color: #827758;
+  font-size: 10px;
+  line-height: 18px;
+}
+
+.role-level-stats-track {
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 1px solid #ccbc96;
+  background: linear-gradient(to bottom, transparent 49.5%, #e4d9be 50%, transparent 50.5%);
+}
+
+.role-level-stats-bar {
+  display: block;
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: #b4b6a0;
+}
+
+.role-level-stats-level {
+  color: #6f705d;
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.role-level-stats-column.is-own-level .role-level-stats-bar {
+  background: linear-gradient(#ceb472, #ac8840);
+}
+
+.role-level-stats-column.is-own-level .role-level-stats-level {
+  color: #795714;
+  font-weight: 800;
+  box-shadow: inset 0 -2px 0 #ad8841;
+}
+
+.role-level-stats-empty {
+  display: grid;
+  place-items: center;
+  min-height: 170px;
+  color: #83775e;
+  font-size: 13px;
+}
+
+.role-level-stats-footer {
+  padding-top: 10px;
+  border-top: 1px solid #ddd0ae;
+  color: #796c50;
+  font-size: 11px;
+}
+
+.role-level-stats-note {
+  margin: 6px 0 0;
+  color: #91846a;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .role-level-stats-overlay {
+    align-items: end;
+    padding: 0;
+  }
+
+  .role-level-stats-dialog {
+    width: 100%;
+    max-height: 75dvh;
+    padding: 18px 20px calc(16px + env(safe-area-inset-bottom));
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 40px rgba(24, 29, 25, 0.22);
+  }
+
+  .role-level-stats-header h2 {
+    font-size: 21px;
+  }
+
+  .role-level-stats-summary {
+    margin: 14px 0 12px;
+    padding: 11px 0;
+  }
+
+  .role-level-stats-summary strong {
+    font-size: 22px;
+  }
+
+  .role-level-stats-chart {
+    height: 145px;
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .role-level-stats-empty {
+    min-height: 145px;
+  }
+}

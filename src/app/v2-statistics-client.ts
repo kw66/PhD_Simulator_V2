@@ -9,6 +9,10 @@ const READ_RETRY_MS = 60_000;
 const UPLOAD_INTERVAL_MS = 30_000;
 const BATCH_DELAY_MS = 500;
 const MAX_BATCH_SIZE = 50;
+// Fetch keepalive has a 64 KiB body budget shared by in-flight requests.
+// Long successful runs contain many paper diagnostics, so row count alone
+// cannot bound their upload. Leave room for the achievement outbox as well.
+export const STATISTICS_MAX_BATCH_BYTES = 48 * 1024;
 const SNAPSHOT_RPC = "get_phd_simulator_v2_stats_snapshot";
 export const STATISTICS_STORAGE_KEY = "phd_simulator_v2_statistics_v2";
 const STORAGE_KEY = STATISTICS_STORAGE_KEY;
@@ -25,7 +29,7 @@ type StatisticsStorage = Pick<Storage, "getItem" | "setItem">;
 type Payload = Record<string, unknown> & { p_id: string };
 export interface StatisticsSnapshot<T> { status: "loading" | "ready" | "unavailable"; data: T | null }
 interface CachedStats { data: unknown; fetchedAt: number; retryAt: number; stale?: boolean }
-interface QueuedResult { kind: StatisticsKind; run: string; id: string; payload?: Payload; activityDay?: string; rejected?: "future-date" }
+interface QueuedResult { kind: StatisticsKind; run: string; id: string; payload?: Payload; activityDay?: string; rejected?: "future-date"; finalizedRunId?: string }
 interface DebugQualification { revision: number; debugUsed: boolean }
 
 class ActivityDateRejection extends Error {
@@ -48,7 +52,7 @@ export interface StatisticsClient {
   startRun(run: string): Promise<void>;
   read<T>(rpc: string, key: object, parse: (value: unknown) => T): StatisticsSnapshot<T>;
   load<T>(rpc: string, key: object, parse: (value: unknown) => T): Promise<void>;
-  enqueue(kind: StatisticsKind, run: string, fingerprint: string, payload: object): boolean;
+  enqueue(kind: StatisticsKind, run: string, fingerprint: string, payload: object, finalizedRunId?: string): boolean;
   flush(): Promise<void>;
   persistPending(): boolean;
   markDebug(run: string | null): void;
@@ -116,6 +120,17 @@ function validPayload(kind: StatisticsKind, value: unknown): value is Payload {
   if (!value || typeof value !== "object") return false;
   const p = value as Payload;
   if (typeof p.p_id !== "string" || !UUID_PATTERN.test(p.p_id)) return false;
+  if (p.p_finalized_run_id !== undefined) {
+    if (typeof p.p_finalized_run_id !== "string" || !UUID_PATTERN.test(p.p_finalized_run_id)
+      || typeof p.p_fingerprint !== "string" || p.p_fingerprint.length < 1 || p.p_fingerprint.length > 1024
+      || typeof p.p_run_key !== "string" || p.p_run_key.length < 1 || p.p_run_key.length > 160
+      || (kind === "activity" && p.p_event !== "finish")) return false;
+    try {
+      const run = JSON.parse(p.p_run_key);
+      if (!Array.isArray(run) || run.length !== 2 || !Number.isFinite(run[0]) || !ROLE_IDS.has(run[1])) return false;
+      if (p.p_context != null && (p.p_context as Record<string, unknown>).runKey !== p.p_run_key) return false;
+    } catch { return false; }
+  }
   if (kind === "activity") {
     if (typeof p.p_day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(p.p_day)
       || !Number.isFinite(Date.parse(p.p_day)) || new Date(p.p_day).toISOString().slice(0, 10) !== p.p_day) return false;
@@ -222,10 +237,15 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
         if (typeof key !== "string" || !value || !STATISTICS_KINDS.includes(value.kind)
           || typeof value.run !== "string" || debugRuns.has(value.run)
           || typeof value.id !== "string" || !UUID_PATTERN.test(value.id)
+          || (value.finalizedRunId !== undefined && (typeof value.finalizedRunId !== "string" || !UUID_PATTERN.test(value.finalizedRunId)))
           || (value.payload !== undefined && (!validPayload(value.kind, value.payload) || value.payload.p_id !== value.id))) continue;
         if (activityExpired(value)) continue;
         const current = results.get(key);
-        if (!current || (current.payload !== undefined && (value.payload === undefined || current.id !== value.id))) results.set(key, value);
+        // A finalization association upgrades a legacy receipt with the same UUID.
+        // A stale tab must not replace that pending upgrade with its old receipt.
+        if (current?.finalizedRunId && !value.finalizedRunId) continue;
+        if (!current || (!current.finalizedRunId && value.finalizedRunId)
+          || (current.payload !== undefined && (value.payload === undefined || current.id !== value.id))) results.set(key, value);
       }
       if (Array.isArray(saved.cache)) for (const entry of saved.cache.slice(-128)) {
         if (!Array.isArray(entry) || entry.length !== 2) continue;
@@ -255,9 +275,14 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     } catch { return false; }
   };
   const rpc = async (name: string, payload: object): Promise<unknown> => {
+    const body = JSON.stringify(payload);
     const response = await request(`${RPC_URL}/${name}`, { method: "POST",
       headers: { apikey: PUBLIC_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify(payload), signal: AbortSignal.timeout(8000), keepalive: true });
+      body, signal: AbortSignal.timeout(8000),
+      // Normal uploads are durable in local storage and need no keepalive quota.
+      // Keep small writes alive only while the page is being hidden/unloaded.
+      keepalive: typeof document !== "undefined" && document.visibilityState === "hidden"
+        && new TextEncoder().encode(body).byteLength <= STATISTICS_MAX_BATCH_BYTES });
     if (!response.ok) {
       if (name === "record_phd_simulator_v2_stats_batch" && response.status === 422) {
         let rejected: string[] | null = null;
@@ -318,6 +343,22 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     return work;
   };
   const hasPending = (): boolean => [...results.values()].some((row) => row.payload !== undefined && !debugRuns.has(row.run));
+  const selectBatch = (): Array<[string, QueuedResult]> => {
+    const batch: Array<[string, QueuedResult]> = [];
+    for (const entry of results) {
+      const row = entry[1];
+      if (!row.payload || debugRuns.has(row.run)) continue;
+      const candidate = [...batch, entry];
+      const bytes = new TextEncoder().encode(JSON.stringify({ p_epoch: DATA_EPOCH,
+        p_records: candidate.map(([, item]) => ({ kind: item.kind, payload: item.payload })) })).byteLength;
+      // A single oversized legacy row can still be sent by normal fetch, without
+      // blocking the unrelated records behind it or silently discarding evidence.
+      if (batch.length > 0 && bytes > STATISTICS_MAX_BATCH_BYTES) break;
+      batch.push(entry);
+      if (batch.length === MAX_BATCH_SIZE || bytes >= STATISTICS_MAX_BATCH_BYTES) break;
+    }
+    return batch;
+  };
   const schedule = (): void => {
     if (!uploadEnabled || disposed || pendingUpload || uploadTimer !== null || !hasPending()) return;
     uploadTimer = setTimeout(() => { uploadTimer = null; void flush(); }, Math.max(BATCH_DELAY_MS, nextUploadAt - Date.now()));
@@ -328,7 +369,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     if (pendingUpload) return pendingUpload;
     if (Date.now() < nextUploadAt) { schedule(); return Promise.resolve(); }
     if (uploadTimer !== null) { clearTimeout(uploadTimer); uploadTimer = null; }
-    let batch = [...results.entries()].filter(([, row]) => row.payload && !debugRuns.has(row.run)).slice(0, MAX_BATCH_SIZE);
+    let batch = selectBatch();
     let activityChanged = false;
     pendingUpload = (async () => {
       try {
@@ -345,7 +386,7 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
               // A rejection receipt prevents reloads or another tab from restoring
               // the poisonous payload. Keep its identity without pretending it counted.
               results.set(key, { kind: row.kind, run: row.run, id: row.id,
-                activityDay: row.activityDay, rejected: "future-date" });
+                activityDay: row.activityDay, rejected: "future-date", ...(row.finalizedRunId ? { finalizedRunId: row.finalizedRunId } : {}) });
             }
             persist();
             // The failed batch wrote nothing. Retry its valid remainder with the
@@ -359,7 +400,8 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
             && (row.payload?.p_event === "start" || row.payload?.p_event === "finish"));
           for (const [key, row] of batch) if (acknowledged.has(row.id) && results.get(key) === row) {
             // Keep a small receipt; replaying the same result must not create a new UUID.
-            results.set(key, { kind: row.kind, run: row.run, id: row.id, ...(row.activityDay ? { activityDay: row.activityDay } : {}) });
+            results.set(key, { kind: row.kind, run: row.run, id: row.id, ...(row.activityDay ? { activityDay: row.activityDay } : {}),
+              ...(row.finalizedRunId ? { finalizedRunId: row.finalizedRunId } : {}) });
           }
           if (batch.some(([, row]) => !acknowledged.has(row.id))) throw new Error("Incomplete statistics acknowledgement");
           break;
@@ -434,16 +476,21 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     load: (name, key, parse) => activeRun === null || name === ACTIVITY_RPC ? loadCached(name, key, parse) : runLoad,
     flush,
     persistPending: () => !uploadEnabled || persist(),
-    enqueue(kind, run, fingerprint, payload) {
+    enqueue(kind, run, fingerprint, payload, finalizedRunId) {
       mergeStorage();
       if (!uploadEnabled || disposed || debugRuns.has(run)) return false;
       const key = JSON.stringify([kind, run, fingerprint]);
-      if (results.has(key)) return false;
+      const current = results.get(key);
+      if (current && (!finalizedRunId || current.finalizedRunId === finalizedRunId || current.rejected)) return false;
+      if (current?.finalizedRunId) return false;
       let id: string;
-      try { id = globalThis.crypto.randomUUID(); } catch { return false; }
-      const row = { ...payload, p_id: id };
+      try { id = current?.id ?? globalThis.crypto.randomUUID(); } catch { return false; }
+      const row: Payload = { ...payload, p_id: id, ...(finalizedRunId ? {
+        p_finalized_run_id: finalizedRunId, p_run_key: run, p_fingerprint: fingerprint,
+      } : {}), ...(kind === "activity" && current?.activityDay ? { p_day: current.activityDay } : {}) };
       if (!validPayload(kind, row)) return false;
       const entry: QueuedResult = { kind, run, id, payload: row,
+        ...(finalizedRunId ? { finalizedRunId } : {}),
         ...(kind === "activity" ? { activityDay: String(row.p_day) } : {}) };
       if (activityExpired(entry)) return false;
       results.set(key, entry);

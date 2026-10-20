@@ -15,6 +15,8 @@ interface RoleRunResult {
   runKey?: string;
   disqualifiedByDebug?: boolean;
   finalized?: boolean;
+  /** Stable account outbox identity shared with achievement finalization. */
+  finalizedRunId?: string;
 }
 interface VisitSnapshot {
   version: 2;
@@ -169,7 +171,7 @@ export function createVisitStats(options: VisitStatsOptions) {
         const payload = { p_day: getBeijingDay(now()), p_run_key: run, p_role_id: result.roleId };
         if (started) client.enqueue("activity", run, "start", { ...payload, p_event: "start" });
         if (finished && result.ending && !result.disqualifiedByDebug) {
-          client.enqueue("activity", run, "finish", { ...payload, p_event: "finish", p_ending: result.ending });
+          client.enqueue("activity", run, "finish", { ...payload, p_event: "finish", p_ending: result.ending }, result.finalizedRunId);
         }
       }
       previousPhase = phase;

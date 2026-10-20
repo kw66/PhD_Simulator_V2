@@ -1,3 +1,4 @@
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright";
@@ -83,7 +84,7 @@ describe("statistics on the actual local development configuration", () => {
       await expect.poll(() => roleStat("global-played-runs").textContent()).toBe("55");
       expect(reads).toEqual(["activity"]);
 
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       await expect.poll(() => reads.filter((rpc) => rpc === "snapshot").length).toBe(1);
       const researchStatistics = await page.evaluate(async () => {
         const load = new Function("path", "return import(path)");

@@ -1,3 +1,4 @@
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
@@ -79,7 +80,7 @@ describe("global achievement statistics in the actual game", () => {
       await expect.poll(() => page.locator('.lobby-profile-achievement').first().getAttribute('data-achievement-id')).toBe('normal:ending-master');
       for (let index = 0; index < 3; index++) await page.locator('[data-action="change-role-achievement-page"][data-delta="1"]').click();
       expect(reads).toBe(1);
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       await expect.poll(() => starts.length).toBe(1);
       for (const id of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
         await page.locator(`[data-event-choice-id="${id}"]:visible`).click();
@@ -88,7 +89,7 @@ describe("global achievement statistics in the actual game", () => {
       expect(writes).toHaveLength(0);
       const id = await page.evaluate(() => (window as unknown as TestWindow).achievementStore.getCurrentRunId());
       await page.evaluate(() => (window as unknown as TestWindow).achievementStore.dispatch("reset-game"));
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       expect(writes).toHaveLength(0);
       await page.locator('[data-action="settle-and-return"]').click();
       await expect.poll(() => writes.length).toBe(1);

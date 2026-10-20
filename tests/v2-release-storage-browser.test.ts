@@ -1,3 +1,4 @@
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -134,7 +135,7 @@ for (const engine of [chromium, webkit]) {
       await page.route("**/*", route => new URL(route.request().url()).origin === new URL(url).origin ? route.continue() : route.abort());
       try {
         await page.goto(url);
-        await page.locator('[data-action="start-game"]').tap();
+        await startGameFromLobby(page, true);
         for (const id of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
           await page.locator(`[data-event-choice-id="${id}"]:visible`).tap();
         }

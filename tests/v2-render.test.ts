@@ -726,10 +726,12 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("经验倍率");
     expect(html).toContain('class="lobby-growth-level-hint" role="note" tabindex="0" aria-label="等级0，每级+1天赋点" data-tooltip="每级+1天赋点"');
     expect(html).toContain('data-tooltip="解锁后获得10点天赋点，每升一级+1点，用于解锁天赋。"');
-    expect(html).toContain('class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率1.0，所有加经验的都乘以这个倍率。" data-tooltip="所有加经验的都乘以这个倍率。"');
-    expect(html).toContain('class="lobby-growth-inline-label lobby-growth-exp-label" role="note" tabindex="0"');
+    expect(html).toContain('class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率1.0"');
+    expect(html).toContain("完成部分成就，可永久提升对应角色的经验倍率");
+    expect(html).toContain('class="lobby-growth-exp-row" role="note" tabindex="0"');
     expect(html).not.toContain('class="lobby-growth-help"');
-    expect(html).toContain('data-tooltip="每局增加科研分✖经验倍率的经验。"');
+    expect(html).toContain("科研分 × 当前经验倍率，向下取整");
+    expect(html).toContain("成就卡标明的经验奖励，同样乘以倍率");
     expect(html).not.toContain("基础效果");
     expect(html).not.toContain("无效果");
     expect(html).toContain("经验");

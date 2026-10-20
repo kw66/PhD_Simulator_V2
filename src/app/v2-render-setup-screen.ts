@@ -274,6 +274,7 @@ function renderRoleAchievementList(selectedRoleId: RoleId, accountProfile: Accou
           <span class="lobby-profile-achievement-progress-label">成就</span>
           <strong class="lobby-profile-achievement-progress-count">${renderAnimatedNumber("achievements:unlocked", unlockedCount)}/${renderAnimatedNumber("achievements:total", definitions.length)}</strong>
         </div>
+        <button class="lobby-level-stats-button" type="button" data-ui-open-level-stats><i data-lucide="chart-no-axes-column" aria-hidden="true"></i><span>等级统计</span></button>
         <div class="lobby-role-pagination is-compact">
           <button class="lobby-page-button pager-arrow" type="button" aria-label="上一页" data-action="change-role-achievement-page" data-delta="-1"${pageIndex === 0 ? " disabled" : ""}><i data-lucide="chevron-left" aria-hidden="true"></i></button>
           <span class="achievement-page-index">${pageIndex + 1}/${pages.length}</span>
@@ -327,7 +328,7 @@ function renderGrowthProgress(
             <span class="lobby-growth-inline-label">等级</span>
             <strong class="lobby-growth-inline-value" ${animationNumberAttributes(`role:${viewModel.role.id}:growth:level`, pointSummary.level)}>${pointSummary.level}</strong>
           </span>
-          <span class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率${experienceMultiplier.toFixed(1)}，所有加经验的都乘以这个倍率。" data-tooltip="所有加经验的都乘以这个倍率。">
+          <span class="lobby-growth-multiplier-hint" role="note" tabindex="0" aria-label="经验倍率${experienceMultiplier.toFixed(1)}" data-relationship-tooltip data-tooltip="局末科研经验和成就奖励经验都会乘以此倍率。完成部分成就，可永久提升对应角色的经验倍率；具体奖励见成就卡。">
             <span class="lobby-growth-inline-label">经验倍率</span>
             <strong class="lobby-growth-inline-value">${experienceMultiplier.toFixed(1)}</strong>
           </span>
@@ -339,8 +340,8 @@ function renderGrowthProgress(
           </div>
         </div>` : `<div class="lobby-growth-exp-detail-row"><span class="lobby-talent-passive-hint" role="note" tabindex="0" data-tooltip="${passiveTalentHint}">无需加点</span></div>`}
       </div>
-      <div class="lobby-growth-exp-row">
-        <span class="lobby-growth-inline-label lobby-growth-exp-label" role="note" tabindex="0" aria-label="经验，每局增加科研分乘经验倍率的经验。" data-tooltip="每局增加科研分✖经验倍率的经验。">经验</span>
+      <div class="lobby-growth-exp-row" role="note" tabindex="0" aria-label="经验计算说明" data-relationship-tooltip data-tooltip="每局结算获得：科研分 × 当前经验倍率，向下取整。首次完成适用于该角色的成就，还会获得成就卡标明的经验奖励，同样乘以倍率。">
+        <span class="lobby-growth-inline-label lobby-growth-exp-label">经验</span>
         <div class="lobby-growth-exp-bar" aria-hidden="true">
           <span ${animationBarAttribute(`role:${viewModel.role.id}:growth:experience`)} style="width:${expProgressPercent}%;"></span>
         </div>
@@ -375,7 +376,7 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
       <div class="lobby-profile-stat-columns">
         <section class="lobby-profile-stat-column">
           <div class="lobby-profile-history-heading">
-            <h2 class="lobby-profile-stat-column-title">历史</h2>
+            <h2 class="lobby-profile-stat-column-title">${escapeHtml(viewModel.historyLabel ?? "历史")}</h2>
             <button class="lobby-profile-history-pager" type="button" data-ui-role-history-page aria-label="${historyPage === 0 ? "查看属性历史，第2页" : "查看科研历史，第1页"}"><span>${historyPage + 1}/2</span><i data-lucide="${historyPage === 0 ? "chevron-right" : "chevron-left"}" aria-hidden="true"></i></button>
           </div>
           <div class="lobby-profile-stat-stack lobby-profile-history-stack" data-role-history-page="${historyPage}" aria-live="polite">

@@ -1,6 +1,6 @@
 import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createStatisticsClient } from "../src/app/v2-statistics-client";
+import { createStatisticsClient, STATISTICS_MAX_BATCH_BYTES } from "../src/app/v2-statistics-client";
 
 type Client = ReturnType<typeof createStatisticsClient>;
 type Kind = "conference" | "journal" | "thesis";
@@ -395,6 +395,57 @@ describe("shared statistics queue", () => {
     expect(network.fetch).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
     expect(network.batches.map((batch) => batch.length)).toEqual([50, 1]);
+  });
+
+  it("splits long successful runs by UTF-8 bytes and eventually sends their passing thesis and finish", async () => {
+    const network = backend();
+    const stats = client({ fetch: network.fetch, storage: storage() });
+    const run = '[321,"normal"]';
+    const finalizedRunId = crypto.randomUUID();
+    const context = { version: 1, roleId: "normal", runKey: run, paperId: "paper", totalMonths: 65,
+      scores: Object.fromEntries(["idea", "experiment", "writing"].map(key => [key, { own: 40, collaboration: 0, total: 40 }])),
+      note: "论文".repeat(2200) };
+    for (let index = 0; index < 8; index++) {
+      expect(stats.enqueue("conference", run, `paper-${index}`, { ...PAYLOADS.conference, p_context: context }, finalizedRunId)).toBe(true);
+    }
+    expect(stats.enqueue("thesis", run, "master", PAYLOADS.thesis, finalizedRunId)).toBe(true);
+    expect(stats.enqueue("activity", run, "finish", { p_event: "finish", p_ending: "phd", p_day: "2026-11-17",
+      p_run_key: run, p_role_id: "normal" }, finalizedRunId)).toBe(true);
+    await stats.flush();
+    expect(network.rows.size).toBeLessThan(10);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(network.rows.size).toBe(10);
+    expect(network.batches.length).toBeGreaterThan(1);
+    for (const [, init] of network.fetch.mock.calls) {
+      expect(new TextEncoder().encode(String(init?.body)).byteLength).toBeLessThanOrEqual(STATISTICS_MAX_BATCH_BYTES);
+    }
+    expect([...network.rows.values()].some(row => row.payload.p_passed === true)).toBe(true);
+    expect([...network.rows.values()].some(row => row.payload.p_ending === "phd")).toBe(true);
+  });
+
+  it("upgrades legacy receipts to stable finalization identities without another raw result UUID", async () => {
+    const network = backend();
+    const local = storage();
+    const first = client({ fetch: network.fetch, storage: local });
+    const stale = client({ fetch: network.fetch, storage: local });
+    const run = '[444,"normal"]';
+    const payload = { p_event: "finish", p_ending: "phd", p_day: "2026-11-17", p_run_key: run, p_role_id: "normal" };
+    first.enqueue("activity", run, "finish", payload);
+    await first.flush();
+    const originalId = network.batches[0]![0]!.payload.p_id;
+    const finalizedRunId = crypto.randomUUID();
+    vi.setSystemTime(new Date("2026-11-18T00:00:00Z"));
+    expect(stale.enqueue("activity", run, "finish", { ...payload, p_day: "2026-11-18" }, finalizedRunId)).toBe(true);
+    expect(stale.persistPending()).toBe(true);
+    await stale.flush();
+    expect(network.batches[1]![0]!.payload).toMatchObject({ p_id: originalId, p_day: "2026-11-17",
+      p_finalized_run_id: finalizedRunId, p_fingerprint: "finish", p_run_key: run });
+    first.dispose(); stale.dispose();
+    const restored = client({ fetch: network.fetch, storage: local });
+    expect(restored.enqueue("activity", run, "finish", payload, finalizedRunId)).toBe(false);
+    await restored.flush();
+    expect(network.rows.size).toBe(1);
+    expect(network.batches).toHaveLength(2);
   });
 
   it("preserves newly queued results during an in-flight batch and sends them later", async () => {

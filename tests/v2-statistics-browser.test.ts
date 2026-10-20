@@ -1,3 +1,4 @@
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "playwright";
@@ -77,7 +78,7 @@ describe("statistics requests through the game UI", () => {
       await expect.poll(() => requests.filter((name) => name === "activity").length).toBe(1);
       expect(await page.locator('[data-role-stat="global-played-runs"][data-role-id="normal"]').textContent()).toBe("0");
       expect(requests).not.toContain("snapshot");
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       await expect.poll(() => requests.filter((name) => name === "snapshot").length).toBe(1);
       await page.waitForFunction(() => JSON.parse(localStorage.getItem("phd_simulator_v2_statistics_v2") ?? "{}").cache?.length > 0);
       await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 31_000; window.dispatchEvent(new Event("online")); });
@@ -86,7 +87,7 @@ describe("statistics requests through the game UI", () => {
       await expect.poll(() => page.locator('[data-role-stat="global-played-runs"][data-role-id="normal"]').textContent()).toBe("1");
       await expect.poll(() => page.locator('[data-role-stat="played-runs"][data-role-id="normal"]').textContent()).toBe("1");
       expect(activityCount("finish")).toBe(0);
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       expect(activityCount("start")).toBe(1);
       await page.evaluate(async () => {
         const root = "/src/core";
@@ -133,7 +134,7 @@ describe("statistics requests through the game UI", () => {
       expect(journalCount).toBe(4);
       await page.locator('[data-ui-play-tab="settings"]').click();
       await page.locator('[data-action="reset-game"]').click();
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       expect(requests.filter((name) => name === "snapshot")).toHaveLength(1);
       expect(activityCount("start")).toBe(1);
       expect(paperCount()).toBe(0);
@@ -146,7 +147,7 @@ describe("statistics requests through the game UI", () => {
       await expect.poll(paperCount).toBe(1);
       await expect.poll(() => activityCount("finish")).toBe(1);
       expect(activityCount("start")).toBe(1);
-      await page.locator('[data-action="start-game"]').click();
+      await startGameFromLobby(page);
       await expect.poll(() => requests.filter((name) => name === "snapshot").length).toBe(2);
       expect(requests).not.toContain("unexpected-individual-read");
       expect(errors).toEqual([]);

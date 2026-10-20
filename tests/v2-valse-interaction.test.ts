@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright";
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { createServer, type ViteDevServer } from "vite";
 
 const fixture = `<!doctype html><html><body><div id="app"></div><script type="module">
@@ -39,7 +40,7 @@ describe("VALSE pending event through real bootstrap handlers", () => {
     await page.route("**/__valse_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
     await page.goto(`${server.resolvedUrls!.local[0]}__valse_test__`);
     await page.waitForSelector("[data-action='start-game']:not(:disabled)");
-    await action("start-game", { roleId: "normal" });
+    await startGameFromLobby(page);
     await action("debug-shift-month", { delta: "33" });
     await action("debug-adjust-stat", { debugStatId: "money", delta: "20" });
     await action("debug-trigger-event", { eventId: "ccig" });

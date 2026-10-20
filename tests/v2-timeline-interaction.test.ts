@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { chromium, type Browser, type Page } from "playwright";
+import { startGameFromLobby } from "./helpers/v2-start-game";
 import { createServer, type ViteDevServer } from "vite";
 
 const fixture = `<!doctype html><html><body><div id="app"></div><script type="module">
@@ -61,7 +62,7 @@ describe("timeline scrolling through the real app handlers", () => {
     } catch (error) {
       throw new Error(`Timeline app did not finish starting: ${startupErrors.join("\n") || "no browser errors"}`, { cause: error });
     }
-    await action("start-game", { roleId: "normal" });
+    await startGameFromLobby(page);
     await action("debug-shift-month", { delta: "18" });
     const initialScroll = await page.locator(".event-timeline-track").evaluate(element => {
       const marker = element.querySelector<HTMLElement>(".event-timeline-marker.is-current")!;
@@ -144,7 +145,7 @@ describe("timeline scrolling through the real app handlers", () => {
   it("shows SAN changes in the month strip and opens a navigable chart", async () => {
     await action("debug-trigger-ending", { eventId: "quit" });
     await action("settle-and-return");
-    await action("start-game");
+    await startGameFromLobby(page);
     for (const choiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
       await page.locator(`.event-content-buttons [data-event-choice-id="${choiceId}"]`).click();
     }
@@ -191,7 +192,7 @@ describe("timeline scrolling through the real app handlers", () => {
   it("fits every recorded SAN month into a long-career chart with sparse axis labels", async () => {
     await action("debug-trigger-ending", { eventId: "quit" });
     await action("settle-and-return");
-    await action("start-game");
+    await startGameFromLobby(page);
     for (const choiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
       await page.locator(`.event-content-buttons [data-event-choice-id="${choiceId}"]`).click();
     }

@@ -82,6 +82,32 @@ function awardWindfall(store: Store, saves: ReturnType<typeof createRunSaveRepos
 }
 
 describe("per-role saves integrated with the store", () => {
+  it("retires only an unallocated playing save through normal one-time finalization", async () => {
+    const { store } = await harness();
+    store.dispatch("start-game", { roleId: "normal" });
+    const runId = store.getCurrentRunId();
+    finishOpening(store);
+    store.dispatch("reset-game");
+    // Lobby edits cannot retroactively allocate talents in a saved run.
+    store.upgradeRoleTalent("normal", "first-month-drive");
+    expect(store.getRoleSaveTalentState("normal")).toMatchObject({ phase: "playing", levels: {} });
+    let finalized = 0;
+    store.subscribeFinalized(() => { finalized++; });
+    expect(store.retireUnallocatedRoleSave("normal")).toBe(true);
+    expect(store.getState().phase).toBe("setup");
+    expect(store.hasRoleSave("normal")).toBe(false);
+    expect(store.getLobbyState().roleProgress.normal.startedRuns).toBe(1);
+    expect(store.getFinalizedOutbox().find(run => run.runId === runId)?.state.ending).toBe("quit");
+    expect(store.getLobbyState().achievementRewardedIds).toContain("global:ending-quit");
+    expect(store.retireUnallocatedRoleSave("normal")).toBe(false);
+    expect(finalized).toBe(1);
+    store.dispatch("start-game", { roleId: "normal" });
+    expect(store.getState().roleTalents?.levels["first-month-drive"]).toBe(1);
+    store.dispatch("reset-game");
+    expect(store.retireUnallocatedRoleSave("normal")).toBe(false);
+    expect(store.hasRoleSave("normal")).toBe(true);
+  });
+
   it("resumes latest after lobby return and browser recreation without counting another start", async () => {
     const { store, storage, adapter } = await harness();
     store.dispatch("start-game", { roleId: "normal" });
