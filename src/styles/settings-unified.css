@@ -15,10 +15,7 @@
 .run-saves-close { border: 0; padding: 3px 5px; background: transparent; color: #715936; font: inherit; font-size: 12px; cursor: pointer; }
 .run-saves-note, .run-saves-status { margin: 0; padding: 0 3px; font-size: 12px; line-height: 1.55; color: #897151; }
 .run-saves-status { color: #935941; }
-.run-saves-list { display: flex; flex-direction: column; gap: 7px; max-height: 405px; overflow-y: auto; padding: 1px 5px 3px 1px; scrollbar-width: thin; scrollbar-color: #bea675 #eee3cf; }
-.run-saves-list::-webkit-scrollbar { width: 7px; }
-.run-saves-list::-webkit-scrollbar-track { background: #eee3cf; border-radius: 9px; }
-.run-saves-list::-webkit-scrollbar-thumb { background: #bea675; border-radius: 9px; border: 1px solid #eee3cf; }
+.run-saves-list { display: flex; flex-direction: column; gap: 7px; max-height: 405px; overflow-y: auto; padding: 1px 5px 3px 1px; }
 .run-save-card { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-height: 65px; padding: 9px 11px; border: 1px solid #d8c9ac; border-radius: 5px; background: #f8f2e6; }
 .run-save-card.is-latest { border-color: #c4aa73; background: #f4e7ca; }
 .run-save-copy { min-width: 0; flex: 1; }

@@ -9,6 +9,18 @@ function getLinearChoice(event: PendingEvent): EventChoice | null {
   return branches.length === 1 && choice && !choice.disabledReason && !choice.effects.stayOnEvent ? choice : null;
 }
 
+/** Advance only an introduction that leads directly to a genuine choice. */
+export function getBranchEventIntroChoice(state: GameState, queued: EventQueueItem): EventChoice | null {
+  if (state.phase !== "playing" || !state.skipBranchEventIntro || queued.rewinderPresentation) return null;
+  const event = getResolvableQueuedEvent(state, queued);
+  if (event.stage !== "act1") return null;
+  const choice = getLinearChoice(event);
+  if (!choice || getEventChoiceRisk(state, event, choice)) return null;
+  const next = choice.effects.enqueueEvents?.filter(item => item.chainId === event.chainId) ?? [];
+  return next.length === 1 && next[0]?.stage === "act2"
+    && next[0].choices.filter(item => item.cosmetic !== true).length > 1 ? choice : null;
+}
+
 export function isLinearEvent(state: GameState, event: EventQueueItem): boolean {
   if (event.rewinderPresentation) return false;
   const visiting = new Set<PendingEvent>();

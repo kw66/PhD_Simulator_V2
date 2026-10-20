@@ -786,7 +786,7 @@ function renderLeftRail(state: GameState): string {
         <div class="new-attr-item new-currency-item" data-player-stat="money" data-stat-value="${roundMoney(state.player.money)}" aria-label="${escapeHtml(`${displayName}，${role.name}，金币 ${formatMoney(state.player.money)}`)}">
           <div class="new-attr-header new-identity-money-header">
             <span class="new-player-identity"><span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span><span class="new-player-role" title="${escapeHtml(role.name)}">${escapeHtml(role.name)}</span></span>
-            <span class="new-player-action-points" aria-label="行动点 ${remainingActions}/${state.actionState.limit}" title="行动点：剩余 / 上限"><span aria-hidden="true">👣</span>${renderAnimatedNumber("player:actions:remaining", remainingActions)}/${renderAnimatedNumber("player:actions:limit", state.actionState.limit)}</span>
+            <span class="new-player-action-points" aria-label="行动点 ${remainingActions}/${state.actionState.limit}"><span aria-hidden="true">👣</span>行动点 ${renderAnimatedNumber("player:actions:remaining", remainingActions)}/${renderAnimatedNumber("player:actions:limit", state.actionState.limit)}</span>
             <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}${getRoleTalentInvestmentLevel(state) > 0 ? `<button type="button" class="new-investment-button" data-action="invest-money" ${state.player.money < 5 || state.phase !== "playing" ? "disabled" : ""} title="投资5金币，${getRoleTalentInvestmentDuration(state)}个月后返还本金及${getRoleTalentInvestmentLevel(state)}金币利息；持有${state.roleTalents?.investments?.length ?? 0}笔">投资</button>` : ""}</span>
           </div>
         </div>
@@ -3964,7 +3964,7 @@ function renderTodoPreviewRow(item: TodoPreviewItem): string {
     <article class="todo-item todo-preview-item todo-preview-future">
       <div class="todo-preview-name"><strong class="todo-title">${escapeHtml(item.title)}</strong></div>
       <div class="event-row-status">
-        <span class="todo-deadline" data-deadline="future">${escapeHtml(item.timeText)}</span>
+        <span class="todo-deadline" data-deadline="future">${escapeHtml(item.timeText).replace(" 发生", '<span class="event-deadline-context"> 发生</span>')}</span>
       </div>
     </article>
   `;
@@ -4016,7 +4016,7 @@ function renderPendingAgendaList(state: GameState, page: PendingAgendaPage): str
               ${automatic ? '<span class="event-auto-indicator" aria-hidden="true"><i data-lucide="fast-forward"></i></span>' : ""}
             </button>
             <div class="event-row-status" id="agenda-status-${escapeHtml(item.event.id)}">
-              <span class="event-ddl-badge" data-deadline="${getEventDeadlineTone(state, item.event)}">期限 ${item.event.deadlineMonths > 0 ? `${renderAnimatedNumber(`event:${item.event.id}:agenda:deadline-months`, item.event.deadlineMonths)}月后` : renderAnimatedNumber(`event:${item.event.id}:agenda:deadline-months`, item.event.deadlineMonths, "本月")}</span>
+              <span class="event-ddl-badge" data-deadline="${getEventDeadlineTone(state, item.event)}"><span class="event-deadline-context">期限 </span>${item.event.deadlineMonths > 0 ? `${renderAnimatedNumber(`event:${item.event.id}:agenda:deadline-months`, item.event.deadlineMonths)}月后` : renderAnimatedNumber(`event:${item.event.id}:agenda:deadline-months`, item.event.deadlineMonths, "本月")}</span>
             </div>
           </article>
         `;
@@ -4382,9 +4382,9 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
   const atLastPendingPage = pendingPage.pageIndex >= pendingPage.pageCount - 1;
   const seasonLabel = getSeasonLabel(state);
   const blockLinearEvents = state.blockLinearEvents !== false;
-  const eventBlockingHint = blockLinearEvents
-    ? "无分支事件手动处理\n点击改为自动"
-    : "无分支事件到期自动处理\n点击改为手动";
+  const skipBranchEventIntro = state.skipBranchEventIntro === true;
+  const eventBlockingHint = `跳过无分支事件 · ${blockLinearEvents ? "未开启" : "已开启"}\n到期自动处理，危险事件仍需确认`;
+  const eventIntroHint = `跳过有分支事件第一幕 · ${skipBranchEventIntro ? "已开启" : "未开启"}\n打开直接进入选择，第一幕仍可回看`;
 
   return `
     <aside class="play-right-rail new-right-container" id="new-right-container">
@@ -4424,16 +4424,28 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
             </span>
             <div class="todo-nav-btns" aria-label="待办事件操作">
               <button
-                class="pending-event-blocking-toggle play-tooltip"
+                class="pending-event-blocking-toggle"
+                data-card-tooltip
                 data-card-icon-action
                 type="button"
                 data-action="set-linear-event-blocking"
                 data-ui-event-blocking="linear"
                 data-block-linear-events="${!blockLinearEvents}"
-                aria-label="无分支事件阻塞"
-                aria-pressed="${blockLinearEvents}"
+                aria-label="跳过无分支事件"
+                aria-pressed="${!blockLinearEvents}"
                 data-tooltip="${eventBlockingHint}"
-              ><i data-lucide="${blockLinearEvents ? "pause" : "play"}" aria-hidden="true"></i></button>
+              ><i data-lucide="fast-forward" aria-hidden="true"></i><span class="event-toggle-check" aria-hidden="true">✓</span></button>
+              <button
+                class="pending-event-blocking-toggle"
+                data-card-tooltip
+                data-card-icon-action
+                type="button"
+                data-action="set-event-intro-skipping"
+                data-skip-branch-event-intro="${!skipBranchEventIntro}"
+                aria-label="跳过有分支事件第一幕"
+                aria-pressed="${skipBranchEventIntro}"
+                data-tooltip="${eventIntroHint}"
+              ><i data-lucide="git-fork" aria-hidden="true"></i><span class="event-toggle-check" aria-hidden="true">✓</span></button>
               <nav class="compact-pagination" aria-label="待办事件分页">
               <button class="todo-nav-btn pager-arrow" id="pending-nav-prev" type="button" data-ui-pending-nav="prev" aria-label="上一页" ${atFirstPendingPage ? "disabled" : ""}><i data-lucide="chevron-left" aria-hidden="true"></i></button>
               <span class="pagination-count" aria-live="polite" aria-atomic="true">${pendingPage.pageIndex + 1}/${pendingPage.pageCount}</span>

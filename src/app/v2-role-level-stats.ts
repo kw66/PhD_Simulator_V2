@@ -35,6 +35,10 @@ export interface RoleLevelStatsOptions {
   now?: () => number;
   onChange?: () => void;
 }
+export interface RoleLevelStatsSyncOptions {
+  /** Backfill existing players without uploading level changes outside settlement. */
+  missingOnly?: boolean;
+}
 
 function browserStorage(): StatsStorage | null {
   try { return globalThis.localStorage ?? null; } catch { return null; }
@@ -85,7 +89,6 @@ export function createRoleLevelStats(options: RoleLevelStatsOptions = {}) {
   const pending = new Map<string, LevelRow>();
   const acknowledged = new Map<string, LevelRow>();
   let snapshot: RemoteSnapshot | null = null;
-  let snapshotReceipt = "";
   let fetchedAt = 0;
   let readRetryAt = 0;
   let uploadRetryAt = 0;
@@ -105,10 +108,6 @@ export function createRoleLevelStats(options: RoleLevelStatsOptions = {}) {
       if ((acknowledged.get(key)?.level ?? -1) >= row.level) pending.delete(key);
     }
   };
-  // Receipt fingerprints invalidate a cached distribution after a successful
-  // upgrade, including upgrades made in another tab at the same timestamp.
-  const receiptFingerprint = (): string => [...acknowledged.entries()]
-    .map(([key, row]) => `${key}:${row.level}`).sort().join("|");
   const mergeStorage = (): void => {
     try {
       const saved = JSON.parse(storage?.getItem(ROLE_LEVEL_STATS_STORAGE_KEY) ?? "null");
@@ -124,7 +123,6 @@ export function createRoleLevelStats(options: RoleLevelStatsOptions = {}) {
         && (!snapshot || saved.fetchedAt > fetchedAt)) {
         try {
           snapshot = parseSnapshot(saved.snapshot); fetchedAt = saved.fetchedAt;
-          snapshotReceipt = typeof saved.snapshotReceipt === "string" ? saved.snapshotReceipt : "";
         } catch { /* Keep the outbox if a cache is corrupt. */ }
       }
     } catch { /* Storage failure must not block read-only statistics. */ }
@@ -135,7 +133,7 @@ export function createRoleLevelStats(options: RoleLevelStatsOptions = {}) {
     try {
       mergeStorage();
       storage.setItem(ROLE_LEVEL_STATS_STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH,
-        savedAt: new Date(now()).toISOString(), pending: [...pending.values()], acknowledged: [...acknowledged.values()], snapshot, fetchedAt, snapshotReceipt }));
+        savedAt: new Date(now()).toISOString(), pending: [...pending.values()], acknowledged: [...acknowledged.values()], snapshot, fetchedAt }));
     } catch { /* A later account sync retries a snapshot that could not be persisted. */ }
   };
   const getPlayerId = (): string | null => {
@@ -191,15 +189,14 @@ export function createRoleLevelStats(options: RoleLevelStatsOptions = {}) {
   };
   const load = (): Promise<void> => {
     mergeStorage();
-    if (disposed || (snapshot && snapshotReceipt === receiptFingerprint() && now() - fetchedAt < CACHE_MS)
+    if (disposed || (snapshot && now() - fetchedAt < CACHE_MS)
       || now() < readRetryAt) return Promise.resolve();
     if (loading) return loading;
     loading = (async () => {
       try {
-        const receipt = receiptFingerprint();
         const received = parseSnapshot(await rpc(READ_RPC, {}));
         if (disposed) return;
-        snapshot = received; fetchedAt = now(); snapshotReceipt = receipt; readRetryAt = 0; persist();
+        snapshot = received; fetchedAt = now(); readRetryAt = 0; persist();
       } catch { readRetryAt = now() + 60_000; }
     })().finally(() => { loading = null; if (!disposed) options.onChange?.(); });
     return loading;
@@ -208,7 +205,7 @@ export function createRoleLevelStats(options: RoleLevelStatsOptions = {}) {
   if (typeof window !== "undefined") window.addEventListener("online", online);
   schedule();
   return {
-    async syncAccount(account: AccountProfile): Promise<void> {
+    async syncAccount(account: AccountProfile, syncOptions: RoleLevelStatsSyncOptions = {}): Promise<void> {
       if (!uploads || disposed) return;
       const identity = getPlayerId();
       if (!identity) return;
@@ -216,7 +213,9 @@ export function createRoleLevelStats(options: RoleLevelStatsOptions = {}) {
       for (const role of getRoleOptions()) {
         const progress = account.roleProgress[role.id];
         if (!progress?.unlocked || !validLevel(progress.level)) continue;
-        mergeRow(pending, { playerId: identity, roleId: role.id, level: progress.level });
+        const row = { playerId: identity, roleId: role.id, level: progress.level };
+        if (syncOptions.missingOnly && acknowledged.has(keyOf(row))) continue;
+        mergeRow(pending, row);
       }
       prune();
       if (pending.size) persist();

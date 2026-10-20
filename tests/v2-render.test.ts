@@ -1901,7 +1901,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('id="pending-event-list"');
     expect(html).toContain('class="event-card"');
     expect(html).toContain('data-ui-open-event-id=');
-    expect(html).toMatch(/class="event-ddl-badge" data-deadline="(?:blocking|pending)">期限 /);
+    expect(html).toMatch(/class="event-ddl-badge" data-deadline="(?:blocking|pending)"><span class="event-deadline-context">期限 <\/span>/);
     expect(html).not.toContain('class="event-card-row"');
     expect(html).not.toContain('class="event-card-preview"');
     expect(html).toContain('id="workstation-section"');
@@ -4857,10 +4857,11 @@ describe("v2 render lobby shell", () => {
   it("keeps long interactive tooltips compact and multiline", () => {
     const state = createAdmittedTestState();
     const html = renderApp(state, createDefaultAccountProfile());
-    expect(html).toContain("pending-event-blocking-toggle play-tooltip");
-    expect(html).toContain("无分支事件手动处理\n点击改为自动");
+    expect(html).toContain("pending-event-blocking-toggle");
+    expect(html).toContain("跳过无分支事件 · 未开启\n到期自动处理，危险事件仍需确认");
     expect(renderApp({ ...state, blockLinearEvents: false }, createDefaultAccountProfile()))
-      .toContain("无分支事件到期自动处理\n点击改为手动");
+      .toContain("跳过无分支事件 · 已开启\n到期自动处理，危险事件仍需确认");
+    expect(html).toContain('aria-label="跳过有分支事件第一幕"');
     expect(html).toContain("class=\"new-attr-level attr-level-research\"");
   });
 

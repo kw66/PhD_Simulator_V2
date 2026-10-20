@@ -121,7 +121,7 @@ export function createDebugEnding(state: GameState, ending: NonNullable<EndingId
     setupSelectedRoleId: state.selectedRoleId,
     playerName: state.playerName ?? "调试同学",
     selectedAdvisorName: advisorName,
-    blockLinearEvents: state.blockLinearEvents,
+    blockLinearEvents: state.blockLinearEvents, skipBranchEventIntro: state.skipBranchEventIntro,
     debugEventReplayEnabled: state.debugEventReplayEnabled,
     degree, phdStartYear: degree === "phd" ? 3 : null,
     ...calendar, totalMonths, maxMonths,

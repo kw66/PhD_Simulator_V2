@@ -35,8 +35,7 @@
 }
 
 .role-level-stats-header,
-.role-level-stats-chart-heading,
-.role-level-stats-footer {
+.role-level-stats-chart-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -175,20 +174,6 @@
   min-height: 170px;
   color: #83775e;
   font-size: 13px;
-}
-
-.role-level-stats-footer {
-  padding-top: 10px;
-  border-top: 1px solid #ddd0ae;
-  color: #796c50;
-  font-size: 11px;
-}
-
-.role-level-stats-note {
-  margin: 6px 0 0;
-  color: #91846a;
-  font-size: 10px;
-  line-height: 1.5;
 }
 
 @media (max-width: 760px) {

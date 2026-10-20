@@ -46,7 +46,6 @@
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
-    scrollbar-width: thin;
   }
   .lobby-page[data-scale-mode="fixed"] .lobby-role-row { display: contents; }
   .lobby-page[data-scale-mode="fixed"] .lobby-role-card {

@@ -35,13 +35,13 @@ export function dispatchSetupAction(
       }
       let startedState = {
         ...createStartedGameState(roleId, payload.talentAllocation, payload.bonusTalentPoints, payload.curseDifficulty, payload.captainTagLevels, payload.rewinderArchive, payload.rewinderCycleNumber),
-        blockLinearEvents: state.blockLinearEvents,
+        blockLinearEvents: state.blockLinearEvents, skipBranchEventIntro: state.skipBranchEventIntro,
         debugEventReplayEnabled: state.debugEventReplayEnabled,
       };
       if (roleId === "rewinder" && usesGameplayRulesFrom("20261018-r9")) {
         const academic = initializeAcademicRun(startedState, payload.rewinderAcademicArchive, payload.rewinderStartYear ?? 1);
         if (!academic) return state;
-        startedState = { ...academic, blockLinearEvents: state.blockLinearEvents, debugEventReplayEnabled: state.debugEventReplayEnabled };
+        startedState = { ...academic, blockLinearEvents: state.blockLinearEvents, skipBranchEventIntro: state.skipBranchEventIntro, debugEventReplayEnabled: state.debugEventReplayEnabled };
         if ((payload.rewinderStartYear ?? 1) > 1) return startedState;
       }
       return enqueueEventQueueItem(
@@ -52,7 +52,7 @@ export function dispatchSetupAction(
     case "reset-game":
       return {
         ...createInitialState(),
-        blockLinearEvents: state.blockLinearEvents,
+        blockLinearEvents: state.blockLinearEvents, skipBranchEventIntro: state.skipBranchEventIntro,
         debugEventReplayEnabled: state.debugEventReplayEnabled,
       };
     default:

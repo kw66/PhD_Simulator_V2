@@ -57,7 +57,6 @@
 .talent-panel .talent-items-list {
   gap: 12px;
   padding: 2px 5px 7px 2px;
-  scrollbar-color: #b9a071 transparent;
 }
 
 .talent-panel .talent-items-list[data-talent-panel-tab="relation"] {

@@ -1,0 +1,52 @@
+/* Share the message board's paper-and-gold scrollbars across every screen. */
+:root {
+  --scrollbar-size: 9px;
+  --scrollbar-track: rgba(76, 85, 72, 0.09);
+  --scrollbar-thumb: #ad9463;
+  --scrollbar-thumb-hover: #8b703f;
+  --scrollbar-border: #f2eadb;
+}
+
+/* Firefox uses the standard scrollbar properties. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Non-auto standard values override these pseudo-elements in newer Chromium. */
+@supports selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  *::-webkit-scrollbar-track {
+    border-radius: 5px;
+    background: var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 2px solid var(--scrollbar-border);
+    border-radius: 5px;
+    background: var(--scrollbar-thumb);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}

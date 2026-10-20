@@ -1,3 +1,5 @@
+@import "./scrollbars.css";
+
 :root {
   color-scheme: light;
   --setup-stage-width: 1540px;
@@ -1439,27 +1441,6 @@ p {
   overflow-y: auto;
   padding-right: 6px;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: #ad9463 rgba(76, 85, 72, 0.09);
-}
-
-.community-message-list::-webkit-scrollbar {
-  width: 9px;
-}
-
-.community-message-list::-webkit-scrollbar-track {
-  border-radius: 5px;
-  background: rgba(76, 85, 72, 0.09);
-}
-
-.community-message-list::-webkit-scrollbar-thumb {
-  border: 2px solid #f2eadb;
-  border-radius: 5px;
-  background: #ad9463;
-}
-
-.community-message-list::-webkit-scrollbar-thumb:hover {
-  background: #8b703f;
 }
 
 .community-message-item {
@@ -4104,8 +4085,6 @@ button.pager-arrow:disabled {
   gap: 4px;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 transparent;
 }
 
 .lobby-profile-achievement {
@@ -5198,8 +5177,6 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 
 .relationship-tooltip.is-achievement-tooltip {
   pointer-events: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 transparent;
 }
 
 .relationship-tooltip.is-touch-tooltip {
@@ -8411,8 +8388,6 @@ button[data-card-icon-action]:focus-visible {
   padding: 2px 5px 7px 2px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(95, 91, 79, 0.3) transparent;
   animation: shopTabEnter 220ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
 }
 
@@ -9685,8 +9660,6 @@ button[data-card-icon-action]:focus-visible {
   padding: 2px 5px 7px 2px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(95, 91, 79, 0.3) transparent;
   animation: shopTabEnter 220ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
 }
 
@@ -11015,7 +10988,7 @@ button[data-card-icon-action]:focus-visible {
 .journal-chart-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 9px; color: #6c665b; font-size: 12px; }
 .journal-chart-summary strong { color: #338064; }
 .journal-chart-summary span:last-child { margin-left: auto; }
-.journal-chart-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; background: #f8f6f0; border: 1px solid #e5ddcd; scrollbar-color: #b8a67f #f0ece3; scrollbar-width: thin; }
+.journal-chart-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; background: #f8f6f0; border: 1px solid #e5ddcd; }
 .journal-score-chart { display: block; max-width: none; }
 .journal-chart-grid { stroke: #e3ddd1; stroke-width: 1; }
 .journal-chart-threshold { stroke: #c19958; stroke-width: 1.5; stroke-dasharray: 5 4; }
@@ -11679,7 +11652,6 @@ button[data-card-icon-action]:focus-visible {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
-    scrollbar-width: thin;
   }
 
   .lobby-page[data-scale-mode="fixed"] .lobby-role-row {
@@ -12109,7 +12081,6 @@ button:disabled {
   padding: 8px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .research-section .research-paper-row {
@@ -12829,7 +12800,6 @@ button:disabled {
   padding: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .research-section .research-paper-row {
@@ -14396,8 +14366,6 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
   border-radius: 0;
   background: #f5ead5;
   box-shadow: none;
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 transparent;
 }
 
 .center-main-panel[data-tab-panel="events"] .event-timeline-marker {
@@ -14749,8 +14717,6 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
 
 .center-main-panel[data-tab-panel="events"] .event-log-content {
   padding: 1px 6px 8px;
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 transparent;
 }
 
 .center-main-panel[data-tab-panel="events"] .log-entry {
@@ -14770,8 +14736,6 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
 
 .new-pending-event-section .new-pending-event-content {
   padding: 2px 1px 8px;
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 transparent;
 }
 
 .new-pending-event-section .pending-event-row,
@@ -14813,11 +14777,41 @@ button.pending-event-blocking-toggle.play-tooltip:focus-visible::after {
   color: #4f3c24;
 }
 
-.new-calendar-header .pending-event-blocking-toggle[aria-pressed="false"] {
+.new-calendar-header .pending-event-blocking-toggle[aria-pressed="true"] {
   border-color: #aebda7;
   background: #e8efe2;
   color: #536d50;
 }
+
+.new-calendar-header .pending-event-blocking-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.pending-event-blocking-toggle .event-toggle-check {
+  display: none;
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 13px;
+  height: 13px;
+  border: 1px solid #fff8e9;
+  border-radius: 50%;
+  background: #536d50;
+  color: white;
+  font: 800 10px/12px sans-serif;
+  text-align: center;
+}
+
+.pending-event-blocking-toggle[aria-pressed="true"] .event-toggle-check { display: block; }
 
 .new-time-row .new-time-display-toggle svg,
 .new-calendar-header .pending-event-blocking-toggle svg {

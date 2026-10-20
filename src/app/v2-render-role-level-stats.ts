@@ -40,8 +40,6 @@ export function renderRoleLevelStatsOverlay(account: AccountProfile, snapshot: R
       </div>
       <div class="role-level-stats-chart-heading"><span>等级分布</span>${ownLevel === null ? "" : `<span class="role-level-stats-own">我的 Lv.${ownLevel}</span>`}</div>
       ${chart}
-      <footer class="role-level-stats-footer"><span>已解锁玩家 · 按浏览器去重</span><span>${populated ? `满级 ${data.maxLevelPlayers} 人` : ""}</span></footer>
-      <p class="role-level-stats-note">每个角色只记录最高等级，升级后更新；数据每10分钟刷新。</p>
     </section>
   </div>`;
 }

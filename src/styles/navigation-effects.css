@@ -155,17 +155,6 @@
   padding: 5px 0;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 transparent;
-}
-
-.new-effect-grid .new-effect-section::-webkit-scrollbar {
-  width: 5px;
-}
-
-.new-effect-grid .new-effect-section::-webkit-scrollbar-thumb {
-  border-radius: 5px;
-  background: #b9a071;
 }
 
 .new-effect-grid .new-effect-section:nth-child(1) {
@@ -225,17 +214,6 @@
   display: contents;
 }
 
-.new-effect-grid .new-effect-list::-webkit-scrollbar,
-.new-effect-source-box::-webkit-scrollbar {
-  width: 5px;
-}
-
-.new-effect-grid .new-effect-list::-webkit-scrollbar-thumb,
-.new-effect-source-box::-webkit-scrollbar-thumb {
-  border-radius: 5px;
-  background: #b9a071;
-}
-
 .new-effect-panel .new-effect-list .effect-chip {
   min-height: 22px;
   padding: 1px 7px;
@@ -281,8 +259,6 @@
   max-height: none;
   align-content: start;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 transparent;
 }
 
 #new-effect-section-source .effect-source-text {

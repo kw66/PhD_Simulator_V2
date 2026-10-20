@@ -17,7 +17,7 @@ export function createDebugRewinderYear(state: GameState): GameState {
   const current: GameState = {
     ...base, year: 1, month: 12, totalMonths: 12,
     playerName: state.playerName, selectedAdvisorName: state.selectedAdvisorName || "陈老师",
-    randomState: state.randomState, blockLinearEvents: state.blockLinearEvents,
+    randomState: state.randomState, blockLinearEvents: state.blockLinearEvents, skipBranchEventIntro: state.skipBranchEventIntro,
     debugEventReplayEnabled: state.debugEventReplayEnabled,
     availableRandomEvents: [], pendingRandomEvents: [], eventQueue: [],
     player: { san: 16, research: 5, social: 8, favor: 7, money: 40 },

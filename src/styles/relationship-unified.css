@@ -140,8 +140,6 @@
   border-radius: 5px;
   background: #fff9ed;
   box-shadow: 0 6px 18px rgba(61, 43, 17, 0.2);
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 #f5e9d0;
 }
 
 .rel-card-grid > .rel-card:nth-last-child(-n + 2) .rel-activity-history-panel {

@@ -22,6 +22,7 @@ export const GAME_ACTION_IDS = [
   "change-role-achievement-page",
   "set-date-display-mode",
   "set-linear-event-blocking",
+  "set-event-intro-skipping",
   "select-paper",
   "create-paper",
   "reroll-paper-topic",

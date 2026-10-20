@@ -125,6 +125,7 @@ import { createRelationshipTooltips } from "./v2-relationship-tooltips";
 import { createDebugWindow } from "./v2-debug-window";
 import { RESEARCH_PAGE_SIZE, renderEventLayoutSamples, renderRelationTalentCard } from "./v2-render-play";
 import { getCurrentEvent, getEventRootId, getSortedEventQueue } from "../core/v2-event-queue";
+import { getBranchEventIntroChoice } from "../core/v2-event-auto-resolution";
 import { getRoleOptions, isPreEnrollmentState } from "../core/v2-progression";
 import { getAttributeTier } from "../core/v2-random-event-rules";
 import { getAvailablePaperSlotCount } from "../core/v2-paper-rules";
@@ -794,7 +795,24 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeEventChainId = nextEvent.chainId;
     activeEventRootId = getEventRootId(nextEvent);
     activeEventHistoryIndex = null;
+    const introChoice = getBranchEventIntroChoice(state, nextEvent);
+    if (introChoice) store.dispatch("resolve-event", { eventId: nextEvent.id, eventChoiceId: introChoice.id });
     render();
+    scrollToEventContent();
+  };
+
+  const scrollToEventContent = (): void => {
+    if (!window.matchMedia("(max-width: 820px)").matches) return;
+    requestAnimationFrame(() => {
+      const content = root.querySelector<HTMLElement>("#event-content-box:not([hidden])");
+      if (!content) return;
+      const tabs = root.querySelector<HTMLElement>(".center-main-tabs");
+      const offset = (tabs?.getBoundingClientRect().height ?? 0) + 12;
+      const top = content.getBoundingClientRect().top;
+      // Keep the event heading visible below the sticky operation bar.
+      if (top < offset || top > offset + 24) window.scrollBy({ top: top - offset,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+    });
   };
 
   const openEventHistoryContent = (eventHistoryId: string): void => {
@@ -815,6 +833,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     activeEventRootId = null;
     activeEventHistoryIndex = null;
     render();
+    scrollToEventContent();
   };
 
   const closeEventContent = (): void => {
@@ -1405,6 +1424,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       delta: typeof dataset.delta === "string" ? Number(dataset.delta) : undefined,
       dateDisplayMode: isDateDisplayMode(dataset.dateDisplayMode) ? dataset.dateDisplayMode : undefined,
       blockLinearEvents: dataset.blockLinearEvents === undefined ? undefined : dataset.blockLinearEvents === "true",
+      skipBranchEventIntro: dataset.skipBranchEventIntro === undefined ? undefined : dataset.skipBranchEventIntro === "true",
       shopItemId: typeof dataset.shopItemId === "string" ? dataset.shopItemId as ShopItemId : undefined,
       shopUpgradeId: typeof dataset.shopUpgradeId === "string"
         ? dataset.shopUpgradeId as ShopUpgradeId | Exclude<CoffeeMachineUpgradeId, null>
@@ -1427,6 +1447,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const openingEvent = store.getState().eventQueue.find((event) => event.chainId === "before-grad-school");
       if (openingEvent) openEventContent(openingEvent.id);
     }
+    if ((actionId === "set-linear-event-blocking" || actionId === "set-event-intro-skipping")
+      && window.matchMedia("(hover: none)").matches) {
+      requestAnimationFrame(() => {
+        const toggle = root.querySelector<HTMLElement>(`[data-action="${actionId}"]`);
+        if (toggle) relationshipTooltips.showActionHint(toggle);
+      });
+    }
   }
 
   const debugWindow = createDebugWindow(
@@ -1448,17 +1475,26 @@ export function bootstrapApp(root: HTMLDivElement): void {
     void statistics.flush();
     void achievementStats.flush();
   };
-  store.subscribeFinalized(record => { void publishFinalizedRun(record); });
+  store.subscribeFinalized(record => {
+    void roleLevelStats.syncAccount(store.getLobbyState());
+    void publishFinalizedRun(record);
+  });
   void store.ready().then(() => {
     for (const record of store.getFinalizedOutbox()) void publishFinalizedRun(record);
-    void roleLevelStats.syncAccount(store.getLobbyState());
+    void roleLevelStats.syncAccount(store.getLobbyState(), { missingOnly: true });
     render();
   });
 
   let previousConferenceState = store.getState();
   let previousRunDisqualified = store.isCurrentRunDisqualified();
+  const knownUnlockedRoles = new Set(getRoleOptions().filter(role => store.getLobbyState().roleProgress[role.id].unlocked).map(role => role.id));
   store.subscribe((state) => {
-    void roleLevelStats.syncAccount(store.getLobbyState());
+    const account = store.getLobbyState();
+    const newlyUnlocked = getRoleOptions().filter(role => account.roleProgress[role.id].unlocked && !knownUnlockedRoles.has(role.id));
+    if (newlyUnlocked.length) {
+      newlyUnlocked.forEach(role => knownUnlockedRoles.add(role.id));
+      void roleLevelStats.syncAccount(account);
+    }
     const before = previousConferenceState;
     previousConferenceState = state;
     const wasDisqualified = previousRunDisqualified;

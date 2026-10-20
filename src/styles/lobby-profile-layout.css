@@ -71,16 +71,38 @@
 
   .lobby-page .lobby-profile-growth-card .lobby-talent-tree.is-designed-tree {
     --lobby-talent-node-height: 208px;
-    --lobby-talent-detail-height: 152px;
+    height: auto;
+  }
+
+  /* Let short descriptions end naturally and longer ones grow without clipping. */
+  .lobby-page .is-designed-tree .lobby-talent-tree-pages {
+    position: relative;
+    inset: auto;
+    padding-top: var(--lobby-talent-top-space);
+  }
+
+  .lobby-page .is-designed-tree .lobby-talent-tree-page {
+    position: relative;
+    inset: auto;
+    grid-template-rows: repeat(3, calc(var(--lobby-talent-node-height) / 3)) auto;
+  }
+
+  .lobby-page .is-captain-tag-tree .lobby-talent-tree-page {
+    grid-template-rows: repeat(2, calc(var(--lobby-talent-node-height) / 2)) auto;
+  }
+
+  .lobby-page .is-designed-tree .lobby-normal-tree-details {
+    position: relative;
+    inset: auto;
+    grid-column: 1 / -1;
+    grid-row: -2 / -1;
+    height: auto;
+    margin-top: var(--lobby-talent-caption-gap);
   }
 }
 
 @media (max-width: 360px) {
   .lobby-page .lobby-profile-summary {
     min-height: calc(6 * 1.45em);
-  }
-
-  .lobby-page .lobby-profile-growth-card .lobby-talent-tree.is-designed-tree {
-    --lobby-talent-detail-height: 180px;
   }
 }

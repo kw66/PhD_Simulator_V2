@@ -194,7 +194,7 @@ export function getAllPlayHelpPageIds(): string[] {
 export function renderPlayHelpInlineToggle(uiState: PlayRenderUiState = {}): string {
   const context = getPlayHelpContext(uiState);
   if (context.pages.length === 0) return "";
-  return `<button class="play-help-toggle play-help-inline-toggle" type="button" data-ui-help-toggle aria-controls="play-help-panel" aria-expanded="${uiState.isHelpOpen === true}" aria-label="小提示" title="小提示"><span aria-hidden="true">💡</span></button>`;
+  return `<button class="play-help-toggle play-help-inline-toggle" type="button" data-ui-help-toggle aria-controls="play-help-panel" aria-expanded="${uiState.isHelpOpen === true}" aria-label="小提示"><span aria-hidden="true">💡</span><span>小提示</span></button>`;
 }
 
 export function renderPlayHelpPanel(uiState: PlayRenderUiState = {}): string {

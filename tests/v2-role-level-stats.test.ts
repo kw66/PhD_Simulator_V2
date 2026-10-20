@@ -49,6 +49,30 @@ describe("per-role player level statistics", () => {
     expect(readSaved(saved).pending).toEqual([]);
   });
 
+  it("backfills missing browser records without uploading already-recorded level changes", async () => {
+    const saved = storage();
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(true));
+    const client = create({ storage: saved, fetch });
+    const account = createDefaultAccountProfile();
+    account.roleProgress.normal.level = 3;
+    await client.syncAccount(account, { missingOnly: true });
+    expect(body(fetch.mock.calls[0]).p_levels).toEqual({ normal: 3 });
+
+    account.roleProgress.normal.level = 5;
+    account.roleProgress.genius.unlocked = true;
+    await client.syncAccount(account, { missingOnly: true });
+    expect(body(fetch.mock.calls[1]).p_levels).toEqual({ genius: 0 });
+    await client.syncAccount(account, { missingOnly: true });
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    await client.syncAccount(account);
+    expect(body(fetch.mock.calls[2]).p_levels).toEqual({ normal: 5 });
+    const restored = create({ storage: saved, fetch });
+    account.roleProgress.normal.level = 6;
+    await restored.syncAccount(account, { missingOnly: true });
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
   it("never uploads or generates identities when disabled, while public reads still work", async () => {
     const saved = storage();
     saved.setItem(VISITOR_KEY, "");
@@ -126,13 +150,19 @@ describe("per-role player level statistics", () => {
     await even.load(); expect(even.read("normal").data?.medianLevel).toBe(1.5);
   });
 
-  it("invalidates a fresh cache after an upgrade, including another tab's same-time upgrade", async () => {
+  it("keeps a fresh cache after uploads and refreshes only on an open after ten minutes", async () => {
     const saved = storage();
     const fetch = vi.fn<typeof globalThis.fetch>(async input => Response.json(String(input).includes("get_") ? snapshot : true));
     const first = create({ storage: saved, fetch }); await first.load();
     const second = create({ storage: saved, fetch });
     const account = createDefaultAccountProfile(); account.roleProgress.normal.level = 3;
     await second.syncAccount(account);
+    await first.load();
+    expect(fetch.mock.calls.filter(call => String(call[0]).includes("get_"))).toHaveLength(1);
+    const restored = create({ storage: saved, fetch }); await restored.load();
+    expect(fetch.mock.calls.filter(call => String(call[0]).includes("get_"))).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(fetch.mock.calls.filter(call => String(call[0]).includes("get_"))).toHaveLength(1);
     await first.load();
     expect(fetch.mock.calls.filter(call => String(call[0]).includes("get_"))).toHaveLength(2);
     await first.load(); expect(fetch).toHaveBeenCalledTimes(3);
@@ -195,7 +225,8 @@ describe("per-role player level statistics", () => {
     expect(markup).toContain('role="dialog"'); expect(markup).toContain('aria-modal="true"');
     expect(markup.match(/class="role-level-stats-column/g)).toHaveLength(11);
     expect(markup).toContain("我的 Lv.2"); expect(markup).toContain("2级：2位玩家，我的等级");
-    expect(markup).toContain("满级 1 人"); expect(markup).toContain("按浏览器去重");
+    expect(markup).not.toContain("满级 1 人"); expect(markup).not.toContain("按浏览器去重");
+    expect(markup).not.toContain("每个角色只记录最高等级"); expect(markup).not.toContain("10分钟");
     expect(markup).toContain("data-ui-close-level-stats");
     for (const status of ["loading", "unavailable"] as const) {
       const pending = renderRoleLevelStatsOverlay(account, { status, data: null });

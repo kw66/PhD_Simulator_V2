@@ -230,7 +230,7 @@
 .graduation-review-legend .is-point-2::before { background: #9b85bb; }
 .graduation-review-legend .is-point-3::before { background: #70a08d; }
 .graduation-review-legend .is-total::before { background: #bd9554; }
-.graduation-review-chart-scroll { max-width: 100%; overflow-x: auto; border: 1px solid #e4ddcf; background: #f9f7f1; scrollbar-width: thin; scrollbar-color: #b8a67f #f0ece3; }
+.graduation-review-chart-scroll { max-width: 100%; overflow-x: auto; border: 1px solid #e4ddcf; background: #f9f7f1; }
 .graduation-review-chart { display: block; max-width: none; }
 .graduation-review-chart text { fill: #77766e; font: 11px var(--ui-font-cjk); }
 .graduation-review-grid { stroke: #e2ded3; stroke-width: 1; }

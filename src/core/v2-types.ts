@@ -836,6 +836,7 @@ export interface GameState extends RandomEventState {
   roleTalents?: import("./v2-role-talent-state").RoleTalentRunState;
   labFinanceLedger?: { totalMonths: number; amounts: Partial<Record<LabFinanceCategory, number>> };
   blockLinearEvents: boolean;
+  skipBranchEventIntro?: boolean;
   debugEventReplayEnabled?: boolean;
   debugSkippedJournalFeePaperIds?: string[];
   phase: GamePhase;
@@ -928,6 +929,7 @@ export interface DispatchPayload {
   bonusTalentPoints?: number;
   talentAllocation?: Record<string, number> | undefined;
   blockLinearEvents?: boolean | undefined;
+  skipBranchEventIntro?: boolean | undefined;
   roleId?: RoleId | undefined;
   paperId?: string | undefined;
   paperSlotIndex?: number | undefined;

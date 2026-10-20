@@ -222,7 +222,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
           <span>本局经验 <strong>+${award.gained}</strong></span>
           <span>等级 <strong>Lv${award.previousLevel}${award.level > award.previousLevel ? ` → Lv${award.level}` : ""}</strong></span>
           <span>经验 <strong>${award.exp}/${nextLevelExp ?? "∞"}</strong></span>
-        </div>${state.phase === "finished" ? `<small class="ending-experience-note">结算后领取；回溯可继续本局</small>` : ""}` : ""}
+        </div>` : ""}
         <footer class="ending-actions">
           ${saveStatus ? `<p class="run-saves-status" role="status">${escapeHtml(saveStatus)}</p>` : ""}
           <div class="ending-buttons">

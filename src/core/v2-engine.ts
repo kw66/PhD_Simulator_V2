@@ -393,7 +393,7 @@ export function dispatchAction(state: GameState, actionId: GameActionId, payload
     ? { ...state, randomState: createGameRandomState() } : state;
   const run = () => {
     const next = dispatchActionInternal(source, actionId, payload);
-    if (next === source || source.phase === "finished" || actionId === "set-linear-event-blocking" || actionId === "select-paper") return next;
+    if (next === source || source.phase === "finished" || actionId === "set-linear-event-blocking" || actionId === "set-event-intro-skipping" || actionId === "select-paper") return next;
     return observeAchievements(source, next, actionId, payload);
   };
   if (!actionId.startsWith("debug-")) return withGameRandom(source, run);
@@ -410,6 +410,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
     return dispatchAction({
       ...createInitialState(),
       blockLinearEvents: state.blockLinearEvents,
+      skipBranchEventIntro: state.skipBranchEventIntro,
       debugEventReplayEnabled: state.debugEventReplayEnabled,
     }, "start-game", {
       roleId: state.selectedRoleId,
@@ -438,7 +439,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
     return state;
   }
   if (state.phase === "finished") return state;
-  if (actionId === "set-linear-event-blocking" && state.phase !== "playing") return dispatchGameAction(state, actionId, payload);
+  if ((actionId === "set-linear-event-blocking" || actionId === "set-event-intro-skipping") && state.phase !== "playing") return dispatchGameAction(state, actionId, payload);
   if (state.phase !== "playing") return dispatchDebugAction(state, actionId, payload) ?? state;
   if (actionId === "quit-game") return quitGame(state);
   const debugAction = actionId.startsWith("debug-");
@@ -495,6 +496,8 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
       return payload.careerType ? prepareCareer(state, payload.careerType) : state;
     case "set-linear-event-blocking":
       return typeof payload.blockLinearEvents === "boolean" ? { ...state, blockLinearEvents: payload.blockLinearEvents } : state;
+    case "set-event-intro-skipping":
+      return typeof payload.skipBranchEventIntro === "boolean" ? { ...state, skipBranchEventIntro: payload.skipBranchEventIntro } : state;
     case "select-paper": {
       const paper = payload.paperId
         ? state.papers.find((entry) => entry.id === payload.paperId)

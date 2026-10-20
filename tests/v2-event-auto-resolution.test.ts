@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
-import { canAutoResolveLinearEvent, isEventBlocking, isLinearEvent, settleLinearEvents } from "../src/core/v2-event-auto-resolution";
+import { canAutoResolveLinearEvent, getBranchEventIntroChoice, isEventBlocking, isLinearEvent, settleLinearEvents } from "../src/core/v2-event-auto-resolution";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { createStore } from "../src/core/v2-store";
@@ -227,5 +227,57 @@ describe("automatic linear event resolution", () => {
     expect(agenda).not.toContain("event-auto-slot");
     expect(agenda.split('data-ui-open-event-id="automatic"')[1]?.split('</article>')[0]).toContain('data-deadline="pending"');
     expect(renderApp({ ...initial, blockLinearEvents: true })).not.toContain('class="event-auto-indicator"');
+  });
+});
+
+
+describe("independent branching introduction preference", () => {
+  function intro(branches = 2): PendingEvent {
+    const decision = { ...event("branch-choice"), chainId: "branch", stage: "act2" as const,
+      choices: Array.from({ length: branches }, (_, index) => ({ id: `choice-${index}`, label: `选择${index}`,
+        outcome: "", effects: {}, ...(index ? { disabledReason: "条件不足" } : {}) })) };
+    return { ...event("branch", { enqueueEvents: [decision] }), stage: "act1" };
+  }
+
+  it.each([[true, true], [true, false], [false, true], [false, false]])(
+    "keeps controls independent (block linear %s, skip introduction %s)", (blockLinearEvents, skipBranchEventIntro) => {
+      const state = { ...stateWith([intro(), intro(1)]), blockLinearEvents, skipBranchEventIntro };
+      expect(!!getBranchEventIntroChoice(state, state.eventQueue[0]!)).toBe(skipBranchEventIntro);
+      expect(getBranchEventIntroChoice(state, state.eventQueue[1]!)).toBeNull();
+      expect(canAutoResolveLinearEvent(state, state.eventQueue[0]!)).toBe(false);
+      expect(canAutoResolveLinearEvent(state, state.eventQueue[1]!)).toBe(!blockLinearEvents);
+    });
+
+  it("preserves the introduction in history and supports revisiting it without auto-advancing", () => {
+    const initial = { ...stateWith([intro()]), skipBranchEventIntro: true };
+    const choice = getBranchEventIntroChoice(initial, initial.eventQueue[0]!)!;
+    const opened = resolve(initial, "branch", choice.id);
+    expect(opened.eventQueue[0]?.stage).toBe("act2");
+    expect(opened.eventQueue[0]?.history?.[0]?.replayEvent?.stage).toBe("act1");
+    const rewound = dispatchAction(opened, "replay-event", { eventId: opened.eventQueue[0]!.id, eventHistoryIndex: 0 });
+    expect(rewound.eventQueue[0]?.stage).toBe("act1");
+    expect(rewound.skipBranchEventIntro).toBe(true);
+  });
+
+  it("does not treat cosmetic rerolls or hazardous linear events as branching", () => {
+    const cosmetic = intro(1);
+    cosmetic.choices[0]!.effects.enqueueEvents![0]!.choices.push({ id: "reroll", label: "换个名字", outcome: "",
+      cosmetic: true, effects: { stayOnEvent: true } });
+    const dangerous = { ...event("danger", { san: -999 }), stage: "act1" as const };
+    const state = { ...stateWith([cosmetic, dangerous]), skipBranchEventIntro: true };
+    for (const queued of state.eventQueue) expect(getBranchEventIntroChoice(state, queued)).toBeNull();
+  });
+
+  it("preserves both preferences across restart and lobby transitions", () => {
+    const store = createStore();
+    store.dispatch("set-event-intro-skipping", { skipBranchEventIntro: true });
+    store.dispatch("set-linear-event-blocking", { blockLinearEvents: false });
+    store.dispatch("start-game", { roleId: "normal" });
+    store.dispatch("restart-game");
+    expect(store.getState().skipBranchEventIntro).toBe(true);
+    expect(store.getState().blockLinearEvents).toBe(false);
+    store.dispatch("reset-game");
+    expect(store.getState().skipBranchEventIntro).toBe(true);
+    expect(store.getState().blockLinearEvents).toBe(false);
   });
 });

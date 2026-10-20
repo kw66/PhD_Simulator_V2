@@ -68,7 +68,7 @@ describe("mobile play panels", () => {
       const rows = await submissions.evaluateAll(nodes => new Set(nodes.map(node => Math.round(node.getBoundingClientRect().top))).size);
       expect(rows).toBe(3);
       const advance = page.locator('[data-action="advance-thesis-point"]').first();
-      expect(await advance.evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThanOrEqual(40);
+      expect(await advance.evaluate(node => node.getBoundingClientRect().height)).toBe(32);
       await advance.tap();
       expect(await advance.isDisabled()).toBe(true);
       await page.locator('[data-ui-play-tab="relationship"]').tap();

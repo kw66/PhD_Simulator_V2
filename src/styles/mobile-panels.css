@@ -23,7 +23,17 @@
   .workstation-section .graduation-cards,
   .relationship-section .rel-card-grid { gap: 4px; }
 
-  .relationship-section .rel-card.filled.rel-card-compact { gap: 3px; }
+  .relationship-section .rel-card.filled.rel-card-compact { gap: 0; }
+  .relationship-section .rel-card-identity { gap: 0; }
+  .relationship-section .rel-card-grid .rel-card-header { padding: 3px 6px; }
+  .relationship-section .rel-card:is(.rel-card-fellow, .rel-card-lover) .rel-card-header { padding-block: 1px; }
+  .relationship-section .rel-fellow-academic-row { min-height: 25px; padding: 3px 6px; gap: 3px 8px; }
+  .relationship-section .rel-card-fellow > .rel-paper-section {
+    min-height: 0;
+    grid-template-rows: auto auto;
+    gap: 3px;
+    padding: 4px 6px 2px;
+  }
 
   .workstation-section .workstation-submit-target-grid {
     grid-template-columns: 24px repeat(2, minmax(0, 1fr));
@@ -53,8 +63,8 @@
   }
 
   .relationship-section .rel-card-grid {
-    --workstation-card-min-height: 96px;
-    --rel-progress-columns: 5.5em minmax(12px, 1fr) 5ch 110px;
+    --workstation-card-min-height: 76px;
+    --rel-progress-columns: max-content minmax(24px, 1fr) max-content 110px;
   }
   .relationship-section .rel-card-grid > .rel-card:is(.locked, .empty) {
     min-height: var(--workstation-card-min-height);
@@ -63,24 +73,39 @@
   .relationship-section .rel-advisor-status,
   .relationship-section .rel-lover-routes {
     grid-template-rows: none;
-    grid-auto-rows: minmax(40px, auto);
-    gap: 3px;
+    grid-auto-rows: auto;
+    gap: 2px;
+    padding: 3px 6px;
   }
 
   .relationship-section .rel-lover-route {
-    grid-template-columns: 3.5em minmax(12px, 1fr) 5ch 110px;
+    grid-template-columns: max-content minmax(24px, 1fr) max-content 110px;
+  }
+
+  .relationship-section .rel-advisor-metric {
+    grid-template-columns: max-content minmax(16px, 1fr) max-content minmax(4em, 90px);
+    min-height: 28px;
+    gap: 4px;
+  }
+
+  .relationship-section .rel-card-fellow .rel-resource-row { padding: 0 6px; }
+  .relationship-section :is(.rel-advisor-project-row, .rel-lover-route, .rel-resource-row) {
+    min-height: 32px;
+    gap: 4px;
   }
 
   .relationship-section .rel-action-btn.rel-cooperation-btn,
   .workstation-section .graduation-cards .rel-action-btn {
-    min-height: 40px;
-    height: auto;
-    padding-inline: 4px;
+    min-height: 32px;
+    height: 32px;
+    padding: 2px 4px;
   }
 
   .relationship-section .rel-card-compact > .rel-monthly-activity {
-    min-height: 40px;
+    min-height: 34px;
     height: auto;
+    margin-top: 0;
+    padding: 0 6px;
   }
 
   .relationship-section .rel-activity-history > summary {
@@ -97,11 +122,25 @@
 
   .workstation-section .graduation-point,
   .workstation-section .graduation-career-row {
-    grid-template-columns: 6em minmax(12px, 1fr) 4ch 110px;
-    min-height: 40px;
+    grid-template-columns: max-content minmax(24px, 1fr) max-content 110px;
+    min-height: 32px;
     height: auto;
     gap: 4px;
+    padding-block: 0;
   }
+
+  .workstation-section .graduation-cards > .graduation-card.rel-card-compact {
+    min-height: 0;
+    gap: 0;
+    padding-bottom: 3px;
+  }
+
+  .workstation-section .graduation-card .rel-card-header { min-height: 32px; padding: 3px 6px; }
+  .workstation-section .graduation-card :is(.graduation-points, .graduation-careers) { padding: 2px 6px; }
+  .workstation-section .graduation-thesis-heading { height: 26px; padding-inline: 6px; }
+  .workstation-section :is(.graduation-point, .graduation-career-row) > .rel-detail-label { grid-area: label; }
+  .workstation-section :is(.graduation-point, .graduation-career-row) > .rel-progress-bar { grid-area: bar; }
+  .workstation-section :is(.graduation-point, .graduation-career-row) > .rel-progress-val { grid-area: value; }
 
   .shop-panel > .shop-tab-btns {
     grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -170,18 +209,14 @@
 @media (max-width: 380px) {
   .research-section .research-promotion-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-  .relationship-section .rel-card-grid {
-    --rel-progress-columns: 5.5em minmax(8px, 1fr) 5.2ch 110px;
-  }
-
-  .relationship-section .rel-lover-route {
-    grid-template-columns: 3.5em minmax(8px, 1fr) 5.2ch 110px;
-    gap: 4px;
-  }
+  .relationship-section .rel-card-grid { --rel-progress-columns: max-content minmax(20px, 1fr) max-content 110px; }
+  .relationship-section .rel-lover-route,
+  .workstation-section :is(.graduation-point, .graduation-career-row) { grid-template-columns: max-content minmax(20px, 1fr) max-content 110px; }
+  .relationship-section .rel-advisor-metric { grid-template-columns: max-content minmax(16px, 1fr) max-content minmax(4em, 74px); }
 
   .workstation-section .graduation-thesis-header {
     grid-template-columns: minmax(0, 1fr) auto;
-    padding-block: 6px;
+    gap: 2px 5px;
   }
 
   .workstation-section .graduation-thesis-header .graduation-reference {
@@ -190,12 +225,6 @@
   }
 
   .workstation-section .graduation-thesis-header .graduation-status { grid-column: 2; }
-
-  .workstation-section .graduation-point,
-  .workstation-section .graduation-career-row {
-    grid-template-columns: 5.7em minmax(8px, 1fr) 3.5ch 100px;
-    gap: 3px;
-  }
 
   .shop-panel > .shop-tab-btns > .shop-tab-btn,
   .talent-panel > .talent-header-row .panel-switch-btn {

@@ -106,7 +106,6 @@
 .ending-buttons > button.is-restart { border-color: #98ad93; background: #e5eee2; color: #365b43; }
 .ending-buttons > button.is-return { border-color: #d2b986; background: #f8eed9; color: #75582e; }
 .ending-buttons > button.is-rewind { border-color: #b6a388; background: #ede5d7; color: #69573d; }
-.ending-experience-note { display: block; margin-top: 4px; color: #887455; font-size: 11px; text-align: center; }
 @media (max-width: 560px) {
   .ending-panel .ending-header { padding-inline: 30px; }
   .ending-panel h2 { font-size: 24px; }

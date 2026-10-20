@@ -114,16 +114,8 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: #b9a071 transparent;
   font-size: 0.8rem;
   line-height: 1.55;
-}
-
-.play-right-rail .play-help-body::-webkit-scrollbar { width: 5px; }
-.play-right-rail .play-help-body::-webkit-scrollbar-thumb {
-  border-radius: 5px;
-  background: #b9a071;
 }
 
 .play-right-rail .play-help-body p { margin: 0 0 10px; }

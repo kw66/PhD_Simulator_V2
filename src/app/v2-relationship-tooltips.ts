@@ -184,5 +184,11 @@ export function createRelationshipTooltips(root: HTMLElement) {
     } else sync();
   }, true);
   window.addEventListener("resize", hide);
-  return { sync };
+  return { sync, showActionHint(element: HTMLElement): void {
+    show(element, true);
+    if (active !== element) return;
+    touchPinned = true;
+    root.classList.add("uses-touch-tooltips");
+    tooltip.classList.add("is-touch-tooltip");
+  } };
 }
