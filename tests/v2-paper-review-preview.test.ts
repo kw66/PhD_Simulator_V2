@@ -35,7 +35,7 @@ describe("paper review agenda previews", () => {
     expect(reviewPreviews(state)).toEqual([]);
     state = dispatchAction(state, "submit-paper", { paperId, paperTarget: "C" });
     expect(reviewPreviews(state)).toMatchObject([{ title: "WACV结果", monthsLater: 3, timeText: "3月后 发生" }]);
-    expect(renderApp(state)).toMatch(/todo-title">WACV结果<\/strong>[\s\S]*?3月后 发生/);
+    expect(renderApp(state)).toMatch(/todo-title">WACV结果<\/strong>[\s\S]*?3月后<span class="event-deadline-context"> 发生<\/span>/);
     expect(renderApp(state)).not.toContain('todo-title">论文结果 ·');
     for (const monthsLater of [2, 1]) {
       state = advancePaperReviewDeadlines(state);
