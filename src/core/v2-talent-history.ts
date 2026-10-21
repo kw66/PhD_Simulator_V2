@@ -1,4 +1,6 @@
 import { formatMoney } from "./v2-money";
+import { formatAttributeDetail } from "./v2-attribute-format";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { GameState } from "./v2-types";
 
 export interface TalentTriggerRecord {
@@ -8,6 +10,9 @@ export interface TalentTriggerRecord {
   effects: string[];
   details?: string[];
 }
+
+const formatEffectAttribute = (value: number): string => usesGameplayRulesFrom("20261021-r13")
+  ? formatAttributeDetail(value) : formatMoney(value);
 
 export function recordTalentTrigger(state: GameState, key: string, trigger: TalentTriggerRecord): GameState {
   const id = `talent:${key}`;
@@ -30,11 +35,13 @@ export function recordTalentTrigger(state: GameState, key: string, trigger: Tale
 
 export function describeTalentChange(label: string, before: number, after: number): string {
   const delta = after - before;
-  return `${label} ${delta > 0 ? "+" : ""}${formatMoney(delta)}（${formatMoney(before)}→${formatMoney(after)}）`;
+  const format = label.includes("金币") ? formatMoney : formatEffectAttribute;
+  return `${label} ${delta > 0 ? "+" : ""}${format(delta)}（${format(before)}→${format(after)}）`;
 }
 
 export function describeTalentReward(label: string, reward: number, before: number, after: number): string {
-  return `${label} ${reward > 0 ? "+" : ""}${formatMoney(reward)}（${formatMoney(before)}→${formatMoney(after)}）`;
+  const format = label.includes("金币") ? formatMoney : formatEffectAttribute;
+  return `${label} ${reward > 0 ? "+" : ""}${format(reward)}（${format(before)}→${format(after)}）`;
 }
 
 /** A tier-resisted reward shows what actually landed: "科研 +0（8→8，抵抗1）". */
@@ -44,6 +51,6 @@ export function describeResistedTalentReward(
   result: { effectiveChange: number; resistedCount: number; cappedCount?: number },
 ): string {
   const gain = result.effectiveChange;
-  const notes = [result.resistedCount > 0 ? `抵抗${formatMoney(result.resistedCount)}` : "", result.cappedCount ? "上限" : ""].filter(Boolean);
-  return `${label} ${gain >= 0 ? "+" : ""}${formatMoney(gain)}（${formatMoney(before)}→${formatMoney(before + gain)}${notes.map((note) => `，${note}`).join("")}）`;
+  const notes = [result.resistedCount > 0 ? `抵抗${formatEffectAttribute(result.resistedCount)}` : "", result.cappedCount ? "上限" : ""].filter(Boolean);
+  return `${label} ${gain >= 0 ? "+" : ""}${formatEffectAttribute(gain)}（${formatEffectAttribute(before)}→${formatEffectAttribute(before + gain)}${notes.map((note) => `，${note}`).join("")}）`;
 }

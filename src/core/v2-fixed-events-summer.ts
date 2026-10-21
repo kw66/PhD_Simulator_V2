@@ -1,4 +1,6 @@
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { formatAttributeDetail, roundAttribute } from "./v2-attribute-format";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import {
   appendMechanismSettlement,
   createFixedEvent,
@@ -35,9 +37,13 @@ function createSummerVacationResultEvent(params: {
   });
 }
 
+function getSummerSanRecovery(missingSan: number, ratio: 0.3 | 0.5): number {
+  const recovery = missingSan * ratio;
+  return usesGameplayRulesFrom("20261021-r13") ? roundAttribute(recovery) : Math.floor(recovery);
+}
+
 function formatSummerSanRecovery(missingSan: number, ratio: 0.3 | 0.5): string {
-  const sanRecovery = Math.floor(missingSan * ratio);
-  return `SAN +${sanRecovery}（已损SAN${ratio * 100}%）`;
+  return `SAN +${formatAttributeDetail(getSummerSanRecovery(missingSan, ratio))}（已损SAN${ratio * 100}%）`;
 }
 
 function createSummerVacationPlanEvent(state: GameState): PendingEvent {
@@ -109,7 +115,7 @@ export function resolveSummerVacationFixedEvent(
   switch (resolution.kind) {
     case "summer-vacation-home": {
       const missingSan = Math.max(0, state.sanCap - state.player.san);
-      const sanRecovery = Math.floor(missingSan * 0.3);
+      const sanRecovery = getSummerSanRecovery(missingSan, 0.3);
       const sanSummary = formatSummerSanRecovery(missingSan, 0.3);
       return {
         nextState: state,
@@ -152,7 +158,7 @@ export function resolveSummerVacationFixedEvent(
       };
     case "summer-vacation-travel": {
       const missingSan = Math.max(0, state.sanCap - state.player.san);
-      const sanRecovery = Math.floor(missingSan * 0.3);
+      const sanRecovery = getSummerSanRecovery(missingSan, 0.3);
       const sanSummary = formatSummerSanRecovery(missingSan, 0.3);
       const socialResult = previewPlayerAttributeChange(state, "social", 1);
       const socialText = formatTierResistedOutcome("社交", 1, socialResult);

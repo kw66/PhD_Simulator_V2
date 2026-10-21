@@ -91,7 +91,7 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
   directPage("审稿人概率", `<p>随着学年推进，审稿人的平均质量逐渐下降，AI审稿激增。论文投稿越来越像随机抽奖：辛苦打磨的工作，能不能中还得看抽到谁。</p>
     <p>3位独立抽取，类型可重复。<b>y=投稿学年−1</b>，首年y=0。</p>${renderReviewerGuide("probability")}`),
   directPage("审稿评分", `${renderReviewerGuide("method")}<p>普通与LLM的三项权重随机生成，<b>权重之和均为3</b>。最高／最低按投稿时的各项合计分选取，有效分四舍五入。</p>`),
-  directPage("审稿人反馈", `<p>拒稿加分只在退稿后生效；SAN变化<b>中稿或拒稿均生效</b>，三位审稿人的效果可叠加。扣SAN先乘疾病倍率并向上取整，再加季节与恋人固定修正，最低0；恢复不受影响。</p>${renderReviewerGuide("effect")}`),
+  directPage("审稿人反馈", `<p>拒稿加分只在退稿后生效；SAN变化<b>中稿或拒稿均生效</b>，三位审稿人的效果可叠加。扣SAN先乘疾病倍率，再加季节与恋人固定修正，保留小数、最低0；恢复不受影响。</p>${renderReviewerGuide("effect")}`),
   directPage("审稿门槛", `<p>表中依次为${renderPaperTerm("Borderline")}／${renderPaperTerm("Accept")}基础门槛；低于前值为Reject，达到后值为Accept。</p>${renderReviewerThresholds()}
     <p>实际门槛=基础门槛×会议影响力÷等级均值，四舍五入。等级均值：A ${REVIEW_TARGET_AVERAGE_INFLUENCE.A}，B ${REVIEW_TARGET_AVERAGE_INFLUENCE.B}，C ${REVIEW_TARGET_AVERAGE_INFLUENCE.C}。</p>`),
   directPage("毕业论文", `<p>推进分按科研能力向下取整；SAN基础消耗不受科研档位减免，季节与通用SAN效果仍生效。</p>`),

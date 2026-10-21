@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { applyPrepublicationPaperDecay, createDraftPaper } from "../src/core/v2-paper-rules";
@@ -190,13 +191,27 @@ describe("role talent lifecycle", () => {
     expect(applyRoleTalentPhdTransfer(before, next)).toBe(next);
   });
 
-  it("normal percentage bonus rounds the raw increment then resists", () => {
+  it("normal percentage bonus retains the fractional raw increment then resists", () => {
     const before = run("normal", { "self-determination": 1 });
     before.player = { ...before.player, research: 12, social: 6, favor: 1 };
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
-    expect(next.player.research).toBeCloseTo(13.2);
-    expect(next.player.social).toBeCloseTo(6.8);
-    expect(next.player.favor).toBe(2);
+    expect(next.player.research).toBeCloseTo(12.72);
+    expect(next.player.social).toBeCloseTo(6.48);
+    expect(next.player.favor).toBe(1.1);
+    expect(applyRoleTalentPhdTransfer(before, next)).toBe(next);
+    const replayed = withGameplayRuleset("20261020-r12", () => applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" }));
+    expect(replayed.player.research).toBeCloseTo(13.2);
+    expect(replayed.player.social).toBeCloseTo(6.8);
+    expect(replayed.player.favor).toBe(2);
+  });
+
+  it("rechecks tiers for fractional transfer gains and still respects the cap", () => {
+    const before = run("normal", { "self-determination": 2 });
+    before.player = { ...before.player, research: 5.9, social: 19.9, favor: 0.04 };
+    const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
+    expect(next.player.research).toBeCloseTo(7.044);
+    expect(next.player.social).toBe(20);
+    expect(next.player.favor).toBeCloseTo(0.048);
   });
 
   it("genius transfer cap is available to the same batch of research growth", () => {

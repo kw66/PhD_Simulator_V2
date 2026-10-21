@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getVisibleValueDelta } from "../src/app/v2-value-animations";
-import { renderAnimatedNumber, renderAnimatedTemplate } from "../src/app/v2-render-animation";
+import { renderAnimatedAttributeNumber, renderAnimatedNumber, renderAnimatedTemplate } from "../src/app/v2-render-animation";
 
 describe("visible value animations", () => {
   it("formats generic progress, balances and multipliers without floating tails", () => {
@@ -42,5 +42,16 @@ describe("visible value animations", () => {
     expect(getVisibleValueDelta({ value: 4, visible: true }, { value: 4, visible: true })).toBe(0);
     expect(getVisibleValueDelta({ value: NaN, visible: true }, { value: 4, visible: true })).toBe(0);
     expect(getVisibleValueDelta({ value: 4, visible: true }, { value: Infinity, visible: true })).toBe(0);
+  });
+
+  it("keeps tiny attribute losses visible without changing money animation precision", () => {
+    const before = { value: 4, visible: true };
+    const after = { value: 3.9996, visible: true };
+    expect(getVisibleValueDelta(before, after, true)).toBe(-0.0004);
+    expect(getVisibleValueDelta(before, after)).toBe(0);
+    expect(getVisibleValueDelta(before, { value: 4 + Number.EPSILON, visible: true }, true)).toBe(0);
+    expect(renderAnimatedAttributeNumber("san", -0.004)).toContain('>-0.004</span>');
+    expect(renderAnimatedAttributeNumber("research", 5.999)).toContain('>5.999</span>');
+    expect(renderAnimatedAttributeNumber("research", 6.25)).toContain('data-animate-number="6.25" data-animate-format="attribute">6.3</span>');
   });
 });

@@ -21,7 +21,7 @@ describe("v2 sanity rules", () => {
     const delta = 0.1 + 0.2;
     expect(formatEventSanChange(delta)).toBe("SAN +0.3");
     expect(formatEventSanChange(-delta, 0.295, 1.234)).toBe("SAN -0.3（减免1.23）（疾病增加0.3）");
-    expect(formatEventSanChange(-0.004)).toBe("SAN -0");
+    expect(formatEventSanChange(-0.004)).toBe("SAN -0.004");
     expect(formatEventSanChange(0, 0, 0, -1)).toBe("SAN -0");
     expect(formatEventSanChange(0)).toBe("SAN +0");
     expect(delta).toBe(0.30000000000000004);
@@ -161,10 +161,10 @@ describe("v2 sanity rules", () => {
     expect(formatTierResistedOutcome("社交", -1, { effectiveChange: 0, resistedCount: 1 })).toBe("社交 -0（抵抗1）");
   });
 
-  it("limits result and resistance displays to two decimals without float tails", () => {
+  it("uses compact result details without hiding tiny nonzero changes or float tails", () => {
     const result = { effectiveChange: 0.1 + 0.2, resistedCount: 0.295 };
     expect(formatTierResistedOutcome("科研", 0.595, result)).toBe("科研 +0.3（抵抗0.3）");
     expect(result).toEqual({ effectiveChange: 0.1 + 0.2, resistedCount: 0.295 });
-    expect(formatTierResistedOutcome("社交", -0.004, { effectiveChange: -0.004, resistedCount: 0 })).toBe("社交 -0");
+    expect(formatTierResistedOutcome("社交", -0.004, { effectiveChange: -0.004, resistedCount: 0 })).toBe("社交 -0.004");
   });
 });

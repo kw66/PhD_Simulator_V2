@@ -1,4 +1,6 @@
 import { recordPersonalIncome } from "./v2-money";
+import { roundAttribute } from "./v2-attribute-format";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { getEffectiveSocial } from "./v2-effective-attributes";
 import { addOrReplaceBuffs, advanceBuffDurations, consumeAiCostCoverage, getActiveBuffs, removeBuffs } from "./v2-buffs";
@@ -75,6 +77,10 @@ export function getMonthlyPersonalSpending(resolution: MonthlyEffectResolution):
   return roundMoney(resolution.items.reduce((total, item) => total + (item.personalSpending ?? Math.max(0, -(item.appliedStats.money ?? 0))), 0));
 }
 
+function settleSanPrecision(value: number): number {
+  return usesGameplayRulesFrom("20261021-r13") ? roundAttribute(value) || 0 : value;
+}
+
 function emptyTotals(): PlayerStats {
   return { san: 0, research: 0, social: 0, favor: 0, money: 0 };
 }
@@ -90,7 +96,7 @@ function applyStats(state: GameState, player: PlayerStats, stats: Partial<Player
     else {
       const payment = quoteSanPayment(next, getRoleMonthlySanCost(next, -stats.san), { allowOverdraw: true, allowBeta: false });
       next = recordPersonalSpending({ ...next, player: { ...next.player,
-        san: next.player.san - payment.sanCost, money: roundMoney(next.player.money - payment.moneyCost),
+        san: settleSanPrecision(next.player.san - payment.sanCost), money: roundMoney(next.player.money - payment.moneyCost),
       } }, payment.moneyCost);
     }
   }
@@ -272,7 +278,7 @@ export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution
         } }, payment.moneyCost);
         appliedStats.san = -payment.sanCost;
       } else appliedStats.san = state.selectedRoleId === "special-finite-life" ? 0 : raw;
-      sanDelta += appliedStats.san;
+      sanDelta = settleSanPrecision(sanDelta + appliedStats.san);
     }
     for (const stat of ["research", "social", "favor"] as const) {
       if (!Object.hasOwn(effect.stats, stat)) continue;
@@ -282,10 +288,10 @@ export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution
     }
     // Attribute reactions may restore SAN or change a second attribute. Keep
     // those committed reactions rather than replacing them with raw buff data.
-    const reactionSan = settledState.player.san - before.san;
+    const reactionSan = settleSanPrecision(settledState.player.san - before.san);
     if (reactionSan !== 0) {
-      sanDelta += reactionSan;
-      appliedStats.san = (appliedStats.san ?? 0) + reactionSan;
+      sanDelta = settleSanPrecision(sanDelta + reactionSan);
+      appliedStats.san = settleSanPrecision((appliedStats.san ?? 0) + reactionSan);
     }
     for (const stat of ["research", "social", "favor"] as const) {
       const actual = Number((settledState.player[stat] - before[stat]).toFixed(10));
@@ -298,19 +304,19 @@ export function resolveMonthlyEffects(state: GameState): MonthlyEffectResolution
   }
   // SAN recovery and drains form one batch: retain recoveries at the cap until
   // all drains have been paid, and judge negative SAN only after the batch.
-  let player = { ...settledState.player, san: sanDelta > 0
+  let player = { ...settledState.player, san: settleSanPrecision(sanDelta > 0
     ? Math.max(startingPlayer.san, Math.min(settledState.sanCap, startingPlayer.san + sanDelta))
-    : startingPlayer.san + sanDelta };
+    : startingPlayer.san + sanDelta) };
   for (const statId of PLAYER_STAT_IDS) {
     const delta = player[statId] - startingPlayer[statId];
-    totals[statId] = statId === "money" ? roundMoney(delta) : delta;
+    totals[statId] = statId === "money" ? roundMoney(delta) : statId === "san" ? settleSanPrecision(delta) : delta;
   }
 
   const emergencySan = state.selectedRoleId === "special-finite-life" ? player.san : getShopEmergencySan(state.shopState, player.san);
   if (emergencySan !== player.san) {
     const delta = emergencySan - player.san;
     player = { ...player, san: emergencySan };
-    totals.san += delta;
+    totals.san = settleSanPrecision(totals.san + delta);
     items.push({
       id: "chair-emergency",
       name: "锥刺股椅",
@@ -336,12 +342,13 @@ function appendMonthlyEffect(
   const appliedStats: Partial<PlayerStats> = {};
   for (const statId of PLAYER_STAT_IDS) {
     const change = player[statId] - before[statId];
-    const delta = statId === "money" ? roundMoney(change) : change;
+    const delta = statId === "money" ? roundMoney(change) : statId === "san" ? settleSanPrecision(change) : change;
     const preserveZero = (statId === "san" || statId === "money") && Object.hasOwn(effect.stats, statId);
     if (delta === 0 && !preserveZero) continue;
     appliedStats[statId] = delta;
     resolution.totals[statId] += delta;
     if (statId === "money") resolution.totals.money = roundMoney(resolution.totals.money);
+    else if (statId === "san") resolution.totals.san = settleSanPrecision(resolution.totals.san);
   }
   resolution.player = player;
   resolution.settledState = settledState;
@@ -358,6 +365,7 @@ function appendObservedAiEffect(
   for (const statId of PLAYER_STAT_IDS) {
     resolution.totals[statId] += appliedStats[statId] ?? 0;
     if (statId === "money") resolution.totals.money = roundMoney(resolution.totals.money);
+    else if (statId === "san") resolution.totals.san = settleSanPrecision(resolution.totals.san);
   }
   resolution.items.push({ ...effect, appliedStats });
 }
@@ -377,7 +385,7 @@ function getMonthlyChairRecoveryContribution(
     .reduce((total, item) => total + (item.appliedStats.san ?? 0), 0);
   const sanBeforeChair = Math.min(state.sanCap, state.player.san + otherSan);
   const sanAfterChair = Math.min(state.sanCap, sanBeforeChair + nominalRecovery);
-  return Math.max(0, sanAfterChair - sanBeforeChair);
+  return settleSanPrecision(Math.max(0, sanAfterChair - sanBeforeChair));
 }
 
 function applyAutomaticCoffeeMachineEffect(
@@ -604,11 +612,11 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
   const monthlyChairRecovery = getMonthlyChairRecoveryContribution(state, resolution);
   const emergencyChairRecovery = Math.max(0, resolution.items
     .find((item) => item.id === "chair-emergency")?.appliedStats.san ?? 0);
-  const chairSanRecovered = Math.max(0, state.shopState.chairSanRecovered ?? 0)
+  const chairSanRecovered = settleSanPrecision(Math.max(0, state.shopState.chairSanRecovered ?? 0)
     + monthlyChairRecovery
-    + emergencyChairRecovery;
+    + emergencyChairRecovery);
   const bikeMonthlyItem = resolution.items.find((item) => item.id === "bike-monthly");
-  const bikeSanSpent = state.shopState.bikeSanSpent + Math.max(0, -(bikeMonthlyItem?.appliedStats.san ?? 0));
+  const bikeSanSpent = settleSanPrecision(state.shopState.bikeSanSpent + Math.max(0, -(bikeMonthlyItem?.appliedStats.san ?? 0)));
   const bikeThreshold = 6;
   const bikeGainLimit = getBikeSanCapLimit(state.shopState);
   const bikeSanCapGains = state.shopState.bikeOwned && bikeGainLimit > 0

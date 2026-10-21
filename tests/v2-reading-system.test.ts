@@ -192,7 +192,7 @@ describe("v2 reading system", () => {
     }];
     for (const operation of ["read", "idea", "experiment", "writing", "relationship-task"] as const) {
       expect(getActiveOperationSanMultiplier(buffs, operation)).toBe(2.5);
-      expect(getActiveOperationSanCost(1, buffs, operation)).toBe(3);
+      expect(getActiveOperationSanCost(1, buffs, operation)).toBe(2.5);
     }
   });
 

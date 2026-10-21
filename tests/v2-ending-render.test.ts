@@ -100,7 +100,7 @@ describe("basic ending presentation", () => {
     expectEndingStat(card, "san", "8.8/20");
     expectEndingStat(card, "research", "-0.8/20");
     expectEndingStat(card, "social", "12.3/20");
-    expectEndingStat(card, "favor", "6.75/20");
+    expectEndingStat(card, "favor", "6.8/20");
     expectEndingStat(card, "money", "2.55");
     expect(card).toContain("科研能力 -0.8，低于0");
     expect(card).not.toMatch(/\d+\.\d{5,}/);

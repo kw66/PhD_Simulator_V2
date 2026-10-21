@@ -60,7 +60,7 @@ describe("fixed result conditions", () => {
     }
   });
 
-  it.each([0, 1, 3, 4, 5, 7, 15, 20])("reports rounded summer recovery for SAN gap %i", (gap) => {
+  it.each([0, 1, 3, 4, 5, 7, 15, 20])("reports fractional summer recovery for SAN gap %i", (gap) => {
     const initial = createInitialState();
     const state = { ...initial, player: { ...initial.player, san: initial.sanCap - gap } };
     for (const [kind, ratio] of [["summer-vacation-home", 0.3], ["summer-vacation-travel", 0.3]] as const) {
@@ -68,14 +68,15 @@ describe("fixed result conditions", () => {
       const resolution = resolveSummerVacationFixedEvent(state, { kind }, roll)!;
       const result = resolution.enqueueEvents![0]!;
       if (kind === "summer-vacation-home") expect(settlementOf(result)).not.toContain("条件：");
-      expect(settlementOf(result)).toContain(`SAN +${Math.floor(gap * ratio)}（已损SAN${ratio * 100}%）`);
-      expect(result.choices[0]!.effects.san ?? 0).toBe(Math.floor(gap * ratio));
+      const recovery = Number((gap * ratio).toFixed(10));
+      expect(settlementOf(result)).toContain(`SAN +${recovery}（已损SAN${ratio * 100}%）`);
+      expect(result.choices[0]!.effects.san ?? 0).toBe(recovery);
       expect(resolution.nextState).toBe(state);
       expect(roll).not.toHaveBeenCalled();
     }
   });
 
-  it.each([0, 1, 4, 5, 7, 10, 15, 20])("floors winter recovery at twenty percent for SAN gap %i in every branch", (gap) => {
+  it.each([0, 1, 4, 5, 7, 10, 15, 20])("retains fractional winter recovery at twenty percent for SAN gap %i in every branch", (gap) => {
     const initial = createInitialState();
     for (const branch of [0, 0.4, 0.8]) {
       for (const active of [false, true]) {
@@ -83,8 +84,9 @@ describe("fixed result conditions", () => {
         const rolls = [branch, 0.99];
         const resolution = resolveWinterVacationFixedEvent(state, { kind: "winter-vacation-rest" }, () => rolls.shift() ?? 0.99)!;
         const result = resolution.enqueueEvents![0]!;
-        expect(result.choices[0]!.effects.san ?? 0).toBe(Math.floor(gap * 0.2));
-        expect(settlementOf(result)).toContain(`SAN +${Math.floor(gap * 0.2)}（已损SAN20%）`);
+        const recovery = Number((gap * 0.2).toFixed(10));
+        expect(result.choices[0]!.effects.san ?? 0).toBe(recovery);
+        expect(settlementOf(result)).toContain(`SAN +${recovery}（已损SAN20%）`);
         expect(resolution.nextState).toBe(state);
       }
     }
@@ -94,7 +96,7 @@ describe("fixed result conditions", () => {
     const initial = createInitialState();
     const beforeTravel = { ...initial, player: { ...initial.player, san: initial.sanCap - 7 } };
     const result = resolveSummerVacationFixedEvent(beforeTravel, { kind: "summer-vacation-travel" }, () => 0)!.enqueueEvents![0]!;
-    expect(result.description).toContain("SAN +2（已损SAN30%）");
+    expect(result.description).toContain("SAN +2.1（已损SAN30%）");
     const refreshed = refreshSummerVacationEvent(
       { ...initial, player: { ...initial.player, san: initial.sanCap } },
       { ...result, queueOrder: 1 },
@@ -114,7 +116,7 @@ describe("fixed result conditions", () => {
     const choice = result.choices[0]!;
     expect(choice.effects.social).toBe(1);
     expect(choice.effects.sanCapDelta).toBe(1);
-    expect(choice.effects.san).toBeUndefined();
+    expect(choice.effects.san).toBe(0.6);
     expect(result.description).toContain("结果：社交 +1");
     expect(result.description).toContain("额外：条件：SAN ≥ 18｜结果：SAN上限 +1");
     expect(result.description).toContain("结果：SAN上限 +1");

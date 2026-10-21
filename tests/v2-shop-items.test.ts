@@ -154,7 +154,7 @@ describe("v2 shop items", () => {
     expect(getShopEmergencySan({ ...equipped, chairUpgrade: "spike" }, -4)).toBe(3);
     expect(getShopEmergencySan(equipped, -4)).toBe(-4);
     expect(getChairMonthlyRecovery(equipped, 10, 20)).toBe(2);
-    expect(getChairMonthlyRecovery(equipped, 19, 20)).toBe(0);
-    expect(getChairMonthlyRecovery({ ...equipped, chairUpgrade: "torture" }, 19, 20)).toBe(3);
+    expect(getChairMonthlyRecovery(equipped, 19, 20)).toBe(0.2);
+    expect(getChairMonthlyRecovery({ ...equipped, chairUpgrade: "torture" }, 19, 20)).toBe(3.8);
   });
 });

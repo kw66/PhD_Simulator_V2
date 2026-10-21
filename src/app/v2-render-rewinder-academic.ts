@@ -1,3 +1,4 @@
+import { formatAttribute, formatAttributeDetail } from "../core/v2-attribute-format";
 import { getAcademicArchivePreview } from "../core/v2-rewinder-academic";
 import type { AcademicYearRecord } from "../core/v2-rewinder-academic-record";
 import { BIKE_TIER_DEFINITIONS } from "../core/v2-bike-system";
@@ -20,7 +21,7 @@ const ACTS = [
 function attributeCard(preview: Preview, label: string, key: "san" | "research" | "social" | "favor", cap: "sanCap" | "researchCap" | "socialCap" | "favorCap", icon: string): string {
   const { current, previous, best } = preview;
   const improved = best.attributes[key] > (previous?.attributes[key] ?? 0) || best.attributes[cap] > (previous?.attributes[cap] ?? 0);
-  return `<article class="academic-stat-card${improved ? " is-improved" : ""}"><div class="academic-stat-heading"><i data-lucide="${icon}" aria-hidden="true"></i><h3>${label}</h3><span>${previous ? improved ? "刷新纪录" : "保留最佳" : "首次定格"}</span></div><div class="academic-stat-main"><strong>${number(best.attributes[key])}</strong><span>/ ${number(best.attributes[cap])}<small>上限</small></span></div><div class="academic-stat-comparison"><span>本次 <b>${number(current.attributes[key])} / ${number(current.attributes[cap])}</b></span><span>原纪录 <b>${previous ? `${number(previous.attributes[key])} / ${number(previous.attributes[cap])}` : "—"}</b></span></div></article>`;
+  return `<article class="academic-stat-card${improved ? " is-improved" : ""}"><div class="academic-stat-heading"><i data-lucide="${icon}" aria-hidden="true"></i><h3>${label}</h3><span>${previous ? improved ? "刷新纪录" : "保留最佳" : "首次定格"}</span></div><div class="academic-stat-main"><strong>${formatAttribute(best.attributes[key])}</strong><span>/ ${formatAttribute(best.attributes[cap])}<small>上限</small></span></div><div class="academic-stat-comparison"><span>本次 <b>${formatAttributeDetail(current.attributes[key])} / ${formatAttributeDetail(current.attributes[cap])}</b></span><span>原纪录 <b>${previous ? `${formatAttributeDetail(previous.attributes[key])} / ${formatAttributeDetail(previous.attributes[cap])}` : "—"}</b></span></div></article>`;
 }
 
 function renderAttributes(preview: Preview): string {

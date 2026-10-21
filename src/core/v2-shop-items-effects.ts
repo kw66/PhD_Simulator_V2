@@ -1,5 +1,7 @@
 import type { PaperActionType, ShopState } from "./v2-types";
 import type { ShopActionModifier } from "./v2-shop-items-shared";
+import { roundAttribute } from "./v2-attribute-format";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export function getShopPaperActionModifier(shopState: ShopState, actionType: PaperActionType): ShopActionModifier {
   const modifier: ShopActionModifier = {
@@ -39,10 +41,12 @@ export function getShopEmergencySan(shopState: ShopState, currentSan: number): n
 export function getChairMonthlyRecovery(shopState: ShopState, currentSan: number, sanCap: number): number {
   if (!shopState.chairOwned) return 0;
   if (shopState.chairUpgrade === "massage") {
-    return Math.floor(Math.max(0, sanCap - currentSan) * 0.2);
+    const recovery = Math.max(0, sanCap - currentSan) * 0.2;
+    return usesGameplayRulesFrom("20261021-r13") ? roundAttribute(recovery) : Math.floor(recovery);
   }
   if (shopState.chairUpgrade === "torture") {
-    return Math.floor(Math.max(0, currentSan) * 0.2);
+    const recovery = Math.max(0, currentSan) * 0.2;
+    return usesGameplayRulesFrom("20261021-r13") ? roundAttribute(recovery) : Math.floor(recovery);
   }
   return 0;
 }

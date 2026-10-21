@@ -52,6 +52,7 @@ import { getGraduationPreparationYear } from "../core/v2-thesis-rules";
 import { getLabReimbursementCount } from "../core/v2-lab-reimbursement";
 import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2-relationship-activity";
 import { formatMoney, roundMoney } from "../core/v2-money";
+import { formatAttribute, formatAttributeDetail } from "../core/v2-attribute-format";
 import { getRoleTalentInvestmentDuration, getRoleTalentInvestmentLevel } from "../core/v2-role-talent-investments";
 import { getPlayerAttributeCap, getPlayerResistanceReduction } from "../core/v2-player-attributes";
 import { getAnnualLabSocialRewards, getPlayerAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
@@ -131,7 +132,7 @@ import { SHOW_ALL_MODULES_DURING_DEVELOPMENT } from "../core/v2-development-flag
 import { renderPlayHelpInlineToggle, renderPlayHelpPanel } from "./v2-play-help";
 import { isEndingSystemLog, renderEndingLog, renderEndingScreen } from "./v2-render-ending";
 import type { EventLayoutSample } from "./v2-event-layout";
-import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
+import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedAttributeNumber, renderAnimatedTemplate } from "./v2-render-animation";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl, hasRoleCardPortrait } from "./v2-role-portrait-assets";
 import { renderDesignedGrowthBoard } from "./v2-render-setup-screen";
 import { renderCaptainTags } from "./v2-render-captain-tags";
@@ -262,7 +263,7 @@ type TalentPanelItem = {
   detail?: string;
   requirement?: string;
   metrics?: Array<{ label: string; value: string; tooltip?: string; highlight?: boolean; animation?: { template: string; values: Record<string, number>; displays?: Record<string, string> } }>;
-  descriptionAnimation?: { template: string; values: Record<string, number> };
+  descriptionAnimation?: { template: string; values: Record<string, number>; displays?: Record<string, string> };
   rewardTable?: { label: string; columns: string[]; rows: string[][]; currentRow?: number };
   advisorSalaryPager?: { startIndex: number; lastStartIndex: number };
   labInheritancePager?: { page: number };
@@ -316,6 +317,10 @@ function clampPercent(value: number): number {
 function formatSignedNumber(value: number): string {
   if (!Number.isFinite(value)) return "0";
   return value >= 0 ? `+${formatMoney(value)}` : formatMoney(value);
+}
+
+function formatSignedAttribute(value: number): string {
+  return `${value >= 0 ? "+" : ""}${formatAttributeDetail(value)}`;
 }
 
 function normalizeGameDisplayText(value: string): string {
@@ -498,26 +503,29 @@ function renderAttrItem(
     : getAttrFillStateClass(value, cap, 3, 1);
   const safePercent = cap > 0 ? ((value + (value > 0 ? 1 : 0)) / (cap + 1)) * 100 : 0;
   const progressClassName = `${fillClassName}${fillStateClass}${value > 0 ? " is-nonzero" : ""}`;
-  const displayedValue = formatMoney(value);
+  const displayedValue = formatAttribute(value, [0, 2, 3, 5, 6, 12, 18, 20, cap]);
+  const displayedCap = formatAttribute(cap, [0, 2, 3, 5, 6, 12, 18, 20, value]);
   const effectiveHint = effectiveValue !== value
-    ? `当前能力视为${formatMoney(effectiveValue)}，用于行动效果、条件与档位减免；属性增减、抵抗和结局仍按真实值${displayedValue}计算`
+    ? `当前能力视为${formatAttributeDetail(effectiveValue)}，用于行动效果、条件与档位减免；属性增减、抵抗和结局仍按真实值${formatAttributeDetail(value)}计算`
     : "";
-  const tooltip = [getAttrTierTooltip(tierKind, value, illnessProbability, effectiveValue, resistanceState), effectiveHint].filter(Boolean).join("\n");
+  const detailValue = formatAttributeDetail(value, [0, 2, 3, 5, 6, 12, 18, 20, cap]);
+  const detailHint = detailValue !== displayedValue ? `${name} ${detailValue}/${formatAttributeDetail(cap)}` : "";
+  const tooltip = [getAttrTierTooltip(tierKind, value, illnessProbability, effectiveValue, resistanceState), detailHint, effectiveHint].filter(Boolean).join("\n");
 
   return `
     <div
       class="new-attr-item attr-item-${tierKind}"
       data-player-stat="${tierKind}"
-      data-stat-value="${displayedValue}"
-      data-stat-cap="${formatMoney(cap)}"
+      data-stat-value="${value}"
+      data-stat-cap="${cap}"
       tabindex="0"
-      aria-label="${escapeHtml(`${name} ${displayedValue}/${formatMoney(cap)}，${getAttrTierName(tierKind, value)}，${tooltip}`)}"
+      aria-label="${escapeHtml(`${name} ${displayedValue}/${displayedCap}，${getAttrTierName(tierKind, value)}，${tooltip}`)}"
       data-tooltip="${escapeHtml(tooltip)}"
     >
       <div class="new-attr-header">
         <span class="new-attr-icon">${icon}</span>
         <span class="new-attr-name">${name}</span>
-        <span class="new-attr-value">${displayedValue}/${formatMoney(cap)}</span>
+        <span class="new-attr-value">${displayedValue}/${displayedCap}</span>
         <span class="new-attr-level attr-level-${tierKind}">${getAttrTierName(tierKind, value)}</span>
       </div>
       <div class="new-attr-bar-row">
@@ -567,14 +575,14 @@ function buildNextMonthEffectItems(state: GameState): EffectBucketItem[] {
         || item.id === "debug-buff-advisor-salary"
         ? "每月"
         : normalizeGameDisplayText(item.name);
-      return [`${displaySource}：${displayName} ${formatSignedNumber(statId === "money" ? roundMoney(value) : value)}${note}`];
+      return [`${displaySource}：${displayName} ${statId === "money" ? formatSignedNumber(roundMoney(value)) : formatSignedAttribute(value)}${note}`];
     });
     const value = resolution.items.reduce((total, item) => total + (item.appliedStats[statId] ?? 0), 0);
     const alwaysShow = statId === "san" || statId === "money";
     if (!alwaysShow && (sources.length === 0 || value === 0)) return [];
     return [{
       id: `next-month-${statId}`,
-      label: `${labels[statId]} ${formatSignedNumber(statId === "money" ? roundMoney(value) : value)}`,
+      label: `${labels[statId]} ${statId === "money" ? formatSignedNumber(roundMoney(value)) : formatSignedAttribute(value)}`,
       sources,
       isDebuff: value < 0,
       category: inferEffectCategory(`next-month-${statId}`, labels[statId]),
@@ -730,10 +738,10 @@ function buildEffectBuckets(state: GameState): {
     for (const buff of buffs) {
       const duration = timing === "permanent" ? "永久" : timing === "next-action" ? "生效后消耗"
         : buff.remainingMonths === null ? "持续生效" : `剩余 ${buff.remainingMonths} 月`;
-      sources.push(`${buff.source} · ${duration} · SAN消耗 ${formatSignedNumber(buff.activeOperationSanDelta ?? 0)}${buff.description?.trim() ? `：${buff.description.trim()}` : ""}`);
+      sources.push(`${buff.source} · ${duration} · SAN消耗 ${formatSignedAttribute(buff.activeOperationSanDelta ?? 0)}${buff.description?.trim() ? `：${buff.description.trim()}` : ""}`);
     }
     for (const source of sources) {
-      upsertBucketItem(target, `${timing}:rule:active-operation-san-delta`, `SAN消耗 ${formatSignedNumber(delta)}`, source, delta > 0);
+      upsertBucketItem(target, `${timing}:rule:active-operation-san-delta`, `SAN消耗 ${formatSignedAttribute(delta)}`, source, delta > 0);
     }
   }
   // Monthly stats are settled by the month-start preview. Keep their Buffs
@@ -1884,7 +1892,7 @@ function renderEnhancedWorkstationSection(state: GameState): string {
                 <span class="workstation-action-icon" aria-hidden="true">🛋</span>
                 <span class="btn-desc">休息</span>
               </span>
-              <span class="btn-effect">SAN+${renderAnimatedNumber("workstation:rest:san-gain", restSanGain)}</span>
+              <span class="btn-effect">SAN+${renderAnimatedAttributeNumber("workstation:rest:san-gain", restSanGain)}</span>
             </button>
             ${renderWorkstationPaperResearchActions(state, selectedPaper)}
           </div>
@@ -2407,9 +2415,10 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
     const tier = getAttrTier(item.value);
     const tierName = kind === "research" ? getAttrTierName("research", item.value)
       : (kind === "intimacy" ? ["初识", "亲近", "甜蜜", "挚爱"] : ["生疏", "熟悉", "合拍", "无间"])[tier];
-    const hint = `${item.label}增减抵抗${getTierResistChance(item.value) * 100}%`;
-    const displayedValue = roundMoney(item.value);
-    return `<span class="rel-detail-item" ${relationshipTooltip(hint)}><span class="rel-detail-label">${renderRelationshipIcon(kind === "research" ? "💡" : kind === "intimacy" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedNumber(`${identity}:${kind}`, displayedValue, formatMoney(item.value))}${item.max === undefined ? "" : `/${item.max}`}</strong><span class="new-attr-level attr-level-${kind} rel-stat-tier">${tierName}</span></span>`;
+    const detailValue = formatAttributeDetail(item.value);
+    const hint = [`${item.label}增减抵抗${getTierResistChance(item.value) * 100}%`, detailValue !== formatAttribute(item.value) ? `${item.label} ${detailValue}${item.max === undefined ? "" : `/${formatAttributeDetail(item.max)}`}` : ""].filter(Boolean).join("\n");
+    const displayedValue = item.value;
+    return `<span class="rel-detail-item" ${relationshipTooltip(hint)}><span class="rel-detail-label">${renderRelationshipIcon(kind === "research" ? "💡" : kind === "intimacy" ? "💕" : "🤝")}${escapeHtml(item.label)}</span> <strong class="rel-detail-value">${renderAnimatedAttributeNumber(`${identity}:${kind}`, displayedValue, item.max === undefined ? undefined : [0, 2, 3, 5, 6, 12, 18, 20, item.max])}${item.max === undefined ? "" : `/${formatAttribute(item.max)}`}</strong><span class="new-attr-level attr-level-${kind} rel-stat-tier">${tierName}</span></span>`;
   }).join("");
   return `
     <article class="rel-card filled rel-card-compact${fellow ? " rel-card-fellow" : card.type === "lover" ? " rel-card-lover" : ""}" data-relationship-type="${card.type}" data-relationship-id="${escapeHtml(card.relationshipId)}">
@@ -3148,7 +3157,7 @@ function renderTalentPanelItem(item: TalentPanelItem, showStatus = true): string
           </div>
         </div>
       ` : ""}
-      ${item.description ? `<p class="talent-item-desc"${item.descriptionTooltip ? ` ${relationshipTooltip(item.descriptionTooltip)}` : ""}>${item.descriptionAnimation ? renderAnimatedTemplate(`talent:${item.id}:description`, item.descriptionAnimation.template, item.descriptionAnimation.values) : escapeHtml(item.description)}</p>` : ""}
+      ${item.description ? `<p class="talent-item-desc"${item.descriptionTooltip ? ` ${relationshipTooltip(item.descriptionTooltip)}` : ""}>${item.descriptionAnimation ? renderAnimatedTemplate(`talent:${item.id}:description`, item.descriptionAnimation.template, item.descriptionAnimation.values, item.descriptionAnimation.displays) : escapeHtml(item.description)}</p>` : ""}
       ${item.rewardRules ? `
         <details class="talent-item-reward-rules">
           <summary>奖励规则</summary>
@@ -3177,7 +3186,7 @@ function buildInternshipTalentItem(state: GameState, requestedPage = 0): TalentP
   const expectedIncome = minimumIncome === maximumIncome ? `${minimumIncome}` : `${minimumIncome}～${maximumIncome}`;
   const metrics = [
     { label: active || remote ? "每月工资" : "预计月薪", value: `${active ? formatMoney(getInternshipSalaryPayment(state).payment) : remote ? "1" : expectedIncome}金` },
-    { label: "每月 SAN", value: active ? formatSignedNumber(monthlyStats.san) : remote ? "-2" : "-4～6" },
+    { label: "每月 SAN", value: active ? formatSignedAttribute(monthlyStats.san) : remote ? "-2" : "-4～6" },
     { label: active || pending ? "剩余时间" : "持续时间", value: `${active || pending ? status.remainingMonths : remote ? 3 : 6}个月` },
     { label: "实验加分", value: active ? formatSignedNumber(experiment.bonus) : remote ? "+4" : "+4～6" },
     { label: "实验倍率", value: `×${active ? formatMoney(experiment.multiplier) : remote ? "1" : "1.25"}` },
@@ -3285,7 +3294,7 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
       ruleCard: true,
       labInheritancePager: { page: inheritancePage },
       metrics: inheritancePage === 0 ? [
-        { label: "你的当前奖励", value: `+${formatMoney(getPlayerAnnualResearchGrowth(state))}` },
+        { label: "你的当前奖励", value: `+${formatAttributeDetail(getPlayerAnnualResearchGrowth(state))}` },
         { label: academicCounters ? "同学成长累计" : "当前同学累计", value: "+" + formatMoney(academicCounters?.labResearchGrowth ?? state.fellowProgressState.reduce((total, profile) => total + (profile.annualResearchGrowthTotal ?? 0), 0)), tooltip: academicCounters ? "历年归档保留的科研成长与本学年新增成长" : "当前同学每学年科研成长的累计值" },
       ] : [
         { label: "同学默契原始", value: `+${socialRewards.fellowAffinity}/人` },
@@ -3321,7 +3330,7 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
           { label: "想 idea", value: jointReward ? formatSignedNumber(jointReward.ideaBonus) : "+4～6" },
           { label: "写论文", value: jointReward ? formatSignedNumber(jointReward.writingBonus) : "+4～6" },
           { label: jointReward ? "科研上限" : "预计上限", value: jointReward
-            ? formatSignedNumber(jointReward.capBonus)
+            ? formatSignedAttribute(jointReward.capBonus)
             : `+${jointCapMinimum}${jointCapMinimum === jointCapMaximum ? "" : `～${jointCapMaximum}`}` },
         ],
         description: jointReward ? "接受时奖励已固定 · 永久生效" : "会场合作获邀 · 范围按当前引用预计",
@@ -3334,11 +3343,11 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
 function getChairTalentItem(state: GameState): TalentPanelItem | null {
   if (!state.shopState.chairOwned) return null;
 
-  const chairSanRecovered = Math.max(0, Math.floor(state.shopState.chairSanRecovered ?? 0));
+  const chairSanRecovered = Math.max(0, state.shopState.chairSanRecovered ?? 0);
   const recoveryMetrics = (effect: string): NonNullable<TalentPanelItem["metrics"]> => [
-    { label: "累计回复 SAN", value: `+${chairSanRecovered}`, animation: { template: "+{recovered}", values: { recovered: chairSanRecovered } } },
+    { label: "累计回复 SAN", value: `+${formatAttribute(chairSanRecovered)}`, animation: { template: "+{recovered}", values: { recovered: chairSanRecovered }, displays: { recovered: formatAttribute(chairSanRecovered) } } },
     { label: "当前效果", value: effect, ...(state.shopState.chairUpgrade === "massage" || state.shopState.chairUpgrade === "torture"
-      ? { animation: { template: "每月 +{recovery}", values: { recovery: getChairMonthlyRecovery(state.shopState, state.player.san, state.sanCap) } } } : {}) },
+      ? { animation: { template: "每月 +{recovery}", values: { recovery: getChairMonthlyRecovery(state.shopState, state.player.san, state.sanCap) }, displays: { recovery: formatAttribute(getChairMonthlyRecovery(state.shopState, state.player.san, state.sanCap)) } } } : {}) },
   ];
   const currentRecovery = getChairMonthlyRecovery(state.shopState, state.player.san, state.sanCap);
   if (state.shopState.chairUpgrade === "advanced") {
@@ -3357,9 +3366,9 @@ function getChairTalentItem(state: GameState): TalentPanelItem | null {
       icon: "🪑",
       name: "电动按摩椅",
       active: true,
-      description: `效果：每月恢复已损 SAN 的 20%（下取整，当前 +${currentRecovery}）。`,
-      descriptionAnimation: { template: "效果：每月恢复已损 SAN 的 20%（下取整，当前 +{recovery}）。", values: { recovery: currentRecovery } },
-      metrics: recoveryMetrics(`每月 +${currentRecovery}`),
+      description: `效果：每月恢复已损 SAN 的 20%（当前 +${formatAttributeDetail(currentRecovery)}）。`,
+      descriptionAnimation: { template: "效果：每月恢复已损 SAN 的 20%（当前 +{recovery}）。", values: { recovery: currentRecovery }, displays: { recovery: formatAttributeDetail(currentRecovery) } },
+      metrics: recoveryMetrics(`每月 +${formatAttribute(currentRecovery)}`),
     };
   }
   if (state.shopState.chairUpgrade === "torture") {
@@ -3368,9 +3377,9 @@ function getChairTalentItem(state: GameState): TalentPanelItem | null {
       icon: "🪑",
       name: "沙发",
       active: true,
-      description: `效果：每月恢复当前 SAN 的 20%（下取整，当前 +${currentRecovery}）。`,
-      descriptionAnimation: { template: "效果：每月恢复当前 SAN 的 20%（下取整，当前 +{recovery}）。", values: { recovery: currentRecovery } },
-      metrics: recoveryMetrics(`每月 +${currentRecovery}`),
+      description: `效果：每月恢复当前 SAN 的 20%（当前 +${formatAttributeDetail(currentRecovery)}）。`,
+      descriptionAnimation: { template: "效果：每月恢复当前 SAN 的 20%（当前 +{recovery}）。", values: { recovery: currentRecovery }, displays: { recovery: formatAttributeDetail(currentRecovery) } },
+      metrics: recoveryMetrics(`每月 +${formatAttribute(currentRecovery)}`),
     };
   }
   if (state.shopState.chairUpgrade === "spike") {
@@ -4277,7 +4286,7 @@ function renderSanChart(
   }).join(" ");
   return `
     <div class="san-chart-panel" id="san-chart-panel" aria-label="SAN月度走势">
-      <div class="san-chart-heading"><strong>SAN走势</strong><span>${escapeHtml(selected?.label ?? "本月")} · ${selectedSan ? `${formatMoney(selectedSan.san)}/${formatMoney(selectedSan.sanCap)}` : "暂无记录"}</span></div>
+      <div class="san-chart-heading"><strong>SAN走势</strong><span>${escapeHtml(selected?.label ?? "本月")} · ${selectedSan ? `${formatAttribute(selectedSan.san)}/${formatAttribute(selectedSan.sanCap)}` : "暂无记录"}</span></div>
       <div class="san-chart-scroll">
         <div class="san-chart-plot" style="--san-chart-hit-width:${(92 / Math.max(1, months.length - 1)).toFixed(3)}%;--san-chart-dot-size:${months.length > 48 ? 5 : months.length > 24 ? 7 : 10}px">
           <svg class="san-chart-svg" viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="none" aria-hidden="true">
@@ -4289,14 +4298,14 @@ function renderSanChart(
               ? `<line class="san-chart-tick${wideTicks.has(index) ? " is-wide-tick" : ""}${narrowTicks.has(index) ? " is-narrow-tick" : ""}" x1="${x(index).toFixed(1)}" y1="175" x2="${x(index).toFixed(1)}" y2="182" />`
               : "").join("")}
           </svg>
-          <span class="san-chart-axis is-max">${formatMoney(domainMax)}</span>
-          <span class="san-chart-axis is-min">${formatMoney(domainMin)}</span>
+          <span class="san-chart-axis is-max">${formatAttribute(domainMax)}</span>
+          <span class="san-chart-axis is-min">${formatAttribute(domainMin)}</span>
           ${months.map((month, index) => {
             const point = sanByMonth.get(month.monthKey);
             const left = (x(index) / chartWidth * 100).toFixed(3);
             const label = escapeHtml(month.label);
             return `
-              ${point ? `<button class="san-chart-point${month.index === pageIndex ? " is-current" : ""}" type="button" data-ui-log-page-index="${month.index}" title="${label} · SAN ${formatMoney(point.san)}/${formatMoney(point.sanCap)}" aria-label="查看${label}日志，SAN ${formatMoney(point.san)}/${formatMoney(point.sanCap)}" style="left:${left}%;top:${(y(point.san) / chartHeight * 100).toFixed(3)}%"></button>` : ""}
+              ${point ? `<button class="san-chart-point${month.index === pageIndex ? " is-current" : ""}" type="button" data-ui-log-page-index="${month.index}" title="${label} · SAN ${formatAttributeDetail(point.san)}/${formatAttributeDetail(point.sanCap)}" aria-label="查看${label}日志，SAN ${formatAttributeDetail(point.san)}/${formatAttributeDetail(point.sanCap)}" style="left:${left}%;top:${(y(point.san) / chartHeight * 100).toFixed(3)}%"></button>` : ""}
               ${wideTicks.has(index) || narrowTicks.has(index) ? `<span class="san-chart-month${wideTicks.has(index) ? " is-wide-tick" : ""}${narrowTicks.has(index) ? " is-narrow-tick" : ""}${index === 0 ? " is-first" : ""}${index === months.length - 1 ? " is-last" : ""}" style="left:${left}%">${label}</span>` : ""}`;
           }).join("")}
         </div>
@@ -4351,7 +4360,7 @@ function renderEventLogSection(
               type="button"
               role="listitem"
               data-ui-log-page-index="${index}"
-              ${timelinePage.kind === "ending" ? 'data-ui-ending-page aria-label="结局"' : `aria-label="${escapeHtml(`${timelinePage.label}：${markerTitle}${sanPoint ? `；SAN ${formatMoney(sanPoint.san)}/${formatMoney(sanPoint.sanCap)}` : ""}`)}"`}
+              ${timelinePage.kind === "ending" ? 'data-ui-ending-page aria-label="结局"' : `aria-label="${escapeHtml(`${timelinePage.label}：${markerTitle}${sanPoint ? `；SAN ${formatAttributeDetail(sanPoint.san)}/${formatAttributeDetail(sanPoint.sanCap)}` : ""}`)}"`}
               aria-pressed="${isCurrent ? "true" : "false"}"
               >
                 ${segment}

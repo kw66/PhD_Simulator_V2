@@ -7,6 +7,8 @@ import { getReadPaperSanCost } from "./v2-reading-system";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
 import type { EventChoice, GameState } from "./v2-types";
 import { getRecoveredSan } from "./v2-san-recovery";
+import { roundAttribute } from "./v2-attribute-format";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 /** Keep result copy consistent with resource replacement without changing the original request. */
 export function formatEventSanPaymentText(text: string, state: GameState, effects: EventChoice["effects"]): string {
@@ -27,7 +29,8 @@ export function applyEventPlayerEffects(state: GameState, effects: EventChoice["
   if (effects.restAction && getActiveOperationAllowance(state, "rest").allowed) {
     state = consumeActiveOperation(state, "rest");
   }
-  const sanCap = Math.max(0, state.sanCap + (effects.sanCapDelta ?? 0));
+  const rawSanCap = Math.max(0, state.sanCap + (effects.sanCapDelta ?? 0));
+  const sanCap = usesGameplayRulesFrom("20261021-r13") ? roundAttribute(rawSanCap) : rawSanCap;
   const researchCapacityState = { ...state.researchCapacityState };
   for (const [key, delta] of Object.entries(effects.researchCapacityStateDeltas ?? {})) {
     researchCapacityState[key as keyof typeof researchCapacityState] += delta ?? 0;

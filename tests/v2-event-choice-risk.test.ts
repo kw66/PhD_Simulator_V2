@@ -161,7 +161,7 @@ describe("event choice risk explanations", () => {
     const pending = event({ san: delta });
     const details = getEventChoiceRiskDetails(current, pending, pending.choices[0]!)!;
     expect(details.risk).toBe("certain");
-    expect(details.reasons[0]!.projectedMin).toBe(initial + delta);
+    expect(details.reasons[0]!.projectedMin).toBeCloseTo(initial + delta, 10);
     expect(details.explanation).toBe(`SAN不足，结算后为${display}，将进入失败结局：不堪重负。`);
   });
 

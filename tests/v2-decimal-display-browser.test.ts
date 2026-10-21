@@ -58,12 +58,13 @@ describe("decimal display through real attribute animations", () => {
         }, value);
         expect(changes).toHaveLength(5);
         expect(changes.every(change => change === expected)).toBe(true);
-        expect(await page.locator('[data-player-stat="research"]').getAttribute("data-stat-value")).toBe(value > 8.1 ? "8.8" : "8");
+        expect(await page.locator('[data-player-stat="research"]').getAttribute("data-stat-value")).toBe(String(value));
+        expect(await page.locator('[data-player-stat="research"] .new-attr-value').textContent()).toContain(value > 8.1 ? "8.8/" : "8/");
         if (expected === "+1") await page.screenshot({ path: "artifacts/decimal-display/attribute-increase.png" });
       }
       await page.evaluate(() => {
         const store = (window as NumericTestWindow).numericTestStore;
-        store.getState().player.research += 0.0000000001;
+        store.getState().player.research += Number.EPSILON * 8;
         store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
       });
       expect(await page.locator('[data-player-stat] .stat-floating-change').count()).toBe(0);

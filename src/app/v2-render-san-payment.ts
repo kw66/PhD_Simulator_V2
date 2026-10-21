@@ -1,8 +1,13 @@
+import { formatAttributeDetail } from "../core/v2-attribute-format";
+import { formatMoney } from "../core/v2-money";
 import { formatSanPayment, type SanPaymentQuote } from "../core/v2-role-talent-costs";
 import { renderAnimatedNumber } from "./v2-render-animation";
 
 export function renderSanPayment(quote: SanPaymentQuote, alphaCapCost = 0, identity?: string, spaced = false): string {
-  const amount = (key: string, value: number): string => identity ? renderAnimatedNumber(`${identity}:${key}`, value) : String(value);
+  const amount = (key: string, value: number): string => {
+    const display = key === "money-cost" ? formatMoney(value) : formatAttributeDetail(value);
+    return identity ? renderAnimatedNumber(`${identity}:${key}`, value, display) : display;
+  };
   const gap = spaced ? " " : "";
   const capCost = quote.sanCapCost + alphaCapCost;
   const text = [quote.sanCost > 0 ? `SAN${gap}-${amount("san-cost", quote.sanCost)}` : "",

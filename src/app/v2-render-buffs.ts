@@ -1,6 +1,7 @@
 import { getActiveBuffs } from "../core/v2-buffs";
 import { combineEffectMultipliers } from "../core/v2-numeric-modifiers";
 import { roundMoney } from "../core/v2-money";
+import { formatAttributeDetail } from "../core/v2-attribute-format";
 import type { Buff, BuffTiming, PaperActionType, PlayerStats } from "../core/v2-types";
 
 export interface BuffDisplayItem {
@@ -55,6 +56,10 @@ function formatNumber(value: number): string {
 
 function formatSignedNumber(value: number): string {
   return `${value >= 0 ? "+" : ""}${formatNumber(value)}`;
+}
+
+function formatSignedAttribute(value: number): string {
+  return `${value >= 0 ? "+" : ""}${formatAttributeDetail(value)}`;
 }
 
 function getDurationText(buff: Buff): string {
@@ -174,7 +179,7 @@ function addActionEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): 
         source,
         isCost: true,
         showWhenZero: true,
-        renderLabel: (value) => `${actionLabel} SAN ${formatSignedNumber(value)}`,
+        renderLabel: (value) => `${actionLabel} SAN ${formatSignedAttribute(value)}`,
       });
     }
   }
@@ -193,7 +198,7 @@ function addReadingEffects(effects: Map<string, AccumulatedEffect>, buff: Buff):
       source,
       isCost: true,
       showWhenZero: true,
-      renderLabel: (value) => `看论文 SAN ${formatSignedNumber(value)}`,
+      renderLabel: (value) => `看论文 SAN ${formatSignedAttribute(value)}`,
     });
   }
   if (reading.manualExtraReads !== undefined) {
@@ -223,7 +228,7 @@ function addMonthlyStats(effects: Map<string, AccumulatedEffect>, buff: Buff): v
       value,
       source,
       showWhenZero: typedStat === "san" || typedStat === "money",
-      renderLabel: (total) => `每月 ${STAT_LABELS[typedStat]} ${formatSignedNumber(typedStat === "money" ? roundMoney(total) : total)}`,
+      renderLabel: (total) => `每月 ${STAT_LABELS[typedStat]} ${typedStat === "money" ? formatSignedNumber(roundMoney(total)) : formatSignedAttribute(total)}`,
     });
   }
 }
@@ -308,7 +313,7 @@ function addRuleEffects(effects: Map<string, AccumulatedEffect>, buff: Buff): vo
       isCost: true,
       showWhenZero: true,
       category: "relationship",
-      renderLabel: (value) => `人际操作 SAN ${formatSignedNumber(value)}`,
+      renderLabel: (value) => `人际操作 SAN ${formatSignedAttribute(value)}`,
     });
   }
 }

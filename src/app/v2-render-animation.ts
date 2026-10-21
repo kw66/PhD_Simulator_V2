@@ -1,3 +1,4 @@
+import { formatAttribute } from "../core/v2-attribute-format";
 import { formatMoney } from "../core/v2-money";
 
 function escapeAttribute(value: string): string {
@@ -14,6 +15,10 @@ export function animationBarAttribute(key: string): string {
 
 export function renderAnimatedNumber(key: string, value: number, display = formatMoney(value)): string {
   return `<span class="animated-number" ${animationNumberAttributes(key, value)}>${escapeAttribute(display)}</span>`;
+}
+
+export function renderAnimatedAttributeNumber(key: string, value: number, boundaries?: readonly number[]): string {
+  return `<span class="animated-number" ${animationNumberAttributes(key, value)} data-animate-format="attribute">${escapeAttribute(formatAttribute(value, boundaries))}</span>`;
 }
 
 export function renderAnimatedTemplate(key: string, template: string, values: Record<string, number>, displays: Record<string, string> = {}): string {

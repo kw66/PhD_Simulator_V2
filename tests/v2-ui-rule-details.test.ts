@@ -484,7 +484,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(nextState.actionState.used).toBe(1);
   });
 
-  it("rounds the combined SAN multiplier before equipment and seasonal adjustments", () => {
+  it("retains fractional combined SAN multipliers before equipment and seasonal adjustments", () => {
     const state = createResearchState();
     state.shopState.keyboardOwned = true;
     state.buffs = [
@@ -492,15 +492,15 @@ describe("v2 research rule details and publication metrics", () => {
       createBuff("second", { activeOperationSanMultiplier: 1.1 }),
     ];
 
-    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(5);
+    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(4.8);
     state.month = 7;
-    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(4);
+    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(3.8);
     state.month = 10;
-    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(6);
+    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(5.8);
     state.eventSupport.hasParasol = true;
-    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(5);
+    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(4.8);
     state.month = 4;
-    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(5);
+    expect(previewResearchOperation(state, "writing", 4).sanCost).toBe(4.8);
   });
 
   it("places duration fourth and the total citation multiplier last with two candidate label lines", () => {

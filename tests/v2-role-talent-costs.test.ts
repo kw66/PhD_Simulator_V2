@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialState } from "../src/core/v2-engine";
 import { consumeActiveOperation, getActiveOperationAllowance, getAiModelForTotalMonths } from "../src/core/v2-ai-shop";
 import { paySanCost, quoteSanPayment } from "../src/core/v2-role-talent-costs";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { applyReadPaperActions, previewReadPaperAction } from "../src/core/v2-reading-system";
 import { applyResearchOperation, createResearchPaper } from "../src/core/v2-research-operation";
 import type { GameState } from "../src/core/v2-types";
@@ -87,5 +88,26 @@ describe("role talent action costs", () => {
     const state = stateWith({ "burning-life-beta": 1 });
     expect(paySanCost({ ...state, player: { ...state.player, san: 30 } }, 2).player.san).toBe(28);
     expect(quoteSanPayment({ ...state, degree: "master" }, 2).allowed).toBe(false);
+  });
+});
+describe("fractional SAN payments", () => {
+  it("quotes replacement money at the same cent precision that is actually charged", () => {
+    const state = stateWith({ "gold-power-alpha": 1 });
+    state.player.money = 50;
+    expect(quoteSanPayment(state, 1.235).moneyCost).toBe(1.24);
+    expect(paySanCost(state, 1.235).player.money).toBe(48.76);
+    expect(quoteSanPayment(state, 50.004)).toMatchObject({ moneyCost: 50, sanCost: 0, allowed: true });
+    expect(quoteSanPayment(state, 50.006).allowed).toBe(false);
+  });
+
+  it("accepts exact decimal balances without allowing a genuine deficit", () => {
+    const initial = createInitialState();
+    const state = { ...initial, player: { ...initial.player, san: 0.7 - 0.6 } };
+    expect(quoteSanPayment(state, 0.1).allowed).toBe(true);
+    expect(paySanCost(state, 0.1).player.san).toBe(0);
+    const deficit = { ...state, player: { ...state.player, san: 0.099 } };
+    expect(quoteSanPayment(deficit, 0.1).allowed).toBe(false);
+    expect(paySanCost(deficit, 0.1, { allowOverdraw: true }).player.san).toBe(-0.001);
+    expect(withGameplayRuleset("20261020-r12", () => quoteSanPayment(state, 0.1)).allowed).toBe(false);
   });
 });

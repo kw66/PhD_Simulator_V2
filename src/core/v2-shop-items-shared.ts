@@ -76,8 +76,8 @@ export function getNextGpuTierDefinition(level: number): GpuTierDefinition | nul
 
 export const SHOP_UPGRADE_DEFINITIONS: ShopUpgradeDefinition[] = [
   { id: "chair-advanced", itemId: "chair", name: "人体工学椅", description: "每月 SAN +2", price: 18 },
-  { id: "chair-massage", itemId: "chair", name: "电动按摩椅", description: "每月恢复 20% 已损失 SAN（下取整）", price: 20 },
-  { id: "chair-torture", itemId: "chair", name: "沙发", description: "每月恢复当前 SAN 的 20%（下取整）", price: 20 },
+  { id: "chair-massage", itemId: "chair", name: "电动按摩椅", description: "每月恢复 20% 已损失 SAN", price: 20 },
+  { id: "chair-torture", itemId: "chair", name: "沙发", description: "每月恢复当前 SAN 的 20%", price: 20 },
   { id: "chair-spike", itemId: "chair", name: "锥刺股椅", description: "SAN 小于等于 0 时恢复到 3", price: 16 },
   { id: "chair-hammock", itemId: "chair", name: "吊床", description: "休息效果 +3", price: 15 },
 ];

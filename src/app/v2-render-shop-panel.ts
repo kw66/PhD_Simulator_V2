@@ -1,4 +1,5 @@
 import { formatMoney, roundMoney } from "../core/v2-money";
+import { formatAttribute, formatAttributeDetail } from "../core/v2-attribute-format";
 import "../styles/shop-unified.css";
 import {
   COFFEE_MACHINE_UPGRADE_DEFINITIONS,
@@ -72,7 +73,7 @@ type RowConfig = {
   statusTone?: "neutral" | "owned" | "locked";
   description: string;
   effectText?: string;
-  effectAnimation?: { key: string; template: string; values: Record<string, number> };
+  effectAnimation?: { key: string; template: string; values: Record<string, number>; displays?: Record<string, string> };
   dim?: boolean;
   selected?: boolean;
   selectionSlot?: boolean;
@@ -249,7 +250,7 @@ function renderPurchaseButton(state: GameState, config: Omit<ActionButtonConfig,
 function renderShopEffectHtml(effectText: string, animation?: RowConfig["effectAnimation"]): string {
   const renderMetricTextHtml = (value: string): string => value
     .split(/((?:SAN\s*)?(?:[+\-×=]\s*)?(?:\{[\w-]+\}|\d+(?:\.\d+)?%?)(?:\s*(?:分|次|点|金币|杯|月))?)/giu)
-    .map((part, index) => index % 2 === 1 ? `<strong>${animation ? renderAnimatedTemplate(animation.key, part, animation.values) : escapeHtml(part)}</strong>` : escapeHtml(part))
+    .map((part, index) => index % 2 === 1 ? `<strong>${animation ? renderAnimatedTemplate(animation.key, part, animation.values, animation.displays) : escapeHtml(part)}</strong>` : escapeHtml(part))
     .join("");
 
   return (animation?.template ?? effectText).split("\n").map((rawLine) => {
@@ -263,7 +264,7 @@ function renderShopEffectHtml(effectText: string, animation?: RowConfig["effectA
     return `
       <span class="shop-effect-line${value ? "" : " is-label-only"}">
         <span>${escapeHtml(label)}</span>
-        ${value ? `<strong>${animation ? renderAnimatedTemplate(animation.key, value, animation.values) : escapeHtml(value)}</strong>` : ""}
+        ${value ? `<strong>${animation ? renderAnimatedTemplate(animation.key, value, animation.values, animation.displays) : escapeHtml(value)}</strong>` : ""}
       </span>
     `;
   }).join("\n");
@@ -429,7 +430,7 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
   const currentName = currentDefinition?.name ?? item.name;
   const currentEffect = [
     currentDefinition?.description ?? `${item.description}，升级路线5选一`,
-    ...(owned ? [`累计 +${Math.max(0, state.shopState.chairSanRecovered)} SAN`] : []),
+    ...(owned ? [`累计 +${formatAttribute(Math.max(0, state.shopState.chairSanRecovered))} SAN`] : []),
   ].join("\n");
   const purchasePrice = getShopActionPrice(state, "buy-shop-item", { shopItemId: "chair" }) ?? item.price;
   const options = CHAIR_UPGRADE_IDS.map((upgradeId): UpgradeRouteOption => {
@@ -462,7 +463,7 @@ function renderChairUpgradeRoute(state: GameState, icon: string, selectedChairUp
     statusTone: owned ? "owned" : "neutral",
     description: "",
     effectText: currentEffect,
-    effectAnimation: owned ? { key: "shop:chair", template: `${currentDefinition?.description ?? `${item.description}，升级路线5选一`}\n累计 +{recovered} SAN`, values: { recovered: Math.max(0, state.shopState.chairSanRecovered) } } : undefined,
+    effectAnimation: owned ? { key: "shop:chair", template: `${currentDefinition?.description ?? `${item.description}，升级路线5选一`}\n累计 +{recovered} SAN`, values: { recovered: Math.max(0, state.shopState.chairSanRecovered) }, displays: { recovered: formatAttributeDetail(Math.max(0, state.shopState.chairSanRecovered)) } } : undefined,
     actions: owned
       ? [
           renderActionButton({

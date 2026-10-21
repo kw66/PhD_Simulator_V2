@@ -31,7 +31,7 @@ import {
   type DesignedTalentNode,
   type TalentAllocation,
 } from "../core/v2-role-talent-definitions";
-import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
+import { animationNumberAttributes, animationBarAttribute, renderAnimatedAttributeNumber, renderAnimatedNumber } from "./v2-render-animation";
 import { getRoleLobbyAchievementDefinitions, getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, MAX_ROLE_LEVEL, ROLE_INITIAL_TALENT_POINTS, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
@@ -357,7 +357,8 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
   const historyStats = historyPage === 0 ? viewModel.historyStats : ([
     ["sanCap", "SAN上限"], ["research", "科研能力"], ["social", "社交能力"],
     ["favor", "导师好感"], ["money", "金币"],
-  ] as const).map(([id, label]) => ({ id, label, value: formatMoney(viewModel.progress.historyBest[id] ?? 0) }));
+  ] as const).map(([id, label]) => ({ id, label, value: id === "money"
+    ? formatMoney(viewModel.progress.historyBest[id] ?? 0) : String(viewModel.progress.historyBest[id] ?? 0) }));
   const unlockAchievement = getRoleLobbyAchievementDefinitions(viewModel.role.id)
     .find((achievement) => getAchievementUnlockRoleIds(achievement).includes(viewModel.role.id));
   const unlockHint = unlockAchievement
@@ -383,7 +384,9 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
             ${historyStats.map((stat) => `
               <div class="lobby-profile-stat-row" data-role-history-stat="${stat.id}">
                 <span>${escapeHtml(stat.label)}</span>
-                <strong>${renderAnimatedNumber(`role:${viewModel.role.id}:history:${stat.id === "representative" ? "representative:score" : stat.id}`, Number(stat.value), stat.value)}</strong>
+                <strong>${historyPage === 1 && stat.id !== "money"
+                  ? renderAnimatedAttributeNumber(`role:${viewModel.role.id}:history:${stat.id}`, Number(stat.value))
+                  : renderAnimatedNumber(`role:${viewModel.role.id}:history:${stat.id === "representative" ? "representative:score" : stat.id}`, Number(stat.value), stat.value)}</strong>
               </div>
             `).join("")}
           </div>

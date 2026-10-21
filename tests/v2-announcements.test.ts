@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-19", "2026-10-18", "2026-10-17", "2026-10-16", "2026-10-13", "2026-10-10"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-21", "2026-10-19", "2026-10-18", "2026-10-17", "2026-10-16", "2026-10-13"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -17,6 +17,7 @@ describe("game announcements", () => {
       for (const change of entry.changes) expect(html).toContain(change.title);
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
+    for (const text of ["不再向上取整", "档位抵抗", "SAN消耗倍率", "加点", "等级分布", "诅咒", "紧凑方格", "期限", "结算月份"]) expect(textForDate("2026-10-21")).toContain(text);
     for (const text of ["解锁即有10天赋点", "每升一级再增加1点", "已有加点保留", "首篇一作论文获得分数后", "被抢发idea和新sota", "所有角色均可回溯事件", "同一选项结果固定", "选项文字居中"]) expect(textForDate("2026-10-19")).toContain(text);
     const mastery = textForDate("2026-10-18");
     for (const text of ["论文熟手", "一作", "顺序循环", "永久+1分", "50%", "移除跑腿熟手"]) expect(mastery).toContain(text);
@@ -44,7 +45,7 @@ describe("game announcements", () => {
     for (const topic of ["5月处理转博", "月末判断毕业", "注册费", "失败预警", "生活费", "2000字", "同学钱包", "角色经验", "十二项发表里程碑", "六个AI系列"]) {
       expect(text).toContain(topic);
     }
-    expect(GAME_ANNOUNCEMENTS.length).toBeLessThan(25);
+    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(25);
   });
 
   it("distinguishes the earlier talent preview from released routes and remaining curse designs", () => {

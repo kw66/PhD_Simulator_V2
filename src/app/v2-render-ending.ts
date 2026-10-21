@@ -1,3 +1,4 @@
+import { formatAttribute, formatAttributeDetail } from "../core/v2-attribute-format";
 import "../styles/event-ending.css";
 import { getPlayerAttributeCap } from "../core/v2-player-attributes";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
@@ -116,7 +117,7 @@ function renderEndingLife(state: GameState): string {
   const lover = state.loverState.active
     ? `<div class="ending-highlight is-lover" data-ending-section="relationships-lover">
         <div class="ending-highlight-heading"><span>💕 恋人：</span><strong>${escapeHtml(state.loverState.name?.trim() || "恋人")}</strong></div>
-        <div class="ending-highlight-detail"><span class="ending-highlight-tags"><span>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span></span><span>亲密 ${formatMoney(state.loverProgressState.intimacy)}</span><span>科研 ${formatMoney(state.loverProgressState.research)}</span></div>
+        <div class="ending-highlight-detail"><span class="ending-highlight-tags"><span>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span></span><span>亲密 ${formatAttribute(state.loverProgressState.intimacy)}</span><span>科研 ${formatAttribute(state.loverProgressState.research)}</span></div>
         <div class="ending-highlight-detail"><span>${state.loverState.startTotalMonths !== null ? `相识 ${Math.max(0, state.totalMonths - state.loverState.startTotalMonths + 1)} 个月` : "相识于研究生阶段"}</span></div>
       </div>` : "";
   const offer = Object.values(state.careerOffers).find((entry) => entry !== undefined);
@@ -163,10 +164,10 @@ function renderEndingSummary(state: GameState, published: Paper[]): string {
     return `<span data-ending-stat="${venue}"${count === 0 ? ' class="is-zero"' : ""}>${label}<strong>${count}</strong></span>`;
   });
   const attributes = [
-    ["san", "🧠 SAN", `${formatMoney(state.player.san)}/${formatMoney(state.sanCap)}`, state.ending === "burnout"],
-    ["research", "💡 科研", `${formatMoney(state.player.research)}/${formatMoney(getResearchCap(state.researchCapacityState))}`, state.ending === "overthinking"],
-    ["social", "🤝 社交", `${formatMoney(state.player.social)}/${getPlayerAttributeCap(state, "social")}`, state.ending === "isolated"],
-    ["favor", "👨‍🏫 导师好感", `${formatMoney(state.player.favor)}/${getPlayerAttributeCap(state, "favor")}`, state.ending === "expelled"],
+    ["san", "🧠 SAN", `${formatAttribute(state.player.san)}/${formatAttribute(state.sanCap)}`, state.ending === "burnout"],
+    ["research", "💡 科研", `${formatAttribute(state.player.research)}/${formatAttribute(getResearchCap(state.researchCapacityState))}`, state.ending === "overthinking"],
+    ["social", "🤝 社交", `${formatAttribute(state.player.social)}/${formatAttribute(getPlayerAttributeCap(state, "social"))}`, state.ending === "isolated"],
+    ["favor", "👨‍🏫 导师好感", `${formatAttribute(state.player.favor)}/${formatAttribute(getPlayerAttributeCap(state, "favor"))}`, state.ending === "expelled"],
     ["money", "💰 金币", formatMoney(state.player.money), state.ending === "poor"],
   ] as const;
   return `<section class="ending-summary" aria-label="本轮属性与成果">
@@ -187,7 +188,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
   const target = state.graduationScoreTarget;
   const failureStats = { burnout: ["SAN", state.player.san], poor: ["金币", state.player.money], expelled: ["导师好感", state.player.favor], isolated: ["社交", state.player.social], overthinking: ["科研能力", state.player.research] } as const;
   const failedStat = ending && ending in failureStats ? failureStats[ending as keyof typeof failureStats] : null;
-  const reason = failedStat ? `${failedStat[0]} ${formatMoney(failedStat[1])}，低于0`
+  const reason = failedStat ? `${failedStat[0]} ${ending === "poor" ? formatMoney(failedStat[1]) : formatAttributeDetail(failedStat[1])}，低于0`
     : ending === "lab-bankrupt" ? `科研经费 ${formatMoney(state.advisorProgressState.funding)}，低于0`
     : ending === "delay" ? target === null ? "毕业要求尚未确定"
       : state.totalResearchScore < target ? `科研分 ${state.totalResearchScore}/${target}，未达标`

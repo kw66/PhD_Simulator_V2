@@ -1,3 +1,4 @@
+import { formatAttributeDetail } from "../core/v2-attribute-format";
 import { roundMoney } from "../core/v2-money";
 
 export interface AnimatedValueSnapshot {
@@ -8,9 +9,15 @@ export interface AnimatedValueSnapshot {
 export function getVisibleValueDelta(
   previous: AnimatedValueSnapshot | undefined,
   current: AnimatedValueSnapshot,
+  attribute = false,
 ): number {
   if (!previous?.visible || !current.visible) return 0;
   if (!Number.isFinite(previous.value) || !Number.isFinite(current.value)) return 0;
+  if (attribute) {
+    const delta = current.value - previous.value;
+    const noise = Number.EPSILON * Math.max(1, Math.abs(current.value), Math.abs(previous.value)) * 8;
+    return Math.abs(delta) <= noise ? 0 : Number(delta.toPrecision(12));
+  }
   return roundMoney(roundMoney(current.value) - roundMoney(previous.value));
 }
 
@@ -50,7 +57,7 @@ export function createValueAnimations(root: HTMLElement): (enabled: boolean) => 
       };
       current.set(key, snapshot);
       const before = previous.get(key);
-      const delta = motionAllowed ? getVisibleValueDelta(before, snapshot) : 0;
+      const delta = motionAllowed ? getVisibleValueDelta(before, snapshot, element.dataset.animateFormat === "attribute") : 0;
       if (delta !== 0 && before) changes.push({ element, delta, before: before.value, dimension });
     });
     previous = current;
@@ -71,7 +78,8 @@ export function createValueAnimations(root: HTMLElement): (enabled: boolean) => 
         floatingChange = document.createElement("span");
         floatingChange.className = `stat-floating-change panel-floating-change is-${direction}`;
         floatingChange.setAttribute("aria-hidden", "true");
-        floatingChange.textContent = delta > 0 ? `+${delta}` : String(delta);
+        const displayedDelta = element.dataset.animateFormat === "attribute" ? formatAttributeDetail(delta) : String(delta);
+        floatingChange.textContent = delta > 0 ? `+${displayedDelta}` : displayedDelta;
         floatingChange.style.right = `${Math.max(4, window.innerWidth - bounds.right)}px`;
         floatingChange.style.top = `${Math.max(18, bounds.top)}px`;
         document.body.appendChild(floatingChange);

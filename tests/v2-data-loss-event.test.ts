@@ -111,7 +111,7 @@ describe("data loss narrative and choices", () => {
     expect(getChoice(makeEvent(state), "stay-up").effects.san).toBe(san);
   });
 
-  it.each([[1.5, 0, -8], [1, -10, 0]])("retains SAN cost modifiers %s/%s and the zero floor", (multiplier, delta, expected) => {
+  it.each([[1.5, 0, -7.5], [1, -10, 0]])("retains SAN cost modifiers %s/%s and the zero floor", (multiplier, delta, expected) => {
     const state = makeState();
     state.buffs = [{
       id: "test-cost", name: "Test", source: "test", timing: "monthly", remainingMonths: 1,

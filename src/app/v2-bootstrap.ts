@@ -1,3 +1,4 @@
+import { formatAttributeDetail } from "../core/v2-attribute-format";
 import {
   Activity,
   ArrowRight,
@@ -541,6 +542,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const delta = getVisibleValueDelta(
         { value: previous[statId], visible: true },
         { value: current[statId], visible: true },
+        statId !== "money",
       );
       const item = root.querySelector<HTMLElement>(`[data-player-stat="${statId}"]`);
       if (!item || item.getClientRects().length === 0 || delta === 0) return;
@@ -549,7 +551,8 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const value = item.querySelector<HTMLElement>(statId === "money" ? ".new-currency-value" : ".new-attr-value");
       const floatingChange = document.createElement("span");
       floatingChange.className = `stat-floating-change is-${direction}`;
-      floatingChange.textContent = delta > 0 ? `+${delta}` : String(delta);
+      const displayedDelta = statId === "money" ? String(delta) : formatAttributeDetail(delta);
+      floatingChange.textContent = delta > 0 ? `+${displayedDelta}` : displayedDelta;
       value?.appendChild(floatingChange);
       value?.classList.add(`is-value-${direction}`);
       item.classList.add(`is-stat-${direction}`);

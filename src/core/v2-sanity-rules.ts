@@ -2,9 +2,14 @@ import { gameRandom } from "./v2-game-random";
 import { getAttributeTier } from "./v2-random-event-rules";
 import { applyMultipliersThenAdditions, combineEffectMultipliers } from "./v2-numeric-modifiers";
 import { formatMoney } from "./v2-money";
+import { formatAttributeDetail, roundAttribute } from "./v2-attribute-format";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { Buff, EventSupportState, GameState } from "./v2-types";
 
 export const SLOTH_SAN_BUFF_ID = "role-sloth-san";
+
+const formatEffectAttribute = (value: number): string => usesGameplayRulesFrom("20261021-r13")
+  ? formatAttributeDetail(value) : formatMoney(value);
 
 /** Fixed monthly drains do not inherit illness, season-action or lover modifiers. */
 export function getRoleMonthlySanCost(state: Pick<GameState, "selectedRoleId" | "degree">, baseCost: number): number {
@@ -68,7 +73,10 @@ export function getSanConsumptionCost(baseCost: number, buffs: readonly Buff[], 
       ? [buff.activeOperationSanMultiplier!] : []
   )));
   const additive = activeBuffs.reduce((total, buff) => total + (buff.activeOperationSanDelta ?? 0), fixedDelta);
-  return Math.max(0, applyMultipliersThenAdditions(baseCost, [multiplier], [additive], "ceil"));
+  if (!usesGameplayRulesFrom("20261021-r13")) {
+    return Math.max(0, applyMultipliersThenAdditions(baseCost, [multiplier], [additive], "ceil"));
+  }
+  return roundAttribute(Math.max(0, applyMultipliersThenAdditions(baseCost, [multiplier], [additive])));
 }
 
 export function getActualSanChange(
@@ -102,14 +110,14 @@ export function getIllnessSanIncrease(
 function formatSignedEffectChange(finalDelta: number, originalDelta = finalDelta): string {
   // A fully resisted cost is still a loss; a net zero keeps the default +0.
   if (finalDelta === 0 && originalDelta < 0) return "-0";
-  return `${finalDelta >= 0 ? "+" : "-"}${formatMoney(Math.abs(finalDelta))}`;
+  return `${finalDelta >= 0 ? "+" : "-"}${formatEffectAttribute(Math.abs(finalDelta))}`;
 }
 
 export function formatEventSanChange(finalDelta: number, illnessIncrease = 0, researchDiscount = 0, originalDelta = finalDelta): string {
   const signedDelta = formatSignedEffectChange(finalDelta, originalDelta);
   const notes = [
-    researchDiscount > 0 ? `（减免${formatMoney(researchDiscount)}）` : "",
-    finalDelta < 0 && illnessIncrease > 0 ? `（疾病增加${formatMoney(illnessIncrease)}）` : "",
+    researchDiscount > 0 ? `（减免${formatEffectAttribute(researchDiscount)}）` : "",
+    finalDelta < 0 && illnessIncrease > 0 ? `（疾病增加${formatEffectAttribute(illnessIncrease)}）` : "",
   ].join("");
   return `SAN ${signedDelta}${notes}`;
 }
@@ -171,13 +179,13 @@ export function formatTierResistedOutcome(
   rawChange: number,
   result: Pick<ReturnType<typeof applyTierResist>, "effectiveChange" | "resistedCount" | "cappedCount"> & { moneyCost?: number; capIncrease?: number },
 ): string {
-  const actual = result.effectiveChange;
-  const signedActual = formatSignedEffectChange(Number(formatMoney(actual)), rawChange);
+  const actual = usesGameplayRulesFrom("20261021-r13") ? result.effectiveChange : Number(formatMoney(result.effectiveChange));
+  const signedActual = formatSignedEffectChange(actual, rawChange);
   const detailText = [
-    result.resistedCount > 0 ? `抵抗${formatMoney(result.resistedCount)}` : "",
+    result.resistedCount > 0 ? `抵抗${formatEffectAttribute(result.resistedCount)}` : "",
     result.cappedCount && rawChange > 0 ? "上限" : "",
     result.moneyCost ? `金币 -${formatMoney(result.moneyCost)}` : "",
-    result.capIncrease ? `${label}上限 +${formatMoney(result.capIncrease)}` : "",
+    result.capIncrease ? `${label}上限 +${formatEffectAttribute(result.capIncrease)}` : "",
   ].filter(Boolean).join("；");
   return `${label} ${signedActual}${detailText ? `（${detailText}）` : ""}`;
 }

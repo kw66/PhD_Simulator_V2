@@ -59,7 +59,7 @@ describe("shared immediate SAN consumption", () => {
   it("shares relationship-only discounts with advisor and lover but not events or promotion", () => {
     const state = stateForMonth(11);
     state.buffs = [modifierBuff({ activeOperationSanMultiplier: 1.5, relationshipOperationSanDelta: -1, activeOperationSanDelta: -1 })];
-    expect(getAdvisorTaskSanCost(state)).toBe(7);
+    expect(getAdvisorTaskSanCost(state)).toBe(6.5);
     expect(getLoverRouteCost(state, "study").san).toBe(5);
     expect(getPaperPromotionCost("github", state)).toBe(6);
     expect(getActualSanChange(-4, state.month, state.eventSupport, state.buffs)).toBe(-6);

@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { recordPersonalIncome } from "./v2-money";
 import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { addOrReplaceBuffs } from "./v2-buffs";
@@ -46,7 +47,8 @@ function addAttributes(state: GameState, changes: Partial<Record<PlayerAttribute
 
 function recoverSan(state: GameState, amount: number): GameState {
   if (amount <= 0 || state.player.san >= state.sanCap) return state;
-  return { ...state, player: { ...state.player, san: Math.min(state.sanCap, state.player.san + amount) } };
+  const san = Math.min(state.sanCap, state.player.san + amount);
+  return { ...state, player: { ...state.player, san: usesGameplayRulesFrom("20261021-r13") ? precise(san) : san } };
 }
 
 /** Apply only the selected run's allocation, never the mutable setup allocation. */
@@ -141,7 +143,11 @@ export function applyRoleTalentPhdTransfer(before: GameState, after: GameState):
   const aPapers = firstAuthor.filter((paper) => paper.target === "A").length;
   if (state.selectedRoleId === "normal") {
     const rank = level(state, "self-determination");
-    state = logTalent(state, addAttributes(state, Object.fromEntries(ATTRIBUTES.map((stat) => [stat, Math.ceil(precise(before.player[stat] * rank / 10))]))), "self-determination", "我命由我", "转博奖励");
+    const rewards = Object.fromEntries(ATTRIBUTES.map((stat) => {
+      const raw = precise(before.player[stat] * rank / 10);
+      return [stat, usesGameplayRulesFrom("20261021-r13") ? raw : Math.ceil(raw)];
+    }));
+    state = logTalent(state, addAttributes(state, rewards), "self-determination", "我命由我", "转博奖励");
   } else if (state.selectedRoleId === "rich") {
     const wealth = roundMoney(before.player.money * 0.25 * level(state, "wealth-growth"));
     const papers = firstAuthor.length * level(state, "knowledge-is-wealth");

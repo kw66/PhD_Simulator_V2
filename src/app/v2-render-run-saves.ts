@@ -1,3 +1,4 @@
+import { formatAttribute, formatAttributeDetail } from "../core/v2-attribute-format";
 import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-calendar";
 import type { GameState } from "../core/v2-types";
 import type { PlayRenderUiState } from "./v2-render-types";
@@ -35,13 +36,13 @@ export function renderRunSaves(state: GameState, uiState: PlayRenderUiState): st
           : "入学前";
         const isLatest = save.kind === "latest" || save.id === mergedMonthId;
         const timing = save.phase === "finished" ? "结局" : isLatest ? "最新" : "月初";
-        const detail = `${save.playerName?.trim() || "？？？"} · ${save.degree === "phd" ? "博士" : "硕士"} · SAN ${save.san}/${save.sanCap} · 科研分 ${save.researchScore}`;
+        const detail = `${save.playerName?.trim() || "？？？"} · ${save.degree === "phd" ? "博士" : "硕士"} · SAN ${formatAttributeDetail(save.san)}/${formatAttributeDetail(save.sanCap)} · 科研分 ${save.researchScore}`;
         const savedAt = isLatest && mergedMonthId ? latest!.savedAt : save.savedAt;
         const label = `读取${month}${isLatest ? "最新进度" : "月初存档"}，${detail}，保存于${formatSavedAt(savedAt)}`;
         return `<div class="run-save-item" role="listitem"><button type="button" class="run-save-card${isLatest ? " is-latest" : ""}" data-ui-load-run-save="${escape(save.id)}" aria-label="${escape(label)}" title="${escape(label)}">
           <strong class="run-save-title">${month}</strong>
           <span class="run-save-position"><span>${save.totalMonths > 0 ? `第${save.totalMonths}月` : "入学"}</span><span class="run-save-timing">${timing}</span></span>
-          <span class="run-save-detail"><span>SAN ${save.san}/${save.sanCap}</span><span>科研 ${save.researchScore}</span></span>
+          <span class="run-save-detail"><span>SAN ${formatAttribute(save.san, [0, 2, 3, 5, 6, 12, 18, 20, save.sanCap])}/${formatAttribute(save.sanCap)}</span><span>科研 ${save.researchScore}</span></span>
         </button></div>`;
       }).join("") : '<p class="run-saves-empty">当前角色尚无存档</p>'}
     </div>

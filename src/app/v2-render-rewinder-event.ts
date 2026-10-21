@@ -1,3 +1,4 @@
+import { formatAttributeDetail } from "../core/v2-attribute-format";
 import { ADVISOR_GRANTS } from "../core/v2-advisor-progress";
 import { formatMoney } from "../core/v2-money";
 import { getFellowName } from "../core/v2-fellow-progression";
@@ -30,10 +31,10 @@ function comparison(label: string, before: string | number, after: string | numb
 }
 
 function attributeCard(label: string, before: number, beforeCap: number, after: number, afterCap: number): string {
-  const beforeText = `${formatMoney(before)} / ${formatMoney(beforeCap)}`;
-  const afterText = `${formatMoney(after)} / ${formatMoney(afterCap)}`;
-  const increases = [after > before ? `当前值 +${formatMoney(after - before)}` : "", afterCap > beforeCap ? `上限 +${formatMoney(afterCap - beforeCap)}` : ""].filter(Boolean);
-  return `<div class="rewinder-stat-card${beforeText !== afterText ? " is-improved" : ""}" aria-label="${escapeHtml(label)}：${display(beforeText)} → ${display(afterText)}"><div class="rewinder-stat-label">${escapeHtml(label)} <span>当前 / 上限</span></div><div class="rewinder-stat-values"><span>${display(beforeText)}</span><i aria-hidden="true">→</i><strong>${formatMoney(after)}<small> / ${formatMoney(afterCap)}</small></strong></div><div class="rewinder-stat-gains">${increases.length ? increases.map(value => `<span>${value}</span>`).join("") : '<span class="is-unchanged">保持</span>'}</div></div>`;
+  const beforeText = `${formatAttributeDetail(before)} / ${formatAttributeDetail(beforeCap)}`;
+  const afterText = `${formatAttributeDetail(after)} / ${formatAttributeDetail(afterCap)}`;
+  const increases = [after > before ? `当前值 +${formatAttributeDetail(after - before)}` : "", afterCap > beforeCap ? `上限 +${formatAttributeDetail(afterCap - beforeCap)}` : ""].filter(Boolean);
+  return `<div class="rewinder-stat-card${beforeText !== afterText ? " is-improved" : ""}" aria-label="${escapeHtml(label)}：${display(beforeText)} → ${display(afterText)}"><div class="rewinder-stat-label">${escapeHtml(label)} <span>当前 / 上限</span></div><div class="rewinder-stat-values"><span>${display(beforeText)}</span><i aria-hidden="true">→</i><strong>${formatAttributeDetail(after)}<small> / ${formatAttributeDetail(afterCap)}</small></strong></div><div class="rewinder-stat-gains">${increases.length ? increases.map(value => `<span>${value}</span>`).join("") : '<span class="is-unchanged">保持</span>'}</div></div>`;
 }
 
 function advisorRank(record: RewinderYearRecord): string {

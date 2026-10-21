@@ -35,13 +35,13 @@ import { createJournalFeeEvent } from "../src/core/v2-journal-fee-events";
 import { getRoleLobbyAchievementDefinitions, getAllAchievementDefinitions } from "../src/core/v2-role-lobby-meta";
 import { getAchievementDisplayPages } from "../src/core/v2-lobby";
 import { createDebugBuffs } from "../src/core/v2-debug-tools";
-import { animationNumberAttributes, renderAnimatedNumber } from "../src/app/v2-render-animation";
+import { animationNumberAttributes, renderAnimatedAttributeNumber, renderAnimatedNumber } from "../src/app/v2-render-animation";
 import type { AdvisorGrantId, GameState, PendingEvent, RelationshipKind } from "../src/core/v2-types";
 
 function renderApp(...args: Parameters<typeof renderAppWithAnimations>): string {
   return renderAppWithAnimations(args[0], args[1], { activeRoleRailView: "achievements", ...args[2] })
     .replace(/<span class="rel-inline-icon" aria-hidden="true">[^<]*<\/span>/g, "")
-    .replace(/<span class="animated-number" data-animate-key="[^"]*" data-animate-number="[^"]*">([^<]*)<\/span>/g, "$1")
+    .replace(/<span class="animated-number" data-animate-key="[^"]*" data-animate-number="[^"]*"(?: data-animate-format="attribute")?>([^<]*)<\/span>/g, "$1")
     .replace(/ data-animate-(?:key|number|bar)="[^"]*"/g, "");
 }
 
@@ -353,7 +353,7 @@ describe("v2 explicit render animation markers", () => {
     expect(advisor).toContain(`<span class="rel-action-label">${icon("🛠️")}做横向</span>`);
     for (const card of [fellow, lover]) {
       expect(card).toContain(`<span class="rel-detail-label">${icon("💡")}科研</span>`);
-      expect(card).toContain('data-animate-number="7">7</span>/20');
+      expect(card).toContain('data-animate-number="7" data-animate-format="attribute">7</span>/20');
     }
     expect(fellow).not.toContain('class="rel-known-time"');
     expect(fellow).toContain('class="rel-fellow-academic-row rel-attributes-row"');
@@ -450,7 +450,7 @@ describe("v2 explicit render animation markers", () => {
     const numbers = readAnimationNumbers(html);
     expect(numbers.get(`person:${fellow.id}:research`)).toBe(7);
     expect(numbers.get(`person:${fellow.id}:affinity`)).toBe(4);
-    expect(html).toContain(`${renderAnimatedNumber(`person:${fellow.id}:research`, 7)}/20`);
+    expect(html).toContain(`${renderAnimatedAttributeNumber(`person:${fellow.id}:research`, 7)}/20`);
     expect(numbers.get(`paper:${paper.id}:fellow:idea:total`)).toBe(10);
     expect(numbers.get(`paper:${paper.id}:fellow:total`)).toBe(60);
     expect(numbers.get("person:advisor:funding")).toBe(4);
@@ -500,7 +500,7 @@ describe("v2 explicit render animation markers", () => {
       const academic = card.match(/<div class="rel-fellow-academic-row rel-attributes-row">([\s\S]*?)<\/div>/)?.[1] ?? "";
       expect(numbers.get(`${identity}:research`)).toBe(expected.display);
       expect(numbers.get(`${identity}:${secondKind}`)).toBe(expected.display);
-      expect(academic).toContain(`data-animate-number="${expected.display}">${expected.display}</span>/20`);
+      expect(academic).toContain(`data-animate-number="${expected.display}" data-animate-format="attribute">${expected.display}</span>/20`);
       expect(academic.match(/class="new-attr-level [^"]* rel-stat-tier"/g)).toHaveLength(2);
       expect(academic).toContain(`class="new-attr-level attr-level-research rel-stat-tier">${expected.research}</span>`);
       expect(academic).toContain(`class="new-attr-level attr-level-${secondKind} rel-stat-tier">${expected[secondKind]}</span>`);
@@ -1014,7 +1014,7 @@ describe("v2 render lobby shell", () => {
     expect(tree).not.toMatch(/破釜沉舟|绝处逢生|顿悟|燃尽/);
     expect(tree).toContain("首月结束后，下月初SAN回复+2/级");
     expect(tree).toContain("除入学以外，每学期初SAN回复+1/级");
-    expect(tree).toContain("转博时科研、社交、导师好感提升10%/级，向上取整");
+    expect(tree).toContain("转博时科研、社交、导师好感提升10%/级，受档位抵抗");
     expect(tree).toContain("转博后每月行动+0.1次/级，余数逐月累积");
     expect(tree).toContain("每笔属性奖励溢出时上限+1，本次溢出可填入新增上限，累计不限");
     expect(tree).toContain("转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限");
@@ -2418,8 +2418,8 @@ describe("v2 render lobby shell", () => {
     expect(selectedHtml).toContain("20");
     expect(selectedHtml).toContain("16");
     expect(selectedHtml).toContain("15");
-    expect(selectedHtml).toContain("每月恢复 <strong>20%</strong> 已损失 SAN（下取整）");
-    expect(selectedHtml).toContain("每月恢复当前 SAN 的 <strong>20%</strong>（下取整）");
+    expect(selectedHtml).toContain("每月恢复 <strong>20%</strong> 已损失 SAN");
+    expect(selectedHtml).toContain("每月恢复当前 SAN 的 <strong>20%</strong>");
     expect((selectedHtml.match(/data-shop-upgrade-option-id="chair-/g) ?? [])).toHaveLength(5);
     expect((selectedHtml.match(/升级费用/g) ?? [])).toHaveLength(5);
     for (const optionId of ["chair-advanced", "chair-massage", "chair-torture", "chair-spike", "chair-hammock"]) {
@@ -5596,10 +5596,10 @@ describe("v2 render lobby shell", () => {
   });
 
   it.each([
-    { value: 5.125, display: "5.13", resistance: 0 },
-    { value: 5.999, display: "6", resistance: 0 },
-    { value: 6.25, display: "6.25", resistance: 20 },
-    { value: 6.75, display: "6.75", resistance: 20 },
+    { value: 5.125, display: "5.1", resistance: 0 },
+    { value: 5.999, display: "5.999", resistance: 0 },
+    { value: 6.25, display: "6.3", resistance: 20 },
+    { value: 6.75, display: "6.8", resistance: 20 },
     { value: 7.8000000004, display: "7.8", resistance: 20 },
     { value: 12.5, display: "12.5", resistance: 40 },
     { value: 18, display: "18", resistance: 60 },
@@ -5617,12 +5617,41 @@ describe("v2 render lobby shell", () => {
       expect(attribute).toContain(`class="new-attr-value">${display}/20</span>`);
       expect(attribute).toContain(`${label}增减抵抗${resistance}%`);
       expect(attribute).not.toContain("概率无效");
-      expect(attribute).toContain(`data-stat-value="${display}"`);
+      expect(attribute).toContain(`data-stat-value="${value}"`);
     }
     for (const type of ["senior", "lover"] as const) {
       expect(getRelationshipCardHtml(html, type).match(new RegExp(`class="rel-detail-value">${display.replace(".", "\\.")}/20</strong>`, "g"))).toHaveLength(2);
     }
     expect(state).toEqual(before);
+  });
+
+  it("formats attribute records independently from money while retaining raw animation values", () => {
+    const account = createDefaultAccountProfile();
+    Object.assign(account.roleProgress.normal.historyBest, { research: 5.999, social: 8.672, favor: 0.004, money: 12.345 });
+    const html = renderAppWithAnimations(createInitialState(), account, { roleHistoryPageIndex: 1 });
+    expect(html).toContain(renderAnimatedAttributeNumber("role:normal:history:research", 5.999));
+    expect(html).toContain(renderAnimatedAttributeNumber("role:normal:history:social", 8.672));
+    expect(html).toContain(renderAnimatedAttributeNumber("role:normal:history:favor", 0.004));
+    expect(html).toContain('data-animate-number="8.672" data-animate-format="attribute">8.7</span>');
+    expect(html).toContain('data-animate-key="role:normal:history:money" data-animate-number="12.35">12.35</span>');
+  });
+
+  it("preserves threshold and failure signs while showing precise attribute details", () => {
+    const state = createRelationshipCardTestState();
+    state.player.san = -0.004;
+    state.player.research = 6.25;
+    state.player.social = 5.999;
+    state.player.favor = 0.004;
+    state.player.money = 12.345;
+    const html = renderApp(state);
+    const statHtml = (id: string): string => html.split(`class="new-attr-item attr-item-${id}"`)[1]!.split('class="new-attr-bar-row"')[0]!;
+    expect(statHtml("san")).toContain('class="new-attr-value">-0.004/');
+    expect(statHtml("favor")).toContain('class="new-attr-value">0.004/');
+    expect(statHtml("social")).toContain('class="new-attr-value">5.999/');
+    expect(statHtml("research")).toContain('class="new-attr-value">6.3/');
+    expect(statHtml("research")).toContain("科研能力 6.25/");
+    expect(statHtml("research")).toContain('data-stat-value="6.25"');
+    expect(html).toContain('class="new-currency-icon" aria-hidden="true">💰</span>12.35');
   });
 
   it("formats balances to two decimals and keeps fixed payroll below the advisor title", () => {

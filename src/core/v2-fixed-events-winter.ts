@@ -1,4 +1,6 @@
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { formatAttributeDetail, roundAttribute } from "./v2-attribute-format";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import {
   appendMechanismSettlement,
@@ -109,8 +111,8 @@ export function resolveWinterVacationFixedEvent(
   }
 
   const missingSan = Math.max(0, state.sanCap - state.player.san);
-  const sanRecovery = Math.floor(missingSan * 0.2);
-  const sanSummary = `SAN +${sanRecovery}（已损SAN20%）`;
+  const sanRecovery = usesGameplayRulesFrom("20261021-r13") ? roundAttribute(missingSan * 0.2) : Math.floor(missingSan * 0.2);
+  const sanSummary = `SAN +${formatAttributeDetail(sanRecovery)}（已损SAN20%）`;
   const redEnvelope = 2 + (state.selectedRoleId === "rich" ? getRoleTalentLevel(state, "red-envelope") : 0);
   const branchRoll = getRoll();
 
