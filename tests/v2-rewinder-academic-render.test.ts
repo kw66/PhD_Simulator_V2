@@ -93,7 +93,7 @@ describe("academic archive pages", () => {
     const html = renderAcademicArchive(completed, 2, "账户进度未能保存，请释放浏览器存储空间后重试");
     expect(html).toContain('role="alert"');
     expect(html).toContain("账户进度未能保存");
-    expect(html).toContain("重试保存并返回");
+    expect(html).toContain("重试归档并返回");
     const choices = html.match(/<button\b[^>]*data-action="toggle-rewinder-archive-person"[^>]*>/g)!;
     expect(choices.every(button => button.includes(" disabled"))).toBe(true);
     expect(html.match(/<button\b[^>]*data-action="confirm-rewinder-archive"[^>]*>/)?.[0]).not.toContain("disabled");

@@ -149,7 +149,8 @@ describe("basic ending presentation", () => {
     expect(card).not.toContain("学业完成");
     expect(card).not.toContain("毕业条件");
     const actions = card.match(/<footer\b[^>]*class="ending-actions"[^>]*>([\s\S]*?)<\/footer>/)?.[1] ?? "";
-    expect(actions.match(/<button\b/g)).toHaveLength(2);
+    expect(actions.match(/<button\b/g)).toHaveLength(3);
+    expect(actions).toContain('data-ui-download-replay');
     expect(actions).toContain('data-action="settle-and-return"');
     expect(actions).not.toContain('data-action="restart-game"');
     expect(actions).not.toContain('data-action="reset-game"');

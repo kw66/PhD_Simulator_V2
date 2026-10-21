@@ -140,7 +140,7 @@
   .lobby-page .lobby-brand-block strong .lucide { width: 20px; height: 20px; flex-basis: 20px; }
 
   .lobby-page .lobby-project-links {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     justify-self: center;
     align-self: center;
     width: min(100%, 360px);
@@ -157,4 +157,9 @@
     border-left: 1px solid rgba(39, 68, 58, 0.16);
     transform: translateY(-50%);
   }
+}
+
+@media (max-width: 360px) {
+  .lobby-page .lobby-project-links a { padding: 0 3px; gap: 3px; font-size: 12px; }
+  .lobby-page .lobby-project-links .lucide { width: 14px; height: 14px; flex-basis: 14px; }
 }

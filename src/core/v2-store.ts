@@ -26,6 +26,8 @@ import { getSelectedCurseDifficulty, selectCurseDifficulty } from "./v2-curse-pr
 import type { AccountProfile, DispatchPayload, GameActionId, GameState, RoleId } from "./v2-types";
 
 type Listener = (state: GameState) => void;
+export interface LocalReplayCapture { id: string; replay: RunReplay; state: GameState }
+export type LocalReplayArchiver = (capture: LocalReplayCapture) => Promise<void>;
 
 function getBrowserStorage(): ExperienceStorage | null {
   try {
@@ -83,6 +85,8 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
   let replay: RunReplay | undefined;
   let replayAnchor: ReplayAnchor | undefined;
   let saveStatus = "";
+  let replayArchiver: LocalReplayArchiver | undefined;
+  let replaySavePending: Promise<void> | undefined;
   let readyComplete = !options.saves && (options.storage !== undefined || typeof window === "undefined");
   let readyPromise: Promise<void> | undefined;
   const listeners = new Set<Listener>();
@@ -94,6 +98,38 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
   let endingAward: AccountProfile["lastRunExperience"];
 
   function notify(): void { listeners.forEach(listener => listener(state)); }
+
+  function captureLocalReplay(): LocalReplayCapture | null {
+    if (!currentRunId || !replay || runUsedDebugPanel || replay.failed || state.phase === "setup") return null;
+    return { id: currentRunId, replay: structuredClone(replay), state: structuredClone(state) };
+  }
+
+  // Durable archive first: failed writes leave the playable source save intact.
+  function archiveBefore(complete: (success: boolean) => void, requested: boolean): Promise<boolean> {
+    if (!requested) {
+      if (saveStatus.startsWith("本地回放")) saveStatus = "";
+      complete(true); return Promise.resolve(true);
+    }
+    const capture = captureLocalReplay();
+    if (!replayArchiver || !capture) { complete(true); return Promise.resolve(true); }
+    saveStatus = "正在保存本地回放…";
+    const operation = Promise.resolve().then(() => replayArchiver!(capture)).then(() => {
+      replaySavePending = undefined;
+      saveStatus = "";
+      complete(true);
+      notify();
+      return true;
+    }, () => {
+      replaySavePending = undefined;
+      saveStatus = "本地回放保存失败，请释放浏览器存储空间后重试；本局存档仍保留";
+      complete(false);
+      notify();
+      return false;
+    });
+    replaySavePending = operation.then(() => undefined);
+    notify();
+    return operation;
+  }
 
   function persistAccount(next = accountProfile, ids = settledRuns, outbox = finalizedOutbox): boolean {
     try { saveAccountProfile(next, storage, ids, outbox); return true; }
@@ -227,6 +263,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
   }
 
   function markCurrentRunAsDebugged(): void {
+    if (replaySavePending) return;
     if (state.phase === "setup" || runUsedDebugPanel) return;
     runUsedDebugPanel = true;
     if (countedStartRole) {
@@ -285,7 +322,55 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     return true;
   }
 
+  function settleAndReturn(saveReplay: boolean): Promise<boolean> {
+    if (state.phase !== "finished" || replaySavePending) return Promise.resolve(false);
+    let settled = false;
+    return archiveBefore(success => {
+      if (!success || !finalize()) return;
+      api.dispatch("reset-game");
+      settled = true;
+    }, saveReplay).then(success => success && settled);
+  }
+
+  function confirmAcademicYearArchive(saveReplay: boolean): Promise<boolean> {
+    const academic = state.rewinderState?.academic;
+    if (state.phase !== "playing" || (!academic?.pending && !academic?.completed) || state.selectedRoleId !== "rewinder" || replaySavePending) {
+      return Promise.resolve(false);
+    }
+    const actionId = "confirm-rewinder-archive" as const;
+    if (!academic.completed) {
+      const nextState = collectRunStatistics(state, dispatchAction(state, actionId, {}));
+      if (!nextState.rewinderState?.academic?.completed) return Promise.resolve(false);
+      if (!runUsedDebugPanel) replay?.commands.push({ kind: "action", actionId, payload: {}, ruleset: REPLAY_RULESET });
+      commit(nextState);
+    }
+    let archived = false;
+    return archiveBefore(success => {
+      if (!success || !finalizeAcademicYear()) return;
+      const setup = dispatchAction(state, "reset-game");
+      runUsedDebugPanel = false;
+      countedStartRole = null;
+      currentRunId = null;
+      replay = undefined;
+      replayAnchor = undefined;
+      commit(setup);
+      archived = true;
+    }, saveReplay).then(success => success && archived);
+  }
+
   const api = {
+    setReplayArchiver(archiver: LocalReplayArchiver): void { if (!replaySavePending) replayArchiver = archiver; },
+    isReplaySavePending(): boolean { return !!replaySavePending; },
+    whenIdle(): Promise<void> { return replaySavePending ?? Promise.resolve(); },
+    getLocalReplayCapture: captureLocalReplay,
+    saveLocalReplay(): Promise<void> {
+      if (replaySavePending) return replaySavePending;
+      if (!replayArchiver || !captureLocalReplay()) return Promise.reject(new Error("本局暂无可保存的正常操作记录"));
+      return archiveBefore(success => { if (success) { saveStatus = "本局回放已保存，可在本地回放中查看"; notify(); } }, true)
+        .then(success => { if (!success) throw new Error("回放保存失败，本局存档仍保留"); });
+    },
+    settleAndReturn,
+    confirmAcademicYearArchive,
     ready,
     isReady(): boolean { return readyComplete; },
     getSaveStatus(): string { return saveStatus; },
@@ -296,6 +381,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       return saved ? { phase: saved.phase, levels: { ...saved.roleTalents?.levels } } : null;
     },
     retireUnallocatedRoleSave(roleId: RoleId): boolean {
+      if (replaySavePending) return false;
       if (!readyComplete || state.phase !== "setup" || !isRoleTalentImplemented(roleId)) return false;
       const saved = saves.get(roleId)?.latest.state;
       if (!saved || saved.phase !== "playing" || Object.values(saved.roleTalents?.levels ?? {}).some(level => level > 0)) return false;
@@ -307,7 +393,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     getCurrentRunId(): string | null { return currentRunId; },
     getEndingExperienceAward() { return endingAward; },
     flushSaves(): Promise<void> { return saves.flush(); },
-    loadRunSave(snapshotId: string): boolean { return state.phase !== "setup" && restore(state.selectedRoleId, snapshotId); },
+    loadRunSave(snapshotId: string): boolean { return !replaySavePending && state.phase !== "setup" && restore(state.selectedRoleId, snapshotId); },
     getFinalizedOutbox(): FinalizedRunRecord[] { return structuredClone(finalizedOutbox); },
     acknowledgeFinalizedRun(runId: string): void {
       const next = finalizedOutbox.filter(record => record.runId !== runId);
@@ -324,6 +410,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       return accountProfile;
     },
     selectCurseDifficulty(roleId: RoleId, difficulty: number): boolean {
+      if (replaySavePending) return false;
       if (state.phase !== "setup") return false;
       const next = selectCurseDifficulty(accountProfile, roleId, difficulty);
       if (next === accountProfile) return false;
@@ -331,6 +418,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       return true;
     },
     recordHelpPageRead(id: string, requiredIds: readonly string[]): void {
+      if (replaySavePending) return;
       if (state.phase !== "playing" || runUsedDebugPanel || !requiredIds.includes(id)) return;
       const next = applyHelpRead(state, id, requiredIds);
       if (next === state) return;
@@ -339,6 +427,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       saveCurrent();
     },
     upgradeRoleTalent(roleId: RoleId, talentId: string): boolean {
+      if (replaySavePending) return false;
       if (state.phase !== "setup" || !isRoleOwned(accountProfile, roleId)) return false;
       const level = accountProfile.roleProgress[roleId].level;
       const allocation = sanitizeRoleTalentAllocation(roleId, level, accountProfile.talentAllocation?.[roleId], accountProfile.achievementTalentPoints?.[roleId] ?? 0);
@@ -351,6 +440,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       return true;
     },
     resetRoleTalents(roleId: RoleId): boolean {
+      if (replaySavePending) return false;
       if (state.phase !== "setup" || !isRoleTalentImplemented(roleId)) return false;
       const talentAllocation = { ...accountProfile.talentAllocation };
       delete talentAllocation[roleId];
@@ -371,6 +461,8 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       return () => listeners.delete(listener);
     },
     dispatch(actionId: GameActionId, payload: DispatchPayload = {}): void {
+      if (replaySavePending) return;
+      if (actionId === "confirm-rewinder-archive") { void confirmAcademicYearArchive(false); return; }
       if (actionId === "debug-trigger-ending" && state.phase !== "setup") markCurrentRunAsDebugged();
       if (actionId === "select-role" && payload.roleId) {
         if (state.phase === "setup" && payload.roleId === accountProfile.selectedLobbyRoleId) {
@@ -404,7 +496,10 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       if (actionId === "restart-game") return;
 
       if (actionId === "reset-game" || actionId === "settle-and-return") {
-        if (actionId === "settle-and-return" && !finalize()) return;
+        if (actionId === "settle-and-return") {
+          void settleAndReturn(false);
+          return;
+        }
         const nextState = dispatchAction(state, "reset-game", payload);
         runUsedDebugPanel = false;
         countedStartRole = null;
@@ -454,15 +549,6 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
         replay?.commands.push({ kind: "action", actionId, payload: structuredClone(payload), ruleset: REPLAY_RULESET });
       }
       commit(nextState);
-      if (actionId === "confirm-rewinder-archive" && finalizeAcademicYear()) {
-        const setup = dispatchAction(state, "reset-game");
-        runUsedDebugPanel = false;
-        countedStartRole = null;
-        currentRunId = null;
-        replay = undefined;
-        replayAnchor = undefined;
-        commit(setup);
-      }
     },
   };
   return api;

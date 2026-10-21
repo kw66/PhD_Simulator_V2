@@ -38,6 +38,8 @@ describe("run save controls in the game", () => {
         await page.locator(`[data-event-choice-id="${id}"]:visible`).click();
       }
       await page.locator('[data-ui-play-tab="settings"]').click();
+      await page.mouse.move(0, 0);
+      await page.locator(".settings-panel").screenshot({ path: `artifacts/settings-polished-${width}.png` });
       const months: RunSaveSummary[] = Array.from({ length: 24 }, (_, index) => {
         const month = 24 - index;
         return { id: `month:${month}`, kind: "month", totalMonths: month, year: Math.floor((month - 1) / 12) + 1,
@@ -73,7 +75,7 @@ describe("run save controls in the game", () => {
     await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     try {
       await page.goto(base);
-      await page.waitForFunction(() => (window as unknown as SaveWindow).saveStore.isReady());
+      await page.waitForFunction(() => (window as unknown as SaveWindow).saveStore?.isReady());
       await page.evaluate(() => {
         const store = (window as unknown as SaveWindow).saveStore;
         Object.assign(store.getLobbyState().roleProgress.normal.historyBest,
@@ -147,7 +149,7 @@ describe("run save controls in the game", () => {
         return { id: store.getCurrentRunId(), state: JSON.stringify(store.getState()) };
       });
       await page.reload();
-      await page.waitForFunction(() => (window as unknown as SaveWindow).saveStore.isReady());
+      await page.waitForFunction(() => (window as unknown as SaveWindow).saveStore?.isReady());
       expect(await page.locator('[data-action="start-game"]').textContent()).toContain("继续游戏");
       await startGameFromLobby(page);
       expect(await page.evaluate(() => JSON.stringify((window as unknown as SaveWindow).saveStore.getState()))).toBe(firstRun.state);
@@ -194,6 +196,7 @@ describe("run save controls in the game", () => {
       await page.locator('[data-action="quit-game"]:visible').click();
       await page.locator('[data-ui-confirm-quit]').click();
       await page.locator('[data-action="settle-and-return"]').click();
+      await page.evaluate(() => (window as unknown as SaveWindow).saveStore.whenIdle());
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getLobbyState().roleProgress.normal.exp)).toBe(5);
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.getCurrentRunId())).toBeNull();
       expect(await page.evaluate(() => (window as unknown as SaveWindow).saveStore.hasRoleSave("normal"))).toBe(false);

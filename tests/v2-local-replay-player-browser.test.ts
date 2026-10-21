@@ -1,0 +1,174 @@
+import { mkdir } from "node:fs/promises";
+import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { chromium, type Browser } from "playwright";
+import { createServer, type ViteDevServer } from "vite";
+import { createInitialState, dispatchAction } from "../src/core/v2-engine";
+import { captureReplayRecording } from "../src/core/v2-local-replay";
+import { createRunReplay, executeReplayCommand, replayStateDigest, type ReplayCommand } from "../src/core/v2-run-replay";
+
+function sample() {
+  const initial = createInitialState();
+  initial.randomState = { seed: 1700000000, cursor: 0 };
+  let state = dispatchAction(initial, "start-game", { roleId: "normal" });
+  const replay = createRunReplay(initial, state, { roleId: "normal" });
+  function action(command: ReplayCommand) {
+    replay.commands.push(command); state = executeReplayCommand(state, command);
+    replay.checkpoints.push({ index: replay.commands.length, digest: replayStateDigest(state), totalMonths: state.totalMonths });
+  }
+  for (const eventChoiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
+    const event = state.eventQueue.find(event => event.chainId === "before-grad-school")!;
+    action({ kind: "action", actionId: "resolve-event", payload: { eventId: event.id, eventChoiceId } });
+  }
+  action({ kind: "action", actionId: "next-month", payload: {} });
+  for (let i = 0; i < 20 && state.eventQueue.length; i++) {
+    const event = state.eventQueue[0]!;
+    action({ kind: "action", actionId: "resolve-event", payload: { eventId: event.id, eventChoiceId: event.choices[0]!.id } });
+  }
+  action({ kind: "action", actionId: "create-paper", payload: { paperSlotIndex: 0 } });
+  const paper = state.papers[0]!;
+  action({ kind: "action", actionId: "research-paper", payload: { paperId: paper.id, paperActionType: "idea" } });
+  action({ kind: "action", actionId: "rest", payload: {} });
+  action({ kind: "action", actionId: "buy-coffee", payload: {} });
+  action({ kind: "action", actionId: "next-month", payload: {} });
+  action({ kind: "action", actionId: "quit-game", payload: {} });
+  return captureReplayRecording(replay, state, { id: "browser-replay-test", now: "2026-10-21T08:00:00.000Z" });
+}
+const fixture = '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="app"></div><script type="module" src="/src/main.ts"></script></body></html>';
+describe("isolated local replay browser player", () => {
+  let server: ViteDevServer;
+  let browser: Browser;
+  beforeAll(async () => {
+    server = await createServer({ configFile: false, logLevel: "error", define: { __LOCAL_PLAYGROUND__: false }, server: { host: "127.0.0.1", port: 0 } });
+    await server.listen(); browser = await chromium.launch();
+    await mkdir("artifacts/local-replay", { recursive: true });
+  }, 30_000);
+  afterAll(async () => { await browser?.close(); await server?.close(); });
+
+  it.each([390, 1440])("imports, plays and browses at %spx without account or RPC writes", async width => {
+    const page = await browser.newPage({ viewport: { width, height: 1040 }, acceptDownloads: true });
+    const requests: string[] = [];
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    page.on("request", request => { if (/supabase|\/rpc\//.test(request.url())) requests.push(request.url()); });
+    try {
+      await page.route("**/__replay_test__*", route => route.fulfill({ contentType: "text/html", body: fixture }));
+      await page.addInitScript(() => { localStorage.setItem("account-sentinel", "do not change"); });
+      await page.goto(`${server.resolvedUrls!.local[0]}__replay_test__?replay=library`);
+      await page.waitForSelector("[data-replay-import]:not(:disabled)");
+      const localBefore = await page.evaluate(() => ({ ...localStorage }));
+      expect(await page.locator("h1").textContent()).toBe("本地回放");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+      await page.screenshot({ path: `artifacts/local-replay/empty-${width}.png`, fullPage: true });
+      const data = sample();
+      await page.locator("[data-replay-file]").setInputFiles({ name: "sample.phdreplay.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
+      await page.waitForSelector("[data-replay-open]");
+      expect(await page.locator(".replay-card-portrait").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+      await page.screenshot({ path: `artifacts/local-replay/library-${width}.png`, fullPage: true });
+      await page.locator("[data-replay-open]").click();
+      await page.waitForSelector(".replay-viewer .play-page");
+      expect(await page.locator(".replay-app > .replay-toolbar").count()).toBe(0);
+      expect(await page.locator(".play-right-rail [data-replay-play]").count()).toBe(1);
+      expect(await page.locator("[data-ui-help-toggle], #play-help-panel").count()).toBe(0);
+      expect(await page.locator("[data-replay-speed]").isEnabled()).toBe(true);
+      expect(await page.locator("[data-action][aria-disabled='true']").count()).toBeGreaterThan(0);
+      expect(await page.locator("[data-action]:not(:disabled)").count()).toBeGreaterThan(0);
+      expect(await page.locator(".replay-inline-progress output").textContent()).toBe(`1 / ${data.replay.commands.length} 步`);
+      await page.locator("[data-replay-step='1']").click();
+      await page.waitForFunction(() => document.querySelector(".replay-inline-progress output")?.textContent?.startsWith("2 /"));
+      await page.locator("[data-replay-step='-1']").click();
+      await page.waitForFunction(() => document.querySelector(".replay-inline-progress output")?.textContent?.startsWith("1 /"));
+      await page.locator("[data-replay-speed]").selectOption("8");
+      await page.locator("[data-replay-play]").click();
+      await page.waitForFunction(() => Number(document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value) > 3);
+      await page.getByRole("button", { name: "暂停", exact: true }).click();
+      const paused = await page.locator("[data-replay-seek]").inputValue();
+      await page.waitForTimeout(200);
+      expect(await page.locator("[data-replay-seek]").inputValue()).toBe(paused);
+      await page.locator("[data-replay-month]").selectOption({ label: "第1学年 · 9月" });
+      await page.waitForFunction(() => document.querySelector(".replay-inline-title small")?.textContent?.startsWith("第1学年 · 9月"));
+      await page.locator("[data-ui-play-tab='workstation']").click();
+      await page.waitForSelector(".workstation-section:visible");
+      await page.screenshot({ path: `artifacts/local-replay/player-${width}.png`, fullPage: true });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+      await page.locator("[data-ui-play-tab='relationship']").click();
+      expect(await page.locator("[data-ui-play-tab='relationship']").getAttribute("aria-pressed")).toBe("true");
+      await page.locator("[data-replay-seek]").fill(String(data.replay.commands.length));
+      await page.locator("[data-replay-seek]").dispatchEvent("change");
+      await page.waitForFunction(() => document.querySelector(".play-page")?.getAttribute("data-phase") === "finished");
+      await page.screenshot({ path: `artifacts/local-replay/ending-${width}.png`, fullPage: true });
+      const downloadPromise = page.waitForEvent("download");
+      await page.locator("[data-replay-export]").click();
+      expect((await downloadPromise).suggestedFilename()).toContain(".phdreplay.json");
+      await page.locator("[data-replay-library]").click();
+      await page.waitForSelector("[data-replay-card]");
+      await page.locator("[data-replay-delete]").click();
+      expect(await page.locator("[data-replay-card]").count()).toBe(1);
+      await page.locator("[data-replay-confirm-delete]").click();
+      await page.waitForSelector(".replay-empty");
+      expect(await page.evaluate(() => ({ ...localStorage }))).toEqual(localBefore);
+      expect(requests).toEqual([]);
+      expect(errors).toEqual([]);
+    } finally { await page.close(); }
+  }, 40_000);
+
+  it.each([390, 1440])("shows the exact event, research and shop button before execution at %spx", async width => {
+    const page = await browser.newPage({ viewport: { width, height: 1040 } });
+    try {
+      await page.route("**/__replay_cue__*", route => route.fulfill({ contentType: "text/html", body: fixture }));
+      await page.goto(`${server.resolvedUrls!.local[0]}__replay_cue__?replay=library`);
+      await page.waitForSelector("[data-replay-import]:not(:disabled)");
+      const data = sample();
+      await page.locator("[data-replay-file]").setInputFiles({ name: "cue.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
+      await page.locator("[data-replay-open]").click();
+      await page.waitForSelector("[data-replay-seek]");
+      for (const [action, tab] of [["resolve-event", "events"], ["research-paper", "workstation"], ["buy-coffee", "shop"]]) {
+        const beforeIndex = data.replay.commands.findIndex(command => command.kind === "action" && command.actionId === action);
+        await page.locator("[data-replay-seek]").fill(String(beforeIndex));
+        await page.locator("[data-replay-seek]").dispatchEvent("change");
+        await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index), beforeIndex);
+        await page.locator("[data-replay-speed]").selectOption("0.5");
+        await page.locator('[data-replay-step="1"]').click();
+        await page.waitForSelector(".replay-click-cue");
+        expect(await page.locator(".replay-click-target").getAttribute("data-action")).toBe(action);
+        expect(await page.locator(`[data-ui-play-tab="${tab}"]`).getAttribute("aria-pressed")).toBe("true");
+        expect(await page.locator("[data-replay-seek]").inputValue()).toBe(String(beforeIndex));
+        if (action === "research-paper") expect(await page.locator(".replay-click-target").getAttribute("data-paper-action-type")).toBe("idea");
+        await page.screenshot({ path: `artifacts/local-replay/cue-${action}-${width}.png`, fullPage: true });
+        await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 1), beforeIndex);
+        expect(await page.locator(".replay-click-cue").count()).toBe(0);
+      }
+      await page.locator("[data-replay-seek]").fill("1");
+      await page.locator("[data-replay-seek]").dispatchEvent("change");
+      await page.waitForFunction(() => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === "1");
+      await page.locator("[data-replay-play]").click();
+      await page.waitForSelector(".replay-click-cue");
+      await page.getByRole("button", { name: "暂停", exact: true }).click();
+      await page.waitForTimeout(1400);
+      expect(await page.locator("[data-replay-seek]").inputValue()).toBe("1");
+      expect(await page.locator(".replay-click-cue").count()).toBe(0);
+      const monthIndex = data.replay.commands.findIndex(command => command.kind === "action" && command.actionId === "next-month");
+      await page.locator("[data-replay-seek]").fill(String(monthIndex));
+      await page.locator("[data-replay-seek]").dispatchEvent("change");
+      await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index), monthIndex);
+      // At half speed the former month preview would hold for two seconds.
+      await page.locator('[data-replay-step="1"]').click();
+      await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 1), monthIndex, { timeout: 1200 });
+      expect(await page.locator(".replay-click-cue").count()).toBe(0);
+    } finally { await page.close(); }
+  }, 40_000);
+
+  it("reports malformed imports and missing recordings without hiding the library", async () => {
+    const page = await browser.newPage();
+    try {
+      await page.route("**/__replay_missing__*", route => route.fulfill({ contentType: "text/html", body: fixture }));
+      await page.goto(`${server.resolvedUrls!.local[0]}__replay_missing__?replay=missing`);
+      await page.waitForSelector(".replay-message.is-error");
+      expect(await page.locator(".replay-message").textContent()).toContain("不在当前浏览器");
+      await page.locator("[data-replay-file]").setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from('{"version":1}') });
+      await page.waitForFunction(() => document.querySelector(".replay-message.is-error")?.textContent?.includes("回放无效"));
+      expect(await page.locator("[data-replay-import]:not(:disabled)").count()).toBeGreaterThan(0);
+    } finally { await page.close(); }
+  }, 30_000);
+
+});

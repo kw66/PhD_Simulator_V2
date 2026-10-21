@@ -6,7 +6,19 @@ import { getReadingIdeaBonus } from "./v2-reading-system";
 import { getResearchCap } from "./v2-research-cap-system";
 import { recordTalentTrigger } from "./v2-talent-history";
 import { formatMoney } from "./v2-money";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { GameState } from "./v2-types";
+
+export function upgradePerfectWorkstation(state: GameState): GameState {
+  if (!usesGameplayRulesFrom("20261021-r14")) return state;
+  const buff = state.buffs.find(item => item.id === "perfect-workstation");
+  if (!buff || ["idea", "experiment", "writing"].every(action => buff.actionEffects?.[action as "idea" | "experiment" | "writing"]?.bonus === 2)) return state;
+  return { ...state, buffs: state.buffs.map(item => item !== buff ? item : { ...buff,
+    actionEffects: { ...buff.actionEffects, idea: { ...buff.actionEffects?.idea, bonus: 2 },
+      experiment: { ...buff.actionEffects?.experiment, bonus: 2 }, writing: { ...buff.actionEffects?.writing, bonus: 2 } },
+    description: "集齐机械键盘、2K显示器、办公椅和咖啡机后，论文三项分数永久+2",
+  }) };
+}
 
 export function recordTalentTransitions(before: GameState, after: GameState): GameState {
   if (before.phase !== "playing" || after.phase === "setup" || after.totalMonths < before.totalMonths) return after;
@@ -51,6 +63,7 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
   }
   if (hasPerfectWorkstation(after.shopState, after.coffeeState)
     && !state.buffs.some((buff) => buff.id === "perfect-workstation")) {
+    const bonus = usesGameplayRulesFrom("20261021-r14") ? 2 : 1;
     state = {
       ...state,
       buffs: addOrReplaceBuffs(state.buffs, [{
@@ -60,14 +73,14 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
         timing: "permanent",
         remainingMonths: null,
         actionEffects: {
-          idea: { bonus: 1 },
-          experiment: { bonus: 1 },
-          writing: { bonus: 1 },
+          idea: { bonus },
+          experiment: { bonus },
+          writing: { bonus },
         },
-        description: "集齐机械键盘、2K显示器、办公椅和咖啡机后，论文三项分数永久+1",
+        description: `集齐机械键盘、2K显示器、办公椅和咖啡机后，论文三项分数永久+${bonus}`,
       }]),
     };
-    add("perfect-workstation", "完美工位", "集齐机械键盘、2K显示器、办公椅和咖啡机", ["idea、实验、论文永久 +1分"]);
+    add("perfect-workstation", "完美工位", "集齐机械键盘、2K显示器、办公椅和咖啡机", [`idea、实验、论文永久 +${bonus}分`]);
   }
   if (!getAiCollaborationStatus(before.aiShopState).active && getAiCollaborationStatus(after.aiShopState).active) {
     add("ai-collaboration", "AI协作", "三路AI同时生效，且包含GPT或Claude", ["每月额外1次科研操作，不消耗行动点，SAN消耗 +2"]);

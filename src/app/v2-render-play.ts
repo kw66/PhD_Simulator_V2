@@ -122,6 +122,7 @@ import {
   type PlayRenderUiState,
   type PlayTabId,
   type ResearchSortMode,
+  type ReplayTransportUiState,
   type TalentPanelTabId,
 } from "./v2-render-types";
 import { renderShopSection as renderInteractiveShopSection } from "./v2-render-shop-panel";
@@ -613,7 +614,6 @@ function buildEffectBuckets(state: GameState): {
   const experimentModifier = getShopPaperActionModifier(state.shopState, "experiment");
   const writingModifier = getShopPaperActionModifier(state.shopState, "writing");
   const readSanDiscount = getShopReadSanDiscount(state.shopState);
-  const coffeeBonus = getCurrentCoffeeBonus(state.coffeeState);
   let seasonalSanCostDelta = 0;
   const seasonalSanSources: string[] = [];
 
@@ -651,9 +651,6 @@ function buildEffectBuckets(state: GameState): {
   }
   if (readSanDiscount > 0) {
     upsertBucketItem(permanent, "permanent", `看论文 SAN -${readSanDiscount}`, "显示器");
-  }
-  if (coffeeBonus > 0) {
-    upsertBucketItem(monthly, "monthly", `冰美式额外 SAN +${coffeeBonus}`, "咖啡机");
   }
   const aiCoverageBuffs = getActiveBuffs(state.buffs).filter((buff) => (
     buff.shopEffects?.aiCostsCovered === true
@@ -3623,7 +3620,7 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
       icon: "🖥️",
       name: "完美工位",
       active: perfectWorkstationActive,
-      description: "集齐机械键盘、2K显示器、办公椅和咖啡机后，idea、实验、论文永久+1分",
+      description: "集齐机械键盘、2K显示器、办公椅和咖啡机后，idea、实验、论文永久+2分",
       metrics: [
         { label: "机械键盘", value: state.shopState.keyboardOwned ? "✅" : "—" },
         { label: "2K显示器", value: state.shopState.monitorOwned ? "✅" : "—" },
@@ -3803,22 +3800,33 @@ function renderQuitConfirmationOverlay(): string {
 function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): string {
   return `
     <div class="settings-panel">
-      <div class="settings-quick-actions" id="settings-panel-content">
-        <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
-          <i data-lucide="history" aria-hidden="true"></i><span>读取存档</span>
-        </button>
-        <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
-          <i data-lucide="log-out" aria-hidden="true"></i>
-          <span>主动退学</span>
-        </button>
-        <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
-          <i data-lucide="house" aria-hidden="true"></i>
-          <span>返回开始页面</span>
-        </button>
-        <button class="settings-community-button is-feedback" type="button" data-ui-open-feedback>
-          <i data-lucide="message-square" aria-hidden="true"></i>
-          <span>留言反馈</span>
-        </button>
+      <div class="settings-sections" id="settings-panel-content">
+        <div class="settings-group" role="group" aria-label="本局进度">
+          <h3 class="settings-group-heading">本局进度<span>存档与继续</span></h3>
+          <div class="settings-quick-actions">
+            <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
+              <i data-lucide="history" aria-hidden="true"></i><span class="settings-action-copy"><span>读取存档</span><small>查看本局的月份存档</small></span>
+            </button>
+            <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
+              <i data-lucide="house" aria-hidden="true"></i><span class="settings-action-copy"><span>返回开始页面</span><small>回到角色与天赋页面</small></span>
+            </button>
+          </div>
+        </div>
+        <div class="settings-group" role="group" aria-label="回放管理">
+          <h3 class="settings-group-heading">回放记录<span>下载与重看</span></h3>
+          <div class="settings-quick-actions">
+            <button class="settings-primary-btn" type="button" data-ui-download-replay><i data-lucide="download" aria-hidden="true"></i><span class="settings-action-copy"><span>下载本局回放</span><small>保存为本地文件</small></span></button>
+            <button class="settings-primary-btn" type="button" data-ui-open-local-replays><i data-lucide="history" aria-hidden="true"></i><span class="settings-action-copy"><span>本地回放</span><small>导入与播放回放文件</small></span></button>
+          </div>
+        </div>
+        <div class="settings-secondary-actions">
+          <button class="settings-community-button is-feedback" type="button" data-ui-open-feedback>
+            <i data-lucide="message-square" aria-hidden="true"></i><span>留言反馈</span>
+          </button>
+          <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
+            <i data-lucide="log-out" aria-hidden="true"></i><span>主动退学</span>
+          </button>
+        </div>
       </div>
       ${state.selectedRoleId === "cursed-debt" && state.curseState ? `<section class="curse-debt-panel"><div><strong>待偿债务 ${state.curseState.debt.toLocaleString("zh-CN", { maximumFractionDigits: 2 })} 金币</strong><span>月利率2% · 毕业前需结清</span></div><div class="curse-debt-actions"><button type="button" class="settings-primary-btn" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || state.curseState.debt <= 0 ? " disabled" : ""}>偿还1金币</button><button type="button" class="settings-primary-btn" data-action="repay-debt"${state.phase !== "playing" || state.player.money <= 0 || state.curseState.debt <= 0 ? " disabled" : ""}>尽力还款</button></div></section>` : ""}
       ${renderRunSaves(state, uiState)}
@@ -4416,7 +4424,7 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
               ><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
               ${seasonLabel ? `<span class="new-time-item new-time-season play-tooltip" id="new-time-season" tabindex="0" aria-label="${escapeHtml(getSeasonEffectText(state))}" data-tooltip="${escapeHtml(getSeasonEffectText(state))}">${seasonLabel}</span>` : ""}
             `}
-          ${renderPlayHelpInlineToggle(uiState)}
+          ${uiState.isReplay || uiState.replayTransport ? "" : renderPlayHelpInlineToggle(uiState)}
           ${preEnrollment ? "" : `<span class="new-time-item new-time-remaining" id="new-time-remaining">${getRemainingMonthsText(state)}</span>`}
         </div>
         <div
@@ -4468,9 +4476,29 @@ function renderRightRail(state: GameState, uiState: PlayRenderUiState = {}): str
           </div>
         </div>
       </div>
-      ${renderPlayHelpPanel(uiState)}
+      ${uiState.replayTransport ? renderReplayTransportControls(uiState.replayTransport) : uiState.isReplay ? "" : renderPlayHelpPanel(uiState)}
     </aside>
   `;
+}
+
+function renderReplayTransportControls(transport: ReplayTransportUiState): string {
+  const atStart = transport.currentStep <= 1;
+  const atEnd = transport.currentStep >= transport.totalSteps;
+  return `<div class="replay-inline-controls" aria-label="回放控制" data-replay-inline-controls>
+    <div class="replay-inline-heading">
+      <button class="replay-inline-icon" type="button" data-replay-library aria-label="返回本地回放" title="返回本地回放"><i data-lucide="arrow-left" aria-hidden="true"></i></button>
+      <span class="replay-inline-title"><strong>${escapeHtml(transport.roleName)} · 本地回放</strong><small>${escapeHtml(transport.monthLabel)}${transport.busy ? " · 正在定位…" : ""}</small></span>
+    </div>
+    <div class="replay-inline-actions">
+      <button class="replay-inline-icon" type="button" data-replay-step="-1" aria-label="上一步" title="上一步"${atStart || transport.busy ? " disabled" : ""}><i data-lucide="skip-back" aria-hidden="true"></i></button>
+      <button class="replay-inline-play" type="button" data-replay-play aria-label="${transport.playing ? "暂停" : "播放"}" title="${transport.playing ? "暂停" : "播放"}"><i data-lucide="${transport.playing ? "pause" : "play"}" aria-hidden="true"></i><span>${transport.playing ? "暂停" : "播放"}</span></button>
+      <button class="replay-inline-icon" type="button" data-replay-step="1" aria-label="下一步" title="下一步"${atEnd || transport.busy ? " disabled" : ""}><i data-lucide="skip-forward" aria-hidden="true"></i></button>
+      <select class="replay-inline-speed" data-replay-speed aria-label="播放速度" title="播放速度">${[.5, 1, 2, 4, 8].map(value => `<option value="${value}"${value === transport.speed ? " selected" : ""}>${value}×</option>`).join("")}</select>
+      <select class="replay-inline-month" data-replay-month aria-label="跳转月份" title="跳转月份">${transport.monthOptions}</select>
+      <button class="replay-inline-icon" type="button" data-replay-export aria-label="导出回放" title="导出回放"><i data-lucide="download" aria-hidden="true"></i></button>
+    </div>
+    <div class="replay-inline-progress"><input type="range" min="1" max="${transport.totalSteps}" value="${transport.currentStep}" step="1" data-replay-seek aria-label="回放进度"><output>${transport.currentStep} / ${transport.totalSteps} 步</output></div>
+  </div>`;
 }
 
 export function renderPlayScreen(state: GameState, uiState: PlayRenderUiState = {}): string {

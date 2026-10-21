@@ -74,6 +74,7 @@ describe("statistics requests through the game UI", () => {
     });
     try {
       await page.goto(`${baseUrl}?start=setup`);
+      await page.waitForFunction(() => (window as StatisticsWindow).statisticsStore?.isReady());
       await expect.poll(() => activityCount("visit")).toBe(1);
       await expect.poll(() => requests.filter((name) => name === "activity").length).toBe(1);
       expect(await page.locator('[data-role-stat="global-played-runs"][data-role-id="normal"]').textContent()).toBe("0");
@@ -105,6 +106,9 @@ describe("statistics requests through the game UI", () => {
         Object.assign(state, resolveDuePaperReviews(state, () => 0.5).state);
         // This network integration fixture starts from a synthetic accepted-paper
         // checkpoint. Saved-state tampering is exercised by the replay tests.
+        // Its fabricated checkpoint has no full replay; archive correctness is
+        // covered by the real-button recording integration test instead.
+        store.setReplayArchiver(async () => {});
         const replay = structuredClone(saves.get(state.selectedRoleId)!.replay!);
         replay.checkpoints.at(-1)!.digest = replayStateDigest(state);
         replay.checkpoints.at(-1)!.totalMonths = state.totalMonths;

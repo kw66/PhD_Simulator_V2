@@ -11,6 +11,17 @@ export type TalentPanelTabId = "character" | "relation" | "equip" | "growth" | "
 export type ShopUpgradeNoticeTab = Extract<ShopTabId, "ai" | "coffee">;
 export type ResearchSortMode = "year" | "citations";
 export type ResearchAuthorshipFilter = "all" | "first" | "coauthor";
+/** Controls rendered in the play page's compact hint slot while viewing a replay. */
+export interface ReplayTransportUiState {
+  roleName: string;
+  monthLabel: string;
+  currentStep: number;
+  totalSteps: number;
+  playing: boolean;
+  busy: boolean;
+  speed: number;
+  monthOptions: string;
+}
 export interface PlayRenderUiState {
   runSaves?: readonly RunSaveSummary[];
   saveStatus?: string;
@@ -33,6 +44,8 @@ export interface PlayRenderUiState {
   activePlayTab?: PlayTabId;
   helpPageByContext?: Readonly<Record<string, number>>;
   isHelpOpen?: boolean;
+  /** The standalone replay player replaces normal help with inline transport controls. */
+  isReplay?: boolean;
   isEventContentOpen?: boolean;
   isEndingContentOpen?: boolean;
   activeEventId?: string | null;
@@ -59,4 +72,5 @@ export interface PlayRenderUiState {
   researchPageIndex?: number;
   researchSortMode?: ResearchSortMode;
   researchAuthorshipFilter?: ResearchAuthorshipFilter;
+  replayTransport?: ReplayTransportUiState;
 }

@@ -1,4 +1,7 @@
 import { formatAttributeDetail } from "../core/v2-attribute-format";
+import { captureReplayRecording } from "../core/v2-local-replay";
+import { createReplayLibrary } from "./v2-replay-library";
+import { downloadReplayRecording } from "./v2-replay-download";
 import {
   Activity,
   ArrowRight,
@@ -28,6 +31,7 @@ import {
   createIcons,
   Crown,
   Database,
+  Download,
   Dumbbell,
   Eye,
   Feather,
@@ -286,6 +290,10 @@ function isDebugRelationshipType(value: string | undefined): value is DebugRelat
 
 export function bootstrapApp(root: HTMLDivElement): void {
   const store = createStore();
+  const replayLibrary = createReplayLibrary();
+  store.setReplayArchiver(async capture => {
+    await replayLibrary.save(captureReplayRecording(capture.replay, capture.state, { id: capture.id }));
+  });
   const statisticsUploadEnabled = isRemoteWriteEnabled();
   const statistics = createStatisticsClient({ uploadEnabled: statisticsUploadEnabled, onChange: (rpc) => {
     if (rpc === "get_phd_simulator_v2_activity_stats") {
@@ -1123,6 +1131,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
       researchSortMode,
       researchAuthorshipFilter,
     });
+    if (store.isReplaySavePending() || store.getSaveStatus().startsWith("本地回放保存失败")) {
+      const notice = document.createElement("p");
+      notice.className = "local-replay-save-notice";
+      notice.setAttribute("role", "status");
+      notice.textContent = store.getSaveStatus();
+      root.append(notice);
+    }
     if (pendingTalentStart && state.phase === "setup") {
       root.querySelector<HTMLElement>(".lobby-page")?.setAttribute("inert", "");
       root.insertAdjacentHTML("beforeend", renderStartTalentReminder(pendingTalentStart.points, pendingTalentStart.continuing));
@@ -1210,6 +1225,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
         Cpu,
         Crown,
         Database,
+        Download,
         Dumbbell,
         Eye,
         Feather,
@@ -1329,6 +1345,18 @@ export function bootstrapApp(root: HTMLDivElement): void {
   function executeButtonAction(dataset: DOMStringMap, skipTalentReminder = false): void {
     const actionId = dataset.action;
     if (!isGameActionId(actionId)) return;
+    if (actionId === "settle-and-return") {
+      skipNextPlayerAnimation = true;
+      void store.settleAndReturn(dataset.saveReplay === "true");
+      return;
+    }
+    if (actionId === "confirm-rewinder-archive") {
+      rewinderStartYear = undefined;
+      refreshTalentTree = true;
+      skipNextPlayerAnimation = true;
+      void store.confirmAcademicYearArchive(dataset.saveReplay === "true");
+      return;
+    }
     if (actionId === "start-game" && !skipTalentReminder && store.getState().phase === "setup") {
       const roleId = isRoleId(dataset.roleId) ? dataset.roleId : store.getLobbyState().selectedLobbyRoleId;
       const continuing = store.hasRoleSave(roleId);
@@ -1360,14 +1388,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
       activeEventId = null;
       activeEventChainId = replaySourceEvent?.chainId ?? null;
       activeEventRootId = replaySourceEvent ? getEventRootId(replaySourceEvent) : null;
-    }
-    if (actionId === "settle-and-return") {
-      skipNextPlayerAnimation = true;
-    }
-    if (actionId === "confirm-rewinder-archive") {
-      rewinderStartYear = undefined;
-      refreshTalentTree = true;
-      skipNextPlayerAnimation = true;
     }
     if (actionId === "upgrade-shop-item" && dataset.shopUpgradeId?.startsWith("chair-")) {
       selectedChairUpgradeId = null;
@@ -1664,6 +1684,21 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    if (target.closest("[data-ui-download-replay]")) {
+      const button = target.closest<HTMLButtonElement>("[data-ui-download-replay]")!;
+      const capture = store.getLocalReplayCapture();
+      if (!capture) { window.alert("本局暂无可下载的正常操作记录"); return; }
+      button.disabled = true;
+      void Promise.resolve().then(() => downloadReplayRecording(captureReplayRecording(capture.replay, capture.state, { id: capture.id })))
+        .catch(error => { window.alert(error instanceof Error ? error.message : "回放下载失败"); })
+        .finally(() => { button.disabled = false; });
+      return;
+    }
+    if (target.closest("[data-ui-open-local-replays]")) {
+      window.open("?replay=library", "_blank", "noopener");
+      return;
+    }
+
     if (isRoleLevelStatsOpen) {
       if (target.closest("[data-ui-close-level-stats]")) closeRoleLevelStats();
       return;
@@ -1680,8 +1715,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
       if (target.closest("button[data-ui-restart-allocate-talents]")) {
         const roleId = pendingTalentStart.dataset.roleId;
         pendingTalentStart = null;
-        if (isRoleId(roleId) && store.retireUnallocatedRoleSave(roleId)) closeTalentReminder(true);
-        else render();
+        if (isRoleId(roleId)) {
+          const retired = store.retireUnallocatedRoleSave(roleId);
+          void store.whenIdle().then(() => {
+            if (retired || (store.getState().phase === "setup" && !store.hasRoleSave(roleId))) closeTalentReminder(true);
+            else render();
+          });
+        } else render();
       } else if (target.closest("button[data-ui-go-allocate-talents]")) {
         closeTalentReminder(true);
       } else if (target.closest("button[data-ui-close-talent-reminder]")) {

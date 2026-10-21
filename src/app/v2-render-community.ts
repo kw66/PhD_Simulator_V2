@@ -127,6 +127,7 @@ export function renderLobbyMasthead(activeRoleRailView: RoleRailViewId): string 
           <a href="https://xhslink.com/m/A2DFslJF4mb" target="_blank" rel="noreferrer"><i data-lucide="user-round" aria-hidden="true"></i><span>开发者</span></a>
           <a href="https://github.com/kw66/PhD_Simulator_V2" target="_blank" rel="noreferrer"><i data-lucide="git-fork" aria-hidden="true"></i><span>项目地址</span></a>
           <a href="https://kw66.github.io/games/" target="_blank" rel="noreferrer"><i data-lucide="gamepad-2" aria-hidden="true"></i><span>游戏合集</span></a>
+          <a href="?replay=library" target="_blank" rel="noopener"><i data-lucide="history" aria-hidden="true"></i><span>本地回放</span></a>
         </nav>
       </div>
       <div class="lobby-masthead-side">

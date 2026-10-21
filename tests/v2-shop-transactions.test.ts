@@ -5,6 +5,8 @@ import { previewResearchOperation } from "../src/core/v2-research-operation";
 import { previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { getShopPaperActionModifier } from "../src/core/v2-shop-items";
 import { getShopActionPrice } from "../src/core/v2-shop-transactions";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
+import { recordTalentTransitions } from "../src/core/v2-talent-transitions";
 import {
   consumeActiveOperation,
   getActiveOperationAllowance,
@@ -27,6 +29,23 @@ function admittedState() {
 }
 
 describe("v2 shop transactions", () => {
+  it("upgrades an earned workstation without retriggering it and preserves old replay rules", () => {
+    const before = admittedState();
+    const equipped = { ...before,
+      shopState: { ...before.shopState, keyboardOwned: true, monitorOwned: true, chairOwned: true },
+      coffeeState: { ...before.coffeeState, machineOwned: true },
+    };
+    const legacy = withGameplayRuleset("20261021-r13", () => recordTalentTransitions(before, equipped));
+    expect(legacy.buffs.find(buff => buff.id === "perfect-workstation")?.actionEffects?.idea?.bonus).toBe(1);
+    const oldReplay = withGameplayRuleset("20261021-r13", () => dispatchAction(legacy, "set-date-display-mode", { dateDisplayMode: "calendar" }));
+    expect(oldReplay.buffs.find(buff => buff.id === "perfect-workstation")?.actionEffects?.idea?.bonus).toBe(1);
+    const continued = dispatchAction(legacy, "set-date-display-mode", { dateDisplayMode: "calendar" });
+    expect(continued.buffs.find(buff => buff.id === "perfect-workstation")?.actionEffects).toEqual({
+      idea: { bonus: 2 }, experiment: { bonus: 2 }, writing: { bonus: 2 },
+    });
+    expect(continued.eventHistory).toEqual(legacy.eventHistory);
+    expect(legacy.buffs.find(buff => buff.id === "perfect-workstation")?.actionEffects?.idea?.bonus).toBe(1);
+  });
   it("buys coffee without a machine and increases recovery only while a machine is owned", () => {
     const initial = admittedState();
     const bought = dispatchAction(initial, "buy-coffee");
@@ -175,9 +194,9 @@ describe("v2 shop transactions", () => {
     expect(state.buffs.find((buff) => buff.id === "perfect-workstation")).toMatchObject({
       timing: "permanent",
       actionEffects: {
-        idea: { bonus: 1 },
-        experiment: { bonus: 1 },
-        writing: { bonus: 1 },
+        idea: { bonus: 2 },
+        experiment: { bonus: 2 },
+        writing: { bonus: 2 },
       },
     });
 

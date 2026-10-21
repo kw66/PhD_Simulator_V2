@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createStore } from "../src/core/v2-store";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { ACCOUNT_STORAGE_KEY, loadAccountProfile, saveAccountProfile } from "../src/core/v2-account-storage";
@@ -91,13 +91,36 @@ function endFirstYear(store: Store) {
 function confirm(store: Store) { store.dispatch("confirm-rewinder-archive"); }
 
 describe("rewinder academic store, save and replay integration", () => {
+  it("durably saves the completed academic-year recording before clearing the playable run", async () => {
+    const { store } = await fixture();
+    endFirstYear(store);
+    let release!: () => void;
+    store.setReplayArchiver(async capture => {
+      expect(capture.state.rewinderState?.academic?.completed?.year).toBe(1);
+      expect(capture.replay.commands.at(-1)).toMatchObject({ actionId: "confirm-rewinder-archive" });
+      await new Promise<void>(resolve => { release = resolve; });
+    });
+    void store.confirmAcademicYearArchive(true);
+    await Promise.resolve();
+    expect(store.hasRoleSave("rewinder")).toBe(true);
+    expect(store.getLobbyState().rewinderAcademicArchive?.years[1]).toBeUndefined();
+    release();
+    await store.whenIdle();
+    expect(store.getState().phase).toBe("setup");
+    expect(store.hasRoleSave("rewinder")).toBe(false);
+    expect(store.getLobbyState().rewinderAcademicArchive?.years[1]).toBeDefined();
+  });
+
   it("archives August once without a graduation reward and restarts the same year from its original base", async () => {
     const { store, storage } = await fixture();
     const opening = structuredClone(store.getState());
     endFirstYear(store);
     expect(store.getLobbyState().rewinderAcademicArchive?.years[1]).toBeUndefined();
     const progress = structuredClone(store.getLobbyState().roleProgress.rewinder);
+    const replayArchive = vi.fn(async () => {});
+    store.setReplayArchiver(replayArchive);
     confirm(store);
+    expect(replayArchive).not.toHaveBeenCalled();
     expect(store.getState().phase).toBe("setup");
     const archived = structuredClone(store.getLobbyState().rewinderAcademicArchive!.years[1]);
     expect(archived).toBeDefined();

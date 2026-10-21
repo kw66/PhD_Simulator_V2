@@ -93,6 +93,7 @@ describe("unallocated talent reminder", () => {
       await page.evaluate(() => (window as unknown as ReminderWindow).reminderStore.dispatch("reset-game"));
       await page.locator('[data-action="start-game"]').click();
       await page.getByRole("button", { name: "重开加点", exact: true }).click();
+      await page.evaluate(() => (window as unknown as ReminderWindow).reminderStore.whenIdle());
       const result = await page.evaluate(() => {
         const store = (window as unknown as ReminderWindow).reminderStore;
         return { phase: store.getState().phase, saved: store.hasRoleSave("normal"),

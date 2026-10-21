@@ -119,6 +119,10 @@
 .academic-next-button { margin-left: auto; border-color: #4d7377 !important; background: linear-gradient(120deg, #577c7c, #3d6069); color: #fff9e9; box-shadow: 0 3px 0 #294951; }
 .academic-next-button.is-confirm { border-color: #9c8352 !important; background: linear-gradient(120deg, #af9560, #897143); box-shadow: 0 3px 0 #736037; }
 .academic-next-button:disabled { opacity: .5; box-shadow: none; }
+.academic-confirm-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.academic-confirm-actions .academic-next-button { margin-left: 0; }
+.academic-save-replay-button { border-color: #bdc4b9; background: #f6f4ec; color: #66736b; }
+.academic-save-replay-button:hover:not(:disabled) { border-color: #9ba995; background: #e8eee4; }
 @keyframes academic-page-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 760px) {
   .academic-archive-overlay { padding: 12px; }
@@ -163,6 +167,8 @@
   .academic-person-detail { font-size: 12px; }
   .academic-archive-footer { padding: 12px; gap: 8px; }
   .academic-archive-footer button { padding: 10px 12px; font-size: 12px; gap: 5px; }
+  .academic-confirm-actions { gap: 6px; }
+  .academic-confirm-actions button { flex: 1 1 100%; }
   .academic-save-note { max-width: 90px; font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) { .academic-archive-body { animation: none; } }

@@ -8,7 +8,7 @@ import { observeAchievements } from "./v2-achievement-runtime";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { dispatchDebugAction } from "./v2-debug-tools";
 import { appendAcademicYearLog } from "./v2-academic-year-log";
-import { recordTalentTransitions } from "./v2-talent-transitions";
+import { recordTalentTransitions, upgradePerfectWorkstation } from "./v2-talent-transitions";
 import { dispatchSetupAction } from "./v2-engine-action-dispatch";
 import { evaluateCoreEndings, finishTrainingIfReady, quitGame } from "./v2-ending-system";
 import { applyQueuedEventEffects, refreshPendingEventDecisions } from "./v2-engine-event-resolution";
@@ -388,6 +388,7 @@ function settlePendingPaperHelp(state: GameState): GameState {
 }
 
 export function dispatchAction(state: GameState, actionId: GameActionId, payload: DispatchPayload = {}): GameState {
+  if (state.phase === "playing") state = upgradePerfectWorkstation(state);
   // Leaving a run must not carry its consumed random cursor into the next start.
   const source = actionId === "restart-game" || actionId === "reset-game"
     ? { ...state, randomState: createGameRandomState() } : state;

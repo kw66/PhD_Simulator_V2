@@ -4678,7 +4678,7 @@ describe("v2 render lobby shell", () => {
       expect(fullGearCard).toMatch(new RegExp(`<span>${itemName}</span>\\s*<strong>✅</strong>`));
     }
     const perfectWorkstationCard = getTalentCardHtml(equipHtml, "perfect-workstation");
-    expect(perfectWorkstationCard).toContain("idea、实验、论文永久+1分");
+    expect(perfectWorkstationCard).toContain("idea、实验、论文永久+2分");
     expect(perfectWorkstationCard.match(/class="talent-item-metric"/g) ?? []).toHaveLength(4);
     expect(inactiveAiCard).toContain("激活后可额外进行 1 次科研操作，额外操作不消耗行动点，但 SAN 消耗 +2");
     expect(inactiveAiCard).toContain('class="talent-item-tag is-inactive">未激活</span>');

@@ -106,6 +106,7 @@
 .ending-buttons > button.is-restart { border-color: #98ad93; background: #e5eee2; color: #365b43; }
 .ending-buttons > button.is-return { border-color: #d2b986; background: #f8eed9; color: #75582e; }
 .ending-buttons > button.is-rewind { border-color: #b6a388; background: #ede5d7; color: #69573d; }
+.ending-buttons > button.is-replay-skip { border-color: #c7bdab; background: #f4f0e7; color: #6f6859; }
 @media (max-width: 560px) {
   .ending-panel .ending-header { padding-inline: 30px; }
   .ending-panel h2 { font-size: 24px; }

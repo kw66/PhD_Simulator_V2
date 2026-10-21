@@ -1,11 +1,15 @@
 .settings-panel {
-  padding: 7px 4px 0;
+  padding: 8px 3px 0;
 }
 
-.settings-panel .settings-quick-actions {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
+.local-replay-save-notice { position: fixed; z-index: 10000; left: 50%; bottom: 22px; transform: translateX(-50%); max-width: min(420px, calc(100vw - 28px)); width: max-content; margin: 0; padding: 12px 18px; border: 1px solid #c3ab7e; border-radius: 8px; background: #fff7e7; color: #70512e; box-shadow: 0 5px 24px #4b38232b; font-size: 13px; line-height: 1.6; text-align: center; }
+
+.settings-sections { display: grid; grid-template-columns: minmax(0, 1fr); gap: 15px; min-width: 0; }
+.settings-group { min-width: 0; padding: 14px; border: 1px solid #d4c3a1; border-radius: 7px; background: #f8f1e2; box-shadow: inset 0 1px 0 #fffdf6; }
+.settings-group-heading { display: flex; align-items: center; gap: 10px; margin: 0 0 11px; color: #5e503b; font-size: 14px; line-height: 1.4; letter-spacing: .04em; }
+.settings-group-heading::before { content: ""; width: 3px; height: 14px; border-radius: 2px; background: #b49459; }
+.settings-group-heading > span { margin-left: auto; color: #9a8766; font-size: 11px; font-weight: 500; letter-spacing: .02em; }
+.settings-panel .settings-group .settings-quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 
 .run-saves { min-height: 0; display: flex; flex-direction: column; gap: 9px; margin-top: 15px; color: #615037; }
 .run-saves-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 5px; background: #eadbbd; }
@@ -30,62 +34,62 @@
 .run-saves-empty { grid-column: 1 / -1; padding: 24px; text-align: center; color: #8a775c; font-size: 13px; }
 
 .settings-panel .settings-quick-actions > button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
   min-width: 0;
-  min-height: 48px;
-  padding: 8px 10px;
-  border: 1px solid #b8a787;
+  min-height: 66px;
+  padding: 12px;
+  border: 1px solid #d0bc95;
   border-radius: 5px;
-  background: linear-gradient(180deg, #fffaf0, #f0e6d5);
+  background: linear-gradient(180deg, #fffcf5, #f4ead6);
   color: #574933;
-  box-shadow: inset 0 1px 0 #fffdf7, 0 2px 0 #d6c8ae, 0 3px 6px rgba(77, 58, 33, 0.07);
-  font-size: 0.8rem;
+  box-shadow: inset 0 1px 0 #fffdf7, 0 1px 0 #e0cfad;
+  font: inherit;
+  font-size: 13px;
   font-weight: 750;
+  text-align: left;
+  cursor: pointer;
   transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
 
 .settings-panel .settings-quick-actions > button .lucide {
-  width: 17px;
-  height: 17px;
-  stroke-width: 2;
+  flex: 0 0 auto;
+  box-sizing: content-box;
+  width: 21px;
+  height: 21px;
+  padding: 8px;
+  border: 1px solid #deceb0;
+  border-radius: 5px;
+  background: #f0e4cb;
+  color: #94713c;
+  stroke-width: 1.7;
 }
 
-.settings-panel .settings-quick-actions > button.is-quit {
-  border-color: #b88d81;
-  background: linear-gradient(180deg, #f9efea, #efdfd8);
-  color: #7a483e;
-  box-shadow: inset 0 1px 0 #fff9f5, 0 2px 0 #d2b8ae, 0 3px 6px rgba(90, 49, 43, 0.07);
-}
+.settings-action-copy { display: grid; min-width: 0; gap: 4px; line-height: 1.4; }
+.settings-action-copy > small { color: #938064; font-size: 11px; font-weight: 400; }
 
 .settings-panel .settings-quick-actions > button.is-return {
-  border-color: #bb9b61;
-  background: linear-gradient(180deg, #f9edcd, #efddb4);
-  color: #684d27;
-  box-shadow: inset 0 1px 0 #fff9e7, 0 2px 0 #ceb987, 0 3px 6px rgba(93, 66, 31, 0.08);
-}
-
-.settings-panel .settings-quick-actions > button.is-feedback {
-  border-color: #9eaf9a;
-  background: linear-gradient(180deg, #f2f5eb, #e3eadc);
-  color: #4a654b;
-  box-shadow: inset 0 1px 0 #fcfff8, 0 2px 0 #c5d2bd, 0 3px 6px rgba(48, 74, 47, 0.07);
+  color: #574933;
 }
 
 .settings-panel .settings-quick-actions > button:hover:not(:disabled):not(.active) {
   border-color: #9b7d4e;
   background: #f1e2c6;
-  box-shadow: inset 0 1px 0 #fffdf7, 0 2px 0 #c3a97a, 0 4px 7px rgba(77, 58, 33, 0.11);
+  box-shadow: inset 0 1px 0 #fffdf7, 0 1px 0 #c3a97a;
   transform: none;
 }
 
-.settings-panel .settings-quick-actions > button.is-quit:hover:not(:disabled):not(.active) {
-  border-color: #a96d60;
-  background: #eddbd2;
-}
-
-.settings-panel .settings-quick-actions > button.is-feedback:hover:not(:disabled):not(.active) {
-  border-color: #819b80;
-  background: #dce8d6;
-}
+.settings-secondary-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 3px 2px; }
+.settings-panel .settings-secondary-actions > button { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 7px; width: auto; min-width: 0; min-height: 34px; padding: 6px 11px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: #837052; box-shadow: none; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.4; white-space: nowrap; cursor: pointer; }
+.settings-panel .settings-secondary-actions > button .lucide { width: 15px; height: 15px; stroke-width: 1.8; }
+.settings-panel .settings-secondary-actions > button.is-quit { border-color: #d8bdb1; color: #976759; background: #f8eee6; }
+.settings-panel .settings-secondary-actions > button:hover:not(:disabled) { border-color: #cfbc96; background: #eee2ca; transform: none; box-shadow: none; }
+.settings-panel .settings-secondary-actions > button.is-quit:hover:not(:disabled) { border-color: #ba8a79; background: #f0dfd5; }
+.settings-panel .settings-secondary-actions > button:disabled { opacity: .48; cursor: not-allowed; }
+.settings-panel .settings-secondary-actions > button:focus-visible { outline: 2px solid #a6803f; outline-offset: 2px; }
 
 .settings-panel .settings-quick-actions > button:disabled {
   border-color: #c9c1b2;
@@ -207,8 +211,22 @@
 }
 
 @media (max-width: 720px) {
-  .settings-panel .settings-quick-actions { gap: 8px; }
-  .settings-panel .settings-quick-actions > button { min-height: 44px; }
+  .settings-sections { gap: 10px; }
+  .settings-group { padding: 10px; }
+  .settings-group-heading { margin-bottom: 8px; font-size: 13px; }
+  .settings-group-heading > span { font-size: 10px; }
+  .settings-panel .settings-group .settings-quick-actions { gap: 7px; }
+  .settings-panel .settings-quick-actions > button { min-height: 58px; padding: 9px 7px; gap: 8px; font-size: 12px; }
+  .settings-panel .settings-quick-actions > button .lucide { width: 18px; height: 18px; padding: 6px; }
+  .settings-action-copy { gap: 3px; }
+  .settings-action-copy > small { font-size: 10px; }
+  .settings-panel .settings-secondary-actions > button { min-height: 36px; }
+}
+
+@media (max-width: 370px) {
+  .settings-panel .settings-quick-actions > button { gap: 6px; padding-inline: 6px; }
+  .settings-panel .settings-quick-actions > button .lucide { width: 16px; height: 16px; padding: 4px; }
+  .settings-action-copy > small { font-size: 9px; }
 }
 
 .curse-debt-panel { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; padding: 12px; border-radius: 10px; background: #f5ebd9; }

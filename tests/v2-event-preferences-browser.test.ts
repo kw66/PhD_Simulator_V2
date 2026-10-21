@@ -49,7 +49,7 @@ describe("event preferences and compact mobile agenda", () => {
     try {
       await page.goto(base);
       await page.waitForFunction(() => (window as unknown as TestWindow).levelStatsSyncCalls?.length === 1);
-      const checks = await page.evaluate(() => {
+      const checks = await page.evaluate(async () => {
         const test = window as unknown as TestWindow;
         const store = test.eventPreferencesStore;
         const startup = structuredClone(test.levelStatsSyncCalls);
@@ -59,6 +59,7 @@ describe("event preferences and compact mobile agenda", () => {
         const routine = structuredClone(test.levelStatsSyncCalls);
         store.dispatch("quit-game");
         store.dispatch("settle-and-return");
+        await store.whenIdle();
         const settled = structuredClone(test.levelStatsSyncCalls);
         const phase = store.getState().phase;
         store.getLobbyState().roleProgress.genius.unlocked = true;
