@@ -5,6 +5,7 @@ import { getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import type { RoleId } from "../core/v2-types";
 import { DATA_EPOCH, isCurrentDataEpoch } from "../core/v2-data-epoch";
 import { isRemoteWriteEnabled } from "./v2-remote-access";
+import { serializeRemoteWrite } from "./v2-upload-transport";
 
 export const ACHIEVEMENT_STATS_STORAGE_KEY = "phd_simulator_v2_achievement_stats_v2";
 const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
@@ -136,17 +137,22 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
     } catch { return null; }
   };
   const rpc = async (name: string, body: object): Promise<unknown> => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
-    try {
-      const response = await request(`${RPC_URL}/${name}`, {
-        method: "POST", headers: { apikey: PUBLIC_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify(body), signal: controller.signal, keepalive: true,
-      });
-      if (!response.ok) throw new Error(`Achievement statistics HTTP ${response.status}`);
-      const text = await response.text();
-      return text ? JSON.parse(text) : null;
-    } finally { clearTimeout(timeout); }
+    const serialized = JSON.stringify(body);
+    const send = async (keepalive: boolean): Promise<unknown> => {
+      if (disposed) throw new Error("Achievement statistics client disposed");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+      try {
+        const response = await request(`${RPC_URL}/${name}`, {
+          method: "POST", headers: { apikey: PUBLIC_KEY, "Content-Type": "application/json" },
+          body: serialized, signal: controller.signal, keepalive,
+        });
+        if (!response.ok) throw new Error(`Achievement statistics HTTP ${response.status}`);
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
+      } finally { clearTimeout(timeout); }
+    };
+    return name.startsWith("record_") ? serializeRemoteWrite(serialized, send) : send(false);
   };
   const scheduleFlush = (delay = 500): void => {
     if (!uploads || disposed || timer || (queue.length === 0 && pendingPlayers.size === 0)) return;

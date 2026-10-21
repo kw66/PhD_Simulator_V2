@@ -2,17 +2,17 @@ import { getRoleOptions } from "../core/v2-progression";
 import { DATA_EPOCH, isCurrentDataEpoch } from "../core/v2-data-epoch";
 import { validStatisticsContext } from "./v2-statistics-context";
 import { isRemoteWriteEnabled } from "./v2-remote-access";
+import { serializeRemoteWrite, UPLOAD_KEEPALIVE_MAX_BYTES } from "./v2-upload-transport";
 
 export const STATISTICS_CACHE_MS = 10 * 60_000;
 export const ACTIVITY_RETENTION_DAYS = 30;
 const READ_RETRY_MS = 60_000;
-const UPLOAD_INTERVAL_MS = 30_000;
 const BATCH_DELAY_MS = 500;
 const MAX_BATCH_SIZE = 50;
 // Fetch keepalive has a 64 KiB body budget shared by in-flight requests.
 // Long successful runs contain many paper diagnostics, so row count alone
 // cannot bound their upload. Leave room for the achievement outbox as well.
-export const STATISTICS_MAX_BATCH_BYTES = 48 * 1024;
+export const STATISTICS_MAX_BATCH_BYTES = UPLOAD_KEEPALIVE_MAX_BYTES;
 const SNAPSHOT_RPC = "get_phd_simulator_v2_stats_snapshot";
 export const STATISTICS_STORAGE_KEY = "phd_simulator_v2_statistics_v2";
 const STORAGE_KEY = STATISTICS_STORAGE_KEY;
@@ -282,32 +282,33 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
   };
   const rpc = async (name: string, payload: object): Promise<unknown> => {
     const body = JSON.stringify(payload);
-    const response = await request(`${RPC_URL}/${name}`, { method: "POST",
-      headers: { apikey: PUBLIC_KEY, "Content-Type": "application/json" },
-      body, signal: AbortSignal.timeout(8000),
-      // Normal uploads are durable in local storage and need no keepalive quota.
-      // Keep small writes alive only while the page is being hidden/unloaded.
-      keepalive: typeof document !== "undefined" && document.visibilityState === "hidden"
-        && new TextEncoder().encode(body).byteLength <= STATISTICS_MAX_BATCH_BYTES });
-    if (!response.ok) {
-      if (name === "record_phd_simulator_v2_stats_batch" && response.status === 422) {
-        let rejected: string[] | null = null;
-        try {
-          const error = await response.json();
-          const details = JSON.parse(error.details);
-          if (error.code === "PT422" && details.reason === "activity-future-date"
-            && Array.isArray(details.ids) && details.ids.length > 0 && details.ids.length <= MAX_BATCH_SIZE
-            && details.ids.every((id: unknown) => typeof id === "string" && UUID_PATTERN.test(id))
-            && new Set(details.ids).size === details.ids.length) rejected = details.ids;
-        } catch { /* Unknown errors retain the batch and use normal backoff. */ }
-        if (rejected) throw new ActivityDateRejection(rejected);
+    const send = async (keepalive: boolean): Promise<unknown> => {
+      if (disposed) throw new Error("Statistics client disposed");
+      const response = await request(`${RPC_URL}/${name}`, { method: "POST",
+        headers: { apikey: PUBLIC_KEY, "Content-Type": "application/json" },
+        body, signal: AbortSignal.timeout(8000),
+        keepalive });
+      if (!response.ok) {
+        if (name === "record_phd_simulator_v2_stats_batch" && response.status === 422) {
+          let rejected: string[] | null = null;
+          try {
+            const error = await response.json();
+            const details = JSON.parse(error.details);
+            if (error.code === "PT422" && details.reason === "activity-future-date"
+              && Array.isArray(details.ids) && details.ids.length > 0 && details.ids.length <= MAX_BATCH_SIZE
+              && details.ids.every((id: unknown) => typeof id === "string" && UUID_PATTERN.test(id))
+              && new Set(details.ids).size === details.ids.length) rejected = details.ids;
+          } catch { /* Unknown errors retain the batch and use normal backoff. */ }
+          if (rejected) throw new ActivityDateRejection(rejected);
+        }
+        throw new Error(`Statistics unavailable: ${response.status}`);
       }
-      throw new Error(`Statistics unavailable: ${response.status}`);
-    }
-    const data: unknown = await response.json();
-    if (name.startsWith("get_phd_simulator_v2_") && (!data || typeof data !== "object"
-      || (data as Record<string, unknown>).epoch !== DATA_EPOCH)) throw new Error("Statistics epoch mismatch");
-    return data;
+      const data: unknown = await response.json();
+      if (name.startsWith("get_phd_simulator_v2_") && (!data || typeof data !== "object"
+        || (data as Record<string, unknown>).epoch !== DATA_EPOCH)) throw new Error("Statistics epoch mismatch");
+      return data;
+    };
+    return name.startsWith("record_") ? serializeRemoteWrite(body, send) : send(false);
   };
   // Keep activity snapshots in the same namespace as the server data epoch.
   // This also discards responses cached by the superseded historical-starts
@@ -349,11 +350,11 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     return work;
   };
   const hasPending = (): boolean => [...results.values()].some((row) => row.payload !== undefined && !debugRuns.has(row.run));
-  const selectBatch = (): Array<[string, QueuedResult]> => {
+  const selectBatch = (eligible: Set<string>): Array<[string, QueuedResult]> => {
     const batch: Array<[string, QueuedResult]> = [];
     for (const entry of results) {
       const row = entry[1];
-      if (!row.payload || debugRuns.has(row.run)) continue;
+      if (!eligible.has(entry[0]) || !row.payload || debugRuns.has(row.run)) continue;
       const candidate = [...batch, entry];
       const bytes = new TextEncoder().encode(JSON.stringify({ p_epoch: DATA_EPOCH,
         p_records: candidate.map(([, item]) => ({ kind: item.kind, payload: item.payload })) })).byteLength;
@@ -375,11 +376,14 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
     if (pendingUpload) return pendingUpload;
     if (Date.now() < nextUploadAt) { schedule(); return Promise.resolve(); }
     if (uploadTimer !== null) { clearTimeout(uploadTimer); uploadTimer = null; }
-    let batch = selectBatch();
+    // Drain the backlog present at this flush. Results queued while it is in
+    // flight get their own turn, so a continuously growing queue cannot loop forever.
+    const eligible = new Set(results.keys());
+    let batch = selectBatch(eligible);
     let activityChanged = false;
     pendingUpload = (async () => {
       try {
-        while (batch.length > 0) {
+        while (batch.length > 0 && !disposed) {
           let response: unknown;
           try {
             response = await rpc("record_phd_simulator_v2_stats_batch", { p_epoch: DATA_EPOCH, p_records: batch.map(([, row]) => ({ kind: row.kind, payload: row.payload })) });
@@ -397,7 +401,8 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
             persist();
             // The failed batch wrote nothing. Retry its valid remainder with the
             // original UUIDs; every rejection removes at least one item (max 50).
-            batch = batch.filter(([, row]) => !rejected.has(row.id) && !debugRuns.has(row.run));
+            for (const [key] of invalid) eligible.delete(key);
+            batch = selectBatch(eligible);
             continue;
           }
           if (!Array.isArray(response) || response.some((id) => typeof id !== "string")) throw new Error("Invalid statistics acknowledgement");
@@ -410,10 +415,12 @@ export function createStatisticsClient(options: StatisticsClientOptions = {}): S
               ...(row.finalizedRunId ? { finalizedRunId: row.finalizedRunId } : {}) });
           }
           if (batch.some(([, row]) => !acknowledged.has(row.id))) throw new Error("Incomplete statistics acknowledgement");
-          break;
+          for (const [key] of batch) eligible.delete(key);
+          persist();
+          batch = selectBatch(eligible);
         }
         failures = 0;
-        nextUploadAt = Date.now() + UPLOAD_INTERVAL_MS;
+        nextUploadAt = 0;
       } catch {
         failures = Math.min(failures + 1, 5);
         nextUploadAt = Date.now() + Math.min(60_000 * 2 ** (failures - 1), STATISTICS_CACHE_MS);

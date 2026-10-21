@@ -427,17 +427,14 @@ describe("shared statistics queue", () => {
     expect(queue(stats, "thesis")).toBe(false);
   });
 
-  it("caps requests at fifty records and waits thirty seconds before the next batch", async () => {
+  it("drains a backlog in consecutive requests capped at fifty records", async () => {
     const network = backend();
     const stats = client({ fetch: network.fetch, storage: storage() });
     for (let index = 0; index < 51; index++) queue(stats, "journal", `paper-${index}`);
     await stats.flush();
-    expect(network.batches.map((batch) => batch.length)).toEqual([50]);
-    await stats.flush();
-    await vi.advanceTimersByTimeAsync(29_999);
-    expect(network.fetch).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1);
     expect(network.batches.map((batch) => batch.length)).toEqual([50, 1]);
+    await stats.flush();
+    expect(network.fetch).toHaveBeenCalledTimes(2);
   });
 
   it("splits long successful runs by UTF-8 bytes and eventually sends their passing thesis and finish", async () => {
@@ -455,8 +452,6 @@ describe("shared statistics queue", () => {
     expect(stats.enqueue("activity", run, "finish", { p_event: "finish", p_ending: "phd", p_day: "2026-11-17",
       p_run_key: run, p_role_id: "normal" }, finalizedRunId)).toBe(true);
     await stats.flush();
-    expect(network.rows.size).toBeLessThan(10);
-    await vi.advanceTimersByTimeAsync(120_000);
     expect(network.rows.size).toBe(10);
     expect(network.batches.length).toBeGreaterThan(1);
     for (const [, init] of network.fetch.mock.calls) {

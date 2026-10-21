@@ -128,8 +128,10 @@ describe("per-role player level statistics", () => {
     const account = createDefaultAccountProfile(); account.roleProgress.normal.level = 2;
     const uploading = first.syncAccount(account);
     const offline = create({ storage: saved, fetch: vi.fn(async () => { throw new Error("offline"); }) });
-    account.roleProgress.normal.level = 5; await offline.syncAccount(account);
+    account.roleProgress.normal.level = 5;
+    const offlineUpload = offline.syncAccount(account);
     accept(Response.json(true)); await uploading;
+    await offlineUpload;
     expect(readSaved(saved).pending).toEqual([{ playerId: PLAYER, roleId: "normal", level: 5 }]);
     expect(readSaved(saved).acknowledged).toEqual([{ playerId: PLAYER, roleId: "normal", level: 2 }]);
   });
