@@ -4,7 +4,9 @@ import { createInitialState } from "../src/core/v2-engine-state-factory";
 import {
   advanceThesisResearchPoint, createInitialThesisState, getGraduationPreparationYear,
   getThesisAdvanceFailure, getThesisAdvanceSanCost, isGraduationPreparationUnlocked, prepareThesisBlindReview, syncThesisState,
+  getThesisForecast, getThesisAdvanceGain,
 } from "../src/core/v2-thesis-rules";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { generatePaperTopic } from "../src/core/v2-paper-topics";
 import type { Degree, GameState, Paper } from "../src/core/v2-types";
 
@@ -12,7 +14,7 @@ function fixture(degree: Degree = "master", month = 1): GameState {
   return {
     ...createInitialState(), phase: "playing", degree, year: degree === "master" ? 3 : 6,
     month, totalMonths: (degree === "master" ? 24 : 60) + month, buffs: [],
-    player: { san: 20, research: 12.9, favor: 0, social: 0, money: 0 },
+    player: { san: 20, research: 12, favor: 0, social: 0, money: 0 },
   };
 }
 
@@ -277,7 +279,7 @@ describe("thesis point advancement", () => {
     expect(review.researchPoints[1]).toMatchObject({ score: 12, initialScore: 0 });
   });
 
-  it.each([1, 2, 3, 4, 5, 6, 7])("permits writing in month %i without AP and rounds research down", (month) => {
+  it.each([1, 2, 3, 4, 5, 6, 7])("permits writing in month %i without AP", (month) => {
     const state = syncThesisState(fixture("master", month), () => 0);
     state.actionState = { ...state.actionState, used: state.actionState.limit };
     const next = advanceThesisResearchPoint(state, 0);
@@ -324,5 +326,78 @@ describe("thesis point advancement", () => {
     } finally {
       random.mockRestore();
     }
+  });
+});
+
+describe("thesis forecast and decimal advancement", () => {
+  it("keeps decimal research in new runs and the integer gain in old replays", () => {
+    const state = syncThesisState(fixture("phd"), () => 0);
+    state.player.research = 9.6;
+    expect(getThesisAdvanceGain(state)).toBe(9.6);
+    const advanced = advanceThesisResearchPoint(state, 0);
+    expect(advanced.thesis.researchPoints[0]!.score).toBe(9.6);
+    expect(advanceThesisResearchPoint({ ...advanced, month: 2, totalMonths: 62 }, 0).thesis.researchPoints[0]!.score).toBe(19.2);
+    withGameplayRuleset("20261021-r14", () => {
+      expect(getThesisAdvanceGain(state)).toBe(9);
+      expect(advanceThesisResearchPoint(state, 0).thesis.researchPoints[0]!.score).toBe(9);
+    });
+  });
+
+  it("previews strongest same-topic papers in year five without initialization or RNG", () => {
+    const state = { ...fixture("phd"), year: 5, totalMonths: 49, graduationScoreTarget: 7, totalResearchScore: 6 };
+    state.player.research = 9.6;
+    state.papers = [paper("a1", 60, "a"), paper("a2", 60, "a"), paper("a3", 60, "a"),
+      paper("b", 150, "b"), paper("coauthor", 1000, "a", { nonFirstAuthor: true })];
+    state.externalPublications = [state.papers[0]!];
+    const before = structuredClone(state);
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockImplementation(() => { throw new Error("unexpected RNG"); });
+    try {
+      expect(getThesisForecast({ ...state, year: 4 })).toBeNull();
+      const forecast = getThesisForecast(state)!;
+      expect(forecast).toMatchObject({ stage: "planning", topicId: "a", advanceGain: 9.6,
+        threshold: 330, currentGuaranteedScore: 180, projectedGuaranteedScore: 382,
+        currentPass: false, projectedPass: true, researchScoreMet: false });
+      expect(forecast.points.map(point => [point.score, point.remainingAdvances, point.projectedScore]))
+        .toEqual([[60, 7, 127.2], [60, 7, 127.2], [60, 7, 127.2]]);
+      expect(getThesisForecast(state)).toEqual(forecast);
+      expect(state).toEqual(before);
+      expect(random).not.toHaveBeenCalled();
+    } finally { random.mockRestore(); }
+  });
+
+  it("counts this month's unused advances per point and freezes after writing", () => {
+    let state = syncThesisState({ ...fixture("phd", 7), graduationScoreTarget: 7, totalResearchScore: 7 }, () => 0);
+    state = advanceThesisResearchPoint(state, 0);
+    const forecast = getThesisForecast(state)!;
+    expect(forecast.stage).toBe("writing");
+    expect(forecast.points.map(point => point.remainingAdvances)).toEqual([0, 1, 1]);
+    expect(forecast.points.map(point => point.projectedScore)).toEqual([12, 12, 12]);
+    expect(forecast.researchScoreMet).toBe(true);
+    expect(getThesisForecast({ ...state, month: 8 })!.points.map(point => point.remainingAdvances)).toEqual([0, 0, 0]);
+    expect(getThesisForecast({ ...state, phase: "finished" })!.stage).toBe("frozen");
+  });
+
+  it("projects support replacement by the real rules without changing the source", () => {
+    const state = syncThesisState({ ...fixture("phd"), papers: [paper("old", 20, "old")] }, () => 0);
+    state.papers.push(paper("new1", 110, "new"), paper("new2", 110, "new"), paper("new3", 110, "new"));
+    const before = structuredClone(state);
+    const forecast = getThesisForecast(state)!;
+    expect(forecast.topicId).toBe("new");
+    expect(forecast.points.map(point => point.score)).toEqual(syncThesisState(state, () => 0).thesis.researchPoints.map(point => point.score));
+    expect(forecast.currentGuaranteedScore).toBe(330);
+    expect(forecast.currentPass).toBe(true);
+    expect(state).toEqual(before);
+    withGameplayRuleset("20261021-r14", () => {
+      expect(getThesisForecast(state)).toMatchObject({ threshold: 360, currentPass: false });
+    });
+  });
+
+  it("has zero baselines for missing papers and unchanged master thresholds", () => {
+    const planning = getThesisForecast({ ...fixture("phd"), year: 5 })!;
+    expect(planning.topicId).toBeNull();
+    expect(planning.points.map(point => point.score)).toEqual([0, 0, 0]);
+    const master = fixture("master");
+    expect(getThesisForecast({ ...master, year: 2 })).toBeNull();
+    expect(getThesisForecast(master)).toMatchObject({ threshold: 200, stage: "writing" });
   });
 });

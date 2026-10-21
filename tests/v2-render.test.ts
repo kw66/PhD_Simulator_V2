@@ -829,7 +829,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("待用 idea");
     expect(html).toContain("下次想 idea");
     expect(html).toContain("升档进度");
-    expect(html).toContain("每 8 次打工，金币收入 +1，SAN 消耗 +1");
+    expect(html).toContain("每 5 次打工，金币收入 +0.5；基础 SAN 消耗保持 5");
     expect(html).toContain("下次金币");
     expect(html).toContain("下次 SAN");
     expect(html).toContain("升档进度");
@@ -2490,7 +2490,7 @@ describe("v2 render lobby shell", () => {
     expect(bikeCard).not.toContain("下一档：");
     expect(bikeCard).toContain('class="shop-item-status is-neutral">可升级</span>');
     expect(bikeCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain(
-      "每月 SAN -1；每 -6 SAN，上限 +1（最多 +3）",
+      "每月 SAN -1；每 -4 SAN，上限 +1（最多 +3）",
     );
   });
 
@@ -2580,7 +2580,7 @@ describe("v2 render lobby shell", () => {
     expect(upgradedMachineCard).toContain("已升级");
     expect(upgradedMachineCard).toContain('class="shop-item-status is-owned">已升级</span>');
     expect(upgradedMachineCard.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toContain(
-      "每累计生产 10 杯冰美式，效果提升 1（最多 +5）",
+      "每累计生产 8 杯冰美式，效果提升 1（最多 +5）",
     );
     expect(upgradedMachineCard).not.toContain('data-action="buy-coffee-machine"');
     expect(advancedUpgradeCard).not.toContain('class="shop-item-status is-owned"');
@@ -4702,7 +4702,7 @@ describe("v2 render lobby shell", () => {
     expect(equipHtml).toContain("累计生产");
     expect(equipHtml).toContain("24 杯");
     expect(equipHtml).toContain("效果提升");
-    expect(equipHtml).toContain("24/50 杯");
+    expect(equipHtml).toContain("24/40 杯");
     expect(equipHtml).toContain('data-talent-item-id="gpu"');
     expect(equipHtml).toContain("RTX 2080 Ti");
     expect(equipHtml).not.toContain('data-talent-item-id="game-controller"');

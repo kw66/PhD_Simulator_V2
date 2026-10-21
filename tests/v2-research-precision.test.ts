@@ -199,12 +199,12 @@ describe("decimal research calculations", () => {
     expect(settlePendingLoverHelp(settled, () => 0)).toBe(settled);
   });
 
-  it("floors research for a thesis point without changing fractional research", () => {
+  it("preserves fractional research when advancing a thesis point", () => {
     const base = makeState();
     const state = syncThesisState({ ...base, year: 3, month: 1, totalMonths: 25,
       player: { ...base.player, research: 6.75 } }, () => 0);
     const next = advanceThesisResearchPoint(state, 0);
-    expect(next.thesis.researchPoints[0]!.score - state.thesis.researchPoints[0]!.score).toBe(6);
+    expect(next.thesis.researchPoints[0]!.score - state.thesis.researchPoints[0]!.score).toBe(6.75);
     expect(next.player.research).toBe(6.75);
   });
 

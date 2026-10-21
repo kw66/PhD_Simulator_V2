@@ -1,4 +1,9 @@
 import type { ShopState } from "./v2-types";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
+
+export function getBikeGrowthThreshold(): number {
+  return usesGameplayRulesFrom("20261022-r15") ? 4 : 6;
+}
 
 export interface BikeTierDefinition {
   level: number;

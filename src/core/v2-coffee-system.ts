@@ -1,5 +1,11 @@
 import type { CoffeeMachineUpgradeId, CoffeeState } from "./v2-types";
 
+import { usesGameplayRulesFrom } from "./v2-rule-context";
+
+export function getCoffeeGrowthInterval(): number {
+  return usesGameplayRulesFrom("20261022-r15") ? 8 : 10;
+}
+
 export interface CoffeeMachineUpgradeDefinition {
   id: Exclude<CoffeeMachineUpgradeId, null>;
   name: string;
@@ -13,7 +19,7 @@ export const BASE_COFFEE_PRICE = 2;
 export const COFFEE_MACHINE_UPGRADE_DEFINITIONS: CoffeeMachineUpgradeDefinition[] = [
   { id: "manual", name: "手动咖啡机", description: "冰美式价格降低 1 金币", price: 12 },
   { id: "automatic", name: "自动咖啡机", description: "每月初额外生产一杯冰美式，金币 -2", price: 16 },
-  { id: "advanced", name: "高级咖啡机", description: "每累计生产 10 杯冰美式，效果提升 1（最多 +5）", price: 18 },
+  { id: "advanced", name: "高级咖啡机", get description() { return `每累计生产 ${getCoffeeGrowthInterval()} 杯冰美式，效果提升 1（最多 +5）`; }, price: 18 },
   { id: "unlimited", name: "无限咖啡机", description: "每月可无限生产冰美式，价格按 2/3/4... 递增", price: 16 },
 ];
 
@@ -32,7 +38,7 @@ export function createCoffeeState(): CoffeeState {
 
 export function getCurrentCoffeeBonus(coffeeState: CoffeeState): number {
   if (!coffeeState.machineOwned || coffeeState.machineUpgrade !== "advanced") return 0;
-  return Math.min(5, Math.floor(coffeeState.machineTrackedCoffeeCount / 10));
+  return Math.min(5, Math.floor(coffeeState.machineTrackedCoffeeCount / getCoffeeGrowthInterval()));
 }
 
 export function getCoffeeSanGain(coffeeState: CoffeeState): number {

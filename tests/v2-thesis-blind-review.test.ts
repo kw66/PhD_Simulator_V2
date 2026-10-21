@@ -6,6 +6,7 @@ import {
   advanceThesisResearchPoint, prepareThesisBlindReview, syncThesisState, THESIS_REVIEW_THRESHOLDS,
 } from "../src/core/v2-thesis-rules";
 import type { Degree, GameState, Paper, PendingEvent } from "../src/core/v2-types";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 
 function fixture(degree: Degree = "master", scores = [100, 100]): GameState {
   const initial: GameState = {
@@ -27,6 +28,16 @@ function stages(event: PendingEvent) {
 }
 
 describe("thesis blind-review sampling", () => {
+  it("accepts 330-point doctoral work in new runs while replaying the old 360 threshold", () => {
+    const state = fixture("phd", [110, 110, 110]);
+    expect(prepareThesisBlindReview(state, () => 0.37).thesis.review!.passed).toBe(true);
+    withGameplayRuleset("20261021-r14", () => {
+      const old = prepareThesisBlindReview(state, () => 0.37).thesis.review!;
+      expect(old.passed).toBe(false);
+      expect(old.reports.every(report => report.grade === "C")).toBe(true);
+      expect(prepareThesisBlindReview(fixture("phd", [120, 120, 120]), () => 0.37).thesis.review!.passed).toBe(true);
+    });
+  });
   it.each(["master", "phd"] as const)("samples only normal %s reviewers with total weight three", (degree) => {
     const points = degree === "master" ? [140, 25] : [230, 160, 30];
     const state = fixture(degree, points);

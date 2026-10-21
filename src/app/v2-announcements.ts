@@ -10,6 +10,16 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-10-22",
+    title: "成长路线加强与大论文提前规划",
+    changes: [
+      { category: "平衡", title: "博士大论文更有余量", description: "博士盲审B档门槛从360降至330，三个研究点各110即可保证通过。推进毕业论文保留有效科研的小数，不再向下取整；优秀标准与写作月份不变。" },
+      { category: "更新", title: "提前规划毕业论文", description: "博士第五学年起可查看当前成果的支撑预览；写作期展示剩余推进次数、预计分数与科研分达标情况。预测按当前科研逐月推满计算，便于提前补齐成果与安排SAN。" },
+      { category: "平衡", title: "熟练打工更轻松", description: "每完成5次打工，后续每次收入增加0.5金币；基础SAN消耗固定为5，不再随熟练度增加，季节与其他效果照常生效。" },
+      { category: "平衡", title: "骑行与咖啡成长加快", description: "骑行每累计消耗4点SAN，获得1点SAN上限，各档成长上限不变。高级咖啡机每累计生产8杯，单杯恢复提高1点，最多额外提高5点；普通咖啡机阶段的生产积累同样计入。" },
+    ],
+  },
+  {
     date: "2026-10-21",
     title: "本地回放、天赋提醒与体验优化",
     changes: [
@@ -225,13 +235,6 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
     title: "事件期限与月度结算",
     changes: [
       { category: "更新", title: "按自己的顺序处理待办", description: "部分事件可在期限内延期处理，月初预览下一轮收支与效果；临时加成按持续时间结算，区分本月、下月与永久影响。学年月份和公历可切换查看。" },
-    ],
-  },
-  {
-    date: "2026-08-17",
-    title: "入学故事与随机导师",
-    changes: [
-      { category: "更新", title: "从联系导师开始读研", description: "保研准备、导师回复和报到串成三幕开局。导师姓名与课题组介绍随机生成，确认前可了解研究方向、指导方式和实验室氛围，带着不同期待开始读研生活。" },
     ],
   },
 ];

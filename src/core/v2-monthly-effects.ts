@@ -27,7 +27,7 @@ import { settleRoleTalentInvestments } from "./v2-role-talent-investments";
 import { getFellowName } from "./v2-fellow-progression";
 import { syncRelationshipState } from "./v2-relationship-rules";
 import { getMonthlySeasonSanModifier, getRoleMonthlySanCost, getSeasonByMonth } from "./v2-sanity-rules";
-import { getBikeMonthlySanCost, getBikeSanCapLimit } from "./v2-bike-system";
+import { getBikeGrowthThreshold, getBikeMonthlySanCost, getBikeSanCapLimit } from "./v2-bike-system";
 import { hasFullGear } from "./v2-meeting-system";
 import { BASE_COFFEE_PRICE, getCoffeeBuyPrice, getCoffeeSanGain } from "./v2-coffee-system";
 import { getChairMonthlyRecovery, getShopEmergencySan } from "./v2-shop-items-effects";
@@ -617,7 +617,7 @@ export function applyMonthlyEffects(state: GameState): AppliedMonthlyEffects {
     + emergencyChairRecovery);
   const bikeMonthlyItem = resolution.items.find((item) => item.id === "bike-monthly");
   const bikeSanSpent = settleSanPrecision(state.shopState.bikeSanSpent + Math.max(0, -(bikeMonthlyItem?.appliedStats.san ?? 0)));
-  const bikeThreshold = 6;
+  const bikeThreshold = getBikeGrowthThreshold();
   const bikeGainLimit = getBikeSanCapLimit(state.shopState);
   const bikeSanCapGains = state.shopState.bikeOwned && bikeGainLimit > 0
     ? Math.min(bikeGainLimit, Math.floor(bikeSanSpent / bikeThreshold))

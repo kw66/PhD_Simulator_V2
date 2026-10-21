@@ -5,6 +5,8 @@ import { paySanCost } from "./v2-role-talent-costs";
 import { generatePaperTopic } from "./v2-paper-topics";
 import { getAcceptedPaperScore } from "./v2-publication-rules";
 import { getActualSanChange } from "./v2-sanity-rules";
+import { roundAttribute } from "./v2-attribute-format";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { Degree, GameState, Paper } from "./v2-types";
 
 export interface ThesisResearchPoint {
@@ -54,8 +56,35 @@ export interface ThesisState {
 
 export const THESIS_REVIEW_THRESHOLDS = {
   master: { C: 120, B: 200, A: 300 },
-  phd: { C: 240, B: 360, A: 500 },
+  phd: { C: 240, B: 330, A: 500 },
 } as const;
+
+export function getThesisReviewThresholds(degree: Degree): { C: number; B: number; A: number } {
+  return degree === "phd" && !usesGameplayRulesFrom("20261022-r15")
+    ? { ...THESIS_REVIEW_THRESHOLDS.phd, B: 360 } : THESIS_REVIEW_THRESHOLDS[degree];
+}
+
+export function getThesisAdvanceGain(state: GameState): number {
+  const research = getEffectiveResearch(state);
+  return usesGameplayRulesFrom("20261022-r15") ? roundAttribute(research) : Math.floor(research);
+}
+
+export interface ThesisForecast {
+  degree: Degree;
+  stage: "planning" | "writing" | "frozen";
+  topicId: string | null;
+  topicLabel: string;
+  points: Array<ThesisResearchPoint & { remainingAdvances: number; projectedScore: number }>;
+  advanceGain: number;
+  threshold: number;
+  currentGuaranteedScore: number;
+  projectedGuaranteedScore: number;
+  currentPass: boolean;
+  projectedPass: boolean;
+  researchScore: number;
+  researchScoreTarget: number | null;
+  researchScoreMet: boolean;
+}
 
 export function createInitialThesisState(): ThesisState {
   return {
@@ -191,6 +220,43 @@ export function syncThesisState(state: GameState, random: () => number = gameRan
   } : state;
 }
 
+/** A planning estimate, assuming unchanged research and every remaining advance.
+ * It does not promise enough SAN, initialize the real thesis, or consume randomness. */
+export function getThesisForecast(state: GameState): ThesisForecast | null {
+  const preparationYear = getGraduationPreparationYear(state.degree);
+  if (state.phase === "setup" || state.year < preparationYear - (state.degree === "phd" ? 1 : 0)) return null;
+  const initialized = state.thesis.degree === state.degree;
+  // Refresh support using the actual replacement rules on a detached projection.
+  // The constant callback is only for an unused generated title; no RNG is read.
+  const thesis = initialized ? syncThesisState(state, () => 0).thesis : null;
+  const supports = thesis ? [] : strongestSupportPapers(supportPapers(state), state.degree === "phd" ? 3 : 2);
+  const sourcePoints = thesis?.researchPoints ?? researchPointsFromPapers(supports, state.degree === "phd" ? 3 : 2);
+  const stage = state.phase === "finished" || thesis?.review || thesis?.reviewResolved
+    || state.year > preparationYear || state.year === preparationYear && state.month >= 8
+    ? "frozen" : state.year < preparationYear || state.month < 1 ? "planning" : "writing";
+  const advanceGain = getThesisAdvanceGain(state);
+  const points = sourcePoints.map(point => {
+    const remainingAdvances = stage === "frozen" ? 0 : stage === "planning" ? 7
+      : Math.max(0, 7 - state.month + Number(point.lastAdvancedTotalMonths !== state.totalMonths));
+    return { ...point, remainingAdvances, projectedScore: roundAttribute(point.score + remainingAdvances * advanceGain) };
+  });
+  const guaranteedScore = (scores: number[]): number => Math.round(
+    (state.degree === "phd" ? 0.8 : 1.2) * scores.reduce((sum, score) => sum + score, 0)
+      + 0.6 * Math.min(...scores),
+  );
+  const currentGuaranteedScore = guaranteedScore(points.map(point => point.score));
+  const projectedGuaranteedScore = guaranteedScore(points.map(point => point.projectedScore));
+  const threshold = getThesisReviewThresholds(state.degree).B;
+  return {
+    degree: state.degree, stage, topicId: thesis?.topicId ?? supports[0]?.topicId ?? null,
+    topicLabel: thesis?.topicLabel ?? supports[0]?.topicLabel ?? "尚无同题成果", points, advanceGain, threshold,
+    currentGuaranteedScore, projectedGuaranteedScore,
+    currentPass: currentGuaranteedScore >= threshold, projectedPass: projectedGuaranteedScore >= threshold,
+    researchScore: state.totalResearchScore, researchScoreTarget: state.graduationScoreTarget,
+    researchScoreMet: state.graduationScoreTarget !== null && state.totalResearchScore >= state.graduationScoreTarget,
+  };
+}
+
 export function getThesisAdvanceSanCost(state: GameState): number {
   return -getActualSanChange(-3, state.month, state.eventSupport, state.buffs);
 }
@@ -213,7 +279,9 @@ export function advanceThesisResearchPoint(state: GameState, index: number): Gam
     thesis: withScoreHistory({
       ...nextState.thesis,
       researchPoints: nextState.thesis.researchPoints.map((point, pointIndex) => pointIndex === index ? {
-        ...point, score: point.score + Math.floor(getEffectiveResearch(nextState)), lastAdvancedTotalMonths: state.totalMonths,
+        ...point, score: usesGameplayRulesFrom("20261022-r15")
+          ? roundAttribute(point.score + getThesisAdvanceGain(nextState)) : point.score + getThesisAdvanceGain(nextState),
+        lastAdvancedTotalMonths: state.totalMonths,
       } : point),
     }, state.totalMonths),
   };
@@ -232,7 +300,7 @@ function sampleReport(degree: Degree, points: ThesisResearchPoint[], random: () 
   }
   const weights = extras.map((extra) => (degree === "master" ? 1.2 : 0.8) + extra);
   const effectiveScore = Math.round(points.reduce((sum, point, index) => sum + point.score * weights[index]!, 0));
-  const thresholds = THESIS_REVIEW_THRESHOLDS[degree];
+  const thresholds = getThesisReviewThresholds(degree);
   const grade = effectiveScore >= thresholds.A ? "A" : effectiveScore >= thresholds.B ? "B"
     : effectiveScore >= thresholds.C ? "C" : "D";
   const bands = { A: [90, 100], B: [75, 89], C: [60, 74], D: [0, 59] } as const;

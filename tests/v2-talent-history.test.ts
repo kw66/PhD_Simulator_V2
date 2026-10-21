@@ -316,7 +316,7 @@ describe("talent trigger history", () => {
     vi.restoreAllMocks();
     expect(triggers(read).map((trigger) => trigger.name)).toEqual(["阅读积累"]);
     expect(read.player.research).toBe(10.8);
-    const workBase = { ...base, partTimeWorkCount: 7 };
+    const workBase = { ...base, partTimeWorkCount: 4 };
     const work = dispatchAction(workBase, "part-time-work");
     expect(triggers(work).map((trigger) => trigger.name)).toEqual(["熟练打工"]);
   });

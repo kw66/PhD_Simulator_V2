@@ -468,18 +468,18 @@ describe("monthly effects", () => {
     expect(applyMonthlyEffects(advanced).nextState.shopState.chairSanRecovered).toBe(2);
   });
 
-  it("lets a road bike inherit base-bike progress with a six-point threshold", () => {
+  it("lets a road bike inherit base-bike progress with a four-point threshold", () => {
     const state = createPlayingMonth(8, 8, 10);
     state.shopState = {
       ...state.shopState,
       bikeOwned: true,
       bikeLevel: 3,
-      bikeSanSpent: 5,
+      bikeSanSpent: 2,
       bikeSanCapGains: 0,
     };
 
     const { nextState } = applyMonthlyEffects(state);
-    expect(nextState.shopState.bikeSanSpent).toBe(7);
+    expect(nextState.shopState.bikeSanSpent).toBe(4);
     expect(nextState.shopState.bikeSanCapGains).toBe(1);
     expect(nextState.sanCap).toBe(state.sanCap + 1);
   });

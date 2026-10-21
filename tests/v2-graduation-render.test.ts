@@ -163,8 +163,8 @@ describe("graduation workstation cards", () => {
     expect(html).toContain('data-animate-number="250.123456"');
     const supportBar = html.match(/<div class="rel-progress-bar graduation-point-bar"[^>]*>/)![0];
     expect(supportBar).toContain('data-tooltip="完整支撑论文 &lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; title\n原始分 0 · 改进分 250.12"');
-    expect(visibleText(html)).not.toContain("完整支撑论文");
-    expect(html.match(/<[^>]*data-tooltip="完整支撑论文[^>]*>/g)).toHaveLength(2);
+    expect(visibleText(html)).toContain("完整支撑论文");
+    expect(html.match(/<[^>]*data-tooltip="完整支撑论文[^>]*>/g)).toHaveLength(3);
     expect(html).toMatch(/class="rel-detail-label"[^>]*data-tooltip="完整支撑论文/);
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img");
@@ -182,7 +182,7 @@ describe("graduation workstation cards", () => {
     expect(actions[1]).not.toContain(" disabled");
     expect(actions[1]).toContain("data-event-risk-tooltip");
     expect(actions[1]).toContain("event-choice-risk is-certain");
-    expect(actions[1]).toContain("推进+12 · SAN-3");
+    expect(actions[1]).toContain("推进+12.9 · SAN-3");
   });
 
   it("uses the existing risk evaluator's emergency-chair protection", () => {

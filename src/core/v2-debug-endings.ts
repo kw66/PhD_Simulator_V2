@@ -3,7 +3,7 @@ import { SCORE_BY_TARGET } from "./v2-content";
 import { getAcademicCalendarYear } from "./v2-calendar";
 import { createInitialState } from "./v2-engine-state-factory";
 import { evaluateCoreEndings, finishTrainingIfReady, quitGame } from "./v2-ending-system";
-import { prepareThesisBlindReview, syncThesisState, THESIS_REVIEW_THRESHOLDS } from "./v2-thesis-rules";
+import { prepareThesisBlindReview, syncThesisState, getThesisReviewThresholds } from "./v2-thesis-rules";
 import { createDraftPaper, getUnlockedPaperSlotCount } from "./v2-paper-rules";
 import { createGrantedPublishedPaper } from "./v2-publication-rules";
 import { getCalendarForTotalMonths, getGraduationScoreTarget, getMonthLimitByDegree } from "./v2-progression";
@@ -163,7 +163,7 @@ export function createDebugEnding(state: GameState, ending: NonNullable<EndingId
     if (ending === "master" || ending === "phd") {
       prepared = { ...prepared, thesis: { ...prepared.thesis,
         researchPoints: prepared.thesis.researchPoints.map((point) => ({ ...point,
-          score: Math.ceil(THESIS_REVIEW_THRESHOLDS[degree].B / 3) + integer(1, 60),
+          score: Math.ceil(getThesisReviewThresholds(degree).B / 3) + integer(1, 60),
         })),
       } };
     }

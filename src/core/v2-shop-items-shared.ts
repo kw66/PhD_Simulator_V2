@@ -36,6 +36,8 @@ export interface ShopUpgradeStateView {
   shopState: ShopState;
 }
 
+import { getBikeGrowthThreshold } from "./v2-bike-system";
+
 export const GPU_UPGRADE_PRICES = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const;
 
 export function getNextGpuPrice(currentLevel: number): number | null {
@@ -47,7 +49,7 @@ export const SHOP_ITEM_DEFINITIONS: ShopItemDefinition[] = [
   { id: "chair", name: "办公椅", description: "每月 SAN +1", price: 10, sellPrice: 5 },
   { id: "keyboard", name: "机械键盘", description: "写论文消耗减少：SAN -1", price: 7, sellPrice: 3 },
   { id: "monitor", name: "2K 显示器", description: "看论文消耗减少：SAN -1", price: 8, sellPrice: 4 },
-  { id: "bike", name: "自行车", description: "骑行每月 SAN -1；每 -6 SAN，SAN 上限 +1（最多 +3）；达到本档上限后不再扣 SAN", price: 6, sellPrice: 3 },
+  { id: "bike", name: "自行车", get description() { return `骑行每月 SAN -1；每 -${getBikeGrowthThreshold()} SAN，SAN 上限 +1（最多 +3）；达到本档上限后不再扣 SAN`; }, price: 6, sellPrice: 3 },
   { id: "ebike", name: "小电驴", description: "春季、秋季每月 SAN +1", price: 12, sellPrice: 6 },
   { id: "down_jacket", name: "羽绒服", description: "使冬季每月 SAN -1 无效", price: 5, sellPrice: 2 },
 ];

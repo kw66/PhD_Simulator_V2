@@ -24,7 +24,7 @@ describe("v2 coffee system", () => {
     expect(COFFEE_MACHINE_UPGRADE_DEFINITIONS.map((item) => item.description)).toEqual([
       "冰美式价格降低 1 金币",
       "每月初额外生产一杯冰美式，金币 -2",
-      "每累计生产 10 杯冰美式，效果提升 1（最多 +5）",
+      "每累计生产 8 杯冰美式，效果提升 1（最多 +5）",
       "每月可无限生产冰美式，价格按 2/3/4... 递增",
     ]);
   });
@@ -49,7 +49,7 @@ describe("v2 coffee system", () => {
     expect(getCoffeeBuyPrice(manual)).toBe(1);
 
     const advanced = { ...baseMachine, machineUpgrade: "advanced" as const, machineInvestment: 23, machineTrackedCoffeeCount: 24 };
-    expect(getCurrentCoffeeBonus(advanced)).toBe(2);
+    expect(getCurrentCoffeeBonus(advanced)).toBe(3);
     expect(getCoffeeMachineOwnedText(advanced)).toContain("高级");
     expect(getCoffeeMachineSellPrice(advanced)).toBe(11);
   });

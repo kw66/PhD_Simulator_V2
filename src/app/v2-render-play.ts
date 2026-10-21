@@ -3,7 +3,7 @@ import { getTalentTriggerDisplay } from "./v2-talent-trigger-display";
 import { formatEventRecoveryDisplay, formatEventResultResistance } from "./v2-event-result-display";
 import { renderRunSaves } from "./v2-render-run-saves";
 import { getEffectiveResearch, getEffectiveSocial } from "../core/v2-effective-attributes";
-import { getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
+import { getCoffeeGrowthInterval, getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import "../styles/workstation-unified.css";
 import "../styles/relationship-unified.css";
 import "../styles/talent-unified.css";
@@ -34,8 +34,9 @@ import {
   BADMINTON_VICTORY_THRESHOLD,
   getBadmintonStrength,
   getPokerWinRate,
+  getPartTimeGrowthInterval,
 } from "../core/v2-growth-system";
-import { getBikeSanCapLimit, getBikeTierDefinition } from "../core/v2-bike-system";
+import { getBikeGrowthThreshold, getBikeSanCapLimit, getBikeTierDefinition } from "../core/v2-bike-system";
 import { getActiveBuffs, getActiveOperationSanDelta } from "../core/v2-buffs";
 import { previewNextMonthEffects } from "../core/v2-monthly-effects";
 import { getFellowName, getFellowResearchTopic, getFellowRoleLabel, getFellowsInCardOrder } from "../core/v2-fellow-progression";
@@ -3425,7 +3426,7 @@ function getBikeTalentItem(state: GameState): TalentPanelItem | null {
     description: tier
       ? capReached
         ? "效果：SAN 上限已满，后续每月不再消耗 SAN。"
-        : `效果：每月 SAN -${tier.monthlySanCost}；每 -6 SAN，上限 +1（最多 +${capLimit}）。`
+        : `效果：每月 SAN -${tier.monthlySanCost}；每 -${getBikeGrowthThreshold()} SAN，上限 +1（最多 +${capLimit}）。`
       : "效果：购入后逐级提升骑行消耗与 SAN 上限成长。",
     metrics: tier
       ? [
@@ -3533,7 +3534,7 @@ function buildGrowthTalentItems(state: GameState, gameGrowthPage = 0): TalentPan
       icon: "💼",
       name: "熟练打工",
       active: true,
-      description: "每 8 次打工，金币收入 +1，SAN 消耗 +1",
+      description: getPartTimeGrowthInterval() === 5 ? "每 5 次打工，金币收入 +0.5；基础 SAN 消耗保持 5" : "每 8 次打工，金币收入 +1，SAN 消耗 +1",
       metrics: [
         { label: "打工", value: `${workCount} 次`, animation: { template: "{count} 次", values: { count: workCount } } },
         { label: "下次金币", value: `+${workPreview.moneyReward}`, animation: { template: "+{reward}", values: { reward: workPreview.moneyReward } } },
@@ -3541,9 +3542,9 @@ function buildGrowthTalentItems(state: GameState, gameGrowthPage = 0): TalentPan
       ],
       progress: {
         label: "升档进度",
-        value: workCount % 8,
-        max: 8,
-        valueLabel: `${workCount % 8}/8`,
+        value: workCount % getPartTimeGrowthInterval(),
+        max: getPartTimeGrowthInterval(),
+        valueLabel: `${workCount % getPartTimeGrowthInterval()}/${getPartTimeGrowthInterval()}`,
       },
     },
     {
@@ -3683,7 +3684,7 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
       name: "咖啡机",
       active: true,
       description: coffeeUpgrade === "advanced"
-        ? "效果：每累计生产 10 杯冰美式，额外 SAN +1，最多 +5。"
+        ? `效果：每累计生产 ${getCoffeeGrowthInterval()} 杯冰美式，额外 SAN +1，最多 +5。`
         : `${getCoffeeMachineOwnedText(state.coffeeState)}。`,
       detail: detail ? `${detail}。` : undefined,
       metrics: coffeeUpgrade === "advanced"
@@ -3695,9 +3696,9 @@ function buildEquipTalentItems(state: GameState): TalentPanelItem[] {
       progress: coffeeUpgrade === "advanced"
         ? {
             label: "效果提升",
-            value: Math.min(50, trackedCoffeeCount),
-            max: 50,
-            valueLabel: `${Math.min(50, trackedCoffeeCount)}/50 杯`,
+            value: Math.min(getCoffeeGrowthInterval() * 5, trackedCoffeeCount),
+            max: getCoffeeGrowthInterval() * 5,
+            valueLabel: `${Math.min(getCoffeeGrowthInterval() * 5, trackedCoffeeCount)}/${getCoffeeGrowthInterval() * 5} 杯`,
           }
         : undefined,
     });

@@ -390,8 +390,8 @@ describe("minimal game engine", () => {
       partTimeWorkCount: 8,
     }, "part-time-work");
     expect(ninthWork.partTimeWorkCount).toBe(9);
-    expect(ninthWork.player.san).toBe(14);
-    expect(ninthWork.player.money).toBe(4);
+    expect(ninthWork.player.san).toBe(15);
+    expect(ninthWork.player.money).toBe(3.5);
 
     const modifiedWork = dispatchAction({
       ...state,

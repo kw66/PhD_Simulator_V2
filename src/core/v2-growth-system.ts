@@ -1,3 +1,13 @@
+import { usesGameplayRulesFrom } from "./v2-rule-context";
+
+export function getPartTimeGrowthInterval(): number {
+  return usesGameplayRulesFrom("20261022-r15") ? 5 : 8;
+}
+
+export function getPartTimeGrowthReward(): number {
+  return usesGameplayRulesFrom("20261022-r15") ? 0.5 : 1;
+}
+
 export const MEETING_EXPERIENCE_INTERVAL = 4;
 export const ACTIVITY_WIN_RATE_CAP = 100;
 export const BADMINTON_VICTORY_THRESHOLD = 100;
@@ -25,6 +35,7 @@ export function getReadingGrowthProgress(readCount: number): { completed: number
 
 export function getPartTimeGrowthProgress(workCount: number): { tier: number; nextAt: number } {
   const normalized = Math.max(0, Math.floor(workCount));
-  const tier = Math.floor(normalized / 8);
-  return { tier, nextAt: (tier + 1) * 8 };
+  const interval = getPartTimeGrowthInterval();
+  const tier = Math.floor(normalized / interval);
+  return { tier, nextAt: (tier + 1) * interval };
 }

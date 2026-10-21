@@ -60,14 +60,14 @@ describe("graduation preparation engine lifecycle", () => {
     const state = prepared("phd");
     let next = state;
     for (const thesisPointIndex of [0, 1, 2]) next = dispatchAction(next, "advance-thesis-point", { thesisPointIndex });
-    expect(next.thesis.researchPoints.map((point) => point.score)).toEqual([14, 14, 14]);
+    expect(next.thesis.researchPoints.map((point) => point.score)).toEqual([14.75, 14.75, 14.75]);
     expect(next.player.san).toBe(11);
     expect(next.actionState).toEqual(state.actionState);
     const repeated = dispatchAction(next, "advance-thesis-point", { thesisPointIndex: 0 });
     expect(repeated.thesis).toEqual(next.thesis);
     expect(repeated.player.san).toBe(11);
     const nextMonth = dispatchAction({ ...repeated, month: 2, totalMonths: repeated.totalMonths + 1 }, "advance-thesis-point", { thesisPointIndex: 0 });
-    expect(nextMonth.thesis.researchPoints[0]!.score).toBe(28);
+    expect(nextMonth.thesis.researchPoints[0]!.score).toBe(29.5);
     const fatal = dispatchAction({ ...state, player: { ...state.player, san: 2 } }, "advance-thesis-point", { thesisPointIndex: 0 });
     expect(fatal).toMatchObject({ phase: "finished", ending: "burnout" });
   });

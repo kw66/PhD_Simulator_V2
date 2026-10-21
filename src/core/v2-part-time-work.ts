@@ -5,7 +5,8 @@ import type { GameState } from "./v2-types";
 import { consumeActiveOperation, getActiveOperationAllowance } from "./v2-ai-shop";
 import { formatSanPayment, paySanCost, quoteSanPayment } from "./v2-role-talent-costs";
 
-const WORKS_PER_TIER = 8;
+import { getPartTimeGrowthInterval, getPartTimeGrowthReward } from "./v2-growth-system";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 const BASE_SAN_COST = 5;
 const BASE_MONEY_REWARD = 2;
 
@@ -21,9 +22,10 @@ export interface PartTimeWorkPreview {
 
 export function previewPartTimeWork(state: GameState): PartTimeWorkPreview {
   const nextCount = Math.max(0, Math.floor(state.partTimeWorkCount)) + 1;
-  const tier = Math.floor((nextCount - 1) / WORKS_PER_TIER);
-  const sanCost = getActiveOperationSanCostForState(state, BASE_SAN_COST + tier, "work");
-  const moneyReward = BASE_MONEY_REWARD + tier;
+  const interval = getPartTimeGrowthInterval();
+  const tier = Math.floor((nextCount - 1) / interval);
+  const sanCost = getActiveOperationSanCostForState(state, BASE_SAN_COST + (usesGameplayRulesFrom("20261022-r15") ? 0 : tier), "work");
+  const moneyReward = BASE_MONEY_REWARD + tier * getPartTimeGrowthReward();
   const blockedReason = !getActiveOperationAllowance(state, "work").allowed
     ? "action-limit"
     : !quoteSanPayment(consumeActiveOperation(state, "work"), sanCost).allowed
@@ -37,7 +39,7 @@ export function previewPartTimeWork(state: GameState): PartTimeWorkPreview {
     tier,
     sanCost,
     moneyReward,
-    nextTierAt: (tier + 1) * WORKS_PER_TIER + 1,
+    nextTierAt: (tier + 1) * interval + 1,
   };
 }
 

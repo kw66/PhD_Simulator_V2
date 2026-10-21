@@ -7,6 +7,7 @@ import { getResearchCap } from "./v2-research-cap-system";
 import { recordTalentTrigger } from "./v2-talent-history";
 import { formatMoney } from "./v2-money";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { getPartTimeGrowthInterval, getPartTimeGrowthReward } from "./v2-growth-system";
 import type { GameState } from "./v2-types";
 
 export function upgradePerfectWorkstation(state: GameState): GameState {
@@ -39,9 +40,10 @@ export function recordTalentTransitions(before: GameState, after: GameState): Ga
       `阅读idea加成 ${getReadingIdeaBonus(before.readingState.readCount + 1)}→${getReadingIdeaBonus(after.readingState.readCount + 1)}`,
     ]);
   }
-  const workGrowth = Math.floor(after.partTimeWorkCount / 8) - Math.floor(before.partTimeWorkCount / 8);
+  const workGrowth = Math.floor(after.partTimeWorkCount / getPartTimeGrowthInterval()) - Math.floor(before.partTimeWorkCount / getPartTimeGrowthInterval());
   if (workGrowth > 0) add("part-time-growth", "熟练打工", `累计打工${after.partTimeWorkCount}次`, [
-    `打工金币收入 +${workGrowth}`, `打工基础SAN消耗 +${workGrowth}`,
+    `打工金币收入 +${formatMoney(workGrowth * getPartTimeGrowthReward())}`,
+    ...(usesGameplayRulesFrom("20261022-r15") ? ["打工基础SAN消耗不变"] : [`打工基础SAN消耗 +${workGrowth}`]),
   ]);
   if (after.eventCounters.badmintonCount > before.eventCounters.badmintonCount) {
     const effects = ["实力提升"];

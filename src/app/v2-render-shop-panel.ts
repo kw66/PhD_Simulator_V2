@@ -26,7 +26,7 @@ import {
   GPU_TIER_DEFINITIONS,
   isShopItemOwned,
 } from "../core/v2-shop-items";
-import { getBikeTierDefinition, getNextBikeTierDefinition } from "../core/v2-bike-system";
+import { getBikeGrowthThreshold, getBikeTierDefinition, getNextBikeTierDefinition } from "../core/v2-bike-system";
 import { getSupportItemDefinition, isSupportItemOwned } from "../core/v2-support-items";
 import { getGiftAwareShopSellPrice, getShopActionPrice, getShopLabFundingCost, type ShopPurchaseAction } from "../core/v2-lover-gift";
 import { animationNumberAttributes, renderAnimatedNumber, renderAnimatedTemplate } from "./v2-render-animation";
@@ -625,7 +625,7 @@ function renderBikeRow(state: GameState): string {
   const currentDescription = displayedTier
     ? capReached
       ? `当前车型已无法继续提高 SAN 上限，暂不再消耗 SAN`
-      : `每月 SAN -${displayedTier.monthlySanCost}；每 -6 SAN，上限 +1（最多 +${displayedTier.sanCapLimit}）`
+      : `每月 SAN -${displayedTier.monthlySanCost}；每 -${getBikeGrowthThreshold()} SAN，上限 +1（最多 +${displayedTier.sanCapLimit}）`
     : "已达到最高等级";
   const detail = tier
     ? `累计消耗 ${state.shopState.bikeSanSpent} SAN｜当前上限 +${state.shopState.bikeSanCapGains}/${capLimit}`
@@ -641,7 +641,7 @@ function renderBikeRow(state: GameState): string {
     effectText: [currentDescription, detail].filter(Boolean).join("\n"),
     effectAnimation: tier ? {
       key: "shop:bike",
-      template: `${capReached ? currentDescription : "每月 SAN -{cost}；每 -6 SAN，上限 +1（最多 +{cap-limit}）"}\n累计消耗 {spent} SAN｜当前上限 +{gained}/{cap}`,
+      template: `${capReached ? currentDescription : `每月 SAN -{cost}；每 -${getBikeGrowthThreshold()} SAN，上限 +1（最多 +{cap-limit}）`}\n累计消耗 {spent} SAN｜当前上限 +{gained}/{cap}`,
       values: { cost: tier.monthlySanCost, "cap-limit": capLimit, spent: state.shopState.bikeSanSpent, gained: state.shopState.bikeSanCapGains, cap: capLimit },
     } : undefined,
     actions: [
