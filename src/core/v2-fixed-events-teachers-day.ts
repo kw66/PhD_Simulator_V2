@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { randomOutcome } from "./v2-event-choice-random";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { formatEventSanPaymentText } from "./v2-event-player-effects";
@@ -149,6 +150,7 @@ function createTeachersDayChoiceEvent(
       {
         id: `teachers-day-message-y${state.year}-m${state.month}`,
         label: "发祝福",
+        ...randomOutcome(),
         outcome: "你选择先发一条节日祝福。",
         effects: {
           fixedEventResolution: { kind: "teachers-day-message" },

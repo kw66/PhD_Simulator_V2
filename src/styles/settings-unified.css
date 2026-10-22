@@ -86,6 +86,7 @@
 .settings-secondary-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 10px; margin: 0 14px; padding: 0 0 2px; }
 .settings-panel .settings-secondary-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-width: 0; min-height: 54px; padding: 8px 10px; border: 1px solid #d0bc95; border-radius: 5px; background: linear-gradient(180deg, #fffcf5, #f4ead6); color: #837052; box-shadow: inset 0 1px 0 #fffdf7, 0 1px 0 #e0cfad; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.4; white-space: nowrap; cursor: pointer; }
 .settings-panel .settings-secondary-actions > button .lucide { width: 18px; height: 18px; stroke-width: 1.8; }
+.settings-panel .settings-secondary-actions > button.is-local-debug { grid-column: 1 / -1; }
 .settings-panel .settings-secondary-actions > button.is-quit { border-color: #d8bdb1; color: #976759; background: #f8eee6; }
 .settings-panel .settings-secondary-actions > button:hover:not(:disabled) { border-color: #cfbc96; background: #eee2ca; transform: none; box-shadow: none; }
 .settings-panel .settings-secondary-actions > button.is-quit:hover:not(:disabled) { border-color: #ba8a79; background: #f0dfd5; }

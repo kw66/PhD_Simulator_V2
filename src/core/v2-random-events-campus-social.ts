@@ -1,3 +1,4 @@
+import { randomOutcome } from "./v2-event-choice-random";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getAttributeTier } from "./v2-random-event-rules";
@@ -78,6 +79,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
       },
       {
         id: `random-7-poker-${serial}`,
+        ...randomOutcome(),
         label: "打德州扑克",
         outcome: pokerStake === 0
           ? (pokerWin ? `条件：本金 0，纯游戏获胜（${pokerWinRate * 100}%）｜结果：${pokerGrowth || "金币 +0"}` : `条件：本金 0，纯游戏落败（${100 - pokerWinRate * 100}%）｜结果：${pokerGrowth || "金币 +0"}`)
@@ -94,6 +96,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
       },
       {
         id: `random-7-ktv-${serial}`,
+        ...randomOutcome(),
         label: "KTV 唱歌",
         outcome: `${formatTierResistedOutcome("社交", 1, ktvSocialResult)}。`,
         effects: {
@@ -103,6 +106,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
       },
       {
         id: `random-7-dinner-${serial}`,
+        ...randomOutcome(),
         label: "聚餐",
         outcome: dinnerAdvisorTreat
           ? `条件：导师请客（${dinnerAttendancePercent}%）｜结果：SAN +5｜${formatTierResistedOutcome("导师好感", 1, dinnerFavorResult!)}。`
@@ -219,6 +223,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
     choices: [
       {
         id: `random-8-gpu-${serial}`,
+        ...randomOutcome(),
         label: "买显卡",
         outcome: reimbursementOutcome(gpuApproved, "显卡报销：本月免单1次，使用时扣科研经费"),
         effects: gpuApproved ? {
@@ -237,6 +242,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
       },
       {
         id: `random-8-renovate-${serial}`,
+        ...randomOutcome(),
         label: "装修工位",
         outcome: reimbursementOutcome(workstationApproved, "工位报销：本月免单1次，使用时扣科研经费"),
         effects: workstationApproved ? {
@@ -245,6 +251,7 @@ export function createFundingCampusRandomEvent(state: GameState, getRoll: Random
       },
       {
         id: `random-8-ai-${serial}`,
+        ...randomOutcome(),
         label: "报销 AI 费用",
         outcome: reimbursementOutcome(aiApproved, `AI报销：下${aiReimbursementUses}次免单，使用时扣科研经费`),
         effects: aiApproved ? {

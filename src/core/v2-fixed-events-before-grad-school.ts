@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { randomOutcome } from "./v2-event-choice-random";
 import { rollCaptainTag } from "./v2-captain-runtime";
 import { isCaptain, type CaptainTag } from "./v2-captain-state";
 import { getRoleDefinition } from "./v2-progression";
@@ -143,6 +144,7 @@ function createAdvisorInfoEvent(
         id: "before-grad-school-reroll",
         label: "换个导师",
         cosmetic: !captainTag,
+        ...randomOutcome(Boolean(captainTag)),
         outcome: "",
         effects: {
           stayOnEvent: true,

@@ -134,7 +134,7 @@ function getCoreMonthlyEffects(state: GameState): Array<Omit<MonthlyEffectItem, 
     effects.push({
       id: "advisor-salary",
       name: "学生工资",
-      source: "导师待遇",
+      source: usesGameplayRulesFrom("20261022-r26") ? "学校配套与导师待遇" : "导师待遇",
       stats: { money: payroll.player.payment },
     });
   }

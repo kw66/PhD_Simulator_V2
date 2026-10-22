@@ -41,6 +41,8 @@ export interface RoleTalentRunState {
   boostedFellowIds?: string[];
   investments?: RoleTalentInvestment[];
   nextInvestmentId?: number;
+  /** Opt-in payment with personal coins instead of SAN. */
+  goldPowerEnabled?: boolean;
   researchCurseBroken?: boolean;
   socialChangedMonth?: number;
   socialGainRemainder?: number;

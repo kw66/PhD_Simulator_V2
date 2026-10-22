@@ -4,6 +4,7 @@ import { renderCaptainTags } from "../src/app/v2-render-captain-tags";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { createCaptainRunState } from "../src/core/v2-captain-state";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
+import { hasUnpaidCurseDebt } from "../src/core/v2-curse-system";
 import type { RoleId } from "../src/core/v2-types";
 
 function enroll(roleId: RoleId) {
@@ -40,6 +41,26 @@ describe("curse and captain UI", () => {
     expect(html).toContain("待偿债务");
     expect(html).toContain('data-action="repay-debt" data-delta="1"');
     expect(html).toContain("尽力还款");
+  });
+
+  it.each([[1e-10, 0.01], [0.00496, 0.01], [0.0100000001, 0.02], [0.024, 0.03], [127.3400000001, 127.35], [127.34496, 127.35]])("shows the payable cents for debt %s and clears it with the displayed amount", (debt, payoff) => {
+    const state = enroll("cursed-debt");
+    state.curseState = { ...state.curseState!, debt };
+    state.player.money = payoff;
+    const account = createDefaultAccountProfile();
+    const html = renderApp(state, account, { activePlayTab: "settings" });
+    expect(html).toContain(`结清需${payoff}金币`);
+    expect(html).not.toContain("待偿债务 0 金币");
+    if (debt < 0.01) expect(html).toContain("待偿债务 &lt;0.01 金币");
+    expect(html).toContain('data-action="repay-debt">尽力还款');
+    expect(hasUnpaidCurseDebt(state)).toBe(true);
+    const cleared = dispatchAction(state, "repay-debt");
+    expect(cleared.player.money).toBe(0);
+    expect(hasUnpaidCurseDebt(cleared)).toBe(false);
+    const paidHtml = renderApp(cleared, account, { activePlayTab: "settings" });
+    expect(paidHtml).toContain("待偿债务 0 金币");
+    expect(paidHtml).not.toContain("结清需");
+    expect(paidHtml).toContain('data-action="repay-debt" disabled>尽力还款');
   });
 
   it("renders captain run levels independently from later account level changes", () => {

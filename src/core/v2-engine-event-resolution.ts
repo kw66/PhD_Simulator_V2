@@ -13,6 +13,7 @@ import {
 import { enqueueResolvedEventFollowUps } from "./v2-engine-event-resolution-followups";
 import { getPlayerAttributeCap } from "./v2-player-attributes";
 import { getActiveOperationAllowance } from "./v2-ai-shop";
+import { getRoleRestSanGain } from "./v2-role-talent-rest";
 import { formatEventSanPaymentText } from "./v2-event-player-effects";
 import { settleGreedCoinGames } from "./v2-role-talent-greed";
 import { applyChoiceEffectsToState } from "./v2-engine-event-resolution-state";
@@ -399,8 +400,39 @@ export function getResolvableQueuedEvent(state: GameState, queuedEvent: EventQue
   return withGameRandomPreview(state, () => getResolvableQueuedEventInternal(state, queuedEvent));
 }
 
+const EVENT_REST_UNAVAILABLE = "本月行动点已用尽，无法休息";
+
+function hasPendingRestAction(event: EventQueueItem): boolean {
+  return event.choices.some(choice => choice.effects.restAction)
+    || !!event.deferredChoices?.some(entry => entry.choice.effects.restAction);
+}
+
+export function refreshEventRestAvailability(state: GameState, event: EventQueueItem): EventQueueItem {
+  if (!usesGameplayRulesFrom("20261022-r18") || !hasPendingRestAction(event)) return event;
+  const allowed = getActiveOperationAllowance(state, "rest").allowed;
+  const deferredRest = event.deferredChoices?.some(entry => entry.choice.effects.restAction);
+  const refreshRecovery = usesGameplayRulesFrom("20261022-r19") && event.chainId.startsWith("illness-");
+  const recoveryText = (text: string) => refreshRecovery
+    ? text.replace(/SAN\s*\+\s*\d+(?:\.\d+)?/gu, `SAN +${getRoleRestSanGain(state)}`) : text;
+  const choices = event.choices.map(choice => {
+    const outcome = choice.effects.restAction ? recoveryText(choice.outcome) : choice.outcome;
+    if (outcome !== choice.outcome) choice = { ...choice, outcome };
+    if (!(choice.effects.restAction || deferredRest)
+      || (choice.disabledReason && choice.disabledReason !== EVENT_REST_UNAVAILABLE)) return choice;
+    if (!allowed) return choice.disabledReason === EVENT_REST_UNAVAILABLE ? choice
+      : { ...choice, disabledReason: EVENT_REST_UNAVAILABLE };
+    if (!choice.disabledReason) return choice;
+    const { disabledReason: _reason, ...available } = choice;
+    return available;
+  });
+  const description = deferredRest ? recoveryText(event.description) : event.description;
+  const completionLog = deferredRest && event.completionLog ? recoveryText(event.completionLog) : event.completionLog;
+  return choices.every((choice, index) => choice === event.choices[index])
+    && description === event.description && completionLog === event.completionLog ? event : { ...event, choices, description, completionLog };
+}
+
 function getResolvableQueuedEventInternal(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
-  const resolved = suppressDepartedRecruitment(state, resolveQueuedEventPreview(state, queuedEvent));
+  const resolved = refreshEventRestAvailability(state, suppressDepartedRecruitment(state, resolveQueuedEventPreview(state, queuedEvent)));
   const choices = resolved.choices.map((choice) => {
     const outcome = formatEventSanPaymentText(choice.outcome, state, choice.effects);
     return outcome === choice.outcome ? choice : { ...choice, outcome };
@@ -499,7 +531,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 }
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
-  const eventQueue = state.eventQueue.map((event) => event.internshipInvitePreview || event.jointTrainingPreview || event.loverDevelopmentPreview || event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.teachersDayPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
+  const eventQueue = state.eventQueue.map((event) => (usesGameplayRulesFrom("20261022-r18") && hasPendingRestAction(event)) || event.internshipInvitePreview || event.jointTrainingPreview || event.loverDevelopmentPreview || event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.teachersDayPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
     && (event.randomReplay || event.chainId === "lover-development"))
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };
@@ -580,7 +612,11 @@ export function applyQueuedEventEffects(
         ...event,
         deferredStatePatch: pendingPatch,
         replayContext: event.replayContext ?? resolvedEvent.replayContext,
-        ...(resolvedEvent.rewinderReplay ? { rewinderReplay: resolvedEvent.rewinderReplay } : {}),
+        ...(resolvedEvent.rewinderReplay ? { rewinderReplay: {
+          ...resolvedEvent.rewinderReplay,
+          ...(choice.outcomeRandom && usesGameplayRulesFrom("20261022-r21")
+            ? { barrierHistoryIndex: resolvedEvent.history?.length ?? 0 } : {}),
+        } } : {}),
       }),
     };
   }
@@ -634,7 +670,9 @@ export function applyQueuedEventEffects(
       journalAcceptancePresentation: resolvedEvent.journalAcceptancePresentation,
       thesisReviewPresentation: resolvedEvent.thesisReviewPresentation,
       rewinderPresentation: resolvedEvent.rewinderPresentation,
-      choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason }) => ({ id, label, outcome, disabledReason })),
+      choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason, outcomeRandom }) => ({ id, label, outcome, disabledReason,
+        ...(outcomeRandom && usesGameplayRulesFrom("20261022-r21") ? { outcomeRandom: true } : {}),
+      })),
       selectedChoiceId: choice.id,
       replayEvent: sceneSource,
     },

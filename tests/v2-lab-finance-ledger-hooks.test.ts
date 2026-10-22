@@ -41,7 +41,7 @@ describe("lab finance settlement hooks", () => {
     const state = makeState();
     state.advisorProgressState.funding = 0.5;
     const before = structuredClone(state);
-    const total = getLabPayroll(state).total;
+    const total = getLabPayroll(state).advisorCost;
     const paid = settleLabPayroll(state);
     expect(paid.labFinanceLedger?.amounts).toEqual({ other: 2, "student-wages": -total });
     expect(paid.advisorProgressState.funding).toBe(0.5 - total);
@@ -161,7 +161,7 @@ describe("lab finance settlement hooks", () => {
     expect(state).toEqual(before);
     const nextMonth = { ...state, month: 5, totalMonths: 5 };
     const paid = applyMonthlyEffects(nextMonth).nextState;
-    const wages = getLabPayroll(nextMonth).total;
+    const wages = getLabPayroll(nextMonth).advisorCost;
     expect(paid.labFinanceLedger).toEqual({ totalMonths: 5,
       amounts: { "student-wages": -wages, "student-reimbursement": -2 },
     });

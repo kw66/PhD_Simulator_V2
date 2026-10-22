@@ -490,6 +490,11 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
       const investment = investRoleTalentMoney(state);
       return investment.success ? pushLog(investment.state, investment.message) : pushNoOpLog(state, investment.message);
     }
+    case "toggle-gold-power": {
+      if (state.phase !== "playing" || state.selectedRoleId !== "rich"
+        || !state.roleTalents || !state.roleTalents.levels["gold-power-alpha"]) return state;
+      return { ...state, roleTalents: { ...state.roleTalents, goldPowerEnabled: !state.roleTalents.goldPowerEnabled } };
+    }
     case "advance-thesis-point":
       return typeof payload.thesisPointIndex === "number"
         ? advanceThesisResearchPoint(syncThesisState(state), payload.thesisPointIndex) : state;

@@ -170,7 +170,7 @@ describe("registration at acceptance confirmation", () => {
       const beforeFunding = state.advisorProgressState.funding;
       state = dispatchAction({ ...state, eventQueue: [] }, "next-month");
       expect(state.totalMonths).toBe(totalMonths);
-      expect(state.advisorProgressState.funding).toBe(beforeFunding - 1.5);
+      expect(state.advisorProgressState.funding).toBe(beforeFunding - 1);
       expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual(["attendee"]);
       expect(state.eventQueue.filter((event) => event.conferencePreview)).toHaveLength(0);
       expect(state.externalPublications[0]?.conferenceHandled).toBe(totalMonths === 9);

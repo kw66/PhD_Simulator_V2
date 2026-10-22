@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { randomOutcome } from "./v2-event-choice-random";
 import { createConferenceMentorContact, replaceConferenceMentorContact } from "./v2-conference-contacts";
 import { getJointTrainingCitationCapBonus } from "./v2-joint-training-system";
 import type { ConferenceMentorContact, EventChoice, GameState, PendingEvent } from "./v2-types";
@@ -115,6 +116,7 @@ function createJointTrainingAct2(input: JointTrainingContext): PendingEvent {
     choices: (["decline", "accept"] as const).map((decision) => ({
       id: decision,
       label: decision === "decline" ? "委婉拒绝" : unavailable ? "暂时放下" : "接受联培",
+      ...randomOutcome(decision === "accept" && !unavailable),
       outcome: unavailable ? "无事发生" : (decision === "decline" ? "婉拒联培，结识新的合作学者。"
         : "接受联培｜具体增益在下一幕确定"),
       effects: { enqueueEvents: [createJointTrainingResult(context, decision)] },

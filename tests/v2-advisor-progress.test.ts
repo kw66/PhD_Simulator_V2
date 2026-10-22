@@ -60,14 +60,14 @@ describe("advisor project economy", () => {
   it("pays advisor projects with gold power without reducing SAN", () => {
     const state = makeState();
     state.selectedRoleId = "rich";
-    state.roleTalents = { levels: { "gold-power-alpha": 1 } };
+    state.roleTalents = { levels: { "gold-power-alpha": 1 }, goldPowerEnabled: true };
     state.player.money = 60;
     state.player.san = 0;
     const next = advanceAdvisorProject(state, "horizontal", () => 0);
     expect(next.player.san).toBe(0);
     expect(next.player.money).toBe(55);
     expect(next.advisorProgressState.horizontalProgress).toBe(20);
-    expect(next.log.some((entry) => entry.text.includes("金之力α"))).toBe(true);
+    expect(next.log.some((entry) => entry.text.includes("金之力"))).toBe(true);
   });
 
   it("can spend the monthly beta waiver on an advisor project", () => {

@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { addOrReplaceBuffs, getActiveOperationSanCostForState, getActiveOperationSanMultiplier, getReadingEffect } from "./v2-buffs";
 import { pushLog } from "./v2-engine-helpers";
 import { formatTierResistedOutcome } from "./v2-sanity-rules";
@@ -244,7 +245,7 @@ export function applyReadPaperActions(
     const parts = [
       `看论文 ${appliedCount} 次`,
       `SAN -${totalSanCost}`,
-      totalMoneyCost > 0 ? `金币 -${totalMoneyCost}（金之力α）` : "",
+      totalMoneyCost > 0 ? `金币 -${totalMoneyCost}（${usesGameplayRulesFrom("20261022-r25") ? "金之力" : "金之力α"}）` : "",
       totalSanCapCost > 0 ? `SAN上限 -${totalSanCapCost}（燃烧生命）` : "",
       `下次想 idea +${totalIdeaBonus}`,
       formatReadingResearchOutcome({ researchGain, researchMilestones, researchResisted }),

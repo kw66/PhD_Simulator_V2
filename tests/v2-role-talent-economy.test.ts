@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { applyMonthlyEffects, applyMonthStartSubscriptions, previewNextMonthEffects, resolveMonthlyEffects } from "../src/core/v2-monthly-effects";
 import { activateRemoteInternship, getInternshipSalaryPayment } from "../src/core/v2-internship-system";
@@ -14,6 +15,36 @@ function playing(role: GameState["selectedRoleId"], levels: Record<string, numbe
 }
 
 describe("role talent monthly economy", () => {
+  it("toggles gold power without consuming resources and preserves the choice across months", () => {
+    const state = playing("rich", { "gold-power-alpha": 1 });
+    const enabled = dispatchAction(state, "toggle-gold-power");
+    expect(enabled.roleTalents?.goldPowerEnabled).toBe(true);
+    expect(enabled.player).toEqual(state.player);
+    expect(enabled.actionState).toEqual(state.actionState);
+    expect(state.roleTalents?.goldPowerEnabled).toBeUndefined();
+    expect(applyMonthlyEffects(enabled).nextState.roleTalents?.goldPowerEnabled).toBe(true);
+    expect(dispatchAction(enabled, "toggle-gold-power").roleTalents?.goldPowerEnabled).toBe(false);
+  });
+
+  it("ignores gold switching without the rich talent or outside a playing run", () => {
+    for (const state of [playing("rich", {}), playing("normal", { "gold-power-alpha": 1 }),
+      { ...playing("rich", { "gold-power-alpha": 1 }), phase: "setup" as const },
+      { ...playing("rich", { "gold-power-alpha": 1 }), phase: "finished" as const }]) {
+      expect(dispatchAction(state, "toggle-gold-power").roleTalents?.goldPowerEnabled).not.toBe(true);
+    }
+  });
+
+  it("renders an unchecked gold switch beside the coin balance and reflects its active state", () => {
+    const state = playing("rich", { "gold-power-alpha": 1 });
+    state.player.money = 1;
+    const options = { activePlayTab: "research" as const };
+    const html = renderApp(state, createDefaultAccountProfile(), options);
+    expect(html).toMatch(/class="new-currency-value"[\s\S]*?data-action="toggle-gold-power" aria-pressed="false"/);
+    expect(html.match(/<button[^>]*data-action="toggle-gold-power"[^>]*>/)?.[0]).not.toContain("disabled");
+    const enabled = dispatchAction(state, "toggle-gold-power");
+    expect(renderApp(enabled, createDefaultAccountProfile(), options)).toContain('data-action="toggle-gold-power" aria-pressed="true"');
+    expect(renderApp(playing("rich", {}), createDefaultAccountProfile(), options)).not.toContain('data-action="toggle-gold-power"');
+  });
   it("invests multiple principals without recording spending and returns each once after twelve months", () => {
     const initial = playing("rich", { "investment-savvy": 2 });
     const first = investRoleTalentMoney(initial);
@@ -71,6 +102,7 @@ describe("role talent monthly economy", () => {
 
   it("replaces separate SAN drains despite recoveries and counts replacement spending once", () => {
     const state = playing("rich", { "gold-power-alpha": 1 });
+    state.roleTalents!.goldPowerEnabled = true;
     state.month = 5;
     state.totalMonths = 5;
     state.buffs = [{ id: "test", name: "test", source: "test", timing: "monthly", remainingMonths: 1,
@@ -81,7 +113,7 @@ describe("role talent monthly economy", () => {
     expect(result.nextState.personalSpending).toBe((state.personalSpending ?? 0) + 4);
   });
 
-  it("uses resisted actual social losses for gold substitution", () => {
+  it("uses resisted actual social losses for gold substitution in r24 recordings", () => withGameplayRuleset("20261022-r24", () => {
     const state = playing("rich", { "gold-power-gamma": 1 });
     state.player.social = 18;
     state.buffs = [{ id: "test", name: "test", source: "test", timing: "monthly", remainingMonths: 1,
@@ -90,7 +122,7 @@ describe("role talent monthly economy", () => {
     expect(result.nextState.player.social).toBe(18);
     expect(result.nextState.player.money).toBe(99.2);
     expect(result.nextState.personalSpending).toBe((state.personalSpending ?? 0) + 0.8);
-  });
+  }));
 
   it("does not clamp untouched overflow attributes or SAN at month-start", () => {
     const state = playing("chosen-reversed", {});
@@ -100,15 +132,15 @@ describe("role talent monthly economy", () => {
   });
 
   it("previews first-month and semester recovery without consuming their settlement", () => {
-    const first = playing("normal", { "first-month-drive": 3, "first-month-drive-plus": 5 });
+    const first = playing("normal", { "first-month-drive": 1, "first-month-drive-plus": 5 });
     first.month = 1;
     first.player.san = 5;
     const before = structuredClone(first);
     const preview = previewNextMonthEffects(first);
     expect(preview.items.find((item) => item.id === "monthly-role-growth")).toMatchObject({
-      name: "满怀干劲", appliedStats: { san: 6 },
+      name: "满怀干劲", appliedStats: { san: 5 },
     });
-    expect(preview.player.san).toBe(13);
+    expect(preview.player.san).toBe(12);
     expect(first).toEqual(before);
     const semester = { ...first, totalMonths: 6, month: 6 };
     expect(previewNextMonthEffects(semester).items.find((item) => item.id === "monthly-role-growth"))
@@ -144,7 +176,7 @@ describe("role talent monthly economy", () => {
     expect(state).toEqual(before);
   });
 
-  it("retains substituted spending exactly once in the engine's early month-start failure path", () => {
+  it("retains substituted spending exactly once in the r24 engine's early month-start failure path", () => withGameplayRuleset("20261022-r24", () => {
     const state = playing("rich", { "gold-power-gamma": 1 });
     state.month = 2;
     state.totalMonths = 2;
@@ -156,13 +188,13 @@ describe("role talent monthly economy", () => {
     expect(next.player.social).toBe(18);
     expect(next.player.money).toBe(98.2);
     expect(next.personalSpending).toBe((state.personalSpending ?? 0) + 1.8);
-  });
+  }));
 
   it("renders talent recovery and qualitative random swaps in the next-month effect rail", () => {
-    const normal = playing("normal", { "first-month-drive": 3 });
+    const normal = playing("normal", { "first-month-drive": 1 });
     normal.month = 1;
     normal.player.san = 5;
-    expect(renderApp(normal, createDefaultAccountProfile(), { activePlayTab: "research" })).toContain("满怀干劲 +6");
+    expect(renderApp(normal, createDefaultAccountProfile(), { activePlayTab: "research" })).toContain("满怀干劲 +5");
     const reversed = playing("chosen-reversed", { "attribute-swap": 1 });
     reversed.month = 1;
     const html = renderApp(reversed, createDefaultAccountProfile(), { activePlayTab: "research" });

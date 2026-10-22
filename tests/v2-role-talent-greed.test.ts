@@ -6,6 +6,7 @@ import { applyGreedAttributeLoss, settleGreedCoinGames, settleGreedReset, settle
 import { investRoleTalentMoney, settleRoleTalentInvestments } from "../src/core/v2-role-talent-investments";
 import { applyMonthlyEffects, previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { settleRoleTalentMonthStart } from "../src/core/v2-role-talent-lifecycle";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import type { GameState } from "../src/core/v2-types";
 
 function greed(levels: Record<string, number> = {}): GameState {
@@ -72,28 +73,58 @@ describe("greed role economy", () => {
     expect(phd.roleTalents?.pendingMoneyConversions).toBe(0);
   });
 
-  it("freezes game count and rounds each round, including qualified losses", () => {
+  it("freezes game count and rounds each round without counting losses as spending", () => {
     const state = greed({ "coin-game": 1, "coin-game-comeback": 5 });
     state.player.money = 1.01;
     state.roleTalents!.pendingCoinGames = 2;
     const rolls = [0, 0.8];
     const next = settleGreedCoinGames(state, () => rolls.shift()!);
     expect(next.player.money).toBe(0.99); // 1.01 × 1.5 = 1.52; 1.52 × .65 = .99
-    expect(next.personalSpending).toBe((state.personalSpending ?? 0) + 0.53);
-    expect(next.roleTalents?.greedQualifiedSpending).toBe(0.53);
+    expect(next.personalSpending).toBe(state.personalSpending);
+    expect(next.roleTalents?.greedQualifiedSpending).toBe(state.roleTalents?.greedQualifiedSpending);
+    expect(next.roleTalents?.pendingCoinGames).toBe(0);
+    expect(rolls).toHaveLength(0);
+  });
+
+  it("does not turn wager losses into spending rewards or extra attribute losses", () => {
+    const state = { ...greed({ "coin-game": 1, "post-phd-money-conversion": 1 }), degree: "phd" as const };
+    state.player.money = 10;
+    state.player.research = 0;
+    state.roleTalents!.pendingCoinGames = 1;
+    let draws = 0;
+    const next = settleGreedCoinGames(state, () => { draws++; return 0.9; });
+    expect(next.player.money).toBe(7);
+    expect(next.player.research).toBe(0);
+    expect(next.personalSpending).toBe(state.personalSpending);
+    expect(next.roleTalents?.greedQualifiedSpending).toBeUndefined();
+    expect(next.roleTalents?.pendingCoinGames).toBe(0);
+    expect(next.roleTalents?.pendingMoneyConversions ?? 0).toBe(0);
+    expect(draws).toBe(1);
+  });
+
+  it.each([
+    [0, 0, 0, 0], [1, 0, 0, 1.5], [1, 0.9, 0, 0.4],
+    [5, 0, 0, 7.5], [10, 0, 0, 12.5], [1000, 0.9, 0, 997],
+    [10, 0.5, 5, 8.25], [1.01, 0.9, 5, 0.66],
+  ])("bounds the wager at five coins: balance=%s roll=%s comeback=%s", (money, roll, comeback, expected) => {
+    const state = greed({ "coin-game": 1, "coin-game-comeback": comeback });
+    state.player.money = money;
+    state.roleTalents!.pendingCoinGames = 1;
+    const next = settleGreedCoinGames(state, () => roll);
+    expect(next.player.money).toBe(expected);
     expect(next.roleTalents?.pendingCoinGames).toBe(0);
   });
 
-  it("converts gambling losses without resetting new attributes or adding more games", () => {
+  it("keeps whole-wallet wagers and loss conversions in existing r19 replays", () => {
     const state = { ...greed({ "coin-game": 1, "post-phd-money-conversion": 1 }), degree: "phd" as const };
     state.player.money = 10;
     state.player.research = 0;
     state.roleTalents!.pendingCoinGames = 1;
     let first = true;
-    const next = settleGreedCoinGames(state, () => first ? (first = false, 0.9) : 1.1 / 7);
+    const next = withGameplayRuleset("20261022-r19", () => settleGreedCoinGames(state, () => first ? (first = false, 0.9) : 1.1 / 7));
     expect(next.player.money).toBe(4);
     expect(next.player.research).toBe(6);
-    expect(next.roleTalents?.pendingCoinGames).toBe(0);
+    expect(next.roleTalents?.greedQualifiedSpending).toBe(6);
     expect(next.roleTalents?.pendingMoneyConversions).toBe(0);
   });
 

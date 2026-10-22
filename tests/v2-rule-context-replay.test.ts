@@ -90,7 +90,7 @@ describe("versioned gameplay operation replay", () => {
     const nextCommand: ReplayCommand = { kind: "action", actionId: "next-month", payload: {}, ruleset: "20261017-r4" };
     replay.commands.push(legacyCommand, nextCommand);
     const legacy = executeReplayCommand(state, legacyCommand, replay.ruleset);
-    const actual = collectRunStatistics(legacy, dispatchAction(legacy, "next-month"));
+    const actual = withGameplayRuleset("20261017-r4", () => collectRunStatistics(legacy, dispatchAction(legacy, "next-month")));
     expect(actual.totalMonths).toBe(3);
     expect(actual.loverProgressState.monthlyActivity).toContain("推进2次");
     expect(isRunReplay(replay)).toBe(true);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { applyQueuedEventEffects, getResolvableQueuedEvent } from "../src/core/v2-engine-event-resolution";
 import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolution-state";
@@ -75,7 +76,7 @@ describe("role talent event settlement", () => {
     expect(state.player.san).toBe(-2);
   });
 
-  it("rechecks gold replacement using the confirmed balance and records real spending", () => {
+  it("rechecks legacy favor replacement using the confirmed balance in r24 recordings", () => withGameplayRuleset("20261022-r24", () => {
     let state = pending(initial("rich", { "gold-power-beta": 1 }), { favor: 0, rawFavor: -1 });
     expect(state.player.favor).toBe(18);
     expect(state.player.money).toBe(80);
@@ -86,7 +87,7 @@ describe("role talent event settlement", () => {
     const rich = applyChoiceEffectsToState(initial("rich", { "gold-power-beta": 1 }), event({ favor: 0, rawFavor: -1 }).choices[0]!).nextState;
     expect(rich.player.favor).toBe(18);
     expect(rich.player.money).toBe(79.2);
-  });
+  }));
 
   it("keeps teachers-day gift and errand raw rewards at one point", () => {
     const state = initial("chosen", { "lasting-fortune": 3 });
@@ -145,7 +146,9 @@ describe("role talent event settlement", () => {
     state.player.san = 1;
     const effects = { san: -6 };
     expect(formatEventSanPaymentText("SAN -6（疾病增加3）", state, effects)).toBe("SAN上限 -1（燃烧生命β）");
-    expect(formatEventSanPaymentText("SAN -6", initial("rich", { "gold-power-alpha": 1 }), effects)).toBe("金币 -6（金之力α）");
+    const rich = initial("rich", { "gold-power-alpha": 1 });
+    rich.roleTalents!.goldPowerEnabled = true;
+    expect(formatEventSanPaymentText("SAN -6", rich, effects)).toBe("金币 -6（金之力）");
     expect(effects.san).toBe(-6);
   });
 });

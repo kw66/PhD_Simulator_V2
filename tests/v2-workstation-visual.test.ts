@@ -51,7 +51,9 @@ describe("workstation visual layout through real bootstrap", () => {
   async function openWorkstation(page: Page) {
     page.setDefaultTimeout(5000);
     await page.route("**/__workstation_visual__", route => route.fulfill({ contentType: "text/html", body: fixture }));
-    await page.goto(`${server.resolvedUrls!.local[0]}__workstation_visual__`);
+    // Cold Vite transforms compete with other browser suites in the full run.
+    // Allow startup time separately without relaxing interaction assertions.
+    await page.goto(`${server.resolvedUrls!.local[0]}__workstation_visual__`, { timeout: 30_000 });
     await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
     const papers = titles.map((title, index) => ({
       ...createDraftPaper(index + 1, 0, () => 0.5), id: `visual-paper-${index}`, paperSlotIndex: index, title,
@@ -288,13 +290,14 @@ describe("workstation visual layout through real bootstrap", () => {
               const anchor = element.getBoundingClientRect();
               const tooltip = document.querySelector<HTMLElement>("#relationship-tooltip")!;
               const bounds = tooltip.getBoundingClientRect();
-              const region = element.closest(".rel-card, .paper-card")?.getBoundingClientRect()
+              const card = element.closest(".rel-card, .paper-card")?.getBoundingClientRect();
+              const region = card
                 ?? element.closest("#workstation-section, .relationship-panel")?.getBoundingClientRect();
               const regionLeft = Math.max(8, region?.left ?? 8);
               const regionRight = Math.min(document.documentElement.clientWidth - 8, region?.right ?? document.documentElement.clientWidth - 8);
               const right = element.getAttribute("data-tooltip-align") === "right"
                 || (element.getAttribute("data-tooltip-align") !== "left" && anchor.left + anchor.width / 2 > (regionLeft + regionRight) / 2);
-              const expectedLeft = Math.max(8, Math.min(right ? anchor.right - bounds.width : anchor.left, document.documentElement.clientWidth - 8 - bounds.width));
+              const expectedLeft = Math.max(card ? regionLeft : 8, Math.min(right ? anchor.right - bounds.width : anchor.left, (card ? regionRight : document.documentElement.clientWidth - 8) - bounds.width));
               return { hidden: tooltip.hidden, gap: bounds.top - anchor.bottom, roomBelow: anchor.bottom + 2 + bounds.height <= innerHeight - 8,
                 left: bounds.left, right: bounds.right, expectedLeft, viewport: document.documentElement.clientWidth };
             });
@@ -338,8 +341,16 @@ describe("workstation visual layout through real bootstrap", () => {
         expect(bounds.overflow, `${width}px card overflow`).toBeLessThanOrEqual(1);
         expect(bounds.actionsContained, `${width}px topic action containment`).toBe(true);
         await button.hover();
-        await expect.poll(() => page.locator("#relationship-tooltip").textContent()).toContain("热度越高");
-        expect(await page.locator("#relationship-tooltip").textContent()).toContain("硕士2篇、博士3篇");
+        await expect.poll(() => page.locator("#relationship-tooltip").textContent()).toContain("选题越热门");
+        expect(await page.locator("#relationship-tooltip").textContent()).toContain("硕士2篇／博士3篇");
+        expect((await page.locator("#relationship-tooltip").textContent())!.split("\n")).toHaveLength(2);
+        expect(await page.locator("#relationship-tooltip").evaluate(element => getComputedStyle(element).whiteSpace)).toBe("pre-line");
+        expect(await button.evaluate(element => getComputedStyle(element, "::after").display)).toBe("none");
+        const hintBounds = await page.locator("#relationship-tooltip").boundingBox();
+        const cardBounds = (await card.boundingBox())!;
+        expect(hintBounds).not.toBeNull();
+        expect(hintBounds!.x).toBeGreaterThanOrEqual(cardBounds.x - 1);
+        expect(hintBounds!.x + hintBounds!.width).toBeLessThanOrEqual(cardBounds.x + cardBounds.width + 1);
         await page.screenshot({ path: `artifacts/workstation-visual/topic-action-${width}.png` });
         await page.keyboard.press("Escape");
       }

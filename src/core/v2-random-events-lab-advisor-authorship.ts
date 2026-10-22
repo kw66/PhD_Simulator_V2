@@ -1,3 +1,4 @@
+import { randomOutcome } from "./v2-event-choice-random";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { createJuniorDelegationTalent, getJuniorDelegationSocialChange } from "./v2-role-talent-relationships";
 import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange, getTierResistedNarrative } from "./v2-sanity-rules";
@@ -44,6 +45,7 @@ export function createAdvisorAuthorshipRandomEvent(state: GameState, _getRoll: R
       },
       {
         id: `random-12-transfer-${serial}`,
+        ...randomOutcome(delegationTalent.effects.juniorDelegationRoll !== undefined),
         label: "转移到师弟师妹",
         outcome: `条件：${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜结果：${formatTierResistedOutcome("社交", transferSocialRaw || -1, transferSocialResult)}${delegationTalent.outcome}`,
         effects: { social: transferSocialChange, rawSocial: transferSocialRaw, ...delegationTalent.effects },

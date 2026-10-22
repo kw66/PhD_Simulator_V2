@@ -42,10 +42,10 @@ describe("lab finances", () => {
     state.advisorProgressState.awards = [{ id: "youth", awardedYear: 2023, startYear: 2024, endYear: 2026 }];
     expect(getLabPayroll(state)).toMatchObject({ player: { payment: 1.5 }, total: 6.5 });
     let next = settleLabPayroll(state);
-    expect(next.advisorProgressState.funding).toBe(93.5);
+    expect(next.advisorProgressState.funding).toBe(95.5);
     expect(next.fellowProgressState.map((profile) => getFellowFinanceAccount(next, profile.id).money)).toEqual([0, 0.5, 2.5]);
     next = settleLabPayroll({ ...next, totalMonths: 5, month: 5 });
-    expect(next.advisorProgressState.funding).toBe(87);
+    expect(next.advisorProgressState.funding).toBe(91);
     expect(next.fellowProgressState.map((profile) => getFellowFinanceAccount(next, profile.id).money)).toEqual([0, 1, 5]);
   });
 
@@ -105,9 +105,9 @@ describe("lab finances", () => {
 
   it("ends the run only when necessary salary payments leave negative funds", () => {
     const state = makeState();
-    state.advisorProgressState.funding = 3;
+    state.advisorProgressState.funding = 2;
     const next = evaluateCoreEndings(settleLabPayroll(state));
-    expect(next).toMatchObject({ phase: "finished", ending: "lab-bankrupt", advisorProgressState: { funding: -1.5 } });
+    expect(next).toMatchObject({ phase: "finished", ending: "lab-bankrupt", advisorProgressState: { funding: -0.5 } });
     expect(next.player.money).toBe(state.player.money);
     expect(evaluateCoreEndings({ ...state, advisorProgressState: { ...state.advisorProgressState, funding: 0.25 } }).phase).toBe("playing");
     expect(evaluateCoreEndings({ ...state, advisorProgressState: { ...state.advisorProgressState, funding: 0 } }).phase).toBe("playing");

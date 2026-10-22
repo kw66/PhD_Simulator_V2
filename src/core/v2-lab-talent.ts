@@ -11,6 +11,7 @@ import { applyTierResist } from "./v2-sanity-rules";
 import type { FellowProgressProfile, GameState } from "./v2-types";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getCaptainResearchCap, getCaptainAffinityCap, getCaptainLoverResearchCap } from "./v2-captain-state";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export const FELLOW_RESEARCH_CAP = 20;
 
@@ -143,7 +144,9 @@ function resolveFellowCoauthoredPapers(state: GameState, recordLogs: boolean): G
   const published = [...state.papers, ...state.externalPublications, ...(state.fellowPapers ?? [])]
     .filter((paper) => paper.status === "published");
   const triggers: Array<{ key: string; record: TalentTriggerRecord }> = [];
-  const affinityPerPaper = 1 + (state.selectedRoleId === "social" && state.fellowProgressState.some((profile) => profile.type === "junior")
+  // Earlier recordings retain the old roster prerequisite; current play rewards every actual collaborator.
+  const affinityPerPaper = 1 + (state.selectedRoleId === "social" && (usesGameplayRulesFrom("20261022-r17")
+    || state.fellowProgressState.some((profile) => profile.type === "junior"))
     ? getRoleTalentLevel(state, "paper-camaraderie") : 0);
   const fellowProgressState = state.fellowProgressState.map((profile) => {
     const rewardedIds = new Set(profile.affinityRewardedPaperIds ?? []);

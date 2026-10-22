@@ -107,7 +107,8 @@ export function initializeRoleTalents(state: GameState): GameState {
 
 export function applyRoleTalentAdvisorAssignment(state: GameState): GameState {
   if (!state.roleTalents || state.roleTalents.advisorFundingGranted || !state.selectedAdvisorName) return state;
-  const amount = state.selectedRoleId === "rich" ? 15 * level(state, "bring-funding") : 0;
+  const fundingPerLevel = usesGameplayRulesFrom("20261022-r24") ? 20 : 15;
+  const amount = state.selectedRoleId === "rich" ? fundingPerLevel * level(state, "bring-funding") : 0;
   state = { ...state, roleTalents: { ...state.roleTalents, advisorFundingGranted: true } };
   if (!amount) return state;
   state = { ...state, advisorProgressState: { ...state.advisorProgressState, funding: roundMoney(state.advisorProgressState.funding + amount) } };
@@ -150,8 +151,13 @@ export function applyRoleTalentPhdTransfer(before: GameState, after: GameState):
     state = logTalent(state, addAttributes(state, rewards), "self-determination", "我命由我", "转博奖励");
   } else if (state.selectedRoleId === "rich") {
     const wealth = roundMoney(before.player.money * 0.25 * level(state, "wealth-growth"));
-    const papers = firstAuthor.length * level(state, "knowledge-is-wealth");
-    for (const [id, name, gain] of [["wealth-growth", "财富倍增", wealth], ["knowledge-is-wealth", "书中自有黄金屋", papers]] as const) {
+    const cooperativeCount = usesGameplayRulesFrom("20261022-r25")
+      ? new Map([...before.papers, ...before.externalPublications]
+        .filter(paper => paper.status === "published" && !isPlayerFirstAuthor(paper))
+        .map(paper => [paper.id, paper])).size : 0;
+    const papers = roundMoney(firstAuthor.length * level(state, "knowledge-is-wealth"));
+    const cooperativeReward = roundMoney(cooperativeCount * level(state, "knowledge-is-wealth-beta"));
+    for (const [id, name, gain] of [["wealth-growth", "财富倍增", wealth], ["knowledge-is-wealth", usesGameplayRulesFrom("20261022-r25") ? "书中自有黄金屋α" : "书中自有黄金屋", papers], ["knowledge-is-wealth-beta", "书中自有黄金屋β", cooperativeReward]] as const) {
       state = logTalent(state, recordPersonalIncome({ ...state, player: { ...state.player, money: roundMoney(state.player.money + gain) } }, gain), id, name, "转博奖励");
     }
   } else if (state.selectedRoleId === "genius") {
@@ -266,9 +272,16 @@ export function settleRoleTalentMonthStart(state: GameState, getRoll: () => numb
   if (!state.roleTalents || state.totalMonths <= 0 || state.roleTalents.lastMonthlySettlement === state.totalMonths) return state;
   state = { ...state, roleTalents: { ...state.roleTalents, lastMonthlySettlement: state.totalMonths, regularActionBudget: 1, regularActionsSpent: 0 } };
   if (state.selectedRoleId === "normal") {
-    if (state.totalMonths === 2) state = logTalent(state, recoverSan(state, 2 * level(state, "first-month-drive")), "first-month-drive", "满怀干劲", "入学首月结束");
+    if (state.totalMonths === 2) {
+      const rank = level(state, "first-month-drive");
+      const recovery = usesGameplayRulesFrom("20261022-r22") ? (rank > 0 ? 5 : 0) : 2 * rank;
+      state = logTalent(state, recoverSan(state, recovery), "first-month-drive", "满怀干劲", "入学首月结束");
+    }
     if (state.totalMonths > 1 && (state.month === 1 || state.month === 7)) state = logTalent(state, recoverSan(state, level(state, "first-month-drive-plus")), "first-month-drive-plus", "满怀干劲+", "新学期开始");
-    if (level(state, "burnout") && state.sanCap < 8) state = logTalent(state, recordAchievementSanCapGain({ ...state, sanCap: state.sanCap + 1 }, 1), "burnout", "触底反弹", "月初SAN上限低于8");
+    if (level(state, "burnout") && state.sanCap < 8) {
+      const gain = usesGameplayRulesFrom("20261022-r22") ? Math.min(2, level(state, "burnout")) : 1;
+      state = logTalent(state, recordAchievementSanCapGain({ ...state, sanCap: state.sanCap + gain }, gain), "burnout", "触底反弹", "月初SAN上限低于8");
+    }
     if (state.degree === "phd") {
       const accumulated = precise((state.roleTalents!.actionRemainder ?? 0) + level(state, "diligence") / 10);
       const extra = Math.floor(accumulated);

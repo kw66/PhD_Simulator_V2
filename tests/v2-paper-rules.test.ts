@@ -24,6 +24,7 @@ import {
 } from "../src/core/v2-paper-rules";
 import {
   generatePaperTopic,
+  getPaperHeatTier,
   PAPER_HEAT_MULTIPLIERS,
   PAPER_TOPIC_CATALOG,
 } from "../src/core/v2-paper-topics";
@@ -62,11 +63,11 @@ describe("v2 paper rules", () => {
   it("创建草稿论文时生成稳定初始结构", () => {
     expect(createDraftPaper(7, 1, () => 0)).toEqual({
       id: "paper-7-2",
-      title: "Latent Video Diffusion for Long-Horizon Video Synthesis",
-      topicId: "video-generation",
-      topicLabel: "视频生成",
-      heatMultiplier: 0.5,
-      prepublicationDecayRate: 0.05,
+      title: "Vision Transformer Backbones for Reliable Visual Recognition",
+      topicId: "image-classification",
+      topicLabel: "图像分类",
+      heatMultiplier: expect.any(Number),
+      prepublicationDecayRate: expect.any(Number),
       idea: 0,
       experiment: 0,
       writing: 0,
@@ -89,18 +90,16 @@ describe("v2 paper rules", () => {
   });
 
   it("按自然年份生成对应时期的方向，热度覆盖 0.50 到 1.50 的 20 个档位", () => {
-    const topic2023 = generatePaperTopic(2023, fromRolls([0.999, 0, 0, 0, 0]));
-    const topic2026 = generatePaperTopic(2026, fromRolls([0.999, 0, 0, 0, 0]));
-    const coldest = generatePaperTopic(2023, () => 0);
-
-    expect(topic2023).toMatchObject({ topicId: "diffusion", topicLabel: "扩散生成", heatMultiplier: 1.5 });
-    expect(topic2026.heatMultiplier).toBe(1.5);
-    expect(["vision-language", "video-understanding", "embodied-vla", "world-models", "multi-agent", "ai-science", "trustworthy-ai", "nlp-evaluation", "mixture-of-experts", "time-series"])
-      .toContain(topic2026.topicId);
-    expect(topic2023.title).not.toBe(topic2026.title);
-    expect(topic2023.prepublicationDecayRate).toBe(0.15);
-    expect(coldest.heatMultiplier).toBe(0.5);
-    expect(coldest.prepublicationDecayRate).toBe(0.05);
+    for (let year = 2023; year <= 2029; year++) {
+      const active = PAPER_TOPIC_CATALOG.filter(topic => topic.tiers[year - 2023] !== null);
+      active.forEach((definition, index) => {
+        const generated = generatePaperTopic(year, () => (index + .5) / active.length);
+        expect(generated.topicId).toBe(definition.id);
+        expect(getPaperHeatTier(generated.heatMultiplier)).toBe(definition.tiers[year - 2023]);
+        expect(PAPER_HEAT_MULTIPLIERS).toContain(generated.heatMultiplier);
+        expect(generated.prepublicationDecayRate).toBeCloseTo(generated.heatMultiplier * .1);
+      });
+    }
   });
 
   it("方向库覆盖视觉、音频、语言、机器学习和机器人，并为每个年份保留四档候选", () => {
@@ -160,7 +159,7 @@ describe("v2 paper rules", () => {
     };
 
     const rerolled = rerollPaperTopic(state, paper.id, fromRolls([0.999, 0, 0, 0, 0]));
-    expect(rerolled.papers[0]).toMatchObject({ id: paper.id, heatMultiplier: 1.5 });
+    expect(rerolled.papers[0]).toMatchObject({ id: paper.id, topicId: "self-supervised" });
     expect(rerolled.papers[0]?.title).not.toBe(paper.title);
     expect(rerolled.log).toBe(state.log);
 

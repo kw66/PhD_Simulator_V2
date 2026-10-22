@@ -123,7 +123,7 @@ describe("role talent lifecycle", () => {
   });
 
   it.each(["rich", "genius", "genius-reversed"] as const)("%s transfer deduplicates publications and excludes fellow-led papers without a coauthor flag", (role) => {
-    const before = run(role, { "knowledge-is-wealth": 1, "proven-by-papers": 1, "boundless-study": 1, "papers-to-insight": 1 });
+    const before = run(role, { "knowledge-is-wealth": 1, "knowledge-is-wealth-beta": 1, "proven-by-papers": 1, "boundless-study": 1, "papers-to-insight": 1 });
     const ordinary = paper("ordinary", "A");
     const explicitPlayer = { ...paper("explicit-player", "A"), leadAuthorId: "player" };
     const fellowLed = { ...paper("fellow-led", "A"), leadAuthorId: "fellow-1" };
@@ -131,7 +131,7 @@ describe("role talent lifecycle", () => {
     before.papers = [ordinary, explicitPlayer, fellowLed, paper("coauthor", "A", true)];
     before.externalPublications = [ordinary, explicitPlayer, giftedC];
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
-    if (role === "rich") expect(next.player.money).toBe(before.player.money + 3);
+    if (role === "rich") expect(next.player.money).toBe(before.player.money + 5);
     else if (role === "genius") {
       expect(next.player.research).toBe(before.player.research + 2);
       expect(getPlayerAttributeCap(next, "research")).toBe(getPlayerAttributeCap(before, "research") + 2);
@@ -176,19 +176,56 @@ describe("role talent lifecycle", () => {
     expect(applyRoleTalentAdvisorAssignment(state)).toBe(state);
     const assigned = { ...state, selectedAdvisorName: "测试导师" };
     const next = applyRoleTalentAdvisorAssignment(assigned);
-    expect(next.advisorProgressState.funding).toBe(assigned.advisorProgressState.funding + 60);
-    expect(next.advisorProgressState.cumulativeFunding).toBe((assigned.advisorProgressState.cumulativeFunding ?? 30) + 60);
+    expect(next.advisorProgressState.funding).toBe(assigned.advisorProgressState.funding + 80);
+    expect(next.advisorProgressState.cumulativeFunding).toBe((assigned.advisorProgressState.cumulativeFunding ?? 30) + 80);
     expect(applyRoleTalentAdvisorAssignment(next)).toBe(next);
   });
 
-  it("rich transfer bonuses share pre-reward money and count only published first-author work", () => {
-    const before = run("rich", { "wealth-growth": 2, "knowledge-is-wealth": 3 });
+  it("grants 100 funding at rank five and preserves the previous rate in r23 recordings", () => {
+    const assigned = { ...run("rich", { "bring-funding": 5 }), selectedAdvisorName: "测试导师" };
+    const next = applyRoleTalentAdvisorAssignment(assigned);
+    expect(next.advisorProgressState.funding).toBe(assigned.advisorProgressState.funding + 100);
+    expect(applyRoleTalentAdvisorAssignment(next)).toBe(next);
+    const legacy = { ...assigned, roleTalents: { levels: { "bring-funding": 4 } } };
+    const old = withGameplayRuleset("20261022-r23", () => applyRoleTalentAdvisorAssignment(legacy));
+    expect(old.advisorProgressState.funding).toBe(legacy.advisorProgressState.funding + 60);
+  });
+
+  it("rich transfer bonuses share pre-reward money and settle separate authorship talents", () => {
+    const before = run("rich", { "wealth-growth": 2, "knowledge-is-wealth": 3, "knowledge-is-wealth-beta": 2 });
     before.player.money = 5.5;
     before.papers = [paper("a", "A"), paper("co", "A", true), createDraftPaper(1, 5, () => 0)];
     before.externalPublications = [paper("b", "B")];
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
-    expect(next.player.money).toBe(14.25);
+    expect(next.player.money).toBe(16.25);
     expect(applyRoleTalentPhdTransfer(before, next)).toBe(next);
+    expect(withGameplayRuleset("20261022-r24", () => applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" })).player.money).toBe(14.25);
+  });
+
+  it("rich paper rewards deduplicate both authorship classes and exclude unfinished papers", () => {
+    const before = run("rich", { "knowledge-is-wealth": 5, "knowledge-is-wealth-beta": 5 });
+    const first = paper("first", "C");
+    const cooperation = paper("cooperation", "A", true);
+    const fellowLed = { ...paper("fellow-led", "B"), leadAuthorId: "fellow-1" };
+    before.papers = [first, cooperation, fellowLed, { ...paper("reviewing", "A"), status: "reviewing" }];
+    before.externalPublications = [first, cooperation, fellowLed, createDraftPaper(1, 0)];
+    const snapshot = structuredClone(before);
+    const after = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
+    expect(after.player.money).toBe(before.player.money + 15);
+    expect(applyRoleTalentPhdTransfer(before, after)).toBe(after);
+    expect(before).toEqual(snapshot);
+  });
+
+  it.each([
+    [{ "knowledge-is-wealth": 2 }, 2],
+    [{ "knowledge-is-wealth-beta": 3 }, 6],
+    [{ "knowledge-is-wealth": 2, "knowledge-is-wealth-beta": 3 }, 8],
+  ] as const)("rich authorship talents reward only their own publication category: %j", (levels, reward) => {
+    const before = run("rich", { ...levels });
+    before.papers = [paper("first", "A"), paper("coauthor", "A", true),
+      { ...paper("fellow", "B"), leadAuthorId: "fellow-1" }];
+    const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
+    expect(next.player.money).toBe(before.player.money + reward);
   });
 
   it("normal percentage bonus retains the fractional raw increment then resists", () => {
@@ -290,17 +327,54 @@ describe("role talent lifecycle", () => {
   });
 
   it("first month recovery is October, semesters March and later September, with cap-only rebound", () => {
-    const state = run("normal", { "first-month-drive": 3, "first-month-drive-plus": 2, burnout: 1 });
+    const state = run("normal", { "first-month-drive": 1, "first-month-drive-plus": 2, burnout: 1 });
     state.player.san = 0;
     expect(settleRoleTalentMonthStart(state).player.san).toBe(0);
     expect(settleRoleTalentMonthStart(month(state, 1)).player.san).toBe(0);
-    expect(settleRoleTalentMonthStart(month(state, 2)).player.san).toBe(6);
+    expect(settleRoleTalentMonthStart(month(state, 2)).player.san).toBe(5);
     expect(settleRoleTalentMonthStart(month(state, 7)).player.san).toBe(2);
     expect(settleRoleTalentMonthStart(month(state, 13)).player.san).toBe(2);
     const rebound = settleRoleTalentMonthStart({ ...month(state, 3), sanCap: 7 });
     expect(rebound.sanCap).toBe(8);
     expect(rebound.player.san).toBe(0);
     expect(settleRoleTalentMonthStart(rebound)).toBe(rebound);
+  });
+
+  it("first-month drive occurs once and the semester talent still recovers twice per academic year", () => {
+    let state = run("normal", { "first-month-drive": 1, "first-month-drive-plus": 2 });
+    const recoveries: number[] = [];
+    for (let total = 1; total <= 25; total += 1) {
+      const next = settleRoleTalentMonthStart({ ...month(state, total), player: { ...state.player, san: 0 } });
+      recoveries.push(next.player.san);
+      expect(settleRoleTalentMonthStart(next)).toBe(next);
+      state = next;
+    }
+    expect(recoveries.map((amount, index) => [index + 1, amount]).filter(([, amount]) => amount! > 0))
+      .toEqual([[2, 5], [7, 2], [13, 2], [19, 2], [25, 2]]);
+  });
+
+  it.each([1, 2])("rebound level %s checks the threshold once, adds only cap and settles once per month", (rank) => {
+    const state = month(run("normal", { burnout: rank }), 3);
+    state.sanCap = 7;
+    state.player.san = 2;
+    const next = settleRoleTalentMonthStart(state);
+    expect(next.sanCap).toBe(7 + rank);
+    expect(next.player.san).toBe(2);
+    expect(settleRoleTalentMonthStart(next)).toBe(next);
+    expect(settleRoleTalentMonthStart(month(next, 4)).sanCap).toBe(7 + rank);
+    expect(settleRoleTalentMonthStart({ ...state, sanCap: 8 }).sanCap).toBe(8);
+  });
+
+  it("r21 recordings retain six-point drive recovery and one-point rebound", () => {
+    const state = month(run("normal", { "first-month-drive": 3, burnout: 2 }), 2);
+    state.player.san = 0;
+    state.sanCap = 7;
+    const old = withGameplayRuleset("20261022-r21", () => settleRoleTalentMonthStart(state));
+    expect(old.player.san).toBe(6);
+    expect(old.sanCap).toBe(8);
+    const current = settleRoleTalentMonthStart(state);
+    expect(current.player.san).toBe(5);
+    expect(current.sanCap).toBe(9);
   });
 
   it("fractional extra actions carry across months without floating-point loss", () => {
@@ -328,7 +402,7 @@ describe("role talent lifecycle", () => {
   });
 
   it("talent history records actual rewards without blocking events or mutating the input", () => {
-    const state = month(run("normal", { "first-month-drive": 3 }), 2);
+    const state = month(run("normal", { "first-month-drive": 1 }), 2);
     state.player.san = state.sanCap - 2;
     const original = structuredClone(state);
     const next = settleRoleTalentMonthStart(state);

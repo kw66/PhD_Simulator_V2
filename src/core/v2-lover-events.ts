@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { randomOutcome } from "./v2-event-choice-random";
 import { createConferenceScholarContact, replaceConferenceScholarContact } from "./v2-conference-contacts";
 import { activateLover, getOppositeGender } from "./v2-lover-system";
 import { canAddRelationship } from "./v2-relationship-rules";
@@ -173,6 +174,7 @@ function createLoverDevelopmentAct2(input: LoverDevelopmentContext): PendingEven
     choices: (["decline", "accept"] as const).map((decision) => ({
       id: decision,
       label: decision === "decline" ? "先保持距离" : unavailable ? "暂时放下" : "尝试在一起",
+      ...randomOutcome(decision === "accept" && !unavailable),
       outcome: unavailable ? "无事发生" : decision === "decline" ? `${getTypeName(context.type)}学者：${context.replacement.name}` : "恋人 +1",
       effects: { enqueueEvents: [createLoverResult({ ...context, setAside: context.canAddRelationship === false }, decision)] },
     })),

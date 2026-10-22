@@ -5,6 +5,8 @@ import { getLabMonthlySalaryTotal, getLabPayroll, getNextMonthLabPayroll, settle
 import { getFellowFinanceAccount } from "../src/core/v2-fellow-finance";
 import { applyMonthlyEffects, previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import type { GameState } from "../src/core/v2-types";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
+import { evaluateCoreEndings } from "../src/core/v2-ending-system";
 
 function makeState(): GameState {
   const base = createStartedGameState("normal");
@@ -19,6 +21,31 @@ function makeState(): GameState {
 }
 
 describe("nominal lab monthly salaries", () => {
+  it("applies fixed school stipends without subsidizing lab bonuses", () => {
+    const state = { ...makeState(), totalMonths: 5, month: 5 };
+    const payroll = getLabPayroll(state);
+    expect(payroll).toMatchObject({ total: 6.5, schoolContribution: 2, advisorCost: 4.5 });
+    const paid = settleLabPayroll(state);
+    const old = withGameplayRuleset("20261022-r25", () => settleLabPayroll(state));
+    expect(old.advisorProgressState.funding).toBe(93.5);
+    expect(paid.advisorProgressState.funding).toBe(95.5);
+    expect(paid.fellowFinanceAccounts).toEqual(old.fellowFinanceAccounts);
+    expect(paid.fellowProgressState).toEqual(old.fellowProgressState);
+    expect(paid.player).toEqual(old.player);
+    expect(paid.labFinanceLedger?.amounts["student-wages"]).toBe(-4.5);
+  });
+
+  it("can avoid a salary-induced bankruptcy while retaining debt when even the lab share is unaffordable", () => {
+    const state = { ...makeState(), totalMonths: 5, month: 5 };
+    state.advisorProgressState.funding = 2.5;
+    const paid = settleLabPayroll(state);
+    expect(paid.advisorProgressState.funding).toBe(0);
+    expect(evaluateCoreEndings(paid).phase).toBe("playing");
+    expect(withGameplayRuleset("20261022-r25", () => evaluateCoreEndings(settleLabPayroll(state))).ending).toBe("lab-bankrupt");
+    state.advisorProgressState.funding = 2.49;
+    expect(evaluateCoreEndings(settleLabPayroll(state)).ending).toBe("lab-bankrupt");
+  });
+
   it.each([59.99, 60, 60.01])("uses one funding snapshot at %s for every salary, independent of roster order", (funding) => {
     for (const degree of ["master", "phd"] as const) {
       const state = { ...makeState(), degree, totalMonths: 5, month: 5 };
@@ -27,14 +54,16 @@ describe("nominal lab monthly salaries", () => {
       const phdPayment = funding >= 60 ? 3.5 : 2.5;
       const playerPayment = degree === "master" ? masterPayment : phdPayment;
       const total = playerPayment + masterPayment + phdPayment;
+      const schoolContribution = (degree === "master" ? 0.5 : 1) + 0.5 + 1;
+      const advisorCost = total - schoolContribution;
       const before = structuredClone(state);
       const payroll = getLabPayroll(state);
       expect(payroll).toEqual({ player: { payment: playerPayment },
         fellows: state.fellowProgressState.map((profile, index) => ({ id: profile.id,
-          payment: [0, masterPayment, phdPayment][index] })), total });
+          payment: [0, masterPayment, phdPayment][index] })), total, schoolContribution, advisorCost });
       const paid = applyMonthlyEffects(state).nextState;
       const reversed = applyMonthlyEffects({ ...state, fellowProgressState: [...state.fellowProgressState].reverse() }).nextState;
-      expect(paid.advisorProgressState.funding).toBe(Number((funding - total).toFixed(2)));
+      expect(paid.advisorProgressState.funding).toBe(Number((funding - advisorCost).toFixed(2)));
       expect(paid.player.money).toBe(state.player.money + playerPayment - 1);
       expect(paid.fellowProgressState.map((profile) => getFellowFinanceAccount(paid, profile.id).money))
         .toEqual([0, masterPayment - 1, phdPayment - 1]);
@@ -51,7 +80,7 @@ describe("nominal lab monthly salaries", () => {
     const preview = getNextMonthLabPayroll(state);
     expect(preview.total).toBe(6.5);
     const paid = applyMonthlyEffects({ ...state, month: 5, totalMonths: 5 }).nextState;
-    expect(paid.advisorProgressState.funding).toBe(53.5);
+    expect(paid.advisorProgressState.funding).toBe(55.5);
     expect(paid.fellowProgressState.map((profile) => profile.monthlySalaryPaid)).toEqual([0, 1.5, 3.5]);
     const before = structuredClone(paid);
     expect(getNextMonthLabPayroll(paid).total).toBe(4.5);
@@ -69,14 +98,14 @@ describe("nominal lab monthly salaries", () => {
     state.month = 10;
     const before = structuredClone(state);
     expect(getNextMonthLabPayroll(state)).toEqual({ player: { payment: 1.5 },
-      fellows: [{ id: fellow.id, payment: 3.5 }], total: 5 });
+      fellows: [{ id: fellow.id, payment: 3.5 }], total: 5, schoolContribution: 1.5, advisorCost: 3.5 });
     expect(getNextMonthLabPayroll({ ...state, fellowProgressState: [{ ...fellow, initialResearchScore: 1 }] }))
-      .toEqual({ player: { payment: 1.5 }, fellows: [], total: 1.5 });
+      .toEqual({ player: { payment: 1.5 }, fellows: [], total: 1.5, schoolContribution: 0.5, advisorCost: 1 });
     const waiting = { ...state, month: 12, totalMonths: 12,
       fellowProgressState: [{ ...fellow, academicYear: 0 }] };
     expect(getLabPayroll(waiting).total).toBe(1.5);
     expect(getNextMonthLabPayroll(waiting)).toEqual({ player: { payment: 1.5 },
-      fellows: [{ id: fellow.id, payment: 1.5 }], total: 3 });
+      fellows: [{ id: fellow.id, payment: 1.5 }], total: 3, schoolContribution: 1, advisorCost: 2 });
     expect(state).toEqual(before);
   });
 
@@ -88,7 +117,7 @@ describe("nominal lab monthly salaries", () => {
     const paid = applyMonthlyEffects(state).nextState;
     expect(getFellowFinanceAccount(paid, fellow.id).money).toBe(0);
     expect(paid.fellowProgressState[0]!.monthlySalaryPaid).toBe(0);
-    expect(paid.advisorProgressState.funding).toBe(Number((funding - (funding >= 60 ? 1.5 : 1)).toFixed(2)));
+    expect(paid.advisorProgressState.funding).toBe(Number((funding - (funding >= 60 ? 1 : 0.5)).toFixed(2)));
     expect(paid.player.money).toBe(state.player.money + (funding >= 60 ? 0.5 : 0));
   });
 
@@ -109,14 +138,14 @@ describe("nominal lab monthly salaries", () => {
     expect(getLabMonthlySalaryTotal(state)).toBe(6.5);
     expect(getLabPayroll(state).total).toBe(6.5);
     const paid = settleLabPayroll(state);
-    expect(paid.advisorProgressState.funding).toBe(100 - 6.5);
+    expect(paid.advisorProgressState.funding).toBe(100 - 4.5);
     expect(getLabPayroll(paid).total).toBe(6.5);
     expect(getLabMonthlySalaryTotal(paid)).toBe(6.5);
     expect(paid.fellowProgressState.map((profile) => getFellowFinanceAccount(paid, profile.id).money)).toEqual([0, 0.5, 2.5]);
     expect(paid.fellowProgressState.map((profile) => profile.monthlySalaryPaid)).toEqual([0, 1.5, 3.5]);
     const next = settleLabPayroll({ ...paid, totalMonths: 6, month: 6 });
     expect(next.fellowProgressState.map((profile) => getFellowFinanceAccount(next, profile.id).money)).toEqual([0, 1, 5]);
-    expect(next.advisorProgressState.funding).toBe(100 - 2 * 6.5);
+    expect(next.advisorProgressState.funding).toBe(100 - 2 * 4.5);
     expect(state.fellowFinanceAccounts).toEqual({});
   });
 
@@ -146,7 +175,7 @@ describe("nominal lab monthly salaries", () => {
     const state = { ...makeState(), totalMonths: 5, month: 5 };
     state.advisorProgressState.funding = 0.1;
     const next = settleLabPayroll(state);
-    expect(next.advisorProgressState.funding).toBe(0.1 - 1 - 1 - 2.5);
+    expect(next.advisorProgressState.funding).toBe(0.1 - 0.5 - 0.5 - 1.5);
     expect(next.fellowProgressState.map((profile) => getFellowFinanceAccount(next, profile.id).money)).toEqual([0, 0, 1.5]);
     expect(next.player.money).toBe(state.player.money);
   });
@@ -161,7 +190,7 @@ describe("nominal lab monthly salaries", () => {
     const paid = applyMonthlyEffects({ ...state, month: 5, totalMonths: 5 }).nextState;
     expect(paid.player.money).toBe(0.6);
     expect(paid.player.money).toBe(preview.player.money);
-    expect(paid.advisorProgressState.funding).toBe(93.5);
+    expect(paid.advisorProgressState.funding).toBe(95.5);
     expect(paid.fellowProgressState.map((profile) => getFellowFinanceAccount(paid, profile.id).money)).toEqual([0, 0.5, 2.5]);
     expect(state).toEqual(snapshot);
   });
@@ -172,7 +201,7 @@ describe("nominal lab monthly salaries", () => {
     const paid = settleLabPayroll(state);
     expect(paid.fellowFinanceAccounts).toEqual(state.fellowFinanceAccounts);
     expect(paid.fellowProgressState.map((profile) => profile.monthlySalaryPaid)).toEqual([0, 0, 0]);
-    expect(paid.advisorProgressState.funding).toBe(98.5);
+    expect(paid.advisorProgressState.funding).toBe(99);
   });
 
   it("preserves genuine fellow debt without clamping or transferring extra lab funding", () => {
@@ -181,7 +210,7 @@ describe("nominal lab monthly salaries", () => {
     state.fellowFinanceAccounts = { [fellow.id]: { name: "同学", money: -1 } };
     const paid = settleLabPayroll(state);
     expect(getFellowFinanceAccount(paid, fellow.id).money).toBe(-0.5);
-    expect(paid.advisorProgressState.funding).toBe(93.5);
+    expect(paid.advisorProgressState.funding).toBe(95.5);
     const noAdvisor = settleLabPayroll({ ...state, selectedAdvisorName: null });
     expect(getFellowFinanceAccount(noAdvisor, fellow.id).money).toBe(-2);
     expect(noAdvisor.advisorProgressState.funding).toBe(100);
@@ -195,10 +224,10 @@ describe("nominal lab monthly salaries", () => {
     const supported = settleLabPayroll(state);
     expect(getFellowFinanceAccount(supported, fellow.id).money).toBe(-0.25);
     expect(supported.fellowProgressState[0]!.monthlySalaryPaid).toBe(0);
-    expect(supported.advisorProgressState.funding).toBe(98.5);
+    expect(supported.advisorProgressState.funding).toBe(99);
     const enrolled = settleLabPayroll({ ...supported, year: 2, month: 1, totalMonths: 13 });
     expect(enrolled.fellowProgressState[0]!.monthlySalaryPaid).toBe(1.5);
     expect(getFellowFinanceAccount(enrolled, fellow.id).money).toBe(0.25);
-    expect(enrolled.advisorProgressState.funding).toBe(98.5 - 3);
+    expect(enrolled.advisorProgressState.funding).toBe(99 - 2);
   });
 });

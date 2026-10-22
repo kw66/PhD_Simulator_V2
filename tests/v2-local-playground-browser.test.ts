@@ -25,6 +25,35 @@ describe("local playground on the actual development configuration", () => {
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
 
+  it("exposes the local settings debug panel without changing the run until a tool is used", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const url = server.resolvedUrls!.local[0]!;
+    const origin = new URL(url).origin;
+    const errors: string[] = [];
+    await context.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    context.on("page", page => page.on("pageerror", error => errors.push(error.message)));
+    const page = await context.newPage();
+    try {
+      await page.goto(url);
+      await page.waitForFunction(() => (window as PlaygroundWindow).localPlaygroundStore?.isReady());
+      await page.locator('[data-action="start-game"]').click();
+      await page.locator('[data-ui-start-without-talents]').click();
+      await page.locator('[data-ui-play-tab="settings"]').click();
+      const before = await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState());
+      const [popup] = await Promise.all([
+        page.waitForEvent("popup"), page.locator('[data-ui-open-debug-window]').click(),
+      ]);
+      await expect.poll(() => popup.locator('[data-debug-connection]').textContent()).toBe("已连接主游戏");
+      expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState())).toEqual(before);
+      expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.isCurrentRunDebugged())).toBe(false);
+      await popup.locator('[data-action="debug-adjust-stat"][data-debug-stat-id="money"][data-delta="1"]').click();
+      await expect.poll(() => page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState().player.money)).toBe(before.player.money + 1);
+      expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.isCurrentRunDebugged())).toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      expect(errors).toEqual([]);
+    } finally { await context.close(); }
+  }, 60_000);
+
   it("unlocks all roles and curse ranks, retains talent choices and isolates account, journal and IndexedDB saves", async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const url = server.resolvedUrls!.local[0]!;
@@ -84,14 +113,14 @@ describe("local playground on the actual development configuration", () => {
       });
       expect(allocations.points).toEqual(Array(12).fill(20));
       expect(allocations.upgraded).toBe(true);
-      await expect.poll(() => page.locator(".lobby-talent-points-value").textContent()).toBe("19");
+      await expect.poll(() => page.locator(".lobby-talent-points-value").textContent()).toBe("18");
       await page.locator('[data-action="start-game"]').click();
       expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState().roleTalents?.levels["first-month-drive"])).toBe(1);
       await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.flushSaves());
       await page.reload();
       await page.waitForFunction(() => (window as PlaygroundWindow).localPlaygroundStore?.isReady());
       expect(await page.locator('.lobby-start-button-label').textContent()).toBe("继续游戏");
-      expect(await page.locator(".lobby-talent-points-value").textContent()).toBe("19");
+      expect(await page.locator(".lobby-talent-points-value").textContent()).toBe("18");
       await page.locator('[data-action="start-game"]').click();
       const isolated = await page.evaluate(async () => {
         const load = new Function("path", "return import(path)");

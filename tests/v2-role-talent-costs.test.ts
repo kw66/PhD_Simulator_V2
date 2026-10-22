@@ -43,15 +43,39 @@ describe("role talent action costs", () => {
     expect(talent.sanCap).toBe(ai.sanCap - 1);
   });
 
-  it("uses the 50 coin threshold, records spending, and never overdraws coins", () => {
+  it("requires the switch, accepts less than fifty coins and never overdraws coins", () => {
+    const state = stateWith({ "gold-power-alpha": 1 });
+    state.player.money = 4;
+    expect(quoteSanPayment(state, 4).allowed).toBe(false);
+    expect(paySanCost(state, 4)).toBe(state);
+    state.roleTalents!.goldPowerEnabled = true;
+    const paid = paySanCost(state, 4);
+    expect(paid.player).toMatchObject({ money: 0, san: 0 });
+    expect(paid.personalSpending).toBe(4);
+    expect(quoteSanPayment(state, 4.01).allowed).toBe(false);
+    expect(paySanCost(state, 4.01)).toBe(state);
+    expect(state.player.money).toBe(4);
+  });
+
+  it("falls back to the full SAN payment when disabled or short of coins", () => {
+    const state = stateWith({ "gold-power-alpha": 1 });
+    state.player = { ...state.player, money: 2, san: 6 };
+    state.roleTalents!.goldPowerEnabled = true;
+    expect(paySanCost(state, 3).player).toMatchObject({ money: 2, san: 3 });
+    expect(paySanCost({ ...state, roleTalents: { ...state.roleTalents!, goldPowerEnabled: false } }, 2).player)
+      .toMatchObject({ money: 2, san: 4 });
+    expect(paySanCost({ ...state, roleTalents: { levels: {}, goldPowerEnabled: true } }, 2).player)
+      .toMatchObject({ money: 2, san: 4 });
+  });
+
+  it("retains automatic fifty-coin gold payments for r24 recordings", () => {
     const state = stateWith({ "gold-power-alpha": 1 });
     state.player.money = 50;
-    const paid = paySanCost(state, 4);
-    expect(paid.player).toMatchObject({ money: 46, san: 0 });
-    expect(paid.personalSpending).toBe(4);
-    expect(paySanCost({ ...state, player: { ...state.player, money: 49.99 } }, 4).player.money).toBe(49.99);
-    expect(quoteSanPayment(state, 51).allowed).toBe(false);
-    expect(paySanCost(state, 51)).toBe(state);
+    withGameplayRuleset("20261022-r24", () => {
+      expect(paySanCost(state, 4).player).toMatchObject({ money: 46, san: 0 });
+      expect(quoteSanPayment({ ...state, player: { ...state.player, money: 49.99 } }, 4).allowed).toBe(false);
+      expect(quoteSanPayment(state, 51).allowed).toBe(false);
+    });
   });
 
   it("pays beta once for the whole manual multiple-paper action", () => {
@@ -93,6 +117,7 @@ describe("role talent action costs", () => {
 describe("fractional SAN payments", () => {
   it("quotes replacement money at the same cent precision that is actually charged", () => {
     const state = stateWith({ "gold-power-alpha": 1 });
+    state.roleTalents!.goldPowerEnabled = true;
     state.player.money = 50;
     expect(quoteSanPayment(state, 1.235).moneyCost).toBe(1.24);
     expect(paySanCost(state, 1.235).player.money).toBe(48.76);

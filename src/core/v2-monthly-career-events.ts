@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { randomOutcome } from "./v2-event-choice-random";
 import {
   CAREER_DEFINITIONS,
   getCareerAbility,
@@ -153,6 +154,7 @@ function createDirectionEvent(
     const result = createResultEvent(state, chainId, type, job, score, success, experienceGain, sanChange);
     return {
       id: `apply-${job.id}`,
+      ...randomOutcome(),
       label: job.name,
       disabledReason: !quoteSanPayment(state, -sanChange).allowed ? `SAN 不足，需要 ${-sanChange}` : undefined,
       outcome: `应聘${job.name}，结果待公布`,

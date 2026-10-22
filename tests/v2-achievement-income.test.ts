@@ -5,6 +5,7 @@ import { observeAchievements } from "../src/core/v2-achievement-runtime";
 import { recordPersonalIncome } from "../src/core/v2-money";
 import { settleRoleTalentInvestments } from "../src/core/v2-role-talent-investments";
 import { settleGreedCoinGames } from "../src/core/v2-role-talent-greed";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { resolveMonthlyEffects } from "../src/core/v2-monthly-effects";
 import type { GameState } from "../src/core/v2-types";
 
@@ -52,6 +53,16 @@ describe("actual monthly income evidence", () => {
     s.roleTalents = { levels: { "coin-game": 1 }, pendingCoinGames: 2 };
     const rolls = [0, 1];
     const next = settleGreedCoinGames(s, () => rolls.shift() ?? 1);
+    expect(next.player.money).toBe(199.5);
+    expect(next.achievementProgress!.counters["income:1"]).toBe(2.5);
+    expect(next.achievementProgress!.satisfied).not.toContain("global:windfall");
+  });
+
+  it("retains whole-wallet win income in r19 recordings", () => {
+    const s = start(); s.selectedRoleId = "rich-reversed"; s.player.money = 200;
+    s.roleTalents = { levels: { "coin-game": 1 }, pendingCoinGames: 2 };
+    const rolls = [0, 1];
+    const next = withGameplayRuleset("20261022-r19", () => settleGreedCoinGames(s, () => rolls.shift() ?? 1));
     expect(next.player.money).toBe(120);
     expect(next.achievementProgress!.counters["income:1"]).toBe(100);
     expect(next.achievementProgress!.satisfied).toContain("global:windfall");

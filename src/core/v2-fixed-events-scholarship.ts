@@ -1,3 +1,4 @@
+import { randomOutcome } from "./v2-event-choice-random";
 import {
   appendMechanismSettlement,
   createFixedEvent,
@@ -175,6 +176,7 @@ function buildScholarshipDecisionEvent(state: GameState, context: ScholarshipOut
       {
         id: `scholarship-apply-y${context.year}-m${context.month}`,
         label: "准备材料并申报",
+        ...randomOutcome(context.year >= 3),
         outcome: `准备材料与答辩，${formatActualSanChange(-2, state.month, state.eventSupport, state.buffs)}；入选后金币 +${context.reward}。`,
         effects: {
           fixedEventResolution: { kind: "scholarship-apply", scholarshipYear: context.year, scholarshipMonth: context.month },

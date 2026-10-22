@@ -198,7 +198,7 @@ describe("minimal game engine", () => {
       const fundingBeforeMonth = state.advisorProgressState.funding;
       state = dispatchAction({ ...state, eventQueue: [] }, "next-month");
       expect(state.totalMonths).toBe(totalMonths);
-      expect(state.advisorProgressState.funding).toBe(fundingBeforeMonth - 1);
+      expect(state.advisorProgressState.funding).toBe(fundingBeforeMonth - 0.5);
       expect(state.advisorProgressState.paidConferenceRegistrationPaperIds).toEqual([paper.id]);
       const trips = state.eventQueue.filter((event) => event.conferencePreview);
       expect(trips).toHaveLength(0);

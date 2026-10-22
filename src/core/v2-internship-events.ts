@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { randomOutcome } from "./v2-event-choice-random";
 import { activateInternship, createInternshipLead, createInternshipOffer, getInternshipMonthlyIncome, getPublishedAPaperCount, hasOngoingInternship, type InternshipLead } from "./v2-internship-system";
 import type { ConferenceCareerState, GameState, InternshipOffer, PendingEvent } from "./v2-types";
 
@@ -173,6 +174,7 @@ function createInternshipInviteAct2(context: InternshipInviteContext): PendingEv
       {
         id: "accept",
         label: "接受实习",
+        ...randomOutcome(!context.unavailable),
         outcome: `企业实习（6个月）｜${company} · ${direction}｜具体岗位和待遇待沟通`,
         ...(context.unavailable ? { disabledReason: "已有实习安排，本次不新增、不延期。" } : {}),
         effects: {

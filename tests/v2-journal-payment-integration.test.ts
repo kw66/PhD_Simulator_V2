@@ -291,7 +291,7 @@ describe("journal payment through the engine", () => {
     const next = dispatchAction(JSON.parse(JSON.stringify(paid)) as GameState, "next-month");
     expect(next.totalMonths).toBe(9);
     expect(next.advisorProgressState.paidJournalPaperIds).toEqual(["test-pami"]);
-    expect(next.advisorProgressState.funding).toBe(93.5);
+    expect(next.advisorProgressState.funding).toBe(94);
     expect(next.eventQueue.some((event) => event.journalFeePreview)).toBe(false);
   });
 });

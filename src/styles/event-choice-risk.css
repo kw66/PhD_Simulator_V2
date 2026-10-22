@@ -1,5 +1,30 @@
 /* Color belongs to actionable, evaluated choices. Keep navigation and history
    neutral, and retain the punctuation so risk never relies on color alone. */
+.event-content-buttons button.event-choice-btn[data-event-no-rewind] {
+  position: relative;
+  padding-inline: 24px;
+}
+.event-content-buttons .event-choice-btn > .event-choice-lock {
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 22px;
+  min-height: 28px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: help;
+}
+.event-choice-lock:focus-visible { outline: 1px solid #967846; border-radius: 4px; }
+.event-content-buttons .event-choice-btn[data-event-no-rewind].is-selected > svg,
+.event-content-buttons .event-choice-btn[data-event-no-rewind].is-selected > [data-lucide="check"] {
+  position: absolute;
+  left: auto;
+  right: 3px;
+}
 button[data-event-risk-state="safe"] {
   --event-risk-color: #54734e;
   --event-risk-border: #879a7e;

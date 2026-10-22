@@ -380,7 +380,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("草稿和会议审稿中的论文每月衰减");
     expect(help).toContain("拒稿后从衰减后的分数继续修改");
     expect(help).toContain("每项扣分=⌊s×h×10%⌋，至少扣1");
-    expect(help).toContain("不同topic的热度会随时间变化，新建论文按当年热度抽取");
+    expect(help).toContain("选题热度影响引用倍率和发表前分数衰减");
     expect(help).toContain("合计最低保留1");
     expect(help).toContain("3位独立抽取，类型可重复");
     expect(help).toContain("普通与LLM的三项权重随机生成，权重之和均为3");

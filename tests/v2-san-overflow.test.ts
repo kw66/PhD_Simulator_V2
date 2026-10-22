@@ -70,7 +70,7 @@ describe("SAN retained above its cap", () => {
 
   it("pays reviewer SAN with gold power alpha without mutating the preview input", () => {
     const base = overflowState();
-    const { state, settlement } = review({ ...base, selectedRoleId: "rich", roleTalents: { levels: { "gold-power-alpha": 1 } },
+    const { state, settlement } = review({ ...base, selectedRoleId: "rich", roleTalents: { levels: { "gold-power-alpha": 1 }, goldPowerEnabled: true },
       player: { ...base.player, san: 10 } }, -2);
     const snapshot = structuredClone(state);
     const projected = projectPaperReviewSettlement(state, settlement);

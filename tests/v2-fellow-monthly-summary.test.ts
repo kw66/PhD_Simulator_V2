@@ -37,7 +37,7 @@ describe("fellow monthly salary records", () => {
     expect(paid.fellowProgressState[0]).toMatchObject({
       monthlySalaryPaid: 1.5, lastSalaryTotalMonths: 4, monthlyActivity: "上月活动",
     });
-    expect(paid.advisorProgressState.funding).toBe(state.advisorProgressState.funding - expected.total);
+    expect(paid.advisorProgressState.funding).toBe(state.advisorProgressState.funding - expected.advisorCost);
     const advanced = advanceFellowResearch(paid, () => 0);
     expect(advanced.fellowProgressState[0]).toMatchObject({ monthlySalaryPaid: 1.5, lastSalaryTotalMonths: 4 });
     const following = settleLabPayroll({ ...advanced, month: 5, totalMonths: 5 });

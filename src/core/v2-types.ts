@@ -575,6 +575,8 @@ export interface PaperCollaborationEffect {
 }
 
 export interface EventChoice {
+  /** Gameplay outcome includes a random draw; choosing it commits the branch. */
+  outcomeRandom?: boolean;
   id: string;
   label: string;
   outcome: string;
@@ -690,7 +692,7 @@ export interface ResolvedEventStage {
   paperReviewPresentation?: PaperReviewEventPresentation;
   journalAcceptancePresentation?: JournalAcceptancePresentation;
   talentTrigger?: import("./v2-talent-history").TalentTriggerRecord;
-  choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason">[];
+  choices: Pick<EventChoice, "id" | "label" | "outcome" | "disabledReason" | "outcomeRandom">[];
   selectedChoiceId: string;
   /** Scene source retained only while its chain is pending. */
   replayEvent?: PendingEvent;

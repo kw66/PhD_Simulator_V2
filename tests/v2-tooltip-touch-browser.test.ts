@@ -131,4 +131,32 @@ describe("touch tooltip gestures", () => {
       expect(await page.locator("#relationship-tooltip").isHidden()).toBe(true);
     } finally { await page.close(); }
   });
+
+  it.each([false, true])("keeps long hints inside the left and right cards (touch: %s)", async touch => {
+    const page = await openFixture(touch);
+    try {
+      await page.evaluate(() => {
+        document.querySelector("#app")!.innerHTML = `<div style="display:flex;gap:12px">
+          ${["left", "right"].map(side => `<div class="paper-card" style="position:relative;width:calc(50% - 6px);min-width:0;height:160px">
+            <span id="${side}-card-note" data-card-tooltip data-tooltip="更换研究方向。热门方向提升引用，但论文分数衰减也更快。&#10;毕业论文需要同方向的一作支撑。" style="position:absolute;${side}:35%;top:30px">说明</span>
+          </div>`).join("")}</div>`;
+      });
+      for (const side of ["left", "right"]) {
+        const note = page.locator(`#${side}-card-note`);
+        if (touch) await note.tap();
+        else await note.hover();
+        const tooltip = page.locator("#relationship-tooltip");
+        expect(await tooltip.isVisible()).toBe(true);
+        const hint = (await tooltip.boundingBox())!;
+        const card = await note.evaluate(element => {
+          const bounds = element.closest(".paper-card")!.getBoundingClientRect();
+          return { left: bounds.left, right: bounds.right };
+        });
+        expect(hint.x).toBeGreaterThanOrEqual(card.left - 1);
+        expect(hint.x + hint.width).toBeLessThanOrEqual(card.right + 1);
+        expect(hint.x).toBeGreaterThanOrEqual(7);
+        expect(hint.x + hint.width).toBeLessThanOrEqual(touch ? 383 : 1273);
+      }
+    } finally { await page.close(); }
+  });
 });

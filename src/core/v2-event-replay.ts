@@ -10,6 +10,8 @@ export interface EventReplayContext {
   totalMonths: number;
   seed: number;
   path: string[];
+  /** In-place random choices cannot be undone through an earlier scene. */
+  barrierHistoryIndex?: number;
 }
 
 function hash(text: string): number {
@@ -48,6 +50,11 @@ export function canRewindPendingEvent(state: GameState, event: EventQueueItem, t
   if (!enabled(state) || event.debugReplayable || !Number.isInteger(targetIndex) || targetIndex < 0
     || !state.eventQueue.some(item => item.id === event.id)) return false;
   const context = event.rewinderReplay;
+  if (usesGameplayRulesFrom("20261022-r21") && (
+    targetIndex < (context?.barrierHistoryIndex ?? 0)
+    || event.history?.slice(targetIndex).some(stage =>
+      stage.choices.find(choice => choice.id === stage.selectedChoiceId)?.outcomeRandom)
+  )) return false;
   const scene = event.history?.[targetIndex]?.replayEvent;
   return !!context && (usesGameplayRulesFrom("20261019-r10") || context.totalMonths === state.totalMonths) && !!scene
     && scene.chainId === event.chainId && scene.source === event.source

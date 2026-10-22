@@ -1,8 +1,10 @@
 import { gameRandom } from "./v2-game-random";
 import { recordPersonalIncome } from "./v2-money";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
-import { applyPlayerAttributeChange, getPlayerAttributeCap } from "./v2-player-attributes";
+import { getPlayerAttributeCap } from "./v2-player-attributes";
+import { applyGreedConversionBatch, type GreedRandomCursor } from "./v2-greed-conversion-batch";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { GameState } from "./v2-types";
 import { describeTalentChange, recordTalentTrigger } from "./v2-talent-history";
 
@@ -23,14 +25,15 @@ function logGreed(before: GameState, after: GameState, name: string, reason: str
   });
 }
 
-function randomSource(state: GameState, injected?: () => number): { roll: () => number; finish: (value: GameState) => GameState } {
-  let seed = state.roleTalents?.greedRandomState ?? (((state.conferenceLocationSeed ?? 1) ^ 0x6d2b79f5) >>> 0);
+function randomSource(state: GameState, injected?: () => number): { roll: () => number; finish: (value: GameState) => GameState; cursor?: GreedRandomCursor } {
+  const cursor = { value: state.roleTalents?.greedRandomState ?? (((state.conferenceLocationSeed ?? 1) ^ 0x6d2b79f5) >>> 0) };
   return {
     roll: injected ?? (() => {
-      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      return seed / 4294967296;
+      cursor.value = (Math.imul(cursor.value, 1664525) + 1013904223) >>> 0;
+      return cursor.value / 4294967296;
     }),
-    finish: (value) => injected ? value : { ...value, roleTalents: { ...value.roleTalents!, greedRandomState: seed } },
+    finish: (value) => injected ? value : { ...value, roleTalents: { ...value.roleTalents!, greedRandomState: cursor.value } },
+    ...(!injected ? { cursor } : {}),
   };
 }
 
@@ -73,27 +76,12 @@ export function settleGreedReset(state: GameState): GameState {
 }
 
 /** Deferred spending rewards cannot be overwritten by the caller's cost commit. */
-export function settleGreedSpendingConversions(state: GameState, getRoll?: () => number): GameState {
+export function settleGreedSpendingConversions(state: GameState, getRoll?: () => number, cursor?: GreedRandomCursor): GameState {
   if (state.selectedRoleId !== "rich-reversed" || !state.roleTalents) return state;
   const count = state.roleTalents.pendingMoneyConversions ?? 0;
   if (count <= 0) return state;
   const random = randomSource(state, getRoll);
-  let next: GameState = { ...state, roleTalents: { ...state.roleTalents, pendingMoneyConversions: 0 } };
-  for (let index = 0; index < count; index += 1) {
-    const target = Math.max(0, Math.min(6, Math.floor(random.roll() * 7)));
-    if (target === 0) {
-      next = { ...next, player: { ...next.player, san: Math.max(next.player.san, Math.min(next.sanCap, next.player.san + 1)) } };
-    } else if (target <= 3) {
-      next = applyPlayerAttributeChange(next, ATTRIBUTES[target - 1]!, 1).state;
-    } else {
-      const stat = ATTRIBUTES[target - 4]!;
-      next = stat === "research" ? { ...next, researchCapacityState: {
-        ...next.researchCapacityState, otherCapBonus: next.researchCapacityState.otherCapBonus + 1,
-      } } : { ...next, roleTalents: { ...next.roleTalents!, capBonuses: {
-        ...next.roleTalents?.capBonuses, [stat]: (next.roleTalents?.capBonuses?.[stat] ?? 0) + 1,
-      } } };
-    }
-  }
+  const next = applyGreedConversionBatch(state, count, random.roll, cursor ?? random.cursor);
   return logGreed(state, random.finish(next), "钱能通神", `实际消费累计${count}金币，随机转化${count}次`);
 }
 
@@ -101,16 +89,22 @@ export function settleGreedSpendingConversions(state: GameState, getRoll?: () =>
 export function settleGreedCoinGames(state: GameState, getRoll?: () => number): GameState {
   if (state.selectedRoleId !== "rich-reversed" || !state.roleTalents) return state;
   const random = randomSource(state, getRoll);
-  let next = settleGreedSpendingConversions(state, random.roll);
+  let next = settleGreedSpendingConversions(state, random.roll, random.cursor);
   const count = next.roleTalents?.pendingCoinGames ?? 0;
   if (count <= 0) return next === state ? state : random.finish(next);
   next = { ...next, roleTalents: { ...next.roleTalents!, pendingCoinGames: 0 } };
   const failureMultiplier = 0.4 + getRoleTalentLevel(next, "coin-game-comeback") * 0.05;
+  const boundedStake = usesGameplayRulesFrom("20261022-r20");
   for (let index = 0; index < count; index += 1) {
     const moneyBefore = next.player.money;
-    const money = roundMoney(moneyBefore * (random.roll() < 0.5 ? 1.5 : failureMultiplier));
+    const multiplier = random.roll() < 0.5 ? 1.5 : failureMultiplier;
+    const stake = Math.min(5, Math.max(0, moneyBefore));
+    const money = roundMoney(boundedStake ? moneyBefore - stake + stake * multiplier : moneyBefore * multiplier);
     next = recordPersonalIncome({ ...next, player: { ...next.player, money } }, money - moneyBefore);
-    if (money < moneyBefore) next = settleGreedSpendingConversions(recordPersonalSpending(next, moneyBefore - money), random.roll);
+    // Wager losses are not purchases. Keep the old feedback only for old replays.
+    if (!boundedStake && money < moneyBefore) next = settleGreedSpendingConversions(recordPersonalSpending(next, moneyBefore - money), random.roll, random.cursor);
   }
-  return logGreed(state, random.finish(next), "金币游戏", `本批冻结${count}次判定，消费转化不会追加本批次数`);
+  return logGreed(state, random.finish(next), "金币游戏", boundedStake
+    ? `本批${count}次判定，每次投入至多5金币，亏损不计消费`
+    : `本批冻结${count}次判定，消费转化不会追加本批次数`);
 }

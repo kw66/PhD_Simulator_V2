@@ -17,7 +17,7 @@ export const ATTRIBUTE_RESISTANCE_HELP_PAGE: PlayHelpPage = {
 export const SALARY_HELP_PAGE: PlayHelpPage = {
   title: "工资与生活费",
   summary: "",
-  body: `<p>基本工资：硕士每月<b>${ADVISOR_SALARY.master}</b>金币，博士每月<b>${ADVISOR_SALARY.phd}</b>金币，不随导师职称增加。</p>
+  body: `<p>基本工资：硕士每月<b>${ADVISOR_SALARY.master}</b>金币，博士每月<b>${ADVISOR_SALARY.phd}</b>金币，不随导师职称增加。学校每月为硕士配套0.5金币、博士配套1金币，其余工资及额外奖金由导师承担。</p>
     <p>发薪前科研经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}时，硕士额外+${ADVISOR_SALARY_BONUS.master}、博士额外+${ADVISOR_SALARY_BONUS.phd}；所有人按发薪前经费判断。</p>
     <p>你和在组同学每月生活费各${MONTHLY_LIVING_COST}金币，工资与生活费合并结算后再检查余额。</p>
     <p>大四不领工资，每月家里给${MONTHLY_LIVING_COST}金币，正好抵生活费，不扣经费。同学加入次月起结算。</p>`,
@@ -150,7 +150,7 @@ const EVENT_PAGES: readonly PlayHelpPage[] = [
   {
     title: "处理事件",
     summary: "<p>快进开关自动处理到期的无分支事件；分叉开关让有分支事件打开时直接进入选择。</p>",
-    body: "<p>第一幕仍可回看；结果页可回溯重选，同一选项结果固定，点击确定后结算。</p><p>自动处理按到期顺序推进，会先完成当前事件的后续情节。遇到需要玩家选择的阻塞事件时会暂停；危险事件必须手动确认。</p><p>论文结果自动处理后，审稿意见与奖励仍保留在日志中。</p>",
+    body: "<p>剧情随时可以回看。确定性结果（含条件判断）在确认前可回溯重选；带🔒的选项包含概率结果，选择后不可回退，点击锁可查看说明。</p><p>自动处理按到期顺序推进，会先完成当前事件的后续情节。遇到需要玩家选择的阻塞事件时会暂停；危险事件必须手动确认。</p><p>论文结果自动处理后，审稿意见与奖励仍保留在日志中。</p>",
     expandable: true,
   },
   {

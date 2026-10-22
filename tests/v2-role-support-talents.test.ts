@@ -43,7 +43,7 @@ describe("upright relationship role talents", () => {
     expect(settlePendingFellowHelp(next, () => 0)).toBe(next);
   });
 
-  it("grants extra publication affinity only with a junior present and never twice", () => {
+  it("grants extra publication affinity independently of unrelated juniors and never twice", () => {
     const state = base("social");
     state.roleTalents = { levels: { "paper-camaraderie": 2 } };
     const peer = createCustomFellowProgressProfile({ type: "peer", gender: "female", research: 3, affinity: 6, startTotalMonths: 1 });
@@ -55,7 +55,7 @@ describe("upright relationship role talents", () => {
     expect(next.fellowProgressState[1]?.affinity).toBe(6);
     expect(settleFellowCoauthoredPapers(next)).toBe(next);
     const withoutJunior = settleFellowCoauthoredPapers({ ...state, fellowProgressState: [peer] });
-    expect(withoutJunior.fellowProgressState[0]?.affinity).toBe(6.8);
+    expect(withoutJunior.fellowProgressState[0]?.affinity).toBe(8.4);
   });
 
   it.each([1, 4, 12])("rescales other reviewer types proportionally in year %s", (year) => {

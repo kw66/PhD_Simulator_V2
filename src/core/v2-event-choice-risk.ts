@@ -15,6 +15,9 @@ import { getShopEmergencySan } from "./v2-shop-items-effects";
 import { applyRoleTalentRest } from "./v2-role-talent-rest";
 import { settleGreedCoinGames } from "./v2-role-talent-greed";
 import { settleRoleTalentRescues } from "./v2-role-talent-reactions";
+import { applyFellowRecruitmentTalent } from "./v2-role-talent-relationships";
+import { syncRelationshipState, tryAddRelationship } from "./v2-relationship-rules";
+import { getEffectiveSocial } from "./v2-effective-attributes";
 import type { EventChoice, FixedEventResolution, GameState, PendingEvent } from "./v2-types";
 
 export type EventChoiceRisk = "certain" | "possible" | null;
@@ -106,6 +109,19 @@ function projectEffects(state: GameState, effects: EventChoice["effects"]): Game
   };
   if ((effects.restAction && getActiveOperationAllowance(state, "rest").allowed) || effects.roleTalentRest)
     next = applyRoleTalentRest(next, { yearSummary: effects.roleTalentRest === "year-summary" });
+  if (effects.fellowAdditions?.length || effects.relationshipAdditions?.length || effects.fellowOverflowAttempts) {
+    // Only quote additions already declared by this choice, not future random recruits.
+    let relationships = syncRelationshipState(next.relationshipState, getEffectiveSocial(next));
+    for (const kind of effects.relationshipAdditions ?? []) relationships = tryAddRelationship(relationships, kind).nextState;
+    let added = 0, failed = 0;
+    for (const fellow of effects.fellowAdditions ?? []) {
+      const attempt = tryAddRelationship(relationships, fellow.type);
+      relationships = attempt.nextState;
+      if (attempt.added) added++; else failed++;
+    }
+    next = applyFellowRecruitmentTalent({ ...next, relationshipState: relationships }, added,
+      Math.max(failed, effects.fellowOverflowAttempts ?? 0));
+  }
   if (effects.readPaperActions) {
     next = previewReadPaperActions(next, effects.readPaperActions, {
       consumeMonthlyAction: false, allowSanOverdraw: true, random: () => 0,

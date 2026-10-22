@@ -279,7 +279,7 @@ describe("basic ending presentation", () => {
     state.personalSpending = 19.5;
     state.conferenceEncounterState.bigBullCooperation = true;
     const card = endingCard(renderApp(state, undefined, {
-      talentAllocation: { normal: { "first-month-drive": 2, diligence: 1 } },
+      talentAllocation: { normal: { "first-month-drive": 1, diligence: 1 } },
     }));
     expect(card).toContain("导师");
     expect(card).toContain("&lt;导师&gt;");

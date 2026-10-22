@@ -3448,6 +3448,7 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="bring-funding"] { --tree-tone: #638c7b; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="wealth-growth"] { --tree-tone: #b79a4d; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="knowledge-is-wealth"] { --tree-tone: #5d8790; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="knowledge-is-wealth-beta"] { --tree-tone: #5d8790; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="investment-savvy"] { --tree-tone: #739375; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="work-pays-off"] { --tree-tone: #6686a0; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="gold-power-alpha"] { --tree-tone: #ba9146; }

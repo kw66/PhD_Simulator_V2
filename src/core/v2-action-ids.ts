@@ -37,6 +37,7 @@ export const GAME_ACTION_IDS = [
   "read-paper",
   "part-time-work",
   "invest-money",
+  "toggle-gold-power",
   "repay-debt",
   "rest",
   "resolve-event",

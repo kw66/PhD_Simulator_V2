@@ -246,7 +246,9 @@ describe("graduation cards and blind review in the browser", () => {
       await page.locator('[data-ui-open-event-id^="career-recruitment-"]:visible').first().click();
       await page.locator('[data-action="resolve-event"][data-event-choice-id="choose-internet"]:visible').first().click();
       expect(await page.locator("#event-content-body").textContent()).toContain("年总包 20～35 万");
-      expect(await page.locator('[data-action="resolve-event"][data-event-choice-id="apply-internet-development"]').textContent()).toBe("大厂开发岗");
+      const jobButton = page.locator('[data-action="resolve-event"][data-event-choice-id="apply-internet-development"]');
+      expect(await jobButton.locator("span").first().textContent()).toBe("大厂开发岗");
+      expect(await jobButton.locator(".event-choice-lock").textContent()).toBe("🔒");
       await page.locator("#event-content-box").screenshot({ path: "artifacts/graduation/recruitment-jobs.png" });
       await page.locator('[data-action="resolve-event"][data-event-choice-id="apply-internet-development"]:visible').first().click();
       await page.locator("#event-content-box").screenshot({ path: "artifacts/graduation/recruitment-result.png" });

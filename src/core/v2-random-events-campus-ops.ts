@@ -1,3 +1,4 @@
+import { randomOutcome } from "./v2-event-choice-random";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
@@ -50,6 +51,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
       },
       {
         id: `random-13-reinstall-${serial}`,
+        ...randomOutcome(),
         label: "自己重装",
         outcome: reinstallSuccess
           ? `条件：重装成功（${reinstallSuccessPercent}%）｜结果：${formatActualSanChange(-3, state.month, state.eventSupport, state.buffs)}。`
@@ -64,6 +66,7 @@ export function createOpsCampusRandomEvent(state: GameState, getRoll: RandomRoll
       },
       {
         id: `random-13-taobao-${serial}`,
+        ...randomOutcome(),
         label: "淘宝找人",
         outcome: taobaoSuccess
           ? "条件：维修成功（50%）｜结果：金币 -2。"

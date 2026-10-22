@@ -1,3 +1,4 @@
+import { randomOutcome } from "./v2-event-choice-random";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { formatTierResistedOutcome, formatActualSanChange, getActualSanChange } from "./v2-sanity-rules";
@@ -63,6 +64,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
       },
       {
         id: `random-15-grad-sim-${serial}`,
+        ...randomOutcome(),
         label: "玩研究生模拟器",
         outcome: `条件：游玩 ${playsV2 ? "v2" : "v1"}（50%）｜结果：SAN +${gradSimSanGain}。`,
         effects: {
@@ -71,6 +73,7 @@ export function createEntertainmentCampusRandomEvent(state: GameState, getRoll: 
       },
       {
         id: `random-15-kings-${serial}`,
+        ...randomOutcome(),
         label: "玩洛克王国世界",
         outcome: `条件：${catchesShinyWolf ? "抓到异色" : "未抓到异色"}（${catchesShinyWolf ? shinyPercent : 100 - shinyPercent}%）｜结果：${formatActualSanChange(-5, state.month, state.eventSupport, state.buffs)}，金币 +${rocoMoneyGain}${rocoGrowth}。`,
         effects: {

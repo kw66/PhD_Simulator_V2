@@ -199,7 +199,7 @@ describe("advisor event spending from actual lab funding", () => {
     expect(applyMonthStartSubscriptions(purchased).nextState.advisorProgressState).toEqual(purchased.advisorProgressState);
     const expired = applyMonthlyEffects({ ...purchased, month: 8, totalMonths: 8 }).nextState;
     expect(hasAiReimbursement(expired)).toBe(false);
-    expect(expired.advisorProgressState.funding).toBe(purchased.advisorProgressState.funding - 1.5);
+    expect(expired.advisorProgressState.funding).toBe(purchased.advisorProgressState.funding - 1);
   });
 
   it("pauses unfunded AI renewals without personal payment and permits manual retry", () => {
@@ -232,7 +232,7 @@ describe("advisor event spending from actual lab funding", () => {
     const preview = previewNextMonthEffects(funded);
     const actual = applyMonthlyEffects({ ...funded, month: 7, totalMonths: 7 });
     expect(preview.items.filter(item => item.id.startsWith("ai-renewal"))).toEqual(actual.resolution.items.filter(item => item.id.startsWith("ai-renewal")));
-    expect(actual.nextState.advisorProgressState.funding).toBe(0);
+    expect(actual.nextState.advisorProgressState.funding).toBe(0.5);
     expect(actual.nextState.aiShopState.subscriptions.gpt.active).toBe(true);
     expect(actual.nextState.aiShopState.subscriptions.claude.paused).toBe(true);
     expect(funded).toEqual(before);

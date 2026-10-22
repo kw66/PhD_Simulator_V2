@@ -26,7 +26,9 @@ export function quoteSanPayment(state: GameState, cost: number, options: SanPaym
   const ordinary = { allowed: true, sanCost: amount, moneyCost: 0, sanCapCost: 0, usesBeta: false };
   if (amount === 0) return ordinary;
   const moneyCost = usesGameplayRulesFrom("20261021-r13") ? roundMoney(amount) : amount;
-  if (getRoleTalentLevel(state, "gold-power-alpha") > 0 && state.player.money >= 50 && state.player.money >= moneyCost) {
+  const goldPowerActive = usesGameplayRulesFrom("20261022-r25")
+    ? state.roleTalents?.goldPowerEnabled === true : state.player.money >= 50;
+  if (getRoleTalentLevel(state, "gold-power-alpha") > 0 && goldPowerActive && state.player.money >= moneyCost) {
     return { ...ordinary, sanCost: 0, moneyCost };
   }
   if (precise(state.player.san) >= amount) return ordinary;
@@ -59,7 +61,7 @@ export function formatSanPayment(quote: SanPaymentQuote): string {
     return [quote.sanCost > 0 ? `SAN -${quote.sanCost}` : "", quote.moneyCost > 0 ? `金币 -${quote.moneyCost}（金之力α）` : "",
       quote.sanCapCost > 0 ? `SAN上限 -${quote.sanCapCost}（燃烧生命β）` : ""].filter(Boolean).join("，") || "SAN -0";
   }
-  return [quote.sanCost > 0 ? `SAN -${formatAttributeDetail(quote.sanCost)}` : "", quote.moneyCost > 0 ? `金币 -${formatMoney(quote.moneyCost)}（金之力α）` : "",
+  return [quote.sanCost > 0 ? `SAN -${formatAttributeDetail(quote.sanCost)}` : "", quote.moneyCost > 0 ? `金币 -${formatMoney(quote.moneyCost)}（${usesGameplayRulesFrom("20261022-r25") ? "金之力" : "金之力α"}）` : "",
     quote.sanCapCost > 0 ? `SAN上限 -${formatAttributeDetail(quote.sanCapCost)}（燃烧生命β）` : ""].filter(Boolean).join("，") || "SAN -0";
 }
 

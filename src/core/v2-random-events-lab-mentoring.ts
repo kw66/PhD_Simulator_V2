@@ -1,3 +1,4 @@
+import { randomOutcome } from "./v2-event-choice-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { createJuniorDelegationTalent, getJuniorDelegationSocialChange, getFellowOverflowEffects, getFellowOverflowOutcome } from "./v2-role-talent-relationships";
@@ -77,6 +78,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
       },
       {
         id: `random-1-self-${serial}`,
+        ...randomOutcome(),
         label: "亲自指导",
         outcome: staysForGradSchool
           ? `条件：对方考研进组（50%）${canAddJunior ? "" : `；师弟师妹人数 ${state.relationshipState.juniorCount}，人际栏已满`}｜结果：${mentoringSanSummary}${canAddJunior ? `｜${mentorshipJuniorLabel} +1｜${mentorshipJuniorLabel}科研 +1｜${mentorshipJuniorLabel}${affinitySummary}` : getFellowOverflowEffects(state).fellowOverflowAttempts ? `｜${getFellowOverflowOutcome(state).split("｜结果：")[1]}` : "｜未新增关系"}`
@@ -93,6 +95,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
       },
       {
         id: `random-1-delegate-${serial}`,
+        ...randomOutcome(delegationTalent.effects.juniorDelegationRoll !== undefined),
         label: "转给师弟师妹",
         outcome: `${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜${formatTierResistedOutcome("社交", delegateSocialRaw || -1, delegateSocialResult)}${delegationTalent.outcome}`,
         effects: { social: delegateSocialChange, rawSocial: delegateSocialRaw, ...delegationTalent.effects },
@@ -246,6 +249,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
       },
       {
         id: `random-2-delegate-${serial}`,
+        ...randomOutcome(delegationTalent.effects.juniorDelegationRoll !== undefined),
         label: "交给师弟师妹",
         outcome: `${hasJuniorForReview ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}｜${formatTierResistedOutcome("社交", delegateSocialRaw || -1, delegateSocialResult)}${delegationTalent.outcome}`,
         effects: { social: delegateSocialChange, rawSocial: delegateSocialRaw, ...delegationTalent.effects },

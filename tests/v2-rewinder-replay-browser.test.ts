@@ -67,7 +67,7 @@ describe("universal event choices through the real browser handlers", () => {
       await page.locator('[data-ui-open-event-id^="teachers-day-"]').first().click();
       await page.locator('#event-content-buttons button[data-event-choice-id^="teachers-day-continue-"]').click();
       const originalId = await page.locator('#event-content-buttons button[data-event-choice-id^="teachers-day-gift-"]').getAttribute("data-event-choice-id");
-      const alternateId = await page.locator('#event-content-buttons button[data-event-choice-id^="teachers-day-message-"]').getAttribute("data-event-choice-id");
+      const alternateId = await page.locator('#event-content-buttons button[data-event-choice-id^="teachers-day-stamp-"]').getAttribute("data-event-choice-id");
       expect(originalId).toBeTruthy(); expect(alternateId).toBeTruthy();
       const before = await page.evaluate(() => {
         const store = (window as RewinderWindow).rewinderReplayStore;
@@ -99,15 +99,41 @@ describe("universal event choices through the real browser handlers", () => {
       await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"]`).click();
       expect(await page.locator("#event-content-body").textContent()).toBe(originalText);
 
-      // Historical tabs expose the same normal ability directly on each choice.
+      // Historical tabs expose reselecting deterministic choices. Probability choices lock after selection.
       await page.locator('[data-ui-event-scene-index="1"]').click();
       expect(await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"]`).getAttribute("data-action")).toBe("replay-event");
       expect(await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"] [aria-label="已选择"]`).count()).toBe(1);
       await page.locator("#event-content-box").screenshot({ path: `artifacts/rewinder-event-replay/${roleId}-${width}-history-choices.png` });
       await page.locator(`#event-content-buttons button[data-event-choice-id="${alternateId}"]`).click();
       await page.locator('[data-ui-event-scene-index="1"]').click();
-      await page.locator(`#event-content-buttons button[data-event-choice-id="${originalId}"]`).click();
-      expect(await page.locator("#event-content-body").textContent()).toBe(originalText);
+      const probabilisticId = await page.locator('#event-content-buttons button[data-event-choice-id^="teachers-day-message-"]').getAttribute("data-event-choice-id");
+      const probabilityButton = page.locator(`#event-content-buttons button[data-event-choice-id="${probabilisticId}"]`);
+      const lock = probabilityButton.locator('.event-choice-lock');
+      const stateBeforeHint = await page.evaluate(() => JSON.stringify((window as RewinderWindow).rewinderReplayStore.getState()));
+      if (width < 600) await lock.tap(); else await lock.hover();
+      await page.locator('#relationship-tooltip:visible').waitFor();
+      expect(await page.locator('#relationship-tooltip').textContent()).toContain('选择后不可回退');
+      if (width >= 600) await lock.click();
+      expect(await page.evaluate(() => JSON.stringify((window as RewinderWindow).rewinderReplayStore.getState()))).toBe(stateBeforeHint);
+      const probabilityFit = await probabilityButton.evaluate(button => {
+        const box = button.getBoundingClientRect();
+        const label = button.querySelector('span')!.getBoundingClientRect();
+        const bar = button.parentElement!;
+        return { centerDelta: Math.abs((label.left + label.right - box.left - box.right) / 2),
+          overflow: bar.scrollWidth - bar.clientWidth, right: bar.getBoundingClientRect().right, viewport: innerWidth };
+      });
+      expect(probabilityFit.centerDelta).toBeLessThanOrEqual(1);
+      expect(probabilityFit.overflow).toBeLessThanOrEqual(1);
+      expect(probabilityFit.right).toBeLessThanOrEqual(probabilityFit.viewport + 1);
+      await page.locator('#event-content-box').screenshot({ path: `artifacts/rewinder-event-replay/${roleId}-${width}-probability-options.png` });
+      await page.locator(`#event-content-buttons button[data-event-choice-id="${probabilisticId}"]`).click();
+      expect(await returnButton.count()).toBe(0);
+      await page.locator('#event-content-box').screenshot({ path: `artifacts/rewinder-event-replay/${roleId}-${width}-locked-result.png` });
+      await page.locator('[data-ui-event-scene-index="1"]').click();
+      expect(await page.locator('#event-content-box [data-action="replay-event"]').count()).toBe(0);
+      const lockedHistory = await page.locator('#event-content-buttons button').all();
+      for (const button of lockedHistory) expect(await button.isDisabled()).toBe(true);
+      await page.locator('[data-ui-event-scene-index="2"]').click();
       expect(await page.evaluate(() => {
         const state = (window as RewinderWindow).rewinderReplayStore.getState();
         return { player: state.player, random: state.randomState };
@@ -121,7 +147,7 @@ describe("universal event choices through the real browser handlers", () => {
         return { money: store.getState().player.money, history: store.getState().eventHistory.filter(event => event.chainId === "teachers-day").length,
           debugged: store.isCurrentRunDebugged(), disqualified: store.isCurrentRunDisqualified() };
       });
-      expect(finished).toEqual({ money: before.player.money - 1, history: 1, debugged: false, disqualified: false });
+      expect(finished).toEqual({ money: before.player.money, history: 1, debugged: false, disqualified: false });
       await page.locator('[data-ui-open-event-history-id*="teachers-day-result-"]').first().click();
       for (const index of [0, 1, 2]) {
         await page.locator(`[data-ui-event-scene-index="${index}"]`).click();

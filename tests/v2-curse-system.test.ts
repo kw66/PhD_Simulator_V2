@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
-import { getMonthEndIllnessDelta, initializeCurse, repayCurseDebt, settleCurseMonthStart } from "../src/core/v2-curse-system";
+import { getCurseDebtPayoffAmount, getMonthEndIllnessDelta, initializeCurse, repayCurseDebt, settleCurseMonthStart } from "../src/core/v2-curse-system";
 import { applyEventPlayerEffects } from "../src/core/v2-event-player-effects";
 import { evaluateCoreEndings, finishTrainingIfReady } from "../src/core/v2-ending-system";
 import { applyMonthlyEffects, previewNextMonthEffects } from "../src/core/v2-monthly-effects";
@@ -11,6 +11,7 @@ import { createMemoryRunSaveAdapter, createRunSaveRepository, validateRunSaveRec
 import { createRunReplay, replayStateDigest, verifyRunReplay } from "../src/core/v2-run-replay";
 import type { CurseDifficulty } from "../src/core/v2-curse-system";
 import type { GameState } from "../src/core/v2-types";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 
 function month(state: GameState, totalMonths: number): GameState {
   return { ...state, totalMonths, month: (totalMonths - 1) % 12 + 1, year: Math.floor((totalMonths - 1) / 12) + 1 };
@@ -124,6 +125,30 @@ describe("cursed character run rules", () => {
     expect(repayCurseDebt(state).curseState?.debt).toBe(0);
     expect(repayCurseDebt(state, 0.001).curseState?.debt).toBe(0.024);
   });
+  it.each([0.01, 0.07, 0.14, 0.29, 127.34])("does not overcharge exact cent debt %s", debt => {
+    const state = month(createStartedGameState("cursed-debt"), 3);
+    state.curseState = { ...state.curseState!, debt };
+    state.player.money = debt;
+    expect(getCurseDebtPayoffAmount(debt)).toBe(debt);
+    const cleared = repayCurseDebt(state);
+    expect(cleared.curseState?.debt).toBe(0);
+    expect(cleared.player.money).toBe(0);
+  });
+
+  it("clears the smallest stored positive debt while preserving old replay rounding", () => {
+    const state = month(createStartedGameState("cursed-debt"), 3);
+    state.curseState = { ...state.curseState!, debt: 1e-10 };
+    state.player.money = 0.01;
+    const legacy = withGameplayRuleset("20261022-r16", () => repayCurseDebt(state));
+    expect(legacy.curseState?.debt).toBe(1e-10);
+    expect(legacy.player.money).toBe(0.01);
+    const cleared = repayCurseDebt(state);
+    expect(cleared.curseState?.debt).toBe(0);
+    expect(cleared.player.money).toBe(0);
+    expect(cleared.personalSpending).toBe(0.01);
+    expect(repayCurseDebt(cleared).personalSpending).toBe(0.01);
+  });
+
   it("requires clearing debt as well as academic requirements for graduation", () => {
     const state = createStartedGameState("cursed-debt");
     const ready: GameState = { ...state, totalMonths: state.maxMonths, graduationScoreTarget: 0,

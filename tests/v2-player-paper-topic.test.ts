@@ -62,7 +62,7 @@ describe("player paper direction continuity", () => {
     expect(preferred([], papers.map(p => ({ ...p, idea: score - 1 })), degree)).toBe(a);
   });
 
-  it("inherits only the direction, generates fresh heat and matching title, and permits random rerolls", () => {
+  it("inherits direction and annual heat, generates a matching title, and permits random rerolls", () => {
     const state = createStartedGameState("normal");
     const first = paper("first", a);
     Object.assign(state, { month: 1, totalMonths: 1, papers: [{ ...first, paperSlotIndex: 0 }], eventQueue: [], randomState: { seed: 123, cursor: 0 } });
@@ -72,10 +72,10 @@ describe("player paper direction continuity", () => {
     expect(created.topicId).toBe(a);
     expect(created.topicLabel).toBe("图像分类");
     expect(created.title).toMatch(/Classification|Recognition/);
-    expect(created.heatMultiplier).not.toBe(first.heatMultiplier);
+    expect(created.heatMultiplier).toBe(first.heatMultiplier);
     expect(created.prepublicationDecayRate).toBeCloseTo(created.heatMultiplier * .1);
-    const rerolled = rerollPaperTopic(next, created.id, () => 0);
-    expect(rerolled.papers[1]!.topicId).toBe("video-generation");
+    const rerolled = rerollPaperTopic(next, created.id, () => 0.999);
+    expect(rerolled.papers[1]!.topicId).toBe("self-supervised");
     const progressed = { ...next, papers: next.papers.map(p => p.id === created.id ? { ...p, idea: 1 } : p) };
     expect(rerollPaperTopic(progressed, created.id, () => 0)).toBe(progressed);
   });
@@ -85,7 +85,7 @@ describe("player paper direction continuity", () => {
     Object.assign(state, { month: 1, totalMonths: 1, papers: [{ ...paper("first", a), paperSlotIndex: 0 }], eventQueue: [], randomState: { seed: 123, cursor: 0 } });
     state.player.research = 6;
     const old = withGameplayRuleset("20261022-r15", () => dispatchAction(state, "create-paper", { paperSlotIndex: 1 }));
-    const expected = withGameRandom(state, () => ({ ...state, papers: [...state.papers, createDraftPaper(state.totalMonths, 0)] }));
+    const expected = withGameplayRuleset("20261022-r15", () => withGameRandom(state, () => ({ ...state, papers: [...state.papers, createDraftPaper(state.totalMonths, 0)] })));
     expect(old.papers[1]).toEqual({ ...expected.papers[1], paperSlotIndex: 1 });
     expect(old.randomState).toEqual(expected.randomState);
     expect(old.papers[1]!.topicId).not.toBe(a);

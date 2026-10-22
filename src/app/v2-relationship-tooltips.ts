@@ -29,6 +29,7 @@ export function createRelationshipTooltips(root: HTMLElement) {
 
   const findTapTrigger = (target: EventTarget | null): HTMLElement | null => {
     const element = findTrigger(target, true);
+    if (element?.hasAttribute("data-event-rewind-hint")) return element;
     // Explanatory notes are tappable; ordinary actions still execute on the
     // first tap, even when the button or one of its children has a hint.
     return element && !(target instanceof Element && target.closest(actionControls)) && !element.closest(actionControls) ? element : null;
@@ -71,10 +72,14 @@ export function createRelationshipTooltips(root: HTMLElement) {
     const regionRight = Math.min(rightEdge, region?.right ?? rightEdge);
     const alignRight = active.dataset.tooltipAlign === "right"
       || (active.dataset.tooltipAlign !== "left" && anchor.left + anchor.width / 2 > (regionLeft + regionRight) / 2);
-    tooltip.style.maxWidth = `${Math.max(0, Math.min(card ? 440 : achievement ? 340 : active.hasAttribute("data-event-risk-tooltip") ? 360 : 240, rightEdge - leftEdge))}px`;
+    // Card controls stay inside their own card, including when a long hint is
+    // wider than the space on the trigger's preferred side.
+    const hintLeft = card ? regionLeft : leftEdge;
+    const hintRight = card ? regionRight : rightEdge;
+    tooltip.style.maxWidth = `${Math.max(0, Math.min(card ? 440 : achievement ? 340 : active.hasAttribute("data-event-risk-tooltip") ? 360 : 240, hintRight - hintLeft))}px`;
     tooltip.style.maxHeight = `${Math.max(0, viewportHeight - 16)}px`;
     const bounds = tooltip.getBoundingClientRect();
-    const left = Math.max(leftEdge, Math.min(alignRight ? anchor.right - bounds.width : anchor.left, rightEdge - bounds.width));
+    const left = Math.max(hintLeft, Math.min(alignRight ? anchor.right - bounds.width : anchor.left, hintRight - bounds.width));
     const below = anchor.bottom + 2;
     const top = below + bounds.height <= viewportHeight - 8 ? below : Math.max(8, anchor.top - bounds.height - 2);
     tooltip.style.left = `${left}px`;
@@ -164,6 +169,21 @@ export function createRelationshipTooltips(root: HTMLElement) {
       || findTapTrigger(event.target) !== gesture.element) return;
     toggleTouchTooltip(gesture.element);
   });
+  root.addEventListener("click", (event) => {
+    // The lock is an explanation target, never an accidental branch choice.
+    const hint = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-event-rewind-hint]") : null;
+    if (!hint) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (Date.now() - lastTouchTime > 800) toggleTouchTooltip(hint);
+  }, true);
+  root.addEventListener("keydown", (event) => {
+    if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute("data-event-rewind-hint")
+      || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleTouchTooltip(event.target);
+  }, true);
   root.addEventListener("click", (event) => {
     // Modern touch browsers already handled pointerup. Keep click-only input
     // (including accessibility activation) usable without double toggling.

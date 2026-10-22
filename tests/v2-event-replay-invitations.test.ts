@@ -1,3 +1,4 @@
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { describe, expect, it } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
@@ -32,7 +33,7 @@ function rewind(state: GameState, chainId: string, eventHistoryIndex: number): G
 }
 
 describe("universal event replay invitation randomness", () => {
-  it("keeps the internship company, direction and every option's offer fixed across rewinds and reloads", () => {
+  it("legacy r20: keeps the internship company, direction and every option's offer fixed across rewinds and reloads", () => withGameplayRuleset("20261022-r20", () => {
     const original = base();
     const chain = "internship-invite";
     const root = createInternshipInviteAct1(buildInternshipInviteContext(original));
@@ -68,9 +69,9 @@ describe("universal event replay invitation randomness", () => {
     expect(state.internshipState.active).toBe(true);
     expect(state.internshipState.offer).toEqual(offers.get("accept"));
     expect(state.eventHistory.filter((event) => event.chainId === chain)).toHaveLength(1);
-  });
+  }));
 
-  it("keeps joint training support fixed without consuming the run stream or stacking preview rewards", () => {
+  it("legacy r20: keeps joint training support fixed without consuming the run stream or stacking preview rewards", () => withGameplayRuleset("20261022-r20", () => {
     const original = base();
     const chain = "joint-training";
     const root = createJointTrainingAct1(buildJointTrainingContext(original, undefined, () => 0.5));
@@ -100,7 +101,7 @@ describe("universal event replay invitation randomness", () => {
     expect(state.conferenceEncounterState.jointTrainingReward?.ideaBonus).toBe(4 + expected!.context.supportLevel!);
     expect(state.eventHistory.filter((event) => event.chainId === chain)).toHaveLength(1);
     expect(dispatchAction(state, "replay-event", { eventId: result.id, eventHistoryIndex: 1 })).toEqual(state);
-  });
+  }));
 
   it.each(["normal", "research-captain"] as const)("preserves intentional name and advisor rerolls for %s", (roleId) => {
     let state = started(roleId);

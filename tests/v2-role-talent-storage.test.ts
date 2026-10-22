@@ -5,6 +5,7 @@ import { getTalentPointBalance, getTalentUpgradeReason, isRoleTalentImplemented,
 import { loadRoleTalentAllocation, ROLE_TALENT_STORAGE_KEY, saveRoleTalentAllocation } from "../src/core/v2-role-talent-storage";
 import { createStore } from "../src/core/v2-store";
 import { getRoleOptions } from "../src/core/v2-progression";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 
 function memoryStorage() {
   const data = new Map<string, string>();
@@ -12,11 +13,65 @@ function memoryStorage() {
 }
 
 describe("role talent allocation", () => {
+  it("unlocks gold power through either salary or investment, preserving old recording prerequisites", () => {
+    expect(getTalentUpgradeReason("rich", 10, {}, "gold-power-alpha")).not.toBeNull();
+    const allocations: Record<string, number>[] = [
+      { heiress: 1, "knowledge-is-wealth": 1, "work-pays-off": 1 },
+      { "red-envelope": 1, "wealth-growth": 1, "investment-savvy": 1 },
+    ];
+    for (const allocation of allocations) {
+      expect(getTalentUpgradeReason("rich", 10, allocation, "gold-power-alpha")).toBeNull();
+      const learned = { ...allocation, "gold-power-alpha": 1 };
+      expect(sanitizeRoleTalentAllocation("rich", 10, learned)).toEqual(learned);
+    }
+    expect(withGameplayRuleset("20261022-r25", () => getTalentUpgradeReason("rich", 10,
+      { "red-envelope": 1, "wealth-growth": 1, "investment-savvy": 1 }, "gold-power-alpha"))).not.toBeNull();
+  });
+  it("supports the rich funding and paper reward ranks and prices while preserving old replay budgets", () => {
+    const allocation = { heiress: 1, "bring-funding": 5, "knowledge-is-wealth": 5 };
+    expect(sanitizeRoleTalentAllocation("rich", 10, allocation)).toEqual(allocation);
+    expect(getTalentPointBalance("rich", 10, allocation)).toBe(9);
+    expect(getTalentUpgradeReason("rich", 10, allocation, "bring-funding")).toBe("已满级");
+    expect(getTalentUpgradeReason("rich", 10, allocation, "knowledge-is-wealth")).toBe("已满级");
+    expect(sanitizeRoleTalentAllocation("rich", 10, { ...allocation, "knowledge-is-wealth": 6 })).toEqual(allocation);
+    withGameplayRuleset("20261022-r24", () => {
+      const old = { ...allocation, "knowledge-is-wealth": 6 };
+      expect(sanitizeRoleTalentAllocation("rich", 10, old)).toEqual(old);
+      expect(getTalentPointBalance("rich", 10, old)).toBe(8);
+    });
+    withGameplayRuleset("20261022-r23", () => {
+      const old = sanitizeRoleTalentAllocation("rich", 10, allocation);
+      expect(old).toEqual({ heiress: 1, "bring-funding": 4, "knowledge-is-wealth": 5 });
+      expect(getTalentPointBalance("rich", 10, old)).toBe(5);
+    });
+  });
+  it("makes funding a root and gives cooperative papers an independent five-rank reward talent", () => {
+    expect(getTalentUpgradeReason("rich", 10, {}, "bring-funding")).toBeNull();
+    expect(getTalentUpgradeReason("rich", 10, {}, "knowledge-is-wealth-beta")).not.toBeNull();
+    expect(getTalentUpgradeReason("rich", 10, { "bring-funding": 1 }, "knowledge-is-wealth-beta")).toBeNull();
+    expect(sanitizeRoleTalentAllocation("rich", 10, { "bring-funding": 1, "knowledge-is-wealth-beta": 6 }))
+      .toEqual({ "bring-funding": 1, "knowledge-is-wealth-beta": 5 });
+    expect(getTalentPointBalance("rich", 10, { "bring-funding": 1, "knowledge-is-wealth-beta": 5 })).toBe(14);
+    expect(withGameplayRuleset("20261022-r24", () => getTalentUpgradeReason("rich", 10, {}, "bring-funding"))).not.toBeNull();
+    expect(withGameplayRuleset("20261022-r24", () => sanitizeRoleTalentAllocation("rich", 10,
+      { "bring-funding": 1, "knowledge-is-wealth-beta": 5 }))).toEqual({});
+  });
+  it("keeps r21 allocation prices and limits for old recordings while rebuilding the current tree", () => {
+    const legacy = { "first-month-drive": 3, "self-determination": 12, diligence: 1, "burning-life-alpha": 1, burnout: 1 };
+    const old = withGameplayRuleset("20261022-r21", () => sanitizeRoleTalentAllocation("normal", 10, legacy, 4));
+    expect(old).toEqual(legacy);
+    const current = sanitizeRoleTalentAllocation("normal", 10, legacy, 4);
+    expect(current).toEqual({ ...legacy, "first-month-drive": 1, "self-determination": 10 });
+    expect(getTalentPointBalance("normal", 10, current, 4)).toBe(7);
+    expect(withGameplayRuleset("20261022-r21", () => getTalentPointBalance("normal", 10, old, 4))).toBe(2);
+    expect(getTalentUpgradeReason("normal", 10, current, "burnout", 4)).toBeNull();
+    expect(getTalentUpgradeReason("normal", 10, { ...current, burnout: 2 }, "burnout", 4)).toBe("已满级");
+  });
   it("supports revised levels, prices and the separate fourth-tier resistance paths", () => {
-    const normal = { "first-month-drive": 1, "self-determination": 12, breakthrough: 1 };
+    const normal = { "first-month-drive": 1, "self-determination": 10, breakthrough: 1 };
     expect(sanitizeRoleTalentAllocation("normal", 10, normal)).toEqual(normal);
-    expect(getTalentPointBalance("normal", 10, normal)).toBe(5);
-    expect(getTalentUpgradeReason("normal", 10, { ...normal, "self-determination": 11 }, "self-determination")).toBeNull();
+    expect(getTalentPointBalance("normal", 10, normal)).toBe(6);
+    expect(getTalentUpgradeReason("normal", 10, { ...normal, "self-determination": 9 }, "self-determination")).toBeNull();
     expect(getTalentUpgradeReason("normal", 10, normal, "self-determination")).toBe("已满级");
     const genius = { "innate-insight": 1, "thirst-for-knowledge": 1, "boundless-study": 1 };
     expect(getTalentUpgradeReason("genius", 10, genius, "academic-confidence")).toBeNull();
@@ -34,11 +89,11 @@ describe("role talent allocation", () => {
       expect(getTalentPointBalance(id, 1, {})).toBe(11);
       expect(getTalentPointBalance(id, 10, {}, 3)).toBe(23);
     }
-    expect(getTalentPointBalance("normal", 2, { "first-month-drive": 1 })).toBe(11);
+    expect(getTalentPointBalance("normal", 2, { "first-month-drive": 1 })).toBe(10);
     expect(getTalentUpgradeReason("normal", 2, {}, "diligence")).not.toBeNull();
     expect(getTalentUpgradeReason("normal", 2, { "first-month-drive": 1 }, "diligence")).toBeNull();
-    expect(getTalentUpgradeReason("normal", 1, { "first-month-drive": 2, "self-determination": 9 }, "diligence")).toBe("天赋点不足");
-    expect(getTalentUpgradeReason("normal", 10, { "first-month-drive": 3 }, "first-month-drive")).toBe("已满级");
+    expect(getTalentUpgradeReason("normal", 1, { "first-month-drive": 1, "self-determination": 9 }, "diligence")).toBe("天赋点不足");
+    expect(getTalentUpgradeReason("normal", 10, { "first-month-drive": 1 }, "first-month-drive")).toBe("已满级");
   });
 
   it("accepts either adjacent prerequisite and only previews unfinished roles", () => {
@@ -53,7 +108,7 @@ describe("role talent allocation", () => {
   it("rejects foreign nodes, fractional levels, orphan successors and over-budget allocations", () => {
     expect(sanitizeRoleTalentAllocation("normal", 1, {
       "first-month-drive": 999, diligence: 10, heiress: 1, "burning-life-alpha": 1,
-    })).toEqual({ "first-month-drive": 3, diligence: 8 });
+    })).toEqual({ "first-month-drive": 1, diligence: 9 });
     expect(sanitizeRoleTalentAllocation("normal", 10, { "first-month-drive": 0.5, diligence: 2, breakthrough: 1 })).toEqual({});
     expect(sanitizeRoleTalentAllocation("normal", 0, { "first-month-drive": 1 })).toEqual({ "first-month-drive": 1 });
     expect(sanitizeRoleTalentAllocation("normal", 10, null)).toEqual({});
@@ -64,12 +119,12 @@ describe("role talent allocation", () => {
     const account = createDefaultAccountProfile();
     account.roleProgress.normal.level = 2;
     account.roleProgress.rich.level = 2;
-    account.talentAllocation = { normal: { "first-month-drive": 2 }, rich: { heiress: 3 } };
+    account.talentAllocation = { normal: { "first-month-drive": 1 }, rich: { heiress: 3 } };
     saveRoleTalentAllocation(account, storage);
     const loaded = loadRoleTalentAllocation(account, storage);
     expect(loaded.talentAllocation).toEqual(account.talentAllocation);
-    loaded.talentAllocation!.normal!["first-month-drive"] = 1;
-    expect(account.talentAllocation.normal!["first-month-drive"]).toBe(2);
+    loaded.talentAllocation!.normal!["first-month-drive"] = 0;
+    expect(account.talentAllocation.normal!["first-month-drive"]).toBe(1);
     storage.setItem(ROLE_TALENT_STORAGE_KEY, "broken");
     expect(loadRoleTalentAllocation(account, storage).talentAllocation).toEqual({});
     expect(() => saveRoleTalentAllocation(account, { getItem: () => null, setItem: () => { throw new Error("blocked"); } })).not.toThrow();
@@ -80,23 +135,23 @@ describe("role talent allocation", () => {
     const account = createDefaultAccountProfile();
     account.roleProgress.normal.level = 3;
     account.achievementTalentPoints = { normal: 2 };
-    account.talentAllocation = { normal: { "first-month-drive": 3, "self-determination": 5 } };
+    account.talentAllocation = { normal: { "first-month-drive": 1, "self-determination": 5 } };
     saveRoleTalentAllocation(account, storage);
     const loaded = loadRoleTalentAllocation(account, storage);
     expect(loaded.talentAllocation).toEqual(account.talentAllocation);
-    expect(getTalentPointBalance("normal", 3, loaded.talentAllocation!.normal!, loaded.achievementTalentPoints!.normal)).toBe(7);
+    expect(getTalentPointBalance("normal", 3, loaded.talentAllocation!.normal!, loaded.achievementTalentPoints!.normal)).toBe(8);
   });
 
   it("lets a fresh player spend the starting budget but keeps locked roles uneditable", () => {
     const store = createStore({ storage: null });
     expect(store.getLobbyState().roleProgress.normal.level).toBe(0);
     expect(store.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
-    for (let point = 0; point < 9; point += 1) expect(store.upgradeRoleTalent("normal", "self-determination")).toBe(true);
+    for (let point = 0; point < 8; point += 1) expect(store.upgradeRoleTalent("normal", "self-determination")).toBe(true);
     expect(store.upgradeRoleTalent("normal", "self-determination")).toBe(false);
     expect(store.upgradeRoleTalent("rich", "heiress")).toBe(false);
     expect(store.getLobbyState().talentAllocation?.rich).toBeUndefined();
     store.dispatch("start-game", { roleId: "normal" });
-    expect(store.getState().roleTalents?.levels).toEqual({ "first-month-drive": 1, "self-determination": 9 });
+    expect(store.getState().roleTalents?.levels).toEqual({ "first-month-drive": 1, "self-determination": 8 });
     store.dispatch("quit-game");
     expect(store.isCurrentRunDisqualified()).toBe(false);
   });
@@ -117,16 +172,17 @@ describe("role talent allocation", () => {
     const store = createStore({ storage });
     expect(store.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
     expect(store.upgradeRoleTalent("normal", "diligence")).toBe(true);
-    expect(store.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
+    expect(store.upgradeRoleTalent("normal", "diligence")).toBe(true);
+    expect(store.upgradeRoleTalent("normal", "first-month-drive")).toBe(false);
     const refreshed = createStore({ storage });
-    expect(refreshed.getLobbyState().talentAllocation?.normal).toEqual({ "first-month-drive": 2, diligence: 1 });
+    expect(refreshed.getLobbyState().talentAllocation?.normal).toEqual({ "first-month-drive": 1, diligence: 2 });
     refreshed.dispatch("start-game", { talentAllocation: { "first-month-drive": 99, diligence: 99 } });
-    expect(refreshed.getState().roleTalents?.levels).toEqual({ "first-month-drive": 2, diligence: 1 });
+    expect(refreshed.getState().roleTalents?.levels).toEqual({ "first-month-drive": 1, diligence: 2 });
     expect(refreshed.upgradeRoleTalent("normal", "diligence")).toBe(false);
     expect(refreshed.resetRoleTalents("normal")).toBe(false);
     expect(refreshed.getState().roleTalents?.levels).not.toBe(refreshed.getLobbyState().talentAllocation?.normal);
     refreshed.dispatch("settle-and-return");
-    expect(refreshed.getState().roleTalents?.levels).toEqual({ "first-month-drive": 2, diligence: 1 });
+    expect(refreshed.getState().roleTalents?.levels).toEqual({ "first-month-drive": 1, diligence: 2 });
     refreshed.dispatch("reset-game");
     expect(refreshed.resetRoleTalents("normal")).toBe(true);
     expect(createStore({ storage }).getLobbyState().talentAllocation?.normal).toBeUndefined();

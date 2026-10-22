@@ -89,7 +89,7 @@ describe("May player transfer before June graduation", () => {
     expect(june).toMatchObject({ phase: "playing", ending: null, totalMonths: 34, month: 10, degree });
     expect(june.eventQueue.some((event) => event.chainId === "phd-decision" || event.chainId?.startsWith("ccig-"))).toBe(false);
     expect(june.player.money).toBe(afterRecruitment.player.money + (degree === "phd" ? 1.5 : 0));
-    expect(june.advisorProgressState.funding).toBe(afterRecruitment.advisorProgressState.funding - (degree === "phd" ? 2.5 : 1));
+    expect(june.advisorProgressState.funding).toBe(afterRecruitment.advisorProgressState.funding - (degree === "phd" ? 1.5 : 0.5));
     const rested = dispatchAction(june, "rest");
     expect(rested).toMatchObject({ phase: "playing", ending: null, totalMonths: 34 });
     const afterJuneRecruitment = skipRecruitment(rested);

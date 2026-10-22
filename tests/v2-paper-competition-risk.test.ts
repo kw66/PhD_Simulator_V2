@@ -121,7 +121,7 @@ describe("competition warning cost and rescue rules", () => {
     if (rescue === "gold") {
       current.selectedRoleId = "rich";
       current.player.money = 50;
-      current.roleTalents = { levels: { "gold-power-alpha": 1 }, initialized: true };
+      current.roleTalents = { levels: { "gold-power-alpha": 1 }, initialized: true, goldPowerEnabled: true };
     } else if (rescue === "beta") {
       current.degree = "phd";
       current.roleTalents = { levels: { "burning-life-beta": 1 }, initialized: true };
@@ -132,7 +132,7 @@ describe("competition warning cost and rescue rules", () => {
     expect(getEventChoiceRisk(current, result, result.choices[0]!)).toBeNull();
     expect(current).toEqual(before);
     expect(settle(current, result).phase).toBe("playing");
-    if (rescue === "gold") current.player.money = 49;
+    if (rescue === "gold") current.player.money = 0;
     else if (rescue === "beta") current.roleTalents!.betaUsedMonth = current.totalMonths;
     else current.shopState.chairUpgrade = null;
     expect(getEventChoiceRisk(current, decision, choice)).toBe("certain");

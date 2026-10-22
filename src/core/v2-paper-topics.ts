@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 export type PaperHeatTier = "cold" | "steady" | "hot" | "frontier";
 
 export type PaperTopicDomain = "vision" | "audio" | "language" | "machine-learning" | "robotics";
@@ -463,19 +464,37 @@ export function getPaperHeatTierLabel(heatMultiplier: number): string {
   return "风口";
 }
 
+/** Stable within the configured annual tier, independent of gameplay random draws. */
+function getAnnualTopicHeat(topic: PaperTopicDefinition, yearIndex: number): number {
+  const multipliers = PAPER_HEAT_MULTIPLIERS.filter((heat) => getPaperHeatTier(heat) === topic.tiers[yearIndex]);
+  let hash = 2166136261;
+  for (const character of `${topic.id}:${TOPIC_YEARS[yearIndex]}`) {
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0;
+  }
+  return multipliers[hash % multipliers.length]!;
+}
+
 export function generatePaperTopic(
   calendarYear: number,
   random: () => number = gameRandom,
   fixedTopic?: Pick<FixedPaperTopic, "topicId"> & Partial<FixedPaperTopic>,
 ): GeneratedPaperTopic {
-  const heatMultiplier = fixedTopic?.heatMultiplier ?? pick(PAPER_HEAT_MULTIPLIERS, random);
-  const prepublicationDecayRate = Number((heatMultiplier * 0.1).toFixed(3));
-  const tier = getPaperHeatTier(heatMultiplier);
   const yearIndex = getYearIndex(calendarYear);
   const activeTopics = PAPER_TOPICS.filter((topic) => topic.tiers[yearIndex] !== null);
-  const topicPool = activeTopics.filter((topic) => topic.tiers[yearIndex] === tier);
-  const topic = PAPER_TOPICS.find((candidate) => candidate.id === fixedTopic?.topicId)
-    ?? pick(topicPool.length > 0 ? topicPool : activeTopics, random);
+  let topic: PaperTopicDefinition;
+  let heatMultiplier: number;
+  if (usesGameplayRulesFrom("20261022-r23")) {
+    topic = activeTopics.find((candidate) => candidate.id === fixedTopic?.topicId) ?? pick(activeTopics, random);
+    heatMultiplier = getAnnualTopicHeat(topic, yearIndex);
+  } else {
+    // Old recordings must keep the original heat-first draw order and overrides.
+    heatMultiplier = fixedTopic?.heatMultiplier ?? pick(PAPER_HEAT_MULTIPLIERS, random);
+    const tier = getPaperHeatTier(heatMultiplier);
+    const topicPool = activeTopics.filter((candidate) => candidate.tiers[yearIndex] === tier);
+    topic = PAPER_TOPICS.find((candidate) => candidate.id === fixedTopic?.topicId)
+      ?? pick(topicPool.length > 0 ? topicPool : activeTopics, random);
+  }
+  const prepublicationDecayRate = Number((heatMultiplier * 0.1).toFixed(3));
   const technique = pick(topic.techniques, random);
   const goal = pick(topic.goals, random);
   const title = pick(TITLE_TEMPLATES, random)(technique, goal);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createInitialState } from "../src/core/v2-engine-state-factory";
 import { applyPlayerAttributeChange, getPlayerAttributeCap, previewPlayerAttributeChange } from "../src/core/v2-player-attributes";
 import type { GameState } from "../src/core/v2-types";
@@ -8,6 +9,17 @@ function player(role: GameState["selectedRoleId"], levels: Record<string, number
 }
 
 describe("shared player attribute settlement", () => {
+  it("does not spend gold to protect favor or social in the current rules", () => {
+    const state = player("rich", { "gold-power-alpha": 1, "gold-power-beta": 1, "gold-power-gamma": 1 });
+    state.roleTalents!.goldPowerEnabled = true;
+    state.player = { ...state.player, favor: 18, social: 18, money: 100 };
+    for (const stat of ["favor", "social"] as const) {
+      const next = applyPlayerAttributeChange(state, stat, -1).state;
+      expect(next.player[stat]).toBe(17.6);
+      expect(next.player.money).toBe(100);
+      expect(next.personalSpending).toBe(state.personalSpending);
+    }
+  });
   it("subtracts percentage points only in the intended direction and never below zero", () => {
     const state = player("chosen", { "lasting-fortune": 3 });
     state.player.research = 18;
@@ -66,7 +78,7 @@ describe("shared player attribute settlement", () => {
     }
   });
 
-  it("converts actual resisted loss, checks the balance every time and counts no replaced loss", () => {
+  it("preserves legacy gold conversion of resisted favor loss in r24 recordings", () => withGameplayRuleset("20261022-r24", () => {
     let state = player("rich", { "gold-power-beta": 1 });
     state.player.favor = 18;
     state.player.money = 50;
@@ -78,7 +90,7 @@ describe("shared player attribute settlement", () => {
     state = applyPlayerAttributeChange(state, "favor", -1).state;
     expect(state.player.favor).toBe(17.6);
     expect(state.player.money).toBe(49.2);
-  });
+  }));
 
   it("preserves permitted swap overflow through later ordinary changes and exempts resets", () => {
     let state = player("chosen-reversed", { "reverse-meter-alpha": 3, "swap-breaks-cap": 1 });

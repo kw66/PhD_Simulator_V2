@@ -207,13 +207,11 @@ describe("achievement ending transaction", () => {
     expect(loaded.getLobbyState().achievementTalentPoints).toEqual({ normal: 2 });
     expect(loaded.getLobbyState().achievementExperienceMultipliers).toEqual({ normal: 2.2 });
     expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
-    expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
-    expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(true);
-    for (let point = 0; point < 9; point += 1) expect(loaded.upgradeRoleTalent("normal", "self-determination")).toBe(true);
+    for (let point = 0; point < 10; point += 1) expect(loaded.upgradeRoleTalent("normal", "self-determination")).toBe(true);
     expect(loaded.upgradeRoleTalent("normal", "self-determination")).toBe(false);
     expect(loaded.upgradeRoleTalent("normal", "first-month-drive")).toBe(false);
     loaded.dispatch("start-game", { roleId: "normal" });
-    expect(loaded.getState().roleTalents?.levels["first-month-drive"]).toBe(3);
+    expect(loaded.getState().roleTalents?.levels["first-month-drive"]).toBe(1);
   });
 
   it("starts normal progression without loading former test-mode levels, unlocks or allocations", () => {

@@ -1,3 +1,4 @@
+import { randomOutcome } from "./v2-event-choice-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { createJuniorDelegationTalent, getJuniorDelegationSocialChange } from "./v2-role-talent-relationships";
@@ -70,6 +71,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       },
       {
         id: `random-4-vertical-${serial}`,
+        ...randomOutcome(),
         label: "接纵向项目",
         outcome: `${verticalSanSummary}；纵向进度 +${PROJECT_PROGRESS_MAX}；${formatTierResistedOutcome("导师好感", 1, verticalFavorResult)}；${formatTierResistedOutcome("科研", 1, verticalResearchResult)}`,
         effects: {
@@ -89,6 +91,7 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
       },
       {
         id: `random-4-share-${serial}`,
+        ...randomOutcome(delegationTalent.effects.juniorDelegationRoll !== undefined),
         label: "让师弟师妹分担",
         outcome: `${hasJunior ? "师弟师妹人数 > 0" : "师弟师妹人数 = 0"}；${shareSanSummary}；${formatTierResistedOutcome("社交", shareSocialRaw || -1, shareSocialResult)}${delegationTalent.outcome}`,
         effects: {

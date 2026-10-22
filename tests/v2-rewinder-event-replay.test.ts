@@ -70,7 +70,7 @@ describe("universal pending event choices", () => {
     }
   });
 
-  it("lets ordinary rewinder runs inspect every Teacher's Day branch repeatedly without rerolls or rewards", () => {
+  it("legacy r20: lets ordinary rewinder runs inspect every Teacher's Day branch repeatedly without rerolls or rewards", () => withGameplayRuleset("20261022-r20", () => {
     const original = base();
     const chain = "teachers-day";
     let state = { ...original, eventQueue: [createEventQueueItem(createTeachersDayEvent(original, () => 0), 1)] };
@@ -109,9 +109,9 @@ describe("universal pending event choices", () => {
     expect(final.eventHistory.filter(event => event.chainId === chain)).toHaveLength(1);
     expect(final.eventHistory.at(-1)?.debugReplayable).not.toBe(true);
     expect(final.eventHistory.at(-1)?.stages.every(stage => stage.replayEvent === undefined)).toBe(true);
-  });
+  }));
 
-  it("retains a random event's branch outcomes across JSON reload and direct history-choice clicks", () => {
+  it("legacy r20: retains a random event's branch outcomes across JSON reload and direct history-choice clicks", () => withGameplayRuleset("20261022-r20", () => {
     const original = base();
     const chain = "random-15";
     const rolls: number[] = [];
@@ -133,12 +133,12 @@ describe("universal pending event choices", () => {
     expect(current(repeated, chain)).toEqual(firstResult);
     expect(gameplay(repeated)).toEqual(gameplay(state));
     expect(choose(repeated, chain)).toEqual(choose(choose(decision, chain, 2), chain));
-  });
+  }));
 
   it("rejects invalid targets, other chains and already confirmed events", () => {
     const original = base();
     const root = createTeachersDayEvent(original, () => 0);
-    const result = choose(choose({ ...original, eventQueue: [createEventQueueItem(root, 1)] }, root.chainId), root.chainId);
+    const result = choose(choose({ ...original, eventQueue: [createEventQueueItem(root, 1)] }, root.chainId), root.chainId, 1);
     const event = current(result, root.chainId);
     const invalidStates: GameState[] = [
       { ...result, phase: "finished", ending: "burnout" },

@@ -49,9 +49,14 @@ export function getFellowOverflowOutcome(state: GameState): string {
 }
 
 export function settleFellowRecruitmentTalent(before: GameState, after: GameState, overflowAttempts = 0): GameState {
+  const previousIds = new Set(before.fellowProgressState.map((fellow) => fellow.id));
+  const count = after.fellowProgressState.filter((fellow) => !previousIds.has(fellow.id)).length;
+  return applyFellowRecruitmentTalent(after, count, overflowAttempts);
+}
+
+/** Shared by actual recruitment and risk quotes; quotes need no generated identities. */
+export function applyFellowRecruitmentTalent(after: GameState, count: number, overflowAttempts = 0): GameState {
   if (after.selectedRoleId === "social-reversed") {
-    const previousIds = new Set(before.fellowProgressState.map((fellow) => fellow.id));
-    const count = after.fellowProgressState.filter((fellow) => !previousIds.has(fellow.id)).length;
     const rank = getRoleTalentLevel(after, "fellow-add-social");
     for (let index = 0; index < count && rank > 0; index++) after = applyPlayerAttributeChange(after, "social", rank).state;
   }

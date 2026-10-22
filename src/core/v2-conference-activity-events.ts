@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { randomOutcome } from "./v2-event-choice-random";
 import { createLoverState } from "./v2-lover-system";
 import { getConferenceMentorContact, getConferenceScholarContact } from "./v2-conference-contacts";
 import type { PendingEvent } from "./v2-types";
@@ -149,6 +150,7 @@ export function createConferenceActivityDecisionEvent(
     choices: selectedOptions.map((option) => ({
       id: option.id,
       label: option.label,
+      ...randomOutcome(option.id === "opposite-scholar"),
       outcome: option.outcome,
       effects: {
         enqueueEvents: [createConferenceActivityResult(context, option, attendanceSummary, preview)],

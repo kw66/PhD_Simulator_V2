@@ -2,6 +2,7 @@ import { renderSanPayment } from "./v2-render-san-payment";
 import { getTalentTriggerDisplay } from "./v2-talent-trigger-display";
 import { formatEventRecoveryDisplay, formatEventResultResistance } from "./v2-event-result-display";
 import { renderRunSaves } from "./v2-render-run-saves";
+import { ENABLE_LOCAL_PLAYGROUND } from "../core/v2-development-flags";
 import { getEffectiveResearch, getEffectiveSocial } from "../core/v2-effective-attributes";
 import { getCoffeeGrowthInterval, getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import "../styles/workstation-unified.css";
@@ -18,8 +19,9 @@ import { getAcademicCalendarMonth, getAcademicCalendarYear } from "../core/v2-ca
 import { getCitationStats } from "../core/v2-citation-stats";
 import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-catalog";
 import { getEventChoiceRiskDetails } from "../core/v2-event-choice-risk";
-import { getResolvableQueuedEvent } from "../core/v2-engine-event-resolution";
+import { getResolvableQueuedEvent, refreshEventRestAvailability } from "../core/v2-engine-event-resolution";
 import { canRewindPendingEvent } from "../core/v2-event-replay";
+import { RANDOM_OUTCOME_HINT } from "../core/v2-event-choice-random";
 import "../styles/event-choice-risk.css";
 import type { ConferenceRegionId } from "../core/v2-conference-system";
 import { getCurrentEvent, getEventQueuePriority, getSortedEventQueue } from "../core/v2-event-queue";
@@ -55,6 +57,7 @@ import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2
 import { formatMoney, roundMoney } from "../core/v2-money";
 import { formatAttribute, formatAttributeDetail } from "../core/v2-attribute-format";
 import { getRoleTalentInvestmentDuration, getRoleTalentInvestmentLevel } from "../core/v2-role-talent-investments";
+import { getRoleTalentLevel } from "../core/v2-role-talent-state";
 import { getPlayerAttributeCap, getPlayerResistanceReduction } from "../core/v2-player-attributes";
 import { getAnnualLabSocialRewards, getPlayerAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
 import { LOVER_ROUTES, getLoverDateFailure, getLoverNextReward, getLoverPassiveGains, getLoverRouteCost, getLoverRouteGain, getLoverRouteProgress } from "../core/v2-lover-progression";
@@ -145,7 +148,7 @@ import { getAcademicDisplayCounters } from "../core/v2-rewinder-academic-record"
 import { renderRewinderEvent, type RewinderAct } from "./v2-render-rewinder-event";
 import { getAdvisorGuidanceAmount } from "../core/v2-advisor-guidance";
 import { getDesignedTalentNodes } from "../core/v2-role-talent-definitions";
-import { getMonthEndIllnessDelta } from "../core/v2-curse-system";
+import { getCurseDebtPayoffAmount, getMonthEndIllnessDelta } from "../core/v2-curse-system";
 import { getCaptainAdvisorGuidanceBonus, getCaptainGuidanceMultiplier, getCaptainAffinityCap, getCaptainCooperationMax, getCaptainLevel, getCaptainLoverId, getCaptainLoverIntimacyCap, getCaptainLoverResearchCap, getCaptainLoverRouteMax, getCaptainProjectMax, getCaptainResearchCap, getCaptainTag, isCaptain } from "../core/v2-captain-state";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
@@ -793,7 +796,7 @@ function renderLeftRail(state: GameState): string {
           <div class="new-attr-header new-identity-money-header">
             <span class="new-player-identity"><span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span><span class="new-player-role" title="${escapeHtml(role.name)}">${escapeHtml(role.name)}</span></span>
             <span class="new-player-action-points" aria-label="行动点 ${remainingActions}/${state.actionState.limit}"><span aria-hidden="true">👣</span>行动点 ${renderAnimatedNumber("player:actions:remaining", remainingActions)}/${renderAnimatedNumber("player:actions:limit", state.actionState.limit)}</span>
-            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}${getRoleTalentInvestmentLevel(state) > 0 ? `<button type="button" class="new-investment-button" data-action="invest-money" ${state.player.money < 5 || state.phase !== "playing" ? "disabled" : ""} title="投资5金币，${getRoleTalentInvestmentDuration(state)}个月后返还本金及${getRoleTalentInvestmentLevel(state)}金币利息；持有${state.roleTalents?.investments?.length ?? 0}笔">投资</button>` : ""}</span>
+            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}${getRoleTalentInvestmentLevel(state) > 0 ? `<button type="button" class="new-investment-button" data-action="invest-money" ${state.player.money < 5 || state.phase !== "playing" ? "disabled" : ""} title="投资5金币，${getRoleTalentInvestmentDuration(state)}个月后返还本金及${getRoleTalentInvestmentLevel(state)}金币利息；持有${state.roleTalents?.investments?.length ?? 0}笔">投资</button>` : ""}${state.selectedRoleId === "rich" && getRoleTalentLevel(state, "gold-power-alpha") > 0 ? `<button type="button" class="new-investment-button new-gold-power-button" data-action="toggle-gold-power" aria-pressed="${state.roleTalents?.goldPowerEnabled === true}" ${state.phase !== "playing" ? "disabled" : ""} title="${state.roleTalents?.goldPowerEnabled ? "已开启：每点SAN消耗改用1金币；金币不足时使用SAN。点击关闭" : "已关闭：点击开启，用金币代替SAN消耗"}"><span aria-hidden="true">${state.roleTalents?.goldPowerEnabled ? "☑" : "☐"}</span> 金之力</button>` : ""}</span>
           </div>
         </div>
       </div>
@@ -1162,6 +1165,8 @@ function renderEventContentBox(
     `;
   }
 
+  // Saved pending scenes may predate the latest action or equipment change.
+  if (state && currentEvent && !completedEvent) currentEvent = refreshEventRestAvailability(state, currentEvent);
   const isCompleted = completedEvent !== null;
   const completedStages = completedEvent?.stages ?? [];
   const history = currentEvent?.history ?? [];
@@ -1248,7 +1253,7 @@ function renderEventContentBox(
       </div>
       ${displayEvent.choices.length > 0 ? `
         <div class="event-content-buttons" id="event-content-buttons" data-mobile-columns="${displayEvent.choices.length === 3 && !displayEvent.rewinderPresentation && displayEvent.choices.every(choice => [...normalizeGameDisplayText(choice.label)].length <= 6) ? 3 : 2}">
-          ${returnIndex >= 0 ? `<button class="event-choice-btn event-action-btn is-event-rewind" type="button" data-action="replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${returnIndex}" title="返回选择，同一选项结果固定"><span>回溯</span></button>` : ""}
+          ${returnIndex >= 0 ? `<button class="event-choice-btn event-action-btn is-event-rewind" type="button" data-action="replay-event" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${returnIndex}" title="返回选择；概率选项选定后不可回退"><span>回溯</span></button>` : ""}
           ${displayEvent.rewinderPresentation && rewinderAct !== "attributes" ? `<button class="event-choice-btn event-action-btn is-rewinder-back" type="button" data-ui-rewinder-act="${rewinderAct === "growth" ? "attributes" : "growth"}"><span>上一幕</span></button>` : ""}
           ${displayEvent.rewinderPresentation && rewinderAct !== "relationships" ? `<button class="event-choice-btn event-action-btn" type="button" data-ui-rewinder-act="${rewinderAct === "attributes" ? "growth" : "relationships"}"><span>${rewinderAct === "attributes" ? "继续 · 成长" : "继续 · 人际"}</span></button>` : displayEvent.choices.map((choice) => {
             const disabledReason = choice.disabledReason?.trim() ?? "";
@@ -1257,9 +1262,10 @@ function renderEventContentBox(
               ? displayStage === "act1" ? "继续" : displayStage === "act3" || displayStage === "result" ? "确定" : choice.label
               : choice.label;
             const riskChoice = riskEvent?.choices.find((candidate) => candidate.id === choice.id);
+            const noRewind = (riskChoice ?? choice).outcomeRandom === true;
             const riskDetails = state && riskEvent && riskChoice && !disabledReason
               ? getEventChoiceRiskDetails(state, riskEvent, riskChoice) : null;
-            const risk = riskDetails?.risk;
+            const risk = historicalPage && noRewind ? undefined : riskDetails?.risk;
             const riskText = riskDetails?.explanation ?? "";
             // An introduction or return button is navigation; it cannot
             // promise that the later decision is safe.
@@ -1269,8 +1275,8 @@ function renderEventContentBox(
             const riskState = risk ?? (riskEvaluated ? "safe" : null);
             const canReplay = (debugReplayable || pendingReplayable) && disabledReason === "";
             const isDisabled = !canReplay && (historicalPage !== null || disabledReason !== "");
-            const titleAttribute = disabledReason ? ` title="${escapeHtml(disabledReason)}"`
-              : riskText ? ` data-event-risk-tooltip data-tooltip="${escapeHtml(riskText)}" aria-description="${escapeHtml(riskText)}"` : "";
+            const hintText = [disabledReason, noRewind ? RANDOM_OUTCOME_HINT : "", riskText].filter(Boolean).join("\n");
+            const titleAttribute = `${disabledReason ? ` title="${escapeHtml(disabledReason)}"` : ""}${hintText ? ` data-event-risk-tooltip data-tooltip="${escapeHtml(hintText)}" aria-description="${escapeHtml(hintText)}"` : ""}`;
             const buttonAttributes = canReplay
               ? `data-action="${pendingReplayable ? "replay-event" : "debug-replay-event"}" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
               : isDisabled
@@ -1281,9 +1287,10 @@ function renderEventContentBox(
                 class="event-choice-btn event-action-btn${choice.id === selectedChoiceId ? " is-selected" : ""}"
                 type="button"
                 ${secondary ? "data-event-secondary" : ""}
+                ${noRewind ? "data-event-no-rewind" : ""}
                 ${riskState ? `data-event-risk-state="${riskState}"` : ""}
                 ${buttonAttributes}
-              ><span>${escapeHtml(normalizeGameDisplayText(choiceLabel))}</span>${risk ? `<span class="event-choice-risk is-${risk}" aria-label="${escapeHtml(riskText)}">${risk === "certain" ? "！" : "？"}</span>` : ""}${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
+              ><span>${escapeHtml(normalizeGameDisplayText(choiceLabel))}</span>${noRewind ? `<span class="event-choice-lock" data-event-rewind-hint data-card-tooltip data-tooltip="${escapeHtml(RANDOM_OUTCOME_HINT)}" tabindex="0" aria-label="概率结果不可回退，查看说明">🔒</span>` : ""}${risk ? `<span class="event-choice-risk is-${risk}" aria-label="${escapeHtml(riskText)}">${risk === "certain" ? "！" : "？"}</span>` : ""}${choice.id === selectedChoiceId ? '<i data-lucide="check" aria-label="已选择"></i>' : ""}</button>
             `;
           }).join("")}
         </div>
@@ -1472,7 +1479,7 @@ function renderPaperSelectionToggle(paper: Paper, selected: boolean, label: stri
 }
 
 function renderPaperDraftActions(paper: Paper, canReroll: boolean): string {
-  const topicHint = `${canReroll ? "重新抽取选题及当年热度。" : "论文已有进度，不能更换选题。"}热度越高，引用倍率越高，发表前分数衰减越快。毕业论文由同方向的一作论文支撑：硕士2篇、博士3篇；不足的研究点从0开始推进。`;
+  const topicHint = `${canReroll ? "" : "已有进度，无法换题。"}选题越热门，引用越高、发表前衰减越快。\n毕业论文支撑：同方向一作，硕士2篇／博士3篇。`;
   return `
     <div class="paper-card-header-actions paper-draft-actions">
       <button
@@ -2399,7 +2406,8 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
     .map((item) => `${item.label} ${signedMoney(item.amount)}`).join("\n") || "本月暂无经费收支";
   const payroll = getNextMonthLabPayroll(state);
   const payrollHint = [
-    "下月工资",
+    `下月工资：${formatMoney(payroll.total)}金币；学校配套${formatMoney(payroll.schoolContribution)}金币`,
+    "学校每月配套：硕士0.5、博士1；其余由导师承担",
     `你：${formatMoney(payroll.player.payment)}金币`,
     ...payroll.fellows.map((payment) => `${getFellowName(state.fellowProgressState.find((profile) => profile.id === payment.id)!)}：${formatMoney(payment.payment)}金币`),
   ].join("\n");
@@ -2440,7 +2448,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
         </div>
       </div>
       ${card.type === "lover" ? `<div class="rel-fellow-academic-row rel-attributes-row">${renderAttributes()}</div>` : ""}
-      ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip(`用于工资、实验、论文和报销，低于0破产\n经费＜${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：同学只做横向，不做纵向\n经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：硕士工资+0.5、博士+1，可触发导师经费事件`, "left")}>${renderRelationshipIcon("💰")}科研经费 <strong aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", roundMoney(state.advisorProgressState.funding), formatMoney(state.advisorProgressState.funding))}</strong></span><span class="rel-finance-summary" ${relationshipTooltip(monthFinanceHint)}>${renderRelationshipIcon("📊")}经费收支 <strong>${signedMoney(monthFinance!.net)}</strong></span><span ${relationshipTooltip(payrollHint, "right")}>${renderRelationshipIcon("💸")}学生工资 <strong>${formatMoney(payroll.total)}</strong></span></div>` : ""}
+      ${advisor ? `<div class="rel-fellow-academic-row"><span ${relationshipTooltip(`用于工资、实验、论文和报销，低于0破产\n经费＜${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：同学只做横向，不做纵向\n经费≥${LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD}：硕士工资+0.5、博士+1，可触发导师经费事件`, "left")}>${renderRelationshipIcon("💰")}科研经费 <strong aria-label="科研经费">${renderAnimatedNumber("person:advisor:funding", roundMoney(state.advisorProgressState.funding), formatMoney(state.advisorProgressState.funding))}</strong></span><span class="rel-finance-summary" ${relationshipTooltip(monthFinanceHint)}>${renderRelationshipIcon("📊")}经费收支 <strong>${signedMoney(monthFinance!.net)}</strong></span><span ${relationshipTooltip(payrollHint, "right")}>${renderRelationshipIcon("💸")}工资支出 <strong>${formatMoney(payroll.advisorCost)}</strong></span></div>` : ""}
       ${fellow ? `<div class="rel-fellow-academic-row rel-attributes-row">
         ${renderAttributes()}
         <span class="rel-detail-item rel-wallet" ${relationshipTooltip("用于生活费、自费实验和订阅AI", "right")}>${renderRelationshipIcon("💰")}<strong>${formatMoney(finance?.money ?? 0)}</strong>${fellowAi ? `<span class="rel-type rel-ai-label" ${relationshipTooltip(`本月订阅${fellowAi.name}`, "right")}>AI</span>` : ""}</span>
@@ -3802,6 +3810,11 @@ function renderQuitConfirmationOverlay(): string {
 }
 
 function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): string {
+  const debt = state.curseState?.debt ?? 0;
+  const debtLabel = debt > 0 && debt < 0.01 ? "&lt;0.01" : debt.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+  // Repayment uses whole cents rounded up; the debt itself retains its interest precision.
+  const payoff = getCurseDebtPayoffAmount(debt);
+  const payoffHint = debt > 0 && (debt < 0.01 || payoff !== roundMoney(debt)) ? ` · 结清需${formatMoney(payoff)}金币` : "";
   return `
     <div class="settings-panel">
       <div class="settings-sections" id="settings-panel-content">
@@ -3830,9 +3843,12 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
           <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
             <i data-lucide="log-out" aria-hidden="true"></i><span>主动退学</span>
           </button>
+          ${ENABLE_LOCAL_PLAYGROUND ? `<button class="settings-primary-btn is-local-debug" type="button" data-ui-open-debug-window title="仅本地测试可见；打开面板不会修改本局">
+            <i data-lucide="wrench" aria-hidden="true"></i><span>打开调试面板</span>
+          </button>` : ""}
         </div>
       </div>
-      ${state.selectedRoleId === "cursed-debt" && state.curseState ? `<section class="curse-debt-panel"><div><strong>待偿债务 ${state.curseState.debt.toLocaleString("zh-CN", { maximumFractionDigits: 2 })} 金币</strong><span>月利率2% · 毕业前需结清</span></div><div class="curse-debt-actions"><button type="button" class="settings-primary-btn" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || state.curseState.debt <= 0 ? " disabled" : ""}>偿还1金币</button><button type="button" class="settings-primary-btn" data-action="repay-debt"${state.phase !== "playing" || state.player.money <= 0 || state.curseState.debt <= 0 ? " disabled" : ""}>尽力还款</button></div></section>` : ""}
+      ${state.selectedRoleId === "cursed-debt" && state.curseState ? `<section class="curse-debt-panel"><div><strong>待偿债务 ${debtLabel} 金币</strong><span>月利率2% · 毕业前需结清${payoffHint}</span></div><div class="curse-debt-actions"><button type="button" class="settings-primary-btn" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || debt <= 0 ? " disabled" : ""}>偿还1金币</button><button type="button" class="settings-primary-btn" data-action="repay-debt"${state.phase !== "playing" || state.player.money <= 0 || debt <= 0 ? " disabled" : ""}>尽力还款</button></div></section>` : ""}
       ${renderRunSaves(state, uiState)}
       ${!uiState.isRunSavePanelOpen && uiState.saveStatus ? `<p class="run-saves-status" role="status">${escapeHtml(uiState.saveStatus)}</p>` : ""}
     </div>

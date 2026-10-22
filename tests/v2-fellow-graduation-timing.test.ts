@@ -108,6 +108,6 @@ describe("fellow graduation timing through month advancement", () => {
     expect(next.fellowProgressState[0]?.monthlySalaryPaid ?? 0).toBe(salary);
     expect(next.player.money).toBe(preview.player.money);
     expect(next.player.money).toBe(state.player.money + 2.5 + 1 - 1);
-    expect(next.advisorProgressState.funding).toBe(state.advisorProgressState.funding - payroll.total);
+    expect(next.advisorProgressState.funding).toBe(state.advisorProgressState.funding - payroll.advisorCost);
   });
 });

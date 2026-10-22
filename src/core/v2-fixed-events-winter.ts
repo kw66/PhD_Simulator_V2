@@ -1,4 +1,5 @@
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
+import { randomOutcome } from "./v2-event-choice-random";
 import { formatAttributeDetail, roundAttribute } from "./v2-attribute-format";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
@@ -70,6 +71,7 @@ function createWinterVacationPlanEvent(state: GameState): PendingEvent {
       {
         id: `winter-vacation-rest-y${state.year}-m${state.month}`,
         label: "好好休息",
+        ...randomOutcome(),
         outcome: "好好休息。",
         effects: {
           fixedEventResolution: { kind: "winter-vacation-rest" },

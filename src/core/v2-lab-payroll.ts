@@ -6,6 +6,7 @@ import { roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { getCalendarForTotalMonths } from "./v2-progression";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { GameState } from "./v2-types";
 
 export function getLabMonthlySalaryTotal(state: GameState): number {
@@ -23,12 +24,18 @@ export function getLabPayroll(state: GameState) {
       && state.totalMonths > profile.startTotalMonths
       ? getAdvisorSalaryPayment(state.advisorProgressState, profile.degree ?? "master").payment : 0,
   }));
-  return { player, fellows, total: roundMoney(player.payment + fellows.reduce((sum, payment) => sum + payment.payment, 0)) };
+  const total = roundMoney(player.payment + fellows.reduce((sum, payment) => sum + payment.payment, 0));
+  // Schools contribute fixed stipends; all remaining wages and bonuses are lab expenses.
+  const schoolContribution = usesGameplayRulesFrom("20261022-r26")
+    ? roundMoney((player.payment > 0 ? (state.degree === "phd" ? 1 : 0.5) : 0)
+      + fellows.reduce((sum, payment, index) => sum + (payment.payment > 0
+        ? (state.fellowProgressState[index]!.degree === "phd" ? 1 : 0.5) : 0), 0)) : 0;
+  return { player, fellows, total, schoolContribution, advisorCost: roundMoney(total - schoolContribution) };
 }
 
 export function getNextMonthLabPayroll(state: GameState): ReturnType<typeof getLabPayroll> {
   if (state.phase !== "playing" || state.totalMonths >= state.maxMonths) {
-    return { player: { payment: 0 }, fellows: [], total: 0 };
+    return { player: { payment: 0 }, fellows: [], total: 0, schoolContribution: 0, advisorCost: 0 };
   }
   const totalMonths = state.totalMonths + 1;
   const calendar = getCalendarForTotalMonths(totalMonths, state.degree);
@@ -47,11 +54,11 @@ export function settleLabPayroll(state: GameState): GameState {
   }
   return recordLabFinance({ ...paidState,
     advisorProgressState: { ...state.advisorProgressState,
-      funding: roundMoney(state.advisorProgressState.funding - payroll.total) },
+      funding: roundMoney(state.advisorProgressState.funding - payroll.advisorCost) },
     fellowProgressState: state.fellowProgressState.map((profile) => {
       const payment = payroll.fellows.find((entry) => entry.id === profile.id)!;
       return { ...profile,
         monthlySalaryPaid: payment.payment, lastSalaryTotalMonths: state.totalMonths };
     }),
-  }, "student-wages", -payroll.total);
+  }, "student-wages", -payroll.advisorCost);
 }

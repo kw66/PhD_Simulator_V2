@@ -71,7 +71,7 @@ describe("fellow research lifecycle", () => {
     expect(state.externalPublications.filter((paper) => paper.id === paperId)).toHaveLength(1);
     expect(state.totalResearchScore).toBe(0);
   });
-  it("retains the person's direction and heat across acceptance, new titles and calendar years", () => {
+  it("retains the person's direction but uses annual heat for new papers, preserving existing papers", () => {
     let state = replacePaper(makeState(), { idea: 100, experiment: 100, writing: 100 });
     const profile = state.fellowProgressState[0]!;
     const first = state.fellowPapers![0]!;
@@ -79,7 +79,9 @@ describe("fellow research lifecycle", () => {
     state = { ...state, fellowPapers: [{ ...prepareConferenceSubmission(first, "A", 1, 1), reviewMonthsLeft: 1 }] };
     const next = advanceFellowResearch({ ...state, totalMonths: 36, year: 3, month: 12 }, () => 0.8);
     const draft = getFellowCurrentPaper(next, profile.id)!;
-    expect(draft).toMatchObject(profile.researchTopic!);
+    expect(draft).toMatchObject({ topicId: first.topicId, topicLabel: first.topicLabel });
+    expect(draft.heatMultiplier).toBeGreaterThan(first.heatMultiplier);
+    expect(draft.prepublicationDecayRate).toBeCloseTo(draft.heatMultiplier * .1);
     expect(draft.title).not.toBe(first.title);
     expect(draft.id).not.toBe(first.id);
     expect(next.fellowProgressState[0]!.researchTopic).toEqual(profile.researchTopic);

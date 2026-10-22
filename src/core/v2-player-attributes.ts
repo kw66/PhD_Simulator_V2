@@ -5,6 +5,7 @@ import { getResearchCap } from "./v2-research-cap-system";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
 import { getRoleTalentLevel, type AttributeChangeSource, type PlayerAttribute } from "./v2-role-talent-state";
 import type { GameState } from "./v2-types";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { applyRoleAttributeReactions, ensureResearchCurseBroken } from "./v2-role-talent-reactions";
 
 const round = (value: number): number => Number(value.toFixed(10));
@@ -68,7 +69,7 @@ export function previewPlayerAttributeChange(
   }
   const replacement = stat === "favor" ? "gold-power-beta" : stat === "social" ? "gold-power-gamma" : null;
   const quotedMoney = roundMoney(Math.abs(effectiveChange) * 2);
-  const moneyCost = source === "ordinary" && effectiveChange < 0 && replacement !== null
+  const moneyCost = !usesGameplayRulesFrom("20261022-r25") && source === "ordinary" && effectiveChange < 0 && replacement !== null
     && state.selectedRoleId === "rich" && getRoleTalentLevel(state, replacement) > 0
     && state.player.money >= 50 && state.player.money >= quotedMoney ? quotedMoney : 0;
   if (moneyCost > 0) effectiveChange = 0;

@@ -1,3 +1,4 @@
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getEventChoiceRisk, getEventChoiceRiskDetails, getEventChoiceRiskExplanation } from "../src/core/v2-event-choice-risk";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
@@ -349,7 +350,7 @@ describe("event choice immediate ending risk", () => {
     }
   });
 
-  it.each(["eligible", "already-awarded", "disqualified"] as const)("uses only payable scholarship money for gold replacement: %s", eligibility => {
+  it.each(["eligible", "already-awarded", "disqualified"] as const)("uses only payable scholarship money for legacy gold replacement: %s", eligibility => withGameplayRuleset("20261022-r24", () => {
     const current = state();
     current.selectedRoleId = "rich";
     current.month = 2;
@@ -379,7 +380,7 @@ describe("event choice immediate ending risk", () => {
     expect(settled.player.san).toBe(expected ? -2 : 0);
     expect(settled.player.money).toBe(expected ? 44 : 48);
     expect(settled.phase).toBe(expected ? "finished" : "playing");
-  });
+  }));
 
   it("keeps state and event unchanged and never consumes RNG across repeated calls", () => {
     const current = state();

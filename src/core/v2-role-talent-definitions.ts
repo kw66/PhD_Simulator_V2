@@ -1,4 +1,5 @@
 import type { RoleId } from "./v2-types";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { MAX_ROLE_LEVEL, ROLE_INITIAL_TALENT_POINTS, ROLE_TALENT_POINTS_PER_LEVEL } from "./v2-role-experience";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-project-constants";
 
@@ -21,29 +22,28 @@ export interface DesignedTalentNode {
 }
 
 export const NORMAL_TALENT_NODES = [
-  { id: "first-month-drive", name: "满怀干劲", icon: "heart-plus", tier: 0, column: "1", row: "1 / 4", maxLevel: 3, cost: 1, effect: "首月结束后，下月初SAN回复+2/级", prerequisiteIds: [] },
-  { id: "self-determination", name: "我命由我", icon: "sunrise", tier: 1, column: "2", row: "1", maxLevel: 12, cost: 1, effect: "转博时科研、社交、导师好感提升10%/级，受档位抵抗", prerequisiteIds: ["first-month-drive"] },
+  { id: "first-month-drive", name: "满怀干劲", icon: "heart-plus", tier: 0, column: "1", row: "1 / 4", maxLevel: 1, cost: 2, effect: "首月结束后，下月初SAN回复+5（仅一次）", prerequisiteIds: [] },
+  { id: "self-determination", name: "我命由我", icon: "sunrise", tier: 1, column: "2", row: "1", maxLevel: 10, cost: 1, effect: "转博时科研、社交、导师好感提升10%/级，受档位抵抗", prerequisiteIds: ["first-month-drive"] },
   { id: "diligence", name: "勤能补拙", icon: "footprints", tier: 1, column: "2", row: "2", maxLevel: 10, cost: 1, effect: "转博后每月行动+0.1次/级，余数逐月累积", prerequisiteIds: ["first-month-drive"] },
   { id: "first-month-drive-plus", name: "满怀干劲+", icon: "zap", tier: 1, column: "2", row: "3", maxLevel: 5, cost: 1, effect: "除入学以外，每学期初SAN回复+1/级", prerequisiteIds: ["first-month-drive"] },
   { id: "breakthrough", name: "突破极限", icon: "rocket", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 2, effect: "每笔属性奖励溢出时上限+1，本次溢出可填入新增上限，累计不限", prerequisiteIds: ["self-determination"] },
   { id: "burning-life-alpha", name: "燃烧生命α", icon: "heart-crack", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 3, effect: "转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限", prerequisiteIds: ["diligence"] },
   { id: "burning-life-beta", name: "燃烧生命β", icon: "heart-pulse", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 2, effect: "转博后每月SAN不足时，免除1次SAN消耗，消耗1点SAN上限", prerequisiteIds: ["first-month-drive-plus"] },
-  { id: "burnout", name: "触底反弹", icon: "flame", tier: 3, column: "4", row: "2 / 4", maxLevel: 1, cost: 3, effect: "每月初SAN上限低于8时，SAN上限+1", prerequisiteIds: ["burning-life-alpha", "burning-life-beta"] },
+  { id: "burnout", name: "触底反弹", icon: "flame", tier: 3, column: "4", row: "2 / 4", maxLevel: 2, cost: 1, effect: "每月初SAN上限低于8时，SAN上限+1/级", prerequisiteIds: ["burning-life-alpha", "burning-life-beta"] },
   { id: "epiphany", name: "厚积薄发", icon: "sparkles", tier: 3, column: "4", row: "1", maxLevel: 2, cost: 3, effect: "转博后每年科研、社交、导师好感+1/级", prerequisiteIds: ["breakthrough"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const RICH_TALENT_NODES = [
   { id: "red-envelope", name: "红包拿来", icon: "gift", tier: 0, column: "1", row: "1", maxLevel: 4, cost: 1, effect: "寒假事件中压岁钱+1/级", prerequisiteIds: [] },
   { id: "heiress", name: "千金小姐", icon: "wallet", tier: 0, column: "1", row: "3", maxLevel: 4, cost: 1, effect: "初始金币+2/级", prerequisiteIds: [] },
-  { id: "bring-funding", name: "带资进组", icon: "hand-coins", tier: 1, column: "2", row: "2", maxLevel: 4, cost: 1, effect: "导师科研经费+15/级", prerequisiteIds: ["red-envelope", "heiress"] },
+  { id: "bring-funding", name: "带资进组", icon: "hand-coins", tier: 0, column: "1", row: "2", maxLevel: 5, cost: 1, effect: "导师科研经费+20/级", prerequisiteIds: [] },
   // Preview rule for later activation: both transfer bonuses use the pre-transfer state, so paper rewards do not compound the coin bonus.
   { id: "wealth-growth", name: "财富倍增", icon: "trending-up", tier: 1, column: "2", row: "1", maxLevel: 8, cost: 1, effect: "转博时金币增加25%/级", prerequisiteIds: ["red-envelope"] },
-  { id: "knowledge-is-wealth", name: "书中自有黄金屋", icon: "book-open", tier: 1, column: "2", row: "3", maxLevel: 5, cost: 2, effect: "转博时每篇一作论文奖励1金币/级", prerequisiteIds: ["heiress"] },
+  { id: "knowledge-is-wealth", name: "书中自有黄金屋α", icon: "book-open", tier: 1, column: "2", row: "3", maxLevel: 5, cost: 1, effect: "转博时每篇一作论文奖励1金币/级", prerequisiteIds: ["heiress"] },
+  { id: "knowledge-is-wealth-beta", name: "书中自有黄金屋β", icon: "users", tier: 1, column: "2", row: "2", maxLevel: 5, cost: 1, effect: "转博时每篇合作论文奖励1金币/级", prerequisiteIds: ["bring-funding"] },
   { id: "investment-savvy", name: "理财能手", icon: "piggy-bank", tier: 2, column: "3", row: "1", maxLevel: 2, cost: 3, effect: "每笔投资5金币，12个月后利息+1/级，可同时多笔", prerequisiteIds: ["wealth-growth"] },
   { id: "work-pays-off", name: "薪满意足", icon: "briefcase-business", tier: 2, column: "3", row: "3", maxLevel: 2, cost: 3, effect: "实习收入+50%/级", prerequisiteIds: ["knowledge-is-wealth"] },
-  { id: "gold-power-alpha", name: "金之力α", icon: "circle-dollar-sign", tier: 3, column: "4", row: "3", maxLevel: 1, cost: 2, effect: "金币达到50时，每点SAN消耗转为1金币", prerequisiteIds: ["work-pays-off"] },
-  { id: "gold-power-beta", name: "金之力β", icon: "badge-dollar-sign", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "金币达到50时，导师好感降低转为金币-2/级", prerequisiteIds: ["bring-funding"] },
-  { id: "gold-power-gamma", name: "金之力γ", icon: "coins", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 2, effect: "金币达到50时，社交能力降低转为金币-2/级", prerequisiteIds: ["investment-savvy"] },
+  { id: "gold-power-alpha", name: "金之力", icon: "circle-dollar-sign", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "开启后，每点SAN消耗转为金币-1；可在金币旁切换", prerequisiteIds: ["work-pays-off", "investment-savvy"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const GENIUS_TALENT_NODES = [
@@ -134,7 +134,7 @@ export const RICH_REVERSED_TALENT_NODES = [
   { id: "spend-to-break-curse", name: "破财消灾", icon: "shield-plus", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 3, effect: "每消耗100金币，金钱诅咒重置值+1", prerequisiteIds: ["money-growth"] },
   { id: "post-phd-money-conversion", name: "钱能通神", icon: "circle-dollar-sign", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 2, effect: "转博后每枚金币消耗随机转化提升SAN、三项属性及三项属性上限", prerequisiteIds: ["money-growth", "loss-to-money"] },
   { id: "finance-master", name: "理财能手", icon: "piggy-bank", tier: 2, column: "3", row: "2", maxLevel: 3, cost: 2, effect: "每笔投资5金币，12个月后利息+1/级，可同时多笔", prerequisiteIds: ["post-phd-money-conversion"] },
-  { id: "coin-game", name: "金币游戏", icon: "coins", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 3, effect: "每次属性减少1点，进行一次判定：50%金币×1.5，50%金币×0.4", prerequisiteIds: ["loss-to-money"] },
+  { id: "coin-game", name: "金币游戏", icon: "coins", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 3, effect: "三项属性每减少1点，投入至多5金币：50%返还1.5倍，50%返还0.4倍；亏损不计消费", prerequisiteIds: ["loss-to-money"] },
   { id: "investment-acceleration", name: "快速周转", icon: "clock-3", tier: 3, column: "4", row: "2", maxLevel: 6, cost: 1, effect: "投资回报周期-1个月/级", prerequisiteIds: ["finance-master"] },
   { id: "coin-game-comeback", name: "败局翻盘", icon: "rotate-ccw", tier: 2, column: "3", row: "3", maxLevel: 5, cost: 1, effect: "金币游戏失败后的倍率+0.05/级", prerequisiteIds: ["coin-game"] },
 ] as const satisfies readonly DesignedTalentNode[];
@@ -228,6 +228,30 @@ const ROLE_TALENT_NODES = {
 } as const;
 
 export function getDesignedTalentNodes(roleId: RoleId): readonly DesignedTalentNode[] | null {
+  if (roleId === "rich" && !usesGameplayRulesFrom("20261022-r25")) {
+    const nodes: readonly DesignedTalentNode[] = [...RICH_TALENT_NODES.filter(node => node.id !== "knowledge-is-wealth-beta"),
+      { id: "gold-power-beta", name: "金之力β", icon: "badge-dollar-sign", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "金币达到50时，导师好感降低转为金币-2", prerequisiteIds: ["bring-funding"] },
+      { id: "gold-power-gamma", name: "金之力γ", icon: "coins", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 2, effect: "金币达到50时，社交能力降低转为金币-2", prerequisiteIds: ["investment-savvy"] },
+    ];
+    return nodes.map(node => {
+      if (node.id === "bring-funding") return { ...node, tier: 1, column: "2", row: "2", prerequisiteIds: ["red-envelope", "heiress"], ...(!usesGameplayRulesFrom("20261022-r24") ? { maxLevel: 4, effect: "导师科研经费+15/级" } : {}) };
+      if (node.id === "knowledge-is-wealth") return { ...node, name: "书中自有黄金屋", maxLevel: usesGameplayRulesFrom("20261022-r24") ? 6 : 5, cost: usesGameplayRulesFrom("20261022-r24") ? 1 : 2, effect: "转博时每篇一作论文奖励1金币/级" };
+      if (node.id === "gold-power-alpha") return { ...node, row: "3", prerequisiteIds: ["work-pays-off"], name: "金之力α", effect: "金币达到50时，每点SAN消耗转为金币-1" };
+      return node;
+    });
+  }
+  if (roleId === "rich" && !usesGameplayRulesFrom("20261022-r26")) {
+    return RICH_TALENT_NODES.map(node => node.id === "gold-power-alpha"
+      ? { ...node, row: "3", prerequisiteIds: ["work-pays-off"] } : node);
+  }
+  if (roleId === "normal" && !usesGameplayRulesFrom("20261022-r22")) {
+    return NORMAL_TALENT_NODES.map(node => {
+      if (node.id === "first-month-drive") return { ...node, maxLevel: 3, cost: 1, effect: "首月结束后，下月初SAN回复+2/级" };
+      if (node.id === "self-determination") return { ...node, maxLevel: 12 };
+      if (node.id === "burnout") return { ...node, maxLevel: 1, cost: 3, effect: "每月初SAN上限低于8时，SAN上限+1" };
+      return node;
+    });
+  }
   return ROLE_TALENT_NODES[roleId as keyof typeof ROLE_TALENT_NODES] ?? null;
 }
 

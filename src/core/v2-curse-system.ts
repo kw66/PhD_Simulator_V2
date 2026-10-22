@@ -62,6 +62,14 @@ export function settleCurseMonthStart(state: GameState, writeLog = true): GameSt
   return next;
 }
 
+/** Cash uses cents; even the smallest positive interest remainder needs one cent. */
+export function getCurseDebtPayoffAmount(debt: number): number {
+  if (!(debt > 0)) return 0;
+  const [whole, fraction = ""] = debt.toFixed(10).split(".");
+  const cents = Number(whole) * 100 + Number(fraction.slice(0, 2)) + (/[1-9]/.test(fraction.slice(2)) ? 1 : 0);
+  return Math.max(0.01, cents / 100);
+}
+
 /** Missing amount means repay as much as available. This does not use an action. */
 export function repayCurseDebt(state: GameState, amount?: number): GameState {
   if (state.phase !== "playing" || state.selectedRoleId !== "cursed-debt" || !state.curseState) return state;
@@ -72,7 +80,9 @@ export function repayCurseDebt(state: GameState, amount?: number): GameState {
   const requested = amount === undefined ? available : Math.min(available, roundMoney(amount));
   if (!(requested > 0)) return pushNoOpLog(state, "金币不足，暂时无法还款。");
   const principal = Math.min(debt, requested);
-  const payment = Math.min(requested, Math.ceil(Number(principal.toFixed(10)) * 100 - 1e-8) / 100);
+  const payment = Math.min(requested, usesGameplayRulesFrom("20261022-r17")
+    ? getCurseDebtPayoffAmount(principal)
+    : Math.ceil(Number(principal.toFixed(10)) * 100 - 1e-8) / 100);
   const remaining = Number(Math.max(0, debt - payment).toFixed(10));
   return pushLog(recordPersonalSpending({ ...state,
     curseState: { ...state.curseState, debt: remaining },

@@ -6,6 +6,8 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { getRoleOptions } from "../src/core/v2-progression";
 import { isRoleTalentImplemented } from "../src/core/v2-role-talent-definitions";
 import { DATA_EPOCH_STARTED_AT } from "../src/core/v2-data-epoch";
+import { saveRoleTalentAllocation } from "../src/core/v2-role-talent-storage";
+import { captureReplayRecording, verifyReplayRecording } from "../src/core/v2-local-replay";
 import type { RoleId } from "../src/core/v2-types";
 
 function storage() {
@@ -13,12 +15,14 @@ function storage() {
   return { values, getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); } };
 }
-async function fixture(roleId: RoleId = "normal", seed?: number) {
+async function fixture(roleId: RoleId = "normal", seed?: number, allocation?: Record<string, number>) {
   const disk = createMemoryRunSaveAdapter();
   const local = storage();
   const account = createDefaultAccountProfile();
   account.roleProgress[roleId].unlocked = true;
+  if (allocation) account.talentAllocation = { [roleId]: allocation };
   saveAccountProfile(account, local);
+  if (allocation) saveRoleTalentAllocation(account, local);
   const saves = createRunSaveRepository({ storage: local, adapter: disk });
   const store = createStore({ storage: local, saves });
   await store.ready();
@@ -35,6 +39,29 @@ function enroll(store: ReturnType<typeof createStore>) {
 }
 
 describe("monthly browser operation replay", () => {
+  it("saves and replays the gold switch without changing its allocation or disqualifying the run", async () => {
+    const allocation = { heiress: 1, "knowledge-is-wealth": 1, "work-pays-off": 1, "gold-power-alpha": 1 };
+    const { store, disk, local } = await fixture("rich", 31022, allocation);
+    enroll(store);
+    store.dispatch("toggle-gold-power");
+    expect(store.getState().roleTalents?.goldPowerEnabled).toBe(true);
+    await store.flushSaves();
+    const saves = createRunSaveRepository({ storage: local, adapter: disk });
+    const restored = createStore({ storage: local, saves });
+    await restored.ready();
+    restored.dispatch("start-game", { roleId: "rich" });
+    expect(restored.getState().roleTalents).toMatchObject({ levels: allocation, goldPowerEnabled: true });
+    expect(restored.isCurrentRunDisqualified()).toBe(false);
+    restored.dispatch("toggle-gold-power");
+    expect(restored.getState().roleTalents?.goldPowerEnabled).toBe(false);
+    restored.dispatch("quit-game");
+    expect(restored.getReplayStatus().failed).toBeUndefined();
+    const replay = saves.get("rich")!.replay!;
+    const recording = captureReplayRecording(replay, restored.getState());
+    const played = await verifyReplayRecording(recording);
+    expect(played.roleTalents?.goldPowerEnabled).toBe(false);
+    expect(played.player).toEqual(restored.getState().player);
+  });
   it("replays a full academic year of ordinary events, shopping, research and reloads", async () => {
     // A reproducible route tests replay fidelity without randomly selecting an
     // event that requires a different strategy from this scripted playthrough.

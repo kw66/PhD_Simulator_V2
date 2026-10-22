@@ -1,3 +1,4 @@
+import { randomOutcome } from "./v2-event-choice-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import {
@@ -47,6 +48,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
     choices: [
       {
         id: `random-6-deep-${serial}`,
+        ...randomOutcome(),
         label: "认真准备",
         outcome: advisorPresentForPrepared
           ? `导师到场（${attendancePercent}%）｜${preparedSanSummary}；${formatTierResistedOutcome("导师好感", 1, preparedFavorResult)}`
@@ -57,6 +59,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
       },
       {
         id: `random-6-series-${serial}`,
+        ...randomOutcome(),
         label: "讲系列论文",
         outcome: advisorPresentForSeries
           ? `导师到场（${attendancePercent}%）｜${seriesSanSummary}；${formatTierResistedOutcome("科研", 1, researchResult)}；${formatTierResistedOutcome("导师好感", 1, seriesFavorResult)}`
@@ -67,6 +70,7 @@ export function createAdvisorMeetingRandomEvent(state: GameState, getRoll: Rando
       },
       {
         id: `random-6-slack-${serial}`,
+        ...randomOutcome(),
         label: "随便水一下",
         outcome: advisorPresentForSlack
           ? `导师到场（${attendancePercent}%）｜${formatTierResistedOutcome("导师好感", -1, slackFavorResult)}`
