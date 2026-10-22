@@ -69,6 +69,12 @@ export function getThesisAdvanceGain(state: GameState): number {
   return usesGameplayRulesFrom("20261022-r15") ? roundAttribute(research) : Math.floor(research);
 }
 
+/** Lowest score possible across all legal blind-review weight allocations. */
+export function getGuaranteedThesisScore(degree: Degree, scores: readonly number[]): number {
+  return Math.round((degree === "phd" ? 0.8 : 1.2) * scores.reduce((sum, score) => sum + score, 0)
+    + 0.6 * Math.min(...scores));
+}
+
 export interface ThesisForecast {
   degree: Degree;
   stage: "planning" | "writing" | "frozen";
@@ -240,12 +246,8 @@ export function getThesisForecast(state: GameState): ThesisForecast | null {
       : Math.max(0, 7 - state.month + Number(point.lastAdvancedTotalMonths !== state.totalMonths));
     return { ...point, remainingAdvances, projectedScore: roundAttribute(point.score + remainingAdvances * advanceGain) };
   });
-  const guaranteedScore = (scores: number[]): number => Math.round(
-    (state.degree === "phd" ? 0.8 : 1.2) * scores.reduce((sum, score) => sum + score, 0)
-      + 0.6 * Math.min(...scores),
-  );
-  const currentGuaranteedScore = guaranteedScore(points.map(point => point.score));
-  const projectedGuaranteedScore = guaranteedScore(points.map(point => point.projectedScore));
+  const currentGuaranteedScore = getGuaranteedThesisScore(state.degree, points.map(point => point.score));
+  const projectedGuaranteedScore = getGuaranteedThesisScore(state.degree, points.map(point => point.projectedScore));
   const threshold = getThesisReviewThresholds(state.degree).B;
   return {
     degree: state.degree, stage, topicId: thesis?.topicId ?? supports[0]?.topicId ?? null,

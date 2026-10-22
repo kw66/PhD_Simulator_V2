@@ -6954,6 +6954,23 @@ button[data-card-icon-action]:focus-visible {
   outline-offset: 2px;
 }
 
+.workstation-section .paper-draft-action-btn.is-reroll[data-card-icon-action] {
+  width: auto;
+  min-width: 0;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-inline: 4px;
+  font-size: var(--workstation-font-small);
+  white-space: nowrap;
+}
+
+.paper-draft-action-btn.is-reroll > [aria-hidden] {
+  font-size: 0.95rem;
+}
+
 .paper-published-summary {
   display: flex;
   align-items: center;

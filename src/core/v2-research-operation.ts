@@ -16,6 +16,8 @@ import { recordPersonalSpending, roundMoney } from "./v2-money";
 import type { GameState, PaperActionType } from "./v2-types";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { captureResearchContext } from "./v2-paper-diagnostics";
+import { getPreferredPaperTopicId } from "./v2-player-paper-topic";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export const RESEARCH_OPERATION_SAN_COST: Record<PaperActionType, number> = {
   idea: 2,
@@ -118,12 +120,14 @@ export function createResearchPaper(state: GameState, slotIndex: number): GameSt
   ]);
   let sequence = 1;
   while (existingPaperIds.has(`paper-${state.totalMonths}-${sequence}`)) sequence += 1;
+  const preferredTopicId = usesGameplayRulesFrom("20261022-r16") ? getPreferredPaperTopicId(state) : undefined;
   const paper = {
     ...createDraftPaper(
       state.totalMonths,
       sequence - 1,
       gameRandom,
       getAcademicCalendarYear(state.year, state.month),
+      preferredTopicId ? { topicId: preferredTopicId } : undefined,
     ),
     paperSlotIndex: slotIndex,
   };

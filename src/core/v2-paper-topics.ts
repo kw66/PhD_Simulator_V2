@@ -466,7 +466,7 @@ export function getPaperHeatTierLabel(heatMultiplier: number): string {
 export function generatePaperTopic(
   calendarYear: number,
   random: () => number = gameRandom,
-  fixedTopic?: FixedPaperTopic,
+  fixedTopic?: Pick<FixedPaperTopic, "topicId"> & Partial<FixedPaperTopic>,
 ): GeneratedPaperTopic {
   const heatMultiplier = fixedTopic?.heatMultiplier ?? pick(PAPER_HEAT_MULTIPLIERS, random);
   const prepublicationDecayRate = Number((heatMultiplier * 0.1).toFixed(3));

@@ -2789,13 +2789,14 @@ describe("v2 render lobby shell", () => {
     expect(emptySlotHtml).toContain(">入门</span>");
     expect(slotHtml).toContain('class="paper-title-meta-row"');
     expect(slotHtml).not.toContain('class="paper-empty-action"');
-    expect(slotHtml).toContain('aria-label="换个选题"');
-    expect(slotHtml).toContain('<span aria-hidden="true">🎲</span></button>');
-    expect(slotHtml).not.toContain(">换个选题</button>");
+    expect(slotHtml).toContain('aria-label="换选题"');
+    expect(slotHtml).toContain('<span aria-hidden="true">🎲</span><span>换选题</span></button>');
+    expect(slotHtml).toContain("热度越高，引用倍率越高，发表前分数衰减越快");
+    expect(slotHtml).toContain("硕士2篇、博士3篇");
     expect(slotHtml).toContain('aria-label="丢弃论文"');
     expect(slotHtml).toContain('<span aria-hidden="true">🗑️</span></button>');
     expect(slotHtml).not.toContain(">丢弃</button>");
-    expect(slotHtml).toContain('title="论文已有进度，不能更换选题"');
+    expect(slotHtml).toContain('data-tooltip="论文已有进度，不能更换选题。');
     expect(slotHtml).toContain(`data-action="discard-paper" data-paper-id="${firstPaper.id}"`);
 
     const zeroProgressPaper = { ...firstPaper, idea: 0, experiment: 0, writing: 0 };

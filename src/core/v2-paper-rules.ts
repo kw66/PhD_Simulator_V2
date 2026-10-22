@@ -117,7 +117,7 @@ export function createDraftPaper(
   existingPaperCount: number,
   random: () => number = gameRandom,
   calendarYear = 2023,
-  fixedTopic?: FixedPaperTopic,
+  fixedTopic?: Pick<FixedPaperTopic, "topicId"> & Partial<FixedPaperTopic>,
 ): Paper {
   const topic = generatePaperTopic(calendarYear, random, fixedTopic);
   return {

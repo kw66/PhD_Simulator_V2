@@ -1472,6 +1472,7 @@ function renderPaperSelectionToggle(paper: Paper, selected: boolean, label: stri
 }
 
 function renderPaperDraftActions(paper: Paper, canReroll: boolean): string {
+  const topicHint = `${canReroll ? "重新抽取选题及当年热度。" : "论文已有进度，不能更换选题。"}热度越高，引用倍率越高，发表前分数衰减越快。毕业论文由同方向的一作论文支撑：硕士2篇、博士3篇；不足的研究点从0开始推进。`;
   return `
     <div class="paper-card-header-actions paper-draft-actions">
       <button
@@ -1481,9 +1482,11 @@ function renderPaperDraftActions(paper: Paper, canReroll: boolean): string {
         ${canReroll
           ? `data-action="reroll-paper-topic" data-paper-id="${escapeHtml(paper.id)}"`
           : 'disabled aria-disabled="true"'}
-        aria-label="换个选题"
-        title="${canReroll ? "换个选题" : "论文已有进度，不能更换选题"}"
-      ><span aria-hidden="true">🎲</span></button>
+        aria-label="换选题"
+        data-card-tooltip
+        data-tooltip="${escapeHtml(topicHint)}"
+        aria-description="${escapeHtml(topicHint)}"
+      ><span aria-hidden="true">🎲</span><span>换选题</span></button>
       <button class="paper-draft-action-btn is-discard" data-card-icon-action type="button" aria-label="丢弃论文" title="丢弃论文" data-action="discard-paper" data-paper-id="${escapeHtml(paper.id)}"><span aria-hidden="true">🗑️</span></button>
     </div>
   `;

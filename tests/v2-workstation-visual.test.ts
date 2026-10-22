@@ -312,6 +312,40 @@ describe("workstation visual layout through real bootstrap", () => {
     } finally { await page.close(); }
   }, 60_000);
 
+  it("fits the labelled topic action and explains heat and thesis support", async () => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1080 }, reducedMotion: "reduce" });
+    try {
+      await openWorkstation(page);
+      await page.evaluate(() => {
+        const store = (window as WorkstationWindow).workstationVisualStore;
+        const paper = store.getState().papers[0]!;
+        Object.assign(paper, { idea: 0, experiment: 0, writing: 0, collaborationScores: { idea: 0, experiment: 0, writing: 0 } });
+        store.dispatch("set-date-display-mode", { dateDisplayMode: "academic" });
+      });
+      for (const width of [1440, 390, 320]) {
+        await page.setViewportSize({ width, height: width <= 390 ? 844 : 1080 });
+        await settleLayout(page);
+        const card = page.locator('[data-paper-slot-index="0"].paper-slot-card');
+        const button = card.getByRole("button", { name: "换选题", exact: true });
+        expect(await button.textContent()).toBe("🎲换选题");
+        const bounds = await card.evaluate(element => {
+          const cardBounds = element.getBoundingClientRect();
+          const actions = element.querySelector(".paper-draft-actions")!.getBoundingClientRect();
+          const main = element.querySelector(".paper-card-header-main")!.getBoundingClientRect();
+          return { overflow: element.scrollWidth - element.clientWidth,
+            actionsContained: actions.right <= cardBounds.right + 1 && actions.left >= main.right - 1 };
+        });
+        expect(bounds.overflow, `${width}px card overflow`).toBeLessThanOrEqual(1);
+        expect(bounds.actionsContained, `${width}px topic action containment`).toBe(true);
+        await button.hover();
+        await expect.poll(() => page.locator("#relationship-tooltip").textContent()).toContain("热度越高");
+        expect(await page.locator("#relationship-tooltip").textContent()).toContain("硕士2篇、博士3篇");
+        await page.screenshot({ path: `artifacts/workstation-visual/topic-action-${width}.png` });
+        await page.keyboard.press("Escape");
+      }
+    } finally { await page.close(); }
+  }, 45_000);
+
   it("removes shared icon underlines on hover while preserving keyboard focus", async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1080 }, reducedMotion: "reduce" });
     try {
