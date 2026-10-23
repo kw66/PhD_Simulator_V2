@@ -2,6 +2,7 @@ import { getActiveGameRandomState, withGameRandomPreview } from "./v2-game-rando
 import { getCurrentEvent } from "./v2-event-queue";
 import { assignAvailableContinuationId } from "./v2-engine-event-resolution-followups";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { hasRandomOutcome } from "./v2-event-choice-random";
 import type { DispatchPayload, EventQueueItem, GameState, PendingEvent } from "./v2-types";
 
 /** Only event metadata is retained: gameplay rewards remain deferred until confirmation. */
@@ -53,7 +54,7 @@ export function canRewindPendingEvent(state: GameState, event: EventQueueItem, t
   if (usesGameplayRulesFrom("20261022-r21") && (
     targetIndex < (context?.barrierHistoryIndex ?? 0)
     || event.history?.slice(targetIndex).some(stage =>
-      stage.choices.find(choice => choice.id === stage.selectedChoiceId)?.outcomeRandom)
+      hasRandomOutcome(stage.choices.find(choice => choice.id === stage.selectedChoiceId)))
   )) return false;
   const scene = event.history?.[targetIndex]?.replayEvent;
   return !!context && (usesGameplayRulesFrom("20261019-r10") || context.totalMonths === state.totalMonths) && !!scene

@@ -32,6 +32,13 @@ function randomDecision(id: number, state = ready(), roll = 0): PendingEvent {
 }
 
 describe("event choice probability classification", () => {
+  it("permits vertical project rewind while preserving the recorded r46 classification", () => {
+    expect(randomDecision(4).choices.find(choice => choice.label === "接纵向项目")?.outcomeRandom).toBeUndefined();
+    withGameplayRuleset("20261023-r46", () => {
+      expect(randomDecision(4).choices.find(choice => choice.label === "接纵向项目")?.outcomeRandom).toBe(true);
+    });
+  });
+
   it("keeps probability mechanisms marked when talents or favor guarantee success", () => {
     const state: GameState = { ...ready(), selectedRoleId: "chosen", roleTalents: {
       levels: { "rare-color-fate": 1, "effortless-reinstall": 1 },

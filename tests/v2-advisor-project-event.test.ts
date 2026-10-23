@@ -9,6 +9,8 @@ import { applyChoiceEffectsToState } from "../src/core/v2-engine-event-resolutio
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createEventQueueItem, decrementEventQueueDeadlines } from "../src/core/v2-event-queue";
 import { settleLinearEvents } from "../src/core/v2-event-auto-resolution";
+import { canRewindPendingEvent } from "../src/core/v2-event-replay";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import { ensureFellowPapers } from "../src/core/v2-fellow-research";
 import * as labProjects from "../src/core/v2-lab-projects";
@@ -367,6 +369,45 @@ describe("advisor project SAN and attribute rules", () => {
 });
 
 describe("advisor project three-stage settlement", () => {
+  it.each([false, true])("rewinds vertical projects with stable guidance and a single final reward (saved r46 metadata: %s)", legacy => {
+    const state = makeState({ papers: [makePaper("first-paper"), makePaper("second-paper")] });
+    let rollIndex = 0;
+    const prepare = () => {
+      const event = makeEvent(state, () => [0.1, 0.5, 0.9][rollIndex++ % 3]!);
+      const decision = resolve(queueEvent(state, event));
+      return resolve(decision, decisionChoice(currentEvent(decision), "vertical").id);
+    };
+    const original = legacy ? withGameplayRuleset("20261023-r46", prepare) : prepare();
+    const expected = resolve(original);
+    let result = JSON.parse(JSON.stringify(original)) as GameState;
+    if (legacy) {
+      expect(currentEvent(result).history?.[1]?.choices.find(choice => choice.id.includes("-vertical-"))?.outcomeRandom).toBe(true);
+      withGameplayRuleset("20261023-r46", () => expect(canRewindPendingEvent(result, currentEvent(result), 1)).toBe(false));
+    }
+    const originalPreview = getResolvableQueuedEvent(result, currentEvent(result)).deferredStatePatch;
+    expect(originalPreview).toBeDefined();
+    const random = vi.spyOn(gameRandomSource, "gameRandom").mockReturnValue(0.999);
+    for (let repetition = 0; repetition < 2; repetition++) {
+      for (const index of [0, 1]) expect(canRewindPendingEvent(result, currentEvent(result), index)).toBe(true);
+      const back = dispatchAction(result, "replay-event", { eventId: currentEvent(result).id, eventHistoryIndex: 1 });
+      expect(currentEvent(back).stage).toBe("act2");
+      expect(settlementState(back)).toEqual(settlementState(state));
+      result = resolve(back, decisionChoice(currentEvent(back), "vertical").id);
+      expect(getResolvableQueuedEvent(result, currentEvent(result)).deferredStatePatch).toEqual(originalPreview);
+      random.mockReturnValue(0);
+    }
+    const back = dispatchAction(result, "replay-event", { eventId: currentEvent(result).id, eventHistoryIndex: 1 });
+    const horizontal = resolve(back, decisionChoice(currentEvent(back), "horizontal").id);
+    expect(settlementState(horizontal)).toEqual(settlementState(state));
+    const horizontalCompleted = resolve(horizontal);
+    expect(horizontalCompleted.advisorProgressState.playerProjectCompletions).toEqual({ horizontal: 1, vertical: 0 });
+    expect(horizontalCompleted.papers).toEqual(state.papers);
+    const completed = resolve(result);
+    expect(settlementState(completed)).toEqual(settlementState(expected));
+    expect(completed.advisorProgressState.playerProjectCompletions).toEqual({ horizontal: 0, vertical: 1 });
+    expect(completed.log.filter(entry => entry.text.startsWith("纵向项目完成："))).toHaveLength(1);
+  });
+
   it.each([
     { type: "horizontal" as const, effects: [/横向进度\s*\+\s*100/u, /SAN\s*-\s*8/u, /导师好感\s*\+\s*1/u] },
     { type: "vertical" as const, effects: [/纵向进度\s*\+\s*100/u, /SAN\s*-\s*6/u, /科研\s*\+\s*1/u] },

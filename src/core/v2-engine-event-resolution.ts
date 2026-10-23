@@ -1,6 +1,7 @@
 import { withGameRandomPreview } from "./v2-game-random";
 import { prepareEventReplay, withEventChoiceRandom } from "./v2-event-replay";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { hasRandomOutcome } from "./v2-event-choice-random";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import {
   pushLog,
@@ -614,7 +615,7 @@ export function applyQueuedEventEffects(
         replayContext: event.replayContext ?? resolvedEvent.replayContext,
         ...(resolvedEvent.rewinderReplay ? { rewinderReplay: {
           ...resolvedEvent.rewinderReplay,
-          ...(choice.outcomeRandom && usesGameplayRulesFrom("20261022-r21")
+          ...(hasRandomOutcome(choice) && usesGameplayRulesFrom("20261022-r21")
             ? { barrierHistoryIndex: resolvedEvent.history?.length ?? 0 } : {}),
         } } : {}),
       }),
@@ -671,7 +672,7 @@ export function applyQueuedEventEffects(
       thesisReviewPresentation: resolvedEvent.thesisReviewPresentation,
       rewinderPresentation: resolvedEvent.rewinderPresentation,
       choices: recordedEvent.choices.map(({ id, label, outcome, disabledReason, outcomeRandom }) => ({ id, label, outcome, disabledReason,
-        ...(outcomeRandom && usesGameplayRulesFrom("20261022-r21") ? { outcomeRandom: true } : {}),
+        ...(hasRandomOutcome({ id, outcomeRandom }) && usesGameplayRulesFrom("20261022-r21") ? { outcomeRandom: true } : {}),
       })),
       selectedChoiceId: choice.id,
       replayEvent: sceneSource,

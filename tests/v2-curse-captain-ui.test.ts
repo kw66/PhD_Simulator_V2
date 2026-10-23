@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { renderApp } from "../src/app/v2-render";
 import { renderCaptainTags } from "../src/app/v2-render-captain-tags";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
-import { createCaptainRunState } from "../src/core/v2-captain-state";
+import { createCaptainRunState, getCaptainLoverId } from "../src/core/v2-captain-state";
+import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
+import { createLoverProgressState } from "../src/core/v2-lover-progression";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { hasUnpaidCurseDebt } from "../src/core/v2-curse-system";
 import type { RoleId } from "../src/core/v2-types";
@@ -80,8 +82,47 @@ describe("curse and captain UI", () => {
     let state = enroll("research-captain");
     state = { ...state, captainState: { ...createCaptainRunState({ social: 10 }), tags: { advisor: "social" } } };
     const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "relationship" });
-    expect(html).toContain('class="rel-type rel-captain-tag">社交达人 Lv10</span>');
+    expect(html).toMatch(/class="rel-type rel-captain-tag"[^>]*data-relationship-tooltip[^>]*tabindex="0"[^>]*>社交达人 Lv10<\/span>/);
+    expect(html).toContain("导师效果：横向项目进度条上限−50。");
+    expect(html).toContain("团队加成按同标签成员人数叠加，不随等级增加。");
     expect(html).toMatch(/data-advisor-project="horizontal"[\s\S]*?aria-valuemax="50"/);
     expect(html).toContain("满50：");
+  });
+
+  it.each([
+    ["normal", "每月项目自动推进+3", "每月行动点+0.3", "各进度条上限−15"],
+    ["rich", "每月科研经费+2.4", "每月自身收入+1.2金币", "每月给予玩家1.2金币"],
+    ["genius", "每月科研积累+1.2", "科研能力及上限+3", "科研能力及上限+3"],
+    ["social", "横向项目进度条上限−15", "默契度及上限+3", "亲密度及上限+3"],
+    ["teacher-child", "纵向项目进度条上限−15", "受导师指导效果+60%", "协作玩家效果+60%"],
+    ["chosen", "挂名论文引用倍率+30%", "每月协作自动推进+0.3次", "每月自动推进+0.3次"],
+  ] as const)("explains %s for each relationship using the opening level snapshot", (tag, advisorEffect, fellowEffect, loverEffect) => {
+    const state = enroll("research-captain");
+    state.fellowProgressState = (["senior", "peer", "junior"] as const).map(type =>
+      createCustomFellowProgressProfile({ type, gender: "female", name: type, research: 8, affinity: 4, startTotalMonths: 1 }));
+    state.loverState = { ...state.loverState, active: true, name: "恋人", type: "smart", gender: "female", startTotalMonths: 1 };
+    state.loverProgressState = { ...createLoverProgressState("smart", () => 0.5), active: true };
+    state.relationshipState.loverCount = 1;
+    state.captainState = { ...createCaptainRunState({ [tag]: 3 }), tags: {
+      advisor: tag, [getCaptainLoverId(state)]: tag,
+      ...Object.fromEntries(state.fellowProgressState.map(profile => [profile.id, tag])),
+    } };
+    const account = createDefaultAccountProfile();
+    account.roleProgress[tag].level = 10;
+    const html = renderApp(state, account, { activePlayTab: "relationship" });
+    const badges = html.match(/<span class="rel-type rel-captain-tag"[^>]*>[\s\S]*?<\/span>/g)!;
+    expect(badges).toHaveLength(5);
+    expect(badges.filter(badge => badge.includes(`导师效果：${advisorEffect}。`))).toHaveLength(1);
+    expect(badges.filter(badge => badge.includes(`同学效果：${fellowEffect}。`))).toHaveLength(3);
+    expect(badges.filter(badge => badge.includes(`恋人效果：${loverEffect}。`))).toHaveLength(1);
+    for (const badge of badges) {
+      expect(badge).toContain("Lv3（本局开局等级）");
+      expect(badge).toContain("团队加成：");
+      expect(badge).toContain('data-relationship-tooltip');
+      expect(badge).toContain('tabindex="0"');
+      expect(badge).toContain('aria-description=');
+      expect(badge).not.toContain("Lv10");
+      expect(badge).not.toContain("/级");
+    }
   });
 });

@@ -3,7 +3,7 @@ import { CAPTAIN_PREREQUISITE_ROLE_IDS } from "../core/v2-account-role-unlocks";
 import { getRoleDefinition } from "../core/v2-progression";
 import { MAX_ROLE_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile } from "../core/v2-types";
-import type { CaptainRunState } from "../core/v2-captain-state";
+import type { CaptainRunState, CaptainTag } from "../core/v2-captain-state";
 
 const TAG_APPEARANCE = [
   { icon: "user-round", tone: "#6d9179" },
@@ -21,49 +21,65 @@ const TAG_APPEARANCE = [
 // Apply each tagged member's grant in sequence, reselecting the lowest each time; ties are random.
 // Chosen extra advances repeat fellow cooperation / lover monthly progress, never their whole month.
 // Advisor collaboration +5 is a fixed per-guidance bonus, not monthly permanent score growth.
+function tagAmount(amount: number, level?: number, unit = ""): string {
+  return `${Number((amount * (level ?? 1)).toFixed(10))}${unit}${level === undefined ? "/级" : ""}`;
+}
+
 const TAG_EFFECTS = {
   normal: {
-    lover: "各进度条上限−5/级",
-    advisor: "每月项目自动推进+1/级",
-    fellow: "每月行动点+0.1/级",
+    lover: (level?: number) => `各进度条上限−${tagAmount(5, level)}`,
+    advisor: (level?: number) => `每月项目自动推进+${tagAmount(1, level)}`,
+    fellow: (level?: number) => `每月行动点+${tagAmount(0.1, level)}`,
     additional: "使玩家SAN消耗−1",
   },
   rich: {
-    lover: "每月给予玩家0.4金币/级",
-    advisor: "每月科研经费+0.8/级",
-    fellow: "每月自身收入+0.4金币/级",
+    lover: (level?: number) => `每月给予玩家${tagAmount(0.4, level, "金币")}`,
+    advisor: (level?: number) => `每月科研经费+${tagAmount(0.8, level)}`,
+    fellow: (level?: number) => `每月自身收入+${tagAmount(0.4, level, "金币")}`,
     additional: "每月使金币最少的非富可敌国成员+5金币（玩家、导师、同学，导师按科研经费）",
   },
   genius: {
-    lover: "科研能力及上限+1/级",
-    advisor: "每月科研积累+0.4/级",
-    fellow: "科研能力及上限+1/级",
+    lover: (level?: number) => `科研能力及上限+${tagAmount(1, level)}`,
+    advisor: (level?: number) => `每月科研积累+${tagAmount(0.4, level)}`,
+    fellow: (level?: number) => `科研能力及上限+${tagAmount(1, level)}`,
     additional: "每月使科研最低的非院士转世成员科研+0.5（玩家、恋人、同学）",
   },
   social: {
-    lover: "亲密度及上限+1/级",
-    advisor: "横向项目进度条上限−5/级",
-    fellow: "默契度及上限+1/级",
+    lover: (level?: number) => `亲密度及上限+${tagAmount(1, level)}`,
+    advisor: (level?: number) => `横向项目进度条上限−${tagAmount(5, level)}`,
+    fellow: (level?: number) => `默契度及上限+${tagAmount(1, level)}`,
     additional: "每月使能力最低的非社交达人成员社交|亲密|默契+0.5（玩家、恋人、同学）",
   },
   "teacher-child": {
-    lover: "协作玩家效果+20%/级",
-    advisor: "纵向项目进度条上限−5/级",
-    fellow: "受导师指导效果+20%/级",
+    lover: (level?: number) => `协作玩家效果+${tagAmount(20, level, "%")}`,
+    advisor: (level?: number) => `纵向项目进度条上限−${tagAmount(5, level)}`,
+    fellow: (level?: number) => `受导师指导效果+${tagAmount(20, level, "%")}`,
     additional: "使玩家每月导师好感+0.5，导师协作分数+5",
   },
   chosen: {
-    lover: "每月自动推进+0.1次/级",
-    advisor: "挂名论文引用倍率+10%/级",
-    fellow: "每月协作自动推进+0.1次/级",
+    lover: (level?: number) => `每月自动推进+${tagAmount(0.1, level, "次")}`,
+    advisor: (level?: number) => `挂名论文引用倍率+${tagAmount(10, level, "%")}`,
+    fellow: (level?: number) => `每月协作自动推进+${tagAmount(0.1, level, "次")}`,
     additional: "使同学协作进度条上限−10",
   },
 } as const;
 
+export function getCaptainRelationshipTagHint(tag: CaptainTag, level: number, type: "advisor" | "lover" | "fellow"): string {
+  const effects = TAG_EFFECTS[tag];
+  const member = type === "advisor" ? "导师" : type === "lover" ? "恋人" : "同学";
+  return [
+    `${getRoleDefinition(tag).name} Lv${level}（本局开局等级）`,
+    `${member}效果：${effects[type](level)}。`,
+    `团队加成：${effects.additional.replace("社交|亲密|默契", "对应的社交／亲密／默契")}。`,
+    "团队加成按同标签成员人数叠加，不随等级增加。",
+    ...(tag === "genius" ? ["科研增长仍受档位抵抗影响。"] : []),
+  ].join("\n");
+}
+
 function renderTagEffects(roleId: typeof CAPTAIN_PREREQUISITE_ROLE_IDS[number]): string {
   const effects = TAG_EFFECTS[roleId as keyof typeof TAG_EFFECTS];
   return `<div class="captain-tag-effects">
-    <p>恋人：${effects.lover}；导师：${effects.advisor}；同学：${effects.fellow}</p>
+    <p>恋人：${effects.lover()}；导师：${effects.advisor()}；同学：${effects.fellow()}</p>
     <p>${effects.additional}</p>
   </div>`;
 }

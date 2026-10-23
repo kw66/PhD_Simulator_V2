@@ -21,7 +21,7 @@ import { getConferenceInfo, getConferenceLocation } from "../core/v2-conference-
 import { getEventChoiceRiskDetails } from "../core/v2-event-choice-risk";
 import { getResolvableQueuedEvent, refreshEventRestAvailability } from "../core/v2-engine-event-resolution";
 import { canRewindPendingEvent } from "../core/v2-event-replay";
-import { RANDOM_OUTCOME_HINT } from "../core/v2-event-choice-random";
+import { hasRandomOutcome, RANDOM_OUTCOME_HINT } from "../core/v2-event-choice-random";
 import "../styles/event-choice-risk.css";
 import type { ConferenceRegionId } from "../core/v2-conference-system";
 import { getCurrentEvent, getEventQueuePriority, getSortedEventQueue } from "../core/v2-event-queue";
@@ -140,7 +140,7 @@ import type { EventLayoutSample } from "./v2-event-layout";
 import { animationNumberAttributes, animationBarAttribute, renderAnimatedNumber, renderAnimatedAttributeNumber, renderAnimatedTemplate } from "./v2-render-animation";
 import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl, hasRoleCardPortrait } from "./v2-role-portrait-assets";
 import { renderDesignedGrowthBoard } from "./v2-render-setup-screen";
-import { renderCaptainTags } from "./v2-render-captain-tags";
+import { getCaptainRelationshipTagHint, renderCaptainTags } from "./v2-render-captain-tags";
 import { renderRewinderPreview } from "./v2-render-rewinder";
 import { renderAcademicArchive } from "./v2-render-rewinder-academic";
 import { isAcademicArchivePending } from "../core/v2-rewinder-academic";
@@ -1262,7 +1262,7 @@ function renderEventContentBox(
               ? displayStage === "act1" ? "继续" : displayStage === "act3" || displayStage === "result" ? "确定" : choice.label
               : choice.label;
             const riskChoice = riskEvent?.choices.find((candidate) => candidate.id === choice.id);
-            const noRewind = (riskChoice ?? choice).outcomeRandom === true;
+            const noRewind = hasRandomOutcome(riskChoice ?? choice);
             const riskDetails = state && riskEvent && riskChoice && !disabledReason
               ? getEventChoiceRiskDetails(state, riskEvent, riskChoice) : null;
             const risk = historicalPage && noRewind ? undefined : riskDetails?.risk;
@@ -2436,7 +2436,7 @@ function renderRelationshipGridCard(state: GameState, card: RelationshipRenderCa
           <div class="rel-header-main">
             <span class="rel-type" data-rel-type-pill="${card.type}">${escapeHtml(card.displayType)}</span>
             <strong class="rel-name">${escapeHtml(card.displayName)}</strong>
-            ${captainTag ? `<span class="rel-type rel-captain-tag">${escapeHtml(getRoleDefinition(captainTag).name)} Lv${state.captainState!.levels[captainTag]}</span>` : ""}
+            ${captainTag ? `<span class="rel-type rel-captain-tag" ${relationshipTooltip(getCaptainRelationshipTagHint(captainTag, state.captainState!.levels[captainTag], advisor ? "advisor" : card.type === "lover" ? "lover" : "fellow"))}>${escapeHtml(getRoleDefinition(captainTag).name)} Lv${state.captainState!.levels[captainTag]}</span>` : ""}
             ${fellow?.longTermMentoring ? `<span class="rel-type rel-mentoring-mark" ${relationshipTooltip("长期合作：每月SAN-1，协作额外推进1次。", "left")} aria-label="长期合作">长期合作</span>` : ""}
             ${card.type === "lover" ? `<span class="rel-type rel-lover-trait" ${relationshipTooltip(getLoverTraitHint(state.loverState.type))}>${state.loverState.type === "beautiful" ? "活泼" : "聪慧"}</span>` : ""}
             ${fellow || card.type === "lover" ? `<span class="rel-academic-label" ${relationshipTooltip(knownHint, "right")}>${renderRelationshipIcon("🎓")}${escapeHtml(fellow ? getFellowAcademicLabel(state, fellow) : getStudentAcademicLabel(state.year, state.degree))}</span>` : ""}
