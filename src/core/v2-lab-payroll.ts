@@ -7,6 +7,7 @@ import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { getCalendarForTotalMonths } from "./v2-progression";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 import type { GameState } from "./v2-types";
 
 export function getLabMonthlySalaryTotal(state: GameState): number {
@@ -30,6 +31,15 @@ export function getLabPayroll(state: GameState) {
     ? roundMoney((player.payment > 0 ? (state.degree === "phd" ? 1 : 0.5) : 0)
       + fellows.reduce((sum, payment, index) => sum + (payment.payment > 0
         ? (state.fellowProgressState[index]!.degree === "phd" ? 1 : 0.5) : 0), 0)) : 0;
+  // Reallocate existing wages only after calculating the lab/school shares.
+  if (usesGameplayRulesFrom("20261023-r38") && state.selectedRoleId === "teacher-child"
+    && getRoleTalentLevel(state, "resource-tilt") > 0) {
+    for (const fellow of fellows) {
+      const transferred = Math.min(0.5, Math.max(0, fellow.payment));
+      fellow.payment = roundMoney(fellow.payment - transferred);
+      player.payment = roundMoney(player.payment + transferred);
+    }
+  }
   return { player, fellows, total, schoolContribution, advisorCost: roundMoney(total - schoolContribution) };
 }
 

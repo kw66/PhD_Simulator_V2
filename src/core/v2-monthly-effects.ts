@@ -35,6 +35,7 @@ import {
   AI_SLOT_IDS,
   createAiBuffs,
   canUseAiTalentFunding,
+  canUseShopTalentFunding,
   getAiModelForTotalMonths,
   getAiRenewalPrice,
   hasAiReimbursement,
@@ -407,7 +408,9 @@ function applyAutomaticCoffeeMachineEffect(
     return { ...state, player: { ...resolution.player } };
   }
 
-  if (resolution.player.money < BASE_COFFEE_PRICE) {
+  const talentFunding = canUseShopTalentFunding(state, BASE_COFFEE_PRICE);
+  const price = talentFunding ? 0 : BASE_COFFEE_PRICE;
+  if (resolution.player.money < price) {
     appendMonthlyEffect(state, resolution, {
       id: "automatic-coffee-machine-paused",
       name: "自动咖啡机",
@@ -422,9 +425,10 @@ function applyAutomaticCoffeeMachineEffect(
     id: "automatic-coffee-machine",
     name: "自动咖啡机",
     source: "商店装备",
-    stats: { money: -BASE_COFFEE_PRICE, san: 3 },
+    stats: { money: -price, san: 3 },
+    note: talentFunding ? `经费护航，科研经费 -${BASE_COFFEE_PRICE}` : undefined,
   });
-  return {
+  const nextState = {
     ...state,
     player: { ...resolution.player },
     coffeeState: {
@@ -433,6 +437,10 @@ function applyAutomaticCoffeeMachineEffect(
       machineTrackedCoffeeCount: state.coffeeState.machineTrackedCoffeeCount + 1,
     },
   };
+  return talentFunding ? recordLabFinance({
+    ...nextState,
+    advisorProgressState: { ...nextState.advisorProgressState, funding: roundMoney(nextState.advisorProgressState.funding - BASE_COFFEE_PRICE) },
+  }, "student-reimbursement", -BASE_COFFEE_PRICE) : nextState;
 }
 
 export function applyMonthStartSubscriptions(
@@ -482,14 +490,16 @@ export function applyMonthStartSubscriptions(
         };
         continue;
       }
-      const canPay = resolution.player.money >= price;
+      const talentFunding = !usesGift && canUseShopTalentFunding(nextState, target.price);
+      const coffeePrice = talentFunding ? 0 : price;
+      const canPay = resolution.player.money >= coffeePrice;
       if (canPay) {
         appendMonthlyEffect(nextState, resolution, {
           id: "coffee-subscription",
           name: "冰美式续费",
           source: "商店订阅",
-          stats: { money: -price, san: getCoffeeSanGain(nextState.coffeeState) },
-          note: usesGift ? "恋人赠礼，本次免费" : undefined,
+          stats: { money: -coffeePrice, san: getCoffeeSanGain(nextState.coffeeState) },
+          note: usesGift ? "恋人赠礼，本次免费" : talentFunding ? `经费护航，科研经费 -${target.price}` : undefined,
         });
         nextState = {
           ...(usesGift ? consumeLoverGift(nextState) : nextState),
@@ -502,6 +512,10 @@ export function applyMonthStartSubscriptions(
             machineTrackedCoffeeCount: nextState.coffeeState.machineTrackedCoffeeCount + Number(nextState.coffeeState.machineOwned),
           },
         };
+        if (talentFunding) nextState = recordLabFinance({
+          ...nextState,
+          advisorProgressState: { ...nextState.advisorProgressState, funding: roundMoney(nextState.advisorProgressState.funding - target.price) },
+        }, "student-reimbursement", -target.price);
       } else {
         appendMonthlyEffect(nextState, resolution, {
           id: "coffee-subscription-paused",

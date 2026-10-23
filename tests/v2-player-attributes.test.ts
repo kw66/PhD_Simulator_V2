@@ -9,6 +9,36 @@ function player(role: GameState["selectedRoleId"], levels: Record<string, number
 }
 
 describe("shared player attribute settlement", () => {
+  it("reverse meters ease growth and resist loss independently for all attributes", () => {
+    for (const [stat, id] of [["research", "reverse-meter-alpha"], ["social", "reverse-meter-beta"], ["favor", "reverse-meter-gamma"]] as const) {
+      for (const rank of [0, 1, 2, 3]) for (const [value, resistance] of [[1, 0], [6, 0.2], [12, 0.4], [18, 0.6]]) {
+        const state = player("chosen-reversed", { [id]: rank });
+        state.player[stat] = value!;
+        expect(previewPlayerAttributeChange(state, stat, 1).effectiveChange).toBeCloseTo(1 - Math.max(0, resistance! - rank * 0.1));
+        expect(previewPlayerAttributeChange(state, stat, -1).effectiveChange).toBeCloseTo(-(1 - resistance! - rank * 0.1));
+        expect(previewPlayerAttributeChange(state, stat, 1, "swap").effectiveChange).toBe(1);
+        expect(previewPlayerAttributeChange(state, stat, -1, "swap").effectiveChange).toBe(-1);
+        expect(previewPlayerAttributeChange(state, stat, -1, "reset").effectiveChange).toBe(-1);
+        const legacy = withGameplayRuleset("20261023-r42", () => previewPlayerAttributeChange(state, stat, -1).effectiveChange);
+        expect(legacy).toBeCloseTo(-(1 - Math.max(0, resistance! - rank * 0.1)));
+      }
+    }
+  });
+  it.each([1, 2, 3])("reduces only reversed genius research growth resistance by ten points per rank: %s", rank => {
+    const state = player("genius-reversed", { "research-resilience": rank, "work-life-balance": 1 });
+    state.player = { ...state.player, research: 18, social: 18, favor: 18, san: 3 };
+    const grown = applyPlayerAttributeChange(state, "research", 1).state;
+    expect(grown.player.research).toBeCloseTo(18.4 + rank * 0.1);
+    expect(grown.player.san).toBe(3);
+    expect(grown.sanCap).toBe(state.sanCap);
+    expect(previewPlayerAttributeChange(state, "research", -1).effectiveChange).toBe(-0.4);
+    expect(previewPlayerAttributeChange(state, "social", 1).effectiveChange).toBe(0.4);
+    expect(previewPlayerAttributeChange(state, "favor", 1).effectiveChange).toBe(0.4);
+    expect(previewPlayerAttributeChange({ ...state, player: { ...state.player, research: 1 } }, "research", 1).effectiveChange).toBe(1);
+    expect(previewPlayerAttributeChange({ ...state, player: { ...state.player, research: 19.9 } }, "research", 1).effectiveChange).toBe(0.1);
+    expect(withGameplayRuleset("20261023-r39", () => previewPlayerAttributeChange(state, "research", 1).effectiveChange)).toBe(0.4);
+  });
+
   it("does not spend gold to protect favor or social in the current rules", () => {
     const state = player("rich", { "gold-power-alpha": 1, "gold-power-beta": 1, "gold-power-gamma": 1 });
     state.roleTalents!.goldPowerEnabled = true;
@@ -23,14 +53,14 @@ describe("shared player attribute settlement", () => {
   it("subtracts percentage points only in the intended direction and never below zero", () => {
     const state = player("chosen", { "lasting-fortune": 3 });
     state.player.research = 18;
-    expect(previewPlayerAttributeChange(state, "research", 1).effectiveChange).toBe(1);
+    expect(previewPlayerAttributeChange(state, "research", 1).effectiveChange).toBe(0.7);
     expect(previewPlayerAttributeChange(state, "research", -1).effectiveChange).toBe(-0.4);
     state.player.research = 1;
     expect(previewPlayerAttributeChange(state, "research", 1).effectiveChange).toBe(1);
   });
 
   it("rereads tiers during equalization and leaves ordinary reward counters untouched", () => {
-    for (const [level, expected] of [[1, 18.4], [2, 19.6], [3, 20]]) {
+    for (const [level, expected] of [[1, 17.2], [2, 18.4], [3, 19]]) {
       const state = player("chosen", { "lasting-fortune": level! });
       state.player.social = 6;
       const next = applyPlayerAttributeChange(state, "social", 14, "equalize").state;
@@ -38,6 +68,33 @@ describe("shared player attribute settlement", () => {
       expect(next.roleTalents?.growthTotals).toBeUndefined();
     }
   });
+
+  it("applies each fortune rank to all three growth attributes without changing losses or bypassing caps", () => {
+    for (const rank of [0, 1, 2, 3]) {
+      const state = player("chosen", { "lasting-fortune": rank });
+      for (const [current, base] of [[1, 1], [6, 0.8], [12, 0.6], [18, 0.4]]) {
+        for (const stat of ["research", "social", "favor"] as const) {
+          state.player[stat] = current!;
+          expect(previewPlayerAttributeChange(state, stat, 1).effectiveChange).toBeCloseTo(Math.min(1, base! + rank * 0.1));
+          expect(previewPlayerAttributeChange(state, stat, -1).effectiveChange).toBeCloseTo(-base!);
+          state.player[stat] = 19.9;
+          expect(previewPlayerAttributeChange(state, stat, 1).effectiveChange).toBeCloseTo(0.1);
+          state.player[stat] = 20;
+          expect(previewPlayerAttributeChange(state, stat, 1).effectiveChange).toBe(0);
+        }
+      }
+    }
+  });
+
+  it("preserves twenty-point fortune reduction and equalization for r30 recordings", () => withGameplayRuleset("20261023-r30", () => {
+    for (const [rank, expected] of [[1, 18.4], [2, 19.6], [3, 20]]) {
+      const state = player("chosen", { "lasting-fortune": rank! });
+      state.player.social = 6;
+      expect(applyPlayerAttributeChange(state, "social", 14, "equalize").state.player.social).toBe(expected);
+      state.player.research = 18;
+      expect(previewPlayerAttributeChange(state, "research", 1).effectiveChange).toBeCloseTo(0.4 + rank! * 0.2);
+    }
+  }));
 
   it("raises each cap once per reward, retains overflow within the new cap and has no lifetime limit", () => {
     let state = player("normal", { breakthrough: 1 });
@@ -96,13 +153,13 @@ describe("shared player attribute settlement", () => {
     let state = player("chosen-reversed", { "reverse-meter-alpha": 3, "swap-breaks-cap": 1 });
     state.player.research = 18;
     state = applyPlayerAttributeChange(state, "research", 40, "swap").state;
-    expect(state.player.research).toBe(46);
+    expect(state.player.research).toBe(58);
     expect(getPlayerAttributeCap(state, "research")).toBe(20);
     state = applyPlayerAttributeChange(state, "research", 1).state;
-    expect(state.player.research).toBe(46);
+    expect(state.player.research).toBe(58);
     state = applyPlayerAttributeChange(state, "research", -1).state;
-    expect(state.player.research).toBe(45.3);
-    state = applyPlayerAttributeChange(state, "research", -45.3, "reset").state;
+    expect(state.player.research).toBe(57.9);
+    state = applyPlayerAttributeChange(state, "research", -57.9, "reset").state;
     expect(state.player.research).toBe(0);
   });
 });

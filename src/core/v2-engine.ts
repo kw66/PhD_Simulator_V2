@@ -1,3 +1,4 @@
+import { settleTeacherChildFavorMilestones } from "./v2-teacher-child-talents";
 import { createGameRandomState, withGameRandom } from "./v2-game-random";
 import { settleCaptainMonth, syncCaptainMembers } from "./v2-captain-runtime";
 import { prepareRewinderYear, completeRewinderYear, isRewinderYearEnd, toggleRewinderPerson } from "./v2-rewinder";
@@ -463,7 +464,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
     };
   }
   if (nextState.phase !== "playing") return nextState;
-  nextState = settleGreedCoinGames(settleRoleTalentDiseaseMilestones(syncRoleTalentFellows(nextState)));
+  nextState = settleGreedCoinGames(settleTeacherChildFavorMilestones(settleRoleTalentDiseaseMilestones(syncRoleTalentFellows(nextState))));
   const checkedState = debugAction ? nextState : evaluateCoreEndings(nextState);
   if (checkedState.phase !== "playing") return checkedState;
   const helpedState = settlePendingPaperHelp(checkedState);

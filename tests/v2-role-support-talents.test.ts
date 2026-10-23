@@ -9,6 +9,7 @@ import { getReviewerWeights } from "../src/core/v2-review-config";
 import { resolveDuePaperReviews } from "../src/core/v2-publication-system";
 import { canUseAiTalentFunding } from "../src/core/v2-ai-shop";
 import { applyShopAction, getShopActionPrice } from "../src/core/v2-shop-transactions";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import type { GameState } from "../src/core/v2-types";
 
 function base(role: GameState["selectedRoleId"]): GameState {
@@ -24,7 +25,7 @@ describe("upright relationship role talents", () => {
     const junior = createCustomFellowProgressProfile({ type: "junior", gender: "female", research: 3, affinity: 1, startTotalMonths: 1 });
     state.fellowProgressState = [junior];
     state.fellowPapers = [{ ...state.papers[0]!, id: "junior", leadAuthorId: junior.id }];
-    const next = settleAdvisorGuidance(queueAdvisorGuidance(state), () => 0);
+    const next = withGameplayRuleset("20261022-r27", () => settleAdvisorGuidance(queueAdvisorGuidance(state), () => 0));
     expect(next.papers[0]?.writing).toBe(20);
     expect(next.papers[0]?.collaborationScores?.writing).toBe(20);
     expect(next.fellowPapers?.[0]?.writing).toBe(10);

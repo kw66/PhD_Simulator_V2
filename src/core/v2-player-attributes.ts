@@ -28,11 +28,13 @@ export function getPlayerAttributeCap(state: GameState, stat: PlayerAttribute): 
 }
 
 export function getPlayerResistanceReduction(state: GameState, stat: PlayerAttribute, rawChange: number): number {
+  if (usesGameplayRulesFrom("20261023-r40") && rawChange > 0 && state.selectedRoleId === "genius-reversed" && stat === "research") return getRoleTalentLevel(state, "research-resilience") * 0.1;
   if (rawChange > 0 && state.selectedRoleId === "genius" && stat === "research") return state.roleTalents?.researchGrowthResistanceReduction ?? 0;
   if (rawChange > 0 && state.selectedRoleId === "teacher-child" && stat === "favor") return getRoleTalentLevel(state, "mentor-expectations") * 0.1;
-  if (state.selectedRoleId === "chosen" && rawChange > 0) return getRoleTalentLevel(state, "lasting-fortune") * 0.2;
+  if (state.selectedRoleId === "chosen" && rawChange > 0) return getRoleTalentLevel(state, "lasting-fortune") * (usesGameplayRulesFrom("20261023-r31") ? 0.1 : 0.2);
   if (state.selectedRoleId !== "chosen-reversed") return 0;
-  return getRoleTalentLevel(state, { research: "reverse-meter-alpha", social: "reverse-meter-beta", favor: "reverse-meter-gamma" }[stat]) * 0.1;
+  const reduction = getRoleTalentLevel(state, { research: "reverse-meter-alpha", social: "reverse-meter-beta", favor: "reverse-meter-gamma" }[stat]) * 0.1;
+  return usesGameplayRulesFrom("20261023-r43") && rawChange < 0 ? -reduction : reduction;
 }
 
 /** Pure quote. The caller retains the original request and requotes when committing an event. */
@@ -44,13 +46,15 @@ export function previewPlayerAttributeChange(
   const canOverflow = source === "swap" && state.selectedRoleId === "chosen-reversed" && getRoleTalentLevel(state, "swap-breaks-cap") > 0;
   const delta = Number.isFinite(rawChange) ? rawChange : 0;
   const adjusted = delta < 0 && source === "ordinary" && stat === "favor" && state.selectedRoleId === "teacher-child-reversed"
-    ? delta - getRoleTalentLevel(state, "lower-favor-reset") : delta;
+    ? delta - getRoleTalentLevel(state, "lower-favor-reset") * (usesGameplayRulesFrom("20261023-r44") ? 0.5 : 1) : delta;
   const uncappedResearch = stat === "research" && state.selectedRoleId === "genius-reversed"
     && (state.roleTalents?.researchCurseBroken || (current >= 20 && getRoleTalentLevel(state, "break-research-curse") > 0));
-  let resolved = source === "reset"
+  const directSwap = source === "swap" && state.selectedRoleId === "chosen-reversed" && usesGameplayRulesFrom("20261023-r42");
+  let resolved = source === "reset" || directSwap
     ? { effectiveChange: round(delta), resistedCount: 0, cappedCount: 0 }
     : applyTierResist(adjusted, current, undefined, source === "swap" || uncappedResearch ? Infinity : maximum,
-      getPlayerResistanceReduction(state, stat, adjusted));
+      source === "equalize" && usesGameplayRulesFrom("20261023-r39") && state.selectedRoleId === "chosen"
+        && getRoleTalentLevel(state, "complete-potential") > 0 ? 1 : getPlayerResistanceReduction(state, stat, adjusted));
   let effectiveChange = resolved.effectiveChange;
   let cappedCount = resolved.cappedCount ?? 0;
   if (source === "swap" && !canOverflow) {

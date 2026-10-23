@@ -1,32 +1,52 @@
 import { gameRandom } from "./v2-game-random";
-import { usesCurrentGameplayRules } from "./v2-rule-context";
+import { usesCurrentGameplayRules, usesGameplayRulesFrom } from "./v2-rule-context";
+import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getCaptainAdvisorGuidanceBonus, getCaptainGuidanceMultiplier, isCaptain } from "./v2-captain-state";
 import { addPaperCollaboration, getRoleCollaborationScore } from "./v2-paper-collaboration";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { getFellowName } from "./v2-fellow-progression";
 import { recordFellowMonthlySupport } from "./v2-fellow-monthly-support";
-import type { GameState, Paper } from "./v2-types";
+import type { GameState, Paper, PaperActionType } from "./v2-types";
 
 const GUIDANCE_AMOUNT = 10;
+type GuidanceScores = Partial<Record<PaperActionType, number>>;
+
+export function getAdvisorGuidanceScores(state: GameState, amount = GUIDANCE_AMOUNT + getCaptainAdvisorGuidanceBonus(state)): GuidanceScores {
+  const writing = getRoleCollaborationScore(state, "advisor", amount);
+  if (state.selectedRoleId !== "teacher-child" || !usesGameplayRulesFrom("20261023-r28")) return { writing };
+  return {
+    ...(getRoleTalentLevel(state, "mentor-insight") > 0 ? { idea: amount } : {}),
+    ...(getRoleTalentLevel(state, usesGameplayRulesFrom("20261023-r38") ? "mentor-insight" : "mentor-insight-beta") > 0 ? { experiment: amount } : {}),
+    writing,
+  };
+}
+
+export function getAdvisorGuidanceSummary(state: GameState, amount?: number): string {
+  const scores = getAdvisorGuidanceScores(state, amount);
+  if (!scores.idea && !scores.experiment) return `论文写作协作+${scores.writing}`;
+  const labels = { idea: "想idea", experiment: "做实验", writing: "写作" };
+  return `论文协作：${(["idea", "experiment", "writing"] as const)
+    .filter((field) => scores[field]).map((field) => `${labels[field]}+${scores[field]}`).join("、")}`;
+}
 
 function applyGuidance(
   papers: Paper[],
   advisorName: string,
-  amount: number,
+  scores: GuidanceScores,
   random: () => number,
 ): Paper | undefined {
   const targets = papers.flatMap((paper) => {
     if (paper.nonFirstAuthor === true || (paper.status !== "draft" && paper.status !== "journal-reviewing")) return [];
-    return paper.experiment > 0 ? [{ paper, field: "writing" as const }] : [];
+    return paper.experiment > 0 || ((scores.idea || scores.experiment) && paper.status === "draft") ? [paper] : [];
   });
   if (targets.length === 0) return undefined;
   const target = targets[Math.floor(random() * targets.length)]!;
-  const paper = addPaperCollaboration(target.paper, {
-    paperId: target.paper.id,
+  const paper = addPaperCollaboration(target, {
+    paperId: target.id,
     collaborator: { id: "advisor", name: advisorName },
-    scores: { [target.field]: amount },
+    scores,
   });
-  return paper === target.paper ? undefined : paper;
+  return paper === target ? undefined : paper;
 }
 
 export function queueAdvisorGuidance(state: GameState): GameState {
@@ -55,8 +75,7 @@ export function settleAdvisorGuidance(state: GameState, random: () => number = g
   let nextState = state;
   const pendingPlayerAmount = state.advisorProgressState.pendingGuidanceToPlayer;
   if (pendingPlayerAmount != null) {
-    const playerAmount = getRoleCollaborationScore(state, "advisor", pendingPlayerAmount);
-    const paper = applyGuidance(nextState.papers, state.selectedAdvisorName, playerAmount, random);
+    const paper = applyGuidance(nextState.papers, state.selectedAdvisorName, getAdvisorGuidanceScores(state, pendingPlayerAmount), random);
     if (paper) {
       nextState = {
         ...nextState,
@@ -64,7 +83,7 @@ export function settleAdvisorGuidance(state: GameState, random: () => number = g
         advisorProgressState: { ...nextState.advisorProgressState, pendingGuidanceToPlayer: null },
       };
       nextState = pushMilestoneLog(nextState,
-        `导师指导：你的《${paper.title}》，论文写作协作 +${playerAmount}`,
+        `导师指导：你的《${paper.title}》，${getAdvisorGuidanceSummary(state, pendingPlayerAmount).replaceAll("+", " +")}`,
         "advisor-guidance-player");
     }
   }
@@ -73,7 +92,7 @@ export function settleAdvisorGuidance(state: GameState, random: () => number = g
     const paper = applyGuidance(
       (nextState.fellowPapers ?? []).filter((entry) => entry.leadAuthorId === profile.id),
       state.selectedAdvisorName,
-      profile.pendingGuidanceFromAdvisor,
+      { writing: profile.pendingGuidanceFromAdvisor },
       random,
     );
     if (!paper) continue;

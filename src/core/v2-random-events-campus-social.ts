@@ -1,6 +1,7 @@
 import { randomOutcome } from "./v2-event-choice-random";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getAttributeTier } from "./v2-random-event-rules";
 import { BADMINTON_VICTORY_THRESHOLD, getBadmintonStrength, getPokerWinRate } from "./v2-growth-system";
 import {
@@ -43,7 +44,7 @@ export function createSocialCampusRandomEvent(state: GameState, getRoll: RandomR
   const ktvSocialNarrative = getTierResistedNarrative("社交", 1, ktvSocialResult);
 
   const attendancePercent = getAdvisorMeetingAttendancePercent(state.advisorProgressState);
-  const dinnerAttendancePercent = state.selectedRoleId === "teacher-child" && getRoleTalentLevel(state, "family-host") > 0 ? 100 : attendancePercent;
+  const dinnerAttendancePercent = state.selectedRoleId === "teacher-child" && !usesGameplayRulesFrom("20261023-r38") && getRoleTalentLevel(state, "family-host") > 0 ? 100 : attendancePercent;
   const dinnerAdvisorTreat = getRoll() < dinnerAttendancePercent / 100;
   getRoll(); // Keep the recorded event roll sequence stable.
   const dinnerFavorResult = dinnerAdvisorTreat ? previewPlayerAttributeChange(state, "favor", 1) : null;

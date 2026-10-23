@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
@@ -26,6 +27,17 @@ function oneDraw(current: GameState) {
 }
 
 describe("role talent event effects", () => {
+  it("gives family gatherings two annual tickets under the revised rules only", () => {
+    const child = state("teacher-child", { "family-host": 1 });
+    const pool = withGameplayRuleset("20261023-r37", () => createRandomEventPool(child));
+    expect(pool.filter(id => id === 7)).toHaveLength(2);
+    const weighted = buildWeightedRandomEventPool({ ...child, availableRandomEvents: pool, social: 1 });
+    expect(weighted.weightedPool.filter(id => id === 7)).toHaveLength(20);
+    expect(withGameplayRuleset("20261023-r37", () => yearlyResetRandomEventState(child)).availableRandomEvents.filter(id => id === 7)).toHaveLength(2);
+    expect(createRandomEventPool(child).filter(id => id === 7)).toHaveLength(1);
+    expect(withGameplayRuleset("20261022-r27", () => createRandomEventPool(child)).filter(id => id === 7)).toHaveLength(1);
+    expect(createRandomEventPool(state("teacher-child")).filter(id => id === 7)).toHaveLength(1);
+  });
   it("adds the correct annual tickets and preserves their draw weight", () => {
     const genius = state("genius", { "thirst-for-knowledge": 1 });
     expect(createRandomEventPool(genius).filter((id) => id === 9)).toHaveLength(2);
@@ -113,8 +125,8 @@ describe("role talent event effects", () => {
     expect(normalizeRoleTalentIllnessProbability(state("normal", { "misfortune-to-fortune": 1 }), -1)).toBe(0);
   });
 
-  it("preserves an event's negative illness result and settles its milestone only after confirmation", () => {
-    const chosen = { ...state("chosen", { "misfortune-to-fortune": 1 }), illnessProbability: -95 };
+  it.each(["misfortune-to-fortune", "healthy-mind"])("preserves an event's negative illness result and settles %s only after confirmation", talent => {
+    const chosen = { ...state("chosen", { [talent]: 1 }), illnessProbability: -95 };
     const event: PendingEvent = {
       id: "disease-milestone", title: "Health", description: "Health", source: "random", blocking: true,
       deadlineMonths: 0, chainId: "disease-milestone", stage: "result",
@@ -124,7 +136,11 @@ describe("role talent event effects", () => {
     expect(queued.roleTalents?.negativeDiseaseMilestone).toBeUndefined();
     const result = dispatchAction(queued, "resolve-event", { eventId: event.id, eventChoiceId: "confirm" });
     expect(result.illnessProbability).toBe(-105);
-    expect(result.roleTalents?.negativeDiseaseMilestone).toBe(1);
+    if (talent === "healthy-mind") {
+      expect(result.roleTalents?.negativeDiseaseSanMilestone).toBe(2);
+      expect(result.sanCap).toBe(chosen.sanCap + 2);
+      expect(dispatchAction(result, "resolve-event", { eventId: event.id, eventChoiceId: "confirm" }).sanCap).toBe(result.sanCap);
+    } else expect(result.roleTalents?.negativeDiseaseMilestone).toBe(2);
     expect(dispatchAction(result, "resolve-event", { eventId: event.id, eventChoiceId: "confirm" }).player).toEqual(result.player);
   });
 });

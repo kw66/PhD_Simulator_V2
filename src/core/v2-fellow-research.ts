@@ -6,6 +6,9 @@ import { getConferenceInfo } from "./v2-conference-catalog";
 import { advanceFellowCooperationWithLog, settlePendingFellowHelp } from "./v2-fellow-cooperation";
 import { getFellowName, getFellowResearchTopic, getFellowsInCardOrder } from "./v2-fellow-progression";
 import { createDraftPaper, decayUnpublishedPaper, prepareConferenceSubmission, resolvePaperReview } from "./v2-paper-rules";
+import { getRoleKindReviewerBonus, getRoleTalentLevel } from "./v2-role-talent-state";
+import { isFellowProjectApprentice, settleAppropriatedFellowPaper } from "./v2-teacher-child-talents";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { attachPaperPublication, recordPaperAcceptances } from "./v2-publication-rules";
 import { advancePaperReviewDeadline, applyRejectedPaperReview, CONFERENCE_PUBLICATION_DELAY_MONTHS, settlePaperCitationMonth } from "./v2-publication-system";
 import { applyPublicationTalentRewards } from "./v2-publication-talent";
@@ -130,7 +133,8 @@ export function advanceFellowResearch(state: GameState, random: () => number = g
         if (profile) addActivity(profile.id, "审稿中");
         return [paper];
       }
-      const result = resolvePaperReview(paper, random);
+      const kindReviewerBonus = profile && usesGameplayRulesFrom("20261023-r36") ? getRoleKindReviewerBonus(nextState) : 0;
+      const result = resolvePaperReview(paper, random, kindReviewerBonus);
       if (result.nextPaper.status !== "published") {
         if (profile) {
           addActivity(profile.id, "论文退稿");
@@ -138,6 +142,19 @@ export function advanceFellowResearch(state: GameState, random: () => number = g
             ? { ...fellow, nextMonthlyAction: "research" } : fellow) };
         }
         return [applyRejectedPaperReview(paper, result.nextPaper.lastReview!)];
+      }
+      if (profile && usesGameplayRulesFrom("20261023-r38")) {
+        const current = nextState.fellowProgressState.find(entry => entry.id === profile.id)!;
+        const historicalIds = new Set([...(nextState.fellowPapers ?? []), ...nextState.externalPublications]
+          .filter(entry => entry.status === "published" && entry.leadAuthorId === profile.id).map(entry => entry.id));
+        const count = (current.successfulPublicationCount ?? historicalIds.size) + 1;
+        nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map(entry => entry.id === profile.id
+          ? { ...entry, successfulPublicationCount: count } : entry) };
+        if (count === 2 && nextState.selectedRoleId === "teacher-child" && getRoleTalentLevel(nextState, "publication-appropriation") > 0) {
+          nextState = settleAppropriatedFellowPaper(nextState, profile, paper, result);
+          addActivity(profile.id, "第2篇论文中稿，成果转为你的一作");
+          return [];
+        }
       }
       if (profile) addActivity(profile.id, `论文中稿${result.nextPaper.collaborators?.some((person) => person.id === "player") ? "（与你合作）" : ""}`);
       const conference = getConferenceInfo(paper.submittedMonth!, paper.target!, paper.submittedYear!);
@@ -215,7 +232,7 @@ export function advanceFellowResearch(state: GameState, random: () => number = g
       if (nextState.selectedAdvisorName && nextState.advisorProgressState.funding < 0) break;
       const profile = nextState.fellowProgressState.find((fellow) => fellow.id === active.id)!;
       let paper = getFellowCurrentPaper(nextState, profile.id);
-      if (!paper || paper.status !== "draft" || profile.nextMonthlyAction === "project") {
+      if (isFellowProjectApprentice(nextState, profile) || !paper || paper.status !== "draft" || profile.nextMonthlyAction === "project") {
         advanceProject(profile);
         continue;
       }

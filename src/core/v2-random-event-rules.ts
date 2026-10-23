@@ -5,6 +5,7 @@ import {
 } from "./v2-random-event-pool-builder";
 import { type PendingRandomEvent } from "./v2-paper-competition";
 import { getRoleTalentLevel, type RoleTalentRunState } from "./v2-role-talent-state";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { RoleId } from "./v2-types";
 
 export interface RandomEventState {
@@ -94,7 +95,8 @@ export function normalizeRoleTalentIllnessProbability(
   value: number,
 ): number {
   const finiteValue = Number.isFinite(value) ? value : 0;
-  const allowsNegative = state.selectedRoleId === "chosen" && getRoleTalentLevel(state, "misfortune-to-fortune") > 0;
+  const allowsNegative = state.selectedRoleId === "chosen" && (getRoleTalentLevel(state, "misfortune-to-fortune") > 0
+    || (usesGameplayRulesFrom("20261023-r39") && getRoleTalentLevel(state, "healthy-mind") > 0));
   return Math.min(100, allowsNegative ? finiteValue : Math.max(0, finiteValue));
 }
 
@@ -108,6 +110,9 @@ export function createRandomEventPool(state?: Pick<RandomEventState, "selectedRo
   const pool: number[] = [...BASE_RANDOM_EVENT_IDS];
   if (state?.selectedRoleId === "genius") {
     pool.push(...Array(getRoleTalentLevel(state, "thirst-for-knowledge")).fill(9));
+  }
+  if (state?.selectedRoleId === "teacher-child" && usesGameplayRulesFrom("20261023-r28") && !usesGameplayRulesFrom("20261023-r38")) {
+    pool.push(...Array(getRoleTalentLevel(state, "family-host")).fill(7));
   }
   if (state?.selectedRoleId === "chosen-reversed") {
     pool.push(...Array(getRoleTalentLevel(state, "group-event-focus")).fill(7));

@@ -146,7 +146,7 @@ import { renderAcademicArchive } from "./v2-render-rewinder-academic";
 import { isAcademicArchivePending } from "../core/v2-rewinder-academic";
 import { getAcademicDisplayCounters } from "../core/v2-rewinder-academic-record";
 import { renderRewinderEvent, type RewinderAct } from "./v2-render-rewinder-event";
-import { getAdvisorGuidanceAmount } from "../core/v2-advisor-guidance";
+import { getAdvisorGuidanceSummary } from "../core/v2-advisor-guidance";
 import { getDesignedTalentNodes } from "../core/v2-role-talent-definitions";
 import { getCurseDebtPayoffAmount, getMonthEndIllnessDelta } from "../core/v2-curse-system";
 import { getCaptainAdvisorGuidanceBonus, getCaptainGuidanceMultiplier, getCaptainAffinityCap, getCaptainCooperationMax, getCaptainLevel, getCaptainLoverId, getCaptainLoverIntimacyCap, getCaptainLoverResearchCap, getCaptainLoverRouteMax, getCaptainProjectMax, getCaptainResearchCap, getCaptainTag, isCaptain } from "../core/v2-captain-state";
@@ -2309,7 +2309,7 @@ function renderAdvisorStatus(state: GameState): string {
           const research = Math.max(0, getEffectiveResearch(state));
           const fellowGuidance = isCaptain(state) ? state.fellowProgressState.map(profile => `${getFellowName(profile)}+${Math.floor((10 + getCaptainAdvisorGuidanceBonus(state)) * getCaptainGuidanceMultiplier(state, profile))}`).join("、") : "同学论文写作协作+10";
           const reward = projectType === "horizontal" ? `经费+${getAdvisorHorizontalReward(advisor)}，每人发${formatMoney(getAdvisorHorizontalReward(advisor) * 0.05)}金劳务费`
-            : `科研积累+10%，你的论文写作协作+${getAdvisorGuidanceAmount(state)}${fellowGuidance ? `；${fellowGuidance}` : ""}`;
+            : `科研积累+10%，你的${getAdvisorGuidanceSummary(state)}${fellowGuidance ? `；${fellowGuidance}` : ""}`;
           const automaticGain = (advisor.nextProject ?? "horizontal") === projectType ? 10 + getCaptainLevel(state, "advisor", "normal") : 0;
           const maximum = getCaptainProjectMax(state, projectType);
           const hint = `主动推进+${Math.floor(research)}～${Math.floor(research + 5)}，导师下月自动推进+${automaticGain}\n满${maximum}：${reward}`;
@@ -3310,7 +3310,7 @@ function buildRelationTalentItems(state: GameState, requestedSalaryStart?: numbe
         { label: "你的社交原始", value: `+${socialRewards.playerSocial}` },
       ],
       description: inheritancePage === 0
-        ? "8月科研+⌊n/2⌋，n为科研更高人数\n含导师、不含恋人；详见人际提示"
+        ? "每学年末科研+⌊n/2⌋，n为科研更高人数\n含导师、不含恋人；详见人际提示"
         : "8月默契+你的社交档位／人\n你的社交+⌊同学人数/2⌋；均抵抗",
     },
     {

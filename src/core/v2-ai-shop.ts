@@ -6,6 +6,7 @@ import type { ActiveOperationType, Buff, GameState, Paper, PaperActionType, Read
 import type { AiShopState, AiSlotId, AiSubscriptionState } from "./v2-types-economy";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from "./v2-lab-project-constants";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export interface AiModelActionEffect {
   bonus?: number;
@@ -41,6 +42,10 @@ export function canUseAiTalentFunding(state: GameState, price: number): boolean 
   return state.selectedRoleId === "teacher-child" && getRoleTalentLevel(state, "funding-shield") > 0
     && price > 0 && state.advisorProgressState.funding >= LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD
     && state.advisorProgressState.funding >= price;
+}
+
+export function canUseShopTalentFunding(state: GameState, price: number): boolean {
+  return usesGameplayRulesFrom("20261023-r28") && canUseAiTalentFunding(state, price);
 }
 
 /* Models advance at the start of each academic year. */

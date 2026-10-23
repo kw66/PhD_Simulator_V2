@@ -25,19 +25,21 @@ import type {
   DateDisplayMode,
 } from "./v2-types";
 
-export const LOBBY_ROLE_PAGE_SIZE = 10;
-export const LOBBY_ROLE_PAGE_ROW_COUNT = Math.max(1, Math.floor(LOBBY_ROLE_PAGE_SIZE / 2));
 export const ROLE_ACHIEVEMENT_PAGE_SIZE = 11;
-const LOBBY_ROLE_ROWS: ReadonlyArray<ReadonlyArray<RoleId>> = [
-  ["normal", "normal-reversed"],
-  ["rich", "rich-reversed"],
-  ["genius", "genius-reversed"],
-  ["teacher-child", "teacher-child-reversed"],
-  ["social", "social-reversed"],
-  ["chosen", "chosen-reversed"],
-  ["research-captain", "rewinder"],
-  ["special-finite-life", "special-fading-genius"],
-  ["cursed-frail", "cursed-debt"],
+const LOBBY_ROLE_PAGES: ReadonlyArray<ReadonlyArray<ReadonlyArray<RoleId>>> = [
+  [
+    ["normal", "normal-reversed"],
+    ["rich", "rich-reversed"],
+    ["genius", "genius-reversed"],
+    ["teacher-child", "teacher-child-reversed"],
+    ["social", "social-reversed"],
+    ["chosen", "chosen-reversed"],
+    ["research-captain", "rewinder"],
+  ],
+  [
+    ["special-finite-life", "special-fading-genius"],
+    ["cursed-frail", "cursed-debt"],
+  ],
 ];
 const GROWTH_STAT_IDS: RoleGrowthStatId[] = ["san", "research", "social", "favor", "money"];
 
@@ -128,23 +130,16 @@ export function selectLobbyRole(account: AccountProfile, roleId: RoleId): Accoun
   };
 }
 
-export function getLobbyRolePageCount(pageSize = LOBBY_ROLE_PAGE_SIZE): number {
-  const pageRowCount = pageSize === LOBBY_ROLE_PAGE_SIZE ? LOBBY_ROLE_PAGE_ROW_COUNT : Math.max(1, Math.floor(pageSize / 2));
-  return Math.max(1, Math.ceil(LOBBY_ROLE_ROWS.length / pageRowCount));
+export function getLobbyRolePageCount(): number {
+  return LOBBY_ROLE_PAGES.length;
 }
 
-export function getLobbyRolePageIndex(roleId: RoleId, pageSize = LOBBY_ROLE_PAGE_SIZE): number {
-  const pageRowCount = pageSize === LOBBY_ROLE_PAGE_SIZE ? LOBBY_ROLE_PAGE_ROW_COUNT : Math.max(1, Math.floor(pageSize / 2));
-  const rowIndex = LOBBY_ROLE_ROWS.findIndex((row) => row.includes(roleId));
-  if (rowIndex >= 0) {
-    return Math.floor(rowIndex / pageRowCount);
-  }
-
-  return 0;
+export function getLobbyRolePageIndex(roleId: RoleId): number {
+  return Math.max(0, LOBBY_ROLE_PAGES.findIndex((page) => page.some((row) => row.includes(roleId))));
 }
 
-export function changeLobbyRolePage(account: AccountProfile, delta: number, pageSize = LOBBY_ROLE_PAGE_SIZE): AccountProfile {
-  const maxPageIndex = getLobbyRolePageCount(pageSize) - 1;
+export function changeLobbyRolePage(account: AccountProfile, delta: number): AccountProfile {
+  const maxPageIndex = getLobbyRolePageCount() - 1;
   return {
     ...account,
     lobbyRolePage: Math.min(maxPageIndex, Math.max(0, account.lobbyRolePage + delta)),
@@ -195,13 +190,8 @@ export function changeRoleAchievementPage(
   };
 }
 
-export function getLobbyRolePageRows(
-  account: AccountProfile,
-  pageSize = LOBBY_ROLE_PAGE_SIZE,
-): RoleId[][] {
-  const pageRowCount = pageSize === LOBBY_ROLE_PAGE_SIZE ? LOBBY_ROLE_PAGE_ROW_COUNT : Math.max(1, Math.floor(pageSize / 2));
-  const pageStart = account.lobbyRolePage * pageRowCount;
-  return LOBBY_ROLE_ROWS.slice(pageStart, pageStart + pageRowCount).map((row) => [...row]);
+export function getLobbyRolePageRows(account: AccountProfile): RoleId[][] {
+  return (LOBBY_ROLE_PAGES[account.lobbyRolePage] ?? []).map((row) => [...row]);
 }
 
 function getStatLabel(statId: RoleGrowthStatId): string {

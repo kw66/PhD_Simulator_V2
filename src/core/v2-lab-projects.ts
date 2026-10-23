@@ -1,7 +1,7 @@
 import { gameRandom } from "./v2-game-random";
 import { getCaptainProjectMax } from "./v2-captain-state";
 import { recordPersonalIncome } from "./v2-money";
-import { getAdvisorGuidanceAmount, queueAdvisorGuidance, settleAdvisorGuidance } from "./v2-advisor-guidance";
+import { getAdvisorGuidanceAmount, getAdvisorGuidanceScores, getAdvisorGuidanceSummary, queueAdvisorGuidance, settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { pushMilestoneLog } from "./v2-engine-helpers";
 import { creditFellowMoney, ensureFellowFinanceAccounts, getFellowFinanceAccount } from "./v2-fellow-finance";
 import { roundMoney } from "./v2-money";
@@ -94,8 +94,11 @@ export function advanceSharedLabProject(
       const previousPending = nextState.advisorProgressState.pendingGuidanceToPlayer;
       nextState = settleAdvisorGuidance(queueAdvisorGuidance(nextState), random);
       if (previousPending == null && nextState.advisorProgressState.pendingGuidanceToPlayer != null) {
+        const scores = getAdvisorGuidanceScores(nextState);
         nextState = pushMilestoneLog(nextState,
-          `导师指导：你的论文写作协作待使用（${getAdvisorGuidanceAmount(nextState)}分）`, "advisor-guidance-pending");
+          scores.idea || scores.experiment
+            ? `导师指导：你的${getAdvisorGuidanceSummary(nextState)}，待使用`
+            : `导师指导：你的论文写作协作待使用（${getAdvisorGuidanceAmount(nextState)}分）`, "advisor-guidance-pending");
       }
     }
   }

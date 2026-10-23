@@ -140,7 +140,7 @@ describe("paper mastery growth", () => {
     expect(repeated.eventHistory).toEqual(granted.eventHistory);
   });
 
-  it("settles multiple PhD-transfer first authors through the real event pipeline", () => {
+  it("settles multiple PhD-transfer first authors through the real event pipeline", () => withGameplayRuleset("20261022-r27", () => {
     const base = createStartedGameState("teacher-child", { "near-the-source": 1, "family-patronage": 2 });
     let state: GameState = { ...base, year: 2, month: 9, totalMonths: 21, totalResearchScore: 2,
       selectedAdvisorName: "测试导师", player: { ...base.player, favor: 12, money: 30 }, eventQueue: [] };
@@ -154,7 +154,7 @@ describe("paper mastery growth", () => {
     expect(state.externalPublications).toHaveLength(4);
     expect(getPaperMasteryCount(state)).toBe(4);
     expect(getPaperMasteryBonuses(state)).toEqual({ idea: 2, experiment: 1, writing: 1 });
-  });
+  }));
 
   it("verifies a mixed old/new replay when a journal publishes under the new rules", () => {
     const initial = createInitialState();

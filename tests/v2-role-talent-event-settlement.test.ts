@@ -45,7 +45,7 @@ describe("role talent event settlement", () => {
     const state = initial("chosen", { "lasting-fortune": 3 });
     const choice = event({ research: 0.4, rawResearch: 1 }).choices[0]!;
     const next = applyChoiceEffectsToState(state, choice).nextState;
-    expect(next.player.research).toBe(19);
+    expect(next.player.research).toBe(18.7);
     expect(state.player.research).toBe(18);
   });
 
@@ -92,7 +92,7 @@ describe("role talent event settlement", () => {
   it("keeps teachers-day gift and errand raw rewards at one point", () => {
     const state = initial("chosen", { "lasting-fortune": 3 });
     const gift = resolveTeachersDayFixedEvent(state, { kind: "teachers-day-stamp" }, () => 0);
-    expect(gift.nextState.player.favor).toBe(20);
+    expect(gift.nextState.player.favor).toBe(19.4);
     const low = { ...state, player: { ...state.player, favor: 1 } };
     const errand = resolveTeachersDayFixedEvent(low, { kind: "teachers-day-message" }, () => 0);
     expect(errand.nextState.player.favor).toBe(2);

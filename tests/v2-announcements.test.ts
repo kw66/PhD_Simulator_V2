@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-22", "2026-10-21", "2026-10-19", "2026-10-18", "2026-10-17", "2026-10-16"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-24", "2026-10-22", "2026-10-21", "2026-10-19", "2026-10-18", "2026-10-17"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -17,6 +17,8 @@ describe("game announcements", () => {
       for (const change of entry.changes) expect(html).toContain(change.title);
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
+    const current = textForDate("2026-10-24");
+    for (const text of ["18位角色", "Q版头像", "诅咒角色移至第二页", "去除上下大块纯色留白", "好感达到12、15、18", "为组奉献", "资源倾斜", "成果归我", "整钱包", "最终净亏损", "钱能通神", "屡败屡研", "心宽体健", "空想·天选之人", "直接排列、不受抵抗"]) expect(current).toContain(text);
     for (const text of ["不再向上取整", "档位抵抗", "SAN消耗倍率", "加点", "等级分布", "诅咒", "紧凑方格", "期限", "结算月份"]) expect(textForDate("2026-10-21")).toContain(text);
     for (const text of ["解锁即有10天赋点", "每升一级再增加1点", "已有加点保留", "首篇一作论文获得分数后", "被抢发idea和新sota", "所有角色均可回溯事件", "同一选项结果固定", "选项文字居中"]) expect(textForDate("2026-10-19")).toContain(text);
     const mastery = textForDate("2026-10-18");
@@ -41,7 +43,7 @@ describe("game announcements", () => {
 
   it("removes superseded rules while retaining the major gameplay milestones", () => {
     const text = GAME_ANNOUNCEMENTS.flatMap((entry) => entry.changes.map((change) => `${change.title}：${change.description}`)).join("\n");
-    expect(text).not.toMatch(/0%／25%／50%／75%|向下取整数显示|每300引用|参会经验|交流实验经验|1、2、1、2|机会永久关闭|实际参与项目者各得5金币|现行规则见最新公告/);
+    expect(text).not.toMatch(/0%／25%／50%／75%|向下取整数显示|每300引用|参会经验|交流实验经验|1、2、1、2|机会永久关闭|实际参与项目者各得5金币|现行规则见最新公告|每次投入至多5金币|亏损不再触发消费奖励/);
     for (const topic of ["5月处理转博", "月末判断毕业", "注册费", "失败预警", "生活费", "2000字", "同学钱包", "角色经验", "十二项发表里程碑", "六个AI系列"]) {
       expect(text).toContain(topic);
     }

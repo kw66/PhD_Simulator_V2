@@ -1,3 +1,4 @@
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { describe, expect, it } from "vitest";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { getEffectiveResearch, getEffectiveSocial } from "../src/core/v2-effective-attributes";
@@ -18,6 +19,15 @@ function stateFor(role: RoleId, levels: Record<string, number> = {}): GameState 
 }
 
 describe("effective talent attributes", () => {
+  it.each(["master", "phd"] as const)("uses real research rather than advisor favor for %s osmosis", (degree) => {
+    const state = { ...stateFor("teacher-child", { "learning-by-osmosis": 1 }), degree };
+    state.player = { ...state.player, research: 3, favor: 18 };
+    expect(getEffectiveResearch(state)).toBe(3);
+    expect(calculateMonthlyCareerProgress(state, "internet")).toBe(1);
+    expect(getAvailablePaperSlotCount(state)).toBe(getAvailablePaperSlotCount({ ...state, roleTalents: { levels: {} } }));
+    expect(getEffectiveResearch({ ...state, player: { ...state.player, research: 19, favor: 2 } })).toBe(19);
+  });
+
   it("hides cursed research from ability checks but keeps real resistance and growth", () => {
     const state = stateFor("genius-reversed");
     expect(getEffectiveResearch(state)).toBe(0);
@@ -39,7 +49,7 @@ describe("effective talent attributes", () => {
     expect(getAvailablePaperSlotCount(next)).toBe(4);
   });
 
-  it("uses advisor favor only for the purchased post-PhD talent", () => {
+  it("uses advisor favor only for the purchased post-PhD talent", () => withGameplayRuleset("20261022-r27", () => {
     const state = stateFor("teacher-child", { "learning-by-osmosis": 1 });
     state.player.research = 3;
     expect(getEffectiveResearch(state)).toBe(3);
@@ -48,7 +58,7 @@ describe("effective talent attributes", () => {
     expect(calculateMonthlyCareerProgress(phd, "internet")).toBe(6);
     expect(previewPlayerAttributeChange(phd, "research", 1).effectiveChange).toBe(1);
     expect(getEffectiveResearch({ ...phd, roleTalents: { levels: {} } })).toBe(3);
-  });
+  }));
 
   it("subtracts the dynamic favor cap, never current favor, without mutating real stats", () => {
     const state = stateFor("teacher-child-reversed");
@@ -108,11 +118,11 @@ describe("effective talent attributes", () => {
 
   it("shows the chosen growth-only reduction and reversed per-attribute reductions", () => {
     const chosen = stateFor("chosen", { "lasting-fortune": 3 });
-    expect(renderApp(chosen)).toContain("科研增长抵抗0%｜下降抵抗60%");
+    expect(renderApp(chosen)).toContain("科研增长抵抗30%｜下降抵抗60%");
     const reversed = stateFor("chosen-reversed", { "reverse-meter-alpha": 3, "reverse-meter-beta": 2, "reverse-meter-gamma": 1 });
     const html = renderApp(reversed);
-    expect(html).toContain("科研增减抵抗30%");
-    expect(html).toContain("社交增减抵抗40%");
-    expect(html).toContain("好感增减抵抗30%");
+    expect(html).toContain("科研增长抵抗30%｜下降抵抗90%");
+    expect(html).toContain("社交增长抵抗40%｜下降抵抗80%");
+    expect(html).toContain("好感增长抵抗30%｜下降抵抗50%");
   });
 });

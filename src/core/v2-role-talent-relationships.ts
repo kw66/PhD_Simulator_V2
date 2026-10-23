@@ -4,6 +4,8 @@ import { canAddRelationship } from "./v2-relationship-rules";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
 import { getFellowName } from "./v2-fellow-progression";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { describeTalentChange, recordTalentTrigger } from "./v2-talent-history";
 import type { EventChoice, FellowProfileAddition, FellowProgressProfile, GameState } from "./v2-types";
 
 export function getJuniorDelegationSocialChange(state: GameState, ordinaryChange: number): number {
@@ -50,8 +52,26 @@ export function getFellowOverflowOutcome(state: GameState): string {
 
 export function settleFellowRecruitmentTalent(before: GameState, after: GameState, overflowAttempts = 0): GameState {
   const previousIds = new Set(before.fellowProgressState.map((fellow) => fellow.id));
-  const count = after.fellowProgressState.filter((fellow) => !previousIds.has(fellow.id)).length;
-  return applyFellowRecruitmentTalent(after, count, overflowAttempts);
+  const joined = after.fellowProgressState.filter((fellow) => !previousIds.has(fellow.id));
+  after = applyFellowRecruitmentTalent(after, joined.length, overflowAttempts);
+  const rank = after.selectedRoleId === "genius" && usesGameplayRulesFrom("20261022-r27")
+    ? getRoleTalentLevel(after, "academic-atmosphere") : 0;
+  if (!rank || !joined.length) return after;
+  const granted = new Set(after.roleTalents?.academicAtmosphereFellowIds ?? []);
+  for (const fellow of joined) {
+    if (granted.has(fellow.id)) continue;
+    granted.add(fellow.id);
+    const research = Number((fellow.research + applyTierResist(rank, fellow.research, undefined, 20).effectiveChange).toFixed(10));
+    after = { ...after,
+      fellowProgressState: after.fellowProgressState.map((entry) => entry.id === fellow.id ? { ...entry, research } : entry),
+      roleTalents: { ...after.roleTalents!, academicAtmosphereFellowIds: [...granted] },
+    };
+    after = recordTalentTrigger(after, `role-academic-atmosphere:${fellow.id}`, {
+      name: "学术氛围", recipient: getFellowName(fellow), reason: "同学加入时提升其自身科研能力",
+      effects: [describeTalentChange("科研", fellow.research, research)],
+    });
+  }
+  return after;
 }
 
 /** Shared by actual recruitment and risk quotes; quotes need no generated identities. */

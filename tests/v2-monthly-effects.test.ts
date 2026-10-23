@@ -30,6 +30,13 @@ function createPlayingMonth(month: number, totalMonths: number, san = 10) {
 }
 
 describe("monthly effects", () => {
+  it("recovers thirty percent of missing SAN with rank-three idle talent only after PhD", () => {
+    const state: GameState = { ...createPlayingMonth(4, 28, 10), selectedRoleId: "normal-reversed", degree: "phd",
+      sanCap: 30, roleTalents: { levels: { "post-phd-recovery": 3 } } };
+    const effects = resolveMonthlyEffects(state);
+    expect(effects.items.find(item => item.id === "role-missing-san-recovery")?.stats.san).toBe(6);
+    expect(resolveMonthlyEffects({ ...state, degree: "master" }).items.some(item => item.id === "role-missing-san-recovery")).toBe(false);
+  });
   it("rounds each monthly money effect before combining the month's total", () => {
     const state = createPlayingMonth(8, 8);
     state.player.money = 0.1;

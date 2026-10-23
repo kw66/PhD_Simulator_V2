@@ -1,5 +1,26 @@
 import type { RoleId } from "../core/v2-types";
 
+const ROLE_CHIBI_PORTRAIT_URLS: Record<RoleId, string> = {
+  normal: new URL("../../art/final_roles/set_20260329_v2/web/chibi/normal_chibi.webp", import.meta.url).href,
+  genius: new URL("../../art/final_roles/set_20260329_v2/web/chibi/genius_chibi.webp", import.meta.url).href,
+  social: new URL("../../art/final_roles/set_20260329_v2/web/chibi/social_chibi.webp", import.meta.url).href,
+  rich: new URL("../../art/final_roles/set_20260329_v2/web/chibi/rich_chibi.webp", import.meta.url).href,
+  "teacher-child": new URL("../../art/final_roles/set_20260329_v2/web/chibi/teacher-child_chibi.webp", import.meta.url).href,
+  chosen: new URL("../../art/final_roles/set_20260329_v2/web/chibi/chosen_chibi.webp", import.meta.url).href,
+  rewinder: new URL("../../art/final_roles/set_20260329_v2/web/chibi/rewinder_chibi.webp", import.meta.url).href,
+  "research-captain": new URL("../../art/final_roles/set_20260329_v2/web/chibi/research-captain_chibi.webp", import.meta.url).href,
+  "normal-reversed": new URL("../../art/final_roles/set_20260329_v2/web/chibi/normal-reversed_chibi.webp", import.meta.url).href,
+  "genius-reversed": new URL("../../art/final_roles/set_20260329_v2/web/chibi/genius-reversed_chibi.webp", import.meta.url).href,
+  "social-reversed": new URL("../../art/final_roles/set_20260329_v2/web/chibi/social-reversed_chibi.webp", import.meta.url).href,
+  "rich-reversed": new URL("../../art/final_roles/set_20260329_v2/web/chibi/rich-reversed_chibi.webp", import.meta.url).href,
+  "teacher-child-reversed": new URL("../../art/final_roles/set_20260329_v2/web/chibi/teacher-child-reversed_chibi.webp", import.meta.url).href,
+  "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/chibi/chosen-reversed_chibi.webp", import.meta.url).href,
+  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/chibi/special-finite-life_chibi.webp", import.meta.url).href,
+  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/chibi/special-fading-genius_chibi.webp", import.meta.url).href,
+  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/chibi/cursed-frail_chibi.webp", import.meta.url).href,
+  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/chibi/cursed-debt_chibi.webp", import.meta.url).href,
+};
+
 const ROLE_CARD_PORTRAIT_URLS: Record<RoleId, string> = {
   normal: new URL("../../art/final_roles/set_20260329_v2/web/card/01_normal_upright_final_card.webp", import.meta.url).href,
   genius: new URL("../../art/final_roles/set_20260329_v2/web/card/02_genius_upright_final_card.webp", import.meta.url).href,
@@ -15,10 +36,10 @@ const ROLE_CARD_PORTRAIT_URLS: Record<RoleId, string> = {
   "rich-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/04_rich_reversed_final_card.webp", import.meta.url).href,
   "teacher-child-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/05_teacher_child_reversed_final_card.webp", import.meta.url).href,
   "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/card/06_chosen_reversed_final_card.webp", import.meta.url).href,
-  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/card/09_finite_life_v4_final_card.webp", import.meta.url).href,
-  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/card/10_fading_genius_v4_final_card.webp", import.meta.url).href,
-  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/card/11_cursed_frail_v4_final_card.webp", import.meta.url).href,
-  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/card/12_cursed_debt_v4_final_card.webp", import.meta.url).href,
+  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/card/09_finite_life_v5_final_card.webp", import.meta.url).href,
+  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/card/10_fading_genius_v5_final_card.webp", import.meta.url).href,
+  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/card/11_cursed_frail_v5_final_card.webp", import.meta.url).href,
+  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/card/12_cursed_debt_v5_final_card.webp", import.meta.url).href,
 };
 
 const ROLE_DETAIL_PORTRAIT_URLS: Record<RoleId, string> = {
@@ -36,10 +57,10 @@ const ROLE_DETAIL_PORTRAIT_URLS: Record<RoleId, string> = {
   "rich-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/04_rich_reversed_final_detail.webp", import.meta.url).href,
   "teacher-child-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/05_teacher_child_reversed_final_detail.webp", import.meta.url).href,
   "chosen-reversed": new URL("../../art/final_roles/set_20260329_v2/web/detail/06_chosen_reversed_final_detail.webp", import.meta.url).href,
-  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/detail/09_finite_life_v4_final_detail.webp", import.meta.url).href,
-  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/detail/10_fading_genius_v4_final_detail.webp", import.meta.url).href,
-  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/detail/11_cursed_frail_v4_final_detail.webp", import.meta.url).href,
-  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/detail/12_cursed_debt_v4_final_detail.webp", import.meta.url).href,
+  "special-finite-life": new URL("../../art/final_roles/set_20260329_v2/web/detail/09_finite_life_v5_final_detail.webp", import.meta.url).href,
+  "special-fading-genius": new URL("../../art/final_roles/set_20260329_v2/web/detail/10_fading_genius_v5_final_detail.webp", import.meta.url).href,
+  "cursed-frail": new URL("../../art/final_roles/set_20260329_v2/web/detail/11_cursed_frail_v5_final_detail.webp", import.meta.url).href,
+  "cursed-debt": new URL("../../art/final_roles/set_20260329_v2/web/detail/12_cursed_debt_v5_final_detail.webp", import.meta.url).href,
 };
 
 const WARMED_DETAIL_PORTRAITS = new Set<RoleId>();
@@ -47,6 +68,10 @@ const PENDING_DETAIL_PORTRAIT_WARMS = new Map<RoleId, Promise<void>>();
 
 export function getRoleCardPortraitUrl(roleId: RoleId): string {
   return ROLE_CARD_PORTRAIT_URLS[roleId];
+}
+
+export function getRoleChibiPortraitUrl(roleId: RoleId): string {
+  return ROLE_CHIBI_PORTRAIT_URLS[roleId];
 }
 
 export function hasRoleCardPortrait(roleId: RoleId): boolean {

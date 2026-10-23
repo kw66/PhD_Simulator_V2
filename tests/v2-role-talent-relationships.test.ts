@@ -10,6 +10,8 @@ import { createRandomEventPool } from "../src/core/v2-random-event-rules";
 import { createMentorAssignEvent } from "../src/core/v2-fixed-events-mentor-assign";
 import { createSocialCampusRandomEvent } from "../src/core/v2-random-events-campus-social";
 import { createDraftPaper } from "../src/core/v2-paper-rules";
+import { syncRoleTalentFellows } from "../src/core/v2-role-talent-lifecycle";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import type { FellowProgressProfile, GameState, PendingEvent, RoleId } from "../src/core/v2-types";
 
 function fellow(index: number, type: FellowProgressProfile["type"] = "junior", affinity = 1) {
@@ -42,6 +44,30 @@ function confirm(state: GameState, chain: string) {
 }
 
 describe("relationship role talent settlements", () => {
+  it.each(["master", "phd"] as const)("settles academic atmosphere only on successful final recruitment during %s", degree => {
+    const recruit = (levels: Record<string, number>, full = false) => {
+      const initial = syncRoleTalentFellows({ ...state("genius", levels, full ? [fellow(1), fellow(2), fellow(3), fellow(4)] : []), degree });
+      const root = createRandomEventById(14, initial, () => 0).event!;
+      const preview = toResult(initial, root, "-idea-");
+      expect(preview.fellowProgressState).toEqual(initial.fellowProgressState);
+      const finalEvent = preview.eventQueue.find(event => event.chainId === root.chainId)!;
+      const result = confirm(preview, root.chainId!);
+      const repeated = dispatchAction(result, "resolve-event", {
+        eventId: finalEvent.id, eventChoiceId: finalEvent.choices[0]!.id,
+      });
+      expect(repeated.fellowProgressState).toEqual(result.fellowProgressState);
+      return { initial, result };
+    };
+    const ordinary = recruit({});
+    const atmosphere = recruit({ "academic-atmosphere": 3 });
+    expect(atmosphere.result.fellowProgressState).toHaveLength(1);
+    expect(atmosphere.result.fellowProgressState[0]!.research).toBeGreaterThan(ordinary.result.fellowProgressState[0]!.research);
+    expect(atmosphere.result.player).toEqual(ordinary.result.player);
+    const full = recruit({ "academic-atmosphere": 3 }, true);
+    expect(full.result.fellowProgressState).toEqual(full.initial.fellowProgressState);
+    expect(full.result.player.research).toBe(full.initial.player.research);
+  });
+
   it.each([[1, "-delegate-"], [2, "-delegate-"], [4, "-share-"], [12, "-transfer-"]] as const)(
     "applies delegation talents once at the final confirmation of random-%i", (id, branch) => {
       const initial = state("social", { "junior-delegation": 1, "junior-bond": 2 }, [fellow(1, "junior", 6), fellow(2, "junior", 6), fellow(3, "peer", 6)]);
@@ -181,6 +207,8 @@ describe("relationship role talent settlements", () => {
   it("adds each role's annual tickets with the correct event IDs", () => {
     const social = createRandomEventPool(state("social", { "supporting-juniors": 1, "peer-camaraderie": 1, "senior-mentorship": 1 }));
     for (const id of [14, 10, 11]) expect(social.filter((entry) => entry === id)).toHaveLength(2);
+    const specialized = createRandomEventPool(state("social", { "supporting-juniors": 2, "peer-camaraderie": 2, "senior-mentorship": 2 }));
+    for (const id of [14, 10, 11]) expect(specialized.filter((entry) => entry === id)).toHaveLength(3);
     const jealous = createRandomEventPool(state("social-reversed", { "junior-event-focus": 4, "peer-event-focus": 3, "senior-event-focus": 2 }));
     expect(jealous.filter((id) => id === 14)).toHaveLength(5);
     expect(jealous.filter((id) => id === 10)).toHaveLength(4);
@@ -192,7 +220,7 @@ describe("relationship role talent settlements", () => {
 
   it("lets family host guarantee the advisor treats dinner with unchanged rewards", () => {
     const initial = state("teacher-child", { "family-host": 1 });
-    const root = createSocialCampusRandomEvent(initial, () => 0.9999);
+    const root = withGameplayRuleset("20261023-r37", () => createSocialCampusRandomEvent(initial, () => 0.9999));
     const dinner = root.choices[0]!.effects.enqueueEvents![0]!.choices.find((choice) => choice.id.includes("-dinner-"))!;
     expect(dinner.outcome).toContain("100%");
     const result = confirm(toResult(initial, root, "-dinner-"), root.chainId!);

@@ -213,6 +213,8 @@ export interface FellowProgressProfile {
   helpedFellowCount?: number;
   annualResearchGrowthTotal?: number;
   longTermMentoring?: boolean;
+  /** Successful reviews, including the second paper reassigned by teacher-child. */
+  successfulPublicationCount?: number;
 }
 
 export interface FellowFinanceAccount {

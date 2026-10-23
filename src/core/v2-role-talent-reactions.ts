@@ -8,6 +8,7 @@ import { roundMoney } from "./v2-money";
 import { getRecoveredSan } from "./v2-san-recovery";
 import { describeTalentChange, recordTalentTrigger } from "./v2-talent-history";
 import type { GameState } from "./v2-types";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 const precise = (value: number) => Number(value.toFixed(10));
 const level = getRoleTalentLevel;
@@ -77,6 +78,18 @@ export function applyRoleAttributeReactions(state: GameState, stat: PlayerAttrib
   if (state.selectedRoleId === "teacher-child-reversed" && stat === "favor" && actual < 0) return settleRoleTalentRescues(state, getRoll);
   if (state.selectedRoleId === "genius-reversed" && stat === "research" && actual > 0) {
     const before = state;
+    if (usesGameplayRulesFrom("20261023-r33")) {
+      const sanCapGain = usesGameplayRulesFrom("20261023-r40") ? 0 : level(state, "work-life-balance");
+      state = recordAchievementSanCapGain({ ...state, sanCap: state.sanCap + sanCapGain }, sanCapGain);
+      state = increaseCap(state, "favor", level(state, "reputation-growth"));
+      state = increaseCap(state, "social", level(state, "social-growth"));
+      state = { ...state, player: { ...state.player,
+        san: getRecoveredSan(state.player.san, state.sanCap, 4 * sanCapGain, state.selectedRoleId) } };
+      for (const [attribute, talent] of [["favor", "reputation-growth"], ["social", "social-growth"]] as const) {
+        if (level(state, talent)) state = applyPlayerAttributeChange(state, attribute, 1, "ordinary", getRoll).state;
+      }
+      return logReaction(before, state, "科研成长", "真实科研提升，结算已激活的成长天赋");
+    }
     // Caps precede rewards, so a near-full bar can use its new capacity in this batch.
     if (state.degree === "phd") {
       state = recordAchievementSanCapGain({ ...state, sanCap: state.sanCap + level(state, "research-wellness") }, level(state, "research-wellness"));

@@ -8,8 +8,10 @@ import type { GameState, PendingEvent } from "../src/core/v2-types";
 
 function fixture() {
   const initial = createStartedGameState("social-reversed", {
-    "social-to-san": 3, "fellow-add-social": 2, "social-loss-coins": 3,
+    "peer-event-focus": 1, "affinity-conversion": 1,
+    "social-to-san": 3, "fellow-add-social": 2, "fellow-remove-social": 1, "social-loss-coins": 3,
   });
+  expect(initial.roleTalents?.levels).toMatchObject({ "social-to-san": 3, "fellow-add-social": 2 });
   const state: GameState = { ...initial, totalMonths: 14, year: 2, month: 2,
     selectedAdvisorName: "导师", eventQueue: [], buffs: [],
     player: { ...initial.player, san: 2, social: 6, research: 1, favor: 6, money: 10 },

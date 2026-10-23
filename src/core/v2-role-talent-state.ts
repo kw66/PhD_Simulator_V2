@@ -1,4 +1,5 @@
 import type { GameState } from "./v2-types";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export type PlayerAttribute = "research" | "social" | "favor";
 export type AttributeChangeSource = "ordinary" | "equalize" | "swap" | "reset";
@@ -34,11 +35,15 @@ export interface RoleTalentRunState {
   socialStagnantMonths?: number;
   lastStagnationCurseMonth?: number;
   rejectedPaperRewardIds?: string[];
+  rejectionRewardKeys?: string[];
   regularActionBudget?: number;
   lastSwapMonth?: number;
   lastCurseMonth?: number;
   negativeDiseaseMilestone?: number;
+  negativeDiseaseSanMilestone?: number;
   boostedFellowIds?: string[];
+  academicAtmosphereFellowIds?: string[];
+  familyPatronageGrantedIds?: string[];
   investments?: RoleTalentInvestment[];
   nextInvestmentId?: number;
   /** Opt-in payment with personal coins instead of SAN. */
@@ -55,6 +60,7 @@ export interface RoleTalentRunState {
   pendingCoinGames?: number;
   moneyConversionRemainder?: number;
   pendingMoneyConversions?: number;
+  pendingMoneyConversionTransactions?: number[];
   lastGreedResetMonth?: number;
   greedRandomState?: number;
   sanCapReserveBonus?: number;
@@ -72,5 +78,6 @@ export function createRoleTalentRunState(levels: Record<string, number> = {}): R
 /** Recompute for each new review draw; existing review reports stay unchanged. */
 export function getRoleKindReviewerBonus(state: Pick<GameState, "selectedRoleId" | "degree" | "player" | "roleTalents">): number {
   if (state.selectedRoleId !== "social" || state.degree !== "phd") return 0;
-  return Math.min(1, Math.max(0, Number((state.player.social * 0.01 * getRoleTalentLevel(state, "kindly-reviewed")).toFixed(10))));
+  const perLevel = usesGameplayRulesFrom("20261023-r36") ? 0.01 : usesGameplayRulesFrom("20261023-r30") ? 0.02 : 0.01;
+  return Math.min(1, Math.max(0, Number((state.player.social * perLevel * getRoleTalentLevel(state, "kindly-reviewed")).toFixed(10))));
 }

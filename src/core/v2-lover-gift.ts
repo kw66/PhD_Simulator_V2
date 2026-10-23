@@ -1,4 +1,4 @@
-import { AI_SLOT_IDS, canUseAiTalentFunding, getAiModelForTotalMonths, hasAiReimbursement } from "./v2-ai-shop";
+import { AI_SLOT_IDS, canUseAiTalentFunding, canUseShopTalentFunding, getAiModelForTotalMonths, hasAiReimbursement } from "./v2-ai-shop";
 import { getLabReimbursementCount, getLabReimbursementKind } from "./v2-lab-reimbursement";
 import { getNextBikeTierDefinition } from "./v2-bike-system";
 import { COFFEE_MACHINE_PRICE, COFFEE_MACHINE_UPGRADE_DEFINITIONS, getAvailableCoffeeMachineUpgrades, getCoffeeBuyPrice } from "./v2-coffee-system";
@@ -56,17 +56,20 @@ export function getShopActionBasePrice(state: GameState, actionId: ShopPurchaseA
   const kind = getLabReimbursementKind(actionId, payload);
   if (kind && (state.shopState.entitlements[kind] > 0 || getLabReimbursementCount(state, kind) > 0)) return 0;
   if (actionId === "buy-ai-month" && hasAiReimbursement(state)) return 0;
-  if (actionId === "buy-ai-month" && getLoverGiftCount(state) === 0 && canUseAiTalentFunding(state, listedPrice)) return 0;
+  if (getLoverGiftCount(state) === 0 && (actionId === "buy-ai-month"
+    ? canUseAiTalentFunding(state, listedPrice) : canUseShopTalentFunding(state, listedPrice))) return 0;
   return listedPrice;
 }
 
 export function getShopLabFundingCost(state: GameState, actionId: ShopPurchaseAction, payload: PurchasePayload): number {
+  const listedPrice = getShopActionListedPrice(state, actionId, payload) ?? 0;
   const kind = getLabReimbursementKind(actionId, payload);
-  const covered = kind
-    ? state.shopState.entitlements[kind] === 0 && getLabReimbursementCount(state, kind) > 0
-    : actionId === "buy-ai-month" && (hasAiReimbursement(state)
-      || (getLoverGiftCount(state) === 0 && canUseAiTalentFunding(state, getShopActionListedPrice(state, actionId, payload) ?? 0)));
-  return covered ? getShopActionListedPrice(state, actionId, payload) ?? 0 : 0;
+  if (kind && state.shopState.entitlements[kind] > 0) return 0;
+  if (kind && getLabReimbursementCount(state, kind) > 0) return listedPrice;
+  if (actionId === "buy-ai-month" && hasAiReimbursement(state)) return listedPrice;
+  const talentFunding = getLoverGiftCount(state) === 0 && (actionId === "buy-ai-month"
+    ? canUseAiTalentFunding(state, listedPrice) : canUseShopTalentFunding(state, listedPrice));
+  return talentFunding ? listedPrice : 0;
 }
 
 export function hasOtherLoverGiftPurchases(state: GameState): boolean {

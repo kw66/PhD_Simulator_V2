@@ -2108,8 +2108,9 @@ p {
 
 .lobby-role-list {
   display: grid;
-  grid-template-rows: repeat(var(--lobby-role-page-rows, 5), 1fr);
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  gap: 7px;
   align-content: start;
   min-height: 0;
 }
@@ -2117,7 +2118,7 @@ p {
 .lobby-role-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
+  gap: 7px;
   align-items: stretch;
 }
 
@@ -2135,17 +2136,20 @@ p {
   --role-card-selected-text: var(--role-card-accent);
   font-family: var(--ui-font-cjk);
   width: 100%;
-  min-height: 110px;
-  padding: 0 8px 0 0;
-  border-radius: 0;
+  min-width: 0;
+  padding: 6px 4px 0;
+  border-radius: 6px;
   border: 1px solid rgba(39, 68, 58, 0.14);
   background:
     linear-gradient(180deg, rgba(255, 252, 246, 0.72), rgba(241, 235, 223, 0.76)),
     linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 52%);
   color: var(--role-card-text);
   display: grid;
-  gap: 0;
-  text-align: left;
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  justify-items: center;
+  gap: 3px;
+  text-align: center;
   cursor: pointer;
   transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
   position: relative;
@@ -2207,50 +2211,32 @@ p {
     0 3px 7px color-mix(in oklab, var(--role-card-accent) 16%, transparent);
 }
 
-.lobby-role-card.is-selected .lobby-role-card-portrait-shell {
-  border-color: color-mix(in oklab, var(--role-card-accent) 36%, transparent);
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, white 82%, var(--role-card-accent) 18%),
-    color-mix(in oklab, rgba(238, 221, 192, 0.94) 80%, var(--role-card-accent) 20%)
-  );
-}
-
-.lobby-role-card-top {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-start;
-  height: 100%;
-  align-items: stretch;
-}
-
-.lobby-role-card-main {
-  display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
-  align-items: stretch;
-  width: 100%;
-  height: 100%;
-  gap: 8px;
-}
-
 .lobby-role-card-portrait-shell {
   position: relative;
-  width: 68px;
-  flex: 0 0 68px;
-  align-self: stretch;
+  isolation: isolate;
+  width: 100%;
+  aspect-ratio: 1;
+  align-self: start;
   border-radius: 0;
   overflow: hidden;
   border: 0;
-  background: none;
+  background: radial-gradient(
+    ellipse 48% 46% at 50% 52%,
+    color-mix(in oklab, var(--role-card-accent) 15%, transparent),
+    color-mix(in oklab, var(--role-card-accent) 7%, transparent) 62%,
+    transparent 100%
+  );
   box-shadow: none;
 }
 
-.lobby-role-card-portrait-shell::after {
+.lobby-role-card-portrait-shell::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 28%, rgba(7, 18, 16, 0.12) 100%);
+  inset: 13%;
+  z-index: -1;
+  border: 1px solid color-mix(in oklab, var(--role-card-accent) 13%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 10px color-mix(in oklab, var(--role-card-accent) 6%, transparent);
   pointer-events: none;
 }
 
@@ -2258,70 +2244,63 @@ p {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 100%;
-  object-fit: cover;
-  object-position: center top;
-}
-
-.lobby-role-card-headings {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 0;
-  min-height: 84px;
-  padding-block: 7px 8px;
-  padding-right: 2px;
-  width: 100%;
-  max-width: 100%;
-  align-self: stretch;
-}
-
-.lobby-role-card .lobby-role-card-headings {
-  color: var(--role-card-text);
+  object-fit: contain;
+  object-position: center;
 }
 
 .lobby-role-card.is-selected .lobby-role-card-name {
   color: var(--role-card-selected-text);
+  background: color-mix(in oklab, var(--role-card-accent) 10%, #fbf6e9);
 }
 
 .lobby-role-card-name {
-  display: block;
-  font-family: var(--display-font-cjk);
-  color: var(--setup-title-color);
-  font-size: var(--setup-item-title-size);
-  line-height: 1.14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ui-font-cjk);
+  color: color-mix(in oklab, var(--role-card-accent) 28%, var(--ink));
+  font-size: 0.82rem;
+  line-height: 1.24;
   letter-spacing: 0;
-  font-weight: 820;
+  font-weight: 750;
   font-kerning: normal;
   min-width: 0;
-  width: auto;
+  width: 100%;
   max-width: 100%;
-  padding-top: 1px;
-  padding-right: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: clip;
+  min-height: 2.48em;
+  padding: 2px 1px;
+  border-radius: 4px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--role-card-accent) 6%, #fcf9f1),
+    color-mix(in oklab, var(--role-card-accent) 3%, #f5efe2)
+  );
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.lobby-role-card-meta {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  width: calc(100% + 8px);
+  min-height: 24px;
+  border-top: 1px solid color-mix(in oklab, var(--role-card-accent) 19%, transparent);
+  background: color-mix(in oklab, var(--role-card-accent) 7%, #f3efe7);
 }
 
 .lobby-role-card-mode-band {
-  position: absolute;
-  z-index: 3;
-  bottom: 0;
-  left: 68px;
-  right: 0;
-  display: block;
-  width: auto;
-  height: 22px;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
   margin: 0;
-  padding: 0 7px;
+  padding: 3px 2px;
   border: 0;
-  background: #f3efe7;
   box-shadow: none;
   color: color-mix(in oklab, var(--role-card-accent) 72%, black 28%);
   font-family: var(--ui-font-cjk);
-  font-size: calc(var(--setup-label-size) - 0.05rem);
+  font-size: 0.65rem;
   font-weight: 760;
   line-height: 1;
   letter-spacing: 0;
@@ -2329,42 +2308,20 @@ p {
   white-space: nowrap;
 }
 
-.lobby-role-card-mode-band > span {
-  position: absolute;
-  inset: 0 51px 0 0;
+.lobby-role-card-level-badge {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.lobby-role-card-level-badge {
-  position: absolute;
-  z-index: 4;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 51px;
-  height: 27px;
-  padding: 0 5px 4px 13px;
-  border-top: 1px solid rgba(70, 66, 58, 0.22);
-  border-left: 1px solid rgba(70, 66, 58, 0.22);
-  border-radius: 999px 0 0 0;
-  background: linear-gradient(145deg, rgba(247, 245, 239, 0.96), rgba(220, 216, 207, 0.96));
+  min-width: 42px;
+  padding: 3px 4px;
+  border-left: 1px solid rgba(70, 66, 58, 0.14);
   color: rgba(62, 59, 53, 0.84);
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.72);
   font-family: var(--ui-font-cjk);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
   white-space: nowrap;
-}
-
-.lobby-role-card-level-badge.is-locked {
-  align-items: flex-end;
-  padding-bottom: 3px;
 }
 
 .lobby-role-card-level-badge.is-locked .lucide {
@@ -3460,6 +3417,7 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="thirst-for-knowledge"] { --tree-tone: #a1738f; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="experiment-practice"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="proven-by-papers"] { --tree-tone: #688bac; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="academic-atmosphere"] { --tree-tone: #6c9379; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="boundless-study"] { --tree-tone: #688bac; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="writing-mastery"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="lasting-work"] { --tree-tone: #a1738f; }
@@ -3469,10 +3427,13 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="near-the-source"] { --tree-tone: #b18a54; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-familiarity"] { --tree-tone: #bb718a; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="family-host"] { --tree-tone: #bd9445; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-patronage"] { --tree-tone: #688bac; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-patronage"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-patronage-beta"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="family-patronage-gamma"] { --tree-tone: #688bac; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="computing-support"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="workspace-renewal"] { --tree-tone: #6594a2; }
-.is-designed-tree .lobby-talent-tree-node[data-talent-id="mentor-insight"] { --tree-tone: #ac8e50; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="mentor-insight"],
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="mentor-insight-beta"] { --tree-tone: #ac8e50; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="funding-shield"] { --tree-tone: #739375; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="learning-by-osmosis"] { --tree-tone: #8b779c; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="favored-by-fate"] { --tree-tone: #bd9445; }
@@ -3485,6 +3446,7 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="complete-potential"] { --tree-tone: #b49b54; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="balanced-growth"] { --tree-tone: #6c9379; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="misfortune-to-fortune"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="healthy-mind"] { --tree-tone: #b87285; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="attribute-swap"] { --tree-tone: #8b779c; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="san-money-swap"] { --tree-tone: #bd9445; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-swap"] { --tree-tone: #a9607c; }
@@ -3496,6 +3458,7 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="reverse-meter-gamma"] { --tree-tone: #bb718a; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="natural-charisma"] { --tree-tone: #bb718a; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="supporting-juniors"] { --tree-tone: #6594a2; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="junior-delegation"] { --tree-tone: #bd9445; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="growing-connections"] { --tree-tone: #b18a54; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="peer-camaraderie"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="circle-of-friends"] { --tree-tone: #8b779c; }
@@ -4657,6 +4620,10 @@ button.pending-event-blocking-toggle.play-tooltip::after {
 }
 
 .lobby-page[data-scale-mode="fixed"] .lobby-role-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.lobby-page[data-scale-mode="fixed"] .lobby-role-list {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -11678,7 +11645,7 @@ button[data-card-icon-action]:focus-visible {
   }
 
   .lobby-page[data-scale-mode="fixed"] .lobby-role-card {
-    flex: 0 0 174px;
+    flex: 0 0 108px;
     scroll-snap-align: start;
   }
 

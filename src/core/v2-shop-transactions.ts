@@ -7,7 +7,7 @@ import {
   hasAiReimbursement as hasAiReimbursementState,
 } from "./v2-ai-shop";
 import { applyAiActivationEffects } from "./v2-ai-activation";
-import { getLabReimbursementKind } from "./v2-lab-reimbursement";
+import { getLabReimbursementCount, getLabReimbursementKind } from "./v2-lab-reimbursement";
 import { formatMoney, recordPersonalSpending, roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { addOrReplaceBuffs, consumeAiCostCoverage, removeBuffs } from "./v2-buffs";
@@ -320,7 +320,7 @@ function toggleCoffeeSubscription(state: GameState): GameState {
 function buySupportItem(state: GameState, itemId: SupportItemId): GameState {
   const item = getSupportItemDefinition(itemId);
   if (isSupportItemOwned(state.eventSupport, itemId)) return fail(state, `你已经拥有${item.name}。`);
-  const { price, usesGift } = getLoverGiftQuote(state, item.price);
+  const { price, usesGift } = getLoverGiftQuote(state, getShopActionBasePrice(state, "buy-support-item", { supportItemId: itemId })!);
   if (state.player.money < price) return fail(state, `金币不足，购买${item.name}需要 ${price} 金币。`);
   const eventSupport = { ...state.eventSupport };
   if (itemId === "badminton_racket") eventSupport.hasBadmintonRacket = true;
@@ -434,17 +434,17 @@ export function applyShopAction(state: GameState, actionId: ShopActionId, payloa
     || (state.totalMonths <= 0 && !SHOW_ALL_MODULES_DURING_DEVELOPMENT)
   ) return state;
   const kind = getLabReimbursementKind(actionId, payload);
-  const fundingCost = kind || actionId === "buy-ai-month"
-    ? getShopLabFundingCost(state, actionId as ShopPurchaseAction, payload) : 0;
+  const fundingCost = getShopLabFundingCost(state, actionId as ShopPurchaseAction, payload);
   if (fundingCost > 0 && state.advisorProgressState.funding < fundingCost) {
     return fail(state, `科研经费不足，本次报销需要 ${fundingCost}；未扣费，报销机会保留至有效期结束。`);
   }
   const executed = executeShopAction(state, actionId, payload);
   if (fundingCost <= 0 || (executed.shopState === state.shopState
-    && executed.coffeeState === state.coffeeState && executed.aiShopState === state.aiShopState)) return executed;
+    && executed.coffeeState === state.coffeeState && executed.aiShopState === state.aiShopState
+    && executed.eventSupport === state.eventSupport)) return executed;
   const purchased = actionId === "buy-ai-month" && hasAiReimbursement(state) ? consumeAiCostCoverage(executed) : executed;
   const labReimbursements = { ...purchased.shopState.labReimbursements };
-  if (kind) labReimbursements[kind] -= 1;
+  if (kind && getLabReimbursementCount(state, kind) > 0) labReimbursements[kind] -= 1;
   return pushLog(recordLabFinance({
     ...purchased,
     advisorProgressState: { ...purchased.advisorProgressState, funding: roundMoney(purchased.advisorProgressState.funding - fundingCost) },

@@ -3,8 +3,21 @@ import { renderApp } from "../src/app/v2-render";
 import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progression";
 import type { GameState } from "../src/core/v2-types";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 
 describe("special role relationship hints", () => {
+  it("shows the teacher child's selected guidance fields without the old writing multiplier", () => {
+    const base = createStartedGameState("teacher-child");
+    const state: GameState = { ...base, month: 2, totalMonths: 2, selectedAdvisorName: "导师",
+      roleTalents: { levels: { "mentor-insight": 1, "mentor-insight-beta": 1 } } };
+    const html = renderApp(state, undefined, { activePlayTab: "relationship" });
+    expect(html).toContain("科研积累+10%，你的论文协作：想idea+10、做实验+10、写作+10；同学论文写作协作+10");
+    expect(html).not.toContain("你的论文写作协作+15");
+    const legacy = withGameplayRuleset("20261022-r27", () => renderApp(state, undefined, { activePlayTab: "relationship" }));
+    expect(legacy).toContain("你的论文写作协作+15；同学论文写作协作+10");
+    expect(legacy).not.toContain("你的论文协作：想idea+10");
+  });
+
   it("shows the actual reduced project threshold and different player/fellow guidance amounts", () => {
     const base = createStartedGameState("research-captain", {}, 0, 1, { "teacher-child": 10 });
     const fellow = createCustomFellowProgressProfile({ type: "peer", gender: "female", research: 5,

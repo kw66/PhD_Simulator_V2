@@ -3,6 +3,7 @@ import { recordPersonalIncome } from "./v2-money";
 import { recordPersonalSpending, roundMoney } from "./v2-money";
 import { getPlayerAttributeCap } from "./v2-player-attributes";
 import { applyGreedConversionBatch, type GreedRandomCursor } from "./v2-greed-conversion-batch";
+import { applyGreedSpendingTransaction } from "./v2-greed-transaction";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { GameState } from "./v2-types";
@@ -78,6 +79,14 @@ export function settleGreedReset(state: GameState): GameState {
 /** Deferred spending rewards cannot be overwritten by the caller's cost commit. */
 export function settleGreedSpendingConversions(state: GameState, getRoll?: () => number, cursor?: GreedRandomCursor): GameState {
   if (state.selectedRoleId !== "rich-reversed" || !state.roleTalents) return state;
+  if (usesGameplayRulesFrom("20261023-r45")) {
+    const transactions = state.roleTalents.pendingMoneyConversionTransactions ?? [];
+    if (transactions.length === 0) return state;
+    const random = randomSource(state, getRoll);
+    let next: GameState = { ...state, roleTalents: { ...state.roleTalents, pendingMoneyConversionTransactions: [] } };
+    for (const amount of transactions) next = applyGreedSpendingTransaction(next, amount, random.roll);
+    return logGreed(state, random.finish(next), "钱能通神", `${transactions.length}笔消费共${roundMoney(transactions.reduce((sum, amount) => sum + amount, 0))}金币，按每笔金额随机分配奖励`);
+  }
   const count = state.roleTalents.pendingMoneyConversions ?? 0;
   if (count <= 0) return state;
   const random = randomSource(state, getRoll);
@@ -94,6 +103,48 @@ export function settleGreedCoinGames(state: GameState, getRoll?: () => number): 
   if (count <= 0) return next === state ? state : random.finish(next);
   next = { ...next, roleTalents: { ...next.roleTalents!, pendingCoinGames: 0 } };
   const failureMultiplier = 0.4 + getRoleTalentLevel(next, "coin-game-comeback") * 0.05;
+  if (usesGameplayRulesFrom("20261023-r46")) {
+    const moneyBefore = next.player.money;
+    let wins = 0;
+    let remaining = count;
+    if (random.cursor) {
+      // The private full-period 32-bit LCG has exactly half wins in each
+      // 2^32 draws and returns to the same cursor. Skip complete periods
+      // exactly, including counts beyond the integer-precision boundary.
+      const period = 4294967296;
+      remaining = count % period;
+      wins = (count - remaining) / 2;
+    }
+    let batchWins = 0;
+    if (random.cursor) {
+      // Keep the exact LCG stream, but avoid a callback/state allocation for
+      // every roll. The high bit is precisely the roll >= 0.5 predicate.
+      let seed = random.cursor.value;
+      let losses = 0;
+      for (let index = 0; index < remaining; index += 1) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        losses += seed >>> 31;
+      }
+      random.cursor.value = seed;
+      batchWins = remaining - losses;
+    } else {
+      for (let index = 0; index < remaining; index += 1) if (random.roll() < 0.5) batchWins++;
+    }
+    wins += batchWins;
+    // Calculate the whole batch before committing money or its reactions.
+    // Use direct arithmetic where finite, logs when intermediate powers would
+    // overflow/underflow. Number.MAX_VALUE is solely the storage numeric limit.
+    const direct = moneyBefore * 1.5 ** wins * failureMultiplier ** (count - wins);
+    const logMoney = Math.log(Math.abs(moneyBefore)) + wins * Math.log(1.5) + (count - wins) * Math.log(failureMultiplier);
+    const magnitude = Math.min(Number.MAX_VALUE, Math.exp(logMoney));
+    const money = roundMoney(moneyBefore === 0 ? 0 : Number.isFinite(direct) && direct !== 0
+      ? direct : Math.sign(moneyBefore) * magnitude);
+    next = { ...next, player: { ...next.player, money } };
+    if (money > moneyBefore) next = recordPersonalIncome(next, money - moneyBefore);
+    if (money < moneyBefore) next = settleGreedSpendingConversions(
+      recordPersonalSpending(next, moneyBefore - money), random.roll, random.cursor);
+    return logGreed(state, random.finish(next), "金币游戏", `本批${count}次判定，${wins}胜${count - wins}负；整轮净盈亏一次结算`);
+  }
   const boundedStake = usesGameplayRulesFrom("20261022-r20");
   for (let index = 0; index < count; index += 1) {
     const moneyBefore = next.player.money;

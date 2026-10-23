@@ -35,11 +35,11 @@ describe("lab annual growth", () => {
     state.roleTalents = { levels: { "lasting-fortune": 3 } };
     state.player.research = 18;
     state.player.social = 18;
-    expect(getPlayerAnnualResearchGrowth(state)).toBe(2);
+    expect(getPlayerAnnualResearchGrowth(state)).toBe(1.4);
     const next = settleLabResearchGrowth(state);
-    expect(next.player.research).toBe(20);
-    expect(next.player.social).toBe(19);
-    expect(next.roleTalents?.growthTotals).toEqual({ research: 2, social: 1 });
+    expect(next.player.research).toBe(19.4);
+    expect(next.player.social).toBe(18.7);
+    expect(next.roleTalents?.growthTotals).toEqual({ research: 1.4, social: 0.7 });
     expect(next.fellowProgressState.every((fellow) => fellow.research === 20)).toBe(true);
   });
 

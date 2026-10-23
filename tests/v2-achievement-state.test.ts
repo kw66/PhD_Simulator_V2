@@ -6,6 +6,7 @@ import { applyEventPlayerEffects } from "../src/core/v2-event-player-effects";
 import { applyPlayerAttributeChange } from "../src/core/v2-player-attributes";
 import { consumeActiveOperation } from "../src/core/v2-ai-shop";
 import { CAREER_JOBS } from "../src/core/v2-career-rules";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import type { GameState } from "../src/core/v2-types";
 
 function state(): GameState {
@@ -55,6 +56,14 @@ describe("state achievement evidence", () => {
     run = observe(next);
     expect(run.satisfied).toContain("genius-reversed:zero-talent-master");
     next.roleTalents.levels["break-research-curse"] = 1;
+    expect(observe(next).satisfied).not.toContain("genius-reversed:zero-talent-master");
+    withGameplayRuleset("20261023-r39", () => {
+      expect(observe(next).satisfied).toContain("genius-reversed:zero-talent-master");
+    });
+    withGameplayRuleset("20261023-r32", () => {
+      expect(observe(next).satisfied).not.toContain("genius-reversed:zero-talent-master");
+    });
+    next.roleTalents.levels["work-life-balance"] = 1;
     expect(observe(next).satisfied).not.toContain("genius-reversed:zero-talent-master");
     next.selectedRoleId = "normal"; next.roleTalents.levels = {}; next.degree = "phd"; next.phase = "playing"; next.ending = null;
     expect(observe(next).satisfied).not.toContain("normal:truly-ordinary");

@@ -58,7 +58,8 @@
   height: auto;
   max-height: none;
   aspect-ratio: 432 / 774;
-  object-fit: contain;
+  /* Fill the frame when an illustration has a different source aspect ratio. */
+  object-fit: cover;
   object-position: center;
   border-radius: 5px;
   user-select: none;

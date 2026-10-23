@@ -48,6 +48,7 @@ const fellow = shape({ id: text, type: choice("senior", "peer", "junior"), gende
   nextMonthlyAction: choice("research", "project"), activityHistory: history, affinityRewardedPaperIds: strings, longTermMentoring: bool,
   researchTopic: shape({ topicId: text, topicLabel: text, heatMultiplier: finite, prepublicationDecayRate: finite }),
   monthlyPublicationCosts: shape(fields("totalMonths registration journal sharedTravel", finite)),
+  successfulPublicationCount: integer,
 });
 const loverState = shape({ active: choice(true), type: choice("beautiful", "smart"), gender: choice("male", "female"), startTotalMonths: nullable(integer), beautifulExtraRecoveryRate: finite }, { contactId: text, name: text });
 const loverProgress = shape({ active: choice(true), ...fields("research intimacy taskProgress taskMax relationProgress relationMax completedTaskCount", finite), canInteract: bool, taskUsedThisMonth: bool }, {

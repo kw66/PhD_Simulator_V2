@@ -6,6 +6,8 @@ import type { PlayRenderUiState } from "../src/app/v2-render-types";
 import { buildBuffDisplayBuckets } from "../src/app/v2-render-buffs";
 import { buildFutureTodoPreviewItems, renderRelationTalentCard } from "../src/app/v2-render-play";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
+import { getRoleOptions } from "../src/core/v2-progression";
+import { isCursedRole } from "../src/core/v2-curse-system";
 import { createAiShopState, getAiModelForTotalMonths } from "../src/core/v2-ai-shop";
 import { activateInternship, activateRemoteInternship } from "../src/core/v2-internship-system";
 import { createCustomFellowProgressProfile, getFellowName, getFellowResearchTopic, getFellowRoleLabel } from "../src/core/v2-fellow-progression";
@@ -706,8 +708,11 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("上一页");
     expect(html).toContain("下一页");
     expect(html).toContain('class="lobby-role-card-portrait"');
-    expect(html).toContain('alt="大多数缩略立绘"');
-    expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(5);
+    expect(html).toContain('alt="大多数Q版头像"');
+    expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(7);
+    for (const role of getRoleOptions()) {
+      expect(html.includes(`data-role-id="${role.id}"`)).toBe(!isCursedRole(role.id));
+    }
     expect(html).toContain("正位");
     expect(html).toContain("逆位");
     expect(html).not.toContain('class="lobby-role-card-tag is-locked"');
@@ -800,11 +805,11 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('class="lobby-profile-exp-bar"');
     expect(html).not.toContain("升级待开放");
     expect(html).not.toContain("立绘待替换");
-    expect((html.match(/data-action="select-role"/g) ?? []).length).toBe(10);
+    expect((html.match(/data-action="select-role"/g) ?? []).length).toBe(14);
     expect(html).toContain('data-action="start-game" data-role-id="normal"');
     expect(html).toContain("社交达人");
-    expect(html).not.toContain("轮回者");
-    expect(html).not.toContain("统御者");
+    expect(html).toContain("轮回者");
+    expect(html).toContain("统御者");
     expect(html).not.toContain("科研成长档案");
     expect(html).not.toContain('class="lobby-profile-hero"');
     expect(html).not.toContain('class="lobby-profile-dossier"');
@@ -1020,7 +1025,7 @@ describe("v2 render lobby shell", () => {
     expect(tree).toContain("转博后每月行动点耗尽仍可行动1次，消耗1点SAN上限");
     expect(tree).toContain("转博后每月SAN不足时，免除1次SAN消耗，消耗1点SAN上限");
     expect(tree).toContain("每月初SAN上限低于8时，SAN上限+1");
-    expect(tree).toContain("转博后每年科研、社交、导师好感+1/级");
+    expect(tree).toContain("转博后每学年末，科研、社交、导师好感+1/级");
     for (const icon of ["heart-plus", "sunrise", "footprints", "zap", "rocket", "heart-crack", "heart-pulse", "flame", "sparkles"]) {
       expect(tree).toContain(`data-lucide="${icon}"`);
     }
@@ -1072,9 +1077,9 @@ describe("v2 render lobby shell", () => {
     ["rich-reversed", 9],
     ["genius", 11],
     ["genius-reversed", 11],
-    ["teacher-child", 10],
+    ["teacher-child", 12],
     ["teacher-child-reversed", 12],
-    ["chosen", 10],
+    ["chosen", 11],
     ["chosen-reversed", 10],
     ["social", 12],
     ["social-reversed", 9],
@@ -1163,19 +1168,19 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("is-chosen-reversed-tree");
     expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
     expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(10);
-    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(8);
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(9);
     expect(html).toContain('<path d="M75 160 H225" />');
     expect(html).toContain('<path d="M225 160 H375" />');
     for (const [id, row, column, cost, level, effect, prerequisites, icon] of [
-      ["attribute-swap", 1, 1, 2, 1, "每月科研、社交、导师好感随机排列，交换差额受抵抗影响", "", "network"],
+      ["attribute-swap", 1, 1, 2, 1, "每月科研、社交、导师好感随机排列，不受抵抗影响", "", "network"],
       ["san-money-swap", 2, 1, 2, 1, "每月SAN、金币随机排列", "", "network"],
-      ["post-phd-swap", 2, 2, 3, 1, "转博后每月科研、社交、导师好感、SAN、金币随机排列，三项属性的交换差额受抵抗影响", "attribute-swap san-money-swap", "rotate-ccw"],
-      ["group-event-focus", 1, 3, 2, 4, "组内团建事件出现概率+100%/级", "post-phd-swap", "users"],
-      ["game-event-focus", 2, 3, 2, 4, "游戏放松事件出现概率+100%/级", "post-phd-swap", "gamepad-2"],
-      ["swap-breaks-cap", 2, 4, 4, 1, "属性交换可突破上限", "group-event-focus game-event-focus", "infinity"],
-      ["reverse-meter-alpha", 3, 1, 1, 3, "科研增减时，抵抗降低10个百分点/级，最低为0", "", "brain"],
-      ["reverse-meter-beta", 3, 2, 1, 3, "社交增减时，抵抗降低10个百分点/级，最低为0", "reverse-meter-alpha", "users"],
-      ["reverse-meter-gamma", 3, 3, 1, 3, "导师好感增减时，抵抗降低10个百分点/级，最低为0", "reverse-meter-beta", "heart-handshake"],
+      ["post-phd-swap", 2, 3, 3, 1, "转博后每月科研、社交、导师好感、SAN、金币随机排列，不受抵抗影响", "group-event-focus game-event-focus", "rotate-ccw"],
+      ["group-event-focus", 1, 2, 2, 4, "组内团建事件出现概率+100%/级", "attribute-swap san-money-swap", "users"],
+      ["game-event-focus", 2, 2, 2, 4, "游戏放松事件出现概率+100%/级", "attribute-swap san-money-swap", "gamepad-2"],
+      ["swap-breaks-cap", 2, 4, 4, 1, "属性交换可突破上限", "post-phd-swap", "infinity"],
+      ["reverse-meter-alpha", 3, 1, 1, 3, "科研增长抵抗-10个百分点/级，下降抵抗+10个百分点/级", "", "brain"],
+      ["reverse-meter-beta", 3, 2, 1, 3, "社交增长抵抗-10个百分点/级，下降抵抗+10个百分点/级", "reverse-meter-alpha", "users"],
+      ["reverse-meter-gamma", 3, 3, 1, 3, "导师好感增长抵抗-10个百分点/级，下降抵抗+10个百分点/级", "reverse-meter-beta", "heart-handshake"],
     ] as const) {
       const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
       expect(node).toContain(`style="grid-column:${column};grid-row:${row}"`);
@@ -1201,21 +1206,21 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain("is-social-reversed-tree");
     expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
     expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(9);
-    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(8);
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(7);
     for (const path of [
-      "M75 32 H225", "M75 96 H225",
-      "M225 96 C295 96 305 32 375 32", "M225 96 H375", "M225 96 C295 96 305 160 375 160",
-      "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
+      "M75 32 C145 32 155 96 225 96", "M75 96 H225", "M75 160 C145 160 155 96 225 96",
+      "M225 96 H375", "M225 96 C295 96 305 160 375 160",
+      "M375 96 H525", "M375 160 H525",
     ]) expect(html).toContain(`<path d="${path}" />`);
     for (const [id, row, column, cost, level, effect, prerequisites] of [
-      ["social-to-san", 1, 1, 1, 3, "社交每提升1点，SAN+1/级", ""],
-      ["fellow-add-social", 2, 1, 2, 2, "人际栏添加同学，社交+1/级", ""],
-      ["social-loss-coins", 1, 2, 1, 3, "社交每降低1点，金币+1/级", "social-to-san"],
-      ["fellow-remove-social", 2, 2, 2, 2, "人际栏放弃同学，社交-1/级", "fellow-add-social"],
-      ["peer-event-focus", 1, 3, 2, 4, "同门合作事件出现概率+100%/级", "fellow-remove-social"],
-      ["junior-event-focus", 2, 3, 2, 4, "指导师弟师妹事件出现概率+100%/级", "fellow-remove-social"],
-      ["senior-event-focus", 3, 3, 2, 4, "师兄师姐指导事件出现概率+100%/级", "fellow-remove-social"],
-      ["affinity-conversion", 2, 4, 4, 1, "放弃同学时，每点默契依次转为导师好感、科研、SAN上限、好感上限、科研上限+1，循环分配", "peer-event-focus junior-event-focus senior-event-focus"],
+      ["social-to-san", 3, 4, 1, 3, "社交每提升1点，SAN+1/级", "fellow-add-social"],
+      ["fellow-add-social", 3, 3, 2, 2, "人际栏添加同学，社交+1/级", "affinity-conversion"],
+      ["social-loss-coins", 2, 4, 1, 3, "社交每降低1点，金币+1/级", "fellow-remove-social"],
+      ["fellow-remove-social", 2, 3, 2, 2, "人际栏放弃同学，社交-1/级", "affinity-conversion"],
+      ["peer-event-focus", 1, 1, 1, 4, "同门合作事件出现概率+100%/级", ""],
+      ["junior-event-focus", 2, 1, 1, 4, "指导师弟师妹事件出现概率+100%/级", ""],
+      ["senior-event-focus", 3, 1, 1, 4, "师兄师姐指导事件出现概率+100%/级", ""],
+      ["affinity-conversion", 2, 2, 4, 1, "放弃同学时，每点默契依次转为导师好感、科研、SAN上限、好感上限、科研上限+1，循环分配", "peer-event-focus junior-event-focus senior-event-focus"],
     ] as const) {
       const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
       expect(node).toContain(`style="grid-column:${column};grid-row:${row}"`);
@@ -1258,11 +1263,11 @@ describe("v2 render lobby shell", () => {
       ["group-meeting-focus", 3, 1, 1, 4, "组会汇报事件出现概率+100%/级", ""],
       ["reset-research", 3, 2, 2, 1, "导师好感重置时科研+1", "favor-reset"],
       ["reset-social", 1, 2, 2, 1, "导师好感重置时社交+1", "favor-reset"],
-      ["reset-coins", 2, 2, 1, 2, "导师好感重置时金币补充到2/级", "favor-reset"],
-      ["favor-reset-decrease", 2, 4, 1, 4, "导师好感上限-1/级", "lower-favor-reset"],
-      ["lower-favor-reset", 2, 3, 3, 2, "导师好感下降幅度+1/级", "reset-research reset-social reset-coins"],
-      ["reset-research-cap", 3, 3, 2, 1, "导师好感重置时科研上限+1", "reset-research"],
-      ["reset-social-cap", 1, 3, 2, 1, "导师好感重置时社交上限+1", "reset-social"],
+      ["reset-coins", 2, 2, 1, 4, "导师好感重置时金币补充到2/级", "favor-reset"],
+      ["favor-reset-decrease", 2, 4, 1, 5, "导师好感上限-1/级", "lower-favor-reset"],
+      ["lower-favor-reset", 2, 3, 1, 4, "导师好感下降幅度+0.5/级", "reset-research reset-social reset-coins"],
+      ["reset-research-cap", 3, 3, 1, 1, "导师好感重置时科研上限+1", "reset-research"],
+      ["reset-social-cap", 1, 3, 1, 1, "导师好感重置时社交上限+1", "reset-social"],
       ["end-of-grace", 3, 4, 3, 2, "导师好感上限下降幅度+1/级", "lower-favor-reset"],
     ] as const) {
       const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
@@ -1293,33 +1298,34 @@ describe("v2 render lobby shell", () => {
     expect((tree.match(/<path d=/g) ?? []).length).toBe(9);
     expect(tree).toMatch(/data-talent-id="research-curse"[^>]*data-tier="fixed"[^>]*style="grid-column:4;grid-row:1"/);
     expect(tree).toContain("科研视为0");
-    for (const [id, name, tier, row, maxLevel, effect, icon, prerequisite] of [
-      ["paper-opening", "记忆残响", 0, 1, 3, "开局解锁论文卡片+1/级", "file-plus-2", ""],
-      ["learning-from-rejection", "屡败屡研", 0, 2, 1, "转博前每篇一作论文首次被拒后，科研能力+1", "rotate-ccw", ""],
-      ["papers-to-insight", "积稿成学", 0, 3, 1, "转博时每篇一作论文，科研能力+1", "files", ""],
-      ["knowledge-monetization", "以文谋生", 1, 1, 2, "科研提升→金币+2/级", "coins", "paper-opening"],
-      ["work-life-balance", "忍辱负重", 1, 2, 2, "科研提升→SAN+2/级", "heart-pulse", "learning-from-rejection"],
-      ["research-network", "正名之路", 1, 3, 1, "科研提升→社交/好感+1", "handshake", "papers-to-insight"],
-      ["research-wellness", "百折不挠", 2, 1, 1, "转博后科研提升→SAN上限+1", "shield-plus", "work-life-balance"],
-      ["reputation-growth", "导师力挺", 2, 2, 1, "转博后科研提升→好感上限+1", "heart-plus", "research-network"],
-      ["social-growth", "学界声援", 2, 3, 1, "转博后科研提升→社交上限+1", "users", "research-network"],
-      ["break-research-curse", "拨云见日", 3, 2, 1, "科研达到20时破除视为0诅咒，且科研不再受上限限制", "sunrise", "research-wellness reputation-growth social-growth"],
+    for (const [id, name, tier, row, maxLevel, cost, effect, icon, prerequisite] of [
+      ["paper-opening", "记忆残响", 0, 3, 3, 1, "开局解锁论文卡片+1/级", "file-plus-2", ""],
+      ["research-resilience", "重拾慧根", 1, 3, 3, 1, "科研增长抵抗降低10个百分点/级", "brain", "paper-opening"],
+      ["knowledge-monetization", "以文谋生", 1, 1, 4, 1, "转博前每篇一作论文首次被拒后，金币+1/级", "coins", "research-wellness"],
+      ["work-life-balance", "忍辱负重", 2, 1, 1, 3, "转博前每篇一作论文首次被拒后，SAN+4、SAN上限+1", "heart-pulse", "knowledge-monetization"],
+      ["research-wellness", "百折不挠", 0, 1, 1, 3, "转博前每篇一作论文首次被拒后，科研能力+1", "shield-plus", ""],
+      ["research-network", "正名之路", 1, 2, 1, 3, "转博时每篇已发表一作论文，科研能力+1", "handshake", "learning-from-rejection"],
+      ["reputation-growth", "导师力挺", 2, 2, 1, 3, "科研提升→导师好感+1、好感上限+1", "heart-plus", "research-network"],
+      ["learning-from-rejection", "屡败屡研", 0, 2, 4, 1, "每篇一作论文被拒后，三项分数+1/级", "rotate-ccw", ""],
+      ["social-growth", "学界声援", 2, 3, 1, 3, "科研提升→社交能力+1、社交上限+1", "users", "research-network"],
+      ["break-research-curse", "拨云见日", 3, 2, 1, 2, "科研达到20时破除视为0诅咒，且科研不再受上限限制", "sunrise", "work-life-balance reputation-growth social-growth"],
     ] as const) {
       const node = tree.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
       expect(node).toContain(`data-tier="${tier}"`);
       expect(node).toContain(`style="grid-column:${tier + 1};grid-row:${row}"`);
       expect(node).toContain(`data-prerequisite-ids="${prerequisite}"`);
-      expect(node).toContain(`data-cost="${["learning-from-rejection", "papers-to-insight", "research-network", "research-wellness", "reputation-growth", "social-growth", "break-research-curse"].includes(id) ? 3 : 1}"`);
+      expect(node).toContain(`data-cost="${cost}"`);
       expect(node).toContain(`class="lobby-normal-tree-node-level">0/${maxLevel}</span>`);
       expect(node).toContain(name);
       expect(node).toContain(effect);
       expect(node).toContain(`data-lucide="${icon}"`);
     }
     for (const path of [
-      "M75 32 H225", "M75 96 H225", "M75 160 H225",
-      "M225 96 C295 96 305 32 375 32", "M225 160 C295 160 305 96 375 96", "M225 160 H375",
+      "M75 32 H225", "M225 32 H375", "M75 96 H225", "M75 160 H225",
+      "M225 96 H375", "M225 96 C295 96 305 160 375 160",
       "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
     ]) expect(tree).toContain(`<path d="${path}" />`);
+    expect(tree).not.toContain('data-talent-id="papers-to-insight"');
     expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
     const fixedNode = tree.split("<button").find((markup) => markup.includes('data-talent-id="research-curse"'))?.split("</button>")[0] ?? "";
     expect(fixedNode).toContain('data-lucide="skull"');
@@ -1337,26 +1343,26 @@ describe("v2 render lobby shell", () => {
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-rich-reversed-tree(?: is-fixed-tree)?" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
     expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(9);
-    expect((tree.match(/<path d=/g) ?? []).length).toBe(7);
+    expect((tree.match(/<path d=/g) ?? []).length).toBe(9);
     expect(tree).toMatch(/data-talent-id="money-curse"[^>]*data-tier="fixed"[^>]*style="grid-column:4;grid-row:1"/);
     expect(tree).toContain("每月SAN/属性重置为0");
     for (const [id, name, tier, column, row, prerequisite] of [
       ["money-growth", "聚沙成塔", "0", "1", "1", ""],
       ["loss-to-money", "因祸得财", "0", "1", "3", ""],
-      ["spend-to-break-curse", "破财消灾", "1", "2", "1", "money-growth"],
+      ["spend-to-break-curse", "破财消灾", "2", "3", "2", "finance-master coin-game post-phd-money-conversion"],
       ["post-phd-money-conversion", "钱能通神", "1", "2", "2", "money-growth loss-to-money"],
-      ["finance-master", "理财能手", "2", "3", "2", "post-phd-money-conversion"],
+      ["finance-master", "理财能手", "1", "2", "1", "money-growth"],
       ["coin-game", "金币游戏", "1", "2", "3", "loss-to-money"],
       ["coin-game-comeback", "败局翻盘", "2", "3", "3", "coin-game"],
-      ["investment-acceleration", "快速周转", "3", "4", "2", "finance-master"],
+      ["investment-acceleration", "快速周转", "2", "3", "1", "finance-master"],
     ] as const) {
       expect(tree).toMatch(new RegExp(`data-talent-id="${id}"[^>]*data-tier="${tier}"[^>]*style="grid-column:${column};grid-row:${row}"[^>]*data-prerequisite-ids="${prerequisite}"`));
       expect(tree).toContain(name);
     }
     expect(tree).toContain("每笔投资5金币，12个月后利息+1/级，可同时多笔");
     expect(tree).toContain("投资回报周期-1个月/级");
-    expect(tree).toContain("转博后每枚金币消耗随机转化提升SAN、三项属性及三项属性上限");
-    expect(tree).toContain("三项属性每减少1点，投入至多5金币：50%返还1.5倍，50%返还0.4倍；亏损不计消费");
+    expect(tree).toContain("转博后，每笔消费按金额随机分配，提升SAN、三项属性及三项属性上限");
+    expect(tree).toContain("三项属性每减少1点，金币50%变为1.5倍、50%变为0.4倍；整轮结算，净亏损计消费");
     expect(tree).toContain("金币游戏失败后的倍率+0.05/级");
     const comeback = tree.split("<button").find((markup) => markup.includes('data-talent-id="coin-game-comeback"'))?.split("</button>")[0] ?? "";
     expect(comeback).toContain('data-cost="1"');
@@ -1396,7 +1402,7 @@ describe("v2 render lobby shell", () => {
     expect(tree).not.toContain("1/1");
     expect(tree).toContain('class="lobby-talent-tree is-designed-tree is-normal-reversed-tree is-fixed-tree"');
     expect(tree).toContain("固定生效");
-    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([0, 2, 2, 2, 2, 2, 1, 2, 2, 2]);
+    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([0, 2, 2, 1, 1, 2, 1, 2, 1, 2]);
     expect(tree).toContain("休息后下次想idea、做实验、写论文+1/级，可叠加");
     expect(tree).toContain("每浪费1常规行动点，SAN上限+1，最多+20");
     expect(tree).toContain("操作开始前SAN为满时，科研能力视为+SAN/5");
@@ -1510,16 +1516,16 @@ describe("v2 render lobby shell", () => {
 
     expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">14</strong>');
     expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(9);
-    expect((tree.match(/<path d=/g) ?? []).length).toBe(7);
+    expect((tree.match(/<path d=/g) ?? []).length).toBe(8);
     expect(tree).toContain('<path d="M375 32 C445 32 455 96 525 96" />');
     expect(tree).toContain('<path d="M375 160 C445 160 455 96 525 96" />');
     expect(tree).not.toContain('<path d="M225 96 H525" />');
     expect(tree).not.toContain('<path d="M375 32 H525" />');
-    expect((tree.match(/class="lobby-normal-tree-node-level">0\/4<\/span>/g) ?? []).length).toBe(2);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/4<\/span>/g) ?? []).length).toBe(3);
     expect((tree.match(/class="lobby-normal-tree-node-level">0\/8<\/span>/g) ?? []).length).toBe(1);
     expect((tree.match(/class="lobby-normal-tree-node-level">0\/3<\/span>/g) ?? []).length).toBe(0);
     expect((tree.match(/class="lobby-normal-tree-node-level">0\/2<\/span>/g) ?? []).length).toBe(2);
-    expect((tree.match(/class="lobby-normal-tree-node-level">0\/5<\/span>/g) ?? []).length).toBe(3);
+    expect((tree.match(/class="lobby-normal-tree-node-level">0\/5<\/span>/g) ?? []).length).toBe(2);
     expect((tree.match(/class="lobby-normal-tree-node-level">0\/1<\/span>/g) ?? []).length).toBe(1);
     expect(tree).not.toContain('class="lobby-normal-tree-node-level">0/6</span>');
     for (const [name, effect, icon] of [
@@ -1543,7 +1549,7 @@ describe("v2 render lobby shell", () => {
     expect(tree).toMatch(/data-talent-id="knowledge-is-wealth-beta"[^>]*data-prerequisite-ids="bring-funding"/);
     expect(tree).toMatch(/data-talent-id="gold-power-alpha"[^>]*data-prerequisite-ids="work-pays-off investment-savvy"/);
     expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
-    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([1, 1, 1, 1, 1, 1, 3, 3, 2]);
+    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([1, 1, 1, 1, 1, 1, 2, 2, 0]);
     expect(tree).not.toContain("打工");
     expect(tree).not.toContain('data-talent-id="gold-power-beta"');
     expect(tree).not.toContain('data-talent-id="gold-power-gamma"');
@@ -1571,38 +1577,42 @@ describe("v2 render lobby shell", () => {
     expect(tree).toMatch(/data-talent-id="tireless-scholar"[^>]*data-prerequisite-ids="innate-insight"/);
     expect(tree).toMatch(/data-talent-id="thirst-for-knowledge"[^>]*data-cost="1"[^>]*data-prerequisite-ids="innate-insight"/);
     expect(tree).toMatch(/data-talent-id="experiment-practice"[^>]*data-prerequisite-ids="idea-insight"/);
-    expect(tree).toMatch(/data-talent-id="proven-by-papers"[^>]*data-prerequisite-ids="tireless-scholar"/);
-    expect(tree).toMatch(/data-talent-id="boundless-study"[^>]*data-prerequisite-ids="thirst-for-knowledge"/);
-    expect(tree).not.toMatch(/data-talent-id="boundless-study"[^>]*data-prerequisite-ids="tireless-scholar"/);
+    expect(tree).toMatch(/data-talent-id="academic-atmosphere"[^>]*data-prerequisite-ids="tireless-scholar"/);
+    expect(tree).toMatch(/data-talent-id="proven-by-papers"[^>]*data-prerequisite-ids="thirst-for-knowledge"/);
+    expect(tree).not.toMatch(/data-talent-id="proven-by-papers"[^>]*data-prerequisite-ids="tireless-scholar"/);
     expect(tree).toMatch(/data-talent-id="writing-mastery"[^>]*data-prerequisite-ids="experiment-practice"/);
     expect(tree).toMatch(/data-talent-id="lasting-work"[^>]*data-prerequisite-ids="writing-mastery"/);
-    expect(tree).toMatch(/data-talent-id="rise-together"[^>]*data-prerequisite-ids="proven-by-papers"/);
-    expect(tree).toMatch(/data-talent-id="academic-confidence"[^>]*data-prerequisite-ids="boundless-study"/);
-    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([1, 1, 3, 1, 1, 2, 1, 1, 1, 1, 3]);
-    expect([...tree.matchAll(/class="lobby-normal-tree-node-level">0\/(\d+)<\/span>/g)].map((match) => Number(match[1]))).toEqual([5, 3, 1, 1, 3, 3, 5, 3, 4, 5, 1]);
+    expect(tree).toMatch(/data-talent-id="rise-together"[^>]*data-prerequisite-ids="academic-atmosphere"/);
+    expect(tree).toMatch(/data-talent-id="academic-confidence"[^>]*data-prerequisite-ids="proven-by-papers"/);
+    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([1, 1, 3, 1, 1, 1, 2, 1, 1, 1, 2]);
+    expect([...tree.matchAll(/class="lobby-normal-tree-node-level">0\/(\d+)<\/span>/g)].map((match) => Number(match[1]))).toEqual([4, 3, 1, 1, 3, 3, 3, 3, 3, 5, 2]);
     for (const [name, effect, icon] of [
       ["生而知之", "初始科研能力+1/级", "brain"],
-      ["灵光乍现", "永久想idea+2分/级", "lightbulb"],
-      ["学而不倦", "科研能力每年+1", "calendar-days"],
+      ["灵光乍现", "永久想idea+3分/级", "lightbulb"],
+      ["学而不倦", "每学年末，科研能力+1", "calendar-days"],
       ["求知若渴", "不断学习事件出现概率+100%", "book-open"],
-      ["躬行求真", "永久做实验+2分/级", "flask-conical"],
-      ["以文证道", "转博时每篇一作A类论文，科研能力+1/级", "file-text"],
-      ["学无止境", "转博时每篇一作A类论文，科研上限+1/级", "infinity"],
-      ["妙笔成章", "永久写论文+2分/级", "notebook-pen"],
-      ["共攀高峰", "转博后同学的科研能力+1/级", "users"],
+      ["躬行求真", "永久做实验+3分/级", "flask-conical"],
+      ["学术氛围", "同学加入时，其自身科研能力+1/级", "users"],
+      ["以文证道", "转博时每篇已发表一作A类论文，科研能力及上限+1/级", "file-text"],
+      ["妙笔成章", "永久写论文+3分/级", "notebook-pen"],
+      ["共攀高峰", "你转博后，同学科研能力+2/级", "users"],
       ["历久弥新", "转博后未发表论文分数每月衰减率减少3个百分点/级", "hourglass"],
     ]) {
       expect(tree).toContain(name);
       expect(tree).toContain(effect);
       expect(tree).toContain(`data-lucide="${icon}"`);
     }
+    expect(tree).toContain("学术氛围");
+    expect(tree).toContain("以文证道");
+    expect(tree).toContain("共攀高峰");
+    expect(tree).not.toContain("学无止境");
     expect(tree).not.toContain("恋人");
     expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-9"');
     expect(html).toContain('class="lobby-normal-tree-detail" data-detail-index="9"');
     expect(tree).not.toContain('data-ui-talent-tree-page-delta');
   });
 
-  it("previews teacher-child talents with dining, reimbursement, collaboration and favor resistance branches", () => {
+  it("previews teacher-child talents with three branches and shared appropriation prerequisites", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "teacher-child";
     account.roleProgress["teacher-child"].unlocked = true;
@@ -1614,20 +1624,22 @@ describe("v2 render lobby shell", () => {
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-teacher-child-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
     expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">15</strong>');
-    expect((tree.match(/data-ui-talent-tree-node="0-\d+"/g) ?? []).length).toBe(10);
+    expect((tree.match(/data-ui-talent-tree-node="0-\d+"/g) ?? []).length).toBe(12);
     expect((tree.match(/<path d=/g) ?? []).length).toBe(10);
     expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
     for (const [id, name, effect, cost, maxLevel, prerequisites] of [
       ["near-the-source", "近水楼台", "初始导师好感+1/级", 1, 5, ""],
-      ["growing-familiarity", "朝夕相处", "导师好感每年+1", 3, 1, "near-the-source"],
-      ["family-host", "长辈买单", "组内团建事件中聚餐必定由导师请客", 1, 1, "near-the-source"],
-      ["family-patronage", "长辈提携", "转博时每6点导师好感赠送1篇一作C类论文/级", 3, 2, "near-the-source"],
-      ["computing-support", "算力后盾", "转博时获得1次显卡报销/级", 3, 3, "growing-familiarity"],
-      ["workspace-renewal", "工位焕新", "转博时获得1次工位报销/级", 3, 3, "growing-familiarity"],
-      ["mentor-insight", "名师点拨", "导师协作分+50%/级", 2, 2, "family-patronage"],
-      ["funding-shield", "经费护航", "科研经费≥60且足够支付时，购买AI优先使用经费", 3, 1, "computing-support workspace-renewal"],
-      ["learning-by-osmosis", "耳濡目染", "转博后科研能力视为科研能力与导师好感的较大值", 6, 1, "mentor-insight"],
-      ["mentor-expectations", "师门厚望", "导师好感增长抵抗降低10个百分点/级，最低为0；下降不变", 1, 3, "mentor-insight"],
+      ["growing-familiarity", "朝夕相处", "每学年末，导师好感+1", 3, 1, "near-the-source"],
+      ["project-apprenticeship", "为组奉献", "同学加入后的前6个月，优先为实验室做项目", 2, 1, ""],
+      ["resource-tilt", "资源倾斜", "每月从每位同学的工资中转移至多0.5金币给你", 3, 1, "project-apprenticeship"],
+      ["publication-appropriation", "成果归我", "每位同学成功发表的第2篇论文，转为你的一作成果", 3, 1, "funding-shield family-patronage-gamma"],
+      ["family-patronage", "长辈提携α", "导师好感达到12时，赠送1篇一作C类论文", 3, 1, ""],
+      ["family-patronage-beta", "长辈提携β", "导师好感达到15时，赠送1篇一作B类论文", 3, 1, "family-patronage"],
+      ["family-patronage-gamma", "长辈提携γ", "导师好感达到18时，赠送1篇一作A类论文", 3, 1, "family-patronage-beta"],
+      ["mentor-insight", "名师点拨", "导师协作覆盖三项", 3, 1, "family-patronage-gamma"],
+      ["funding-shield", "经费护航", "科研经费≥60且足够支付时，商店花销优先使用经费", 2, 1, "resource-tilt"],
+      ["learning-by-osmosis", "耳濡目染", "每学年末，科研提升导师好感的10%/级", 3, 2, "growing-familiarity"],
+      ["mentor-expectations", "师门厚望", "导师好感增长抵抗降低10个百分点/级", 1, 3, "learning-by-osmosis"],
     ] as const) {
       const node = tree.match(new RegExp('<button[^>]*data-talent-id="' + id + '"[\\s\\S]*?<\\/button>'))?.[0] ?? "";
       expect(node).toContain(name);
@@ -1636,14 +1648,19 @@ describe("v2 render lobby shell", () => {
       expect(node).toContain('data-prerequisite-ids="' + prerequisites + '"');
       expect(node).toContain('class="lobby-normal-tree-node-level">0/' + maxLevel + '</span>');
     }
-    expect(tree).toContain('<path d="M75 96 H225" />');
+    expect(tree).not.toContain('<path d="M75 32 V160" />');
+    expect(tree).toContain('<path d="M75 32 H225" />');
     expect(tree).toContain('<path d="M225 32 H375" />');
-    expect(tree).toContain('<path d="M225 32 C295 32 305 96 375 96" />');
+    expect(tree).toContain('<path d="M375 160 C445 160 455 96 525 96" />');
+    expect(tree).not.toContain('data-talent-id="family-host"');
+    expect(tree).not.toContain('data-talent-id="mentor-insight-beta"');
     expect(tree).toContain('<path d="M225 160 H375" />');
     expect(tree).toContain('<path d="M375 160 H525" />');
     expect(tree).toContain('<path d="M375 32 H525" />');
-    expect(tree).toContain('<path d="M375 96 C445 96 455 32 525 32" />');
-    expect(tree).toContain('data-prerequisite-ids="computing-support workspace-renewal"');
+    expect(tree).toContain('<path d="M225 96 H375" />');
+    expect(tree).toContain('<path d="M375 96 H525" />');
+    expect(tree).not.toContain('data-talent-id="computing-support"');
+    expect(tree).not.toContain('data-talent-id="workspace-renewal"');
     expect(tree).toContain('class="lobby-talent-tree-node is-selected" type="button" data-ui-talent-tree-node="0-7"');
     expect(html).toContain('class="lobby-normal-tree-detail" data-detail-index="7"');
     expect(tree).not.toContain('data-ui-talent-tree-page-delta');
@@ -1651,7 +1668,7 @@ describe("v2 render lobby shell", () => {
     expect(JSON.stringify(state)).toBe(originalState);
   });
 
-  it("previews ten chosen talents with cross-connected event branches and negative disease growth", () => {
+  it("previews eleven chosen talents with cross-connected event branches and negative disease growth", () => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = "chosen";
     account.roleProgress.chosen.unlocked = true;
@@ -1663,20 +1680,21 @@ describe("v2 render lobby shell", () => {
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-chosen-tree"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
     expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">20</strong>');
-    expect((tree.match(/data-ui-talent-tree-node="0-\d+"/g) ?? []).length).toBe(10);
-    expect((tree.match(/<path d=/g) ?? []).length).toBe(10);
+    expect((tree.match(/data-ui-talent-tree-node="0-\d+"/g) ?? []).length).toBe(11);
+    expect((tree.match(/<path d=/g) ?? []).length).toBe(11);
     expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
     for (const [id, name, effect, cost, maxLevel, prerequisites] of [
-      ["favored-by-fate", "天命所眷", "初始科研、社交、导师好感、金币+1/级", 3, 2, ""],
+      ["favored-by-fate", "天命所眷", "初始科研、社交、导师好感、金币+1/级", 3, 3, ""],
       ["athletic-prodigy", "运动健将", "组内团建事件中羽毛球实力+20/级", 1, 2, ""],
-      ["lasting-fortune", "福运绵长", "科研、社交、导师好感增长时，抵抗降低20个百分点/级，最低为0；下降不变", 2, 3, "favored-by-fate"],
+      ["lasting-fortune", "福运绵长", "科研、社交、导师好感增长抵抗降低10个百分点/级", 2, 3, "balanced-growth"],
       ["lucky-hand", "牌运亨通", "组内团建事件中打牌胜率+20%/级", 1, 2, ""],
       ["rare-color-fate", "异色之缘", "游戏放松事件中游玩洛克王国必定捉到异色", 1, 1, "athletic-prodigy lucky-hand"],
       ["effortless-reinstall", "手到擒来", "显卡故障事件中自己重装必定成功", 1, 1, "athletic-prodigy lucky-hand"],
-      ["fortunate-health", "吉人天相", "每月疾病概率-1%/级", 1, 4, "rare-color-fate effortless-reinstall"],
-      ["complete-potential", "查缺补漏", "转博时，按科研、社交、导师好感与三者最高值的差额提升属性，受抵抗影响", 7, 1, "lasting-fortune"],
-      ["balanced-growth", "齐头并进", "转博后科研、社交、导师好感中的最低项每年+1/级", 2, 2, "complete-potential"],
-      ["misfortune-to-fortune", "否极泰来", "疾病概率可为负数，每满-100%，全属性+1/级", 2, 3, "fortunate-health"],
+      ["fortunate-health", "吉人天相", "每月疾病概率-1%/级", 1, 5, "rare-color-fate effortless-reinstall"],
+      ["complete-potential", "查缺补漏", "转博时，科研、社交、导师好感补齐至三者最高值，不受抵抗影响", 5, 1, "favored-by-fate"],
+      ["balanced-growth", "齐头并进", "转博后每学年末，科研、社交、导师好感中的最低项+1/级", 1, 3, "complete-potential"],
+      ["misfortune-to-fortune", "否极泰来", "疾病概率可为负数，每满-50%，全属性+1/级", 1, 3, "fortunate-health"],
+      ["healthy-mind", "心宽体健", "疾病概率可为负数，每满-50%，SAN上限+1/级", 1, 3, "fortunate-health"],
     ] as const) {
       const node = tree.match(new RegExp('<button[^>]*data-talent-id="' + id + '"[\\s\\S]*?<\\/button>'))?.[0] ?? "";
       expect(node).toContain(name);
@@ -1691,9 +1709,11 @@ describe("v2 render lobby shell", () => {
       ["rare-color-fate", 1, 2, "2"],
       ["effortless-reinstall", 1, 2, "3"],
       ["fortunate-health", 2, 3, "2 / 4"],
-      ["complete-potential", 2, 3, "1"],
-      ["balanced-growth", 3, 4, "1"],
-      ["misfortune-to-fortune", 3, 4, "2 / 4"],
+      ["complete-potential", 1, 2, "1"],
+      ["balanced-growth", 2, 3, "1"],
+      ["lasting-fortune", 3, 4, "1"],
+      ["misfortune-to-fortune", 3, 4, "2"],
+      ["healthy-mind", 3, 4, "3"],
     ] as const) {
       const node = tree.match(new RegExp('<button[^>]*data-talent-id="' + id + '"[^>]*>'))?.[0] ?? "";
       expect(node).toContain('data-tier="' + tier + '"');
@@ -1704,7 +1724,7 @@ describe("v2 render lobby shell", () => {
       "M75 96 H225", "M75 160 H225",
       "M75 96 C145 96 155 160 225 160", "M75 160 C145 160 155 96 225 96",
       "M225 96 C295 96 305 128 375 128", "M225 160 C295 160 305 128 375 128",
-      "M375 128 H525",
+      "M375 128 C445 128 455 96 525 96", "M375 128 C445 128 455 160 525 160",
     ]) expect(tree).toContain('<path d="' + path + '" />');
     expect(tree).not.toContain('<path d="M225 32 H525" />');
     expect(tree).not.toContain('<path d="M75 128 H225" />');
@@ -1725,17 +1745,17 @@ describe("v2 render lobby shell", () => {
     const originalState = JSON.stringify(state);
     const nodes = [
       ["natural-charisma", "八面玲珑", "初始社交+1/级", 1, 5, "", 0, "smile"],
-      ["supporting-juniors", "提携后进", "指导师弟师妹事件出现概率+100%", 2, 1, "", 0, "user-round"],
-      ["growing-connections", "左右逢源", "社交每年+1", 3, 1, "natural-charisma", 1, "calendar-days"],
-      ["peer-camaraderie", "同窗共进", "同门合作事件出现概率+100%", 2, 1, "supporting-juniors", 1, "handshake"],
-      ["circle-of-friends", "高朋满座", "转博时人际栏每位同学使社交+1/级、社交上限+1/级", 3, 2, "growing-connections", 2, "users"],
-      ["senior-mentorship", "师友相助", "师兄师姐指导事件出现概率+100%", 2, 1, "peer-camaraderie", 2, "graduation-cap"],
-      ["kindly-reviewed", "人缘加持", "转博后心软审稿人概率+社交×1%/级，其余类型保持相对比例", 2, 5, "circle-of-friends", 3, "heart"],
-      ["collective-wisdom", "群策群力", "同学协作分+50%/级", 2, 2, "senior-mentorship", 3, "network"],
-      ["junior-delegation", "借力后进", "麻烦师弟师妹不扣社交", 2, 1, "", 0, "hand-helping"],
-      ["junior-bond", "投桃报李", "麻烦师弟师妹默契+1/级", 1, 3, "junior-delegation", 1, "heart-handshake"],
-      ["paper-camaraderie", "珠联璧合", "合作发表论文提升的默契+1/级", 2, 2, "junior-bond", 2, "file-heart"],
-      ["overflow-social", "人多势众", "人际栏同学溢出转为社交+1/级", 2, 2, "senior-mentorship", 3, "user-round-plus"],
+      ["supporting-juniors", "提携后进", "指导师弟师妹事件出现概率+100%/级", 1, 2, "", 0, "user-round"],
+      ["growing-connections", "左右逢源", "每学年末，社交+1", 3, 1, "natural-charisma", 1, "calendar-days"],
+      ["peer-camaraderie", "同窗共进", "同门合作事件出现概率+100%/级", 1, 2, "", 0, "handshake"],
+      ["circle-of-friends", "高朋满座", "转博时人际栏每位同学使社交+1/级、社交上限+1/级", 2, 2, "growing-connections", 2, "users"],
+      ["senior-mentorship", "师友相助", "师兄师姐指导事件出现概率+100%/级", 1, 2, "peer-camaraderie supporting-juniors", 1, "graduation-cap"],
+      ["kindly-reviewed", "人缘加持", "转博后，全实验室心软审稿人概率+你的社交×1%/级", 1, 5, "circle-of-friends", 3, "heart"],
+      ["collective-wisdom", "群策群力", "同学协作分+50%/级", 2, 2, "paper-camaraderie", 3, "network"],
+      ["junior-delegation", "借力后进", "麻烦师弟师妹不扣社交", 1, 1, "supporting-juniors", 1, "hand-helping"],
+      ["junior-bond", "投桃报李", "麻烦师弟师妹默契+1/级", 1, 3, "junior-delegation", 2, "heart-handshake"],
+      ["paper-camaraderie", "珠联璧合", "合作发表论文提升的默契+1/级", 2, 2, "senior-mentorship", 2, "file-heart"],
+      ["overflow-social", "人多势众", "人际栏同学溢出转为社交+1/级", 2, 2, "junior-bond paper-camaraderie", 3, "user-round-plus"],
     ] as const;
 
     for (const [index, [id, name, effect, cost, maxLevel, prerequisites, tier, icon]] of nodes.entries()) {
@@ -1744,7 +1764,7 @@ describe("v2 render lobby shell", () => {
       const node = tree.match(new RegExp('<button[^>]*data-talent-id="' + id + '"[\\s\\S]*?<\\/button>'))?.[0] ?? "";
       expect(html).toContain('天赋点 <strong class="lobby-talent-points-value">20</strong>');
       expect((tree.match(/data-ui-talent-tree-node="0-\d+"/g) ?? []).length).toBe(12);
-      expect((tree.match(/<path d=/g) ?? []).length).toBe(9);
+      expect((tree.match(/<path d=/g) ?? []).length).toBe(11);
       expect(tree).not.toContain("笔下留情");
       expect(tree).not.toContain("社交及其上限");
       expect(tree).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
@@ -1762,7 +1782,7 @@ describe("v2 render lobby shell", () => {
       for (const path of ["M75 32 H225", "M225 32 H375", "M375 32 H525", "M75 160 H225", "M225 160 H375", "M375 160 H525"]) {
         expect(tree).toContain('<path d="' + path + '" />');
       }
-      for (const path of ["M75 96 H225", "M225 96 H375", "M375 160 C445 160 455 96 525 96"]) {
+      for (const path of ["M75 96 H225", "M225 96 H375", "M375 96 H525", "M75 96 C145 96 155 160 225 160", "M375 160 C445 160 455 96 525 96"]) {
         expect(tree).toContain('<path d="' + path + '" />');
       }
     }
@@ -1823,29 +1843,29 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("办公椅 0/1 · 工学椅 0/1");
   });
 
-  it("renders the second page with special tags and the last gender-paired rows", () => {
+  it("keeps all four cursed roles on the second page", () => {
     const account = createDefaultAccountProfile();
-    account.selectedLobbyRoleId = "research-captain";
+    account.selectedLobbyRoleId = "special-finite-life";
     account.lobbyRolePage = 1;
     const html = renderApp(createInitialState(), account);
 
-    expect(html).toContain("统御者");
-    expect(html).toContain("轮回者");
-    expect(html).toContain("特殊");
+    for (const role of getRoleOptions()) {
+      expect(html.includes(`data-role-id="${role.id}"`)).toBe(isCursedRole(role.id));
+    }
     expect((html.match(/class="lobby-page-dot(?: is-active)?"/g) ?? []).length).toBe(2);
     expect(html).toContain('class="lobby-page-dot is-active"');
     expect(html).toContain('aria-label="第2页"');
     expect(html).toContain('aria-current="page" disabled');
-    expect(html).toContain("天选之人");
-    expect((html.match(/data-action="select-role"/g) ?? []).length).toBe(8);
-    expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(4);
+    expect(html).not.toContain("天选之人");
+    expect((html.match(/data-action="select-role"/g) ?? []).length).toBe(4);
+    expect((html.match(/class="lobby-role-row"/g) ?? []).length).toBe(2);
     expect(html).toContain("有限人生");
     expect(html).toContain("天才迟暮");
     expect(html).not.toContain("百变旦旦");
     expect(html).not.toContain("魅力妲己");
     expect(html).toContain("体弱多病");
     expect(html).toContain("寒门负重");
-    expect(html).toContain('class="lobby-role-card-mode-band is-special"');
+    expect(html).not.toContain('class="lobby-role-card-mode-band is-special"');
     expect(html).toContain("诅咒");
   });
 
@@ -4645,7 +4665,7 @@ describe("v2 render lobby shell", () => {
     expect(relationHtml).toContain('data-talent-item-id="lab-mutual-growth"');
     expect(relationHtml).not.toContain('data-talent-item-id="fellow-publication-growth"');
     const inheritance = getTalentCardHtml(relationHtml, "lab-mutual-growth");
-    expect(inheritance).toContain("8月科研+⌊n/2⌋，n为科研更高人数");
+    expect(inheritance).toContain("每学年末科研+⌊n/2⌋，n为科研更高人数");
     expect(inheritance).toContain("含导师、不含恋人；详见人际提示");
     expect(inheritance).not.toContain('data-relationship-tooltip data-tooltip="n为科研高于自己的实验室成员人数"');
     expect(inheritance).toContain('data-ui-lab-inheritance-page="1"');

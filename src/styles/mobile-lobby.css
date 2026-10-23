@@ -49,10 +49,12 @@
   }
   .lobby-page[data-scale-mode="fixed"] .lobby-role-row { display: contents; }
   .lobby-page[data-scale-mode="fixed"] .lobby-role-card {
-    flex: 0 0 156px;
-    min-height: 96px;
+    flex: 0 0 108px;
     scroll-snap-align: start;
   }
+  .lobby-page .lobby-role-card-name { font-size: 13px; min-height: 2.48em; }
+  .lobby-page .lobby-role-card-mode-band,
+  .lobby-page .lobby-role-card-level-badge { font-size: 11px; }
 
   .lobby-page[data-scale-mode="fixed"] .lobby-profile-top {
     grid-template-columns: 94px minmax(0, 1fr);

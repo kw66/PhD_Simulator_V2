@@ -48,11 +48,23 @@ describe("actual monthly income evidence", () => {
     expect(next.achievementProgress!.satisfied).not.toContain("global:windfall");
   });
 
-  it("records individual coin-game wins even when the following loss erases them", () => {
+  it("counts only the final coin-game net result as income or spending", () => {
     const s = start(); s.selectedRoleId = "rich-reversed"; s.player.money = 200;
     s.roleTalents = { levels: { "coin-game": 1 }, pendingCoinGames: 2 };
     const rolls = [0, 1];
     const next = settleGreedCoinGames(s, () => rolls.shift() ?? 1);
+    expect(next.player.money).toBe(120);
+    expect(next.achievementProgress?.counters["income:1"] ?? 0).toBe(0);
+    expect(next.personalSpending).toBe(80);
+    expect(next.roleTalents?.greedQualifiedSpending).toBe(80);
+    expect(next.achievementProgress?.satisfied ?? []).not.toContain("global:windfall");
+  });
+
+  it("retains individual bounded-stake wins in r45 recordings", () => {
+    const s = start(); s.selectedRoleId = "rich-reversed"; s.player.money = 200;
+    s.roleTalents = { levels: { "coin-game": 1 }, pendingCoinGames: 2 };
+    const rolls = [0, 1];
+    const next = withGameplayRuleset("20261023-r45", () => settleGreedCoinGames(s, () => rolls.shift() ?? 1));
     expect(next.player.money).toBe(199.5);
     expect(next.achievementProgress!.counters["income:1"]).toBe(2.5);
     expect(next.achievementProgress!.satisfied).not.toContain("global:windfall");

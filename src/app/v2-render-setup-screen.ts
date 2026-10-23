@@ -4,7 +4,6 @@ import {
   getLobbyRolePageRows,
   getAchievementDisplayPages,
   isRoleOwned,
-  LOBBY_ROLE_PAGE_ROW_COUNT,
 } from "../core/v2-lobby";
 import { formatMoney } from "../core/v2-money";
 import { getRoleDefinition, getRoleOptions } from "../core/v2-progression";
@@ -35,7 +34,7 @@ import { animationNumberAttributes, animationBarAttribute, renderAnimatedAttribu
 import { getRoleLobbyAchievementDefinitions, getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
 import { DEFAULT_ROLE_EXP_GAIN_MULTIPLIER, getNextRoleLevelExperience, MAX_ROLE_LEVEL, ROLE_INITIAL_TALENT_POINTS, ROLE_TALENT_POINTS_PER_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile, GameState, LobbySelectedRoleViewModel, RoleAchievementDefinition, RoleId } from "../core/v2-types";
-import { getRoleCardPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
+import { getRoleChibiPortraitUrl, getRoleDetailPortraitUrl } from "./v2-role-portrait-assets";
 import { renderLobbyMasthead, renderLobbyMessageRailView } from "./v2-render-community";
 import { renderLobbyAnnouncementRailView } from "./v2-render-announcements";
 import { renderAchievementCard } from "./v2-render-achievement-progress";
@@ -121,7 +120,7 @@ function isLobbyAchievementUnlocked(
   return isAchievementCompleted(accountProfile, achievement);
 }
 
-function renderRoleCardCornerBadge(roleId: RoleId, level: number, owned: boolean): string {
+function renderRoleCardLevelBadge(roleId: RoleId, level: number, owned: boolean): string {
   if (!owned) {
     return `
       <span class="lobby-role-card-level-badge is-locked" aria-label="未解锁">
@@ -140,6 +139,7 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
   const toneClass = getRoleToneClass(roleId);
   const selectedClass = selectedRoleId === roleId ? " is-selected" : "";
   const statusClass = owned ? " is-owned" : " is-locked";
+  const level = getDisplayedRoleLevel(progress.level);
 
   return `
     <button
@@ -148,29 +148,26 @@ function renderRoleCard(roleId: RoleId, accountProfile: AccountProfile, selected
       data-action="select-role"
       data-role-id="${escapeHtml(role.id)}"
       aria-pressed="${selectedRoleId === roleId ? "true" : "false"}"
+      aria-label="${escapeHtml(`${role.name}，${getRoleModeLabel(roleId)}，${owned ? `等级${level}` : "未解锁"}`)}"
     >
-      <div class="lobby-role-card-top">
-        <div class="lobby-role-card-main">
-          <div class="lobby-role-card-portrait-shell">
-            <img
-              class="lobby-role-card-portrait"
-              src="${escapeHtml(getRoleCardPortraitUrl(role.id))}"
-              width="144"
-              height="258"
-              loading="lazy"
-              decoding="async"
-              fetchpriority="low"
-              alt="${escapeHtml(`${role.name}缩略立绘`)}"
-            />
-          </div>
-          <div class="lobby-role-card-headings">
-            <strong class="lobby-role-card-name">${escapeHtml(role.name)}</strong>
-            <div class="lobby-role-card-mode-band ${getRoleModeClass(roleId)}">
-              <span>${getRoleModeLabel(roleId)}</span>
-            </div>
-            ${renderRoleCardCornerBadge(roleId, getDisplayedRoleLevel(progress.level), owned)}
-          </div>
+      <strong class="lobby-role-card-name">${escapeHtml(role.name)}</strong>
+      <div class="lobby-role-card-portrait-shell">
+        <img
+          class="lobby-role-card-portrait"
+          src="${escapeHtml(getRoleChibiPortraitUrl(role.id))}"
+          width="256"
+          height="256"
+          loading="lazy"
+          decoding="async"
+          fetchpriority="low"
+          alt="${escapeHtml(`${role.name}Q版头像`)}"
+        />
+      </div>
+      <div class="lobby-role-card-meta">
+        <div class="lobby-role-card-mode-band ${getRoleModeClass(roleId)}">
+          <span>${getRoleModeLabel(roleId)}</span>
         </div>
+        ${renderRoleCardLevelBadge(roleId, level, owned)}
       </div>
     </button>
   `;
@@ -446,6 +443,7 @@ const DESIGNED_TALENT_TREES = {
       "M75 32 H225", "M75 160 H225",
       "M75 96 H225",
       "M225 32 H375", "M225 160 H375",
+      "M225 96 C295 96 305 160 375 160",
       "M375 32 C445 32 455 96 525 96", "M375 160 C445 160 455 96 525 96",
     ],
   },
@@ -463,12 +461,10 @@ const DESIGNED_TALENT_TREES = {
     nodes: TEACHER_CHILD_TALENT_NODES,
     viewBoxHeight: 192,
     paths: [
-      "M75 96 C145 96 155 32 225 32", "M75 96 C145 96 155 160 225 160",
-      "M75 96 H225",
-      "M225 32 H375", "M225 32 C295 32 305 96 375 96",
-      "M225 160 H375", "M375 160 H525",
+      "M75 32 H225", "M225 32 H375", "M375 32 H525",
+      "M75 96 H225", "M225 96 H375", "M375 96 H525",
+      "M75 160 H225", "M225 160 H375", "M375 160 H525",
       "M375 160 C445 160 455 96 525 96",
-      "M375 32 H525", "M375 96 C445 96 455 32 525 32",
     ],
   },
   chosen: {
@@ -479,16 +475,16 @@ const DESIGNED_TALENT_TREES = {
       "M75 96 H225", "M75 160 H225",
       "M75 96 C145 96 155 160 225 160", "M75 160 C145 160 155 96 225 96",
       "M225 96 C295 96 305 128 375 128", "M225 160 C295 160 305 128 375 128",
-      "M375 128 H525",
+      "M375 128 C445 128 455 96 525 96", "M375 128 C445 128 455 160 525 160",
     ],
   },
   "chosen-reversed": {
     nodes: CHOSEN_REVERSED_TALENT_NODES,
     viewBoxHeight: 192,
     paths: [
-      "M75 32 C145 32 155 96 225 96", "M75 96 H225",
-      "M225 96 C295 96 305 32 375 32", "M225 96 H375",
-      "M375 32 C445 32 455 96 525 96", "M375 96 H525",
+      "M75 32 H225", "M75 96 H225",
+      "M75 32 C145 32 155 96 225 96", "M75 96 C145 96 155 32 225 32",
+      "M225 32 C295 32 305 96 375 96", "M225 96 H375", "M375 96 H525",
       "M75 160 H225", "M225 160 H375",
     ],
   },
@@ -498,8 +494,8 @@ const DESIGNED_TALENT_TREES = {
     paths: [
       "M75 32 H225", "M225 32 H375", "M375 32 H525",
       "M75 160 H225", "M225 160 H375", "M375 160 H525",
-      "M75 96 H225", "M225 96 H375",
-      "M375 160 C445 160 455 96 525 96",
+      "M75 96 H225", "M225 96 H375", "M375 96 H525",
+      "M75 96 C145 96 155 160 225 160", "M375 160 C445 160 455 96 525 96",
     ],
   },
   "normal-reversed": {
@@ -518,15 +514,17 @@ const DESIGNED_TALENT_TREES = {
     paths: [
       "M75 32 H225", "M75 160 C145 160 155 96 225 96",
       "M75 32 C145 32 155 96 225 96", "M75 160 H225",
-      "M225 96 H375", "M375 96 H525", "M225 160 H375",
+      "M225 32 H375", "M225 160 H375",
+      "M225 32 C295 32 305 96 375 96", "M225 96 H375",
+      "M225 160 C295 160 305 96 375 96",
     ],
   },
   "genius-reversed": {
     nodes: GENIUS_REVERSED_TALENT_NODES,
     viewBoxHeight: 192,
     paths: [
-      "M75 32 H225", "M75 96 H225", "M75 160 H225",
-      "M225 96 C295 96 305 32 375 32", "M225 160 C295 160 305 96 375 96", "M225 160 H375",
+      "M75 32 H225", "M225 32 H375", "M75 96 H225",
+      "M75 160 H225", "M225 96 H375", "M225 96 C295 96 305 160 375 160",
       "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
     ],
   },
@@ -544,9 +542,9 @@ const DESIGNED_TALENT_TREES = {
     nodes: SOCIAL_REVERSED_TALENT_NODES,
     viewBoxHeight: 192,
     paths: [
-      "M75 32 H225", "M75 96 H225",
-      "M225 96 C295 96 305 32 375 32", "M225 96 H375", "M225 96 C295 96 305 160 375 160",
-      "M375 32 C445 32 455 96 525 96", "M375 96 H525", "M375 160 C445 160 455 96 525 96",
+      "M75 32 C145 32 155 96 225 96", "M75 96 H225", "M75 160 C145 160 155 96 225 96",
+      "M225 96 H375", "M225 96 C295 96 305 160 375 160",
+      "M375 96 H525", "M375 160 H525",
     ],
   },
 } as const;
@@ -674,7 +672,7 @@ export function renderSetupScreen(
                       ${renderRolePager(accountProfile)}
                     </div>
                   </div>
-                  <div class="lobby-role-list" style="--lobby-role-page-rows: ${LOBBY_ROLE_PAGE_ROW_COUNT}">
+                  <div class="lobby-role-list">
                     ${rolePageRows.map((row) => `
                       <div class="lobby-role-row">
                         ${row.map((roleId) => renderRoleCard(roleId, accountProfile, selectedRoleId)).join("")}

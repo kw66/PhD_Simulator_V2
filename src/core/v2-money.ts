@@ -1,8 +1,12 @@
 import { recordAchievementCounter, recordAchievementFact, recordAchievementStats } from "./v2-achievement-runtime-types";
 import type { GameState } from "./v2-types";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export function roundMoney(amount: number): number {
+  // At this magnitude doubles cannot represent cents; shifting the exponent
+  // would overflow even though the original amount is still finite.
+  if (usesGameplayRulesFrom("20261023-r46") && Math.abs(amount) >= 1e21) return Math.sign(amount) * Math.min(Math.abs(amount), Number.MAX_VALUE);
   const [coefficient, exponent = "0"] = Math.abs(amount).toString().split("e");
   const rounded = Math.round(Number(`${coefficient}e${Number(exponent) + 2}`)) / 100;
   return rounded === 0 ? 0 : Math.sign(amount) * rounded;
@@ -17,6 +21,14 @@ export function recordPersonalSpending(state: GameState, amount: number): GameSt
   if (!(spent > 0)) return state;
   let next: GameState = { ...state, personalSpending: roundMoney((state.personalSpending ?? 0) + spent) };
   if (state.selectedRoleId !== "rich-reversed" || !state.roleTalents) return next;
+  if (usesGameplayRulesFrom("20261023-r45")) {
+    return { ...next, roleTalents: { ...state.roleTalents,
+      greedQualifiedSpending: roundMoney((state.roleTalents.greedQualifiedSpending ?? 0) + spent),
+      ...(state.degree === "phd" && getRoleTalentLevel(state, "post-phd-money-conversion") > 0 ? {
+        pendingMoneyConversionTransactions: [...(state.roleTalents.pendingMoneyConversionTransactions ?? []), spent],
+      } : {}),
+    } };
+  }
   const conversions = state.degree === "phd" && getRoleTalentLevel(state, "post-phd-money-conversion") > 0
     ? roundMoney((state.roleTalents.moneyConversionRemainder ?? 0) + spent) : 0;
   const count = Math.floor(conversions);

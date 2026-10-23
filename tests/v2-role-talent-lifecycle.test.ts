@@ -5,6 +5,7 @@ import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progres
 import { applyPrepublicationPaperDecay, createDraftPaper } from "../src/core/v2-paper-rules";
 import { getPlayerAttributeCap, previewPlayerAttributeChange } from "../src/core/v2-player-attributes";
 import { getRoleKindReviewerBonus } from "../src/core/v2-role-talent-state";
+import { settleFellowRecruitmentTalent } from "../src/core/v2-role-talent-relationships";
 import {
   initializeRoleTalents, applyRoleTalentAdvisorAssignment, applyRoleTalentPhdTransfer,
   settleRoleTalentMonthStart, settleRoleTalentYearEnd, syncRoleTalentFellows, settleRoleTalentDiseaseMilestones,
@@ -26,6 +27,79 @@ function fellow(id: string, research: number) {
 }
 
 describe("role talent lifecycle", () => {
+  it("scales osmosis to twenty percent at rank two", () => {
+    const before = month(run("teacher-child", { "learning-by-osmosis": 2 }), 12);
+    before.player = { ...before.player, research: 1, favor: 10 };
+    expect(settleRoleTalentYearEnd(before).player.research).toBe(3);
+  });
+  it.each(["master", "phd"] as const)("settles osmosis at August end in %s with ordinary research resistance and no fellow changes", (degree) => {
+    const before = month(run("teacher-child", { "learning-by-osmosis": 1 }), degree === "master" ? 12 : 36);
+    before.degree = degree;
+    before.player = { ...before.player, research: 6, favor: 15 };
+    before.fellowProgressState = [fellow("unaffected", 8)];
+    expect(settleRoleTalentYearEnd({ ...before, month: 11 }).player.research).toBe(6);
+    expect(settleRoleTalentMonthStart(before).player.research).toBe(6);
+    const after = settleRoleTalentYearEnd(before);
+    expect(after.player.research).toBe(7.2);
+    expect(after.player.favor).toBe(15);
+    expect(after.roleTalents?.growthTotals?.research).toBe(1.2);
+    expect(after.fellowProgressState).toEqual(before.fellowProgressState);
+    expect(settleRoleTalentYearEnd(after)).toBe(after);
+    const nextYear = settleRoleTalentYearEnd(month(after, before.totalMonths + 12));
+    expect(nextYear.player.research).toBe(8.4);
+  });
+
+  it("uses the updated annual favor for osmosis and respects the research cap", () => {
+    const before = month(run("teacher-child", { "learning-by-osmosis": 1, "growing-familiarity": 1 }), 12);
+    before.player = { ...before.player, research: 1, favor: 6 };
+    const after = settleRoleTalentYearEnd(before);
+    expect(after.player.favor).toBe(6.8);
+    expect(after.player.research).toBe(1.68);
+    const nearCap = { ...before, player: { ...before.player, research: 19.8, favor: 18 } };
+    expect(settleRoleTalentYearEnd(nearCap).player.research).toBe(20);
+    const capped = { ...before, player: { ...before.player, research: 20, favor: 18 } };
+    expect(settleRoleTalentYearEnd(capped).player.research).toBe(20);
+  });
+
+  it("does not apply osmosis at enrollment, without its talent, or in r27", () => {
+    const before = run("teacher-child", { "learning-by-osmosis": 1 });
+    before.player = { ...before.player, research: 3, favor: 18 };
+    expect(initializeRoleTalents(before).player.research).toBe(3);
+    expect(settleRoleTalentYearEnd(month({ ...before, roleTalents: { levels: {} } }, 12)).player.research).toBe(3);
+    for (const degree of ["master", "phd"] as const) {
+      const legacy = withGameplayRuleset("20261022-r27", () => settleRoleTalentYearEnd(month({ ...before, degree }, 12)));
+      expect(legacy.player.research).toBe(3);
+    }
+  });
+
+  it("settles a paper milestone immediately after annual favor crosses its threshold", () => {
+    const before = month(run("teacher-child", { "growing-familiarity": 1, "family-patronage": 1 }), 12);
+    before.player.favor = 11.8;
+    expect(before.externalPublications).toHaveLength(0);
+    const after = settleRoleTalentYearEnd(before);
+    expect(after.player.favor).toBeGreaterThanOrEqual(12);
+    expect(after.externalPublications.map(paper => paper.target)).toEqual(["C"]);
+    expect(after.roleTalents?.familyPatronageGrantedIds).toEqual(["family-patronage"]);
+    expect(settleRoleTalentYearEnd(after)).toBe(after);
+    expect(settleRoleTalentYearEnd(month(after, 24)).externalPublications).toEqual(after.externalPublications);
+    const legacy = withGameplayRuleset("20261022-r27", () => settleRoleTalentYearEnd(before));
+    expect(legacy.player.favor).toBeGreaterThanOrEqual(12);
+    expect(legacy.externalPublications).toEqual([]);
+  });
+
+  it("settles enrollment milestone papers after initial favor, without a transfer or second initialization grant", () => {
+    const before = run("teacher-child", { "near-the-source": 1, "family-patronage": 1 });
+    before.player.favor = 11.8;
+    const after = initializeRoleTalents(before);
+    expect(after.degree).toBe("master");
+    expect(after.player.favor).toBeGreaterThanOrEqual(12);
+    expect(after.externalPublications.map(paper => paper.target)).toEqual(["C"]);
+    expect(after.roleTalents?.familyPatronageGrantedIds).toEqual(["family-patronage"]);
+    expect(initializeRoleTalents(after)).toBe(after);
+    const legacy = withGameplayRuleset("20261022-r27", () => initializeRoleTalents(before));
+    expect(legacy.externalPublications).toHaveLength(0);
+  });
+
   it("social and advisor initial and annual growth use ordinary resistance", () => {
     for (const [role, initial, annual, stat] of [["social", "natural-charisma", "growing-connections", "social"], ["teacher-child", "near-the-source", "growing-familiarity", "favor"]] as const) {
       const state = initializeRoleTalents(run(role, { [initial]: 5, [annual]: 1 }));
@@ -45,6 +119,14 @@ describe("role talent lifecycle", () => {
     expect(getRoleKindReviewerBonus(next)).toBeCloseTo(0.432);
     expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: 10 } })).toBeCloseTo(0.2);
     expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: 30 } })).toBeCloseTo(0.6);
+    withGameplayRuleset("20261023-r35", () => {
+      expect(getRoleKindReviewerBonus(next)).toBeCloseTo(0.864);
+    });
+    withGameplayRuleset("20261023-r29", () => {
+      expect(getRoleKindReviewerBonus(next)).toBeCloseTo(0.432);
+      expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: 10 } })).toBeCloseTo(0.2);
+      expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: 30 } })).toBeCloseTo(0.6);
+    });
     expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: -1 } })).toBe(0);
     expect(getRoleKindReviewerBonus({ ...next, player: { ...next.player, social: 100 } })).toBe(1);
     expect(getRoleKindReviewerBonus({ ...next, selectedRoleId: "normal" })).toBe(0);
@@ -52,7 +134,7 @@ describe("role talent lifecycle", () => {
     expect(applyRoleTalentPhdTransfer(before, next)).toBe(next);
   });
 
-  it("advisor family transfer grants real first-author publications and persistent reimbursement uses once", () => {
+  it("advisor family transfer grants real first-author publications and persistent reimbursement uses once", () => withGameplayRuleset("20261022-r27", () => {
     const before = run("teacher-child", { "family-patronage": 2, "computing-support": 2, "workspace-renewal": 1 });
     before.player.favor = 12.9;
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
@@ -63,7 +145,7 @@ describe("role talent lifecycle", () => {
     expect(next.shopState.entitlements.gpuTransaction).toBe(before.shopState.entitlements.gpuTransaction + 2);
     expect(next.shopState.entitlements.workstationTransaction).toBe(before.shopState.entitlements.workstationTransaction + 1);
     expect(applyRoleTalentPhdTransfer(before, next)).toBe(next);
-  });
+  }));
 
   it("sloth initial and transfer bonuses retain decimal gains and upgrade the fixed SAN curse", () => {
     let state = initializeRoleTalents(run("normal-reversed", { "sloth-head-start": 1, "post-phd-growth": 1 }));
@@ -100,7 +182,7 @@ describe("role talent lifecycle", () => {
   });
 
   it("reversed genius opens extra slots and counts only published first-author papers at transfer", () => {
-    const before = createStartedGameState("genius-reversed", { "paper-opening": 3, "papers-to-insight": 1 });
+    const before = createStartedGameState("genius-reversed", { "paper-opening": 3, "learning-from-rejection": 1, "research-network": 1 });
     expect(before.paperSlotsUnlocked).toBe(4);
     before.papers = [createDraftPaper(1, 0), { ...paper("review", "A"), status: "reviewing" }];
     before.externalPublications = [paper("first", "C"), paper("coauthor", "A", true)];
@@ -108,7 +190,7 @@ describe("role talent lifecycle", () => {
     expect(next.player.research).toBe(before.player.research + 1);
   });
 
-  it("rejection reward requires first rejection as master first author and cannot repeat", () => {
+  it("preserves the r32 first-rejection research reward", () => withGameplayRuleset("20261023-r32", () => {
     const state = run("genius-reversed", { "learning-from-rejection": 1 });
     const submitted = { ...createDraftPaper(1, 0), status: "reviewing" as const };
     const next = settleRoleTalentPaperRejection(state, submitted);
@@ -120,10 +202,10 @@ describe("role talent lifecycle", () => {
     expect(settleRoleTalentPaperRejection(state, { ...submitted, leadAuthorId: "player" }).player.research).toBe(state.player.research + 1);
     const phd = { ...state, degree: "phd" as const };
     expect(settleRoleTalentPaperRejection(phd, submitted)).toBe(phd);
-  });
+  }));
 
   it.each(["rich", "genius", "genius-reversed"] as const)("%s transfer deduplicates publications and excludes fellow-led papers without a coauthor flag", (role) => {
-    const before = run(role, { "knowledge-is-wealth": 1, "knowledge-is-wealth-beta": 1, "proven-by-papers": 1, "boundless-study": 1, "papers-to-insight": 1 });
+    const before = run(role, { "knowledge-is-wealth": 1, "knowledge-is-wealth-beta": 1, "proven-by-papers": 1, "research-network": 1 });
     const ordinary = paper("ordinary", "A");
     const explicitPlayer = { ...paper("explicit-player", "A"), leadAuthorId: "player" };
     const fellowLed = { ...paper("fellow-led", "A"), leadAuthorId: "fellow-1" };
@@ -162,12 +244,24 @@ describe("role talent lifecycle", () => {
     expect(settleRoleTalentMonthStart(month(changed, 4), () => 0).player.research).toBe(changed.player.research);
   });
   it("initial bonuses and permanent action buffs apply only once", () => {
-    const state = run("genius", { "innate-insight": 5, "idea-insight": 2, "experiment-practice": 3, "writing-mastery": 1 });
+    const state = run("genius", { "innate-insight": 4, "idea-insight": 2, "experiment-practice": 3, "writing-mastery": 1 });
     const next = initializeRoleTalents(state);
-    expect(next.player.research).toBe(state.player.research + 5);
-    expect(next.buffs.map((buff) => buff.actionEffects)).toEqual([{ idea: { bonus: 4 } }, { experiment: { bonus: 6 } }, { writing: { bonus: 2 } }]);
+    expect(next.player.research).toBe(state.player.research + 4);
+    expect(next.buffs.map((buff) => buff.actionEffects)).toEqual([{ idea: { bonus: 6 } }, { experiment: { bonus: 9 } }, { writing: { bonus: 3 } }]);
     expect(initializeRoleTalents(next)).toBe(next);
     expect(state.buffs).toHaveLength(0);
+  });
+
+  it("preserves r26 starting research and two-point action buffs in saved recordings", () => {
+    withGameplayRuleset("20261022-r26", () => {
+      const next = createStartedGameState("genius", {
+        "innate-insight": 5, "idea-insight": 2, "experiment-practice": 1, "writing-mastery": 1,
+      });
+      expect(next.player.research).toBe(6);
+      expect(next.buffs.map(buff => buff.actionEffects)).toEqual([
+        { idea: { bonus: 4 } }, { experiment: { bonus: 2 } }, { writing: { bonus: 2 } },
+      ]);
+    });
   });
 
   it("rich starting money and assigned advisor funding are independent one-time awards", () => {
@@ -252,16 +346,16 @@ describe("role talent lifecycle", () => {
   });
 
   it("genius transfer cap is available to the same batch of research growth", () => {
-    const before = run("genius", { "proven-by-papers": 3, "boundless-study": 5 });
+    const before = run("genius", { "proven-by-papers": 3 });
     before.player.research = 20;
     before.papers = [paper("a", "A"), paper("co", "A", true), paper("b", "B")];
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
-    expect(getPlayerAttributeCap(next, "research")).toBe(25);
+    expect(getPlayerAttributeCap(next, "research")).toBe(23);
     expect(next.player.research).toBeCloseTo(21.2);
   });
 
   it("freezes academic confidence from pre-transfer papers but activates after transfer growth", () => {
-    const before = run("genius", { "academic-confidence": 1, "proven-by-papers": 3, "boundless-study": 5 });
+    const before = run("genius", { "academic-confidence": 2, "proven-by-papers": 3 });
     before.player.research = 20;
     before.papers = [paper("a", "A"), paper("co", "A", true), paper("b", "B"), { ...paper("draft", "A"), status: "draft" }];
     before.externalPublications = [paper("a", "A")];
@@ -285,30 +379,96 @@ describe("role talent lifecycle", () => {
     expect(previewPlayerAttributeChange(next, "research", 1).effectiveChange).toBe(1);
   });
 
+  it.each([[1, 0.1], [2, 0.2]] as const)("academic confidence rank %i counts only unique published first-author A papers", (rank, reduction) => {
+    const before = run("genius", { "academic-confidence": rank });
+    const first = paper("first", "A");
+    before.papers = [first, paper("coauthor", "A", true),
+      { ...paper("fellow-led", "A"), leadAuthorId: "fellow-1" },
+      { ...paper("unpublished", "A"), status: "reviewing" }, paper("b", "B")];
+    before.externalPublications = [first];
+    const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
+    expect(next.roleTalents?.researchGrowthResistanceReduction).toBe(reduction);
+    expect(next.player.research).toBe(before.player.research);
+  });
+
+  it("academic confidence rank two caps at sixty percentage points", () => {
+    const before = run("genius", { "academic-confidence": 2 });
+    before.papers = Array.from({ length: 4 }, (_, index) => paper(`a-${index}`, "A"));
+    expect(applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" }).roleTalents?.researchGrowthResistanceReduction).toBe(0.6);
+  });
+
+  it("r26 recordings keep separate cap rewards and count coauthored A for academic confidence", () => {
+    const before = run("genius", { "proven-by-papers": 3, "boundless-study": 5, "academic-confidence": 1 });
+    before.player.research = 20;
+    before.papers = [paper("first", "A"), paper("coauthor", "A", true)];
+    const next = withGameplayRuleset("20261022-r26", () => applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" }));
+    expect(getPlayerAttributeCap(next, "research")).toBe(25);
+    expect(next.player.research).toBe(21.2);
+    expect(next.roleTalents?.researchGrowthResistanceReduction).toBe(0.2);
+  });
+
   it("each fellow receives the post-transfer boost once, including later recruits", () => {
-    let state = run("genius", { "rise-together": 4 });
+    let state = run("genius", { "rise-together": 3 });
     state = { ...state, fellowProgressState: [fellow("first", 18)] };
     expect(syncRoleTalentFellows(state)).toBe(state);
     const initial = syncRoleTalentFellows({ ...state, degree: "phd" });
-    expect(initial.fellowProgressState[0]!.research).toBeCloseTo(19.6);
+    expect(initial.fellowProgressState[0]!.research).toBeCloseTo(20);
     expect(syncRoleTalentFellows(initial)).toBe(initial);
     const added = syncRoleTalentFellows({ ...initial, fellowProgressState: [...initial.fellowProgressState, fellow("second", 5)] });
-    expect(added.fellowProgressState[0]!.research).toBeCloseTo(19.6);
-    expect(added.fellowProgressState[1]!.research).toBeCloseTo(8.4);
+    expect(added.fellowProgressState[0]!.research).toBeCloseTo(20);
+    expect(added.fellowProgressState[1]!.research).toBeCloseTo(10);
+    const legacy = withGameplayRuleset("20261022-r27", () => syncRoleTalentFellows({ ...state, degree: "phd" }));
+    expect(legacy.fellowProgressState[0]!.research).toBeCloseTo(19.2);
   });
 
-  it("chosen equalization resists once and full fortune eliminates growth resistance", () => {
+  it("academic atmosphere improves the joining fellow rather than the player and deduplicates rejoins", () => {
+    const state = { ...run("genius", { "academic-atmosphere": 3 }),
+      fellowProgressState: [fellow("first", 5), fellow("near-cap", 19.8), fellow("at-cap", 20)] };
+    const snapshot = structuredClone(state);
+    const next = settleFellowRecruitmentTalent({ ...state, fellowProgressState: [] }, state);
+    expect(next.player).toEqual(state.player);
+    expect(next.fellowProgressState.map(item => item.research)).toEqual([7.6, 20, 20]);
+    expect(settleFellowRecruitmentTalent(next, next)).toBe(next);
+    const absent = { ...next, fellowProgressState: [] };
+    const rejoined = settleFellowRecruitmentTalent(absent, { ...absent, fellowProgressState: [next.fellowProgressState[0]!] });
+    expect(rejoined.fellowProgressState[0]!.research).toBe(7.6);
+    expect(state).toEqual(snapshot);
+  });
+
+  it("academic atmosphere and post-transfer growth have independent once-per-fellow settlements", () => {
+    const before = { ...run("genius", { "academic-atmosphere": 3, "rise-together": 3 }),
+      fellowProgressState: [fellow("master-recruit", 1)] };
+    const joined = settleFellowRecruitmentTalent({ ...before, fellowProgressState: [] }, before);
+    expect(joined.fellowProgressState[0]!.research).toBe(4);
+    const transferred = applyRoleTalentPhdTransfer(joined, { ...joined, degree: "phd" });
+    expect(transferred.fellowProgressState[0]!.research).toBe(9.2);
+    expect(syncRoleTalentFellows(transferred)).toBe(transferred);
+    const later = syncRoleTalentFellows(settleFellowRecruitmentTalent(transferred, { ...transferred,
+      fellowProgressState: [...transferred.fellowProgressState, fellow("phd-recruit", 1)] }));
+    expect(later.fellowProgressState.map(item => item.research)).toEqual([9.2, 9.2]);
+    expect(later.player).toEqual(before.player);
+    expect(syncRoleTalentFellows(later)).toBe(later);
+    const legacy = withGameplayRuleset("20261022-r26", () => settleFellowRecruitmentTalent({ ...before, fellowProgressState: [] }, before));
+    expect(legacy).toBe(before);
+  });
+
+  it("chosen equalization bypasses resistance with or without fortune and preserves r38 replay behavior", () => {
     const before = run("chosen", { "complete-potential": 1, "lasting-fortune": 1 });
     before.player = { ...before.player, research: 20, social: 6, favor: 6 };
     const next = applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" });
-    expect(next.player.social).toBeCloseTo(18.4);
-    expect(next.player.favor).toBeCloseTo(18.4);
+    expect(next.player.social).toBe(20);
+    expect(next.player.favor).toBe(20);
     const full = { ...before, roleTalents: { levels: { "complete-potential": 1, "lasting-fortune": 3 } } };
     expect(applyRoleTalentPhdTransfer(full, { ...full, degree: "phd" }).player.social).toBe(20);
+    const legacy = withGameplayRuleset("20261023-r38", () => applyRoleTalentPhdTransfer(before, { ...before, degree: "phd" }));
+    expect(legacy.player.social).toBeCloseTo(17.2);
+    expect(legacy.player.favor).toBeCloseTo(17.2);
   });
 
   it("annual rewards occur at the first August end, once per academic year", () => {
-    const state = run("genius", { "tireless-scholar": 1 });
+    const state = createStartedGameState("genius", { "innate-insight": 1, "tireless-scholar": 1 });
+    expect(state.player.research).toBe(2);
+    expect(settleRoleTalentMonthStart(month(state, 1)).player.research).toBe(2);
     expect(settleRoleTalentYearEnd(month(state, 11)).player.research).toBe(state.player.research);
     const august = settleRoleTalentYearEnd(month(state, 12));
     expect(august.player.research).toBe(state.player.research + 1);
@@ -389,16 +549,82 @@ describe("role talent lifecycle", () => {
   });
 
   it("negative disease milestones are historical, retain probability and allow multiple new milestones", () => {
-    const state = run("chosen", { "misfortune-to-fortune": 2 });
+    const state = run("chosen", { "misfortune-to-fortune": 2, "lasting-fortune": 3 });
+    state.player = { ...state.player, research: 0, social: 0, favor: 0 };
     state.illnessProbability = -205;
     const next = settleRoleTalentDiseaseMilestones(state);
-    expect(next.player.research).toBe(state.player.research + 4);
+    expect(next.player.research).toBe(8);
+    expect(next.player.social).toBe(8);
+    expect(next.player.favor).toBe(8);
+    expect(next.player.san).toBe(state.player.san);
+    expect(next.player.money).toBe(state.player.money);
     expect(next.illnessProbability).toBe(-205);
-    expect(next.roleTalents?.negativeDiseaseMilestone).toBe(2);
+    expect(next.roleTalents?.negativeDiseaseMilestone).toBe(4);
     expect(next.log[0]!.text).toContain("否极泰来");
-    expect(next.log[0]!.text).toContain("新领取2档奖励");
+    expect(next.log[0]!.text).toContain("新领取4档奖励");
     expect(settleRoleTalentDiseaseMilestones({ ...next, illnessProbability: -99 }).player).toEqual(next.player);
     expect(settleRoleTalentDiseaseMilestones(next)).toBe(next);
+  });
+
+  it.each([1, 2, 3])("awards rank %s only on new fifty-point negative disease milestones", (rank) => {
+    let state = run("chosen", { "misfortune-to-fortune": rank, "lasting-fortune": 3 });
+    state.player = { ...state.player, research: 0, social: 0, favor: 0 };
+    state.illnessProbability = -49.9;
+    expect(settleRoleTalentDiseaseMilestones(state)).toBe(state);
+    state = settleRoleTalentDiseaseMilestones({ ...state, illnessProbability: -50 });
+    for (const stat of ["research", "social", "favor"] as const) expect(state.player[stat]).toBe(rank);
+    expect(state.roleTalents?.negativeDiseaseMilestone).toBe(1);
+    expect(settleRoleTalentDiseaseMilestones({ ...state, illnessProbability: -99.9 }).player).toEqual(state.player);
+    const second = settleRoleTalentDiseaseMilestones({ ...state, illnessProbability: -100 });
+    for (const stat of ["research", "social", "favor"] as const) expect(second.player[stat]).toBe(rank * 2);
+    expect(second.roleTalents?.negativeDiseaseMilestone).toBe(2);
+    const recovered = settleRoleTalentDiseaseMilestones({ ...second, illnessProbability: 20 });
+    const crossedAgain = settleRoleTalentDiseaseMilestones({ ...recovered, illnessProbability: -100 });
+    expect(crossedAgain.player).toEqual(second.player);
+    expect(crossedAgain.roleTalents?.negativeDiseaseMilestone).toBe(2);
+  });
+
+  it("retains ordinary attribute resistance and caps in high-rank negative disease rewards", () => {
+    const state = run("chosen", { "misfortune-to-fortune": 3, "lasting-fortune": 3 });
+    state.player = { ...state.player, research: 18, social: 19.8, favor: 20 };
+    state.illnessProbability = -50;
+    const next = settleRoleTalentDiseaseMilestones(state);
+    expect(next.player.research).toBe(20);
+    expect(next.player.social).toBe(20);
+    expect(next.player.favor).toBe(20);
+    expect(next.roleTalents?.negativeDiseaseMilestone).toBe(1);
+    expect(settleRoleTalentDiseaseMilestones(next)).toBe(next);
+  });
+
+  it("keeps one-hundred-point illness milestones and full fortune equalization in r30 recordings", () => withGameplayRuleset("20261023-r30", () => {
+    const before = run("chosen", { "misfortune-to-fortune": 2, "lasting-fortune": 3, "complete-potential": 1 });
+    before.player = { ...before.player, research: 0, social: 0, favor: 0 };
+    before.illnessProbability = -99.9;
+    expect(settleRoleTalentDiseaseMilestones(before)).toBe(before);
+    const next = settleRoleTalentDiseaseMilestones({ ...before, illnessProbability: -205 });
+    expect(next.roleTalents?.negativeDiseaseMilestone).toBe(2);
+    expect(next.player.research).toBe(4);
+    expect(next.player.social).toBe(4);
+    expect(next.player.favor).toBe(4);
+    expect(settleRoleTalentDiseaseMilestones(next)).toBe(next);
+    const transfer = { ...before, player: { ...before.player, research: 20, social: 6, favor: 6 } };
+    expect(applyRoleTalentPhdTransfer(transfer, { ...transfer, degree: "phd" }).player.social).toBe(20);
+  }));
+
+  it("supports rank-five health and rank-three annual growth without duplicating annual rewards", () => {
+    const before = run("chosen", { "fortunate-health": 5, "misfortune-to-fortune": 1 });
+    before.illnessProbability = -45;
+    const next = settleRoleTalentMonthStart(month(before, 2));
+    expect(next.illnessProbability).toBe(-50);
+    expect(next.roleTalents?.negativeDiseaseMilestone).toBe(1);
+    const growth = month(run("chosen", { "balanced-growth": 3, "lasting-fortune": 3 }), 12);
+    growth.degree = "phd";
+    growth.player = { ...growth.player, research: 1, social: 1, favor: 10 };
+    const after = settleRoleTalentYearEnd(growth);
+    expect(after.player.research).toBe(4);
+    expect(after.player.social).toBe(4);
+    expect(after.player.favor).toBe(10);
+    expect(settleRoleTalentYearEnd(after)).toBe(after);
   });
 
   it("talent history records actual rewards without blocking events or mutating the input", () => {
@@ -426,14 +652,18 @@ describe("role talent lifecycle", () => {
     expect(state).toEqual(original);
   });
 
-  it("swap preserves a shared snapshot, uses resisted differences and skips admission", () => {
+  it("swap directly permutes a shared snapshot, skips admission and preserves r41 recordings", () => {
     const state = run("chosen-reversed", { "attribute-swap": 1 });
     state.player = { ...state.player, research: 18, social: 6, favor: 1, san: 10 };
     expect(settleRoleTalentMonthStart(month(state, 1), () => 0).player).toEqual(state.player);
     const next = settleRoleTalentMonthStart(month(state, 2), () => 0);
-    expect(next.player.research).toBeCloseTo(10.8);
-    expect(next.player.social).toBeCloseTo(1.2);
-    expect(next.player.favor).toBeCloseTo(14.8);
+    expect(next.player.research).toBe(6);
+    expect(next.player.social).toBe(1);
+    expect(next.player.favor).toBe(18);
+    const legacy = withGameplayRuleset("20261023-r41", () => settleRoleTalentMonthStart(month(state, 2), () => 0));
+    expect(legacy.player.research).toBeCloseTo(10.8);
+    expect(legacy.player.social).toBeCloseTo(1.2);
+    expect(legacy.player.favor).toBeCloseTo(14.8);
     expect(next.player.san).toBe(9);
     expect(state.player.research).toBe(18);
     expect(settleRoleTalentMonthStart(next, () => 0)).toBe(next);
@@ -447,6 +677,38 @@ describe("role talent lifecycle", () => {
     expect(next.player.san).toBe(49);
     expect(next.player.money).toBe(10);
     expect(next.sanCap).toBe(state.sanCap);
+  });
+
+  it("swapping x and y twice restores both values regardless of resistance talents", () => {
+    for (const rank of [0, 3]) for (const [x, y] of [[1, 20], [6.2, 18.7], [20, 10]]) {
+      const state = run("chosen-reversed", { "attribute-swap": 1, "reverse-meter-alpha": rank, "reverse-meter-beta": rank });
+      state.player = { ...state.player, research: x!, social: y!, favor: 5 };
+      // Leave favor in place, then exchange research/social. Curse hits SAN, then coins.
+      const exchange = (value: GameState, totalMonths: number) => {
+        const rolls = [0.99, 0];
+        return settleRoleTalentMonthStart(month(value, totalMonths), () => rolls.shift()!);
+      };
+      const first = exchange(state, 2);
+      expect(first.player).toMatchObject({ research: y, social: x, favor: 5 });
+      const restored = exchange(JSON.parse(JSON.stringify(first)), 3);
+      expect(restored.player).toMatchObject({ research: x, social: y, favor: 5 });
+      expect(restored.roleTalents?.growthTotals).toBeUndefined();
+      expect(restored.roleTalents?.lossTotals).toBeUndefined();
+      expect(state.player.research).toBe(x);
+    }
+  });
+
+  it("five-way swapping moves money into research exactly, applying only the destination cap", () => {
+    for (const uncapped of [0, 1]) {
+      const state = run("chosen-reversed", { "post-phd-swap": 1, "swap-breaks-cap": uncapped });
+      state.degree = "phd";
+      state.player = { research: 1, social: 18, favor: 6, san: 9, money: 50 };
+      const rolls = [0, 0.99, 0.99, 0.99];
+      const next = settleRoleTalentMonthStart(month(state, 2), () => rolls.shift()!);
+      expect(next.player).toEqual({ research: uncapped ? 50 : 20, social: 18, favor: 6, san: 8, money: 1 });
+      expect(next.researchCapacityState).toEqual(state.researchCapacityState);
+      expect(next.personalSpending).toBe(state.personalSpending);
+    }
   });
 
   it("the five-stat permutation replaces both smaller swaps and preserves ordinary reward counters", () => {
@@ -477,11 +739,11 @@ describe("role talent lifecycle", () => {
     const state = run("chosen", { "fortunate-health": 4 });
     state.illnessProbability = 1;
     expect(settleRoleTalentMonthStart(month(state, 2)).illnessProbability).toBe(0);
-    const negative = { ...state, roleTalents: { levels: { "fortunate-health": 4, "misfortune-to-fortune": 1 } }, illnessProbability: -98 };
+    const negative = { ...state, roleTalents: { levels: { "fortunate-health": 4, "misfortune-to-fortune": 1 }, negativeDiseaseMilestone: 1 }, illnessProbability: -98 };
     const next = settleRoleTalentMonthStart(month(negative, 2));
     expect(next.illnessProbability).toBe(-102);
     expect(next.player.research).toBe(state.player.research + 1);
-    expect(next.roleTalents?.negativeDiseaseMilestone).toBe(1);
+    expect(next.roleTalents?.negativeDiseaseMilestone).toBe(2);
   });
 
   it("lasting work subtracts percentage points only after transfer and never turns decay into growth", () => {

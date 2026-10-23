@@ -1,5 +1,6 @@
 import type { GameState, Paper, PaperActionType, PaperCollaborationEffect, PaperEffectUpdate } from "./v2-types";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 const SCORE_FIELDS = ["idea", "experiment", "writing"] as const;
 
@@ -7,7 +8,8 @@ const SCORE_FIELDS = ["idea", "experiment", "writing"] as const;
 export function getRoleCollaborationScore(state: GameState, source: "advisor" | "fellow", amount: number): number {
   const talentId = source === "advisor" ? "mentor-insight" : "collective-wisdom";
   const expectedRole = source === "advisor" ? "teacher-child" : "social";
-  const level = state.selectedRoleId === expectedRole ? getRoleTalentLevel(state, talentId) : 0;
+  const level = state.selectedRoleId === expectedRole && (source !== "advisor" || !usesGameplayRulesFrom("20261023-r28"))
+    ? getRoleTalentLevel(state, talentId) : 0;
   return Number.isFinite(amount) ? Math.max(0, Math.floor(amount * (1 + 0.5 * level))) : 0;
 }
 

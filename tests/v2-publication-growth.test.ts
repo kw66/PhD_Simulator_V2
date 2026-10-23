@@ -44,9 +44,9 @@ describe("v2 publication growth transparency", () => {
     state.player.favor = 18;
     state.papers = [publishedPaper("C", "Poster")];
     const next = applyPublicationTalentRewards(state);
-    expect(next.player.research).toBe(19);
-    expect(next.player.favor).toBe(19);
-    expect(next.roleTalents?.growthTotals).toMatchObject({ research: 1, favor: 1 });
+    expect(next.player.research).toBe(18.7);
+    expect(next.player.favor).toBe(18.7);
+    expect(next.roleTalents?.growthTotals).toMatchObject({ research: 0.7, favor: 0.7 });
     expect(state.player.research).toBe(18);
   });
 

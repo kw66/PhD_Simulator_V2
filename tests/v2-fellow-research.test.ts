@@ -14,6 +14,7 @@ import { getConferenceInfo } from "../src/core/v2-conference-catalog";
 import { endRelationship } from "../src/core/v2-relationship-actions";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import type { GameState, Paper } from "../src/core/v2-types";
+import { withGameplayRuleset, type GameplayRuleset } from "../src/core/v2-rule-context";
 
 function makeState(research = 20): GameState {
   const base = createStartedGameState("normal");
@@ -39,6 +40,29 @@ function replacePaper(state: GameState, patch: Partial<Paper>): GameState {
 }
 
 describe("fellow research lifecycle", () => {
+  it.each([false, true])("shares the current social review bonus with an active fellow (coauthored: %s)", (coauthored) => {
+    let state = replacePaper(makeState(100), { idea: 100, experiment: 100, writing: 100 });
+    state = { ...state, selectedRoleId: "social", degree: "phd", player: { ...state.player, social: 20 },
+      roleTalents: { levels: { "kindly-reviewed": 5 } } };
+    const paper = { ...prepareConferenceSubmission(state.fellowPapers![0]!, "C", 1, 1), reviewMonthsLeft: 1,
+      collaborators: coauthored ? [{ id: "player", name: "张明" }] : [] };
+    state = { ...state, fellowPapers: [paper] };
+    const reports = (input: GameState, ruleset?: GameplayRuleset) => {
+      const settle = () => nextMonth(input, () => 0.1);
+      const next = ruleset ? withGameplayRuleset(ruleset, settle) : settle();
+      return [...(next.fellowPapers ?? []), ...next.externalPublications].find(entry => entry.id === paper.id)!.lastReview!.reports;
+    };
+    expect(reports(state).every(report => report.reviewerType === "kind")).toBe(true);
+    for (const excluded of [
+      { ...state, degree: "master" as const },
+      { ...state, player: { ...state.player, social: 0 } },
+      { ...state, roleTalents: { levels: {} } },
+      { ...state, selectedRoleId: "normal" as const },
+      { ...state, fellowProgressState: [] },
+    ]) expect(reports(excluded).some(report => report.reviewerType !== "kind")).toBe(true);
+    expect(reports(state, "20261023-r35").some(report => report.reviewerType !== "kind")).toBe(true);
+    expect(paper.lastReview).toBeNull();
+  });
   it("waits three full months after submission, blocks editing and exposes the accepted collaboration in results", () => {
     let state = replacePaper(makeState(100), { idea: 100, experiment: 100, writing: 0 });
     const fellowPaper = state.fellowPapers![0]!;

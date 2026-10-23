@@ -8,7 +8,7 @@ import type { FellowTypeId, GameState } from "../src/core/v2-types";
 
 function fixture(type: FellowTypeId, fellowLed: boolean, extraJunior: boolean): GameState {
   const state = createStartedGameState("social", {
-    "natural-charisma": 3, "junior-delegation": 1, "junior-bond": 1, "paper-camaraderie": 2,
+    "natural-charisma": 3, "peer-camaraderie": 1, "senior-mentorship": 1, "paper-camaraderie": 2,
   });
   expect(state.roleTalents?.levels["paper-camaraderie"]).toBe(2);
   const collaborator = { ...createCustomFellowProgressProfile({

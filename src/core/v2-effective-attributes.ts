@@ -1,3 +1,4 @@
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getPlayerAttributeCap } from "./v2-player-attributes";
 import type { GameState } from "./v2-types";
@@ -18,7 +19,7 @@ export function getEffectiveResearch(
     && !state.roleTalents.researchCurseBroken) return 0;
 
   let effective = real;
-  if (state.selectedRoleId === "teacher-child" && state.degree === "phd"
+  if (!usesGameplayRulesFrom("20261023-r28") && state.selectedRoleId === "teacher-child" && state.degree === "phd"
     && getRoleTalentLevel(state, "learning-by-osmosis") > 0) {
     effective = Math.max(real, state.player.favor);
   }
