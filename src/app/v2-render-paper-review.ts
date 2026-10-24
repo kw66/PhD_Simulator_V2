@@ -75,7 +75,7 @@ function renderReviewers(presentation: Extract<PaperReviewEventPresentation, { k
         <div class="paper-reviewer-weights"><span>权重</span><p>${escapeHtml(report.weightInfo ?? "未记录")}</p></div>
         <dl class="paper-reviewer-metrics"><div><dt>有效分</dt><dd>${formatMoney(report.effectiveScore)}</dd></div><div><dt>${renderPaperTerm("Reject")} 阈值</dt><dd>${threshold ? `＜${threshold.reject}` : "−"}</dd></div><div><dt>${renderPaperTerm("Accept")} 阈值</dt><dd>${threshold ? `≥${threshold.borderline}` : "−"}</dd></div></dl>
         <blockquote class="paper-reviewer-comment">“${escapeHtml(report.comment ?? "未留下具体意见")}” <span aria-hidden="true">${REVIEWER_EMOJI[report.reviewerType ?? "normal"]}</span></blockquote>
-        <div class="paper-reviewer-effects">${improvement ? `<span>拒稿后修改：${escapeHtml(improvement)}</span>` : ""}${report.sanChange ? `<span>审稿影响 ${escapeHtml(formatEventSanChange(report.sanChange, report.illnessSanIncrease))}</span>` : ""}</div>
+        <div class="paper-reviewer-effects">${improvement ? `<span>若拒稿，修改可得：${escapeHtml(improvement)}</span>` : ""}${report.sanChange ? `<span>审稿影响 ${escapeHtml(formatEventSanChange(report.sanChange, report.illnessSanIncrease))}</span>` : ""}</div>
       </article>`;
     }).join("")}</div></section>`;
 }
@@ -91,7 +91,7 @@ function pcAssessment(presentation: Extract<PaperReviewEventPresentation, { kind
   return {
     votes: votes.length ? `评审概况：${votes.join("；")}。` : "评审概况：审稿意见已汇总。",
     comment: presentation.accepted
-      ? `PC 评语：综合评审后，论文达到本届录用要求。${concern?.comment ? `定稿时建议回应：“${escapeHtml(concern.comment)}”。` : "定稿时仍需仔细回应审稿意见。"}`
+      ? "PC 评语：综合评审后，论文达到本届录用要求。定稿时请结合审稿意见完善论证与实验。"
       : `PC 评语：综合评审后，论文暂未达到本届录用要求。${concern?.comment ? `优先处理：“${escapeHtml(concern.comment)}”。` : "建议根据审稿意见补充论证后再投稿。"}`,
   };
 }

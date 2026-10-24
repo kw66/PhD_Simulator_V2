@@ -67,6 +67,7 @@ describe("graduation cards and blind review in the browser", () => {
       }, degree);
       await page.locator('[data-ui-play-tab="workstation"]').click();
       const points = page.locator('[data-action="advance-thesis-point"]');
+      expect(await page.locator(".thesis-forecast").count()).toBe(0);
       expect(await points.count()).toBe(degree === "master" ? 2 : 3);
       await points.first().click();
       expect(await points.first().isDisabled()).toBe(true);
@@ -223,6 +224,36 @@ describe("graduation cards and blind review in the browser", () => {
       throw error;
     } finally { await page.close(); }
   }, 30_000);
+
+  it.each([
+    { month: 1, width: 1920 },
+    { month: 10, width: 390 },
+  ])("closes recruitment immediately on rest in month $month at width $width", async ({ month, width }) => {
+    const page = await browser.newPage({ viewport: { width, height: 1080 } });
+    page.setDefaultTimeout(10000);
+    try {
+      await page.route("**/__graduation_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
+      await page.goto(`${server.resolvedUrls!.local[0]}__graduation_test__`);
+      await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
+      const base = createStartedGameState("normal");
+      const state = { ...base, year: 3, month, totalMonths: 24 + month };
+      const event = createEventQueueItem(createCareerRecruitmentEvent(state, () => 0), 1);
+      await page.evaluate(({ queued, month }) => {
+        const store = (window as GraduationWindow).graduationStore;
+        store.dispatch("start-game", { roleId: "normal" });
+        Object.assign(store.getState(), { year: 3, month, totalMonths: 24 + month, eventQueue: [queued] });
+        store.dispatch("set-linear-event-blocking", { blockLinearEvents: true });
+      }, { queued: event, month });
+      await page.locator('[data-ui-open-event-id^="career-recruitment-"]:visible').first().click();
+      await page.locator('#event-content-buttons [data-event-choice-id="rest"]').click();
+      expect(await page.locator("#event-content-box").isVisible()).toBe(false);
+      expect(await page.evaluate(() => {
+        const state = (window as GraduationWindow).graduationStore.getState();
+        return { pending: state.eventQueue.some(event => event.source === "career"),
+          settled: state.careerLastRecruitmentTotalMonths === state.totalMonths };
+      })).toEqual({ pending: false, settled: true });
+    } finally { await page.close(); }
+  });
 
   it("chooses a recruitment track and job in the browser, then settles the offer on confirmation", async () => {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });

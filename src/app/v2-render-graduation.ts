@@ -10,18 +10,15 @@ import {
   getThesisAdvanceFailure,
   getThesisAdvanceGain,
   getThesisAdvanceSanCost,
-  getThesisForecast,
   getThesisReviewThresholds,
   isGraduationPreparationUnlocked,
   syncThesisState,
-  type ThesisForecast,
 } from "../core/v2-thesis-rules";
 import type { GameState, PendingEvent } from "../core/v2-types";
 import { animationBarAttribute, renderAnimatedNumber } from "./v2-render-animation";
 import { getThesisGlobalStats } from "./v2-thesis-stats";
 import { formatCompactSanPayment, quoteSanPayment } from "../core/v2-role-talent-costs";
 import "../styles/event-choice-risk.css";
-import "../styles/thesis-forecast.css";
 
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")
@@ -40,24 +37,8 @@ function renderGraduationCountdown(months: number, milestone: "开放" | "盲审
   return `<span class="graduation-countdown"><strong>${identity ? renderAnimatedNumber(identity, months) : months}</strong>月后${milestone}</span>`;
 }
 
-function renderThesisForecast(forecast: ThesisForecast): string {
-  const planning = forecast.stage === "planning";
-  const frozen = forecast.stage === "frozen";
-  const supported = forecast.points.filter(point => point.supportPaperId).length;
-  const projectedPass = frozen ? forecast.currentPass : forecast.projectedPass;
-  const projectedScore = frozen ? forecast.currentGuaranteedScore : forecast.projectedGuaranteedScore;
-  const status = projectedPass ? frozen ? "保底达到 B" : "预计保底达到 B" : frozen ? "尚未保底达到 B" : "预计仍未保底 B";
-  const scoreTarget = forecast.researchScoreTarget === null ? "待定" : formatMoney(forecast.researchScoreTarget);
-  const pointRows = forecast.points.map((point, index) => {
-    const title = point.supportPaperTitle ?? "暂无同题支撑论文";
-    return `<div class="thesis-forecast-point" data-thesis-forecast-point="${index}"><div class="thesis-forecast-point-head"><strong>研究点${index + 1}</strong><span>${point.supportPaperId ? `支撑 ${formatMoney(point.initialScore)}` : "待补支撑"}</span></div><span class="thesis-forecast-paper${point.supportPaperId ? "" : " is-empty"}" tabindex="0" ${tooltip(title)}>${escapeHtml(title)}</span><div class="thesis-forecast-point-score">${frozen ? '<span>已封存</span>' : `<span>还可推进 <b>${point.remainingAdvances}</b> 次</span>`}<span>${frozen ? "当前" : "预计"} <strong>${formatMoney(point.projectedScore)}</strong></span></div></div>`;
-  }).join("");
-  return `<details class="thesis-forecast" data-thesis-forecast-stage="${forecast.stage}"><summary aria-label="${planning ? "提前规划" : frozen ? "送审检查" : "送审预估"}，展开查看各研究点"><span class="thesis-forecast-summary-line"><span>同题支撑 ${supported}/${forecast.points.length}</span><strong class="${projectedPass ? "is-ready" : "is-short"}">${frozen ? "保底" : "预计保底"} B ${projectedPass ? "✓" : "未达"}</strong><span class="${forecast.researchScoreMet ? "is-ready" : "is-short"}">科研 ${formatMoney(forecast.researchScore)}/${scoreTarget} ${forecast.researchScoreMet ? "✓" : "未达"}</span></span><small>${frozen ? "已封存 · 展开查看送审检查" : "按当前科研逐月推满 · 不保证 SAN 足够"}</small></summary><div class="thesis-forecast-detail"><div class="thesis-forecast-heading"><strong>${planning ? "提前规划" : frozen ? "送审检查" : "送审预估"}</strong><span>B线 ${formatMoney(forecast.threshold)}</span></div><div class="thesis-forecast-points" style="--thesis-point-count:${forecast.points.length}">${pointRows}</div><div class="thesis-forecast-checks"><div class="thesis-forecast-check${projectedPass ? " is-ready" : " is-short"}"><div><strong>${status}</strong><span>B线 ${formatMoney(forecast.threshold)}</span></div><p>保底加权分 <b>${formatMoney(forecast.currentGuaranteedScore)}</b>${frozen ? "" : `<span aria-hidden="true"> → </span><b>${formatMoney(projectedScore)}</b>`}</p></div><div class="thesis-forecast-check${forecast.researchScoreMet ? " is-ready" : " is-short"}"><div><strong>科研分${forecast.researchScoreMet ? "已达标" : "未达标"}</strong><span>送审资格</span></div><p><b>${formatMoney(forecast.researchScore)}</b> / ${scoreTarget}</p></div></div><p class="thesis-forecast-note">${frozen ? "保底分按最不利专家权重计算；实际结论以盲审结果为准。" : `按当前科研每次 +${formatMoney(forecast.advanceGain)}、余下月份每点推满估计，不保证 SAN 足够。${planning ? "开题时再确定方向与支撑论文。" : ""}`}</p></div></details>`;
-}
-
 function renderThesisCard(state: GameState): string {
   const unlocked = isGraduationPreparationUnlocked(state);
-  const forecast = getThesisForecast(state);
   const thesis = unlocked && state.thesis.degree === state.degree ? state.thesis
     : syncThesisState({ ...state, phase: "playing", year: getGraduationPreparationYear(state.degree), month: 1,
       thesis: createInitialThesisState(),
@@ -114,7 +95,6 @@ function renderThesisCard(state: GameState): string {
       </div>`;
     }).join("")}${state.degree === "master" ? `<div class="graduation-point is-unused" data-graduation-point="2"><span class="rel-detail-label"><span class="rel-inline-icon" aria-hidden="true">🔬</span>研究点3</span><div class="rel-progress-bar graduation-point-bar" role="meter" aria-label="研究点3（硕士无需推进）" aria-valuemin="0" aria-valuemax="${formatMoney(baseScale)}" aria-valuenow="0"></div><strong class="rel-progress-val">0</strong><span class="graduation-unused-action">硕士不需要</span></div>` : ""}</div>
     ${thesis.reviewResolved && review?.reason ? `<p class="graduation-review-reason">${escapeHtml(review.reason)}</p>` : ""}
-    ${forecast ? renderThesisForecast(forecast) : ""}
   </section>`;
 }
 

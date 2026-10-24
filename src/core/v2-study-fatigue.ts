@@ -5,7 +5,7 @@ import { formatTierResistedOutcome } from "./v2-sanity-rules";
 import { usesCurrentGameplayRules } from "./v2-rule-context";
 
 export const STUDY_FATIGUE_EVENT_ID = 19;
-export const STUDY_FATIGUE_RESEARCH_COSTS = { travel: 1, sport: 1, friends: 1, money: 2 } as const;
+export const STUDY_FATIGUE_RESEARCH_COSTS = { travel: 1, sport: 1, friends: 1, money: 1 } as const;
 
 /** Only the player's own research operations count, including the AI bonus action. */
 export function isStudyFatigueEligible(state: GameState): boolean {

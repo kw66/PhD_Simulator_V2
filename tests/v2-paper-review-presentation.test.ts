@@ -153,6 +153,9 @@ describe("paper review presentation", () => {
     const decision = advance(advance(state));
     const html = content(decision);
     expect(html).toContain("科研分 +4");
+    expect(html).toContain("定稿时请结合审稿意见完善论证与实验");
+    expect(html).not.toContain("定稿时建议回应");
+    expect(html).not.toContain("需要解释方法差异");
     expect(html).toContain("注册费：科研经费 -1（导师支付）");
     expect(decision.advisorProgressState.funding).toBe(state.advisorProgressState.funding);
     expect(html).not.toContain("paper-review-talents");
@@ -175,7 +178,7 @@ describe("paper review presentation", () => {
   it("separates conditional revision gains from review SAN and shows actual rejection feedback", () => {
     const { state } = fixture(false);
     const reviewers = advance(state);
-    expect(content(reviewers)).toContain("拒稿后修改");
+    expect(content(reviewers)).toContain("若拒稿，修改可得");
     expect(content(reviewers)).toContain("审稿影响");
     const decision = advance(reviewers);
     const html = content(decision);

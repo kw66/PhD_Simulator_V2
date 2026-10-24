@@ -64,7 +64,7 @@ describe("厌倦学习", () => {
     expect(legacy.choices[0]!.effects.enqueueEvents![0]!.choices[2]!.outcome).toContain("社交 +1");
   });
 
-  it.each([[0, "科研 -0.4（抵抗0.6）"], [3, "科研 -1（抵抗1）"]])("shows resisted research in current and historical results without rewriting the saved event: %i", (option, expected) => {
+  it.each([[0, "科研 -0.4（抵抗0.6）"], [3, "科研 -0.4（抵抗0.6）"]])("shows resisted research in current and historical results without rewriting the saved event: %i", (option, expected) => {
     const initial = state();
     const before = { ...initial, player: { ...initial.player, research: 18 } };
     const queued = { ...before, eventQueue: [createEventQueueItem(createStudyFatigueEvent(before), 0)] };
@@ -103,7 +103,7 @@ describe("厌倦学习", () => {
     [0, -0.8, 6, 0, 0, 0],
     [1, -0.8, 0, 3, 0, 0],
     [2, -0.8, 0, 0, 1, 0],
-    [3, -1.8, 0, 0, 0, 3],
+    [3, -0.8, 0, 0, 0, 3],
   ])("settles option %s with shared resistance and exactly one future penalty", (option, research, san, cap, social, money) => {
     const { before, after } = finish(option);
     expect(after.player.research - before.player.research).toBeCloseTo(research);

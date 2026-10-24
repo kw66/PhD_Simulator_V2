@@ -38,6 +38,7 @@ describe("graduation workstation cards", () => {
     const state = graduationState(degree);
     state.thesis.researchPoints[0] = { ...state.thesis.researchPoints[0]!, initialScore: 60, score: 84 };
     const html = renderGraduationCards(state);
+    expect(html).not.toContain("thesis-forecast");
     expect(html).toContain('data-thesis-initial-score="60"');
     expect(html.match(/data-graduation-point="\d+"/g)).toHaveLength(3);
     const points = html.match(/<div class="graduation-point"[\s\S]*?<\/button>\s*<\/div>/g) ?? [];
@@ -163,8 +164,7 @@ describe("graduation workstation cards", () => {
     expect(html).toContain('data-animate-number="250.123456"');
     const supportBar = html.match(/<div class="rel-progress-bar graduation-point-bar"[^>]*>/)![0];
     expect(supportBar).toContain('data-tooltip="完整支撑论文 &lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; title\n原始分 0 · 改进分 250.12"');
-    expect(visibleText(html)).toContain("完整支撑论文");
-    expect(html.match(/<[^>]*data-tooltip="完整支撑论文[^>]*>/g)).toHaveLength(3);
+    expect(html.match(/<[^>]*data-tooltip="完整支撑论文[^>]*>/g)).toHaveLength(2);
     expect(html).toMatch(/class="rel-detail-label"[^>]*data-tooltip="完整支撑论文/);
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img");

@@ -94,16 +94,13 @@ describe("monthly recruitment", () => {
     }
   });
 
-  it("gives failed interviews and resting distinct stories without inventing an offer", () => {
+  it("gives failed interviews their own story without inventing an offer", () => {
     const state = readyState();
     const root = createCareerRecruitmentEvent(state, () => 0.99);
     const direction = root.choices.find((choice) => choice.id === "choose-internet")!.effects.enqueueEvents![0]!;
     const result = direction.choices[0]!.effects.enqueueEvents![0]!;
     expect(result.description).toContain("没有下一轮");
     expect(result.description).not.toContain("录用通知");
-    const rest = root.choices.find((choice) => choice.id === "rest")!.effects.enqueueEvents![0]!;
-    expect(rest.description).not.toContain("下个月还会有");
-    expect(rest.choices[0]!.effects.enqueueEvents![0]!.description).not.toContain("已收到的 offer");
   });
 
   it("schedules each final-year month within the four windows, even after offers", () => {
@@ -204,13 +201,16 @@ describe("monthly recruitment", () => {
     }
   });
 
-  it("uses rest without SAN cost and blocks a second recruitment this month", () => {
-    const initial = readyState();
+  it.each([1, 10])("settles rest in one click without cost or lost offers in month %s", (month) => {
+    const initial = readyState("master", month);
+    initial.careerOffers.internet = { type: "internet", jobId: "old", name: "旧 offer", threshold: 1, score: 1 };
     let current = startRecruitment(initial, () => 0);
     current = advanceScene(current, "rest");
-    current = advanceScene(current, "rest");
-    current = advanceScene(current, "confirm");
-    expect(current.player.san).toBe(initial.player.san);
+    expect(current.eventQueue.some(event => event.source === "career")).toBe(false);
+    expect(current.player).toEqual(initial.player);
+    expect(current.careerProgress).toEqual(initial.careerProgress);
+    expect(current.careerInterviewExperience).toEqual(initial.careerInterviewExperience);
+    expect(current.careerOffers).toEqual(initial.careerOffers);
     expect(current.careerLastRecruitmentTotalMonths).toBe(initial.totalMonths);
     expect(shouldScheduleCareerRecruitment(current)).toBe(false);
   });

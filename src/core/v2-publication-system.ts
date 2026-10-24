@@ -62,7 +62,7 @@ function getReviewerLines(settlement: PaperReviewSettlement): string[] {
         ? [`${report.improvementAction === "idea" ? "idea" : report.improvementAction === "experiment" ? "实验" : "写作"} +${report.improvementAmount}`]
         : []),
     ];
-    const improvement = improvementItems.length > 0 ? `，拒稿后修改${improvementItems.join("、")}` : "";
+    const improvement = improvementItems.length > 0 ? `，若拒稿，修改可得：${improvementItems.join("、")}` : "";
     const san = report.sanChange ? `，确认后 ${formatEventSanChange(report.sanChange, report.illnessSanIncrease)}` : "";
     return `**审稿人${index + 1} · ${report.reviewer}**：${decision}，有效分 ${report.effectiveScore}${feedback}${improvement}${san}`;
   });

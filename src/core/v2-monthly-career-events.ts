@@ -173,36 +173,6 @@ function createDirectionEvent(
   };
 }
 
-function createRestEvent(state: GameState, chainId: string, hasOpenDirections: boolean): PendingEvent {
-  const result: PendingEvent = {
-    id: `${chainId}-rest-result`, title: "找工作 ➜ 本月休息 ➜ 月度安排",
-    description: [
-      hasOpenDirections
-        ? "你关掉职位表，把没改完的论文重新铺到桌上。消息群里还在讨论笔试题，你看了两眼，决定这个月先不跟着跑。"
-        : "你关掉职位表，把没改完的论文重新铺到桌上。招聘窗口已过，群里聊的也渐渐变成毕业手续和去向。",
-      `晚上离开实验室时，你终于没有再翻招聘邮件。眼下的安排清楚了些；${Object.keys(state.careerOffers).length ? "已经收到的 offer，也还好好留在邮箱里。" : "桌上的论文，至少又向前推进了一点。"}`,
-      "机制结算\n本月未应聘",
-    ].join("\n\n"),
-    source: "career", blocking: true, deadlineMonths: 0, chainId, stage: "result",
-    choices: [{ id: "confirm", label: "确定", outcome: "本月未应聘", effects: {
-      careerRecruitment: { totalMonths: state.totalMonths },
-    } }],
-  };
-  return {
-    id: `${chainId}-rest-choice`, title: "找工作 ➜ 本月休息",
-    description: [
-      hasOpenDirections
-        ? "你又把这几份岗位启事看了一遍。要求并非全不合适，只是论文、组会和毕业材料已经把这个月的日程排得很满。"
-        : "几个方向的招聘窗口都已结束。你又翻了一遍岗位启事，确认这个月没有能报名的去向。",
-      hasOpenDirections
-        ? "同门问你要不要一起准备笔试，你说想先把手头的事收一收。这次先不投了，至少能安静地把眼前的问题解决。"
-        : "你把职位表收进文件夹，继续处理论文和毕业材料。眼下不用再为笔试腾日程了。",
-    ].join("\n\n"),
-    source: "career", blocking: true, deadlineMonths: 0, chainId, stage: "act2",
-    choices: [{ id: "rest", label: "本月不应聘", outcome: "本月不参加招聘", effects: { enqueueEvents: [result] } }],
-  };
-}
-
 export function createCareerRecruitmentEvent(
   state: GameState,
   random: () => number = gameRandom,
@@ -227,7 +197,7 @@ export function createCareerRecruitmentEvent(
         outcome: `查看${CAREER_DEFINITIONS[type].name}岗位`,
         effects: { enqueueEvents: [createDirectionEvent(state, chainId, type, random)] },
       })),
-      { id: "rest", label: "本月休息", outcome: "本月不参加招聘", effects: { enqueueEvents: [createRestEvent(state, chainId, available.length > 0)] } },
+      { id: "rest", label: "本月休息", outcome: "本月不参加招聘", effects: { careerRecruitment: { totalMonths: state.totalMonths } } },
     ],
   };
 }

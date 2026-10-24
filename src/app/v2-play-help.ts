@@ -95,7 +95,7 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
   directPage("审稿门槛", `<p>表中依次为${renderPaperTerm("Borderline")}／${renderPaperTerm("Accept")}基础门槛；低于前值为Reject，达到后值为Accept。</p>${renderReviewerThresholds()}
     <p>实际门槛=基础门槛×会议影响力÷等级均值，四舍五入。等级均值：A ${REVIEW_TARGET_AVERAGE_INFLUENCE.A}，B ${REVIEW_TARGET_AVERAGE_INFLUENCE.B}，C ${REVIEW_TARGET_AVERAGE_INFLUENCE.C}。</p>`),
   directPage("毕业论文", `<p>每次推进增加当前有效科研能力对应的分数，保留小数；每个研究点每月可推进一次，不占行动点。</p>
-    <p>博士第五学年可提前查看支撑成果；最后学年9月至次年3月可推进，4月送审。卡片预测按当前科研逐月推满估算，仍需准备足够SAN。</p>
+    <p>最后学年9月至次年3月可推进，4月送审。</p>
     <p>SAN基础消耗不受科研档位减免，季节与通用SAN效果仍生效。</p>`),
   directPage("支撑论文", `<p>只计自己的一作成果。各方向取最高的2／3篇，合计最高的方向作为大论文方向，缺少的研究点从0开始。</p>
     <p>送审前，同方向新论文高于研究点<b>当前总分</b>才整体替换，不叠加此前提升；每篇只支撑一个研究点。</p>

@@ -108,7 +108,7 @@ const REVIEWER_COMMENTS: Record<PaperReviewerType, { Accept: string; Borderline:
   hostile: {
     Accept: "SOTA 对比、局限性和新颖性说明都交代得比较完整",
     Borderline: "还有关键要求没有满足，论文说服力不足",
-    Reject: "没有清楚证明 SOTA、局限性或新颖性，当前版本很难接受",
+    Reject: "缺少与先进方法的充分比较，对方法新颖性和局限性的讨论也不够清楚",
   },
 };
 
