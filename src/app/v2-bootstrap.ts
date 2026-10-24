@@ -114,6 +114,7 @@ import { DEBUG_RELATIONSHIP_TYPES, DEBUG_STAT_IDS, GAME_ACTION_IDS } from "../co
 import { AI_SLOT_IDS, getAiModelForTotalMonths } from "../core/v2-ai-shop";
 import { getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import { createStore } from "../core/v2-store";
+import { isRoleOwned } from "../core/v2-lobby";
 import { getSelectedCurseDifficulty } from "../core/v2-curse-progress";
 import { createVisitStats } from "./v2-visit-stats";
 import { createConferenceStats } from "./v2-conference-stats";
@@ -1753,9 +1754,14 @@ export function bootstrapApp(root: HTMLDivElement): void {
       const nextYear = Number(academicYearButton.dataset.uiRewinderStartYear);
       if (getAvailableAcademicYears(store.getLobbyState().rewinderAcademicArchive).includes(nextYear)) {
         rewinderStartYear = nextYear;
+        talentTreeSelectedNodeByPage[0] = nextYear - 1;
         refreshTalentTree = true;
-        render();
-        root.querySelector<HTMLButtonElement>(`button[data-ui-rewinder-start-year="${nextYear}"]`)?.focus({ preventScroll: true });
+        if (isRoleOwned(store.getLobbyState(), "rewinder") && !store.hasRoleSave("rewinder")) {
+          executeButtonAction({ action: "start-game", roleId: "rewinder", rewinderStartYear: String(nextYear) });
+        } else {
+          render();
+          root.querySelector<HTMLButtonElement>(`button[data-ui-rewinder-start-year="${nextYear}"]`)?.focus({ preventScroll: true });
+        }
       }
       return;
     }

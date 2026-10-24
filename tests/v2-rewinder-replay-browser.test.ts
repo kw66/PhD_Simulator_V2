@@ -4,6 +4,8 @@ import { startGameFromLobby } from "./helpers/v2-start-game";
 import { chromium, type Browser } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import type { createStore } from "../src/core/v2-store";
+import { createStartedGameState } from "../src/core/v2-engine-state-factory";
+import { captureAcademicYear } from "../src/core/v2-rewinder-academic-record";
 
 type RewinderWindow = typeof window & { rewinderReplayStore: ReturnType<typeof createStore> };
 const fixture = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
@@ -32,6 +34,54 @@ describe("universal event choices through the real browser handlers", () => {
     await mkdir("artifacts/rewinder-event-replay", { recursive: true });
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
+
+  it.each([390, 1440].flatMap(width => [1, 2].map(year => ({ width, year }))))("starts academic year $year from its portrait at $width px", async ({ width, year }) => {
+    const page = await browser.newPage({ viewport: { width, height: 960 } });
+    page.setDefaultTimeout(8_000);
+    const origin = new URL(server.resolvedUrls!.local[0]!).origin;
+    await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    try {
+      await page.goto(origin);
+      await page.locator('[data-action="start-game"]').waitFor();
+      const base = createStartedGameState("rewinder");
+      const record = captureAcademicYear({ ...base, year: 1, month: 12, totalMonths: 12 });
+      await page.evaluate(({ year, record }) => {
+        const store = (window as RewinderWindow).rewinderReplayStore;
+        const account = store.getLobbyState();
+        account.roleProgress.rewinder.unlocked = true;
+        if (year === 2) account.rewinderAcademicArchive = { version: 1, years: { 1: record } };
+        store.dispatch("select-role", { roleId: "rewinder" });
+      }, { year, record });
+      expect(await page.evaluate(() => (window as RewinderWindow).rewinderReplayStore.hasRoleSave("rewinder"))).toBe(false);
+      if (year === 1) {
+        expect(await page.evaluate(() => (window as RewinderWindow).rewinderReplayStore.getLobbyState().rewinderAcademicArchive)).toBeUndefined();
+      }
+      const lockedYear = page.locator(`[data-ui-rewinder-start-year="${year + 1}"]`);
+      expect(await lockedYear.isDisabled()).toBe(true);
+      await lockedYear.dispatchEvent("click");
+      expect(await page.evaluate(() => (window as RewinderWindow).rewinderReplayStore.getState().phase)).toBe("setup");
+      await page.locator('[data-rewinder-special]').click();
+      await page.locator(`[data-ui-rewinder-start-year="${year}"]`).click();
+      await expect.poll(() => page.evaluate(() => {
+        const store = (window as RewinderWindow).rewinderReplayStore;
+        const state = store.getState();
+        return { phase: state.phase, role: state.selectedRoleId, year: state.rewinderState?.academic?.startYear,
+          starts: store.getLobbyState().roleProgress.rewinder.startedRuns };
+      })).toEqual({ phase: "playing", role: "rewinder", year, starts: 1 });
+      await page.evaluate(async () => {
+        const store = (window as RewinderWindow).rewinderReplayStore;
+        await store.flushSaves();
+        store.dispatch("reset-game");
+      });
+      expect(await page.locator('[data-ui-rewinder-start-year]:disabled').count()).toBe(6);
+      await page.locator('.lobby-start-button').click();
+      expect(await page.evaluate(() => {
+        const store = (window as RewinderWindow).rewinderReplayStore;
+        return { phase: store.getState().phase, year: store.getState().rewinderState?.academic?.startYear,
+          starts: store.getLobbyState().roleProgress.rewinder.startedRuns };
+      })).toEqual({ phase: "playing", year, starts: 1 });
+    } finally { await page.close(); }
+  }, 30_000);
 
   it.each([1440, 390, 320].flatMap(width => (["normal", "rewinder"] as const).map(roleId => ({ width, roleId }))))("reselects $roleId branches with fixed outcomes and locks confirmed history at $width px", async ({ width, roleId }) => {
     const page = await browser.newPage({ viewport: { width, height: width < 600 ? 844 : 1000 },
