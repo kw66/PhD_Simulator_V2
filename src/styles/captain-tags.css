@@ -12,7 +12,8 @@
 .lobby-talent-tree.is-captain-tag-tree .lobby-talent-tree-node {
   width: min(68px, 100%);
   max-width: 100%;
-  height: 66px;
+  height: 76px;
+  gap: 4px;
 }
 
 .lobby-talent-tree.is-captain-tag-tree .special-role-avatar-ring {
@@ -41,8 +42,23 @@
 }
 
 .rewinder-year-node:disabled {
-  opacity: .48;
+  opacity: 1;
   cursor: not-allowed;
+}
+
+.rewinder-year-node:disabled .special-role-avatar-ring {
+  opacity: .58;
+  filter: grayscale(.72);
+}
+
+.rewinder-year-node:disabled .special-role-avatar {
+  opacity: .72;
+  filter: grayscale(.8);
+}
+
+.rewinder-year-node:disabled .rewinder-year-node-label {
+  color: #7b817a;
+  opacity: .88;
 }
 
 .captain-tag-effects {
@@ -65,7 +81,7 @@
 
   .lobby-talent-tree.is-captain-tag-tree .lobby-talent-tree-page { width: 96%; }
 
-  .lobby-talent-tree.is-captain-tag-tree .lobby-talent-tree-node { width: min(64px, 100%); height: 64px; }
+  .lobby-talent-tree.is-captain-tag-tree .lobby-talent-tree-node { width: min(64px, 100%); height: 72px; gap: 3px; }
 
   .lobby-talent-tree.is-captain-tag-tree .special-role-avatar-ring { width: 44px; }
 
