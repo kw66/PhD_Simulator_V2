@@ -54,7 +54,7 @@ describe("curse and captain UI", () => {
     expect(rail).toContain('class="new-debt-balance"');
     expect(rail).toContain(`data-player-debt="${debt}"`);
     if (debt < 0.01) expect(rail).toContain("债务 &lt;0.01");
-    const button = rail.match(/<button[^>]*data-action="repay-debt"[^>]*>提前还债<\/button>/)![0];
+    const button = rail.match(/<button[^>]*data-action="repay-debt"[^>]*>[\s\S]*?<\/button>/)![0];
     expect(button).not.toContain(" disabled");
     const delta = Number(button.match(/data-delta="([^"]+)"/)![1]);
     const repaid = dispatchAction(state, "repay-debt", { debtRepayment: delta });
@@ -69,7 +69,7 @@ describe("curse and captain UI", () => {
     state.curseState = { ...state.curseState!, debt };
     state.player.money = money;
     const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "workstation" });
-    expect(html).toMatch(/data-action="repay-debt" data-delta="1" disabled[^>]*>提前还债<\/button>/);
+    expect(html).toMatch(/data-action="repay-debt" data-delta="1" disabled[^>]*aria-label="提前还债/);
   });
 
   it("keeps the debt balance specific to the debt role", () => {

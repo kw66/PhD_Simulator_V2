@@ -56,7 +56,7 @@ import { getLabReimbursementCount } from "../core/v2-lab-reimbursement";
 import { compactRelationshipActivity, summarizeRelationshipActivity } from "./v2-relationship-activity";
 import { formatMoney, roundMoney } from "../core/v2-money";
 import { formatAttribute, formatAttributeDetail } from "../core/v2-attribute-format";
-import { getRoleTalentInvestmentDuration, getRoleTalentInvestmentLevel } from "../core/v2-role-talent-investments";
+import { getRoleTalentInvestmentLevel } from "../core/v2-role-talent-investments";
 import { getRoleTalentLevel } from "../core/v2-role-talent-state";
 import { getPlayerAttributeCap, getPlayerResistanceReduction } from "../core/v2-player-attributes";
 import { getAnnualLabSocialRewards, getPlayerAnnualResearchGrowth, getFellowPublicationTotals } from "../core/v2-lab-talent";
@@ -148,7 +148,7 @@ import { getAcademicDisplayCounters } from "../core/v2-rewinder-academic-record"
 import { renderRewinderEvent, type RewinderAct } from "./v2-render-rewinder-event";
 import { getAdvisorGuidanceSummary } from "../core/v2-advisor-guidance";
 import { getDesignedTalentNodes } from "../core/v2-role-talent-definitions";
-import { getCurseDebtPayoffAmount, getMonthEndIllnessDelta } from "../core/v2-curse-system";
+import { getCurseDebtPayoffAmount, getMonthEndIllnessDelta, settleCurseMonthStart } from "../core/v2-curse-system";
 import { getCaptainAdvisorGuidanceBonus, getCaptainGuidanceMultiplier, getCaptainAffinityCap, getCaptainCooperationMax, getCaptainLevel, getCaptainLoverId, getCaptainLoverIntimacyCap, getCaptainLoverResearchCap, getCaptainLoverRouteMax, getCaptainProjectMax, getCaptainResearchCap, getCaptainTag, isCaptain } from "../core/v2-captain-state";
 
 const ATTR_TIER_THRESHOLDS = [6, 12, 18] as const;
@@ -783,7 +783,32 @@ function renderDebtBalance(state: GameState): string {
   const label = debt > 0 && debt < 0.01 ? "&lt;0.01" : formatMoney(debt);
   const payoff = getCurseDebtPayoffAmount(debt);
   const payment = Math.min(1, payoff);
-  return `<span class="new-debt-balance" data-player-debt="${debt}" title="月利率2%，毕业前需结清${debt > 0 ? `；结清需${formatMoney(payoff)}金币` : ""}">债务 ${label}<button type="button" class="new-investment-button new-debt-repayment-button" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || debt <= 0 ? " disabled" : ""} title="每次偿还1金币，尾款不足1金币按实际结清${debt > 0 ? `；本次偿还${formatMoney(payment)}金币` : ""}">提前还债</button></span>`;
+  const nextDebt = settleCurseMonthStart({ ...state, totalMonths: state.totalMonths + 1 }, false).curseState?.debt ?? debt;
+  const interest = Math.max(0, nextDebt - debt);
+  const interestLabel = interest > 0 && interest < 0.01 ? "&lt;0.01" : formatMoney(interest);
+  return `<button type="button" class="new-currency-action-card new-debt-repayment-button" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || debt <= 0 ? " disabled" : ""} aria-label="提前还债，本次${formatMoney(payment)}金币">
+    <span class="new-currency-action-name"><i data-lucide="hand-coins" aria-hidden="true"></i>-${formatMoney(payment)}金</span>
+    <span class="new-currency-action-status"><span class="new-debt-balance" data-player-debt="${debt}">债务 ${label}金</span></span>
+    <span class="new-currency-action-status">利息+${interestLabel}金</span>
+  </button>`;
+}
+
+function renderCurrencyActions(state: GameState): string {
+  const investmentLevel = getRoleTalentInvestmentLevel(state);
+  const investedMoney = (state.roleTalents?.investments ?? []).reduce((sum, item) => sum + item.principal, 0);
+  const goldPowerAvailable = state.selectedRoleId === "rich" && getRoleTalentLevel(state, "gold-power-alpha") > 0;
+  const goldPowerEnabled = state.roleTalents?.goldPowerEnabled === true;
+  const debt = renderDebtBalance(state);
+  if (!investmentLevel && !goldPowerAvailable && !debt) return "";
+  return `<div class="new-currency-actions" aria-label="金币相关操作">
+    ${debt}
+    ${investmentLevel > 0 ? `<button type="button" class="new-currency-action-card new-investment-button" data-action="invest-money"${state.player.money < 5 || state.phase !== "playing" ? " disabled" : ""} aria-label="投资5金币，目前在投${formatMoney(investedMoney)}金币">
+      <span class="new-currency-action-name"><i data-lucide="piggy-bank" aria-hidden="true"></i>-5金币</span><span class="new-currency-action-status">目前${formatMoney(investedMoney)}金</span>
+    </button>` : ""}
+    ${goldPowerAvailable ? `<button type="button" class="new-currency-action-card new-gold-power-button" data-action="toggle-gold-power" aria-pressed="${goldPowerEnabled}"${state.phase !== "playing" ? " disabled" : ""}>
+      <span class="new-currency-action-name"><span class="new-gold-power-check" aria-hidden="true">${goldPowerEnabled ? "✓" : ""}</span>金之力</span>
+    </button>` : ""}
+  </div>`;
 }
 
 function renderLeftRail(state: GameState): string {
@@ -805,8 +830,9 @@ function renderLeftRail(state: GameState): string {
           <div class="new-attr-header new-identity-money-header">
             <span class="new-player-identity"><span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span><span class="new-player-role" title="${escapeHtml(role.name)}">${escapeHtml(role.name)}</span></span>
             <span class="new-player-action-points" aria-label="行动点 ${remainingActions}/${state.actionState.limit}"><span aria-hidden="true">👣</span>行动点 ${renderAnimatedNumber("player:actions:remaining", remainingActions)}/${renderAnimatedNumber("player:actions:limit", state.actionState.limit)}</span>
-            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}${renderDebtBalance(state)}${getRoleTalentInvestmentLevel(state) > 0 ? `<button type="button" class="new-investment-button" data-action="invest-money" ${state.player.money < 5 || state.phase !== "playing" ? "disabled" : ""} title="投资5金币，${getRoleTalentInvestmentDuration(state)}个月后返还本金及${getRoleTalentInvestmentLevel(state)}金币利息；持有${state.roleTalents?.investments?.length ?? 0}笔">投资</button>` : ""}${state.selectedRoleId === "rich" && getRoleTalentLevel(state, "gold-power-alpha") > 0 ? `<button type="button" class="new-investment-button new-gold-power-button" data-action="toggle-gold-power" aria-pressed="${state.roleTalents?.goldPowerEnabled === true}" ${state.phase !== "playing" ? "disabled" : ""} title="${state.roleTalents?.goldPowerEnabled ? "已开启：每点SAN消耗改用1金币；金币不足时使用SAN。点击关闭" : "已关闭：点击开启，用金币代替SAN消耗"}"><span aria-hidden="true">${state.roleTalents?.goldPowerEnabled ? "☑" : "☐"}</span> 金之力</button>` : ""}</span>
+            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}</span>
           </div>
+          ${renderCurrencyActions(state)}
         </div>
       </div>
 
