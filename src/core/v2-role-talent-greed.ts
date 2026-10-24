@@ -56,7 +56,7 @@ export function applyGreedAttributeLoss(state: GameState, amount: number, _getRo
 
 export function getGreedResetTarget(state: GameState): number {
   return state.selectedRoleId === "rich-reversed" && getRoleTalentLevel(state, "spend-to-break-curse") > 0
-    ? Math.floor((state.roleTalents?.greedQualifiedSpending ?? 0) / 100) : 0;
+    ? Math.floor((state.roleTalents?.greedQualifiedSpending ?? 0) / (usesGameplayRulesFrom("20261024-r54") ? 50 : 100)) : 0;
 }
 
 /** The curse is an exact reset; its dedicated loss reactions are the sole exception to reset exclusion. */

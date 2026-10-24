@@ -45,11 +45,6 @@
   align-content: start;
 }
 
-/* Rewinder rules stay on one compact row; the special node contains the in-run rewind rule. */
-.lobby-page .is-rewinder-tree .lobby-talent-tree-node {
-  grid-row: 1 !important;
-}
-
 @media (min-width: 821px) {
   /* Fill the rail after the profile grows, while short final pages stay compact. */
   .lobby-page .lobby-profile-achievement-list:has(> :nth-child(11)) {

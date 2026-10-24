@@ -9,6 +9,7 @@ import { createCustomFellowProgressProfile } from "../src/core/v2-fellow-progres
 import { captureAcademicYear } from "../src/core/v2-rewinder-academic-record";
 import { completeAcademicArchive, prepareAcademicArchive, selectAcademicSource } from "../src/core/v2-rewinder-academic";
 import type { GameState } from "../src/core/v2-types";
+import { getRoleChibiPortraitUrl } from "../src/app/v2-role-portrait-assets";
 
 function fixture(): GameState {
   const base = createStartedGameState("rewinder");
@@ -63,19 +64,22 @@ describe("academic archive pages", () => {
     const setup = createInitialState();
     const html = renderApp(setup, account);
     expect(html).toContain("开始第2学年");
-    expect(html).toContain('data-ui-rewinder-start-year="2" aria-pressed="true"');
-    expect(html).toContain('data-ui-rewinder-start-year="3" aria-pressed="false" disabled');
+    expect(html).toMatch(/data-ui-rewinder-start-year="2"[^>]*aria-pressed="true"/);
+    expect(html).toMatch(/data-ui-rewinder-start-year="3"[^>]*aria-pressed="false"[^>]*disabled/);
+    expect(html.match(/data-rewinder-year=/g)).toHaveLength(6);
+    expect(html).not.toContain("rewinder-year-picker");
+    expect(html.match(new RegExp(`<img class="special-role-avatar" src="${getRoleChibiPortraitUrl("rewinder")}"`, "g"))).toHaveLength(6);
     const resumed = renderApp(setup, account, { hasRoleSave: true });
     expect(resumed).toContain("继续本学年");
-    expect(resumed).toContain('data-ui-rewinder-start-year="1" aria-pressed="false" disabled');
+    expect(resumed).toMatch(/data-ui-rewinder-start-year="1"[^>]*aria-pressed="false"[^>]*disabled/);
     expect(renderApp(setup, account, { rewinderStartYear: 1 })).toContain("开始第1学年");
   });
 
   it("keeps the compact special rule in the first talent row", () => {
-    const html = renderRewinderPreview(3, 8, 4);
-    expect(html).toContain("第4学年 · 一年一生");
+    const html = renderRewinderPreview(6, 8, 4);
+    expect(html).toContain("第8次轮回 · 第4学年");
     expect(html).toContain("第8次轮回");
-    expect(html).toContain("逐年挑战，年末归档，承接前一年成果");
+    expect(html).toContain("每次挑战一个学年，8月归档，9月承接上一年成果");
     expect(html).not.toContain("事件可回退，结果固定");
     expect(html).toContain("grid-column:4;grid-row:1");
     expect(html).not.toContain("局内轮回");

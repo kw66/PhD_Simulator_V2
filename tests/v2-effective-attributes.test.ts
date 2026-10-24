@@ -60,16 +60,22 @@ describe("effective talent attributes", () => {
     expect(getEffectiveResearch({ ...phd, roleTalents: { levels: {} } })).toBe(3);
   }));
 
-  it("subtracts the dynamic favor cap, never current favor, without mutating real stats", () => {
+  it("keeps real research and social values while the curse converts their growth into favor loss", () => {
     const state = stateFor("teacher-child-reversed");
     state.roleTalents!.capBonuses = { favor: -10 };
     state.player.favor = 1;
-    expect(getEffectiveResearch(state)).toBe(8);
-    expect(getEffectiveSocial(state)).toBe(8);
-    expect(getAnnualLabSocialRewards(state).fellowAffinity).toBe(1);
+    expect(getEffectiveResearch(state)).toBe(18);
+    expect(getEffectiveSocial(state)).toBe(18);
+    expect(getAnnualLabSocialRewards(state).fellowAffinity).toBe(3);
     expect(previewPlayerAttributeChange(state, "social", -1).effectiveChange).toBe(-0.4);
     expect(state.player.research).toBe(18);
-    expect(getEffectiveSocial({ ...state, player: { ...state.player, social: 5 } })).toBe(0);
+    expect(getEffectiveSocial({ ...state, player: { ...state.player, social: 5 } })).toBe(5);
+    withGameplayRuleset("20261024-r51", () => {
+      expect(getEffectiveResearch(state)).toBe(8);
+      expect(getEffectiveSocial(state)).toBe(8);
+      expect(getAnnualLabSocialRewards(state).fellowAffinity).toBe(1);
+      expect(getEffectiveSocial({ ...state, player: { ...state.player, social: 5 } })).toBe(0);
+    });
   });
 
   it("preserves the full-SAN snapshot after payment and allows overflow SAN", () => {

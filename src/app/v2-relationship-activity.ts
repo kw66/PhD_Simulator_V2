@@ -1,5 +1,7 @@
 export function compactRelationshipActivity(activity: string): string[] {
   const compact = activity
+    .replace(/帮助([^，；《]+?)(?:完善|打磨)《[^》]*》：/gu, "助$1·")
+    .replace(/([^，；《]+?)帮助(?:完善|打磨)《[^》]*》：/gu, "获$1帮助·")
     .replace(/暂无项目安排|暂无安排/gu, "暂无活动")
     .replace(/(?:推进)?(横向|纵向)(?:项目)?进度/gu, "$1")
     .replace(/推进(横向|纵向)项目/gu, "$1")

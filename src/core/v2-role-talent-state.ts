@@ -36,6 +36,8 @@ export interface RoleTalentRunState {
   lastStagnationCurseMonth?: number;
   rejectedPaperRewardIds?: string[];
   rejectionRewardKeys?: string[];
+  /** First rejection is consumed even without an eligible coauthor or an allocated reward talent. */
+  settledRejectionCamaraderiePaperIds?: string[];
   regularActionBudget?: number;
   lastSwapMonth?: number;
   lastCurseMonth?: number;

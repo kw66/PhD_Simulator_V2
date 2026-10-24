@@ -56,9 +56,14 @@ export function ensureResearchCurseBroken(state: GameState): GameState {
 /** A rescue establishes the reset value exactly, then grants one independent reward batch. */
 export function settleRoleTalentRescues(state: GameState, getRoll: () => number = gameRandom): GameState {
   state = ensureResearchCurseBroken(state);
-  if (state.selectedRoleId !== "teacher-child-reversed" || !state.roleTalents || !level(state, "favor-reset") || state.player.favor >= 0) return state;
+  if (state.selectedRoleId !== "teacher-child-reversed" || !state.roleTalents) return state;
+  const redesigned = usesGameplayRulesFrom("20261024-r52");
+  if (redesigned) {
+    if (state.player.favor >= 6) return state;
+  } else if (!level(state, "favor-reset") || state.player.favor >= 0) return state;
   const before = state;
-  const favorCap = Math.max(6, getPlayerAttributeCap(state, "favor") - 1 - level(state, "end-of-grace"));
+  const favorCap = redesigned ? getPlayerAttributeCap(state, "favor") + 1
+    : Math.max(6, getPlayerAttributeCap(state, "favor") - 1 - level(state, "end-of-grace"));
   state = { ...state, player: { ...state.player, favor: favorCap }, roleTalents: { ...state.roleTalents,
     favorResetCount: (state.roleTalents.favorResetCount ?? 0) + 1,
     capBonuses: { ...state.roleTalents.capBonuses, favor: favorCap - 20 } } };
@@ -68,14 +73,25 @@ export function settleRoleTalentRescues(state: GameState, getRoll: () => number 
   if (level(state, "reset-social")) state = applyPlayerAttributeChange(state, "social", 1, "ordinary", getRoll).state;
   const minimumMoney = 2 * level(state, "reset-coins");
   if (minimumMoney > 0 && state.player.money < minimumMoney) state = { ...state, player: { ...state.player, money: minimumMoney } };
-  return logReaction(before, state, "无限包容", "导师好感低于0，降低上限后重置并发放奖励");
+  return logReaction(before, state, redesigned ? "恩荫成枷" : "无限包容", redesigned
+    ? "导师好感低于6，重置为当前上限并使上限+1"
+    : "导师好感低于0，降低上限后重置并发放奖励");
 }
 
 /** Receive one completed ordinary request; multi-point research gains trigger just once. */
 export function applyRoleAttributeReactions(state: GameState, stat: PlayerAttribute, actual: number, getRoll: () => number = gameRandom): GameState {
   if (!state.roleTalents || actual === 0) return state;
   if (actual < 0) state = applyGreedAttributeLoss(state, -actual, getRoll);
-  if (state.selectedRoleId === "teacher-child-reversed" && stat === "favor" && actual < 0) return settleRoleTalentRescues(state, getRoll);
+  if (state.selectedRoleId === "teacher-child-reversed") {
+    if (stat === "favor" && actual < 0) return settleRoleTalentRescues(state, getRoll);
+    if (usesGameplayRulesFrom("20261024-r52") && actual > 0 && (stat === "research" || stat === "social")) {
+      const before = state;
+      state = applyPlayerAttributeChange(state, "favor", -actual, "ordinary", getRoll, { suppressReactions: true }).state;
+      if (state.player.favor < 0) state = { ...state, player: { ...state.player, favor: 0 } };
+      state = settleRoleTalentRescues(state, getRoll);
+      return logReaction(before, state, "恩荫成枷", `${stat === "research" ? "科研" : "社交"}提升视为导师好感下降`);
+    }
+  }
   if (state.selectedRoleId === "genius-reversed" && stat === "research" && actual > 0) {
     const before = state;
     if (usesGameplayRulesFrom("20261023-r33")) {

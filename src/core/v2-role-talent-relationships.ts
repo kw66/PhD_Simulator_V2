@@ -13,12 +13,17 @@ export function getJuniorDelegationSocialChange(state: GameState, ordinaryChange
     && state.fellowProgressState.some((fellow) => fellow.type === "junior") ? 0 : ordinaryChange;
 }
 
+function hasJuniorBondRole(state: GameState): boolean {
+  return state.selectedRoleId === "social"
+    || (state.selectedRoleId === "social-reversed" && usesGameplayRulesFrom("20261024-r49"));
+}
+
 export function createJuniorDelegationTalent(state: GameState, getRoll: () => number): {
   effects: Pick<EventChoice["effects"], "juniorDelegationRoll">;
   outcome: string;
 } {
   const juniors = state.fellowProgressState.filter((fellow) => fellow.type === "junior");
-  const rank = state.selectedRoleId === "social" ? getRoleTalentLevel(state, "junior-bond") : 0;
+  const rank = hasJuniorBondRole(state) ? getRoleTalentLevel(state, "junior-bond") : 0;
   if (!rank || !juniors.length) return { effects: {}, outcome: "" };
   const roll = Math.max(0, Math.min(0.999999999999, getRoll()));
   const junior = juniors[Math.floor(roll * juniors.length)]!;
@@ -28,7 +33,7 @@ export function createJuniorDelegationTalent(state: GameState, getRoll: () => nu
 }
 
 export function applyJuniorDelegationTalent(state: GameState, roll: number | undefined): GameState {
-  if (roll === undefined || !Number.isFinite(roll) || state.selectedRoleId !== "social") return state;
+  if (roll === undefined || !Number.isFinite(roll) || !hasJuniorBondRole(state)) return state;
   const rank = getRoleTalentLevel(state, "junior-bond");
   const juniors = state.fellowProgressState.filter((fellow) => fellow.type === "junior");
   if (!rank || !juniors.length) return state;

@@ -85,15 +85,15 @@ describe("ordinary attribute talent reactions", () => {
     expect(state.eventHistory.filter(entry => entry.id === "talent:role-break-research-curse")).toHaveLength(1);
   });
 
-  it("adds the ordinary favor penalty before resistance and never amplifies reset", () => {
+  it("preserves the old ordinary favor penalty in r51 recordings", () => withGameplayRuleset("20261024-r51", () => {
     const state = base("teacher-child-reversed", { "lower-favor-reset": 2 });
     expect(previewPlayerAttributeChange(state, "favor", -1).effectiveChange).toBe(-1);
     expect(withGameplayRuleset("20261023-r43", () => previewPlayerAttributeChange(state, "favor", -1).effectiveChange)).toBe(-1.6);
     expect(previewPlayerAttributeChange(state, "favor", 1).effectiveChange).toBe(0.4);
     expect(previewPlayerAttributeChange(state, "favor", -1, "reset").effectiveChange).toBe(-1);
-  });
+  }));
 
-  it.each([1, 2, 3, 4])("adds half a point per rank before resistance without rounding or affecting other changes: %s", rank => {
+  it.each([1, 2, 3, 4])("preserves half-point favor loss ranks in r51 recordings: %s", rank => withGameplayRuleset("20261024-r51", () => {
     const state = base("teacher-child-reversed", { "lower-favor-reset": rank });
     state.player.favor = 4;
     expect(previewPlayerAttributeChange(state, "favor", -0.25).effectiveChange).toBe(-0.25 - rank * 0.5);
@@ -101,18 +101,18 @@ describe("ordinary attribute talent reactions", () => {
     expect(previewPlayerAttributeChange(state, "favor", 0).effectiveChange).toBe(0);
     expect(previewPlayerAttributeChange(state, "favor", -1, "reset").effectiveChange).toBe(-1);
     expect(previewPlayerAttributeChange(state, "social", -1).adjustedRawChange).toBe(-1);
-  });
+  }));
 
-  it("rank-four refill supplies eight coins once and never removes existing money", () => {
+  it("rank-four refill supplies eight coins once in r51 recordings", () => withGameplayRuleset("20261024-r51", () => {
     const state = base("teacher-child-reversed", { "favor-reset": 1, "reset-coins": 4 });
     state.player = { ...state.player, favor: -0.5, money: 1 };
     const next = settleRoleTalentRescues(state);
     expect(next.player.money).toBe(8);
     expect(settleRoleTalentRescues(next)).toBe(next);
     expect(settleRoleTalentRescues({ ...state, player: { ...state.player, money: 10 } }).player.money).toBe(10);
-  });
+  }));
 
-  it("rescues strictly below zero once, lowers the cap before reset and grants new caps before rewards", () => {
+  it("preserves the old below-zero rescue in r51 recordings", () => withGameplayRuleset("20261024-r51", () => {
     let state = base("teacher-child-reversed", { "favor-reset": 1, "reset-research": 1, "reset-social": 1,
       "reset-research-cap": 1, "reset-social-cap": 1, "reset-coins": 2, "end-of-grace": 2 });
     state.player = { ...state.player, favor: 1, research: 20, social: 20, money: 1 };
@@ -127,9 +127,9 @@ describe("ordinary attribute talent reactions", () => {
     expect(state.roleTalents?.lossTotals?.favor).toBe(2);
     expect(evaluateCoreEndings(state).phase).toBe("playing");
     expect(settleRoleTalentRescues(state)).toBe(state);
-  });
+  }));
 
-  it("continues to reset at minimum favor cap six and never adds coins above the refill target", () => {
+  it("continues to reset at minimum favor cap six in r51 recordings", () => withGameplayRuleset("20261024-r51", () => {
     const state = base("teacher-child-reversed", { "favor-reset": 1, "reset-coins": 2, "end-of-grace": 2 });
     state.roleTalents!.capBonuses = { favor: -14 };
     state.player.favor = 0;
@@ -141,6 +141,23 @@ describe("ordinary attribute talent reactions", () => {
     const directNegative = { ...state, player: { ...state.player, favor: -1 } };
     expect(evaluateCoreEndings(directNegative).player.favor).toBe(6);
     expect(evaluateCoreEndings(directNegative).phase).toBe("playing");
+  }));
+
+  it("converts research and social growth into favor loss and resets below six", () => {
+    let state = base("teacher-child-reversed", {});
+    state.player = { ...state.player, favor: 5, research: 1, social: 1 };
+    state = update(state, "research", 1);
+    expect(state.player.research).toBe(2);
+    expect(state.player.favor).toBe(21);
+    expect(getPlayerAttributeCap(state, "favor")).toBe(21);
+    expect(state.roleTalents?.favorResetCount).toBe(1);
+  });
+
+  it("uses the revised favor resistance in both directions", () => {
+    const state = base("teacher-child-reversed", { "end-of-grace": 3 });
+    state.player.favor = 18;
+    expect(previewPlayerAttributeChange(state, "favor", 1).effectiveChange).toBeCloseTo(0.1);
+    expect(previewPlayerAttributeChange(state, "favor", -1).effectiveChange).toBeCloseTo(-0.7);
   });
 
   it("keeps gain and loss remainders separately, rewards completed points and tracks any social change", () => {
@@ -191,7 +208,7 @@ describe("ordinary attribute talent reactions", () => {
     expect(confirmed.roleTalents?.attributeReactionSequence).toBe(1);
   });
 
-  it("previews a favor reset as a rescue and never consumes global RNG for greed projection", () => {
+  it("previews a favor reset as a rescue and never consumes global RNG for greed projection in r51 recordings", () => withGameplayRuleset("20261024-r51", () => {
     const state = base("teacher-child-reversed", { "favor-reset": 1 });
     state.player.favor = 0;
     const event: PendingEvent = { id: "risk", title: "", description: "", source: "fixed", stage: "result", chainId: "risk",
@@ -205,7 +222,7 @@ describe("ordinary attribute talent reactions", () => {
       expect(getEventChoiceRisk(greed, gamble, gamble.choices[0]!)).toBeNull();
       expect(JSON.stringify(greed)).toBe(snapshot);
     } finally { random.mockRestore(); }
-  });
+  }));
 
   it("freezes greed games until the complete event request has been applied and previews deterministically", () => {
     const initial = base("rich-reversed", { "coin-game": 1, "loss-to-money": 1, "post-phd-money-conversion": 1 });

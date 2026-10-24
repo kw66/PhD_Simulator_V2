@@ -84,7 +84,7 @@ describe("curse and captain UI", () => {
     const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "relationship" });
     expect(html).toMatch(/class="rel-type rel-captain-tag"[^>]*data-relationship-tooltip[^>]*tabindex="0"[^>]*>社交达人 Lv10<\/span>/);
     expect(html).toContain("导师效果：横向项目进度条上限−50。");
-    expect(html).toContain("团队加成按同标签成员人数叠加，不随等级增加。");
+    expect(html).toContain("团队加成：每月使能力最低的非社交达人成员对应的社交／亲密／默契+0.5（玩家、恋人、同学）。");
     expect(html).toMatch(/data-advisor-project="horizontal"[\s\S]*?aria-valuemax="50"/);
     expect(html).toContain("满50：");
   });
@@ -116,8 +116,11 @@ describe("curse and captain UI", () => {
     expect(badges.filter(badge => badge.includes(`同学效果：${fellowEffect}。`))).toHaveLength(3);
     expect(badges.filter(badge => badge.includes(`恋人效果：${loverEffect}。`))).toHaveLength(1);
     for (const badge of badges) {
-      expect(badge).toContain("Lv3（本局开局等级）");
+      expect(badge).toContain(" Lv3</span>");
       expect(badge).toContain("团队加成：");
+      expect(badge).not.toContain("本局开局等级");
+      expect(badge).not.toContain("团队加成按");
+      expect(badge).not.toContain("档位抵抗");
       expect(badge).toContain('data-relationship-tooltip');
       expect(badge).toContain('tabindex="0"');
       expect(badge).toContain('aria-description=');

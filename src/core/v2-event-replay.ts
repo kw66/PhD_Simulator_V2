@@ -51,8 +51,12 @@ export function canRewindPendingEvent(state: GameState, event: EventQueueItem, t
   if (!enabled(state) || event.debugReplayable || !Number.isInteger(targetIndex) || targetIndex < 0
     || !state.eventQueue.some(item => item.id === event.id)) return false;
   const context = event.rewinderReplay;
+  // Advisor redraws are the only in-place random choice in this chain.
+  // A pending opening may still carry a barrier from before redraws were exempted.
+  const barrierHistoryIndex = event.chainId === "before-grad-school" && usesGameplayRulesFrom("20261024-r48")
+    ? 0 : context?.barrierHistoryIndex ?? 0;
   if (usesGameplayRulesFrom("20261022-r21") && (
-    targetIndex < (context?.barrierHistoryIndex ?? 0)
+    targetIndex < barrierHistoryIndex
     || event.history?.slice(targetIndex).some(stage =>
       hasRandomOutcome(stage.choices.find(choice => choice.id === stage.selectedChoiceId)))
   )) return false;

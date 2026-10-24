@@ -2,7 +2,9 @@ import { getAiModelForTotalMonths, polishUnsubmittedPapers, type AiModelOffer } 
 import { creditFellowMoney, getFellowFinanceAccount, getFellowSpendableMoney } from "./v2-fellow-finance";
 import { getLabExperimentMoneyCost } from "./v2-lab-compute";
 import { roundMoney } from "./v2-money";
-import { getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
+import { addPaperCollaboration, getPaperScoreBreakdown, setPaperOwnScore } from "./v2-paper-collaboration";
+import { getFellowName } from "./v2-fellow-progression";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { generateResearchScore } from "./v2-research-operation";
 import type { GameState, Paper, PaperActionType } from "./v2-types";
 
@@ -41,9 +43,13 @@ export function subscribeFellowAi(
   fellowId: string,
   paperId: string,
   field: PaperActionType,
+  helpingFellow = false,
 ): { state: GameState; model: AiModelOffer | null; subscribed: boolean } {
   const profile = state.fellowProgressState.find((entry) => entry.id === fellowId);
-  const paper = state.fellowPapers?.find((entry) => entry.id === paperId && entry.leadAuthorId === fellowId);
+  const peerHelp = helpingFellow && usesGameplayRulesFrom("20261024-r50")
+    && state.fellowPapers?.some((entry) => entry.leadAuthorId === fellowId && entry.status === "reviewing");
+  const paper = state.fellowPapers?.find((entry) => entry.id === paperId && (entry.leadAuthorId === fellowId
+    || (peerHelp && entry.nonFirstAuthor !== true && state.fellowProgressState.some((fellow) => fellow.id === entry.leadAuthorId))));
   if (state.phase !== "playing" || !profile || !paper
     || paper.status !== "draft"
     || profile.nextMonthlyAction === "project" || state.totalMonths <= profile.startTotalMonths) {
@@ -69,7 +75,12 @@ export function subscribeFellowAi(
           aiSubscribedTotalMonths: state.totalMonths },
       },
       fellowPapers: model.slot === "claude"
-        ? paid.fellowPapers?.map((entry) => entry.id === paperId ? polishUnsubmittedPapers([entry], model).papers[0]! : entry)
+        ? paid.fellowPapers?.map((entry) => {
+          if (entry.id !== paperId) return entry;
+          const polished = polishUnsubmittedPapers([entry], model).papers[0]!;
+          return peerHelp ? addPaperCollaboration(entry, { paperId, collaborator: { id: fellowId, name: getFellowName(profile) },
+            scores: { idea: polished.idea - entry.idea, experiment: polished.experiment - entry.experiment, writing: polished.writing - entry.writing } }) : polished;
+        })
         : paid.fellowPapers,
     },
     model,

@@ -1,49 +1,4 @@
-/* Keep the four established rules on row one and the rewind rule on row two. */
-.lobby-page .is-rewinder-tree .lobby-talent-tree-node[data-rewinder-rule] { grid-row: var(--rewinder-node-row) !important; }
-.rewinder-cycle-banner { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; grid-column: 1 / 4; grid-row: 2; align-self: center; justify-self: stretch; min-width: 0; padding: 8px 12px; border-block: 1px solid rgba(151, 127, 74, .2); background: linear-gradient(90deg, transparent, rgba(236, 221, 182, .38) 18%, rgba(236, 221, 182, .38) 82%, transparent); color: #81683d; }
-.rewinder-cycle-banner > span:last-child { display: grid; gap: 3px; min-width: 0; }
-.rewinder-cycle-banner small { color: #a08b67; font-size: 10px; line-height: 1.25; letter-spacing: .08em; }
-.rewinder-cycle-banner strong { color: #66583f; font-size: 17px; font-weight: 800; line-height: 1.25; }
-.rewinder-cycle-seal { position: relative; display: grid; place-items: center; flex: 0 0 37px; width: 37px; height: 37px; border: 1px solid #bda373; border-radius: 50%; background: radial-gradient(circle, #fff8e9 45%, #f0e2be); color: #897049; font-size: 15px; font-weight: 800; box-shadow: 0 0 0 3px rgba(194, 168, 112, .12), inset 0 0 0 3px #f9f2df; }
-.rewinder-cycle-seal::before { content: ""; position: absolute; inset: -6px; border: 1px dashed rgba(162, 138, 88, .46); border-radius: 50%; }
-.rewinder-year-picker { margin: 9px 0 2px; padding: 8px 7px 2px; border: 0; border-top: 1px solid rgba(161, 143, 106, .28); border-radius: 0; background: transparent; box-shadow: none; }
-/* The extra academic-year controls must not be clipped by the legacy fixed-height lobby. */
-.lobby-page[data-scale-mode="fixed"] .lobby-detail-stage:has(.rewinder-year-picker) { height: auto; max-height: none; overflow: visible; }
-.lobby-page[data-scale-mode="fixed"] .lobby-profile-card:has(.rewinder-year-picker) { height: auto; }
-.rewinder-year-picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 4px 9px; padding-bottom: 6px; border-bottom: 1px solid rgba(161, 143, 106, .18); }
-.rewinder-year-picker-heading > div { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
-.rewinder-year-picker-heading strong { color: #586a67; font-size: 14px; letter-spacing: .04em; }
-.rewinder-year-picker-heading span { color: #a39a87; font-size: 11px; }
-.rewinder-year-picker-heading em { flex: 0 0 auto; padding: 0 0 0 9px; border-left: 1px solid rgba(161, 143, 106, .28); color: #8e754b; font-size: 11px; font-style: normal; font-weight: 700; }
-.rewinder-year-options { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
-.rewinder-year-options::before { content: ""; position: absolute; top: 18px; right: 8%; left: 8%; height: 1px; background: linear-gradient(90deg, transparent, #c7b88e 12%, #c7b88e 88%, transparent); pointer-events: none; }
-.rewinder-year-options button { position: relative; z-index: 1; display: grid; justify-items: center; gap: 3px; min-width: 0; padding: 3px 3px 5px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #787d72; cursor: pointer; font: inherit; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
-.rewinder-year-options button:hover:not(:disabled) { border-color: rgba(118, 145, 142, .35); background: rgba(232, 241, 234, .7); transform: translateY(-1px); }
-.rewinder-year-index { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #c9b98d; border-radius: 50%; background: #f8f0da; color: #947848; font-family: Georgia, "Times New Roman", serif; font-size: 12px; font-weight: 700; box-shadow: 0 0 0 3px #f5efdf; }
-.rewinder-year-label { color: #596b67; font-size: 11px; font-weight: 750; white-space: nowrap; }
-.rewinder-year-options button > small { color: #aaa28f; font-size: 9px; line-height: 1.1; white-space: nowrap; }
-.rewinder-year-options button.is-available .rewinder-year-index { border-color: #7da49a; background: #e6f1eb; color: #4f7773; }
-.rewinder-year-options button.is-current { border-color: transparent; background: rgba(228, 237, 232, .48); box-shadow: inset 0 -2px 0 rgba(101, 141, 145, .68); }
-.rewinder-year-options button.is-current .rewinder-year-index { border-color: #658d91; background: #dceceb; color: #3f6870; box-shadow: 0 0 0 2px rgba(232, 241, 234, .9); }
-.rewinder-year-options button.is-current .rewinder-year-label { color: #3e626d; }
-.rewinder-year-options button:disabled { opacity: .56; cursor: default; }
-.rewinder-year-options button[aria-pressed="true"]:disabled { opacity: .82; }
 .rewinder-preview-card .lobby-talent-tree.is-designed-tree.is-captain-tag-tree { --lobby-talent-detail-height: 92px; }
-.lobby-page .rewinder-preview-card.is-setup-preview .lobby-talent-tree.is-designed-tree.is-captain-tag-tree { --lobby-talent-node-height: 82px; --lobby-talent-detail-height: 92px; }
 @media (max-width: 520px) {
-  .rewinder-cycle-banner { gap: 9px; padding: 8px 5px; }
-  .rewinder-cycle-banner small { font-size: 9px; letter-spacing: 0; }
-  .rewinder-cycle-banner strong { font-size: 14px; }
-  .rewinder-cycle-seal { flex-basis: 31px; width: 31px; height: 31px; font-size: 13px; }
-  .rewinder-year-picker { margin-top: 8px; padding-inline: 3px; }
-  .rewinder-year-picker-heading { gap: 7px; margin-inline: 2px; }
-  .rewinder-year-picker-heading > div { gap: 5px; }
-  .rewinder-year-picker-heading span { font-size: 10px; }
-  .rewinder-year-options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
-  .rewinder-year-options::before { top: 18px; right: 16%; left: 16%; background: linear-gradient(90deg, transparent, #c7b88e 18%, #c7b88e 82%, transparent); }
-  .rewinder-year-options button { padding-block: 3px 5px; }
-  .rewinder-year-index { width: 27px; height: 27px; }
-  .rewinder-year-label { font-size: 10px; }
   .rewinder-preview-card .lobby-talent-tree.is-designed-tree.is-captain-tag-tree { --lobby-talent-detail-height: 112px; }
-  .lobby-page .rewinder-preview-card.is-setup-preview .lobby-talent-tree.is-designed-tree.is-captain-tag-tree { --lobby-talent-node-height: 82px; --lobby-talent-detail-height: 112px; }
 }

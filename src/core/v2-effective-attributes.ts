@@ -24,6 +24,7 @@ export function getEffectiveResearch(
     effective = Math.max(real, state.player.favor);
   }
   if (state.selectedRoleId === "teacher-child-reversed" && state.roleTalents) {
+    if (usesGameplayRulesFrom("20261024-r52")) return real;
     effective = Math.max(0, real - getPlayerAttributeCap(state, "favor"));
   }
   if (state.selectedRoleId === "normal-reversed"
@@ -37,6 +38,7 @@ export function getEffectiveResearch(
 export function getEffectiveSocial(state: EffectiveAttributeState): number {
   const real = state.player.social;
   if (state.selectedRoleId === "teacher-child-reversed" && state.roleTalents) {
+    if (usesGameplayRulesFrom("20261024-r52")) return real;
     return Math.max(0, real - getPlayerAttributeCap(state, "favor"));
   }
   return real;

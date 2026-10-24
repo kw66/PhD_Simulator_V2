@@ -15,6 +15,7 @@ export interface DesignedTalentNode {
   maxLevel: number;
   cost: number;
   effect: string;
+  hint?: string;
   prerequisiteIds: readonly string[];
   initialLevel?: number;
   fixed?: boolean;
@@ -129,13 +130,23 @@ const R42_CHOSEN_REVERSED_TALENT_NODES = [
   { id: "reverse-meter-gamma", name: "电表倒转γ", icon: "heart-handshake", tier: 2, column: "3", row: "3", maxLevel: 3, cost: 1, effect: "导师好感增减抵抗降低10个百分点/级", prerequisiteIds: ["reverse-meter-beta"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
-export const CHOSEN_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R42_CHOSEN_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
+const R49_CHOSEN_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R42_CHOSEN_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
   if (node.id === "post-phd-swap") return { ...node, tier: 2, column: "3", prerequisiteIds: ["group-event-focus", "game-event-focus"] };
   if (node.id === "group-event-focus" || node.id === "game-event-focus") return { ...node, tier: 1, column: "2", prerequisiteIds: ["attribute-swap", "san-money-swap"] };
   if (node.id === "swap-breaks-cap") return { ...node, prerequisiteIds: ["post-phd-swap"] };
   if (node.id.startsWith("reverse-meter-")) return { ...node, effect: node.effect.replace("增减抵抗降低10个百分点/级", "增长抵抗-10个百分点/级，下降抵抗+10个百分点/级") };
   return node;
 });
+
+export const CHOSEN_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = [
+  ...R49_CHOSEN_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
+    if (node.id === "fate-curse") return { ...node, effect: "SAN上限、科研、社交、导师好感、科研上限、社交上限、好感上限轮流在月初-1" };
+    if (node.id === "swap-breaks-cap") return { ...node, cost: 2 };
+    return node;
+  }),
+  { id: "annual-highest-growth", name: "渐入佳境", icon: "sprout", tier: 3, column: "4", row: "3", maxLevel: 3, cost: 1,
+    effect: "每学年末，科研、社交、导师好感中的最高项+1/级", prerequisiteIds: ["reverse-meter-gamma"] },
+];
 
 const LEGACY_SOCIAL_REVIEW_EFFECT = "转博后心软审稿人概率+社交×2%/级，其余类型保持相对比例";
 export const SOCIAL_TALENT_NODES = [
@@ -153,7 +164,7 @@ export const SOCIAL_TALENT_NODES = [
   { id: "overflow-social", name: "人多势众", icon: "user-round-plus", tier: 3, column: "4", row: "2", maxLevel: 2, cost: 2, effect: "人际栏同学溢出转为社交+1/级", prerequisiteIds: ["junior-bond", "paper-camaraderie"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
-export const NORMAL_REVERSED_TALENT_NODES = [
+const R48_NORMAL_REVERSED_TALENT_NODES = [
   { id: "sloth-core", name: "极致怠惰", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "SAN消耗×2；转博后SAN消耗×3", prerequisiteIds: [], initialLevel: 1, fixed: true },
   { id: "monthly-san-recovery", name: "松弛人生", icon: "heart-pulse", tier: 0, column: "1", row: "1", maxLevel: 3, cost: 2, effect: "每月SAN回复+1/级", prerequisiteIds: [] },
   { id: "sloth-head-start", name: "天纵不羁", icon: "sparkles", tier: 1, column: "2", row: "2", maxLevel: 5, cost: 2, effect: "初始全属性+1/级", prerequisiteIds: ["monthly-san-recovery"] },
@@ -165,6 +176,22 @@ export const NORMAL_REVERSED_TALENT_NODES = [
   { id: "year-summary-recovery", name: "忙里偷闲", icon: "calendar-days", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 1, effect: "学年总结事件中休息会回满SAN", prerequisiteIds: ["coffee-lifeline"] },
   { id: "full-san-research", name: "满血状态", icon: "brain", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 2, effect: "操作开始前SAN为满时，科研能力视为+SAN/5", prerequisiteIds: ["year-summary-recovery", "san-cap-reserve"] },
 ] as const satisfies readonly DesignedTalentNode[];
+
+const R50_NORMAL_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R48_NORMAL_REVERSED_TALENT_NODES.map(node => {
+  if (node.id === "monthly-san-recovery") return { ...node, cost: 1 };
+  if (node.id === "san-cap-reserve") return { ...node, cost: 1, maxLevel: 2, effect: "每浪费1常规行动点，SAN上限+1/级，最多+10/级" };
+  return node;
+});
+
+export const NORMAL_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = [
+  ...R50_NORMAL_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
+    if (node.id === "sloth-head-start") return { ...node, tier: 0, column: "1", prerequisiteIds: [] };
+    if (node.id === "post-phd-growth") return { ...node, tier: 1, column: "2" };
+    return node;
+  }),
+  { id: "sloth-annual-growth", name: "岁岁有成", icon: "sprout", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 3,
+    effect: "每学年末，科研、社交、导师好感+1", prerequisiteIds: ["post-phd-growth"] },
+];
 
 const R44_RICH_REVERSED_TALENT_NODES = [
   { id: "money-curse", name: "金钱诅咒", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0, effect: "每月SAN/属性重置为0", prerequisiteIds: [], initialLevel: 1, fixed: true },
@@ -178,12 +205,19 @@ const R44_RICH_REVERSED_TALENT_NODES = [
   { id: "coin-game-comeback", name: "败局翻盘", icon: "rotate-ccw", tier: 2, column: "3", row: "3", maxLevel: 5, cost: 1, effect: "金币游戏失败后的倍率+0.05/级", prerequisiteIds: ["coin-game"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
-export const RICH_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R44_RICH_REVERSED_TALENT_NODES.map(node => {
+const R52_RICH_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R44_RICH_REVERSED_TALENT_NODES.map(node => {
   if (node.id === "coin-game") return { ...node, effect: "三项属性每减少1点，金币50%变为1.5倍、50%变为0.4倍；整轮结算，净亏损计消费" };
   if (node.id === "post-phd-money-conversion") return { ...node, effect: "转博后，每笔消费按金额随机分配，提升SAN、三项属性及三项属性上限" };
   if (node.id === "finance-master") return { ...node, tier: 1, column: "2", row: "1", prerequisiteIds: ["money-growth"] };
   if (node.id === "investment-acceleration") return { ...node, tier: 2, column: "3", row: "1" };
   if (node.id === "spend-to-break-curse") return { ...node, tier: 2, column: "3", row: "2", prerequisiteIds: ["finance-master", "coin-game", "post-phd-money-conversion"] };
+  return node;
+});
+
+export const RICH_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R52_RICH_REVERSED_TALENT_NODES.map(node => {
+  if (node.id === "money-growth") return { ...node, cost: 1 };
+  if (node.id === "spend-to-break-curse") return { ...node, tier: 3, column: "4", row: "2",
+    effect: "累计每消耗50金币，金钱诅咒重置值+1", prerequisiteIds: ["investment-acceleration", "coin-game-comeback", "post-phd-money-conversion"] };
   return node;
 });
 
@@ -243,11 +277,35 @@ const R43_TEACHER_CHILD_REVERSED_TALENT_NODES = [
   { id: "end-of-grace", name: "恩断义绝", icon: "shield-plus", tier: 3, column: "4", row: "3", maxLevel: 2, cost: 3, effect: "导师好感上限下降幅度+1/级", prerequisiteIds: ["lower-favor-reset"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
-export const TEACHER_CHILD_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R43_TEACHER_CHILD_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
+const R51_TEACHER_CHILD_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R43_TEACHER_CHILD_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
   if (node.id === "lower-favor-reset") return { ...node, cost: 1, maxLevel: 4, effect: "导师好感下降幅度+0.5/级" };
   if (node.id === "favor-reset-decrease") return { ...node, maxLevel: 5 };
   if (node.id === "reset-research-cap" || node.id === "reset-social-cap") return { ...node, cost: 1 };
   if (node.id === "reset-coins") return { ...node, maxLevel: 4 };
+  return node;
+});
+
+export const TEACHER_CHILD_REVERSED_TALENT_NODES = [
+  { id: "favor-burden", name: "恩荫成枷", icon: "skull", tier: 3, column: "4", row: "1", maxLevel: 1, cost: 0,
+    effect: "科研、社交实际增长扣减导师好感；好感低于6时重置为当前上限，并使上限+1",
+    prerequisiteIds: [], initialLevel: 1, fixed: true },
+  { id: "advisor-meeting-focus", name: "耳提面命", icon: "message-circle", tier: 0, column: "1", row: "1", maxLevel: 4, cost: 1, effect: "导师约谈事件出现概率+100%/级", prerequisiteIds: [] },
+  { id: "favor-reset", name: "恩断义绝", icon: "heart-crack", tier: 0, column: "1", row: "2", maxLevel: 2, cost: 1, effect: "导师好感上限-4/级", prerequisiteIds: [] },
+  { id: "group-meeting-focus", name: "特别关注", icon: "presentation", tier: 0, column: "1", row: "3", maxLevel: 4, cost: 1, effect: "组会汇报事件出现概率+100%/级", prerequisiteIds: [] },
+  { id: "reset-research", name: "歪打正着", icon: "brain", tier: 1, column: "2", row: "3", maxLevel: 1, cost: 2, effect: "导师好感重置时科研+1", prerequisiteIds: ["favor-reset"] },
+  { id: "reset-social", name: "没大没小", icon: "users", tier: 1, column: "2", row: "1", maxLevel: 1, cost: 2, effect: "导师好感重置时社交+1", prerequisiteIds: ["favor-reset"] },
+  { id: "reset-coins", name: "伸手就有", icon: "coins", tier: 1, column: "2", row: "2", maxLevel: 4, cost: 1, effect: "导师好感重置时金币补充到2/级", prerequisiteIds: ["favor-reset"] },
+  { id: "lower-favor-reset", name: "恃宠而骄", icon: "heart-crack", tier: 2, column: "3", row: "2", maxLevel: 4, cost: 1, effect: "导师好感下降幅度+0.5/级", prerequisiteIds: ["reset-research", "reset-social", "reset-coins"] },
+  { id: "reset-research-cap", name: "离经叛道", icon: "shield-plus", tier: 2, column: "3", row: "3", maxLevel: 1, cost: 1, effect: "导师好感重置时科研上限+1", prerequisiteIds: ["reset-research"] },
+  { id: "reset-social-cap", name: "横行无忌", icon: "heart-handshake", tier: 2, column: "3", row: "1", maxLevel: 1, cost: 1, effect: "导师好感重置时社交上限+1", prerequisiteIds: ["reset-social"] },
+  { id: "end-of-grace", name: "得寸进尺", icon: "trending-up", tier: 3, column: "4", row: "2", maxLevel: 3, cost: 1,
+    effect: "导师好感增长抵抗+10个百分点/级，下降抵抗-10个百分点/级", prerequisiteIds: ["lower-favor-reset"] },
+] as const satisfies readonly DesignedTalentNode[];
+
+const R52_TEACHER_CHILD_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = TEACHER_CHILD_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
+  if (node.id === "favor-burden") return { ...node, effect: "科研、社交视为减少导师好感", hint: "按实际增加值扣减导师好感；导师好感低于6时重置为当前上限，并使上限+1。" };
+  if (node.id === "favor-reset") return { ...node, effect: "导师好感上限-5/级" };
+  if (node.id === "end-of-grace") return { ...node, row: "3" };
   return node;
 });
 
@@ -263,7 +321,7 @@ const R40_SOCIAL_REVERSED_TALENT_NODES = [
   { id: "affinity-conversion", name: "过河拆桥", icon: "rotate-ccw", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 4, effect: "放弃同学时，每点默契依次转为导师好感、科研、SAN上限、好感上限、科研上限+1，循环分配", prerequisiteIds: ["peer-event-focus", "junior-event-focus", "senior-event-focus"] },
 ] as const satisfies readonly DesignedTalentNode[];
 
-export const SOCIAL_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R40_SOCIAL_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
+const R48_SOCIAL_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R40_SOCIAL_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
   if (["peer-event-focus", "junior-event-focus", "senior-event-focus"].includes(node.id)) return { ...node, tier: 0, column: "1", cost: 1, prerequisiteIds: [] };
   if (node.id === "affinity-conversion") return { ...node, tier: 1, column: "2" };
   if (node.id === "social-to-san") return { ...node, tier: 3, column: "4", row: "3", prerequisiteIds: ["fellow-add-social"] };
@@ -272,6 +330,20 @@ export const SOCIAL_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R40_S
   if (node.id === "fellow-remove-social") return { ...node, tier: 2, column: "3", row: "2", prerequisiteIds: ["affinity-conversion"] };
   return node;
 });
+
+export const SOCIAL_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = [
+  ...R48_SOCIAL_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
+    if (node.id === "social-stagnation") return { ...node, effect: "连续4个月社交未变化，下月初科研和导师好感-1" };
+    if (node.id === "affinity-conversion") return { ...node, cost: 2 };
+    if (node.id === "fellow-add-social" || node.id === "fellow-remove-social") return { ...node, cost: 1 };
+    if (node.id === "junior-event-focus") return { ...node, row: "1" };
+    if (node.id === "peer-event-focus") return { ...node, row: "2" };
+    return node;
+  }),
+  { ...SOCIAL_TALENT_NODES.find(node => node.id === "junior-bond")!, tier: 1, column: "2", row: "1", prerequisiteIds: ["junior-event-focus"] },
+  { id: "rejection-camaraderie", name: "同病相怜", icon: "file-heart", tier: 1, column: "2", row: "3", maxLevel: 2, cost: 2,
+    effect: "每篇参与的同学论文首次被拒，与该同学默契+1/级", prerequisiteIds: ["senior-event-focus"] },
+];
 
 export const FRAIL_TALENT_NODES = [
   { id: "illness-surface", name: "病在腠理", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "疾病概率：+9%、+6%、+3%、+1%", prerequisiteIds: [], challenge: true },
@@ -322,15 +394,20 @@ const ROLE_TALENT_NODES = {
 
 export function getDesignedTalentNodes(roleId: RoleId): readonly DesignedTalentNode[] | null {
   if (roleId === "rich-reversed" && !usesGameplayRulesFrom("20261023-r45")) return R44_RICH_REVERSED_TALENT_NODES;
-  if (roleId === "rich-reversed" && !usesGameplayRulesFrom("20261023-r46")) return RICH_REVERSED_TALENT_NODES.map(node => node.id === "coin-game"
+  if (roleId === "rich-reversed" && !usesGameplayRulesFrom("20261023-r46")) return R52_RICH_REVERSED_TALENT_NODES.map(node => node.id === "coin-game"
     ? { ...node, effect: R44_RICH_REVERSED_TALENT_NODES.find(old => old.id === node.id)!.effect } : node);
+  if (roleId === "rich-reversed" && !usesGameplayRulesFrom("20261024-r54")) return R52_RICH_REVERSED_TALENT_NODES;
   if (roleId === "teacher-child-reversed" && !usesGameplayRulesFrom("20261023-r44")) return R43_TEACHER_CHILD_REVERSED_TALENT_NODES;
+  if (roleId === "teacher-child-reversed" && !usesGameplayRulesFrom("20261024-r52")) return R51_TEACHER_CHILD_REVERSED_TALENT_NODES;
+  if (roleId === "teacher-child-reversed" && !usesGameplayRulesFrom("20261024-r53")) return R52_TEACHER_CHILD_REVERSED_TALENT_NODES;
   if (roleId === "chosen-reversed" && !usesGameplayRulesFrom("20261023-r43")) return R42_CHOSEN_REVERSED_TALENT_NODES.map(node => {
     if (!usesGameplayRulesFrom("20261023-r42") && node.id === "attribute-swap") return { ...node, effect: "每月科研、社交、导师好感随机排列，交换差额受抵抗影响" };
     if (!usesGameplayRulesFrom("20261023-r42") && node.id === "post-phd-swap") return { ...node, effect: "转博后每月科研、社交、导师好感、SAN、金币随机排列，三项属性的交换差额受抵抗影响" };
     return node;
   });
+  if (roleId === "chosen-reversed" && !usesGameplayRulesFrom("20261024-r50")) return R49_CHOSEN_REVERSED_TALENT_NODES;
   if (roleId === "social-reversed" && !usesGameplayRulesFrom("20261023-r41")) return R40_SOCIAL_REVERSED_TALENT_NODES;
+  if (roleId === "social-reversed" && !usesGameplayRulesFrom("20261024-r49")) return R48_SOCIAL_REVERSED_TALENT_NODES;
   const chosenNodes: readonly DesignedTalentNode[] = usesGameplayRulesFrom("20261023-r39") ? CHOSEN_TALENT_NODES
     : CHOSEN_TALENT_NODES.filter(node => node.id !== "healthy-mind").map(node => {
       if (node.id === "favored-by-fate") return { ...node, maxLevel: 2 };
@@ -366,13 +443,15 @@ export function getDesignedTalentNodes(roleId: RoleId): readonly DesignedTalentN
   if (roleId === "genius-reversed" && !usesGameplayRulesFrom("20261023-r33")) return LEGACY_GENIUS_REVERSED_TALENT_NODES;
   if (roleId === "genius-reversed" && !usesGameplayRulesFrom("20261023-r40")) return R33_GENIUS_REVERSED_TALENT_NODES;
   if (roleId === "normal-reversed" && !usesGameplayRulesFrom("20261023-r40")) {
-    return NORMAL_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
+    return R48_NORMAL_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
       const previous = node.id === "post-phd-recovery" ? { ...node, maxLevel: 2 }
         : node.id === "post-phd-growth" ? { ...node, cost: 1 } : node;
       return !usesGameplayRulesFrom("20261023-r32") && ["restful-idle", "post-phd-recovery", "post-phd-growth", "year-summary-recovery"].includes(node.id)
         ? { ...previous, cost: 2 } : previous;
     });
   }
+  if (roleId === "normal-reversed" && !usesGameplayRulesFrom("20261024-r49")) return R48_NORMAL_REVERSED_TALENT_NODES;
+  if (roleId === "normal-reversed" && !usesGameplayRulesFrom("20261024-r51")) return R50_NORMAL_REVERSED_TALENT_NODES;
   if (roleId === "chosen" && !usesGameplayRulesFrom("20261023-r31")) {
     return chosenNodes.map((node): DesignedTalentNode => {
       if (node.id === "lasting-fortune") return { ...node, tier: 1, column: "2", effect: "科研、社交、导师好感增长抵抗降低20个百分点/级", prerequisiteIds: ["favored-by-fate"] };

@@ -31,6 +31,10 @@ export function getPlayerResistanceReduction(state: GameState, stat: PlayerAttri
   if (usesGameplayRulesFrom("20261023-r40") && rawChange > 0 && state.selectedRoleId === "genius-reversed" && stat === "research") return getRoleTalentLevel(state, "research-resilience") * 0.1;
   if (rawChange > 0 && state.selectedRoleId === "genius" && stat === "research") return state.roleTalents?.researchGrowthResistanceReduction ?? 0;
   if (rawChange > 0 && state.selectedRoleId === "teacher-child" && stat === "favor") return getRoleTalentLevel(state, "mentor-expectations") * 0.1;
+  if (usesGameplayRulesFrom("20261024-r52") && state.selectedRoleId === "teacher-child-reversed" && stat === "favor") {
+    const resistance = getRoleTalentLevel(state, "end-of-grace") * 0.1;
+    return rawChange > 0 ? -resistance : resistance;
+  }
   if (state.selectedRoleId === "chosen" && rawChange > 0) return getRoleTalentLevel(state, "lasting-fortune") * (usesGameplayRulesFrom("20261023-r31") ? 0.1 : 0.2);
   if (state.selectedRoleId !== "chosen-reversed") return 0;
   const reduction = getRoleTalentLevel(state, { research: "reverse-meter-alpha", social: "reverse-meter-beta", favor: "reverse-meter-gamma" }[stat]) * 0.1;

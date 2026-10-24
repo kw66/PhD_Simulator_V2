@@ -177,7 +177,14 @@ describe("greed rewards per transaction", () => {
     const nodes = getDesignedTalentNodes("rich-reversed")!;
     expect(nodes.find(n => n.id === "finance-master")?.prerequisiteIds).toEqual(["money-growth"]);
     expect(nodes.find(n => n.id === "investment-acceleration")?.prerequisiteIds).toEqual(["finance-master"]);
-    expect(nodes.find(n => n.id === "spend-to-break-curse")?.prerequisiteIds).toEqual(["finance-master", "coin-game", "post-phd-money-conversion"]);
+    expect(nodes.find(n => n.id === "money-growth")?.cost).toBe(1);
+    expect(nodes.find(n => n.id === "spend-to-break-curse")).toMatchObject({
+      cost: 3, tier: 3, column: "4", row: "2",
+      prerequisiteIds: ["investment-acceleration", "coin-game-comeback", "post-phd-money-conversion"],
+      effect: "累计每消耗50金币，金钱诅咒重置值+1",
+    });
+    expect(withGameplayRuleset("20261024-r53", () => getDesignedTalentNodes("rich-reversed"))?.find(n => n.id === "spend-to-break-curse"))
+      .toMatchObject({ tier: 2, column: "3", row: "2", prerequisiteIds: ["finance-master", "coin-game", "post-phd-money-conversion"] });
     expect(withGameplayRuleset("20261023-r44", () => getDesignedTalentNodes("rich-reversed"))?.find(n => n.id === "finance-master")?.prerequisiteIds).toEqual(["post-phd-money-conversion"]);
   });
 });

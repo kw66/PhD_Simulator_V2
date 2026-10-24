@@ -185,9 +185,9 @@ describe("v2 research rule details and publication metrics", () => {
 
   it("explains alternating fellow research, monthly review work and experiment retries", () => {
     const help = getHelpText({ activePlayTab: "relationship" });
-    expect(help).toContain("次月开始科研；科研成功后，下月做项目");
-    expect(help).toContain("审稿3个月，等待时继续做项目");
-    expect(help).toContain("中稿当月开新稿，退稿当月继续修改");
+    expect(help).toContain("次月起论文月与项目月交替");
+    expect(help).toContain("论文月自己的稿件在审时，随机帮助一位有草稿的同学");
+    expect(help).toContain("中稿开新稿，退稿后修改，均不重置月序");
     expect(getHelpPageText({ activePlayTab: "relationship" }, "科研经费"))
       .toContain("同学做项目时，月初经费<60选横向，否则选纵向");
     expect(help).toContain("同学实验先用经费，不足差额用钱包；两者都不足则改做横向");
@@ -207,7 +207,7 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("满100互助，加分为⌊帮助者科研⌋");
     expect(help).toContain("无可修改论文时，双方各暂存一次帮助");
     expect(help).toContain("达到参考分后优先投A，其次B、C");
-    expect(help).toContain("你实际帮助过才会署名；成果与引用计入玩家，科研分不计");
+    expect(help).toContain("你实际参与的论文才计入你的成果与引用，科研分不计");
     expect(help).not.toMatch(/自动推进=⌊默契⌋|每次为⌊默契⌋/);
   });
 
@@ -293,7 +293,8 @@ describe("v2 research rule details and publication metrics", () => {
     expect(help).toContain("离校后保留钱包与论文责任");
     expect(help).toContain("预留生活费与一次实验费用后");
     expect(help).toContain("择优订阅AI，每月一种");
-    expect(help).toContain("AI只作用于自己的论文，不影响协作");
+    expect(help).toContain("AI用于同学当次论文操作，也可帮助其他同学的草稿");
+    expect(help).toContain("协作条满奖励不受AI影响");
     expect(help).toContain("不再发工资或购买AI");
     expect(help).not.toMatch(/报销预留|小数累计|经费净增55|经费≤0|下月加薪|每级\+|金额四舍五入/);
   });

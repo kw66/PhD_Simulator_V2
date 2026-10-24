@@ -9,7 +9,7 @@ import { getLabPayroll, settleLabPayroll } from "./v2-lab-payroll";
 import { MONTHLY_LIVING_COST } from "./v2-content";
 import { settleFellowAcademicYear } from "./v2-fellow-lifecycle";
 import { settleLabResearchGrowth } from "./v2-lab-talent";
-import { settleRoleTalentMonthEnd, settleRoleTalentMonthStart, settleRoleTalentYearEnd } from "./v2-role-talent-lifecycle";
+import { FANTASY_CURSE_TARGETS, settleRoleTalentMonthEnd, settleRoleTalentMonthStart, settleRoleTalentYearEnd } from "./v2-role-talent-lifecycle";
 import { settleScheduledActionBuffs } from "./v2-study-fatigue";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { settleGreedCoinGames } from "./v2-role-talent-greed";
@@ -21,7 +21,7 @@ import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
 import { getCalendarForTotalMonths, isPreEnrollmentState } from "./v2-progression";
-import { applyPlayerAttributeChange } from "./v2-player-attributes";
+import { applyPlayerAttributeChange, getPlayerAttributeCap } from "./v2-player-attributes";
 import { quoteSanPayment } from "./v2-role-talent-costs";
 import { settleRoleTalentInvestments } from "./v2-role-talent-investments";
 import { getFellowName } from "./v2-fellow-progression";
@@ -736,8 +736,10 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
     if (Object.keys(stats).length > 0) lifecycleItems.push({ id, name, source: "角色天赋", stats, appliedStats: { ...stats } });
   };
   observe(state, inherited, "annual-lab-growth", "实验室传承");
+  const hasRotatingCapCurse = usesGameplayRulesFrom("20261024-r50") && state.selectedRoleId === "chosen-reversed";
   observe(inherited, annual, "annual-role-growth", state.selectedRoleId === "normal" ? "厚积薄发"
-    : state.selectedRoleId === "genius" ? "学而不倦" : "齐头并进");
+    : state.selectedRoleId === "normal-reversed" ? "岁岁有成"
+    : state.selectedRoleId === "genius" ? "学而不倦" : hasRotatingCapCurse ? "渐入佳境" : "齐头并进");
   if (yearEnd.sanCap > annual.sanCap) lifecycleItems.push({
     id: "monthly-role-idle-cap", name: "日渐圆润", source: "角色天赋", stats: {}, appliedStats: {},
     label: `SAN上限 +${yearEnd.sanCap - annual.sanCap}`, note: "月末未使用常规行动",
@@ -753,14 +755,32 @@ export function previewNextMonthEffects(state: GameState): MonthlyEffectResoluti
   // Preview deterministic effects only. Sampling a random permutation here
   // would change the tooltip on every render and could promise a false result.
   const nextMonthState = settleScheduledActionBuffs(settleRoleTalentMonthStart(settleCurseMonthStart(beforeMonthlyTalents, false), undefined, { skipSwaps: true }));
-  const hasRandomStagnation = state.selectedRoleId === "social-reversed" && (yearEnd.roleTalents?.socialStagnantMonths ?? 0) >= 2;
-  if (!hasRandomStagnation) observe(beforeMonthlyTalents, nextMonthState, "monthly-role-growth", state.selectedRoleId === "normal"
+  const hasFixedStagnation = usesGameplayRulesFrom("20261024-r49") && state.selectedRoleId === "social-reversed"
+    && (yearEnd.roleTalents?.socialStagnantMonths ?? 0) >= 4;
+  const hasRandomStagnation = !usesGameplayRulesFrom("20261024-r49") && state.selectedRoleId === "social-reversed"
+    && (yearEnd.roleTalents?.socialStagnantMonths ?? 0) >= 2;
+  if (!hasRandomStagnation) observe(beforeMonthlyTalents, nextMonthState, hasFixedStagnation ? "monthly-role-stagnation" : "monthly-role-growth", hasFixedStagnation ? "患得患失" : state.selectedRoleId === "normal"
     ? nextTotalMonths === 2 ? "满怀干劲" : "满怀干劲+"
     : state.selectedRoleId === "chosen" ? "否极泰来" : state.selectedRoleId === "special-fading-genius" ? "天才迟暮" : state.selectedRoleId === "rich-reversed" ? "金钱诅咒" : "命运反噬");
   if (hasRandomStagnation) lifecycleItems.push({
     id: "monthly-role-stagnation", name: "患得患失", source: "角色天赋", stats: {}, appliedStats: {},
     label: "科研/好感随机 -1", note: "患得患失：月初科研或导师好感随机降低1点，受抵抗影响",
   });
+  if (hasRotatingCapCurse && nextTotalMonths > 1) {
+    const target = FANTASY_CURSE_TARGETS[(nextTotalMonths - 2) % FANTASY_CURSE_TARGETS.length]!;
+    const capStat = target === "researchCap" ? "research" : target === "socialCap" ? "social" : target === "favorCap" ? "favor" : null;
+    if (target === "sanCap" || capStat) {
+      const name = target === "sanCap" ? "SAN上限" : { research: "科研上限", social: "社交上限", favor: "导师好感上限" }[capStat!];
+      const before = target === "sanCap" ? beforeMonthlyTalents.sanCap : getPlayerAttributeCap(beforeMonthlyTalents, capStat!);
+      const after = target === "sanCap" ? nextMonthState.sanCap : getPlayerAttributeCap(nextMonthState, capStat!);
+      const delta = roundAttribute(after - before);
+      lifecycleItems.push({
+        id: "monthly-role-curse-cap", name: "命运反噬", source: "角色天赋", stats: {}, appliedStats: {},
+        label: delta < 0 ? `${name} ${delta}` : `${name}不变（已达下限）`,
+        note: `下月初${name}：${roundAttribute(before)}→${roundAttribute(after)}`,
+      });
+    }
+  }
   if (nextMonthState.sanCap > beforeMonthlyTalents.sanCap) lifecycleItems.push({
     id: "monthly-role-san-cap", name: "触底反弹", source: "角色天赋", stats: {}, appliedStats: {},
     label: `SAN上限 +${nextMonthState.sanCap - beforeMonthlyTalents.sanCap}`,

@@ -61,21 +61,26 @@ describe("rewinder annual event display", () => {
     expect(growth).not.toMatch(/参会|实习|联培|undefined/);
   });
 
-  it("keeps the four compact read-only abilities available inside a run", () => {
+  it("shows six academic-year avatars and the consolidated special rule inside a run", () => {
     const html = renderApp(fixture(), undefined, { activePlayTab: "talent", activeTalentTab: "character" });
-    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
+    expect(html.match(/data-rewinder-year=/g)).toHaveLength(6);
+    expect(html).toContain('data-rewinder-special="true"');
     expect(html).not.toContain("玩法待实装");
     expect(html).not.toContain("暂无角色天赋树");
   });
 
-  it("keeps the special rule in the first row without the universal event ability", () => {
-    const html = renderRewinderPreview(3, 12);
-    const nodes = html.match(/<button[^>]*data-rewinder-rule="\d+"[^>]*>/g)!;
-    expect(nodes).toHaveLength(4);
-    expect(nodes[3]).toContain('data-ui-talent-tree-node="0-3"');
-    expect(nodes[3]).toContain('grid-column:4;grid-row:1');
-    expect(nodes[3]).toContain('aria-pressed="true"');
+  it("merges the three inheritance rules into the right-side special node", () => {
+    const html = renderRewinderPreview(6, 12);
+    const special = html.match(/<button[^>]*data-rewinder-special="true"[^>]*>/)?.[0] ?? "";
+    expect(html.match(/data-rewinder-year=/g)).toHaveLength(6);
+    expect(special).toContain('data-ui-talent-tree-node="0-6"');
+    expect(special).toContain('grid-column:4;grid-row:1');
+    expect(special).toContain('aria-pressed="true"');
     expect(html).toContain("第12次轮回");
+    expect(html).toContain("属性轮回：属性取本年最佳");
+    expect(html).toContain("天赋轮回：成长与永久效果保留");
+    expect(html).toContain("人际轮回：人际与成果随档案延续");
+    expect(html).toContain("每次挑战一个学年，8月归档，9月承接上一年成果");
     expect(html).not.toContain("局内轮回");
     expect(html).not.toContain("事件可回退");
     expect(html).not.toContain("结果固定");

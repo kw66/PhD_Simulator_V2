@@ -5,6 +5,7 @@ import { createStartedGameState } from "../src/core/v2-engine-state-factory";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { CAPTAIN_PREREQUISITE_ROLE_IDS, reconcileAccountRoleUnlocks } from "../src/core/v2-account-role-unlocks";
 import { getTalentPointBalance, getTalentUpgradeReason, sanitizeRoleTalentAllocation } from "../src/core/v2-role-talent-definitions";
+import { getRoleChibiPortraitUrl } from "../src/app/v2-role-portrait-assets";
 
 function captainAccount() {
   const account = createDefaultAccountProfile();
@@ -31,7 +32,9 @@ describe("统御者 passive label display", () => {
     expect(html.match(/data-tag-role-id=/g)).toHaveLength(6);
     CAPTAIN_PREREQUISITE_ROLE_IDS.forEach((roleId, index) => {
       expect(html).toContain(`data-tag-role-id="${roleId}" data-current-level="${index * 2}"`);
+      expect(html).toContain(`<img class="special-role-avatar" src="${getRoleChibiPortraitUrl(roleId)}" alt="" aria-hidden="true">`);
     });
+    expect(html.match(/class="lobby-talent-tree-node-ring special-role-avatar-ring"/g)).toHaveLength(6);
     expect(html).toContain('data-detail-index="4">');
     expect(html).toContain("导师子女 Lv8");
     expect(html).not.toContain('data-ui-talent-reset=');

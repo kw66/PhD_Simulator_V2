@@ -13,19 +13,26 @@ function memoryStorage() {
 }
 
 describe("role talent allocation", () => {
-  it("supports playful half-point loss ranks, five initial cap reductions and four coin refill ranks", () => {
-    const allocation = { "favor-reset": 1, "reset-coins": 4, "lower-favor-reset": 4, "favor-reset-decrease": 5 };
+  it("supports the revised playful cap, resistance and four coin refill ranks", () => {
+    const allocation = { "favor-reset": 2, "reset-research": 1, "reset-coins": 4, "lower-favor-reset": 4, "end-of-grace": 3 };
     expect(sanitizeRoleTalentAllocation("teacher-child-reversed", 10, allocation)).toEqual(allocation);
     expect(getTalentPointBalance("teacher-child-reversed", 10, allocation)).toBe(5);
-    expect(sanitizeRoleTalentAllocation("teacher-child-reversed", 10, { ...allocation, "reset-coins": 5, "lower-favor-reset": 5, "favor-reset-decrease": 6 })).toEqual(allocation);
+    expect(sanitizeRoleTalentAllocation("teacher-child-reversed", 10, { ...allocation, "favor-reset": 3, "reset-coins": 5, "lower-favor-reset": 5, "end-of-grace": 4 })).toEqual(allocation);
     const nodes = getDesignedTalentNodes("teacher-child-reversed")!;
-    expect(nodes.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(35);
+    expect(nodes.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(27);
     expect(nodes.find(node => node.id === "reset-research-cap")?.cost).toBe(1);
     expect(nodes.find(node => node.id === "reset-social-cap")?.cost).toBe(1);
+    expect(nodes.find(node => node.id === "favor-reset")).toMatchObject({ name: "恩断义绝", cost: 1, maxLevel: 2 });
+    expect(nodes.find(node => node.id === "end-of-grace")).toMatchObject({ name: "得寸进尺", cost: 1, maxLevel: 3 });
+    expect(nodes.some(node => node.id === "favor-reset-decrease")).toBe(false);
     withGameplayRuleset("20261023-r43", () => {
       const old = getDesignedTalentNodes("teacher-child-reversed")!;
       expect(old.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(36);
       expect(old.find(node => node.id === "lower-favor-reset")).toMatchObject({ cost: 3, maxLevel: 2 });
+    });
+    withGameplayRuleset("20261024-r51", () => {
+      const old = getDesignedTalentNodes("teacher-child-reversed")!;
+      expect(old.find(node => node.id === "favor-reset-decrease")).toMatchObject({ maxLevel: 5, effect: "导师好感上限-1/级" });
     });
   });
 
@@ -38,7 +45,7 @@ describe("role talent allocation", () => {
     }
     expect(getTalentUpgradeReason("chosen-reversed", 10, { "attribute-swap": 1 }, "post-phd-swap")).not.toBeNull();
     expect(getTalentUpgradeReason("chosen-reversed", 10, { "group-event-focus": 1 }, "swap-breaks-cap")).not.toBeNull();
-    expect(getDesignedTalentNodes("chosen-reversed")!.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(36);
+    expect(getDesignedTalentNodes("chosen-reversed")!.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(37);
     withGameplayRuleset("20261023-r42", () => {
       const nodes = getDesignedTalentNodes("chosen-reversed")!;
       expect(nodes.find(node => node.id === "post-phd-swap")?.prerequisiteIds).toEqual(["attribute-swap", "san-money-swap"]);
@@ -51,20 +58,20 @@ describe("role talent allocation", () => {
     for (const root of ["peer-event-focus", "junior-event-focus", "senior-event-focus"]) {
       const allocation = { [root]: 1, "affinity-conversion": 1 };
       expect(sanitizeRoleTalentAllocation("social-reversed", 0, allocation)).toEqual(allocation);
-      expect(getTalentPointBalance("social-reversed", 0, allocation)).toBe(5);
+      expect(getTalentPointBalance("social-reversed", 0, allocation)).toBe(7);
       for (const branch of [
         { "fellow-add-social": 1, "social-to-san": 3 },
         { "fellow-remove-social": 1, "social-loss-coins": 3 },
       ] as Record<string, number>[]) {
         expect(sanitizeRoleTalentAllocation("social-reversed", 0, { ...allocation, ...branch })).toEqual({ ...allocation, ...branch });
-        expect(getTalentPointBalance("social-reversed", 0, { ...allocation, ...branch })).toBe(0);
+        expect(getTalentPointBalance("social-reversed", 0, { ...allocation, ...branch })).toBe(3);
       }
     }
     expect(getTalentUpgradeReason("social-reversed", 0, { "fellow-add-social": 1 }, "social-to-san")).toBeNull();
     expect(getTalentUpgradeReason("social-reversed", 0, { "fellow-remove-social": 1 }, "social-loss-coins")).toBeNull();
     expect(getTalentUpgradeReason("social-reversed", 0, {}, "affinity-conversion")).not.toBeNull();
     expect(getTalentUpgradeReason("social-reversed", 0, {}, "fellow-add-social")).not.toBeNull();
-    expect(getDesignedTalentNodes("social-reversed")!.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(30);
+    expect(getDesignedTalentNodes("social-reversed")!.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(31);
     withGameplayRuleset("20261023-r40", () => {
       const nodes = getDesignedTalentNodes("social-reversed")!;
       expect(nodes.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(42);
@@ -189,10 +196,10 @@ describe("role talent allocation", () => {
       "coffee-lifeline": 3, "year-summary-recovery": 1 };
     for (const allocation of [growth, recovery]) {
       expect(sanitizeRoleTalentAllocation("normal-reversed", 0, allocation)).toEqual(allocation);
-      expect(getTalentPointBalance("normal-reversed", 0, allocation)).toBe(0);
+      expect(getTalentPointBalance("normal-reversed", 0, allocation)).toBe(1);
     }
-    expect(getTalentUpgradeReason("normal-reversed", 0, growth, "restful-idle")).toBe("天赋点不足");
-    expect(getTalentUpgradeReason("normal-reversed", 0, recovery, "restful-idle")).toBe("天赋点不足");
+    expect(getTalentUpgradeReason("normal-reversed", 0, growth, "restful-idle")).toBeNull();
+    expect(getTalentUpgradeReason("normal-reversed", 0, recovery, "restful-idle")).toBeNull();
     const nodes = getDesignedTalentNodes("normal-reversed")!;
     expect(nodes.reduce((sum, node) => sum + node.cost * node.maxLevel, 0)).toBe(34);
     expect(nodes.find(node => node.id === "post-phd-growth")).toMatchObject({ cost: 2, maxLevel: 2 });
@@ -207,7 +214,7 @@ describe("role talent allocation", () => {
 
   it("preserves sloth talent budgets in r31 recordings", () => {
     const allocation = { "monthly-san-recovery": 3, "restful-idle": 1, "coffee-lifeline": 2 };
-    expect(getTalentPointBalance("normal-reversed", 0, allocation)).toBe(1);
+    expect(getTalentPointBalance("normal-reversed", 0, allocation)).toBe(4);
     withGameplayRuleset("20261023-r31", () => {
       expect(sanitizeRoleTalentAllocation("normal-reversed", 0, allocation)).toEqual(allocation);
       expect(getTalentPointBalance("normal-reversed", 0, allocation)).toBe(0);

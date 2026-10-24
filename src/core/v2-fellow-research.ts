@@ -20,6 +20,8 @@ import { advanceSharedLabProject, LAB_PROJECT_VERTICAL_FUNDING_THRESHOLD } from 
 import { settleAdvisorGuidance } from "./v2-advisor-guidance";
 import { settleConferenceRegistrationFees, settleFellowConferenceFees } from "./v2-lab-publication-costs";
 import { getCaptainLevel, isCaptain } from "./v2-captain-state";
+import { settleFellowPaperRejection } from "./v2-lab-talent";
+import { addPaperCollaboration } from "./v2-paper-collaboration";
 import type { GameState, Paper, PaperActionType, PaperTarget } from "./v2-types";
 
 export const FELLOW_PAPER_FIELDS = ["idea", "experiment", "writing"] as const;
@@ -76,7 +78,7 @@ export function ensureFellowPapers(state: GameState, random: () => number = game
     ...state,
     fellowPapers: [...(state.fellowPapers ?? []), ...added],
     fellowProgressState: state.fellowProgressState.map((profile) => missing.some((entry) => entry.id === profile.id)
-      ? { ...profile, nextMonthlyAction: "research" } : profile),
+      ? { ...profile, nextMonthlyAction: usesGameplayRulesFrom("20261024-r50") ? profile.nextMonthlyAction ?? "research" : "research" } : profile),
   };
 }
 
@@ -138,10 +140,12 @@ export function advanceFellowResearch(state: GameState, random: () => number = g
       if (result.nextPaper.status !== "published") {
         if (profile) {
           addActivity(profile.id, "论文退稿");
-          nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id
+          if (!usesGameplayRulesFrom("20261024-r50")) nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id
             ? { ...fellow, nextMonthlyAction: "research" } : fellow) };
         }
-        return [applyRejectedPaperReview(paper, result.nextPaper.lastReview!)];
+        const rejectedPaper = applyRejectedPaperReview(paper, result.nextPaper.lastReview!);
+        nextState = settleFellowPaperRejection(nextState, paper, rejectedPaper);
+        return [rejectedPaper];
       }
       if (profile && usesGameplayRulesFrom("20261023-r38")) {
         const current = nextState.fellowProgressState.find(entry => entry.id === profile.id)!;
@@ -232,33 +236,67 @@ export function advanceFellowResearch(state: GameState, random: () => number = g
       if (nextState.selectedAdvisorName && nextState.advisorProgressState.funding < 0) break;
       const profile = nextState.fellowProgressState.find((fellow) => fellow.id === active.id)!;
       let paper = getFellowCurrentPaper(nextState, profile.id);
-      if (isFellowProjectApprentice(nextState, profile) || !paper || paper.status !== "draft" || profile.nextMonthlyAction === "project") {
+      const peerHelpMonth = usesGameplayRulesFrom("20261024-r50") && paper?.status === "reviewing";
+      if (isFellowProjectApprentice(nextState, profile) || !paper || (!peerHelpMonth && paper.status !== "draft") || profile.nextMonthlyAction === "project") {
         advanceProject(profile);
         continue;
       }
+      let helpedFellow: typeof profile | undefined;
+      if (peerHelpMonth) {
+        const candidates = getFellowsInCardOrder(nextState.fellowProgressState).filter((fellow) => fellow.id !== profile.id)
+          .map((fellow) => ({ fellow, paper: getFellowCurrentPaper(nextState, fellow.id) }))
+          .filter((entry): entry is { fellow: typeof profile; paper: Paper } => entry.paper?.status === "draft" && entry.paper.nonFirstAuthor !== true);
+        if (!candidates.length) {
+          nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id
+            ? { ...fellow, nextMonthlyAction: "project" } : fellow) };
+          addActivity(profile.id, "论文月暂无可帮助的同学论文");
+          continue;
+        }
+        const selected = candidates[Math.min(candidates.length - 1, Math.max(0, Math.floor(random() * candidates.length)))]!;
+        helpedFellow = selected.fellow;
+        paper = selected.paper;
+      }
       const field = getFellowResearchAction(paper);
-      const subscription = subscribeFellowAi(nextState, profile.id, paper.id, field);
+      const beforeSubscription = paper;
+      const subscription = subscribeFellowAi(nextState, profile.id, paper.id, field, !!helpedFellow);
       nextState = subscription.state;
-      paper = getFellowCurrentPaper(nextState, profile.id)!;
+      paper = nextState.fellowPapers!.find((entry) => entry.id === beforeSubscription.id)!;
       if (subscription.subscribed && subscription.model) {
         const priceLabel = subscription.model.price === 0 ? "免费" : `自费 -${subscription.model.price}`;
         addActivity(profile.id, `订阅${subscription.model.name}（${priceLabel}）${subscription.model.slot === "claude" ? "，论文打磨" : ""}`);
+      }
+      if (helpedFellow && subscription.subscribed && subscription.model?.slot === "claude") {
+        const polish = FELLOW_PAPER_FIELDS.filter((key) => paper![key] > beforeSubscription[key])
+          .map((key) => `${key === "idea" ? "idea" : key === "experiment" ? "实验" : "写作"} +${paper![key] - beforeSubscription[key]}`).join("、");
+        if (polish) {
+          addActivity(profile.id, `帮助${getFellowName(helpedFellow)}打磨《${paper.title}》：${polish}`);
+          addActivity(helpedFellow.id, `${getFellowName(profile)}帮助打磨《${paper.title}》：${polish}`);
+        }
       }
       const experimentCost = getLabExperimentMoneyCost(nextState);
       let experimentPayment = "";
       if (field === "experiment") {
         const payment = payFellowResearchCost(nextState, profile.id, experimentCost);
         if (!payment.paid) {
-          advanceProject(profile, true);
+          if (helpedFellow) {
+            nextState = { ...nextState, fellowProgressState: nextState.fellowProgressState.map((fellow) => fellow.id === profile.id
+              ? { ...fellow, nextMonthlyAction: "project" } : fellow) };
+            addActivity(profile.id, `帮助${getFellowName(helpedFellow)}的论文实验经费不足，未推进`);
+          } else advanceProject(profile, true);
           continue;
         }
         nextState = payment.state;
         experimentPayment = `（经费 -${payment.labCost}${payment.personalCost > 0 ? `，自费 -${payment.personalCost}` : ""}）`;
       }
-      const updated = applyFellowAiResearch(paper, field, profile.research, subscription.model, random);
-      const gain = updated[field] - paper[field];
+      const researched = applyFellowAiResearch(paper, field, profile.research, subscription.model, random);
+      const gain = researched[field] - paper[field];
+      const updated = helpedFellow ? addPaperCollaboration(paper, { paperId: paper.id,
+        collaborator: { id: profile.id, name: getFellowName(profile) }, scores: { [field]: gain } }) : researched;
       const label = field === "idea" ? "idea" : field === "experiment" ? "实验" : "写作";
-      addActivity(profile.id, `${paper.createdTotalMonths === state.totalMonths ? "新稿" : "论文"}${label} +${gain}${experimentPayment}`);
+      if (helpedFellow) {
+        addActivity(profile.id, `帮助${getFellowName(helpedFellow)}完善《${paper.title}》：${label} +${gain}${experimentPayment}`);
+        addActivity(helpedFellow.id, `${getFellowName(profile)}帮助完善《${paper.title}》：${label} +${gain}`);
+      } else addActivity(profile.id, `${paper.createdTotalMonths === state.totalMonths ? "新稿" : "论文"}${label} +${gain}${experimentPayment}`);
       nextState = {
         ...nextState,
         fellowPapers: nextState.fellowPapers?.map((entry) => entry.id === paper.id ? updated : entry),

@@ -168,7 +168,7 @@ describe("role talent lifecycle", () => {
     expect(settleRoleTalentMonthEnd({ ...state, totalMonths: 0 }).sanCap).toBe(state.sanCap);
   });
 
-  it("limits 日渐圆润 to twenty self-generated SAN cap points", () => {
+  it("preserves the r48 twenty-point 日渐圆润 cap", () => withGameplayRuleset("20261024-r48", () => {
     let state = month(run("normal-reversed", { "san-cap-reserve": 1 }), 1);
     state.roleTalents = { ...state.roleTalents!, regularActionBudget: 25, regularActionsSpent: 0 };
     state = settleRoleTalentMonthEnd(state);
@@ -179,7 +179,7 @@ describe("role talent lifecycle", () => {
     } });
     expect(next.sanCap).toBe(35);
     expect(next.roleTalents?.sanCapReserveBonus).toBe(20);
-  });
+  }));
 
   it("reversed genius opens extra slots and counts only published first-author papers at transfer", () => {
     const before = createStartedGameState("genius-reversed", { "paper-opening": 3, "learning-from-rejection": 1, "research-network": 1 });
@@ -220,16 +220,24 @@ describe("role talent lifecycle", () => {
     } else expect(next.player.research).toBe(before.player.research + 3);
   });
 
-  it("reversed teacher static favor cap reduction happens once and respects minimum six", () => {
+  it("preserves the previous teacher-child reversed cap reduction in r51 recordings", () => withGameplayRuleset("20261024-r51", () => {
     const state = run("teacher-child-reversed", { "favor-reset-decrease": 4 });
     const next = initializeRoleTalents(state);
     expect(getPlayerAttributeCap(next, "favor")).toBe(16);
     expect(initializeRoleTalents(next)).toBe(next);
     const low = initializeRoleTalents({ ...state, roleTalents: { levels: state.roleTalents!.levels, capBonuses: { favor: -12 } } });
     expect(getPlayerAttributeCap(low, "favor")).toBe(6);
+  }));
+
+  it("uses the current teacher-child reversed cap talent and keeps initialization idempotent", () => {
+    const state = run("teacher-child-reversed", { "favor-reset": 2 });
+    const next = initializeRoleTalents(state);
+    expect(getPlayerAttributeCap(next, "favor")).toBe(12);
+    expect(withGameplayRuleset("20261024-r52", () => getPlayerAttributeCap(initializeRoleTalents(state), "favor"))).toBe(10);
+    expect(initializeRoleTalents(next)).toBe(next);
   });
 
-  it("social stagnation counts complete months including September, resets on any actual social movement", () => {
+  it("preserves r48 two-month social stagnation and reset timing", () => withGameplayRuleset("20261024-r48", () => {
     const state = run("social-reversed", {});
     const september = settleRoleTalentMonthEnd(month(state, 1));
     expect(september.roleTalents?.socialStagnantMonths).toBe(1);
@@ -242,7 +250,7 @@ describe("role talent lifecycle", () => {
     const changed = settleRoleTalentMonthEnd({ ...november, roleTalents: { ...november.roleTalents!, socialChangedMonth: 3 } });
     expect(changed.roleTalents?.socialStagnantMonths).toBe(0);
     expect(settleRoleTalentMonthStart(month(changed, 4), () => 0).player.research).toBe(changed.player.research);
-  });
+  }));
   it("initial bonuses and permanent action buffs apply only once", () => {
     const state = run("genius", { "innate-insight": 4, "idea-insight": 2, "experiment-practice": 3, "writing-mastery": 1 });
     const next = initializeRoleTalents(state);
@@ -646,7 +654,8 @@ describe("role talent lifecycle", () => {
     const original = structuredClone(state);
     const next = settleRoleTalentMonthStart(state, () => { throw new Error("preview must not roll"); }, { skipSwaps: true });
     expect(next.player.research).toBe(state.player.research);
-    expect(next.player.san).toBe(state.player.san - 1);
+    expect(next.player.san).toBe(state.player.san);
+    expect(next.sanCap).toBe(state.sanCap - 1);
     expect(next.log[0]!.text).toContain("命运反噬");
     expect(next.eventQueue).toEqual(state.eventQueue);
     expect(state).toEqual(original);
@@ -664,7 +673,8 @@ describe("role talent lifecycle", () => {
     expect(legacy.player.research).toBeCloseTo(10.8);
     expect(legacy.player.social).toBeCloseTo(1.2);
     expect(legacy.player.favor).toBeCloseTo(14.8);
-    expect(next.player.san).toBe(9);
+    expect(next.player.san).toBe(10);
+    expect(next.sanCap).toBe(state.sanCap - 1);
     expect(state.player.research).toBe(18);
     expect(settleRoleTalentMonthStart(next, () => 0)).toBe(next);
   });
@@ -674,23 +684,23 @@ describe("role talent lifecycle", () => {
     state.player.san = 10;
     state.player.money = 50;
     const next = settleRoleTalentMonthStart(month(state, 2), () => 0);
-    expect(next.player.san).toBe(49);
+    expect(next.player.san).toBe(50);
     expect(next.player.money).toBe(10);
-    expect(next.sanCap).toBe(state.sanCap);
+    expect(next.sanCap).toBe(state.sanCap - 1);
   });
 
   it("swapping x and y twice restores both values regardless of resistance talents", () => {
     for (const rank of [0, 3]) for (const [x, y] of [[1, 20], [6.2, 18.7], [20, 10]]) {
       const state = run("chosen-reversed", { "attribute-swap": 1, "reverse-meter-alpha": rank, "reverse-meter-beta": rank });
       state.player = { ...state.player, research: x!, social: y!, favor: 5 };
-      // Leave favor in place, then exchange research/social. Curse hits SAN, then coins.
+      // Leave favor in place and isolate two swaps on SAN-cap curse months.
       const exchange = (value: GameState, totalMonths: number) => {
         const rolls = [0.99, 0];
         return settleRoleTalentMonthStart(month(value, totalMonths), () => rolls.shift()!);
       };
       const first = exchange(state, 2);
       expect(first.player).toMatchObject({ research: y, social: x, favor: 5 });
-      const restored = exchange(JSON.parse(JSON.stringify(first)), 3);
+      const restored = exchange(JSON.parse(JSON.stringify(first)), 9);
       expect(restored.player).toMatchObject({ research: x, social: y, favor: 5 });
       expect(restored.roleTalents?.growthTotals).toBeUndefined();
       expect(restored.roleTalents?.lossTotals).toBeUndefined();
@@ -705,7 +715,7 @@ describe("role talent lifecycle", () => {
       state.player = { research: 1, social: 18, favor: 6, san: 9, money: 50 };
       const rolls = [0, 0.99, 0.99, 0.99];
       const next = settleRoleTalentMonthStart(month(state, 2), () => rolls.shift()!);
-      expect(next.player).toEqual({ research: uncapped ? 50 : 20, social: 18, favor: 6, san: 8, money: 1 });
+      expect(next.player).toEqual({ research: uncapped ? 50 : 20, social: 18, favor: 6, san: 9, money: 1 });
       expect(next.researchCapacityState).toEqual(state.researchCapacityState);
       expect(next.personalSpending).toBe(state.personalSpending);
     }
@@ -718,7 +728,7 @@ describe("role talent lifecycle", () => {
     let rolls = 0;
     const next = settleRoleTalentMonthStart(month(state, 2), () => { rolls++; return 0; });
     expect(rolls).toBe(4);
-    expect(next.player).toEqual({ research: 2, social: 3, favor: 4, san: 49, money: 1 });
+    expect(next.player).toEqual({ research: 2, social: 3, favor: 4, san: 50, money: 1 });
     expect(next.personalSpending).toBe(state.personalSpending);
     expect(next.roleTalents?.growthTotals).toBeUndefined();
     expect(next.roleTalents?.lossTotals).toBeUndefined();
@@ -730,9 +740,9 @@ describe("role talent lifecycle", () => {
     state.player.san = 10;
     state.player.money = 50;
     const next = settleRoleTalentMonthStart(month(state, 2), () => 0);
-    expect(next.player.san).toBe(state.sanCap - 1);
+    expect(next.player.san).toBe(state.sanCap);
     expect(next.player.money).toBe(10);
-    expect(next.sanCap).toBe(state.sanCap);
+    expect(next.sanCap).toBe(state.sanCap - 1);
   });
 
   it("monthly fortune cannot go negative until misfortune talent is active", () => {

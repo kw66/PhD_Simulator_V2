@@ -1072,17 +1072,17 @@ describe("v2 render lobby shell", () => {
 
   it.each([
     ["normal", 9],
-    ["normal-reversed", 10],
+    ["normal-reversed", 11],
     ["rich", 9],
     ["rich-reversed", 9],
     ["genius", 11],
     ["genius-reversed", 11],
     ["teacher-child", 12],
-    ["teacher-child-reversed", 12],
+    ["teacher-child-reversed", 11],
     ["chosen", 11],
-    ["chosen-reversed", 10],
+    ["chosen-reversed", 11],
     ["social", 12],
-    ["social-reversed", 9],
+    ["social-reversed", 11],
   ] as const)("shows only the selected bottom explanation for %s without a side panel or allocation changes", (roleId, count) => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = roleId;
@@ -1131,8 +1131,10 @@ describe("v2 render lobby shell", () => {
     account.selectedLobbyRoleId = roleId;
     const html = renderApp(createInitialState(), account);
     expect(html).toContain('class="lobby-profile-growth-card');
-    expect(html.match(/data-rewinder-rule=/g)).toHaveLength(4);
+    expect(html.match(/data-rewinder-year=/g)).toHaveLength(6);
+    expect(html).toContain('data-rewinder-special="true"');
     for (const category of ["属性轮回", "天赋轮回", "人际轮回", "轮回者 · 特殊"]) expect(html).toContain(category);
+    expect(html).not.toContain("rewinder-year-picker");
     expect(html).not.toContain("局内轮回");
     expect(html).not.toContain("事件可回退");
     expect(html).not.toContain("rewinder-unlock-progress");
@@ -1167,8 +1169,8 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(state, account);
     expect(html).toContain("is-chosen-reversed-tree");
     expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
-    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(10);
-    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(9);
+    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(11);
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(10);
     expect(html).toContain('<path d="M75 160 H225" />');
     expect(html).toContain('<path d="M225 160 H375" />');
     for (const [id, row, column, cost, level, effect, prerequisites, icon] of [
@@ -1177,10 +1179,11 @@ describe("v2 render lobby shell", () => {
       ["post-phd-swap", 2, 3, 3, 1, "转博后每月科研、社交、导师好感、SAN、金币随机排列，不受抵抗影响", "group-event-focus game-event-focus", "rotate-ccw"],
       ["group-event-focus", 1, 2, 2, 4, "组内团建事件出现概率+100%/级", "attribute-swap san-money-swap", "users"],
       ["game-event-focus", 2, 2, 2, 4, "游戏放松事件出现概率+100%/级", "attribute-swap san-money-swap", "gamepad-2"],
-      ["swap-breaks-cap", 2, 4, 4, 1, "属性交换可突破上限", "post-phd-swap", "infinity"],
+      ["swap-breaks-cap", 2, 4, 2, 1, "属性交换可突破上限", "post-phd-swap", "infinity"],
       ["reverse-meter-alpha", 3, 1, 1, 3, "科研增长抵抗-10个百分点/级，下降抵抗+10个百分点/级", "", "brain"],
       ["reverse-meter-beta", 3, 2, 1, 3, "社交增长抵抗-10个百分点/级，下降抵抗+10个百分点/级", "reverse-meter-alpha", "users"],
       ["reverse-meter-gamma", 3, 3, 1, 3, "导师好感增长抵抗-10个百分点/级，下降抵抗+10个百分点/级", "reverse-meter-beta", "heart-handshake"],
+      ["annual-highest-growth", 3, 4, 1, 3, "每学年末，科研、社交、导师好感中的最高项+1/级", "reverse-meter-gamma", "sprout"],
     ] as const) {
       const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
       expect(node).toContain(`style="grid-column:${column};grid-row:${row}"`);
@@ -1192,7 +1195,7 @@ describe("v2 render lobby shell", () => {
     }
     const curse = html.split("<button").find((markup) => markup.includes('data-talent-id="fate-curse"'))?.split("</button>")[0] ?? "";
     expect(curse).toContain('data-lucide="skull"');
-    expect(curse).toContain("SAN、金币、科研、社交、导师好感轮流在月初-1");
+    expect(curse).toContain("SAN上限、科研、社交、导师好感、科研上限、社交上限、好感上限轮流在月初-1");
     expect(curse).not.toContain("lobby-normal-tree-node-level");
     expect(JSON.stringify({ account, state })).toBe(before);
   });
@@ -1205,8 +1208,8 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(state, account);
     expect(html).toContain("is-social-reversed-tree");
     expect(html).toContain('data-prerequisite-mode="any" data-prerequisite-min-level="1"');
-    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(9);
-    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(7);
+    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(11);
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(9);
     for (const path of [
       "M75 32 C145 32 155 96 225 96", "M75 96 H225", "M75 160 C145 160 155 96 225 96",
       "M225 96 H375", "M225 96 C295 96 305 160 375 160",
@@ -1214,13 +1217,15 @@ describe("v2 render lobby shell", () => {
     ]) expect(html).toContain(`<path d="${path}" />`);
     for (const [id, row, column, cost, level, effect, prerequisites] of [
       ["social-to-san", 3, 4, 1, 3, "社交每提升1点，SAN+1/级", "fellow-add-social"],
-      ["fellow-add-social", 3, 3, 2, 2, "人际栏添加同学，社交+1/级", "affinity-conversion"],
+      ["fellow-add-social", 3, 3, 1, 2, "人际栏添加同学，社交+1/级", "affinity-conversion"],
       ["social-loss-coins", 2, 4, 1, 3, "社交每降低1点，金币+1/级", "fellow-remove-social"],
-      ["fellow-remove-social", 2, 3, 2, 2, "人际栏放弃同学，社交-1/级", "affinity-conversion"],
-      ["peer-event-focus", 1, 1, 1, 4, "同门合作事件出现概率+100%/级", ""],
-      ["junior-event-focus", 2, 1, 1, 4, "指导师弟师妹事件出现概率+100%/级", ""],
+      ["fellow-remove-social", 2, 3, 1, 2, "人际栏放弃同学，社交-1/级", "affinity-conversion"],
+      ["peer-event-focus", 2, 1, 1, 4, "同门合作事件出现概率+100%/级", ""],
+      ["junior-event-focus", 1, 1, 1, 4, "指导师弟师妹事件出现概率+100%/级", ""],
       ["senior-event-focus", 3, 1, 1, 4, "师兄师姐指导事件出现概率+100%/级", ""],
-      ["affinity-conversion", 2, 2, 4, 1, "放弃同学时，每点默契依次转为导师好感、科研、SAN上限、好感上限、科研上限+1，循环分配", "peer-event-focus junior-event-focus senior-event-focus"],
+      ["affinity-conversion", 2, 2, 2, 1, "放弃同学时，每点默契依次转为导师好感、科研、SAN上限、好感上限、科研上限+1，循环分配", "peer-event-focus junior-event-focus senior-event-focus"],
+      ["junior-bond", 1, 2, 1, 3, "麻烦师弟师妹默契+1/级", "junior-event-focus"],
+      ["rejection-camaraderie", 3, 2, 2, 2, "每篇参与的同学论文首次被拒，与该同学默契+1/级", "senior-event-focus"],
     ] as const) {
       const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
       expect(node).toContain(`style="grid-column:${column};grid-row:${row}"`);
@@ -1230,7 +1235,7 @@ describe("v2 render lobby shell", () => {
       expect(node).toContain(effect);
     }
     const curse = html.split("<button").find((markup) => markup.includes('data-talent-id="social-stagnation"'))?.split("</button>")[0] ?? "";
-    expect(curse).toContain("连续2个月社交未变化，下月初科研、导师好感随机-1");
+    expect(curse).toContain("连续4个月社交未变化，下月初科研和导师好感-1");
     expect(curse).toContain('data-lucide="skull"');
     expect(curse).toContain('style="grid-column:4;grid-row:1"');
     expect(curse).toContain('data-prerequisite-ids=""');
@@ -1245,13 +1250,13 @@ describe("v2 render lobby shell", () => {
     const before = JSON.stringify({ account, state });
     const html = renderApp(state, account);
     expect(html).toContain("is-teacher-child-reversed-tree");
-    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(12);
-    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(10);
+    expect(html.match(/data-ui-talent-tree-node="0-\d+"/g)).toHaveLength(11);
+    expect(html.split('class="lobby-profile-growth-card')[1]?.match(/<path d=/g)).toHaveLength(9);
     for (const path of [
       "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
       "M225 160 H375", "M225 32 H375",
       "M225 32 C285 32 315 96 375 96", "M225 96 H375", "M225 160 C285 160 315 96 375 96",
-      "M375 96 H525", "M375 96 C445 96 455 160 525 160",
+      "M375 96 H525",
     ]) expect(html).toContain(`<path d="${path}" />`);
     expect(html).not.toContain("M300 32 V160");
     expect(html).toContain('aria-label="耳提面命：');
@@ -1259,16 +1264,15 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toMatch(/class="lobby-talent-tree-node[^>]* title=/);
     for (const [id, row, column, cost, level, effect, prerequisites] of [
       ["advisor-meeting-focus", 1, 1, 1, 4, "导师约谈事件出现概率+100%/级", ""],
-      ["favor-reset", 2, 1, 2, 1, "导师好感低于0时上限-1，好感重置为上限", ""],
+      ["favor-reset", 2, 1, 1, 2, "导师好感上限-4/级", ""],
       ["group-meeting-focus", 3, 1, 1, 4, "组会汇报事件出现概率+100%/级", ""],
       ["reset-research", 3, 2, 2, 1, "导师好感重置时科研+1", "favor-reset"],
       ["reset-social", 1, 2, 2, 1, "导师好感重置时社交+1", "favor-reset"],
       ["reset-coins", 2, 2, 1, 4, "导师好感重置时金币补充到2/级", "favor-reset"],
-      ["favor-reset-decrease", 2, 4, 1, 5, "导师好感上限-1/级", "lower-favor-reset"],
       ["lower-favor-reset", 2, 3, 1, 4, "导师好感下降幅度+0.5/级", "reset-research reset-social reset-coins"],
       ["reset-research-cap", 3, 3, 1, 1, "导师好感重置时科研上限+1", "reset-research"],
       ["reset-social-cap", 1, 3, 1, 1, "导师好感重置时社交上限+1", "reset-social"],
-      ["end-of-grace", 3, 4, 3, 2, "导师好感上限下降幅度+1/级", "lower-favor-reset"],
+      ["end-of-grace", 2, 4, 1, 3, "导师好感增长抵抗+10个百分点/级，下降抵抗-10个百分点/级", "lower-favor-reset"],
     ] as const) {
       const node = html.split("<button").find((markup) => markup.includes(`data-talent-id="${id}"`))?.split("</button>")[0] ?? "";
       expect(node).toContain(`style="grid-column:${column};grid-row:${row}"`);
@@ -1279,7 +1283,8 @@ describe("v2 render lobby shell", () => {
     }
     const curse = html.split("<button").find((markup) => markup.includes('data-talent-id="favor-burden"'))?.split("</button>")[0] ?? "";
     expect(curse).toContain('data-lucide="skull"');
-    expect(curse).toContain("科研、社交视为减少导师好感上限，最低为0；导师好感上限最低为6");
+    expect(curse).toContain("科研、社交实际增长扣减导师好感");
+    expect(curse).toContain("好感低于6时重置为当前上限，并使上限+1");
     expect(curse).not.toContain("lobby-normal-tree-node-level");
     expect(html).toContain('data-prerequisite-mode="any"');
     expect(JSON.stringify({ account, state })).toBe(before);
@@ -1349,7 +1354,7 @@ describe("v2 render lobby shell", () => {
     for (const [id, name, tier, column, row, prerequisite] of [
       ["money-growth", "聚沙成塔", "0", "1", "1", ""],
       ["loss-to-money", "因祸得财", "0", "1", "3", ""],
-      ["spend-to-break-curse", "破财消灾", "2", "3", "2", "finance-master coin-game post-phd-money-conversion"],
+        ["spend-to-break-curse", "破财消灾", "3", "4", "2", "investment-acceleration coin-game-comeback post-phd-money-conversion"],
       ["post-phd-money-conversion", "钱能通神", "1", "2", "2", "money-growth loss-to-money"],
       ["finance-master", "理财能手", "1", "2", "1", "money-growth"],
       ["coin-game", "金币游戏", "1", "2", "3", "loss-to-money"],
@@ -1363,6 +1368,8 @@ describe("v2 render lobby shell", () => {
     expect(tree).toContain("投资回报周期-1个月/级");
     expect(tree).toContain("转博后，每笔消费按金额随机分配，提升SAN、三项属性及三项属性上限");
     expect(tree).toContain("三项属性每减少1点，金币50%变为1.5倍、50%变为0.4倍；整轮结算，净亏损计消费");
+      expect(tree).toContain("聚沙成塔：每月金币+1/级，1天赋点");
+      expect(tree).toContain("破财消灾：累计每消耗50金币，金钱诅咒重置值+1，3天赋点");
     expect(tree).toContain("金币游戏失败后的倍率+0.05/级");
     const comeback = tree.split("<button").find((markup) => markup.includes('data-talent-id="coin-game-comeback"'))?.split("</button>")[0] ?? "";
     expect(comeback).toContain('data-cost="1"');
@@ -1378,18 +1385,22 @@ describe("v2 render lobby shell", () => {
     const html = renderApp(createInitialState(), account);
     const tree = html.match(/<div class="lobby-talent-tree is-designed-tree is-normal-reversed-tree(?: is-fixed-tree)?" role="group" aria-label="天赋树预览"[\s\S]*?<\/div>\s*<\/section>/)?.[0] ?? "";
 
-    expect((tree.match(/data-ui-talent-tree-node="0-\d"/g) ?? []).length).toBe(10);
+    expect((tree.match(/data-ui-talent-tree-node="0-\d+"/g) ?? []).length).toBe(11);
     expect((tree.match(/<path d=/g) ?? []).length).toBe(8);
     expect(tree).toContain("极致怠惰");
+    expect(tree).toContain('<path d="M75 96 H225" />');
+    expect(tree).not.toContain('<path d="M75 32 C145 32 155 96 225 96" />');
+    expect(tree).toContain("每学年末，科研、社交、导师好感+1");
     expect(tree).toMatch(/data-talent-id="sloth-core"[^>]*data-tier="fixed"[^>]*style="grid-column:4;grid-row:1"/);
     expect(tree).not.toContain('data-prerequisite-ids="sloth-core"');
     expect(tree).toContain('<path d="M75 32 H225" />');
     expect(tree).toContain('<path d="M75 160 H225" />');
     expect(tree).toMatch(/data-talent-id="monthly-san-recovery"[^>]*style="grid-column:1;grid-row:1"[^>]*data-prerequisite-ids=""/);
-    expect(tree).toMatch(/data-talent-id="sloth-head-start"[^>]*style="grid-column:2;grid-row:2"[^>]*data-prerequisite-ids="monthly-san-recovery"/);
+    expect(tree).toMatch(/data-talent-id="sloth-head-start"[^>]*style="grid-column:1;grid-row:2"[^>]*data-prerequisite-ids=""/);
     expect(tree).toMatch(/data-talent-id="restful-idle"[^>]*style="grid-column:1;grid-row:3"[^>]*data-prerequisite-ids=""/);
     expect(tree).toMatch(/data-talent-id="post-phd-recovery"[^>]*style="grid-column:2;grid-row:1"[^>]*data-prerequisite-ids="monthly-san-recovery"/);
-    expect(tree).toMatch(/data-talent-id="post-phd-growth"[^>]*style="grid-column:3;grid-row:2"[^>]*data-prerequisite-ids="sloth-head-start"/);
+    expect(tree).toMatch(/data-talent-id="post-phd-growth"[^>]*style="grid-column:2;grid-row:2"[^>]*data-prerequisite-ids="sloth-head-start"/);
+    expect(tree).toMatch(/data-talent-id="sloth-annual-growth"[^>]*style="grid-column:3;grid-row:2"[^>]*data-prerequisite-ids="post-phd-growth"/);
     expect(tree).toMatch(/data-talent-id="year-summary-recovery"[^>]*style="grid-column:3;grid-row:3"[^>]*data-prerequisite-ids="coffee-lifeline"/);
     expect(tree).toMatch(/data-talent-id="full-san-research"[^>]*data-prerequisite-ids="year-summary-recovery san-cap-reserve"/);
     expect(tree).toContain('<path d="M375 160 C445 160 455 96 525 96" />');
@@ -1402,16 +1413,16 @@ describe("v2 render lobby shell", () => {
     expect(tree).not.toContain("1/1");
     expect(tree).toContain('class="lobby-talent-tree is-designed-tree is-normal-reversed-tree is-fixed-tree"');
     expect(tree).toContain("固定生效");
-    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([0, 2, 2, 1, 1, 2, 1, 2, 1, 2]);
+    expect([...tree.matchAll(/data-cost="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([0, 1, 2, 1, 1, 2, 1, 1, 1, 2, 3]);
     expect(tree).toContain("休息后下次想idea、做实验、写论文+1/级，可叠加");
-    expect(tree).toContain("每浪费1常规行动点，SAN上限+1，最多+20");
+    expect(tree).toContain("每浪费1常规行动点，SAN上限+1/级，最多+10/级");
     expect(tree).toContain("操作开始前SAN为满时，科研能力视为+SAN/5");
     const sanCapNode = tree.split("<button").find((markup) => markup.includes('data-talent-id="san-cap-reserve"'))?.split("</button>")[0] ?? "";
-    expect(sanCapNode).toContain('class="lobby-normal-tree-node-level">0/1</span>');
+    expect(sanCapNode).toContain('class="lobby-normal-tree-node-level">0/2</span>');
     for (const icon of ["skull", "heart-pulse", "sparkles", "hourglass", "heart-plus", "trending-up", "brain", "shield", "calendar-days"]) {
       expect(tree).toContain(`data-lucide="${icon}"`);
     }
-    for (const name of ["松弛人生", "天纵不羁", "睡得好香", "无所事事", "天生我材", "困睡醒科", "日渐圆润", "忙里偷闲", "满血状态"]) {
+    for (const name of ["松弛人生", "天纵不羁", "睡得好香", "无所事事", "天生我材", "困睡醒科", "日渐圆润", "忙里偷闲", "满血状态", "岁岁有成"]) {
       expect(tree).toContain(name);
     }
   });

@@ -485,7 +485,7 @@ const DESIGNED_TALENT_TREES = {
       "M75 32 H225", "M75 96 H225",
       "M75 32 C145 32 155 96 225 96", "M75 96 C145 96 155 32 225 32",
       "M225 32 C295 32 305 96 375 96", "M225 96 H375", "M375 96 H525",
-      "M75 160 H225", "M225 160 H375",
+      "M75 160 H225", "M225 160 H375", "M375 160 H525",
     ],
   },
   social: {
@@ -502,7 +502,7 @@ const DESIGNED_TALENT_TREES = {
     nodes: NORMAL_REVERSED_TALENT_NODES,
     viewBoxHeight: 192,
     paths: [
-      "M75 32 H225", "M75 32 C145 32 155 96 225 96", "M75 160 H225",
+      "M75 32 H225", "M75 96 H225", "M75 160 H225",
       "M225 32 H375", "M225 96 H375", "M225 160 H375",
       "M375 32 C445 32 455 96 525 96",
       "M375 160 C445 160 455 96 525 96",
@@ -515,8 +515,9 @@ const DESIGNED_TALENT_TREES = {
       "M75 32 H225", "M75 160 C145 160 155 96 225 96",
       "M75 32 C145 32 155 96 225 96", "M75 160 H225",
       "M225 32 H375", "M225 160 H375",
-      "M225 32 C295 32 305 96 375 96", "M225 96 H375",
-      "M225 160 C295 160 305 96 375 96",
+      "M225 96 H525",
+      "M375 32 C445 32 455 96 525 96",
+      "M375 160 C445 160 455 96 525 96",
     ],
   },
   "genius-reversed": {
@@ -535,7 +536,7 @@ const DESIGNED_TALENT_TREES = {
       "M75 96 C145 96 155 32 225 32", "M75 96 H225", "M75 96 C145 96 155 160 225 160",
       "M225 160 H375", "M225 32 H375",
       "M225 32 C285 32 315 96 375 96", "M225 96 H375", "M225 160 C285 160 315 96 375 96",
-      "M375 96 H525", "M375 96 C445 96 455 160 525 160",
+      "M375 96 H525",
     ],
   },
   "social-reversed": {
@@ -545,6 +546,7 @@ const DESIGNED_TALENT_TREES = {
       "M75 32 C145 32 155 96 225 96", "M75 96 H225", "M75 160 C145 160 155 96 225 96",
       "M225 96 H375", "M225 96 C295 96 305 160 375 160",
       "M375 96 H525", "M375 160 H525",
+      "M75 32 H225", "M75 160 H225",
     ],
   },
 } as const;
@@ -578,7 +580,7 @@ export function renderDesignedGrowthBoard(roleId: keyof typeof DESIGNED_TALENT_T
               ${nodes.map((node, index) => `
                 <div class="lobby-normal-tree-detail" data-detail-index="${index}"${index === activeIndex ? "" : " hidden"}>
                   <div class="lobby-normal-tree-detail-heading"><strong>${escapeHtml(node.name)}${node.challenge ? `（${challengeDifficultyNames[node.tier]}）` : ""}</strong></div>
-                  <p>${escapeHtml(node.effect)}${node.challenge ? node.tier < challengeDifficultyNames.length - 1 ? "；博士毕业解锁下一难度" : "" : `<span class="lobby-normal-tree-detail-cost">${nodeLabel(node)}</span>`}</p>
+                  <p>${escapeHtml(node.effect)}${node.hint ? ` <span class="lobby-normal-tree-detail-hint" role="note" tabindex="0" aria-label="查看补充说明" data-relationship-tooltip data-tooltip="${escapeHtml(node.hint)}"><i data-lucide="info" aria-hidden="true"></i></span>` : ""}${node.challenge ? node.tier < challengeDifficultyNames.length - 1 ? "；博士毕业解锁下一难度" : "" : `<span class="lobby-normal-tree-detail-cost">${nodeLabel(node)}</span>`}</p>
                 </div>
               `).join("")}
             </div>
@@ -619,6 +621,11 @@ function renderSelectedRoleDetail(
   const availableYears = getAvailableAcademicYears(accountProfile.rewinderAcademicArchive);
   const selectedYear = rewinderStartYear !== undefined && availableYears.includes(rewinderStartYear)
     ? rewinderStartYear : availableYears.at(-1) ?? 1;
+  const rewinderYearStatuses = Array.from({ length: 6 }, (_, index) => {
+    const year = index + 1;
+    const isFinal = year === 6 || (accountProfile.rewinderAcademicArchive?.years[year - 1]?.identity.maxMonths ?? Infinity) <= year * 12;
+    return isFinal ? "毕业终章" : accountProfile.rewinderAcademicArchive?.years[year] ? "已归档" : availableYears.includes(year) ? "可挑战" : "未解锁";
+  });
 
   return `
     <section class="lobby-detail-stage">
@@ -628,7 +635,7 @@ function renderSelectedRoleDetail(
             ${renderLobbyPortrait(getRoleDetailPortraitUrl(viewModel.role.id), viewModel.role.name, viewModel.role.id)}
             ${renderProfileInfoPanel(viewModel, allocation, bonusPoints, experienceMultiplier, hasRoleSave, isSaveLoading, roleHistoryPageIndex, selectedYear)}
           </section>
-          ${selectedRoleId === "rewinder" ? `<section class="rewinder-year-picker" aria-label="选择挑战学年"><div class="rewinder-year-picker-heading"><div><strong>学年轮回</strong><span>选择挑战学年</span></div><em>第${selectedYear}学年</em></div><div class="rewinder-year-options" role="list">${Array.from({ length: 6 }, (_, index) => index + 1).map(year => { const isFinal = year === 6 || (accountProfile.rewinderAcademicArchive?.years[year - 1]?.identity.maxMonths ?? Infinity) <= year * 12; const status = isFinal ? "毕业终章" : accountProfile.rewinderAcademicArchive?.years[year] ? "已归档" : availableYears.includes(year) ? "可挑战" : "未解锁"; return `<button type="button" class="rewinder-year-option${year === selectedYear ? " is-current" : ""}${availableYears.includes(year) && !hasRoleSave ? " is-available" : ""}" data-ui-rewinder-start-year="${year}" aria-pressed="${year === selectedYear}"${hasRoleSave || !availableYears.includes(year) ? ` disabled title="${hasRoleSave ? "请先完成当前学年" : `完成第${year - 1}学年归档后解锁`}"` : ""}><span class="rewinder-year-index">0${year}</span><span class="rewinder-year-label">第${year}学年</span><small>${status}</small></button>`; }).join("")}</div></section>${renderRewinderPreview(talentTreeSelectedNodeByPage[0] ?? 3, getNextRewinderCycleNumber(accountProfile), selectedYear, false)}` : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
+          ${selectedRoleId === "rewinder" ? renderRewinderPreview(talentTreeSelectedNodeByPage[0] === 6 ? 6 : selectedYear - 1, getNextRewinderCycleNumber(accountProfile), selectedYear, false, { availableYears, hasRoleSave, statusByYear: rewinderYearStatuses }) : selectedRoleId === "research-captain" ? renderCaptainTags(accountProfile.roleProgress, talentTreeSelectedNodeByPage[0] ?? 0) : hasDesignedTalentTree(selectedRoleId)
             ? renderDesignedGrowthBoard(selectedRoleId, isCursedRole(selectedRoleId) ? getSelectedCurseDifficulty(accountProfile, selectedRoleId) - 1 : talentTreeSelectedNodeByPage[0] ?? 0, allocation, allocation ? viewModel.progress.level : undefined, false, bonusPoints, isCursedRole(selectedRoleId) ? { unlockedDifficulty: getUnlockedCurseDifficulty(accountProfile, selectedRoleId) } : undefined)
             : ""}
         </div>

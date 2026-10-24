@@ -20,6 +20,7 @@ import { applyPublicationTalentRewards, projectPublicationTalentRewards } from "
 import { applyPaperMastery } from "./v2-paper-mastery";
 import { formatEventSanChange, getActualSanChange, getIllnessSanIncrease } from "./v2-sanity-rules";
 import { getConferenceRegistrationFee, projectConferenceRegistrationFees, settleConferenceRegistrationFees } from "./v2-lab-publication-costs";
+import { settleFellowPaperRejection } from "./v2-lab-talent";
 
 const DEFAULT_TARGET_INFLUENCE: Record<PaperTarget, number> = { A: 1.1, B: 0.6, C: 0.3 };
 export const CITATION_SETTLEMENT_INTERVAL_MONTHS = 1;
@@ -435,7 +436,7 @@ export function applyRejectedPaperReview(paper: Paper, reviewResult: PaperReview
 }
 
 /** Apply the result only after the player confirms the review-result event. */
-function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement): GameState {
+function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement, recordLogs = true): GameState {
   if (state.phase !== "playing") return state;
   const paperIndex = state.papers.findIndex((paper) => paper.id === settlement.paperId);
   if (paperIndex < 0) return state;
@@ -455,11 +456,12 @@ function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewS
     const rejectedPaper = applyRejectedPaperReview(paper, reviewResult);
     const papers = [...state.papers];
     papers[paperIndex] = rejectedPaper;
-    return settleRoleTalentPaperRejection({
+    const rejectedState = settleRoleTalentPaperRejection({
       ...state,
       papers,
       selectedPaperId: rejectedPaper.id,
     }, paper);
+    return settleFellowPaperRejection(rejectedState, paper, rejectedPaper, recordLogs);
   }
 
   const publicationEffect = getPublicationBuffEffect(state.buffs);
@@ -487,7 +489,7 @@ function resolvePaperReviewSettlement(state: GameState, settlement: PaperReviewS
 }
 
 export function projectPaperReviewSettlement(state: GameState, settlement: PaperReviewSettlement): GameState {
-  const nextState = resolvePaperReviewSettlement(state, settlement);
+  const nextState = resolvePaperReviewSettlement(state, settlement, false);
   if (nextState === state || !settlement.accepted) return nextState;
   return applyPaperMastery(projectPublicationTalentRewards(projectConferenceRegistrationFees(nextState, [settlement.paperId])), false);
 }

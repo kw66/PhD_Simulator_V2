@@ -4,14 +4,15 @@ import { getRoleDefinition } from "../core/v2-progression";
 import { MAX_ROLE_LEVEL } from "../core/v2-role-experience";
 import type { AccountProfile } from "../core/v2-types";
 import type { CaptainRunState, CaptainTag } from "../core/v2-captain-state";
+import { getRoleChibiPortraitUrl } from "./v2-role-portrait-assets";
 
 const TAG_APPEARANCE = [
-  { icon: "user-round", tone: "#6d9179" },
-  { icon: "coins", tone: "#b18a45" },
-  { icon: "brain", tone: "#7c87aa" },
-  { icon: "handshake", tone: "#a56d85" },
-  { icon: "graduation-cap", tone: "#a17b59" },
-  { icon: "sparkles", tone: "#b59b4e" },
+  { tone: "#6d9179" },
+  { tone: "#b18a45" },
+  { tone: "#7c87aa" },
+  { tone: "#a56d85" },
+  { tone: "#a17b59" },
+  { tone: "#b59b4e" },
 ] as const;
 
 // Last effects stack by tagged relationship count, not tag level.
@@ -68,11 +69,8 @@ export function getCaptainRelationshipTagHint(tag: CaptainTag, level: number, ty
   const effects = TAG_EFFECTS[tag];
   const member = type === "advisor" ? "导师" : type === "lover" ? "恋人" : "同学";
   return [
-    `${getRoleDefinition(tag).name} Lv${level}（本局开局等级）`,
     `${member}效果：${effects[type](level)}。`,
     `团队加成：${effects.additional.replace("社交|亲密|默契", "对应的社交／亲密／默契")}。`,
-    "团队加成按同标签成员人数叠加，不随等级增加。",
-    ...(tag === "genius" ? ["科研增长仍受档位抵抗影响。"] : []),
   ].join("\n");
 }
 
@@ -100,7 +98,7 @@ export function renderCaptainTags(roleProgress: Partial<AccountProfile["roleProg
           <div class="lobby-talent-tree-page is-active is-designed-page" data-tree-page="0">
             ${tags.map((tag, index) => `
               <button class="lobby-talent-tree-node${index === activeIndex ? " is-selected" : ""}" type="button" data-ui-talent-tree-node="0-${index}" data-tag-role-id="${tag.roleId}" data-current-level="${tag.level}" aria-label="${tag.name}标签，等级${tag.level}，跟随对应角色等级" aria-pressed="${index === activeIndex}" style="--tree-tone:${tag.tone};grid-column:${index % 3 + 1};grid-row:${Math.floor(index / 3) + 1}">
-                <span class="lobby-talent-tree-node-ring"><i data-lucide="${tag.icon}" aria-hidden="true"></i></span>
+                <span class="lobby-talent-tree-node-ring special-role-avatar-ring"><img class="special-role-avatar" src="${getRoleChibiPortraitUrl(tag.roleId)}" alt="" aria-hidden="true"></span>
                 <span class="lobby-normal-tree-node-level">${tag.level}/${MAX_ROLE_LEVEL}</span>
               </button>
             `).join("")}

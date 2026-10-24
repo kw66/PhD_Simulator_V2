@@ -2966,6 +2966,23 @@ button.pager-arrow:disabled {
   white-space: nowrap;
 }
 
+.lobby-normal-tree-detail-hint {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  margin-left: 4px;
+  vertical-align: -2px;
+  align-items: center;
+  justify-content: center;
+  color: var(--setup-label-color);
+  cursor: help;
+}
+
+.lobby-normal-tree-detail-hint svg {
+  width: 13px;
+  height: 13px;
+}
+
 .lobby-growth-summary-row,
 .lobby-growth-exp-row {
   display: flex;
@@ -3456,6 +3473,7 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="reverse-meter-alpha"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="reverse-meter-beta"] { --tree-tone: #6c9379; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="reverse-meter-gamma"] { --tree-tone: #bb718a; }
+.is-chosen-reversed-tree .lobby-talent-tree-node[data-talent-id="annual-highest-growth"] { --tree-tone: #7c9b72; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="natural-charisma"] { --tree-tone: #bb718a; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="supporting-juniors"] { --tree-tone: #6594a2; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="junior-delegation"] { --tree-tone: #bd9445; }
@@ -3472,6 +3490,7 @@ button.pager-arrow:disabled {
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="coffee-lifeline"] { --tree-tone: #6e8fa0; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-recovery"] { --tree-tone: #7b9379; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="post-phd-growth"] { --tree-tone: #b18a54; }
+.is-designed-tree .lobby-talent-tree-node[data-talent-id="sloth-annual-growth"] { --tree-tone: #b18a54; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="san-cap-reserve"] { --tree-tone: #8b779c; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="summer-recovery"] { --tree-tone: #a67a65; }
 .is-designed-tree .lobby-talent-tree-node[data-talent-id="year-summary-recovery"] { --tree-tone: #a67a65; }
@@ -3572,6 +3591,8 @@ button.pager-arrow:disabled {
 .is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="junior-event-focus"],
 .is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="senior-event-focus"] { --tree-tone: #6594a2; }
 .is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="affinity-conversion"] { --tree-tone: #8b779c; }
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="junior-bond"] { --tree-tone: #bb718a; }
+.is-social-reversed-tree .lobby-talent-tree-node[data-talent-id="rejection-camaraderie"] { --tree-tone: #a9607c; }
 
 .is-designed-tree .lobby-talent-tree-node-ring {
   flex: 0 0 auto;

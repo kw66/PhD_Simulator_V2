@@ -169,8 +169,8 @@ describe("role talent monthly economy", () => {
     const before = structuredClone(state);
     const preview = previewNextMonthEffects(state);
     expect(preview.items.find((item) => item.id === "monthly-role-random-swap")?.label).toBe("随机交换");
-    expect(preview.items.find((item) => item.id === "monthly-role-growth"))
-      .toMatchObject({ name: "命运反噬", appliedStats: { san: -1 } });
+    expect(preview.items.find((item) => item.id === "monthly-role-curse-cap"))
+      .toMatchObject({ name: "命运反噬", label: "SAN上限 -1", appliedStats: {} });
     expect(preview.player).toMatchObject({ research: 1, social: 10, favor: 18 });
     expect(previewNextMonthEffects(state)).toEqual(preview);
     expect(state).toEqual(before);

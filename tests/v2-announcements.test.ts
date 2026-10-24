@@ -18,8 +18,8 @@ describe("game announcements", () => {
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
     const current = textForDate("2026-10-24");
-    for (const text of ["统御者标签", "本局等级效果与团队加成", "接纵向项目恢复回溯", "导师指导结果固定"]) expect(current).toContain(text);
-    for (const text of ["18位角色", "Q版头像", "诅咒角色移至第二页", "去除上下大块纯色留白", "好感达到12、15、18", "为组奉献", "资源倾斜", "成果归我", "整钱包", "最终净亏损", "钱能通神", "屡败屡研", "心宽体健", "空想·天选之人", "直接排列、不受抵抗"]) expect(current).toContain(text);
+    for (const text of ["统御者标签", "本局等级效果与团队加成", "接纵向项目恢复回溯", "导师指导结果固定", "帮助随机同学做项目", "参与同学论文首次被拒"]) expect(current).toContain(text);
+    for (const text of ["18位角色", "Q版头像", "统御者标签使用对应角色的Q版头像", "轮回者以自身Q版头像展示六个学年", "继承规则合并至特殊项", "诅咒角色移至第二页", "去除上下大块纯色留白", "好感达到12、15、18", "为组奉献", "资源倾斜", "成果归我", "整钱包", "最终净亏损", "钱能通神", "每累计消费50金币", "聚沙成塔改为1点", "屡败屡研", "心宽体健", "空想的月初轮转", "渐入佳境", "无界轮转需2点", "连续4个月未变", "恩荫成枷", "得寸进尺每级提升好感增长抵抗10个百分点"]) expect(current).toContain(text);
     for (const text of ["不再向上取整", "档位抵抗", "SAN消耗倍率", "加点", "等级分布", "诅咒", "紧凑方格", "期限", "结算月份"]) expect(textForDate("2026-10-21")).toContain(text);
     for (const text of ["解锁即有10天赋点", "每升一级再增加1点", "已有加点保留", "首篇一作论文获得分数后", "被抢发idea和新sota", "所有角色均可回溯事件", "同一选项结果固定", "选项文字居中"]) expect(textForDate("2026-10-19")).toContain(text);
     const mastery = textForDate("2026-10-18");

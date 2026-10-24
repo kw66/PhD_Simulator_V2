@@ -8,7 +8,7 @@ import { getLoverName } from "./v2-lover-system";
 import { applyPlayerAttributeChange, getPlayerAttributeCap, previewPlayerAttributeChange } from "./v2-player-attributes";
 import { getAttributeTier } from "./v2-random-event-rules";
 import { applyTierResist } from "./v2-sanity-rules";
-import type { FellowProgressProfile, GameState } from "./v2-types";
+import type { FellowProgressProfile, GameState, Paper } from "./v2-types";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { getCaptainResearchCap, getCaptainAffinityCap, getCaptainLoverResearchCap } from "./v2-captain-state";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
@@ -182,4 +182,39 @@ export function projectFellowCoauthoredPapers(state: GameState): GameState {
 
 export function settleFellowCoauthoredPapers(state: GameState): GameState {
   return resolveFellowCoauthoredPapers(state, true);
+}
+
+/** Reward only the lead fellow when a paper the player participated in is first rejected. */
+export function settleFellowPaperRejection(
+  state: GameState, submitted: Paper, rejected: Paper, recordLogs = true,
+): GameState {
+  if (!usesGameplayRulesFrom("20261024-r49") || state.selectedRoleId !== "social-reversed"
+    || state.phase !== "playing" || submitted.status !== "reviewing"
+    || submitted.id !== rejected.id || rejected.status !== "draft" || rejected.lastReview?.accepted !== false
+    || (submitted.rejectionCount ?? 0) !== 0 || rejected.rejectionCount !== 1
+    || state.roleTalents?.settledRejectionCamaraderiePaperIds?.includes(submitted.id)) return state;
+  let nextState: GameState = { ...state, roleTalents: { ...(state.roleTalents ?? { levels: {} }),
+    settledRejectionCamaraderiePaperIds: [...(state.roleTalents?.settledRejectionCamaraderiePaperIds ?? []), submitted.id],
+  } };
+  const rank = getRoleTalentLevel(state, "rejection-camaraderie");
+  if (!rank) return nextState;
+  const triggers: Array<{ key: string; record: TalentTriggerRecord }> = [];
+  const fellowProgressState = state.fellowProgressState.map((profile) => {
+    const collaborated = submitted.leadAuthorId === profile.id
+      && submitted.collaborators?.some((person) => person.id === "player");
+    if (!collaborated) return profile;
+    const result = applyTierResist(rank, profile.affinity, undefined, getCaptainAffinityCap(state, profile));
+    const affinity = Number((profile.affinity + result.effectiveChange).toFixed(10));
+    const summary = describeResistedTalentReward("默契", profile.affinity, result);
+    triggers.push({ key: `rejection-camaraderie:${submitted.id}:${profile.id}`, record: {
+      name: "同病相怜", recipient: `你与${getFellowName(profile)}`,
+      reason: `合作论文《${submitted.title}》首次被拒`, effects: [summary],
+    } });
+    return recordFellowMonthlySupport({ ...profile, affinity }, state.totalMonths, `合作论文首次被拒；${summary}`);
+  });
+  nextState = { ...nextState, fellowProgressState };
+  if (recordLogs) {
+    for (const trigger of triggers) nextState = recordTalentTrigger(nextState, trigger.key, trigger.record);
+  }
+  return nextState;
 }

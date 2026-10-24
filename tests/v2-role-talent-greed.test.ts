@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { applyPlayerAttributeChange } from "../src/core/v2-player-attributes";
 import { recordPersonalSpending } from "../src/core/v2-money";
-import { applyGreedAttributeLoss, settleGreedCoinGames, settleGreedReset, settleGreedSpendingConversions } from "../src/core/v2-role-talent-greed";
+import { applyGreedAttributeLoss, getGreedResetTarget, settleGreedCoinGames, settleGreedReset, settleGreedSpendingConversions } from "../src/core/v2-role-talent-greed";
 import { investRoleTalentMoney, settleRoleTalentInvestments } from "../src/core/v2-role-talent-investments";
 import { applyMonthlyEffects, previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { settleRoleTalentMonthStart } from "../src/core/v2-role-talent-lifecycle";
@@ -36,6 +36,17 @@ describe("greed role economy", () => {
     const capped = settleGreedReset({ ...state, roleTalents: { ...state.roleTalents!, greedQualifiedSpending: 9999 }, sanCap: 12 });
     expect(capped.player).toMatchObject({ san: 12, research: 20, social: 20, favor: 20 });
   }));
+
+  it("raises curse reset by one per 50 qualified coins in r54 while preserving r53's 100-coin threshold", () => {
+    const spending = (amount: number): GameState => ({
+      ...greed({ "spend-to-break-curse": 1 }),
+      roleTalents: { levels: { "spend-to-break-curse": 1 }, greedQualifiedSpending: amount },
+    });
+    for (const [amount, currentTarget, previousTarget] of [[0, 0, 0], [49, 0, 0], [50, 1, 0], [99, 1, 0], [100, 2, 1]] as const) {
+      expect(getGreedResetTarget(spending(amount))).toBe(currentTarget);
+      expect(withGameplayRuleset("20261024-r53", () => getGreedResetTarget(spending(amount)))).toBe(previousTarget);
+    }
+  });
 
   it("accumulates fractional ordinary losses across attributes without rewarding each fraction", () => withGameplayRuleset("20261023-r44", () => {
     let state = greed({ "loss-to-money": 1, "coin-game": 1 });

@@ -3,7 +3,7 @@ import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { createEventQueueItem } from "../src/core/v2-event-queue";
 import { canRewindPendingEvent } from "../src/core/v2-event-replay";
 import { createTeachersDayEvent } from "../src/core/v2-fixed-events-teachers-day";
-import { randomOutcome } from "../src/core/v2-event-choice-random";
+import { hasRandomOutcome, randomOutcome } from "../src/core/v2-event-choice-random";
 import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import type { GameState, PendingEvent } from "../src/core/v2-types";
 
@@ -121,7 +121,53 @@ describe("probabilistic event choices commit the revealed branch", () => {
     });
   });
 
-  it("retains the captain advisor reroll barrier while remaining on the same scene", () => {
+  it.each(["normal", "research-captain"] as const)("keeps intentional advisor redraws unlocked for %s", roleId => {
+    let state = dispatchAction({ ...createInitialState(), randomState: { seed: 1234, cursor: 0 } }, "start-game", { roleId });
+    state = choose(state, "before-grad-school-open-advisor-info");
+    const rerollId = "before-grad-school-reroll";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      expect(current(state).choices.find(choice => choice.id === rerollId)?.outcomeRandom).not.toBe(true);
+      state = choose(state, rerollId);
+      expect(current(state).rewinderReplay?.barrierHistoryIndex).toBeUndefined();
+      expect(canRewindPendingEvent(state, current(state), 0)).toBe(true);
+    }
+    state = JSON.parse(JSON.stringify(state)) as GameState;
+    for (const alias of ["replay-event", "rewinder-replay-event"] as const) {
+      expect(current(rewind(state, 0, alias)).stage).toBe("act1");
+    }
+    const candidate = current(state).choices.find(choice => choice.id === "before-grad-school-confirm")!
+      .effects.fixedEventResolution!.advisorCandidate!;
+    state = choose(state, "before-grad-school-confirm");
+    expect(canRewindPendingEvent(state, current(state), 0)).toBe(true);
+    expect(canRewindPendingEvent(state, current(state), 1)).toBe(true);
+    const returned = rewind(state, 1);
+    expect(current(returned).choices.find(choice => choice.id === "before-grad-school-confirm")!
+      .effects.fixedEventResolution!.advisorCandidate).toEqual(candidate);
+    state = choose(state, "before-grad-school-finish");
+    expect(state.selectedAdvisorName).toBe(candidate.advisorName);
+    if (roleId === "research-captain") expect(state.captainState!.tags.advisor).toBe(candidate.captainTag);
+  });
+
+  it("unlocks a pending captain advisor redraw that already carries the old barrier", () => {
+    let state = withGameplayRuleset("20261024-r47", () => {
+      let started = dispatchAction({ ...createInitialState(), randomState: { seed: 1234, cursor: 0 } }, "start-game", { roleId: "research-captain" });
+      started = choose(started, "before-grad-school-open-advisor-info");
+      return choose(started, "before-grad-school-reroll");
+    });
+    state = JSON.parse(JSON.stringify(state)) as GameState;
+    expect(current(state).rewinderReplay?.barrierHistoryIndex).toBe(1);
+    const reroll = current(state).choices.find(choice => choice.id === "before-grad-school-reroll")!;
+    expect(reroll.outcomeRandom).toBe(true);
+    expect(hasRandomOutcome(reroll)).toBe(false);
+    for (const alias of ["replay-event", "rewinder-replay-event"] as const) {
+      expect(canRewindPendingEvent(state, current(state), 0)).toBe(true);
+      expect(current(rewind(state, 0, alias)).stage).toBe("act1");
+    }
+    state = choose(state, "before-grad-school-confirm");
+    for (const index of [0, 1]) expect(canRewindPendingEvent(state, current(state), index)).toBe(true);
+  });
+
+  it("retains the captain advisor reroll barrier in r47 recordings", () => withGameplayRuleset("20261024-r47", () => {
     let state = dispatchAction({ ...createInitialState(), randomState: { seed: 1234, cursor: 0 } }, "start-game", { roleId: "research-captain" });
     state = choose(state, "before-grad-school-open-advisor-info");
     expect(current(state).history).toHaveLength(1);
@@ -143,5 +189,5 @@ describe("probabilistic event choices commit the revealed branch", () => {
     expect(canRewindPendingEvent(state, current(state), 1)).toBe(true);
     const afterReturn = rewind(state, 1);
     expect(canRewindPendingEvent(afterReturn, current(afterReturn), 0)).toBe(false);
-  });
+  }));
 });

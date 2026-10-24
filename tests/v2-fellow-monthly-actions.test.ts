@@ -160,12 +160,13 @@ describe("fellow monthly action state", () => {
     expect(fellow(later).nextMonthlyAction).toBe("research");
   });
 
-  it("resets a pending project to research when a missing current draft is created", () => {
+  it("preserves a pending project when a missing current draft is created", () => {
     const base = makeState({ fellows: [makeFellow("fellow", { nextMonthlyAction: "project" })] });
     const next = ensureFellowPapers({ ...base, fellowPapers: [] }, zeroRandom);
     expect(scores(currentPaper(next))).toEqual([0, 0, 0]);
-    expect(fellow(next).nextMonthlyAction).toBe("research");
-    expect(scores(currentPaper(nextMonth(next)))).toEqual([10, 0, 0]);
+    expect(fellow(next).nextMonthlyAction).toBe("project");
+    expect(scores(currentPaper(nextMonth(next)))).toEqual([0, 0, 0]);
+    expect(scores(currentPaper(nextMonth(nextMonth(next))))).toEqual([10, 0, 0]);
   });
 
   it("creates a blank draft on joining and runs the new cadence through dispatchAction", () => {
@@ -432,7 +433,7 @@ describe("fellow experiments and zero lab funding", () => {
 });
 
 describe("reviews settle before monthly own actions", () => {
-  it.each([59, 60])("does a project every month while reviewing at entry funding %s", (funding) => {
+  it.each([59, 60])("keeps paper/project alternation while reviewing at entry funding %s", (funding) => {
     const before = withReview(makeState({ funding }), "fellow", 100, 3);
     const submitted = currentPaper(before);
     let state = before;
@@ -442,7 +443,7 @@ describe("reviews settle before monthly own actions", () => {
         status: "reviewing", reviewMonthsLeft,
         submittedIdea: submitted.submittedIdea, submittedExperiment: submitted.submittedExperiment, submittedWriting: submitted.submittedWriting,
       });
-      const progress = (3 - reviewMonthsLeft) * 20;
+      const progress = reviewMonthsLeft === 2 ? 0 : 20;
       expect(state.advisorProgressState).toMatchObject({
         funding, horizontalProgress: funding < 60 ? progress : 0, verticalProgress: funding >= 60 ? progress : 0,
       });
@@ -450,7 +451,7 @@ describe("reviews settle before monthly own actions", () => {
     expect(state.player).toEqual(before.player);
   });
 
-  it.each([false, true])("researches a fresh draft in the acceptance month, then projects (player coauthor=%s)", (coauthored) => {
+  it.each([false, true])("keeps the scheduled project after acceptance, then researches the new draft (player coauthor=%s)", (coauthored) => {
     let before = withPaper(makeState({ fellows: [makeFellow("fellow", { nextMonthlyAction: "project" })] }), { idea: 100, experiment: 100, writing: 100 });
     if (coauthored) {
       const paper = currentPaper(before);
@@ -463,51 +464,52 @@ describe("reviews settle before monthly own actions", () => {
     expect(publications).toHaveLength(1);
     expect(publications[0]).toMatchObject({ status: "published", lastReview: { accepted: true } });
     expect(currentPaper(accepted).id).not.toBe(oldPaper.id);
-    expect(currentPaper(accepted)).toMatchObject({ status: "draft", createdTotalMonths: accepted.totalMonths, idea: 10, experiment: 0, writing: 0 });
-    expect(fellow(accepted).nextMonthlyAction).toBe("project");
-    expect(accepted.advisorProgressState).toMatchObject({ horizontalProgress: 0, verticalProgress: 0 });
-    const projected = nextMonth(accepted);
-    expect(scores(currentPaper(projected))).toEqual([9, 0, 0]);
-    expect(projected.advisorProgressState.horizontalProgress).toBe(20);
-    expect(fellow(projected).nextMonthlyAction).toBe("research");
-    expect(currentPaper(nextMonth(projected)).experiment).toBe(10);
+    expect(currentPaper(accepted)).toMatchObject({ status: "draft", createdTotalMonths: accepted.totalMonths, idea: 0, experiment: 0, writing: 0 });
+    expect(fellow(accepted).nextMonthlyAction).toBe("research");
+    expect(accepted.advisorProgressState).toMatchObject({ horizontalProgress: 20, verticalProgress: 0 });
+    const researched = nextMonth(accepted);
+    expect(scores(currentPaper(researched))).toEqual([10, 0, 0]);
+    expect(researched.advisorProgressState.horizontalProgress).toBe(20);
+    expect(fellow(researched).nextMonthlyAction).toBe("project");
+    expect(currentPaper(nextMonth(nextMonth(researched))).experiment).toBe(10);
   });
 
-  it("applies rejection feedback, optimizes and resubmits immediately, then projects", () => {
+  it("applies rejection feedback without cancelling the scheduled project, then researches", () => {
     const before = withReview(makeState({ fellows: [makeFellow("fellow", { research: 4, nextMonthlyAction: "project" })] }), "fellow", 1);
     const submitted = currentPaper(before);
     const review = paperRules.resolvePaperReview(submitted, zeroRandom).nextPaper.lastReview!;
     expect(review.accepted).toBe(false);
     const feedback = applyRejectedPaperReview(decayUnpublishedPaper(submitted), review);
-    const optimized = nextMonth(before);
-    expect(currentPaper(optimized)).toMatchObject({
-      id: submitted.id, status: "reviewing", rejectionCount: 1, reviewMonthsLeft: 3,
-      idea: feedback.idea, experiment: feedback.experiment + 1, writing: feedback.writing,
+    const projected = nextMonth(before);
+    expect(currentPaper(projected)).toMatchObject({
+      id: submitted.id, status: "draft", rejectionCount: 1, reviewMonthsLeft: 0,
+      idea: feedback.idea, experiment: feedback.experiment, writing: feedback.writing,
     });
-    expect(currentPaper(optimized)).toMatchObject({ submittedMonth: optimized.month, submittedYear: optimized.year });
-    expect(fellow(optimized).nextMonthlyAction).toBe("project");
-    expect(optimized.advisorProgressState).toMatchObject({ funding: 7, horizontalProgress: 0, verticalProgress: 0 });
-    const projected = nextMonth(optimized);
-    expect(scores(currentPaper(projected))).toEqual(scores(decayUnpublishedPaper(currentPaper(optimized))));
     expect(projected.advisorProgressState.horizontalProgress).toBe(4);
     expect(fellow(projected).nextMonthlyAction).toBe("research");
+    expect(projected.advisorProgressState.funding).toBe(10);
+    const optimized = nextMonth(projected);
+    expect(currentPaper(optimized).rejectionCount).toBe(1);
+    expect(currentPaper(optimized).experiment).toBeGreaterThan(feedback.experiment);
+    expect(fellow(optimized).nextMonthlyAction).toBe("project");
+    expect(optimized.advisorProgressState.funding).toBe(7);
   });
 
-  it.each([true, false])("settles retained help before selecting post-review research (accepted=%s)", (accepted) => {
+  it.each([true, false])("settles retained help after review without replacing a scheduled project (accepted=%s)", (accepted) => {
     const before = withReview(makeState({ fellows: [makeFellow("fellow", { nextMonthlyAction: "project", pendingHelpToFellow: 10 })] }), "fellow", accepted ? 100 : 1);
     const next = nextMonth(before);
     const paper = currentPaper(next);
     if (accepted) {
-      expect(scores(paper)).toEqual([10, 10, 0]);
+      expect(scores(paper)).toEqual([10, 0, 0]);
       expect(getPaperScoreBreakdown(paper, "idea")).toEqual({ own: 0, collaboration: 10, total: 10 });
-      expect(next.advisorProgressState.funding).toBe(10 - 1 - 3);
+      expect(next.advisorProgressState.funding).toBe(10 - 1);
     } else {
-      expect(paper.writing).toBe(10);
+      expect(paper.writing).toBe(1);
       expect(getPaperScoreBreakdown(paper, "experiment")).toEqual({ own: 1, collaboration: 10, total: 11 });
       expect(next.advisorProgressState.funding).toBe(10);
     }
-    expect(fellow(next)).toMatchObject({ pendingHelpToFellow: null, nextMonthlyAction: "project" });
-    expect(next.advisorProgressState).toMatchObject({ horizontalProgress: 0, verticalProgress: 0 });
+    expect(fellow(next)).toMatchObject({ pendingHelpToFellow: null, nextMonthlyAction: "research" });
+    expect(next.advisorProgressState).toMatchObject({ horizontalProgress: 20, verticalProgress: 0 });
   });
 
   it.each([false, true])("settles every due review before any research or project (reversed papers=%s)", (reversed) => {

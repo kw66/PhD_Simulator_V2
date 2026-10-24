@@ -73,9 +73,12 @@ export function initializeRoleTalents(state: GameState): GameState {
   if (state.selectedRoleId === "teacher-child-reversed") {
     const old = state;
     const current = getPlayerAttributeCap(state, "favor");
-    const target = Math.max(6, current - level(state, "favor-reset-decrease"));
+    const redesigned = usesGameplayRulesFrom("20261024-r52");
+    const reduction = level(state, redesigned ? "favor-reset" : "favor-reset-decrease")
+      * (redesigned ? usesGameplayRulesFrom("20261024-r53") ? 4 : 5 : 1);
+    const target = Math.max(6, current - reduction);
     state = { ...state, roleTalents: { ...state.roleTalents!, capBonuses: { ...state.roleTalents!.capBonuses, favor: (state.roleTalents!.capBonuses?.favor ?? 0) + target - current } } };
-    state = logTalent(old, state, "favor-reset-decrease", "得寸进尺", "入学时调整导师好感上限");
+    state = logTalent(old, state, redesigned ? "favor-reset" : "favor-reset-decrease", redesigned ? "恩断义绝" : "得寸进尺", "入学时调整导师好感上限");
   }
   if (state.selectedRoleId === "genius") {
     state = logTalent(state, addAttributes(state, { research: level(state, "innate-insight") }), "innate-insight", "生而知之", "入学前的积累");
@@ -222,12 +225,22 @@ export function applyRoleTalentPhdTransfer(before: GameState, after: GameState):
 export function settleRoleTalentYearEnd(state: GameState): GameState {
   if (!state.roleTalents || state.month !== 12 || state.roleTalents.lastAnnualSettlement === state.year) return state;
   state = { ...state, roleTalents: { ...state.roleTalents, lastAnnualSettlement: state.year } };
+  if (state.selectedRoleId === "normal-reversed" && usesGameplayRulesFrom("20261024-r51")) {
+    const rank = level(state, "sloth-annual-growth");
+    state = logTalent(state, addAttributes(state, { research: rank, social: rank, favor: rank }), "sloth-annual-growth", "岁岁有成", "学年结束");
+  }
   if (state.selectedRoleId === "genius") state = logTalent(state, addAttributes(state, { research: level(state, "tireless-scholar") }), "tireless-scholar", "学而不倦", "学年结束");
   if (state.selectedRoleId === "social") state = logTalent(state, addAttributes(state, { social: level(state, "growing-connections") }), "growing-connections", "左右逢源", "学年结束");
   if (state.selectedRoleId === "teacher-child") state = logTalent(state, addAttributes(state, { favor: level(state, "growing-familiarity") }), "growing-familiarity", "朝夕相处", "学年结束");
   if (state.selectedRoleId === "teacher-child" && usesGameplayRulesFrom("20261023-r28")) {
     state = logTalent(state, addAttributes(state, { research: precise(Math.max(0, state.player.favor) * 0.1 * level(state, "learning-by-osmosis")) }), "learning-by-osmosis", "耳濡目染", "学年结束");
     state = settleTeacherChildFavorMilestones(state);
+  }
+  if (state.selectedRoleId === "chosen-reversed" && usesGameplayRulesFrom("20261024-r50")) {
+    const rank = level(state, "annual-highest-growth");
+    const maximum = Math.max(...ATTRIBUTES.map(stat => state.player[stat]));
+    const changes = Object.fromEntries(ATTRIBUTES.map(stat => [stat, state.player[stat] === maximum ? rank : 0]));
+    state = logTalent(state, addAttributes(state, changes), "annual-highest-growth", "渐入佳境", "学年结束，提升所有并列最高项");
   }
   if (state.degree !== "phd") return state;
   if (state.selectedRoleId === "normal") {
@@ -266,6 +279,19 @@ export function settleRoleTalentDiseaseMilestones(state: GameState): GameState {
   const gain = (deepest - previous) * rank;
   return logTalent(state, addAttributes(state, { research: gain, social: gain, favor: gain }), "misfortune-to-fortune", "否极泰来", `疾病概率首次达到-${deepest * milestoneStep}%档位`, [`新领取${deepest - previous}档奖励；历史已领至-${deepest * milestoneStep}%，不会重复领取`], String(deepest));
 }
+
+/** Cap changes are independent of current values and preserve swap overflow. */
+function changeFantasyAttributeCap(state: GameState, stat: PlayerAttribute, amount: number): GameState {
+  const current = getPlayerAttributeCap(state, stat);
+  const change = Math.max(0, current + amount) - current;
+  if (!change) return state;
+  if (stat === "research") return { ...state, researchCapacityState: { ...state.researchCapacityState,
+    otherCapBonus: precise(state.researchCapacityState.otherCapBonus + change) } };
+  return { ...state, roleTalents: { ...state.roleTalents!, capBonuses: { ...state.roleTalents?.capBonuses,
+    [stat]: precise((state.roleTalents?.capBonuses?.[stat] ?? 0) + change) } } };
+}
+
+export const FANTASY_CURSE_TARGETS = ["sanCap", "research", "social", "favor", "researchCap", "socialCap", "favorCap"] as const;
 
 function shuffle<T>(values: T[], getRoll: () => number): T[] {
   const shuffled = [...values];
@@ -316,10 +342,15 @@ export function settleRoleTalentMonthStart(state: GameState, getRoll: () => numb
   }
   if (state.totalMonths <= 1) return state;
   if (state.selectedRoleId === "rich-reversed") return settleGreedReset(state);
-  if (state.selectedRoleId === "social-reversed" && (state.roleTalents?.socialStagnantMonths ?? 0) >= 2) {
-    // A preview quotes either branch without consuming the actual random stream.
-    const stat = (options.skipSwaps ? 0 : getRoll()) < 0.5 ? "research" : "favor";
-    state = logTalent(state, applyPlayerAttributeChange(state, stat, -1).state, "social-stagnation", "患得患失", "连续两个月社交没有实际变化");
+  const fourMonthStagnation = usesGameplayRulesFrom("20261024-r49");
+  if (state.selectedRoleId === "social-reversed" && (state.roleTalents?.socialStagnantMonths ?? 0) >= (fourMonthStagnation ? 4 : 2)) {
+    if (fourMonthStagnation) {
+      state = logTalent(state, addAttributes(state, { research: -1, favor: -1 }), "social-stagnation", "患得患失", "连续四个月社交没有实际变化");
+    } else {
+      // Legacy previews quote either branch without consuming the actual random stream.
+      const stat = (options.skipSwaps ? 0 : getRoll()) < 0.5 ? "research" : "favor";
+      state = logTalent(state, applyPlayerAttributeChange(state, stat, -1).state, "social-stagnation", "患得患失", "连续两个月社交没有实际变化");
+    }
     state = { ...state, roleTalents: { ...state.roleTalents!, lastStagnationCurseMonth: state.totalMonths } };
   }
   if (state.selectedRoleId === "chosen") {
@@ -341,7 +372,18 @@ export function settleRoleTalentMonthStart(state: GameState, getRoll: () => numb
         if (level(state, "san-money-swap")) state = logTalent(state, applySwap(state, ["san", "money"], getRoll), "san-money-swap", "祸福相依", "月初SAN与金币随机排列");
       }
     }
-    // October is the first curse month; the five targets then repeat in order.
+    if (usesGameplayRulesFrom("20261024-r50")) {
+      const target = FANTASY_CURSE_TARGETS[(state.totalMonths - 2) % FANTASY_CURSE_TARGETS.length]!;
+      const beforeCurse = state;
+      if (target === "sanCap") state = { ...state, sanCap: Math.max(0, state.sanCap - 1) };
+      else if (target === "researchCap" || target === "socialCap" || target === "favorCap") {
+        const stat = { researchCap: "research", socialCap: "social", favorCap: "favor" }[target] as PlayerAttribute;
+        state = changeFantasyAttributeCap(state, stat, -1);
+      } else state = applyPlayerAttributeChange(state, target, -1).state;
+      state = logTalent(beforeCurse, state, "fate-curse", "命运反噬", "月初轮流损失一项属性或上限");
+      return { ...state, roleTalents: { ...state.roleTalents!, lastSwapMonth: state.totalMonths, lastCurseMonth: state.totalMonths } };
+    }
+    // Legacy October is the first curse month; the five targets repeat in order.
     const target = (["san", "money", ...ATTRIBUTES] as const)[(state.totalMonths - 2) % 5]!;
     const beforeCurse = state;
     if (target === "san" || target === "money") {
@@ -359,8 +401,11 @@ export function settleRoleTalentMonthEnd(state: GameState): GameState {
   state = { ...state, roleTalents: { ...state.roleTalents, lastMonthEndSettlement: state.totalMonths } };
   if (state.selectedRoleId === "normal-reversed" && level(state, "san-cap-reserve")) {
     const unused = Math.max(0, (state.roleTalents!.regularActionBudget ?? 1) - (state.roleTalents!.regularActionsSpent ?? 0));
-    const remaining = Math.max(0, 20 - (state.roleTalents!.sanCapReserveBonus ?? 0));
-    const gained = Math.min(unused, remaining);
+    const rank = level(state, "san-cap-reserve");
+    const perAction = usesGameplayRulesFrom("20261024-r49") ? rank : 1;
+    const maximum = usesGameplayRulesFrom("20261024-r49") ? 10 * rank : 20;
+    const remaining = Math.max(0, maximum - (state.roleTalents!.sanCapReserveBonus ?? 0));
+    const gained = Math.min(unused * perAction, remaining);
     if (gained) state = logTalent(state, recordAchievementSanCapGain({
       ...state,
       sanCap: state.sanCap + gained,
