@@ -226,6 +226,26 @@
   cursor: default;
 }
 
+.new-debt-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 5px;
+  color: #8c5942;
+  font-size: 0.82em;
+  white-space: nowrap;
+}
+
+.new-debt-repayment-button {
+  margin-left: 0;
+}
+
+.play-left-rail .new-identity-money-header:has(.new-debt-balance) .new-currency-value {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  max-width: 100%;
+}
+
 .new-gold-power-button {
   white-space: nowrap;
   background: #f6f1e5;
@@ -240,6 +260,7 @@
 }
 
 @media (max-width: 820px) {
+  .play-left-rail .new-identity-money-header:has(.new-debt-balance) { flex-wrap: wrap; }
   .play-left-rail .new-identity-money-header:has(.new-gold-power-button) { flex-wrap: wrap; }
   .play-left-rail .new-identity-money-header:has(.new-gold-power-button) .new-player-identity {
     flex: 0 0 auto;

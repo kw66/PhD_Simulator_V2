@@ -10,6 +10,14 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-10-25",
+    title: "诅咒难度调整与还债快捷操作",
+    changes: [
+      { category: "平衡", title: "四类诅咒难度调整", description: "按简单、中等、困难、地狱顺序，有限人生总SAN调整为300／200／150／100；天才迟暮初始科研调整为20／18／16／14；寒门负重初始债务调整为50／70／90／110。体弱多病按SAN＜6、6至不足12、12至不足18、≥18分档，四档月末疾病概率变化分别为+9／+6／+3／-1、+18／+12／+6／0、+27／+18／+9／+1、+36／+24／+12／+2个百分点。" },
+      { category: "优化", title: "金币旁可提前还债", description: "寒门负重在金币旁显示当前债务，可每次偿还1金币，不足1金币的尾款按实际金额结清。" },
+    ],
+  },
+  {
     date: "2026-10-24",
     title: "角色图鉴重排与天赋规则更新",
     changes: [
@@ -230,16 +238,10 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   },
   {
     date: "2026-08-31",
-    title: "论文主循环与多样审稿",
+    title: "论文主循环、AI与装备路线",
     changes: [
       { category: "更新", title: "从选题到成果归档", description: "研究方向随年代变化，热度影响分数衰减；idea、实验、写作、投稿、审稿串成完整循环。录用论文进入成果档案，释放工作槽，后续研究可以继续开展。" },
       { category: "更新", title: "八类审稿人与多种录用结果", description: "三位具有不同偏好和门槛的审稿人共同评议，每篇论文都有独立反馈。会议结果包含Poster、Spotlight、Oral和最佳论文评选，成果不再只用中稿与否概括。" },
-    ],
-  },
-  {
-    date: "2026-08-29",
-    title: "AI换代与装备路线",
-    changes: [
       { category: "更新", title: "六个AI系列各有所长", description: "GPT、Claude、Gemini、DeepSeek、豆包和Kimi随学年更换型号，分别提供科研加分、打磨、阅读或额外操作机会。不同模型按有效效果协作，订阅和续费形成持续开支。" },
       { category: "更新", title: "购买、升级与日常恢复", description: "显卡、工位、办公椅和咖啡等装备接入购买、出售与升级路线，影响研究效率、实验费用和SAN恢复。装备效果、长期成长与临时Buff分开展示。" },
       { category: "更新", title: "事件期限与月度结算", description: "部分事件可在期限内延期处理，月初预览下一轮收支与效果；临时加成按持续时间结算，区分本月、下月与永久影响。学年月份和公历可切换查看。" },

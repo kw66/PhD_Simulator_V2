@@ -23,13 +23,15 @@ export function normalizeCurseDifficulty(value: unknown): CurseDifficulty {
 export function initializeCurse(state: GameState, difficulty: unknown = 1): GameState {
   if (!isCursedRole(state.selectedRoleId)) return state;
   const rank = normalizeCurseDifficulty(difficulty);
-  const curseState: CurseRunState = { difficulty: rank, debt: state.selectedRoleId === "cursed-debt" ? [60, 80, 100, 120][rank - 1]! : 0, lastSettledTotalMonths: 1 };
+  const relaxed = usesGameplayRulesFrom("20261025-r55");
+  const curseState: CurseRunState = { difficulty: rank, debt: state.selectedRoleId === "cursed-debt"
+    ? (relaxed ? [50, 70, 90, 110] : [60, 80, 100, 120])[rank - 1]! : 0, lastSettledTotalMonths: 1 };
   const rebalanced = usesGameplayRulesFrom("20261017-r6");
   let next = { ...state, curseState };
   if (state.selectedRoleId === "special-fading-genius") next = { ...next, player: { ...state.player,
-    research: (rebalanced ? [18, 16, 14, 12] : [20, 17, 14, 11])[rank - 1]! } };
+    research: (relaxed ? [20, 18, 16, 14] : rebalanced ? [18, 16, 14, 12] : [20, 17, 14, 11])[rank - 1]! } };
   if (state.selectedRoleId === "special-finite-life") {
-    const san = (rebalanced ? [300, 200, 120, 80] : [400, 300, 200, 100])[rank - 1]!;
+    const san = (relaxed ? [300, 200, 150, 100] : rebalanced ? [300, 200, 120, 80] : [400, 300, 200, 100])[rank - 1]!;
     next = { ...next, sanCap: san, player: { ...state.player, san } };
   }
   return { ...next, paperSlotsUnlocked: Math.max(next.paperSlotsUnlocked, getUnlockedPaperSlotCount(next.player.research)) };
@@ -39,9 +41,10 @@ export function initializeCurse(state: GameState, difficulty: unknown = 1): Game
 export function getMonthEndIllnessDelta(state: GameState): number {
   if (state.totalMonths <= 0) return 0;
   const tier = state.player.san < 6 ? 0 : state.player.san < 12 ? 1 : state.player.san < 18 ? 2 : 3;
-  return state.selectedRoleId === "cursed-frail"
-    ? [9, 6, 3, usesGameplayRulesFrom("20261017-r6") ? 1 : 0][tier]! * (state.curseState?.difficulty ?? 1)
-    : DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[tier];
+  if (state.selectedRoleId !== "cursed-frail") return DISEASE_MONTH_END_CHANGE_BY_SAN_TIER[tier];
+  const difficulty = state.curseState?.difficulty ?? 1;
+  if (tier === 3 && usesGameplayRulesFrom("20261025-r55")) return difficulty - 2;
+  return [9, 6, 3, usesGameplayRulesFrom("20261017-r6") ? 1 : 0][tier]! * difficulty;
 }
 
 /** The first September is not charged; October settles the first completed month. */

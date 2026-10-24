@@ -20,12 +20,12 @@ describe("cursed character run rules", () => {
   it.each([1, 2, 3, 4] as const)("fixes difficulty %s at start without allocating talents", difficulty => {
     const fading = createStartedGameState("special-fading-genius", {}, 0, difficulty);
     expect(fading.curseState?.difficulty).toBe(difficulty);
-    expect(fading.player.research).toBe([18, 16, 14, 12][difficulty - 1]);
-    expect(fading.paperSlotsUnlocked).toBe([4, 3, 3, 3][difficulty - 1]);
+    expect(fading.player.research).toBe([20, 18, 16, 14][difficulty - 1]);
+    expect(fading.paperSlotsUnlocked).toBe([4, 4, 3, 3][difficulty - 1]);
     const finite = createStartedGameState("special-finite-life", {}, 0, difficulty);
-    expect(finite.player.san).toBe([300, 200, 120, 80][difficulty - 1]);
+    expect(finite.player.san).toBe([300, 200, 150, 100][difficulty - 1]);
     expect(finite.sanCap).toBe(finite.player.san);
-    expect(createStartedGameState("cursed-debt", {}, 0, difficulty).curseState?.debt).toBe([60, 80, 100, 120][difficulty - 1]);
+    expect(createStartedGameState("cursed-debt", {}, 0, difficulty).curseState?.debt).toBe([50, 70, 90, 110][difficulty - 1]);
   });
   it("keeps ordinary characters unchanged and validates malformed difficulty", () => {
     const ordinary = createStartedGameState("normal");
@@ -35,15 +35,15 @@ describe("cursed character run rules", () => {
   it.each([1, 2, 3, 4] as const)("replaces illness percentage points at difficulty %s", difficulty => {
     for (const [san, expected] of [[5, 9], [6, 6], [12, 3], [17.99, 3], [18, 1], [19, 1], [20, 1]]) {
       const state = month(createStartedGameState("cursed-frail", {}, 0, difficulty), 1);
-      expect(getMonthEndIllnessDelta({ ...state, player: { ...state.player, san: san! } })).toBe(expected! * difficulty);
+      expect(getMonthEndIllnessDelta({ ...state, player: { ...state.player, san: san! } })).toBe(san! >= 18 ? difficulty - 2 : expected! * difficulty);
     }
     expect(getMonthEndIllnessDelta(createStartedGameState("cursed-frail", {}, 0, difficulty))).toBe(0);
   });
   it("starts decay after September and resists each loss normally", () => {
     const state = createStartedGameState("special-fading-genius");
-    expect(settleCurseMonthStart(month(state, 1)).player.research).toBe(18);
+    expect(settleCurseMonthStart(month(state, 1)).player.research).toBe(20);
     const october = settleCurseMonthStart(month(state, 2));
-    expect(october.player.research).toBe(17.8);
+    expect(october.player.research).toBe(19.8);
     expect(settleCurseMonthStart(october)).toBe(october);
     const depleted = { ...month(state, 2), player: { ...state.player, research: 0.5 } };
     expect(settleCurseMonthStart(depleted).player.research).toBe(0);
@@ -96,24 +96,24 @@ describe("cursed character run rules", () => {
   it("compounds debt without integer rounding, only once each month", () => {
     const state = createStartedGameState("cursed-debt");
     expect(state.player.money).toBe(1);
-    expect(settleCurseMonthStart(month(state, 1)).curseState?.debt).toBe(60);
+    expect(settleCurseMonthStart(month(state, 1)).curseState?.debt).toBe(50);
     const october = settleCurseMonthStart(month(state, 2));
-    expect(october.curseState?.debt).toBe(61.2);
+    expect(october.curseState?.debt).toBe(51);
     expect(settleCurseMonthStart(october)).toBe(october);
-    expect(settleCurseMonthStart(month(october, 3)).curseState?.debt).toBe(62.424);
+    expect(settleCurseMonthStart(month(october, 3)).curseState?.debt).toBe(52.02);
   });
   it("repays independently from actions, preserves income counters and records spending", () => {
     const initial = createStartedGameState("cursed-debt");
     const state = { ...initial, player: { ...initial.player, money: 70 } };
     const partial = repayCurseDebt(state, 20);
     expect(partial.player.money).toBe(50);
-    expect(partial.curseState?.debt).toBe(40);
+    expect(partial.curseState?.debt).toBe(30);
     expect(partial.personalSpending).toBe(20);
     expect(partial.actionState).toEqual(state.actionState);
     const cleared = dispatchAction(partial, "repay-debt");
     expect(cleared.curseState?.debt).toBe(0);
-    expect(cleared.player.money).toBe(10);
-    expect(cleared.personalSpending).toBe(60);
+    expect(cleared.player.money).toBe(20);
+    expect(cleared.personalSpending).toBe(50);
     expect(settleCurseMonthStart(month(cleared, 2)).curseState?.debt).toBe(0);
     expect(repayCurseDebt(state, Infinity)).toBe(state);
     expect(repayCurseDebt(state, -2)).toBe(state);
@@ -159,22 +159,22 @@ describe("cursed character run rules", () => {
   it("previews decline exactly without mutating the live branch", () => {
     const state = month(createStartedGameState("special-fading-genius"), 1);
     const before = structuredClone(state);
-    expect(previewNextMonthEffects(state).player.research).toBe(17.8);
+    expect(previewNextMonthEffects(state).player.research).toBe(19.8);
     expect(state).toEqual(before);
   });
   it("runs decay and debt exactly once through the real month transition", () => {
     const fading = month(createStartedGameState("special-fading-genius"), 1);
     const december = dispatchAction({ ...fading, player: { ...fading.player, money: 100 } }, "next-month");
     expect(december.totalMonths).toBe(2);
-    expect(december.player.research).toBe(17.8);
+    expect(december.player.research).toBe(19.8);
     const debt = month(createStartedGameState("cursed-debt"), 1);
     const withMoney = { ...debt, player: { ...debt.player, money: 100 } };
     previewNextMonthEffects(withMoney);
     previewNextMonthEffects(withMoney);
     const advanced = dispatchAction(withMoney, "next-month");
     expect(advanced.totalMonths).toBe(2);
-    expect(advanced.curseState?.debt).toBe(61.2);
-    expect(withMoney.curseState?.debt).toBe(60);
+    expect(advanced.curseState?.debt).toBe(51);
+    expect(withMoney.curseState?.debt).toBe(50);
   });
   it("does not recover finite life through purchased coffee", () => {
     const finite = month(createStartedGameState("special-finite-life"), 1);

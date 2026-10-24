@@ -32,7 +32,7 @@ describe("v2 progression", () => {
     expect(role.startingStats).toEqual(startingStats);
     expect(state.player).toEqual({ ...startingStats,
       ...(role.id === "special-finite-life" ? { san: 300 } : {}),
-      ...(role.id === "special-fading-genius" ? { research: 18 } : {}),
+      ...(role.id === "special-fading-genius" ? { research: 20 } : {}),
     });
     expect(state.sanCap).toBe(role.id === "special-finite-life" ? 300 : 20);
     expect(state.paperSlotsUnlocked).toBe(role.id === "special-fading-genius" ? 4 : 1);

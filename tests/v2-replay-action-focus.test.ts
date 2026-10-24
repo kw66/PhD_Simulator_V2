@@ -1,9 +1,31 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import type { ReplayCommand } from "../src/core/v2-run-replay";
-import { getReplayActionTiming, prepareReplayActionView } from "../src/app/v2-replay-action-focus";
+import { getReplayActionTarget, getReplayActionTiming, prepareReplayActionView } from "../src/app/v2-replay-action-focus";
 
 describe("replay action presentation", () => {
+  it("keeps advance repayment on the current page and reveals settings for full repayment", () => {
+    const state = createInitialState();
+    const partial: ReplayCommand = { kind: "action", actionId: "repay-debt", payload: { debtRepayment: 1 } };
+    expect(prepareReplayActionView(state, partial, { activePlayTab: "workstation" }).ui.activePlayTab).toBe("workstation");
+    expect(prepareReplayActionView(state, { ...partial, payload: {} }, { activePlayTab: "workstation" }).ui.activePlayTab).toBe("settings");
+  });
+
+  it("matches recorded repayment amounts to the correct button", () => {
+    const makeButton = (delta?: string) => ({ dataset: { action: "repay-debt", ...(delta ? { delta } : {}) },
+      closest: () => null, getClientRects: () => [{}] }) as unknown as HTMLElement;
+    const full = makeButton();
+    const advance = makeButton("1");
+    const root = { querySelectorAll: () => [full, advance] } as unknown as ParentNode;
+    vi.stubGlobal("getComputedStyle", () => ({ visibility: "visible" }));
+    try {
+      expect(getReplayActionTarget(root, { kind: "action", actionId: "repay-debt", payload: { debtRepayment: 1 } })).toBe(advance);
+      expect(getReplayActionTarget(root, { kind: "action", actionId: "repay-debt", payload: {} })).toBe(full);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("leaves an old event view and selects the recorded paper without mutating the game", () => {
     const state = createInitialState();
     const original = structuredClone(state);

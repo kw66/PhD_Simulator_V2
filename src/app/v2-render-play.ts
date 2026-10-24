@@ -777,6 +777,15 @@ function buildEffectBuckets(state: GameState): {
   };
 }
 
+function renderDebtBalance(state: GameState): string {
+  if (state.selectedRoleId !== "cursed-debt" || !state.curseState) return "";
+  const debt = state.curseState.debt;
+  const label = debt > 0 && debt < 0.01 ? "&lt;0.01" : formatMoney(debt);
+  const payoff = getCurseDebtPayoffAmount(debt);
+  const payment = Math.min(1, payoff);
+  return `<span class="new-debt-balance" data-player-debt="${debt}" title="月利率2%，毕业前需结清${debt > 0 ? `；结清需${formatMoney(payoff)}金币` : ""}">债务 ${label}<button type="button" class="new-investment-button new-debt-repayment-button" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || debt <= 0 ? " disabled" : ""} title="每次偿还1金币，尾款不足1金币按实际结清${debt > 0 ? `；本次偿还${formatMoney(payment)}金币` : ""}">提前还债</button></span>`;
+}
+
 function renderLeftRail(state: GameState): string {
   const researchCap = getResearchCap(state.researchCapacityState);
   const effectBuckets = buildEffectBuckets(state);
@@ -796,7 +805,7 @@ function renderLeftRail(state: GameState): string {
           <div class="new-attr-header new-identity-money-header">
             <span class="new-player-identity"><span class="new-player-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span><span class="new-player-role" title="${escapeHtml(role.name)}">${escapeHtml(role.name)}</span></span>
             <span class="new-player-action-points" aria-label="行动点 ${remainingActions}/${state.actionState.limit}"><span aria-hidden="true">👣</span>行动点 ${renderAnimatedNumber("player:actions:remaining", remainingActions)}/${renderAnimatedNumber("player:actions:limit", state.actionState.limit)}</span>
-            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}${getRoleTalentInvestmentLevel(state) > 0 ? `<button type="button" class="new-investment-button" data-action="invest-money" ${state.player.money < 5 || state.phase !== "playing" ? "disabled" : ""} title="投资5金币，${getRoleTalentInvestmentDuration(state)}个月后返还本金及${getRoleTalentInvestmentLevel(state)}金币利息；持有${state.roleTalents?.investments?.length ?? 0}笔">投资</button>` : ""}${state.selectedRoleId === "rich" && getRoleTalentLevel(state, "gold-power-alpha") > 0 ? `<button type="button" class="new-investment-button new-gold-power-button" data-action="toggle-gold-power" aria-pressed="${state.roleTalents?.goldPowerEnabled === true}" ${state.phase !== "playing" ? "disabled" : ""} title="${state.roleTalents?.goldPowerEnabled ? "已开启：每点SAN消耗改用1金币；金币不足时使用SAN。点击关闭" : "已关闭：点击开启，用金币代替SAN消耗"}"><span aria-hidden="true">${state.roleTalents?.goldPowerEnabled ? "☑" : "☐"}</span> 金之力</button>` : ""}</span>
+            <span class="new-currency-value"><span class="new-currency-icon" aria-hidden="true">💰</span>${formatMoney(state.player.money)}${renderDebtBalance(state)}${getRoleTalentInvestmentLevel(state) > 0 ? `<button type="button" class="new-investment-button" data-action="invest-money" ${state.player.money < 5 || state.phase !== "playing" ? "disabled" : ""} title="投资5金币，${getRoleTalentInvestmentDuration(state)}个月后返还本金及${getRoleTalentInvestmentLevel(state)}金币利息；持有${state.roleTalents?.investments?.length ?? 0}笔">投资</button>` : ""}${state.selectedRoleId === "rich" && getRoleTalentLevel(state, "gold-power-alpha") > 0 ? `<button type="button" class="new-investment-button new-gold-power-button" data-action="toggle-gold-power" aria-pressed="${state.roleTalents?.goldPowerEnabled === true}" ${state.phase !== "playing" ? "disabled" : ""} title="${state.roleTalents?.goldPowerEnabled ? "已开启：每点SAN消耗改用1金币；金币不足时使用SAN。点击关闭" : "已关闭：点击开启，用金币代替SAN消耗"}"><span aria-hidden="true">${state.roleTalents?.goldPowerEnabled ? "☑" : "☐"}</span> 金之力</button>` : ""}</span>
           </div>
         </div>
       </div>

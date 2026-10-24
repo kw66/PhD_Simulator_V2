@@ -66,7 +66,8 @@ export function prepareReplayActionView(state: GameState, command: ReplayCommand
       ui.selectedChairUpgradeId = payload.shopUpgradeId as PlayRenderUiState["selectedChairUpgradeId"];
     } else if (payload.supportItemId || ["bike", "ebike", "down_jacket"].includes(payload.shopItemId ?? "")) ui.activeShopTab = "life";
     else ui.activeShopTab = "gear";
-  } else if (["quit-game", "repay-debt", "set-date-display-mode"].includes(action)) {
+  } else if (["quit-game", "set-date-display-mode"].includes(action)
+    || action === "repay-debt" && payload.debtRepayment === undefined) {
     ui.activePlayTab = "settings";
     ui.isQuitConfirmationOpen = action === "quit-game";
   } else if (["set-linear-event-blocking", "set-event-intro-skipping"].includes(action)) ui.activePlayTab = "events";
@@ -89,7 +90,7 @@ export function getReplayActionTarget(root: ParentNode, command: ReplayCommand):
   const action = actionId === "rewinder-replay-event" ? "replay-event" : actionId;
   const candidates = [...root.querySelectorAll<HTMLElement>("[data-action]")].filter(element => element.dataset.action === action && visible(element));
   return candidates.find(element => targetFields.every(field => {
-    const value = payload[field];
+    const value = field === "delta" && actionId === "repay-debt" ? payload.debtRepayment ?? payload.delta : payload[field];
     if (value !== undefined) return element.dataset[field] === String(value);
     // Distinguish 'return to choices' from replaying an option, and full repayment from 1 coin.
     return field !== "eventChoiceId" && field !== "delta" || element.dataset[field] === undefined;

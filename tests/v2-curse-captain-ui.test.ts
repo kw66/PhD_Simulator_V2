@@ -45,6 +45,39 @@ describe("curse and captain UI", () => {
     expect(html).toContain("尽力还款");
   });
 
+  it.each([[12, 5, 11, 4], [0.3, 1, 0, 0.7], [1e-10, 1, 0, 0.99]])("repays debt %s from the currency rail, including the final remainder", (debt, money, remainingDebt, remainingMoney) => {
+    const state = enroll("cursed-debt");
+    state.curseState = { ...state.curseState!, debt };
+    state.player.money = money;
+    const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "workstation" });
+    const rail = html.match(/<aside class="play-left-rail[\s\S]*?<\/aside>/)![0];
+    expect(rail).toContain('class="new-debt-balance"');
+    expect(rail).toContain(`data-player-debt="${debt}"`);
+    if (debt < 0.01) expect(rail).toContain("债务 &lt;0.01");
+    const button = rail.match(/<button[^>]*data-action="repay-debt"[^>]*>提前还债<\/button>/)![0];
+    expect(button).not.toContain(" disabled");
+    const delta = Number(button.match(/data-delta="([^"]+)"/)![1]);
+    const repaid = dispatchAction(state, "repay-debt", { debtRepayment: delta });
+    expect(repaid.curseState!.debt).toBe(remainingDebt);
+    expect(repaid.player.money).toBe(remainingMoney);
+    expect(repaid.actionState).toEqual(state.actionState);
+    expect(repaid.totalMonths).toBe(state.totalMonths);
+  });
+
+  it.each([[0, 5], [12, 0], [12, 0.99], [0.3, 0.5]])("disables advance repayment for debt %s and cash %s", (debt, money) => {
+    const state = enroll("cursed-debt");
+    state.curseState = { ...state.curseState!, debt };
+    state.player.money = money;
+    const html = renderApp(state, createDefaultAccountProfile(), { activePlayTab: "workstation" });
+    expect(html).toMatch(/data-action="repay-debt" data-delta="1" disabled[^>]*>提前还债<\/button>/);
+  });
+
+  it("keeps the debt balance specific to the debt role", () => {
+    const html = renderApp(enroll("normal"), createDefaultAccountProfile());
+    expect(html).not.toContain('class="new-debt-balance"');
+    expect(html).not.toContain(">提前还债</button>");
+  });
+
   it.each([[1e-10, 0.01], [0.00496, 0.01], [0.0100000001, 0.02], [0.024, 0.03], [127.3400000001, 127.35], [127.34496, 127.35]])("shows the payable cents for debt %s and clears it with the displayed amount", (debt, payoff) => {
     const state = enroll("cursed-debt");
     state.curseState = { ...state.curseState!, debt };
