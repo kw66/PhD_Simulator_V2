@@ -18,6 +18,7 @@ describe("game announcements", () => {
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
     const current = textForDate("2026-10-24");
+    for (const text of ["官方教学录像重新补录", "当前规则", "10与20天赋点博士", "逐一点开", "科研分", "调试入口仅本地", "坏结局"]) expect(textForDate("2026-10-25")).toContain(text);
     for (const text of ["300／200／150／100", "20／18／16／14", "50／70／90／110", "+36／+24／+12／+2", "每次偿还1金币"]) expect(textForDate("2026-10-25")).toContain(text);
     for (const text of ["统御者标签", "本局等级效果与团队加成", "接纵向项目恢复回溯", "导师指导结果固定", "帮助随机同学做项目", "参与同学论文首次被拒"]) expect(current).toContain(text);
     for (const text of ["18位角色", "Q版头像", "统御者标签使用对应角色的Q版头像", "轮回者以自身Q版头像展示六个学年", "继承规则合并至特殊项", "诅咒角色移至第二页", "去除上下大块纯色留白", "好感达到12、15、18", "为组奉献", "资源倾斜", "成果归我", "整钱包", "最终净亏损", "钱能通神", "每累计消费50金币", "聚沙成塔改为1点", "屡败屡研", "心宽体健", "空想的月初轮转", "渐入佳境", "无界轮转需2点", "连续4个月未变", "恩荫成枷", "得寸进尺每级提升好感增长抵抗10个百分点"]) expect(current).toContain(text);

@@ -39,6 +39,14 @@ describe("local playground on the actual development configuration", () => {
       await page.locator('[data-action="start-game"]').click();
       await page.locator('[data-ui-start-without-talents]').click();
       await page.locator('[data-ui-play-tab="settings"]').click();
+      const controls = page.locator(".settings-sections > button");
+      expect(await controls.count()).toBe(7);
+      const debugStyle = await page.locator('[data-ui-open-debug-window]').evaluate(element => {
+        const button = getComputedStyle(element);
+        const peer = getComputedStyle(document.querySelector('[data-ui-open-run-saves]')!);
+        return ["height", "border", "background-image", "font-size", "box-shadow"].every(key => button.getPropertyValue(key) === peer.getPropertyValue(key));
+      });
+      expect(debugStyle).toBe(true);
       const before = await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState());
       const [popup] = await Promise.all([
         page.waitForEvent("popup"), page.locator('[data-ui-open-debug-window]').click(),

@@ -366,9 +366,12 @@ function renderProfileInfoPanel(viewModel: LobbySelectedRoleViewModel, allocatio
     <section class="lobby-profile-info">
       <div class="lobby-profile-info-head">
         <h1 class="lobby-profile-art-name">${escapeHtml(viewModel.role.name)}</h1>
-        ${viewModel.unlockState.owned
-          ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"${viewModel.role.id === "rewinder" ? ` data-rewinder-start-year="${rewinderStartYear}"` : ""}${isSaveLoading ? ' disabled aria-busy="true"' : ""}><span class="lobby-start-button-label">${isSaveLoading ? "读取中…" : hasRoleSave ? viewModel.role.id === "rewinder" ? "继续本学年" : "继续游戏" : viewModel.role.id === "rewinder" ? `开始第${rewinderStartYear}学年` : "开始游戏"}</span><i class="lobby-start-button-arrow" data-lucide="arrow-right" aria-hidden="true"></i></button>`
-          : `<span class="lobby-start-lock" role="group" tabindex="0" aria-label="${escapeHtml(unlockHint)}" data-tooltip="${escapeHtml(unlockHint)}"><button class="lobby-start-button is-disabled" type="button" disabled aria-label="角色尚未解锁"><i data-lucide="lock" aria-hidden="true"></i></button></span>`}
+        <div class="lobby-profile-action-group">
+          <a class="lobby-official-replays-button" href="?replay=official" target="_blank" rel="noopener"><strong>官方录像</strong></a>
+          ${viewModel.unlockState.owned
+            ? `<button class="lobby-start-button" type="button" data-action="start-game" data-role-id="${escapeHtml(viewModel.role.id)}"${viewModel.role.id === "rewinder" ? ` data-rewinder-start-year="${rewinderStartYear}"` : ""}${isSaveLoading ? ' disabled aria-busy="true"' : ""}><span class="lobby-start-button-label">${isSaveLoading ? "读取中…" : hasRoleSave ? viewModel.role.id === "rewinder" ? "继续本学年" : "继续游戏" : viewModel.role.id === "rewinder" ? `开始第${rewinderStartYear}学年` : "开始游戏"}</span><i class="lobby-start-button-arrow" data-lucide="arrow-right" aria-hidden="true"></i></button>`
+            : `<span class="lobby-start-lock" role="group" tabindex="0" aria-label="${escapeHtml(unlockHint)}" data-tooltip="${escapeHtml(unlockHint)}"><button class="lobby-start-button is-disabled" type="button" disabled aria-label="角色尚未解锁"><i data-lucide="lock" aria-hidden="true"></i></button></span>`}
+        </div>
       </div>
       <p class="lobby-profile-summary">${escapeHtml(viewModel.lobby.summary)}</p>
       <div class="lobby-profile-stat-columns">

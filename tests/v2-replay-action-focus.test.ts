@@ -68,7 +68,7 @@ describe("replay action presentation", () => {
     expect(action.previewMs).toBeGreaterThan(event.previewMs);
     expect(action.resultMs).toBeGreaterThan(event.resultMs);
     expect(action.resultMs).toBeGreaterThan(action.previewMs);
-    expect(getReplayActionTiming({ kind: "action", actionId: "next-month", payload: {} })).toEqual({ previewMs: 0, resultMs: 0 });
+    expect(getReplayActionTiming({ kind: "action", actionId: "next-month", payload: {} }).previewMs).toBeGreaterThan(0);
     expect(getReplayActionTiming({ kind: "action", actionId: "select-paper", payload: { paperId: "paper-1" } }).resultMs).toBe(0);
   });
 });

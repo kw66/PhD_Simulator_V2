@@ -1,6 +1,8 @@
 import { ENABLE_LOCAL_PLAYGROUND } from "../core/v2-development-flags";
 import { parseReplayRecording, serializeReplayRecording, validateReplayRecording, verifyReplayRecording, type ReplayRecording } from "../core/v2-local-replay";
 import type { GameState, RoleId } from "../core/v2-types";
+import { withGameplayRuleset } from "../core/v2-rule-context";
+import { deriveReplayResults, type ReplayMetrics } from "./v2-replay-results";
 
 export interface ReplaySummary {
   id: string;
@@ -13,8 +15,11 @@ export interface ReplaySummary {
   phase: GameState["phase"];
   ending: GameState["ending"];
   researchScore: number;
+  metrics?: ReplayMetrics;
   commandCount: number;
   academicYear?: number;
+  officialRoute?: string;
+  officialNote?: string;
 }
 export interface ReplayLibraryEntry { id: string; recording: ReplayRecording; summary: ReplaySummary }
 export interface ReplayLibraryAdapter {
@@ -69,10 +74,14 @@ export function createIndexedDbReplayAdapter(options: { playground?: boolean; in
   };
 }
 function summarize(recording: ReplayRecording, state: GameState): ReplaySummary {
+  const lastAction = [...recording.replay.commands].reverse().find(command => command.kind === "action");
+  const { money, attributes } = withGameplayRuleset(lastAction?.kind === "action" && lastAction.ruleset || recording.replay.ruleset,
+    () => deriveReplayResults(state));
+  const metrics = { money, attributes };
   return { id: recording.id, createdAt: recording.createdAt, updatedAt: recording.updatedAt,
     roleId: state.selectedRoleId, playerName: state.playerName, totalMonths: state.totalMonths,
     degree: state.degree, phase: state.phase, ending: state.ending, researchScore: state.totalResearchScore,
-    commandCount: recording.replay.commands.length,
+    commandCount: recording.replay.commands.length, metrics,
     ...(state.rewinderState?.academic?.completed ? { academicYear: state.rewinderState.academic.completed.year } : {}) };
 }
 export function createReplayLibrary(options: { adapter?: ReplayLibraryAdapter; playground?: boolean } = {}) {

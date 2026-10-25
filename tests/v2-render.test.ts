@@ -1960,7 +1960,8 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="talent-items-list"');
     expect(html).toContain('class="settings-panel"');
     expect(html).toContain('id="settings-panel-content"');
-    expect(html).toContain('class="settings-quick-actions"');
+    expect(html).toContain('class="settings-sections"');
+    expect(html).not.toContain('class="settings-group"');
     expect(html).not.toContain('class="settings-plan"');
     expect(html).not.toContain("后续计划");
     expect(html).not.toContain('data-ui-layout-toggle="debug-event-rail"');

@@ -5,6 +5,7 @@ import { createServer, type ViteDevServer } from "vite";
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
 import { captureReplayRecording } from "../src/core/v2-local-replay";
 import { createRunReplay, executeReplayCommand, replayStateDigest, type ReplayCommand } from "../src/core/v2-run-replay";
+import manifest from "../src/app/v2-official-replay-manifest.json";
 
 function sample() {
   const initial = createInitialState();
@@ -62,6 +63,11 @@ describe("isolated local replay browser player", () => {
       const data = sample();
       await page.locator("[data-replay-file]").setInputFiles({ name: "sample.phdreplay.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
       await page.waitForSelector("[data-replay-open]");
+      expect(await page.locator(".replay-card-metrics > div").count()).toBe(6);
+      expect(await page.locator(".replay-card-metrics").textContent()).toContain("科研分");
+      expect(await page.locator(".replay-card-metrics").textContent()).toContain("金币");
+      expect(await page.locator(".replay-card-metrics dd span").count()).toBe(4);
+      expect(await page.locator("[data-replay-results], .replay-results-dialog").count()).toBe(0);
       expect(await page.locator(".replay-card-portrait").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
       await page.screenshot({ path: `artifacts/local-replay/library-${width}.png`, fullPage: true });
       await page.locator("[data-replay-open]").click();
@@ -79,8 +85,15 @@ describe("isolated local replay browser player", () => {
       await page.waitForFunction(() => document.querySelector(".replay-inline-progress output")?.textContent?.startsWith("1 /"));
       await page.locator("[data-replay-speed]").selectOption("8");
       await page.locator("[data-replay-play]").click();
-      await page.waitForFunction(() => Number(document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value) > 3);
-      await page.getByRole("button", { name: "暂停", exact: true }).click();
+      // Pause in the same browser turn that observes progress; at 8x the next
+      // render can replace the button before a second Playwright call reaches it.
+      await page.waitForFunction(() => {
+        if (Number(document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value) <= 3) return false;
+        const pause = document.querySelector<HTMLButtonElement>('[data-replay-play][aria-label="暂停"]');
+        if (!pause) return false;
+        pause.click(); return true;
+      });
+      expect(await page.locator("[data-replay-play]").getAttribute("aria-label")).toBe("播放");
       const paused = await page.locator("[data-replay-seek]").inputValue();
       await page.waitForTimeout(200);
       expect(await page.locator("[data-replay-seek]").inputValue()).toBe(paused);
@@ -129,11 +142,21 @@ describe("isolated local replay browser player", () => {
         await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index), beforeIndex);
         await page.locator("[data-replay-speed]").selectOption("0.5");
         await page.locator('[data-replay-step="1"]').click();
-        await page.waitForSelector(".replay-click-cue");
-        expect(await page.locator(".replay-click-target").getAttribute("data-action")).toBe(action);
-        expect(await page.locator(`[data-ui-play-tab="${tab}"]`).getAttribute("aria-pressed")).toBe("true");
-        expect(await page.locator("[data-replay-seek]").inputValue()).toBe(String(beforeIndex));
-        if (action === "research-paper") expect(await page.locator(".replay-click-target").getAttribute("data-paper-action-type")).toBe("idea");
+        // Read the transient cue and its surrounding view atomically, before
+        // the preview timer executes the recorded action.
+        const cue = await page.waitForFunction(({ action, tab }) => {
+          const target = document.querySelector<HTMLElement>(`.replay-click-target[data-action="${action}"]`);
+          if (!target) return null;
+          return { action: target.dataset.action, paperAction: target.dataset.paperActionType,
+            tabPressed: document.querySelector(`[data-ui-play-tab="${tab}"]`)?.getAttribute("aria-pressed"),
+            index: document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value };
+        }, { action, tab });
+        const shown = await cue.jsonValue();
+        if (!shown) throw new Error(`Missing preview for ${action}`);
+        expect(shown.action).toBe(action);
+        expect(shown.tabPressed).toBe("true");
+        expect(shown.index).toBe(String(beforeIndex));
+        if (action === "research-paper") expect(shown.paperAction).toBe("idea");
         await page.screenshot({ path: `artifacts/local-replay/cue-${action}-${width}.png`, fullPage: true });
         await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 1), beforeIndex);
         expect(await page.locator(".replay-click-cue").count()).toBe(0);
@@ -142,8 +165,12 @@ describe("isolated local replay browser player", () => {
       await page.locator("[data-replay-seek]").dispatchEvent("change");
       await page.waitForFunction(() => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === "1");
       await page.locator("[data-replay-play]").click();
-      await page.waitForSelector(".replay-click-cue");
-      await page.getByRole("button", { name: "暂停", exact: true }).click();
+      await page.waitForFunction(() => {
+        if (!document.querySelector(".replay-click-cue")) return false;
+        const pause = document.querySelector<HTMLButtonElement>('[data-replay-play][aria-label="暂停"]');
+        if (!pause) return false;
+        pause.click(); return true;
+      });
       await page.waitForTimeout(1400);
       expect(await page.locator("[data-replay-seek]").inputValue()).toBe("1");
       expect(await page.locator(".replay-click-cue").count()).toBe(0);
@@ -151,9 +178,10 @@ describe("isolated local replay browser player", () => {
       await page.locator("[data-replay-seek]").fill(String(monthIndex));
       await page.locator("[data-replay-seek]").dispatchEvent("change");
       await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index), monthIndex);
-      // At half speed the former month preview would hold for two seconds.
       await page.locator('[data-replay-step="1"]').click();
-      await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 1), monthIndex, { timeout: 1200 });
+      await page.waitForSelector('.replay-click-target[data-action="next-month"]');
+      expect(await page.locator("[data-replay-seek]").inputValue()).toBe(String(monthIndex));
+      await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 1), monthIndex);
       expect(await page.locator(".replay-click-cue").count()).toBe(0);
     } finally { await page.close(); }
   }, 40_000);
@@ -167,7 +195,87 @@ describe("isolated local replay browser player", () => {
       expect(await page.locator(".replay-message").textContent()).toContain("不在当前浏览器");
       await page.locator("[data-replay-file]").setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from('{"version":1}') });
       await page.waitForFunction(() => document.querySelector(".replay-message.is-error")?.textContent?.includes("回放无效"));
-      expect(await page.locator("[data-replay-import]:not(:disabled)").count()).toBeGreaterThan(0);
+      await page.waitForSelector("[data-replay-import]:not(:disabled)");
+    } finally { await page.close(); }
+  }, 30_000);
+
+  it.each([390, 1440])("filters official routes and visits talents without rebuilding the screen at %spx", async width => {
+    const page = await browser.newPage({ viewport: { width, height: 1040 } });
+    try {
+      await page.goto(`${server.resolvedUrls!.local[0]}?replay=official`);
+      await page.waitForSelector("[data-replay-card]");
+      expect(await page.locator("[data-replay-route]").count()).toBe(6);
+      const phd10 = manifest.filter(item => item.route === "phd-10");
+      expect(await page.locator("[data-replay-card]").count()).toBe(phd10.length);
+      expect(await page.locator(".replay-card-metrics > div").count()).toBe(phd10.length * 6);
+      expect(await page.locator(".replay-card-metrics dd span").count()).toBe(phd10.length * 4);
+      expect(await page.locator(".replay-card-metrics").first().textContent()).not.toContain("…");
+      expect(await page.locator("[data-replay-results]").count()).toBe(0);
+      await page.locator('[data-replay-route="master-10"]').click();
+      expect(await page.locator("[data-replay-card]").count()).toBe(manifest.filter(item => item.route === "master-10").length);
+      for (const route of ["cursed", "special"]) {
+        await page.locator(`[data-replay-route="${route}"]`).click();
+        expect(await page.locator(`[data-replay-route="${route}"]`).getAttribute("aria-pressed")).toBe("true");
+        expect(await page.locator("[data-replay-card]").count()).toBe(0);
+        expect(await page.locator(".replay-empty").textContent()).toContain("暂无录像");
+      }
+      await page.locator('[data-replay-route="phd-10"]').click();
+      await page.locator('[data-replay-open="official-normal-phd-10"]').click();
+      await page.waitForSelector("[data-replay-seek]");
+      await page.locator("[data-replay-speed]").selectOption("0.5");
+      await page.locator('[data-replay-step="1"]').click();
+      await page.waitForSelector(".replay-click-target[data-ui-open-event-id]");
+      expect(await page.locator("#event-content-box:visible").count()).toBe(0);
+      expect(await page.locator("[data-replay-seek]").inputValue()).toBe("1");
+      await page.screenshot({ path: `artifacts/local-replay/cue-event-entry-${width}.png`, fullPage: true });
+      await page.waitForFunction(() => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === "2");
+      await page.locator("[data-replay-seek]").fill("4");
+      await page.locator("[data-replay-seek]").dispatchEvent("change");
+      await page.waitForFunction(() => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === "4");
+      await page.locator('[data-replay-step="1"]').click();
+      await page.waitForFunction(() => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === "5");
+      await page.locator("[data-replay-speed]").selectOption("2");
+      await page.locator('[data-replay-step="1"]').click();
+      await page.waitForSelector('.replay-click-target[data-ui-play-tab="talent"]');
+      expect(await page.locator('[data-ui-play-tab="talent"]').getAttribute("aria-pressed")).toBe("false");
+      await page.screenshot({ path: `artifacts/local-replay/cue-main-tab-${width}.png`, fullPage: true });
+      await page.waitForSelector(".replay-click-target[data-ui-talent-tree-node]");
+      await page.waitForSelector(".replay-click-cue", { state: "detached" });
+      expect(await page.locator('[data-ui-play-tab="talent"]').getAttribute("aria-pressed")).toBe("true");
+      const lit = page.locator('[data-ui-talent-tree-node][data-current-level]:not([data-current-level="0"])');
+      const purchased = await lit.evaluateAll(nodes => nodes.map(node => node.getAttribute("data-ui-talent-tree-node")));
+      expect(purchased.length).toBeGreaterThan(0);
+      const viewer = await page.locator(".replay-viewer").elementHandle();
+      const tree = await page.locator(".lobby-talent-tree").elementHandle();
+      const portrait = await page.locator(".play-page img").first().elementHandle();
+      await page.locator("[data-replay-speed]").selectOption("8");
+      for (const key of purchased.slice(1)) {
+        await page.locator('[data-replay-step="1"]').click();
+        await page.waitForFunction(key => document.querySelector(`[data-ui-talent-tree-node="${key}"]`)?.getAttribute("aria-pressed") === "true" && !document.querySelector(".replay-click-cue"), key);
+        expect(await page.locator("[data-replay-seek]").inputValue()).toBe("5");
+        expect(await page.locator(".lobby-normal-tree-detail:visible").count()).toBe(1);
+        expect(await viewer!.evaluate(node => node.isConnected)).toBe(true);
+        expect(await tree!.evaluate(node => node.isConnected)).toBe(true);
+        expect(await portrait!.evaluate(node => node.isConnected)).toBe(true);
+      }
+      // Manual selection uses the existing details and does not modify allocation.
+      const allocation = await lit.evaluateAll(nodes => nodes.map(node => node.getAttribute("data-current-level")));
+      await page.locator(`[data-ui-talent-tree-node="${purchased[0]}"]`).click();
+      expect(await page.locator(`[data-ui-talent-tree-node="${purchased[0]}"]`).getAttribute("aria-pressed")).toBe("true");
+      expect(await lit.evaluateAll(nodes => nodes.map(node => node.getAttribute("data-current-level")))).toEqual(allocation);
+      expect(await viewer!.evaluate(node => node.isConnected)).toBe(true);
+      expect(await tree!.evaluate(node => node.isConnected)).toBe(true);
+      expect(await page.locator(`[data-ui-talent-tree-node="${purchased[0]}"]`).evaluate(node => node === document.activeElement)).toBe(true);
+      // Playing and pausing also preserve the current panel and its animations.
+      await page.locator("[data-replay-play]").evaluate((button: HTMLButtonElement) => button.click());
+      await page.locator("[data-replay-play]").evaluate((button: HTMLButtonElement) => button.click());
+      expect(await viewer!.evaluate(node => node.isConnected)).toBe(true);
+      expect(await page.locator("[data-replay-play]").getAttribute("aria-label")).toBe("播放");
+      await page.locator('[data-replay-step="1"]').click();
+      await page.waitForFunction(() => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === "6");
+      const downloadPromise = page.waitForEvent("download");
+      await page.locator("[data-replay-export]").click();
+      expect((await downloadPromise).suggestedFilename()).toContain("official-normal-phd-10");
     } finally { await page.close(); }
   }, 30_000);
 

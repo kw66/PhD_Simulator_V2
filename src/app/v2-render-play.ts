@@ -3852,36 +3852,22 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
   const payoffHint = debt > 0 && (debt < 0.01 || payoff !== roundMoney(debt)) ? ` · 结清需${formatMoney(payoff)}金币` : "";
   return `
     <div class="settings-panel">
-      <div class="settings-sections" id="settings-panel-content">
-        <div class="settings-group" role="group" aria-label="本局进度">
-          <h3 class="settings-group-heading">本局进度<span>存档与继续</span></h3>
-          <div class="settings-quick-actions">
-            <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
-              <i data-lucide="history" aria-hidden="true"></i><span class="settings-action-copy"><span>读取存档</span><small>查看本局的月份存档</small></span>
-            </button>
-            <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
-              <i data-lucide="house" aria-hidden="true"></i><span class="settings-action-copy"><span>返回开始页面</span><small>回到角色与天赋页面</small></span>
-            </button>
-          </div>
-        </div>
-        <div class="settings-group" role="group" aria-label="回放管理">
-          <h3 class="settings-group-heading">回放记录<span>下载与重看</span></h3>
-          <div class="settings-quick-actions">
-            <button class="settings-primary-btn" type="button" data-ui-download-replay><i data-lucide="download" aria-hidden="true"></i><span class="settings-action-copy"><span>下载本局回放</span><small>保存为本地文件</small></span></button>
-            <button class="settings-primary-btn" type="button" data-ui-open-local-replays><i data-lucide="history" aria-hidden="true"></i><span class="settings-action-copy"><span>本地回放</span><small>导入与播放回放文件</small></span></button>
-          </div>
-        </div>
-        <div class="settings-secondary-actions">
-          <button class="settings-community-button is-feedback" type="button" data-ui-open-feedback>
-            <i data-lucide="message-square" aria-hidden="true"></i><span>留言反馈</span>
-          </button>
-          <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
-            <i data-lucide="log-out" aria-hidden="true"></i><span>主动退学</span>
-          </button>
-          ${ENABLE_LOCAL_PLAYGROUND ? `<button class="settings-primary-btn is-local-debug" type="button" data-ui-open-debug-window title="仅本地测试可见；打开面板不会修改本局">
-            <i data-lucide="wrench" aria-hidden="true"></i><span>打开调试面板</span>
-          </button>` : ""}
-        </div>
+      <div class="settings-sections" id="settings-panel-content" role="group" aria-label="游戏设置">
+        <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
+          <i data-lucide="history" aria-hidden="true"></i><span>读取存档</span>
+        </button>
+        <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
+          <i data-lucide="house" aria-hidden="true"></i><span>返回开始页面</span>
+        </button>
+        <button class="settings-primary-btn" type="button" data-ui-download-replay><i data-lucide="download" aria-hidden="true"></i><span>下载本局回放</span></button>
+        <button class="settings-primary-btn" type="button" data-ui-open-local-replays><i data-lucide="history" aria-hidden="true"></i><span>本地回放</span></button>
+        <button class="settings-community-button is-feedback" type="button" data-ui-open-feedback>
+          <i data-lucide="message-square" aria-hidden="true"></i><span>留言反馈</span>
+        </button>
+        <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
+          <i data-lucide="log-out" aria-hidden="true"></i><span>主动退学</span>
+        </button>
+        ${ENABLE_LOCAL_PLAYGROUND ? `<button class="settings-primary-btn" type="button" data-ui-open-debug-window><i data-lucide="wrench" aria-hidden="true"></i><span>调试面板</span></button>` : ""}
       </div>
       ${state.selectedRoleId === "cursed-debt" && state.curseState ? `<section class="curse-debt-panel"><div><strong>待偿债务 ${debtLabel} 金币</strong><span>月利率2% · 毕业前需结清${payoffHint}</span></div><div class="curse-debt-actions"><button type="button" class="settings-primary-btn" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || debt <= 0 ? " disabled" : ""}>偿还1金币</button><button type="button" class="settings-primary-btn" data-action="repay-debt"${state.phase !== "playing" || state.player.money <= 0 || debt <= 0 ? " disabled" : ""}>尽力还款</button></div></section>` : ""}
       ${renderRunSaves(state, uiState)}

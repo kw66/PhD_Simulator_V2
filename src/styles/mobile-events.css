@@ -79,7 +79,7 @@
     gap: 6px;
   }
   .settings-panel .settings-quick-actions > button { min-height: 44px; font-size: 13px; }
-  .settings-panel { padding-top: 4px; }
+  .settings-panel { padding-top: 0; }
   .run-saves { margin-top: 8px; gap: 5px; }
   .run-saves-list { grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 5px; }
   .run-saves-heading { padding: 5px 8px; gap: 5px; }

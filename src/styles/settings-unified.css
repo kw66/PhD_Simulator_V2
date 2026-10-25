@@ -1,17 +1,18 @@
 .settings-panel {
-  padding: 8px 3px 0;
+  padding: 0;
+  align-content: start;
+  justify-items: start;
+}
+
+.center-shell:has(> .center-main-panels > [data-tab-panel="settings"]:not([hidden])) {
+  gap: 0;
 }
 
 .local-replay-save-notice { position: fixed; z-index: 10000; left: 50%; bottom: 22px; transform: translateX(-50%); max-width: min(420px, calc(100vw - 28px)); width: max-content; margin: 0; padding: 12px 18px; border: 1px solid #c3ab7e; border-radius: 8px; background: #fff7e7; color: #70512e; box-shadow: 0 5px 24px #4b38232b; font-size: 13px; line-height: 1.6; text-align: center; }
 
-.settings-sections { display: grid; grid-template-columns: minmax(0, 1fr); gap: 15px; min-width: 0; }
-.settings-group { min-width: 0; padding: 14px; border: 1px solid #d4c3a1; border-radius: 7px; background: #f8f1e2; box-shadow: inset 0 1px 0 #fffdf6; }
-.settings-group-heading { display: flex; align-items: center; gap: 10px; margin: 0 0 11px; color: #5e503b; font-size: 14px; line-height: 1.4; letter-spacing: .04em; }
-.settings-group-heading::before { content: ""; width: 3px; height: 14px; border-radius: 2px; background: #b49459; }
-.settings-group-heading > span { margin-left: auto; color: #9a8766; font-size: 11px; font-weight: 500; letter-spacing: .02em; }
-.settings-panel .settings-group .settings-quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.settings-sections { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); justify-self: stretch; width: 100%; gap: 7px; min-width: 0; padding: 0; }
 
-.run-saves { min-height: 0; display: flex; flex-direction: column; gap: 9px; margin-top: 15px; color: #615037; }
+.run-saves { width: 100%; max-width: 680px; min-height: 0; display: flex; flex-direction: column; gap: 9px; margin-top: 15px; color: #615037; }
 .run-saves-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 5px; background: #eadbbd; }
 .run-saves-heading h3 { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 14px; }
 .run-saves-heading h3 .lucide { width: 17px; height: 17px; }
@@ -33,67 +34,51 @@
 .run-save-card:focus-visible, .run-saves-close:focus-visible { outline: 2px solid #a6803f; outline-offset: 2px; }
 .run-saves-empty { grid-column: 1 / -1; padding: 24px; text-align: center; color: #8a775c; font-size: 13px; }
 
-.settings-panel .settings-quick-actions > button {
-  display: flex;
+.settings-panel .settings-sections > button {
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 9px;
+  justify-content: center;
+  gap: 5px;
   width: 100%;
+  flex: 0 0 auto;
   min-width: 0;
-  min-height: 54px;
-  padding: 8px 10px;
-  border: 1px solid #d0bc95;
+  min-height: 42px;
+  padding: 9px 7px;
+  border: 1px solid rgba(154, 115, 52, .34);
   border-radius: 5px;
-  background: linear-gradient(180deg, #fffcf5, #f4ead6);
+  background: linear-gradient(145deg, #fffaf0, #eee3cd);
   color: #574933;
-  box-shadow: inset 0 1px 0 #fffdf7, 0 1px 0 #e0cfad;
+  box-shadow: inset 0 1px 0 #fffdf7, inset 0 -1px 0 #aa8d5030, 0 1px 2px #53422612;
   font: inherit;
   font-size: 13px;
-  font-weight: 750;
-  text-align: left;
+  font-weight: 650;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
   cursor: pointer;
   transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
 
-.settings-panel .settings-quick-actions > button .lucide {
+.settings-panel .settings-sections > button .lucide {
   flex: 0 0 auto;
-  box-sizing: content-box;
-  width: 18px;
-  height: 18px;
-  padding: 5px;
-  border: 1px solid #deceb0;
-  border-radius: 5px;
-  background: #f0e4cb;
-  color: #94713c;
+  width: 15px;
+  height: 15px;
+  color: #8c6d39;
   stroke-width: 1.7;
 }
 
-.settings-action-copy { display: grid; min-width: 0; gap: 2px; line-height: 1.4; }
-.settings-action-copy > span { white-space: nowrap; }
-.settings-action-copy > small { color: #938064; font-size: 11px; font-weight: 400; }
-
-.settings-panel .settings-quick-actions > button.is-return {
-  color: #574933;
-}
-
-.settings-panel .settings-quick-actions > button:hover:not(:disabled):not(.active) {
+.settings-panel .settings-sections > button:hover:not(:disabled) {
   border-color: #9b7d4e;
   background: #f1e2c6;
   box-shadow: inset 0 1px 0 #fffdf7, 0 1px 0 #c3a97a;
   transform: none;
 }
 
-.settings-secondary-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 10px; margin: 0 14px; padding: 0 0 2px; }
-.settings-panel .settings-secondary-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-width: 0; min-height: 54px; padding: 8px 10px; border: 1px solid #d0bc95; border-radius: 5px; background: linear-gradient(180deg, #fffcf5, #f4ead6); color: #837052; box-shadow: inset 0 1px 0 #fffdf7, 0 1px 0 #e0cfad; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.4; white-space: nowrap; cursor: pointer; }
-.settings-panel .settings-secondary-actions > button .lucide { width: 18px; height: 18px; stroke-width: 1.8; }
-.settings-panel .settings-secondary-actions > button.is-local-debug { grid-column: 1 / -1; }
-.settings-panel .settings-secondary-actions > button.is-quit { border-color: #d8bdb1; color: #976759; background: #f8eee6; }
-.settings-panel .settings-secondary-actions > button:hover:not(:disabled) { border-color: #cfbc96; background: #eee2ca; transform: none; box-shadow: none; }
-.settings-panel .settings-secondary-actions > button.is-quit:hover:not(:disabled) { border-color: #ba8a79; background: #f0dfd5; }
-.settings-panel .settings-secondary-actions > button:disabled { opacity: .48; cursor: not-allowed; }
-.settings-panel .settings-secondary-actions > button:focus-visible { outline: 2px solid #a6803f; outline-offset: 2px; }
-
-.settings-panel .settings-quick-actions > button:disabled {
+.settings-panel .settings-sections > button:active:not(:disabled) { transform: translateY(1px); background: #ece0c6; box-shadow: inset 0 1px 2px #53422625; }
+.settings-panel .settings-sections > button.is-quit { border-color: #d8bdb1; color: #976759; background: #f8eee6; }
+.settings-panel .settings-sections > button.is-quit .lucide { color: inherit; }
+.settings-panel .settings-sections > button.is-quit:hover:not(:disabled) { border-color: #ba8a79; background: #f0dfd5; }
+.settings-panel .settings-sections > button:disabled {
   border-color: #c9c1b2;
   background: #ebe7dd;
   color: #928b7d;
@@ -101,7 +86,7 @@
   cursor: not-allowed;
 }
 
-.settings-panel .settings-quick-actions > button:focus-visible {
+.settings-panel .settings-sections > button:focus-visible {
   outline: 2px solid #a6803f;
   outline-offset: 2px;
 }
@@ -212,23 +197,15 @@
   outline-offset: 3px;
 }
 
-@media (max-width: 720px) {
-  .settings-sections { gap: 10px; }
-  .settings-group { padding: 10px; }
-  .settings-group-heading { margin-bottom: 8px; font-size: 13px; }
-  .settings-group-heading > span { font-size: 10px; }
-  .settings-panel .settings-group .settings-quick-actions { gap: 7px; }
-  .settings-panel .settings-quick-actions > button { min-height: 50px; padding: 6px; gap: 5px; font-size: 12px; }
-  .settings-panel .settings-quick-actions > button .lucide { width: 16px; height: 16px; padding: 2px; }
-  .settings-action-copy { gap: 2px; }
-  .settings-action-copy > small { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .settings-secondary-actions { margin-inline: 10px; gap: 7px; }
-  .settings-panel .settings-secondary-actions > button { min-height: 50px; padding: 7px; font-size: 12px; }
+@media (max-width: 820px) {
+  .settings-panel { padding: 0; }
+  .settings-sections { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .settings-panel .settings-sections > button { min-height: 40px; padding: 8px 7px; gap: 4px; font-size: 12px; }
+  .settings-panel .settings-sections > button .lucide { width: 14px; height: 14px; }
 }
 
 @media (max-width: 370px) {
-  .settings-panel .settings-quick-actions > button { padding-inline: 6px; font-size: 11px; }
-  .settings-action-copy > small { font-size: 9px; }
+  .settings-panel .settings-sections > button { gap: 4px; font-size: 11px; }
 }
 
 .curse-debt-panel { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; padding: 12px; border-radius: 10px; background: #f5ebd9; }

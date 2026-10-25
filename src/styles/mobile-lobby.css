@@ -66,8 +66,10 @@
   .lobby-page .lobby-profile-art { grid-column: 1; grid-row: 1 / 3; align-self: center; }
   .lobby-page[data-scale-mode="fixed"] .lobby-profile-portrait { width: 94px; max-height: 168px; }
   .lobby-page[data-scale-mode="fixed"] .lobby-profile-info-head { grid-column: 2; gap: 6px; min-width: 0; flex-direction: column; align-items: stretch; }
+  .lobby-page .lobby-profile-action-group { align-self: flex-start; margin-left: 0; gap: 6px; }
+  .lobby-page .lobby-profile-action-group .lobby-official-replays-button { min-height: 44px; }
   .lobby-page .lobby-profile-art-name { font-size: 21px; line-height: 1.25; }
-  .lobby-page .lobby-start-button { min-width: 0; min-height: 44px; }
+  .lobby-page[data-scale-mode="fixed"] .lobby-start-button { width: fit-content; min-width: 108px; min-height: 44px; align-self: flex-start; }
   .lobby-page .lobby-start-lock { width: 100%; }
   .lobby-page .lobby-profile-summary {
     grid-column: 2;
@@ -164,4 +166,10 @@
 @media (max-width: 360px) {
   .lobby-page .lobby-project-links a { padding: 0 3px; gap: 3px; font-size: 12px; }
   .lobby-page .lobby-project-links .lucide { width: 14px; height: 14px; flex-basis: 14px; }
+  .lobby-page .lobby-profile-action-group { gap: 4px; }
+  .lobby-page .lobby-profile-action-group .lobby-official-replays-button { gap: 4px; padding-inline: 6px; }
+  .lobby-page .lobby-profile-action-group .lobby-official-replays-button strong { font-size: 12px; }
+  .lobby-page .lobby-profile-action-group .lobby-start-button { min-width: 88px; padding-inline: 6px; gap: 4px; }
+  .lobby-page .lobby-profile-action-group .lobby-start-button-label { font-size: 13px; }
+  .lobby-page .lobby-profile-action-group .lobby-start-button-arrow { width: 15px; height: 15px; }
 }

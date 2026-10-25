@@ -23,7 +23,16 @@ export function prepareReplayActionView(state: GameState, command: ReplayCommand
     isReplay: true,
     activeEventHistoryId: null, activeEventHistoryIndex: null, isEventContentOpen: false,
     isEndingContentOpen: false, isHelpOpen: false, isQuitConfirmationOpen: false, isRunSavePanelOpen: false };
-  if (command.kind === "help") return { ui: { ...ui, isHelpOpen: true } };
+  if (command.kind === "help") {
+    const parts = command.id.split(":");
+    const page = Number(parts.pop());
+    const key = parts.join(":");
+    const main = parts[0];
+    return { ui: { ...ui, activePlayTab: main as PlayRenderUiState["activePlayTab"],
+      ...(main === "shop" ? { activeShopTab: parts[1] as PlayRenderUiState["activeShopTab"] } : {}),
+      ...(main === "talent" ? { activeTalentTab: parts[1] as PlayRenderUiState["activeTalentTab"] } : {}),
+      isHelpOpen: true, helpPageByContext: { ...ui.helpPageByContext, [key]: page } } };
+  }
   const { actionId: action, payload } = command;
   if (eventActions.has(action)) {
     ui.activePlayTab = "events";
@@ -66,7 +75,7 @@ export function prepareReplayActionView(state: GameState, command: ReplayCommand
       ui.selectedChairUpgradeId = payload.shopUpgradeId as PlayRenderUiState["selectedChairUpgradeId"];
     } else if (payload.supportItemId || ["bike", "ebike", "down_jacket"].includes(payload.shopItemId ?? "")) ui.activeShopTab = "life";
     else ui.activeShopTab = "gear";
-  } else if (["quit-game", "set-date-display-mode"].includes(action)
+  } else if (action === "quit-game"
     || action === "repay-debt" && payload.debtRepayment === undefined) {
     ui.activePlayTab = "settings";
     ui.isQuitConfirmationOpen = action === "quit-game";
@@ -87,6 +96,12 @@ export function getReplayActionTarget(root: ParentNode, command: ReplayCommand):
   const { actionId, payload } = command;
   if (actionId === "select-paper") return [...root.querySelectorAll<HTMLElement>("[data-ui-select-workstation-paper]")]
     .find(element => element.dataset.uiSelectWorkstationPaper === payload.paperId && visible(element)) ?? null;
+  if (actionId === "quit-game") return root.querySelector<HTMLElement>("[data-ui-confirm-quit]");
+  // Older automated recordings can include an attempted action after its monthly
+  // allowance is exhausted. Its disabled button has no data-action attribute.
+  const workstationButtons: Partial<Record<string, string>> = { rest: ".is-rest", "read-paper": ".is-read", "part-time-work": ".is-work" };
+  const workstationButton = workstationButtons[actionId];
+  if (workstationButton) return root.querySelector<HTMLElement>(`.workstation-main-actions ${workstationButton}`);
   const action = actionId === "rewinder-replay-event" ? "replay-event" : actionId;
   const candidates = [...root.querySelectorAll<HTMLElement>("[data-action]")].filter(element => element.dataset.action === action && visible(element));
   return candidates.find(element => targetFields.every(field => {
@@ -98,7 +113,7 @@ export function getReplayActionTarget(root: ParentNode, command: ReplayCommand):
 }
 
 export function getReplayActionTiming(command: ReplayCommand): { previewMs: number; resultMs: number } {
-  if (command.kind === "action" && command.actionId === "next-month") return { previewMs: 0, resultMs: 0 };
+  if (command.kind === "action" && command.actionId === "next-month") return { previewMs: 450, resultMs: 900 };
   if (command.kind === "action" && ["select-paper", "set-date-display-mode", "set-linear-event-blocking", "set-event-intro-skipping"].includes(command.actionId)) {
     return { previewMs: 200, resultMs: 0 };
   }

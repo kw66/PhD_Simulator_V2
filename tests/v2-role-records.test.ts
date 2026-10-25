@@ -42,14 +42,23 @@ describe("role history and run statistics", () => {
     expect(view.statistics[4].tooltip).toContain("已达成结局");
   });
 
-  it.each(["master", "phd", "quit", "burnout", "poor", "expelled", "isolated", "overthinking", "delay"] as const)("records the %s result once and persists its start separately", async (ending) => {
+  it.each(["master", "phd", "quit", "burnout", "poor", "expelled", "isolated", "overthinking", "lab-bankrupt", "delay"] as const)("records the %s result and personal history once and persists its start separately", async (ending) => {
     const storage = createStorage();
     const saves = createRunSaveRepository({ storage, adapter: createMemoryRunSaveAdapter() });
     const store = createStore({ storage, saves });
     await store.ready();
     store.dispatch("start-game", { roleId: "normal" });
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 0 });
+    const hasPublication = !["master", "phd", "delay"].includes(ending);
+    if (hasPublication) Object.assign(store.getState(), dispatchAction(store.getState(), "debug-add-paper", { debugJournalTarget: "nature", debugPaperAuthorship: "first" }));
     const state = store.getState();
+    if (hasPublication) {
+      const published = [...state.papers, ...state.externalPublications].find(paper => paper.status === "published")!;
+      published.publication!.citations = 9;
+      published.publication!.effectiveScore = 80;
+      state.totalCitations = 9;
+    }
+    state.sanCap = 36;
     state.eventQueue = [];
     state.totalMonths = 1;
     state.month = 1;
@@ -58,6 +67,10 @@ describe("role history and run statistics", () => {
     if (ending === "expelled") state.player.favor = -1;
     if (ending === "isolated") state.player.social = -1;
     if (ending === "overthinking") state.player.research = -1;
+    if (ending === "lab-bankrupt") {
+      state.selectedAdvisorName = "测试导师";
+      state.advisorProgressState.funding = -1;
+    }
     if (ending === "master" || ending === "phd" || ending === "delay") {
       state.degree = ending === "phd" ? "phd" : "master";
       state.maxMonths = getMonthLimitByDegree(state.degree);
@@ -70,6 +83,9 @@ describe("role history and run statistics", () => {
     trustFixture(store, saves);
     store.dispatch(ending === "quit" ? "quit-game" : "next-month");
     expect(store.getState()).toMatchObject({ phase: "finished", ending });
+    const finished = store.getState();
+    const expectedHistory = { researchScore: finished.totalResearchScore, totalCitations: finished.totalCitations,
+      hIndex: Number(hasPublication), natureCount: Number(hasPublication), representativeScore: hasPublication ? 80 : 0, sanCap: 36 };
     const completedRuns = Number(ending === "master" || ending === "phd");
     store.dispatch("next-month");
     store.dispatch("quit-game");
@@ -80,7 +96,10 @@ describe("role history and run statistics", () => {
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 0 });
     store.dispatch("settle-and-return");
     expect(store.getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 1, completedRuns });
-    expect(createStore({ storage }).getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 1, completedRuns });
+    expect(store.getLobbyState().roleProgress.normal.historyBest).toMatchObject(expectedHistory);
+    expect(createStore({ storage }).getLobbyState().roleProgress.normal).toMatchObject({ startedRuns: 1, playedRuns: 1, completedRuns, historyBest: expectedHistory });
+    const historyView = buildLobbySelectedRoleViewModel(store.getLobbyState(), "normal");
+    expect(historyView.historyStats.find(stat => stat.id === "nature-count")?.value).toBe(String(Number(hasPublication)));
     expect(store.getLobbyState().roleProgress.rich).toMatchObject({ startedRuns: 0, playedRuns: 0 });
   });
 
