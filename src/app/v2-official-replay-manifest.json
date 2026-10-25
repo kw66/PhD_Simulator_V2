@@ -1100,5 +1100,271 @@
         }
       ]
     }
+  },
+  {
+    "id": "official-teacher-child-master-10",
+    "file": "teacher-child-master-10.json",
+    "roleId": "teacher-child",
+    "route": "master-10",
+    "note": "",
+    "totalMonths": 34,
+    "degree": "master",
+    "score": 3,
+    "commands": 264,
+    "ruleset": "20261025-r55",
+    "finalDigest": "d519da38:710ff16a:186214",
+    "metrics": {
+      "money": 1.5,
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 5.24576,
+          "cap": 19
+        },
+        {
+          "label": "科研能力",
+          "value": 7.48,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 3,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 10,
+          "cap": 20
+        }
+      ]
+    }
+  },
+  {
+    "id": "official-teacher-child-reversed-master-10",
+    "file": "teacher-child-reversed-master-10.json",
+    "roleId": "teacher-child-reversed",
+    "route": "master-10",
+    "note": "",
+    "totalMonths": 34,
+    "degree": "master",
+    "score": 5,
+    "commands": 283,
+    "ruleset": "20261025-r55",
+    "finalDigest": "ca254233:f2ffdc43:220058",
+    "metrics": {
+      "money": 1,
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 8.67968,
+          "cap": 19
+        },
+        {
+          "label": "科研能力",
+          "value": 7.6,
+          "cap": 21
+        },
+        {
+          "label": "社交能力",
+          "value": 6,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 10.26,
+          "cap": 16
+        }
+      ]
+    }
+  },
+  {
+    "id": "official-genius-reversed-master-10",
+    "file": "genius-reversed-master-10.json",
+    "roleId": "genius-reversed",
+    "route": "master-10",
+    "note": "",
+    "totalMonths": 34,
+    "degree": "master",
+    "score": 6,
+    "commands": 270,
+    "ruleset": "20261025-r55",
+    "finalDigest": "1f9f80c8:e14f56f0:250449",
+    "metrics": {
+      "money": 3.5,
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 4,
+          "cap": 17
+        },
+        {
+          "label": "科研能力",
+          "value": 8.4,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 2,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 1,
+          "cap": 20
+        }
+      ]
+    }
+  },
+  {
+    "id": "official-social-master-10",
+    "file": "social-master-10.json",
+    "roleId": "social",
+    "route": "master-10",
+    "note": "",
+    "totalMonths": 34,
+    "degree": "master",
+    "score": 3,
+    "commands": 264,
+    "ruleset": "20261025-r55",
+    "finalDigest": "dffeb15:8b27e12d:179940",
+    "metrics": {
+      "money": 5.5,
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 11.65056,
+          "cap": 18
+        },
+        {
+          "label": "科研能力",
+          "value": 5,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 2,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 6,
+          "cap": 20
+        }
+      ]
+    }
+  },
+  {
+    "id": "official-social-reversed-master-10",
+    "file": "social-reversed-master-10.json",
+    "roleId": "social-reversed",
+    "route": "master-10",
+    "note": "",
+    "totalMonths": 34,
+    "degree": "master",
+    "score": 2,
+    "commands": 259,
+    "ruleset": "20261025-r55",
+    "finalDigest": "72f39ba4:e92dd194:181576",
+    "metrics": {
+      "money": 0.5,
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 3.77904,
+          "cap": 21
+        },
+        {
+          "label": "科研能力",
+          "value": 8.6,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 6,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 8.4,
+          "cap": 20
+        }
+      ]
+    }
+  },
+  {
+    "id": "official-chosen-reversed-master-10",
+    "file": "chosen-reversed-master-10.json",
+    "roleId": "chosen-reversed",
+    "route": "master-10",
+    "note": "",
+    "totalMonths": 34,
+    "degree": "master",
+    "score": 3,
+    "commands": 280,
+    "ruleset": "20261025-r55",
+    "finalDigest": "d5dc661c:bbfe9970:204318",
+    "metrics": {
+      "money": 6.3,
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 10.43,
+          "cap": 12
+        },
+        {
+          "label": "科研能力",
+          "value": 8.6,
+          "cap": 17
+        },
+        {
+          "label": "社交能力",
+          "value": 1.5,
+          "cap": 16
+        },
+        {
+          "label": "导师好感",
+          "value": 4.5,
+          "cap": 16
+        }
+      ]
+    }
+  },
+  {
+    "id": "official-rich-reversed-master-10",
+    "file": "rich-reversed-master-10.json",
+    "roleId": "rich-reversed",
+    "route": "master-10",
+    "note": "",
+    "totalMonths": 34,
+    "degree": "master",
+    "score": 5,
+    "commands": 302,
+    "ruleset": "20261025-r55",
+    "finalDigest": "db9e06d9:a1844417:145393",
+    "metrics": {
+      "money": 3.5,
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 5,
+          "cap": 20
+        },
+        {
+          "label": "科研能力",
+          "value": 4,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 3,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 3,
+          "cap": 20
+        }
+      ]
+    }
   }
 ]

@@ -5,7 +5,7 @@
 }
 
 .center-shell:has(> .center-main-panels > [data-tab-panel="settings"]:not([hidden])) {
-  gap: 0;
+  gap: 10px;
 }
 
 .local-replay-save-notice { position: fixed; z-index: 10000; left: 50%; bottom: 22px; transform: translateX(-50%); max-width: min(420px, calc(100vw - 28px)); width: max-content; margin: 0; padding: 12px 18px; border: 1px solid #c3ab7e; border-radius: 8px; background: #fff7e7; color: #70512e; box-shadow: 0 5px 24px #4b38232b; font-size: 13px; line-height: 1.6; text-align: center; }
