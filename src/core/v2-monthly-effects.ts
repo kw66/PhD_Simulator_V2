@@ -16,7 +16,7 @@ import { settleGreedCoinGames } from "./v2-role-talent-greed";
 import { normalizeRoleTalentIllnessProbability } from "./v2-random-event-rules";
 import { getMonthEndIllnessDelta, settleCurseMonthStart } from "./v2-curse-system";
 import { getRecoveredSan } from "./v2-san-recovery";
-import { recordPersonalSpending, roundMoney } from "./v2-money";
+import { recordPersonalSpending, recordShopPurchase, roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { activateLoverMonthlyDiscount } from "./v2-lover-progression";
 import { consumeLoverGift, getLoverGiftQuote } from "./v2-lover-gift";
@@ -512,6 +512,7 @@ export function applyMonthStartSubscriptions(
             machineTrackedCoffeeCount: nextState.coffeeState.machineTrackedCoffeeCount + Number(nextState.coffeeState.machineOwned),
           },
         };
+        nextState = recordShopPurchase(nextState, coffeePrice);
         if (talentFunding) nextState = recordLabFinance({
           ...nextState,
           advisorProgressState: { ...nextState.advisorProgressState, funding: roundMoney(nextState.advisorProgressState.funding - target.price) },
@@ -560,6 +561,7 @@ export function applyMonthStartSubscriptions(
         note,
       });
       if (item.paid) {
+        nextState = recordShopPurchase(nextState, item.price);
         paidModels.push(item.model);
         if (usesGift) nextState = consumeLoverGift(nextState);
         if (fundingCost > 0) nextState = recordLabFinance({

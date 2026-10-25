@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-25", "2026-10-24", "2026-10-22", "2026-10-21", "2026-10-19", "2026-10-18"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-26", "2026-10-25", "2026-10-24", "2026-10-22", "2026-10-21", "2026-10-19"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -18,6 +18,8 @@ describe("game announcements", () => {
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
     const current = textForDate("2026-10-24");
+    for (const text of ["硕士或博士毕业", "科研低于社交与导师好感", "社交低于科研与导师好感", "相差至少6", "商店每笔实际扣除", "自动续费按每笔"])
+      expect(textForDate("2026-10-26")).toContain(text);
     for (const text of ["官方教学录像重新补录", "当前规则", "10与20天赋点博士", "逐一点开", "科研分", "调试入口仅本地", "坏结局"]) expect(textForDate("2026-10-25")).toContain(text);
     for (const text of ["300／200／150／100", "20／18／16／14", "50／70／90／110", "+36／+24／+12／+2", "每次偿还1金币"]) expect(textForDate("2026-10-25")).toContain(text);
     for (const text of ["统御者标签", "本局等级效果与团队加成", "接纵向项目恢复回溯", "导师指导结果固定", "帮助随机同学做项目", "参与同学论文首次被拒"]) expect(current).toContain(text);

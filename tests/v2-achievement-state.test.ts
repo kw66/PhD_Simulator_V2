@@ -1,9 +1,8 @@
 ﻿import { describe, expect, it } from "vitest";
 import { createInitialState } from "../src/core/v2-engine-state-factory";
-import { createAchievementRunProgress, recordAchievementStats } from "../src/core/v2-achievement-runtime-types";
+import { createAchievementRunProgress } from "../src/core/v2-achievement-runtime-types";
 import { evaluateStateAchievements, observeStateAchievements } from "../src/core/v2-achievement-state";
 import { applyEventPlayerEffects } from "../src/core/v2-event-player-effects";
-import { applyPlayerAttributeChange } from "../src/core/v2-player-attributes";
 import { consumeActiveOperation } from "../src/core/v2-ai-shop";
 import { CAREER_JOBS } from "../src/core/v2-career-rules";
 import { withGameplayRuleset } from "../src/core/v2-rule-context";
@@ -150,18 +149,49 @@ describe("state achievement evidence", () => {
     expect(observe(next).satisfied).toContain(`global:career-${suffix}`);
   });
 
-  it("preserves intra-action stat peaks and strict challenge limits", () => {
-    let next = state(); next.player.research = 5;
-    next = applyPlayerAttributeChange(next, "research", 1).state;
-    next = applyPlayerAttributeChange(next, "research", -5, "reset").state;
-    next.phase = "finished"; next.ending = "phd"; next.degree = "phd";
-    const run = observe(next);
-    expect(run.peaks.research).toBe(6);
-    expect(evaluateStateAchievements(next, run)).not.toContain("unlock:genius-reversed");
-    next.player.san = 12; next = recordAchievementStats(next);
-    expect(evaluateStateAchievements(next, next.achievementProgress!)).not.toContain("unlock:chosen-reversed");
-    next.personalSpending = 10;
+  it.each(["master", "phd"] as const)("uses final strict attribute comparisons at %s graduation", ending => {
+    for (const [role, stat, other, third] of [
+      ["genius", "research", "social", "favor"],
+      ["teacher-child", "favor", "research", "social"],
+      ["social", "social", "favor", "research"],
+    ] as const) {
+      const next = state(); next.selectedRoleId = role; next.phase = "finished"; next.ending = ending;
+      const run = createAchievementRunProgress(); run.peaks[stat] = 30;
+      next.player[stat] = 7; next.player[other] = 8; next.player[third] = 9;
+      expect(evaluateStateAchievements(next, run)).toContain(`unlock:${role}-reversed`);
+      for (const tied of [other, third]) {
+        const tie = structuredClone(next); tie.player[tied] = 7;
+        expect(evaluateStateAchievements(tie, run)).not.toContain(`unlock:${role}-reversed`);
+      }
+      next.phase = "playing"; next.ending = null;
+      expect(evaluateStateAchievements(next, run)).not.toContain(`unlock:${role}-reversed`);
+    }
+  });
+
+  it.each(["master", "phd"] as const)("checks final spread and single shop spending at %s graduation", ending => {
+    const next = state(); next.phase = "finished"; next.ending = ending; next.selectedRoleId = "chosen";
+    const run = createAchievementRunProgress(); run.minima.san = 0; run.peaks["attribute-spread"] = 20;
+    next.player.research = 7; next.player.social = 13; next.player.favor = 9;
+    expect(evaluateStateAchievements(next, run)).toContain("unlock:chosen-reversed");
+    next.player.social = 12.99;
+    expect(evaluateStateAchievements(next, run)).not.toContain("unlock:chosen-reversed");
+    next.player.research = 2.04; next.player.social = 8.04; next.player.favor = 5;
+    expect(evaluateStateAchievements(next, run)).toContain("unlock:chosen-reversed");
+    next.selectedRoleId = "rich"; next.personalSpending = 200;
+    for (const max of [0, 10]) {
+      run.counters["shop-largest-purchase"] = max;
+      expect(evaluateStateAchievements(next, run)).toContain("unlock:rich-reversed");
+    }
+    run.counters["shop-largest-purchase"] = 10.01;
     expect(evaluateStateAchievements(next, run)).not.toContain("unlock:rich-reversed");
+  });
+
+  it("does not award inverse unlocks before graduation or for a bad ending", () => {
+    for (const role of ["genius", "teacher-child", "social", "rich", "chosen"] as const) {
+      const next = state(); next.selectedRoleId = role; next.phase = "finished"; next.ending = "quit";
+      next.player.research = 1; next.player.social = 8; next.player.favor = 9;
+      expect(evaluateStateAchievements(next, createAchievementRunProgress()).filter(id => id.startsWith("unlock:"))).toEqual([]);
+    }
   });
 
   it("measures attribute spread simultaneously instead of combining unrelated peaks", () => {

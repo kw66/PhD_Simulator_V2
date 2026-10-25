@@ -20,6 +20,23 @@ function storage() {
 }
 
 describe("achievement ending transaction", () => {
+  it.each(["master", "phd"] as const)("unlocks inverse roles from actual %s graduation evidence", degree => {
+    for (const [role, research, social, favor] of [
+      ["genius", 7, 8, 9], ["teacher-child", 8, 9, 7],
+      ["social", 8, 7, 9], ["chosen", 1, 7, 4], ["rich", 7, 7, 7],
+    ] as const) {
+      const before = createStartedGameState(role);
+      const finished = observeAchievements(before, { ...before, phase: "finished", ending: degree,
+        player: { ...before.player, research, social, favor } });
+      const result = settleRunAchievements(createDefaultAccountProfile(), finished, date1);
+      const target = `${role}-reversed` as RoleId;
+      expect(result.account.roleProgress[target].unlocked).toBe(true);
+      // Graduation and the inverse unlock each grant one multiplier.
+      expect(result.account.achievementExperienceMultipliers?.[role]).toBe(2);
+      expect(settleRunAchievements(result.account, finished, date2).account.achievementExperienceMultipliers?.[role]).toBe(2);
+    }
+  });
+
   it.each(["research-captain", "cursed-frail"] as const)("only settles hard shared milestones for %s", role => {
     const before = createStartedGameState(role);
     const observed = observeAchievements(before, { ...before, player: { ...before.player, research: 30 } });

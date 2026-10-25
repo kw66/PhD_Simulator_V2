@@ -8,10 +8,12 @@ import { createDraftPaper } from "../src/core/v2-paper-rules";
 import { createGrantedPublishedPaper } from "../src/core/v2-publication-rules";
 import { applyResearchOperation, getResearchExperimentMoneyCost, previewResearchOperation } from "../src/core/v2-research-operation";
 import { createLoverProgressState } from "../src/core/v2-lover-progression";
+import { createAchievementRunProgress } from "../src/core/v2-achievement-runtime-types";
 import { activateLover } from "../src/core/v2-lover-system";
 import type { AdvisorGrantId, GameState } from "../src/core/v2-types";
 import {
   applyMonthlyEffects,
+  applyMonthStartSubscriptions,
   previewNextMonthEffects,
   resolveMonthlyEffects,
 } from "../src/core/v2-monthly-effects";
@@ -30,6 +32,15 @@ function createPlayingMonth(month: number, totalMonths: number, san = 10) {
 }
 
 describe("monthly effects", () => {
+  it("tracks a successful coffee subscription renewal as one shop charge", () => {
+    const initial = createPlayingMonth(2, 2);
+    const state: GameState = { ...initial, selectedRoleId: "rich", achievementProgress: createAchievementRunProgress(),
+      player: { ...initial.player, money: 10 },
+      coffeeState: { ...createPlayingMonth(2, 2).coffeeState, subscriptionEnabled: true } };
+    const renewed = applyMonthStartSubscriptions(state).nextState;
+    expect(renewed.achievementProgress?.counters["shop-largest-purchase"]).toBe(2);
+  });
+
   it("recovers thirty percent of missing SAN with rank-three idle talent only after PhD", () => {
     const state: GameState = { ...createPlayingMonth(4, 28, 10), selectedRoleId: "normal-reversed", degree: "phd",
       sanCap: 30, roleTalents: { levels: { "post-phd-recovery": 3 } } };

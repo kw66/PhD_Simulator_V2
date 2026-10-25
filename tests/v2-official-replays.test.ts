@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import manifest from "../src/app/v2-official-replay-manifest.json";
 import { deriveReplayResults } from "../src/app/v2-replay-results";
 import { parseReplayRecording, verifyReplayRecording } from "../src/core/v2-local-replay";
-import { CURRENT_GAMEPLAY_RULESET } from "../src/core/v2-rule-context";
+import { SUPPORTED_GAMEPLAY_RULESETS } from "../src/core/v2-rule-context";
 import { getDesignedTalentNodes, sanitizeRoleTalentAllocation } from "../src/core/v2-role-talent-definitions";
 import type { RoleId } from "../src/core/v2-types";
 import { createInitialState } from "../src/core/v2-engine";
@@ -26,7 +26,8 @@ describe("published official teaching replays", () => {
   it.each(manifest)("reproduces $id with legal talents and the advertised graduation and metrics", async entry => {
     const recording = parseReplayRecording(await readFile(`public/official-replays/${entry.file}`, "utf8"));
     expect(recording.id).toBe(entry.id);
-    expect(recording.replay.ruleset).toBe(CURRENT_GAMEPLAY_RULESET);
+    expect(recording.replay.ruleset).toBe(entry.ruleset);
+    expect(SUPPORTED_GAMEPLAY_RULESETS).toContain(entry.ruleset);
     expect(recording.replay.initial).toEqual({ ...createInitialState(), randomState: recording.replay.initial.randomState });
     expect(recording.finalDigest).toBe(entry.finalDigest);
     expect(recording.replay.commands).toHaveLength(entry.commands);
@@ -42,7 +43,7 @@ describe("published official teaching replays", () => {
     expect(sanitizeRoleTalentAllocation(role, budget === 20 ? 10 : 0, allocation, 0)).toEqual(allocation);
     expect(getDesignedTalentNodes(role)!.reduce((sum, node) => sum + node.cost * (allocation[node.id] ?? 0), 0)).toBe(budget);
     expect(recording.replay.commands.every(command => command.kind === "action" && !command.actionId.startsWith("debug-")
-      && (command.ruleset ?? recording.replay.ruleset) === CURRENT_GAMEPLAY_RULESET)).toBe(true);
+      && (command.ruleset ?? recording.replay.ruleset) === entry.ruleset)).toBe(true);
     const state = await verifyReplayRecording(recording, { yieldControl: async () => {} });
     expect(state.phase).toBe("finished");
     expect(state.ending).toBe(entry.degree);

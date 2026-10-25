@@ -1,4 +1,4 @@
-import { recordAchievementCounter, recordAchievementFact, recordAchievementStats } from "./v2-achievement-runtime-types";
+import { createAchievementRunProgress, recordAchievementCounter, recordAchievementFact, recordAchievementStats } from "./v2-achievement-runtime-types";
 import type { GameState } from "./v2-types";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
@@ -40,6 +40,17 @@ export function recordPersonalSpending(state: GameState, amount: number): GameSt
     } : {}),
   } };
   return next;
+}
+
+/** Keep the largest actual one-off shop charge for the per-transaction spending challenge. */
+export function recordShopPurchase(state: GameState, amount: number): GameState {
+  const paid = roundMoney(amount);
+  if (!usesGameplayRulesFrom("20261026-r56") || state.selectedRoleId !== "rich" || !(paid > 0)) return state;
+  const run = state.achievementProgress ?? createAchievementRunProgress();
+  const key = "shop-largest-purchase";
+  const largest = Math.max(run.counters[key] ?? 0, paid);
+  if (largest === run.counters[key]) return state;
+  return { ...state, achievementProgress: { ...run, counters: { ...run.counters, [key]: largest } } };
 }
 
 export function normalizeGameMoney(state: GameState): GameState {

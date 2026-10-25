@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createInitialState, dispatchAction } from "../src/core/v2-engine";
+import { createAchievementRunProgress } from "../src/core/v2-achievement-runtime-types";
 import { previewResearchOperation } from "../src/core/v2-research-operation";
 import { previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { getShopPaperActionModifier } from "../src/core/v2-shop-items";
@@ -29,6 +30,33 @@ function admittedState() {
 }
 
 describe("v2 shop transactions", () => {
+  it("tracks only successful actual shop charges for the rich inverse unlock", () => {
+    const admitted = admittedState();
+    const initial = { ...admitted, selectedRoleId: "rich" as const,
+      achievementProgress: createAchievementRunProgress(), player: { ...admitted.player, money: 100 } };
+    const failed = dispatchAction({ ...initial, player: { ...initial.player, money: 0 } }, "buy-shop-item", { shopItemId: "chair" });
+    expect(failed.achievementProgress?.counters["shop-largest-purchase"]).toBeUndefined();
+
+    const small = dispatchAction(initial, "buy-shop-item", { shopItemId: "keyboard" });
+    expect(small.achievementProgress?.counters["shop-largest-purchase"]).toBe(7);
+    const atLimit = dispatchAction(small, "buy-shop-item", { shopItemId: "chair" });
+    expect(atLimit.achievementProgress?.counters["shop-largest-purchase"]).toBe(10);
+    const overLimit = dispatchAction(atLimit, "upgrade-shop-item", { shopUpgradeId: "chair-advanced" });
+    expect(overLimit.achievementProgress?.counters["shop-largest-purchase"]).toBe(18);
+    const sold = dispatchAction(overLimit, "sell-shop-item", { shopItemId: "chair" });
+    expect(sold.achievementProgress?.counters["shop-largest-purchase"]).toBe(18);
+    const reloaded = JSON.parse(JSON.stringify(sold));
+    expect(dispatchAction(reloaded, "buy-coffee").achievementProgress?.counters["shop-largest-purchase"]).toBe(18);
+
+    const reimbursed = structuredClone(atLimit);
+    reimbursed.shopState.entitlements.workstationTransaction = 1;
+    const freeUpgrade = dispatchAction(reimbursed, "upgrade-shop-item", { shopUpgradeId: "chair-advanced" });
+    expect(freeUpgrade.shopState.chairUpgrade).toBe("advanced");
+    expect(freeUpgrade.achievementProgress?.counters["shop-largest-purchase"]).toBe(10);
+    const oldReplay = withGameplayRuleset("20261025-r55", () => dispatchAction(initial, "buy-shop-item", { shopItemId: "ebike" }));
+    expect(oldReplay.achievementProgress?.counters["shop-largest-purchase"]).toBeUndefined();
+  });
+
   it("upgrades an earned workstation without retriggering it and preserves old replay rules", () => {
     const before = admittedState();
     const equipped = { ...before,

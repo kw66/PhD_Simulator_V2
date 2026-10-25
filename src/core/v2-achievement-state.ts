@@ -8,6 +8,7 @@ import { getAdvisorRankIndex } from "./v2-advisor-progress";
 import { getDesignedTalentNodes } from "./v2-role-talent-definitions";
 import { getRoleEndingAchievements } from "./v2-achievement-catalog";
 import { isCursedRole } from "./v2-curse-system";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 function satisfy(run: AchievementRunProgress, id: string): void {
   if (!run.satisfied.includes(id)) run.satisfied.push(id);
@@ -122,6 +123,17 @@ export function evaluateStateAchievements(state: GameState, run: AchievementRunP
       if (state.ending === "phd") {
         check(isCursedRole(state.selectedRoleId) && state.curseState?.difficulty === 4,
           `${state.selectedRoleId}:curse-hell-phd`);
+      }
+      if (usesGameplayRulesFrom("20261026-r56")) {
+        const { research, social, favor } = state.player;
+        if (state.selectedRoleId === "genius") check(research < favor && research < social, "unlock:genius-reversed");
+        if (state.selectedRoleId === "teacher-child") check(favor < research && favor < social, "unlock:teacher-child-reversed");
+        if (state.selectedRoleId === "social") check(social < research && social < favor, "unlock:social-reversed");
+        if (state.selectedRoleId === "rich") check((run.counters["shop-largest-purchase"] ?? 0) <= 10, "unlock:rich-reversed");
+        if (state.selectedRoleId === "chosen") check(Number((Math.max(research, social, favor) - Math.min(research, social, favor)).toFixed(10)) >= 6,
+          "unlock:chosen-reversed");
+      } else if (state.ending === "phd") {
+        // Recorded commands retain their original achievement evidence and checksums.
         check(peak("research") < 6, "unlock:genius-reversed");
         check(peak("favor") < 6, "unlock:teacher-child-reversed");
         check(peak("social") < 6, "unlock:social-reversed");

@@ -8,7 +8,7 @@ import {
 } from "./v2-ai-shop";
 import { applyAiActivationEffects } from "./v2-ai-activation";
 import { getLabReimbursementCount, getLabReimbursementKind } from "./v2-lab-reimbursement";
-import { formatMoney, recordPersonalSpending, roundMoney } from "./v2-money";
+import { formatMoney, recordPersonalSpending, recordShopPurchase, roundMoney } from "./v2-money";
 import { recordLabFinance } from "./v2-lab-finance-ledger";
 import { addOrReplaceBuffs, consumeAiCostCoverage, removeBuffs } from "./v2-buffs";
 import {
@@ -77,7 +77,7 @@ function isCoffeeMachineUpgrade(value: string): value is CoffeeMachineUpgrade {
 }
 
 function payForPurchase(state: GameState, price: number, usesGift: boolean): GameState {
-  return updateMoney(usesGift ? consumeLoverGift(state) : state, state.player.money - price);
+  return recordShopPurchase(updateMoney(usesGift ? consumeLoverGift(state) : state, state.player.money - price), price);
 }
 
 function purchaseCostText(price: number, usesGift: boolean): string {

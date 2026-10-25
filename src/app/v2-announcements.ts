@@ -10,6 +10,15 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-10-26",
+    title: "五位逆位角色解锁条件调整",
+    changes: [
+      { category: "平衡", title: "改为硕士或博士毕业时判定", description: "正位角色达成对应条件即可解锁逆位：院士转世毕业时科研低于社交与导师好感；导师子女毕业时导师好感低于科研与社交；社交达人毕业时社交低于科研与导师好感；天选之人毕业时，科研、社交、导师好感最高项与最低项相差至少6。各项均按毕业时的属性判定。" },
+      { category: "平衡", title: "贪求改为限制单笔商店消费", description: "富可敌国硕士或博士毕业时，商店每笔实际扣除的金币均不得超过10；生活费、事件花费等非商店交易不计，商店自动续费按每笔分别计算。" },
+      { category: "修复", title: "手机开始按钮铺满一行", description: "官方录像与开始游戏并排占满可用宽度，已解锁和未解锁角色均保持一致，修复右侧留白和窄屏挤压。" },
+    ],
+  },
+  {
     date: "2026-10-25",
     title: "官方教学录像与回放体验更新",
     changes: [
@@ -215,6 +224,7 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
     changes: [
       { category: "更新", title: "伙伴也在完成自己的研究", description: "同学有固定研究方向，独立完成idea、实验、写作、投稿和审稿，复用论文评分、衰减与引用规则。帮助同学完成的论文可成为你的合作成果。" },
       { category: "更新", title: "论文记录每个人的贡献", description: "自身分与协作分分别积累，作者和贡献保留在论文中，停止合作不会抹去已有成果。不同类型伙伴提供不同方向的帮助，成果显示彼此合作的痕迹。" },
+      { category: "更新", title: "论文竞争与新SOTA事件", description: "竞争事件针对具体论文展开，提供不同应对方式，影响投入、分数与后续安排。没有合适目标时等待，论文状态变化后实时更新，避免误伤其他稿件。" },
     ],
   },
   {
@@ -222,13 +232,6 @@ export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
     title: "关系名额与告别",
     changes: [
       { category: "更新", title: "自由经营人际关系", description: "导师、恋人和普通同学分别管理名额。可停止同学合作或结束恋爱，之后再建立新的关系；新增事件会提示满员，人物姓名与身份持续保留。" },
-    ],
-  },
-  {
-    date: "2026-09-09",
-    title: "科研竞争进入论文流程",
-    changes: [
-      { category: "更新", title: "被抢发idea与新sota", description: "竞争事件针对具体论文展开，提供不同应对方式，影响投入、分数与后续安排。没有合适目标时等待，论文状态变化后实时更新，避免误伤其他稿件。" },
     ],
   },
   {
