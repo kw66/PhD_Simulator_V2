@@ -70,7 +70,7 @@
   .lobby-page .lobby-profile-action-group .lobby-official-replays-button { min-height: 44px; }
   .lobby-page .lobby-profile-art-name { font-size: 21px; line-height: 1.25; }
   .lobby-page[data-scale-mode="fixed"] .lobby-start-button { width: fit-content; min-width: 108px; min-height: 44px; align-self: flex-start; }
-  .lobby-page .lobby-start-lock { width: 100%; }
+  .lobby-page .lobby-start-lock { width: auto; }
   .lobby-page .lobby-profile-summary {
     grid-column: 2;
     display: block;
