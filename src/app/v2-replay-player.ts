@@ -12,6 +12,7 @@ import { prepareReplayActionView, getReplayActionTarget, getReplayActionTiming }
 import { renderEventLayoutSamples, renderPlayScreen } from "./v2-render-play";
 import { getRoleChibiPortraitUrl } from "./v2-role-portrait-assets";
 import { OFFICIAL_REPLAY_SLOTS, type OfficialReplayRoute } from "./v2-official-replays";
+import { createOfficialReplayStats } from "./v2-official-replay-stats";
 import { getReplayResults, type ReplayMetrics } from "./v2-replay-results";
 import { getReplayNavigationStep } from "./v2-replay-navigation";
 import type { PlayRenderUiState } from "./v2-render-types";
@@ -44,22 +45,23 @@ function renderMetrics(summary: ReplaySummary, metrics?: ReplayMetrics, failed =
   ];
   return `<dl class="replay-card-metrics" data-replay-metrics="${escape(summary.id)}" aria-label="本局最终数值">${stats.map(stat => `<div><dt>${stat.label}</dt><dd>${stat.value === undefined ? failed ? "—" : "…" : number(stat.value)}${stat.cap === undefined ? "" : `<span> / ${number(stat.cap)}</span>`}</dd></div>`).join("")}</dl>`;
 }
-function renderSummary(summary: ReplaySummary, official = false, metrics = summary.metrics): string {
+function renderSummary(summary: ReplaySummary, official = false, metrics = summary.metrics, plays?: number): string {
   const role = getRoleDefinition(summary.roleId);
   const status = summary.academicYear ? `第${summary.academicYear}学年归档` : summary.ending ? endings[summary.ending] ?? "本轮结束" : summary.phase === "finished" ? "本轮结束" : "途中记录";
   const filename = `${role.name}${summary.playerName ? ` · ${summary.playerName}` : ""}`;
   return `<article class="replay-card${summary.roleId.endsWith("-reversed") ? " is-reversed" : ""}" data-replay-card="${escape(summary.id)}">
     <img class="replay-card-portrait" src="${escape(getRoleChibiPortraitUrl(summary.roleId))}" alt="" loading="lazy">
-    <div class="replay-card-identity"><h2>${escape(role.name)}</h2><p><span class="replay-card-status${summary.ending === "phd" || summary.ending === "master" ? " is-graduated" : ""}">${escape(status)}</span>${official ? "" : `<small>${escape(summary.playerName || dateLabel(summary.updatedAt))} · ${summary.totalMonths}个月</small>`}</p></div>
+    <div class="replay-card-identity"><h2>${escape(role.name)}</h2><p><span class="replay-card-status${summary.ending === "phd" || summary.ending === "master" ? " is-graduated" : ""}">${escape(status)}</span>${official ? `<small data-replay-plays="${escape(summary.id)}">播放 ${plays ?? "—"}</small>` : `<small>${escape(summary.playerName || dateLabel(summary.updatedAt))} · ${summary.totalMonths}个月</small>`}</p></div>
     <div class="replay-card-actions"><a class="replay-link is-primary" href="${replayHref(summary.id)}" data-replay-open="${escape(summary.id)}" aria-label="播放${escape(filename)}">${icon("play")}播放</a><button class="replay-button is-icon" type="button" data-replay-export="${escape(summary.id)}" aria-label="${official ? "下载" : "导出"}${escape(filename)}">${icon("download")}</button>${official ? "" : `<button class="replay-button is-icon is-delete" type="button" data-replay-delete="${escape(summary.id)}" aria-label="删除${escape(filename)}的回放">${icon("trash-2")}</button>`}</div>
     ${renderMetrics(summary, metrics)}
   </article>`;
 }
 
-/** A separate browser entry: no game store, persistent account or remote clients. */
+/** A separate browser entry: no game store or persistent account. */
 export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "library", options: { library?: ReplayLibrary; official?: boolean } = {}) {
   const library = options.library ?? createReplayLibrary();
   const official = options.official === true;
+  const playStats = official ? createOfficialReplayStats({ onChange: updatePlayCounts }) : null;
   let summaries: ReplaySummary[] = [];
   let officialRoute: OfficialReplayRoute = "phd-10";
   let recording: ReplayRecording | null = null;
@@ -89,7 +91,14 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
   const tooltips = createRelationshipTooltips(root);
   const charts = createResponsiveScoreCharts(root);
   root.classList.add("replay-app");
-  document.title = `${official ? "官方录像" : "本地回放"} · 研究生模拟器 2.0`;
+  document.title = "录像与攻略 · 研究生模拟器 2.0";
+  void playStats?.load();
+
+  function updatePlayCounts(): void {
+    root.querySelectorAll<HTMLElement>("[data-replay-plays]").forEach(node => {
+      node.textContent = `播放 ${playStats?.get(node.dataset.replayPlays!) ?? "—"}`;
+    });
+  }
 
   function syncLayout(): void {
     const shell = root.querySelector<HTMLElement>(".play-stage-shell");
@@ -146,7 +155,8 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
     const localContent = summaries.length ? `<div class="replay-grid">${summaries.map(summary => renderSummary(summary, false, summary.metrics ?? metricsCache.get(summary.id))).join("")}</div>` : `<section class="replay-empty">${icon("film")}<h2>还没有回放</h2><p>在结局页面下载本局回放，再导入这里。</p></section>`;
     root.innerHTML = `<main class="replay-library${official ? " is-official-library" : ""}">
       <section class="replay-library-sheet">
-        <header class="replay-library-header"><div class="replay-library-title">${icon(official ? "graduation-cap" : "history")}<h1>${official ? "官方录像" : "本地回放"}</h1></div><nav class="replay-library-actions" aria-label="回放操作">${!official ? `<button class="replay-button is-primary" type="button" data-replay-import${busy ? " disabled" : ""}>${icon("upload")}${busy ? "读取中…" : "导入"}</button>` : ""}<a class="replay-button" href="${gameHref()}">${icon("arrow-left")}返回游戏</a></nav></header>
+        <header class="replay-library-header"><div class="replay-library-title">${icon(official ? "graduation-cap" : "history")}<h1>录像与攻略</h1></div><nav class="replay-library-actions" aria-label="回放操作">${!official ? `<button class="replay-button is-primary" type="button" data-replay-import${busy ? " disabled" : ""}>${icon("upload")}${busy ? "读取中…" : "导入"}</button>` : ""}<a class="replay-button" href="${gameHref()}">${icon("arrow-left")}返回游戏</a></nav></header>
+        <nav class="replay-source-tabs" aria-label="录像来源"><a href="${replayHref("official")}"${official ? ' aria-current="page"' : ""}>官方录像攻略</a><a href="${replayHref("library")}"${!official ? ' aria-current="page"' : ""}>玩家录像</a></nav>
         ${messageHtml()}${deleting ? `<div class="replay-confirm" role="alert"><span>删除这份本地回放？</span><button class="replay-button" type="button" data-replay-cancel-delete>保留</button><button class="replay-button" type="button" data-replay-confirm-delete="${escape(deleting)}"${busy ? " disabled" : ""}>确认删除</button></div>` : ""}
         ${official ? renderOfficialSections() : localContent}
       </section><input class="replay-file-input" type="file" accept=".json,.phdreplay,application/json" data-replay-file aria-label="选择本地回放文件">
@@ -175,7 +185,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
   }
   function renderOfficialSections(): string {
     const entries = summaries.filter(summary => summary.officialRoute === officialRoute);
-    return `<nav class="replay-route-tabs" aria-label="教学路线">${OFFICIAL_REPLAY_SLOTS.map(({ route, label }) => `<button type="button" data-replay-route="${route}" aria-pressed="${route === officialRoute}">${label.replace("路线", "")}</button>`).join("")}</nav><section class="replay-official-section" aria-label="${OFFICIAL_REPLAY_SLOTS.find(slot => slot.route === officialRoute)!.label}">${entries.length ? `<div class="replay-grid">${entries.map(summary => renderSummary(summary, true, summary.metrics ?? metricsCache.get(summary.id))).join("")}</div>` : '<div class="replay-empty"><p>暂无录像，陆续补充。</p></div>'}</section>`;
+    return `<nav class="replay-route-tabs" aria-label="教学路线">${OFFICIAL_REPLAY_SLOTS.map(({ route, label }) => `<button type="button" data-replay-route="${route}" aria-pressed="${route === officialRoute}">${label.replace("路线", "")}</button>`).join("")}</nav><section class="replay-official-section" aria-label="${OFFICIAL_REPLAY_SLOTS.find(slot => slot.route === officialRoute)!.label}">${entries.length ? `<div class="replay-grid">${entries.map(summary => renderSummary(summary, true, summary.metrics ?? metricsCache.get(summary.id), playStats?.get(summary.id))).join("")}</div>` : '<div class="replay-empty"><p>暂无录像，陆续补充。</p></div>'}</section>`;
   }
   function monthOptions(): string {
     if (!session) return "";
@@ -432,7 +442,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
     const route = ++routeVersion;
     metricsRequest?.abort();
     pause(); session?.dispose(); session = null; state = null; recording = null; recordingId = null; message = ""; busy = true;
-    root.innerHTML = `<main class="replay-loading"><p class="replay-eyebrow">本地回放</p><h1>正在展开这一局</h1><progress aria-label="读取回放"></progress><p>还原操作与随机结果…</p></main>`;
+    root.innerHTML = `<main class="replay-loading"><p class="replay-eyebrow">${official ? "官方录像攻略" : "玩家录像"}</p><h1>正在展开这一局</h1><progress aria-label="读取回放"></progress><p>还原操作与随机结果…</p></main>`;
     try {
       const loaded = await library.get(id);
       if (route !== routeVersion) return;
@@ -445,6 +455,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
       if (route !== routeVersion || session !== active) return;
       ui = { activePlayTab: "events", dateDisplayMode: "academic", isEventContentOpen: false, academicArchiveAct: 0 };
       await seek(1, undefined, false);
+      if (route === routeVersion && session === active) void playStats?.track(id);
     } catch (cause) {
       if (route !== routeVersion) return;
       announce(cause instanceof Error ? cause.message : "无法打开回放", true);
@@ -601,6 +612,6 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
   window.addEventListener("popstate", popstate);
   await (((official && initialId === "official") || (!official && initialId === "library")) ? showLibrary() : open(initialId));
   return {
-    dispose() { metricsRequest?.abort(); pause(); session?.dispose(); observer.disconnect(); document.querySelector("#relationship-tooltip")?.remove(); cancelAnimationFrame(animationFrame); window.removeEventListener("resize", scheduleLayout); window.removeEventListener("scroll", positionCue, true); window.removeEventListener("popstate", popstate); routeVersion++; seekVersion++; },
+    dispose() { playStats?.dispose(); metricsRequest?.abort(); pause(); session?.dispose(); observer.disconnect(); document.querySelector("#relationship-tooltip")?.remove(); cancelAnimationFrame(animationFrame); window.removeEventListener("resize", scheduleLayout); window.removeEventListener("scroll", positionCue, true); window.removeEventListener("popstate", popstate); routeVersion++; seekVersion++; },
   };
 }

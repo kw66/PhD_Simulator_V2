@@ -5,7 +5,7 @@ import type { RoleId } from "../core/v2-types";
 import type { ReplayLibrary, ReplaySummary } from "./v2-replay-library";
 import manifest from "./v2-official-replay-manifest.json";
 
-export type OfficialReplayRoute = "phd-0" | "phd-10" | "phd-20" | "master-10" | "cursed" | "special";
+export type OfficialReplayRoute = "phd-0" | "phd-10" | "master-10" | "cursed" | "special";
 
 interface OfficialReplayDefinition {
   id: string;
@@ -25,7 +25,6 @@ interface OfficialReplayDefinition {
 export const OFFICIAL_REPLAY_SLOTS: readonly { route: OfficialReplayRoute; label: string; detail: string }[] = [
   { route: "phd-0", label: "0 天赋点博士路线", detail: "不投入天赋点的基础路线" },
   { route: "phd-10", label: "10 天赋点博士路线", detail: "六位正位与六位逆位示范" },
-  { route: "phd-20", label: "20 天赋点博士路线", detail: "完整构筑与博士毕业示范" },
   { route: "master-10", label: "10 天赋点硕士路线", detail: "专注三年硕士毕业的路线" },
   { route: "cursed", label: "诅咒角色", detail: "诅咒挑战录像" },
   { route: "special", label: "特殊角色", detail: "统御者与轮回者录像" },

@@ -73,6 +73,10 @@ describe("game announcements", () => {
     expect(html).toMatch(/aria-selected="true"\s+data-ui-role-rail-view="announcements"/);
     expect(html).toContain("游戏公告");
     expect(html).toContain('data-action="start-game"');
+    expect(html).toContain("录像与攻略");
+    expect(html).toContain('href="https://kw66.github.io/PhD_Simulator/"');
+    expect(html).toContain("旧版 v1.0");
+    expect(html).not.toContain('href="?replay=library"');
     expect(html).toContain('class="lobby-profile-main"');
     expect(html).toContain("lobby-announcement-rail-view");
     for (const metric of ["views", "visitors", "games"]) {

@@ -9,10 +9,10 @@ import type { RoleId } from "../src/core/v2-types";
 import { createInitialState } from "../src/core/v2-engine";
 
 describe("published official teaching replays", () => {
-  it("covers all twelve upright and reversed roles for master 10 and doctoral 10/20 routes", () => {
+  it("covers all twelve upright and reversed roles for master 10 and doctoral 10 routes", () => {
     const roles = ["normal", "genius", "rich", "teacher-child", "social", "chosen"];
     const expected = [...roles, ...roles.map(role => `${role}-reversed`)].sort();
-    for (const route of ["master-10", "phd-10", "phd-20"]) {
+    for (const route of ["master-10", "phd-10"]) {
       expect(manifest.filter(entry => entry.route === route).map(entry => entry.roleId).sort()).toEqual(expected);
     }
   });

@@ -24,7 +24,7 @@ try {
     const talents = start.payload.talentAllocation ?? {};
     assert.equal(start.payload.bonusTalentPoints ?? 0, 0, path);
     const spent = E.getDesignedTalentNodes(role).reduce((n, node) => n + node.cost * (talents[node.id] ?? 0), 0);
-    assert.ok([0, 10, 20].includes(spent), path);
+    assert.ok([0, 10].includes(spent), path);
     assert.deepEqual(E.sanitizeRoleTalentAllocation(role, spent === 20 ? 10 : 0, talents, 0), talents, path);
     assert.ok(spent === 10 || final.degree === 'phd', path);
     const route = final.degree + '-' + spent;

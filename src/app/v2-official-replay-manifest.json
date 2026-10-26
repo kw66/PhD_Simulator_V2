@@ -76,44 +76,6 @@
     }
   },
   {
-    "id": "official-normal-phd-20",
-    "file": "normal-phd-20.json",
-    "roleId": "normal",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 11,
-    "commands": 546,
-    "ruleset": "20261025-r55",
-    "finalDigest": "5df87116:9b5c2a94:390521",
-    "metrics": {
-      "money": 5,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 14,
-          "cap": 14
-        },
-        {
-          "label": "科研能力",
-          "value": 16.28,
-          "cap": 21
-        },
-        {
-          "label": "社交能力",
-          "value": 7.7,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 8.1,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
     "id": "official-genius-master-10",
     "file": "genius-master-10.json",
     "roleId": "genius",
@@ -184,44 +146,6 @@
         {
           "label": "导师好感",
           "value": 7.2,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
-    "id": "official-genius-phd-20",
-    "file": "genius-phd-20.json",
-    "roleId": "genius",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 12,
-    "commands": 507,
-    "ruleset": "20261025-r55",
-    "finalDigest": "3d073221:c6983347:394822",
-    "metrics": {
-      "money": 20.5,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 18,
-          "cap": 18
-        },
-        {
-          "label": "科研能力",
-          "value": 14.8,
-          "cap": 21
-        },
-        {
-          "label": "社交能力",
-          "value": 3,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 6.2,
           "cap": 20
         }
       ]
@@ -304,44 +228,6 @@
     }
   },
   {
-    "id": "official-rich-phd-20",
-    "file": "rich-phd-20.json",
-    "roleId": "rich",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 12,
-    "commands": 542,
-    "ruleset": "20261025-r55",
-    "finalDigest": "fe77f509:e135607b:446836",
-    "metrics": {
-      "money": 20,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 18,
-          "cap": 18
-        },
-        {
-          "label": "科研能力",
-          "value": 11.6,
-          "cap": 20
-        },
-        {
-          "label": "社交能力",
-          "value": 5,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 6,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
     "id": "official-teacher-child-phd-10",
     "file": "teacher-child-phd-10.json",
     "roleId": "teacher-child",
@@ -380,44 +266,6 @@
     }
   },
   {
-    "id": "official-teacher-child-phd-20",
-    "file": "teacher-child-phd-20.json",
-    "roleId": "teacher-child",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 14,
-    "commands": 591,
-    "ruleset": "20261025-r55",
-    "finalDigest": "2f4abcbe:45a8fec4:486842",
-    "metrics": {
-      "money": 4.5,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 9.8,
-          "cap": 11
-        },
-        {
-          "label": "科研能力",
-          "value": 19.036,
-          "cap": 20
-        },
-        {
-          "label": "社交能力",
-          "value": 5,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 20,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
     "id": "official-social-phd-10",
     "file": "social-phd-10.json",
     "roleId": "social",
@@ -450,44 +298,6 @@
         {
           "label": "导师好感",
           "value": 6,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
-    "id": "official-social-phd-20",
-    "file": "social-phd-20.json",
-    "roleId": "social",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 10,
-    "commands": 580,
-    "ruleset": "20261025-r55",
-    "finalDigest": "b1174c3f:3b61a6e1:491724",
-    "metrics": {
-      "money": 4,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 4.9775651021,
-          "cap": 11
-        },
-        {
-          "label": "科研能力",
-          "value": 9.2,
-          "cap": 20
-        },
-        {
-          "label": "社交能力",
-          "value": 13.6,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 7.6,
           "cap": 20
         }
       ]
@@ -570,44 +380,6 @@
     }
   },
   {
-    "id": "official-chosen-phd-20",
-    "file": "chosen-phd-20.json",
-    "roleId": "chosen",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 20,
-    "commands": 567,
-    "ruleset": "20261025-r55",
-    "finalDigest": "8b8b47db:207ee419:540452",
-    "metrics": {
-      "money": 24.5,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 26,
-          "cap": 26
-        },
-        {
-          "label": "科研能力",
-          "value": 20,
-          "cap": 20
-        },
-        {
-          "label": "社交能力",
-          "value": 18.4,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 19.6,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
     "id": "official-normal-reversed-master-10",
     "file": "normal-reversed-master-10.json",
     "roleId": "normal-reversed",
@@ -684,44 +456,6 @@
     }
   },
   {
-    "id": "official-normal-reversed-phd-20",
-    "file": "normal-reversed-phd-20.json",
-    "roleId": "normal-reversed",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 14,
-    "commands": 485,
-    "ruleset": "20261025-r55",
-    "finalDigest": "193b640a:9a0d99aa:360747",
-    "metrics": {
-      "money": 52.5,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 20,
-          "cap": 20
-        },
-        {
-          "label": "科研能力",
-          "value": 13,
-          "cap": 23
-        },
-        {
-          "label": "社交能力",
-          "value": 8.9,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 10.4,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
     "id": "official-genius-reversed-phd-10",
     "file": "genius-reversed-phd-10.json",
     "roleId": "genius-reversed",
@@ -749,44 +483,6 @@
         {
           "label": "社交能力",
           "value": 1,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 7,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
-    "id": "official-genius-reversed-phd-20",
-    "file": "genius-reversed-phd-20.json",
-    "roleId": "genius-reversed",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 8,
-    "commands": 462,
-    "ruleset": "20261025-r55",
-    "finalDigest": "929b3d2e:55d6a344:280446",
-    "metrics": {
-      "money": 22.5,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 16.0464677069,
-          "cap": 20
-        },
-        {
-          "label": "科研能力",
-          "value": 19,
-          "cap": 20
-        },
-        {
-          "label": "社交能力",
-          "value": 4,
           "cap": 20
         },
         {
@@ -836,44 +532,6 @@
     }
   },
   {
-    "id": "official-teacher-child-reversed-phd-20",
-    "file": "teacher-child-reversed-phd-20.json",
-    "roleId": "teacher-child-reversed",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 15,
-    "commands": 590,
-    "ruleset": "20261025-r55",
-    "finalDigest": "7318ec48:9c5eb7a8:546229",
-    "metrics": {
-      "money": 4,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 16,
-          "cap": 16
-        },
-        {
-          "label": "科研能力",
-          "value": 13.6,
-          "cap": 29
-        },
-        {
-          "label": "社交能力",
-          "value": 10.8,
-          "cap": 29
-        },
-        {
-          "label": "导师好感",
-          "value": 11.66,
-          "cap": 21
-        }
-      ]
-    }
-  },
-  {
     "id": "official-rich-reversed-phd-10",
     "file": "rich-reversed-phd-10.json",
     "roleId": "rich-reversed",
@@ -912,82 +570,6 @@
     }
   },
   {
-    "id": "official-rich-reversed-phd-20",
-    "file": "rich-reversed-phd-20.json",
-    "roleId": "rich-reversed",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 18,
-    "commands": 794,
-    "ruleset": "20261025-r55",
-    "finalDigest": "2d9d288:1c549968:906798",
-    "metrics": {
-      "money": 1.5,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 5.7711026134,
-          "cap": 15
-        },
-        {
-          "label": "科研能力",
-          "value": 12.9754774014,
-          "cap": 71.7612631537
-        },
-        {
-          "label": "社交能力",
-          "value": 12.073068314,
-          "cap": 69.7037838899
-        },
-        {
-          "label": "导师好感",
-          "value": 11.6270156048,
-          "cap": 69.6308441507
-        }
-      ]
-    }
-  },
-  {
-    "id": "official-social-reversed-phd-20",
-    "file": "social-reversed-phd-20.json",
-    "roleId": "social-reversed",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 13,
-    "commands": 617,
-    "ruleset": "20261025-r55",
-    "finalDigest": "804ee67b:32b3a2dd:527328",
-    "metrics": {
-      "money": 4,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 5.15296,
-          "cap": 19
-        },
-        {
-          "label": "科研能力",
-          "value": 12.4,
-          "cap": 23
-        },
-        {
-          "label": "社交能力",
-          "value": 17.8,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 7.8,
-          "cap": 22
-        }
-      ]
-    }
-  },
-  {
     "id": "official-social-reversed-phd-10",
     "file": "social-reversed-phd-10.json",
     "roleId": "social-reversed",
@@ -1021,44 +603,6 @@
           "label": "导师好感",
           "value": 8.8,
           "cap": 20
-        }
-      ]
-    }
-  },
-  {
-    "id": "official-chosen-reversed-phd-20",
-    "file": "chosen-reversed-phd-20.json",
-    "roleId": "chosen-reversed",
-    "route": "phd-20",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 14,
-    "commands": 625,
-    "ruleset": "20261025-r55",
-    "finalDigest": "e19d391f:72970ceb:555125",
-    "metrics": {
-      "money": 10.5,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 10,
-          "cap": 10
-        },
-        {
-          "label": "科研能力",
-          "value": 12.1,
-          "cap": 10
-        },
-        {
-          "label": "社交能力",
-          "value": 3,
-          "cap": 10
-        },
-        {
-          "label": "导师好感",
-          "value": 2.2,
-          "cap": 11
         }
       ]
     }

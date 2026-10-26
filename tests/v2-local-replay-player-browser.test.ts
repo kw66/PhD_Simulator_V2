@@ -57,7 +57,7 @@ describe("isolated local replay browser player", () => {
       await page.goto(`${server.resolvedUrls!.local[0]}__replay_test__?replay=library`);
       await page.waitForSelector("[data-replay-import]:not(:disabled)");
       const localBefore = await page.evaluate(() => ({ ...localStorage }));
-      expect(await page.locator("h1").textContent()).toBe("本地回放");
+      expect(await page.locator("h1").textContent()).toBe("录像与攻略");
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
       await page.screenshot({ path: `artifacts/local-replay/empty-${width}.png`, fullPage: true });
       const data = sample();
@@ -204,7 +204,7 @@ describe("isolated local replay browser player", () => {
     try {
       await page.goto(`${server.resolvedUrls!.local[0]}?replay=official`);
       await page.waitForSelector("[data-replay-card]");
-      expect(await page.locator("[data-replay-route]").count()).toBe(6);
+      expect(await page.locator("[data-replay-route]").count()).toBe(5);
       const phd10 = manifest.filter(item => item.route === "phd-10");
       expect(await page.locator("[data-replay-card]").count()).toBe(phd10.length);
       expect(await page.locator(".replay-card-metrics > div").count()).toBe(phd10.length * 6);
