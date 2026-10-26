@@ -54,11 +54,15 @@ describe("real game local recording integration", () => {
       await page.locator('[data-action="settle-and-return"]').click();
       await page.waitForFunction(() => (window as unknown as RecordingWindow).recordingStore.getState().phase === "setup");
       expect(await page.evaluate(() => (window as unknown as RecordingWindow).recordingStore.hasRoleSave("normal"))).toBe(false);
-      const libraryLink = page.locator('.lobby-masthead a[href="?replay=library"]');
+      const libraryLink = page.locator('.lobby-profile-action-group a[href="?replay=official"]');
       expect(await libraryLink.count()).toBe(1);
+      expect(await libraryLink.textContent()).toContain("录像与攻略");
+      const legacyLink = page.locator('.lobby-project-links a[href="https://kw66.github.io/PhD_Simulator/"]');
+      expect(await legacyLink.count()).toBe(1);
+      expect(await legacyLink.textContent()).toContain("旧版 v1.0");
       await viewer.goto(new URL((await libraryLink.getAttribute("href"))!, base).href);
+      await viewer.locator('.replay-source-tabs a[href*="library"]').click();
       await viewer.waitForSelector('.replay-empty');
-      expect(await viewer.locator('[data-replay-card]').count()).toBe(0);
       await viewer.locator('[data-replay-file]').setInputFiles({ name: finishedFile.suggestedFilename(), mimeType: "application/json", buffer: Buffer.from(text) });
       await viewer.waitForSelector('[data-replay-card]');
       expect(await viewer.locator('[data-replay-card]').count()).toBe(1);
