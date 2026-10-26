@@ -1699,10 +1699,6 @@ export function bootstrapApp(root: HTMLDivElement): void {
         .finally(() => { button.disabled = false; });
       return;
     }
-    if (target.closest("[data-ui-open-local-replays]")) {
-      window.open("?replay=library", "_blank", "noopener");
-      return;
-    }
 
     if (isRoleLevelStatsOpen) {
       if (target.closest("[data-ui-close-level-stats]")) closeRoleLevelStats();

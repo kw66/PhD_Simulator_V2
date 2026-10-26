@@ -143,7 +143,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
     scheduleLayout();
   }
   function renderLibrary(): void {
-    const localContent = summaries.length ? `<div class="replay-grid">${summaries.map(summary => renderSummary(summary, false, summary.metrics ?? metricsCache.get(summary.id))).join("")}</div>` : `<section class="replay-empty">${icon("film")}<h2>还没有回放</h2><p>在游戏「设置」中下载本局回放，再导入这里。</p></section>`;
+    const localContent = summaries.length ? `<div class="replay-grid">${summaries.map(summary => renderSummary(summary, false, summary.metrics ?? metricsCache.get(summary.id))).join("")}</div>` : `<section class="replay-empty">${icon("film")}<h2>还没有回放</h2><p>在结局页面下载本局回放，再导入这里。</p></section>`;
     root.innerHTML = `<main class="replay-library${official ? " is-official-library" : ""}">
       <section class="replay-library-sheet">
         <header class="replay-library-header"><div class="replay-library-title">${icon(official ? "graduation-cap" : "history")}<h1>${official ? "官方录像" : "本地回放"}</h1></div><nav class="replay-library-actions" aria-label="回放操作">${!official ? `<button class="replay-button is-primary" type="button" data-replay-import${busy ? " disabled" : ""}>${icon("upload")}${busy ? "读取中…" : "导入"}</button>` : ""}<a class="replay-button" href="${gameHref()}">${icon("arrow-left")}返回游戏</a></nav></header>
@@ -201,7 +201,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
     // Ending/archive overlays must not block the replay controls in the side rail.
     root.querySelector(".play-stage-shell")?.removeAttribute("inert");
     // Recorded actions alone advance simulation. These controls remain visible for faithful playback.
-    root.querySelectorAll<HTMLElement>(".replay-viewer [data-action], .replay-viewer [data-ui-open-run-saves], .replay-viewer [data-ui-open-feedback], .replay-viewer [data-ui-open-debug-window], .replay-viewer [data-ui-download-replay], .replay-viewer [data-ui-open-local-replays]").forEach(element => {
+    root.querySelectorAll<HTMLElement>(".replay-viewer [data-action], .replay-viewer [data-ui-open-run-saves], .replay-viewer [data-ui-open-feedback], .replay-viewer [data-ui-open-debug-window], .replay-viewer [data-ui-download-replay]").forEach(element => {
       element.dataset.replayInert = "true";
       element.setAttribute("aria-disabled", "true");
       // Keep game buttons visually active so the replay can point at the

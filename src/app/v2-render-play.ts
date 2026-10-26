@@ -3853,14 +3853,12 @@ function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): st
   return `
     <div class="settings-panel">
       <div class="settings-sections" id="settings-panel-content" role="group" aria-label="游戏设置">
-        <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
-          <i data-lucide="history" aria-hidden="true"></i><span>读取存档</span>
-        </button>
         <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
           <i data-lucide="house" aria-hidden="true"></i><span>返回开始页面</span>
         </button>
-        <button class="settings-primary-btn" type="button" data-ui-download-replay><i data-lucide="download" aria-hidden="true"></i><span>下载本局回放</span></button>
-        <button class="settings-primary-btn" type="button" data-ui-open-local-replays><i data-lucide="history" aria-hidden="true"></i><span>本地回放</span></button>
+        <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
+          <i data-lucide="history" aria-hidden="true"></i><span>读取存档</span>
+        </button>
         <button class="settings-community-button is-feedback" type="button" data-ui-open-feedback>
           <i data-lucide="message-square" aria-hidden="true"></i><span>留言反馈</span>
         </button>

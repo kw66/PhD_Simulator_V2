@@ -228,7 +228,7 @@ export function renderEndingScreen(state: GameState, experienceAward?: RoleExper
           ${saveStatus ? `<p class="run-saves-status" role="status">${escapeHtml(saveStatus)}</p>` : ""}
           <div class="ending-buttons">
             <button class="settings-primary-btn is-return" type="button" data-action="settle-and-return"><i data-lucide="house" aria-hidden="true"></i><span>结算并返回</span></button>
-            <button class="settings-primary-btn is-return is-replay-skip" type="button" data-ui-download-replay><i data-lucide="download" aria-hidden="true"></i><span>下载回放</span></button>
+            <button class="settings-primary-btn is-return is-replay-skip" type="button" data-ui-download-replay><i data-lucide="download" aria-hidden="true"></i><span>下载本局回放</span></button>
             <button class="settings-primary-btn is-rewind" type="button" data-ui-open-run-saves><i data-lucide="history" aria-hidden="true"></i><span>我要回溯</span></button>
           </div>
         </footer>

@@ -20,7 +20,7 @@ describe("real game local recording integration", () => {
     await server.listen(); browser = await chromium.launch();
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
-  it("downloads unfinished and finished recordings without automatic archives and plays the downloaded file", async () => {
+  it("downloads from the ending page without automatic archives and plays the downloaded file", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 1040 } });
     const page = await context.newPage();
     const base = server.resolvedUrls!.local[0]!;
@@ -35,11 +35,8 @@ describe("real game local recording integration", () => {
         await page.locator(`[data-event-choice-id="${id}"]:visible`).click();
       }
       await page.locator('[data-ui-play-tab="settings"]').click();
-      const firstDownload = page.waitForEvent("download");
-      await page.locator('[data-ui-download-replay]:visible').click();
-      const unfinished = parseReplayRecording(await readFile((await (await firstDownload).path())!, "utf8"));
-      expect((await verifyReplayRecording(unfinished)).phase).toBe("playing");
-      expect(await page.evaluate(() => (window as unknown as RecordingWindow).recordingStore.getState().phase)).toBe("playing");
+      expect(await page.locator('.settings-sections > button').first().getAttribute("data-action")).toBe("reset-game");
+      expect(await page.locator('.settings-sections [data-ui-download-replay], .settings-sections [data-ui-open-local-replays]').count()).toBe(0);
       const viewer = await context.newPage();
       await viewer.goto(`${base}?replay=library`);
       await viewer.waitForSelector('.replay-empty');
@@ -47,6 +44,7 @@ describe("real game local recording integration", () => {
       await page.locator('[data-action="quit-game"]').click();
       await page.locator('[data-ui-confirm-quit]').click();
       const finalDownload = page.waitForEvent("download");
+      expect(await page.locator('.ending-actions [data-ui-download-replay]').textContent()).toContain('下载本局回放');
       await page.locator('.ending-actions [data-ui-download-replay]').click();
       const finishedFile = await finalDownload;
       const text = await readFile((await finishedFile.path())!, "utf8");
@@ -56,7 +54,9 @@ describe("real game local recording integration", () => {
       await page.locator('[data-action="settle-and-return"]').click();
       await page.waitForFunction(() => (window as unknown as RecordingWindow).recordingStore.getState().phase === "setup");
       expect(await page.evaluate(() => (window as unknown as RecordingWindow).recordingStore.hasRoleSave("normal"))).toBe(false);
-      await viewer.reload();
+      const libraryLink = page.locator('.lobby-masthead a[href="?replay=library"]');
+      expect(await libraryLink.count()).toBe(1);
+      await viewer.goto(new URL((await libraryLink.getAttribute("href"))!, base).href);
       await viewer.waitForSelector('.replay-empty');
       expect(await viewer.locator('[data-replay-card]').count()).toBe(0);
       await viewer.locator('[data-replay-file]').setInputFiles({ name: finishedFile.suggestedFilename(), mimeType: "application/json", buffer: Buffer.from(text) });
