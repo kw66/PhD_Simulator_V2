@@ -40,7 +40,7 @@ describe("local playground on the actual development configuration", () => {
       await page.locator('[data-ui-start-without-talents]').click();
       await page.locator('[data-ui-play-tab="settings"]').click();
       const controls = page.locator(".settings-sections > button");
-      expect(await controls.count()).toBe(7);
+      expect(await controls.count()).toBe(5);
       const debugStyle = await page.locator('[data-ui-open-debug-window]').evaluate(element => {
         const button = getComputedStyle(element);
         const peer = getComputedStyle(document.querySelector('[data-ui-open-run-saves]')!);

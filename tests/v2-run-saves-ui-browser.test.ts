@@ -39,7 +39,7 @@ describe("run save controls in the game", () => {
       }
       await page.locator('[data-ui-play-tab="settings"]').click();
       const settings = page.locator(".settings-sections");
-      expect(await settings.locator(":scope > button").count()).toBe(6);
+      expect(await settings.locator(":scope > button").count()).toBe(4);
       expect(await page.locator("[data-ui-open-debug-window]").count()).toBe(0);
       const settingsLayout = await settings.evaluate(element => {
         const style = getComputedStyle(element);
@@ -48,7 +48,7 @@ describe("run save controls in the game", () => {
           columns: buttons.filter(button => Math.abs(button.getBoundingClientRect().top - buttons[0]!.getBoundingClientRect().top) < 1).length,
           clipped: buttons.some(button => button.scrollWidth > button.clientWidth) };
       });
-      expect(settingsLayout).toEqual({ border: "0px", background: "rgba(0, 0, 0, 0)", shadow: "none", columns: width > 820 ? 6 : 2, clipped: false });
+      expect(settingsLayout).toEqual({ border: "0px", background: "rgba(0, 0, 0, 0)", shadow: "none", columns: width > 820 ? 4 : 2, clipped: false });
       await page.mouse.move(0, 0);
       await page.locator(".settings-panel").screenshot({ path: `artifacts/settings-polished-${width}.png` });
       const months: RunSaveSummary[] = Array.from({ length: 24 }, (_, index) => {
