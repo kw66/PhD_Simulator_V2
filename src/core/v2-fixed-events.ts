@@ -1,4 +1,6 @@
 import { gameRandom } from "./v2-game-random";
+import { createFeedbackEvent } from "./v2-fixed-events-feedback";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import {
   type FixedResolutionResult,
   type RandomRollProvider,
@@ -95,6 +97,10 @@ export function collectFixedEventsForState(
   }
   if (state.month === 5) {
     events.push(createWinterVacationEvent(state));
+  }
+  if (state.year === 3 && state.month === 4 && usesGameplayRulesFrom("20261026-r57")
+    && !state.eventHistory.some(event => event.chainId === "midterm-message")) {
+    events.push(createFeedbackEvent());
   }
   if (state.month === 9) {
     events.push(createCcigEvent(state));

@@ -1,11 +1,11 @@
 import type { RoleRailViewId } from "./v2-render-types";
 import { MESSAGE_MAX_LENGTH, NICKNAME_MAX_LENGTH } from "./v2-community-messages";
 
-function renderMessageComposer(mode: "board" | "feedback"): string {
-  const prefix = mode === "board" ? "lobby-message" : "game-feedback";
+export function renderMessageComposer(mode: "board" | "feedback", inlineEvent = false): string {
+  const prefix = inlineEvent ? "event-feedback" : mode === "board" ? "lobby-message" : "game-feedback";
 
   return `
-    <section class="community-compose${mode === "feedback" ? " is-feedback" : ""}">
+    <section class="community-compose${mode === "feedback" ? " is-feedback" : ""}${inlineEvent ? " is-event-feedback" : ""}">
       <div class="community-reply-indicator" data-community-reply-indicator="${mode}" hidden>
         <span class="community-reply-context"><strong data-community-reply-name></strong><span data-community-reply-preview></span></span>
         <button class="community-cancel-reply" type="button" data-community-cancel-reply="${mode}" aria-label="取消回复"><i data-lucide="x" aria-hidden="true"></i><span>取消</span></button>
@@ -16,10 +16,10 @@ function renderMessageComposer(mode: "board" | "feedback"): string {
           <input id="${prefix}-nickname" type="text" autocomplete="nickname" aria-label="昵称，最多${NICKNAME_MAX_LENGTH}字" placeholder="怎么称呼你" data-community-nickname="${mode}" />
           <span class="community-nickname-count" data-community-nickname-count="${mode}" aria-hidden="true">0/${NICKNAME_MAX_LENGTH}</span>
         </div>
-        <button class="community-send-button" type="button" data-community-send="${mode}">
+        ${inlineEvent ? "" : `<button class="community-send-button" type="button" data-community-send="${mode}">
           <i data-lucide="send" aria-hidden="true"></i>
           <span>发送</span>
-        </button>
+        </button>`}
       </div>
       <div class="community-content-wrap">
         <textarea id="${prefix}-content" rows="4" aria-label="留言内容" aria-describedby="${prefix}-count" placeholder="说点什么吧" data-community-content="${mode}"></textarea>

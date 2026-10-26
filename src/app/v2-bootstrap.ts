@@ -130,7 +130,6 @@ import { countMessageCharacters, createCommunityMessages, MESSAGE_MAX_LENGTH, NI
 import { createValueAnimations, getVisibleValueDelta } from "./v2-value-animations";
 import { createEventLayout } from "./v2-event-layout";
 import { createRelationshipTooltips } from "./v2-relationship-tooltips";
-import { createDebugWindow } from "./v2-debug-window";
 import { RESEARCH_PAGE_SIZE, renderEventLayoutSamples, renderRelationTalentCard } from "./v2-render-play";
 import { getCurrentEvent, getEventRootId, getSortedEventQueue } from "../core/v2-event-queue";
 import { getBranchEventIntroChoice } from "../core/v2-event-auto-resolution";
@@ -291,7 +290,9 @@ function isDebugRelationshipType(value: string | undefined): value is DebugRelat
   return value !== undefined && DEBUG_RELATIONSHIP_TYPE_SET.has(value);
 }
 
-export function bootstrapApp(root: HTMLDivElement): void {
+export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
+  // Resolve development tools before wiring buttons so popup opening stays synchronous.
+  const debugTools = import.meta.env.DEV ? await import("./v2-debug-window") : null;
   const store = createStore();
   const replayLibrary = createReplayLibrary();
   store.setReplayArchiver(async capture => {
@@ -798,6 +799,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     if (!nextEvent) {
       return;
     }
+    if (nextEvent.chainId === "midterm-message") community.cancelReply("feedback");
 
     selectPlayTab("events");
     isEventContentOpen = true;
@@ -1484,7 +1486,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     }
   }
 
-  const debugWindow = createDebugWindow(
+  const debugWindow = debugTools?.createDebugWindow(
     () => store.getState(),
     executeButtonAction,
   );
@@ -1550,7 +1552,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     void conferenceStats.track(before, state, { debugUsed });
     void journalStats.track(before, state, { debugUsed });
     void thesisStats.track(before, state, { debugUsed });
-    debugWindow.update();
+    debugWindow?.update();
     render();
     void visitStats.trackGamePhase(state.phase, {
       runKey: JSON.stringify([state.conferenceLocationSeed, state.selectedRoleId]),
@@ -1885,7 +1887,13 @@ export function bootstrapApp(root: HTMLDivElement): void {
     const sendMessageButton = target.closest<HTMLButtonElement>("button[data-community-send]");
     if (sendMessageButton && !sendMessageButton.disabled) {
       const source = sendMessageButton.dataset.communitySend;
-      if (source === "board" || source === "feedback") void community.submit(source);
+      const eventId = sendMessageButton.dataset.communityEventId;
+      if (source === "board" || source === "feedback") void (async () => {
+        const sent = await community.submit(source);
+        if (sent && eventId && store.getState().eventQueue.some(event => event.id === eventId)) {
+          executeButtonAction({ action: "resolve-event", eventId, eventChoiceId: "midterm-message-send" });
+        }
+      })();
       return;
     }
 
@@ -2347,7 +2355,7 @@ export function bootstrapApp(root: HTMLDivElement): void {
     }
 
     const debugOpenButton = target.closest<HTMLButtonElement>("button[data-ui-open-debug-window]");
-    if (debugOpenButton) {
+    if (debugOpenButton && debugWindow) {
       if (!debugWindow.open()) {
         window.alert("调试窗口被浏览器拦截，请允许本站弹出窗口后重试");
       }

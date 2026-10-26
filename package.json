@@ -22,6 +22,11 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:unit": "node scripts/test-group.mjs unit",
+    "test:browser": "node scripts/test-group.mjs browser",
+    "test:long": "node scripts/test-group.mjs long",
+    "test:groups": "node scripts/test-group.mjs list",
+    "test:related": "vitest related --run",
     "test:watch": "vitest",
     "verify": "npm run typecheck && npm run test && npm run build"
   },

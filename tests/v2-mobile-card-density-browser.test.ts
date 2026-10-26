@@ -90,7 +90,8 @@ describe("compact mobile relationship and graduation cards", () => {
     try {
       await page.route("**/*.supabase.co/**", route => route.abort());
       await page.route("**/__mobile_card_density__", route => route.fulfill({ contentType: "text/html", body: fixture }));
-      await page.goto(`${server.resolvedUrls!.local[0]}__mobile_card_density__`);
+      // App readiness is checked below; unrelated image loading must not gate navigation.
+      await page.goto(`${server.resolvedUrls!.local[0]}__mobile_card_density__`, { waitUntil: "domcontentloaded", timeout: 15_000 });
       await page.locator('[data-action="start-game"]').waitFor({ timeout: 15_000 });
       await page.evaluate(async () => { await (window as CardWindow).mobileCardStore.ready(); });
       await page.evaluate(() => {

@@ -17,12 +17,12 @@ async function startApp(container: HTMLDivElement): Promise<void> {
   } else if (replayId !== null) {
     const { bootstrapReplayPlayer } = await import("./app/v2-replay-player");
     await bootstrapReplayPlayer(container, replayId || "library");
-  } else if (debugChannel) {
+  } else if (import.meta.env.DEV && debugChannel) {
     const { bootstrapDebugWindow } = await import("./app/v2-debug-window");
     bootstrapDebugWindow(container, debugChannel);
   } else {
     const { bootstrapApp } = await import("./app/v2-bootstrap");
-    bootstrapApp(container);
+    await bootstrapApp(container);
   }
 }
 

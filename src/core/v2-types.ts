@@ -711,6 +711,8 @@ export interface ResolvedEventRecord {
 }
 
 export interface PendingEvent {
+  /** Optional invitations disappear on leaving their final available month. */
+  expiresAtMonthEnd?: boolean;
   rewinderPresentation?: import("./v2-rewinder-state").RewinderPresentation;
   thesisReviewPresentation?: ThesisReviewPresentation;
   id: string;

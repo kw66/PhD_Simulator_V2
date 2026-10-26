@@ -1,8 +1,9 @@
 import { renderSanPayment } from "./v2-render-san-payment";
 import { getTalentTriggerDisplay } from "./v2-talent-trigger-display";
 import { formatEventRecoveryDisplay, formatEventResultResistance } from "./v2-event-result-display";
-import { renderRunSaves } from "./v2-render-run-saves";
-import { ENABLE_LOCAL_PLAYGROUND } from "../core/v2-development-flags";
+import { renderSettingsSection } from "./v2-render-settings";
+import { renderMessageComposer } from "./v2-render-community";
+import { usesGameplayRulesFrom } from "../core/v2-rule-context";
 import { getEffectiveResearch, getEffectiveSocial } from "../core/v2-effective-attributes";
 import { getCoffeeGrowthInterval, getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import "../styles/workstation-unified.css";
@@ -922,6 +923,9 @@ export function buildFutureTodoPreviewItems(state: GameState): TodoPreviewItem[]
     }
 
     const calendar = getCalendarForTotalMonths(nextTotalMonths, state.degree);
+    if (calendar.year === 3 && calendar.month === 4 && usesGameplayRulesFrom("20261026-r57")) {
+      addItem({ title: "游玩感想", monthsLater });
+    }
     const application = state.advisorProgressState.pendingApplication;
     if (application && calendar.month === 12
       && getAcademicCalendarYear(calendar.year, calendar.month) === application.calendarYear) {
@@ -1285,6 +1289,7 @@ function renderEventContentBox(
           : journalAcceptancePresentation
           ? renderJournalAcceptanceEvent(journalAcceptancePresentation, renderEventDescriptionHtml(displayEvent.description, getEventNarrativeNames(displayEvent, state)))
           : renderEventDescriptionHtml(displayDescription, getEventNarrativeNames(displayEvent, state))}
+        ${currentEvent?.chainId === "midterm-message" && !historicalPage && !isCompleted ? renderMessageComposer("feedback", true) : ""}
       </div>
       ${displayEvent.choices.length > 0 ? `
         <div class="event-content-buttons" id="event-content-buttons" data-mobile-columns="${displayEvent.choices.length === 3 && !displayEvent.rewinderPresentation && displayEvent.choices.every(choice => [...normalizeGameDisplayText(choice.label)].length <= 6) ? 3 : 2}">
@@ -1312,7 +1317,9 @@ function renderEventContentBox(
             const isDisabled = !canReplay && (historicalPage !== null || disabledReason !== "");
             const hintText = [disabledReason, noRewind ? RANDOM_OUTCOME_HINT : "", riskText].filter(Boolean).join("\n");
             const titleAttribute = `${disabledReason ? ` title="${escapeHtml(disabledReason)}"` : ""}${hintText ? ` data-event-risk-tooltip data-tooltip="${escapeHtml(hintText)}" aria-description="${escapeHtml(hintText)}"` : ""}`;
-            const buttonAttributes = canReplay
+            const buttonAttributes = !isDisabled && currentEvent?.chainId === "midterm-message" && choice.id === "midterm-message-send"
+              ? `data-action="resolve-event" data-event-id="${escapeHtml(currentEventId)}" data-event-choice-id="${escapeHtml(choice.id)}" data-community-send="feedback" data-community-event-id="${escapeHtml(currentEventId)}"`
+              : canReplay
               ? `data-action="${pendingReplayable ? "replay-event" : "debug-replay-event"}" data-event-id="${escapeHtml(currentEventId)}" data-event-history-index="${displayPageIndex}" data-event-choice-id="${escapeHtml(choice.id)}"${titleAttribute}`
               : isDisabled
               ? `disabled aria-disabled="true"${titleAttribute}`
@@ -3843,37 +3850,6 @@ function renderQuitConfirmationOverlay(): string {
     </div>
   `;
 }
-
-function renderSettingsSection(state: GameState, uiState: PlayRenderUiState): string {
-  const debt = state.curseState?.debt ?? 0;
-  const debtLabel = debt > 0 && debt < 0.01 ? "&lt;0.01" : debt.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
-  // Repayment uses whole cents rounded up; the debt itself retains its interest precision.
-  const payoff = getCurseDebtPayoffAmount(debt);
-  const payoffHint = debt > 0 && (debt < 0.01 || payoff !== roundMoney(debt)) ? ` · 结清需${formatMoney(payoff)}金币` : "";
-  return `
-    <div class="settings-panel">
-      <div class="settings-sections" id="settings-panel-content" role="group" aria-label="游戏设置">
-        <button class="settings-primary-btn is-return" type="button" data-action="reset-game">
-          <i data-lucide="house" aria-hidden="true"></i><span>返回开始页面</span>
-        </button>
-        <button class="settings-primary-btn is-load" type="button" data-ui-open-run-saves aria-expanded="${uiState.isRunSavePanelOpen === true}">
-          <i data-lucide="history" aria-hidden="true"></i><span>读取存档</span>
-        </button>
-        <button class="settings-community-button is-feedback" type="button" data-ui-open-feedback>
-          <i data-lucide="message-square" aria-hidden="true"></i><span>留言反馈</span>
-        </button>
-        <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
-          <i data-lucide="log-out" aria-hidden="true"></i><span>主动退学</span>
-        </button>
-        ${ENABLE_LOCAL_PLAYGROUND ? `<button class="settings-primary-btn" type="button" data-ui-open-debug-window><i data-lucide="wrench" aria-hidden="true"></i><span>调试面板</span></button>` : ""}
-      </div>
-      ${state.selectedRoleId === "cursed-debt" && state.curseState ? `<section class="curse-debt-panel"><div><strong>待偿债务 ${debtLabel} 金币</strong><span>月利率2% · 毕业前需结清${payoffHint}</span></div><div class="curse-debt-actions"><button type="button" class="settings-primary-btn" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || debt <= 0 ? " disabled" : ""}>偿还1金币</button><button type="button" class="settings-primary-btn" data-action="repay-debt"${state.phase !== "playing" || state.player.money <= 0 || debt <= 0 ? " disabled" : ""}>尽力还款</button></div></section>` : ""}
-      ${renderRunSaves(state, uiState)}
-      ${!uiState.isRunSavePanelOpen && uiState.saveStatus ? `<p class="run-saves-status" role="status">${escapeHtml(uiState.saveStatus)}</p>` : ""}
-    </div>
-  `;
-}
-
 
 function renderCenterShell(state: GameState, uiState: PlayRenderUiState = {}): string {
   const blockingEventCount = state.eventQueue.filter((event) => isEventBlocking(state, event)).length;

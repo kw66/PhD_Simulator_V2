@@ -152,6 +152,11 @@ npm run dev
 | `npm run dev` | 启动开发服务器 |
 | `npm run typecheck` | TypeScript 类型检查 |
 | `npm test` | 运行测试，包含浏览器交互测试 |
+| `npm run test:unit` | 并行运行规则和渲染单元测试 |
+| `npm run test:browser` | 串行运行浏览器交互测试 |
+| `npm run test:long` | 完整生命周期和官方录像回归 |
+| `npm run test:related -- src/core/文件名.ts` | 检查与指定文件相关的测试 |
+| `npm run test:groups` | 查看测试分组及完整文件清单 |
 | `npm run build` | 构建静态站点，输出到 `dist/` |
 | `npm run preview` | 预览构建产物 |
 | `npm run verify` | 依次运行类型检查、测试与构建 |
@@ -164,3 +169,5 @@ npm run verify
 ```
 
 Linux 环境可使用 `npx playwright install --with-deps chromium` 一并安装系统依赖。项目使用 TypeScript、Vite、Vitest 和 Playwright，线上版本通过 GitHub Pages 部署。
+
+日常修改可先运行相关测试，提交前使用 `npm run verify` 做完整检查。主分支部署仍运行全部测试：单元测试、两组独立浏览器分片、长流程检查和构建并行执行，全部通过后才发布。仅修改 README 或文档不触发部署；新提交会取消过时的部署任务。新增 `v2-*.test.ts` 会自动加入分组，浏览器测试按 Playwright 导入识别。

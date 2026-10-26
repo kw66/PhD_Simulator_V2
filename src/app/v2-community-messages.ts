@@ -685,7 +685,7 @@ export function renderCommunityMessages(root: ParentNode, community: CommunityMe
     root.querySelectorAll<HTMLButtonElement>(`button[data-community-send="${source}"]`).forEach((button) => {
       button.disabled = !state.writeEnabled || state.submitting !== null || state.savingEdit;
       const label = button.querySelector("span");
-      if (label) label.textContent = state.replyTarget?.source === source ? "回复" : "发送";
+      if (label) label.textContent = button.dataset.communityEventId ? "发布留言" : state.replyTarget?.source === source ? "回复" : "发送";
     });
     root.querySelectorAll<HTMLElement>(`[data-community-notice="${source}"]`).forEach((target) => {
       target.textContent = !state.writeEnabled ? READ_ONLY_NOTICE : state.noticeSource === source ? state.notice : "";

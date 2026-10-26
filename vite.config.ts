@@ -1,4 +1,9 @@
 import { defineConfig } from "vitest/config";
+import { discoverTestGroups } from "./scripts/test-groups.mjs";
+
+const testGroup = process.env.V2_TEST_GROUP;
+const testGroups = discoverTestGroups();
+if (testGroup && !Object.hasOwn(testGroups, testGroup)) throw new Error(`Unknown test group: ${testGroup}`);
 
 const LOCAL_HOST = "127.0.0.1";
 const LOCAL_PORT = 4321;
@@ -27,9 +32,9 @@ export default defineConfig(({ command, mode, isPreview }) => ({
   },
   test: {
     environment: "node",
-    include: ["tests/v2-*.test.ts"],
-    // Browser-backed test files each start Vite and Chromium; serialize them in CI.
-    fileParallelism: process.env.CI !== "true",
-    maxWorkers: 4,
+    include: testGroup ? testGroups[testGroup as keyof typeof testGroups] : ["tests/v2-*.test.ts"],
+    // Only pure rule tests run concurrently in CI. Browser shards are isolated jobs.
+    fileParallelism: testGroup === "unit" || (!testGroup && process.env.CI !== "true"),
+    maxWorkers: process.env.CI === "true" ? 2 : 4,
   },
 }));

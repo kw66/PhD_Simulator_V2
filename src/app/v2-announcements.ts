@@ -10,6 +10,14 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-10-27",
+    title: "游玩感想与运行优化",
+    changes: [
+      { category: "更新", title: "第三年邀请分享游玩感想", description: "第三年第四个月新增单幕留言事件，可直接分享游玩体会或反馈bug，发布到公共留言板。也可跳过，不消耗行动点或资源；事件仅本月有效。" },
+      { category: "优化", title: "精简资源与部署流程", description: "清理重复样式和未使用的旧图片，调试窗口仅本地开发时加载。调整测试与部署流程，保留完整检查，缩短更新等待。" },
+    ],
+  },
+  {
     date: "2026-10-26",
     title: "五位逆位角色解锁条件调整",
     changes: [

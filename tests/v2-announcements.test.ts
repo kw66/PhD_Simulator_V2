@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-26", "2026-10-25", "2026-10-24", "2026-10-22", "2026-10-21", "2026-10-19"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-27", "2026-10-26", "2026-10-25", "2026-10-24", "2026-10-22", "2026-10-21"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -52,7 +52,7 @@ describe("game announcements", () => {
     for (const topic of ["5月处理转博", "月末判断毕业", "注册费", "失败预警", "生活费", "2000字", "同学钱包", "角色经验", "十二项发表里程碑", "六个AI系列"]) {
       expect(text).toContain(topic);
     }
-    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(25);
+    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(26);
   });
 
   it("distinguishes the earlier talent preview from released routes and remaining curse designs", () => {

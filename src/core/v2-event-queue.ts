@@ -132,7 +132,7 @@ export function getQueuedPaperTargetIds(events: PendingEvent[]): string[] {
 }
 
 export function decrementEventQueueDeadlines(eventQueue: EventQueueItem[]): EventQueueItem[] {
-  return eventQueue.map((event) =>
+  return eventQueue.filter((event) => !event.expiresAtMonthEnd || event.deadlineMonths > 0).map((event) =>
     event.deadlineMonths > 0
       ? {
           ...event,
