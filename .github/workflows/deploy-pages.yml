@@ -18,7 +18,8 @@ jobs:
     permissions:
       contents: read
       pages: write
-    runs-on: ubuntu-latest
+    # Playwright 1.58 supports Ubuntu 24.04; ubuntu-latest may use an unsupported OS.
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
