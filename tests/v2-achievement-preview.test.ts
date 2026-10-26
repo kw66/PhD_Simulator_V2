@@ -170,11 +170,11 @@ describe("achievement catalog and presentation", () => {
 
   it("shows five upright graduation challenges on source roles and target unlock mirrors", () => {
     const conditions = {
-      "genius-reversed": "硕士或博士毕业时，科研能力低于导师好感和社交能力",
-      "teacher-child-reversed": "硕士或博士毕业时，导师好感低于科研和社交能力",
-      "social-reversed": "硕士或博士毕业时，社交能力低于科研和导师好感",
-      "rich-reversed": "硕士或博士毕业时，商店单笔消费均不超过10金币",
-      "chosen-reversed": "硕士或博士毕业时，三项属性最高与最低相差≥6",
+      "genius-reversed": "毕业时，科研能力低于导师好感和社交能力",
+      "teacher-child-reversed": "毕业时，导师好感低于科研和社交能力",
+      "social-reversed": "毕业时，社交能力低于科研和导师好感",
+      "rich-reversed": "毕业时，商店单笔消费均不超过10金币",
+      "chosen-reversed": "毕业时，三项属性最高与最低相差≥6",
     } as const;
     for (const roleId of Object.keys(conditions) as (keyof typeof conditions)[]) {
       const mirror = getRoleLobbyAchievementDefinitions(roleId)[0];

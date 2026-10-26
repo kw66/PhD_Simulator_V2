@@ -18,7 +18,7 @@ describe("game announcements", () => {
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
     const current = textForDate("2026-10-24");
-    for (const text of ["硕士或博士毕业", "科研低于社交与导师好感", "社交低于科研与导师好感", "相差至少6", "商店每笔实际扣除", "自动续费按每笔"])
+    for (const text of ["毕业时", "科研低于社交与导师好感", "社交低于科研与导师好感", "相差至少6", "商店每笔实际扣除", "自动续费按每笔"])
       expect(textForDate("2026-10-26")).toContain(text);
     for (const text of ["官方教学录像重新补录", "当前规则", "10与20天赋点博士", "逐一点开", "科研分", "调试入口仅本地", "坏结局"]) expect(textForDate("2026-10-25")).toContain(text);
     for (const text of ["300／200／150／100", "20／18／16／14", "50／70／90／110", "+36／+24／+12／+2", "每次偿还1金币"]) expect(textForDate("2026-10-25")).toContain(text);

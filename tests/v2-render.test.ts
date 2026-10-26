@@ -981,7 +981,7 @@ describe("v2 render lobby shell", () => {
       expect(html).toContain(`data-achievement-id="${achievement.id}"`);
     }
     expect(html).toContain('class="lobby-start-lock" role="group" tabindex="0"');
-    expect(html).toContain('data-tooltip="解锁目标：院士转世 · 硕士或博士毕业时，科研能力低于导师好感和社交能力"');
+    expect(html).toContain('data-tooltip="解锁目标：院士转世 · 毕业时，科研能力低于导师好感和社交能力"');
     expect(html).toContain('<button class="lobby-start-button is-disabled" type="button" disabled');
     expect(html).not.toContain("成就系统待接入：完成院士路线的逆位挑战后解锁");
     expect(html).not.toContain("查看解锁条件");
