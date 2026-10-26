@@ -12,7 +12,7 @@ const fixture = `<!doctype html><html><head><meta name="viewport" content="width
 import '/src/styles/global.css';
 import { bootstrapApp } from '/src/app/v2-bootstrap.ts';
 import '/src/styles/mobile-panels.css';
-bootstrapApp(document.getElementById('app'));
+await bootstrapApp(document.getElementById('app'));
 </script></body></html>`;
 
 describe("mobile play panels", () => {
@@ -46,8 +46,9 @@ describe("mobile play panels", () => {
         title: "Unified Learning of Robust Representations for Cross-Modal Retrieval and Open-World Visual Understanding",
         idea: 55, experiment: 60, writing: 70 };
       const published = attachPaperPublication({ ...paper, id: "mobile-published", paperSlotIndex: 1, status: "published", target: "A", submittedIdea: 55, submittedExperiment: 60, submittedWriting: 70 }, 1.5);
-      await page.evaluate(({ paper, published }) => {
+      await page.evaluate(async ({ paper, published }) => {
         const store = (window as MobileWindow).mobilePanelsStore;
+        await store.ready();
         store.dispatch("start-game", { roleId: "normal" });
         for (const eventChoiceId of ["before-grad-school-open-advisor-info", "before-grad-school-confirm", "before-grad-school-finish"]) {
           store.dispatch("resolve-event", { eventChoiceId });
@@ -64,6 +65,8 @@ describe("mobile play panels", () => {
       }, { paper, published });
       await page.locator('[data-ui-play-tab="workstation"]').tap();
       const submissions = page.locator('.workstation-submit-target-grid .workstation-submit-target');
+      await page.locator('[data-ui-play-tab="workstation"][aria-pressed="true"]').waitFor();
+      await submissions.first().waitFor();
       expect(await submissions.count()).toBe(6);
       const rows = await submissions.evaluateAll(nodes => new Set(nodes.map(node => Math.round(node.getBoundingClientRect().top))).size);
       expect(rows).toBe(3);
