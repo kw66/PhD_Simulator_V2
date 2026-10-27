@@ -20,6 +20,7 @@ export interface ReplaySummary {
   academicYear?: number;
   officialRoute?: string;
   officialNote?: string;
+  strategy?: string;
 }
 export interface ReplayLibraryEntry { id: string; recording: ReplayRecording; summary: ReplaySummary }
 export interface ReplayLibraryAdapter {
@@ -75,9 +76,8 @@ export function createIndexedDbReplayAdapter(options: { playground?: boolean; in
 }
 function summarize(recording: ReplayRecording, state: GameState): ReplaySummary {
   const lastAction = [...recording.replay.commands].reverse().find(command => command.kind === "action");
-  const { money, attributes } = withGameplayRuleset(lastAction?.kind === "action" && lastAction.ruleset || recording.replay.ruleset,
+  const { researchScore: _researchScore, ...metrics } = withGameplayRuleset(lastAction?.kind === "action" && lastAction.ruleset || recording.replay.ruleset,
     () => deriveReplayResults(state));
-  const metrics = { money, attributes };
   return { id: recording.id, createdAt: recording.createdAt, updatedAt: recording.updatedAt,
     roleId: state.selectedRoleId, playerName: state.playerName, totalMonths: state.totalMonths,
     degree: state.degree, phase: state.phase, ending: state.ending, researchScore: state.totalResearchScore,

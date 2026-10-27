@@ -231,8 +231,25 @@ describe("standalone local replay library", () => {
     const imported = createReplayLibrary({ adapter: createMemoryReplayAdapter() });
     await imported.import(text);
     expect(await imported.get(recording.id)).toEqual(recording);
+    expect((await imported.list())[0]!.metrics?.outcomes).toEqual(summary.metrics?.outcomes);
+    expect(summary.metrics?.outcomes).toBeDefined();
+    expect(summary.metrics?.talentPoints).toBe(0);
+    expect((await imported.list())[0]!.metrics?.talentPoints).toBe(0);
     await reloaded.remove(recording.id);
     expect(await library.list()).toEqual([]);
+  });
+  it("leaves absent outcome data in older cached summaries unknown until reimport", async () => {
+    const adapter = createMemoryReplayAdapter(), library = createReplayLibrary({ adapter });
+    const { recording } = fixture();
+    const summary = await library.save(recording);
+    delete summary.metrics!.outcomes;
+    delete summary.metrics!.talentPoints;
+    await adapter.put({ id: recording.id, recording, summary });
+    expect((await library.list())[0]!.metrics).not.toHaveProperty("outcomes");
+    expect((await library.list())[0]!.metrics).not.toHaveProperty("talentPoints");
+    await library.import(serializeReplayRecording(recording));
+    expect((await library.list())[0]!.metrics?.outcomes).toMatchObject({ totalCitations: 0, internships: 0 });
+    expect((await library.list())[0]!.metrics?.talentPoints).toBe(0);
   });
   it("preserves creation date, rejects altered imports and reports storage failures", async () => {
     const adapter = createMemoryReplayAdapter(), library = createReplayLibrary({ adapter });

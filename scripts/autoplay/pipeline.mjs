@@ -1,8 +1,8 @@
 import {FIELDS,expectedResearch,projectAi,paperReliability,cashReserve,safePayment} from './estimates.mjs';
 // A bounded, public-information projection. Future random events and research
 // rolls are not simulated; score expectation is integrated from the public rule.
-export function planPaper(E,state,paper,{deadline=70,minProbability=.8,minScore=1,scoreNeed=Infinity,buffer=6}={}){
- const missing=FIELDS.filter(f=>paper[f]<=0);
+export function planPaper(E,state,paper,{deadline=70,minProbability=.8,minScore=1,scoreNeed=Infinity,buffer=6,requiredFields,evaluate,researchQuantile=.25}={}){
+ const missing=requiredFields??FIELDS.filter(f=>paper[f]<=0);
  const fields=missing.length?missing:FIELDS;
  if(!fields.length)return null;
  const proposals=[],reliabilities=new Map();
@@ -16,11 +16,10 @@ export function planPaper(E,state,paper,{deadline=70,minProbability=.8,minScore=
  function visit(s,p,remaining,steps,cost,san,waits=0){
   if(s.totalMonths+3>deadline||s.totalMonths-state.totalMonths>6)return;
   if(!remaining.length){
+   // Every projected activation must have a controller step. Claude bundles
+   // are enumerated below, including activation-only completion; an implicit
+   // final polish would promise scores that the recorded actions never earn.
    const finishes=[{paper:p,price:0}];
-   if(!s.aiShopState.subscriptions.claude.active){
-    const polished=projectAi(E,s,['claude'],p);
-    if(polished&&polished.state.player.money>=cashReserve(E,s))finishes.push({paper:polished.paper,price:polished.cost});
-   }
    for(const finish of finishes)for(const target of ['B','C','A']){
     const key=[s.year,s.month,target,E.getRoleKindReviewerBonus(s),...FIELDS.map(f=>finish.paper[f])].join(':');
     if(!reliabilities.has(key))reliabilities.set(key,paperReliability(E,s,finish.paper,target));
@@ -29,7 +28,6 @@ export function planPaper(E,state,paper,{deadline=70,minProbability=.8,minScore=
     proposals.push({steps,cost:cost+finish.price,polishPrice:finish.price,san,probability,target,finishMonth:s.totalMonths,resultMonth:s.totalMonths+3,scores:FIELDS.map(f=>finish.paper[f]),utility:(Math.min(E.SCORE_BY_TARGET[target],scoreNeed)*probability*10-(cost+finish.price)*1.2-san*.12-(s.totalMonths-state.totalMonths)*2)});
    }return;
   }
-  if(missing.length&&remaining[0]==='writing'&&p.writing>0)return visit(s,p,remaining.slice(1),steps,cost,san,waits);
   const field=remaining[0];
   // Include recovery in the complete budget. A policy that requires all three
   // operations to fit the current SAN bar will reject feasible manuscripts for
@@ -46,7 +44,7 @@ export function planPaper(E,state,paper,{deadline=70,minProbability=.8,minScore=
    const models=Object.keys(proj.state.aiShopState.subscriptions).filter(slot=>proj.state.aiShopState.subscriptions[slot].active).sort().join(',');
    if(modelSets.has(models))continue;
    modelSets.add(models);
-   const projectedRemaining=missing.length?remaining.filter(f=>proj.paper[f]<=0):remaining;
+   const projectedRemaining=missing.length&&!requiredFields?remaining.filter(f=>proj.paper[f]<=0):remaining;
    const projectedField=projectedRemaining[0];
    const purchase=bundle.filter(x=>!s.aiShopState.subscriptions[x].active);
    const requiredModels=Object.keys(proj.state.aiShopState.subscriptions).filter(slot=>proj.state.aiShopState.subscriptions[slot].active&&['gpt','claude','deepseek','gemini','doubao'].includes(slot));
@@ -67,9 +65,19 @@ export function planPaper(E,state,paper,{deadline=70,minProbability=.8,minScore=
    const paid=E.paySanCost(prepared,e.sanCost);
    if(paid.player.money<cashReserve(E,s))continue;
    let next=E.consumeNextActionBuffs({...paid,advisorProgressState:{...paid.advisorProgressState,funding:paid.advisorProgressState.funding-experiment.advisorFunding}},projectedField);
-   let copy={...proj.paper,[projectedField]:proj.paper[projectedField]+e.improvement};
-   if(projectedField==='experiment'&&next.advisorProgressState.pendingGuidanceToPlayer!=null){const help=E.getAdvisorGuidanceScores(next,next.advisorProgressState.pendingGuidanceToPlayer);for(const f of FIELDS)copy[f]+=help[f]??0;next={...next,advisorProgressState:{...next.advisorProgressState,pendingGuidanceToPlayer:null}};}
-   const path=[...steps,{month:s.totalMonths,field:projectedField,bundle:purchase,models:requiredModels,san:e.sanCost,gain:e.improvement,cost:proj.cost}];
+   // Reviewer confidence at three mean scores ignores the research rolls that
+   // still have to happen. Budget a lower quartile outcome in each field so a
+   // low roll has room to miss without invalidating the entire funded route.
+   let cumulative=0,projectedScore=proj.paper[projectedField]+e.improvement;
+   for(const [score,weight] of [...e.distribution].sort((a,b)=>a[0]-b[0])){
+    cumulative+=weight;
+    if(cumulative>=researchQuantile){projectedScore=score;break;}
+   }
+   let copy={...proj.paper,[projectedField]:projectedScore};
+   // Pending guidance settles at a month boundary and can select another draft.
+   // It is not an immediate writing operation after this experiment. Budget the
+   // complete manuscript without that uncredited help; replan once it arrives.
+   const path=[...steps,{month:s.totalMonths,field:projectedField,bundle:purchase,models:requiredModels,san:e.sanCost,gain:projectedScore-proj.paper[projectedField],cost:proj.cost,improvementOnly:true}];
    if(projectedRemaining.length>1){
     // Spend the AI research action this month when it makes the full batch feasible.
     if(E.getActiveOperationAllowance(next,projectedRemaining[1]).allowed)visit(next,copy,projectedRemaining.slice(1),path,cost+proj.cost+experiment.playerMoney,san+e.sanCost,waits);
@@ -83,5 +91,5 @@ export function planPaper(E,state,paper,{deadline=70,minProbability=.8,minScore=
  visit(state,paper,fields,[],0,0);
  // Prefer a feasible start now. Re-optimizing a cheaper future start every
  // month otherwise keeps moving the opening date indefinitely.
- return proposals.sort((a,b)=>(a.steps[0].month-state.totalMonths)-(b.steps[0].month-state.totalMonths)||b.utility-a.utility)[0]??null;
+ return proposals.sort((a,b)=>(a.steps[0].month-state.totalMonths)-(b.steps[0].month-state.totalMonths)||(evaluate?evaluate(b)-evaluate(a):b.utility-a.utility))[0]??null;
 }

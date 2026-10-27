@@ -48,7 +48,12 @@ describe("replay guide and aggregate play counts", () => {
       await page.locator(`[data-replay-plays="${id}"]`).getByText("播放 12", { exact: true }).waitFor();
       expect(await page.locator("h1").textContent()).toBe("录像与攻略");
       expect(await page.locator('[data-replay-route="phd-20"]').count()).toBe(0);
-      expect(await page.locator('.replay-source-tabs a').allTextContents()).toEqual(["官方录像攻略", "玩家录像"]);
+      expect(await page.locator('.replay-source-tabs a').allTextContents()).toEqual(["官方录像攻略", "本地录像"]);
+      expect(await page.locator('[data-replay-role]').allTextContents()).toEqual(["大多数"]);
+      expect(await page.locator('.replay-card-strategy').allTextContents()).toEqual(["稳定通过", "稳定通过", "稳定通过"]);
+      expect(await page.locator('[data-replay-build]').allTextContents()).toEqual(["0天赋点", "10天赋点", "10天赋点"]);
+      expect(await page.locator('[data-replay-card="official-normal-master-10"] .replay-card-status').textContent()).toBe("硕士毕业");
+      expect(await page.locator('[data-replay-card="official-normal-phd-10"] .replay-card-status').textContent()).toBe("博士毕业");
       expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
       await page.screenshot({ path: `artifacts/replay-guide/official-${width}.png`, fullPage: true });
       expect(requests).toHaveLength(1);
@@ -66,7 +71,7 @@ describe("replay guide and aggregate play counts", () => {
       expect(requests.filter(r => r.name.startsWith("record_"))).toHaveLength(1);
       await page.locator('.replay-source-tabs a[href*="library"]').click();
       await page.locator("[data-replay-import]").waitFor();
-      expect(await page.locator('.replay-source-tabs [aria-current="page"]').textContent()).toBe("玩家录像");
+      expect(await page.locator('.replay-source-tabs [aria-current="page"]').textContent()).toBe("本地录像");
       expect(requests).toHaveLength(2);
       await page.screenshot({ path: `artifacts/replay-guide/player-${width}.png`, fullPage: true });
       expect(errors).toEqual([]);

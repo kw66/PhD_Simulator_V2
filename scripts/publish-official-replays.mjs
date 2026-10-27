@@ -48,7 +48,7 @@ try {
     await E.verifyReplayRecording(recording, { yieldControl: async () => {} });
     const { researchScore: score, ...metrics } = deriveReplayResults(final);
     const file = role + '-' + route + '.json';
-    published.push({ recording, definition: { id, file, roleId: role, route, note: '', totalMonths: final.totalMonths, degree: final.degree, score, commands: commands.length, ruleset: source.replay.ruleset, finalDigest: source.finalDigest, metrics } });
+    published.push({ recording, definition: { id, file, roleId: role, route, note: '', strategy: '稳定通过', totalMonths: final.totalMonths, degree: final.degree, score, commands: commands.length, ruleset: source.replay.ruleset, finalDigest: source.finalDigest, metrics } });
     console.log(JSON.stringify({ id, score, commands: commands.length, removedNoOps: source.replay.commands.length - commands.length }));
   }
   // Verify all inputs before replacing the public library.

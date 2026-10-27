@@ -5,8 +5,10 @@ import { expectedResearch, paperReliability, projectAi, safePayment, stageGoal }
 import { createPlanner } from './planner.mjs';
 import { planPaper } from './pipeline.mjs';
 import { auditTeachingReplay } from './quality.mjs';
+import { readingMilestoneReachable } from './surplus.mjs';
 import { relationshipEventPriorities } from './relationships.mjs';
 import {opportunityEventPriority,compareVenues,planLoverActivity,internshipBudget} from './opportunities.mjs';
+import {scholarshipDecision,scholarshipChance,transferPaperOptions,criticalPolish} from './milestones.mjs';
 const { E, close } = await loadEngine();
 try {
   const recording = E.parseReplayRecording(await readFile('public/official-replays/normal-phd-10.json', 'utf8'));
@@ -24,9 +26,39 @@ try {
   assert.ok(paperReliability(E,s,balanced,'C') >= paperReliability(E,s,balanced,'A'));
   assert.equal(stageGoal(E,s,'phd').submissionDeadline,18);
   assert.equal(stageGoal(E,{...s,totalMonths:22},'phd').submissionDeadline,30);
+  assert.equal(stageGoal(E,{...s,degree:'phd'},'phd').deadline,67,'required papers must be credited before April blind review freezes');
+  assert.equal(stageGoal(E,s,'master').deadline,31);
   const spring={...s,totalMonths:20,year:2,month:8,eventQueue:[],totalResearchScore:0,
     player:{san:20,research:4,social:4,favor:4,money:20},
     advisorProgressState:{...s.advisorProgressState,funding:60}};
+  const mildWarning={...spring,totalMonths:6,year:1,month:6,
+    roleTalents:{...spring.roleTalents,levels:{}},papers:[],
+    actionState:{...spring.actionState,used:spring.actionState.limit,aiResearchBonusUsed:true},
+    player:{san:6.5,research:2,social:2,favor:2,money:3}};
+  assert.ok(E.previewNextMonthEffects(mildWarning).player.san>=5);
+  assert.notEqual(createPlanner(E).next(mildWarning).action,'buy-coffee',
+    'a nonfatal soft warning with no remaining action must not consume the manuscript cash reserve');
+  const eligibleScholar={...spring,totalMonths:14,year:2,month:2,totalResearchScore:1};
+  assert.equal(scholarshipDecision(E,eligibleScholar).apply,true,'one published C already qualifies for the second-year six-coin award');
+  assert.equal(scholarshipDecision(E,{...eligibleScholar,totalResearchScore:3,year:3,
+    scholarshipState:{...s.scholarshipState,scoreBaseline:3,lastAwardYear:2}}).apply,false,
+    'previously awarded scores cannot justify another application');
+  assert.equal(scholarshipDecision(E,{...eligibleScholar,buffs:[E.createImageMisuseBuff()]}).apply,false,
+    'a disqualified run must not pay to apply');
+  assert.equal(scholarshipChance(E,3,2),1/3);
+  assert.equal(scholarshipChance(E,4,4),0);
+  assert.equal(transferPaperOptions(E,{...spring,totalMonths:18}).deadline,21,
+    'the last timely first-round submission is still a second-year transfer attempt');
+  assert.equal(transferPaperOptions(E,{...spring,totalMonths:29,totalResearchScore:1}).minScore,2,
+    'a last C cannot replace the B required for the final transfer');
+  const criticalPaper={...E.createDraftPaper(27,0,()=>.5),idea:9,experiment:4,writing:11};
+  const critical={...spring,totalMonths:29,year:3,month:5,totalResearchScore:2,
+    papers:[criticalPaper],player:{...spring.player,money:13.5},aiShopState:E.createAiShopState(),
+    roleTalents:{...spring.roleTalents,levels:{}}};
+  assert.ok(criticalPolish(E,critical,criticalPaper)?.after>=.95,'buy an affordable same-grade reliability improvement before the last decisive submission');
+  const polishDecision=createPlanner(E).next(critical);
+  assert.equal(polishDecision.action,'buy-ai-month');
+  assert.equal(polishDecision.payload.aiSlotId,'claude');
   const ready={...E.createDraftPaper(18,0,()=>.5),idea:19,experiment:14,writing:12};
   const submissionState={...projectAi(E,spring,['claude']).state,papers:[ready]};
   assert.ok(paperReliability(E,submissionState,ready,'B')>=.5);
@@ -77,15 +109,25 @@ try {
   const planBefore=JSON.stringify(spring);
   const pipeline=planPaper(E,spring,{...ready,idea:0,experiment:0,writing:0},{deadline:33});
   assert.ok(pipeline?.steps.length);
+  assert.ok(pipeline.steps.filter(step=>!step.activationOnly).every(step=>step.improvementOnly),
+    'external nonzero scores cannot silently fulfill an unexecuted quality operation');
   assert.equal(JSON.stringify(spring),planBefore,'planning must not mutate the game or RNG');
   assert.deepEqual(pipeline,planPaper(E,{...spring,randomState:{seed:987654,cursor:123}},
     {...ready,idea:0,experiment:0,writing:0},{deadline:33}),'plans must not depend on hidden future rolls');
+  const guided={...spring,advisorProgressState:{...spring.advisorProgressState,pendingGuidanceToPlayer:10}};
+  assert.deepEqual(planPaper(E,guided,{...ready,idea:0,experiment:0,writing:0},{deadline:33}),pipeline,
+    'uncredited future advisor guidance cannot replace a funded writing operation');
   if(pipeline.steps[0].month===spring.totalMonths){
     const step=pipeline.steps[0],projected=projectAi(E,spring,step.models).state;
     assert.ok(safePayment(E,projected,step.field,expectedResearch(E,projected,ready,step.field).sanCost,8),
       'the controller must be able to execute the budgeted first step safely');
   }
   const lastMonth={...spring,totalMonths:30,year:3,month:6,player:{...spring.player,research:12}};
+  const finalReadingMonth={...spring,totalMonths:69,year:6,month:9,
+    actionState:{...spring.actionState,limit:1,used:0},
+    readingState:{...spring.readingState,readCount:86}};
+  assert.equal(readingMilestoneReachable(E,finalReadingMonth),false,
+    'graduation settles at month 70: no automatic or manual reads can be purchased after it');
   const lastStep=planPaper(E,lastMonth,{...ready,idea:30,experiment:30,writing:0},{deadline:33});
   assert.ok(lastStep&&lastStep.resultMonth===33,'a result arriving in the transfer month is usable');
   let sameMonth={...spring,totalMonths:32,year:3,month:8,maxMonths:34,totalResearchScore:2,illnessProbability:0,
@@ -98,6 +140,50 @@ try {
     sameMonth=E.executeReplayCommand(sameMonth,{kind:'action',actionId:decision.action,payload:decision.payload},E.REPLAY_RULESET);
   }
   assert.equal(sameMonth.degree,'phd','settle the review before the live transfer condition is rebuilt');
+  const blindBoundary={...spring,totalMonths:67,year:6,month:7,degree:'phd',maxMonths:70,
+    graduationScoreTarget:7,totalResearchScore:6,illnessProbability:0,
+    papers:[{...E.prepareConferenceSubmission({...ready,idea:100,experiment:100,writing:100},'C',4,6),reviewMonthsLeft:1}]};
+  const blindFrozen=E.executeReplayCommand(blindBoundary,{kind:'action',actionId:'next-month',payload:{}},E.REPLAY_RULESET);
+  assert.equal(blindFrozen.thesis.review.submitted,false,
+    'unlike transfer, settling a paper result during April cannot repair an already frozen blind review');
+  assert.notEqual(stageGoal(E,{...blindFrozen,totalResearchScore:7,
+    thesis:{...blindFrozen.thesis,researchPoints:blindFrozen.thesis.researchPoints.map(p=>({...p,score:500}))}},'phd').id,'finish',
+    'late scores and thesis advances cannot turn a frozen failure into a completed graduation plan');
+  assert.equal(compareVenues(E,{...blindBoundary,totalMonths:65},{...ready,idea:30,experiment:30,writing:30},{deadline:67}),null,
+    'a needed conference result must arrive before blind-review qualification freezes');
+  const commitmentState={...spring,totalMonths:10,year:1,month:10,
+    roleTalents:{...spring.roleTalents,levels:{}},player:{san:20,research:5,social:4,favor:4,money:20},papers:[]};
+  const interruptedPlanner=createPlanner(E);
+  let committedState=commitmentState;
+  let completedOperations=0;
+  for(let n=0;n<12&&completedOperations<2;n++){
+    const d=interruptedPlanner.next(committedState);
+    committedState=E.executeReplayCommand(committedState,{kind:'action',actionId:d.action,payload:d.payload},E.REPLAY_RULESET);
+    // Isolate an interruption of the manuscript controller from new events.
+    committedState={...committedState,eventQueue:[],player:{...committedState.player,san:20,money:20}};
+    if(d.action==='research-paper')completedOperations++;
+  }
+  assert.equal(completedOperations,2);
+  committedState={...committedState,totalMonths:16,year:2,month:4,aiShopState:E.createAiShopState(),
+    actionState:{...committedState.actionState,used:0,aiResearchBonusUsed:false},buffs:committedState.buffs.filter(b=>!b.id.startsWith('ai-')),
+    player:{...committedState.player,san:20,money:20}};
+  let afterDelay;
+  for(let n=0;n<6;n++){
+    afterDelay=interruptedPlanner.next(committedState);
+    if(afterDelay.action!=='buy-ai-month')break;
+    committedState=E.executeReplayCommand(committedState,{kind:'action',actionId:afterDelay.action,payload:afterDelay.payload},E.REPLAY_RULESET);
+  }
+  assert.equal(afterDelay.action,'research-paper');
+  assert.equal(afterDelay.payload.paperActionType,'writing','a calendar interruption must preserve the unfinished writing operation');
+  const claudeFillsMissing={...projectAi(E,spring,['gpt','deepseek','gemini']).state,totalMonths:20,year:2,month:8,
+    roleTalents:{...spring.roleTalents,levels:{}},totalResearchScore:1,
+    actionState:{...spring.actionState,limit:1,used:1,aiResearchBonusUsed:false},
+    player:{san:10.416,research:3,social:2,favor:3,money:3.5},
+    papers:[{...ready,idea:13,experiment:0,writing:0}]};
+  const fillDecision=createPlanner(E).next(claudeFillsMissing);
+  assert.equal(fillDecision.action,'buy-ai-month');
+  assert.equal(fillDecision.payload.aiSlotId,'claude',
+    'planned Claude activation may fill experiment before the writing operation; do not loop replanning the same route');
   const interrupted={...spring,totalMonths:18,year:2,month:6,
     player:{san:5,research:2,social:3,favor:3,money:4.5},
     papers:[{...ready,idea:12,experiment:0,writing:0}],

@@ -5,33 +5,60 @@
     "roleId": "normal",
     "route": "phd-0",
     "note": "",
+    "strategy": "稳定通过",
     "totalMonths": 70,
     "degree": "phd",
-    "score": 7,
-    "commands": 503,
+    "score": 9,
+    "commands": 519,
     "ruleset": "20261027-r58",
-    "finalDigest": "52dc7f86:c964ae4:331324",
+    "finalDigest": "193e4ecb:86212681:371852",
     "metrics": {
       "money": 23.5,
+      "talentPoints": 0,
+      "outcomes": {
+        "totalCitations": 106,
+        "publications": {
+          "A": 0,
+          "B": 3,
+          "C": 3,
+          "nature": 0,
+          "nmi": 0,
+          "pami": 0
+        },
+        "thesisGrades": {
+          "A": 0,
+          "B": 5,
+          "C": 0,
+          "D": 0
+        },
+        "thesisStatus": "revealed",
+        "lover": false,
+        "jointTraining": false,
+        "internships": 0,
+        "job": "地方国企技术岗",
+        "fellows": 1,
+        "advisorRank": "四级教授",
+        "funding": 67
+      },
       "attributes": [
         {
           "label": "SAN",
-          "value": 17.24926976,
+          "value": 20,
           "cap": 20
         },
         {
           "label": "科研能力",
-          "value": 7.6,
+          "value": 10,
           "cap": 20
         },
         {
           "label": "社交能力",
-          "value": 6.8,
+          "value": 7.6,
           "cap": 20
         },
         {
           "label": "导师好感",
-          "value": 5,
+          "value": 5.2,
           "cap": 20
         }
       ]
@@ -43,33 +70,60 @@
     "roleId": "normal",
     "route": "phd-10",
     "note": "",
+    "strategy": "稳定通过",
     "totalMonths": 70,
     "degree": "phd",
-    "score": 9,
-    "commands": 517,
+    "score": 15,
+    "commands": 543,
     "ruleset": "20261027-r58",
-    "finalDigest": "bb27f6d9:c6552c1d:406482",
+    "finalDigest": "1a02061e:f20e6104:409760",
     "metrics": {
-      "money": 32,
+      "money": 25,
+      "talentPoints": 10,
+      "outcomes": {
+        "totalCitations": 162,
+        "publications": {
+          "A": 2,
+          "B": 3,
+          "C": 3,
+          "nature": 0,
+          "nmi": 0,
+          "pami": 0
+        },
+        "thesisGrades": {
+          "A": 0,
+          "B": 5,
+          "C": 0,
+          "D": 0
+        },
+        "thesisStatus": "revealed",
+        "lover": false,
+        "jointTraining": false,
+        "internships": 1,
+        "job": "地方国企技术岗",
+        "fellows": 1,
+        "advisorRank": "副教授",
+        "funding": 43
+      },
       "attributes": [
         {
           "label": "SAN",
-          "value": 20,
-          "cap": 20
+          "value": 18,
+          "cap": 18
         },
         {
           "label": "科研能力",
-          "value": 14.2,
+          "value": 13.2,
           "cap": 20
         },
         {
           "label": "社交能力",
-          "value": 13,
+          "value": 9.2,
           "cap": 20
         },
         {
           "label": "导师好感",
-          "value": 7.6,
+          "value": 4,
           "cap": 20
         }
       ]
@@ -81,14 +135,41 @@
     "roleId": "normal",
     "route": "master-10",
     "note": "",
+    "strategy": "稳定通过",
     "totalMonths": 34,
     "degree": "master",
     "score": 2,
-    "commands": 213,
+    "commands": 234,
     "ruleset": "20261027-r58",
-    "finalDigest": "f780500b:74b91233:130230",
+    "finalDigest": "75f1da8a:f04a0f4c:155996",
     "metrics": {
-      "money": 8.5,
+      "money": 7,
+      "talentPoints": 10,
+      "outcomes": {
+        "totalCitations": 12,
+        "publications": {
+          "A": 0,
+          "B": 0,
+          "C": 2,
+          "nature": 0,
+          "nmi": 0,
+          "pami": 0
+        },
+        "thesisGrades": {
+          "A": 0,
+          "B": 3,
+          "C": 0,
+          "D": 0
+        },
+        "thesisStatus": "revealed",
+        "lover": false,
+        "jointTraining": false,
+        "internships": 0,
+        "job": null,
+        "fellows": 0,
+        "advisorRank": "副教授",
+        "funding": 80.5
+      },
       "attributes": [
         {
           "label": "SAN",
@@ -97,17 +178,17 @@
         },
         {
           "label": "科研能力",
-          "value": 5,
+          "value": 9.2,
           "cap": 20
         },
         {
           "label": "社交能力",
-          "value": 5,
+          "value": 4,
           "cap": 20
         },
         {
           "label": "导师好感",
-          "value": 5.2,
+          "value": 5,
           "cap": 20
         }
       ]

@@ -13,6 +13,7 @@ interface OfficialReplayDefinition {
   roleId: RoleId;
   route: OfficialReplayRoute;
   note: string;
+  strategy?: string;
   totalMonths: number;
   degree: "master" | "phd";
   score: number;
@@ -21,14 +22,6 @@ interface OfficialReplayDefinition {
   finalDigest: string;
   metrics: ReplayMetrics;
 }
-
-export const OFFICIAL_REPLAY_SLOTS: readonly { route: OfficialReplayRoute; label: string; detail: string }[] = [
-  { route: "phd-0", label: "0 天赋点博士路线", detail: "不投入天赋点的基础路线" },
-  { route: "phd-10", label: "10 天赋点博士路线", detail: "角色策略示范" },
-  { route: "master-10", label: "10 天赋点硕士路线", detail: "专注三年硕士毕业的路线" },
-  { route: "cursed", label: "诅咒角色", detail: "诅咒挑战录像" },
-  { route: "special", label: "特殊角色", detail: "统御者与轮回者录像" },
-];
 
 const DEFINITIONS = manifest as readonly OfficialReplayDefinition[];
 
@@ -48,6 +41,7 @@ function summary(definition: OfficialReplayDefinition): ReplaySummary {
     metrics: definition.metrics,
     commandCount: definition.commands,
     officialRoute: definition.route,
+    strategy: definition.strategy ?? "稳定通过",
     officialNote: definition.note ? `${role.name} · ${definition.note}` : role.name,
   };
 }

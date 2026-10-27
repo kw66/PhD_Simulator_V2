@@ -52,8 +52,10 @@ export function relationshipEventPriorities(E, s, degreeGoal, reservedCoins=0, c
   const budget=prefix=>canBudgetOptionalEvent(E,s,optionalEventSanCost(E,s,prefix),commitment);
   const badmintonWin = Math.max(0, s.player.san) * (s.eventCounters.badmintonCount + 3)
     + (s.eventSupport.hasBadmintonRacket ? 40 : 0) >= 100;
+  const knownResearch=s.totalResearchScore+s.papers.filter(p=>p.status==='reviewing').reduce((n,p)=>n+(E.SCORE_BY_TARGET[p.target]??0),0);
+  const masterCashNeed=reserve+(s.totalMonths<24&&knownResearch<2?6:2);
   return [
-    s.player.favor <= 0 ? 'year-summary-favor' : s.player.san < 6 ? 'year-summary-sleep' : s.player.money < (s.degree==='master'?reserve+(s.totalMonths<24?6:2):Math.min(reserve,cashReserve(E,s)+2)) ? 'year-summary-part-time'
+    s.player.favor <= 0 ? 'year-summary-favor' : s.player.san < 6 ? 'year-summary-sleep' : s.player.money < (s.degree==='master'?(degreeGoal==='master'?masterCashNeed:reserve+(s.totalMonths<24?6:2)):Math.min(reserve,cashReserve(E,s)+2)) ? 'year-summary-part-time'
       : s.player.favor < 3 ? 'year-summary-favor' : needSocial ? 'year-summary-social'
       : s.player.favor < 6 ? 'year-summary-favor' : 'year-summary-sleep',
     badmintonWin && !s.eventSupport.hasStrongBodyTalent || s.illnessProbability >= 30

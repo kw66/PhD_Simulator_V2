@@ -11,13 +11,14 @@ const seeds=(process.argv[4]??'1097218,271001,271019').split(',').map(Number);
 const directory=process.argv[5]??'artifacts/strategic-autoplay';await mkdir(directory,{recursive:true});
 const {E,close}=await loadEngine();
 try{
- const policyFiles=['planner.mjs','estimates.mjs','pipeline.mjs','quality.mjs','relationships.mjs','opportunities.mjs','engine.mjs'];
+ const policyFiles=['planner.mjs','estimates.mjs','pipeline.mjs','quality.mjs','relationships.mjs','opportunities.mjs','surplus.mjs','engine.mjs','milestones.mjs'];
  const policySources=Object.fromEntries(await Promise.all(policyFiles.map(async name=>[name,await readFile(new URL(name,plannerModule),'utf8')])));
  const policyDigest=createHash('sha256').update(JSON.stringify(policySources)).digest('hex');
  await writeFile(`${directory}/policy-snapshot.json`,JSON.stringify({policyDigest,sources:policySources},null,2));
  const budget=Number(route.split('-').at(-1));
  const old=budget===0?null:JSON.parse(await readFile(`public/official-replays/${role}-${route}.json`,'utf8'));
- const talents=JSON.parse(process.env.AUTOPLAY_TALENTS??'null')??(budget===0?{}:old.replay.commands[0].payload.talentAllocation??{});
+ const defaultTalents=role==='normal'&&route==='master-10'?{'first-month-drive':1,'first-month-drive-plus':5,'self-determination':1,'breakthrough':1}:budget===0?{}:old.replay.commands[0].payload.talentAllocation??{};
+ const talents=JSON.parse(process.env.AUTOPLAY_TALENTS??'null')??defaultTalents;
  const config=JSON.parse(process.env.AUTOPLAY_CONFIG??'{}');
  for(const seed of seeds){
   const degreeGoal=route.startsWith('master')?'master':'phd';

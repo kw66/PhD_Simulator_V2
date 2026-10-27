@@ -11,7 +11,6 @@ import { createReplayLibrary, type ReplayLibrary, type ReplaySummary } from "./v
 import { prepareReplayActionView, getReplayActionTarget, getReplayActionTiming } from "./v2-replay-action-focus";
 import { renderEventLayoutSamples, renderPlayScreen } from "./v2-render-play";
 import { getRoleChibiPortraitUrl } from "./v2-role-portrait-assets";
-import { OFFICIAL_REPLAY_SLOTS, type OfficialReplayRoute } from "./v2-official-replays";
 import { createOfficialReplayStats } from "./v2-official-replay-stats";
 import { getReplayResults, type ReplayMetrics } from "./v2-replay-results";
 import { getReplayNavigationStep } from "./v2-replay-navigation";
@@ -36,6 +35,11 @@ function monthLabel(totalMonths: number): string {
 function dateLabel(value: string): string {
   return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
 }
+function talentLabel(summary: ReplaySummary, metrics?: Pick<ReplayMetrics, "talentPoints">): string {
+  const role = summary.roleId;
+  if (role === "rewinder" || role === "research-captain" || role.startsWith("special-") || role.startsWith("cursed-")) return "无天赋点";
+  return metrics?.talentPoints === null ? "天赋点未知" : metrics?.talentPoints === undefined ? "天赋点…" : `${metrics.talentPoints}天赋点`;
+}
 function renderMetrics(summary: ReplaySummary, metrics?: ReplayMetrics, failed = false): string {
   const number = (value: number): string => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(value);
   const stats = [
@@ -43,15 +47,35 @@ function renderMetrics(summary: ReplaySummary, metrics?: ReplayMetrics, failed =
     { label: "金币", value: metrics?.money, cap: undefined },
     ...["SAN", "科研能力", "社交能力", "导师好感"].map(label => metrics?.attributes.find(stat => stat.label === label) ?? { label, value: undefined, cap: undefined }),
   ];
-  return `<dl class="replay-card-metrics" data-replay-metrics="${escape(summary.id)}" aria-label="本局最终数值">${stats.map(stat => `<div><dt>${stat.label}</dt><dd>${stat.value === undefined ? failed ? "—" : "…" : number(stat.value)}${stat.cap === undefined ? "" : `<span> / ${number(stat.cap)}</span>`}</dd></div>`).join("")}</dl>`;
+  const cell = (label: string, value: string, className = ""): string => `<div${className ? ` class="${className}"` : ""}><dt>${label}</dt><dd>${value}</dd></div>`;
+  const outcomes = metrics?.outcomes;
+  const counts = (values: Record<string, number>, labels: [string, string][]): string => labels.map(([key, label]) => `<span class="replay-count">${label}<b>${number(values[key]!)}</b></span>`).join("");
+  const detail = outcomes ? `<dl class="replay-card-outcomes">
+    ${cell("论文", counts(outcomes.publications, [["A", "A"], ["B", "B"], ["C", "C"]]))}
+    ${cell("期刊", counts(outcomes.publications, [["nature", "Nature"], ["nmi", "NMI"], ["pami", "PAMI"]]))}
+    ${cell("总引用", number(outcomes.totalCitations))}
+    ${cell("盲审", outcomes.thesisGrades ? counts(outcomes.thesisGrades, [["A", "A"], ["B", "B"], ["C", "C"], ...(outcomes.thesisGrades.D ? [["D", "D"] as [string, string]] : [])]) : outcomes.thesisStatus === "pending" ? "待揭晓" : "未送审", "replay-card-review")}
+  </dl><dl class="replay-card-life">
+    ${cell("恋爱", outcomes.lover ? "恋爱中" : "未恋爱")}
+    ${cell("联培", outcomes.jointTraining ? "已获得" : "未获得")}
+    ${cell("实习", `${number(outcomes.internships)}次`)}
+    ${cell("同学", `${number(outcomes.fellows)}人`)}
+    ${cell("导师", escape(outcomes.advisorRank ?? "无"))}
+    ${cell("经费", `${number(outcomes.funding)}金`)}
+  </dl><dl class="replay-card-career">${cell("工作", outcomes.job ? `${escape(outcomes.job)} offer` : "暂无 offer")}</dl>` : `<p class="replay-card-pending">${failed ? "详细结果暂不可用" : "正在还原本局结果…"}</p>`;
+  const labels: Record<string, string> = { 科研能力: "科研", 社交能力: "社交", 导师好感: "好感" };
+  return `<div class="replay-card-metrics" data-replay-metrics="${escape(summary.id)}" aria-label="本局最终数值"><dl class="replay-card-base">${stats.map(stat => cell(labels[stat.label] ?? stat.label, `${stat.value === undefined ? failed ? "—" : "…" : number(stat.value)}${stat.cap === undefined ? "" : `<span class="replay-stat-cap"> / ${number(stat.cap)}</span>`}`)).join("")}</dl>${detail}</div>`;
 }
 function renderSummary(summary: ReplaySummary, official = false, metrics = summary.metrics, plays?: number): string {
   const role = getRoleDefinition(summary.roleId);
   const status = summary.academicYear ? `第${summary.academicYear}学年归档` : summary.ending ? endings[summary.ending] ?? "本轮结束" : summary.phase === "finished" ? "本轮结束" : "途中记录";
+  const degree = summary.degree === "phd" ? "博士" : "硕士";
+  const degreeStatus = summary.ending === "phd" || summary.ending === "master" ? status : `${degree} · ${status}`;
+  const talents = talentLabel(summary, metrics);
   const filename = `${role.name}${summary.playerName ? ` · ${summary.playerName}` : ""}`;
   return `<article class="replay-card${summary.roleId.endsWith("-reversed") ? " is-reversed" : ""}" data-replay-card="${escape(summary.id)}">
     <img class="replay-card-portrait" src="${escape(getRoleChibiPortraitUrl(summary.roleId))}" alt="" loading="lazy">
-    <div class="replay-card-identity"><h2>${escape(role.name)}</h2><p><span class="replay-card-status${summary.ending === "phd" || summary.ending === "master" ? " is-graduated" : ""}">${escape(status)}</span>${official ? `<small data-replay-plays="${escape(summary.id)}">播放 ${plays ?? "—"}</small>` : `<small>${escape(summary.playerName || dateLabel(summary.updatedAt))} · ${summary.totalMonths}个月</small>`}</p></div>
+    <div class="replay-card-identity"><h2${official ? ' class="replay-card-strategy" aria-label="策略"' : ""}>${escape(official ? summary.strategy ?? "稳定通过" : role.name)}</h2><p><span class="replay-card-status${summary.ending === "phd" || summary.ending === "master" ? " is-graduated" : ""}">${escape(degreeStatus)}</span><span class="replay-card-build" data-replay-build="${escape(summary.id)}">${talents}</span></p>${official ? `<small data-replay-plays="${escape(summary.id)}">播放 ${plays ?? "—"}</small>` : `<small>${escape(summary.playerName || dateLabel(summary.updatedAt))} · ${summary.totalMonths}个月</small>`}</div>
     <div class="replay-card-actions"><a class="replay-link is-primary" href="${replayHref(summary.id)}" data-replay-open="${escape(summary.id)}" aria-label="播放${escape(filename)}">${icon("play")}播放</a><button class="replay-button is-icon" type="button" data-replay-export="${escape(summary.id)}" aria-label="${official ? "下载" : "导出"}${escape(filename)}">${icon("download")}</button>${official ? "" : `<button class="replay-button is-icon is-delete" type="button" data-replay-delete="${escape(summary.id)}" aria-label="删除${escape(filename)}的回放">${icon("trash-2")}</button>`}</div>
     ${renderMetrics(summary, metrics)}
   </article>`;
@@ -63,7 +87,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
   const official = options.official === true;
   const playStats = official ? createOfficialReplayStats({ onChange: updatePlayCounts }) : null;
   let summaries: ReplaySummary[] = [];
-  let officialRoute: OfficialReplayRoute = "phd-10";
+  let selectedRole: ReplaySummary["roleId"] | null = null;
   let recording: ReplayRecording | null = null;
   let recordingId: string | null = null;
   let session: ReplaySession | null = null;
@@ -152,13 +176,16 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
     scheduleLayout();
   }
   function renderLibrary(): void {
-    const localContent = summaries.length ? `<div class="replay-grid">${summaries.map(summary => renderSummary(summary, false, summary.metrics ?? metricsCache.get(summary.id))).join("")}</div>` : `<section class="replay-empty">${icon("film")}<h2>还没有回放</h2><p>在结局页面下载本局回放，再导入这里。</p></section>`;
+    const roles = [...new Set(summaries.map(summary => summary.roleId))];
+    if (!selectedRole || !roles.includes(selectedRole)) selectedRole = roles[0] ?? null;
+    const entries = summaries.filter(summary => summary.roleId === selectedRole);
+    const content = entries.length ? `<nav class="replay-role-tabs" aria-label="录像角色">${roles.map(role => `<button type="button" data-replay-role="${escape(role)}" aria-pressed="${role === selectedRole}">${escape(getRoleDefinition(role).name)}</button>`).join("")}</nav><section class="replay-role-section" aria-label="${escape(getRoleDefinition(selectedRole!).name)}录像"><div class="replay-grid">${entries.map(summary => renderSummary(summary, official, metricsCache.get(summary.id) ?? summary.metrics, playStats?.get(summary.id))).join("")}</div></section>` : `<section class="replay-empty">${icon("film")}<h2>还没有录像</h2><p>${official ? "陆续补充。" : "在结局页面下载本局回放，再导入这里。"}</p></section>`;
     root.innerHTML = `<main class="replay-library${official ? " is-official-library" : ""}">
       <section class="replay-library-sheet">
         <header class="replay-library-header"><div class="replay-library-title">${icon(official ? "graduation-cap" : "history")}<h1>录像与攻略</h1></div><nav class="replay-library-actions" aria-label="回放操作">${!official ? `<button class="replay-button is-primary" type="button" data-replay-import${busy ? " disabled" : ""}>${icon("upload")}${busy ? "读取中…" : "导入"}</button>` : ""}<a class="replay-button" href="${gameHref()}">${icon("arrow-left")}返回游戏</a></nav></header>
-        <nav class="replay-source-tabs" aria-label="录像来源"><a href="${replayHref("official")}"${official ? ' aria-current="page"' : ""}>官方录像攻略</a><a href="${replayHref("library")}"${!official ? ' aria-current="page"' : ""}>玩家录像</a></nav>
+        <nav class="replay-source-tabs" aria-label="录像来源"><a href="${replayHref("official")}"${official ? ' aria-current="page"' : ""}>官方录像攻略</a><a href="${replayHref("library")}"${!official ? ' aria-current="page"' : ""}>本地录像</a></nav>
         ${messageHtml()}${deleting ? `<div class="replay-confirm" role="alert"><span>删除这份本地回放？</span><button class="replay-button" type="button" data-replay-cancel-delete>保留</button><button class="replay-button" type="button" data-replay-confirm-delete="${escape(deleting)}"${busy ? " disabled" : ""}>确认删除</button></div>` : ""}
-        ${official ? renderOfficialSections() : localContent}
+        ${content}
       </section><input class="replay-file-input" type="file" accept=".json,.phdreplay,application/json" data-replay-file aria-label="选择本地回放文件">
     </main>`;
     decorate();
@@ -167,7 +194,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
   async function loadMissingMetrics(): Promise<void> {
     metricsRequest?.abort();
     const request = new AbortController(); metricsRequest = request;
-    const visible = summaries.filter(item => (!official || item.officialRoute === officialRoute) && !item.metrics && !metricsCache.has(item.id));
+    const visible = summaries.filter(item => item.roleId === selectedRole && (!item.metrics?.outcomes || item.metrics.talentPoints === undefined) && !metricsCache.has(item.id));
     for (const summary of visible) {
       try {
         const loaded = await library.get(summary.id);
@@ -180,12 +207,10 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
         if (request.signal.aborted) return;
       }
       const target = root.querySelector(`[data-replay-metrics="${CSS.escape(summary.id)}"]`);
-      if (target) target.outerHTML = renderMetrics(summary, metricsCache.get(summary.id), true);
+      if (target) target.outerHTML = renderMetrics(summary, metricsCache.get(summary.id) ?? summary.metrics, true);
+      const build = root.querySelector(`[data-replay-build="${CSS.escape(summary.id)}"]`);
+      if (build) build.textContent = talentLabel(summary, metricsCache.get(summary.id) ?? { talentPoints: null });
     }
-  }
-  function renderOfficialSections(): string {
-    const entries = summaries.filter(summary => summary.officialRoute === officialRoute);
-    return `<nav class="replay-route-tabs" aria-label="教学路线">${OFFICIAL_REPLAY_SLOTS.map(({ route, label }) => `<button type="button" data-replay-route="${route}" aria-pressed="${route === officialRoute}">${label.replace("路线", "")}</button>`).join("")}</nav><section class="replay-official-section" aria-label="${OFFICIAL_REPLAY_SLOTS.find(slot => slot.route === officialRoute)!.label}">${entries.length ? `<div class="replay-grid">${entries.map(summary => renderSummary(summary, true, summary.metrics ?? metricsCache.get(summary.id), playStats?.get(summary.id))).join("")}</div>` : '<div class="replay-empty"><p>暂无录像，陆续补充。</p></div>'}</section>`;
   }
   function monthOptions(): string {
     if (!session) return "";
@@ -442,7 +467,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
     const route = ++routeVersion;
     metricsRequest?.abort();
     pause(); session?.dispose(); session = null; state = null; recording = null; recordingId = null; message = ""; busy = true;
-    root.innerHTML = `<main class="replay-loading"><p class="replay-eyebrow">${official ? "官方录像攻略" : "玩家录像"}</p><h1>正在展开这一局</h1><progress aria-label="读取回放"></progress><p>还原操作与随机结果…</p></main>`;
+    root.innerHTML = `<main class="replay-loading"><p class="replay-eyebrow">${official ? "官方录像攻略" : "本地录像"}</p><h1>正在展开这一局</h1><progress aria-label="读取回放"></progress><p>还原操作与随机结果…</p></main>`;
     try {
       const loaded = await library.get(id);
       if (route !== routeVersion) return;
@@ -510,7 +535,7 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
     const button = target.closest<HTMLElement>("button, a");
     if (button?.hasAttribute("data-replay-inert")) { event.preventDefault(); return; }
     const data = button?.dataset;
-    if (data?.replayRoute && OFFICIAL_REPLAY_SLOTS.some(slot => slot.route === data.replayRoute)) { officialRoute = data.replayRoute as OfficialReplayRoute; renderLibrary(); return; }
+    if (data?.replayRole && summaries.some(summary => summary.roleId === data.replayRole)) { selectedRole = data.replayRole as ReplaySummary["roleId"]; renderLibrary(); return; }
     if (data?.replayOpen) { event.preventDefault(); navigate(data.replayOpen); return; }
     if (button?.hasAttribute("data-replay-library")) { event.preventDefault(); navigate(official ? "official" : "library"); return; }
     if (button?.hasAttribute("data-replay-import")) { root.querySelector<HTMLInputElement>("[data-replay-file]")?.click(); return; }

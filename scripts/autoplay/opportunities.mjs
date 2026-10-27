@@ -44,12 +44,40 @@ export function internshipBudget(E,s,reservedCoins=0) {
  return {sustainable:Boolean(plan),reserve,researchWindows:plan?.research??0,months:plan?.months??[]};
 }
 
+// This is a window check, not a promise that a future random event will fund a
+// manuscript. Count only today's unused actions and one normal action per later
+// month; an existing draft may finish during thesis season, a blank one may not.
+function paperOpportunity(E,s,degreeGoal,{productionTarget,productionDeadline}={}) {
+ const ending=degreeGoal==='master'?34:70;
+ const target=productionTarget??(s.graduationScoreTarget??(degreeGoal==='master'?1:7))+2;
+ const deadline=Math.min(ending,productionDeadline??(degreeGoal==='master'?ending:60));
+ const currentActions=Math.max(0,s.actionState.limit-s.actionState.used);
+ const windows=lastMonth=>currentActions+Math.max(0,lastMonth-s.totalMonths);
+ const blank=s.totalResearchScore<target&&s.totalMonths<=deadline-3&&windows(deadline-3)>=3;
+ const fields=new Set(blank?FIELDS:[]);
+ for(const paper of s.papers){
+  if(!['draft','journal-reviewing'].includes(paper.status))continue;
+  const journal=paper.status==='journal-reviewing';
+  const lastMonth=journal?ending:ending-3;
+  if(s.totalMonths>lastMonth||windows(lastMonth)<1)continue;
+  const missing=FIELDS.filter(field=>paper[field]<=0);
+  if(windows(lastMonth)<Math.max(1,missing.length))continue;
+  const needsRevision=journal
+   ?sum(paper)<E.JOURNAL_DEFINITIONS[paper.journalTarget].acceptanceScore
+   :!missing.length&&paperReliability(E,s,paper,'C')<.82;
+  for(const field of needsRevision?FIELDS:missing)fields.add(field);
+ }
+ return {needsPaper:fields.size>0,fields};
+}
+
 // Policy decisions use visible requirements and worst-case costs, never stored rolls.
-export function opportunityEventPriority(E,s,e,degreeGoal,reservedCoins=0) {
+// The optional final context keeps existing callers valid while letting the
+// planner supply its own production target and result deadline.
+export function opportunityEventPriority(E,s,e,degreeGoal,reservedCoins=0,context={}) {
  const reserve=cashReserve(E,s)+reservedCoins;
  const endingMonth=degreeGoal==='master'?34:70;
  const left=(degreeGoal==='master'?34:64)-s.totalMonths;
- const needsPaper=s.totalResearchScore<(s.graduationScoreTarget??(degreeGoal==='master'?1:7))+2;
+ const {needsPaper,fields}=paperOpportunity(E,s,degreeGoal,context);
  if(e.conferencePreview&&e.stage==='act2'){
   if(degreeGoal==='phd'&&s.degree==='master'&&s.totalResearchScore<3)
    return {id:'proxy',reason:'先保转博成果与下一篇论文预算，本次代贴，转博后再安排参会探索'};
@@ -86,11 +114,18 @@ export function opportunityEventPriority(E,s,e,degreeGoal,reservedCoins=0) {
    '持续与同一学者合作：积累三次交流，科研达到12后争取联培');
   if(!hasLover&&left>=8)add('opposite-scholar',E.getEffectiveSocial(s)>=12?(encounters>=2?92:78):encounters>=3?15:E.getEffectiveSocial(s)>=6&&left>=18?62:25,
    '尚无恋人：积累会场交往，社交达到12后争取发展关系；不预知学者类型');
-  if(needsPaper){
-   add('experiment-discussion',32,'为下一次实验积累次数加成');
-   add('idea-networking',31,'为下一篇论文积累idea次数加成');
-   add('famous-scholar',28,'为下篇idea积累倍率加成');
-   if(trained)add('big-bull-coop',30,'已有联培：继续交流为下一次写作补分');
+  if(fields.has('experiment'))add('experiment-discussion',32,'已有可兑现的实验窗口，为计划中的实验积累次数加成');
+  if(fields.has('idea')){
+   add('idea-networking',31,'已有可兑现的idea窗口，为计划中的论文积累次数加成');
+   add('famous-scholar',28,'已有可兑现的idea窗口，为计划中的论文积累倍率加成');
+  }
+  if(trained&&fields.has('writing'))add('big-bull-coop',30,'已有联培：继续交流为尚待完成的写作补分');
+  // A late menu can omit both tea and tourism. Repeated mentor contact has
+  // immediate social value; a random scholar can restore SAN with no partner.
+  // Never read the generated scholar type to choose a guaranteed recovery.
+  if(!needsPaper){
+   if(coops>=1)add('big-bull-coop',20,'已有合作联系：本次交流可直接提升社交，不为用不到的论文加成选活动');
+   if(!hasLover&&s.player.san<s.sanCap)add('opposite-scholar',10,'没有可兑现的论文加成窗口：会场交流保留随机恢复SAN的机会，不预知学者类型');
   }
   return options.sort((a,b)=>b.value-a.value)[0]??null;
  }
@@ -119,10 +154,10 @@ export function opportunityEventPriority(E,s,e,degreeGoal,reservedCoins=0) {
 
 // A deliberately conservative late-game option: only enter a journal when
 // acceptance is already funded by existing paper scores. No stranded 75/125 draft.
-export function compareVenues(E,s,p,{degreeGoal='phd',reliability=.82,reservedCoins=0,minScore=1}={}) {
+export function compareVenues(E,s,p,{degreeGoal='phd',reliability=.82,reservedCoins=0,minScore=1,deadline=degreeGoal==='master'?34:70}={}) {
  if(!p||p.status!=='draft'||FIELDS.some(f=>p[f]<=0))return null;
  const conferences=['A','B','C'].map(target=>({target,probability:paperReliability(E,s,p,target),score:E.SCORE_BY_TARGET[target]}));
- const conference=s.totalMonths+3<=(degreeGoal==='master'?34:70)
+ const conference=s.totalMonths+3<=deadline
   ?conferences.find(c=>c.score>=minScore&&c.probability>=reliability):null;
  const wantsContacts=!s.conferenceEncounterState.jointTrainingReward||!s.loverState.active||!E.hasInternshipExperience(s);
  const reserve=cashReserve(E,s)+reservedCoins;

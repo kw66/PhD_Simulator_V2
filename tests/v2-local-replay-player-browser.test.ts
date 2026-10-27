@@ -45,6 +45,40 @@ describe("isolated local replay browser player", () => {
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
 
+  it.each([320, 390, 1440])("fits result summaries and switches local roles at %spx", async width => {
+    const page = await browser.newPage({ viewport: { width, height: 1040 } });
+    try {
+      await page.goto(`${server.resolvedUrls!.local[0]}?replay=official`);
+      await page.waitForSelector(".replay-card-outcomes");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      const overflow = await page.locator(".replay-card-metrics dl > div").evaluateAll(nodes => nodes.filter(node => node.scrollWidth > node.clientWidth + 1).map(node => node.textContent));
+      expect(overflow).toEqual([]);
+      if (width === 1440) {
+        const unusedWidth = await page.locator(".replay-grid").evaluate(grid => grid.getBoundingClientRect().right
+          - grid.lastElementChild!.getBoundingClientRect().right);
+        expect(unusedWidth).toBeLessThanOrEqual(1);
+      }
+      await page.screenshot({ path: `artifacts/local-replay/results-${width}.png`, fullPage: true });
+      await page.locator('.replay-source-tabs a[href*="library"]').click();
+      await page.waitForSelector("[data-replay-import]");
+      for (const roleId of ["normal", "genius"] as const) {
+        const initial = createInitialState();
+        const payload = { roleId };
+        const state = dispatchAction(initial, "start-game", payload);
+        const data = captureReplayRecording(createRunReplay(initial, state, payload), state, { id: `role-${roleId}` });
+        await page.locator("[data-replay-file]").setInputFiles({ name: "role.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
+        await page.waitForSelector(`[data-replay-role="${roleId}"]`);
+      }
+      expect(await page.locator("[data-replay-role]").count()).toBe(2);
+      for (const roleId of ["genius", "normal"]) {
+        await page.locator(`[data-replay-role="${roleId}"]`).click();
+        expect(await page.locator("[data-replay-card]").getAttribute("data-replay-card")).toBe(`role-${roleId}`);
+        expect(await page.locator(".replay-card-review").textContent()).toContain("未送审");
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      }
+    } finally { await page.close(); }
+  }, 30_000);
+
   it.each([390, 1440])("imports, plays and browses at %spx without account or RPC writes", async width => {
     const page = await browser.newPage({ viewport: { width, height: 1040 }, acceptDownloads: true });
     const requests: string[] = [];
@@ -63,10 +97,13 @@ describe("isolated local replay browser player", () => {
       const data = sample();
       await page.locator("[data-replay-file]").setInputFiles({ name: "sample.phdreplay.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
       await page.waitForSelector("[data-replay-open]");
-      expect(await page.locator(".replay-card-metrics > div").count()).toBe(6);
+      expect(await page.locator(".replay-card-base > div").count()).toBe(6);
       expect(await page.locator(".replay-card-metrics").textContent()).toContain("科研分");
       expect(await page.locator(".replay-card-metrics").textContent()).toContain("金币");
-      expect(await page.locator(".replay-card-metrics dd span").count()).toBe(4);
+      expect(await page.locator(".replay-stat-cap").count()).toBe(4);
+      for (const label of ["总引用", "恋爱", "联培", "实习", "盲审", "工作", "同学", "导师", "经费", "Nature", "NMI", "PAMI"]) {
+        expect(await page.locator(".replay-card-metrics").textContent()).toContain(label);
+      }
       expect(await page.locator("[data-replay-results], .replay-results-dialog").count()).toBe(0);
       expect(await page.locator(".replay-card-portrait").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
       await page.screenshot({ path: `artifacts/local-replay/library-${width}.png`, fullPage: true });
@@ -205,27 +242,20 @@ describe("isolated local replay browser player", () => {
     } finally { await page.close(); }
   }, 30_000);
 
-  it.each([390, 1440])("filters official routes and visits talents without rebuilding the screen at %spx", async width => {
+  it.each([390, 1440])("groups official replays by role and visits talents without rebuilding the screen at %spx", async width => {
     const page = await browser.newPage({ viewport: { width, height: 1040 } });
     try {
       await page.goto(`${server.resolvedUrls!.local[0]}?replay=official`);
       await page.waitForSelector("[data-replay-card]");
-      expect(await page.locator("[data-replay-route]").count()).toBe(5);
-      const phd10 = manifest.filter(item => item.route === "phd-10");
-      expect(await page.locator("[data-replay-card]").count()).toBe(phd10.length);
-      expect(await page.locator(".replay-card-metrics > div").count()).toBe(phd10.length * 6);
-      expect(await page.locator(".replay-card-metrics dd span").count()).toBe(phd10.length * 4);
+      expect(await page.locator("[data-replay-role]").count()).toBe(new Set(manifest.map(item => item.roleId)).size);
+      expect(await page.locator("[data-replay-card]").count()).toBe(manifest.length);
+      expect(await page.locator(".replay-card-base > div").count()).toBe(manifest.length * 6);
+      expect(await page.locator(".replay-stat-cap").count()).toBe(manifest.length * 4);
       expect(await page.locator(".replay-card-metrics").first().textContent()).not.toContain("…");
       expect(await page.locator("[data-replay-results]").count()).toBe(0);
-      await page.locator('[data-replay-route="master-10"]').click();
-      expect(await page.locator("[data-replay-card]").count()).toBe(manifest.filter(item => item.route === "master-10").length);
-      for (const route of ["cursed", "special"]) {
-        await page.locator(`[data-replay-route="${route}"]`).click();
-        expect(await page.locator(`[data-replay-route="${route}"]`).getAttribute("aria-pressed")).toBe("true");
-        expect(await page.locator("[data-replay-card]").count()).toBe(0);
-        expect(await page.locator(".replay-empty").textContent()).toContain("暂无录像");
-      }
-      await page.locator('[data-replay-route="phd-10"]').click();
+      expect(await page.locator("[data-replay-route]").count()).toBe(0);
+      await page.locator('[data-replay-role="normal"]').click();
+      expect(await page.locator('[data-replay-role="normal"]').getAttribute("aria-pressed")).toBe("true");
       await page.locator('[data-replay-open="official-normal-phd-10"]').click();
       await page.waitForSelector("[data-replay-seek]");
       await page.locator('[data-replay-play][aria-label="暂停"]').click();

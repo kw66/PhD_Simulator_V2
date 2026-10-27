@@ -4,7 +4,7 @@ export const sum=p=>p.idea+p.experiment+p.writing;
 export function teachingProfile(E,s){
  const points=E.getDesignedTalentNodes(s.selectedRoleId).reduce((n,node)=>n+node.cost*(s.roleTalents?.levels[node.id]??0),0);
  return {points,mode:points===0?'stable':points>=20?'comprehensive':'balanced',
-  scoreMargin:points===0?1:points>=20?4:2,ideaTarget:points===0?18:points>=20?28:24};
+  scoreMargin:points===0?3:points>=20?6:5,ideaTarget:points===0?18:points>=20?28:24};
 }
 const researchCache=new Map();
 const reliabilityCaches=new WeakMap();
@@ -99,8 +99,12 @@ export function paperReliability(E,s,p,target) {
  return probability;
 }
 export function stageGoal(E,s,degreeGoal) {
- const thesis=s.degree===degreeGoal?E.getThesisForecast(s):null,deadline=degreeGoal==='master'?34:70;
- if(thesis&&thesis.researchScoreMet&&thesis.currentPass)return {id:'finish',label:'毕业收尾：保留安全储备，不再购买科研用品',deadline};
+ // April's blind review freezes before queued conference results are claimed.
+ // Graduate in June, but have required research credited by March.
+ const thesis=s.degree===degreeGoal?E.getThesisForecast(s):null,deadline=degreeGoal==='master'?31:67;
+ const review=s.thesis?.review;
+ if(thesis&&thesis.researchScoreMet&&thesis.currentPass&&(!review||review.submitted&&review.passed))return {id:'finish',label:'毕业收尾：保留安全储备，不再购买科研用品',deadline};
+ if(review&&(!review.submitted||!review.passed))return {id:'missed-review',label:'盲审已冻结且未通过：本局无法补救，不再为毕业资格购买科研用品',deadline};
  if(thesis&&thesis.stage!=='planning')return {id:'thesis',label:'毕业准备：优先补齐盲审短板与科研分',deadline};
  const transfer=s.degree==='master'&&degreeGoal==='phd'?{milestoneMonth:s.totalMonths<21?21:33,submissionDeadline:s.totalMonths<21?18:30,requiredScore:s.totalMonths<21?2:3}:{};
  if(s.totalResearchScore===0)return {id:'foundation',label:'打基础：积累阅读与加成，完成首篇可靠投稿',deadline,...transfer};
