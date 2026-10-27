@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { loadEngine } from './engine.mjs';
-import { expectedResearch, paperReliability, stageGoal } from './estimates.mjs';
+import { expectedResearch, paperReliability, projectAi, safePayment, stageGoal } from './estimates.mjs';
+import { createPlanner } from './planner.mjs';
+import { planPaper } from './pipeline.mjs';
 import { auditTeachingReplay } from './quality.mjs';
+import { relationshipEventPriorities } from './relationships.mjs';
+import {opportunityEventPriority,compareVenues,planLoverActivity,internshipBudget} from './opportunities.mjs';
 const { E, close } = await loadEngine();
 try {
   const recording = E.parseReplayRecording(await readFile('public/official-replays/normal-phd-10.json', 'utf8'));
@@ -20,8 +24,177 @@ try {
   assert.ok(paperReliability(E,s,balanced,'C') >= paperReliability(E,s,balanced,'A'));
   assert.equal(stageGoal(E,s,'phd').submissionDeadline,18);
   assert.equal(stageGoal(E,{...s,totalMonths:22},'phd').submissionDeadline,30);
+  const spring={...s,totalMonths:20,year:2,month:8,eventQueue:[],totalResearchScore:0,
+    player:{san:20,research:4,social:4,favor:4,money:20},
+    advisorProgressState:{...s.advisorProgressState,funding:60}};
+  const ready={...E.createDraftPaper(18,0,()=>.5),idea:19,experiment:14,writing:12};
+  const submissionState={...projectAi(E,spring,['claude']).state,papers:[ready]};
+  assert.ok(paperReliability(E,submissionState,ready,'B')>=.5);
+  assert.ok(paperReliability(E,submissionState,ready,'B')<.82);
+  const submission=createPlanner(E).next(submissionState);
+  assert.equal(submission.action,'submit-paper','a reliable C must not decay indefinitely while waiting for B');
+  assert.equal(submission.payload.paperTarget,'C');
+  const projectState={...spring,month:4,totalMonths:16,player:{...spring.player,san:10},
+    eventQueue:[{id:'project-budget-test',title:'project',chainId:'random-4',stage:'act2',source:'random',blocking:true,deadlineMonths:1,
+      choices:[{id:'random-4-horizontal-1',effects:{san:-8},label:'horizontal'},
+        {id:'random-4-vertical-1',effects:{san:-6},label:'vertical'},
+        {id:'random-4-reject-1',effects:{favor:-2},label:'reject'}]}]};
+  assert.equal(createPlanner(E).next(projectState).payload.eventChoiceId,'random-4-reject-1',
+    'surviving a project is insufficient when it exhausts the manuscript SAN budget');
+  assert.equal(relationshipEventPriorities(E,{...spring,player:{...spring.player,favor:0,money:0}},'phd')[0],
+    'year-summary-favor','zero favor must be repaired before optional income to avoid the next mandatory talk ending the run');
+  const lowFavorMeeting={...spring,player:{...spring.player,favor:0,san:9},
+    eventQueue:[{id:'meeting-test',chainId:'random-6',stage:'act2',source:'random',title:'meeting',blocking:true,
+      choices:[{id:'random-6-deep-1',label:'prepare',effects:{san:-2}},
+        {id:'random-6-slack-1',label:'slack',effects:{}}]}]};
+  assert.equal(createPlanner(E).next(lowFavorMeeting).payload.eventChoiceId,'random-6-deep-1',
+    'do not rely on a stored random advisor absence to slack at zero favor');
+  for(const [eventNumber,field,minorCost,minorMultiplier,majorCost]of [[17,'idea',2,1,4],[18,'experiment',3,.75,6]]){
+    const paper={...ready,idea:20,experiment:20,writing:0};
+    const competition={id:`competition-${eventNumber}`,chainId:`random-${eventNumber}`,stage:'act2',
+      title:'competition',source:'random',blocking:true,paperCompetitionTargetId:paper.id,
+      choices:[['ignore',0,.25],['minor',minorCost,minorMultiplier],['major',majorCost,1.25]].map(([branch,sanCost,multiplier])=>({
+        id:`random-${eventNumber}-${branch}-1`,label:branch,effects:{enqueueEvents:[{
+          id:'result',stage:'result',choices:[{id:'finish',effects:{paperCompetitionResolution:{paperId:paper.id,field,sanCost,multiplier}}}]
+        }]}
+      }))};
+    const competitionState={...spring,papers:[paper],eventQueue:[competition],player:{...spring.player,san:14}};
+    const preservation=createPlanner(E).next(competitionState);
+    assert.equal(preservation.action,'resolve-event');
+    assert.ok(!preservation.payload.eventChoiceId.includes('ignore'),
+      'do not destroy three quarters of a funded draft when preserving it is affordable');
+    const resolution=competition.choices.find(c=>c.id===preservation.payload.eventChoiceId)
+      .effects.enqueueEvents[0].choices[0].effects.paperCompetitionResolution;
+    const preview=E.previewPaperCompetitionResolution(competitionState,resolution);
+    assert.ok(safePayment(E,competitionState,null,preview.sanCost,8));
+    assert.ok(preview.score>=15);
+    const inReview={...E.prepareConferenceSubmission({...paper,writing:100,idea:100,experiment:100},'C',8,2),
+      idea:20,experiment:20};
+    const reviewDecision=createPlanner(E).next({...competitionState,papers:[inReview]});
+    assert.ok(reviewDecision.payload.eventChoiceId.includes('ignore'),
+      'a competition does not change frozen submission scores; protect the next manuscript budget');
+  }
+  const planBefore=JSON.stringify(spring);
+  const pipeline=planPaper(E,spring,{...ready,idea:0,experiment:0,writing:0},{deadline:33});
+  assert.ok(pipeline?.steps.length);
+  assert.equal(JSON.stringify(spring),planBefore,'planning must not mutate the game or RNG');
+  assert.deepEqual(pipeline,planPaper(E,{...spring,randomState:{seed:987654,cursor:123}},
+    {...ready,idea:0,experiment:0,writing:0},{deadline:33}),'plans must not depend on hidden future rolls');
+  if(pipeline.steps[0].month===spring.totalMonths){
+    const step=pipeline.steps[0],projected=projectAi(E,spring,step.models).state;
+    assert.ok(safePayment(E,projected,step.field,expectedResearch(E,projected,ready,step.field).sanCost,8),
+      'the controller must be able to execute the budgeted first step safely');
+  }
+  const lastMonth={...spring,totalMonths:30,year:3,month:6,player:{...spring.player,research:12}};
+  const lastStep=planPaper(E,lastMonth,{...ready,idea:30,experiment:30,writing:0},{deadline:33});
+  assert.ok(lastStep&&lastStep.resultMonth===33,'a result arriving in the transfer month is usable');
+  let sameMonth={...spring,totalMonths:32,year:3,month:8,maxMonths:34,totalResearchScore:2,illnessProbability:0,
+    papers:[{...E.prepareConferenceSubmission({...ready,idea:100,experiment:100,writing:100},'C',6,3),reviewMonthsLeft:1}]};
+  sameMonth=E.executeReplayCommand(sameMonth,{kind:'action',actionId:'next-month',payload:{}},E.REPLAY_RULESET);
+  const transferPlanner=createPlanner(E);
+  for(let n=0;n<60&&sameMonth.eventQueue.length&&sameMonth.degree!=='phd';n++){
+    const decision=transferPlanner.next(sameMonth);
+    assert.equal(decision.action,'resolve-event');
+    sameMonth=E.executeReplayCommand(sameMonth,{kind:'action',actionId:decision.action,payload:decision.payload},E.REPLAY_RULESET);
+  }
+  assert.equal(sameMonth.degree,'phd','settle the review before the live transfer condition is rebuilt');
+  const interrupted={...spring,totalMonths:18,year:2,month:6,
+    player:{san:5,research:2,social:3,favor:3,money:4.5},
+    papers:[{...ready,idea:12,experiment:0,writing:0}],
+    shopState:{...spring.shopState,chairOwned:true}};
+  const afterInterruption=createPlanner(E).next(interrupted);
+  assert.notEqual(afterInterruption.action,'buy-ai-month',
+    'a model quoted for next month must not be bought before recovery this month');
   const report = auditTeachingReplay(E,recording);
+  const opportunityState={...spring,degree:'phd',year:4,totalMonths:40,month:4,totalResearchScore:5,graduationScoreTarget:7,
+    player:{...spring.player,research:12,social:12,favor:10,money:20}};
+  const trip={stage:'act2',conferencePreview:{context:{region:'domestic',conferenceName:'Test',conferenceYear:2027,city:'Test'}}};
+  assert.equal(opportunityEventPriority(E,opportunityState,trip,'phd').id,'self');
+  const brokeTrip={...opportunityState,player:{...opportunityState.player,money:1,favor:3}};
+  assert.equal(opportunityEventPriority(E,brokeTrip,trip,'phd').id,'proxy','attendance cannot consume the manuscript or favor safety buffer');
+  assert.equal(opportunityEventPriority(E,opportunityState,{...trip,conferencePreview:{context:{...trip.conferencePreview.context,availableAtTotalMonths:72}}},'phd').id,'proxy',
+    'do not pay travel for a conference that takes place after graduation');
+  const careerState={...opportunityState,conferenceCareerState:{...opportunityState.conferenceCareerState,hasInternshipExperience:true,enterpriseCount:1}};
+  const enterpriseMenu={stage:'act2',conferenceActivityPreview:{},choices:[{id:'enterprise-networking'},{id:'tour-local'}]};
+  assert.equal(opportunityEventPriority(E,careerState,enterpriseMenu,'phd').id,'enterprise-networking','remote internship experience unlocks the enterprise bridge without an A paper');
+  const jointMenu={stage:'act2',conferenceActivityPreview:{},choices:[{id:'big-bull-coop'},{id:'tour-local'}]};
+  assert.equal(opportunityEventPriority(E,opportunityState,jointMenu,'phd').id,'big-bull-coop');
+  assert.equal(opportunityEventPriority(E,{...opportunityState,player:{...opportunityState.player,research:9,social:8}},
+    {...jointMenu,choices:[...jointMenu.choices,{id:'tea-break'}]},'phd').id,'big-bull-coop',
+    'build the first contacts before research reaches 12, rather than waiting until too late to accumulate three meetings');
+  const romanceMenu={stage:'act2',conferenceActivityPreview:{},choices:[{id:'opposite-scholar'},{id:'tour-local'}]};
+  const romanceDecision=opportunityEventPriority(E,opportunityState,romanceMenu,'phd');
+  assert.equal(romanceDecision.id,'opposite-scholar');
+  assert.equal(opportunityEventPriority(E,{...opportunityState,player:{...opportunityState.player,social:7}},
+    {...romanceMenu,choices:[...romanceMenu.choices,{id:'tea-break'}]},'phd').id,'opposite-scholar',
+    'start the repeated-contact route before social 12 instead of waiting until graduation');
+  const occupied={...opportunityState,loverState:{...opportunityState.loverState,active:true}};
+  assert.equal(opportunityEventPriority(E,occupied,romanceMenu,'phd').id,'tour-local','do not jeopardize an existing lover by flirting');
+  assert.deepEqual(romanceDecision,opportunityEventPriority(E,opportunityState,{...romanceMenu,
+    conferenceActivityPreview:{rolls:[.01,.99]},choices:romanceMenu.choices.map(c=>({...c,effects:{hiddenResult:'different'}}))},'phd'),
+    'opportunity decisions must not depend on hidden scholar type or outcome');
+  assert.equal(opportunityEventPriority(E,opportunityState,{chainId:'joint-training',stage:'act2'},'phd').id,'accept');
+  assert.equal(opportunityEventPriority(E,opportunityState,{loverDevelopmentPreview:{},stage:'act2'},'phd').id,'accept');
+  const late={...opportunityState,year:6,totalMonths:62};
+  const journalPaper={...ready,idea:50,experiment:45,writing:35};
+  const journalDecision=compareVenues(E,late,journalPaper);
+  assert.equal(journalDecision.action,'submit-journal-paper');
+  assert.equal(journalDecision.payload.journalTarget,'pami');
+  const submittedJournal=E.executeReplayCommand({...late,papers:[journalPaper]},
+    {kind:'action',actionId:journalDecision.action,payload:journalDecision.payload},E.REPLAY_RULESET);
+  assert.equal(submittedJournal.papers[0].status,'journal-reviewing');
+  const journalConfirmation=createPlanner(E).next(submittedJournal);
+  assert.equal(journalConfirmation.action,'submit-journal-paper');
+  const publishedJournal=E.executeReplayCommand(submittedJournal,{kind:'action',actionId:journalConfirmation.action,payload:journalConfirmation.payload},E.REPLAY_RULESET);
+  assert.equal(publishedJournal.totalResearchScore,late.totalResearchScore+5,'journal requires an explicit second publication confirmation');
+  const graduationReady={...submittedJournal,totalResearchScore:20,thesis:{...publishedJournal.thesis,
+    researchPoints:publishedJournal.thesis.researchPoints.map(point=>({...point,score:500}))}};
+  assert.equal(stageGoal(E,graduationReady,'phd').id,'finish');
+  assert.equal(createPlanner(E).next(graduationReady).action,'submit-journal-paper',
+    'confirm an already completed journal before idling through graduation');
+  assert.notEqual(compareVenues(E,late,{...journalPaper,idea:30,experiment:30,writing:30})?.action,'submit-journal-paper',
+    '75-point submission threshold is not the 125-point publication threshold');
+  assert.equal(compareVenues(E,{...late,totalMonths:69},{...journalPaper,idea:30,experiment:30,writing:30}),null,
+    'a high acceptance probability cannot justify a review that finishes after graduation');
+  assert.equal(compareVenues(E,{...late,totalMonths:69},journalPaper)?.action,'submit-journal-paper',
+    'an already-ready journal can still be completed when conference review is too late');
+  assert.notEqual(compareVenues(E,{...late,player:{...late.player,money:0},advisorProgressState:{...late.advisorProgressState,funding:2}},journalPaper)?.action,'submit-journal-paper',
+    'journal must have affordable publication fees');
+  const costlyOffer={chainId:'internship-invite',stage:'act2',internshipInvitePreview:{context:{offer:{monthlySanCost:1}}}};
+  assert.equal(opportunityEventPriority(E,{...opportunityState,player:{...opportunityState.player,san:8}},costlyOffer,'phd').id,'decline',
+    'do not inspect an unrevealed cheap internship offer to justify an unsafe commitment');
+  const sustainableIntern={...opportunityState,sanCap:50,player:{...opportunityState.player,san:50,money:30},
+    shopState:{...opportunityState.shopState,chairOwned:true,chairUpgrade:'massage'}};
+  const beforeIntern=JSON.stringify(sustainableIntern),internBudget=internshipBudget(E,sustainableIntern);
+  assert.equal(E.getRoleRestSanGain(sustainableIntern),2);
+  assert.equal(internBudget.sustainable,true,'monthly recovery and starting SAN can sustain an ordinary role with only +2 per rest');
+  assert.ok(internBudget.researchWindows>=2);
+  assert.equal(JSON.stringify(sustainableIntern),beforeIntern,'internship forecasting must not mutate the run or RNG');
+  assert.equal(opportunityEventPriority(E,sustainableIntern,costlyOffer,'phd').id,'accept');
+  assert.deepEqual(opportunityEventPriority(E,sustainableIntern,costlyOffer,'phd'),
+    opportunityEventPriority(E,sustainableIntern,{...costlyOffer,internshipInvitePreview:{context:{offer:{monthlySanCost:6,baseMonthlyIncome:2}}}},'phd'),
+    'both cheap and expensive hidden offers must use the same public worst-case budget');
+  assert.equal(planLoverActivity(E,occupied),null,'no lover action is available before the progression profile is active');
+  const wastedHelp={...occupied,papers:[],loverProgressState:{...occupied.loverProgressState,active:true,
+    intimacy:4,research:10,pendingPaperHelp:{amount:10,name:'Test'},routes:{study:{progress:99,completed:0},play:{progress:0,completed:0}}}};
+  assert.notEqual(planLoverActivity(E,wastedHelp)?.action,'lover-study','do not spend SAN to duplicate stored, non-stacking paper help');
   assert.equal(report.finalDigest,recording.finalDigest);
+  assert.ok(report.stages.length > 0);
+  assert.equal(report.needsManualReview, true);
+  const master=E.parseReplayRecording(await readFile('public/official-replays/normal-master-10.json','utf8'));
+  const shortRoute={...s,totalMonths:2,year:1,month:2,eventQueue:[],player:{...s.player,san:20,money:3}};
+  assert.notEqual(createPlanner(E,{degreeGoal:'master'}).next(shortRoute).action,'part-time-work',
+    'do not save for a chair whose SAN value cannot repay its work cost during a masters route');
+  let graduateYear=structuredClone(master.replay.initial);
+  for(const c of master.replay.commands){graduateYear=E.executeReplayCommand(graduateYear,c,master.replay.ruleset);if(graduateYear.totalMonths>=25)break;}
+  const missingMasterPaper={...graduateYear,eventQueue:[],totalResearchScore:0,
+    papers:[],externalPublications:[],player:{...graduateYear.player,san:20,money:8}};
+  assert.equal(E.getThesisForecast(missingMasterPaper).stage,'writing');
+  assert.equal(E.getThesisForecast(missingMasterPaper).currentPass,false);
+  assert.notEqual(createPlanner(E,{degreeGoal:'master'}).next(missingMasterPaper).action,'advance-thesis-point',
+    'protect the first three graduation-year months for the required paper instead of spending every month on the thesis first');
+  const wrongRoute=auditTeachingReplay(E,master,{degreeGoal:'phd'});
+  assert.ok(wrongRoute.issues.some(x=>x.code==='wrong-degree-ending'), 'a master ending cannot qualify a PhD tutorial');
   // A small synthetic audit fixture keeps this regression independent of which
   // tutorial is currently published. Publication legality is checked separately.
   const initial={...E.createInitialState(),player:{...E.createInitialState().player,money:20}};

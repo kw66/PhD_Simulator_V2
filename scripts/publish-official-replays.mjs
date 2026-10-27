@@ -2,14 +2,13 @@
 // Input is a JSON array of paths to captured .phdreplay.json recordings.
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir, readdir, unlink } from 'node:fs/promises';
-import { createServer } from 'vite';
+import { loadEngine } from './autoplay/engine.mjs';
 import { auditTeachingReplay } from './autoplay/quality.mjs';
 
 const paths = JSON.parse(await readFile(process.argv[2], 'utf8'));
-const server = await createServer({ configFile: false, logLevel: 'error', server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' });
+const { E, loadModule, close } = await loadEngine();
 try {
-  const E = Object.assign({}, ...await Promise.all(['v2-local-replay', 'v2-run-replay', 'v2-role-talent-definitions', 'v2-rule-context', 'v2-engine', 'v2-paper-rules', 'v2-conference-catalog', 'v2-review-config', 'v2-monthly-effects', 'v2-role-talent-state'].map(name => server.ssrLoadModule('/src/core/' + name + '.ts'))));
-  const { deriveReplayResults } = await server.ssrLoadModule('/src/app/v2-replay-results.ts');
+  const { deriveReplayResults } = await loadModule('/src/app/v2-replay-results.ts');
   const published = [];
   const ids = new Set();
   for (const path of paths) {
@@ -58,4 +57,4 @@ try {
   for (const name of await readdir(directory)) if (name.endsWith('.json') && !published.some(x => x.definition.file === name)) await unlink(directory + '/' + name);
   for (const { recording, definition } of published) await writeFile(directory + '/' + definition.file, E.serializeReplayRecording(recording));
   await writeFile('src/app/v2-official-replay-manifest.json', JSON.stringify(published.map(x => x.definition), null, 2));
-} finally { await server.close(); }
+} finally { await close(); }

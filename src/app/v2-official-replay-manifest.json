@@ -1,5 +1,43 @@
 [
   {
+    "id": "official-normal-phd-0",
+    "file": "normal-phd-0.json",
+    "roleId": "normal",
+    "route": "phd-0",
+    "note": "",
+    "totalMonths": 70,
+    "degree": "phd",
+    "score": 7,
+    "commands": 503,
+    "ruleset": "20261027-r58",
+    "finalDigest": "52dc7f86:c964ae4:331324",
+    "metrics": {
+      "money": 23.5,
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 17.24926976,
+          "cap": 20
+        },
+        {
+          "label": "科研能力",
+          "value": 7.6,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 6.8,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 5,
+          "cap": 20
+        }
+      ]
+    }
+  },
+  {
     "id": "official-normal-phd-10",
     "file": "normal-phd-10.json",
     "roleId": "normal",
@@ -7,12 +45,12 @@
     "note": "",
     "totalMonths": 70,
     "degree": "phd",
-    "score": 7,
-    "commands": 439,
+    "score": 9,
+    "commands": 517,
     "ruleset": "20261027-r58",
-    "finalDigest": "e78a7be8:ee0ac438:331388",
+    "finalDigest": "bb27f6d9:c6552c1d:406482",
     "metrics": {
-      "money": 74,
+      "money": 32,
       "attributes": [
         {
           "label": "SAN",
@@ -21,17 +59,17 @@
         },
         {
           "label": "科研能力",
-          "value": 6.8,
+          "value": 14.2,
           "cap": 20
         },
         {
           "label": "社交能力",
-          "value": 1,
+          "value": 13,
           "cap": 20
         },
         {
           "label": "导师好感",
-          "value": 3,
+          "value": 7.6,
           "cap": 20
         }
       ]
@@ -45,12 +83,12 @@
     "note": "",
     "totalMonths": 34,
     "degree": "master",
-    "score": 1,
-    "commands": 203,
+    "score": 2,
+    "commands": 213,
     "ruleset": "20261027-r58",
-    "finalDigest": "de028ae2:67982094:116879",
+    "finalDigest": "f780500b:74b91233:130230",
     "metrics": {
-      "money": 14.5,
+      "money": 8.5,
       "attributes": [
         {
           "label": "SAN",
@@ -59,55 +97,17 @@
         },
         {
           "label": "科研能力",
-          "value": 7.6,
+          "value": 5,
           "cap": 20
         },
         {
           "label": "社交能力",
-          "value": 1,
+          "value": 5,
           "cap": 20
         },
         {
           "label": "导师好感",
-          "value": 6,
-          "cap": 20
-        }
-      ]
-    }
-  },
-  {
-    "id": "official-normal-phd-0",
-    "file": "normal-phd-0.json",
-    "roleId": "normal",
-    "route": "phd-0",
-    "note": "",
-    "totalMonths": 70,
-    "degree": "phd",
-    "score": 8,
-    "commands": 490,
-    "ruleset": "20261027-r58",
-    "finalDigest": "2f04cf4c:8e32245e:345652",
-    "metrics": {
-      "money": 31,
-      "attributes": [
-        {
-          "label": "SAN",
-          "value": 13.09246976,
-          "cap": 20
-        },
-        {
-          "label": "科研能力",
-          "value": 7.8,
-          "cap": 20
-        },
-        {
-          "label": "社交能力",
-          "value": 0,
-          "cap": 20
-        },
-        {
-          "label": "导师好感",
-          "value": 6.2,
+          "value": 5.2,
           "cap": 20
         }
       ]
