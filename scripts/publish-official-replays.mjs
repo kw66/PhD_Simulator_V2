@@ -3,11 +3,12 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir, readdir, unlink } from 'node:fs/promises';
 import { createServer } from 'vite';
+import { auditTeachingReplay } from './autoplay/quality.mjs';
 
 const paths = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const server = await createServer({ configFile: false, logLevel: 'error', server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' });
 try {
-  const E = Object.assign({}, ...await Promise.all(['v2-local-replay', 'v2-run-replay', 'v2-role-talent-definitions', 'v2-rule-context', 'v2-engine'].map(name => server.ssrLoadModule('/src/core/' + name + '.ts'))));
+  const E = Object.assign({}, ...await Promise.all(['v2-local-replay', 'v2-run-replay', 'v2-role-talent-definitions', 'v2-rule-context', 'v2-engine', 'v2-paper-rules', 'v2-conference-catalog', 'v2-review-config', 'v2-monthly-effects', 'v2-role-talent-state'].map(name => server.ssrLoadModule('/src/core/' + name + '.ts'))));
   const { deriveReplayResults } = await server.ssrLoadModule('/src/app/v2-replay-results.ts');
   const published = [];
   const ids = new Set();
@@ -18,6 +19,9 @@ try {
     assert.equal(final.phase, 'finished', path);
     assert.ok(['master', 'phd'].includes(final.ending), path);
     assert.equal(final.degree, final.ending);
+    const teachingAudit = auditTeachingReplay(E, source);
+    assert.equal(teachingAudit.finalDigest, source.finalDigest, path);
+    assert.ok(teachingAudit.passed, `${path}: teaching quality rejected: ${JSON.stringify(teachingAudit.issues)}`);
     assert.deepEqual(source.replay.initial, { ...E.createInitialState(), randomState: source.replay.initial.randomState }, path);
     const start = source.replay.commands[0];
     const role = start.payload.roleId;

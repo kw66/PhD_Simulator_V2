@@ -19,6 +19,19 @@ describe("replay guide and aggregate play counts", () => {
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
 
+  it("plays the zero-point tutorial through enrollment without a lit talent node", async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 1000 } });
+    await page.route("**/*.supabase.co/**", route => route.fulfill({ json: {} }));
+    try {
+      await page.goto(`${server.resolvedUrls!.local[0]}?replay=official-normal-phd-0`);
+      await page.locator('[data-replay-play][aria-label="暂停"]').waitFor();
+      await page.locator('[data-replay-speed]').selectOption('8');
+      await page.waitForFunction(() => Number(document.querySelector<HTMLInputElement>('[data-replay-seek]')?.value) > 7);
+      expect(await page.locator('[data-replay-play]').getAttribute('aria-label')).toBe('暂停');
+      expect(await page.locator('.replay-viewer').textContent()).not.toContain('找不到操作按钮');
+    } finally { await page.close(); }
+  }, 30_000);
+
   it.each([390, 1440])("shows compact routes and counts only successful official opens at %s px", async width => {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });
     const id = "official-normal-phd-10";
