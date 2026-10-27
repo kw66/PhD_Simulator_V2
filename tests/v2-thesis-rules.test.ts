@@ -4,7 +4,7 @@ import { createInitialState } from "../src/core/v2-engine-state-factory";
 import {
   advanceThesisResearchPoint, createInitialThesisState, getGraduationPreparationYear,
   getThesisAdvanceFailure, getThesisAdvanceSanCost, isGraduationPreparationUnlocked, prepareThesisBlindReview, syncThesisState,
-  getThesisForecast, getThesisAdvanceGain,
+  getThesisForecast, getThesisAdvanceGain, getThesisReviewThresholds,
 } from "../src/core/v2-thesis-rules";
 import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { generatePaperTopic } from "../src/core/v2-paper-topics";
@@ -92,13 +92,13 @@ describe("thesis initialization and support", () => {
   it("replaces the weakest whole point only on strict improvement", () => {
     let state = syncThesisState({ ...fixture(), papers: [paper("old", 100), paper("strong", 200)] }, () => 0);
     state = advanceThesisResearchPoint(state, 1);
-    expect(state.thesis.researchPoints[1]!.score).toBe(112);
+    expect(state.thesis.researchPoints[1]!.score).toBe(117);
     expect(state.thesis.researchPoints[1]!.initialScore).toBe(100);
-    const same = { ...state, papers: [...state.papers, paper("equal", 112), paper("below", 111), paper("other", 300, "other")] };
+    const same = { ...state, papers: [...state.papers, paper("equal", 117), paper("below", 116), paper("other", 300, "other")] };
     expect(syncThesisState(same)).toBe(same);
-    state = syncThesisState({ ...same, papers: [...same.papers, paper("new", 113)] });
-    expect(state.thesis.researchPoints.map((point) => point.score)).toEqual([200, 113]);
-    expect(state.thesis.researchPoints.map((point) => point.initialScore)).toEqual([200, 113]);
+    state = syncThesisState({ ...same, papers: [...same.papers, paper("new", 118)] });
+    expect(state.thesis.researchPoints.map((point) => point.score)).toEqual([200, 118]);
+    expect(state.thesis.researchPoints.map((point) => point.initialScore)).toEqual([200, 118]);
     expect(state.thesis.researchPoints[1]!.supportPaperId).toBe("new");
     expect(state.thesis.topicId).toBe("image-classification");
     expect(getThesisAdvanceFailure(state, 1)).toContain("本月已推进");
@@ -107,8 +107,8 @@ describe("thesis initialization and support", () => {
     expect(syncThesisState(altered)).toBe(altered);
     expect(new Set(state.thesis.researchPoints.map((point) => point.supportPaperId)).size).toBe(2);
     const advanced = advanceThesisResearchPoint({ ...state, month: 2, totalMonths: state.totalMonths + 1 }, 1);
-    expect(advanced.thesis.researchPoints[1]).toMatchObject({ score: 125, initialScore: 113, supportPaperId: "new" });
-    expect(state.thesis.researchPoints[1]).toMatchObject({ score: 113, initialScore: 113 });
+    expect(advanced.thesis.researchPoints[1]).toMatchObject({ score: 135, initialScore: 118, supportPaperId: "new" });
+    expect(state.thesis.researchPoints[1]).toMatchObject({ score: 118, initialScore: 118 });
   });
 
   it("does not reuse a support paper for a second point or inflate on repeated refresh", () => {
@@ -146,20 +146,20 @@ describe("thesis direction replacement", () => {
     expect(state.thesis.topicId).toBe("old");
   });
 
-  it.each([211, 212, 213])("compares candidate total %i against current scores including manual gains", (total) => {
+  it.each([216, 217, 218])("compares candidate total %i against current scores including manual gains", (total) => {
     const state = syncThesisState({ ...fixture(), papers: [paper("old1", 100, "old"), paper("old2", 100, "old")] }, () => 0);
     const advanced = advanceThesisResearchPoint(state, 0);
     const candidates = { ...advanced, papers: [...advanced.papers, paper("new1", 110, "new"), paper("new2", total - 110, "new")] };
     const random = vi.fn(() => 0);
     const next = syncThesisState(candidates, random);
-    if (total <= 212) {
+    if (total <= 217) {
       expect(next).toBe(candidates);
       expect(next.thesis.title).toBe(state.thesis.title);
       expect(random).not.toHaveBeenCalled();
     } else {
       expect(next.thesis.topicId).toBe("new");
-      expect(next.thesis.researchPoints.map((point) => point.score)).toEqual([110, 103]);
-      expect(next.thesis.researchPoints.map((point) => point.initialScore)).toEqual([110, 103]);
+      expect(next.thesis.researchPoints.map((point) => point.score)).toEqual([110, 108]);
+      expect(next.thesis.researchPoints.map((point) => point.initialScore)).toEqual([110, 108]);
       expect(random).toHaveBeenCalledTimes(1);
     }
   });
@@ -191,7 +191,7 @@ describe("thesis direction replacement", () => {
     expect(getThesisAdvanceFailure(next, 1)).toContain("本月已推进");
     expect(advanceThesisResearchPoint(next, 1)).toBe(next);
     expect(getThesisAdvanceFailure(next, 0)).toBeNull();
-    expect(advanceThesisResearchPoint(next, 0).thesis.researchPoints[0]).toMatchObject({ score: 212, initialScore: 200 });
+    expect(advanceThesisResearchPoint(next, 0).thesis.researchPoints[0]).toMatchObject({ score: 217, initialScore: 200 });
     if (degree === "phd") expect(getThesisAdvanceFailure(next, 2)).toBeNull();
     expect(next.player).toBe(state.player);
   });
@@ -256,14 +256,49 @@ describe("thesis direction replacement", () => {
 });
 
 describe("thesis point advancement", () => {
+  it("adds the base five at zero research and independently limits all three points each month", () => {
+    let state = syncThesisState(fixture("phd"), () => 0);
+    state.player.research = 0;
+    const actions = { ...state.actionState };
+    expect(getThesisAdvanceGain(state)).toBe(5);
+    for (const index of [0, 1, 2]) {
+      state = advanceThesisResearchPoint(state, index);
+      expect(advanceThesisResearchPoint(state, index)).toBe(state);
+    }
+    expect(state.thesis.researchPoints.map(point => point.score)).toEqual([5, 5, 5]);
+    expect(state.actionState).toEqual(actions);
+    const nextMonth = { ...state, month: 2, totalMonths: 62 };
+    expect(advanceThesisResearchPoint(nextMonth, 1).thesis.researchPoints.map(point => point.score)).toEqual([5, 10, 5]);
+    withGameplayRuleset("20261026-r57", () => {
+      expect(getThesisAdvanceGain(state)).toBe(0);
+      expect(advanceThesisResearchPoint(nextMonth, 1).thesis.researchPoints[1]!.score).toBe(5);
+    });
+  });
+
+  it("allows research three to pass master review after ten balanced advances without support papers", () => {
+    let state = syncThesisState({ ...fixture(), graduationScoreTarget: 1, totalResearchScore: 1 }, () => 0);
+    state.player.research = 3;
+    for (let month = 1; month <= 5; month += 1) {
+      state = { ...state, month, totalMonths: 24 + month, player: { ...state.player, san: 20 } };
+      state = advanceThesisResearchPoint(advanceThesisResearchPoint(state, 0), 1);
+    }
+    expect(state.thesis.researchPoints.map(point => point.score)).toEqual([40, 40]);
+    expect(getThesisForecast(state)).toMatchObject({ advanceGain: 8, currentGuaranteedScore: 120, threshold: 100, currentPass: true });
+    for (const roll of [0, 0.5, 0.999999]) {
+      const reviewed = prepareThesisBlindReview({ ...state, month: 8, totalMonths: 32 }, () => roll).thesis.review!;
+      expect(reviewed.passed).toBe(true);
+      expect(reviewed.reports.every(report => report.grade === "B" && report.effectiveScore === 120)).toBe(true);
+    }
+  });
+
   it.each(["master", "phd"] as const)("preserves %s baselines through advancement and an independent review snapshot", (degree) => {
     const initialized = syncThesisState({ ...fixture(degree), papers: [paper("support", 100)] }, () => 0);
     const first = advanceThesisResearchPoint(initialized, 0);
     const second = advanceThesisResearchPoint({ ...first, month: 2, totalMonths: first.totalMonths + 1 }, 0);
     const advanced = advanceThesisResearchPoint(second, 1);
     expect(initialized.thesis.researchPoints[0]).toMatchObject({ score: 100, initialScore: 100 });
-    expect(advanced.thesis.researchPoints[0]).toMatchObject({ score: 124, initialScore: 100 });
-    expect(advanced.thesis.researchPoints[1]).toMatchObject({ score: 12, initialScore: 0 });
+    expect(advanced.thesis.researchPoints[0]).toMatchObject({ score: 134, initialScore: 100 });
+    expect(advanced.thesis.researchPoints[1]).toMatchObject({ score: 17, initialScore: 0 });
     const prepared = prepareThesisBlindReview({
       ...advanced, month: 8, totalMonths: advanced.totalMonths + 6,
       graduationScoreTarget: 10, totalResearchScore: 10,
@@ -275,21 +310,21 @@ describe("thesis point advancement", () => {
     expect(review.researchPoints[0]).not.toBe(prepared.thesis.researchPoints[0]);
     prepared.thesis.researchPoints[0]!.score = 999;
     prepared.thesis.researchPoints[0]!.initialScore = 999;
-    expect(review.researchPoints[0]).toMatchObject({ score: 124, initialScore: 100 });
-    expect(review.researchPoints[1]).toMatchObject({ score: 12, initialScore: 0 });
+    expect(review.researchPoints[0]).toMatchObject({ score: 134, initialScore: 100 });
+    expect(review.researchPoints[1]).toMatchObject({ score: 17, initialScore: 0 });
   });
 
   it.each([1, 2, 3, 4, 5, 6, 7])("permits writing in month %i without AP", (month) => {
     const state = syncThesisState(fixture("master", month), () => 0);
     state.actionState = { ...state.actionState, used: state.actionState.limit };
     const next = advanceThesisResearchPoint(state, 0);
-    expect(next.thesis.researchPoints[0]!.score).toBe(12);
+    expect(next.thesis.researchPoints[0]!.score).toBe(17);
     expect(next.player.san).toBe(20 - (month === 7 ? 2 : 3));
     expect(next.actionState).toEqual(state.actionState);
     expect(advanceThesisResearchPoint(next, 0)).toBe(next);
-    expect(advanceThesisResearchPoint(next, 1).thesis.researchPoints[1]!.score).toBe(12);
+    expect(advanceThesisResearchPoint(next, 1).thesis.researchPoints[1]!.score).toBe(17);
     const later = { ...next, month: month + 1, totalMonths: next.totalMonths + 1 };
-    if (month < 7) expect(advanceThesisResearchPoint(later, 0).thesis.researchPoints[0]!.score).toBe(24);
+    if (month < 7) expect(advanceThesisResearchPoint(later, 0).thesis.researchPoints[0]!.score).toBe(34);
   });
 
   it.each([8, 9, 10, 11, 12])("disallows writing in month %i", (month) => {
@@ -305,7 +340,7 @@ describe("thesis point advancement", () => {
     expect(getThesisAdvanceSanCost(state)).toBe(3);
     expect(getThesisAdvanceFailure(state, 0)).toBeNull();
     const next = advanceThesisResearchPoint(state, 0);
-    expect(next.thesis.researchPoints[0]!.score).toBe(510);
+    expect(next.thesis.researchPoints[0]!.score).toBe(515);
     expect(next.player.san).toBe(-2);
     expect(next.ending).toBeNull();
     state.buffs = [{ id: "cost", name: "cost", source: "test", timing: "monthly", remainingMonths: 1, activeOperationSanMultiplier: 2 }];
@@ -321,7 +356,7 @@ describe("thesis point advancement", () => {
       for (const index of [-1, 0.5, 2, NaN]) expect(advanceThesisResearchPoint(state, index)).toBe(state);
       expect(getThesisAdvanceFailure(uninitialized, 0)).not.toBeNull();
       expect(advanceThesisResearchPoint({ ...state, phase: "setup" }, 0).thesis).toBe(state.thesis);
-      expect(advanceThesisResearchPoint(state, 0).thesis.researchPoints[0]!.score).toBe(12);
+      expect(advanceThesisResearchPoint(state, 0).thesis.researchPoints[0]!.score).toBe(17);
       expect(random).not.toHaveBeenCalled();
     } finally {
       random.mockRestore();
@@ -333,10 +368,18 @@ describe("thesis forecast and decimal advancement", () => {
   it("keeps decimal research in new runs and the integer gain in old replays", () => {
     const state = syncThesisState(fixture("phd"), () => 0);
     state.player.research = 9.6;
-    expect(getThesisAdvanceGain(state)).toBe(9.6);
+    expect(getThesisAdvanceGain(state)).toBe(14.6);
     const advanced = advanceThesisResearchPoint(state, 0);
-    expect(advanced.thesis.researchPoints[0]!.score).toBe(9.6);
-    expect(advanceThesisResearchPoint({ ...advanced, month: 2, totalMonths: 62 }, 0).thesis.researchPoints[0]!.score).toBe(19.2);
+    expect(advanced.thesis.researchPoints[0]!.score).toBe(14.6);
+    expect(advanceThesisResearchPoint({ ...advanced, month: 2, totalMonths: 62 }, 0).thesis.researchPoints[0]!.score).toBe(29.2);
+    withGameplayRuleset("20261026-r57", () => {
+      expect(getThesisAdvanceGain(state)).toBe(9.6);
+      const old = advanceThesisResearchPoint(state, 0);
+      expect(old.thesis.researchPoints[0]!.score).toBe(9.6);
+      expect(advanceThesisResearchPoint({ ...old, month: 2, totalMonths: 62 }, 0).thesis.researchPoints[0]!.score).toBe(19.2);
+      expect(getThesisReviewThresholds("master")).toEqual({ C: 120, B: 200, A: 300 });
+      expect(getThesisReviewThresholds("phd")).toEqual({ C: 240, B: 330, A: 500 });
+    });
     withGameplayRuleset("20261021-r14", () => {
       expect(getThesisAdvanceGain(state)).toBe(9);
       expect(advanceThesisResearchPoint(state, 0).thesis.researchPoints[0]!.score).toBe(9);
@@ -354,11 +397,11 @@ describe("thesis forecast and decimal advancement", () => {
     try {
       expect(getThesisForecast({ ...state, year: 4 })).toBeNull();
       const forecast = getThesisForecast(state)!;
-      expect(forecast).toMatchObject({ stage: "planning", topicId: "a", advanceGain: 9.6,
-        threshold: 330, currentGuaranteedScore: 180, projectedGuaranteedScore: 382,
+      expect(forecast).toMatchObject({ stage: "planning", topicId: "a", advanceGain: 14.6,
+        threshold: 250, currentGuaranteedScore: 180, projectedGuaranteedScore: 487,
         currentPass: false, projectedPass: true, researchScoreMet: false });
       expect(forecast.points.map(point => [point.score, point.remainingAdvances, point.projectedScore]))
-        .toEqual([[60, 7, 127.2], [60, 7, 127.2], [60, 7, 127.2]]);
+        .toEqual([[60, 7, 162.2], [60, 7, 162.2], [60, 7, 162.2]]);
       expect(getThesisForecast(state)).toEqual(forecast);
       expect(state).toEqual(before);
       expect(random).not.toHaveBeenCalled();
@@ -371,7 +414,7 @@ describe("thesis forecast and decimal advancement", () => {
     const forecast = getThesisForecast(state)!;
     expect(forecast.stage).toBe("writing");
     expect(forecast.points.map(point => point.remainingAdvances)).toEqual([0, 1, 1]);
-    expect(forecast.points.map(point => point.projectedScore)).toEqual([12, 12, 12]);
+    expect(forecast.points.map(point => point.projectedScore)).toEqual([17, 17, 17]);
     expect(forecast.researchScoreMet).toBe(true);
     expect(getThesisForecast({ ...state, month: 8 })!.points.map(point => point.remainingAdvances)).toEqual([0, 0, 0]);
     expect(getThesisForecast({ ...state, phase: "finished" })!.stage).toBe("frozen");
@@ -392,12 +435,12 @@ describe("thesis forecast and decimal advancement", () => {
     });
   });
 
-  it("has zero baselines for missing papers and unchanged master thresholds", () => {
+  it("has zero baselines for missing papers and degree-specific current thresholds", () => {
     const planning = getThesisForecast({ ...fixture("phd"), year: 5 })!;
     expect(planning.topicId).toBeNull();
     expect(planning.points.map(point => point.score)).toEqual([0, 0, 0]);
     const master = fixture("master");
     expect(getThesisForecast({ ...master, year: 2 })).toBeNull();
-    expect(getThesisForecast(master)).toMatchObject({ threshold: 200, stage: "writing" });
+    expect(getThesisForecast(master)).toMatchObject({ threshold: 100, stage: "writing" });
   });
 });

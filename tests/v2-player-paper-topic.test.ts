@@ -53,13 +53,22 @@ describe("player paper direction continuity", () => {
 
   it.each(["master", "phd"] as const)("returns to random exploration only when support guarantees A for %s", degree => {
     const count = degree === "master" ? 2 : 3;
-    const score = degree === "master" ? 100 : 167;
+    const score = degree === "master" ? 67 : 167;
     const papers = Array.from({ length: count }, (_, index) => paper(`a${index}`, a, score, "published"));
     expect(preferred([], papers, degree)).toBeUndefined();
     expect(preferred([], papers.slice(0, -1), degree)).toBe(a);
     const uneven = papers.map((p, index) => ({ ...p, idea: index === 0 ? score * count : 0 }));
     expect(preferred([], uneven, degree)).toBe(a);
     expect(preferred([], papers.map(p => ({ ...p, idea: score - 1 })), degree)).toBe(a);
+  });
+
+  it("retains the higher master direction-exploration threshold in r57 replays", () => {
+    const papers = [paper("first", a, 67, "published"), paper("second", a, 67, "published")];
+    expect(preferred([], papers, "master")).toBeUndefined();
+    withGameplayRuleset("20261026-r57", () => {
+      expect(preferred([], papers, "master")).toBe(a);
+      expect(preferred([], papers.map(p => ({ ...p, idea: 100 })), "master")).toBeUndefined();
+    });
   });
 
   it("inherits direction and annual heat, generates a matching title, and permits random rerolls", () => {

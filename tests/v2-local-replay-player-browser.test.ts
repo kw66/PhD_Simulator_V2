@@ -72,6 +72,12 @@ describe("isolated local replay browser player", () => {
       await page.screenshot({ path: `artifacts/local-replay/library-${width}.png`, fullPage: true });
       await page.locator("[data-replay-open]").click();
       await page.waitForSelector(".replay-viewer .play-page");
+      await page.locator('[data-replay-play][aria-label="暂停"]').waitFor();
+      await page.waitForFunction(() => Number(document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value) > 1);
+      await page.locator('[data-replay-play][aria-label="暂停"]').click();
+      await page.locator("[data-replay-seek]").fill("1");
+      await page.locator("[data-replay-seek]").dispatchEvent("change");
+      await page.waitForFunction(() => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === "1");
       expect(await page.locator(".replay-app > .replay-toolbar").count()).toBe(0);
       expect(await page.locator(".play-right-rail [data-replay-play]").count()).toBe(1);
       expect(await page.locator("[data-ui-help-toggle], #play-help-panel").count()).toBe(0);
@@ -222,6 +228,7 @@ describe("isolated local replay browser player", () => {
       await page.locator('[data-replay-route="phd-10"]').click();
       await page.locator('[data-replay-open="official-normal-phd-10"]').click();
       await page.waitForSelector("[data-replay-seek]");
+      await page.locator('[data-replay-play][aria-label="暂停"]').click();
       await page.locator("[data-replay-speed]").selectOption("0.5");
       await page.locator('[data-replay-step="1"]').click();
       await page.waitForSelector(".replay-click-target[data-ui-open-event-id]");

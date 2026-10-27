@@ -72,7 +72,7 @@ describe("graduation cards and blind review in the browser", () => {
       await points.first().click();
       expect(await points.first().isDisabled()).toBe(true);
       expect(await points.nth(1).isEnabled()).toBe(true);
-      expect(await page.evaluate(() => (window as GraduationWindow).graduationStore.getState().thesis.researchPoints[0]!.score)).toBe(14.75);
+      expect(await page.evaluate(() => (window as GraduationWindow).graduationStore.getState().thesis.researchPoints[0]!.score)).toBe(19.75);
       expect(await page.evaluate(() => (window as GraduationWindow).graduationStore.getState().actionState.used)).toBe(0);
       await page.evaluate(() => {
         const store = (window as GraduationWindow).graduationStore;

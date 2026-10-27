@@ -204,7 +204,7 @@ describe("decimal research calculations", () => {
     const state = syncThesisState({ ...base, year: 3, month: 1, totalMonths: 25,
       player: { ...base.player, research: 6.75 } }, () => 0);
     const next = advanceThesisResearchPoint(state, 0);
-    expect(next.thesis.researchPoints[0]!.score - state.thesis.researchPoints[0]!.score).toBe(6.75);
+    expect(next.thesis.researchPoints[0]!.score - state.thesis.researchPoints[0]!.score).toBe(11.75);
     expect(next.player.research).toBe(6.75);
   });
 

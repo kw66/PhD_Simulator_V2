@@ -28,6 +28,23 @@ function stages(event: PendingEvent) {
 }
 
 describe("thesis blind-review sampling", () => {
+  it("uses the approved degree thresholds while preserving all r57 review grades", () => {
+    expect(THESIS_REVIEW_THRESHOLDS).toEqual({ master: { C: 60, B: 100, A: 200 }, phd: { C: 180, B: 250, A: 500 } });
+    for (const [degree, raw, currentGrade, oldGrade] of [
+      ["master", 60, "C", "D"], ["master", 100, "B", "D"], ["master", 200, "A", "B"],
+      ["phd", 180, "C", "D"], ["phd", 250, "B", "C"], ["phd", 500, "A", "A"],
+    ] as const) {
+      const state = fixture(degree, Array(degree === "master" ? 2 : 3).fill(raw / 3));
+      const current = prepareThesisBlindReview(state, () => 0.37).thesis.review!;
+      expect(current.reports.every(report => report.grade === currentGrade)).toBe(true);
+      withGameplayRuleset("20261026-r57", () => {
+        const old = prepareThesisBlindReview(state, () => 0.37).thesis.review!;
+        expect(old.reports.every(report => report.grade === oldGrade)).toBe(true);
+        expect(old.passed).toBe(oldGrade === "A" || oldGrade === "B");
+      });
+    }
+  });
+
   it("accepts 330-point doctoral work in new runs while replaying the old 360 threshold", () => {
     const state = fixture("phd", [110, 110, 110]);
     expect(prepareThesisBlindReview(state, () => 0.37).thesis.review!.passed).toBe(true);
@@ -90,7 +107,7 @@ describe("thesis blind-review sampling", () => {
   it("one C prevents passing even when the other reviewers give B", () => {
     const rolls = [0, 0.999999, 0, 0.999999, 0.999999, 0, 0.999999, 0.999999, 0];
     let index = 0;
-    const review = prepareThesisBlindReview(fixture("master", [100, 40]), () => rolls[index++] ?? 0).thesis.review!;
+    const review = prepareThesisBlindReview(fixture("master", [50, 20]), () => rolls[index++] ?? 0).thesis.review!;
     expect(review.reports.map((report) => report.grade)).toEqual(["C", "B", "B"]);
     expect(review.passed).toBe(false);
     expect(review.excellent).toBe(false);
@@ -134,16 +151,16 @@ describe("thesis blind-review event snapshots", () => {
     state.month = 2;
     state.totalMonths = 26;
     state = advanceThesisResearchPoint(state, 0);
-    expect(state.thesis.scoreHistory.at(-1)).toMatchObject({ totalMonths: 26, pointScores: [46, 10] });
+    expect(state.thesis.scoreHistory.at(-1)).toMatchObject({ totalMonths: 26, pointScores: [51, 10] });
     state.month = 8;
     state.totalMonths = 32;
     const collected = collectThesisEventForMonth(state, () => 0);
     const [overview, reports, decision] = stages(collected.event!);
-    expect(overview.thesisReviewPresentation?.scoreHistory.at(-1)?.pointScores).toEqual([46, 10]);
+    expect(overview.thesisReviewPresentation?.scoreHistory.at(-1)?.pointScores).toEqual([51, 10]);
     expect(reports.thesisReviewPresentation?.scoreHistory).toEqual(overview.thesisReviewPresentation?.scoreHistory);
     expect(decision.thesisReviewPresentation?.scoreHistory).toEqual(overview.thesisReviewPresentation?.scoreHistory);
     state.thesis.scoreHistory.at(-1)!.pointScores[0] = 999;
-    expect(overview.thesisReviewPresentation?.scoreHistory.at(-1)?.pointScores[0]).toBe(46);
+    expect(overview.thesisReviewPresentation?.scoreHistory.at(-1)?.pointScores[0]).toBe(51);
   });
 
   it.each(["master", "phd"] as const)("builds three %s scenes and resolves only on final confirmation", (degree) => {

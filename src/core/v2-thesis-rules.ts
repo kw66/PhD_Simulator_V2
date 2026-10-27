@@ -55,17 +55,19 @@ export interface ThesisState {
 }
 
 export const THESIS_REVIEW_THRESHOLDS = {
-  master: { C: 120, B: 200, A: 300 },
-  phd: { C: 240, B: 330, A: 500 },
+  master: { C: 60, B: 100, A: 200 },
+  phd: { C: 180, B: 250, A: 500 },
 } as const;
 
 export function getThesisReviewThresholds(degree: Degree): { C: number; B: number; A: number } {
-  return degree === "phd" && !usesGameplayRulesFrom("20261022-r15")
-    ? { ...THESIS_REVIEW_THRESHOLDS.phd, B: 360 } : THESIS_REVIEW_THRESHOLDS[degree];
+  if (usesGameplayRulesFrom("20261027-r58")) return THESIS_REVIEW_THRESHOLDS[degree];
+  return degree === "master" ? { C: 120, B: 200, A: 300 }
+    : { C: 240, B: usesGameplayRulesFrom("20261022-r15") ? 330 : 360, A: 500 };
 }
 
 export function getThesisAdvanceGain(state: GameState): number {
   const research = getEffectiveResearch(state);
+  if (usesGameplayRulesFrom("20261027-r58")) return roundAttribute(5 + research);
   return usesGameplayRulesFrom("20261022-r15") ? roundAttribute(research) : Math.floor(research);
 }
 

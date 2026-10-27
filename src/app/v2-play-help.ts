@@ -94,7 +94,7 @@ const WORKSTATION_PAGES: readonly PlayHelpPage[] = [
   directPage("审稿人反馈", `<p>拒稿加分只在退稿后生效；SAN变化<b>中稿或拒稿均生效</b>，三位审稿人的效果可叠加。扣SAN先乘疾病倍率，再加季节与恋人固定修正，保留小数、最低0；恢复不受影响。</p>${renderReviewerGuide("effect")}`),
   directPage("审稿门槛", `<p>表中依次为${renderPaperTerm("Borderline")}／${renderPaperTerm("Accept")}基础门槛；低于前值为Reject，达到后值为Accept。</p>${renderReviewerThresholds()}
     <p>实际门槛=基础门槛×会议影响力÷等级均值，四舍五入。等级均值：A ${REVIEW_TARGET_AVERAGE_INFLUENCE.A}，B ${REVIEW_TARGET_AVERAGE_INFLUENCE.B}，C ${REVIEW_TARGET_AVERAGE_INFLUENCE.C}。</p>`),
-  directPage("毕业论文", `<p>每次推进增加当前有效科研能力对应的分数，保留小数；每个研究点每月可推进一次，不占行动点。</p>
+  directPage("毕业论文", `<p>每次推进增加5＋当前有效科研能力，保留小数；每个研究点每月可分别推进一次，不占行动点。</p>
     <p>最后学年9月至次年3月可推进，4月送审。</p>
     <p>SAN基础消耗不受科研档位减免，季节与通用SAN效果仍生效。</p>`),
   directPage("支撑论文", `<p>只计自己的一作成果。各方向取最高的2／3篇，合计最高的方向作为大论文方向，缺少的研究点从0开始。</p>

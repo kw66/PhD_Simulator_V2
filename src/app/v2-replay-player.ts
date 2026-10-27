@@ -455,7 +455,13 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
       if (route !== routeVersion || session !== active) return;
       ui = { activePlayTab: "events", dateDisplayMode: "academic", isEventContentOpen: false, academicArchiveAct: 0 };
       await seek(1, undefined, false);
-      if (route === routeVersion && session === active) void playStats?.track(id);
+      if (route !== routeVersion || session !== active) return;
+      void playStats?.track(id);
+      if (state && !busy && active.getIndex() < active.getLength()) {
+        playing = true;
+        syncPlaybackButton();
+        schedulePlay();
+      }
     } catch (cause) {
       if (route !== routeVersion) return;
       announce(cause instanceof Error ? cause.message : "无法打开回放", true);

@@ -182,7 +182,7 @@ describe("graduation workstation cards", () => {
     expect(actions[1]).not.toContain(" disabled");
     expect(actions[1]).toContain("data-event-risk-tooltip");
     expect(actions[1]).toContain("event-choice-risk is-certain");
-    expect(actions[1]).toContain("推进+12.9 · SAN-3");
+    expect(actions[1]).toContain("推进+17.9 · SAN-3");
   });
 
   it("uses the existing risk evaluator's emergency-chair protection", () => {

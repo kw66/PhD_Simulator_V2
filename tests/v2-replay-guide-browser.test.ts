@@ -41,6 +41,8 @@ describe("replay guide and aggregate play counts", () => {
       expect(requests).toHaveLength(1);
       await page.locator(`[data-replay-open="${id}"]`).click();
       await page.locator("[data-replay-seek]").waitFor();
+      await page.locator('[data-replay-play][aria-label="暂停"]').waitFor();
+      await page.waitForFunction(() => Number(document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value) > 1);
       await expect.poll(() => requests.filter(r => r.name.startsWith("record_")).length).toBe(1);
       expect(requests.at(-1)?.body).toEqual({ p_replay_id: id });
       await page.locator("[data-replay-library]").click();
