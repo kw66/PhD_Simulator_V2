@@ -63,7 +63,10 @@ describe("v2 before grad school events", () => {
     expect(act1.description).not.toContain("接受待录取");
     expect(act1.description).not.toContain("公告栏");
     expect(act1.choices.map((choice) => choice.label)).toEqual(["联系导师", "换个姓名"]);
-    expect(act1.description).toContain("叫李旭旭");
+    const studentName = act1.choices[0]!.effects.fixedEventResolution!.studentName!;
+    const advisorName = act1.choices[1]!.effects.fixedEventResolution!.advisorCandidate!.advisorName;
+    expect(act1.description).toContain(`叫${studentName}`);
+    expect(studentName).not.toBe(advisorName);
   });
 
   it("keeps the selected student name after confirmation and changes it on reroll", () => {
@@ -72,7 +75,8 @@ describe("v2 before grad school events", () => {
     const candidateName = act1.choices[0]?.effects.fixedEventResolution?.studentName;
     const rerollResolution = act1.choices[1]?.effects.fixedEventResolution;
 
-    expect(candidateName).toBe("李旭旭");
+    expect(candidateName).toBeTruthy();
+    expect(candidateName).not.toBe(rerollResolution!.advisorCandidate!.advisorName);
     expect(rerollResolution?.kind).toBe("student-name-reroll");
 
     const confirmed = resolveStudentNameConfirmation(state, {
@@ -87,7 +91,9 @@ describe("v2 before grad school events", () => {
       () => 0,
     );
     const refreshed = rerolled.nextState.eventQueue[0];
-    expect(refreshed?.description).toContain("叫李旭霖");
+    const refreshedName = refreshed!.choices[0]!.effects.fixedEventResolution!.studentName!;
+    expect(refreshed?.description).toContain(`叫${refreshedName}`);
+    expect(refreshedName).not.toBe(rerollResolution!.advisorCandidate!.advisorName);
     expect(refreshed?.description).not.toContain(`叫${candidateName}`);
   });
 

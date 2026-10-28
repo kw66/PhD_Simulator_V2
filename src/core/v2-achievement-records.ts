@@ -86,6 +86,18 @@ export function loadRoleAchievementRecords(account: AccountProfile, storage: Ach
         achievementExperienceMultipliers[roleId] = Number(((achievementExperienceMultipliers[roleId] ?? 0) + paidCollectors * 0.2).toFixed(10));
       }
     }
+    if (saved.unlockRewardVersion !== 1) {
+      for (const roleId of ["genius", "teacher-child", "social", "rich", "chosen"] as const) {
+        if (achievementRewardedIds.includes(`unlock:${roleId}-reversed`)) {
+          achievementExperienceMultipliers[roleId] = Number(Math.max(0, (achievementExperienceMultipliers[roleId] ?? 0) - 1).toFixed(10));
+        }
+      }
+      if (achievementRewardedIds.includes("normal:truly-ordinary")) {
+        for (const roleId of Object.keys(roleProgress) as RoleId[]) {
+          if (roleId !== "normal") achievementExperienceMultipliers[roleId] = Number(((achievementExperienceMultipliers[roleId] ?? 0) + 1).toFixed(10));
+        }
+      }
+    }
     return { ...account, roleProgress, achievementUnlockedAt, achievementUnlockedByRole,
       achievementRewardedIds, achievementCollectionProgress: collectionProgress,
       achievementExperienceMultipliers, achievementTalentPoints };
@@ -137,6 +149,7 @@ export function saveRoleAchievementRecords(account: AccountProfile, storage: Ach
     storage?.setItem(ROLE_ACHIEVEMENT_STORAGE_KEY, JSON.stringify({
       version: 2,
       collectorRewardVersion: 1,
+      unlockRewardVersion: 1,
       epoch: DATA_EPOCH,
       savedAt: new Date().toISOString(),
       unlockedAt: account.achievementUnlockedAt,

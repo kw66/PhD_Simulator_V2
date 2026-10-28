@@ -6,6 +6,7 @@ import { replayPendingEvent } from "./v2-event-replay";
 import { syncPaperResearchStarted } from "./v2-paper-competition";
 import { isAcademicYearEnd, prepareAcademicArchive, toggleAcademicPerson, selectAcademicSource, completeAcademicArchive } from "./v2-rewinder-academic";
 import { observeAchievements } from "./v2-achievement-runtime";
+import { recordRoleUnlockMonthEnd } from "./v2-achievement-role-unlocks";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import { dispatchDebugAction } from "./v2-debug-tools";
 import { appendAcademicYearLog } from "./v2-academic-year-log";
@@ -359,6 +360,7 @@ function advanceMonth(state: GameState, force = false): GameState {
   if (state.rewinderState?.monthEndProcessed !== state.totalMonths) {
     state = settleRoleTalentMonthEnd(settleRoleTalentYearEnd(settleLabResearchGrowth(settleFellowAcademicYear(state))));
   }
+  state = recordRoleUnlockMonthEnd(state);
   if (state.rewinderState?.academic) {
     state = evaluateCoreEndings(state);
     if (state.phase !== "playing") return state;

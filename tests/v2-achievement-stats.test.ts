@@ -26,6 +26,32 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-16T06:
 afterEach(() => { controllers.splice(0).forEach(controller => controller.dispose()); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("global achievement statistics", () => {
+  it("keeps valid completions when an offline run contains retired achievements", async () => {
+    const saved = storage();
+    saved.setItem(ACHIEVEMENT_STATS_STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: new Date().toISOString(),
+      pending: [{ p_player_id: PLAYER, p_run_id: RUN, p_role_id: "normal",
+        p_achievement_ids: ["global:travel-kit", "global:help-collector", "global:paper-lover"] }] }));
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(true));
+    const client = create({ storage: saved, fetch });
+    await client.flush();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body)).p_achievement_ids).toEqual(["global:paper-lover"]);
+    expect(JSON.parse(saved.getItem(ACHIEVEMENT_STATS_STORAGE_KEY)!).pending).toEqual([]);
+  });
+
+  it("still rejects unknown or ineligible IDs instead of treating them as retired", async () => {
+    for (const id of ["not-a-real-achievement", "genius:ending-master"]) {
+      const saved = storage();
+      saved.setItem(ACHIEVEMENT_STATS_STORAGE_KEY, JSON.stringify({ version: 1, epoch: DATA_EPOCH, savedAt: new Date().toISOString(),
+        pending: [{ p_player_id: PLAYER, p_run_id: RUN, p_role_id: "normal",
+          p_achievement_ids: ["global:travel-kit", "global:paper-lover", id] }] }));
+      const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(true));
+      const client = create({ storage: saved, fetch });
+      await client.flush();
+      expect(fetch).not.toHaveBeenCalled();
+    }
+  });
+
   it("registers starts before settlement, once per browser across reloads and stale tabs", async () => {
     const saved = storage(); saved.setItem(VISITOR_KEY, PLAYER);
     const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(true));

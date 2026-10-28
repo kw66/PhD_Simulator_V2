@@ -1,3 +1,5 @@
+import { getKnownPersonNames } from "./v2-person-names";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getEffectiveResearch, getEffectiveSocial } from "./v2-effective-attributes";
 import {
   formatResearchMiscSanChange,
@@ -19,7 +21,8 @@ function createRandomEvent10(state: GameState, getRoll: RandomRollProvider, recr
   const serial = state.totalRandomEventCount;
   const peerGender = getRoll() < 0.5 ? "male" : "female";
   const recruitmentSeed = `random-10:${serial}:${getRoll()}`;
-  const usedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
+  const usedNames = usesGameplayRulesFrom("20261028-r59") ? getKnownPersonNames(state)
+    : state.fellowProgressState.map((profile) => getFellowName(profile));
   const isLowSocial = getEffectiveSocial(state) < 6;
   const canAddPeer = canAddRelationship(state.relationshipState, "peer");
   const exchangeSanChange = getActualSanChange(-2, state.month, state.eventSupport, state.buffs);
@@ -137,7 +140,7 @@ function createRandomEvent11(state: GameState, getRoll: RandomRollProvider, recr
   const seniorGender = getRoll() < 0.5 ? "male" : "female";
   const recruitmentSeed = `random-11:${serial}:${getRoll()}`;
   const roleText = getFellowRoleLabel("senior", seniorGender);
-  const usedNames = [
+  const usedNames = usesGameplayRulesFrom("20261028-r59") ? getKnownPersonNames(state) : [
     ...state.fellowProgressState.map((profile) => getFellowName(profile)),
     state.selectedAdvisorName ?? "",
     state.loverState.name ?? "",

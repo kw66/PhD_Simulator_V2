@@ -422,7 +422,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
       if (state.phase !== "playing" || runUsedDebugPanel || !requiredIds.includes(id)) return;
       const next = applyHelpRead(state, id, requiredIds);
       if (next === state) return;
-      replay?.commands.push({ kind: "help", id, requiredIds: [...requiredIds] });
+      replay?.commands.push({ kind: "help", id, requiredIds: [...requiredIds], ruleset: REPLAY_RULESET });
       state = next;
       saveCurrent();
     },

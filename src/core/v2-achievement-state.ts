@@ -33,18 +33,20 @@ export function observeStateAchievements(
     && run.sets["former-lover-types"]?.some(type => type !== next.loverState.type)) satisfy(run, "global:new-love-type");
 
   // These conditions must coexist. Keep a fact once reached, even after sales or graduation.
+  const revised = usesGameplayRulesFrom("20261028-r59");
   const fellows = next.fellowProgressState;
-  if (fellows.length >= 4) satisfy(run, "global:expanded-cohort");
-  if (fellows.filter(fellow => fellow.type === "junior" && fellow.gender === "female").length >= 4) satisfy(run, "global:junior-rescue");
+  if (fellows.length >= (revised ? 3 : 4)) satisfy(run, "global:expanded-cohort");
+  if (fellows.filter(fellow => fellow.type === "junior" && fellow.gender === "female").length >= (revised ? 3 : 4)) satisfy(run, "global:junior-rescue");
   const types = new Set(fellows.map(fellow => `${fellow.type}:${fellow.gender}`));
-  if (["senior:male", "senior:female", "junior:male", "junior:female"].every(type => types.has(type))) satisfy(run, "global:balanced-company");
+  if (!revised && ["senior:male", "senior:female", "junior:male", "junior:female"].every(type => types.has(type))) satisfy(run, "global:balanced-company");
   if (fellows.filter(fellow => fellow.research >= 12).length >= 3) satisfy(run, "global:top-lab");
   if (fellows.filter(fellow => fellow.affinity >= 12).length >= 3) satisfy(run, "global:perfect-rapport");
   if (next.loverState.active && next.degree === "master") satisfy(run, "global:early-romance");
 
   const shop = next.shopState;
   if (shop.ebikeOwned && next.eventSupport.hasDownJacket && next.eventSupport.hasParasol) {
-    satisfy(run, "global:travel-kit"); satisfy(run, "global:full-gear");
+    if (!revised) satisfy(run, "global:travel-kit");
+    satisfy(run, "global:full-gear");
   }
   if (shop.chairOwned && next.coffeeState.machineOwned && shop.keyboardOwned && shop.monitorOwned) satisfy(run, "global:perfect-workstation");
   if (shop.chairOwned && shop.chairUpgrade === "massage") satisfy(run, "normal:chair-upgrade");
@@ -54,7 +56,7 @@ export function observeStateAchievements(
   if (hasAiCollaboration(next.aiShopState)) satisfy(run, "global:ai-collaboration");
   if (next.roleTalents?.researchCurseBroken) satisfy(run, "genius-reversed:break-research-curse");
   if (next.conferenceEncounterState.bigBullCooperation || next.conferenceEncounterState.jointTrainingReward) satisfy(run, "global:joint-training");
-  if (getAdvisorRankIndex(next.advisorProgressState) >= 3) satisfy(run, "global:reverse-mentoring-i");
+  if (getAdvisorRankIndex(next.advisorProgressState) >= (revised ? 2 : 3)) satisfy(run, "global:reverse-mentoring-i");
   if (next.advisorProgressState.awards.some(award => award.id === "academician")) satisfy(run, "global:reverse-mentoring-ii");
 
   for (const type of Object.keys(CAREER_JOBS) as CareerType[]) {
@@ -63,7 +65,7 @@ export function observeStateAchievements(
     if (rank < 0) continue;
     satisfy(run, "global:career-start");
     const suffix = { internet: "internet", stateOwned: "state", civilService: "civil", academic: "academic" }[type];
-    const minimumRank = { internet: 1, stateOwned: 3, civilService: 3, academic: 1 }[type];
+    const minimumRank = { internet: 1, stateOwned: revised ? 1 : 3, civilService: 3, academic: 1 }[type];
     if (rank >= minimumRank) satisfy(run, `global:career-${suffix}`);
     if (rank === CAREER_JOBS[type].length - 1) satisfy(run, `global:career-apex-${suffix}`);
   }
@@ -124,7 +126,7 @@ export function evaluateStateAchievements(state: GameState, run: AchievementRunP
         check(isCursedRole(state.selectedRoleId) && state.curseState?.difficulty === 4,
           `${state.selectedRoleId}:curse-hell-phd`);
       }
-      if (usesGameplayRulesFrom("20261026-r56")) {
+      if (!usesGameplayRulesFrom("20261028-r59") && usesGameplayRulesFrom("20261026-r56")) {
         const { research, social, favor } = state.player;
         if (state.selectedRoleId === "genius") check(research < favor && research < social, "unlock:genius-reversed");
         if (state.selectedRoleId === "teacher-child") check(favor < research && favor < social, "unlock:teacher-child-reversed");
@@ -132,7 +134,7 @@ export function evaluateStateAchievements(state: GameState, run: AchievementRunP
         if (state.selectedRoleId === "rich") check((run.counters["shop-largest-purchase"] ?? 0) <= 10, "unlock:rich-reversed");
         if (state.selectedRoleId === "chosen") check(Number((Math.max(research, social, favor) - Math.min(research, social, favor)).toFixed(10)) >= 6,
           "unlock:chosen-reversed");
-      } else if (state.ending === "phd") {
+      } else if (!usesGameplayRulesFrom("20261026-r56") && state.ending === "phd") {
         // Recorded commands retain their original achievement evidence and checksums.
         check(peak("research") < 6, "unlock:genius-reversed");
         check(peak("favor") < 6, "unlock:teacher-child-reversed");

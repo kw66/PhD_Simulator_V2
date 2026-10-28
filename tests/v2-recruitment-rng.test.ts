@@ -89,7 +89,8 @@ describe("recruitment random stream isolation", () => {
     expect(additions(changed.eventQueue[0]!)).toEqual(original);
     const selected = choose(changed, "-idea-");
     const accepted = choose(selected);
-    expect(accepted.fellowProgressState[0]).toMatchObject(original[0]!);
+    // Candidate identity stays fixed; the joining bonus uses the new social tier.
+    expect(accepted.fellowProgressState[0]).toMatchObject({ ...original[0]!, affinity: original[0]!.affinity + 1 });
   });
 
   it("keeps research draws independent of name collision retries", () => {

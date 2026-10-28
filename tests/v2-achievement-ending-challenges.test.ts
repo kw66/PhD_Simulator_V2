@@ -7,6 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 import { createGrantedPublishedPaper } from "../src/core/v2-publication-rules";
 import { recordLabFinance } from "../src/core/v2-lab-finance-ledger";
 import { replayStateDigest } from "../src/core/v2-run-replay";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import type { GameState, Paper, ResolvedEventRecord, ResolvedEventStage } from "../src/core/v2-types";
 
 const noConference = "global:no-first-conference-graduation";
@@ -30,13 +31,15 @@ function application(index: number, result = "confirm", applied = true): Resolve
 describe("settlement-only final challenges", () => {
   it.each(["master", "phd"] as const)("allows %s graduation without first-author conferences, including zero publications", degree => {
     const state = { ...ending(), degree, ending: degree };
-    expect(evaluateEndingResearchAchievements(state)).toContain(noConference);
+    expect(evaluateEndingResearchAchievements(state)).not.toContain(noConference);
+    expect(withGameplayRuleset("20261027-r58", () => evaluateEndingResearchAchievements(state))).toContain(noConference);
     const first = paper(1, { journalTarget: "pami" });
     const metadataOnly = paper(2);
     metadataOnly.publication = { ...metadataOnly.publication!, journalTarget: "nature" };
     state.papers = [first, paper(3, { status: "reviewing" })];
     state.externalPublications = [first, metadataOnly, paper(4, { nonFirstAuthor: true }), paper(5, { leadAuthorId: "fellow-1" })];
-    expect(evaluateEndingResearchAchievements(state)).toContain(noConference);
+    expect(evaluateEndingResearchAchievements(state)).not.toContain(noConference);
+    expect(withGameplayRuleset("20261027-r58", () => evaluateEndingResearchAchievements(state))).toContain(noConference);
     state.externalPublications.push(paper(6));
     expect(evaluateEndingResearchAchievements(state)).not.toContain(noConference);
   });
@@ -83,12 +86,13 @@ describe("settlement-only final challenges", () => {
     state.eventHistory = Array.from({ length: 6 }, (_, index) => application(index));
     const digest = replayStateDigest(state);
     const settled = settleRunAchievements(createDefaultAccountProfile(), state, "2026-10-17T01:00:00Z");
-    expect(settled.state.runAchievementIds).toEqual(expect.arrayContaining([noConference, spending, rejected]));
-    expect(Object.values(settled.account.roleProgress).every(role => role.exp === 15)).toBe(true);
+    expect(settled.state.runAchievementIds).toEqual(expect.arrayContaining([spending, rejected]));
+    expect(settled.state.runAchievementIds).not.toContain(noConference);
+    expect(Object.values(settled.account.roleProgress).every(role => role.exp === 10)).toBe(true);
     expect(replayStateDigest(state)).toBe(digest);
     expect(state.achievementProgress?.satisfied ?? []).not.toEqual(expect.arrayContaining([noConference, spending, rejected]));
     const again = settleRunAchievements(settled.account, state, "2026-10-18T01:00:00Z");
-    expect(Object.values(again.account.roleProgress).every(role => role.exp === 15)).toBe(true);
+    expect(Object.values(again.account.roleProgress).every(role => role.exp === 10)).toBe(true);
     const special = settleRunAchievements(createDefaultAccountProfile(), { ...state, selectedRoleId: "research-captain" });
     expect(special.state.runAchievementIds).not.toEqual(expect.arrayContaining([noConference, spending, rejected]));
   });

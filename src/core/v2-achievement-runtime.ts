@@ -5,6 +5,8 @@ import { observeStateAchievements } from "./v2-achievement-state";
 import { evaluateEndingResearchAchievements, observeResearchAchievements } from "./v2-achievement-research";
 import { evaluateEndingChallenges } from "./v2-achievement-ending-challenges";
 import { observeEventAchievements } from "./v2-achievement-events";
+import { observeRoleUnlockAchievements } from "./v2-achievement-role-unlocks";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { COLLECTION_REQUIREMENTS, getCollectorAchievementKey, observeAchievementCollections } from "./v2-achievement-collections";
 import { awardRoleExperience } from "./v2-role-experience";
 import { CAPTAIN_UNLOCK_ACHIEVEMENT_ID, REWINDER_UNLOCK_ACHIEVEMENT_ID, reconcileAccountRoleUnlocks } from "./v2-account-role-unlocks";
@@ -18,6 +20,7 @@ export function observeAchievements(previous: GameState, next: GameState, action
   observeStateAchievements(before, next, run, actionId, payload);
   observeResearchAchievements(before, next, run);
   observeEventAchievements(before, next, run);
+  observeRoleUnlockAchievements(before, next, run, actionId, payload);
   observeAchievementCollections(before, next, run, actionId, payload);
   return { ...next, achievementProgress: run };
 }
@@ -42,8 +45,9 @@ export function settleAcademicYearAchievements(account: AccountProfile, state: G
 
 function requiresEnding(id: string): boolean {
   return /:(?:ending-|zero-talent-master$|curse-hell-phd$)/u.test(id)
-    || ["normal:truly-ordinary", "global:slow-research", "global:academic-star", "global:no-first-conference-graduation",
-      "unlock:genius-reversed", "unlock:teacher-child-reversed", "unlock:social-reversed", "unlock:rich-reversed", "unlock:chosen-reversed"].includes(id);
+    || ["normal:truly-ordinary", "global:slow-research", "global:academic-star", "global:no-first-conference-graduation"].includes(id)
+    || (!usesGameplayRulesFrom("20261028-r59")
+      && ["unlock:genius-reversed", "unlock:teacher-child-reversed", "unlock:social-reversed", "unlock:rich-reversed", "unlock:chosen-reversed"].includes(id));
 }
 
 function settleAchievementEvidence(account: AccountProfile, state: GameState, timestamp: string, ending: boolean): AchievementSettlement {

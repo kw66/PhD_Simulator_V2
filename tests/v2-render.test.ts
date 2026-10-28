@@ -626,7 +626,7 @@ describe("v2 explicit render animation markers", () => {
 });
 
 describe("v2 render lobby shell", () => {
-  it("renders the new meta lobby with only normal owned by default", () => {
+  it("renders the meta lobby with normal and curse roles owned by default", () => {
     const html = renderApp(createInitialState(), createDefaultAccountProfile());
 
     expect(html).toContain('data-phase="setup"');
@@ -634,7 +634,7 @@ describe("v2 render lobby shell", () => {
     expect(html).toContain('class="lobby-stage"');
     expect(html).toContain('class="lobby-stage-scale"');
     expect(html).toContain("角色图鉴");
-    expect(html).toContain("已收录 1 / 18");
+    expect(html).toContain("已收录 5 / 18");
     expect(html).toContain("大多数");
     expect(html).toContain("院士转世");
     expect(html).toContain("怠惰·大多数");
@@ -981,7 +981,7 @@ describe("v2 render lobby shell", () => {
       expect(html).toContain(`data-achievement-id="${achievement.id}"`);
     }
     expect(html).toContain('class="lobby-start-lock" role="group" tabindex="0"');
-    expect(html).toContain('data-tooltip="解锁目标：院士转世 · 毕业时，科研能力低于导师好感和社交能力"');
+    expect(html).toContain('data-tooltip="解锁目标：院士转世 · 连续6个月订购付费AI"');
     expect(html).toContain('<button class="lobby-start-button is-disabled" type="button" disabled');
     expect(html).not.toContain("成就系统待接入：完成院士路线的逆位挑战后解锁");
     expect(html).not.toContain("查看解锁条件");
@@ -1441,11 +1441,12 @@ describe("v2 render lobby shell", () => {
       "normal:all-rounder",
       "normal:chair-upgrade",
     ]);
-    expect(normalAchievements.slice(0, 6).every((achievement) => achievement.rewardText?.startsWith("经验+5，解锁"))).toBe(true);
+    expect(normalAchievements.slice(0, 5).every((achievement) => achievement.rewardText?.startsWith("经验+5，解锁"))).toBe(true);
+    expect(normalAchievements[5]?.rewardText).toBe("解锁怠惰·大多数角色");
     expect(normalAchievements.slice(6).filter(achievement => !achievement.unlocksRoleId && !achievement.unlocksRoleIds?.length).every((achievement) =>
       ["normal:ending-master", "normal:ending-phd"].includes(achievement.id) ? achievement.rewardText === "经验倍率+1"
         : ["normal:self-reliance", "normal:truly-ordinary"].includes(achievement.id)
-          ? ["经验+5", "经验倍率+1"].includes(achievement.rewardText ?? "")
+          ? ["经验+5", "全角色经验倍率+1"].includes(achievement.rewardText ?? "")
           : achievement.rewardText === (achievement.id.endsWith("-collector") && achievement.id !== "global:help-collector" ? "经验倍率+0.2" : "经验+5"))).toBe(true);
     expect(reversedAchievements.length).toBeGreaterThan(9);
     expect(reversedAchievements[0]).toMatchObject({

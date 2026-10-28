@@ -2,6 +2,7 @@ import type { FinalizedRunRecord } from "../core/v2-account-storage";
 import { isAchievementAvailableToRole } from "../core/v2-achievement-scope";
 import { getRoleOptions } from "../core/v2-progression";
 import { getAllAchievementDefinitions } from "../core/v2-role-lobby-meta";
+import { isRetiredAchievementId } from "../core/v2-retired-achievements";
 import type { RoleId } from "../core/v2-types";
 import { DATA_EPOCH, isCurrentDataEpoch } from "../core/v2-data-epoch";
 import { isRemoteWriteEnabled } from "./v2-remote-access";
@@ -55,14 +56,16 @@ function parseSnapshot(value: unknown): Snapshot {
   });
   return { version: 2, epoch: DATA_EPOCH, achievements };
 }
-function validQueuedRun(value: unknown): value is QueuedRun {
+function normalizeQueuedRun(value: unknown): QueuedRun | null {
   const row = value as QueuedRun;
-  return !!row && typeof row.p_player_id === "string" && UUID.test(row.p_player_id)
+  if (!(!!row && typeof row.p_player_id === "string" && UUID.test(row.p_player_id)
     && typeof row.p_run_id === "string" && UUID.test(row.p_run_id) && ROLES.has(row.p_role_id)
-    && Array.isArray(row.p_achievement_ids) && row.p_achievement_ids.every(id => {
+    && Array.isArray(row.p_achievement_ids) && row.p_achievement_ids.every(id => typeof id === "string"))) return null;
+  const ids = [...new Set(row.p_achievement_ids)].filter(id => !isRetiredAchievementId(id));
+  return ids.every(id => {
       const definition = DEFINITIONS.get(id);
       return !!definition && isAchievementAvailableToRole(definition.scope, row.p_role_id);
-    });
+    }) ? { ...row, p_achievement_ids: ids } : null;
 }
 
 /** One account outbox and one batch snapshot; rendering never performs network IO. */
@@ -102,7 +105,8 @@ export function createAchievementStats(options: AchievementStatsOptions = {}) {
         }
         const pending = new Map(queue.map(row => [row.p_run_id, row]));
         if (Array.isArray(saved.pending)) for (const row of saved.pending) {
-          if (validQueuedRun(row) && !pending.has(row.p_run_id)) pending.set(row.p_run_id, row);
+          const normalized = normalizeQueuedRun(row);
+          if (normalized && !pending.has(normalized.p_run_id)) pending.set(normalized.p_run_id, normalized);
         }
         queue = [...pending.values()].filter(row => !acknowledgedRuns.has(row.p_run_id));
         if (saved.snapshot && Number.isFinite(saved.fetchedAt) && saved.fetchedAt <= now()

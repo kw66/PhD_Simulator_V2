@@ -1,4 +1,6 @@
 import { pickStableRandomName } from "./v2-random-name";
+import { getKnownPersonNames, getUniquePersonName } from "./v2-person-names";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getRoleDefinition } from "./v2-progression";
 import type { ConferenceEncounterState, ConferenceMentorContact, ConferenceScholarContact, Gender, LoverTypeId, RoleId } from "./v2-types";
 
@@ -8,6 +10,7 @@ export interface ContactSeed {
   levelRoll?: number;
   selectedRoleId?: RoleId;
   playerGender?: Gender;
+  usedNames?: readonly string[];
 }
 
 const defaultSeed: ContactSeed = { id: "conference-contact" };
@@ -28,7 +31,10 @@ function contactId(kind: string, seed: ContactSeed, previousId = ""): string {
   return id === previousId ? `${id}:next` : id;
 }
 
-function contactName(id: string, previousName?: string): string {
+function contactName(id: string, previousName?: string, usedNames: readonly string[] = []): string {
+  if (usesGameplayRulesFrom("20261028-r59")) {
+    return getUniquePersonName(pickStableRandomName(id), [...usedNames, ...(previousName ? [previousName] : [])], id);
+  }
   let attempt = 0;
   let name = pickStableRandomName(id);
   while (name === previousName) {
@@ -40,29 +46,31 @@ function contactName(id: string, previousName?: string): string {
 
 export function createConferenceMentorContact(seed: ContactSeed = defaultSeed): ConferenceMentorContact {
   const id = contactId("mentor", seed);
-  return { id, name: contactName(id), level: 2, cooperationCount: 0 };
+  return { id, name: contactName(id, undefined, seed.usedNames), level: 2, cooperationCount: 0 };
 }
 
 export function createConferenceScholarContact(type: LoverTypeId, seed: ContactSeed = defaultSeed): ConferenceScholarContact {
   const id = contactId(`scholar:${type}`, seed);
   const playerGender = seed.playerGender ?? getRoleDefinition(seed.selectedRoleId ?? "normal").gender;
-  return { id, name: contactName(id), gender: playerGender === "female" ? "male" : "female", encounterCount: 0 };
+  return { id, name: contactName(id, undefined, seed.usedNames), gender: playerGender === "female" ? "male" : "female", encounterCount: 0 };
 }
 
 export function getConferenceMentorContact(encounter: ConferenceEncounterState, seed: ContactSeed = defaultSeed): ConferenceMentorContact {
-  return encounter.bigBull ?? createConferenceMentorContact(seed);
+  return encounter.bigBull ?? createConferenceMentorContact({ ...seed,
+    usedNames: [...(seed.usedNames ?? []), ...getKnownPersonNames({ conferenceEncounterState: encounter })] });
 }
 
 export function getConferenceScholarContact(encounter: ConferenceEncounterState, type: LoverTypeId, seed: ContactSeed = defaultSeed): ConferenceScholarContact {
-  return encounter.scholars?.[type] ?? createConferenceScholarContact(type, seed);
+  return encounter.scholars?.[type] ?? createConferenceScholarContact(type, { ...seed,
+    usedNames: [...(seed.usedNames ?? []), ...getKnownPersonNames({ conferenceEncounterState: encounter })] });
 }
 
 export function replaceConferenceMentorContact(previous: ConferenceMentorContact, seed: ContactSeed = defaultSeed): ConferenceMentorContact {
   const id = contactId("mentor", seed, previous.id);
-  return { ...createConferenceMentorContact(seed), id, name: contactName(id, previous.name) };
+  return { ...createConferenceMentorContact(seed), id, name: contactName(id, previous.name, seed.usedNames) };
 }
 
 export function replaceConferenceScholarContact(previous: ConferenceScholarContact, type: LoverTypeId, seed: ContactSeed = defaultSeed): ConferenceScholarContact {
   const id = contactId(`scholar:${type}`, seed, previous.id);
-  return { ...createConferenceScholarContact(type, seed), id, name: contactName(id, previous.name), gender: previous.gender };
+  return { ...createConferenceScholarContact(type, seed), id, name: contactName(id, previous.name, seed.usedNames), gender: previous.gender };
 }

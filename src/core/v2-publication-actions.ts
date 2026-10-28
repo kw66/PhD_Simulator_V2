@@ -7,6 +7,8 @@ import {
   getPaperPromotionMultiplierBonus,
 } from "./v2-publication-rules";
 import type { GameState, PaperPromotionId } from "./v2-types";
+import { getApplicablePaperPromotions } from "./v2-paper-promotion-eligibility";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 const PROMOTION_LABELS: Record<PaperPromotionId, string> = {
   arxiv: "挂 arXiv",
@@ -22,6 +24,10 @@ function getPromotionFailure(state: GameState, paperId: string, promotionId: Pap
   if (paper.status !== "published" || !paper.publication) return "只有已发表论文可以推广";
   if (paper.nonFirstAuthor === true) return "非一作论文不能由你进行宣传";
   if (paper.publication.promotions?.[promotionId] === true) return "这项推广已经完成";
+  if (usesGameplayRulesFrom("20261028-r59") && !getApplicablePaperPromotions(paper).includes(promotionId)) {
+    return promotionId === "arxiv" ? "论文已经公开，挂 arXiv 不再带来提前曝光"
+      : promotionId === "quantum" ? "量子位宣传仅适用于期刊论文" : "这项推广不适用于该论文";
+  }
   if (promotionId === "quantum" && !paper.journalTarget && !paper.publication.journalTarget) return "量子位宣传仅适用于期刊论文";
   if (
     promotionId === "arxiv"

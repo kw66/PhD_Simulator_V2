@@ -74,7 +74,7 @@ export function getRoleLobbyDefinition(roleId: RoleId): RoleLobbyDefinition {
 }
 
 export function createDefaultRoleMetaProgress(roleId: RoleId): RoleMetaProgress {
-  const unlocked = roleId === "normal";
+  const unlocked = roleId === "normal" || isCursedRole(roleId);
 
   return {
     level: 0,

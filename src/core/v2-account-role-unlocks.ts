@@ -1,3 +1,4 @@
+import { CURSED_ROLE_IDS } from "./v2-curse-system";
 import type { AccountProfile, RoleId } from "./v2-types";
 import { ACHIEVEMENT_CATALOG } from "./v2-achievement-catalog";
 import { getAchievementUnlockRoleIds, isAchievementCompleted } from "./v2-achievement-scope";
@@ -47,6 +48,11 @@ export function reconcileAccountRoleUnlocks(
   timestamp = new Date().toISOString(),
   completingRoleId: RoleId = "normal",
 ): AccountProfile {
+  const lockedCurses = CURSED_ROLE_IDS.filter(roleId => !account.roleProgress[roleId].unlocked);
+  if (lockedCurses.length) {
+    account = { ...account, roleProgress: { ...account.roleProgress } };
+    for (const roleId of lockedCurses) account.roleProgress[roleId] = { ...account.roleProgress[roleId], unlocked: true };
+  }
   // Reconcile permanent unlock rewards too, including achievements earned before a reward was added.
   // Experience and multiplier rewards remain exclusively in the one-time ending transaction.
   for (const definition of ACHIEVEMENT_CATALOG) {

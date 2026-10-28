@@ -9,6 +9,17 @@ import { DATA_EPOCH_STARTED_AT } from "../src/core/v2-data-epoch";
 import { saveRoleTalentAllocation } from "../src/core/v2-role-talent-storage";
 import { captureReplayRecording, verifyReplayRecording } from "../src/core/v2-local-replay";
 import type { RoleId } from "../src/core/v2-types";
+import { executeReplayCommand } from "../src/core/v2-run-replay";
+import { createStartedGameState } from "../src/core/v2-engine-state-factory";
+
+it("retains old help achievements in old replays but not new help commands on resumed runs", () => {
+  const state = createStartedGameState("normal");
+  const legacy = executeReplayCommand(state, { kind: "help", id: "a", requiredIds: ["a"] }, "20261027-r58");
+  expect(legacy.achievementProgress?.satisfied).toContain("global:help-collector");
+  const current = executeReplayCommand(state, { kind: "help", id: "a", requiredIds: ["a"], ruleset: "20261028-r59" }, "20261027-r58");
+  expect(current.achievementProgress?.sets["help-pages"]).toEqual(["a"]);
+  expect(current.achievementProgress?.satisfied).not.toContain("global:help-collector");
+});
 
 function storage() {
   const values = new Map<string, string>();
@@ -154,7 +165,7 @@ describe("monthly browser operation replay", () => {
     restored = createStore({ storage: local, saves: createRunSaveRepository({ storage: local, adapter: disk }) });
     await restored.ready(); restored.dispatch("start-game", { roleId: "normal" });
     expect(restored.isCurrentRunDisqualified()).toBe(false);
-    expect(restored.getState().achievementProgress?.satisfied).toContain("global:help-collector");
+    expect(restored.getState().achievementProgress?.satisfied).not.toContain("global:help-collector");
     expect(saves.get("normal")!.replay!.checkpoints.at(-1)!.index).toBe(5);
     restored.dispatch("quit-game");
     expect(restored.getEndingExperienceAward()?.disqualifiedByIntegrity).toBeUndefined();

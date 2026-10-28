@@ -1,4 +1,6 @@
 import { gameRandom } from "./v2-game-random";
+import { getKnownPersonNames } from "./v2-person-names";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { randomOutcome } from "./v2-event-choice-random";
 import { createConferenceMentorContact, replaceConferenceMentorContact } from "./v2-conference-contacts";
 import { getJointTrainingCitationCapBonus } from "./v2-joint-training-system";
@@ -14,32 +16,34 @@ export interface JointTrainingContext {
   invitationCitations?: number;
   active?: boolean;
   contactAvailable?: boolean;
+  usedNames?: readonly string[];
 }
 
 export function buildJointTrainingContext(
-  state: Pick<GameState, "conferenceEncounterState" | "totalCitations">,
+  state: Pick<GameState, "conferenceEncounterState" | "totalCitations"> & Partial<GameState>,
   contact?: ConferenceMentorContact,
   getRoll: () => number = gameRandom,
 ): JointTrainingContext {
   const mentor = contact ?? state.conferenceEncounterState.bigBull
-    ?? createConferenceMentorContact({ id: "joint-training-invite", roll: getRoll() });
+    ?? createConferenceMentorContact({ id: "joint-training-invite", roll: getRoll(), usedNames: getKnownPersonNames(state) });
   return normalizeContext({
     rejectedBigBullCoopCount: state.conferenceEncounterState.rejectedBigBullCoopCount,
     pendingCitationCapBonus: getJointTrainingCitationCapBonus(state.totalCitations),
     invitationCitations: state.totalCitations,
     contact: { ...mentor },
     active: state.conferenceEncounterState.bigBullCooperation || !!state.conferenceEncounterState.jointTrainingReward,
+    ...(usesGameplayRulesFrom("20261028-r59") ? { usedNames: getKnownPersonNames(state) } : {}),
   });
 }
 
 function normalizeContext(context: JointTrainingContext): JointTrainingContext & { contact: ConferenceMentorContact; replacement: ConferenceMentorContact } {
-  const contact = context.contact ?? createConferenceMentorContact();
+  const contact = context.contact ?? createConferenceMentorContact({ id: "conference-contact", usedNames: context.usedNames });
   let replacementSeed = 2166136261;
   for (const character of `${contact.id}:replacement`) replacementSeed = Math.imul(replacementSeed ^ character.charCodeAt(0), 16777619);
   return {
     ...context,
     contact,
-    replacement: context.replacement ?? replaceConferenceMentorContact(contact, { id: `${contact.id}:replacement`, levelRoll: (replacementSeed >>> 0) / 4294967296 }),
+    replacement: context.replacement ?? replaceConferenceMentorContact(contact, { id: `${contact.id}:replacement`, levelRoll: (replacementSeed >>> 0) / 4294967296, usedNames: context.usedNames }),
   };
 }
 

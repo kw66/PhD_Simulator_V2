@@ -2,6 +2,8 @@ import { gameRandom } from "./v2-game-random";
 import { withEventChoiceRandom } from "./v2-event-replay";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getEffectiveSocial } from "./v2-effective-attributes";
+import { getKnownPersonNames, getUniquePersonName } from "./v2-person-names";
+import { getInitialRelationshipSocialBonus } from "./v2-relationship-initialization";
 import { addOrReplaceBuffs, removeBuffs } from "./v2-buffs";
 import { scheduleConferenceAttendance } from "./v2-conference-attendance";
 import { resolveScholarshipAwardChoice } from "./v2-academic-integrity";
@@ -234,7 +236,9 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
   }
   let fellowProgressState = state.fellowProgressState;
   let failedFellowAdditions = 0;
-  const usedFellowNames = fellowProgressState.map((profile) => getFellowName(profile));
+  const initialSocialBonus = getInitialRelationshipSocialBonus(state);
+  const usedFellowNames = usesGameplayRulesFrom("20261028-r59")
+    ? getKnownPersonNames(state) : fellowProgressState.map((profile) => getFellowName(profile));
   for (const [additionIndex, addition] of (effects.fellowAdditions ?? []).entries()) {
     const relationshipResult = tryAddRelationship(relationshipState, addition.type);
     relationshipState = relationshipResult.nextState;
@@ -246,7 +250,7 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
           gender: addition.gender,
           startTotalMonths: state.totalMonths,
           research: addition.research,
-          affinity: addition.affinity,
+          affinity: addition.affinity + initialSocialBonus,
           longTermMentoring: addition.longTermMentoring,
           academicYear: addition.academicYear,
           academicStartTotalMonths: addition.academicStartTotalMonths,
@@ -386,7 +390,11 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     state.selectedAdvisorName ?? "",
     state.playerName ?? "",
   ];
-  let loverState = mergedLoverState.name && !mergedLoverState.contactId
+  let loverState = usesGameplayRulesFrom("20261028-r59") && effects.activateLoverProgress && mergedLoverState.name
+    ? { ...mergedLoverState, name: getUniquePersonName(mergedLoverState.name,
+      getKnownPersonNames({ ...state, fellowProgressState, conferenceEncounterState }, ["lover", mergedLoverState.contactId ?? ""]),
+      `lover:${mergedLoverState.contactId ?? mergedLoverState.startTotalMonths}`) }
+    : mergedLoverState.name && !mergedLoverState.contactId
     ? { ...mergedLoverState, name: getUniqueFellowName(mergedLoverState.name, loverUsedNames, `lover:${mergedLoverState.type}:${mergedLoverState.startTotalMonths}:${mergedLoverState.gender}`) }
     : mergedLoverState;
   let loverProgressRollIndex = 0;
@@ -396,6 +404,9 @@ function applyDirectCoreEffects(state: GameState, choice: EventChoice, buffSourc
     ...(effects.activateLoverProgress ? createLoverProgressState(effects.activateLoverProgress, loverProgressRandom, state.year) : state.loverProgressState),
     ...(effects.loverProgressStateUpdates ?? {}),
   };
+  if (effects.activateLoverProgress && initialSocialBonus > 0) {
+    loverProgressState.intimacy = roundMoney(loverProgressState.intimacy + initialSocialBonus);
+  }
   if (effects.loverIntimacyDelta && loverState.active) {
     loverProgressState = {
       ...loverProgressState,

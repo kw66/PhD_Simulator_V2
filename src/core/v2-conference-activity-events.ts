@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { getKnownPersonNames } from "./v2-person-names";
 import { randomOutcome } from "./v2-event-choice-random";
 import { createLoverState } from "./v2-lover-system";
 import { getConferenceMentorContact, getConferenceScholarContact } from "./v2-conference-contacts";
@@ -105,13 +106,19 @@ export function createConferenceActivityDecisionEvent(
   const rolls = frozenPreview?.rolls ?? Array.from({ length: 32 }, () => getRoll());
   let rollIndex = 0;
   const seed = { id: context.id, roll: rolls[10] ?? 0.5, levelRoll: rolls[9] ?? 0.5,
-    selectedRoleId: state.selectedRoleId, playerGender: state.playerGender };
+    selectedRoleId: state.selectedRoleId, playerGender: state.playerGender,
+    usedNames: getKnownPersonNames(state.playerAttributeState ?? state) };
   const encounter = state.conferenceEncounterState;
+  const bigBull = encounter.bigBull ?? frozenPreview?.contacts?.bigBull ?? getConferenceMentorContact(encounter, seed);
+  const beautiful = encounter.scholars?.beautiful ?? frozenPreview?.contacts?.scholars?.beautiful
+    ?? getConferenceScholarContact(encounter, "beautiful", { ...seed, usedNames: [...seed.usedNames, bigBull.name] });
+  const smart = encounter.scholars?.smart ?? frozenPreview?.contacts?.scholars?.smart
+    ?? getConferenceScholarContact(encounter, "smart", { ...seed, usedNames: [...seed.usedNames, bigBull.name, beautiful.name] });
   const contacts = {
-    bigBull: encounter.bigBull ?? frozenPreview?.contacts?.bigBull ?? getConferenceMentorContact(encounter, seed),
+    bigBull,
     scholars: {
-      beautiful: encounter.scholars?.beautiful ?? frozenPreview?.contacts?.scholars?.beautiful ?? getConferenceScholarContact(encounter, "beautiful", seed),
-      smart: encounter.scholars?.smart ?? frozenPreview?.contacts?.scholars?.smart ?? getConferenceScholarContact(encounter, "smart", seed),
+      beautiful,
+      smart,
     },
   };
   const preview: ConferenceActivityPreview = { context, attendanceSummary, rolls, contacts };

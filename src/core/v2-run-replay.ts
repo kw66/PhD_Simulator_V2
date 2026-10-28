@@ -3,11 +3,11 @@ import { GAME_ACTION_IDS } from "./v2-action-ids";
 import { dispatchAction } from "./v2-engine";
 import { createAchievementRunProgress } from "./v2-achievement-runtime-types";
 import { collectRunStatistics } from "./v2-run-statistics";
-import { CURRENT_GAMEPLAY_RULESET, SUPPORTED_GAMEPLAY_RULESETS, withGameplayRuleset, type GameplayRuleset } from "./v2-rule-context";
+import { CURRENT_GAMEPLAY_RULESET, SUPPORTED_GAMEPLAY_RULESETS, usesGameplayRulesFrom, withGameplayRuleset, type GameplayRuleset } from "./v2-rule-context";
 import type { DispatchPayload, GameActionId, GameState } from "./v2-types";
 
 export type ReplayCommand = { kind: "action"; actionId: GameActionId; payload: DispatchPayload; ruleset?: GameplayRuleset }
-  | { kind: "help"; id: string; requiredIds: string[] };
+  | { kind: "help"; id: string; requiredIds: string[]; ruleset?: GameplayRuleset };
 /** Bump when deterministic gameplay rules change, independently of account epochs. */
 export const REPLAY_RULESET = CURRENT_GAMEPLAY_RULESET;
 const SUPPORTED_REPLAY_RULESETS = SUPPORTED_GAMEPLAY_RULESETS;
@@ -48,14 +48,15 @@ export function applyHelpRead(state: GameState, id: string, requiredIds: readonl
   if (pages.has(id)) return state;
   pages.add(id);
   run.sets["help-pages"] = [...pages];
-  if (requiredIds.length > 0 && requiredIds.every(key => pages.has(key)) && !run.satisfied.includes("global:help-collector")) {
+  if (!usesGameplayRulesFrom("20261028-r59") && requiredIds.length > 0 && requiredIds.every(key => pages.has(key)) && !run.satisfied.includes("global:help-collector")) {
     run.satisfied.push("global:help-collector");
   }
   return { ...state, achievementProgress: run };
 }
 
 export function executeReplayCommand(state: GameState, command: ReplayCommand, defaultRuleset: GameplayRuleset = REPLAY_RULESET): GameState {
-  if (command.kind === "help") return applyHelpRead(state, command.id, command.requiredIds);
+  if (command.kind === "help") return withGameplayRuleset(command.ruleset ?? defaultRuleset,
+    () => applyHelpRead(state, command.id, command.requiredIds));
   return withGameplayRuleset(command.ruleset ?? defaultRuleset, () => {
     const next = dispatchAction(state, command.actionId, command.payload);
     return command.actionId === "start-game" ? next : collectRunStatistics(state, next);
@@ -78,6 +79,7 @@ export function isRunReplay(value: unknown): value is RunReplay {
     && record.commands.length <= 200_000 && record.commands.every(command => command && (
       command.kind === "help" ? typeof command.id === "string" && Array.isArray(command.requiredIds)
         && command.requiredIds.every(id => typeof id === "string")
+        && (command.ruleset === undefined || SUPPORTED_REPLAY_RULESETS.includes(command.ruleset))
         : command.kind === "action" && GAME_ACTION_IDS.includes(command.actionId) && !!command.payload && typeof command.payload === "object"
           && (command.ruleset === undefined || SUPPORTED_REPLAY_RULESETS.includes(command.ruleset))))
     && record.commands[0]?.kind === "action" && record.commands[0].actionId === "start-game"

@@ -1,4 +1,6 @@
 import { gameRandom } from "./v2-game-random";
+import { getKnownPersonNames } from "./v2-person-names";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { randomOutcome } from "./v2-event-choice-random";
 import { createConferenceScholarContact, replaceConferenceScholarContact } from "./v2-conference-contacts";
 import { activateLover, getOppositeGender } from "./v2-lover-system";
@@ -25,6 +27,7 @@ export interface LoverDevelopmentContext {
   contactAvailable?: boolean;
   setAside?: boolean;
   profileRolls?: [number, number];
+  usedNames?: readonly string[];
 }
 
 export function buildLoverDevelopmentContext(input: {
@@ -40,7 +43,8 @@ export function buildLoverDevelopmentContext(input: {
   const encounter = input.state?.conferenceEncounterState ?? input.conferenceEncounterState;
   const profileRolls: [number, number] = [getRoll(), getRoll()];
   const contact = input.contact ?? encounter.scholars?.[input.type]
-    ?? createConferenceScholarContact(input.type, { id: "lover-development", roll: getRoll(), playerGender: input.playerGender });
+    ?? createConferenceScholarContact(input.type, { id: "lover-development", roll: getRoll(), playerGender: input.playerGender,
+      usedNames: input.state ? getKnownPersonNames(input.state) : getKnownPersonNames({ conferenceEncounterState: encounter as ConferenceEncounterState }) });
   return normalizeContext({
     type: input.type, totalMonths: input.totalMonths, playerGender: input.playerGender,
     loverGender: contact.gender,
@@ -52,6 +56,8 @@ export function buildLoverDevelopmentContext(input: {
     researchCap: input.state ? getResearchCap(input.state.researchCapacityState) : undefined,
     researchResistanceReduction: input.state ? getPlayerResistanceReduction(input.state, "research", 1) : 0,
     profileRolls,
+    ...(usesGameplayRulesFrom("20261028-r59") ? { usedNames: input.state ? getKnownPersonNames(input.state)
+      : getKnownPersonNames({ conferenceEncounterState: encounter as ConferenceEncounterState }) } : {}),
   });
 }
 
@@ -60,10 +66,11 @@ function canAccept(state: GameState): boolean {
 }
 
 function normalizeContext(context: LoverDevelopmentContext): LoverDevelopmentContext & { contact: ConferenceScholarContact; replacement: ConferenceScholarContact } {
-  const contact = context.contact ?? createConferenceScholarContact(context.type, { id: "conference-contact", playerGender: context.playerGender });
+  const contact = context.contact ?? createConferenceScholarContact(context.type, { id: "conference-contact", playerGender: context.playerGender, usedNames: context.usedNames });
   return {
     ...context, contact, loverGender: contact.gender, profileRolls: context.profileRolls ?? [0.5, 0.5],
-    replacement: context.replacement ?? replaceConferenceScholarContact(contact, context.type, { id: `${contact.id}:replacement`, playerGender: context.playerGender }),
+    replacement: context.replacement ?? replaceConferenceScholarContact(contact, context.type, { id: `${contact.id}:replacement`, playerGender: context.playerGender,
+      usedNames: [...(context.usedNames ?? []), ...Object.values(context.scholars ?? {}).flatMap(person => person ? [person.name] : [])] }),
   };
 }
 

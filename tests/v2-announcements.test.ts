@@ -18,8 +18,9 @@ describe("game announcements", () => {
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
     const current = textForDate("2026-10-24");
-    for (const text of ["毕业时", "科研低于社交与导师好感", "社交低于科研与导师好感", "相差至少6", "商店每笔实际扣除", "自动续费按每笔"])
-      expect(textForDate("2026-10-26")).toContain(text);
+    expect(textForDate("2026-10-26")).toContain("手机开始按钮铺满一行");
+    for (const text of ["连续6个月订购付费AI", "六次教师节", "停止合作", "月末持有至少50金币", "前两年半", "初始默契", "0／1／2／3", "基础社交收益由1提高至2", "适用的宣传", "默认开放"])
+      expect(textForDate("2026-10-28")).toContain(text);
     for (const text of ["逐一点开", "科研分", "调试入口仅本地", "坏结局"]) expect(textForDate("2026-10-25")).toContain(text);
     for (const text of ["三份教学录像", "0天赋点博士", "10天赋点博士", "10天赋点硕士", "其他角色及20点路线以后补录", "9、15和2", "本地录像", "按角色切换"]) expect(textForDate("2026-10-28")).toContain(text);
     for (const text of ["硕士C／B／A档调整为60／100／200", "博士调整为180／250／500"]) expect(textForDate("2026-10-27")).toContain(text);

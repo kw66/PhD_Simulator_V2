@@ -113,10 +113,11 @@ describe("state achievement evidence", () => {
     expect(run.satisfied).toContain("global:top-lab");
     replacement.shopState.ebikeOwned = true; replacement.eventSupport.hasDownJacket = true;
     observeStateAchievements(next, replacement, run);
-    expect(run.satisfied).not.toContain("global:travel-kit");
+    expect(run.satisfied).not.toContain("global:full-gear");
     replacement.eventSupport.hasParasol = true;
     observeStateAchievements(next, replacement, run);
-    expect(run.satisfied).toContain("global:travel-kit");
+    expect(run.satisfied).toContain("global:full-gear");
+    expect(run.satisfied).not.toContain("global:travel-kit");
   });
 
   it("requires breakup then a different lover type, not a breakup alone", () => {
@@ -139,8 +140,8 @@ describe("state achievement evidence", () => {
   });
 
   it.each([
-    ["internet", "internet", 1], ["stateOwned", "state", 3], ["civilService", "civil", 3], ["academic", "academic", 1],
-  ] as const)("raises the %s offer condition by one tier", (type, suffix, index) => {
+    ["internet", "internet", 1], ["stateOwned", "state", 1], ["civilService", "civil", 3], ["academic", "academic", 1],
+  ] as const)("uses the configured %s offer tier", (type, suffix, index) => {
     const next = state(); const low = CAREER_JOBS[type][index - 1]!;
     next.careerOffers[type] = { ...low, jobId: low.id, score: 999 };
     expect(observe(next).satisfied).not.toContain(`global:career-${suffix}`);
@@ -149,7 +150,7 @@ describe("state achievement evidence", () => {
     expect(observe(next).satisfied).toContain(`global:career-${suffix}`);
   });
 
-  it.each(["master", "phd"] as const)("uses final strict attribute comparisons at %s graduation", ending => {
+  it.each(["master", "phd"] as const)("preserves r58 strict attribute comparisons at %s graduation", ending => withGameplayRuleset("20261027-r58", () => {
     for (const [role, stat, other, third] of [
       ["genius", "research", "social", "favor"],
       ["teacher-child", "favor", "research", "social"],
@@ -166,9 +167,9 @@ describe("state achievement evidence", () => {
       next.phase = "playing"; next.ending = null;
       expect(evaluateStateAchievements(next, run)).not.toContain(`unlock:${role}-reversed`);
     }
-  });
+  }));
 
-  it.each(["master", "phd"] as const)("checks final spread and single shop spending at %s graduation", ending => {
+  it.each(["master", "phd"] as const)("preserves r58 spread and spending checks at %s graduation", ending => withGameplayRuleset("20261027-r58", () => {
     const next = state(); next.phase = "finished"; next.ending = ending; next.selectedRoleId = "chosen";
     const run = createAchievementRunProgress(); run.minima.san = 0; run.peaks["attribute-spread"] = 20;
     next.player.research = 7; next.player.social = 13; next.player.favor = 9;
@@ -184,14 +185,35 @@ describe("state achievement evidence", () => {
     }
     run.counters["shop-largest-purchase"] = 10.01;
     expect(evaluateStateAchievements(next, run)).not.toContain("unlock:rich-reversed");
-  });
+  }));
 
-  it("does not award inverse unlocks before graduation or for a bad ending", () => {
+  it("does not derive new inverse unlocks from ending statistics alone", () => {
     for (const role of ["genius", "teacher-child", "social", "rich", "chosen"] as const) {
       const next = state(); next.selectedRoleId = role; next.phase = "finished"; next.ending = "quit";
       next.player.research = 1; next.player.social = 8; next.player.favor = 9;
       expect(evaluateStateAchievements(next, createAchievementRunProgress()).filter(id => id.startsWith("unlock:"))).toEqual([]);
     }
+  });
+
+  it("keeps former cohort, professor, duplicate equipment and career thresholds in old replays", () => {
+    const next = state();
+    next.fellowProgressState = [fellow("one"), fellow("two"), fellow("three")]
+      .map(profile => ({ ...profile, type: "junior", gender: "female" }));
+    next.advisorProgressState.awards = [{ id: "general", awardedYear: 1, startYear: 1, endYear: 4 }];
+    next.shopState.ebikeOwned = true;
+    next.eventSupport.hasDownJacket = next.eventSupport.hasParasol = true;
+    const offer = CAREER_JOBS.stateOwned[1]!;
+    next.careerOffers.stateOwned = { ...offer, jobId: offer.id, score: 150 };
+    const current = observe(next).satisfied;
+    for (const id of ["global:expanded-cohort", "global:junior-rescue", "global:reverse-mentoring-i", "global:career-state"]) {
+      expect(current).toContain(id);
+    }
+    const old = withGameplayRuleset("20261027-r58", () => observe(next).satisfied);
+    for (const id of ["global:expanded-cohort", "global:junior-rescue", "global:reverse-mentoring-i", "global:career-state"]) {
+      expect(old).not.toContain(id);
+    }
+    expect(current).not.toContain("global:travel-kit");
+    expect(old).toContain("global:travel-kit");
   });
 
   it("measures attribute spread simultaneously instead of combining unrelated peaks", () => {

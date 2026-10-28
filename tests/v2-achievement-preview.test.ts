@@ -55,9 +55,9 @@ describe("achievement catalog and presentation", () => {
     for (const title of ["笨鸟先飞", "主动破冰", "初获赏识"]) {
       expect(byTitle(title).scope).toEqual({ roleIds: ["normal"] });
     }
-    expect(byTitle("自立自强")).toMatchObject({ description: "硕士期间科研、社交、导师好感均达6",
+    expect(byTitle("自立自强")).toMatchObject({ description: "硕士期间科研、社交、导师好感分别达到6",
       rewardText: "经验+5", scope: { roleIds: ["normal"] } });
-    expect(byTitle("真·大多数")).toMatchObject({ rewardText: "经验倍率+1，解锁全部诅咒角色", scope: { roleIds: ["normal"] } });
+    expect(byTitle("真·大多数")).toMatchObject({ rewardText: "全角色经验倍率+1", scope: { roleIds: ["normal"] }, rewardScope: { audiences: ["all"] } });
     expect(byTitle("突破极限Ⅰ").scope).toEqual({ audiences: ["upright"] });
     expect(byTitle("突破极限Ⅱ").scope).toEqual({ audiences: ["all"] });
     expect(byTitle("突破极限Ⅱ").description).toBe("科研|社交|好感任一项达30");
@@ -65,14 +65,14 @@ describe("achievement catalog and presentation", () => {
       ["绝地求生·嫉妒", "social-reversed"], ["绝地求生·玩世", "teacher-child-reversed"], ["绝地求生·空想", "chosen-reversed"]]) {
       expect(byTitle(title)).toMatchObject({ id: `${roleId}:zero-talent-master`, description: "使用0天赋点硕士毕业", rewardText: "经验倍率+1", scope: { roleIds: [roleId] } });
     }
-    expect(byTitle("医学奇迹").description).toBe("累计提升40点生命上限");
+    expect(byTitle("医学奇迹").description).toBe("累计提升40点SAN上限");
     expect(byTitle("医学奇迹").scope).toEqual({ audiences: ["upright", "reversed"] });
-    expect(byTitle("命悬一线").description).toBe("生命上限不超过6");
+    expect(byTitle("命悬一线").description).toBe("SAN上限不超过6");
     expect(byTitle("命悬一线").scope).toEqual({ audiences: ["upright", "reversed"] });
-    expect(byTitle("我有多动症Ⅰ").description).toBe("单月行动≥3次（含AI）");
-    expect(byTitle("我有多动症Ⅱ").description).toBe("单月行动≥4次（含AI）");
+    expect(byTitle("我有多动症Ⅰ").description).toBe("单月主动行动至少3次");
+    expect(byTitle("我有多动症Ⅱ").description).toBe("单月主动行动至少4次");
     expect(byTitle("打工狂人").description).toBe("累计打工15次");
-    expect(byTitle("六边形战士Ⅱ").description).toBe("科研|社交|好感|金币均达20");
+    expect(byTitle("六边形战士Ⅱ").description).toBe("一局内科研、社交、好感、金币分别达到20");
     expect(byTitle("顶级显卡Ⅰ").description).toBe("拥有A6000及以上的显卡");
     expect(byTitle("顶级显卡Ⅱ").description).toBe("拥有B300显卡");
     expect(ACHIEVEMENT_CATALOG.some(item => ["高级显卡", "二次行动"].includes(item.title))).toBe(false);
@@ -170,17 +170,17 @@ describe("achievement catalog and presentation", () => {
 
   it("shows five upright graduation challenges on source roles and target unlock mirrors", () => {
     const conditions = {
-      "genius-reversed": "毕业时，科研能力低于导师好感和社交能力",
-      "teacher-child-reversed": "毕业时，导师好感低于科研和社交能力",
-      "social-reversed": "毕业时，社交能力低于科研和导师好感",
-      "rich-reversed": "毕业时，商店单笔消费均不超过10金币",
-      "chosen-reversed": "毕业时，三项属性最高与最低相差≥6",
+      "genius-reversed": "连续6个月订购付费AI",
+      "teacher-child-reversed": "六年教师节均只发祝福",
+      "social-reversed": "主动与科研能力高于自己的同学停止合作",
+      "rich-reversed": "连续6个月月末持有至少50金币",
+      "chosen-reversed": "前两年半未主动推进论文，之后成功转博",
     } as const;
     for (const roleId of Object.keys(conditions) as (keyof typeof conditions)[]) {
       const mirror = getRoleLobbyAchievementDefinitions(roleId)[0];
       expect(mirror).toMatchObject({ id: `unlock:${roleId}`, unlocksRoleId: roleId,
         description: conditions[roleId], scope: { roleIds: [roleId.replace("-reversed", "")] } });
-      expect(mirror.rewardText).toMatch(/^经验倍率\+1，解锁.+角色$/);
+      expect(mirror.rewardText).toMatch(/^解锁.+角色$/);
       for (const role of getRoleOptions()) {
         expect(getRoleAchievementDefinitions(role.id).some(item => item.id === mirror.id))
           .toBe(isAchievementAvailableToRole(mirror.scope, role.id));
@@ -201,10 +201,10 @@ describe("achievement catalog and presentation", () => {
     }
     for (const [name, description] of [
       ["优秀硕士论文", "硕士论文盲审获3A"], ["优秀博士论文", "博士论文盲审获5A"],
-      ["横向之王", "完成10次横向项目"], ["纵向之王", "完成10次纵向项目"],
-      ["鞭策导师Ⅰ", "导师评上三级教授"], ["鞭策导师Ⅱ", "导师评上院士"],
+      ["横向之王", "参与完成10个横向项目"], ["纵向之王", "参与完成10个纵向项目"],
+      ["鞭策导师Ⅰ", "导师晋升教授"], ["鞭策导师Ⅱ", "导师评上院士"],
       ["最佳之作", "一作发表A类Best Paper"], ["自然之子", "一作发表NMI"], ["自然之巅", "一作发表Nature"],
-      ["万引大佬", "总引用达到10000"], ["高分论文Ⅰ", "论文非协作分达100"], ["高分论文Ⅱ", "论文非协作分达150"],
+      ["万引大佬", "总引用达到10000"], ["高分论文Ⅰ", "单篇一作论文自身分数达到100"], ["高分论文Ⅱ", "单篇一作论文自身分数达到150"],
     ]) expect(find(name)).toMatchObject({ description, rewardText: "经验+5", scope: { audiences:
       ["自然之巅", "未来院士", "诺奖之始", "万引大佬"].includes(name)
         ? ["all"] : ["upright", "reversed"] } });
@@ -215,28 +215,28 @@ describe("achievement catalog and presentation", () => {
     const find = (title: string) => ACHIEVEMENT_CATALOG.find(item => item.title === title)!;
     for (const [title, description] of [
       ["三A在手", "硕士期间一作发表≥3篇A类论文"],
-      ["协作共赢", "合作发表≥10篇论文"],
-      ["协作先行", "先发合作论文，再发一作"],
+      ["协作共赢", "以非一作身份发表至少10篇论文"],
+      ["协作先行", "先发表非一作论文，再发表首篇一作论文"],
       ["学会拒绝", "导师项目|审稿|毕设各拒绝1次"],
       ["我爱茶歇", "开会选择茶歇≥3次"],
       ["公费旅游", "开会选择旅游≥3次"],
       ["顺便展出", "在VALSE做Poster展示"],
-      ["Buff之神", "同一时刻拥有≥10种Buff"],
-      ["博闻强记", "阅读全部小提示"],
-      ["事件爆发", "某个月同时出现≥6个事件"],
+      ["Buff之神", "同时拥有至少10类Buff效果"],
+      ["事件爆发", "同时有至少6件待办事件"],
       ["失之交臂", "被举报导致错失国奖"],
-      ["命悬一线", "生命上限不超过6"],
+      ["命悬一线", "SAN上限不超过6"],
       ["群英荟萃", "单篇论文作者≥6人"],
-      ["全网开花", "单篇一作完成全部宣传"],
+      ["全网开花", "单篇一作论文完成全部适用宣传"],
       ["整装待发", "集齐小电驴|遮阳伞|羽绒服"],
-      ["AI协作", "同时订阅3路AI，含GPT/Claude"],
+      ["AI协作", "同时启用至少3家AI，包含GPT或Claude"],
       ["一夜暴富", "某个月收入达到100金币"],
       ["初入职场", "取得任意offer"],
       ["大厂上岸", "取得大厂算法岗及以上offer"],
-      ["央企有我", "取得央企总部业务主管及以上offer"],
+      ["国企有我", "取得省属国企研发岗及以上offer"],
       ["金榜题名", "取得省直二级主任科员及以上offer"],
       ["站上讲台", "取得211讲师及以上offer"],
     ]) expect(find(title)).toMatchObject({ description, rewardText: "经验+5", scope: { audiences: ["upright", "reversed"] } });
+    for (const title of ["博闻强记", "另辟蹊径", "均衡分布", "出行套装"]) expect(find(title)).toBeUndefined();
     expect(find("拨云见日")).toMatchObject({ description: "游戏内破除学术失语诅咒", rewardText: "经验倍率+1", scope: { roleIds: ["genius-reversed"] } });
     expect(find("登峰造极·大厂").description).toContain("首席科学家");
     expect(ACHIEVEMENT_CATALOG.filter(item => item.title.startsWith("登峰造极"))).toHaveLength(4);
@@ -286,7 +286,7 @@ describe("achievement catalog and presentation", () => {
     const original = getRoleAchievementDefinitions("normal").slice(0, 6);
     expect(original).toHaveLength(6);
     for (const item of original) {
-      expect(item.rewardText).toMatch(/^经验\+5，解锁.+角色$/);
+      expect(item.rewardText).toMatch(item.unlocksRoleId === "normal-reversed" ? /^解锁.+角色$/ : /^经验\+5，解锁.+角色$/);
       expect(renderAchievementCard(item, false)).toContain(item.rewardText!);
     }
     for (const item of ACHIEVEMENT_CATALOG) {
@@ -297,7 +297,8 @@ describe("achievement catalog and presentation", () => {
         expect(item.rewardScope).toEqual({ audiences: ["all"] });
         expect(item.scope.roleIds).toHaveLength(1);
       }
-      else if (getAchievementUnlockRoleIds(item).length) expect(item.rewardText).toMatch(/^(经验\+5|经验倍率\+1)，解锁.+角色$/);
+      else if (getAchievementUnlockRoleIds(item).length) expect(item.rewardText).toMatch(/^解锁.+角色$/);
+      else if (item.id === "normal:truly-ordinary") expect(item.rewardText).toBe("全角色经验倍率+1");
       else if (getCollectorAchievementKey(item.id)) expect(item.rewardText).toBe("经验倍率+0.2");
       else expect(["经验+5", "经验倍率+1"]).toContain(item.rewardText);
       expect(renderAchievementCard(item, false)).toContain(`class="lobby-profile-achievement-reward">${item.rewardText}</p>`);

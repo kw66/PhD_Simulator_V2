@@ -53,7 +53,7 @@ describe("decimal attributes across module boundaries", () => {
     const state = stateWithDecimals();
     const next = applyChoiceEffectsToState(state, { id: "recruit", label: "recruit", outcome: "",
       effects: { fellowAdditions: [{ type: "peer", name: "陈青", gender: "male", research, affinity: 1.25 }] } }).nextState;
-    expect(next.fellowProgressState[0]).toMatchObject({ research: 6.8, affinity: 1.25 });
+    expect(next.fellowProgressState[0]).toMatchObject({ research: 6.8, affinity: 3.25 });
   });
 
   it("retains fractional cooperation progress while keeping integer paper output", () => {
@@ -136,9 +136,10 @@ describe("decimal attributes across module boundaries", () => {
   it("resolves conference raw attributes once and respects research above the base cap", () => {
     const state = stateWithDecimals();
     const tea = createBaseConferenceActivityOptions(conference, conferenceState(state)).find((option) => option.id === "tea-break")!;
-    expect(tea.effects.social).toBe(0.6);
-    expect(tea.outcome).toContain("社交 +0.6");
-    expect(applyChoiceEffectsToState(state, { ...tea }).nextState.player.social).toBe(13.1);
+    expect(tea.effects.social).toBe(1.2);
+    expect(tea.effects.rawSocial).toBe(2);
+    expect(tea.outcome).toContain("社交 +1.2");
+    expect(applyChoiceEffectsToState(state, { ...tea }).nextState.player.social).toBe(13.7);
     state.player.research = 20.25;
     state.researchCapacityState.otherCapBonus = 2;
     const smart = createAdvancedConferenceActivityOptions(conferenceState(state), () => 0.9).find((option) => option.id === "opposite-scholar")!;

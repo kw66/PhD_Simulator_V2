@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getConferenceActivityTravelSanRecovery, resolveConferenceActivityAttributes } from "./v2-conference-activity-shared";
 import { canTriggerConferenceInternshipInvite, hasOngoingInternship } from "./v2-internship-system";
 import type {
@@ -12,6 +13,7 @@ export function createBaseConferenceActivityOptions(
   state: ConferenceActivityBuildState,
   getRoll: () => number = gameRandom,
 ): ConferenceActivityOptionDefinition[] {
+  const teaSocial = context.grade === "A" && usesGameplayRulesFrom("20261028-r59") ? 2 : 1;
   const options: ConferenceActivityOptionDefinition[] = [
     {
       id: "tour-local",
@@ -28,13 +30,13 @@ export function createBaseConferenceActivityOptions(
     {
       id: "tea-break",
       label: "茶歇交友",
-      outcome: "社交 +1。",
+      outcome: `社交 +${teaSocial}。`,
       resultDescription: [
         "你端着咖啡问旁边的人：“你们也做这个方向？”对方叹了口气，说刚被审稿人要求补一套实验。你顺势讲起自己的经历，几个人越聊越投入，☕咖啡凉了也没人注意。",
         "晚宴上再碰到，你已经敢招手叫对方过来坐。大家交换了联系方式，约好以后有问题可以互相问问。 🤝回到住处，你给新认识的人发了句“今天聊得很开心”，这次没有反复改上半天。",
       ].join("\n\n"),
       effects: {
-        social: 1,
+        social: teaSocial,
       },
     },
     {

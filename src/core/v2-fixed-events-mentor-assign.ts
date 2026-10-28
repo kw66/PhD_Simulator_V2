@@ -1,3 +1,6 @@
+import { getInitialRelationshipSocialBonus } from "./v2-relationship-initialization";
+import { getKnownPersonNames } from "./v2-person-names";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { gameRandom } from "./v2-game-random";
 import { getFellowOverflowEffects, getFellowOverflowOutcome } from "./v2-role-talent-relationships";
 import { createGeneratedFellowProfileAddition, getFellowName, getFellowRoleLabel } from "./v2-fellow-progression";
@@ -23,7 +26,8 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
     return roll;
   };
   const canAddJunior = canAddRelationship(state.relationshipState, "junior");
-  const generatedNames = state.fellowProgressState.map((profile) => getFellowName(profile));
+  const generatedNames = usesGameplayRulesFrom("20261028-r59") ? getKnownPersonNames(state)
+    : state.fellowProgressState.map((profile) => getFellowName(profile));
   const candidates = Array.from({ length: 4 }, (_, index) => {
     const addition = createGeneratedFellowProfileAddition(
       "junior",
@@ -80,7 +84,7 @@ export function createMentorAssignEvent(state: GameState, getNameRoll: () => num
     results: Object.fromEntries(candidates.map((candidate) => [candidate.choiceId, {
       title: candidate.label,
       description: canAddJunior
-        ? `你和${candidate.prose}约好在实验室见面，📍发去门牌号，又补了句“找不到就发消息”。🌱原来现在也轮到你给别人指路了。\n\n${candidate.prose}：科研能力 ${formatMoney(candidate.addition.research)}/20，默契度 ${formatMoney(candidate.addition.affinity)}/20。`
+        ? `你和${candidate.prose}约好在实验室见面，📍发去门牌号，又补了句“找不到就发消息”。🌱原来现在也轮到你给别人指路了。\n\n${candidate.prose}：科研能力 ${formatMoney(candidate.addition.research)}/20，默契度 ${formatMoney(Math.min(20, candidate.addition.affinity + getInitialRelationshipSocialBonus(state)))}/20。`
         : "你看完材料，还是没接下这次指导。📋眼下已有的合作还要顾，😓新生的安排只能请导师另找人选。",
     }])),
   });

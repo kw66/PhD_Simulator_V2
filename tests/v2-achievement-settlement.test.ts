@@ -6,6 +6,7 @@ import { observeAchievements, settleRunAchievements } from "../src/core/v2-achie
 import { COLLECTION_REQUIREMENTS } from "../src/core/v2-achievement-collections";
 import { createStore } from "../src/core/v2-store";
 import { ACCOUNT_STORAGE_KEY, loadAccountProfile, saveAccountProfile } from "../src/core/v2-account-storage";
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import type { GameState, RoleId } from "../src/core/v2-types";
 
 const date1 = "2026-10-16T06:00:00.000Z";
@@ -20,7 +21,7 @@ function storage() {
 }
 
 describe("achievement ending transaction", () => {
-  it.each(["master", "phd"] as const)("unlocks inverse roles from actual %s graduation evidence", degree => {
+  it.each(["master", "phd"] as const)("preserves inverse unlock settlement from r58 %s graduation evidence", degree => withGameplayRuleset("20261027-r58", () => {
     for (const [role, research, social, favor] of [
       ["genius", 7, 8, 9], ["teacher-child", 8, 9, 7],
       ["social", 8, 7, 9], ["chosen", 1, 7, 4], ["rich", 7, 7, 7],
@@ -31,9 +32,23 @@ describe("achievement ending transaction", () => {
       const result = settleRunAchievements(createDefaultAccountProfile(), finished, date1);
       const target = `${role}-reversed` as RoleId;
       expect(result.account.roleProgress[target].unlocked).toBe(true);
-      // Graduation and the inverse unlock each grant one multiplier.
-      expect(result.account.achievementExperienceMultipliers?.[role]).toBe(2);
-      expect(settleRunAchievements(result.account, finished, date2).account.achievementExperienceMultipliers?.[role]).toBe(2);
+      // Only graduation grants a multiplier; inverse unlocks carry no experience reward.
+      expect(result.account.achievementExperienceMultipliers?.[role]).toBe(1);
+      expect(settleRunAchievements(result.account, finished, date2).account.achievementExperienceMultipliers?.[role]).toBe(1);
+    }
+  }));
+
+  it.each(["master", "phd"] as const)("does not unlock inverse roles from legacy %s ending conditions in new games", degree => {
+    for (const [role, research, social, favor] of [
+      ["genius", 7, 8, 9], ["teacher-child", 8, 9, 7],
+      ["social", 8, 7, 9], ["chosen", 1, 7, 4], ["rich", 7, 7, 7],
+    ] as const) {
+      const before = createStartedGameState(role);
+      const finished = observeAchievements(before, { ...before, phase: "finished", ending: degree,
+        player: { ...before.player, research, social, favor } });
+      const result = settleRunAchievements(createDefaultAccountProfile(), finished, date1);
+      expect(result.account.roleProgress[`${role}-reversed` as RoleId].unlocked).toBe(false);
+      expect(result.account.achievementExperienceMultipliers?.[role]).toBe(1);
     }
   });
 
@@ -100,26 +115,28 @@ describe("achievement ending transaction", () => {
     },
   );
 
-  it("unlocks every curse role from truly ordinary without repeating its multiplier reward", () => {
+  it("opens curse roles by default and grants truly ordinary to all roles once", () => {
     const curses: RoleId[] = ["cursed-frail", "special-fading-genius", "special-finite-life", "cursed-debt"];
     const original = createDefaultAccountProfile();
     const wrong = settleRunAchievements(original, ending("rich", ["normal:truly-ordinary"]), date1);
-    expect(curses.every(id => !wrong.account.roleProgress[id].unlocked)).toBe(true);
+    expect(curses.every(id => wrong.account.roleProgress[id].unlocked)).toBe(true);
+    expect(wrong.account.achievementExperienceMultipliers).toEqual({});
     const first = settleRunAchievements(original, ending("normal", ["normal:truly-ordinary"]), date1);
     expect(curses.every(id => first.account.roleProgress[id].unlocked)).toBe(true);
-    expect(curses.every(id => !original.roleProgress[id].unlocked)).toBe(true);
-    expect(first.account.achievementExperienceMultipliers).toEqual({ normal: 1 });
+    expect(curses.every(id => original.roleProgress[id].unlocked)).toBe(true);
+    const allRoles = Object.fromEntries(Object.keys(original.roleProgress).map(id => [id, 1]));
+    expect(first.account.achievementExperienceMultipliers).toEqual(allRoles);
     const repeated = settleRunAchievements(first.account, ending("normal", ["normal:truly-ordinary"]), date2);
-    expect(repeated.account.achievementExperienceMultipliers).toEqual({ normal: 1 });
+    expect(repeated.account.achievementExperienceMultipliers).toEqual(allRoles);
     expect(repeated.state.runAchievementIds).toEqual([]);
-    // Simulate an account that completed the achievement before curse unlocks were added.
+    // Retained locked flags cannot override unconditional curse ownership.
     const old = structuredClone(first.account);
     for (const id of curses) old.roleProgress[id].unlocked = false;
     const memory = storage();
     saveAccountProfile(old, memory);
     const loaded = loadAccountProfile(memory).account;
     expect(curses.every(id => loaded.roleProgress[id].unlocked)).toBe(true);
-    expect(loaded.achievementExperienceMultipliers).toEqual({ normal: 1 });
+    expect(loaded.achievementExperienceMultipliers).toEqual(allRoles);
     expect(loaded.achievementUnlockedByRole?.["normal:truly-ordinary"]).toEqual({ normal: date1 });
   });
 
@@ -138,12 +155,39 @@ describe("achievement ending transaction", () => {
     expect(repeated.account.roleProgress).toEqual(second.account.roleProgress);
   });
 
+  it.each([
+    ["normal", "normal:chair-upgrade", "normal-reversed"],
+    ["genius", "unlock:genius-reversed", "genius-reversed"],
+    ["social", "unlock:social-reversed", "social-reversed"],
+    ["rich", "unlock:rich-reversed", "rich-reversed"],
+    ["teacher-child", "unlock:teacher-child-reversed", "teacher-child-reversed"],
+    ["chosen", "unlock:chosen-reversed", "chosen-reversed"],
+  ] as const)("unlocks %s inverse without awarding experience or multipliers", (role, id, inverse) => {
+    const result = settleRunAchievements(createDefaultAccountProfile(), ending(role, [id]), date1);
+    expect(result.account.roleProgress[inverse].unlocked).toBe(true);
+    expect(result.experienceForCurrentRole).toBe(0);
+    expect(result.account.achievementExperienceMultipliers).toEqual({});
+    expect(Object.values(result.account.roleProgress).every(progress => progress.exp === 0 && progress.level === 0)).toBe(true);
+  });
+
+  it("opens retained locked curse roles without requiring any achievement", () => {
+    const account = createDefaultAccountProfile();
+    const curses: RoleId[] = ["cursed-frail", "special-fading-genius", "special-finite-life", "cursed-debt"];
+    for (const id of curses) account.roleProgress[id].unlocked = false;
+    const memory = storage();
+    saveAccountProfile(account, memory);
+    const loaded = loadAccountProfile(memory).account;
+    expect(curses.every(id => loaded.roleProgress[id].unlocked)).toBe(true);
+    expect(loaded.achievementRewardedIds).toEqual([]);
+    expect(loaded.achievementUnlockedAt).toEqual({});
+  });
+
   it("limits scoped rewards and records to their eligible roles", () => {
     const wrong = settleRunAchievements(createDefaultAccountProfile(), ending("rich", ["normal:self-reliance", "unlock:genius-reversed"]));
     expect(wrong.account.achievementRewardedIds).toEqual([]);
     const right = settleRunAchievements(createDefaultAccountProfile(), ending("genius", ["unlock:genius-reversed"]));
     expect(right.account.roleProgress["genius-reversed"].unlocked).toBe(true);
-    expect(right.account.achievementExperienceMultipliers).toEqual({ genius: 1 });
+    expect(right.account.achievementExperienceMultipliers).toEqual({});
     expect(right.account.roleProgress.genius.exp).toBe(0);
   });
 
@@ -242,7 +286,7 @@ describe("achievement ending transaction", () => {
     expect(store.getLobbyState().talentAllocation).toEqual({});
   });
 
-  it("tracks help pages actually opened once and does not count them in debug runs", () => {
+  it("retains help-page evidence without awarding the retired help collector", () => {
     const store = createStore({ storage: null });
     store.dispatch("start-game", { roleId: "normal" });
     store.recordHelpPageRead("a", ["a", "b"]);
@@ -251,9 +295,9 @@ describe("achievement ending transaction", () => {
     store.recordHelpPageRead("b", ["a", "b"]);
     store.dispatch("quit-game");
     expect(store.getLobbyState().achievementRewardedIds).not.toContain("global:help-collector");
-    expect(store.getState().runAchievementIds).toContain("global:help-collector");
+    expect(store.getState().runAchievementIds).not.toContain("global:help-collector");
     store.dispatch("settle-and-return");
-    expect(store.getLobbyState().achievementRewardedIds).toContain("global:help-collector");
+    expect(store.getLobbyState().achievementRewardedIds).not.toContain("global:help-collector");
     store.markCurrentRunAsDebugged();
     store.recordHelpPageRead("a", ["a"]);
     expect(store.getState().achievementProgress?.sets["help-pages"] ?? []).toEqual([]);

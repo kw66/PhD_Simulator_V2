@@ -146,7 +146,7 @@ describe("departed candidates in pending events", () => {
     expect(choice.effects.san).toBe(cost);
     const accepted = choose(choose(decision, "-short-term-"));
     expect(accepted.player.san).toBe(july.player.san + cost);
-    expect(accepted.fellowProgressState[0]).toMatchObject({ ...candidate, startTotalMonths: 23 });
+    expect(accepted.fellowProgressState[0]).toMatchObject({ ...candidate, affinity: candidate.affinity + 1, startTotalMonths: 23 });
   });
 
   it.each([[10, 3, 0, "-short-term-"], [10, 6, 0, "-short-term-"], [11, 5, 0, "-deep-"], [14, 4, 3, "-idea-"]] as const)(
@@ -195,7 +195,7 @@ describe("departed candidates in pending events", () => {
     const atJune = { ...queued, ...getCalendarForTotalMonths(34, "phd"), totalMonths: 34 };
     expect(additions(getResolvableQueuedEvent(atJune, queued.eventQueue[0]!))[0]).toEqual(original);
     const accepted = choose(choose(choose(atJune), "-short-term-"));
-    expect(accepted.fellowProgressState[0]).toMatchObject({ ...original, startTotalMonths: 34 });
+    expect(accepted.fellowProgressState[0]).toMatchObject({ ...original, affinity: original.affinity + 1, startTotalMonths: 34 });
     expect(getFellowAcademicYear(accepted, accepted.fellowProgressState[0]!)).toBe(3);
     const atJuly = { ...queued, ...getCalendarForTotalMonths(35, "phd"), totalMonths: 35 };
     const blocked = choose(choose(choose(atJuly), "-short-term-"));

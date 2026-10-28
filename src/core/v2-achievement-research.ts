@@ -2,6 +2,8 @@ import { ADVISOR_REQUIREMENTS } from "./v2-content";
 import { getConferenceInfo } from "./v2-conference-catalog";
 import { getPaperScoreBreakdown } from "./v2-paper-collaboration";
 import { createAchievementRunProgress, type AchievementRunProgress } from "./v2-achievement-runtime-types";
+import { hasCompletedApplicablePaperPromotions } from "./v2-paper-promotion-eligibility";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { GameState, Paper } from "./v2-types";
 
 const SCORE_FIELDS = ["idea", "experiment", "writing"] as const;
@@ -28,6 +30,14 @@ function reviewing(paper: Paper | undefined): boolean {
 }
 
 function authorCount(state: GameState, paper: Paper): number {
+  if (usesGameplayRulesFrom("20261028-r59")) {
+    const identities = new Set(["player", "advisor"]);
+    for (const person of paper.collaborators ?? []) {
+      if (person.id && person.name.trim() && person.name !== "你") identities.add(person.id);
+    }
+    if (paper.nonFirstAuthor && paper.leadAuthorId) identities.add(paper.leadAuthorId);
+    return identities.size;
+  }
   // Player and supervisor are always authors. Only recorded contributors count;
   // decorative fallback names from the renderer are not gameplay evidence.
   const names = new Set([state.playerName?.trim() || "player", state.selectedAdvisorName?.trim() || "advisor"]);
@@ -126,7 +136,9 @@ export function evaluateResearchAchievements(state: GameState, run: AchievementR
   add("global:high-score-paper-i", ownPapers.some(paper => SCORE_FIELDS.reduce((sum, field) => sum + getPaperScoreBreakdown(paper, field).own, 0) >= 100));
   add("global:high-score-paper-ii", ownPapers.some(paper => SCORE_FIELDS.reduce((sum, field) => sum + getPaperScoreBreakdown(paper, field).own, 0) >= 150));
   add("global:nobel-beginning", papers.some(paper => SCORE_FIELDS.reduce((sum, field) => sum + paper[field], 0) >= 1000));
-  add("global:all-publicity", firstAuthors.some(paper => ["arxiv", "github", "xiaohongshu", "quantum"].every(key => paper.publication?.promotions?.[key as keyof NonNullable<NonNullable<Paper["publication"]>["promotions"]>])));
+  add("global:all-publicity", firstAuthors.some(paper => usesGameplayRulesFrom("20261028-r59")
+    ? hasCompletedApplicablePaperPromotions(paper)
+    : ["arxiv", "github", "xiaohongshu", "quantum"].every(key => paper.publication?.promotions?.[key as keyof NonNullable<NonNullable<Paper["publication"]>["promotions"]>])));
   add("global:author-six", papers.some(paper => authorCount(state, paper) >= 6));
   add("global:thousand-citations", state.totalCitations >= 1000);
   add("global:ten-thousand-citations", state.totalCitations >= 10000);
@@ -173,7 +185,7 @@ export function evaluateEndingResearchAchievements(state: GameState): string[] {
   const firstAuthors = allPapers(state).filter(paper => paper.status === "published" && isFirstAuthor(paper));
   const result: string[] = [];
   if (state.ending === "phd" && firstAuthors.length === 2) result.push("global:slow-research");
-  if (!firstAuthors.some(paper => !paper.journalTarget && !paper.publication?.journalTarget)) {
+  if (!usesGameplayRulesFrom("20261028-r59") && !firstAuthors.some(paper => !paper.journalTarget && !paper.publication?.journalTarget)) {
     result.push("global:no-first-conference-graduation");
   }
   return result;

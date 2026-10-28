@@ -307,7 +307,7 @@ describe("research achievement evidence", () => {
       published("best", { publication: { citations: 0, effectiveScore: 150, citationDebuffMultiplier: 1, acceptType: "Best Paper", promotions: { arxiv: true, github: true, xiaohongshu: true, quantum: false } } }),
     ]);
     expect(evaluateResearchAchievements(current, run)).toEqual(expect.arrayContaining(["global:nature-child", "global:nature-summit", "global:future-academician", "global:best-paper"]));
-    expect(evaluateResearchAchievements(current, run)).not.toContain("global:all-publicity");
+    expect(evaluateResearchAchievements(current, run)).toContain("global:all-publicity");
     current.papers[3]!.publication!.promotions!.quantum = true;
     expect(evaluateResearchAchievements(current, run)).toContain("global:all-publicity");
     current.papers[0]!.nonFirstAuthor = true;

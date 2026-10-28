@@ -1,4 +1,6 @@
 import { gameRandom } from "./v2-game-random";
+import { getUniquePersonName } from "./v2-person-names";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { Degree, FellowProfileAddition, FellowProgressProfile, FellowTaskType, FellowTypeId, Gender } from "./v2-types";
 import { pickRandomAdvisorName, pickStableRandomName } from "./v2-random-name";
 import { generatePaperTopic, type FixedPaperTopic } from "./v2-paper-topics";
@@ -71,6 +73,7 @@ export function getFellowsInCardOrder(profiles: readonly FellowProgressProfile[]
 }
 
 export function getUniqueFellowName(candidate: string, usedNames: readonly string[], seed: string): string {
+  if (usesGameplayRulesFrom("20261028-r59")) return getUniquePersonName(candidate, usedNames, seed);
   const occupied = new Set(usedNames.map((name) => name.trim()).filter(Boolean));
   const normalized = candidate.trim();
   if (!occupied.has(normalized)) return normalized;

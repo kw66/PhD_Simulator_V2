@@ -121,6 +121,23 @@ describe("role achievement records", () => {
     expect(reloaded.achievementTalentPoints).toEqual(converted.achievementTalentPoints);
   });
 
+  it("updates paid unlock multipliers and extends truly ordinary once on reload", () => {
+    const saved = { version: 2, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT, roles: {}, collectorRewardVersion: 1,
+      rewardedIds: ["unlock:genius-reversed", "normal:chair-upgrade", "normal:truly-ordinary"],
+      experienceMultipliers: { normal: 2.2, genius: 2, rich: 0.2 } };
+    const converted = loadRoleAchievementRecords(createDefaultAccountProfile(), memoryStorage(saved));
+    expect(converted.achievementExperienceMultipliers?.normal).toBe(2.2);
+    expect(converted.achievementExperienceMultipliers?.genius).toBe(2);
+    expect(converted.achievementExperienceMultipliers?.rich).toBe(1.2);
+    expect(converted.achievementExperienceMultipliers?.["cursed-frail"]).toBe(1);
+    expect(converted.achievementExperienceMultipliers?.rewinder).toBe(1);
+    const storage = memoryStorage();
+    saveRoleAchievementRecords(converted, storage);
+    const reloaded = loadRoleAchievementRecords(createDefaultAccountProfile(), storage);
+    expect(reloaded.achievementExperienceMultipliers).toEqual(converted.achievementExperienceMultipliers);
+    expect(reloaded.roleProgress).toEqual(converted.roleProgress);
+  });
+
   it("does not accept dates without completion evidence or infer achievements from owning targets", () => {
     const saved = { version: 2, epoch: DATA_EPOCH, savedAt: DATA_EPOCH_STARTED_AT, roles: { "genius-reversed": { unlocked: true } },
       unlockedAt: { "unlock:genius-reversed": FIRST, "global:deep-sleep": FIRST }, unlockedByRole: {} };

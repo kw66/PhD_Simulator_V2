@@ -3,6 +3,7 @@ import { renderApp } from "../src/app/v2-render";
 import { createStore } from "../src/core/v2-store";
 import { getAllAchievementDefinitions } from "../src/core/v2-role-lobby-meta";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
+import { CURSED_ROLE_IDS } from "../src/core/v2-curse-system";
 import { ACCOUNT_STORAGE_KEY, saveAccountProfile } from "../src/core/v2-account-storage";
 import { createMemoryRunSaveAdapter, createRunSaveRepository } from "../src/core/v2-run-saves";
 import { replayStateDigest } from "../src/core/v2-run-replay";
@@ -117,10 +118,10 @@ describe("session store", () => {
     expect(store.isCurrentRunDebugged()).toBe(false);
   });
 
-  it("starts at the lobby with only the base role playable", () => {
+  it("starts at the lobby with the base and curse roles playable", () => {
     const store = createStore({ storage: null });
     expect(store.getState().phase).toBe("setup");
-    expect(Object.entries(store.getLobbyState().roleProgress).filter(([, progress]) => progress.unlocked).map(([id]) => id)).toEqual(["normal"]);
+    expect(Object.entries(store.getLobbyState().roleProgress).filter(([, progress]) => progress.unlocked).map(([id]) => id).sort()).toEqual(["normal", ...CURSED_ROLE_IDS].sort());
     store.dispatch("select-role", { roleId: "genius" });
     store.dispatch("start-game", { roleId: "genius" }); expect(store.getState().phase).toBe("setup");
     store.dispatch("start-game", { roleId: "normal" }); expect(store.getState().phase).toBe("playing");

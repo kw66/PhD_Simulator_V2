@@ -1,6 +1,7 @@
 import { gameRandom } from "./v2-game-random";
 import { randomOutcome } from "./v2-event-choice-random";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { getKnownPersonNames, getUniquePersonName } from "./v2-person-names";
 import { rollCaptainTag } from "./v2-captain-runtime";
 import { isCaptain, type CaptainTag } from "./v2-captain-state";
 import { getRoleDefinition } from "./v2-progression";
@@ -208,9 +209,13 @@ export function createBeforeGradSchoolAct1Event(
   advisorIntelOverride?: FixedEventAdvisorIntel,
   captainTagOverride?: CaptainTag,
 ): PendingEvent {
-  const advisorName = advisorNameOverride ?? pickRandomAdvisorName(getRoll);
+  const rawAdvisorName = advisorNameOverride ?? pickRandomAdvisorName(getRoll);
+  const advisorName = usesGameplayRulesFrom("20261028-r59")
+    ? getUniquePersonName(rawAdvisorName, getKnownPersonNames(_state, ["advisor"]), "enrollment-advisor") : rawAdvisorName;
   const advisorIntel = advisorIntelOverride ?? createRandomAdvisorIntel(getRoll);
-  const candidateName = studentName ?? pickRandomAdvisorName(getRoll);
+  const rawCandidateName = studentName ?? pickRandomAdvisorName(getRoll);
+  const candidateName = usesGameplayRulesFrom("20261028-r59")
+    ? getUniquePersonName(rawCandidateName, [...getKnownPersonNames(_state, ["player"]), advisorName], "enrollment-player") : rawCandidateName;
   const captainTag = isCaptain(_state) ? captainTagOverride ?? rollCaptainTag(getRoll) : undefined;
   return createFixedEvent({
     id: "before-grad-school-qualification",
@@ -282,10 +287,14 @@ export function resolveStudentNameReroll(
     return { nextState: state, outcome: "未找到可更换的姓名。" };
   }
 
+  const rawStudentName = pickDifferentRandomName(currentName, getRoll);
+  const nextStudentName = usesGameplayRulesFrom("20261028-r59")
+    ? getUniquePersonName(rawStudentName, [...getKnownPersonNames(state, ["player"]), advisorCandidate.advisorName, currentName],
+      `reroll-player:${currentName}`) : rawStudentName;
   const refreshedEvent = createBeforeGradSchoolAct1Event(
     state,
     getRoll,
-    pickDifferentRandomName(currentName, getRoll),
+    nextStudentName,
     advisorCandidate.advisorName,
     advisorIntel,
     advisorCandidate.captainTag,
@@ -357,7 +366,9 @@ export function resolveAdvisorReroll(
     };
   }
 
-  const advisorName = createDifferentAdvisorName(candidate.advisorName, getRoll);
+  const rawAdvisorName = createDifferentAdvisorName(candidate.advisorName, getRoll);
+  const advisorName = usesGameplayRulesFrom("20261028-r59")
+    ? getUniquePersonName(rawAdvisorName, [...getKnownPersonNames(state, ["advisor"]), candidate.advisorName], "reroll-advisor") : rawAdvisorName;
   const advisorIntel = createDifferentAdvisorIntel(currentIntel, getRoll);
   const captainTag = isCaptain(state) ? rollCaptainTag(getRoll) : undefined;
   const refreshedEvent = createAdvisorInfoEvent(advisorName, advisorIntel, captainTag, captainTag ? state.captainState!.levels[captainTag] : 0);

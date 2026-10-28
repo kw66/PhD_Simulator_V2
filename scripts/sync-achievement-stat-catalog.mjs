@@ -2,8 +2,9 @@ import { createServer } from 'vite';
 import { readFile, writeFile } from 'node:fs/promises';
 
 // Generate the database allowlist from the exact same rules as the game.
-// Run --check in verification; default updates only the marked SQL seed section.
+// Run --check in verification; default updates marked seed sections in both migrations.
 const path = 'supabase/migrations/20261016_kwgame_v2_achievement_stats.sql';
+const currentPath = 'supabase/migrations/20261028_kwgame_v2_achievement_review.sql';
 const server = await createServer({ configFile: false, logLevel: 'error', server: { watch: null } });
 try {
   const { getAllAchievementDefinitions } = await server.ssrLoadModule('/src/core/v2-role-lobby-meta.ts');
@@ -23,6 +24,14 @@ try {
     if (original !== updated) throw new Error('Achievement SQL catalog differs from game definitions; run node scripts/sync-achievement-stat-catalog.mjs');
   } else {
     await writeFile(path, updated, 'utf8');
+  }
+  const currentGenerated = generated.replace(';\n-- END', '\non conflict (id) do update set eligible_role_ids = excluded.eligible_role_ids, active = true;\n-- END');
+  const current = await readFile(currentPath, 'utf8');
+  const currentUpdated = current.replace(/-- BEGIN GENERATED ACHIEVEMENT CATALOG[\s\S]*?-- END GENERATED ACHIEVEMENT CATALOG/, currentGenerated);
+  if (process.argv.includes('--check')) {
+    if (current !== currentUpdated) throw new Error('Current achievement migration differs from game definitions');
+  } else {
+    await writeFile(currentPath, currentUpdated, 'utf8');
   }
   console.log(`Achievement SQL catalog verified: ${definitions.length} achievements, ${ROLE_DEFINITIONS.length} roles`);
 } finally {

@@ -1,3 +1,6 @@
+import { getInitialRelationshipSocialBonus } from "./v2-relationship-initialization";
+import { getKnownPersonNames } from "./v2-person-names";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { randomOutcome } from "./v2-event-choice-random";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
@@ -18,7 +21,7 @@ import type { RecruitmentCalendar } from "./v2-recruitment-eligibility";
 
 function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recruitmentCalendar: RecruitmentCalendar): PendingEvent {
   const serial = state.totalRandomEventCount;
-  const usedNames = [
+  const usedNames = usesGameplayRulesFrom("20261028-r59") ? getKnownPersonNames(state) : [
     ...state.fellowProgressState.map((profile) => getFellowName(profile)),
     state.selectedAdvisorName ?? "",
     state.loverState.name ?? "",
@@ -52,7 +55,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
   const mentorshipJuniorName = mentorshipJunior.name ?? "这名本科生";
   const mentorshipJuniorLabel = getFellowRoleLabel(mentorshipJunior.type, mentorshipJunior.gender);
   const mentorshipJuniorPronoun = getFellowPronoun(mentorshipJunior.gender);
-  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 101, undefined, [], getRoll);
+  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 101, undefined, usesGameplayRulesFrom("20261028-r59") ? [...getKnownPersonNames(state), mentorshipJunior.name ?? ""] : [], getRoll);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const delegationTalent = createJuniorDelegationTalent(state, getRoll);
 
@@ -130,7 +133,7 @@ function createRandomEvent1(state: GameState, getRoll: RandomRollProvider, recru
           ? [
               `你陪${mentorshipJuniorName}补对照、改草稿，一张表讲了几遍，水早凉了。💧等${mentorshipJuniorPronoun}能自己解释结果，你的任务却还停在原处。`,
               canAddJunior
-                ? `${mentorshipJuniorPronoun}决定考研进组：“谢谢${playerHonorific}，以后还得多请教。”辅导让${mentorshipJuniorLabel}科研 +1、与你的${affinitySummary}；目前科研 ${formatMoney(guidedJunior.research)}、默契 ${formatMoney(guidedJunior.affinity)}。你多了一位${mentorshipJuniorLabel}，🤝笔记里已有自己整理的问题。`
+                ? `${mentorshipJuniorPronoun}决定考研进组：“谢谢${playerHonorific}，以后还得多请教。”辅导让${mentorshipJuniorLabel}科研 +1、与你的${affinitySummary}；目前科研 ${formatMoney(guidedJunior.research)}、默契 ${formatMoney(Math.min(20, guidedJunior.affinity + getInitialRelationshipSocialBonus(state)))}。你多了一位${mentorshipJuniorLabel}，🤝笔记里已有自己整理的问题。`
                 : `${mentorshipJuniorPronoun}决定考研进组，但关系栏已满，暂未记入人际栏。你整理好资料发回去，📂之后仍得各忙各的。`,
             ].join("\n\n")
           : [
@@ -182,7 +185,7 @@ function createRandomEvent2(state: GameState, getRoll: RandomRollProvider): Pend
   const delegateSocialResult = previewPlayerAttributeChange(state, "social", delegateSocialRaw);
   const delegateSocialChange = delegateSocialResult.effectiveChange;
   const delegateSocialNarrative = getTierResistedNarrative("社交", delegateSocialRaw || -1, delegateSocialResult);
-  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 211, undefined, [], getRoll);
+  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 211, undefined, usesGameplayRulesFrom("20261028-r59") ? getKnownPersonNames(state) : [], getRoll);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const reviewReadRolls: number[] = [];
   const reviewReadPreview = previewReadPaperActions(state, 2, {
@@ -320,7 +323,7 @@ function createRandomEvent14(state: GameState, getRoll: RandomRollProvider, recr
   const serial = state.totalRandomEventCount;
   const juniorGender = getRoll() < 0.5 ? "male" : "female";
   const recruitmentSeed = `random-14:${serial}:${getRoll()}`;
-  const usedNames = [
+  const usedNames = usesGameplayRulesFrom("20261028-r59") ? getKnownPersonNames(state) : [
     ...state.fellowProgressState.map((profile) => getFellowName(profile)),
     state.selectedAdvisorName ?? "",
     state.loverState.name ?? "",

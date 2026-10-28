@@ -4,6 +4,14 @@ import { createRoleLevelStats, ROLE_LEVEL_STATS_STORAGE_KEY } from "../src/app/v
 import { renderRoleLevelStatsOverlay } from "../src/app/v2-render-role-level-stats";
 import { DATA_EPOCH } from "../src/core/v2-data-epoch";
 import { createDefaultAccountProfile } from "../src/core/v2-lobby";
+import { CURSED_ROLE_IDS } from "../src/core/v2-curse-system";
+
+const curseLevels = Object.fromEntries(CURSED_ROLE_IDS.map(id => [id, 0]));
+function singleRoleAccount() {
+  const account = createDefaultAccountProfile();
+  for (const role of CURSED_ROLE_IDS) account.roleProgress[role].unlocked = false;
+  return account;
+}
 
 const VISITOR_KEY = "phd_simulator_v2_activity_visitor_id";
 const PLAYER = "71000000-0000-4000-8000-000000000001";
@@ -37,7 +45,7 @@ describe("per-role player level statistics", () => {
     await client.syncAccount(account);
     await client.syncAccount(account);
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(body(fetch.mock.calls[0])).toEqual({ p_player_id: PLAYER, p_epoch: DATA_EPOCH, p_levels: { normal: 0 } });
+    expect(body(fetch.mock.calls[0])).toEqual({ p_player_id: PLAYER, p_epoch: DATA_EPOCH, p_levels: { normal: 0, ...curseLevels } });
     account.roleProgress.normal.level = 2;
     account.roleProgress.genius.unlocked = true;
     await client.syncAccount(account);
@@ -56,7 +64,7 @@ describe("per-role player level statistics", () => {
     const account = createDefaultAccountProfile();
     account.roleProgress.normal.level = 3;
     await client.syncAccount(account, { missingOnly: true });
-    expect(body(fetch.mock.calls[0]).p_levels).toEqual({ normal: 3 });
+    expect(body(fetch.mock.calls[0]).p_levels).toEqual({ normal: 3, ...curseLevels });
 
     account.roleProgress.normal.level = 5;
     account.roleProgress.genius.unlocked = true;
@@ -93,7 +101,7 @@ describe("per-role player level statistics", () => {
     const saved = storage();
     const failed = vi.fn<typeof globalThis.fetch>(async () => { throw new Error("offline"); });
     const first = create({ storage: saved, fetch: failed });
-    const account = createDefaultAccountProfile(); account.roleProgress.normal.level = 3;
+    const account = singleRoleAccount(); account.roleProgress.normal.level = 3;
     await first.syncAccount(account); await first.syncAccount(account);
     expect(failed).toHaveBeenCalledTimes(1);
     expect(readSaved(saved).pending).toEqual([{ playerId: PLAYER, roleId: "normal", level: 3 }]);
@@ -110,9 +118,9 @@ describe("per-role player level statistics", () => {
     const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(true));
     const stale = create({ storage: saved, fetch });
     const newer = create({ storage: saved, fetch });
-    const upgraded = createDefaultAccountProfile(); upgraded.roleProgress.normal.level = 6;
+    const upgraded = singleRoleAccount(); upgraded.roleProgress.normal.level = 6;
     await newer.syncAccount(upgraded);
-    const old = createDefaultAccountProfile(); old.roleProgress.normal.level = 2;
+    const old = singleRoleAccount(); old.roleProgress.normal.level = 2;
     await stale.syncAccount(old); stale.dispose();
     const restored = create({ storage: saved, fetch }); await restored.syncAccount(old);
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -125,7 +133,7 @@ describe("per-role player level statistics", () => {
     let accept: (response: Response) => void = () => {};
     const firstFetch = vi.fn<typeof globalThis.fetch>(() => new Promise(resolve => { accept = resolve; }));
     const first = create({ storage: saved, fetch: firstFetch });
-    const account = createDefaultAccountProfile(); account.roleProgress.normal.level = 2;
+    const account = singleRoleAccount(); account.roleProgress.normal.level = 2;
     const uploading = first.syncAccount(account);
     const offline = create({ storage: saved, fetch: vi.fn(async () => { throw new Error("offline"); }) });
     account.roleProgress.normal.level = 5;
@@ -196,7 +204,7 @@ describe("per-role player level statistics", () => {
     }
     const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json(true));
     const invalid = create({ storage: storage(), fetch });
-    const account = createDefaultAccountProfile(); account.roleProgress.normal.level = 11;
+    const account = singleRoleAccount(); account.roleProgress.normal.level = 11;
     await invalid.syncAccount(account); expect(fetch).not.toHaveBeenCalled();
   });
 

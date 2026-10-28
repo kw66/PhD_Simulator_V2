@@ -1,4 +1,5 @@
 import { randomOutcome } from "./v2-event-choice-random";
+import { getKnownPersonNames } from "./v2-person-names";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
 import { getEffectiveResearch } from "./v2-effective-attributes";
 import { previewPlayerAttributeChange } from "./v2-player-attributes";
@@ -40,7 +41,8 @@ export function createAdvisorProjectRandomEvent(state: GameState, getRoll: Rando
   const shareSocialResult = previewPlayerAttributeChange(state, "social", shareSocialRaw);
   const shareSocialChange = shareSocialResult.effectiveChange;
   const shareSocialNarrative = getTierResistedNarrative("社交", shareSocialRaw || -1, shareSocialResult);
-  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 307, undefined, [], getRoll);
+  const unfamiliarJunior = createGeneratedFellowProfileAddition("junior", serial + 307, undefined,
+    usesGameplayRulesFrom("20261028-r59") ? getKnownPersonNames(state) : [], getRoll);
   const unfamiliarJuniorLabel = getFellowRoleLabel(unfamiliarJunior.type, unfamiliarJunior.gender);
   const guidanceRolls = Array.from({ length: (state.fellowProgressState.length + 1) * 2 }, () => getRoll());
   const delegationTalent = createJuniorDelegationTalent(state, getRoll);

@@ -1,4 +1,5 @@
 import { gameRandom } from "./v2-game-random";
+import { getKnownPersonNames } from "./v2-person-names";
 import { getConferenceMentorContact, getConferenceScholarContact } from "./v2-conference-contacts";
 import { applyTierResist, formatTierResistedOutcome } from "./v2-sanity-rules";
 import { resolveConferenceActivityAttributes } from "./v2-conference-activity-shared";
@@ -15,13 +16,14 @@ export function createAdvancedConferenceActivityOptions(
   if (state.social < 6) return [];
   const encounter = state.conferenceEncounterState;
   const seed = { id: context?.id ?? "conference-contact", roll: identityRoll, levelRoll,
-    selectedRoleId: state.selectedRoleId, playerGender: state.playerGender };
+    selectedRoleId: state.selectedRoleId, playerGender: state.playerGender,
+    usedNames: getKnownPersonNames(state.playerAttributeState ?? state) };
   const mentor = getConferenceMentorContact(encounter, seed);
   const nextCooperationCount = mentor.cooperationCount + 1;
   const cooperationResult = `与${mentor.name}合作达${nextCooperationCount}次`;
   const jointTrainingInvite = state.research >= 12 && !encounter.jointTrainingReward && !encounter.bigBullCooperation && nextCooperationCount >= 3;
   const type = typeRoll < 0.5 ? "beautiful" : "smart";
-  const scholar = getConferenceScholarContact(encounter, type, seed);
+  const scholar = getConferenceScholarContact(encounter, type, { ...seed, usedNames: [...seed.usedNames, mentor.name] });
   const nextEncounterCount = scholar.encounterCount + 1;
   const encounterResult = `与${scholar.name}搭讪达${nextEncounterCount}次`;
   const hasLover = Boolean(state.loverState?.active || state.relationshipState.loverCount > 0);

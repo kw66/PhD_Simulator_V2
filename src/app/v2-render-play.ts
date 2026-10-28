@@ -4,6 +4,7 @@ import { formatEventRecoveryDisplay, formatEventResultResistance } from "./v2-ev
 import { renderSettingsSection } from "./v2-render-settings";
 import { renderMessageComposer } from "./v2-render-community";
 import { usesGameplayRulesFrom } from "../core/v2-rule-context";
+import { getApplicablePaperPromotions } from "../core/v2-paper-promotion-eligibility";
 import { getEffectiveResearch, getEffectiveSocial } from "../core/v2-effective-attributes";
 import { getCoffeeGrowthInterval, getCoffeeMachineOwnedText, getCurrentCoffeeBonus } from "../core/v2-coffee-system";
 import "../styles/workstation-unified.css";
@@ -201,12 +202,9 @@ function getAvailablePromotionCount(state: GameState): number {
     paper.status === "published" && paper.nonFirstAuthor !== true && paper.publication
   )).reduce((count, paper) => {
     const promotions = paper.publication?.promotions ?? { arxiv: false, github: false, xiaohongshu: false, quantum: false };
-    const ids: PaperPromotionId[] = (paper.journalTarget ?? paper.publication?.journalTarget)
-      ? ["github", "xiaohongshu", "quantum"] as PaperPromotionId[]
-      : ["arxiv", "github", "xiaohongshu"] as PaperPromotionId[];
+    const ids = getApplicablePaperPromotions(paper);
     return count + ids.filter((id) => {
       if (promotions[id] === true) return false;
-      if (id === "arxiv" && (paper.target === null || paper.conferenceHandled === true || paper.publication?.preprintExposed === true || paper.publication?.posterExposed === true || (paper.publication?.monthsSincePublish ?? 0) >= 3)) return false;
       return quoteSanPayment(state, getPaperPromotionCost(id, state)).allowed
         && state.player.money >= getPaperPromotionMoneyCost(id);
     }).length;
@@ -2779,8 +2777,6 @@ function getPaperVenue(state: GameState, paper: Paper): { marker: string; short:
   };
 }
 
-const RESEARCH_PROMOTION_IDS: readonly PaperPromotionId[] = ["arxiv", "github", "xiaohongshu"];
-
 function renderResearchPromotionActions(state: GameState, paper: Paper): string {
   if (paper.status !== "published" || !paper.publication || paper.nonFirstAuthor === true) return "";
 
@@ -2789,17 +2785,7 @@ function renderResearchPromotionActions(state: GameState, paper: Paper): string 
     github: false,
     xiaohongshu: false,
   };
-  const visiblePromotionIds = ((paper.journalTarget ?? paper.publication?.journalTarget)
-    ? ["github", "xiaohongshu", "quantum"]
-    : RESEARCH_PROMOTION_IDS).filter((promotionId) => {
-    if (promotionId !== "arxiv") return true;
-    return promotions.arxiv === true
-      || (paper.target !== null
-      && paper.conferenceHandled !== true
-      && paper.publication?.preprintExposed !== true
-      && paper.publication?.posterExposed !== true
-      && (paper.publication?.monthsSincePublish ?? 0) < 3);
-  }) as PaperPromotionId[];
+  const visiblePromotionIds = getApplicablePaperPromotions(paper);
   if (visiblePromotionIds.length === 0) return "";
   const promotionLabels: Record<PaperPromotionId, string> = {
     arxiv: "arXiv",
