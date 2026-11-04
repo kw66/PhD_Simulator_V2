@@ -28,11 +28,11 @@ export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
   { id: "special-finite-life:curse-hell-phd", icon: "⏳", title: "向死而生", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["special-finite-life"] }, rewardScope: { audiences: ["all"] } },
   { id: "cursed-debt:curse-hell-phd", icon: "💸", title: "逆债而行", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["cursed-debt"] }, rewardScope: { audiences: ["all"] } },
   // 正位角色的逆位解锁路线
-  { id: "unlock:genius-reversed", icon: "🪨", title: "大智若愚", description: "连续6个月订购付费AI", rewardText: "解锁愚钝·院士转世角色", unlocksRoleId: "genius-reversed", scope: { roleIds: ["genius"] } },
+  { id: "unlock:genius-reversed", icon: "🪨", title: "大智若愚", description: "一局内AI订阅累计30金币", rewardText: "解锁愚钝·院士转世角色", unlocksRoleId: "genius-reversed", scope: { roleIds: ["genius"] } },
   { id: "unlock:teacher-child-reversed", icon: "🎭", title: "不假师恩", description: "六年教师节均只发祝福", rewardText: "解锁玩世·导师子女角色", unlocksRoleId: "teacher-child-reversed", scope: { roleIds: ["teacher-child"] } },
-  { id: "unlock:social-reversed", icon: "🧍", title: "独来独往", description: "主动与科研能力高于自己的同学停止合作", rewardText: "解锁嫉妒·社交达人角色", unlocksRoleId: "social-reversed", scope: { roleIds: ["social"] } },
-  { id: "unlock:rich-reversed", icon: "🪙", title: "一毛不拔", description: "连续6个月月末持有至少50金币", rewardText: "解锁贪求·富可敌国角色", unlocksRoleId: "rich-reversed", scope: { roleIds: ["rich"] } },
-  { id: "unlock:chosen-reversed", icon: "🌤️", title: "从容不迫", description: "前两年半未主动推进论文，之后成功转博", rewardText: "解锁空想·天选之人角色", unlocksRoleId: "chosen-reversed", scope: { roleIds: ["chosen"] } },
+  { id: "unlock:social-reversed", icon: "🧍", title: "独来独往", description: "因人际栏已满而无法加入同学", rewardText: "解锁嫉妒·社交达人角色", unlocksRoleId: "social-reversed", scope: { roleIds: ["social"] } },
+  { id: "unlock:rich-reversed", icon: "🪙", title: "一毛不拔", description: "持有至少30金币时主动打工一次", rewardText: "解锁贪求·富可敌国角色", unlocksRoleId: "rich-reversed", scope: { roleIds: ["rich"] } },
+  { id: "unlock:chosen-reversed", icon: "🌤️", title: "从容不迫", description: "“下次想idea”Buff达到+20分", rewardText: "解锁空想·天选之人角色", unlocksRoleId: "chosen-reversed", scope: { roleIds: ["chosen"] } },
 
   // 角色与类别限定
   { id: "normal:self-reliance-i", icon: "🔬", title: "笨鸟先飞", description: "硕士期间科研达6", rewardText: "经验+5", scope: { roleIds: ["normal"] } },

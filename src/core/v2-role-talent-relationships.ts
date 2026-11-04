@@ -1,4 +1,4 @@
-import { recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
+import { recordAchievementFact, recordAchievementSanCapGain } from "./v2-achievement-runtime-types";
 import { applyPlayerAttributeChange, previewPlayerAttributeChange } from "./v2-player-attributes";
 import { canAddRelationship } from "./v2-relationship-rules";
 import { getRoleTalentLevel } from "./v2-role-talent-state";
@@ -44,7 +44,7 @@ export function applyJuniorDelegationTalent(state: GameState, roll: number | und
 }
 
 export function getFellowOverflowEffects(state: GameState, candidate?: FellowProfileAddition): Pick<EventChoice["effects"], "fellowOverflowAttempts" | "fellowOverflowCandidates"> {
-  return state.selectedRoleId === "social" && getRoleTalentLevel(state, "overflow-social") > 0
+  return state.selectedRoleId === "social" && (getRoleTalentLevel(state, "overflow-social") > 0 || usesGameplayRulesFrom("20261104-r60"))
     ? { fellowOverflowAttempts: 1, ...(candidate ? { fellowOverflowCandidates: [candidate] } : {}) } : {};
 }
 
@@ -56,6 +56,10 @@ export function getFellowOverflowOutcome(state: GameState): string {
 }
 
 export function settleFellowRecruitmentTalent(before: GameState, after: GameState, overflowAttempts = 0): GameState {
+  if (usesGameplayRulesFrom("20261104-r60") && after.selectedRoleId === "social" && overflowAttempts > 0
+    && !canAddRelationship(after.relationshipState, "peer")) {
+    after = recordAchievementFact(after, "unlock:social-reversed");
+  }
   const previousIds = new Set(before.fellowProgressState.map((fellow) => fellow.id));
   const joined = after.fellowProgressState.filter((fellow) => !previousIds.has(fellow.id));
   after = applyFellowRecruitmentTalent(after, joined.length, overflowAttempts);

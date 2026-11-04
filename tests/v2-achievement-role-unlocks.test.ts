@@ -55,6 +55,7 @@ function transfer(state: GameState, month = 33): GameState {
 
 describe("r59 behavioral reversed-role unlocks", () => {
   it("counts six paid-model months across brands and reimbursement, then settles even without graduation", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = started("genius");
     for (let month = 1; month <= 6; month += 1) {
       state = { ...atMonth(state, month), aiShopState: createAiShopState(),
@@ -71,9 +72,11 @@ describe("r59 behavioral reversed-role unlocks", () => {
     expect(ended.ending).toBe("quit");
     const settled = settleRunAchievements(createDefaultAccountProfile(), ended);
     expect(settled.account.roleProgress["genius-reversed"].unlocked).toBe(true);
+      });
   });
 
   it("does not count free AI, failed payments, or nonconsecutive paid months", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     let free = started("genius");
     for (let month = 1; month <= 6; month += 1) {
       free = { ...atMonth(free, month), aiShopState: createAiShopState() };
@@ -87,9 +90,11 @@ describe("r59 behavioral reversed-role unlocks", () => {
     }
     expect(state.achievementProgress?.sets["unlock-paid-ai-months"]).toEqual(["1", "2", "3", "5", "6", "7"]);
     expect(state.achievementProgress?.satisfied).not.toContain("unlock:genius-reversed");
+      });
   });
 
   it("counts automatic renewal and permits buying the updated model in the same month", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = atMonth(started("genius"), 8);
     state = dispatchAction(state, "buy-ai-month", { aiSlotId: "gpt" });
     state = dispatchAction(state, "toggle-ai-subscription", { aiSlotId: "gpt" });
@@ -101,9 +106,11 @@ describe("r59 behavioral reversed-role unlocks", () => {
     expect(state.achievementProgress?.satisfied).not.toContain("unlock:genius-reversed");
     state = dispatchAction(state, "buy-ai-month", { aiSlotId: "gpt" });
     expect(state.achievementProgress?.satisfied).toContain("unlock:genius-reversed");
+      });
   });
 
   it("requires six actual Teachers' Day greetings and does not require an ending", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = started("teacher-child");
     for (let year = 1; year <= 6; year += 1) state = greeting(state, year);
     expect(state.phase).toBe("playing");
@@ -111,16 +118,20 @@ describe("r59 behavioral reversed-role unlocks", () => {
     expect(state.achievementProgress?.satisfied).toContain("unlock:teacher-child-reversed");
     const settled = settleRunAchievements(createDefaultAccountProfile(), dispatchAction(state, "quit-game"));
     expect(settled.account.roleProgress["teacher-child-reversed"].unlocked).toBe(true);
+      });
   });
 
   it("a gifted Teachers' Day prevents the six-year no-gift achievement", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = started("teacher-child");
     for (let year = 1; year <= 6; year += 1) state = greeting(state, year, year === 3);
     expect(state.eventHistory.filter(record => record.chainId === "teachers-day")).toHaveLength(6);
     expect(state.achievementProgress?.satisfied).not.toContain("unlock:teacher-child-reversed");
+      });
   });
 
   it.each([0, 1, 2])("counts only actively removing a strictly stronger fellow (research=%s)", research => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = started("social");
     const fellow = createCustomFellowProgressProfile({ type: "peer", gender: "female", startTotalMonths: 1, research, affinity: 1 });
     state = { ...state, player: { ...state.player, research: 1 }, fellowProgressState: [fellow] };
@@ -129,9 +140,11 @@ describe("r59 behavioral reversed-role unlocks", () => {
     const removed = dispatchAction(state, "end-relationship", { relationshipId: fellow.id });
     expect(removed.fellowProgressState).toHaveLength(0);
     expect(removed.achievementProgress?.satisfied.includes("unlock:social-reversed")).toBe(research > 1);
+      });
   });
 
   it("requires six consecutive month-end reserves, not purchases, previews or repeated samples", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = started("rich");
     for (let month = 1; month <= 8; month += 1) {
       state = { ...atMonth(state, month), player: { ...state.player, money: month === 2 ? 49.9 : 50 } };
@@ -141,9 +154,11 @@ describe("r59 behavioral reversed-role unlocks", () => {
       expect(state.achievementProgress?.satisfied.includes("unlock:rich-reversed")).toBe(month === 8);
     }
     expect(state.achievementProgress?.counters["unlock-reserve-streak"]).toBe(6);
+      });
   });
 
   it("samples the outgoing month before next-month AI charges", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = atMonth(started("rich"), 3);
     state = dispatchAction(state, "buy-ai-month", { aiSlotId: "gpt" });
     state = dispatchAction(state, "toggle-ai-subscription", { aiSlotId: "gpt" });
@@ -152,9 +167,11 @@ describe("r59 behavioral reversed-role unlocks", () => {
     expect(state.totalMonths).toBe(4);
     expect(state.player.money).toBeLessThan(50);
     expect(state.achievementProgress?.counters["unlock-reserve-streak"]).toBe(1);
+      });
   });
 
   it.each([30, 31])("allows research only after the first 30 months (active month %s)", month => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = atMonth(started("chosen"), month);
     state = dispatchAction(state, "create-paper", { paperSlotIndex: 0 });
     const paperId = state.papers[0]!.id;
@@ -163,9 +180,11 @@ describe("r59 behavioral reversed-role unlocks", () => {
     state = transfer(state);
     expect(state.degree).toBe("phd");
     expect(state.achievementProgress?.satisfied.includes("unlock:chosen-reversed")).toBe(month === 31);
+      });
   });
 
   it("ignores failed research and does not require zero papers or zero research score", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     let state = atMonth(started("chosen"), 30);
     state = dispatchAction(state, "create-paper", { paperSlotIndex: 0 });
     const paperId = state.papers[0]!.id;
@@ -174,18 +193,22 @@ describe("r59 behavioral reversed-role unlocks", () => {
     expect(state.achievementProgress?.counters["research-actions:30"] ?? 0).toBe(0);
     state = transfer({ ...state, player: { ...state.player, san: 20 } });
     expect(state.achievementProgress?.satisfied).toContain("unlock:chosen-reversed");
+      });
   });
 
   it("does not count early transfer or mere transition to a graduation ending", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     const early = transfer(started("chosen"), 21);
     expect(early.degree).toBe("phd");
     expect(early.achievementProgress?.satisfied).not.toContain("unlock:chosen-reversed");
     const base = started("rich");
     const ended = observeAchievements(base, { ...base, phase: "finished", ending: "master" });
     expect(ended.achievementProgress?.satisfied).not.toContain("unlock:rich-reversed");
+      });
   });
 
   it("preserves r58 graduation rules without adding new behavior evidence", () => {
+    return withGameplayRuleset("20261028-r59", () => {
     withGameplayRuleset("20261027-r58", () => {
       const base = started("rich");
       expect(recordRoleUnlockMonthEnd(base)).toBe(base);
@@ -193,5 +216,6 @@ describe("r59 behavioral reversed-role unlocks", () => {
       expect(ended.achievementProgress?.satisfied).toContain("unlock:rich-reversed");
       expect(ended.achievementProgress?.counters["unlock-reserve-streak"]).toBeUndefined();
     });
+      });
   });
 });

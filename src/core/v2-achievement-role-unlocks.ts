@@ -1,4 +1,5 @@
 import { getAiModelById } from "./v2-ai-shop";
+import { roundMoney } from "./v2-money";
 import { createAchievementRunProgress, type AchievementRunProgress } from "./v2-achievement-runtime-types";
 import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { DispatchPayload, GameActionId, GameState } from "./v2-types";
@@ -20,15 +21,42 @@ function recordPaidAiMonth(state: GameState, run: AchievementRunProgress): void 
     months.has(String(Number(month) - offset))).every(Boolean))) satisfy(run, "unlock:genius-reversed");
 }
 
+/** Match the Buff panel's active next-action idea bonus, excluding permanent/monthly effects. */
+export function getNextIdeaUnlockBonus(state: Pick<GameState, "buffs">): number {
+  return state.buffs.reduce((total, buff) => {
+    const bonus = buff.actionEffects?.idea?.bonus;
+    return buff.timing === "next-action" && (buff.remainingMonths === null || buff.remainingMonths > 0)
+      && typeof bonus === "number" && Number.isFinite(bonus) ? total + bonus : total;
+  }, 0);
+}
+
+function recordPaidAiSpending(previous: GameState, next: GameState, run: AchievementRunProgress): void {
+  for (const [slot, subscription] of Object.entries(next.aiShopState.subscriptions)) {
+    const before = previous.aiShopState.subscriptions[slot as keyof typeof previous.aiShopState.subscriptions];
+    if (!subscription.active || subscription.lastRenewalTotalMonths !== next.totalMonths || next.totalMonths < 1
+      || (before.active && before.modelId === subscription.modelId
+        && before.lastRenewalTotalMonths === subscription.lastRenewalTotalMonths)) continue;
+    const price = getAiModelById(subscription.modelId)?.price ?? 0;
+    if (price <= 0) continue;
+    // Subscription value counts even when a reimbursement or gift pays the bill.
+    run.counters["unlock-paid-ai-spending"] = roundMoney((run.counters["unlock-paid-ai-spending"] ?? 0) + price);
+  }
+  if ((run.counters["unlock-paid-ai-spending"] ?? 0) >= 30) satisfy(run, "unlock:genius-reversed");
+}
+
 /** Observe actual committed behavior, without requiring a successful graduation. */
 export function observeRoleUnlockAchievements(
   previous: GameState, next: GameState, run: AchievementRunProgress,
   actionId?: GameActionId, payload?: DispatchPayload,
 ): void {
   if (!usesGameplayRulesFrom("20261028-r59")) return;
+  const revised = usesGameplayRulesFrom("20261104-r60");
   if (next.selectedRoleId === "genius") {
-    recordPaidAiMonth(previous, run);
-    recordPaidAiMonth(next, run);
+    if (revised) recordPaidAiSpending(previous, next, run);
+    else {
+      recordPaidAiMonth(previous, run);
+      recordPaidAiMonth(next, run);
+    }
   }
   if (next.selectedRoleId === "teacher-child") {
     const years = new Set<number>();
@@ -46,12 +74,19 @@ export function observeRoleUnlockAchievements(
       satisfy(run, "unlock:teacher-child-reversed");
     }
   }
-  if (next.selectedRoleId === "social" && actionId === "end-relationship" && payload?.relationshipId) {
+  if (revised) {
+    if (next.selectedRoleId === "rich" && actionId === "part-time-work"
+      && previous.player.money >= 30 && next.partTimeWorkCount > previous.partTimeWorkCount) {
+      satisfy(run, "unlock:rich-reversed");
+    }
+    if (next.selectedRoleId === "chosen" && getNextIdeaUnlockBonus(next) >= 20) satisfy(run, "unlock:chosen-reversed");
+  }
+  if (!revised && next.selectedRoleId === "social" && actionId === "end-relationship" && payload?.relationshipId) {
     const removed = previous.fellowProgressState.find(fellow => fellow.id === payload.relationshipId);
     if (removed && removed.research > previous.player.research
       && !next.fellowProgressState.some(fellow => fellow.id === removed.id)) satisfy(run, "unlock:social-reversed");
   }
-  if (next.selectedRoleId === "chosen" && previous.degree === "master" && next.degree === "phd"
+  if (!revised && next.selectedRoleId === "chosen" && previous.degree === "master" && next.degree === "phd"
     && previous.totalMonths > 30) {
     const researchedEarly = Object.entries(run.counters).some(([key, value]) => {
       const month = /^research-actions:(\d+)$/u.exec(key)?.[1];
@@ -63,7 +98,7 @@ export function observeRoleUnlockAchievements(
 
 /** Sample after the outgoing month's settlements and before next month's income/renewals. */
 export function recordRoleUnlockMonthEnd(state: GameState): GameState {
-  if (!usesGameplayRulesFrom("20261028-r59") || state.phase !== "playing"
+  if (!usesGameplayRulesFrom("20261028-r59") || usesGameplayRulesFrom("20261104-r60") || state.phase !== "playing"
     || state.selectedRoleId !== "rich" || state.totalMonths < 1) return state;
   const progress = state.achievementProgress ?? createAchievementRunProgress();
   if (progress.counters["unlock-reserve-last-month"] === state.totalMonths) return state;

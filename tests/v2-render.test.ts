@@ -981,7 +981,7 @@ describe("v2 render lobby shell", () => {
       expect(html).toContain(`data-achievement-id="${achievement.id}"`);
     }
     expect(html).toContain('class="lobby-start-lock" role="group" tabindex="0"');
-    expect(html).toContain('data-tooltip="解锁目标：院士转世 · 连续6个月订购付费AI"');
+    expect(html).toContain('data-tooltip="解锁目标：院士转世 · 一局内AI订阅累计30金币"');
     expect(html).toContain('<button class="lobby-start-button is-disabled" type="button" disabled');
     expect(html).not.toContain("成就系统待接入：完成院士路线的逆位挑战后解锁");
     expect(html).not.toContain("查看解锁条件");

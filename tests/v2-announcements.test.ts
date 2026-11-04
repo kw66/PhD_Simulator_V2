@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-10-28", "2026-10-27", "2026-10-26", "2026-10-25", "2026-10-24", "2026-10-22"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-11-04", "2026-10-28", "2026-10-27", "2026-10-26", "2026-10-25", "2026-10-24"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -19,8 +19,10 @@ describe("game announcements", () => {
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
     const current = textForDate("2026-10-24");
     expect(textForDate("2026-10-26")).toContain("手机开始按钮铺满一行");
-    for (const text of ["连续6个月订购付费AI", "六次教师节", "停止合作", "月末持有至少50金币", "前两年半", "初始默契", "0／1／2／3", "基础社交收益由1提高至2", "适用的宣传", "默认开放"])
+    for (const text of ["六次教师节", "初始默契", "0／1／2／3", "基础社交收益由1提高至2", "适用的宣传", "默认开放"])
       expect(textForDate("2026-10-28")).toContain(text);
+    for (const text of ["AI订阅金额累计达到30金币", "人际栏已满", "持有至少30金币", "下次想idea", "+20分", "永久和本月加成不计入"])
+      expect(textForDate("2026-11-04")).toContain(text);
     for (const text of ["逐一点开", "科研分", "调试入口仅本地", "坏结局"]) expect(textForDate("2026-10-25")).toContain(text);
     for (const text of ["三份教学录像", "0天赋点博士", "10天赋点博士", "10天赋点硕士", "其他角色及20点路线以后补录", "9、15和2", "本地录像", "按角色切换"]) expect(textForDate("2026-10-28")).toContain(text);
     for (const text of ["硕士C／B／A档调整为60／100／200", "博士调整为180／250／500"]) expect(textForDate("2026-10-27")).toContain(text);
@@ -53,10 +55,11 @@ describe("game announcements", () => {
     const text = GAME_ANNOUNCEMENTS.flatMap((entry) => entry.changes.map((change) => `${change.title}：${change.description}`)).join("\n");
     expect(text).not.toMatch(/0%／25%／50%／75%|向下取整数显示|每300引用|参会经验|交流实验经验|1、2、1、2|机会永久关闭|实际参与项目者各得5金币|现行规则见最新公告|每次投入至多5金币|亏损不再触发消费奖励/);
     expect(text).not.toMatch(/36局|10与20天赋点博士|360降至330|300／200／120／80|18／16／14／12|在设置中还款|184项|角色图鉴扩展至20位|历史同学和恋人可勾选加入空位|所有角色均可回溯事件|回放首页采用档案式边框|五类跨局收集成就各奖励全体角色天赋点/);
+    expect(text).not.toMatch(/连续6个月订购付费AI|连续6个月月末持有至少50金币|前两年半未主动推进论文/);
     for (const topic of ["5月处理转博", "月末判断毕业", "注册费", "失败预警", "生活费", "2000字", "同学钱包", "角色经验", "十二项发表里程碑", "六个AI系列"]) {
       expect(text).toContain(topic);
     }
-    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(26);
+    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(27);
   });
 
   it("adds a third lobby tab without replacing the selected role or start button", () => {

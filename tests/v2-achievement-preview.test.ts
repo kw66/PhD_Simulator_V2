@@ -170,11 +170,11 @@ describe("achievement catalog and presentation", () => {
 
   it("shows five upright graduation challenges on source roles and target unlock mirrors", () => {
     const conditions = {
-      "genius-reversed": "连续6个月订购付费AI",
+      "genius-reversed": "一局内AI订阅累计30金币",
       "teacher-child-reversed": "六年教师节均只发祝福",
-      "social-reversed": "主动与科研能力高于自己的同学停止合作",
-      "rich-reversed": "连续6个月月末持有至少50金币",
-      "chosen-reversed": "前两年半未主动推进论文，之后成功转博",
+      "social-reversed": "因人际栏已满而无法加入同学",
+      "rich-reversed": "持有至少30金币时主动打工一次",
+      "chosen-reversed": "“下次想idea”Buff达到+20分",
     } as const;
     for (const roleId of Object.keys(conditions) as (keyof typeof conditions)[]) {
       const mirror = getRoleLobbyAchievementDefinitions(roleId)[0];
