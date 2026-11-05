@@ -26,7 +26,7 @@ const digestPattern = /^[0-9a-f]{1,8}:[0-9a-f]{1,8}:\d{1,9}$/;
 const forbiddenActions = new Set(["force-next-month", "restart-game", "reset-game", "settle-and-return", "select-role",
   "change-lobby-role-page", "change-role-achievement-page"]);
 const payloadKeys = new Set([
-  "rewinderAcademicArchive", "rewinderStartYear", "rewinderPaperSource", "rewinderCoffeeSource", "rewinderArchive",
+  "rewinderAcademicArchive", "rewinderStartYear", "rewinderPaperSource", "rewinderCoffeeSource", "rewinderChairSource", "rewinderArchive",
   "rewinderCycleNumber", "rewinderPersonKey", "captainTagLevels", "curseDifficulty", "debtRepayment", "bonusTalentPoints",
   "talentAllocation", "blockLinearEvents", "skipBranchEventIntro", "roleId", "paperId", "paperSlotIndex", "thesisPointIndex",
   "careerType", "paperActionType", "paperTarget", "journalTarget", "promotionId", "eventId", "eventChoiceId",
@@ -36,7 +36,7 @@ const payloadKeys = new Set([
 // Record requires every supported promotion to be listed when the engine adds one.
 const promotionIds = { arxiv: true, github: true, xiaohongshu: true, quantum: true } satisfies Record<PaperPromotionId, true>;
 const enumFields: Record<string, readonly unknown[]> = {
-  rewinderPaperSource: ["current", "previous"], rewinderCoffeeSource: ["current", "previous"], curseDifficulty: [1, 2, 3, 4],
+  rewinderPaperSource: ["current", "previous"], rewinderCoffeeSource: ["current", "previous"], rewinderChairSource: ["current", "previous"], curseDifficulty: [1, 2, 3, 4],
   careerType: ["internet", "stateOwned", "civilService", "academic"], paperActionType: ["idea", "experiment", "writing"],
   paperTarget: ["A", "B", "C"], journalTarget: ["nature", "nmi", "pami"], promotionId: Object.keys(promotionIds),
   projectType: ["horizontal", "vertical"], dateDisplayMode: ["academic", "calendar"], aiSlotId: AI_SLOT_IDS,

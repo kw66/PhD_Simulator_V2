@@ -4,6 +4,7 @@ import { isRunReplay, truncateRunReplay, verifyRunReplay, type RunReplay } from 
 import type { GameState, RoleId } from "./v2-types";
 import { isCursedRole } from "./v2-curse-system";
 import { CAPTAIN_TAG_IDS } from "./v2-captain-state";
+import { isAcademicLongTermEquipment } from "./v2-rewinder-academic-validation";
 
 export const RUN_SAVE_VERSION = 2;
 export const MAX_RUN_MONTH_SAVES = 70;
@@ -108,6 +109,14 @@ function validState(value: unknown, roleId: RoleId): value is GameState {
     || !Number.isInteger(value.month) || Number(value.month) < 0 || Number(value.month) > 12
     || !["master", "phd"].includes(String(value.degree))) return false;
   if (!object(value.player) || !["san", "research", "social", "favor", "money"].every(key => Number.isFinite(value.player && (value.player as Record<string, unknown>)[key]))) return false;
+  if (roleId === "rewinder" && object(value.rewinderState) && object(value.rewinderState.academic)) {
+    const academic = value.rewinderState.academic;
+    if (object(academic.pending) && academic.pending.chairSource !== undefined
+      && academic.pending.chairSource !== "current" && academic.pending.chairSource !== "previous") return false;
+    const records = [...(object(academic.history) && object(academic.history.years) ? Object.values(academic.history.years) : []), academic.completed];
+    if (records.some(record => object(record) && object(record.equipment) && record.equipment.longTerm !== undefined
+      && !isAcademicLongTermEquipment(record.equipment.longTerm))) return false;
+  }
   if (roleId === "research-captain") {
     const captain = value.captainState;
     if (!object(captain) || !object(captain.levels) || !object(captain.tags)

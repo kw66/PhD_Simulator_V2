@@ -1,10 +1,12 @@
 import { captureAcademicYear, mergeAcademicYear, restoreAcademicYear, normalizeAcademicArchive,
   buildAcademicCandidates, type AcademicArchive, type AcademicYearRecord } from "./v2-rewinder-academic-record";
 import type { GameState } from "./v2-types";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 
 export interface AcademicSelection {
   paperSource: "current" | "previous";
   coffeeSource?: "current" | "previous";
+  chairSource?: "current" | "previous";
   personKeys: string[];
 }
 export interface AcademicRunState {
@@ -78,13 +80,15 @@ export function getAcademicArchivePreview(state: GameState) {
     && selected.filter(candidate => candidate.kind === "fellow").length <= 4;
   return { year: state.year, cycleNumber: state.rewinderState?.cycleNumber ?? 1,
     current, previous, best: mergeAcademicYear(current, previous, selection),
-    paperSource: selection.paperSource, coffeeSource: selection.coffeeSource ?? "current", candidates, canConfirm: valid };
+    paperSource: selection.paperSource, coffeeSource: selection.coffeeSource ?? "current",
+    chairSource: selection.chairSource ?? "current", candidates, canConfirm: valid };
 }
 
 export function prepareAcademicArchive(state: GameState): GameState {
   if (!isAcademicYearEnd(state)) return state;
   const current = captureAcademicYear(state);
   const pending: AcademicSelection = { paperSource: "current", coffeeSource: "current",
+    ...(usesGameplayRulesFrom("20261105-r61") ? { chairSource: "current" as const } : {}),
     personKeys: buildAcademicCandidates(current).map(candidate => candidate.key) };
   return { ...state, rewinderState: { ...state.rewinderState!, monthEndProcessed: state.totalMonths,
     academic: { ...state.rewinderState!.academic!, pending } } };
@@ -106,7 +110,8 @@ export function toggleAcademicPerson(state: GameState, key?: string): GameState 
   return { ...state, rewinderState: { ...state.rewinderState!, academic: { ...run, pending: { ...run.pending!, personKeys } } } };
 }
 
-export function selectAcademicSource(state: GameState, field: "paperSource" | "coffeeSource", source?: "current" | "previous"): GameState {
+export function selectAcademicSource(state: GameState, field: "paperSource" | "coffeeSource" | "chairSource", source?: "current" | "previous"): GameState {
+  if (field === "chairSource" && !usesGameplayRulesFrom("20261105-r61")) return state;
   if (!isAcademicArchivePending(state) || state.rewinderState?.academic?.completed
     || (source !== "current" && source !== "previous")) return state;
   const run = state.rewinderState!.academic!;

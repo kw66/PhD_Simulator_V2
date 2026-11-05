@@ -14,6 +14,7 @@ export const GAME_ACTION_IDS = [
   "toggle-rewinder-archive-person",
   "select-rewinder-archive-papers",
   "select-rewinder-archive-coffee",
+  "select-rewinder-archive-chair",
   "confirm-rewinder-archive",
   "reset-game",
   "quit-game",

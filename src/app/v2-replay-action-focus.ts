@@ -58,7 +58,7 @@ export function prepareReplayActionView(state: GameState, command: ReplayCommand
   } else if (["relationship-task", "advisor-project", "end-relationship"].includes(action) || action.startsWith("lover-")) {
     ui.activePlayTab = "relationship";
   } else if (action.includes("rewinder-archive")) {
-    ui.academicArchiveAct = action === "select-rewinder-archive-papers" || action === "select-rewinder-archive-coffee" ? 1 : 2;
+    ui.academicArchiveAct = action === "select-rewinder-archive-papers" || action === "select-rewinder-archive-coffee" || action === "select-rewinder-archive-chair" ? 1 : 2;
   } else if (action === "toggle-rewinder-person") {
     ui.activePlayTab = "events";
     ui.isEventContentOpen = true;
@@ -83,7 +83,7 @@ export function prepareReplayActionView(state: GameState, command: ReplayCommand
   return { ui, paperId: payload.paperId };
 }
 
-const targetFields: readonly (keyof DispatchPayload)[] = ["paperId", "paperSlotIndex", "thesisPointIndex", "careerType", "paperActionType", "paperTarget", "journalTarget", "promotionId", "eventId", "eventChoiceId", "eventHistoryIndex", "relationshipId", "projectType", "rewinderPersonKey", "rewinderPaperSource", "rewinderCoffeeSource", "shopItemId", "shopUpgradeId", "aiSlotId", "supportItemId", "delta", "dateDisplayMode", "blockLinearEvents", "skipBranchEventIntro"];
+const targetFields: readonly (keyof DispatchPayload)[] = ["paperId", "paperSlotIndex", "thesisPointIndex", "careerType", "paperActionType", "paperTarget", "journalTarget", "promotionId", "eventId", "eventChoiceId", "eventHistoryIndex", "relationshipId", "projectType", "rewinderPersonKey", "rewinderPaperSource", "rewinderCoffeeSource", "rewinderChairSource", "shopItemId", "shopUpgradeId", "aiSlotId", "supportItemId", "delta", "dateDisplayMode", "blockLinearEvents", "skipBranchEventIntro"];
 
 function visible(element: HTMLElement): boolean {
   return !element.closest("[hidden]") && element.getClientRects().length > 0

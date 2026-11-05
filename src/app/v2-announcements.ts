@@ -10,6 +10,14 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-11-05",
+    title: "轮回者设备继承与结算展示",
+    changes: [
+      { category: "优化", title: "永久效果合并展示", description: "学年归档按效果汇总永久加分、次数、消耗与倍率，同类效果不再重复列出，仍可查看来源。" },
+      { category: "更新", title: "长期设备跨学年保留", description: "显卡、自行车等级取高，键盘、显示器、小电驴及生活装备保留；椅子和咖啡机路线冲突时可选。设备栏直接展示归档结果，金币仍独立取最佳。设备投资与成长记录随设备保留，临时订阅及待用报销不继承。" },
+    ],
+  },
+  {
     date: "2026-11-04",
     title: "逆位角色解锁条件调整",
     changes: [

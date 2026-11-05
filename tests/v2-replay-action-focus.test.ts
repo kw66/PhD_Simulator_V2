@@ -4,6 +4,17 @@ import type { ReplayCommand } from "../src/core/v2-run-replay";
 import { getReplayActionTarget, getReplayActionTiming, prepareReplayActionView } from "../src/app/v2-replay-action-focus";
 
 describe("replay action presentation", () => {
+  it("reveals the archive equipment act and targets the selected chair source", () => {
+    const command: ReplayCommand = { kind: "action", actionId: "select-rewinder-archive-chair", payload: { rewinderChairSource: "previous" } };
+    expect(prepareReplayActionView(createInitialState(), command, {}).ui.academicArchiveAct).toBe(1);
+    const buttons = ["current", "previous"].map(source => ({ dataset: { action: "select-rewinder-archive-chair", rewinderChairSource: source },
+      closest: () => null, getClientRects: () => [{}] }) as unknown as HTMLElement);
+    vi.stubGlobal("getComputedStyle", () => ({ visibility: "visible" }));
+    try {
+      expect(getReplayActionTarget({ querySelectorAll: () => buttons } as unknown as ParentNode, command)).toBe(buttons[1]);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("keeps advance repayment on the current page and reveals settings for full repayment", () => {
     const state = createInitialState();
     const partial: ReplayCommand = { kind: "action", actionId: "repay-debt", payload: { debtRepayment: 1 } };

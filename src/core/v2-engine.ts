@@ -439,6 +439,7 @@ function dispatchActionInternal(state: GameState, actionId: GameActionId, payloa
     if (actionId === "toggle-rewinder-archive-person") return toggleAcademicPerson(state, payload.rewinderPersonKey);
     if (actionId === "select-rewinder-archive-papers") return selectAcademicSource(state, "paperSource", payload.rewinderPaperSource);
     if (actionId === "select-rewinder-archive-coffee") return selectAcademicSource(state, "coffeeSource", payload.rewinderCoffeeSource);
+    if (actionId === "select-rewinder-archive-chair") return selectAcademicSource(state, "chairSource", payload.rewinderChairSource);
     if (actionId === "confirm-rewinder-archive") return completeAcademicArchive(state);
     return state;
   }

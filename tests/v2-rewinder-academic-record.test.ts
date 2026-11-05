@@ -28,7 +28,7 @@ function fellow(id: string, name = id) {
 function archive(s: GameState) { return captureAcademicYear(s); }
 
 describe("academic-year record", () => {
-  it("clears transient work, ordinary equipment and active internships while retaining permanent earned state", () => {
+  it("clears transient work and active internships while retaining permanent earned state and equipment", () => {
     const s = state();
     s.papers = [paper("accepted"), paper("draft", { status: "draft" }), paper("reviewing", { status: "reviewing" })];
     s.totalCitations = 10; s.totalResearchScore = 6;
@@ -44,7 +44,7 @@ describe("academic-year record", () => {
     expect(restored.papers.map(p => p.id)).toEqual(["accepted"]);
     expect(restored.papers[0]).toMatchObject({ conferenceHandled: true, conferenceHandledAtTotalMonths: 12 });
     expect(restored.papers[0]!.publication!.citations).toBe(10);
-    expect(restored.shopState).toMatchObject({ gpuLevel: 0, chairOwned: false, keyboardOwned: false, ebikeOwned: false,
+    expect(restored.shopState).toMatchObject({ gpuLevel: 5, chairOwned: true, keyboardOwned: true, ebikeOwned: true,
       bikeOwned: true, bikeLevel: 3, bikeSanSpent: 27.5, bikeSanCapGains: 2 });
     expect(restored.coffeeState).toMatchObject({ machineOwned: true, machineUpgrade: "advanced", machineTrackedCoffeeCount: 36, coffeePurchaseCountThisMonth: 0 });
     expect(restored.internshipState.active).toBe(false); expect(restored.internshipCount).toBe(3);

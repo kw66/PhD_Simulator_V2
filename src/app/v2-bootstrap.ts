@@ -4,12 +4,14 @@ import { createReplayLibrary } from "./v2-replay-library";
 import { downloadReplayRecording } from "./v2-replay-download";
 import {
   Activity,
+  Armchair,
   ArrowRight,
   Award,
   Backpack,
   BadgeCheck,
   BadgeDollarSign,
   Bell,
+  Bike,
   BookOpen,
   Brain,
   Briefcase,
@@ -61,6 +63,7 @@ import {
   House,
   Hourglass,
   Infinity,
+  Keyboard,
   Laptop,
   Lightbulb,
   Lock,
@@ -87,6 +90,7 @@ import {
   Settings,
   Shield,
   ShieldPlus,
+  Shirt,
   Skull,
   Smile,
   Sparkles,
@@ -97,6 +101,7 @@ import {
   Sunrise,
   Target,
   Trophy,
+  Umbrella,
   TrendingUp,
   Users,
   UsersRound,
@@ -1165,6 +1170,7 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
           button.dataset.action === previousArchiveButton.action
           && button.dataset.rewinderPersonKey === previousArchiveButton.rewinderPersonKey
           && button.dataset.rewinderPaperSource === previousArchiveButton.rewinderPaperSource
+          && button.dataset.rewinderChairSource === previousArchiveButton.rewinderChairSource
           && button.dataset.rewinderCoffeeSource === previousArchiveButton.rewinderCoffeeSource)
         : undefined;
       (restoreFocus ?? root.querySelector<HTMLElement>("#academic-archive-title"))?.focus({ preventScroll: true });
@@ -1204,12 +1210,14 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
     createIcons({
       icons: {
         Activity,
+        Armchair,
         ArrowRight,
         Award,
         Backpack,
         BadgeCheck,
         BadgeDollarSign,
         Bell,
+        Bike,
         BookOpen,
         Brain,
         Briefcase,
@@ -1260,6 +1268,7 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
         House,
         Hourglass,
         Infinity,
+        Keyboard,
         Laptop,
         Lightbulb,
         Lock,
@@ -1286,6 +1295,7 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
         Settings,
         Shield,
         ShieldPlus,
+        Shirt,
         Skull,
         Smile,
         Sparkles,
@@ -1296,6 +1306,7 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
         Sunrise,
         Target,
         Trophy,
+        Umbrella,
         TrendingUp,
         Users,
         UsersRound,
@@ -1444,6 +1455,7 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
       rewinderStartYear: actionId === "start-game" && typeof dataset.rewinderStartYear === "string" ? Number(dataset.rewinderStartYear) : undefined,
       rewinderPaperSource: dataset.rewinderPaperSource === "current" || dataset.rewinderPaperSource === "previous" ? dataset.rewinderPaperSource : undefined,
       rewinderCoffeeSource: dataset.rewinderCoffeeSource === "current" || dataset.rewinderCoffeeSource === "previous" ? dataset.rewinderCoffeeSource : undefined,
+      rewinderChairSource: dataset.rewinderChairSource === "current" || dataset.rewinderChairSource === "previous" ? dataset.rewinderChairSource : undefined,
       projectType: dataset.projectType === "horizontal" || dataset.projectType === "vertical" ? dataset.projectType : undefined,
       debugStatId: isDebugStatId(dataset.debugStatId) ? dataset.debugStatId : undefined,
       debugPaperTarget: isPaperTarget(dataset.debugPaperTarget) ? dataset.debugPaperTarget : undefined,

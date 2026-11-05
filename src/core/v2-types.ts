@@ -924,6 +924,7 @@ export interface DispatchPayload {
   rewinderStartYear?: number;
   rewinderPaperSource?: "current" | "previous";
   rewinderCoffeeSource?: "current" | "previous";
+  rewinderChairSource?: "current" | "previous";
   rewinderArchive?: import("./v2-rewinder-state").RewinderArchive;
   rewinderCycleNumber?: number;
   rewinderPersonKey?: string;

@@ -60,16 +60,22 @@
 .academic-kept-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
 .academic-kept-tags > span { padding: 3px 7px; border: 1px solid #c3cfb6; border-radius: 4px; background: #eff4e8; color: #60794e; font-size: 12px; }
 .academic-kept-tags > span.is-empty { color: #93958b; border-color: #deded3; background: #f5f5ec; }
+.academic-kept-tags > span.is-debuff { color: #94594c; border-color: #d9b7aa; background: #f8eae2; }
+.academic-kept-tags > span { max-width: 100%; overflow-wrap: anywhere; }
 .academic-kept-card p { margin-top: 8px; color: #8a8a7f; font-size: 12px; line-height: 1.5; }
-.academic-equipment-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
-.academic-equipment-row > div { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid #d4c8b0; border-radius: 6px; background: #f4eddf; }
-.academic-equipment-row svg { width: 23px; height: 23px; flex: 0 0 auto; color: #947b58; }
-.academic-equipment-row > div > span { display: grid; gap: 4px; }
-.academic-equipment-row strong { color: #6a654e; font-size: 14px; }
-.academic-equipment-row small { color: #8b806b; font-size: 12px; }
-.academic-coffee-choice { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; color: #7a6b54; font-size: 12px; }
-.academic-coffee-choice button { padding: 6px 10px; border: 1px solid #c4b28e; border-radius: 4px; background: #faf4e7; color: #877251; }
-.academic-coffee-choice button[aria-pressed="true"] { border-color: #698976; background: #e7eee3; color: #426c51; }
+.academic-equipment-section { margin-top: 14px; }
+.academic-equipment-section .academic-section-heading { margin-bottom: 8px; }
+.academic-equipment-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.academic-equipment-item { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 10px; border: 1px solid #d4c8b0; border-radius: 5px; background: #f4eddf; }
+.academic-equipment-row svg { width: 18px; height: 18px; flex: 0 0 auto; color: #947b58; }
+.academic-equipment-item > span { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.academic-equipment-row strong { color: #6a654e; font-size: 12px; font-weight: 650; }
+.academic-equipment-row small { color: #8b806b; font-size: 11px; line-height: 1.4; }
+.academic-equipment-empty { grid-column: 1 / -1; color: #93958b; font-size: 12px; padding: 5px 0; }
+.academic-equipment-choice { display: grid; grid-template-columns: 72px repeat(2, minmax(0, 1fr)); align-items: center; gap: 6px; margin-top: 7px; color: #7a6b54; font-size: 12px; }
+.academic-equipment-choice button { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 6px; min-width: 0; min-height: 36px; padding: 6px 9px; border: 1px solid #c4b28e; border-radius: 4px; background: #faf4e7; color: #877251; overflow-wrap: anywhere; }
+.academic-equipment-choice button small { font-size: 10px; opacity: .8; }
+.academic-equipment-choice button[aria-pressed="true"] { border-color: #698976; background: #e7eee3; color: #426c51; }
 .academic-paper-section { margin-top: 20px; }
 .academic-section-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 11px; }
 .academic-section-heading h3 { color: #425b60; font-size: 16px; }
@@ -141,7 +147,8 @@
   .academic-money-card > p { flex-basis: 100%; margin-left: 0; text-align: right; }
   .academic-final-people, .academic-candidate-people { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .academic-growth-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .academic-kept-grid, .academic-equipment-row, .academic-paper-options { grid-template-columns: minmax(0, 1fr); }
+  .academic-kept-grid, .academic-paper-options { grid-template-columns: minmax(0, 1fr); }
+  .academic-equipment-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .academic-archive-footer { padding: 14px 18px; }
 }
 @media (max-width: 420px) {
@@ -153,6 +160,8 @@
   .academic-act-progress { gap: 14px; }
   .academic-act-progress > span { font-size: 11px; }
   .academic-archive-body { padding: 15px 12px; }
+  .academic-equipment-choice { grid-template-columns: 54px repeat(2, minmax(0, 1fr)); }
+  .academic-equipment-choice button { padding: 6px; font-size: 11px; }
   .academic-attribute-grid { gap: 9px; }
   .academic-stat-card { padding: 12px 10px; }
   .academic-stat-heading { gap: 4px; }

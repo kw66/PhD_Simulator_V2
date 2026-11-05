@@ -105,6 +105,13 @@ const encounters = shape({ ...fields("metBigBullCoop bigBullCooperation permanen
 const achievement = shape({ satisfied: strings, counters: counts, sets: dictionary(strings), peaks: counts, minima: counts,
   collections: shape(fields("buffs products conferences locations directions", strings)) });
 const careerValues = shape(fields("internet stateOwned civilService academic", nonnegative));
+const longTermEquipment = shape({
+  gpuLevel: choice(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+  ...fields("chairOwned keyboardOwned monitorOwned ebikeOwned hasDownJacket hasParasol hasBadmintonRacket", bool),
+  chairUpgrade: choice(null, "advanced", "massage", "torture", "spike", "hammock"), chairSanRecovered: nonnegative,
+  investments: shape(fields("gpu chair keyboard monitor", nonnegative), fields("ebike down_jacket parasol badminton_racket", nonnegative)),
+});
+export function isAcademicLongTermEquipment(value: unknown): boolean { return longTermEquipment(value); }
 const record = shape({
   year: choice(1, 2, 3, 4, 5), totalMonths: integer,
   identity: shape({ playerName: nullable(text), degree: choice("master", "phd"), phdStartYear: nullable(integer), graduationScoreTarget: nullable(nonnegative), maxMonths: choice(34, 70) }),
@@ -116,7 +123,7 @@ const record = shape({
     scholarshipState: shape({ lastAwardYear: nullable(integer), scoreBaseline: nonnegative, claimedPaperIds: strings }, { awardCount: integer }),
     achievementProgress: achievement, displayCounters: shape(fields("labResearchGrowth playerLedPublications fellowLedPublications", nonnegative)),
   }),
-  equipment: shape({ coffee, bike: shape({ ...fields("bikeOwned ebikeOwned", bool), ...fields("bikeLevel bikeSanSpent bikeSanCapGains investment giftDiscount", nonnegative) }) }),
+  equipment: shape({ coffee, bike: shape({ ...fields("bikeOwned ebikeOwned", bool), ...fields("bikeLevel bikeSanSpent bikeSanCapGains investment giftDiscount", nonnegative) }) }, { longTerm: longTermEquipment }),
   permanentBuffs: array(buff, 500), conference: shape({ encounters, career: shape({ enterpriseCount: integer, rejectedInternshipCount: integer, permanentlyBlockedInternship: bool }, { hasInternshipExperience: bool, lastInternshipOffer: offer }) }),
   papers: shape({ papers: array(paper), externalPublications: array(paper), totalResearchScore: nonnegative, totalCitations: nonnegative, citationHistoryByYear: counts }),
   people: shape({ advisor: shape({ name: nullable(text), progress: advisor }), lover: nullable(shape({ state: loverState, progress: loverProgress })),

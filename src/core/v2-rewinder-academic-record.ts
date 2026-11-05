@@ -14,11 +14,14 @@ import { formatMoney } from "./v2-money";
 import { createRelationshipState, syncRelationshipState } from "./v2-relationship-rules";
 import { createShopState } from "./v2-shop-items";
 import { createInitialThesisState } from "./v2-thesis-rules";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
+import { captureAcademicEquipment, getAcademicEquipment, mergeAcademicEquipment, type AcademicLongTermEquipment } from "./v2-rewinder-academic-equipment";
 import type { Buff, CoffeeState, FellowFinanceAccount, FellowProgressProfile, GameState, Paper, PlayerStats } from "./v2-types";
 
 export interface AcademicSelection {
   paperSource: "current" | "previous";
   coffeeSource?: "current" | "previous";
+  chairSource?: "current" | "previous";
   personKeys: string[];
 }
 export interface AcademicDisplayCounters { labResearchGrowth: number; playerLedPublications: number; fellowLedPublications: number }
@@ -39,7 +42,7 @@ export interface AcademicYearRecord {
       publicationTalentState: NonNullable<GameState["publicationTalentState"]>; scholarshipState: GameState["scholarshipState"];
       achievementProgress: AchievementRunProgress; displayCounters: AcademicDisplayCounters };
   equipment: { bike: Pick<GameState["shopState"], "bikeOwned" | "bikeLevel" | "ebikeOwned" | "bikeSanSpent" | "bikeSanCapGains"> & { investment: number; giftDiscount: number };
-    coffee: CoffeeState };
+    coffee: CoffeeState; longTerm?: AcademicLongTermEquipment };
   permanentBuffs: Buff[];
   conference: { encounters: GameState["conferenceEncounterState"]; career: GameState["conferenceCareerState"] };
   papers: Pick<GameState, "papers" | "externalPublications" | "totalResearchScore" | "totalCitations" | "citationHistoryByYear">;
@@ -116,7 +119,7 @@ function canonicalPermanentBuffs(items: readonly Buff[]): Buff[] {
   }
   return [...groups.values()];
 }
-/** Explicit allow-list: transient events, scientific work in progress and ordinary equipment never enter an archive. */
+/** Explicit allow-list: transient events and scientific work in progress never enter an archive. */
 export function captureAcademicYear(state: GameState): AcademicYearRecord {
   const achievements = clone(state.achievementProgress ?? createAchievementRunProgress());
   const rejections = Object.entries(achievements.counters).filter(([key]) => key.startsWith("research:rejected:")).map(([, value]) => value);
@@ -131,6 +134,7 @@ export function captureAcademicYear(state: GameState): AcademicYearRecord {
   const coffee = clone(state.coffeeState);
   coffee.coffeePurchaseCountThisMonth = 0;
   coffee.coffeeProducedCountThisMonth = 0;
+  if (usesGameplayRulesFrom("20261105-r61")) { coffee.subscriptionEnabled = false; coffee.subscriptionPaused = false; }
   const advisor = clone(state.advisorProgressState);
   advisor.pendingGuidanceToPlayer = null;
   const lover = state.loverState.active && state.loverProgressState.active ? {
@@ -151,7 +155,8 @@ export function captureAcademicYear(state: GameState): AcademicYearRecord {
       achievementProgress: achievements, displayCounters: getAcademicDisplayCounters(state) },
     equipment: { bike: { bikeOwned: state.shopState.bikeOwned, bikeLevel: state.shopState.bikeLevel, ebikeOwned: state.shopState.ebikeOwned,
       bikeSanSpent: state.shopState.bikeSanSpent, bikeSanCapGains: state.shopState.bikeSanCapGains, investment: state.shopState.investments.bike,
-      giftDiscount: (state.shopState.investments as GameState["shopState"]["investments"] & { bikeGiftDiscount?: number }).bikeGiftDiscount ?? 0 }, coffee },
+      giftDiscount: (state.shopState.investments as GameState["shopState"]["investments"] & { bikeGiftDiscount?: number }).bikeGiftDiscount ?? 0 }, coffee,
+      ...(usesGameplayRulesFrom("20261105-r61") ? { longTerm: captureAcademicEquipment(state) } : {}) },
     permanentBuffs: canonicalPermanentBuffs(state.buffs),
     conference: { encounters: clone(state.conferenceEncounterState), career: clone(state.conferenceCareerState) },
     papers: { papers: published(state.papers, state.totalMonths), externalPublications: published(state.externalPublications, state.totalMonths),
@@ -252,6 +257,7 @@ export function mergeAcademicYear(current: AcademicYearRecord, previous?: Academ
   const fallbackCoffee = coffeeSource === current ? previous : current;
   const coffee = clone(coffeeSource.equipment.coffee.machineOwned ? coffeeSource.equipment.coffee : fallbackCoffee.equipment.coffee);
   coffee.machineTrackedCoffeeCount = Math.max(current.equipment.coffee.machineTrackedCoffeeCount, previous.equipment.coffee.machineTrackedCoffeeCount);
+  if (usesGameplayRulesFrom("20261105-r61")) { coffee.subscriptionEnabled = false; coffee.subscriptionPaused = false; }
   const buffs = new Map<string, Buff>();
   for (const [record, source] of [[previous, "previous"], [current, "current"]] as const) for (const buff of canonicalPermanentBuffs(record.permanentBuffs)) {
     if (buff.relationshipId && !choices.personKeys.includes(`${source}:${buff.relationshipId === "advisor" || buff.relationshipId === "lover" ? buff.relationshipId : `fellow:${buff.relationshipId}`}`)) continue;
@@ -266,7 +272,8 @@ export function mergeAcademicYear(current: AcademicYearRecord, previous?: Academ
     papers: clone(choices.paperSource === "previous" ? previous.papers : current.papers),
     equipment: { coffee, bike: { ...clone(bikeAsset), ...maxima({ bikeSanSpent: current.equipment.bike.bikeSanSpent,
       bikeSanCapGains: current.equipment.bike.bikeSanCapGains }, previous.equipment.bike),
-      ebikeOwned: false } },
+      ebikeOwned: usesGameplayRulesFrom("20261105-r61") && (currentBike.ebikeOwned || previousBike.ebikeOwned) },
+      ...(usesGameplayRulesFrom("20261105-r61") ? { longTerm: mergeAcademicEquipment(current, previous, choices.chairSource) } : {}) },
     growth: { ...clone(growth), ...maxima({ partTimeWorkCount: growth.partTimeWorkCount, internshipCount: growth.internshipCount,
       personalSpending: growth.personalSpending, totalRandomEventCount: growth.totalRandomEventCount, relationshipMentorshipStacks: growth.relationshipMentorshipStacks }, old),
       readingState: maxima(growth.readingState, old.readingState), eventCounters: maxima(growth.eventCounters, old.eventCounters),
@@ -290,6 +297,15 @@ export function restoreAcademicYear(base: GameState, record: AcademicYearRecord)
     bikeSanSpent: r.equipment.bike.bikeSanSpent, bikeSanCapGains: r.equipment.bike.bikeSanCapGains });
   const investments = { ...shop.investments, bike: r.equipment.bike.investment, bikeGiftDiscount: r.equipment.bike.giftDiscount };
   shop.investments = investments;
+  const longTerm = usesGameplayRulesFrom("20261105-r61") ? getAcademicEquipment(r) : undefined;
+  if (longTerm) {
+    Object.assign(shop, { gpuLevel: longTerm.gpuLevel, chairOwned: longTerm.chairOwned, chairUpgrade: longTerm.chairUpgrade,
+      chairSanRecovered: longTerm.chairSanRecovered, keyboardOwned: longTerm.keyboardOwned,
+      monitorOwned: longTerm.monitorOwned, ebikeOwned: longTerm.ebikeOwned });
+    shop.investments = { ...shop.investments, ...longTerm.investments };
+    r.equipment.coffee.subscriptionEnabled = false;
+    r.equipment.coffee.subscriptionPaused = false;
+  }
   const papers = r.papers;
   const publishedIds = union(papers.papers.map(paper => paper.id), papers.externalPublications.map(paper => paper.id));
   const fellows = r.people.fellows.map(({ profile }) => {
@@ -323,7 +339,8 @@ export function restoreAcademicYear(base: GameState, record: AcademicYearRecord)
     fellowPapers: [], fellowResearchLastTotalMonths: r.totalMonths, paperSlotsUnlocked: getUnlockedPaperSlotCount(a.research), selectedPaperId: null,
     eventQueue: [], eventHistory: [], log: [], ending: null, endingCause: undefined, pendingRandomEvents: [], pendingRunStatistics: [],
     actionState: { used: 0, limit: 1, aiResearchBonusUsed: false }, thesis: createInitialThesisState(),
-    eventSupport: { hasParasol: false, hasDownJacket: false, hasBadmintonRacket: false, hasStrongBodyTalent: g.strongBody, aiCostsCoveredUntilTotalMonths: null },
+    eventSupport: { hasParasol: longTerm?.hasParasol ?? false, hasDownJacket: longTerm?.hasDownJacket ?? false,
+      hasBadmintonRacket: longTerm?.hasBadmintonRacket ?? false, hasStrongBodyTalent: g.strongBody, aiCostsCoveredUntilTotalMonths: null },
     careerOffers: {}, careerPreparedMonths: {}, careerLastRecruitmentTotalMonths: null, labFinanceLedger: undefined, sanHistory: [],
   };
   const totals = getFellowPublicationTotals(next);

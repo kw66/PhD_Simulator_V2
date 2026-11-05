@@ -5,6 +5,9 @@ import { BIKE_TIER_DEFINITIONS } from "../core/v2-bike-system";
 import { PUBLICATION_TALENT_DEFINITIONS } from "../core/v2-publication-talent";
 import { formatMoney } from "../core/v2-money";
 import { getAcceptedPaperScore } from "../core/v2-publication-rules";
+import { getGpuTierDefinition, SHOP_UPGRADE_DEFINITIONS } from "../core/v2-shop-items";
+import { buildBuffDisplayBuckets } from "./v2-render-buffs";
+import { hasAcademicEquipmentConflict } from "../core/v2-rewinder-academic-equipment";
 import type { CoffeeState, GameState, Paper } from "../core/v2-types";
 import "../styles/rewinder-academic.css";
 
@@ -60,17 +63,48 @@ const coffeeLabels: Record<Exclude<CoffeeState["machineUpgrade"], null>, string>
 };
 function coffeeLabel(coffee: CoffeeState): string { return !coffee.machineOwned ? "未购置咖啡机" : coffee.machineUpgrade ? coffeeLabels[coffee.machineUpgrade] : "咖啡机"; }
 
+function chairLabel(chair: AcademicYearRecord["equipment"]["longTerm"]): string {
+  return chair?.chairUpgrade ? SHOP_UPGRADE_DEFINITIONS.find(item => item.id === `chair-${chair.chairUpgrade}`)?.name ?? "办公椅" : "办公椅";
+}
+
+function equipmentItem(icon: string, label: string, detail = ""): string {
+  return `<div class="academic-equipment-item"><i data-lucide="${icon}" aria-hidden="true"></i><span><strong>${escapeHtml(label)}</strong>${detail ? `<small>${escapeHtml(detail)}</small>` : ""}</span></div>`;
+}
+
+function equipmentChoice(preview: Preview, kind: "chair" | "coffee", currentLabel: string, previousLabel: string): string {
+  return `<div class="academic-equipment-choice"><span>${kind === "chair" ? "椅子" : "咖啡机"}路线</span>${(["current", "previous"] as const).map(source => `<button type="button" data-action="select-rewinder-archive-${kind}" data-rewinder-${kind}-source="${source}" aria-pressed="${(kind === "chair" ? preview.chairSource : preview.coffeeSource) === source}"><small>${source === "current" ? "本次" : "原档案"}</small>${escapeHtml(source === "current" ? currentLabel : previousLabel)}</button>`).join("")}</div>`;
+}
+
+function renderEquipment(preview: Preview): string {
+  const { best, current, previous } = preview;
+  const { bike, coffee, longTerm: equipment } = best.equipment;
+  const items = [
+    equipment?.gpuLevel ? equipmentItem("cpu", getGpuTierDefinition(equipment.gpuLevel)?.name ?? "显卡") : "",
+    equipment?.chairOwned ? equipmentItem("armchair", chairLabel(equipment), equipment.chairSanRecovered > 0 ? `累计恢复 ${number(equipment.chairSanRecovered)} SAN` : "") : "",
+    equipment?.keyboardOwned ? equipmentItem("keyboard", "机械键盘") : "",
+    equipment?.monitorOwned ? equipmentItem("monitor", "2K 显示器") : "",
+    bike.bikeOwned ? equipmentItem("bike", BIKE_TIER_DEFINITIONS.find(item => item.level === bike.bikeLevel)?.name ?? "自行车", `骑行 ${number(bike.bikeSanSpent)} · SAN上限 +${number(bike.bikeSanCapGains)}`) : "",
+    equipment?.ebikeOwned ? equipmentItem("bike", "小电驴") : "",
+    coffee.machineOwned ? equipmentItem("coffee", coffeeLabel(coffee), `累计制作 ${number(coffee.machineTrackedCoffeeCount)} 杯`) : "",
+    equipment?.hasDownJacket ? equipmentItem("shirt", "羽绒服") : "",
+    equipment?.hasParasol ? equipmentItem("umbrella", "遮阳伞") : "",
+    equipment?.hasBadmintonRacket ? equipmentItem("trophy", "羽毛球拍") : "",
+  ].filter(Boolean);
+  const currentChair = current.equipment.longTerm;
+  const previousChair = previous?.equipment.longTerm;
+  const chairChoice = hasAcademicEquipmentConflict(current, previous, "chair");
+  const coffeeChoice = hasAcademicEquipmentConflict(current, previous, "coffee");
+  return `<section class="academic-equipment-section" aria-label="保留设备"><div class="academic-section-heading"><h3>保留设备</h3></div><div class="academic-equipment-row">${items.length ? items.join("") : '<span class="academic-equipment-empty">尚未购置长期设备</span>'}</div>${chairChoice ? equipmentChoice(preview, "chair", chairLabel(currentChair), chairLabel(previousChair)) : ""}${coffeeChoice ? equipmentChoice(preview, "coffee", coffeeLabel(current.equipment.coffee), coffeeLabel(previous!.equipment.coffee)) : ""}</section>`;
+}
+
 function renderGrowth(preview: Preview): string {
   const { current, best, previous } = preview;
   const growth = best.growth;
   const currentGrowth = current.growth;
   const talents = new Set(growth.publicationTalentState?.claimedIds ?? []);
   const talentNames = PUBLICATION_TALENT_DEFINITIONS.filter(item => talents.has(item.id)).map(item => item.name);
-  const bike = best.equipment.bike;
-  const coffee = best.equipment.coffee;
-  const coffeeChoice = !!previous && current.equipment.coffee.machineOwned && previous.equipment.coffee.machineOwned
-    && current.equipment.coffee.machineUpgrade !== previous.equipment.coffee.machineUpgrade;
-  return `<div class="academic-growth-metrics">${growthMetric("读论文", currentGrowth.readingState.readCount, growth.readingState.readCount)}${growthMetric("打工", currentGrowth.partTimeWorkCount, growth.partTimeWorkCount)}${growthMetric("实习经历", currentGrowth.internshipCount, growth.internshipCount)}${growthMetric("国奖", currentGrowth.scholarshipState.awardCount, growth.scholarshipState.awardCount)}${growthMetric("论文熟手", currentGrowth.paperMasteryState?.count, growth.paperMasteryState?.count)}</div><div class="academic-record-line"><span>实验室传承 <strong>${number(growth.displayCounters.labResearchGrowth)}</strong></span><span>论文合作 · 我的一作 <strong>${number(growth.displayCounters.playerLedPublications)}</strong></span><span>论文合作 · 同伴一作 <strong>${number(growth.displayCounters.fellowLedPublications)}</strong></span></div><div class="academic-kept-grid"><section class="academic-kept-card"><h3><i data-lucide="sparkles" aria-hidden="true"></i>永久成长</h3><div class="academic-kept-tags">${best.permanentBuffs.length ? best.permanentBuffs.map(buff => `<span title="${escapeHtml(buff.description ?? buff.name)}">${escapeHtml(buff.name)}</span>`).join("") : '<span class="is-empty">尚无永久buff</span>'}</div><p>成长、经历与事件计数分别取最佳。</p></section><section class="academic-kept-card"><h3><i data-lucide="award" aria-hidden="true"></i>发表天赋</h3><div class="academic-kept-tags">${talentNames.length ? talentNames.map(name => `<span>${escapeHtml(name)}</span>`).join("") : '<span class="is-empty">尚未解锁发表天赋</span>'}</div><p>已达成的天赋保留，旧奖励不会重复发放。</p></section></div><div class="academic-equipment-row"><div><i data-lucide="footprints" aria-hidden="true"></i><span><strong>${bike.bikeOwned ? BIKE_TIER_DEFINITIONS.find(item => item.level === bike.bikeLevel)?.name ?? "自行车" : "未购置自行车"}</strong><small>骑行积累 ${number(bike.bikeSanSpent)} · 已增SAN上限 ${number(bike.bikeSanCapGains)}</small></span></div><div><i data-lucide="coffee" aria-hidden="true"></i><span><strong>${coffeeLabel(coffee)}</strong><small>累计制作 ${number(coffee.machineTrackedCoffeeCount)} 杯</small></span></div></div>${coffeeChoice ? `<div class="academic-coffee-choice"><span>选择保留的咖啡机路线</span>${(["current", "previous"] as const).map(source => `<button type="button" data-action="select-rewinder-archive-coffee" data-rewinder-coffee-source="${source}" aria-pressed="${preview.coffeeSource === source}">${source === "current" ? "本次" : "原档案"} · ${coffeeLabel(source === "current" ? current.equipment.coffee : previous!.equipment.coffee)}</button>`).join("")}</div>` : ""}<section class="academic-paper-section"><div class="academic-section-heading"><h3>选择一整套论文成果</h3><p>论文、引用与科研分一同保留，不拼接不同尝试。</p></div><div class="academic-paper-options">${paperChoice(preview, "current", current)}${previous ? paperChoice(preview, "previous", previous) : ""}</div>${selectedPaperList(preview)}</section><p class="academic-footnote">只留下已发表论文；待参会论文按已完成展示保存。在研、在投论文及临时buff清除。</p>`;
+  const permanentEffects = buildBuffDisplayBuckets(best.permanentBuffs).permanent;
+  return `<div class="academic-growth-metrics">${growthMetric("读论文", currentGrowth.readingState.readCount, growth.readingState.readCount)}${growthMetric("打工", currentGrowth.partTimeWorkCount, growth.partTimeWorkCount)}${growthMetric("实习经历", currentGrowth.internshipCount, growth.internshipCount)}${growthMetric("国奖", currentGrowth.scholarshipState.awardCount, growth.scholarshipState.awardCount)}${growthMetric("论文熟手", currentGrowth.paperMasteryState?.count, growth.paperMasteryState?.count)}</div><div class="academic-record-line"><span>实验室传承 <strong>${number(growth.displayCounters.labResearchGrowth)}</strong></span><span>论文合作 · 我的一作 <strong>${number(growth.displayCounters.playerLedPublications)}</strong></span><span>论文合作 · 同伴一作 <strong>${number(growth.displayCounters.fellowLedPublications)}</strong></span></div><div class="academic-kept-grid"><section class="academic-kept-card"><h3><i data-lucide="sparkles" aria-hidden="true"></i>永久成长</h3><div class="academic-kept-tags">${permanentEffects.length ? permanentEffects.map(effect => `<span${effect.isDebuff ? ' class="is-debuff"' : ""} title="${escapeHtml(effect.sources.join("\n"))}">${escapeHtml(effect.label)}</span>`).join("") : '<span class="is-empty">尚无永久效果</span>'}</div><p>成长、经历与事件计数分别取最佳。</p></section><section class="academic-kept-card"><h3><i data-lucide="award" aria-hidden="true"></i>发表天赋</h3><div class="academic-kept-tags">${talentNames.length ? talentNames.map(name => `<span>${escapeHtml(name)}</span>`).join("") : '<span class="is-empty">尚未解锁发表天赋</span>'}</div><p>已达成的天赋保留，旧奖励不会重复发放。</p></section></div>${renderEquipment(preview)}<section class="academic-paper-section"><div class="academic-section-heading"><h3>选择一整套论文成果</h3><p>论文、引用与科研分一同保留，不拼接不同尝试。</p></div><div class="academic-paper-options">${paperChoice(preview, "current", current)}${previous ? paperChoice(preview, "previous", previous) : ""}</div>${selectedPaperList(preview)}</section><p class="academic-footnote">只留下已发表论文；待参会论文按已完成展示保存。在研、在投论文及临时buff清除。</p>`;
 }
 
 function personCard(person: Preview["candidates"][number], selectedSlot = false): string {

@@ -10,6 +10,7 @@ import { captureAcademicYear } from "../src/core/v2-rewinder-academic-record";
 import { completeAcademicArchive, prepareAcademicArchive, selectAcademicSource } from "../src/core/v2-rewinder-academic";
 import type { GameState } from "../src/core/v2-types";
 import { getRoleChibiPortraitUrl } from "../src/app/v2-role-portrait-assets";
+import { createAcademicEquipmentFixture } from "./helpers/v2-academic-equipment-fixture";
 
 function fixture(): GameState {
   const base = createStartedGameState("rewinder");
@@ -24,6 +25,24 @@ function fixture(): GameState {
 }
 
 describe("academic archive pages", () => {
+  it("groups permanent effects by effect while retaining source details and all long-term equipment", () => {
+    const state = createAcademicEquipmentFixture();
+    const original = structuredClone(state);
+    const html = renderAcademicArchive(state, 1);
+    expect(html).toContain("idea +5分");
+    expect(html).toContain("VALSE报告");
+    expect(html).toContain("学术讨论");
+    expect(html).not.toContain(">报告收获</span>");
+    for (const label of ["RTX A6000 显卡", "电动按摩椅", "机械键盘", "2K 显示器", "小电驴", "自动咖啡机", "羽绒服", "遮阳伞", "羽毛球拍"]) expect(html).toContain(label);
+    expect(html.match(/class="academic-equipment-item"/g)).toHaveLength(10);
+    expect(html).toContain('data-rewinder-chair-source="current" aria-pressed="true"');
+    expect(html).toContain('data-rewinder-chair-source="previous" aria-pressed="false"');
+    expect(state).toEqual(original);
+    const selected = renderAcademicArchive(selectAcademicSource(state, "chairSource", "previous"), 1);
+    expect(selected).toContain('data-rewinder-chair-source="previous" aria-pressed="true"');
+    expect(selected).toContain("吊床");
+  });
+
   it("shows one distinct act at a time and only offers final confirmation in act three", () => {
     const state = fixture();
     const first = renderAcademicArchive(state, 0);
