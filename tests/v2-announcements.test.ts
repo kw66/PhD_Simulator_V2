@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-11-05", "2026-11-04", "2026-10-28", "2026-10-27", "2026-10-26", "2026-10-25"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-11-08", "2026-11-05", "2026-11-04", "2026-10-28", "2026-10-27", "2026-10-26"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -59,7 +59,7 @@ describe("game announcements", () => {
     for (const topic of ["5月处理转博", "月末判断毕业", "注册费", "失败预警", "生活费", "2000字", "同学钱包", "角色经验", "十二项发表里程碑", "六个AI系列"]) {
       expect(text).toContain(topic);
     }
-    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(28);
+    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(29);
   });
 
   it("adds a third lobby tab without replacing the selected role or start button", () => {

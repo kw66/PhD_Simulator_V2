@@ -5,6 +5,7 @@ import { previewNextMonthEffects } from "../src/core/v2-monthly-effects";
 import { applyPlayerAttributeChange, getPlayerAttributeCap } from "../src/core/v2-player-attributes";
 import { getCalendarForTotalMonths } from "../src/core/v2-progression";
 import { settleRoleTalentMonthEnd, settleRoleTalentMonthStart } from "../src/core/v2-role-talent-lifecycle";
+import { getDesignedTalentNodes } from "../src/core/v2-role-talent-definitions";
 import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import type { GameState, RoleId } from "../src/core/v2-types";
 
@@ -80,10 +81,10 @@ describe("r49 日渐圆润 monthly limits", () => {
   });
 });
 
-describe("r49 患得患失 monthly timing", () => {
-  it("waits four complete unchanged months and then penalizes every further unchanged month", () => {
+describe("r62 患得患失 monthly timing", () => {
+  it("waits four complete unchanged months and restarts the streak after each curse", () => {
     let state = playing("social-reversed");
-    const getRoll = vi.fn(() => { throw new Error("r49 stagnation must not draw randomness"); });
+    const getRoll = vi.fn(() => { throw new Error("r62 stagnation must not draw randomness"); });
     for (let current = 1; current <= 4; current += 1) {
       state = settleRoleTalentMonthStart(atMonth(state, current), getRoll);
       expect(state.player.research).toBe(3);
@@ -94,12 +95,27 @@ describe("r49 患得患失 monthly timing", () => {
     }
     state = settleRoleTalentMonthStart(atMonth(state, 5), getRoll);
     expect(state.player.research).toBe(2);
-    expect(state.player.favor).toBe(2);
+    expect(state.player.social).toBe(2);
+    expect(state.player.favor).toBe(3);
+    expect(state.roleTalents?.socialChangedMonth).toBe(5);
     expect(state.roleTalents?.lastStagnationCurseMonth).toBe(5);
     expect(settleRoleTalentMonthStart(state, getRoll)).toBe(state);
-    state = settleRoleTalentMonthStart(atMonth(settleRoleTalentMonthEnd(state), 6), getRoll);
+    state = settleRoleTalentMonthEnd(state);
+    expect(state.roleTalents?.socialStagnantMonths).toBe(0);
+    for (let current = 6; current <= 9; current += 1) {
+      state = settleRoleTalentMonthStart(atMonth(state, current), getRoll);
+      expect(state.player.research).toBe(2);
+      expect(state.player.social).toBe(2);
+      expect(state.player.favor).toBe(3);
+      state = settleRoleTalentMonthEnd(state);
+      expect(state.roleTalents?.socialStagnantMonths).toBe(current - 5);
+    }
+    state = settleRoleTalentMonthStart(atMonth(state, 10), getRoll);
     expect(state.player.research).toBe(1);
-    expect(state.player.favor).toBe(1);
+    expect(state.player.social).toBe(1);
+    expect(state.player.favor).toBe(3);
+    expect(state.roleTalents?.socialChangedMonth).toBe(10);
+    expect(settleRoleTalentMonthEnd(state).roleTalents?.socialStagnantMonths).toBe(0);
     expect(getRoll).not.toHaveBeenCalled();
   });
 
@@ -125,43 +141,76 @@ describe("r49 患得患失 monthly timing", () => {
     expect(end.roleTalents?.socialStagnantMonths).toBe(4);
     const next = settleRoleTalentMonthStart(atMonth(end, 5));
     expect(next.player.research).toBe(state.player.research - 1);
-    expect(next.player.favor).toBe(state.player.favor - 1);
+    expect(next.player.social).toBeLessThan(state.player.social);
+    expect(next.player.favor).toBe(state.player.favor);
   });
 
-  it("applies ordinary tier resistance separately to research and favor", () => {
+  it("applies ordinary tier resistance separately to research and social and resets from a fractional loss", () => {
     const state = stagnant(atMonth(playing("social-reversed"), 5), 4);
-    state.player = { ...state.player, research: 6, favor: 18 };
+    state.player = { ...state.player, research: 6, social: 18 };
     const after = settleRoleTalentMonthStart(state);
     expect(after.player.research).toBeCloseTo(5.2);
-    expect(after.player.favor).toBeCloseTo(17.6);
+    expect(after.player.social).toBeCloseTo(17.6);
+    expect(after.player.favor).toBe(state.player.favor);
     expect(after.roleTalents?.lossTotals?.research).toBeCloseTo(0.8);
-    expect(after.roleTalents?.lossTotals?.favor).toBeCloseTo(0.4);
+    expect(after.roleTalents?.lossTotals?.social).toBeCloseTo(0.4);
+    expect(after.roleTalents?.socialChangedMonth).toBe(5);
+    expect(settleRoleTalentMonthEnd(after).roleTalents?.socialStagnantMonths).toBe(0);
   });
 
   it("previews both deterministic losses after month four and preserves the source state", () => {
     const state = stagnant(atMonth(playing("social-reversed"), 4), 3);
-    state.player = { ...state.player, research: 6, favor: 18 };
+    state.player = { ...state.player, research: 6, social: 18 };
     const snapshot = structuredClone(state);
     const preview = previewNextMonthEffects(state);
     const effect = preview.items.find(item => item.id === "monthly-role-stagnation");
-    expect(effect).toMatchObject({ name: "患得患失", stats: { research: -0.8, favor: -0.4 }, appliedStats: { research: -0.8, favor: -0.4 } });
+    expect(effect).toMatchObject({ name: "患得患失", stats: { research: -0.8, social: -0.4 }, appliedStats: { research: -0.8, social: -0.4 } });
     expect(effect?.label).toBeUndefined();
     expect(preview.totals.research).toBeCloseTo(-0.8);
-    expect(preview.totals.favor).toBeCloseTo(-0.4);
+    expect(preview.totals.social).toBeCloseTo(-0.4);
     expect(preview.player.research).toBeCloseTo(5.2);
-    expect(preview.player.favor).toBeCloseTo(17.6);
+    expect(preview.player.social).toBeCloseTo(17.6);
+    expect(preview.player.favor).toBe(state.player.favor);
     expect(previewNextMonthEffects(state)).toEqual(preview);
     expect(state).toEqual(snapshot);
     expect(previewNextMonthEffects(stagnant(atMonth(state, 3), 2)).items.some(item => item.id === "monthly-role-stagnation")).toBe(false);
   });
 
-  it("previews actual negative research and favor instead of hiding lethal risks", () => {
+  it("previews actual negative research and social instead of hiding lethal risks", () => {
     const state = stagnant(atMonth(playing("social-reversed"), 4), 3);
-    state.player = { ...state.player, research: 0.2, favor: 0.5 };
+    state.player = { ...state.player, research: 0.2, social: 0.5 };
     const preview = previewNextMonthEffects(state);
     expect(preview.player.research).toBeCloseTo(-0.8);
-    expect(preview.player.favor).toBeCloseTo(-0.5);
-    expect(preview.items.find(item => item.id === "monthly-role-stagnation")?.appliedStats).toEqual({ research: -1, favor: -1 });
+    expect(preview.player.social).toBeCloseTo(-0.5);
+    expect(preview.player.favor).toBe(state.player.favor);
+    expect(preview.items.find(item => item.id === "monthly-role-stagnation")?.appliedStats).toEqual({ research: -1, social: -1 });
+  });
+
+  it("settles social-loss talent rewards once and includes them in the monthly preview", () => {
+    const state = stagnant(atMonth(playing("social-reversed", { "social-loss-coins": 2 }), 4), 3);
+    const snapshot = structuredClone(state);
+    const preview = previewNextMonthEffects(state);
+    const next = settleRoleTalentMonthStart(atMonth(settleRoleTalentMonthEnd(state), 5));
+    expect(next.player.money).toBe(state.player.money + 2);
+    expect(next.roleTalents?.socialLossRemainder).toBe(0);
+    expect(settleRoleTalentMonthStart(next)).toBe(next);
+    expect(preview.items.find(item => item.id === "monthly-role-stagnation")?.appliedStats).toEqual({ research: -1, social: -1, money: 2 });
+    expect(state).toEqual(snapshot);
+  });
+
+  it.each(["20261024-r49", "20261105-r61"] as const)("preserves consecutive research/favor penalties and copy for %s replays", (ruleset) => {
+    withGameplayRuleset(ruleset, () => {
+      const state = stagnant(atMonth(playing("social-reversed"), 4), 3);
+      const preview = previewNextMonthEffects(state);
+      expect(preview.items.find(item => item.id === "monthly-role-stagnation")?.appliedStats).toEqual({ research: -1, favor: -1 });
+      const fifth = settleRoleTalentMonthStart(atMonth(settleRoleTalentMonthEnd(state), 5));
+      expect(fifth.player).toMatchObject({ research: 2, social: 3, favor: 2 });
+      expect(settleRoleTalentMonthEnd(fifth).roleTalents?.socialStagnantMonths).toBe(5);
+      const sixth = settleRoleTalentMonthStart(atMonth(settleRoleTalentMonthEnd(fifth), 6));
+      expect(sixth.player).toMatchObject({ research: 1, social: 3, favor: 1 });
+      expect(getDesignedTalentNodes("social-reversed")?.find(node => node.id === "social-stagnation")?.effect)
+        .toBe("连续4个月社交未变化，下月初科研和导师好感-1");
+    });
   });
 
   it.each([[0, "research", "favor"], [0.9, "favor", "research"]] as const)("preserves the r48 random branch for roll %s", (roll, reduced, unaffected) => {

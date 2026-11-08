@@ -1235,7 +1235,7 @@ describe("v2 render lobby shell", () => {
       expect(node).toContain(effect);
     }
     const curse = html.split("<button").find((markup) => markup.includes('data-talent-id="social-stagnation"'))?.split("</button>")[0] ?? "";
-    expect(curse).toContain("连续4个月社交未变化，下月初科研和导师好感-1");
+    expect(curse).toContain("连续4个月社交未变化，下月初科研和社交各-1；此次社交下降也视为变化");
     expect(curse).toContain('data-lucide="skull"');
     expect(curse).toContain('style="grid-column:4;grid-row:1"');
     expect(curse).toContain('data-prerequisite-ids=""');

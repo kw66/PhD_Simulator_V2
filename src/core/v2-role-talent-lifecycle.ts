@@ -345,7 +345,8 @@ export function settleRoleTalentMonthStart(state: GameState, getRoll: () => numb
   const fourMonthStagnation = usesGameplayRulesFrom("20261024-r49");
   if (state.selectedRoleId === "social-reversed" && (state.roleTalents?.socialStagnantMonths ?? 0) >= (fourMonthStagnation ? 4 : 2)) {
     if (fourMonthStagnation) {
-      state = logTalent(state, addAttributes(state, { research: -1, favor: -1 }), "social-stagnation", "患得患失", "连续四个月社交没有实际变化");
+      const losses = usesGameplayRulesFrom("20261108-r62") ? { research: -1, social: -1 } : { research: -1, favor: -1 };
+      state = logTalent(state, addAttributes(state, losses), "social-stagnation", "患得患失", "连续四个月社交没有实际变化");
     } else {
       // Legacy previews quote either branch without consuming the actual random stream.
       const stat = (options.skipSwaps ? 0 : getRoll()) < 0.5 ? "research" : "favor";

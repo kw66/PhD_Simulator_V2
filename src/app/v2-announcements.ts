@@ -10,6 +10,13 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-11-08",
+    title: "嫉妒的患得患失调整",
+    changes: [
+      { category: "平衡", title: "社交下降打断连续惩罚", description: "嫉妒连续4个月社交未发生实际变化，下月初改为科研和社交各-1，不再扣导师好感。此次社交下降也视为变化，重新累计未变化月份；属性下降仍受抵抗影响。" },
+    ],
+  },
+  {
     date: "2026-11-05",
     title: "轮回者设备继承与结算展示",
     changes: [

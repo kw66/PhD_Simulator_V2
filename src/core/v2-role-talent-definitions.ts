@@ -333,7 +333,7 @@ const R48_SOCIAL_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = R40_SOCI
 
 export const SOCIAL_REVERSED_TALENT_NODES: readonly DesignedTalentNode[] = [
   ...R48_SOCIAL_REVERSED_TALENT_NODES.map((node): DesignedTalentNode => {
-    if (node.id === "social-stagnation") return { ...node, effect: "连续4个月社交未变化，下月初科研和导师好感-1" };
+    if (node.id === "social-stagnation") return { ...node, effect: "连续4个月社交未变化，下月初科研和社交各-1；此次社交下降也视为变化" };
     if (node.id === "affinity-conversion") return { ...node, cost: 2 };
     if (node.id === "fellow-add-social" || node.id === "fellow-remove-social") return { ...node, cost: 1 };
     if (node.id === "junior-event-focus") return { ...node, row: "1" };
@@ -418,6 +418,8 @@ export function getDesignedTalentNodes(roleId: RoleId): readonly DesignedTalentN
   if (roleId === "chosen-reversed" && !usesGameplayRulesFrom("20261024-r50")) return R49_CHOSEN_REVERSED_TALENT_NODES;
   if (roleId === "social-reversed" && !usesGameplayRulesFrom("20261023-r41")) return R40_SOCIAL_REVERSED_TALENT_NODES;
   if (roleId === "social-reversed" && !usesGameplayRulesFrom("20261024-r49")) return R48_SOCIAL_REVERSED_TALENT_NODES;
+  if (roleId === "social-reversed" && !usesGameplayRulesFrom("20261108-r62")) return SOCIAL_REVERSED_TALENT_NODES.map(node => node.id === "social-stagnation"
+    ? { ...node, effect: "连续4个月社交未变化，下月初科研和导师好感-1" } : node);
   const chosenNodes: readonly DesignedTalentNode[] = usesGameplayRulesFrom("20261023-r39") ? CHOSEN_TALENT_NODES
     : CHOSEN_TALENT_NODES.filter(node => node.id !== "healthy-mind").map(node => {
       if (node.id === "favored-by-fate") return { ...node, maxLevel: 2 };
