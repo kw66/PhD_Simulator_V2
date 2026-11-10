@@ -255,6 +255,40 @@ describe("graduation cards and blind review in the browser", () => {
     } finally { await page.close(); }
   });
 
+  it("reenables a genius civil-service job after resting from four to six SAN", async () => {
+    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    page.setDefaultTimeout(10000);
+    try {
+      await page.route("**/__graduation_test__", route => route.fulfill({ contentType: "text/html", body: fixture }));
+      await page.goto(`${server.resolvedUrls!.local[0]}__graduation_test__`);
+      await page.waitForSelector('[data-action="start-game"]:not(:disabled)');
+      const base = createStartedGameState("genius");
+      const eventState = { ...base, year: 3, month: 3, totalMonths: 27,
+        player: { ...base.player, san: 4 }, totalResearchScore: 100, selectedAdvisorName: "王老师" };
+      const event = createEventQueueItem(createCareerRecruitmentEvent(eventState, () => 0), 1);
+      await page.evaluate(({ queued, prepared }) => {
+        const store = (window as GraduationWindow).graduationStore;
+        store.dispatch("start-game", { roleId: "genius" });
+        Object.assign(store.getState(), prepared, { eventQueue: [queued] });
+        store.dispatch("set-linear-event-blocking", { blockLinearEvents: true });
+      }, { queued: event, prepared: eventState });
+      await page.locator('[data-ui-open-event-id^="career-recruitment-"]:visible').first().click();
+      await page.locator('[data-event-choice-id="choose-civilService"]:visible').click();
+      const job = page.locator('#event-content-buttons button').filter({ hasText: "乡镇机关" });
+      expect(await job.isDisabled()).toBe(true);
+      await page.evaluate(() => (window as GraduationWindow).graduationStore.dispatch("rest"));
+      expect(await page.evaluate(() => (window as GraduationWindow).graduationStore.getState().player.san)).toBe(6);
+      await expect.poll(() => job.isEnabled()).toBe(true);
+      await page.locator("#event-content-box").screenshot({ path: "artifacts/graduation/civil-service-san-restored.png" });
+      await job.click();
+      await page.locator('#event-content-buttons [data-event-choice-id="accept-offer"]').click();
+      expect(await page.evaluate(() => {
+        const state = (window as GraduationWindow).graduationStore.getState();
+        return { san: state.player.san, offer: state.careerOffers.civilService?.jobId };
+      })).toEqual({ san: 0, offer: "civil-town-deputy-section" });
+    } finally { await page.close(); }
+  }, 30_000);
+
   it("chooses a recruitment track and job in the browser, then settles the offer on confirmation", async () => {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     page.setDefaultTimeout(10000);

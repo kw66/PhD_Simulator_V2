@@ -11,6 +11,7 @@ import {
 } from "./v2-career-rules";
 import { getActualSanChange } from "./v2-sanity-rules";
 import { quoteSanPayment } from "./v2-role-talent-costs";
+import { usesGameplayRulesFrom } from "./v2-rule-context";
 import type { EventChoice, GameState, PendingEvent } from "./v2-types";
 
 export const CAREER_INTERVIEW_SAN_COST: Record<CareerType, number> = {
@@ -208,4 +209,31 @@ export function shouldScheduleCareerRecruitment(state: GameState): boolean {
     && state.year === (state.degree === "master" ? 3 : 6)
     && state.careerLastRecruitmentTotalMonths !== state.totalMonths
     && !state.eventQueue.some((event) => event.chainId === `career-recruitment-${state.totalMonths}`);
+}
+
+/** Refresh payment eligibility without rebuilding jobs or rerolling interview results. */
+export function refreshCareerRecruitmentEvent<T extends PendingEvent>(state: GameState, event: T): T {
+  if (!usesGameplayRulesFrom("20261110-r63") || event.source !== "career"
+    || !event.chainId?.startsWith("career-recruitment-")
+    || (event.stage !== "act1" && event.stage !== "act2")) return event;
+  const choices = event.choices.map(choice => {
+    if (event.stage === "act1") {
+      const children = choice.effects.enqueueEvents;
+      if (!children) return choice;
+      const refreshed = children.map(child => refreshCareerRecruitmentEvent(state, child));
+      return refreshed.every((child, index) => child === children[index]) ? choice
+        : { ...choice, effects: { ...choice.effects, enqueueEvents: refreshed } };
+    }
+    // The result already stores the exact cost that will be charged at confirmation.
+    const result = choice.effects.enqueueEvents?.find(child => child.source === "career" && child.stage === "result");
+    const sanChange = result?.choices[0]?.effects.san;
+    if (typeof sanChange !== "number" || (choice.disabledReason && !choice.disabledReason.startsWith("SAN 不足，需要 "))) return choice;
+    const cost = Math.max(0, -sanChange);
+    const disabledReason = quoteSanPayment(state, cost).allowed ? undefined : `SAN 不足，需要 ${cost}`;
+    if (disabledReason === choice.disabledReason) return choice;
+    if (disabledReason) return { ...choice, disabledReason };
+    const { disabledReason: _reason, ...available } = choice;
+    return available;
+  });
+  return choices.every((choice, index) => choice === event.choices[index]) ? event : { ...event, choices };
 }

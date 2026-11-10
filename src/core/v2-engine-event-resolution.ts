@@ -38,6 +38,7 @@ import { refreshJournalFeeEvent } from "./v2-journal-fee-events";
 import { refreshInternshipInviteEvent, revealInternshipInviteLead, revealInternshipInviteResult } from "./v2-internship-events";
 import { refreshJointTrainingEvent, revealJointTrainingResult } from "./v2-joint-training-events";
 import { refreshLoverDevelopmentEvent } from "./v2-lover-events";
+import { refreshCareerRecruitmentEvent } from "./v2-monthly-career-events";
 import { hasScholarshipDisqualification } from "./v2-academic-integrity";
 import { createLoverSetAsideChoice, LOVER_OCCUPIED_TEXT } from "./v2-lover-events";
 import { hasRecruitLeft } from "./v2-recruitment-eligibility";
@@ -447,6 +448,7 @@ function getResolvableQueuedEventInternal(state: GameState, queuedEvent: EventQu
 }
 
 function resolveQueuedEventPreview(state: GameState, queuedEvent: EventQueueItem): EventQueueItem {
+  queuedEvent = refreshCareerRecruitmentEvent(state, queuedEvent);
   if (queuedEvent.fixedResultPreview) {
     const context = queuedEvent.fixedResultPreview;
     let rollIndex = 0;
@@ -533,7 +535,7 @@ function refreshRandomResultPreview(state: GameState, event: EventQueueItem): Ev
 
 export function refreshPendingEventDecisions(state: GameState): GameState {
   const eventQueue = state.eventQueue.map((event) => (usesGameplayRulesFrom("20261022-r18") && hasPendingRestAction(event)) || event.internshipInvitePreview || event.jointTrainingPreview || event.loverDevelopmentPreview || event.fixedResultPreview || event.fixedTreePreview || event.ccigActivityPreview || event.conferenceActivityPreview || event.teachersDayPreview || event.conferencePreview || event.journalFeePreview || event.chainId === "winter-vacation" || event.chainId === "scholarship" || event.chainId === "summer-vacation" || ((event.stage === "act2" || event.stage === "result")
-    && (event.randomReplay || event.chainId === "lover-development"))
+    && (event.randomReplay || event.chainId === "lover-development")) || (usesGameplayRulesFrom("20261110-r63") && event.source === "career")
     ? getResolvableQueuedEvent(state, event) : event);
   return eventQueue.every((event, index) => event === state.eventQueue[index]) ? state : { ...state, eventQueue };
 }
