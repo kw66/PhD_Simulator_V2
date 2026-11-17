@@ -44,7 +44,7 @@ export function settleAcademicYearAchievements(account: AccountProfile, state: G
 }
 
 function requiresEnding(id: string): boolean {
-  return /:(?:ending-|zero-talent-master$|curse-hell-phd$)/u.test(id)
+  return /:(?:ending-|zero-talent-master$|curse-(?:easy|normal|hard|hell)-phd$)/u.test(id)
     || ["normal:truly-ordinary", "global:slow-research", "global:academic-star", "global:no-first-conference-graduation"].includes(id)
     || (!usesGameplayRulesFrom("20261028-r59")
       && ["unlock:genius-reversed", "unlock:teacher-child-reversed", "unlock:social-reversed", "unlock:rich-reversed", "unlock:chosen-reversed"].includes(id));

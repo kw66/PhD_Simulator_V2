@@ -11,8 +11,10 @@ export interface GameAnnouncement {
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
     date: "2026-11-17",
-    title: "开放测试模式",
+    title: "诅咒分档奖励与测试模式",
     changes: [
+      { category: "更新", title: "诅咒四档成就与奖励", description: "四个诅咒角色新增Ⅰ、Ⅱ、Ⅲ档博士毕业成就，分别对应简单、中等、困难，每项首次结算奖励全角色经验+5。地狱档改为Ⅳ，保留全角色天赋点+1奖励及已有完成记录；按实际通关难度达成对应成就。" },
+      { category: "修复", title: "招聘选项随SAN恢复刷新", description: "修复找工作时SAN不足导致岗位持续灰色的问题：休息恢复后可重新应聘，SAN下降后也会重新检查。四类招聘均生效，刷新不重抽岗位或录取结果。" },
       { category: "更新", title: "设置中开启测试模式", description: "线上玩家也可在设置中开启测试模式。确认并成功打开后，当前存档转为测试进度，不计入经验、成就和后续统计；关闭窗口不会恢复资格。可继续保存测试进度，也可读取开启前的正常月度存档。" },
     ],
   },

@@ -1,5 +1,9 @@
 # 在线统计
 
+## 2026-11-17 诅咒分档成就
+
+四个诅咒新增简单、中等、困难博士毕业成就，共12项；目录增至187项。原地狱成就ID和完成记录保留，标题改为Ⅳ。增量迁移为 `20261117_kwgame_v2_curse_difficulty_rewards.sql`，同步目录白名单和毕业统计证据。线上执行状态：待恢复数据库管理员登录后执行；本地奖励结算不依赖统计上传。
+
 ## 官方录像播放次数
 
 2026-10-27 已在 kwgame 部署 `supabase/migrations/20261027_kwgame_v2_replay_plays.sql` 并通过线上回滚测试。部署后，官方录像使用既有 `phd_simulator_v2_activity_counters` 表累计次数，计数键以 `phd_simulator_v2_official_replay:` 开头，不新建业务表，不写入逐次观看记录。每份录像只占一行；角色与路线白名单最多允许60个键，与其他活动计数隔离。

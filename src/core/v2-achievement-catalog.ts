@@ -21,12 +21,23 @@ export function getRoleEndingAchievements(roleId: RoleId): CatalogAchievement[] 
 export const ACHIEVEMENT_CATALOG: CatalogAchievement[] = [
   { id: "unlock:rewinder", icon: "⏳", title: "轮回者", description: "完成24个不同成就", rewardText: "解锁轮回者角色", unlocksRoleId: "rewinder", scope: { audiences: ["all"] } },
   { id: "unlock:research-captain", icon: "👑", title: "统御者", description: "解锁全部6个基础正位角色", rewardText: "解锁统御者角色", unlocksRoleId: "research-captain", scope: { audiences: ["all"] } },
-  // Highest difficulty doctorate challenges; rewards apply to every role once.
-  // Each role has its own completion; each reward permanently benefits every role once.
-  { id: "cursed-frail:curse-hell-phd", icon: "💀", title: "病入膏肓", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["cursed-frail"] }, rewardScope: { audiences: ["all"] } },
-  { id: "special-fading-genius:curse-hell-phd", icon: "🧠", title: "才思不灭", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["special-fading-genius"] }, rewardScope: { audiences: ["all"] } },
-  { id: "special-finite-life:curse-hell-phd", icon: "⏳", title: "向死而生", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["special-finite-life"] }, rewardScope: { audiences: ["all"] } },
-  { id: "cursed-debt:curse-hell-phd", icon: "💸", title: "逆债而行", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["cursed-debt"] }, rewardScope: { audiences: ["all"] } },
+  // Each difficulty grants only its matching achievement; rewards reach every role once.
+  { id: "cursed-frail:curse-easy-phd", icon: "💀", title: "病入膏肓Ⅰ", description: "简单难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["cursed-frail"] }, rewardScope: { audiences: ["all"] } },
+  { id: "cursed-frail:curse-normal-phd", icon: "💀", title: "病入膏肓Ⅱ", description: "中等难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["cursed-frail"] }, rewardScope: { audiences: ["all"] } },
+  { id: "cursed-frail:curse-hard-phd", icon: "💀", title: "病入膏肓Ⅲ", description: "困难难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["cursed-frail"] }, rewardScope: { audiences: ["all"] } },
+  { id: "cursed-frail:curse-hell-phd", icon: "💀", title: "病入膏肓Ⅳ", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["cursed-frail"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-fading-genius:curse-easy-phd", icon: "🧠", title: "才思不灭Ⅰ", description: "简单难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["special-fading-genius"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-fading-genius:curse-normal-phd", icon: "🧠", title: "才思不灭Ⅱ", description: "中等难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["special-fading-genius"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-fading-genius:curse-hard-phd", icon: "🧠", title: "才思不灭Ⅲ", description: "困难难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["special-fading-genius"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-fading-genius:curse-hell-phd", icon: "🧠", title: "才思不灭Ⅳ", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["special-fading-genius"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-finite-life:curse-easy-phd", icon: "⏳", title: "向死而生Ⅰ", description: "简单难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["special-finite-life"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-finite-life:curse-normal-phd", icon: "⏳", title: "向死而生Ⅱ", description: "中等难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["special-finite-life"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-finite-life:curse-hard-phd", icon: "⏳", title: "向死而生Ⅲ", description: "困难难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["special-finite-life"] }, rewardScope: { audiences: ["all"] } },
+  { id: "special-finite-life:curse-hell-phd", icon: "⏳", title: "向死而生Ⅳ", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["special-finite-life"] }, rewardScope: { audiences: ["all"] } },
+  { id: "cursed-debt:curse-easy-phd", icon: "💸", title: "逆债而行Ⅰ", description: "简单难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["cursed-debt"] }, rewardScope: { audiences: ["all"] } },
+  { id: "cursed-debt:curse-normal-phd", icon: "💸", title: "逆债而行Ⅱ", description: "中等难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["cursed-debt"] }, rewardScope: { audiences: ["all"] } },
+  { id: "cursed-debt:curse-hard-phd", icon: "💸", title: "逆债而行Ⅲ", description: "困难难度博士毕业", rewardText: "全角色经验+5", scope: { roleIds: ["cursed-debt"] }, rewardScope: { audiences: ["all"] } },
+  { id: "cursed-debt:curse-hell-phd", icon: "💸", title: "逆债而行Ⅳ", description: "地狱难度博士毕业", rewardText: "全角色天赋点+1", scope: { roleIds: ["cursed-debt"] }, rewardScope: { audiences: ["all"] } },
   // 正位角色的逆位解锁路线
   { id: "unlock:genius-reversed", icon: "🪨", title: "大智若愚", description: "一局内AI订阅累计30金币", rewardText: "解锁愚钝·院士转世角色", unlocksRoleId: "genius-reversed", scope: { roleIds: ["genius"] } },
   { id: "unlock:teacher-child-reversed", icon: "🎭", title: "不假师恩", description: "六年教师节均只发祝福", rewardText: "解锁玩世·导师子女角色", unlocksRoleId: "teacher-child-reversed", scope: { roleIds: ["teacher-child"] } },

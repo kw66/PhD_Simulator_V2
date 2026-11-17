@@ -297,6 +297,11 @@ describe("achievement catalog and presentation", () => {
         expect(item.rewardScope).toEqual({ audiences: ["all"] });
         expect(item.scope.roleIds).toHaveLength(1);
       }
+      else if (/:curse-(easy|normal|hard)-phd$/u.test(item.id)) {
+        expect(item.rewardText).toBe("全角色经验+5");
+        expect(item.rewardScope).toEqual({ audiences: ["all"] });
+        expect(item.scope.roleIds).toHaveLength(1);
+      }
       else if (getAchievementUnlockRoleIds(item).length) expect(item.rewardText).toMatch(/^解锁.+角色$/);
       else if (item.id === "normal:truly-ordinary") expect(item.rewardText).toBe("全角色经验倍率+1");
       else if (getCollectorAchievementKey(item.id)) expect(item.rewardText).toBe("经验倍率+0.2");

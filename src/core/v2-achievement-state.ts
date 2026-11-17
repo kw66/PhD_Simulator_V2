@@ -122,9 +122,13 @@ export function evaluateStateAchievements(state: GameState, run: AchievementRunP
       const paid = nodes.some(node => !node.fixed && node.cost > 0 && (state.roleTalents?.levels[node.id] ?? 0) > 0);
       if (!paid && state.ending === "phd") check(state.selectedRoleId === "normal", "normal:truly-ordinary");
       if (!paid && state.ending === "master" && state.selectedRoleId.endsWith("-reversed")) ids.add(`${state.selectedRoleId}:zero-talent-master`);
-      if (state.ending === "phd") {
-        check(isCursedRole(state.selectedRoleId) && state.curseState?.difficulty === 4,
-          `${state.selectedRoleId}:curse-hell-phd`);
+      if (state.ending === "phd" && isCursedRole(state.selectedRoleId)) {
+        const difficulty = state.curseState?.difficulty;
+        if (difficulty === 4) ids.add(`${state.selectedRoleId}:curse-hell-phd`);
+        else if (usesGameplayRulesFrom("20261117-r64") && difficulty && difficulty >= 1 && difficulty <= 3) {
+          const suffix = { 1: "easy", 2: "normal", 3: "hard" }[difficulty];
+          ids.add(`${state.selectedRoleId}:curse-${suffix}-phd`);
+        }
       }
       if (!usesGameplayRulesFrom("20261028-r59") && usesGameplayRulesFrom("20261026-r56")) {
         const { research, social, favor } = state.player;
