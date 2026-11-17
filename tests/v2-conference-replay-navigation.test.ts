@@ -61,6 +61,10 @@ describe("conference replay through real bootstrap handlers", () => {
       await page.goto(`${server.resolvedUrls!.local[0]}__conference_replay_test__`);
       await page.waitForSelector("[data-action='start-game']:not(:disabled)");
       await startGameFromLobby(page);
+      page.once("dialog", async dialog => {
+        expect(dialog.message()).toContain("开启测试模式");
+        await dialog.accept();
+      });
       await action(page, "debug-toggle-event-replay", { debugEventReplayEnabled: "true" });
       await trackRandom(page, 0);
       await action(page, "debug-trigger-event", { eventId: "conference-activity-c" });
