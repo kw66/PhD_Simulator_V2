@@ -27,6 +27,18 @@ async function startGame(page: Page) {
   }
 }
 
+function answerTestMode(page: Page, accept: boolean) {
+  return new Promise<void>(resolve => page.once("dialog", async dialog => {
+    expect(dialog.type()).toBe("confirm");
+    expect(dialog.message()).toContain("当前存档将失去正常结算资格");
+    expect(dialog.message()).toContain("经验、成就和后续统计");
+    expect(dialog.message()).toContain("正常月度存档");
+    if (accept) await dialog.accept();
+    else await dialog.dismiss();
+    resolve();
+  }));
+}
+
 describe("debug qualification through the real popup and save controls", () => {
   let server: ViteDevServer;
   let browser: Browser;
@@ -47,7 +59,7 @@ describe("debug qualification through the real popup and save controls", () => {
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
 
-  it.each([false, true])("opening is harmless; dirty progress remains dirty until an earlier save is loaded (rewind: %s)", async rewind => {
+  it.each([false, true])("confirmed opening disqualifies immediately and only earlier clean saves restore eligibility (rewind: %s)", async rewind => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: "reduce" });
     const origin = new URL(server.resolvedUrls!.local[0]!).origin;
     const errors: string[] = [];
@@ -77,26 +89,22 @@ describe("debug qualification through the real popup and save controls", () => {
       await page.goto(server.resolvedUrls!.local[0]!);
       await startGame(page);
       await page.locator('[data-ui-play-tab="settings"]').click();
-      expect(await page.locator('[data-ui-open-debug-window]').count()).toBe(0);
-      // Developer fixtures retain explicit debug access; ordinary settings expose no opener.
-      await page.evaluate(() => {
-        const button = document.createElement("button");
-        button.setAttribute("data-ui-open-debug-window", "");
-        button.textContent = "开发测试入口";
-        document.querySelector("#app")!.append(button);
-      });
-      const [popup] = await Promise.all([
-        page.waitForEvent("popup"), page.locator('[data-ui-open-debug-window]').click(),
-      ]);
-      await expect.poll(() => popup.locator('[data-debug-connection]').textContent()).toBe("已连接主游戏");
+      expect(await page.locator('[data-ui-open-debug-window]').textContent()).toContain("测试模式");
       const clean = { debugged: false, disqualified: false, statistics: false };
       const dirty = { debugged: true, disqualified: true, statistics: true };
+      const originalState = await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getState());
+      await Promise.all([answerTestMode(page, false), page.locator('[data-ui-open-debug-window]').click()]);
+      expect(context.pages()).toHaveLength(1);
       expect(await qualification(page)).toEqual(clean);
-      // Normal gameplay still remains eligible while the tools window is open.
+      expect(await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getState())).toEqual(originalState);
+      const [popup] = await Promise.all([
+        page.waitForEvent("popup"), answerTestMode(page, true), page.locator('[data-ui-open-debug-window]').click(),
+      ]);
+      await expect.poll(() => popup.locator('[data-debug-connection]').textContent()).toBe("已连接主游戏");
+      expect(await qualification(page)).toEqual(dirty);
+      // Merely opening disqualifies; normal actions cannot clear the flag.
       await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.dispatch("set-linear-event-blocking", { blockLinearEvents: false }));
-      expect(await qualification(page)).toEqual(clean);
-      await popup.locator('[data-action="debug-adjust-stat"][data-debug-stat-id="money"][data-delta="1"]').click();
-      await expect.poll(() => qualification(page)).toEqual(dirty);
+      expect(await qualification(page)).toEqual(dirty);
       await popup.locator('[data-action="force-next-month"]').click();
       await expect.poll(() => page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getState().totalMonths)).toBe(2);
       await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.flushSaves());
@@ -140,11 +148,63 @@ describe("debug qualification through the real popup and save controls", () => {
         }, STATISTICS_STORAGE_KEY)).toBe(true);
       } else {
         expect(achievements).toEqual([]);
+        expect(await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getLobbyState().roleProgress.normal.exp)).toBe(0);
+        expect(await page.evaluate(key => {
+          const saved = JSON.parse(localStorage.getItem(key)!);
+          return saved.results.some(([fingerprint]: [string]) => {
+            const [kind, , event] = JSON.parse(fingerprint);
+            return kind === "activity" && event === "finish";
+          });
+        }, STATISTICS_STORAGE_KEY)).toBe(false);
       }
       // An already open panel alone also leaves the next new run clean.
       await startGameFromLobby(page);
       expect(await qualification(page)).toEqual(clean);
+      await expect.poll(() => popup.locator('[data-debug-connection]').textContent()).toBe("已连接主游戏");
+      const unexpectedDialogs: string[] = [];
+      const rejectUnexpectedDialog = async (dialog: import("playwright").Dialog) => {
+        unexpectedDialogs.push(dialog.message()); await dialog.dismiss();
+      };
+      page.on("dialog", rejectUnexpectedDialog);
+      await popup.locator('[data-action="reset-game"]').click();
+      await expect.poll(() => page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getState().phase)).toBe("setup");
+      expect(unexpectedDialogs).toEqual([]);
+      page.off("dialog", rejectUnexpectedDialog);
+      await startGameFromLobby(page);
+      expect(await qualification(page)).toEqual(clean);
+      const money = await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getState().player.money);
+      const adjust = popup.locator('[data-action="debug-adjust-stat"][data-debug-stat-id="money"][data-delta="1"]');
+      await Promise.all([answerTestMode(page, false), adjust.click()]);
+      expect(await qualification(page)).toEqual(clean);
+      expect(await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getState().player.money)).toBe(money);
+      await Promise.all([answerTestMode(page, true), adjust.click()]);
+      await expect.poll(() => qualification(page)).toEqual(dirty);
+      expect(await page.evaluate(() => (window as unknown as DebugSaveWindow).debugSaveStore.getState().player.money)).toBe(money + 1);
       expect(errors).toEqual([]);
     } finally { await context.close(); }
   }, 60_000);
+
+  it("keeps a confirmed run clean when the browser blocks the test window", async () => {
+    const context = await browser.newContext();
+    const origin = new URL(server.resolvedUrls!.local[0]!).origin;
+    await context.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    const page = await context.newPage();
+    try {
+      await page.goto(server.resolvedUrls!.local[0]!);
+      await startGame(page);
+      await page.locator('[data-ui-play-tab="settings"]').click();
+      await page.evaluate(() => { window.open = () => null; });
+      const messages: string[] = [];
+      page.on("dialog", async dialog => {
+        messages.push(dialog.message());
+        if (dialog.type() === "confirm") await dialog.accept();
+        else await dialog.dismiss();
+      });
+      await page.locator('[data-ui-open-debug-window]').click();
+      expect(messages).toHaveLength(2);
+      expect(messages[1]).toContain("被浏览器拦截");
+      expect(context.pages()).toHaveLength(1);
+      expect(await qualification(page)).toEqual({ debugged: false, disqualified: false, statistics: false });
+    } finally { await context.close(); }
+  }, 30_000);
 });

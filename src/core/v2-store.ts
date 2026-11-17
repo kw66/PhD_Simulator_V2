@@ -246,6 +246,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     if (replay.failed) saves.commit(record.latest.state, { runId: record.runId, debugUsed: record.debugUsed, replay });
     accountProfile = selectLobbyRole(accountProfile, roleId);
     if (!runUsedDebugPanel && !replay.failed) saveStatus = "";
+    if (runUsedDebugPanel) saveStatus = "测试进度：当前存档不计入经验、成就和后续统计；关闭测试窗口不会恢复资格";
     if (replay.failed && !runUsedDebugPanel) saveStatus = "存档操作检查未通过，本局不结算经验、成就和后续统计";
     commit(record.latest.state, accountProfile, { restored: true });
     return true;
@@ -266,6 +267,7 @@ export function createStore(options: { storage?: ExperienceStorage | null; saves
     if (replaySavePending) return;
     if (state.phase === "setup" || runUsedDebugPanel) return;
     runUsedDebugPanel = true;
+    saveStatus = "测试进度：当前存档不计入经验、成就和后续统计；关闭测试窗口不会恢复资格";
     if (countedStartRole) {
       const roleId = countedStartRole;
       const progress = accountProfile.roleProgress[roleId];

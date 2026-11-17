@@ -1967,7 +1967,7 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain("后续计划");
     expect(html).not.toContain('data-ui-layout-toggle="debug-event-rail"');
     expect(html).not.toContain('data-ui-layout-toggle="debug-bottom-bar"');
-    expect(html).not.toContain('data-ui-open-debug-window');
+    expect(html).toContain('data-ui-open-debug-window');
     expect(html).toContain('data-ui-open-feedback');
     expect(html).not.toContain('id="debug-bottom-bar"');
     expect(html).not.toContain('class="debug-bottom-stat-grid"');
@@ -2045,7 +2045,8 @@ describe("v2 render lobby shell", () => {
     expect(html).not.toContain('data-action="force-next-month"');
 
     const settings = html.match(/<section[^>]*data-tab-panel="settings"[^>]*>[\s\S]*?<\/section>/)?.[0] ?? "";
-    expect(settings).not.toContain('data-ui-open-debug-window');
+    expect(settings).toContain('data-ui-open-debug-window');
+    expect(settings).toContain("测试模式");
     expect(settings).not.toContain("打开调试面板");
     expect(settings).toContain('data-action="quit-game"');
     expect(settings).not.toContain('data-action="restart-game"');

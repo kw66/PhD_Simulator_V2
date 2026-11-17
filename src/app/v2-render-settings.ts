@@ -1,5 +1,4 @@
 import { getCurseDebtPayoffAmount } from "../core/v2-curse-system";
-import { ENABLE_LOCAL_PLAYGROUND } from "../core/v2-development-flags";
 import { formatMoney, roundMoney } from "../core/v2-money";
 import type { GameState } from "../core/v2-types";
 import { renderRunSaves } from "./v2-render-run-saves";
@@ -35,7 +34,7 @@ export function renderSettingsSection(state: GameState, uiState: PlayRenderUiSta
         <button class="settings-primary-btn is-quit" type="button" data-action="quit-game" title="进入退学结局后，可回溯或结算并返回"${state.totalMonths <= 0 || state.phase === "finished" ? ' disabled aria-disabled="true"' : ""}>
           <i data-lucide="log-out" aria-hidden="true"></i><span>主动退学</span>
         </button>
-        ${ENABLE_LOCAL_PLAYGROUND ? `<button class="settings-primary-btn" type="button" data-ui-open-debug-window><i data-lucide="wrench" aria-hidden="true"></i><span>调试面板</span></button>` : ""}
+        <button class="settings-primary-btn" type="button" data-ui-open-debug-window><i data-lucide="wrench" aria-hidden="true"></i><span>测试模式</span></button>
       </div>
       ${state.selectedRoleId === "cursed-debt" && state.curseState ? `<section class="curse-debt-panel"><div><strong>待偿债务 ${debtLabel} 金币</strong><span>月利率2% · 毕业前需结清${payoffHint}</span></div><div class="curse-debt-actions"><button type="button" class="settings-primary-btn" data-action="repay-debt" data-delta="1"${state.phase !== "playing" || state.player.money < 1 || debt <= 0 ? " disabled" : ""}>偿还1金币</button><button type="button" class="settings-primary-btn" data-action="repay-debt"${state.phase !== "playing" || state.player.money <= 0 || debt <= 0 ? " disabled" : ""}>尽力还款</button></div></section>` : ""}
       ${renderRunSaves(state, uiState)}

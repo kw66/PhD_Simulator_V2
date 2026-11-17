@@ -10,6 +10,13 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-11-17",
+    title: "开放测试模式",
+    changes: [
+      { category: "更新", title: "设置中开启测试模式", description: "线上玩家也可在设置中开启测试模式。确认并成功打开后，当前存档转为测试进度，不计入经验、成就和后续统计；关闭窗口不会恢复资格。可继续保存测试进度，也可读取开启前的正常月度存档。" },
+    ],
+  },
+  {
     date: "2026-11-08",
     title: "嫉妒的患得患失调整",
     changes: [

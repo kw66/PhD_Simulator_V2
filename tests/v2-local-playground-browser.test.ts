@@ -25,7 +25,7 @@ describe("local playground on the actual development configuration", () => {
   }, 30_000);
   afterAll(async () => { await browser?.close(); await server?.close(); });
 
-  it("exposes the local settings debug panel without changing the run until a tool is used", async () => {
+  it("requires confirmation and disqualifies the local run as soon as the test panel opens", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const url = server.resolvedUrls!.local[0]!;
     const origin = new URL(url).origin;
@@ -48,12 +48,13 @@ describe("local playground on the actual development configuration", () => {
       });
       expect(debugStyle).toBe(true);
       const before = await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState());
+      page.once("dialog", dialog => dialog.accept());
       const [popup] = await Promise.all([
         page.waitForEvent("popup"), page.locator('[data-ui-open-debug-window]').click(),
       ]);
       await expect.poll(() => popup.locator('[data-debug-connection]').textContent()).toBe("已连接主游戏");
       expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState())).toEqual(before);
-      expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.isCurrentRunDebugged())).toBe(false);
+      expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.isCurrentRunDebugged())).toBe(true);
       await popup.locator('[data-action="debug-adjust-stat"][data-debug-stat-id="money"][data-delta="1"]').click();
       await expect.poll(() => page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState().player.money)).toBe(before.player.money + 1);
       expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.isCurrentRunDebugged())).toBe(true);

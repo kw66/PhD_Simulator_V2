@@ -17,7 +17,7 @@ async function startApp(container: HTMLDivElement): Promise<void> {
   } else if (replayId !== null) {
     const { bootstrapReplayPlayer } = await import("./app/v2-replay-player");
     await bootstrapReplayPlayer(container, replayId || "library");
-  } else if (import.meta.env.DEV && debugChannel) {
+  } else if (debugChannel) {
     const { bootstrapDebugWindow } = await import("./app/v2-debug-window");
     bootstrapDebugWindow(container, debugChannel);
   } else {

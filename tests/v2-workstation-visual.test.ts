@@ -424,6 +424,7 @@ describe("workstation visual layout through real bootstrap", () => {
         body: '<!doctype html><html><body><div id="app"></div><script type="module" src="/src/main.ts"></script></body></html>',
       }));
       const opened = page.waitForEvent("popup");
+      page.once("dialog", dialog => dialog.accept());
       await page.evaluate(() => {
         const button = document.createElement("button");
         button.setAttribute("data-ui-open-debug-window", "");

@@ -296,8 +296,8 @@ function isDebugRelationshipType(value: string | undefined): value is DebugRelat
 }
 
 export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
-  // Resolve development tools before wiring buttons so popup opening stays synchronous.
-  const debugTools = import.meta.env.DEV ? await import("./v2-debug-window") : null;
+  // Load test tools before wiring buttons so confirmed popup opening stays synchronous.
+  const debugTools = await import("./v2-debug-window");
   const store = createStore();
   const replayLibrary = createReplayLibrary();
   store.setReplayArchiver(async capture => {
@@ -1363,6 +1363,7 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
   function executeButtonAction(dataset: DOMStringMap, skipTalentReminder = false): void {
     const actionId = dataset.action;
     if (!isGameActionId(actionId)) return;
+    if ((actionId.startsWith("debug-") || actionId === "force-next-month") && !enableTestMode()) return;
     if (actionId === "settle-and-return") {
       skipNextPlayerAnimation = true;
       void store.settleAndReturn(dataset.saveReplay === "true");
@@ -1498,7 +1499,20 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
     }
   }
 
-  const debugWindow = debugTools?.createDebugWindow(
+  function confirmTestMode(): boolean {
+    if (store.getState().phase === "setup") return false;
+    return store.isCurrentRunDebugged() || window.confirm(
+      "开启测试模式后，当前存档将失去正常结算资格，不再计入经验、成就和后续统计。关闭测试窗口也不会恢复资格。\n\n你仍可继续游玩和保存测试进度，或读取开启测试模式前的正常月度存档。\n\n确定开启测试模式吗？",
+    );
+  }
+
+  function enableTestMode(): boolean {
+    if (!confirmTestMode()) return false;
+    store.markCurrentRunAsDebugged();
+    return store.isCurrentRunDebugged();
+  }
+
+  const debugWindow = debugTools.createDebugWindow(
     () => store.getState(),
     executeButtonAction,
   );
@@ -2368,8 +2382,11 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
 
     const debugOpenButton = target.closest<HTMLButtonElement>("button[data-ui-open-debug-window]");
     if (debugOpenButton && debugWindow) {
+      if (!confirmTestMode()) return;
       if (!debugWindow.open()) {
-        window.alert("调试窗口被浏览器拦截，请允许本站弹出窗口后重试");
+        window.alert("测试窗口被浏览器拦截，当前存档未因此失效。请允许本站弹出窗口后重试。");
+      } else {
+        store.markCurrentRunAsDebugged();
       }
       return;
     }
