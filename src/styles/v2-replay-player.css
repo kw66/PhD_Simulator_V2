@@ -69,6 +69,7 @@
 .replay-inline-controls button svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .replay-inline-controls .replay-inline-icon { width: 34px; padding: 6px; }
 .replay-inline-controls .replay-inline-play { background: linear-gradient(180deg, #f6e7c8, #e8d6ad); border-color: #ad8b52; box-shadow: inset 0 -2px 0 #a98a5040; color: #6c5028; }
+.replay-inline-single-step small { color: var(--setup-label-color); font-size: 10px; font-weight: 400; }
 .replay-inline-controls button:disabled { opacity: .4; cursor: default; }
 .replay-inline-controls button:hover:not(:disabled), .replay-inline-controls select:hover { border-color: #987641; background-color: #f1e3c7; }
 .replay-inline-controls .replay-inline-speed, .replay-inline-controls .replay-inline-month { width: 100%; }

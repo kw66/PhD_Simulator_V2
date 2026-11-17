@@ -4493,11 +4493,12 @@ function renderReplayTransportControls(transport: ReplayTransportUiState): strin
     <div class="replay-inline-actions">
       <button class="replay-inline-icon" type="button" data-replay-step="-1" aria-label="上一步" title="上一步"${atStart || transport.busy ? " disabled" : ""}><i data-lucide="skip-back" aria-hidden="true"></i></button>
       <button class="replay-inline-play" type="button" data-replay-play aria-label="${transport.playing ? "暂停" : "播放"}" title="${transport.playing ? "暂停" : "播放"}"><i data-lucide="${transport.playing ? "pause" : "play"}" aria-hidden="true"></i><span>${transport.playing ? "暂停" : "播放"}</span></button>
-      <button class="replay-inline-icon" type="button" data-replay-step="1" aria-label="下一步" title="下一步"${atEnd || transport.busy ? " disabled" : ""}><i data-lucide="skip-forward" aria-hidden="true"></i></button>
+      <button class="replay-inline-icon" type="button" data-replay-step="1" aria-label="下一步" title="演示下一步（含点击动画与天赋说明）"${atEnd || transport.busy ? " disabled" : ""}><i data-lucide="skip-forward" aria-hidden="true"></i></button>
       <select class="replay-inline-speed" data-replay-speed aria-label="播放速度" title="播放速度">${[.5, 1, 2, 4, 8].map(value => `<option value="${value}"${value === transport.speed ? " selected" : ""}>${value}×</option>`).join("")}</select>
       <select class="replay-inline-month" data-replay-month aria-label="跳转月份" title="跳转月份">${transport.monthOptions}</select>
       <button class="replay-inline-icon" type="button" data-replay-export aria-label="导出回放" title="导出回放"><i data-lucide="download" aria-hidden="true"></i></button>
     </div>
+    <button class="replay-inline-single-step" type="button" data-replay-single-step aria-label="单步" title="暂停自动播放，只推进一条录像操作"${atEnd || transport.busy ? " disabled" : ""}><i data-lucide="step-forward" aria-hidden="true"></i><span>单步</span><small>点一下，走一步</small></button>
     <div class="replay-inline-progress"><input type="range" min="1" max="${transport.totalSteps}" value="${transport.currentStep}" step="1" data-replay-seek aria-label="回放进度"><output>${transport.currentStep} / ${transport.totalSteps} 步</output></div>
   </div>`;
 }

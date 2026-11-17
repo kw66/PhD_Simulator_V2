@@ -7,7 +7,7 @@ import { createDefaultAccountProfile } from "../src/core/v2-lobby";
 
 describe("game announcements", () => {
   it("summarizes the latest mechanisms within the six-item page limit", () => {
-    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-11-17", "2026-11-08", "2026-11-05", "2026-11-04", "2026-10-28", "2026-10-27"]);
+    expect(GAME_ANNOUNCEMENTS.slice(0, 6).map((entry) => entry.date)).toEqual(["2026-11-18", "2026-11-17", "2026-11-08", "2026-11-05", "2026-11-04", "2026-10-28"]);
     for (const page of [0, 1, 2]) {
       const entry = GAME_ANNOUNCEMENTS[page]!;
       expect(entry.changes.length).toBeLessThanOrEqual(6);
@@ -18,6 +18,7 @@ describe("game announcements", () => {
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
     const current = textForDate("2026-10-24");
+    expect(textForDate("2026-11-18")).toContain("立即推进一条录像操作并停留");
     expect(textForDate("2026-10-26")).toContain("手机开始按钮铺满一行");
     for (const text of ["六次教师节", "初始默契", "0／1／2／3", "基础社交收益由1提高至2", "适用的宣传", "默认开放"])
       expect(textForDate("2026-10-28")).toContain(text);
@@ -59,7 +60,7 @@ describe("game announcements", () => {
     for (const topic of ["5月处理转博", "月末判断毕业", "注册费", "失败预警", "生活费", "2000字", "同学钱包", "角色经验", "十二项发表里程碑", "六个AI系列"]) {
       expect(text).toContain(topic);
     }
-    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(30);
+    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(31);
   });
 
   it("adds a third lobby tab without replacing the selected role or start button", () => {

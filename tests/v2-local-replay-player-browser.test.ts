@@ -229,6 +229,72 @@ describe("isolated local replay browser player", () => {
     } finally { await page.close(); }
   }, 40_000);
 
+  it.each([320, 390, 1440])("single-steps one command and cancels autoplay at %spx", async width => {
+    const page = await browser.newPage({ viewport: { width, height: 1040 } });
+    try {
+      await page.route("**/__replay_single__*", route => route.fulfill({ contentType: "text/html", body: fixture }));
+      await page.goto(`${server.resolvedUrls!.local[0]}__replay_single__?replay=library`);
+      await page.waitForSelector("[data-replay-import]:not(:disabled)");
+      const data = sample();
+      await page.locator("[data-replay-file]").setInputFiles({ name: "single.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
+      await page.locator("[data-replay-open]").click();
+      await page.waitForSelector("[data-replay-seek]");
+      // Interrupt a live cue atomically, before its timer can execute a command.
+      const interrupted = await page.waitForFunction(() => {
+        if (!document.querySelector(".replay-click-cue")) return null;
+        const button = document.querySelector<HTMLButtonElement>("[data-replay-single-step]");
+        if (!button || button.disabled) return null;
+        const index = Number(document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value);
+        button.click();
+        return { index };
+      });
+      const interruptedStep = await interrupted.jsonValue();
+      if (!interruptedStep) throw new Error("No autoplay cue was interrupted");
+      const before = interruptedStep.index;
+      await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 1), before);
+      expect(await page.locator("[data-replay-play]").getAttribute("aria-label")).toBe("播放");
+      expect(await page.locator(".replay-click-cue").count()).toBe(0);
+      await page.waitForTimeout(1500);
+      expect(await page.locator("[data-replay-seek]").inputValue()).toBe(String(before + 1));
+      await page.getByRole("button", { name: "单步", exact: true }).click();
+      await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 2), before);
+      expect(await page.locator("[data-replay-play]").getAttribute("aria-label")).toBe("播放");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      await page.screenshot({ path: `artifacts/local-replay/single-step-${width}.png`, fullPage: true });
+      // The last command is a real ending; stepping must stop there and recover after going back.
+      const end = data.replay.commands.length;
+      await page.locator("[data-replay-seek]").fill(String(end - 1));
+      await page.locator("[data-replay-seek]").dispatchEvent("change");
+      await page.waitForSelector("[data-replay-single-step]:not(:disabled)");
+      await page.locator("[data-replay-single-step]").click();
+      await page.waitForFunction(() => document.querySelector(".play-page")?.getAttribute("data-phase") === "finished");
+      expect(await page.locator("[data-replay-seek]").inputValue()).toBe(String(end));
+      expect(await page.locator("[data-replay-single-step]").isDisabled()).toBe(true);
+      await page.locator('[data-replay-step="-1"]').click();
+      await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index - 1), end);
+      expect(await page.locator("[data-replay-single-step]").isEnabled()).toBe(true);
+      expect(await page.locator("[data-replay-play]").getAttribute("aria-label")).toBe("播放");
+    } finally { await page.close(); }
+  }, 30_000);
+
+  it("single-steps past the official talent tour without consuming an extra click", async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 1040 } });
+    try {
+      await page.goto(`${server.resolvedUrls!.local[0]}?replay=official`);
+      await page.locator('[data-replay-open="official-normal-phd-10"]').click();
+      await page.waitForSelector("[data-replay-seek]");
+      await page.locator("[data-replay-seek]").fill("5");
+      await page.locator("[data-replay-seek]").dispatchEvent("change");
+      await page.waitForSelector('[data-ui-play-tab="talent"][aria-pressed="true"]');
+      await page.locator("[data-replay-single-step]").click();
+      await page.waitForFunction(() => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === "6");
+      expect(await page.locator("[data-replay-play]").getAttribute("aria-label")).toBe("播放");
+      expect(await page.locator(".replay-click-cue").count()).toBe(0);
+      await page.waitForTimeout(1500);
+      expect(await page.locator("[data-replay-seek]").inputValue()).toBe("6");
+    } finally { await page.close(); }
+  }, 30_000);
+
   it("reports malformed imports and missing recordings without hiding the library", async () => {
     const page = await browser.newPage();
     try {

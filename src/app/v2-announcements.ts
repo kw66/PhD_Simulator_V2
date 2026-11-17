@@ -10,6 +10,13 @@ export interface GameAnnouncement {
 
 export const GAME_ANNOUNCEMENTS: readonly GameAnnouncement[] = [
   {
+    date: "2026-11-18",
+    title: "录像支持手动单步",
+    changes: [
+      { category: "更新", title: "点一下，走一步", description: "官方攻略和本地录像新增“单步”按钮。点击后暂停自动播放，立即推进一条录像操作并停留，方便逐步查看事件选择和科研安排；仍可使用播放、倍速和月份跳转。" },
+    ],
+  },
+  {
     date: "2026-11-17",
     title: "诅咒分档奖励与测试模式",
     changes: [

@@ -555,6 +555,16 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
       syncPlaybackButton();
       return;
     }
+    if (button?.hasAttribute("data-replay-single-step") && session && !busy) {
+      pause();
+      if (session.getIndex() < session.getLength()) {
+        // One click consumes one recorded command, not a navigation animation
+        // or a talent-tour stop. Seeking also cancels any pending preview.
+        void seek(session.getIndex() + 1);
+        renderPlayer();
+      } else syncPlaybackButton();
+      return;
+    }
     if (data?.replayStep && session) {
       pause();
       if (Number(data.replayStep) > 0) previewNextAction(false);
