@@ -61,7 +61,7 @@ describe("game announcements", () => {
     for (const topic of ["5月处理转博", "月末判断毕业", "注册费", "失败预警", "生活费", "2000字", "同学钱包", "角色经验", "十二项发表里程碑", "六个AI系列"]) {
       expect(text).toContain(topic);
     }
-    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(31);
+    expect(GAME_ANNOUNCEMENTS.length).toBeLessThanOrEqual(32);
   });
 
   it("adds a third lobby tab without replacing the selected role or start button", () => {

@@ -100,7 +100,7 @@ describe("r65 greed income-only stake",()=>{
   expect(income(next)).toBe(2);
  }));
  it("charges two talent points now and retains the historical three-point cost",()=>{
-  const cost=()=>getDesignedTalentNodes("rich-reversed").find(n=>n.id==="coin-game")!.cost;
+  const cost=()=>getDesignedTalentNodes("rich-reversed")!.find(n=>n.id==="coin-game")!.cost;
   expect(cost()).toBe(2);
   expect(withGameplayRuleset("20261117-r64",cost)).toBe(3);
  });
