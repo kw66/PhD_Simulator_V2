@@ -34,7 +34,13 @@ describe("compact batch investment controls", () => {
       const money = () => page.evaluate(() => (window as unknown as TestWindow).investmentStore.getState().player.money);
       const arrow = page.getByRole("button", { name: "批量投资", exact: true });
       await arrow.waitFor({ state: "visible" });
-      const height = (await arrow.boundingBox())!.height;
+      // The startup render can replace the button after visibility resolves.
+      // Retry the measurement rather than dereference a detached layout box.
+      let height = 0;
+      await expect.poll(async () => {
+        height = (await arrow.boundingBox())?.height ?? 0;
+        return height;
+      }).toBeGreaterThan(0);
       await arrow.click();
       const dialog = page.getByRole("dialog", { name: "批量投资" });
       await dialog.waitFor();
@@ -45,7 +51,7 @@ describe("compact batch investment controls", () => {
       expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
       await page.screenshot({ path: `artifacts/batch-investment-${width}.png` });
       await page.keyboard.press("Escape"); expect(await money()).toBe(5000);
-      expect((await arrow.boundingBox())!.height).toBe(height);
+      await expect.poll(async () => (await arrow.boundingBox())?.height).toBe(height);
       await page.locator('[data-action="invest-money"]').click(); expect(await money()).toBe(4995);
       await arrow.click(); await dialog.getByRole("button", { name: "最大", exact: true }).click();
       expect(await money()).toBe(4995);
