@@ -491,7 +491,7 @@ function dispatchGameAction(state: GameState, actionId: GameActionId, payload: D
     case "repay-debt":
       return repayCurseDebt(state, payload.debtRepayment);
     case "invest-money": {
-      const investment = investRoleTalentMoney(state);
+      const investment = investRoleTalentMoney(state, payload.investmentAmount);
       return investment.success ? pushLog(investment.state, investment.message) : pushNoOpLog(state, investment.message);
     }
     case "toggle-gold-power": {

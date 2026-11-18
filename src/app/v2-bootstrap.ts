@@ -1,3 +1,4 @@
+import { showInvestmentDialog } from "./v2-investment-dialog";
 import { formatAttributeDetail } from "../core/v2-attribute-format";
 import { captureReplayRecording } from "../core/v2-local-replay";
 import { createReplayLibrary } from "./v2-replay-library";
@@ -1438,6 +1439,7 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
     store.dispatch(actionId, {
       curseDifficulty: actionId === "start-game" ? getSelectedCurseDifficulty(store.getLobbyState(), isRoleId(dataset.roleId) ? dataset.roleId : store.getState().selectedRoleId) : undefined,
       debtRepayment: typeof dataset.delta === "string" ? Number(dataset.delta) : undefined,
+      investmentAmount: typeof dataset.investmentAmount === "string" ? Number(dataset.investmentAmount) : undefined,
       roleId: isRoleId(dataset.roleId) ? dataset.roleId : undefined,
       paperId: typeof dataset.paperId === "string" ? dataset.paperId : undefined,
       paperSlotIndex: typeof dataset.paperSlotIndex === "string" ? Number(dataset.paperSlotIndex) : undefined,
@@ -2391,6 +2393,11 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
       return;
     }
 
+    const batchInvestment = target.closest<HTMLButtonElement>("button[data-ui-investment-batch]");
+    if (batchInvestment && !batchInvestment.disabled) {
+      showInvestmentDialog(root, () => store.getState(), amount => executeButtonAction({ action: "invest-money", investmentAmount: String(amount) }));
+      return;
+    }
     const button = target.closest<HTMLButtonElement>("button[data-action]");
     if (!button || button.disabled) return;
 

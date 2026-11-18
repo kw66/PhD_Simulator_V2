@@ -31,7 +31,7 @@ const payloadKeys = new Set([
   "talentAllocation", "blockLinearEvents", "skipBranchEventIntro", "roleId", "paperId", "paperSlotIndex", "thesisPointIndex",
   "careerType", "paperActionType", "paperTarget", "journalTarget", "promotionId", "eventId", "eventChoiceId",
   "eventHistoryIndex", "relationshipId", "projectType", "delta", "dateDisplayMode", "shopItemId", "shopUpgradeId",
-  "aiSlotId", "supportItemId",
+  "aiSlotId", "supportItemId", "investmentAmount",
 ]);
 // Record requires every supported promotion to be listed when the engine adds one.
 const promotionIds = { arxiv: true, github: true, xiaohongshu: true, quantum: true } satisfies Record<PaperPromotionId, true>;
@@ -89,6 +89,10 @@ function validatePayload(payload: Record<string, unknown>): void {
     }
     if (["rewinderStartYear", "rewinderCycleNumber", "bonusTalentPoints", "paperSlotIndex", "thesisPointIndex", "eventHistoryIndex"].includes(key)) {
       if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0 || value > 100_000) invalid(`操作参数 ${key}`);
+      continue;
+    }
+    if (key === "investmentAmount") {
+      if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 5 || value % 5 !== 0) invalid(`操作参数 ${key}`);
       continue;
     }
     if (key === "debtRepayment" || key === "delta") {

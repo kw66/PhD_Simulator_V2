@@ -168,7 +168,7 @@ describe("isolated local replay browser player", () => {
     } finally { await page.close(); }
   }, 40_000);
 
-  it.each([390, 1440])("shows the exact event, research and shop button before execution at %spx", async width => {
+  it.each([390, 1440])("single-steps the full event, research and shop preview before execution at %spx", async width => {
     const page = await browser.newPage({ viewport: { width, height: 1040 } });
     try {
       await page.route("**/__replay_cue__*", route => route.fulfill({ contentType: "text/html", body: fixture }));
@@ -184,7 +184,7 @@ describe("isolated local replay browser player", () => {
         await page.locator("[data-replay-seek]").dispatchEvent("change");
         await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index), beforeIndex);
         await page.locator("[data-replay-speed]").selectOption("0.5");
-        await page.locator('[data-replay-step="1"]').click();
+        await page.locator('[data-replay-single-step]').click();
         // Read the transient cue and its surrounding view atomically, before
         // the preview timer executes the recorded action.
         const cue = await page.waitForFunction(({ action, tab }) => {
@@ -192,17 +192,22 @@ describe("isolated local replay browser player", () => {
           if (!target) return null;
           return { action: target.dataset.action, paperAction: target.dataset.paperActionType,
             tabPressed: document.querySelector(`[data-ui-play-tab="${tab}"]`)?.getAttribute("aria-pressed"),
-            index: document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value };
+            index: document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value,
+            cueIndex: document.querySelector<HTMLElement>(".replay-click-cue")?.dataset.replayActionIndex };
         }, { action, tab });
         const shown = await cue.jsonValue();
         if (!shown) throw new Error(`Missing preview for ${action}`);
         expect(shown.action).toBe(action);
         expect(shown.tabPressed).toBe("true");
         expect(shown.index).toBe(String(beforeIndex));
+        expect(shown.cueIndex).toBe(String(beforeIndex + 1));
         if (action === "research-paper") expect(shown.paperAction).toBe("idea");
         await page.screenshot({ path: `artifacts/local-replay/cue-${action}-${width}.png`, fullPage: true });
         await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 1), beforeIndex);
         expect(await page.locator(".replay-click-cue").count()).toBe(0);
+        expect(await page.locator("[data-replay-play]").getAttribute("aria-label")).toBe("播放");
+        await page.waitForTimeout(1500);
+        expect(await page.locator("[data-replay-seek]").inputValue()).toBe(String(beforeIndex + 1));
       }
       await page.locator("[data-replay-seek]").fill("1");
       await page.locator("[data-replay-seek]").dispatchEvent("change");
@@ -251,6 +256,14 @@ describe("isolated local replay browser player", () => {
       const interruptedStep = await interrupted.jsonValue();
       if (!interruptedStep) throw new Error("No autoplay cue was interrupted");
       const before = interruptedStep.index;
+      const preview = await page.waitForFunction(index => {
+        const cue = document.querySelector<HTMLElement>(".replay-click-cue");
+        const target = document.querySelector(".replay-click-target[data-action]");
+        if (!cue || !target) return null;
+        return { index: document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value,
+          cueIndex: cue.dataset.replayActionIndex, expectedIndex: String(index) };
+      }, before);
+      expect(await preview.jsonValue()).toEqual({ index: String(before), cueIndex: String(before + 1), expectedIndex: String(before) });
       await page.waitForFunction(index => document.querySelector<HTMLInputElement>("[data-replay-seek]")?.value === String(index + 1), before);
       expect(await page.locator("[data-replay-play]").getAttribute("aria-label")).toBe("播放");
       expect(await page.locator(".replay-click-cue").count()).toBe(0);

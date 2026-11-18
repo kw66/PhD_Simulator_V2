@@ -12,25 +12,26 @@ export function getRoleTalentInvestmentDuration(state: GameState): number {
   return 12 - (state.selectedRoleId === "rich-reversed" ? Math.min(6, getRoleTalentLevel(state, "investment-acceleration")) : 0);
 }
 
-export function investRoleTalentMoney(state: GameState): { state: GameState; success: boolean; message: string } {
+export function investRoleTalentMoney(state: GameState, amount = 5): { state: GameState; success: boolean; message: string } {
   const level = getRoleTalentInvestmentLevel(state);
   if (state.phase !== "playing" || level === 0) return { state, success: false, message: "尚未解锁理财能手" };
-  if (state.player.money < 5) return { state, success: false, message: "投资需要5金币" };
+  if (!Number.isSafeInteger(amount) || amount < 5 || amount % 5 !== 0) return { state, success: false, message: "投资金额需为5的正整数倍" };
+  if (state.player.money < amount) return { state, success: false, message: `投资需要${formatMoney(amount)}金币` };
   const id = state.roleTalents?.nextInvestmentId ?? 1;
   const duration = getRoleTalentInvestmentDuration(state);
   return {
     state: {
       ...state,
-      player: { ...state.player, money: roundMoney(state.player.money - 5) },
+      player: { ...state.player, money: roundMoney(state.player.money - amount) },
       roleTalents: {
         ...state.roleTalents!, nextInvestmentId: id + 1,
         investments: [...(state.roleTalents?.investments ?? []), {
-          id, investedAt: state.totalMonths, dueAt: state.totalMonths + duration, principal: 5, interest: level,
+          id, investedAt: state.totalMonths, dueAt: state.totalMonths + duration, principal: amount, interest: amount / 5 * level,
         }],
       },
     },
     success: true,
-    message: `投资5金币，${duration}个月后收回本金并获得${formatMoney(level)}金币利息`,
+    message: `投资${formatMoney(amount)}金币，${duration}个月后收回本金并获得${formatMoney(amount / 5 * level)}金币利息`,
   };
 }
 
@@ -45,6 +46,6 @@ export function settleRoleTalentInvestments(state: GameState): { state: GameStat
       player: { ...state.player, money: roundMoney(state.player.money + principal + interest) },
       roleTalents: { ...state.roleTalents!, investments: investments.filter((investment) => investment.dueAt > state.totalMonths) },
     }, interest),
-    principal, interest, count: due.length,
+    principal, interest, count: due.reduce((sum, investment) => sum + investment.principal / 5, 0),
   };
 }

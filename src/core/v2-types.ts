@@ -931,6 +931,7 @@ export interface DispatchPayload {
   captainTagLevels?: Partial<Record<RoleId, number>>;
   curseDifficulty?: import("./v2-curse-system").CurseDifficulty;
   debtRepayment?: number;
+  investmentAmount?: number;
   bonusTalentPoints?: number;
   talentAllocation?: Record<string, number> | undefined;
   blockLinearEvents?: boolean | undefined;

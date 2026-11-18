@@ -289,6 +289,41 @@
 
 .play-left-rail button.new-currency-action-card:disabled { color: #8b7c63; }
 
+.new-investment-control { display: flex; min-width: 0; }
+.play-left-rail .new-investment-control .new-investment-button {
+  flex: 1; justify-content: flex-start; border-radius: 6px 0 0 6px; padding: 6px;
+}
+.new-investment-control .new-currency-action-status { overflow: hidden; text-overflow: ellipsis; }
+.new-investment-batch {
+  flex: 0 0 30px; min-height: 34px; padding: 0; border: 1px solid rgba(166,138,85,.4);
+  border-left: 0; border-radius: 0 6px 6px 0; background: #f3ebd9; color: #67502e; cursor: pointer;
+}
+.new-investment-batch:disabled { opacity: .55; cursor: default; }
+.new-investment-batch:focus-visible { outline: 2px solid #947442; outline-offset: 2px; }
+.investment-overlay { position: fixed; inset: 0; z-index: 1200; }
+.investment-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+.investment-panel {
+  position: absolute; box-sizing: border-box; width: min(300px, calc(100vw - 16px)); padding: 16px;
+  color: #574632; background: #fffaf0; border: 1px solid #c5ae89; border-radius: 10px;
+  box-shadow: 0 8px 28px #30231135; font-size: 14px;
+}
+.investment-panel header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.investment-panel h2 { margin: 0; font-size: 17px; }
+.investment-panel button { min-height: 36px; border: 1px solid #c5ae89; border-radius: 5px; background: #f3ebd9; color: inherit; cursor: pointer; font: inherit; }
+.investment-panel header button { width: 36px; font-size: 20px; }
+.investment-panel button:disabled { opacity: .5; cursor: default; }
+.investment-presets { display: flex; gap: 8px; margin-bottom: 12px; }
+.investment-presets button { flex: 1; }
+.investment-panel label { display: block; margin-bottom: 6px; }
+.investment-panel input { box-sizing: border-box; width: 100%; padding: 8px; border: 1px solid #c5ae89; border-radius: 5px; background: #fffefa; color: inherit; font: inherit; }
+.investment-panel p { min-height: 40px; margin: 10px 0; font-size: 12px; line-height: 1.65; }
+.investment-panel .investment-confirm { width: 100%; background: #e8d6b6; font-weight: 600; }
+@media (max-width: 600px) {
+  .investment-panel { left: 8px !important; top: auto !important; bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 16px); }
+  .investment-backdrop { background: #30231125; }
+  .investment-panel button { min-height: 44px; }
+}
+
 .play-left-rail .new-gold-power-button[aria-pressed="true"] {
   border-color: #819173;
   background: linear-gradient(180deg, #f4f6e9, #e8eddc);

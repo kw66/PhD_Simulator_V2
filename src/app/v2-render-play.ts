@@ -801,9 +801,9 @@ function renderCurrencyActions(state: GameState): string {
   if (!investmentLevel && !goldPowerAvailable && !debt) return "";
   return `<div class="new-currency-actions" aria-label="金币相关操作">
     ${debt}
-    ${investmentLevel > 0 ? `<button type="button" class="new-currency-action-card new-investment-button" data-action="invest-money"${state.player.money < 5 || state.phase !== "playing" ? " disabled" : ""} aria-label="投资5金币，目前在投${formatMoney(investedMoney)}金币">
-      <span class="new-currency-action-name"><i data-lucide="piggy-bank" aria-hidden="true"></i>-5金币</span><span class="new-currency-action-status">目前${formatMoney(investedMoney)}金</span>
-    </button>` : ""}
+    ${investmentLevel > 0 ? `<div class="new-investment-control"><button type="button" class="new-currency-action-card new-investment-button" data-action="invest-money"${state.player.money < 5 || state.phase !== "playing" ? " disabled" : ""} aria-label="投资5金币，目前在投${formatMoney(investedMoney)}金币">
+      <span class="new-currency-action-name"><i data-lucide="piggy-bank" aria-hidden="true"></i>-5金币</span><span class="new-currency-action-status" title="在投${formatMoney(investedMoney)}金">在投${formatMoney(investedMoney)}金</span>
+    </button><button type="button" class="new-investment-batch" data-ui-investment-batch aria-label="批量投资" aria-haspopup="dialog" title="批量投资"${state.player.money < 5 || state.phase !== "playing" ? " disabled" : ""}>▾</button></div>` : ""}
     ${goldPowerAvailable ? `<button type="button" class="new-currency-action-card new-gold-power-button" data-action="toggle-gold-power" aria-pressed="${goldPowerEnabled}"${state.phase !== "playing" ? " disabled" : ""}>
       <span class="new-currency-action-name"><span class="new-gold-power-check" aria-hidden="true">${goldPowerEnabled ? "✓" : ""}</span>金之力</span>
     </button>` : ""}

@@ -557,12 +557,13 @@ export async function bootstrapReplayPlayer(root: HTMLDivElement, initialId = "l
     }
     if (button?.hasAttribute("data-replay-single-step") && session && !busy) {
       pause();
+      syncPlaybackButton();
       if (session.getIndex() < session.getLength()) {
-        // One click consumes one recorded command, not a navigation animation
-        // or a talent-tour stop. Seeking also cancels any pending preview.
-        void seek(session.getIndex() + 1);
-        renderPlayer();
-      } else syncPlaybackButton();
+        // Play the full next command, including navigation and its click cue.
+        // The optional talent tour must not consume this command's step.
+        talentTour = null;
+        previewNextAction(false);
+      }
       return;
     }
     if (data?.replayStep && session) {
