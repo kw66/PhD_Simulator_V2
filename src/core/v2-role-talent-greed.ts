@@ -45,13 +45,17 @@ export function applyGreedAttributeLoss(state: GameState, amount: number, _getRo
     ? precise((state.roleTalents.greedLossRemainder ?? 0) + amount) : 0;
   const games = getRoleTalentLevel(state, "coin-game") > 0
     ? precise((state.roleTalents.coinGameRemainder ?? 0) + amount) : 0;
-  const next = { ...state, player: { ...state.player, money: roundMoney(state.player.money + Math.floor(loss)) },
+  const income = Math.floor(loss);
+  const incomeStake = usesGameplayRulesFrom("20261119-r65") && getRoleTalentLevel(state, "coin-game") > 0;
+  const immediateIncome = incomeStake ? 0 : income;
+  const next = { ...state, player: { ...state.player, money: roundMoney(state.player.money + immediateIncome) },
     roleTalents: { ...state.roleTalents, greedLossRemainder: precise(loss - Math.floor(loss)),
       coinGameRemainder: precise(games - Math.floor(games)),
       pendingCoinGames: (state.roleTalents.pendingCoinGames ?? 0) + Math.floor(games),
+      ...(incomeStake ? { pendingGreedStake: Math.min(Number.MAX_VALUE, (state.roleTalents.pendingGreedStake ?? 0) + income) } : {}),
     },
   };
-  return logGreed(state, recordPersonalIncome(next, Math.floor(loss)), "因祸得财", `三项属性实际下降累计满${Math.floor(loss)}点`);
+  return logGreed(state, recordPersonalIncome(next, immediateIncome), "因祸得财", `三项属性实际下降累计满${income}点`);
 }
 
 export function getGreedResetTarget(state: GameState): number {
@@ -101,10 +105,14 @@ export function settleGreedCoinGames(state: GameState, getRoll?: () => number): 
   let next = settleGreedSpendingConversions(state, random.roll, random.cursor);
   const count = next.roleTalents?.pendingCoinGames ?? 0;
   if (count <= 0) return next === state ? state : random.finish(next);
-  next = { ...next, roleTalents: { ...next.roleTalents!, pendingCoinGames: 0 } };
+  const incomeStake = usesGameplayRulesFrom("20261119-r65");
+  const stake = next.roleTalents?.pendingGreedStake ?? 0;
+  next = { ...next, roleTalents: { ...next.roleTalents!, pendingCoinGames: 0,
+    ...(incomeStake ? { pendingGreedStake: 0 } : {}),
+  } };
   const failureMultiplier = 0.4 + getRoleTalentLevel(next, "coin-game-comeback") * 0.05;
   if (usesGameplayRulesFrom("20261023-r46")) {
-    const moneyBefore = next.player.money;
+    const moneyBefore = incomeStake ? stake : next.player.money;
     let wins = 0;
     let remaining = count;
     if (random.cursor) {
@@ -139,6 +147,12 @@ export function settleGreedCoinGames(state: GameState, getRoll?: () => number): 
     const magnitude = Math.min(Number.MAX_VALUE, Math.exp(logMoney));
     const money = roundMoney(moneyBefore === 0 ? 0 : Number.isFinite(direct) && direct !== 0
       ? direct : Math.sign(moneyBefore) * magnitude);
+    if (incomeStake) {
+      const wallet = roundMoney(Math.min(Number.MAX_VALUE, next.player.money + money));
+      const received = roundMoney(wallet - next.player.money);
+      next = recordPersonalIncome({ ...next, player: { ...next.player, money: wallet } }, received);
+      return logGreed(state, random.finish(next), "金币游戏", `本轮因祸得财本金${stake}，${count}次判定，${wins}胜${count - wins}负；收入${received}，已有金币不参与，少赚不计消费`);
+    }
     next = { ...next, player: { ...next.player, money } };
     if (money > moneyBefore) next = recordPersonalIncome(next, money - moneyBefore);
     if (money < moneyBefore) next = settleGreedSpendingConversions(

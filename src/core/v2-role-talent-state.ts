@@ -60,6 +60,8 @@ export interface RoleTalentRunState {
   greedLossRemainder?: number;
   coinGameRemainder?: number;
   pendingCoinGames?: number;
+  /** r65: combined loss-to-money income, paid only after the batch settles. */
+  pendingGreedStake?: number;
   moneyConversionRemainder?: number;
   pendingMoneyConversions?: number;
   pendingMoneyConversionTransactions?: number[];

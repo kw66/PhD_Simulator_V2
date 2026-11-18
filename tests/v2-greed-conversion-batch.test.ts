@@ -1,3 +1,4 @@
+import { withGameplayRuleset } from "../src/core/v2-rule-context";
 import { describe, expect, it } from "vitest";
 import { createInitialState } from "../src/core/v2-engine";
 import { applyPlayerAttributeChange } from "../src/core/v2-player-attributes";
@@ -137,7 +138,7 @@ describe("greed spending batch preserves scalar gameplay", () => {
     expect(calls).toBe(0);
   });
 
-  it("shares one private cursor across coin rolls and interleaved spending rewards", () => {
+  it("shares one private cursor across coin rolls and interleaved spending rewards (r64)", () => withGameplayRuleset("20261117-r64", () => {
     const state = fixture();
     state.player.money = 123;
     state.roleTalents!.levels = { "post-phd-money-conversion": 1, "coin-game-comeback": 3 };
@@ -148,7 +149,7 @@ describe("greed spending batch preserves scalar gameplay", () => {
     const actual = settleGreedCoinGames(state);
     expected.roleTalents!.greedRandomState = random.inspect().seed;
     expect(actual).toEqual(expected);
-  });
+  }));
 });
 
 describe("exact fast decimal rounding for greed conversions", () => {

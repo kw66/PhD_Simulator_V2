@@ -407,6 +407,8 @@ export function getDesignedTalentNodes(roleId: RoleId): readonly DesignedTalentN
   if (roleId === "rich-reversed" && !usesGameplayRulesFrom("20261023-r46")) return R52_RICH_REVERSED_TALENT_NODES.map(node => node.id === "coin-game"
     ? { ...node, effect: R44_RICH_REVERSED_TALENT_NODES.find(old => old.id === node.id)!.effect } : node);
   if (roleId === "rich-reversed" && !usesGameplayRulesFrom("20261024-r54")) return R52_RICH_REVERSED_TALENT_NODES;
+  if (roleId === "rich-reversed" && usesGameplayRulesFrom("20261119-r65")) return ROLE_TALENT_NODES["rich-reversed"].map(node => node.id === "coin-game"
+    ? { ...node, cost: 2, effect: "三项属性每减少1点判定一次：本轮因祸得财收入合并为本金，连续50%乘1.5、50%乘0.4；已有金币不参与，少赚不计消费" } : node);
   if (roleId === "teacher-child-reversed" && !usesGameplayRulesFrom("20261023-r44")) return R43_TEACHER_CHILD_REVERSED_TALENT_NODES;
   if (roleId === "teacher-child-reversed" && !usesGameplayRulesFrom("20261024-r52")) return R51_TEACHER_CHILD_REVERSED_TALENT_NODES;
   if (roleId === "teacher-child-reversed" && !usesGameplayRulesFrom("20261024-r53")) return R52_TEACHER_CHILD_REVERSED_TALENT_NODES;

@@ -17,7 +17,7 @@ function fixture(): GameState {
 }
 
 describe("greed rewards per transaction", () => {
-  it("settles the full wallet product once, rounding only the final balance", () => {
+  it("settles the full wallet product once, rounding only the final balance (r64)", () => withGameplayRuleset("20261117-r64", () => {
     const state = fixture();
     state.player.money = 1.01;
     state.roleTalents!.levels["coin-game-comeback"] = 5;
@@ -32,9 +32,9 @@ describe("greed rewards per transaction", () => {
     expect(calls).toBe(9);
     expect(settleGreedCoinGames(next)).toBe(next);
     expect(state.player.money).toBe(1.01);
-  });
+  }));
 
-  it("counts only net income, never intermediate losses, with no stake limit", () => {
+  it("counts only net income, never intermediate losses, with no stake limit (r64)", () => withGameplayRuleset("20261117-r64", () => {
     const state = fixture();
     state.roleTalents!.pendingCoinGames = 4;
     let calls = 0;
@@ -46,9 +46,9 @@ describe("greed rewards per transaction", () => {
     expect(calls).toBe(4);
     const old = withGameplayRuleset("20261023-r45", () => settleGreedCoinGames(state, () => 0));
     expect(old.player.money).toBe(110);
-  });
+  }));
 
-  it("survives overflowing intermediate products and preserves deterministic serialized playback", () => {
+  it("survives overflowing intermediate products and preserves deterministic serialized playback (r64)", () => withGameplayRuleset("20261117-r64", () => {
     const state = fixture();
     state.player.money = 1e300;
     state.roleTalents!.pendingCoinGames = 2000;
@@ -59,9 +59,9 @@ describe("greed rewards per transaction", () => {
     expect(Object.values(next.player).every(Number.isFinite)).toBe(true);
     expect(roundMoney(Number.MAX_VALUE)).toBe(Number.MAX_VALUE);
     expect(settleGreedCoinGames(state)).toEqual(settleGreedCoinGames(JSON.parse(JSON.stringify(state))));
-  });
+  }));
 
-  it("skips exact full private RNG periods without changing subsequent reward draws", () => {
+  it("skips exact full private RNG periods without changing subsequent reward draws (r64)", () => withGameplayRuleset("20261117-r64", () => {
     const state = fixture();
     state.roleTalents!.pendingCoinGames = 4294967296;
     state.roleTalents!.greedRandomState = 1234;
@@ -70,9 +70,9 @@ describe("greed rewards per transaction", () => {
       player: { ...state.player, money: 0 }, roleTalents: { ...state.roleTalents!, pendingCoinGames: 0 } }, 100));
     expect(next.player).toEqual(expected.player);
     expect(next.roleTalents).toEqual(expected.roleTalents);
-  });
+  }));
 
-  it("keeps wins and maximum-sized spending finite at the numeric storage boundary", () => {
+  it("keeps wins and maximum-sized spending finite at the numeric storage boundary (r64)", () => withGameplayRuleset("20261117-r64", () => {
     const state = fixture();
     state.player.money = Number.MAX_VALUE;
     state.roleTalents!.pendingCoinGames = 1;
@@ -81,7 +81,7 @@ describe("greed rewards per transaction", () => {
     expect(Object.values(rewarded.player).every(Number.isFinite)).toBe(true);
     expect(Object.values(rewarded.roleTalents!.capBonuses!).every(Number.isFinite)).toBe(true);
     expect(allocateGreedSpending(Number.MAX_VALUE, () => 0.5).every(value => Number.isFinite(value) && value >= 0)).toBe(true);
-  });
+  }));
 
   it("preserves purchase boundaries including fractions, with seven draws each", () => {
     const before = fixture();

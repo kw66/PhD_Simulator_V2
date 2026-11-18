@@ -48,7 +48,7 @@ describe("actual monthly income evidence", () => {
     expect(next.achievementProgress!.satisfied).not.toContain("global:windfall");
   });
 
-  it("counts only the final coin-game net result as income or spending", () => {
+  it("counts only the final coin-game net result as income or spending (r64)", () => withGameplayRuleset("20261117-r64", () => {
     const s = start(); s.selectedRoleId = "rich-reversed"; s.player.money = 200;
     s.roleTalents = { levels: { "coin-game": 1 }, pendingCoinGames: 2 };
     const rolls = [0, 1];
@@ -58,7 +58,7 @@ describe("actual monthly income evidence", () => {
     expect(next.personalSpending).toBe(80);
     expect(next.roleTalents?.greedQualifiedSpending).toBe(80);
     expect(next.achievementProgress?.satisfied ?? []).not.toContain("global:windfall");
-  });
+  }));
 
   it("retains individual bounded-stake wins in r45 recordings", () => {
     const s = start(); s.selectedRoleId = "rich-reversed"; s.player.money = 200;
