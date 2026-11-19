@@ -42,6 +42,7 @@ describe("timeline scrolling through the real app handlers", () => {
       button.click();
       button.remove();
     }, { actionId, extra });
+    if (await page.locator("[data-test-mode-confirm]").count()) await page.locator("[data-test-mode-confirm]").click();
   }
 
   beforeEach(async () => {
@@ -63,10 +64,6 @@ describe("timeline scrolling through the real app handlers", () => {
       throw new Error(`Timeline app did not finish starting: ${startupErrors.join("\n") || "no browser errors"}`, { cause: error });
     }
     await startGameFromLobby(page);
-    page.on("dialog", async dialog => {
-      expect(dialog.message()).toContain("开启测试模式");
-      await dialog.accept();
-    });
     await action("debug-shift-month", { delta: "18" });
     const initialScroll = await page.locator(".event-timeline-track").evaluate(element => {
       const marker = element.querySelector<HTMLElement>(".event-timeline-marker.is-current")!;

@@ -14,7 +14,7 @@ describe("conference replay through real bootstrap handlers", () => {
   let browser: Browser;
 
   beforeAll(async () => {
-    server = await createServer({ configFile: false, logLevel: "error", server: { host: "127.0.0.1", port: 0 } });
+    server = await createServer({ configFile: false, logLevel: "error", optimizeDeps: { entries: ["index.html"] }, server: { host: "127.0.0.1", port: 0, watch: null, hmr: false } });
     await server.listen();
     browser = await chromium.launch();
   }, 30_000);
@@ -61,11 +61,8 @@ describe("conference replay through real bootstrap handlers", () => {
       await page.goto(`${server.resolvedUrls!.local[0]}__conference_replay_test__`);
       await page.waitForSelector("[data-action='start-game']:not(:disabled)");
       await startGameFromLobby(page);
-      page.once("dialog", async dialog => {
-        expect(dialog.message()).toContain("开启测试模式");
-        await dialog.accept();
-      });
       await action(page, "debug-toggle-event-replay", { debugEventReplayEnabled: "true" });
+      await page.locator("[data-test-mode-confirm]").click();
       await trackRandom(page, 0);
       await action(page, "debug-trigger-event", { eventId: "conference-activity-c" });
       await page.locator('[data-ui-open-event-id$="-activity-act1"]').click();

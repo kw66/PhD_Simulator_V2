@@ -15,7 +15,7 @@ describe("VALSE pending event through real bootstrap handlers", () => {
   let page: Page;
 
   beforeAll(async () => {
-    server = await createServer({ configFile: false, logLevel: "error", server: { host: "127.0.0.1", port: 0 } });
+    server = await createServer({ configFile: false, logLevel: "error", optimizeDeps: { entries: ["index.html"] }, server: { host: "127.0.0.1", port: 0, watch: null, hmr: false } });
     await server.listen();
     browser = await chromium.launch();
   }, 30_000);
@@ -43,11 +43,8 @@ describe("VALSE pending event through real bootstrap handlers", () => {
     await page.goto(`${server.resolvedUrls!.local[0]}__valse_test__`);
     await page.waitForSelector("[data-action='start-game']:not(:disabled)");
     await startGameFromLobby(page);
-    page.once("dialog", async dialog => {
-      expect(dialog.message()).toContain("开启测试模式");
-      await dialog.accept();
-    });
     await action("debug-shift-month", { delta: "33" });
+      await page.locator("[data-test-mode-confirm]").click();
     await action("debug-adjust-stat", { debugStatId: "money", delta: "20" });
     await action("debug-trigger-event", { eventId: "ccig" });
     await page.locator('[data-ui-open-event-id="ccig-y3-m9"]').click();

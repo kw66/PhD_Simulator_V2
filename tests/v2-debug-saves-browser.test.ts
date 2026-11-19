@@ -27,16 +27,14 @@ async function startGame(page: Page) {
   }
 }
 
-function answerTestMode(page: Page, accept: boolean) {
-  return new Promise<void>(resolve => page.once("dialog", async dialog => {
-    expect(dialog.type()).toBe("confirm");
-    expect(dialog.message()).toContain("当前存档将失去正常结算资格");
-    expect(dialog.message()).toContain("经验、成就和后续统计");
-    expect(dialog.message()).toContain("正常月度存档");
-    if (accept) await dialog.accept();
-    else await dialog.dismiss();
-    resolve();
-  }));
+async function answerTestMode(page: Page, accept: boolean) {
+  const dialog = page.locator("[data-test-mode-dialog]");
+  await dialog.waitFor();
+  expect(await dialog.textContent()).toContain("当前存档将失去正常结算资格");
+  expect(await dialog.textContent()).toContain("经验、成就和后续统计");
+  expect(await dialog.textContent()).toContain("正常月度存档");
+  if (accept) await dialog.locator("[data-test-mode-confirm]").click();
+  else await dialog.getByRole("button", { name: "取消", exact: true }).click();
 }
 
 describe("debug qualification through the real popup and save controls", () => {
@@ -197,12 +195,12 @@ describe("debug qualification through the real popup and save controls", () => {
       const messages: string[] = [];
       page.on("dialog", async dialog => {
         messages.push(dialog.message());
-        if (dialog.type() === "confirm") await dialog.accept();
-        else await dialog.dismiss();
+        await dialog.dismiss();
       });
       await page.locator('[data-ui-open-debug-window]').click();
-      expect(messages).toHaveLength(2);
-      expect(messages[1]).toContain("被浏览器拦截");
+      await page.locator('[data-test-mode-confirm]').click();
+      expect(messages).toHaveLength(0);
+      expect(await page.locator('[data-test-mode-dialog]').textContent()).toContain("被浏览器拦截");
       expect(context.pages()).toHaveLength(1);
       expect(await qualification(page)).toEqual({ debugged: false, disqualified: false, statistics: false });
     } finally { await context.close(); }

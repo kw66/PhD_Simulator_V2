@@ -5,10 +5,41 @@ import { getMonthEndIllnessDelta, settleCurseMonthStart } from "../src/core/v2-c
 import { CURRENT_GAMEPLAY_RULESET, withGameplayRuleset } from "../src/core/v2-rule-context";
 import { createRunReplay, executeReplayCommand, replayStateDigest, verifyRunReplay, type ReplayCommand } from "../src/core/v2-run-replay";
 import type { GameState } from "../src/core/v2-types";
+import { getDesignedTalentNodes } from "../src/core/v2-role-talent-definitions";
 
 const roles = ["special-finite-life", "special-fading-genius", "cursed-frail"] as const;
 
 describe("curse rebalance and saved operation replay", () => {
+  it.each([1, 2, 3, 4] as const)("preserves r65 debt and applies new principal only at a new start, difficulty %s", difficulty => {
+    const old = withGameplayRuleset("20261119-r65", () => {
+      const state = createStartedGameState("cursed-debt", {}, 0, difficulty);
+      expect(state.curseState?.debt).toBe([50, 70, 90, 110][difficulty - 1]);
+      expect(getDesignedTalentNodes("cursed-debt")?.[difficulty - 1]?.effect).toBe(`初始债务${[50, 70, 90, 110][difficulty - 1]}；月利率2%`);
+      return state;
+    });
+    const current = createStartedGameState("cursed-debt", {}, 0, difficulty);
+    expect(current.curseState?.debt).toBe([30, 50, 70, 90][difficulty - 1]);
+    expect(settleCurseMonthStart({ ...old, totalMonths: 2 }).curseState?.debt).toBeCloseTo(old.curseState!.debt * 1.02, 10);
+    expect(settleCurseMonthStart({ ...current, totalMonths: 2 }).curseState?.debt).toBeCloseTo(current.curseState!.debt * 1.02, 10);
+  });
+  it.each(["20261119-r65", CURRENT_GAMEPLAY_RULESET] as const)("preserves finite-life hell opening and replay under %s", ruleset => {
+    const expectedSan = ruleset === "20261119-r65" ? 100 : 120;
+    withGameplayRuleset(ruleset, () => {
+      const state = createStartedGameState("special-finite-life", {}, 0, 4);
+      expect(state.player.san).toBe(expectedSan);
+      expect(state.sanCap).toBe(expectedSan);
+      expect(getDesignedTalentNodes("special-finite-life")?.[3]?.effect).toBe(`总SAN ${expectedSan}；不可回复`);
+    });
+    const initial = createInitialState();
+    initial.randomState = { seed: 1700000000, cursor: 0 };
+    const command: ReplayCommand = { kind: "action", actionId: "start-game", payload: { roleId: "special-finite-life", curseDifficulty: 4 } };
+    const started = executeReplayCommand(initial, command, ruleset);
+    expect(started.player.san).toBe(expectedSan);
+    const replay = createRunReplay(initial, started, command.payload);
+    replay.ruleset = ruleset;
+    replay.commands = [command];
+    expect(verifyRunReplay(replay, { state: initial, index: 0 }, started)).not.toBeNull();
+  });
   it.each([1, 2, 3, 4] as const)("preserves r54 starts and monthly illness at difficulty %s", difficulty => {
     withGameplayRuleset("20261024-r54", () => {
       const finite = createStartedGameState("special-finite-life", {}, 0, difficulty);
@@ -36,7 +67,7 @@ describe("curse rebalance and saved operation replay", () => {
       expect(getMonthEndIllnessDelta({ ...frail, totalMonths: 1, month: 1 })).toBe(0);
     });
     expect(createStartedGameState("special-finite-life", {}, 0, difficulty).player.san)
-      .toBe([300, 200, 150, 100][difficulty - 1]);
+      .toBe([300, 200, 150, 120][difficulty - 1]);
   });
 
   it.each(roles)("reproduces a legacy %s opening and continues it under the new rules", roleId => {

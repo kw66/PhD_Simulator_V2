@@ -7,8 +7,8 @@ describe("replay guide and aggregate play counts", () => {
   let server: ViteDevServer;
   let browser: Browser;
   beforeAll(async () => {
-    server = await createServer({ configFile: false, logLevel: "error", define: { __LOCAL_PLAYGROUND__: false },
-      server: { host: "127.0.0.1", port: 0, hmr: false }, plugins: [{ name: "mock-production-replay-stats", transform(code, id) {
+    server = await createServer({ configFile: false, logLevel: "error", define: { __LOCAL_PLAYGROUND__: false }, optimizeDeps: { entries: ["index.html"] },
+      server: { host: "127.0.0.1", port: 0, hmr: false, watch: null }, plugins: [{ name: "mock-production-replay-stats", transform(code, id) {
         if (id.replaceAll("\\", "/").endsWith("/src/app/v2-official-replay-stats.ts")) return code
           .replace("options.enabled ?? import.meta.env.PROD", "options.enabled ?? true")
           .replace("options.writeEnabled ?? isRemoteWriteEnabled()", "options.writeEnabled ?? true");
@@ -32,6 +32,18 @@ describe("replay guide and aggregate play counts", () => {
     } finally { await page.close(); }
   }, 30_000);
 
+  it.each(["official-fading-genius-hell-phd-11", "official-frail-hell-phd-10"])("opens the verified hell replay %s", async id => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 1000 } });
+    await page.route("**/*.supabase.co/**", route => route.fulfill({ json: {} }));
+    try {
+      await page.goto(`${server.resolvedUrls!.local[0]}?replay=${id}`);
+      await page.locator('[data-replay-play][aria-label="暂停"]').waitFor();
+      await page.locator('[data-replay-speed]').selectOption('8');
+      await page.waitForFunction(() => Number(document.querySelector<HTMLInputElement>('[data-replay-seek]')?.value) > 7);
+      expect(await page.locator('.replay-viewer').textContent()).not.toContain('找不到操作按钮');
+    } finally { await page.close(); }
+  }, 30_000);
+
   it.each([390, 1440])("shows compact routes and counts only successful official opens at %s px", async width => {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });
     const id = "official-normal-phd-10";
@@ -49,13 +61,22 @@ describe("replay guide and aggregate play counts", () => {
       expect(await page.locator("h1").textContent()).toBe("录像与攻略");
       expect(await page.locator('[data-replay-route="phd-20"]').count()).toBe(0);
       expect(await page.locator('.replay-source-tabs a').allTextContents()).toEqual(["官方录像攻略", "本地录像"]);
-      expect(await page.locator('[data-replay-role]').allTextContents()).toEqual(["大多数"]);
+      expect(await page.locator('[data-replay-role]').allTextContents()).toEqual(["大多数", "天才迟暮", "体弱多病"]);
       expect(await page.locator('.replay-card-strategy').allTextContents()).toEqual(["稳定通过", "稳定通过", "稳定通过"]);
       expect(await page.locator('[data-replay-build]').allTextContents()).toEqual(["0天赋点", "10天赋点", "10天赋点"]);
       expect(await page.locator('[data-replay-card="official-normal-master-10"] .replay-card-status').textContent()).toBe("硕士毕业");
       expect(await page.locator('[data-replay-card="official-normal-phd-10"] .replay-card-status').textContent()).toBe("博士毕业");
       expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
       await page.screenshot({ path: `artifacts/replay-guide/official-${width}.png`, fullPage: true });
+      await page.locator('[data-replay-role="cursed-frail"]').click();
+      expect(await page.locator('.replay-card-note').textContent()).toContain('39.84%');
+      expect(await page.locator('.replay-card-strategy').textContent()).toContain('地狱');
+      expect(await page.locator('[data-replay-card]').count()).toBe(1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      await page.screenshot({ path: `artifacts/replay-guide/frail-hell-${width}.png`, fullPage: true });
+      await page.locator('[data-replay-role="special-fading-genius"]').click();
+      expect(await page.locator('.replay-card-note').textContent()).toContain('科研仅0.9');
+      await page.locator('[data-replay-role="normal"]').click();
       expect(requests).toHaveLength(1);
       await page.locator(`[data-replay-open="${id}"]`).click();
       await page.locator("[data-replay-seek]").waitFor();

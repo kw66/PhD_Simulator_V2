@@ -1,5 +1,6 @@
-import { showInvestmentDialog } from "./v2-investment-dialog";
 import { formatAttributeDetail } from "../core/v2-attribute-format";
+import { showTestModeDialog } from "./v2-test-mode-dialog";
+import { showInvestmentDialog } from "./v2-investment-dialog";
 import { captureReplayRecording } from "../core/v2-local-replay";
 import { createReplayLibrary } from "./v2-replay-library";
 import { downloadReplayRecording } from "./v2-replay-download";
@@ -1364,7 +1365,14 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
   function executeButtonAction(dataset: DOMStringMap, skipTalentReminder = false): void {
     const actionId = dataset.action;
     if (!isGameActionId(actionId)) return;
-    if ((actionId.startsWith("debug-") || actionId === "force-next-month") && !enableTestMode()) return;
+    if ((actionId.startsWith("debug-") || actionId === "force-next-month") && !store.isCurrentRunDebugged()) {
+      const requested = { ...dataset };
+      requestTestMode(() => {
+        store.markCurrentRunAsDebugged();
+        if (store.isCurrentRunDebugged()) executeButtonAction(requested, skipTalentReminder);
+      });
+      return;
+    }
     if (actionId === "settle-and-return") {
       skipNextPlayerAnimation = true;
       void store.settleAndReturn(dataset.saveReplay === "true");
@@ -1501,17 +1509,14 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
     }
   }
 
-  function confirmTestMode(): boolean {
-    if (store.getState().phase === "setup") return false;
-    return store.isCurrentRunDebugged() || window.confirm(
-      "开启测试模式后，当前存档将失去正常结算资格，不再计入经验、成就和后续统计。关闭测试窗口也不会恢复资格。\n\n你仍可继续游玩和保存测试进度，或读取开启测试模式前的正常月度存档。\n\n确定开启测试模式吗？",
-    );
-  }
-
-  function enableTestMode(): boolean {
-    if (!confirmTestMode()) return false;
-    store.markCurrentRunAsDebugged();
-    return store.isCurrentRunDebugged();
+  function requestTestMode(onConfirm: () => void): void {
+    if (store.getState().phase === "setup") return;
+    if (store.isCurrentRunDebugged()) { onConfirm(); return; }
+    const runId = store.getCurrentRunId();
+    showTestModeDialog(root, { onConfirm: () => {
+      // An independently restored save must not inherit consent for another run.
+      if (store.getState().phase !== "setup" && store.getCurrentRunId() === runId) onConfirm();
+    } });
   }
 
   const debugWindow = debugTools.createDebugWindow(
@@ -2384,12 +2389,13 @@ export async function bootstrapApp(root: HTMLDivElement): Promise<void> {
 
     const debugOpenButton = target.closest<HTMLButtonElement>("button[data-ui-open-debug-window]");
     if (debugOpenButton && debugWindow) {
-      if (!confirmTestMode()) return;
-      if (!debugWindow.open()) {
-        window.alert("测试窗口被浏览器拦截，当前存档未因此失效。请允许本站弹出窗口后重试。");
-      } else {
-        store.markCurrentRunAsDebugged();
-      }
+      requestTestMode(() => {
+        if (!debugWindow.open()) {
+          showTestModeDialog(root, { blocked: true, alreadyDebugged: store.isCurrentRunDebugged() });
+        } else {
+          store.markCurrentRunAsDebugged();
+        }
+      });
       return;
     }
 

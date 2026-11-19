@@ -193,5 +193,135 @@
         }
       ]
     }
+  },
+  {
+    "id": "official-fading-genius-hell-phd-11",
+    "file": "fading-genius-hell-phd-11.json",
+    "roleId": "special-fading-genius",
+    "route": "cursed",
+    "note": "通过阅读、设备和同学合作维持科研，博士科研分11。毕业科研仅0.9，需持续留意月末衰减；本局为成功示范，不代表任意开局均能通关。",
+    "strategy": "地狱 · 科研维护",
+    "totalMonths": 70,
+    "degree": "phd",
+    "score": 11,
+    "commands": 524,
+    "ruleset": "20261117-r64",
+    "finalDigest": "f551568c:3aa0a2b0:373858",
+    "metrics": {
+      "money": 9,
+      "talentPoints": null,
+      "outcomes": {
+        "totalCitations": 130,
+        "publications": {
+          "A": 0,
+          "B": 5,
+          "C": 1,
+          "nature": 0,
+          "nmi": 0,
+          "pami": 0
+        },
+        "thesisGrades": {
+          "A": 0,
+          "B": 5,
+          "C": 0,
+          "D": 0
+        },
+        "thesisStatus": "revealed",
+        "lover": false,
+        "jointTraining": false,
+        "internships": 0,
+        "job": null,
+        "fellows": 1,
+        "advisorRank": "副教授",
+        "funding": 45.5
+      },
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 14.8,
+          "cap": 20
+        },
+        {
+          "label": "科研能力",
+          "value": 0.9,
+          "cap": 23
+        },
+        {
+          "label": "社交能力",
+          "value": 9.2,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 7.6,
+          "cap": 20
+        }
+      ]
+    }
+  },
+  {
+    "id": "official-frail-hell-phd-10",
+    "file": "frail-hell-phd-10.json",
+    "roleId": "cursed-frail",
+    "route": "cursed",
+    "note": "博士科研分10。17月首篇B投稿估计录用率约39.84%，存在转博失败风险；后期利用双工位共享润色。本局为成功示范，不是保过攻略。",
+    "strategy": "地狱 · 共享润色",
+    "totalMonths": 70,
+    "degree": "phd",
+    "score": 10,
+    "commands": 540,
+    "ruleset": "20261119-r65",
+    "finalDigest": "a4fe0969:c25f5c6f:368693",
+    "metrics": {
+      "money": 17.5,
+      "talentPoints": null,
+      "outcomes": {
+        "totalCitations": 146,
+        "publications": {
+          "A": 1,
+          "B": 4,
+          "C": 1,
+          "nature": 0,
+          "nmi": 0,
+          "pami": 0
+        },
+        "thesisGrades": {
+          "A": 0,
+          "B": 5,
+          "C": 0,
+          "D": 0
+        },
+        "thesisStatus": "revealed",
+        "lover": false,
+        "jointTraining": false,
+        "internships": 0,
+        "job": "大厂开发岗",
+        "fellows": 1,
+        "advisorRank": "四级教授",
+        "funding": 122
+      },
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 20,
+          "cap": 20
+        },
+        {
+          "label": "科研能力",
+          "value": 13,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 6.2,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 6,
+          "cap": 20
+        }
+      ]
+    }
   }
 ]

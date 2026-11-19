@@ -39,7 +39,7 @@ describe("isolated local replay browser player", () => {
   let server: ViteDevServer;
   let browser: Browser;
   beforeAll(async () => {
-    server = await createServer({ configFile: false, logLevel: "error", define: { __LOCAL_PLAYGROUND__: false }, server: { host: "127.0.0.1", port: 0 } });
+    server = await createServer({ configFile: false, logLevel: "error", define: { __LOCAL_PLAYGROUND__: false }, optimizeDeps: { entries: ["index.html"] }, server: { host: "127.0.0.1", port: 0, watch: null } });
     await server.listen(); browser = await chromium.launch();
     await mkdir("artifacts/local-replay", { recursive: true });
   }, 30_000);
@@ -327,9 +327,10 @@ describe("isolated local replay browser player", () => {
       await page.goto(`${server.resolvedUrls!.local[0]}?replay=official`);
       await page.waitForSelector("[data-replay-card]");
       expect(await page.locator("[data-replay-role]").count()).toBe(new Set(manifest.map(item => item.roleId)).size);
-      expect(await page.locator("[data-replay-card]").count()).toBe(manifest.length);
-      expect(await page.locator(".replay-card-base > div").count()).toBe(manifest.length * 6);
-      expect(await page.locator(".replay-stat-cap").count()).toBe(manifest.length * 4);
+      const normalCount = manifest.filter(entry => entry.roleId === "normal").length;
+      expect(await page.locator("[data-replay-card]").count()).toBe(normalCount);
+      expect(await page.locator(".replay-card-base > div").count()).toBe(normalCount * 6);
+      expect(await page.locator(".replay-stat-cap").count()).toBe(normalCount * 4);
       expect(await page.locator(".replay-card-metrics").first().textContent()).not.toContain("…");
       expect(await page.locator("[data-replay-results]").count()).toBe(0);
       expect(await page.locator("[data-replay-route]").count()).toBe(0);

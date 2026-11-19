@@ -48,9 +48,9 @@ describe("local playground on the actual development configuration", () => {
       });
       expect(debugStyle).toBe(true);
       const before = await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState());
-      page.once("dialog", dialog => dialog.accept());
+      await page.locator('[data-ui-open-debug-window]').click();
       const [popup] = await Promise.all([
-        page.waitForEvent("popup"), page.locator('[data-ui-open-debug-window]').click(),
+        page.waitForEvent("popup"), page.locator('[data-test-mode-confirm]').click(),
       ]);
       await expect.poll(() => popup.locator('[data-debug-connection]').textContent()).toBe("已连接主游戏");
       expect(await page.evaluate(() => (window as PlaygroundWindow).localPlaygroundStore.getState())).toEqual(before);

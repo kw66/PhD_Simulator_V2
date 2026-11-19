@@ -9,9 +9,10 @@ import type { RoleId } from "../src/core/v2-types";
 import { createInitialState } from "../src/core/v2-engine";
 
 describe("published official teaching replays", () => {
-  it("keeps only the normal role tutorials while other strategies are reviewed", () => {
-    expect(manifest.every(entry => entry.roleId === "normal")).toBe(true);
-    expect(manifest.every(entry => ["master-10", "phd-10", "phd-0"].includes(entry.route))).toBe(true);
+  it("publishes normal tutorials and the two verified hell curse routes", () => {
+    expect(manifest.filter(entry => entry.route === "cursed").map(entry => entry.roleId).sort()).toEqual(["cursed-frail", "special-fading-genius"]);
+    expect(manifest.find(entry => entry.roleId === "cursed-frail")?.note).toContain("39.84%");
+    expect(manifest.every(entry => ["master-10", "phd-10", "phd-0", "cursed"].includes(entry.route))).toBe(true);
     for (const route of ["master-10", "phd-10", "phd-0"]) {
       expect(manifest.filter(entry => entry.route === route).map(entry => entry.roleId)).toEqual(["normal"]);
     }
@@ -28,7 +29,10 @@ describe("published official teaching replays", () => {
     expect(recording.id).toBe(entry.id);
     expect(recording.replay.ruleset).toBe(entry.ruleset);
     expect(SUPPORTED_GAMEPLAY_RULESETS).toContain(entry.ruleset);
-    expect(recording.replay.initial).toEqual({ ...createInitialState(), randomState: recording.replay.initial.randomState });
+    // Normal-account recordings retain the harmless lobby selection before enrollment.
+    expect(recording.replay.initial).toEqual({ ...createInitialState(),
+      setupSelectedRoleId: entry.route === "cursed" ? "normal" : null,
+      randomState: recording.replay.initial.randomState });
     expect(recording.finalDigest).toBe(entry.finalDigest);
     expect(recording.replay.commands).toHaveLength(entry.commands);
     const start = recording.replay.commands[0]!;
@@ -37,7 +41,8 @@ describe("published official teaching replays", () => {
     expect(start.actionId).toBe("start-game");
     expect(start.payload.roleId).toBe(entry.roleId);
     expect(start.payload.bonusTalentPoints ?? 0).toBe(0);
-    const budget = Number(entry.route.split("-").at(-1));
+    const budget = entry.route === "cursed" ? 0 : Number(entry.route.split("-").at(-1));
+    if (entry.route === "cursed") expect(start.payload.curseDifficulty).toBe(4);
     const allocation = start.payload.talentAllocation ?? {};
     const role = entry.roleId as RoleId;
     expect(sanitizeRoleTalentAllocation(role, budget === 20 ? 10 : 0, allocation, 0)).toEqual(allocation);

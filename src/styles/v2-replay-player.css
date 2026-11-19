@@ -28,6 +28,7 @@
 .replay-card:hover { border-color: color-mix(in oklab, var(--replay-role-accent) 45%, #c9bda2); box-shadow: inset 0 1px 0 #ffffffd1, 0 3px 6px #12252112; }
 .replay-card-portrait { width: 48px; height: 48px; object-fit: contain; background: radial-gradient(ellipse at 50% 60%, color-mix(in oklab, var(--replay-role-accent) 16%, transparent), transparent 70%); }
 .replay-card-identity { min-width: 0; }
+.replay-card-note { grid-column: 1 / -1; margin: 0; color: #79684e; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .replay-card h2 { margin: 0 0 3px; font-family: var(--display-font-cjk); font-size: 14px; font-weight: 750; }
 .replay-card p { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; color: #7b715c; font-size: 11px; }
 .replay-card small { display: block; margin-top: 2px; color: #948770; font-size: 10px; overflow-wrap: anywhere; }

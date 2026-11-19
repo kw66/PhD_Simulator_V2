@@ -34,7 +34,7 @@ describe("workstation visual layout through real bootstrap", () => {
   let browser: Browser;
 
   beforeAll(async () => {
-    server = await createServer({ configFile: false, logLevel: "error", server: { host: "127.0.0.1", port: 0 },
+    server = await createServer({ configFile: false, logLevel: "error", optimizeDeps: { entries: ["index.html"] }, server: { host: "127.0.0.1", port: 0, watch: null, hmr: false },
       plugins: [{ name: "workstation-visual-store", transform(code, id) {
         if (id.replaceAll("\\", "/").endsWith("/src/app/v2-bootstrap.ts")) {
           return code.replace("const store = createStore();", "const store = createStore(); globalThis.workstationVisualStore = store;");
@@ -424,7 +424,6 @@ describe("workstation visual layout through real bootstrap", () => {
         body: '<!doctype html><html><body><div id="app"></div><script type="module" src="/src/main.ts"></script></body></html>',
       }));
       const opened = page.waitForEvent("popup");
-      page.once("dialog", dialog => dialog.accept());
       await page.evaluate(() => {
         const button = document.createElement("button");
         button.setAttribute("data-ui-open-debug-window", "");
@@ -432,6 +431,7 @@ describe("workstation visual layout through real bootstrap", () => {
         button.click();
         button.remove();
       });
+      await page.locator("[data-test-mode-confirm]").click();
       const popup = await opened;
       const nextMonth = popup.locator('[data-action="force-next-month"]');
       await nextMonth.waitFor();
