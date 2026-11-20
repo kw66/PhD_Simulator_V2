@@ -25,13 +25,13 @@ export function initializeCurse(state: GameState, difficulty: unknown = 1): Game
   const rank = normalizeCurseDifficulty(difficulty);
   const relaxed = usesGameplayRulesFrom("20261025-r55");
   const curseState: CurseRunState = { difficulty: rank, debt: state.selectedRoleId === "cursed-debt"
-    ? (usesGameplayRulesFrom("20261120-r66") ? [30, 50, 70, 90] : relaxed ? [50, 70, 90, 110] : [60, 80, 100, 120])[rank - 1]! : 0, lastSettledTotalMonths: 1 };
+    ? (usesGameplayRulesFrom("20261120-r67") ? [10, 20, 30, 40] : usesGameplayRulesFrom("20261120-r66") ? [30, 50, 70, 90] : relaxed ? [50, 70, 90, 110] : [60, 80, 100, 120])[rank - 1]! : 0, lastSettledTotalMonths: 1 };
   const rebalanced = usesGameplayRulesFrom("20261017-r6");
   let next = { ...state, curseState };
   if (state.selectedRoleId === "special-fading-genius") next = { ...next, player: { ...state.player,
     research: (relaxed ? [20, 18, 16, 14] : rebalanced ? [18, 16, 14, 12] : [20, 17, 14, 11])[rank - 1]! } };
   if (state.selectedRoleId === "special-finite-life") {
-    const san = (usesGameplayRulesFrom("20261120-r66") ? [300, 200, 150, 120]
+    const san = (usesGameplayRulesFrom("20261120-r67") ? [300, 240, 200, 180] : usesGameplayRulesFrom("20261120-r66") ? [300, 200, 150, 120]
       : relaxed ? [300, 200, 150, 100] : rebalanced ? [300, 200, 120, 80] : [400, 300, 200, 100])[rank - 1]!;
     next = { ...next, sanCap: san, player: { ...state.player, san } };
   }

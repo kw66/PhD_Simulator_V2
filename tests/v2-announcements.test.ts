@@ -18,7 +18,7 @@ describe("game announcements", () => {
     }
     const textForDate = (date: string) => GAME_ANNOUNCEMENTS.find(entry => entry.date === date)!.changes.map(change => `${change.title}：${change.description}`).join("\n");
     const current = textForDate("2026-10-24");
-    for (const text of ["100提高至120", "30、50、70、90", "月利率仍为2%", "天才迟暮地狱博士11分", "体弱多病地狱博士10分", "游戏内弹窗"]) expect(textForDate("2026-11-20")).toContain(text);
+    for (const text of ["300、240、200、180", "10、20、30、40", "月利率仍为2%", "天才迟暮地狱博士11分", "体弱多病地狱博士10分", "有限人生地狱博士11分", "寒门负重地狱博士7分", "游戏内弹窗"]) expect(textForDate("2026-11-20")).toContain(text);
     expect(GAME_ANNOUNCEMENTS.flatMap(entry => entry.changes).map(change => change.description).join("\n")).not.toContain("本地开发启动");
     expect(textForDate("2026-11-18")).toContain("红框和执行片段后停住");
     for (const text of ["收入合并为本金", "由3天赋点降至2点", "投资支持批量操作", "外部字体加载不再阻塞首屏", "红框预览"]) expect(textForDate("2026-11-19")).toContain(text);

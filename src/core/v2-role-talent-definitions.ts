@@ -361,16 +361,16 @@ export const FADING_GENIUS_TALENT_NODES = [
 
 export const FINITE_LIFE_TALENT_NODES = [
   { id: "finite-life-400", name: "尚有时日", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 300；不可回复", prerequisiteIds: [], challenge: true },
-  { id: "finite-life-300", name: "时日渐短", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 200；不可回复", prerequisiteIds: [], challenge: true },
-  { id: "finite-life-200", name: "暮色渐深", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 150；不可回复", prerequisiteIds: [], challenge: true },
-  { id: "finite-life-100", name: "命悬一线", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 120；不可回复", prerequisiteIds: [], challenge: true },
+  { id: "finite-life-300", name: "时日渐短", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 240；不可回复", prerequisiteIds: [], challenge: true },
+  { id: "finite-life-200", name: "暮色渐深", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 200；不可回复", prerequisiteIds: [], challenge: true },
+  { id: "finite-life-100", name: "命悬一线", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "总SAN 180；不可回复", prerequisiteIds: [], challenge: true },
 ] as const satisfies readonly DesignedTalentNode[];
 
 export const DEBT_TALENT_NODES = [
-  { id: "debt-60", name: "捉襟见肘", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "初始债务30；月利率2%", prerequisiteIds: [], challenge: true },
-  { id: "debt-80", name: "入不敷出", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "初始债务50；月利率2%", prerequisiteIds: [], challenge: true },
-  { id: "debt-100", name: "债台高筑", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "初始债务70；月利率2%", prerequisiteIds: [], challenge: true },
-  { id: "debt-120", name: "泥足深陷", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "初始债务90；月利率2%", prerequisiteIds: [], challenge: true },
+  { id: "debt-60", name: "捉襟见肘", icon: "skull", tier: 0, column: "1", row: "2", maxLevel: 1, cost: 0, effect: "初始债务10；月利率2%", prerequisiteIds: [], challenge: true },
+  { id: "debt-80", name: "入不敷出", icon: "skull", tier: 1, column: "2", row: "2", maxLevel: 1, cost: 0, effect: "初始债务20；月利率2%", prerequisiteIds: [], challenge: true },
+  { id: "debt-100", name: "债台高筑", icon: "skull", tier: 2, column: "3", row: "2", maxLevel: 1, cost: 0, effect: "初始债务30；月利率2%", prerequisiteIds: [], challenge: true },
+  { id: "debt-120", name: "泥足深陷", icon: "skull", tier: 3, column: "4", row: "2", maxLevel: 1, cost: 0, effect: "初始债务40；月利率2%", prerequisiteIds: [], challenge: true },
 ] as const satisfies readonly DesignedTalentNode[];
 
 const ROLE_TALENT_NODES = {
@@ -407,6 +407,10 @@ export function getDesignedTalentNodes(roleId: RoleId): readonly DesignedTalentN
     effect: `总SAN ${[300, 200, 150, 100][index]}；不可回复` }));
   if (roleId === "cursed-debt" && !usesGameplayRulesFrom("20261120-r66")) return DEBT_TALENT_NODES.map((node, index) => ({ ...node,
     effect: `初始债务${[50, 70, 90, 110][index]}；月利率2%` }));
+  if (roleId === "special-finite-life" && !usesGameplayRulesFrom("20261120-r67")) return FINITE_LIFE_TALENT_NODES.map((node, index) => ({ ...node,
+    effect: `总SAN ${[300, 200, 150, 120][index]}；不可回复` }));
+  if (roleId === "cursed-debt" && !usesGameplayRulesFrom("20261120-r67")) return DEBT_TALENT_NODES.map((node, index) => ({ ...node,
+    effect: `初始债务${[30, 50, 70, 90][index]}；月利率2%` }));
   if (roleId === "rich-reversed" && !usesGameplayRulesFrom("20261023-r45")) return R44_RICH_REVERSED_TALENT_NODES;
   if (roleId === "rich-reversed" && !usesGameplayRulesFrom("20261023-r46")) return R52_RICH_REVERSED_TALENT_NODES.map(node => node.id === "coin-game"
     ? { ...node, effect: R44_RICH_REVERSED_TALENT_NODES.find(old => old.id === node.id)!.effect } : node);

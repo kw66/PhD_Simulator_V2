@@ -323,5 +323,135 @@
         }
       ]
     }
+  },
+  {
+    "id": "official-finite-life-hell-phd-11",
+    "file": "finite-life-hell-phd-11.json",
+    "roleId": "special-finite-life",
+    "route": "cursed",
+    "note": "初始180 SAN，33月转博，博士科研分11，毕业剩4 SAN。25月首篇B投稿估计录用率约83.63%；需控制前期消耗并预留毕业论文开支，不是保过攻略。",
+    "strategy": "地狱 · 节俭科研",
+    "totalMonths": 70,
+    "degree": "phd",
+    "score": 11,
+    "commands": 465,
+    "ruleset": "20261120-r67",
+    "finalDigest": "9f69d0d2:2c1a8e8a:359565",
+    "metrics": {
+      "money": 37.5,
+      "talentPoints": null,
+      "outcomes": {
+        "totalCitations": 164,
+        "publications": {
+          "A": 1,
+          "B": 4,
+          "C": 3,
+          "nature": 0,
+          "nmi": 0,
+          "pami": 0
+        },
+        "thesisGrades": {
+          "A": 0,
+          "B": 5,
+          "C": 0,
+          "D": 0
+        },
+        "thesisStatus": "revealed",
+        "lover": false,
+        "jointTraining": false,
+        "internships": 0,
+        "job": "地方国企技术岗",
+        "fellows": 1,
+        "advisorRank": "副教授",
+        "funding": 57
+      },
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 4,
+          "cap": 180
+        },
+        {
+          "label": "科研能力",
+          "value": 11.6,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 7.6,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 3,
+          "cap": 20
+        }
+      ]
+    }
+  },
+  {
+    "id": "official-debt-hell-phd-7",
+    "file": "debt-hell-phd-7.json",
+    "roleId": "cursed-debt",
+    "route": "cursed",
+    "note": "初始债务40金币、月利率2%，21月转博，67月清债。前两篇C投稿估计录用率约83.47%和85.07%，均需录用才能按期转博；中途曾现金见底。博士科研分7，毕业现金5.33金币。仅展示本局成功路线，不代表任意开局均能清债毕业。",
+    "strategy": "地狱 · 节俭还债",
+    "totalMonths": 70,
+    "degree": "phd",
+    "score": 7,
+    "commands": 531,
+    "ruleset": "20261120-r67",
+    "finalDigest": "58892780:69f771b4:349099",
+    "metrics": {
+      "money": 5.33,
+      "talentPoints": null,
+      "outcomes": {
+        "totalCitations": 38,
+        "publications": {
+          "A": 0,
+          "B": 0,
+          "C": 7,
+          "nature": 0,
+          "nmi": 0,
+          "pami": 0
+        },
+        "thesisGrades": {
+          "A": 0,
+          "B": 5,
+          "C": 0,
+          "D": 0
+        },
+        "thesisStatus": "revealed",
+        "lover": false,
+        "jointTraining": false,
+        "internships": 0,
+        "job": null,
+        "fellows": 1,
+        "advisorRank": "副教授",
+        "funding": 35.5
+      },
+      "attributes": [
+        {
+          "label": "SAN",
+          "value": 15.1712456909,
+          "cap": 20
+        },
+        {
+          "label": "科研能力",
+          "value": 8.4,
+          "cap": 20
+        },
+        {
+          "label": "社交能力",
+          "value": 6.8,
+          "cap": 20
+        },
+        {
+          "label": "导师好感",
+          "value": 4.2,
+          "cap": 20
+        }
+      ]
+    }
   }
 ]

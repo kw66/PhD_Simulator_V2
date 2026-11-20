@@ -9,8 +9,8 @@ import type { RoleId } from "../src/core/v2-types";
 import { createInitialState } from "../src/core/v2-engine";
 
 describe("published official teaching replays", () => {
-  it("publishes normal tutorials and the two verified hell curse routes", () => {
-    expect(manifest.filter(entry => entry.route === "cursed").map(entry => entry.roleId).sort()).toEqual(["cursed-frail", "special-fading-genius"]);
+  it("publishes normal tutorials and all four verified hell curse routes", () => {
+    expect(manifest.filter(entry => entry.route === "cursed").map(entry => entry.roleId).sort()).toEqual(["cursed-debt", "cursed-frail", "special-fading-genius", "special-finite-life"]);
     expect(manifest.find(entry => entry.roleId === "cursed-frail")?.note).toContain("39.84%");
     expect(manifest.every(entry => ["master-10", "phd-10", "phd-0", "cursed"].includes(entry.route))).toBe(true);
     for (const route of ["master-10", "phd-10", "phd-0"]) {
@@ -54,6 +54,7 @@ describe("published official teaching replays", () => {
     expect(state.ending).toBe(entry.degree);
     expect(state.degree).toBe(entry.degree);
     expect(state.totalMonths).toBe(entry.totalMonths);
+    if (entry.roleId === "cursed-debt") expect(state.curseState?.debt).toBe(0);
     expect(deriveReplayResults(state)).toEqual({ researchScore: entry.score, ...entry.metrics });
   }, 30_000);
 });

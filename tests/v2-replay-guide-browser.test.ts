@@ -32,7 +32,7 @@ describe("replay guide and aggregate play counts", () => {
     } finally { await page.close(); }
   }, 30_000);
 
-  it.each(["official-fading-genius-hell-phd-11", "official-frail-hell-phd-10"])("opens the verified hell replay %s", async id => {
+  it.each(["official-fading-genius-hell-phd-11", "official-frail-hell-phd-10", "official-finite-life-hell-phd-11", "official-debt-hell-phd-7"])("opens the verified hell replay %s", async id => {
     const page = await browser.newPage({ viewport: { width: 390, height: 1000 } });
     await page.route("**/*.supabase.co/**", route => route.fulfill({ json: {} }));
     try {
@@ -61,7 +61,7 @@ describe("replay guide and aggregate play counts", () => {
       expect(await page.locator("h1").textContent()).toBe("录像与攻略");
       expect(await page.locator('[data-replay-route="phd-20"]').count()).toBe(0);
       expect(await page.locator('.replay-source-tabs a').allTextContents()).toEqual(["官方录像攻略", "本地录像"]);
-      expect(await page.locator('[data-replay-role]').allTextContents()).toEqual(["大多数", "天才迟暮", "体弱多病"]);
+      expect(await page.locator('[data-replay-role]').allTextContents()).toEqual(["大多数", "天才迟暮", "体弱多病", "有限人生", "寒门负重"]);
       expect(await page.locator('.replay-card-strategy').allTextContents()).toEqual(["稳定通过", "稳定通过", "稳定通过"]);
       expect(await page.locator('[data-replay-build]').allTextContents()).toEqual(["0天赋点", "10天赋点", "10天赋点"]);
       expect(await page.locator('[data-replay-card="official-normal-master-10"] .replay-card-status').textContent()).toBe("硕士毕业");
@@ -76,6 +76,14 @@ describe("replay guide and aggregate play counts", () => {
       await page.screenshot({ path: `artifacts/replay-guide/frail-hell-${width}.png`, fullPage: true });
       await page.locator('[data-replay-role="special-fading-genius"]').click();
       expect(await page.locator('.replay-card-note').textContent()).toContain('科研仅0.9');
+      for (const role of ['special-finite-life', 'cursed-debt']) {
+        await page.locator(`[data-replay-role="${role}"]`).click();
+        expect(await page.locator('[data-replay-card]').count()).toBe(1);
+        expect(await page.locator('.replay-card-strategy').textContent()).toContain('地狱');
+        expect(await page.locator('.replay-card-note').textContent()).toContain('不');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+        await page.screenshot({ path: `artifacts/replay-guide/${role}-hell-${width}.png`, fullPage: true });
+      }
       await page.locator('[data-replay-role="normal"]').click();
       expect(requests).toHaveLength(1);
       await page.locator(`[data-replay-open="${id}"]`).click();

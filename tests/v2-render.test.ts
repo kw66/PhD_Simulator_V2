@@ -1143,8 +1143,8 @@ describe("v2 render lobby shell", () => {
   it.each([
     ["cursed-frail", ["+9%、+6%、+3%、-1%", "+18%、+12%、+6%、0%", "+27%、+18%、+9%、+1%", "+36%、+24%、+12%、+2%"]],
     ["special-fading-genius", ["初始科研20；每月科研-0.5", "初始科研18；每月科研-0.5", "初始科研16；每月科研-0.5", "初始科研14；每月科研-0.5"]],
-    ["special-finite-life", ["总SAN 300；不可回复", "总SAN 200；不可回复", "总SAN 150；不可回复", "总SAN 120；不可回复"]],
-    ["cursed-debt", ["初始债务30；月利率2%", "初始债务50；月利率2%", "初始债务70；月利率2%", "初始债务90；月利率2%"]],
+    ["special-finite-life", ["总SAN 300；不可回复", "总SAN 240；不可回复", "总SAN 200；不可回复", "总SAN 180；不可回复"]],
+    ["cursed-debt", ["初始债务10；月利率2%", "初始债务20；月利率2%", "初始债务30；月利率2%", "初始债务40；月利率2%"]],
   ] as const)("renders %s as four mutually exclusive curse choices", (roleId, effects) => {
     const account = createDefaultAccountProfile();
     account.selectedLobbyRoleId = roleId;
