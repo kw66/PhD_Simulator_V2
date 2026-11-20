@@ -44,6 +44,32 @@ describe("replay guide and aggregate play counts", () => {
     } finally { await page.close(); }
   }, 30_000);
 
+  it("shows a curse count and sends its canonical counter key only once", async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 1000 } });
+    const id = "official-finite-life-hell-phd-11", statsId = "official-special-finite-life-phd-0";
+    const writes: unknown[] = [];
+    await page.route("**/*.supabase.co/**", route => {
+      const isRead = route.request().url().includes('/get_');
+      if (!isRead) writes.push(route.request().postDataJSON());
+      return route.fulfill({ json: isRead ? { [statsId]: 8 } : 9 });
+    });
+    try {
+      await page.goto(`${server.resolvedUrls!.local[0]}?replay=official`);
+      await page.locator('[data-replay-role="special-finite-life"]').click();
+      await page.locator(`[data-replay-plays="${id}"]`).getByText("播放 8", { exact: true }).waitFor();
+      await page.locator(`[data-replay-open="${id}"]`).click();
+      await page.locator('[data-replay-seek]').waitFor();
+      await expect.poll(() => writes.length).toBe(1);
+      expect(writes).toEqual([{ p_replay_id: statsId }]);
+      await page.locator('[data-replay-library]').click();
+      await page.locator(`[data-replay-plays="${id}"]`).getByText("播放 9", { exact: true }).waitFor();
+      await page.locator(`[data-replay-open="${id}"]`).click();
+      await page.locator('[data-replay-seek]').waitFor();
+      await page.locator('[data-replay-library]').click();
+      expect(writes).toEqual([{ p_replay_id: statsId }]);
+    } finally { await page.close(); }
+  }, 30_000);
+
   it.each([390, 1440])("shows compact routes and counts only successful official opens at %s px", async width => {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });
     const id = "official-normal-phd-10";

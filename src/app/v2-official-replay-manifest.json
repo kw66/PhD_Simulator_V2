@@ -257,7 +257,8 @@
           "cap": 20
         }
       ]
-    }
+    },
+    "statsId": "official-special-fading-genius-phd-0"
   },
   {
     "id": "official-frail-hell-phd-10",
@@ -322,7 +323,8 @@
           "cap": 20
         }
       ]
-    }
+    },
+    "statsId": "official-cursed-frail-phd-0"
   },
   {
     "id": "official-finite-life-hell-phd-11",
@@ -387,7 +389,8 @@
           "cap": 20
         }
       ]
-    }
+    },
+    "statsId": "official-special-finite-life-phd-0"
   },
   {
     "id": "official-debt-hell-phd-7",
@@ -452,6 +455,7 @@
           "cap": 20
         }
       ]
-    }
+    },
+    "statsId": "official-cursed-debt-phd-0"
   }
 ]

@@ -3,7 +3,10 @@ import { isRemoteWriteEnabled } from "./v2-remote-access";
 
 const RPC_URL = "https://rffmgeacueokudwreyeb.supabase.co/rest/v1/rpc";
 const PUBLIC_KEY = "sb_publishable_TRVbO2x2mmuoRw592EqtvQ_FHpqUMkJ";
-const ids = new Set(manifest.map(entry => entry.id));
+const definitions: readonly { id: string; statsId?: string }[] = manifest;
+// The deployed counter RPC uses role/build keys independently of recording IDs.
+const statsIds = new Map(definitions.map(entry => [entry.id, entry.statsId ?? entry.id]));
+const displayIds = new Map([...statsIds].map(([id, statsId]) => [statsId, id]));
 
 /** Aggregate counters only: no account, recording, or viewing-history uploads. */
 export function createOfficialReplayStats(options: {
@@ -18,7 +21,7 @@ export function createOfficialReplayStats(options: {
   let loading: Promise<void> | undefined;
 
   function set(id: string, value: unknown): void {
-    if (ids.has(id) && typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    if (statsIds.has(id) && typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
       counts.set(id, Math.max(counts.get(id) ?? 0, value));
     }
   }
@@ -38,17 +41,21 @@ export function createOfficialReplayStats(options: {
         try {
           const result = await rpc("get_phd_simulator_v2_replay_plays", {});
           if (!result || typeof result !== "object" || Array.isArray(result)) return;
-          for (const [id, count] of Object.entries(result)) set(id, count);
+          for (const [statsId, count] of Object.entries(result)) {
+            const id = displayIds.get(statsId);
+            if (id) set(id, count);
+          }
           if (!abort.signal.aborted) options.onChange?.();
         } catch { /* Statistics never block browsing or playback. */ }
       })();
     },
     async track(id: string): Promise<void> {
-      if (!writes || abort.signal.aborted || !ids.has(id) || counted.has(id)) return;
+      const statsId = statsIds.get(id);
+      if (!writes || abort.signal.aborted || !statsId || counted.has(id)) return;
       // Reopening, seeking and pausing on this page do not inflate the count.
       counted.add(id);
       try {
-        set(id, await rpc("record_phd_simulator_v2_replay_play", { p_replay_id: id }));
+        set(id, await rpc("record_phd_simulator_v2_replay_play", { p_replay_id: statsId }));
         if (!abort.signal.aborted) options.onChange?.();
       } catch { /* No automatic retry: an unacknowledged increment may have succeeded. */ }
     },
