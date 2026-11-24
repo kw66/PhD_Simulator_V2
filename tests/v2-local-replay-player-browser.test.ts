@@ -54,9 +54,9 @@ describe("isolated local replay browser player", () => {
       const overflow = await page.locator(".replay-card-metrics dl > div").evaluateAll(nodes => nodes.filter(node => node.scrollWidth > node.clientWidth + 1).map(node => node.textContent));
       expect(overflow).toEqual([]);
       if (width === 1440) {
-        const unusedWidth = await page.locator(".replay-grid").evaluate(grid => grid.getBoundingClientRect().right
-          - grid.lastElementChild!.getBoundingClientRect().right);
-        expect(unusedWidth).toBeLessThanOrEqual(1);
+        const widths = await page.locator("[data-replay-card]").evaluateAll(cards => cards.map(card => card.getBoundingClientRect().width));
+        expect(widths.length).toBeGreaterThan(1);
+        for (const cardWidth of widths) expect(cardWidth).toBeCloseTo(360, 0);
       }
       await page.screenshot({ path: `artifacts/local-replay/results-${width}.png`, fullPage: true });
       await page.locator('.replay-source-tabs a[href*="library"]').click();
@@ -74,6 +74,9 @@ describe("isolated local replay browser player", () => {
         await page.locator(`[data-replay-role="${roleId}"]`).click();
         expect(await page.locator("[data-replay-card]").getAttribute("data-replay-card")).toBe(`role-${roleId}`);
         expect(await page.locator(".replay-card-review").textContent()).toContain("未送审");
+        if (width === 1440) {
+          expect(await page.locator("[data-replay-card]").evaluate(card => card.getBoundingClientRect().width)).toBeCloseTo(360, 0);
+        }
         expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
       }
     } finally { await page.close(); }
